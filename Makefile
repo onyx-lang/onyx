@@ -4,7 +4,7 @@ OBJ_FILES=\
 CC=gcc
 INCLUDES=
 LIBS=
-FLGAS=-g
+FLAGS=-g
 
 %.o: %.c
 	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
