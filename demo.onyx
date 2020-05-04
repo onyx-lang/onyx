@@ -1,0 +1,10 @@
+
+use "core";
+
+Foo :: struct {
+	x, y i32;
+}
+
+main :: (argc i32, argv []*u8) int {
+	print("Hello World!");
+}
