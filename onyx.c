@@ -22,12 +22,31 @@
 // 
 
 int main(int argc, char *argv[]) {
-	bh_string test_str1 = bh_string_new("Hello ");
-	bh_string test_str2 = bh_string_new("World!");
+	bh_string test_str = bh_string_new(256);
+	bh_string world_str = bh_string_new("World");
 
-	bh_string_append(&test_str1, &test_str2);
-	bh_string_print(&test_str1);
+	bh_string_append(&test_str, "Hello Frank!");
+	bh_string_replace_at(&test_str, &world_str, 6);
+	bh_string_replace_at(&test_str, "Hola ", 0);
+	bh_string_print(&test_str);
 
-	bh_string_delete(&test_str1);
-	bh_string_delete(&test_str2);
+	bh_string_delete(&test_str);
+	bh_string_delete(&world_str);
+	
+	return 0;
 }
+
+// int main(int argc, char const *argv[]) {
+// 	FILE* file = fopen(argv[1], "r");
+// 	long start = ftell(file);
+// 	fseek(file, 0, SEEK_END);
+// 	long end = ftell(file);
+// 	fseek(file, 0, SEEK_SET);
+// 
+// 
+// 	char* data = (char *) malloc(sizeof(u8) * (end - start + 1));
+// 	read(file->, data, end - start);
+// 	fclose(file);
+// 	printf("%ld - %ld = %ld\n", end, start, end - start);
+// 	printf("%s", data);
+// }
