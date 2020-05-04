@@ -3,7 +3,8 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <string.h> // TODO: Replace with neede functions
+#include <stdlib.h>
+#include <string.h> // TODO: Replace with needed functions
 
 //-------------------------------------------------------------------------------------
 // Better types
@@ -58,6 +59,29 @@ int bh_string_delete(bh_string* str) {
 	str->length = 0;
 	str->capacity = 0;
 	return 1;
+}
+
+int bh_string_ensure_capacity(bh_string* str, u64 cap) {
+	if (str->capacity >= cap) return 1;
+
+	 //TODO: This could fail
+	str->data = (u8*) realloc((void*) str->data, sizeof(u8) * cap);
+	str->capacity = cap;
+
+	return 1;
+}
+
+void bh_string_append(bh_string* str1, bh_string* str2) {
+	if (!bh_string_ensure_capacity(str1, str1->length + str2->length)) return;
+
+	//TODO: Replace with custom memory management
+	memcpy(str1->data + str1->length, str2->data, str2->length);
+	str1->length += str2->length;
+}
+
+// TEMP
+void bh_string_print(bh_string* str) {
+	write(STDOUT_FILENO, str->data, str->length);
 }
 
 

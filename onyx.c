@@ -22,9 +22,12 @@
 // 
 
 int main(int argc, char *argv[]) {
-	bh_string test_str = bh_string_new("Hello World!");
+	bh_string test_str1 = bh_string_new("Hello ");
+	bh_string test_str2 = bh_string_new("World!");
 
-	
+	bh_string_append(&test_str1, &test_str2);
+	bh_string_print(&test_str1);
 
-	bh_string_delete(&test_str);
+	bh_string_delete(&test_str1);
+	bh_string_delete(&test_str2);
 }
