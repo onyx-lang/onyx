@@ -20,6 +20,7 @@ typedef signed short i16;
 typedef signed int i32;
 typedef signed long i64;
 typedef signed long long i128;
+typedef unsigned long isize;
 
 //-------------------------------------------------------------------------------------
 // Better strings
@@ -75,7 +76,8 @@ void bh_string_print(bh_string* str);
 //-------------------------------------------------------------------------------------
 
 typedef enum bh_file_error {
-	BH_FILE_ERROR_NONE
+	BH_FILE_ERROR_NONE,
+	BH_FILE_ERROR_INVALID
 } bh_file_error;
 
 typedef enum bh_file_mode {
@@ -88,9 +90,9 @@ typedef enum bh_file_mode {
 } bh_file_mode;
 
 typedef enum bh_file_whence {
-	bh_file_whence_begin = 0,
-	bh_file_whence_current = 1,
-	bh_file_whence_end = 2,
+	BH_FILE_WHENCE_BEGIN = SEEK_SET,
+	BH_FILE_WHENCE_CURRENT = SEEK_CUR,
+	BH_FILE_WHENCE_END = SEEK_END,
 } bh_file_whence;
 
 typedef int bh_file_descriptor;
@@ -106,17 +108,57 @@ typedef enum bh_file_standard {
 	BH_FILE_STANDARD_ERROR
 } bh_file_standard;
 
+typedef struct bh_file_contents {
+	// This will hold the allocator as well
+	isize length;
+	void* data;
+} bh_file_contents;
+
 bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand);
 
 bh_file_error bh_file_create(bh_file* file, char const* filename);
 bh_file_error bh_file_open(bh_file* file, char const* filename);
-bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, char const* filename);
-bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, char const* filename);
+bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* filename);
+bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* filename);
+i32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read);
+i32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote);
+static i32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset);
+i32 bh_file_seek(bh_file* file, i64 offset);
+i64 bh_file_seek_to_end(bh_file* file);
+i64 bh_file_skip(bh_file* file, i64 bytes);
+i64 bh_file_tell(bh_file* file);
+bh_file_error bh_file_close(bh_file* file);
+i32 bh_file_read(bh_file* file, void* buffer, isize buff_size);
+i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
+i64 bh_file_size(bh_file* file);
+
+#define bh_file_read_contents(x) _Generic((x), \
+	bh_file*: bh_file_read_contents_bh_file, \
+	const char*: bh_file_read_contents_direct, \
+	char*: bh_file_read_contents_direct)(x)
+
+bh_file_contents bh_file_read_contents_bh_file(bh_file* file);
+bh_file_contents bh_file_read_contents_direct(const char* filename);
+i32 bh_file_contents_delete(bh_file_contents* contents);
+
+
+
+
+
+
+
+
+
+
+
 
 //-------------------------------------------------------------------------------------
 // IMPLEMENTATIONS
 //-------------------------------------------------------------------------------------
 
+//-------------------------------------------------------------------------------------
+// STRING IMPLEMENTATION
+//-------------------------------------------------------------------------------------
 bh_string bh_string_new_cap(unsigned long cap) {
 	bh_string str;
 	str.data = (u8*) malloc(sizeof(u8) * cap);
@@ -247,3 +289,184 @@ void bh_string_print(bh_string* str) {
 	write(STDOUT_FILENO, str->data, str->length);
 }
 
+
+
+//-------------------------------------------------------------------------------------
+// FILE IMPLEMENTATION
+//-------------------------------------------------------------------------------------
+bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
+	i32 sd_fd = -1;
+	const char* filename = NULL;
+
+	switch (stand) {
+	case BH_FILE_STANDARD_INPUT:
+		sd_fd = STDIN_FILENO;
+		filename = "stdin"; // These are constants in the data section so everything should be okay
+		break;
+	case BH_FILE_STANDARD_OUTPUT:
+		sd_fd = STDOUT_FILENO;
+		filename = "stdout";
+		break;
+	case BH_FILE_STANDARD_ERROR:
+		sd_fd = STDERR_FILENO;
+		filename = "stderr";
+		break;
+	}
+
+	file->fd = sd_fd;
+	file->filename = filename;
+
+	return BH_FILE_ERROR_NONE;
+}
+
+bh_file_error bh_file_create(bh_file* file, const char* filename) {
+	// Need to do this to avoid compiler complaining about types
+	bh_file_mode write_rw = (bh_file_mode) (BH_FILE_MODE_WRITE | BH_FILE_MODE_RW);
+	return bh_file_open_mode(file, write_rw, filename);
+}
+
+bh_file_error bh_file_open(bh_file* file, const char* filename) {
+	return bh_file_open_mode(file, BH_FILE_MODE_READ, filename);
+}
+
+bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* filename) {
+
+	i32 os_mode = 0;
+
+	switch (mode & BH_FILE_MODE_MODES) {
+	case BH_FILE_MODE_READ:   					  os_mode = O_RDONLY; break;
+	case BH_FILE_MODE_WRITE:  					  os_mode = O_WRONLY | O_CREAT | O_TRUNC; break;
+	case BH_FILE_MODE_APPEND: 					  os_mode = O_RDONLY | O_APPEND | O_CREAT; break;
+	case BH_FILE_MODE_READ   | BH_FILE_MODE_RW:   os_mode = O_RDWR; break;
+	case BH_FILE_MODE_WRITE  | BH_FILE_MODE_RW:   os_mode = O_RDWR | O_CREAT | O_TRUNC; break;
+	case BH_FILE_MODE_APPEND | BH_FILE_MODE_RW:   os_mode = O_RDWR | O_APPEND | O_CREAT; break;
+	//default: // TODO Handle errors
+	}
+
+	file->fd = open(filename, os_mode,
+		S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH | S_IRGRP | S_IWGRP //+rw-rw-rw-
+	);
+	if (file->fd < 0) {
+		return BH_FILE_ERROR_INVALID;
+	}
+
+	// TODO: Set this using some allocator
+	file->filename = filename;
+
+	return BH_FILE_ERROR_NONE;
+}
+
+bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* filename) {
+	file->filename = filename; // This may be unsafe
+	file->fd = fd;
+	return BH_FILE_ERROR_NONE;
+}
+
+i32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read) {
+	isize res = pread(file->fd, buffer, buff_size, offset);
+	if (res < 0) return 0;
+	if (bytes_read) *bytes_read = res;
+	return 1;
+}
+
+i32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote) {
+	isize res;
+	i64 current_offset = 0;
+	bh__file_seek_wrapper(file->fd, offset, BH_FILE_WHENCE_CURRENT, &current_offset);
+	if (current_offset == offset) {
+		// Standard in and out do like pwrite()
+		res = write(file->fd, buffer, buff_size);
+	} else {
+		res = pwrite(file->fd, buffer, buff_size, offset);
+	}
+	if (res < 0) return 0;
+	if (bytes_wrote) *bytes_wrote = res;
+
+	return 1;
+}
+
+static i32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset) {
+	i64 res = lseek(fd, offset, whence);
+	if (res < 0) return 0;
+	if (new_offset) *new_offset = res;
+	return 1;
+}
+
+// Returns new offset
+i64 bh_file_seek_to(bh_file* file, i64 offset) {
+	i64 new_offset = -1;
+	bh__file_seek_wrapper(file->fd, offset, BH_FILE_WHENCE_BEGIN, &new_offset);
+	return new_offset;
+}
+
+i64 bh_file_seek_to_end(bh_file* file) {
+	i64 new_offset = -1;
+	bh__file_seek_wrapper(file->fd, 0, BH_FILE_WHENCE_END, &new_offset);
+	return new_offset;
+}
+
+i64 bh_file_skip(bh_file* file, i64 bytes) {
+	i64 new_offset = 0;
+	bh__file_seek_wrapper(file->fd, bytes, BH_FILE_WHENCE_CURRENT, &new_offset);
+	return new_offset;
+}
+
+i64 bh_file_tell(bh_file* file) {
+	i64 new_offset = 0;
+	bh__file_seek_wrapper(file->fd, 0, BH_FILE_WHENCE_CURRENT, &new_offset);
+	return new_offset;
+}
+
+bh_file_error bh_file_close(bh_file* file) {
+	bh_file_error err = BH_FILE_ERROR_NONE;
+	i32 res = close(file->fd);
+	if (res < 0)
+		err = BH_FILE_ERROR_INVALID;
+
+	return err;
+}
+
+i32 bh_file_read(bh_file* file, void* buffer, isize buff_size) {
+	return bh_file_read_at(file, bh_file_tell(file), buffer, buff_size, NULL);
+}
+
+i32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
+	return bh_file_write_at(file, bh_file_tell(file), buffer, buff_size, NULL);
+}
+
+i64 bh_file_size(bh_file* file) {
+	i64 size = 0;
+	i64 prev = bh_file_tell(file);
+	bh_file_seek_to_end(file);
+	size = bh_file_tell(file);
+	bh_file_seek_to(file, prev);
+	return size;
+}
+
+bh_file_contents bh_file_read_contents_bh_file(bh_file* file) {
+	bh_file_contents fc = { .length = 0, .data = NULL };
+
+	isize size = bh_file_size(file);
+	if (size <= 0) return fc;
+
+	fc.data = malloc(size + 1);
+	fc.length = size;
+	bh_file_read_at(file, 0, fc.data, fc.length, NULL);
+	((u8*) fc.data)[fc.length] = '\0';
+
+	return fc;
+}
+
+bh_file_contents bh_file_read_contents_direct(const char* filename) {
+	bh_file file;
+	bh_file_open(&file, filename);
+	bh_file_contents fc = bh_file_read_contents(&file);
+	bh_file_close(&file);
+	return fc;
+}
+
+i32 bh_file_contents_delete(bh_file_contents* contents) {
+	free(contents->data);
+	contents->length = 0;
+	return 1;
+}
