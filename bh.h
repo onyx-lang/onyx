@@ -62,13 +62,56 @@ void bh_string_append_cstr(bh_string* str1, const char* str2);
 void bh_string_replace_at_bh_string(bh_string* dest, bh_string* src, u64 offset);
 void bh_string_replace_at_cstr(bh_string* dest, const char* src, u64 offset);
 void bh_string_insert_at_bh_string(bh_string* dest, bh_string* src, u64 offset);
-void bh_string_insert_at_cstr(bh_string* dest, bh_string* src, u64 offset);
+void bh_string_insert_at_cstr(bh_string* dest, const char* src, u64 offset);
 void bh_string_trim_end(bh_string* str, const char* charset);
 void bh_string_trim_begin(bh_string* str, const char* charset);
 void bh_string_trim_end_space(bh_string* str);
 // TEMP
 void bh_string_print(bh_string* str);
 
+
+//-------------------------------------------------------------------------------------
+// Better files
+//-------------------------------------------------------------------------------------
+
+typedef enum bh_file_error {
+	BH_FILE_ERROR_NONE
+} bh_file_error;
+
+typedef enum bh_file_mode {
+	BH_FILE_MODE_READ = 1 << 0,
+	BH_FILE_MODE_WRITE = 1 << 1,
+	BH_FILE_MODE_APPEND = 1 << 2,
+	BH_FILE_MODE_RW = 1 << 3,
+
+	BH_FILE_MODE_MODES = BH_FILE_MODE_READ | BH_FILE_MODE_WRITE | BH_FILE_MODE_APPEND | BH_FILE_MODE_RW
+} bh_file_mode;
+
+typedef enum bh_file_whence {
+	bh_file_whence_begin = 0,
+	bh_file_whence_current = 1,
+	bh_file_whence_end = 2,
+} bh_file_whence;
+
+typedef int bh_file_descriptor;
+
+typedef struct bh_file {
+	bh_file_descriptor fd;
+	char const* filename;
+} bh_file;
+
+typedef enum bh_file_standard {
+	BH_FILE_STANDARD_INPUT,
+	BH_FILE_STANDARD_OUTPUT,
+	BH_FILE_STANDARD_ERROR
+} bh_file_standard;
+
+bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand);
+
+bh_file_error bh_file_create(bh_file* file, char const* filename);
+bh_file_error bh_file_open(bh_file* file, char const* filename);
+bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, char const* filename);
+bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, char const* filename);
 
 //-------------------------------------------------------------------------------------
 // IMPLEMENTATIONS
@@ -151,62 +194,56 @@ void bh_string_replace_at_cstr(bh_string* dest, const char* src, u64 offset) {
 }
 
 void bh_string_insert_at_bh_string(bh_string* dest, bh_string* src, u64 offset) {
+	if (!bh_string_ensure_capacity(dest, dest->length + src->length)) return;
+
+	memmove(dest->data + offset + src->length, dest->data + offset, dest->length + src->length - offset);
+	memcpy(dest->data + offset, src->data, src->length);
+	dest->length += src->length;
 }
 
-void bh_string_insert_at_cstr(bh_string* dest, bh_string* src, u64 offset) {
+void bh_string_insert_at_cstr(bh_string* dest, const char* src, u64 offset) {
+	const int srclen = strlen(src);
+	if (!bh_string_ensure_capacity(dest, dest->length + srclen)) return;
+
+	// TODO: Use something better. This copies to a seperate buffer first
+	memmove(dest->data + offset + srclen, dest->data + offset, dest->length + srclen - offset);
+	memcpy(dest->data + offset, src, srclen);
+	dest->length += srclen;
+}
+
+static inline u8 charset_contains(const char* charset, char ch) {
+	while (*charset) {
+		if (*charset == ch) return *charset;
+		charset++;
+	}
+
+	return 0;
 }
 
 void bh_string_trim_end(bh_string* str, const char* charset) {
+	while (charset_contains(charset, str->data[str->length - 1]))
+		str->length--;
 }
 
 void bh_string_trim_begin(bh_string* str, const char* charset) {
+	u32 off = 0, i;
+	while (charset_contains(charset, str->data[off])) off++;
+
+	if (off == 0) return;
+
+	for (i = 0; i < str->length - off; i++) {
+		str->data[i] = str->data[i + off];
+	}
+
+	str->length -= off;
 }
 
 void bh_string_trim_end_space(bh_string* str) {
+	bh_string_trim_end(str, " \t\n\r");
 }
 
 // TEMP
 void bh_string_print(bh_string* str) {
-	write(STDOUT_FILENO, str->data, str->capacity);
+	write(STDOUT_FILENO, str->data, str->length);
 }
 
-
-
-//-------------------------------------------------------------------------------------
-// Better files
-//-------------------------------------------------------------------------------------
-typedef struct File {
-	i32 fd;
-	u8 open : 1;
-	const char* path;
-} File;
-
-int file_open(File *f, const char* path, int flags) {
-	f->fd = open(path, flags,
-		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH 	// +rw-rw-rw
-	);
-
-	if (f->fd < 0)
-		return 1;
-
-	f->open = 1;
-	f->path = path;
-	return 0;
-}
-
-int file_close(File* f) {
-	if (close(f->fd) < 0) {
-		return errno;
-	}
-
-	f->open = 0;
-	return 0;
-}
-
-unsigned char file_read_byte(File* f) {
-	if (!f->open) return 0;
-
-	unsigned char byte;
-	read(f->fd, &byte, 1);
-	return byte;
-}

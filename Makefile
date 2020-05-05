@@ -6,10 +6,13 @@ INCLUDES=
 LIBS=
 FLAGS=-g
 
-%.o: %.c
+%.o: %.c bh.h
 	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
 
 onyx: $(OBJ_FILES)
 	$(CC) $(FLAGS) $< -o $@ $(LIBS)
+
+clean:
+	rm $(OBJ_FILES) 2>&1 >/dev/null
 
 all: onyx clean
