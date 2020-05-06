@@ -1,0 +1,56 @@
+The ONYX Programming Language
+-----------------------------
+
+WHAT:
+	ONYX is a low-ish level programming language designed for use with
+	Web-Assembly 32-bit (WASM). It features some advanced features such
+	as comptime code execution and JS literals for external functions.
+
+WHY:
+	ONYX was made to help me learn about compiler design.
+
+FEATURES:
+	- Strong type system
+	- Smart package loading
+	- Structs and enums
+	- functions (no anonymous functions)
+	- Control structures
+		if, for, switch
+	- pointers
+	- inferred typing
+	- defer
+	? polymorphic functions
+
+EXAMPLE CODE:
+
+// This is a comment
+// This is also the only way to do comments
+
+use "core"; // Looks for "core.onyx" in the current directory
+
+Foo :: struct { x: i32, y: i32 };
+
+export add :: (a: i32, b: i32) -> i32 {
+	return a + b;	
+};
+
+foo :: (a: i32) -> Foo {
+	return Foo { x = a, y = 0 };
+}
+
+MVP CODE:
+
+// Comments need to be parsed
+
+export add :: (a: i32, b: i32) -> i32 {
+	return a + b;
+}
+
+export max :: (a: i32, b: i32) -> i32 {
+	// Curly braces are required
+	if a > b {
+		return a;
+	} else {
+		return b;
+	}
+}

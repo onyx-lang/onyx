@@ -1,9 +1,11 @@
-use "core";
+/* This is a comment
+This is also the only way to do comments
+*/
 
-Foo :: struct {
-	x, y i32;
-}
+use "core"; /* Looks for "core.onyx" in the current directory */
 
-main :: (argc i32, argv []*u8) int {
-	print("Hello World!");
-}
+Foo :: struct { x i32, y i32 };
+
+add :: (a i32, b i32) -> i32 {
+	return a + b;	
+};

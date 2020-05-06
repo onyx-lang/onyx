@@ -21,6 +21,17 @@ typedef signed int i32;
 typedef signed long i64;
 typedef signed long long i128;
 typedef unsigned long isize;
+typedef i32 b32;
+
+//-------------------------------------------------------------------------------------
+// Better character functions
+//-------------------------------------------------------------------------------------
+inline b32 char_is_alpha(const char a);
+inline b32 char_is_num(const char a);
+inline b32 char_is_alphanum(const char a);
+inline b32 char_is_whitespace(const char a);
+inline b32 char_in_range(const char lo, const char hi, const char a);
+char charset_contains(const char* charset, char ch);
 
 //-------------------------------------------------------------------------------------
 // Better strings
@@ -56,8 +67,8 @@ typedef struct bh_string {
 
 bh_string bh_string_new_cap(unsigned long cap);
 bh_string bh_string_new_str(const char* cstr);
-i32 bh_string_delete(bh_string* str);
-i32 bh_string_ensure_capacity(bh_string* str, u64 cap);
+b32 bh_string_delete(bh_string* str);
+b32 bh_string_ensure_capacity(bh_string* str, u64 cap);
 void bh_string_append_bh_string(bh_string* str1, bh_string* str2);
 void bh_string_append_cstr(bh_string* str1, const char* str2);
 void bh_string_replace_at_bh_string(bh_string* dest, bh_string* src, u64 offset);
@@ -74,7 +85,6 @@ void bh_string_print(bh_string* str);
 //-------------------------------------------------------------------------------------
 // Better files
 //-------------------------------------------------------------------------------------
-
 typedef enum bh_file_error {
 	BH_FILE_ERROR_NONE,
 	BH_FILE_ERROR_INVALID
@@ -120,10 +130,9 @@ bh_file_error bh_file_create(bh_file* file, char const* filename);
 bh_file_error bh_file_open(bh_file* file, char const* filename);
 bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* filename);
 bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* filename);
-i32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read);
-i32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote);
-static i32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset);
-i32 bh_file_seek(bh_file* file, i64 offset);
+b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read);
+b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote);
+static b32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset);
 i64 bh_file_seek_to_end(bh_file* file);
 i64 bh_file_skip(bh_file* file, i64 bytes);
 i64 bh_file_tell(bh_file* file);
@@ -157,6 +166,44 @@ i32 bh_file_contents_delete(bh_file_contents* contents);
 //-------------------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------------------
+// CHAR FUNCTIONS
+//-------------------------------------------------------------------------------------
+inline b32 char_is_alpha(const char a) {
+	return ('a' <= a && a <= 'z') || ('A' <= a && a <= 'Z');
+}
+
+inline b32 char_is_num(const char a) {
+	return ('0' <= a && a <= '9');
+}
+
+inline b32 char_is_alphanum(const char a) {
+	return char_is_alpha(a) || char_is_num(a);
+}
+
+inline b32 char_is_whitespace(const char a) {
+	return charset_contains(" \t\r\n", a);
+}
+
+inline b32 char_in_range(const char lo, const char hi, const char a) {
+	return lo <= a <= hi;
+}
+
+char charset_contains(const char* charset, char ch) {
+	while (*charset) {
+		if (*charset == ch) return ch;
+		charset++;
+	}
+
+	return 0;
+}
+
+i64 chars_match(char* ptr1, char* ptr2) {
+	i64 len = 0;
+	while (*ptr1 == *ptr2) ptr1++, ptr2++, len++;
+	return *ptr2 == '\0' ? len : 0;
+}
+
+//-------------------------------------------------------------------------------------
 // STRING IMPLEMENTATION
 //-------------------------------------------------------------------------------------
 bh_string bh_string_new_cap(unsigned long cap) {
@@ -182,14 +229,14 @@ bh_string bh_string_new_str(const char* cstr) {
 	return str;
 }
 
-i32 bh_string_delete(bh_string* str) {
+b32 bh_string_delete(bh_string* str) {
 	free(str->data);
 	str->length = 0;
 	str->capacity = 0;
 	return 1;
 }
 
-i32 bh_string_ensure_capacity(bh_string* str, u64 cap) {
+b32 bh_string_ensure_capacity(bh_string* str, u64 cap) {
 	if (str->capacity >= cap) return 1;
 
 	//TODO: This could fail
@@ -217,7 +264,7 @@ void bh_string_append_cstr(bh_string* str1, const char* str2) {
 }
 
 void bh_string_replace_at_bh_string(bh_string* dest, bh_string* src, u64 offset) {
-	if (offset >= dest->length) return;
+	if (offset > dest->length) return;
 	if (!bh_string_ensure_capacity(dest, offset + src->length)) return;
 
 	memcpy(dest->data + offset, src->data, src->length);
@@ -226,7 +273,7 @@ void bh_string_replace_at_bh_string(bh_string* dest, bh_string* src, u64 offset)
 }
 
 void bh_string_replace_at_cstr(bh_string* dest, const char* src, u64 offset) {
-	if (offset >= dest->length) return;
+	if (offset > dest->length) return;
 	const int srclen = strlen(src);
 	if (!bh_string_ensure_capacity(dest, offset + srclen)) return;
 
@@ -253,14 +300,6 @@ void bh_string_insert_at_cstr(bh_string* dest, const char* src, u64 offset) {
 	dest->length += srclen;
 }
 
-static inline u8 charset_contains(const char* charset, char ch) {
-	while (*charset) {
-		if (*charset == ch) return *charset;
-		charset++;
-	}
-
-	return 0;
-}
 
 void bh_string_trim_end(bh_string* str, const char* charset) {
 	while (charset_contains(charset, str->data[str->length - 1]))
@@ -362,14 +401,14 @@ bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* file
 	return BH_FILE_ERROR_NONE;
 }
 
-i32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read) {
+b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read) {
 	isize res = pread(file->fd, buffer, buff_size, offset);
 	if (res < 0) return 0;
 	if (bytes_read) *bytes_read = res;
 	return 1;
 }
 
-i32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote) {
+b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote) {
 	isize res;
 	i64 current_offset = 0;
 	bh__file_seek_wrapper(file->fd, offset, BH_FILE_WHENCE_CURRENT, &current_offset);
@@ -385,7 +424,7 @@ i32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_s
 	return 1;
 }
 
-static i32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset) {
+static b32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset) {
 	i64 res = lseek(fd, offset, whence);
 	if (res < 0) return 0;
 	if (new_offset) *new_offset = res;
@@ -426,11 +465,11 @@ bh_file_error bh_file_close(bh_file* file) {
 	return err;
 }
 
-i32 bh_file_read(bh_file* file, void* buffer, isize buff_size) {
+b32 bh_file_read(bh_file* file, void* buffer, isize buff_size) {
 	return bh_file_read_at(file, bh_file_tell(file), buffer, buff_size, NULL);
 }
 
-i32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
+b32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
 	return bh_file_write_at(file, bh_file_tell(file), buffer, buff_size, NULL);
 }
 
@@ -465,7 +504,7 @@ bh_file_contents bh_file_read_contents_direct(const char* filename) {
 	return fc;
 }
 
-i32 bh_file_contents_delete(bh_file_contents* contents) {
+b32 bh_file_contents_delete(bh_file_contents* contents) {
 	free(contents->data);
 	contents->length = 0;
 	return 1;
