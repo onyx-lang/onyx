@@ -26,11 +26,11 @@ typedef i32 b32;
 //-------------------------------------------------------------------------------------
 // Better character functions
 //-------------------------------------------------------------------------------------
-inline b32 char_is_alpha(const char a);
-inline b32 char_is_num(const char a);
-inline b32 char_is_alphanum(const char a);
-inline b32 char_is_whitespace(const char a);
-inline b32 char_in_range(const char lo, const char hi, const char a);
+b32 char_is_alpha(const char a);
+b32 char_is_num(const char a);
+b32 char_is_alphanum(const char a);
+b32 char_is_whitespace(const char a);
+b32 char_in_range(const char lo, const char hi, const char a);
 char charset_contains(const char* charset, char ch);
 
 //-------------------------------------------------------------------------------------
@@ -168,23 +168,23 @@ i32 bh_file_contents_delete(bh_file_contents* contents);
 //-------------------------------------------------------------------------------------
 // CHAR FUNCTIONS
 //-------------------------------------------------------------------------------------
-inline b32 char_is_alpha(const char a) {
+b32 char_is_alpha(const char a) {
 	return ('a' <= a && a <= 'z') || ('A' <= a && a <= 'Z');
 }
 
-inline b32 char_is_num(const char a) {
+b32 char_is_num(const char a) {
 	return ('0' <= a && a <= '9');
 }
 
-inline b32 char_is_alphanum(const char a) {
+b32 char_is_alphanum(const char a) {
 	return char_is_alpha(a) || char_is_num(a);
 }
 
-inline b32 char_is_whitespace(const char a) {
+b32 char_is_whitespace(const char a) {
 	return charset_contains(" \t\r\n", a);
 }
 
-inline b32 char_in_range(const char lo, const char hi, const char a) {
+b32 char_in_range(const char lo, const char hi, const char a) {
 	return lo <= a <= hi;
 }
 

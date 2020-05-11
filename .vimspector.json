@@ -6,7 +6,7 @@
                 "type": "cppdbg",
                 "request": "launch",
                 "program": "${workspaceFolder}/onyx",
-                "args": ["demo.onyx"],
+                "args": ["progs/mvp.onyx"],
                 "stopAtEntry": true,
                 "cwd": "${workspaceFolder}",
                 "environment": [],
