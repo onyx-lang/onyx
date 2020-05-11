@@ -1,4 +1,5 @@
 OBJ_FILES=\
+	onyxlex.o \
 	onyx.o
 
 CC=gcc
@@ -10,7 +11,7 @@ FLAGS=-g
 	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
 
 onyx: $(OBJ_FILES)
-	$(CC) $(FLAGS) $< -o $@ $(LIBS)
+	$(CC) $(FLAGS) $? -o $@ $(LIBS)
 
 clean:
 	rm $(OBJ_FILES) 2>&1 >/dev/null
