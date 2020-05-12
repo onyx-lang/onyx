@@ -40,14 +40,15 @@ foo :: (a: i32) -> Foo {
 
 MVP CODE:
 
-// Comments need to be parsed
+/* Comments need to be parsed */
 
-export add :: (a: i32, b: i32) -> i32 {
+export proc add :: (a i32, b i32) -> i32 {
 	return a + b;
 }
 
-export max :: (a: i32, b: i32) -> i32 {
-	// Curly braces are required
+export proc max :: (a i32, b i32) -> i32 {
+	/* Curly braces are required */
+
 	if a > b {
 		return a;
 	} else {
