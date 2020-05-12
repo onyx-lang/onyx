@@ -15,7 +15,7 @@ bh_arr(Token) parse_tokens(bh_file_contents *fc) {
 	};
 
 	bh_arr(Token) token_arr = NULL;
-	bh_arr_grow(token_arr, 1024);
+	bh_arr_grow(token_arr, 512);
 
 	Token tk;
 	do {
@@ -40,6 +40,10 @@ int main(int argc, char *argv[]) {
 	bh_arr(Token) token_arr = parse_tokens(&fc);
 
 	printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
+
+	for (Token* it = token_arr; !bh_arr_end(token_arr, it); it++) {
+		printf("%s\n", get_token_type_name(*it));
+	}
 
 	bh_file_contents_delete(&fc);
 	bh_arr_free(token_arr);

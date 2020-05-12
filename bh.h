@@ -1,7 +1,6 @@
 #ifndef BH_H
 #define BH_H
 
-#include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -43,15 +42,19 @@ i64 chars_match(char* ptr1, char* ptr2);
 #define bh_max(a, b)		((a) > (b) ? (a) : (b))
 #define bh_min(a, b)		((a) < (b) ? (a) : (b))
 #define bh_clamp(v, a, b)	(bh_min((b), bh_max((a), (v))))
+#define bh_abs(x)			((x) < 0 ? -(x) : (x))
 
 //-------------------------------------------------------------------------------------
 // Better strings
 //-------------------------------------------------------------------------------------
-typedef struct bh_string {
-	u8* data;
+typedef struct bh__string {
 	u64 length;
 	u64 capacity;
-} bh_string;
+} bh__string;
+
+typedef char bh_string;
+
+#define bh__stringhead(x)		(((bh__string *)(x)) - 1)
 
 #define bh_string_new(x) _Generic((x), \
 	unsigned long: bh_string_new_cap, \
@@ -266,47 +269,52 @@ i64 chars_match(char* ptr1, char* ptr2) {
 //-------------------------------------------------------------------------------------
 // STRING IMPLEMENTATION
 //-------------------------------------------------------------------------------------
-bh_string bh_string_new_cap(unsigned long cap) {
-	bh_string str;
-	str.data = (u8*) malloc(sizeof(u8) * cap);
-	str.length = 0;
-	str.capacity = cap;
-	return str;
+bh_string* bh_string_new_cap(unsigned long cap) {
+	bh__string* str;
+	str = (bh__string*) malloc(sizeof(*str) + sizeof(char) * cap + 1);
+	str[0] = 0;
+	return str + 1;
 }
 
-bh_string bh_string_new_str(const char* cstr) {
+bh_string* bh_string_new_str(const char* cstr) {
 	const i32 len = strlen(cstr);
-	bh_string str;
+	bh__string* str;
 	i32 i;
 
-	str.data = (u8*) malloc(sizeof(u8) * len);
+	str = malloc(sizeof(*str) + sizeof(char) * len + 1);
+	char* data = (char*) (str + 1);
 	for (i = 0; i < len; i++) {
-		str.data[i] = cstr[i];
+		data[i] = cstr[i];
 	}
 
-	str.length = len;
-	str.capacity = len;
-	return str;
+	data[i] = 0; // Always null terminate the string
+
+	str->length = len;
+	str->capacity = len;
+	return str + 1;
 }
 
-b32 bh_string_delete(bh_string* str) {
-	free(str->data);
+b32 bh_string_delete(bh_string** str) {
+	bh__string* strptr = bh__stringhead(*str);
+	free(strptr);
 	str->length = 0;
 	str->capacity = 0;
 	return 1;
 }
 
-b32 bh_string_ensure_capacity(bh_string* str, u64 cap) {
-	if (str->capacity >= cap) return 1;
+b32 bh_string_grow(bh_string** str, u64 cap) {
+	bh__string* strptr = bh__stringhead(*str);
+	if (strptr->capacity >= cap) return 1;
 
-	//TODO: This could fail
-	str->data = (u8*) realloc((void*) str->data, sizeof(u8) * cap);
-	str->capacity = cap;
+	void* p;
+	p = realloc(strptr, sizeof(*strptr) + sizeof(char) * cap + 1);
+
+	strptr->capacity = cap;
 
 	return 1;
 }
 
-void bh_string_append_bh_string(bh_string* str1, bh_string* str2) {
+void bh_string_append_bh_string(bh_string** str1, bh_string** str2) {
 	if (!bh_string_ensure_capacity(str1, str1->length + str2->length)) return;
 
 	//TODO: Replace with custom memory management
