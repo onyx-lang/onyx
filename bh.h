@@ -38,6 +38,13 @@ char charset_contains(const char* charset, char ch);
 i64 chars_match(char* ptr1, char* ptr2);
 
 //-------------------------------------------------------------------------------------
+// Better math functions
+//-------------------------------------------------------------------------------------
+#define bh_max(a, b)		((a) > (b) ? (a) : (b))
+#define bh_min(a, b)		((a) < (b) ? (a) : (b))
+#define bh_clamp(v, a, b)	(bh_min((b), bh_max((a), (v))))
+
+//-------------------------------------------------------------------------------------
 // Better strings
 //-------------------------------------------------------------------------------------
 typedef struct bh_string {
@@ -155,35 +162,60 @@ bh_file_contents bh_file_read_contents_direct(const char* filename);
 i32 bh_file_contents_delete(bh_file_contents* contents);
 
 //-------------------------------------------------------------------------------------
-// Better arrays
+// Better dynamically-sized arrays
 //-------------------------------------------------------------------------------------
 typedef struct bh__arr {
 	i32 length, capacity;
 } bh__arr;
+
+#ifndef BH_ARR_GROW_FORMULA
+#define BH_ARR_GROW_FORMULA(x)		((x) > 0 ? ((x) << 1) : 4)
+#endif
 
 #define bh_arr(T)					T*
 #define bh__arrhead(arr)			(((bh__arr *)(arr)) - 1)
 
 #define bh_arr_length(arr) 			(arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr) 		(arr ? bh__arrhead(arr)->capacity : 0)
-#define bh_arr_valid(arr, i)		(arr ? (int)(i) < bh__arrhead(arr)->length : 0)
-
-#define bh_arr_set_length(arr, n)	(bh__arr_ensure_capacity((void **) &arr, sizeof(arr[0]), n), bh__arrhead(arr)->length = n)
+#define bh_arr_size(arr)			(arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
+#define bh_arr_valid(arr, i)		(arr ? (i32)(i) < bh__arrhead(arr)->length : 0)
 
 #define bh_arr_pop(arr)				((arr)[--bh__arrhead(arr)->length])
 #define bh_arr_last(arr)			((arr)[bh__arrhead(arr)->length - 1])
 #define bh_arr_end(arr, i)			((i) >= &(arr)[bh_arr_length(arr)])
 
-#define bh_arr_new(arr, cap)		(bh__arr_ensure_capacity((void**) &arr, sizeof(arr[0]), cap))
-#define bh_arr_free(arr)			(bh__arr_free((void**) &arr))
-#define bh_arr_copy(arr)			(bh__arr_copy(arr, sizeof(arr[0])))
+#define bh_arr_new(arr, cap)		(bh__arr_grow((void**) &arr, sizeof(*(arr)), cap))
+#define bh_arr_free(arr)			(bh__arr_free((void**) &(arr)))
+#define bh_arr_copy(arr)			(bh__arr_copy((arr), sizeof(*(arr))))
+
+#define bh_arr_grow(arr, cap) 		(bh__arr_grow((void **) &(arr), sizeof(*(arr)), cap))
+#define bh_arr_shrink(arr, cap)		(bh__arr_shrink((void **) &(arr), sizeof(*(arr)), cap))
+#define bh_arr_set_length(arr, n)	( \
+	bh__arr_grow((void **) &(arr), sizeof(*(arr)), n), \
+	bh__arrhead(arr)->length = n)
+
+#define bh_arr_insertn(arr, i, n)	(bh__arr_insertn((void **) &(arr), sizeof(*(arr)), i, n))
+
 #define bh_arr_insert_end(arr, n)	( \
-	bh__arr_ensure_capacity((void**) &arr, sizeof(arr[0]), bh_arr_length(arr) + n), \
+	bh__arr_grow((void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + n), \
 	bh__arrhead(arr)->length += n)
 
-b32 bh__arr_ensure_capacity(void** arr, int elemsize, int cap);
+#define bh_arr_push(arr, value) 	( \
+	bh__arr_grow((void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1), \
+	arr[bh__arrhead(arr)->length++] = value)
+
+#define bh_arr_is_empty(arr)		(arr ? bh__arrhead(arr)->length == 0 : 1)
+#define bh_arr_clear(arr)			(arr ? (bh__arrhead(arr)->length = 0) : 0)
+
+#define bh_arr_deleten(arr, i, n)	(bh__arr_deleten((void **) &(arr), sizeof(*(arr)), i, n))
+#define bh_arr_fastdelete(arr, i)	(arr[i] = arr[--bh__arrhead(arr)->length])
+
+b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap);
+b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_free(void **arr);
-void* bh__arr_copy(void *arr, int elemsize);
+void* bh__arr_copy(void *arr, i32 elemsize);
+void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems);
+void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems);
 
 #ifdef BH_DEFINE
 #undef BH_DEFINE
@@ -302,7 +334,7 @@ void bh_string_replace_at_bh_string(bh_string* dest, bh_string* src, u64 offset)
 
 void bh_string_replace_at_cstr(bh_string* dest, const char* src, u64 offset) {
 	if (offset > dest->length) return;
-	const int srclen = strlen(src);
+	const i32 srclen = strlen(src);
 	if (!bh_string_ensure_capacity(dest, offset + srclen)) return;
 
 	memcpy(dest->data + offset, src, srclen);
@@ -319,7 +351,7 @@ void bh_string_insert_at_bh_string(bh_string* dest, bh_string* src, u64 offset) 
 }
 
 void bh_string_insert_at_cstr(bh_string* dest, const char* src, u64 offset) {
-	const int srclen = strlen(src);
+	const i32 srclen = strlen(src);
 	if (!bh_string_ensure_capacity(dest, dest->length + srclen)) return;
 
 	// TODO: Use something better. This copies to a seperate buffer first
@@ -542,7 +574,7 @@ b32 bh_file_contents_delete(bh_file_contents* contents) {
 // ARRAY IMPLEMENTATION
 //-------------------------------------------------------------------------------------
 
-b32 bh__arr_ensure_capacity(void** arr, int elemsize, int cap) {
+b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap) {
 	bh__arr* arrptr;
 
 	if (*arr == NULL) {
@@ -558,8 +590,8 @@ b32 bh__arr_ensure_capacity(void** arr, int elemsize, int cap) {
 
 		if (arrptr->capacity < cap) {
 			void* p;
-			int newcap = arrptr->capacity ? arrptr->capacity : 4;
-			while (newcap < cap) newcap <<= 1;
+			i32 newcap = arrptr->capacity;
+			while (newcap < cap) newcap = BH_ARR_GROW_FORMULA(newcap);
 
 			p = realloc(arrptr, sizeof(*arrptr) + elemsize * newcap);
 
@@ -576,11 +608,77 @@ b32 bh__arr_ensure_capacity(void** arr, int elemsize, int cap) {
 	return 1;
 }
 
+b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap) {
+	if (*arr == NULL) return 0;
+
+	bh__arr* arrptr = bh__arrhead(*arr);
+	cap = bh_max(cap, arrptr->length);
+
+	if (arrptr->capacity > cap) {
+		void* p = realloc(arrptr, sizeof(*arrptr) + elemsize * cap);
+
+		if (p) {
+			arrptr = (bh__arr *) p;
+			arrptr->capacity = cap;
+		} else {
+			return 0;
+		}
+	}
+
+	*arr = arrptr + 1;
+	return 1;
+}
+
 b32 bh__arr_free(void **arr) {
 	bh__arr* arrptr = bh__arrhead(*arr);
 	free(arrptr);
+	*arr = NULL;
 }
 
+void* bh__arr_copy(void *arr, i32 elemsize) {
+	bh__arr* arrptr = bh__arrhead(arr);
+
+	const i32 cap = arrptr->length;
+
+	void* newarr = NULL;
+	bh__arr_grow(&newarr, elemsize, cap);
+	bh__arrhead(newarr)->length = cap;
+	bh__arrhead(newarr)->capacity = cap;
+	memcpy(newarr, arr, elemsize * arrptr->length);
+
+	return newarr;
+}
+
+void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems) {
+	bh__arr* arrptr = bh__arrhead(*arr);	
+
+	if (index >= arrptr->length) return; // Can't delete past the end of the array
+	if (numelems <= 0) return; // Can't delete nothing
+
+	memmove(
+		(char *)(*arr) + elemsize * index,					// Target
+		(char *)(*arr) + elemsize * (index + numelems),		// Source
+		elemsize * (arrptr->length - (index + numelems)));	// Length
+	arrptr->length -= numelems;
+}
+
+void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems) {
+	bh__arr* arrptr = bh__arrhead(*arr);
+
+	if (numelems) {
+		if (*arr == NULL) {
+			bh__arr_grow(arr, elemsize, numelems); // Making a new array
+			return;
+		}
+
+		if (!bh__arr_grow(arr, elemsize, arrptr->length + numelems)) return; // Fail case
+		memmove(
+			(char *)(*arr) + elemsize * (index + numelems),
+			(char *)(*arr) + elemsize * index,
+			elemsize * (arrptr->length - index));
+		arrptr->length += numelems;
+	}
+}
 
 #endif // ifdef BH_DEFINE
 

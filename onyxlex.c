@@ -55,11 +55,11 @@ static const char* TokenTypeNames[] = {
 
 #ifndef INCREMENT_CURR_TOKEN
 #define INCREMENT_CURR_TOKEN(tkn) { \
-	tkn->curr++; \
-	tkn->line_column++; \
-	if (*tkn->curr == '\n') { \
-		tkn->line_number++; \
-		tkn->line_column = 1; \
+	(tkn)->curr++; \
+	while (*(tkn)->curr == '\n' && (tkn)->curr != (tkn)->end) { \
+		(tkn)->curr++; \
+		(tkn)->line_number++; \
+		(tkn)->line_start = (tkn)->curr; \
 	} \
 }
 #endif
@@ -70,9 +70,10 @@ static b32 token_lit(Tokenizer* tokenizer, Token* tk, char* lit, TokenType type)
 		tk->type = type;
 		tk->token = tokenizer->curr;
 		tk->length = len;
+		tk->line_number = tokenizer->line_number;
+		tk->line_column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
 
 		tokenizer->curr += len;
-		tokenizer->line_column += len;
 
 		return 1;
 	}
@@ -94,7 +95,7 @@ Token get_token(Tokenizer* tokenizer) {
 	tk.token = tokenizer->curr;
 	tk.length = 1;
 	tk.line_number = tokenizer->line_number;
-	tk.line_column = tokenizer->line_column;
+	tk.line_column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
 
 	if (tokenizer->curr == tokenizer->end) {
 		tk.type = TOKEN_TYPE_END_STREAM;

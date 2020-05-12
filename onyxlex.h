@@ -7,8 +7,8 @@ typedef struct Tokenizer {
 	char *start, *curr, *end;
 
 	// TODO: Fix the line number and column count
+	char* line_start;
 	u64 line_number;
-	u64 line_column;
 } Tokenizer;
 
 typedef enum TokenType {
