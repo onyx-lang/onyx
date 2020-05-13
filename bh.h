@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 #include <string.h> // TODO: Replace with needed functions
+#include <assert.h>
 
 //-------------------------------------------------------------------------------------
 // Better types
@@ -24,6 +25,7 @@ typedef signed long i64;
 typedef signed long long i128;
 typedef unsigned long isize;
 typedef i32 b32;
+typedef void* ptr;
 
 //-------------------------------------------------------------------------------------
 // Better character functions
@@ -47,6 +49,8 @@ i64 chars_match(char* ptr1, char* ptr2);
 //-------------------------------------------------------------------------------------
 // Better strings
 //-------------------------------------------------------------------------------------
+#ifndef BH_NO_STRING
+
 typedef struct bh__string {
 	u64 length;
 	u64 capacity;
@@ -95,10 +99,14 @@ void bh_string_trim_end_space(bh_string* str);
 // TEMP
 void bh_string_print(bh_string* str);
 
+#endif
+
 
 //-------------------------------------------------------------------------------------
 // Better files
 //-------------------------------------------------------------------------------------
+#ifndef BH_NO_FILE
+
 typedef enum bh_file_error {
 	BH_FILE_ERROR_NONE,
 	BH_FILE_ERROR_INVALID
@@ -164,9 +172,13 @@ bh_file_contents bh_file_read_contents_bh_file(bh_file* file);
 bh_file_contents bh_file_read_contents_direct(const char* filename);
 i32 bh_file_contents_delete(bh_file_contents* contents);
 
+#endif
+
 //-------------------------------------------------------------------------------------
 // Better dynamically-sized arrays
 //-------------------------------------------------------------------------------------
+#ifndef BH_NO_ARRAY
+
 typedef struct bh__arr {
 	i32 length, capacity;
 } bh__arr;
@@ -220,6 +232,60 @@ void* bh__arr_copy(void *arr, i32 elemsize);
 void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems);
 void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems);
 
+#endif
+
+//-------------------------------------------------------------------------------------
+// HASH TABLE FUNCTIONS
+//-------------------------------------------------------------------------------------
+#ifndef BH_NO_HASHTABLE
+
+#define BH__HASH_STORED_KEY_SIZE 64
+typedef struct bh__hash_entry {
+	char key[BH__HASH_STORED_KEY_SIZE];
+	// Value follows
+} bh__hash_entry;
+
+#define BH__HASH_MODULUS 1021
+#define BH__HASH_KEYSIZE 16
+u64 bh__hash_function(const char* str, i32 len) {
+	u64 hash = 5381;
+	i32 c, l = 0;
+	if (len == 0) len = BH__HASH_KEYSIZE;
+
+	while ((c = *str++) && l++ < len) {
+		hash = (hash << 5) + hash + c;
+	}
+
+	return hash % BH__HASH_MODULUS;
+}
+
+#define bh_hash(T)		T*
+
+#ifdef BH_HASH_SIZE_SAFE
+	#define bh_hash_init(tab)				bh__hash_init((ptr **) &(tab))
+	#define bh_hash_free(tab)				bh__hash_free((ptr **) &(tab))
+	#define bh_hash_put(T, tab, key, value) (assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_put((ptr *) tab, sizeof(T), key)) = (T) value))
+	#define bh_hash_has(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (bh__hash_has((ptr *) tab, sizeof(T), key)))
+	#define bh_hash_get(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_get((ptr *) tab, sizeof(T), key))))
+	#define bh_hash_delete(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), bh__hash_delete((ptr *) tab, sizeof(T), key))
+#else
+	#define bh_hash_init(tab)				bh__hash_init((ptr **) &(tab))
+	#define bh_hash_free(tab)				bh__hash_free((ptr **) &(tab))
+	#define bh_hash_put(T, tab, key, value) (*((T *) bh__hash_put((ptr *) tab, sizeof(T), key)) = value)
+	#define bh_hash_has(T, tab, key)		(bh__hash_has((ptr *) tab, sizeof(T), key))
+	#define bh_hash_get(T, tab, key)		(*((T *) bh__hash_get((ptr *) tab, sizeof(T), key)))
+	#define bh_hash_delete(T, tab, key)		(bh__hash_delete((ptr *) tab, sizeof(T), key))
+#endif
+
+b32 bh__hash_init(ptr **table);
+b32 bh__hash_free(ptr **table);
+ptr bh__hash_put(ptr *table, i32 elemsize, char *key);
+b32 bh__hash_has(ptr *table, i32 elemsize, char *key);
+ptr bh__hash_get(ptr *table, i32 elemsize, char *key);
+void bh__hash_delete(ptr *table, i32 elemsize, char *key);
+
+#endif
+
 #ifdef BH_DEFINE
 #undef BH_DEFINE
 
@@ -269,6 +335,8 @@ i64 chars_match(char* ptr1, char* ptr2) {
 //-------------------------------------------------------------------------------------
 // STRING IMPLEMENTATION
 //-------------------------------------------------------------------------------------
+#ifndef BH_NO_STRING
+
 bh_string* bh_string_new_cap(unsigned long cap) {
 	bh__string* str;
 	str = (bh__string*) malloc(sizeof(*str) + sizeof(char) * cap + 1);
@@ -287,7 +355,7 @@ bh_string* bh_string_new_str(const char* cstr) {
 		data[i] = cstr[i];
 	}
 
-	data[i] = 0; // Always null terminate the string
+	data[len] = 0; // Always null terminate the string
 
 	str->length = len;
 	str->capacity = len;
@@ -396,11 +464,13 @@ void bh_string_print(bh_string* str) {
 	write(STDOUT_FILENO, str->data, str->length);
 }
 
-
+#endif // ifndef BH_NO_STRING
 
 //-------------------------------------------------------------------------------------
 // FILE IMPLEMENTATION
 //-------------------------------------------------------------------------------------
+#ifndef BH_NO_FILE
+
 bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
 	i32 sd_fd = -1;
 	const char* filename = NULL;
@@ -578,9 +648,12 @@ b32 bh_file_contents_delete(bh_file_contents* contents) {
 	return 1;
 }
 
+#endif // ifndef BH_NO_FILE
+
 //-------------------------------------------------------------------------------------
 // ARRAY IMPLEMENTATION
 //-------------------------------------------------------------------------------------
+#ifndef BH_NO_ARRAY
 
 b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap) {
 	bh__arr* arrptr;
@@ -594,7 +667,6 @@ b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap) {
 
 	} else {
 		arrptr = bh__arrhead(*arr);
-		if (arrptr->length > cap) return 1;
 
 		if (arrptr->capacity < cap) {
 			void* p;
@@ -687,6 +759,122 @@ void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems) {
 		arrptr->length += numelems;
 	}
 }
+
+#endif // ifndef BH_NO_ARRAY
+
+//-------------------------------------------------------------------------------------
+// HASHTABLE IMPLEMENTATION
+//-------------------------------------------------------------------------------------
+#ifndef BH_NO_HASHTABLE
+
+b32 bh__hash_init(ptr **table) {
+	*table = malloc(sizeof(ptr) * BH__HASH_MODULUS);
+	if (*table == NULL) return 0;
+
+	for (i32 i = 0; i < BH__HASH_MODULUS; i++) {
+		(*table)[i] = NULL;
+	}
+
+	return 1;
+}
+
+b32 bh__hash_free(ptr **table) {
+	for (i32 i = 0; i < BH__HASH_MODULUS; i++) {
+		if ((*table)[i] != NULL) {
+			bh_arr_free(*((*table) + i));
+		}
+	}
+
+	free(*table);
+	*table = NULL;
+}
+
+// Assumes NULL terminated string for key
+ptr bh__hash_put(ptr *table, i32 elemsize, char *key) {
+	u64 index = bh__hash_function(key, 0);
+
+	elemsize += sizeof(bh__hash_entry);
+
+	ptr arrptr = table[index];
+	i32 len = bh_arr_length(arrptr);
+
+	while (len--) {
+		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) goto found_matching;
+		arrptr = (ptr)((char *) arrptr + elemsize);
+	}
+
+	// Didn't find it in the array, make a new one
+	arrptr = table[index];
+	len = bh_arr_length(arrptr);
+	bh__arr_grow(&arrptr, elemsize, len + 1);
+	bh__arrhead(arrptr)->length++;
+	table[index] = arrptr;
+
+	arrptr = (ptr)(((char *) arrptr) + elemsize * len);
+	strncpy(arrptr, key, BH__HASH_STORED_KEY_SIZE);
+
+found_matching:
+	return (ptr)(((char *) arrptr) + BH__HASH_STORED_KEY_SIZE);
+}
+
+b32 bh__hash_has(ptr *table, i32 elemsize, char *key) {
+	u64 index = bh__hash_function(key, 0);	
+
+	ptr arrptr = table[index];
+	i32 len = bh_arr_length(arrptr);
+	if (arrptr == NULL) return 0;
+
+	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;	
+
+	while (len--) {
+		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) return 1;
+		arrptr = (ptr)((char *) arrptr + stride);
+	}
+
+	return 0;
+}
+
+ptr bh__hash_get(ptr *table, i32 elemsize, char *key) {
+	u64 index = bh__hash_function(key, 0);
+
+	ptr arrptr = table[index];
+	i32 len = bh_arr_length(arrptr);
+	assert(arrptr != NULL);
+
+	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;
+
+	while (len--) {
+		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) {
+			return (ptr)((char *) arrptr + BH__HASH_STORED_KEY_SIZE);
+		}
+
+		arrptr = (ptr)((char *) arrptr + stride);
+	}
+
+	return 0;
+}
+
+void bh__hash_delete(ptr *table, i32 elemsize, char *key) {
+	u64 index = bh__hash_function(key, 0);
+
+	ptr arrptr = table[index];
+	i32 len = bh_arr_length(arrptr);
+	if (arrptr == NULL) return; // Didn't exist
+
+	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;
+	i32 i = 0;
+
+	while (len && strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) != 0) {
+		arrptr = (ptr)((char *) arrptr + stride);
+		i++, len--;
+	}
+
+	if (len == 0) return; // Didn't exist
+
+	bh__arr_deleten((void **) &arrptr, elemsize, i, 1);
+}
+
+#endif // ifndef BH_NO_HASHTABLE
 
 #endif // ifdef BH_DEFINE
 

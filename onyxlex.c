@@ -1,7 +1,7 @@
 #include "bh.h"
 #include "onyxlex.h"
 
-static const char* TokenTypeNames[] = {
+static const char* onyx_token_type_names[] = {
 	"TOKEN_TYPE_UNKNOWN",
 	"TOKEN_TYPE_END_STREAM",
 
@@ -70,7 +70,7 @@ static const char* TokenTypeNames[] = {
 }
 #endif
 
-static b32 token_lit(Tokenizer* tokenizer, Token* tk, char* lit, TokenType type) {
+static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, OnyxTokenType type) {
 	i64 len = chars_match(tokenizer->curr, lit);
 	if (len > 0) {
 		tk->type = type;
@@ -86,12 +86,12 @@ static b32 token_lit(Tokenizer* tokenizer, Token* tk, char* lit, TokenType type)
 	return 0;
 }
 
-const char* get_token_type_name(Token tkn) {
-	return TokenTypeNames[tkn.type];
+const char* onyx_get_token_type_name(OnyxToken tkn) {
+	return onyx_token_type_names[tkn.type];
 }
 
-Token get_token(Tokenizer* tokenizer) {
-	Token tk;
+OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
+	OnyxToken tk;
 
 	// Skip whitespace
 	while (char_is_whitespace(*tokenizer->curr) && tokenizer->curr != tokenizer->end)

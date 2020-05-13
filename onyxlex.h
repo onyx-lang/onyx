@@ -3,15 +3,15 @@
 
 #include "bh.h"
 
-typedef struct Tokenizer {
+typedef struct OnyxTokenizer {
 	char *start, *curr, *end;
 
 	// TODO: Fix the line number and column count
 	char* line_start;
 	u64 line_number;
-} Tokenizer;
+} OnyxTokenizer;
 
-typedef enum TokenType {
+typedef enum OnyxTokenType {
 	TOKEN_TYPE_UNKNOWN,
 	TOKEN_TYPE_END_STREAM,
 
@@ -62,16 +62,16 @@ typedef enum TokenType {
 	TOKEN_TYPE_LITERAL_NUMERIC,
 
 	TOKEN_TYPE_COUNT
-} TokenType;
+} OnyxTokenType;
 
-typedef struct Token {
-	TokenType type;
+typedef struct OnyxToken {
+	OnyxTokenType type;
 	char* token;
 	isize length;
 	u64 line_number, line_column;
-} Token;
+} OnyxToken;
 
-const char* get_token_type_name(Token tkn);
-Token get_token(Tokenizer* tokenizer);
+const char* onyx_get_token_type_name(OnyxToken tkn);
+OnyxToken onyx_get_token(OnyxTokenizer* tokenizer);
 
 #endif
