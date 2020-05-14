@@ -9,6 +9,8 @@ typedef struct OnyxTokenizer {
 	// TODO: Fix the line number and column count
 	char* line_start;
 	u64 line_number;
+
+	bh_hash(u16) symbol_count;
 } OnyxTokenizer;
 
 typedef enum OnyxTokenType {
@@ -73,5 +75,6 @@ typedef struct OnyxToken {
 
 const char* onyx_get_token_type_name(OnyxToken tkn);
 OnyxToken onyx_get_token(OnyxTokenizer* tokenizer);
+bh_arr(OnyxToken) onyx_parse_tokens(bh_file_contents *fc, bh_hash(u16) symcount);
 
 #endif

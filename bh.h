@@ -242,11 +242,12 @@ void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems);
 #define BH__HASH_STORED_KEY_SIZE 64
 typedef struct bh__hash_entry {
 	char key[BH__HASH_STORED_KEY_SIZE];
-	// Value follows
+	i32 value; // NOTE: Not actually an i32, just used as a placeholder for offset
 } bh__hash_entry;
 
 #define BH__HASH_MODULUS 1021
-#define BH__HASH_KEYSIZE 16
+#define BH__HASH_KEYSIZE 64
+#ifdef BH_DEFINE
 u64 bh__hash_function(const char* str, i32 len) {
 	u64 hash = 5381;
 	i32 c, l = 0;
@@ -258,6 +259,13 @@ u64 bh__hash_function(const char* str, i32 len) {
 
 	return hash % BH__HASH_MODULUS;
 }
+#endif
+
+typedef struct bh_hash_iterator {
+	ptr *tab, *endtab, arr;
+	i32 elemsize, arridx;
+	bh__hash_entry* entry;
+} bh_hash_iterator;
 
 #define bh_hash(T)		T*
 
@@ -277,12 +285,18 @@ u64 bh__hash_function(const char* str, i32 len) {
 	#define bh_hash_delete(T, tab, key)		(bh__hash_delete((ptr *) tab, sizeof(T), key))
 #endif
 
+#define bh_hash_iter_setup(T, tab)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_iter_setup((ptr *) tab, sizeof(T)))
+#define bh_hash_iter_key(it)				(it.entry->key)
+#define bh_hash_iter_value(T, it)			(assert(sizeof(T) == it.elemsize), *(T *)&(it.entry->value))
+
 b32 bh__hash_init(ptr **table);
 b32 bh__hash_free(ptr **table);
 ptr bh__hash_put(ptr *table, i32 elemsize, char *key);
 b32 bh__hash_has(ptr *table, i32 elemsize, char *key);
 ptr bh__hash_get(ptr *table, i32 elemsize, char *key);
 void bh__hash_delete(ptr *table, i32 elemsize, char *key);
+bh_hash_iterator bh__hash_iter_setup(ptr *table, i32 elemsize);
+b32 bh_hash_iter_next(bh_hash_iterator* it);
 
 #endif
 
@@ -662,6 +676,8 @@ b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap) {
 		if (cap == 0 && elemsize == 0) return 1;
 
 		arrptr = (bh__arr *) malloc(sizeof(*arrptr) + elemsize * cap);
+		if (arrptr == NULL) return 0;
+
 		arrptr->capacity = cap;
 		arrptr->length = 0;
 
@@ -793,7 +809,7 @@ b32 bh__hash_free(ptr **table) {
 ptr bh__hash_put(ptr *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);
 
-	elemsize += sizeof(bh__hash_entry);
+	elemsize += BH__HASH_STORED_KEY_SIZE;
 
 	ptr arrptr = table[index];
 	i32 len = bh_arr_length(arrptr);
@@ -821,9 +837,9 @@ b32 bh__hash_has(ptr *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);	
 
 	ptr arrptr = table[index];
-	i32 len = bh_arr_length(arrptr);
 	if (arrptr == NULL) return 0;
 
+	i32 len = bh_arr_length(arrptr);
 	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;	
 
 	while (len--) {
@@ -872,6 +888,45 @@ void bh__hash_delete(ptr *table, i32 elemsize, char *key) {
 	if (len == 0) return; // Didn't exist
 
 	bh__arr_deleten((void **) &arrptr, elemsize, i, 1);
+}
+
+bh_hash_iterator bh__hash_iter_setup(ptr *table, i32 elemsize) {
+	bh_hash_iterator it = {
+		.tab = table,
+		.endtab = table + BH__HASH_MODULUS,
+		.arr = NULL,
+		.elemsize = elemsize,
+		.entry = NULL
+	};
+	return it;
+}
+
+b32 bh_hash_iter_next(bh_hash_iterator* it) {
+	if (it->tab == NULL) return 0;
+
+	if (it->entry != NULL) {
+		it->arridx++;
+		if (it->arridx >= bh_arr_length(it->arr)) {
+			it->tab++;
+			goto step_to_next;
+		}
+
+		it->entry = (bh__hash_entry *)((char *)(it->entry) + BH__HASH_STORED_KEY_SIZE + it->elemsize);
+		return 1;
+	}
+
+step_to_next:
+	// Set forward to find next valid
+	while (*it->tab == NULL && it->tab != it->endtab) {
+		it->tab++;
+	}
+
+	if (it->tab == it->endtab) return 0;
+
+	it->arr = *it->tab;
+	it->entry = it->arr;
+	it->arridx = 0;
+	return 1;
 }
 
 #endif // ifndef BH_NO_HASHTABLE
