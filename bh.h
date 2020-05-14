@@ -276,6 +276,10 @@ typedef struct bh_hash_iterator {
 	#define bh_hash_has(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (bh__hash_has((ptr *) tab, sizeof(T), key)))
 	#define bh_hash_get(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_get((ptr *) tab, sizeof(T), key))))
 	#define bh_hash_delete(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), bh__hash_delete((ptr *) tab, sizeof(T), key))
+
+	#define bh_hash_iter_setup(T, tab)			(bh__hash_iter_setup((ptr *) tab, sizeof(T)))
+	#define bh_hash_iter_key(it)				(it.entry->key)
+	#define bh_hash_iter_value(T, it)			(*(T *)&(it.entry->value))
 #else
 	#define bh_hash_init(tab)				bh__hash_init((ptr **) &(tab))
 	#define bh_hash_free(tab)				bh__hash_free((ptr **) &(tab))
@@ -283,11 +287,11 @@ typedef struct bh_hash_iterator {
 	#define bh_hash_has(T, tab, key)		(bh__hash_has((ptr *) tab, sizeof(T), key))
 	#define bh_hash_get(T, tab, key)		(*((T *) bh__hash_get((ptr *) tab, sizeof(T), key)))
 	#define bh_hash_delete(T, tab, key)		(bh__hash_delete((ptr *) tab, sizeof(T), key))
-#endif
 
-#define bh_hash_iter_setup(T, tab)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_iter_setup((ptr *) tab, sizeof(T)))
-#define bh_hash_iter_key(it)				(it.entry->key)
-#define bh_hash_iter_value(T, it)			(assert(sizeof(T) == it.elemsize), *(T *)&(it.entry->value))
+	#define bh_hash_iter_setup(T, tab)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_iter_setup((ptr *) tab, sizeof(T)))
+	#define bh_hash_iter_key(it)				(it.entry->key)
+	#define bh_hash_iter_value(T, it)			(assert(sizeof(T) == it.elemsize), *(T *)&(it.entry->value))
+#endif
 
 b32 bh__hash_init(ptr **table);
 b32 bh__hash_free(ptr **table);
