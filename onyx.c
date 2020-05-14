@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
 	printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
 	for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
-		printf("%s (Line %ld, Col %ld)\n", onyx_get_token_type_name(*it), it->line_number, it->line_column);
+		printf("%s '%c' (Line %ld, Col %ld)\n", onyx_get_token_type_name(*it), *(char *)it->token, it->line_number, it->line_column);
 	}
 
 	bh_hash_iterator it = bh_hash_iter_setup(u16, symbol_count);

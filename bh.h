@@ -383,7 +383,7 @@ char charset_contains(const char* charset, char ch) {
 
 i64 chars_match(char* ptr1, char* ptr2) {
 	i64 len = 0;
-	while (*ptr1 == *ptr2) ptr1++, ptr2++, len++;
+	while (*ptr2 != '\0' && *ptr1 == *ptr2) ptr1++, ptr2++, len++;
 	return *ptr2 == '\0' ? len : 0;
 }
 

@@ -240,7 +240,7 @@ bh_arr(OnyxToken) onyx_parse_tokens(bh_file_contents *fc, bh_hash(u16) symcount)
 	OnyxTokenizer tknizer = {
 		.start 			= fc->data,
 		.curr 			= fc->data,
-		.end 			= fc->data + fc->length - 1,
+		.end 			= fc->data + fc->length,
 		.line_number 	= 1,
 		.line_start 	= fc->data,
 		.symbol_count   = symcount,
