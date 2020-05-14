@@ -61,12 +61,11 @@ static const char* onyx_token_type_names[] = {
 
 #ifndef INCREMENT_CURR_TOKEN
 #define INCREMENT_CURR_TOKEN(tkn) { \
-	(tkn)->curr++; \
-	while (*(tkn)->curr == '\n' && (tkn)->curr != (tkn)->end) { \
-		(tkn)->curr++; \
+	if (*(tkn)->curr == '\n') { \
 		(tkn)->line_number++; \
-		(tkn)->line_start = (tkn)->curr; \
+		(tkn)->line_start = (tkn)->curr + 1; \
 	} \
+	(tkn)->curr++; \
 }
 #endif
 

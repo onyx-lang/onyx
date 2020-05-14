@@ -2,13 +2,15 @@
  /* nested comments /* are /* okay */ */ */
 */
 
-foreign proc "console" "log" :: (data ptr, length i32) -> void;
+foreign "console" "log" :: proc (data ptr, length i32) -> void ---;
 
-export proc add :: (a i32, b i32) -> i32 {
+global thing :: 
+
+export add :: proc (a i32, b i32) -> i32 {
 	return a + b;
 };
 
-export proc max :: (a i32, b i32) -> i32 {
+export max :: proc (a i32, b i32) -> i32 {
 	/* Curly braces are required */
 	x := "String literal! HERE \\\"Woot Woot\" done";
 
