@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <stdio.h> // TODO: Replace with custom implementation of printf
 #include <stdlib.h>
 #include <string.h> // TODO: Replace with needed functions
 #include <assert.h>
@@ -26,6 +27,42 @@ typedef signed long long i128;
 typedef unsigned long isize;
 typedef i32 b32;
 typedef void* ptr;
+
+//-------------------------------------------------------------------------------------
+// Better debug functions
+//-------------------------------------------------------------------------------------
+#ifdef BH_DEBUG
+
+void* bh__debug_malloc(size_t size, const char* file, u64 line);
+void  bh__debug_free(void* ptr, const char* file, u64 line);
+void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
+
+#ifdef BH_DEFINE
+
+void* bh__debug_malloc(size_t size, const char* file, u64 line) {
+	void* p = malloc(size);
+	printf("[DEBUG] %p = malloc(%ld) at %s:%ld\n", p, size, file, line);
+	return p;
+}
+
+void bh__debug_free(void* ptr, const char* file, u64 line) {
+	printf("[DEBUG] free(%p) at %s:%ld\n", ptr, file, line);
+	free(ptr);
+}
+
+void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
+	void* p = realloc(ptr, size);
+	printf("[DEBUG] %p = realloc(%p, %ld) at %s:%ld\n", p, ptr, size, file, line);
+	return p;
+}
+
+#endif
+
+#define malloc(size)		(bh__debug_malloc(size, __FILE__, __LINE__))
+#define free(ptr)			(bh__debug_free(ptr, __FILE__, __LINE__))
+#define realloc(ptr, size)	(bh__debug_realloc(ptr, size, __FILE__, __LINE__))
+
+#endif
 
 //-------------------------------------------------------------------------------------
 // Better character functions
@@ -262,8 +299,8 @@ u64 bh__hash_function(const char* str, i32 len) {
 #endif
 
 typedef struct bh_hash_iterator {
-	ptr *tab, *endtab, arr;
-	i32 elemsize, arridx;
+	ptr *tab, *endtab;
+	i32 elemsize, arrlen;
 	bh__hash_entry* entry;
 } bh_hash_iterator;
 
@@ -898,7 +935,6 @@ bh_hash_iterator bh__hash_iter_setup(ptr *table, i32 elemsize) {
 	bh_hash_iterator it = {
 		.tab = table,
 		.endtab = table + BH__HASH_MODULUS,
-		.arr = NULL,
 		.elemsize = elemsize,
 		.entry = NULL
 	};
@@ -909,8 +945,8 @@ b32 bh_hash_iter_next(bh_hash_iterator* it) {
 	if (it->tab == NULL) return 0;
 
 	if (it->entry != NULL) {
-		it->arridx++;
-		if (it->arridx >= bh_arr_length(it->arr)) {
+		it->arrlen--;
+		if (it->arrlen <= 0) {
 			it->tab++;
 			goto step_to_next;
 		}
@@ -920,16 +956,15 @@ b32 bh_hash_iter_next(bh_hash_iterator* it) {
 	}
 
 step_to_next:
-	// Set forward to find next valid
+	// Step forward to find next valid
 	while (*it->tab == NULL && it->tab != it->endtab) {
 		it->tab++;
 	}
 
 	if (it->tab == it->endtab) return 0;
 
-	it->arr = *it->tab;
-	it->entry = it->arr;
-	it->arridx = 0;
+	it->entry = *it->tab;
+	it->arrlen = bh_arr_length(it->entry);
 	return 1;
 }
 

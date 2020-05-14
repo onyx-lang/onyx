@@ -1,4 +1,5 @@
 #define BH_NO_STRING
+// #define BH_DEBUG
 #define BH_DEFINE
 #include "bh.h"
 
@@ -37,6 +38,7 @@ int main(int argc, char *argv[]) {
 
 	bh_file_contents_delete(&fc);
 	bh_arr_free(token_arr);
+	bh_hash_free(symbol_count);
 
 	return 0;
 }
