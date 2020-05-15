@@ -450,39 +450,44 @@ typedef struct bh_hash_iterator {
 	bh__hash_entry* entry;
 } bh_hash_iterator;
 
+typedef struct bh__hash {
+	bh_allocator allocator;
+	ptr arrs[BH__HASH_MODULUS];
+} bh__hash;
+
 #define bh_hash(T)		T*
 
 #ifdef BH_HASH_SIZE_SAFE
-	#define bh_hash_init(tab)				bh__hash_init((ptr **) &(tab))
-	#define bh_hash_free(tab)				bh__hash_free((ptr **) &(tab))
-	#define bh_hash_put(T, tab, key, value) (assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_put((ptr *) tab, sizeof(T), key)) = (T) value))
-	#define bh_hash_has(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (bh__hash_has((ptr *) tab, sizeof(T), key)))
-	#define bh_hash_get(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_get((ptr *) tab, sizeof(T), key))))
-	#define bh_hash_delete(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), bh__hash_delete((ptr *) tab, sizeof(T), key))
+	#define bh_hash_init(allocator_, tab)	bh__hash_init(allocator_, (bh__hash **)&(tab))
+	#define bh_hash_free(tab)				bh__hash_free((bh__hash **)&(tab))
+	#define bh_hash_put(T, tab, key, value) (assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_put((bh__hash *) tab, sizeof(T), key)) = (T) value))
+	#define bh_hash_has(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (bh__hash_has((bh__hash *) tab, sizeof(T), key)))
+	#define bh_hash_get(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_get((bh__hash *) tab, sizeof(T), key))))
+	#define bh_hash_delete(T, tab, key)		(assert(sizeof(T) == sizeof(*(tab))), bh__hash_delete((bh__hash *) tab, sizeof(T), key))
 
-	#define bh_hash_iter_setup(T, tab)			(bh__hash_iter_setup((ptr *) tab, sizeof(T)))
-	#define bh_hash_iter_key(it)				(it.entry->key)
-	#define bh_hash_iter_value(T, it)			(*(T *)&(it.entry->value))
-#else
-	#define bh_hash_init(tab)				bh__hash_init((ptr **) &(tab))
-	#define bh_hash_free(tab)				bh__hash_free((ptr **) &(tab))
-	#define bh_hash_put(T, tab, key, value) (*((T *) bh__hash_put((ptr *) tab, sizeof(T), key)) = value)
-	#define bh_hash_has(T, tab, key)		(bh__hash_has((ptr *) tab, sizeof(T), key))
-	#define bh_hash_get(T, tab, key)		(*((T *) bh__hash_get((ptr *) tab, sizeof(T), key)))
-	#define bh_hash_delete(T, tab, key)		(bh__hash_delete((ptr *) tab, sizeof(T), key))
-
-	#define bh_hash_iter_setup(T, tab)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_iter_setup((ptr *) tab, sizeof(T)))
+	#define bh_hash_iter_setup(T, tab)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_iter_setup((bh__hash *) tab, sizeof(T)))
 	#define bh_hash_iter_key(it)				(it.entry->key)
 	#define bh_hash_iter_value(T, it)			(assert(sizeof(T) == it.elemsize), *(T *)&(it.entry->value))
+#else
+	#define bh_hash_init(allocator_, tab)	bh__hash_init(allocator_, (bh__hash **)&(tab))
+	#define bh_hash_free(tab)				bh__hash_free((bh__hash **)&(tab))
+	#define bh_hash_put(T, tab, key, value) (*((T *) bh__hash_put((bh__hash *) tab, sizeof(T), key)) = value)
+	#define bh_hash_has(T, tab, key)		(bh__hash_has((bh__hash *) tab, sizeof(T), key))
+	#define bh_hash_get(T, tab, key)		(*((T *) bh__hash_get((bh__hash *) tab, sizeof(T), key)))
+	#define bh_hash_delete(T, tab, key)		(bh__hash_delete((bh__hash *) tab, sizeof(T), key))
+
+	#define bh_hash_iter_setup(T, tab)			(bh__hash_iter_setup((bh__hash *) tab, sizeof(T)))
+	#define bh_hash_iter_key(it)				(it.entry->key)
+	#define bh_hash_iter_value(T, it)			(*(T *)&(it.entry->value))
 #endif
 
-b32 bh__hash_init(ptr **table);
-b32 bh__hash_free(ptr **table);
-ptr bh__hash_put(ptr *table, i32 elemsize, char *key);
-b32 bh__hash_has(ptr *table, i32 elemsize, char *key);
-ptr bh__hash_get(ptr *table, i32 elemsize, char *key);
-void bh__hash_delete(ptr *table, i32 elemsize, char *key);
-bh_hash_iterator bh__hash_iter_setup(ptr *table, i32 elemsize);
+b32 bh__hash_init(bh_allocator allocator, bh__hash **table);
+b32 bh__hash_free(bh__hash **table);
+ptr bh__hash_put(bh__hash *table, i32 elemsize, char *key);
+b32 bh__hash_has(bh__hash *table, i32 elemsize, char *key);
+ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key);
+void bh__hash_delete(bh__hash *table, i32 elemsize, char *key);
+bh_hash_iterator bh__hash_iter_setup(bh__hash *table, i32 elemsize);
 b32 bh_hash_iter_next(bh_hash_iterator* it);
 
 #endif
@@ -667,7 +672,7 @@ BH_ALLOCATOR_PROC(bh_alloc_nofree_allocator_proc) {
 	} break;
 
 	case bh_allocator_action_resize: {
-		// Need to think about this one
+		// Do nothing since this is a fixed allocator
 	} break;
 
 	case bh_allocator_action_free: {
@@ -1180,60 +1185,62 @@ void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems) {
 //-------------------------------------------------------------------------------------
 #ifndef BH_NO_HASHTABLE
 
-b32 bh__hash_init(ptr **table) {
-	*table = malloc(sizeof(ptr) * BH__HASH_MODULUS);
+b32 bh__hash_init(bh_allocator allocator, bh__hash **table) {
+	*table = bh_alloc(allocator, sizeof(bh__hash));
 	if (*table == NULL) return 0;
 
+	(*table)->allocator = allocator;
+
 	for (i32 i = 0; i < BH__HASH_MODULUS; i++) {
-		(*table)[i] = NULL;
+		(*table)->arrs[i] = NULL;
 	}
 
 	return 1;
 }
 
-b32 bh__hash_free(ptr **table) {
+b32 bh__hash_free(bh__hash **table) {
 	for (i32 i = 0; i < BH__HASH_MODULUS; i++) {
-		if ((*table)[i] != NULL) {
-			bh_arr_free(*((*table) + i));
+		if ((*table)->arrs[i] != NULL) {
+			bh_arr_free((*table)->arrs[i]);
 		}
 	}
 
-	free(*table);
+	bh_free((*table)->allocator, *table);
 	*table = NULL;
 }
 
 // Assumes NULL terminated string for key
-ptr bh__hash_put(ptr *table, i32 elemsize, char *key) {
+ptr bh__hash_put(bh__hash *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);
 
 	elemsize += BH__HASH_STORED_KEY_SIZE;
 
-	ptr arrptr = table[index];
+	ptr arrptr = table->arrs[index];
 	i32 len = bh_arr_length(arrptr);
 
 	while (len--) {
 		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) goto found_matching;
-		arrptr = (ptr)((char *) arrptr + elemsize);
+		arrptr = bh_pointer_add(arrptr, elemsize);
 	}
 
 	// Didn't find it in the array, make a new one
-	arrptr = table[index];
+	arrptr = table->arrs[index];
 	len = bh_arr_length(arrptr);
-	bh__arr_grow(bh_arr_allocator(arrptr), &arrptr, elemsize, len + 1);
+	bh__arr_grow(table->allocator, &arrptr, elemsize, len + 1);
 	bh__arrhead(arrptr)->length++;
-	table[index] = arrptr;
+	table->arrs[index] = arrptr;
 
-	arrptr = (ptr)(((char *) arrptr) + elemsize * len);
+	arrptr = bh_pointer_add(arrptr, elemsize * len);
 	strncpy(arrptr, key, BH__HASH_STORED_KEY_SIZE);
 
 found_matching:
-	return (ptr)(((char *) arrptr) + BH__HASH_STORED_KEY_SIZE);
+	return bh_pointer_add(arrptr, BH__HASH_STORED_KEY_SIZE);
 }
 
-b32 bh__hash_has(ptr *table, i32 elemsize, char *key) {
+b32 bh__hash_has(bh__hash *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);	
 
-	ptr arrptr = table[index];
+	ptr arrptr = table->arrs[index];
 	if (arrptr == NULL) return 0;
 
 	i32 len = bh_arr_length(arrptr);
@@ -1241,16 +1248,16 @@ b32 bh__hash_has(ptr *table, i32 elemsize, char *key) {
 
 	while (len--) {
 		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) return 1;
-		arrptr = (ptr)((char *) arrptr + stride);
+		arrptr = bh_pointer_add(arrptr, stride);
 	}
 
 	return 0;
 }
 
-ptr bh__hash_get(ptr *table, i32 elemsize, char *key) {
+ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);
 
-	ptr arrptr = table[index];
+	ptr arrptr = table->arrs[index];
 	i32 len = bh_arr_length(arrptr);
 	assert(arrptr != NULL);
 
@@ -1258,19 +1265,19 @@ ptr bh__hash_get(ptr *table, i32 elemsize, char *key) {
 
 	while (len--) {
 		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) {
-			return (ptr)((char *) arrptr + BH__HASH_STORED_KEY_SIZE);
+			return bh_pointer_add(arrptr, BH__HASH_STORED_KEY_SIZE);
 		}
 
-		arrptr = (ptr)((char *) arrptr + stride);
+		return bh_pointer_add(arrptr, stride);
 	}
 
 	return 0;
 }
 
-void bh__hash_delete(ptr *table, i32 elemsize, char *key) {
+void bh__hash_delete(bh__hash *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);
 
-	ptr arrptr = table[index];
+	ptr arrptr = table->arrs[index];
 	i32 len = bh_arr_length(arrptr);
 	if (arrptr == NULL) return; // Didn't exist
 
@@ -1278,7 +1285,7 @@ void bh__hash_delete(ptr *table, i32 elemsize, char *key) {
 	i32 i = 0;
 
 	while (len && strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) != 0) {
-		arrptr = (ptr)((char *) arrptr + stride);
+		arrptr = bh_pointer_add(arrptr, stride);
 		i++, len--;
 	}
 
@@ -1287,10 +1294,10 @@ void bh__hash_delete(ptr *table, i32 elemsize, char *key) {
 	bh__arr_deleten((void **) &arrptr, elemsize, i, 1);
 }
 
-bh_hash_iterator bh__hash_iter_setup(ptr *table, i32 elemsize) {
+bh_hash_iterator bh__hash_iter_setup(bh__hash *table, i32 elemsize) {
 	bh_hash_iterator it = {
-		.tab = table,
-		.endtab = table + BH__HASH_MODULUS,
+		.tab = table->arrs,
+		.endtab = table->arrs + BH__HASH_MODULUS,
 		.elemsize = elemsize,
 		.entry = NULL
 	};
@@ -1307,7 +1314,7 @@ b32 bh_hash_iter_next(bh_hash_iterator* it) {
 			goto step_to_next;
 		}
 
-		it->entry = (bh__hash_entry *)((char *)(it->entry) + BH__HASH_STORED_KEY_SIZE + it->elemsize);
+		it->entry = (bh__hash_entry *)bh_pointer_add(it->entry, BH__HASH_STORED_KEY_SIZE + it->elemsize);
 		return 1;
 	}
 

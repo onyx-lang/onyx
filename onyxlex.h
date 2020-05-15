@@ -68,8 +68,8 @@ typedef enum OnyxTokenType {
 
 typedef struct OnyxToken {
 	OnyxTokenType type;
-	char* token;
 	isize length;
+	char* token;
 	u64 line_number, line_column;
 } OnyxToken;
 
