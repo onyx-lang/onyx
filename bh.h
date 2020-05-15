@@ -156,7 +156,7 @@ ptr bh_resize_aligned(bh_allocator a, ptr data, isize new_size, isize alignment)
 void bh_free(bh_allocator a, ptr data);
 
 #define bh_alloc_item(allocator_, T)				(T *) bh_alloc(allocator_, sizeof(T))
-#define bh_alloc_araray(allocator_, T, n)			(T *) bh_alloc(allocator_, sizeof(T) * (n))
+#define bh_alloc_array(allocator_, T, n)			(T *) bh_alloc(allocator_, sizeof(T) * (n))
 
 // NOTE: This should get optimized out since alignment should be a power of two
 #define bh__align(x, alignment)						((((x) / alignment) + 1) * alignment)
