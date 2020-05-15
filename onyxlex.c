@@ -236,7 +236,7 @@ token_parsed:
 	return tk;
 }
 
-bh_arr(OnyxToken) onyx_parse_tokens(bh_file_contents *fc, bh_hash(u16) symcount) {
+bh_arr(OnyxToken) onyx_parse_tokens(bh_allocator tk_alloc, bh_file_contents *fc, bh_hash(u16) symcount) {
 	OnyxTokenizer tknizer = {
 		.start 			= fc->data,
 		.curr 			= fc->data,
@@ -247,7 +247,7 @@ bh_arr(OnyxToken) onyx_parse_tokens(bh_file_contents *fc, bh_hash(u16) symcount)
 	};
 
 	bh_arr(OnyxToken) token_arr = NULL;
-	bh_arr_grow(token_arr, 512);
+	bh_arr_new(tk_alloc, token_arr, 512);
 
 	OnyxToken tk;
 	do {

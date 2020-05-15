@@ -28,6 +28,14 @@ typedef unsigned long isize;
 typedef i32 b32;
 typedef void* ptr;
 
+
+
+
+
+
+
+
+
 //-------------------------------------------------------------------------------------
 // Better debug functions
 //-------------------------------------------------------------------------------------
@@ -45,6 +53,12 @@ void* bh__debug_malloc(size_t size, const char* file, u64 line) {
 	return p;
 }
 
+void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line) {
+	void* p = aligned_alloc(size, alignment);
+	printf("[DEBUG] %p = aligned_alloc(%ld, %ld) at %s:%ld\n", p, alignment, size, file, line);
+	return p;
+}
+
 void bh__debug_free(void* ptr, const char* file, u64 line) {
 	printf("[DEBUG] free(%p) at %s:%ld\n", ptr, file, line);
 	free(ptr);
@@ -58,11 +72,22 @@ void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
 
 #endif
 
-#define malloc(size)		(bh__debug_malloc(size, __FILE__, __LINE__))
-#define free(ptr)			(bh__debug_free(ptr, __FILE__, __LINE__))
-#define realloc(ptr, size)	(bh__debug_realloc(ptr, size, __FILE__, __LINE__))
+#define malloc(size)					(bh__debug_malloc(size, __FILE__, __LINE__))
+#define aligned_alloc(size, alignment)	(bh__debug_aligned_alloc(size, alignment, __FILE__, __LINE__))
+#define free(ptr)						(bh__debug_free(ptr, __FILE__, __LINE__))
+#define realloc(ptr, size)				(bh__debug_realloc(ptr, size, __FILE__, __LINE__))
 
 #endif
+
+
+
+
+
+
+
+
+
+
 
 //-------------------------------------------------------------------------------------
 // Better character functions
@@ -75,6 +100,12 @@ b32 char_in_range(const char lo, const char hi, const char a);
 char charset_contains(const char* charset, char ch);
 i64 chars_match(char* ptr1, char* ptr2);
 
+
+
+
+
+
+
 //-------------------------------------------------------------------------------------
 // Better math functions
 //-------------------------------------------------------------------------------------
@@ -82,6 +113,91 @@ i64 chars_match(char* ptr1, char* ptr2);
 #define bh_min(a, b)		((a) < (b) ? (a) : (b))
 #define bh_clamp(v, a, b)	(bh_min((b), bh_max((a), (v))))
 #define bh_abs(x)			((x) < 0 ? -(x) : (x))
+
+#define bh_pointer_add(ptr, amm)		((void *)((u8 *) ptr + amm))
+
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// Custom allocators
+//-------------------------------------------------------------------------------------
+
+typedef enum bh_allocator_actions {
+	bh_allocator_action_alloc,
+	bh_allocator_action_free,
+	bh_allocator_action_resize,
+} bh_allocator_actions;
+
+#define BH_ALLOCATOR_PROC(name) \
+ptr name(ptr data, bh_allocator_actions action, \
+		 isize size, isize alignment, \
+		 void* prev_memory, \
+		 u64 flags)
+
+typedef BH_ALLOCATOR_PROC(bh__allocator_proc); // NOTE: so bh__allocator_proc can be used instead of that type
+
+typedef struct bh_allocator {
+	bh__allocator_proc* proc; // Procedure that can handle bh_allocator_actions
+	ptr					data; // Pointer to the other data for the allocator
+} bh_allocator;
+
+typedef enum bh_allocator_flags {
+	bh_allocator_flag_clear = 1	// Sets all memory to be 0
+} bh_allocator_flags;
+
+ptr bh_alloc(bh_allocator a, isize size);
+ptr bh_alloc_aligned(bh_allocator a, isize size, isize alignment);
+ptr bh_resize(bh_allocator a, ptr data, isize new_size);
+ptr bh_resize_aligned(bh_allocator a, ptr data, isize new_size, isize alignment);
+void bh_free(bh_allocator a, ptr data);
+
+#define bh_alloc_item(allocator_, T)				(T *) bh_alloc(allocator_, sizeof(T))
+#define bh_alloc_araray(allocator_, T, n)			(T *) bh_alloc(allocator_, sizeof(T) * (n))
+
+// NOTE: This should get optimized out since alignment should be a power of two
+#define bh__align(x, alignment)						((((x) / alignment) + 1) * alignment)
+
+
+
+
+// HEAP ALLOCATOR
+// Essentially a wrapper for malloc, free and realloc
+bh_allocator bh_heap_allocator(void);
+BH_ALLOCATOR_PROC(bh_heap_allocator_proc);
+
+
+
+
+
+// NOFREE ALLOCATOR
+
+typedef struct bh_alloc_nofree {
+	ptr memory;
+	ptr next_allocation;
+	isize size, total_size; // in bytes
+} bh_alloc_nofree;
+
+BH_ALLOCATOR_PROC(bh_alloc_nofree_allocator_proc);
+void bh_alloc_nofree_init(bh_alloc_nofree* alloc, isize total_size);
+void bh_alloc_nofree_free(bh_alloc_nofree* alloc);
+bh_allocator bh_alloc_nofree_allocator(bh_alloc_nofree* alloc);
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //-------------------------------------------------------------------------------------
 // Better strings
@@ -139,6 +255,14 @@ void bh_string_print(bh_string* str);
 #endif
 
 
+
+
+
+
+
+
+
+
 //-------------------------------------------------------------------------------------
 // Better files
 //-------------------------------------------------------------------------------------
@@ -178,7 +302,7 @@ typedef enum bh_file_standard {
 } bh_file_standard;
 
 typedef struct bh_file_contents {
-	// This will hold the allocator as well
+	bh_allocator allocator;
 	isize length;
 	void* data;
 } bh_file_contents;
@@ -200,16 +324,25 @@ i32 bh_file_read(bh_file* file, void* buffer, isize buff_size);
 i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
 i64 bh_file_size(bh_file* file);
 
-#define bh_file_read_contents(x) _Generic((x), \
+#define bh_file_read_contents(allocator_, x) _Generic((x), \
 	bh_file*: bh_file_read_contents_bh_file, \
 	const char*: bh_file_read_contents_direct, \
-	char*: bh_file_read_contents_direct)(x)
+	char*: bh_file_read_contents_direct)((allocator_), x)
 
-bh_file_contents bh_file_read_contents_bh_file(bh_file* file);
-bh_file_contents bh_file_read_contents_direct(const char* filename);
+bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file);
+bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* filename);
 i32 bh_file_contents_delete(bh_file_contents* contents);
 
 #endif
+
+
+
+
+
+
+
+
+
 
 //-------------------------------------------------------------------------------------
 // Better dynamically-sized arrays
@@ -217,6 +350,7 @@ i32 bh_file_contents_delete(bh_file_contents* contents);
 #ifndef BH_NO_ARRAY
 
 typedef struct bh__arr {
+	bh_allocator allocator;
 	i32 length, capacity;
 } bh__arr;
 
@@ -227,6 +361,7 @@ typedef struct bh__arr {
 #define bh_arr(T)					T*
 #define bh__arrhead(arr)			(((bh__arr *)(arr)) - 1)
 
+#define bh_arr_allocator(arr)		(arr ? bh__arrhead(arr)->allocator : bh_heap_allocator())
 #define bh_arr_length(arr) 			(arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr) 		(arr ? bh__arrhead(arr)->capacity : 0)
 #define bh_arr_size(arr)			(arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
@@ -236,9 +371,9 @@ typedef struct bh__arr {
 #define bh_arr_last(arr)			((arr)[bh__arrhead(arr)->length - 1])
 #define bh_arr_end(arr, i)			((i) >= &(arr)[bh_arr_length(arr)])
 
-#define bh_arr_new(arr, cap)		(bh__arr_grow((void**) &arr, sizeof(*(arr)), cap))
-#define bh_arr_free(arr)			(bh__arr_free((void**) &(arr)))
-#define bh_arr_copy(arr)			(bh__arr_copy((arr), sizeof(*(arr))))
+#define bh_arr_new(allocator_, arr, cap)	(bh__arr_grow((allocator_), (void**) &arr, sizeof(*(arr)), cap))
+#define bh_arr_free(arr)					(bh__arr_free((void**) &(arr)))
+#define bh_arr_copy(allocator_, arr)		(bh__arr_copy((allocator_), (arr), sizeof(*(arr))))
 
 #define bh_arr_grow(arr, cap) 		(bh__arr_grow((void **) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_shrink(arr, cap)		(bh__arr_shrink((void **) &(arr), sizeof(*(arr)), cap))
@@ -253,7 +388,7 @@ typedef struct bh__arr {
 	bh__arrhead(arr)->length += n)
 
 #define bh_arr_push(arr, value) 	( \
-	bh__arr_grow((void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1), \
+	bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1), \
 	arr[bh__arrhead(arr)->length++] = value)
 
 #define bh_arr_is_empty(arr)		(arr ? bh__arrhead(arr)->length == 0 : 1)
@@ -262,14 +397,25 @@ typedef struct bh__arr {
 #define bh_arr_deleten(arr, i, n)	(bh__arr_deleten((void **) &(arr), sizeof(*(arr)), i, n))
 #define bh_arr_fastdelete(arr, i)	(arr[i] = arr[--bh__arrhead(arr)->length])
 
-b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap);
+b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_free(void **arr);
-void* bh__arr_copy(void *arr, i32 elemsize);
+void* bh__arr_copy(bh_allocator alloc, void *arr, i32 elemsize);
 void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems);
 void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems);
 
 #endif
+
+
+
+
+
+
+
+
+
+
+
 
 //-------------------------------------------------------------------------------------
 // HASH TABLE FUNCTIONS
@@ -345,6 +491,44 @@ b32 bh_hash_iter_next(bh_hash_iterator* it);
 #undef BH_DEFINE
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //-------------------------------------------------------------------------------------
 // IMPLEMENTATIONS
 //-------------------------------------------------------------------------------------
@@ -387,8 +571,146 @@ i64 chars_match(char* ptr1, char* ptr2) {
 	return *ptr2 == '\0' ? len : 0;
 }
 
+
+
+
+
+
+
 //-------------------------------------------------------------------------------------
-// STRING IMPLEMENTATION
+// CUSTOM ALLOCATORS IMPLEMENTATION 
+//-------------------------------------------------------------------------------------
+
+
+ptr bh_alloc(bh_allocator a, isize size) {
+	return bh_alloc_aligned(a, size, 16);
+}
+
+ptr bh_alloc_aligned(bh_allocator a, isize size, isize alignment) {
+	return a.proc(a.data, bh_allocator_action_alloc, size, alignment, NULL,  0);
+}
+
+ptr bh_resize(bh_allocator a, ptr data, isize new_size) {
+	return bh_resize_aligned(a, data, new_size, 16);
+}
+
+ptr bh_resize_aligned(bh_allocator a, ptr data, isize new_size, isize alignment) {
+	return a.proc(a.data, bh_allocator_action_resize, new_size, alignment, data, 0);
+}
+
+void bh_free(bh_allocator a, ptr data) {
+	if (data != NULL) a.proc(a.data, bh_allocator_action_free, 0, 0, data, 0);
+}
+
+
+
+// HEAP ALLOCATOR IMPLEMENTATION
+
+bh_allocator bh_heap_allocator(void) {
+	return (bh_allocator) {
+		.proc = bh_heap_allocator_proc,
+		.data = NULL
+	};
+}
+
+BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
+	ptr retval = NULL;
+
+	switch (action) {
+	case bh_allocator_action_alloc: {
+		retval = aligned_alloc(alignment, size);
+
+		if (flags & bh_allocator_flag_clear && retval != NULL) {
+			memset(retval, 0, size);
+		}
+	} break;
+
+	case bh_allocator_action_resize: {
+		// TODO: Maybe replace with better custom function
+		retval = realloc(prev_memory, size);
+	} break;
+
+	case bh_allocator_action_free: {
+		free(prev_memory);
+	} break;
+	}
+
+	return retval;
+}
+
+
+
+
+
+
+
+// NOFREE ALLOCATOR IMPLEMENTATION
+
+BH_ALLOCATOR_PROC(bh_alloc_nofree_allocator_proc) {
+	bh_alloc_nofree* alloc_nf = (bh_alloc_nofree*) data;
+
+	ptr retval = NULL;
+
+	switch (action) {
+	case bh_allocator_action_alloc: {
+		size = bh__align(size, alignment);
+
+		retval = alloc_nf->next_allocation;
+
+		alloc_nf->next_allocation = bh_pointer_add(alloc_nf->next_allocation, size);
+		alloc_nf->size += size;
+		if (alloc_nf->size > alloc_nf->total_size) {
+			// Out of memory
+			fprintf(stderr, "NoFree allocator out of memory\n");
+			return NULL;
+		}
+	} break;
+
+	case bh_allocator_action_resize: {
+		// Need to think about this one
+	} break;
+
+	case bh_allocator_action_free: {
+		// Do nothing since this allocator isn't made for freeing memory
+	} break;
+	}
+
+	return retval;
+}
+
+void bh_alloc_nofree_init(bh_alloc_nofree* alloc, isize total_size) {
+	ptr data = malloc(total_size);
+
+	alloc->total_size = total_size;
+	alloc->size = 0;
+	alloc->memory = data;
+	alloc->next_allocation = data;
+}
+
+void bh_alloc_nofree_free(bh_alloc_nofree* alloc) {
+	free(alloc->memory);
+	alloc->memory = NULL;
+	alloc->next_allocation = NULL;
+	alloc->total_size = 0;
+	alloc->size = 0;
+}
+
+bh_allocator bh_alloc_nofree_allocator(bh_alloc_nofree* alloc) {
+	return (bh_allocator) {
+		.proc = bh_alloc_nofree_allocator_proc,
+		.data = alloc,
+	};
+}
+
+
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// STRING IMPLEMENTATION (BROKEN)
 //-------------------------------------------------------------------------------------
 #ifndef BH_NO_STRING
 
@@ -520,6 +842,14 @@ void bh_string_print(bh_string* str) {
 }
 
 #endif // ifndef BH_NO_STRING
+
+
+
+
+
+
+
+
 
 //-------------------------------------------------------------------------------------
 // FILE IMPLEMENTATION
@@ -675,13 +1005,16 @@ i64 bh_file_size(bh_file* file) {
 	return size;
 }
 
-bh_file_contents bh_file_read_contents_bh_file(bh_file* file) {
-	bh_file_contents fc = { .length = 0, .data = NULL };
+bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file) {
+	bh_file_contents fc = {
+		.allocator = alloc,
+		.length = 0, .data = NULL
+	};
 
 	isize size = bh_file_size(file);
 	if (size <= 0) return fc;
 
-	fc.data = malloc(size + 1);
+	fc.data = bh_alloc(alloc, size + 1);
 	fc.length = size;
 	bh_file_read_at(file, 0, fc.data, fc.length, NULL);
 	((u8*) fc.data)[fc.length] = '\0';
@@ -689,36 +1022,46 @@ bh_file_contents bh_file_read_contents_bh_file(bh_file* file) {
 	return fc;
 }
 
-bh_file_contents bh_file_read_contents_direct(const char* filename) {
+bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* filename) {
 	bh_file file;
 	bh_file_open(&file, filename);
-	bh_file_contents fc = bh_file_read_contents(&file);
+	bh_file_contents fc = bh_file_read_contents(alloc, &file);
 	bh_file_close(&file);
 	return fc;
 }
 
 b32 bh_file_contents_delete(bh_file_contents* contents) {
-	free(contents->data);
+	bh_free(contents->allocator, contents->data);
 	contents->length = 0;
 	return 1;
 }
 
 #endif // ifndef BH_NO_FILE
 
+
+
+
+
+
+
+
+
+
 //-------------------------------------------------------------------------------------
 // ARRAY IMPLEMENTATION
 //-------------------------------------------------------------------------------------
 #ifndef BH_NO_ARRAY
 
-b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap) {
+b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap) {
 	bh__arr* arrptr;
 
 	if (*arr == NULL) {
 		if (cap == 0 && elemsize == 0) return 1;
 
-		arrptr = (bh__arr *) malloc(sizeof(*arrptr) + elemsize * cap);
+		arrptr = (bh__arr *) bh_alloc(alloc, sizeof(*arrptr) + elemsize * cap);
 		if (arrptr == NULL) return 0;
 
+		arrptr->allocator = alloc;
 		arrptr->capacity = cap;
 		arrptr->length = 0;
 
@@ -730,7 +1073,7 @@ b32 bh__arr_grow(void** arr, i32 elemsize, i32 cap) {
 			i32 newcap = arrptr->capacity;
 			while (newcap < cap) newcap = BH_ARR_GROW_FORMULA(newcap);
 
-			p = realloc(arrptr, sizeof(*arrptr) + elemsize * newcap);
+			p = bh_resize(arrptr->allocator, arrptr, sizeof(*arrptr) + elemsize * newcap);
 
 			if (p) {
 				arrptr = (bh__arr *) p;
@@ -752,7 +1095,7 @@ b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap) {
 	cap = bh_max(cap, arrptr->length);
 
 	if (arrptr->capacity > cap) {
-		void* p = realloc(arrptr, sizeof(*arrptr) + elemsize * cap);
+		void* p = bh_resize(arrptr->allocator, arrptr, sizeof(*arrptr) + elemsize * cap);
 
 		if (p) {
 			arrptr = (bh__arr *) p;
@@ -768,17 +1111,17 @@ b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap) {
 
 b32 bh__arr_free(void **arr) {
 	bh__arr* arrptr = bh__arrhead(*arr);
-	free(arrptr);
+	bh_free(arrptr->allocator, arrptr);
 	*arr = NULL;
 }
 
-void* bh__arr_copy(void *arr, i32 elemsize) {
+void* bh__arr_copy(bh_allocator alloc, void *arr, i32 elemsize) {
 	bh__arr* arrptr = bh__arrhead(arr);
 
 	const i32 cap = arrptr->length;
 
 	void* newarr = NULL;
-	bh__arr_grow(&newarr, elemsize, cap);
+	bh__arr_grow(alloc, &newarr, elemsize, cap);
 	bh__arrhead(newarr)->length = cap;
 	bh__arrhead(newarr)->capacity = cap;
 	memcpy(newarr, arr, elemsize * arrptr->length);
@@ -800,15 +1143,14 @@ void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems) {
 }
 
 void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems) {
-	bh__arr* arrptr = bh__arrhead(*arr);
-
 	if (numelems) {
 		if (*arr == NULL) {
-			bh__arr_grow(arr, elemsize, numelems); // Making a new array
+			bh__arr_grow(bh_arr_allocator(arr), arr, elemsize, numelems); // Making a new array
 			return;
 		}
 
-		if (!bh__arr_grow(arr, elemsize, arrptr->length + numelems)) return; // Fail case
+		bh__arr* arrptr = bh__arrhead(*arr);
+		if (!bh__arr_grow(bh_arr_allocator(arr), arr, elemsize, arrptr->length + numelems)) return; // Fail case
 		memmove(
 			(char *)(*arr) + elemsize * (index + numelems),
 			(char *)(*arr) + elemsize * index,
@@ -818,6 +1160,20 @@ void bh__arr_insertn(void **arr, i32 elemsize, i32 index, i32 numelems) {
 }
 
 #endif // ifndef BH_NO_ARRAY
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //-------------------------------------------------------------------------------------
 // HASHTABLE IMPLEMENTATION
@@ -863,7 +1219,7 @@ ptr bh__hash_put(ptr *table, i32 elemsize, char *key) {
 	// Didn't find it in the array, make a new one
 	arrptr = table[index];
 	len = bh_arr_length(arrptr);
-	bh__arr_grow(&arrptr, elemsize, len + 1);
+	bh__arr_grow(bh_arr_allocator(arrptr), &arrptr, elemsize, len + 1);
 	bh__arrhead(arrptr)->length++;
 	table[index] = arrptr;
 

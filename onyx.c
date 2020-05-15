@@ -1,5 +1,5 @@
 #define BH_NO_STRING
-// #define BH_DEBUG
+#define BH_DEBUG
 #define BH_DEFINE
 #include "bh.h"
 
@@ -15,12 +15,14 @@ int main(int argc, char *argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	bh_file_contents fc = bh_file_read_contents(&source_file);
+	bh_allocator alloc = bh_heap_allocator();
+
+	bh_file_contents fc = bh_file_read_contents(alloc, &source_file);
 	bh_file_close(&source_file);
 
 	bh_hash(u16) symbol_count;
 	bh_hash_init(symbol_count);
-	bh_arr(OnyxToken) token_arr = onyx_parse_tokens(&fc, symbol_count);
+	bh_arr(OnyxToken) token_arr = onyx_parse_tokens(alloc, &fc, symbol_count);
 
 	printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
