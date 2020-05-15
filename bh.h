@@ -658,17 +658,18 @@ BH_ALLOCATOR_PROC(bh_alloc_nofree_allocator_proc) {
 
 	switch (action) {
 	case bh_allocator_action_alloc: {
-		size = bh__align(size, alignment);
-
 		retval = alloc_nf->next_allocation;
 
+		size = bh__align(size, alignment);
 		alloc_nf->next_allocation = bh_pointer_add(alloc_nf->next_allocation, size);
-		alloc_nf->size += size;
-		if (alloc_nf->size > alloc_nf->total_size) {
+		
+		if (alloc_nf->size + size >= alloc_nf->total_size) {
 			// Out of memory
 			fprintf(stderr, "NoFree allocator out of memory\n");
 			return NULL;
 		}
+
+		alloc_nf->size += size;
 	} break;
 
 	case bh_allocator_action_resize: {
