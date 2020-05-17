@@ -176,12 +176,16 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc);
 // ARENA ALLOCATOR
 typedef struct bh_arena {
 	bh_allocator backing;
-	ptr memory;
-	ptr next_allocation;
-	isize size, total_size; // in bytes
+	ptr first_arena, current_arena;
+	isize size, arena_size; // in bytes
 } bh_arena;
 
-void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize total_size);
+typedef struct bh__arena_internal {
+	ptr next_arena;
+	void* data; // Not actually a pointer, just used for the offset
+} bh__arena_internal;
+
+void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size);
 void bh_arena_free(bh_arena* alloc);
 bh_allocator bh_arena_allocator(bh_arena* alloc);
 BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
@@ -375,16 +379,16 @@ typedef struct bh__arr {
 #define bh_arr_free(arr)					(bh__arr_free((void**) &(arr)))
 #define bh_arr_copy(allocator_, arr)		(bh__arr_copy((allocator_), (arr), sizeof(*(arr))))
 
-#define bh_arr_grow(arr, cap) 		(bh__arr_grow((void **) &(arr), sizeof(*(arr)), cap))
+#define bh_arr_grow(arr, cap) 		(bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_shrink(arr, cap)		(bh__arr_shrink((void **) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_set_length(arr, n)	( \
-	bh__arr_grow((void **) &(arr), sizeof(*(arr)), n), \
+	bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), n), \
 	bh__arrhead(arr)->length = n)
 
 #define bh_arr_insertn(arr, i, n)	(bh__arr_insertn((void **) &(arr), sizeof(*(arr)), i, n))
 
 #define bh_arr_insert_end(arr, n)	( \
-	bh__arr_grow((void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + n), \
+	bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + n), \
 	bh__arrhead(arr)->length += n)
 
 #define bh_arr_push(arr, value) 	( \
@@ -650,21 +654,30 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
 
 // ARENA ALLOCATOR IMPLEMENTATION
-void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize total_size) {
-	ptr data = bh_alloc(backing, total_size);
+void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size) {
+	ptr data = bh_alloc(backing, arena_size);
 
 	alloc->backing = backing;
-	alloc->total_size = total_size;
+	alloc->arena_size = arena_size;
 	alloc->size = 0;
-	alloc->memory = data;
-	alloc->next_allocation = data;
+	alloc->first_arena = data;
+	alloc->current_arena = data;
+
+	((bh__arena_internal *)(alloc->first_arena))->next_arena = NULL;
 }
 
 void bh_arena_free(bh_arena* alloc) {
-	bh_free(alloc->backing, alloc->memory);
-	alloc->memory = NULL;
-	alloc->next_allocation = NULL;
-	alloc->total_size = 0;
+	bh__arena_internal *walker = (bh__arena_internal *) alloc->first_arena;
+	bh__arena_internal *trailer = walker;
+	while (walker != NULL) {
+		walker = walker->next_arena;
+		bh_free(alloc->backing, trailer);
+		trailer = walker;
+	}
+
+	alloc->first_arena = NULL;
+	alloc->current_arena = NULL;
+	alloc->arena_size = 0;
 	alloc->size = 0;
 }
 
@@ -676,24 +689,35 @@ bh_allocator bh_arena_allocator(bh_arena* alloc) {
 }
 
 BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
-	bh_arena* alloc_nf = (bh_arena*) data;
+	bh_arena* alloc_arena = (bh_arena*) data;
 
 	ptr retval = NULL;
 
 	switch (action) {
 	case bh_allocator_action_alloc: {
-		retval = alloc_nf->next_allocation;
 
-		size = bh__align(size, alignment);
-		alloc_nf->next_allocation = bh_pointer_add(alloc_nf->next_allocation, size);
-		
-		if (alloc_nf->size + size >= alloc_nf->total_size) {
-			// Out of memory
-			fprintf(stderr, "NoFree allocator out of memory\n");
+		// TODO: Do this better because right now bh__align is bad
+		// size = bh__align(size, alignment);
+		if (size > alloc_arena->arena_size) {
+			// Size too large for the arena
 			return NULL;
 		}
+		
+		if (alloc_arena->size + size >= alloc_arena->arena_size) {
+			alloc_arena->size = sizeof(ptr);
+			bh__arena_internal* new_arena = (bh__arena_internal *) bh_alloc(alloc_arena->backing, alloc_arena->arena_size);
 
-		alloc_nf->size += size;
+			if (new_arena == NULL) {
+				fprintf(stderr, "Arena Allocator: couldn't allocate new arena");
+				return NULL;
+			}
+
+			((bh__arena_internal *)alloc_arena->current_arena)->next_arena = new_arena;
+			alloc_arena->current_arena = new_arena;
+		}
+
+		retval = alloc_arena->current_arena + alloc_arena->size;
+		alloc_arena->size += size;
 	} break;
 
 	case bh_allocator_action_resize: {

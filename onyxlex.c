@@ -236,14 +236,13 @@ token_parsed:
 	return tk;
 }
 
-bh_arr(OnyxToken) onyx_parse_tokens(bh_allocator tk_alloc, bh_file_contents *fc, bh_hash(u16) symcount) {
+bh_arr(OnyxToken) onyx_parse_tokens(bh_allocator tk_alloc, bh_file_contents *fc) {
 	OnyxTokenizer tknizer = {
 		.start 			= fc->data,
 		.curr 			= fc->data,
 		.end 			= fc->data + fc->length,
 		.line_number 	= 1,
 		.line_start 	= fc->data,
-		.symbol_count   = symcount,
 	};
 
 	bh_arr(OnyxToken) token_arr = NULL;
@@ -252,22 +251,6 @@ bh_arr(OnyxToken) onyx_parse_tokens(bh_allocator tk_alloc, bh_file_contents *fc,
 	OnyxToken tk;
 	do {
 		tk = onyx_get_token(&tknizer);
-
-		if (tk.type == TOKEN_TYPE_SYMBOL) {
-			u16 val = 0;
-
-			char tmp = tk.token[tk.length];
-			tk.token[tk.length] = '\0';
-
-			if (bh_hash_has(u16, tknizer.symbol_count, tk.token)) {
-				val = bh_hash_get(u16, tknizer.symbol_count, tk.token);
-			}
-
-			bh_hash_put(u16, tknizer.symbol_count, tk.token, val + 1);
-
-			tk.token[tk.length] = tmp;
-		}
-
 		bh_arr_push(token_arr, tk);
 	} while (tk.type != TOKEN_TYPE_END_STREAM);
 

@@ -20,9 +20,7 @@ int main(int argc, char *argv[]) {
 	bh_file_contents fc = bh_file_read_contents(alloc, &source_file);
 	bh_file_close(&source_file);
 
-	bh_hash(u16) symbol_count;
-	bh_hash_init(alloc, symbol_count);
-	bh_arr(OnyxToken) token_arr = onyx_parse_tokens(alloc, &fc, symbol_count);
+	bh_arr(OnyxToken) token_arr = onyx_parse_tokens(alloc, &fc);
 
 	printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
@@ -30,17 +28,8 @@ int main(int argc, char *argv[]) {
 		printf("%s '%c' (Line %ld, Col %ld)\n", onyx_get_token_type_name(*it), *(char *)it->token, it->line_number, it->line_column);
 	}
 
-	bh_hash_iterator it = bh_hash_iter_setup(u16, symbol_count);
-	while (bh_hash_iter_next(&it)) {
-		const char* sym = bh_hash_iter_key(it);
-		u16 count = bh_hash_iter_value(u16, it);
-
-		printf("%s was seen %d times.\n", sym, count);
-	}
-
 	bh_file_contents_delete(&fc);
 	bh_arr_free(token_arr);
-	bh_hash_free(symbol_count);
 
 	return 0;
 }
