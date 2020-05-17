@@ -712,11 +712,12 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 				return NULL;
 			}
 
+			new_arena->next_arena = NULL;
 			((bh__arena_internal *)alloc_arena->current_arena)->next_arena = new_arena;
 			alloc_arena->current_arena = new_arena;
 		}
 
-		retval = alloc_arena->current_arena + alloc_arena->size;
+		retval = bh_pointer_add(alloc_arena->current_arena, alloc_arena->size);
 		alloc_arena->size += size;
 	} break;
 
