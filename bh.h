@@ -173,18 +173,18 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc);
 
 
 
-// NOFREE ALLOCATOR
-
+// ARENA ALLOCATOR
 typedef struct bh_arena {
+	bh_allocator backing;
 	ptr memory;
 	ptr next_allocation;
 	isize size, total_size; // in bytes
 } bh_arena;
 
-BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
-void bh_arena_init(bh_arena* alloc, isize total_size);
+void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize total_size);
 void bh_arena_free(bh_arena* alloc);
 bh_allocator bh_arena_allocator(bh_arena* alloc);
+BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
 
 
 
@@ -649,7 +649,31 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
 
 
-// NOFREE ALLOCATOR IMPLEMENTATION
+// ARENA ALLOCATOR IMPLEMENTATION
+void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize total_size) {
+	ptr data = bh_alloc(backing, total_size);
+
+	alloc->backing = backing;
+	alloc->total_size = total_size;
+	alloc->size = 0;
+	alloc->memory = data;
+	alloc->next_allocation = data;
+}
+
+void bh_arena_free(bh_arena* alloc) {
+	bh_free(alloc->backing, alloc->memory);
+	alloc->memory = NULL;
+	alloc->next_allocation = NULL;
+	alloc->total_size = 0;
+	alloc->size = 0;
+}
+
+bh_allocator bh_arena_allocator(bh_arena* alloc) {
+	return (bh_allocator) {
+		.proc = bh_arena_allocator_proc,
+		.data = alloc,
+	};
+}
 
 BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 	bh_arena* alloc_nf = (bh_arena*) data;
@@ -683,32 +707,6 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
 	return retval;
 }
-
-void bh_arena_init(bh_arena* alloc, isize total_size) {
-	ptr data = malloc(total_size);
-
-	alloc->total_size = total_size;
-	alloc->size = 0;
-	alloc->memory = data;
-	alloc->next_allocation = data;
-}
-
-void bh_arena_free(bh_arena* alloc) {
-	free(alloc->memory);
-	alloc->memory = NULL;
-	alloc->next_allocation = NULL;
-	alloc->total_size = 0;
-	alloc->size = 0;
-}
-
-bh_allocator bh_arena_allocator(bh_arena* alloc) {
-	return (bh_allocator) {
-		.proc = bh_arena_allocator_proc,
-		.data = alloc,
-	};
-}
-
-
 
 
 
