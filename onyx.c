@@ -6,6 +6,7 @@
 #include <stdio.h> // TODO: Replace with custom lib
 
 #include "onyxlex.h"
+#include "onyxparser.h"
 
 int main(int argc, char *argv[]) {
 	bh_file source_file;

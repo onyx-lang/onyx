@@ -114,7 +114,15 @@ i64 chars_match(char* ptr1, char* ptr2);
 #define bh_clamp(v, a, b)	(bh_min((b), bh_max((a), (v))))
 #define bh_abs(x)			((x) < 0 ? -(x) : (x))
 
+
+
+
+
+//-------------------------------------------------------------------------------------
+// Helpful macros
+//-------------------------------------------------------------------------------------
 #define bh_pointer_add(ptr, amm)		((void *)((u8 *) ptr + amm))
+#define BH_BIT(x)						(1 << (x))
 
 
 
@@ -192,10 +200,16 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
 
 
 
+// SCRATCH ALLOCATOR
+typedef struct bh_scratch {
+	bh_allocator backing;
+	ptr memory, end, curr;
+} bh_scratch;
 
-
-
-
+void bh_scratch_init(bh_scratch* scratch, bh_allocator backing, isize scratch_size);
+void bh_scratch_free(bh_scratch* scratch);
+bh_allocator bh_scratch_allocator(bh_scratch* scratch);
+BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 
 
 
@@ -736,6 +750,58 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
 
 
+// SCRATCH ALLOCATOR IMPLEMENTATION
+void bh_scratch_init(bh_scratch* scratch, bh_allocator backing, isize scratch_size) {
+	ptr memory = bh_alloc(backing, scratch_size);
+
+	scratch->backing = backing;
+	scratch->memory = memory;
+	scratch->curr = memory;
+	scratch->end = memory + scratch_size;
+}
+
+void bh_scratch_free(bh_scratch* scratch) {
+	bh_free(scratch->backing, scratch->memory);
+
+	scratch->memory = NULL;
+	scratch->curr = NULL;
+	scratch->end = NULL;
+}
+
+bh_allocator bh_scratch_allocator(bh_scratch* scratch) {
+	return (bh_allocator) {
+		.proc = bh_scratch_allocator_proc,
+		.data = scratch,
+	};
+}
+
+BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
+	bh_scratch* scratch = (bh_scratch*) data;
+	ptr retval = NULL;
+
+	switch (action) {
+	case bh_allocator_action_alloc: {
+		if (size > scratch->end - scratch->memory) {
+			return NULL;
+		}
+
+		retval = scratch->curr;
+		scratch->curr += size;
+
+		if (scratch->curr >= scratch->end) {
+			scratch->curr = scratch->memory;
+			retval = scratch->curr;	
+		}
+	} break;
+
+	case bh_allocator_action_free:
+	case bh_allocator_action_resize:
+		// Do nothing
+		break;
+	}
+
+	return retval;
+}
 
 
 //-------------------------------------------------------------------------------------

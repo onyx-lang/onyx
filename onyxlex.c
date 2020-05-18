@@ -34,6 +34,7 @@ static const char* onyx_token_type_names[] = {
 	"TOKEN_TYPE_SYM_MINUS",
 	"TOKEN_TYPE_SYM_STAR",
 	"TOKEN_TYPE_SYM_PERCENT",
+	"TOKEN_TYPE_SYM_DOT",
 	"TOKEN_TYPE_SYM_FSLASH",
 	"TOKEN_TYPE_SYM_BSLASH",
 	"TOKEN_TYPE_SYM_TYPE_SIGNATURE",
@@ -163,8 +164,9 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("+", TOKEN_TYPE_SYM_PLUS);
 	LITERAL_TOKEN("-", TOKEN_TYPE_SYM_MINUS);
 	LITERAL_TOKEN("*", TOKEN_TYPE_SYM_STAR);
-	LITERAL_TOKEN("/", TOKEN_TYPE_SYM_FSLASH);
+	LITERAL_TOKEN(".", TOKEN_TYPE_SYM_DOT);
 	LITERAL_TOKEN("%", TOKEN_TYPE_SYM_PERCENT);
+	LITERAL_TOKEN("/", TOKEN_TYPE_SYM_FSLASH);
 	LITERAL_TOKEN("\\", TOKEN_TYPE_SYM_BSLASH);
 	LITERAL_TOKEN("::", TOKEN_TYPE_SYM_TYPE_SIGNATURE);
 	LITERAL_TOKEN(":", TOKEN_TYPE_SYM_COLON);
@@ -221,7 +223,7 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 	// Number literal
 	if (char_is_num(*tokenizer->curr)) {
 		u64 len = 0;
-		while (char_is_num(*tokenizer->curr) || *tokenizer->curr == '.') {
+		while (char_is_num(*(tokenizer->curr + 1)) || *(tokenizer->curr + 1) == '.') {
 			len++;
 			INCREMENT_CURR_TOKEN(tokenizer);
 		}

@@ -2,9 +2,9 @@
  /* nested comments /* are /* okay */ */ */
 */
 
-foreign "console" "log" :: proc (data ptr, length i32) -> void ---;
-
-global thing :: 
+foreign console {
+	log :: proc (data ptr, length i32) -> void ---;
+}
 
 export add :: proc (a i32, b i32) -> i32 {
 	return a + b;
@@ -19,4 +19,9 @@ export max :: proc (a i32, b i32) -> i32 {
 	} else {
 		return b;
 	}
+};
+
+export main :: proc () -> void {
+	console.log(add(2, 3));
+	console.log(max(5, 10));
 };

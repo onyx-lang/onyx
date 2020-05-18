@@ -1,5 +1,6 @@
 OBJ_FILES=\
 	onyxlex.o \
+	onyxparser.o \
 	onyx.o
 
 CC=gcc
