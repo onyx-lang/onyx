@@ -673,7 +673,7 @@ void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size) {
 
 	alloc->backing = backing;
 	alloc->arena_size = arena_size;
-	alloc->size = 0;
+	alloc->size = sizeof(ptr);
 	alloc->first_arena = data;
 	alloc->current_arena = data;
 
@@ -727,7 +727,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 			}
 
 			new_arena->next_arena = NULL;
-			((bh__arena_internal *)alloc_arena->current_arena)->next_arena = new_arena;
+			((bh__arena_internal *)(alloc_arena->current_arena))->next_arena = new_arena;
 			alloc_arena->current_arena = new_arena;
 		}
 
