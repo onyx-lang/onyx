@@ -2,7 +2,7 @@
 #include "onyxmsgs.h"
 
 static const char* msg_formats[] = {
-	"expected token '%s'",
+	"expected token '%s', got '%s'",
 	"unexpected token '%s'",
 	"unknown type '%s'"
 };

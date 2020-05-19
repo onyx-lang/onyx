@@ -7,45 +7,45 @@ static const char* onyx_token_type_names[] = {
 
 	"TOKEN_TYPE_COMMENT",
 
-	"TOKEN_TYPE_KEYWORD_STRUCT",
-	"TOKEN_TYPE_KEYWORD_USE",
-	"TOKEN_TYPE_KEYWORD_EXPORT",
-	"TOKEN_TYPE_KEYWORD_IF",
-	"TOKEN_TYPE_KEYWORD_ELSE",
-	"TOKEN_TYPE_KEYWORD_FOR",
-	"TOKEN_TYPE_KEYWORD_DO",
-	"TOKEN_TYPE_KEYWORD_RETURN",
-	"TOKEN_TYPE_KEYWORD_FOREIGN",
-	"TOKEN_TYPE_KEYWORD_PROC",
-	"TOKEN_TYPE_KEYWORD_GLOBAL",
+	"struct",		//"TOKEN_TYPE_KEYWORD_STRUCT",
+	"use",			//"TOKEN_TYPE_KEYWORD_USE",
+	"export",		//"TOKEN_TYPE_KEYWORD_EXPORT",
+	"if",			//"TOKEN_TYPE_KEYWORD_IF",
+	"else",			//"TOKEN_TYPE_KEYWORD_ELSE",
+	"for",			//"TOKEN_TYPE_KEYWORD_FOR",
+	"do",			//"TOKEN_TYPE_KEYWORD_DO",
+	"return",		//"TOKEN_TYPE_KEYWORD_RETURN",
+	"foreign",		//"TOKEN_TYPE_KEYWORD_FOREIGN",
+	"proc",			//"TOKEN_TYPE_KEYWORD_PROC",
+	"global",		//"TOKEN_TYPE_KEYWORD_GLOBAL",
 
-	"TOKEN_TYPE_RIGHT_ARROW",
-	"TOKEN_TYPE_LEFT_ARROW",
-	"TOKEN_TYPE_OPEN_PAREN",
-	"TOKEN_TYPE_CLOSE_PAREN",
-	"TOKEN_TYPE_OPEN_BRACE",
-	"TOKEN_TYPE_CLOSE_BRACE",
-	"TOKEN_TYPE_OPEN_BRACKET",
-	"TOKEN_TYPE_CLOSE_BRACKET",
-	"TOKEN_TYPE_OPEN_ANGLE",
-	"TOKEN_TYPE_CLOSE_ANGLE",
+	"->", //"TOKEN_TYPE_RIGHT_ARROW",
+	"<-", //"TOKEN_TYPE_LEFT_ARROW",
+	"(",  //"TOKEN_TYPE_OPEN_PAREN",
+	")",  //"TOKEN_TYPE_CLOSE_PAREN",
+	"{",  //"TOKEN_TYPE_OPEN_BRACE",
+	"}",  //"TOKEN_TYPE_CLOSE_BRACE",
+	"[",  //"TOKEN_TYPE_OPEN_BRACKET",
+	"]",  //"TOKEN_TYPE_CLOSE_BRACKET",
+	"<",  //"TOKEN_TYPE_OPEN_ANGLE",
+	">",  //"TOKEN_TYPE_CLOSE_ANGLE",
 
-	"TOKEN_TYPE_SYM_PLUS",
-	"TOKEN_TYPE_SYM_MINUS",
-	"TOKEN_TYPE_SYM_STAR",
-	"TOKEN_TYPE_SYM_PERCENT",
-	"TOKEN_TYPE_SYM_DOT",
-	"TOKEN_TYPE_SYM_FSLASH",
-	"TOKEN_TYPE_SYM_BSLASH",
-	"TOKEN_TYPE_SYM_COLON",
-	"TOKEN_TYPE_SYM_SEMICOLON",
-	"TOKEN_TYPE_SYM_COMMA",
-	"TOKEN_TYPE_SYM_EQUALS",
-	"TOKEN_TYPE_SYM_GRAVE",
-	"TOKEN_TYPE_SYM_TILDE",
-	"TOKEN_TYPE_SYM_BANG",
-	"TOKEN_TYPE_SYM_CARET",
-	"TOKEN_TYPE_SYM_AMPERSAND",
+	"+",  // "TOKEN_TYPE_SYM_PLUS",
+	"-",  // "TOKEN_TYPE_SYM_MINUS",
+	"*",  // "TOKEN_TYPE_SYM_STAR",
+	"%",  // "TOKEN_TYPE_SYM_PERCENT",
+	".",  // "TOKEN_TYPE_SYM_DOT",
+	"/",  // "TOKEN_TYPE_SYM_FSLASH",
+	"\\", // "TOKEN_TYPE_SYM_BSLASH",
+	":",  // "TOKEN_TYPE_SYM_COLON",
+	";",  // "TOKEN_TYPE_SYM_SEMICOLON",
+	",",  // "TOKEN_TYPE_SYM_COMMA",
+	"=",  // "TOKEN_TYPE_SYM_EQUALS",
+	"`",  // "TOKEN_TYPE_SYM_GRAVE",
+	"~",  // "TOKEN_TYPE_SYM_TILDE",
+	"!",  // "TOKEN_TYPE_SYM_BANG",
+	"^",  // "TOKEN_TYPE_SYM_CARET",
+	"&",  // "TOKEN_TYPE_SYM_AMPERSAND",
 
 	"TOKEN_TYPE_SYMBOL",
 	"TOKEN_TYPE_LITERAL_STRING",
@@ -85,8 +85,8 @@ static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, OnyxTok
 	return 0;
 }
 
-const char* onyx_get_token_type_name(OnyxToken tkn) {
-	return onyx_token_type_names[tkn.type];
+const char* onyx_get_token_type_name(OnyxTokenType tkn_type) {
+	return onyx_token_type_names[tkn_type];
 }
 
 void onyx_token_null_toggle(OnyxToken tkn) {
@@ -267,7 +267,7 @@ void onyx_tokenizer_free(OnyxTokenizer* tokenizer) {
 	bh_arr_free(tokenizer->tokens);
 }
 
-void onyx_parse_tokens(OnyxTokenizer* tokenizer) {
+void onyx_lex_tokens(OnyxTokenizer* tokenizer) {
 	OnyxToken* tk;
 	do {
 		tk = onyx_get_token(tokenizer);

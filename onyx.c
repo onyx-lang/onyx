@@ -1,5 +1,5 @@
 #define BH_NO_STRING
-#define BH_DEBUG
+// #define BH_DEBUG
 #define BH_DEFINE
 #include "bh.h"
 
@@ -23,16 +23,16 @@ int main(int argc, char *argv[]) {
 	bh_file_close(&source_file);
 
 	OnyxTokenizer tokenizer = onyx_tokenizer_create(alloc, &fc);
-	onyx_parse_tokens(&tokenizer);
+	onyx_lex_tokens(&tokenizer);
 	bh_arr(OnyxToken) token_arr = tokenizer.tokens;
 
-	printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
+	// printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
-	for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
-		onyx_token_null_toggle(*it);
-		printf("%s '%s' (%s:%ld:%ld)\n", onyx_get_token_type_name(*it), it->token, it->pos.filename, it->pos.line, it->pos.column);
-		onyx_token_null_toggle(*it);
-	}
+	// for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
+	// 	onyx_token_null_toggle(*it);
+	// 	printf("%s '%s' (%s:%ld:%ld)\n", onyx_get_token_type_name(*it), it->token, it->pos.filename, it->pos.line, it->pos.column);
+	// 	onyx_token_null_toggle(*it);
+	// }
 
 	bh_arena msg_arena;
 	bh_arena_init(&msg_arena, alloc, 4096);
@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
 
 	bh_file_contents_delete(&fc);
 	onyx_tokenizer_free(&tokenizer);
+	onyx_parser_free(&parser);
 	bh_arena_free(&msg_arena);
 	bh_arena_free(&ast_arena);
 

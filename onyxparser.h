@@ -104,8 +104,8 @@ struct OnyxAstNodeBlock {
 	OnyxToken *token;
 	OnyxTypeInfo *return_type;
 	OnyxAstNode *next;
+	OnyxAstNode *body;
 	OnyxAstNode *unused1;
-	OnyxAstNode *unused2;
 };
 
 struct OnyxAstNodeParam {
@@ -142,10 +142,13 @@ union OnyxAstNode {
 	};
 
 	OnyxAstNodeBlock as_block;
+	OnyxAstNodeFuncDef as_funcdef;
+	OnyxAstNodeParam as_param;
 };
 
 OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
+void onyx_parser_free(OnyxParser* parser);
 OnyxAstNode* onyx_parse(OnyxParser *parser);
 
 #endif // #ifndef ONYXPARSER_H

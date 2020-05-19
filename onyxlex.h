@@ -79,11 +79,11 @@ typedef struct OnyxTokenizer {
 	bh_arr(OnyxToken) tokens;
 } OnyxTokenizer;
 
-const char* onyx_get_token_type_name(OnyxToken tkn);
+const char* onyx_get_token_type_name(OnyxTokenType tkn_type);
 void onyx_token_null_toggle(OnyxToken tkn);
 OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer);
 OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc);
 void onyx_tokenizer_free(OnyxTokenizer* tokenizer);
-void onyx_parse_tokens(OnyxTokenizer* tokenizer);
+void onyx_lex_tokens(OnyxTokenizer* tokenizer);
 
 #endif
