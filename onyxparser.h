@@ -1,50 +1,63 @@
+#ifndef ONYXPARSER_H
+#define ONYXPARSER_H
+
 #define BH_NO_STRING
 #include "bh.h"
 
 #include "onyxlex.h"
+#include "onyxmsgs.h"
+
+typedef union OnyxAstNode OnyxAstNode;
+typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
+typedef struct OnyxAstNodeParam OnyxAstNodeParam;
+typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
 
 typedef struct OnyxParser {
-	OnyxTokenizer tokenizer;
-	OnyxToken *prev;
-	OnyxToken *curr;
+	OnyxTokenizer *tokenizer;
+	OnyxToken *prev_token;
+	OnyxToken *curr_token;
+
+	bh_hash(OnyxAstNode*) identifiers;
+
+	OnyxMessages *msgs;
 
 	bh_allocator allocator;
 } OnyxParser;
 
 typedef enum OnyxAstNodeKind {
-	ONYX_PARSE_NODE_KIND_ERROR,
-	ONYX_PARSE_NODE_KIND_PROGRAM,
+	ONYX_AST_NODE_KIND_ERROR,
+	ONYX_AST_NODE_KIND_PROGRAM,
 
-	ONYX_PARSE_NODE_KIND_FUNCDEF,
-	ONYX_PARSE_NODE_KIND_BLOCK,
-	ONYX_PARSE_NODE_KIND_SCOPE,
+	ONYX_AST_NODE_KIND_FUNCDEF,
+	ONYX_AST_NODE_KIND_BLOCK,
+	ONYX_AST_NODE_KIND_SCOPE,
 
-	ONYX_PARSE_NODE_KIND_ADD,
-	ONYX_PARSE_NODE_KIND_SUB,
-	ONYX_PARSE_NODE_KIND_MUL,
-	ONYX_PARSE_NODE_KIND_DIVIDE,
-	ONYX_PARSE_NODE_KIND_MODULUS,
-	ONYX_PARSE_NODE_KIND_NEGATE,
+	ONYX_AST_NODE_KIND_ADD,
+	ONYX_AST_NODE_KIND_SUB,
+	ONYX_AST_NODE_KIND_MUL,
+	ONYX_AST_NODE_KIND_DIVIDE,
+	ONYX_AST_NODE_KIND_MODULUS,
+	ONYX_AST_NODE_KIND_NEGATE,
 
-	ONYX_PARSE_NODE_KIND_TYPE,
-	ONYX_PARSE_NODE_KIND_LITERAL,
-	ONYX_PARSE_NODE_KIND_CAST,
-	ONYX_PARSE_NODE_KIND_PARAM,
-	ONYX_PARSE_NODE_KIND_CALL,
-	ONYX_PARSE_NODE_KIND_RETURN,
+	ONYX_AST_NODE_KIND_TYPE,
+	ONYX_AST_NODE_KIND_LITERAL,
+	ONYX_AST_NODE_KIND_CAST,
+	ONYX_AST_NODE_KIND_PARAM,
+	ONYX_AST_NODE_KIND_CALL,
+	ONYX_AST_NODE_KIND_RETURN,
 
-	ONYX_PARSE_NODE_KIND_EQUAL,
-	ONYX_PARSE_NODE_KIND_NOT_EQUAL,
-	ONYX_PARSE_NODE_KIND_GREATER,
-	ONYX_PARSE_NODE_KIND_GREATER_EQUAL,
-	ONYX_PARSE_NODE_KIND_LESS,
-	ONYX_PARSE_NODE_KIND_LESS_EQUAL,
-	ONYX_PARSE_NODE_KIND_NOT,
+	ONYX_AST_NODE_KIND_EQUAL,
+	ONYX_AST_NODE_KIND_NOT_EQUAL,
+	ONYX_AST_NODE_KIND_GREATER,
+	ONYX_AST_NODE_KIND_GREATER_EQUAL,
+	ONYX_AST_NODE_KIND_LESS,
+	ONYX_AST_NODE_KIND_LESS_EQUAL,
+	ONYX_AST_NODE_KIND_NOT,
 
-	ONYX_PARSE_NODE_KIND_IF,
-	ONYX_PARSE_NODE_KIND_LOOP,
+	ONYX_AST_NODE_KIND_IF,
+	ONYX_AST_NODE_KIND_LOOP,
 
-	ONYX_PARSE_NODE_KIND_COUNT
+	ONYX_AST_NODE_KIND_COUNT
 } OnyxAstNodeKind;
 
 typedef enum OnyxTypeInfoKind {
@@ -79,11 +92,6 @@ typedef struct OnyxTypeInfo {
 
 extern OnyxTypeInfo builtin_types[];
 
-typedef union OnyxAstNode OnyxAstNode;
-typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
-typedef struct OnyxAstNodeParam OnyxAstNodeParam;
-typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
-
 typedef enum OnyxAstFlags {
 	ONYX_AST_BLOCK_FLAG_HAS_RETURN = BH_BIT(1),
 	ONYX_AST_BLOCK_FLAG_TOP_LEVEL  = BH_BIT(2),
@@ -103,9 +111,9 @@ struct OnyxAstNodeBlock {
 struct OnyxAstNodeParam {
 	OnyxAstNodeKind kind;
 	u32 flags;
-	OnyxToken *token;
+	OnyxToken *token;			// Symbol name i.e. 'a', 'b'
 	OnyxTypeInfo *type;
-	OnyxAstNode *next;
+	OnyxAstNodeParam *next;
 	OnyxAstNode *left;
 	OnyxAstNode *right;	
 };
@@ -118,7 +126,6 @@ struct OnyxAstNodeFuncDef {
 	OnyxAstNodeBlock *body;
 	OnyxAstNodeParam *params;
 	u64 param_count; // Same size as ptr
-	u64 unused1;
 };
 
 union OnyxAstNode {
@@ -128,15 +135,17 @@ union OnyxAstNode {
 		OnyxAstNodeKind kind;
 		u32 flags;
 		OnyxToken *token;
-		OnyxTypeInfo* type;
+		OnyxTypeInfo *type;
 		OnyxAstNode *next;
 		OnyxAstNode *left;
 		OnyxAstNode *right;
-	} as_node;
+	};
 
 	OnyxAstNodeBlock as_block;
 };
 
-ptr onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer tokenizer);
-OnyxAstNode* onyx_parse(OnyxParser parser);
+OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
+OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
+OnyxAstNode* onyx_parse(OnyxParser *parser);
+
+#endif // #ifndef ONYXPARSER_H

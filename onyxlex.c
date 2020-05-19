@@ -37,7 +37,6 @@ static const char* onyx_token_type_names[] = {
 	"TOKEN_TYPE_SYM_DOT",
 	"TOKEN_TYPE_SYM_FSLASH",
 	"TOKEN_TYPE_SYM_BSLASH",
-	"TOKEN_TYPE_SYM_TYPE_SIGNATURE",
 	"TOKEN_TYPE_SYM_COLON",
 	"TOKEN_TYPE_SYM_SEMICOLON",
 	"TOKEN_TYPE_SYM_COMMA",
@@ -76,8 +75,8 @@ static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, OnyxTok
 		tk->type = type;
 		tk->token = tokenizer->curr;
 		tk->length = len;
-		tk->line_number = tokenizer->line_number;
-		tk->line_column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
+		tk->pos.line = tokenizer->line_number;
+		tk->pos.column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
 
 		tokenizer->curr += len;
 
@@ -90,7 +89,14 @@ const char* onyx_get_token_type_name(OnyxToken tkn) {
 	return onyx_token_type_names[tkn.type];
 }
 
-OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
+void onyx_token_null_toggle(OnyxToken tkn) {
+	static char backup = 0;
+	char tmp = tkn.token[tkn.length];
+	tkn.token[tkn.length] = backup;
+	backup = tmp;
+}
+
+OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	OnyxToken tk;
 
 	// Skip whitespace
@@ -100,8 +106,9 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 	tk.type = TOKEN_TYPE_UNKNOWN;
 	tk.token = tokenizer->curr;
 	tk.length = 1;
-	tk.line_number = tokenizer->line_number;
-	tk.line_column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
+	tk.pos.filename = tokenizer->filename;
+	tk.pos.line = tokenizer->line_number;
+	tk.pos.column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
 
 	if (tokenizer->curr == tokenizer->end) {
 		tk.type = TOKEN_TYPE_END_STREAM;
@@ -110,7 +117,7 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 
 	// Comments
 	if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '*') {
-		tokenizer->curr += 2;	
+		tokenizer->curr += 2;
 		tk.type = TOKEN_TYPE_COMMENT;
 		tk.token = tokenizer->curr;
 		u16 layers = 1;
@@ -122,7 +129,7 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 				tk.type = TOKEN_TYPE_END_STREAM;
 				break;
 			}
-			
+
 			if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '*') {
 				layers++;
 				INCREMENT_CURR_TOKEN(tokenizer);
@@ -132,7 +139,7 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 				layers--;
 				INCREMENT_CURR_TOKEN(tokenizer);
 			}
-		}	
+		}
 
 		INCREMENT_CURR_TOKEN(tokenizer);
 
@@ -168,7 +175,6 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("%", TOKEN_TYPE_SYM_PERCENT);
 	LITERAL_TOKEN("/", TOKEN_TYPE_SYM_FSLASH);
 	LITERAL_TOKEN("\\", TOKEN_TYPE_SYM_BSLASH);
-	LITERAL_TOKEN("::", TOKEN_TYPE_SYM_TYPE_SIGNATURE);
 	LITERAL_TOKEN(":", TOKEN_TYPE_SYM_COLON);
 	LITERAL_TOKEN(";", TOKEN_TYPE_SYM_SEMICOLON);
 	LITERAL_TOKEN(",", TOKEN_TYPE_SYM_COMMA);
@@ -235,26 +241,35 @@ OnyxToken onyx_get_token(OnyxTokenizer* tokenizer) {
 	INCREMENT_CURR_TOKEN(tokenizer);
 
 token_parsed:
-	return tk;
+	bh_arr_push(tokenizer->tokens, tk);
+
+	return &tokenizer->tokens[bh_arr_length(tokenizer->tokens) - 1];
 }
 
-bh_arr(OnyxToken) onyx_parse_tokens(bh_allocator tk_alloc, bh_file_contents *fc) {
+OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc) {
 	OnyxTokenizer tknizer = {
 		.start 			= fc->data,
 		.curr 			= fc->data,
 		.end 			= fc->data + fc->length,
+
+		.filename 		= fc->filename,
+
 		.line_number 	= 1,
 		.line_start 	= fc->data,
+		.tokens			= NULL,
 	};
 
-	bh_arr(OnyxToken) token_arr = NULL;
-	bh_arr_new(tk_alloc, token_arr, 512);
+	bh_arr_new(allocator, tknizer.tokens, 512);
+	return tknizer;
+}
 
-	OnyxToken tk;
+void onyx_tokenizer_free(OnyxTokenizer* tokenizer) {
+	bh_arr_free(tokenizer->tokens);
+}
+
+void onyx_parse_tokens(OnyxTokenizer* tokenizer) {
+	OnyxToken* tk;
 	do {
-		tk = onyx_get_token(&tknizer);
-		bh_arr_push(token_arr, tk);
-	} while (tk.type != TOKEN_TYPE_END_STREAM);
-
-	return token_arr;
+		tk = onyx_get_token(tokenizer);
+	} while (tk->type != TOKEN_TYPE_END_STREAM);
 }

@@ -3,13 +3,6 @@
 
 #include "bh.h"
 
-typedef struct OnyxTokenizer {
-	char *start, *curr, *end;
-
-	char* line_start;
-	u64 line_number;
-} OnyxTokenizer;
-
 typedef enum OnyxTokenType {
 	TOKEN_TYPE_UNKNOWN,
 	TOKEN_TYPE_END_STREAM,
@@ -46,7 +39,6 @@ typedef enum OnyxTokenType {
 	TOKEN_TYPE_SYM_DOT,
 	TOKEN_TYPE_SYM_FSLASH,
 	TOKEN_TYPE_SYM_BSLASH,
-	TOKEN_TYPE_SYM_TYPE_SIGNATURE,
 	TOKEN_TYPE_SYM_COLON,
 	TOKEN_TYPE_SYM_SEMICOLON,
 	TOKEN_TYPE_SYM_COMMA,
@@ -64,15 +56,34 @@ typedef enum OnyxTokenType {
 	TOKEN_TYPE_COUNT
 } OnyxTokenType;
 
+typedef struct OnyxFilePos {
+	const char* filename;
+	u64 line, column;
+} OnyxFilePos;
+
 typedef struct OnyxToken {
 	OnyxTokenType type;
 	isize length;
 	char* token;
-	u64 line_number, line_column;
+	OnyxFilePos pos;
 } OnyxToken;
 
+typedef struct OnyxTokenizer {
+	char *start, *curr, *end;
+
+	const char* filename;
+
+	char* line_start;
+	u64 line_number;
+
+	bh_arr(OnyxToken) tokens;
+} OnyxTokenizer;
+
 const char* onyx_get_token_type_name(OnyxToken tkn);
-OnyxToken onyx_get_token(OnyxTokenizer* tokenizer);
-bh_arr(OnyxToken) onyx_parse_tokens(bh_allocator tk_alloc, bh_file_contents *fc);
+void onyx_token_null_toggle(OnyxToken tkn);
+OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer);
+OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc);
+void onyx_tokenizer_free(OnyxTokenizer* tokenizer);
+void onyx_parse_tokens(OnyxTokenizer* tokenizer);
 
 #endif

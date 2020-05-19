@@ -321,6 +321,7 @@ typedef enum bh_file_standard {
 
 typedef struct bh_file_contents {
 	bh_allocator allocator;
+	const char *filename;
 	isize length;
 	void* data;
 } bh_file_contents;
@@ -389,7 +390,7 @@ typedef struct bh__arr {
 #define bh_arr_last(arr)			((arr)[bh__arrhead(arr)->length - 1])
 #define bh_arr_end(arr, i)			((i) >= &(arr)[bh_arr_length(arr)])
 
-#define bh_arr_new(allocator_, arr, cap)	(bh__arr_grow((allocator_), (void**) &arr, sizeof(*(arr)), cap))
+#define bh_arr_new(allocator_, arr, cap)	(bh__arr_grow((allocator_), (void**) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_free(arr)					(bh__arr_free((void**) &(arr)))
 #define bh_arr_copy(allocator_, arr)		(bh__arr_copy((allocator_), (arr), sizeof(*(arr))))
 
@@ -601,7 +602,7 @@ i64 chars_match(char* ptr1, char* ptr2) {
 
 
 //-------------------------------------------------------------------------------------
-// CUSTOM ALLOCATORS IMPLEMENTATION 
+// CUSTOM ALLOCATORS IMPLEMENTATION
 //-------------------------------------------------------------------------------------
 
 
@@ -716,7 +717,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 			// Size too large for the arena
 			return NULL;
 		}
-		
+
 		if (alloc_arena->size + size >= alloc_arena->arena_size) {
 			alloc_arena->size = sizeof(ptr);
 			bh__arena_internal* new_arena = (bh__arena_internal *) bh_alloc(alloc_arena->backing, alloc_arena->arena_size);
@@ -790,7 +791,7 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
 
 		if (scratch->curr >= scratch->end) {
 			scratch->curr = scratch->memory;
-			retval = scratch->curr;	
+			retval = scratch->curr;
 		}
 	} break;
 
@@ -1103,6 +1104,7 @@ i64 bh_file_size(bh_file* file) {
 bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file) {
 	bh_file_contents fc = {
 		.allocator = alloc,
+		.filename  = file->filename,
 		.length = 0, .data = NULL
 	};
 
@@ -1225,7 +1227,7 @@ void* bh__arr_copy(bh_allocator alloc, void *arr, i32 elemsize) {
 }
 
 void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems) {
-	bh__arr* arrptr = bh__arrhead(*arr);	
+	bh__arr* arrptr = bh__arrhead(*arr);
 
 	if (index >= arrptr->length) return; // Can't delete past the end of the array
 	if (numelems <= 0) return; // Can't delete nothing
@@ -1328,13 +1330,13 @@ found_matching:
 }
 
 b32 bh__hash_has(bh__hash *table, i32 elemsize, char *key) {
-	u64 index = bh__hash_function(key, 0);	
+	u64 index = bh__hash_function(key, 0);
 
 	ptr arrptr = table->arrs[index];
 	if (arrptr == NULL) return 0;
 
 	i32 len = bh_arr_length(arrptr);
-	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;	
+	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;
 
 	while (len--) {
 		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) return 1;
@@ -1348,11 +1350,11 @@ ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);
 
 	ptr arrptr = table->arrs[index];
-	i32 len = bh_arr_length(arrptr);
-	assert(arrptr != NULL);
+	if (arrptr == NULL) return NULL;
 
 	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;
 
+	i32 len = bh_arr_length(arrptr);
 	while (len--) {
 		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) {
 			return bh_pointer_add(arrptr, BH__HASH_STORED_KEY_SIZE);
@@ -1361,7 +1363,7 @@ ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key) {
 		return bh_pointer_add(arrptr, stride);
 	}
 
-	return 0;
+	return NULL;
 }
 
 void bh__hash_delete(bh__hash *table, i32 elemsize, char *key) {
