@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
 
 	// for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
 	// 	onyx_token_null_toggle(*it);
-	// 	printf("%s '%s' (%s:%ld:%ld)\n", onyx_get_token_type_name(*it), it->token, it->pos.filename, it->pos.line, it->pos.column);
+	// 	printf("%s (%s:%ld:%ld)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
 	// 	onyx_token_null_toggle(*it);
 	// }
 

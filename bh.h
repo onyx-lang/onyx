@@ -8,6 +8,7 @@
 
 #include <stdio.h> // TODO: Replace with custom implementation of printf
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h> // TODO: Replace with needed functions
 #include <assert.h>
 
@@ -42,6 +43,7 @@ typedef void* ptr;
 #ifdef BH_DEBUG
 
 void* bh__debug_malloc(size_t size, const char* file, u64 line);
+void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line);
 void  bh__debug_free(void* ptr, const char* file, u64 line);
 void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
 
@@ -121,8 +123,13 @@ i64 chars_match(char* ptr1, char* ptr2);
 //-------------------------------------------------------------------------------------
 // Helpful macros
 //-------------------------------------------------------------------------------------
+#define bh_offset_of(Type, elem)		((isize)&(((Type)*) 0)->elem)
+#define bh_aligh_of(Type)				bh_offset_of(struct { char c; Type member; }, member)
+#define bh_swap(Type, a, b)				do { Type tmp = (a); (a) = (b); (b) = tmp; } while(0)
+
 #define bh_pointer_add(ptr, amm)		((void *)((u8 *) ptr + amm))
 #define BH_BIT(x)						(1 << (x))
+#define BH_MASK_SET(var, set, mask) 	((set) ? (var) |= (mask) : (var) &= ~(mask))
 
 
 
@@ -217,6 +224,7 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 
 
 
+
 //-------------------------------------------------------------------------------------
 // Better strings
 //-------------------------------------------------------------------------------------
@@ -288,7 +296,8 @@ void bh_string_print(bh_string* str);
 
 typedef enum bh_file_error {
 	BH_FILE_ERROR_NONE,
-	BH_FILE_ERROR_INVALID
+	BH_FILE_ERROR_INVALID,
+	BH_FILE_ERROR_BAD_FD,
 } bh_file_error;
 
 typedef enum bh_file_mode {
@@ -353,6 +362,55 @@ bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* fi
 i32 bh_file_contents_delete(bh_file_contents* contents);
 
 #endif
+
+
+
+
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// Alternate printing
+//-------------------------------------------------------------------------------------
+// Barebones implementation of printf. Does not support all format options
+// Currently supports:
+// 		%c - chars
+//		%_(u)d - ints where _ is:
+//			nothing - decimal
+//			o - octal
+//			x - hexadecimal
+//		%_(u)l - longs where _ is:
+//			nothing - decimal
+//			o - octal
+//			x - hexadecimal
+//		%f - floating points
+//		%s - null terminated strings
+//		%p - pointers
+//		%% - literal %
+
+enum bh__print_format {
+	BH__PRINT_FORMAT_DECIMAL 		= BH_BIT(0),
+	BH__PRINT_FORMAT_OCTAL			= BH_BIT(1),
+	BH__PRINT_FORMAT_HEXADECIMAL	= BH_BIT(2),
+	BH__PRINT_FORMAT_UNSIGNED		= BH_BIT(3),
+};
+
+isize bh_printf(char const *fmt, ...);
+isize bh_printf_va(char const *fmt, va_list va);
+isize bh_printf_err(char const *fmt, ...);
+isize bh_printf_err_va(char const *fmt, va_list va);
+isize bh_fprintf(bh_file* f, char const *fmt, ...);
+isize bh_fprintf_va(bh_file* f, char const *fmt, va_list va);
+char* bh_bprintf(char const *fmt, ...);
+char* bh_bprintf_va(char const *fmt, va_list va);
+isize bh_snprintf(char *str, isize n, char const *fmt, ...);
+isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va);
+
+
+
 
 
 
@@ -969,6 +1027,8 @@ bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
 		sd_fd = STDERR_FILENO;
 		filename = "stderr";
 		break;
+	default:
+		return BH_FILE_ERROR_BAD_FD;
 	}
 
 	file->fd = sd_fd;
@@ -1134,6 +1194,164 @@ b32 bh_file_contents_delete(bh_file_contents* contents) {
 }
 
 #endif // ifndef BH_NO_FILE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// ALTERNATE PRINTF IMPLEMENTATION
+//-------------------------------------------------------------------------------------
+isize bh_printf(char const *fmt, ...) {
+	isize res;
+	va_list va;
+	va_start(va, fmt);
+	res = bh_printf_va(fmt, va);
+	va_end(va);
+	return res;
+}
+
+isize bh_printf_va(char const *fmt, va_list va) {
+	bh_file file;
+	bh_file_get_standard(&file, BH_FILE_STANDARD_OUTPUT);
+	return bh_fprintf_va(&file, fmt, va);
+}
+
+isize bh_printf_err(char const *fmt, ...) {
+	isize res;
+	va_list va;
+	va_start(va, fmt);
+	res = bh_printf_err_va(fmt, va);
+	va_end(va);
+	return res;
+}
+
+isize bh_printf_err_va(char const *fmt, va_list va) {
+	bh_file file;
+	bh_file_get_standard(&file, BH_FILE_STANDARD_ERROR);
+	return bh_fprintf_va(&file, fmt, va);
+}
+
+isize bh_fprintf(bh_file* f, char const *fmt, ...) {
+	isize res;
+	va_list va;
+	va_start(va, fmt);
+	res = bh_fprintf_va(f, fmt, va);
+	va_end(va);
+	return res;
+}
+
+isize bh_fprintf_va(bh_file* f, char const *fmt, va_list va) {
+	static char buf[4096];
+	isize len = bh_snprintf_va(buf, sizeof(buf), fmt, va);
+	bh_file_write(f, buf, len - 1);
+	return len;
+}
+
+char* bh_bprintf(char const *fmt, ...) {
+	char* res;
+	va_list va;
+	va_start(va, fmt);
+	res = bh_bprintf_va(fmt, va);
+	va_end(va);
+	return res;
+}
+
+char* bh_bprintf_va(char const *fmt, va_list va) {
+	static char buffer[4096];
+	bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
+	return buffer;
+}
+
+isize bh_snprintf(char *str, isize n, char const *fmt, ...) {
+	isize res;
+	va_list va;
+	va_start(va, fmt);
+	res = bh_snprintf_va(str, n, fmt, va);
+	va_end(va);
+	return res;
+}
+
+isize bh__print_string(char* dest, isize n, char* src) {
+	isize len = 0;
+	while (n-- && (*dest++ = *src++)) len++;
+	return len;
+}
+
+isize bh__printi64(char* str, isize n, enum bh__print_format format, i32 value) {
+	char buf[130];
+	buf[129] = 0;
+	char* walker = buf + 129;
+
+	while (value > 0) {
+		*--walker = '0' + (value % 10);
+		value /= 10;
+	}
+
+	return bh__print_string(str, n, walker);
+}
+
+
+isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
+	char const *text_start = str;
+	isize res;
+
+	while (*fmt) {
+		i32 base = 10, size;
+		isize len = 0;
+
+		while (*fmt && *fmt != '%') {
+			*(str++) = *(fmt++);
+			len++;
+		}
+
+		fmt++;
+
+		switch (*fmt++) {
+		case 'o': base = 8; break;
+		case 'x': base = 16; break;
+		default: fmt--;
+		}
+
+		switch (*fmt) {
+		case 'c': {
+			char c = (char) va_arg(va, int);
+			*(str++) = c;
+		} break;
+
+		case 'd': {
+			i64 value = (i64) va_arg(va, int);
+			len = bh__printi64(str, n, 0, value);
+		} break;
+
+		default: fmt--;
+		}
+
+		fmt++;
+
+		str += len;
+	}
+
+	return str - text_start + 1;
+}
+
+
+
+
+
 
 
 

@@ -1,6 +1,6 @@
 /* This is a comment */
 
-log :: proc (a i32, b i64) -> i32 ---;
+log :: proc (a i32, b i32) -> i32 ---;
 
 add :: proc (a i32, b i32) -> i32 {
 	/* More comments */
