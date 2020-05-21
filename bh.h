@@ -1337,8 +1337,10 @@ isize bh__printi64(char* str, isize n, bh__print_format format, i64 value) {
 	char buf[128];
 	buf[127] = 0;
 	char* walker = buf + 127;
-	b32 negative = value < 0;
 	u32 base = format.base ? format.base : 10, tmp;
+
+	b32 negative = value < 0;
+	if (negative) value = -value;
 
 	if (value == 0) {
 		*--walker = '0';
