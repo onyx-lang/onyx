@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <stdio.h> // TODO: Replace with custom implementation of printf
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h> // TODO: Replace with needed functions
@@ -37,49 +36,6 @@ typedef void* ptr;
 
 
 
-//-------------------------------------------------------------------------------------
-// Better debug functions
-//-------------------------------------------------------------------------------------
-#ifdef BH_DEBUG
-
-void* bh__debug_malloc(size_t size, const char* file, u64 line);
-void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line);
-void  bh__debug_free(void* ptr, const char* file, u64 line);
-void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
-
-#ifdef BH_DEFINE
-
-void* bh__debug_malloc(size_t size, const char* file, u64 line) {
-	void* p = malloc(size);
-	printf("[DEBUG] %p = malloc(%ld) at %s:%ld\n", p, size, file, line);
-	return p;
-}
-
-void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line) {
-	void* p = aligned_alloc(size, alignment);
-	printf("[DEBUG] %p = aligned_alloc(%ld, %ld) at %s:%ld\n", p, alignment, size, file, line);
-	return p;
-}
-
-void bh__debug_free(void* ptr, const char* file, u64 line) {
-	printf("[DEBUG] free(%p) at %s:%ld\n", ptr, file, line);
-	free(ptr);
-}
-
-void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
-	void* p = realloc(ptr, size);
-	printf("[DEBUG] %p = realloc(%p, %ld) at %s:%ld\n", p, ptr, size, file, line);
-	return p;
-}
-
-#endif
-
-#define malloc(size)					(bh__debug_malloc(size, __FILE__, __LINE__))
-#define aligned_alloc(size, alignment)	(bh__debug_aligned_alloc(size, alignment, __FILE__, __LINE__))
-#define free(ptr)						(bh__debug_free(ptr, __FILE__, __LINE__))
-#define realloc(ptr, size)				(bh__debug_realloc(ptr, size, __FILE__, __LINE__))
-
-#endif
 
 
 
@@ -391,12 +347,9 @@ i32 bh_file_contents_delete(bh_file_contents* contents);
 //		%p - pointers
 //		%% - literal %
 
-enum bh__print_format {
-	BH__PRINT_FORMAT_DECIMAL 		= BH_BIT(0),
-	BH__PRINT_FORMAT_OCTAL			= BH_BIT(1),
-	BH__PRINT_FORMAT_HEXADECIMAL	= BH_BIT(2),
-	BH__PRINT_FORMAT_UNSIGNED		= BH_BIT(3),
-};
+typedef struct bh__print_format {
+	u32 base;
+} bh__print_format;
 
 isize bh_printf(char const *fmt, ...);
 isize bh_printf_va(char const *fmt, va_list va);
@@ -408,6 +361,62 @@ char* bh_bprintf(char const *fmt, ...);
 char* bh_bprintf_va(char const *fmt, va_list va);
 isize bh_snprintf(char *str, isize n, char const *fmt, ...);
 isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va);
+
+
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// Better debug functions
+//-------------------------------------------------------------------------------------
+#ifdef BH_DEBUG
+
+void* bh__debug_malloc(size_t size, const char* file, u64 line);
+void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line);
+void  bh__debug_free(void* ptr, const char* file, u64 line);
+void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
+
+#ifdef BH_DEFINE
+
+void* bh__debug_malloc(size_t size, const char* file, u64 line) {
+	void* p = malloc(size);
+	bh_printf("[DEBUG] %p = malloc(%d) at %s:%d\n", p, size, file, line);
+	return p;
+}
+
+void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line) {
+	void* p = aligned_alloc(size, alignment);
+	bh_printf("[DEBUG] %p = aligned_alloc(%d, %d) at %s:%d\n", p, alignment, size, file, line);
+	return p;
+}
+
+void bh__debug_free(void* ptr, const char* file, u64 line) {
+	bh_printf("[DEBUG] free(%p) at %s:%d\n", ptr, file, line);
+	free(ptr);
+}
+
+void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
+	void* p = realloc(ptr, size);
+	bh_printf("[DEBUG] %p = realloc(%p, %d) at %s:%d\n", p, ptr, size, file, line);
+	return p;
+}
+
+#endif
+
+#define malloc(size)					(bh__debug_malloc(size, __FILE__, __LINE__))
+#define aligned_alloc(size, alignment)	(bh__debug_aligned_alloc(size, alignment, __FILE__, __LINE__))
+#define free(ptr)						(bh__debug_free(ptr, __FILE__, __LINE__))
+#define realloc(ptr, size)				(bh__debug_realloc(ptr, size, __FILE__, __LINE__))
+
+#endif
+
+
+
+
+
 
 
 
@@ -781,7 +790,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 			bh__arena_internal* new_arena = (bh__arena_internal *) bh_alloc(alloc_arena->backing, alloc_arena->arena_size);
 
 			if (new_arena == NULL) {
-				fprintf(stderr, "Arena Allocator: couldn't allocate new arena");
+				bh_printf_err("Arena Allocator: couldn't allocate new arena");
 				return NULL;
 			}
 
@@ -1291,26 +1300,84 @@ isize bh__print_string(char* dest, isize n, char* src) {
 	return len;
 }
 
-isize bh__printi64(char* str, isize n, enum bh__print_format format, i32 value) {
-	char buf[130];
-	buf[129] = 0;
-	char* walker = buf + 129;
+isize bh__printu64(char* str, isize n, bh__print_format format, u64 value) {
+	char buf[128];
+	buf[127] = 0;
+	char* walker = buf + 127;
+	u32 base = format.base ? format.base : 10, tmp;
 
 	while (value > 0) {
-		*--walker = '0' + (value % 10);
-		value /= 10;
+		tmp = value % base;
+		if (tmp > 9) {
+			switch (tmp) {
+			case 10: tmp = 'a'; break;
+			case 11: tmp = 'b'; break;
+			case 12: tmp = 'c'; break;
+			case 13: tmp = 'd'; break;
+			case 14: tmp = 'e'; break;
+			case 15: tmp = 'f'; break;
+			}
+		} else {
+			tmp += '0';
+		}
+
+		*--walker = tmp;
+		value /= base;
+	}
+
+	if (format.base == 16) {
+		*--walker = 'x';
+		*--walker = '0';
 	}
 
 	return bh__print_string(str, n, walker);
 }
 
+isize bh__printi64(char* str, isize n, bh__print_format format, i64 value) {
+	char buf[128];
+	buf[127] = 0;
+	char* walker = buf + 127;
+	b32 negative = value < 0;
+	u32 base = format.base ? format.base : 10, tmp;
 
+	while (value > 0) {
+		tmp = value % base;
+		if (tmp > 9) {
+			switch (tmp) {
+			case 10: tmp = 'a'; break;
+			case 11: tmp = 'b'; break;
+			case 12: tmp = 'c'; break;
+			case 13: tmp = 'd'; break;
+			case 14: tmp = 'e'; break;
+			case 15: tmp = 'f'; break;
+			}
+		} else {
+			tmp += '0';
+		}
+
+		*--walker = tmp;
+		value /= base;
+	}
+
+	if (negative) {
+		*--walker = '-';
+	}
+
+	if (format.base == 16) {
+		*--walker = 'x';
+		*--walker = '0';
+	}
+
+	return bh__print_string(str, n, walker);
+}
+
+// TODO: This is very hacked together but for now it will work.
 isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
 	char const *text_start = str;
 	isize res;
 
 	while (*fmt) {
-		i32 base = 10, size;
+		bh__print_format format = { 0 };
 		isize len = 0;
 
 		while (*fmt && *fmt != '%') {
@@ -1318,11 +1385,13 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
 			len++;
 		}
 
+		if (!*fmt) goto end_of_format;
+
 		fmt++;
 
 		switch (*fmt++) {
-		case 'o': base = 8; break;
-		case 'x': base = 16; break;
+		case 'o': format.base = 8; break;
+		case 'x': format.base = 16; break;
 		default: fmt--;
 		}
 
@@ -1334,7 +1403,23 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
 
 		case 'd': {
 			i64 value = (i64) va_arg(va, int);
-			len = bh__printi64(str, n, 0, value);
+			len = bh__printi64(str, n, format, value);
+		} break;
+
+		case 'l': {
+			i64 value = (i64) va_arg(va, long);
+			len = bh__printi64(str, n, format, value);
+		} break;
+
+		case 'p': {
+			u64 value = (u64) va_arg(va, ptr);
+			format.base = 16;
+			len = bh__printu64(str, n, format, value);
+		} break;
+
+		case 's': {
+			char* s = va_arg(va, char *);
+			len = bh__print_string(str, n, s);
 		} break;
 
 		default: fmt--;
@@ -1342,7 +1427,9 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
 
 		fmt++;
 
+end_of_format:
 		str += len;
+		n -= len;
 	}
 
 	return str - text_start + 1;

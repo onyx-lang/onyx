@@ -3,8 +3,6 @@
 #define BH_DEFINE
 #include "bh.h"
 
-#include <stdio.h> // TODO: Replace with custom lib
-
 #include "onyxlex.h"
 #include "onyxmsgs.h"
 #include "onyxparser.h"
@@ -13,7 +11,7 @@ int main(int argc, char *argv[]) {
 	bh_file source_file;
 	bh_file_error err = bh_file_open(&source_file, argv[1]);
 	if (err != BH_FILE_ERROR_NONE) {
-		fprintf(stderr, "Failed to open file %s\n", argv[1]);
+		bh_printf_err("Failed to open file %s\n", argv[1]);
 		return EXIT_FAILURE;
 	}
 

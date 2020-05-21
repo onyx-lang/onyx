@@ -122,7 +122,6 @@ static OnyxAstNode* parse_statement(OnyxParser* parser) {
 		return NULL;
 
 	default:
-		printf("ERROR\n");
 		parser_next_token(parser);
 		return NULL;
 	}

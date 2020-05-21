@@ -14,7 +14,7 @@ void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos,
 
 	va_list arg_list;
 	va_start(arg_list, pos);
-	vsnprintf(msg->text, ONYX_MSG_BUFFER_SIZE, msg_formats[type], arg_list);
+	bh_snprintf_va(msg->text, ONYX_MSG_BUFFER_SIZE, msg_formats[type], arg_list);
 	va_end(arg_list);
 
 	OnyxMessage** walker = &msgs->first;
@@ -30,12 +30,12 @@ void onyx_message_print(OnyxMessages* msgs) {
 
 	while (msg) {
 		if (msg->pos.filename) {
-			printf("(%s:%ld:%ld) %s\n", msg->pos.filename, msg->pos.line, msg->pos.column, msg->text);
+			bh_printf("(%s:%l:%l) %s\n", msg->pos.filename, msg->pos.line, msg->pos.column, msg->text);
 		} else {
-			printf("(%ld:%ld) %s\n", msg->pos.line, msg->pos.column, msg->text);
+			bh_printf("(%l:%l) %s\n", msg->pos.line, msg->pos.column, msg->text);
 		}
 		msg = msg->next;
-	}	
+	}
 }
 
 void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs) {
