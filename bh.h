@@ -1340,23 +1340,27 @@ isize bh__printi64(char* str, isize n, bh__print_format format, i64 value) {
 	b32 negative = value < 0;
 	u32 base = format.base ? format.base : 10, tmp;
 
-	while (value > 0) {
-		tmp = value % base;
-		if (tmp > 9) {
-			switch (tmp) {
-			case 10: tmp = 'a'; break;
-			case 11: tmp = 'b'; break;
-			case 12: tmp = 'c'; break;
-			case 13: tmp = 'd'; break;
-			case 14: tmp = 'e'; break;
-			case 15: tmp = 'f'; break;
+	if (value == 0) {
+		*--walker = '0';
+	} else {
+		while (value > 0) {
+			tmp = value % base;
+			if (tmp > 9) {
+				switch (tmp) {
+				case 10: tmp = 'a'; break;
+				case 11: tmp = 'b'; break;
+				case 12: tmp = 'c'; break;
+				case 13: tmp = 'd'; break;
+				case 14: tmp = 'e'; break;
+				case 15: tmp = 'f'; break;
+				}
+			} else {
+				tmp += '0';
 			}
-		} else {
-			tmp += '0';
-		}
 
-		*--walker = tmp;
-		value /= base;
+			*--walker = tmp;
+			value /= base;
+		}
 	}
 
 	if (negative) {
@@ -1382,7 +1386,6 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
 
 		while (*fmt && *fmt != '%') {
 			*(str++) = *(fmt++);
-			len++;
 		}
 
 		if (!*fmt) goto end_of_format;
