@@ -2,6 +2,7 @@ OBJ_FILES=\
 	onyxlex.o \
 	onyxparser.o \
 	onyxmsgs.o \
+	onyxutils.o \
 	onyx.o
 
 CC=gcc

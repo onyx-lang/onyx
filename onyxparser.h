@@ -8,16 +8,26 @@
 #include "onyxmsgs.h"
 
 typedef union OnyxAstNode OnyxAstNode;
+typedef struct OnyxAstNodeLocal OnyxAstNodeLocal;
+typedef struct OnyxAstNodeScope OnyxAstNodeScope;
 typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
 typedef struct OnyxAstNodeParam OnyxAstNodeParam;
 typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
 
 typedef struct OnyxParser {
-	OnyxTokenizer *tokenizer;
+	OnyxTokenizer *tokenizer; // NOTE: not used since all tokens are lexed before parsing starts
 	OnyxToken *prev_token;
 	OnyxToken *curr_token;
 
+	// BUG: This way of handling identifiers will work for now,
+	// but it will not allow for shadowing. Also, variable names
+	// cannot be the same as any function or global variable.
+	// That will get annoying to program.
+	// NOTE: A table of the current identifiers in the current scope.
+	// If the identifier doesn't at the time of parsing, it is an error.
+	// Cleared at the end of a block.
 	bh_hash(OnyxAstNode*) identifiers;
+	OnyxAstNodeScope *curr_scope;
 
 	OnyxMessages *msgs;
 
@@ -31,10 +41,11 @@ typedef enum OnyxAstNodeKind {
 	ONYX_AST_NODE_KIND_FUNCDEF,
 	ONYX_AST_NODE_KIND_BLOCK,
 	ONYX_AST_NODE_KIND_SCOPE,
+	ONYX_AST_NODE_KIND_LOCAL,
 
 	ONYX_AST_NODE_KIND_ADD,
-	ONYX_AST_NODE_KIND_SUB,
-	ONYX_AST_NODE_KIND_MUL,
+	ONYX_AST_NODE_KIND_MINUS,
+	ONYX_AST_NODE_KIND_MULTIPLY,
 	ONYX_AST_NODE_KIND_DIVIDE,
 	ONYX_AST_NODE_KIND_MODULUS,
 	ONYX_AST_NODE_KIND_NEGATE,
@@ -44,6 +55,7 @@ typedef enum OnyxAstNodeKind {
 	ONYX_AST_NODE_KIND_CAST,
 	ONYX_AST_NODE_KIND_PARAM,
 	ONYX_AST_NODE_KIND_CALL,
+	ONYX_AST_NODE_KIND_ASSIGNMENT,
 	ONYX_AST_NODE_KIND_RETURN,
 
 	ONYX_AST_NODE_KIND_EQUAL,
@@ -75,7 +87,7 @@ typedef enum OnyxTypeInfoKind {
 	ONYX_TYPE_INFO_KIND_INT32,
 	ONYX_TYPE_INFO_KIND_INT64,
 
-	ONYX_TYPE_INFO_KIND_FLOAT32,	
+	ONYX_TYPE_INFO_KIND_FLOAT32,
 	ONYX_TYPE_INFO_KIND_FLOAT64,
 	ONYX_TYPE_INFO_KIND_SOFT_FLOAT, // 64-bits of data but could be treated as 32-bit
 } OnyxTypeInfoKind;
@@ -93,10 +105,31 @@ typedef struct OnyxTypeInfo {
 extern OnyxTypeInfo builtin_types[];
 
 typedef enum OnyxAstFlags {
-	ONYX_AST_BLOCK_FLAG_HAS_RETURN = BH_BIT(1),
-	ONYX_AST_BLOCK_FLAG_TOP_LEVEL  = BH_BIT(2),
-	ONYX_AST_BLOCK_FLAG_EXPORTED   = BH_BIT(3),
+	ONYX_AST_FLAG_HAS_RETURN = BH_BIT(1),
+	ONYX_AST_FLAG_TOP_LEVEL  = BH_BIT(2),
+	ONYX_AST_FLAG_EXPORTED   = BH_BIT(3),
+	ONYX_AST_FLAG_FUNCTION_PARAM = BH_BIT(3),
 } OnyxAstFlags;
+
+struct OnyxAstNodeLocal {
+	OnyxAstNodeKind kind;
+	u32 flags;
+	OnyxToken *token;
+	OnyxTypeInfo *type;
+	OnyxAstNodeLocal *prev_local;
+	OnyxAstNode *unused1;
+	OnyxAstNode *unused2;
+};
+
+struct OnyxAstNodeScope {
+	OnyxAstNodeKind kind;
+	u32 flags;
+	OnyxToken *token;	// NOTE: UNUSED
+	OnyxTypeInfo *type; // NOTE: UNUSED
+	OnyxAstNodeScope *prev_scope;
+	OnyxAstNodeLocal *last_local;
+	OnyxAstNode *unused;
+};
 
 struct OnyxAstNodeBlock {
 	OnyxAstNodeKind kind;
@@ -105,7 +138,7 @@ struct OnyxAstNodeBlock {
 	OnyxTypeInfo *return_type;
 	OnyxAstNode *next;
 	OnyxAstNode *body;
-	OnyxAstNode *unused1;
+	OnyxAstNodeScope *scope; // NOTE: Only set on blocks belonging to functions
 };
 
 struct OnyxAstNodeParam {
@@ -114,8 +147,8 @@ struct OnyxAstNodeParam {
 	OnyxToken *token;			// Symbol name i.e. 'a', 'b'
 	OnyxTypeInfo *type;
 	OnyxAstNodeParam *next;
-	OnyxAstNode *left;
-	OnyxAstNode *right;	
+	u64 param_count;
+	OnyxAstNode *right;
 };
 
 struct OnyxAstNodeFuncDef {
@@ -123,9 +156,9 @@ struct OnyxAstNodeFuncDef {
 	u32 flags;
 	OnyxToken *token; // This will point to the symbol token to identify it
 	OnyxTypeInfo *return_type;
+	OnyxAstNode *next;
 	OnyxAstNodeBlock *body;
 	OnyxAstNodeParam *params;
-	u64 param_count; // Same size as ptr
 };
 
 union OnyxAstNode {
@@ -146,6 +179,7 @@ union OnyxAstNode {
 	OnyxAstNodeParam as_param;
 };
 
+const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);
 OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
 void onyx_parser_free(OnyxParser* parser);

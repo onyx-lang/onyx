@@ -6,6 +6,7 @@
 #include "onyxlex.h"
 #include "onyxmsgs.h"
 #include "onyxparser.h"
+#include "onyxutils.h"
 
 int main(int argc, char *argv[]) {
 	bh_file source_file;
@@ -24,11 +25,11 @@ int main(int argc, char *argv[]) {
 	onyx_lex_tokens(&tokenizer);
 	bh_arr(OnyxToken) token_arr = tokenizer.tokens;
 
-	// printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
+	// bh_printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
 	// for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
 	// 	onyx_token_null_toggle(*it);
-	// 	printf("%s (%s:%ld:%ld)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
+	// 	bh_printf("%s (%s:%l:%l)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
 	// 	onyx_token_null_toggle(*it);
 	// }
 
@@ -47,6 +48,7 @@ int main(int argc, char *argv[]) {
 	OnyxAstNode* program = onyx_parse(&parser);
 
 	onyx_message_print(&msgs);
+	onyx_ast_print(program);
 
 	bh_file_contents_delete(&fc);
 	onyx_tokenizer_free(&tokenizer);

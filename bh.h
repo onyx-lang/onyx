@@ -737,6 +737,7 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
 // ARENA ALLOCATOR IMPLEMENTATION
 void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size) {
+	arena_size = bh_max(arena_size, sizeof(ptr));
 	ptr data = bh_alloc(backing, arena_size);
 
 	alloc->backing = backing;
@@ -780,7 +781,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
 		// TODO: Do this better because right now bh__align is bad
 		// size = bh__align(size, alignment);
-		if (size > alloc_arena->arena_size) {
+		if (size > alloc_arena->arena_size - sizeof(ptr)) {
 			// Size too large for the arena
 			return NULL;
 		}
@@ -1427,6 +1428,12 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
 			len = bh__print_string(str, n, s);
 		} break;
 
+		case 'b': { // String with a length (not null terminated)
+			char* s = va_arg(va, char *);
+			i32 l = va_arg(va, int);
+			len = bh__print_string(str, bh_min(l, n), s);
+		} break;
+
 		default: fmt--;
 		}
 
@@ -1670,7 +1677,7 @@ ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key) {
 			return bh_pointer_add(arrptr, BH__HASH_STORED_KEY_SIZE);
 		}
 
-		return bh_pointer_add(arrptr, stride);
+		arrptr = bh_pointer_add(arrptr, stride);
 	}
 
 	return NULL;
@@ -1679,21 +1686,23 @@ ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key) {
 void bh__hash_delete(bh__hash *table, i32 elemsize, char *key) {
 	u64 index = bh__hash_function(key, 0);
 
-	ptr arrptr = table->arrs[index];
-	i32 len = bh_arr_length(arrptr);
+	ptr arrptr = table->arrs[index], walker;
 	if (arrptr == NULL) return; // Didn't exist
+	walker = arrptr;
 
 	i32 stride = elemsize + BH__HASH_STORED_KEY_SIZE;
 	i32 i = 0;
 
-	while (len && strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) != 0) {
-		arrptr = bh_pointer_add(arrptr, stride);
+	i32 len = bh_arr_length(arrptr);
+	while (len && strncmp(key, (char *) walker, BH__HASH_STORED_KEY_SIZE) != 0) {
+		walker = bh_pointer_add(walker, stride);
 		i++, len--;
 	}
 
 	if (len == 0) return; // Didn't exist
 
-	bh__arr_deleten((void **) &arrptr, elemsize, i, 1);
+	bh__arr_deleten((void **) &arrptr, stride, i, 1);
+	table->arrs[index] = arrptr;
 }
 
 bh_hash_iterator bh__hash_iter_setup(bh__hash *table, i32 elemsize) {
@@ -1730,6 +1739,10 @@ step_to_next:
 
 	it->entry = *it->tab;
 	it->arrlen = bh_arr_length(it->entry);
+	if (it->arrlen <= 0) {
+		it->tab++;
+		goto step_to_next;
+	}
 	return 1;
 }
 
