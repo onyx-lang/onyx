@@ -104,11 +104,11 @@ typedef struct OnyxTypeInfo {
 
 extern OnyxTypeInfo builtin_types[];
 
+// NOTE: Some of these flags will overlap since there are
+// only 32-bits of flags to play with
 typedef enum OnyxAstFlags {
-	ONYX_AST_FLAG_HAS_RETURN = BH_BIT(1),
-	ONYX_AST_FLAG_TOP_LEVEL  = BH_BIT(2),
-	ONYX_AST_FLAG_EXPORTED   = BH_BIT(3),
-	ONYX_AST_FLAG_FUNCTION_PARAM = BH_BIT(3),
+	// Top-level flags
+	ONYX_AST_FLAG_EXPORTED   = BH_BIT(1),
 } OnyxAstFlags;
 
 struct OnyxAstNodeLocal {
@@ -117,7 +117,7 @@ struct OnyxAstNodeLocal {
 	OnyxToken *token;
 	OnyxTypeInfo *type;
 	OnyxAstNodeLocal *prev_local;
-	OnyxAstNode *unused1;
+	OnyxAstNode *shadowed;
 	OnyxAstNode *unused2;
 };
 
@@ -177,6 +177,8 @@ union OnyxAstNode {
 	OnyxAstNodeBlock as_block;
 	OnyxAstNodeFuncDef as_funcdef;
 	OnyxAstNodeParam as_param;
+	OnyxAstNodeLocal as_local;
+	OnyxAstNodeScope as_scope;
 };
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);

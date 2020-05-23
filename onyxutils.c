@@ -23,4 +23,5 @@ void onyx_ast_print(OnyxAstNode* node) {
 		onyx_ast_print(node->next);
 		bh_printf("}");
 	}
+
 }

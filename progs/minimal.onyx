@@ -10,5 +10,7 @@ export add :: proc (a i32, b i32) -> i32 {
 export mul :: proc (a i32, b i32) -> i32 {
 	c: i32 = a - b;
 	d := a + 2;
+
+	e: i32;
 	return c * d;
 };
