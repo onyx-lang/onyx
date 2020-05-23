@@ -15,6 +15,7 @@ static const char* onyx_token_type_names[] = {
 	"for",			//"TOKEN_TYPE_KEYWORD_FOR",
 	"do",			//"TOKEN_TYPE_KEYWORD_DO",
 	"return",		//"TOKEN_TYPE_KEYWORD_RETURN",
+	"const",		//"TOKEN_TYPE_KEYWORD_CONST",
 	"foreign",		//"TOKEN_TYPE_KEYWORD_FOREIGN",
 	"proc",			//"TOKEN_TYPE_KEYWORD_PROC",
 	"global",		//"TOKEN_TYPE_KEYWORD_GLOBAL",
@@ -155,6 +156,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("foreign", TOKEN_TYPE_KEYWORD_FOREIGN);
 	LITERAL_TOKEN("for", TOKEN_TYPE_KEYWORD_FOR);
 	LITERAL_TOKEN("return", TOKEN_TYPE_KEYWORD_RETURN);
+	LITERAL_TOKEN("const", TOKEN_TYPE_KEYWORD_CONST);
 	LITERAL_TOKEN("do", TOKEN_TYPE_KEYWORD_DO);
 	LITERAL_TOKEN("proc", TOKEN_TYPE_KEYWORD_PROC);
 	LITERAL_TOKEN("global", TOKEN_TYPE_KEYWORD_GLOBAL);

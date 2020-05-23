@@ -25,13 +25,15 @@ int main(int argc, char *argv[]) {
 	onyx_lex_tokens(&tokenizer);
 	bh_arr(OnyxToken) token_arr = tokenizer.tokens;
 
-	// bh_printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
+#if 0
+	bh_printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
-	// for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
-	// 	onyx_token_null_toggle(*it);
-	// 	bh_printf("%s (%s:%l:%l)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
-	// 	onyx_token_null_toggle(*it);
-	// }
+	for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
+		onyx_token_null_toggle(*it);
+		bh_printf("%s (%s:%l:%l)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
+		onyx_token_null_toggle(*it);
+	}
+#endif
 
 	bh_arena msg_arena;
 	bh_arena_init(&msg_arena, alloc, 4096);
@@ -47,8 +49,13 @@ int main(int argc, char *argv[]) {
 	OnyxParser parser = onyx_parser_create(ast_alloc, &tokenizer, &msgs);
 	OnyxAstNode* program = onyx_parse(&parser);
 
-	onyx_message_print(&msgs);
-	onyx_ast_print(program);
+	// NOTE: if there are errors, assume the parse tree was generated wrong,
+	// even if it may have still been generated correctly.
+	if (onyx_message_has_errors(&msgs)) {
+		onyx_message_print(&msgs);
+	} else {
+		onyx_ast_print(program);
+	}
 
 	bh_file_contents_delete(&fc);
 	onyx_tokenizer_free(&tokenizer);

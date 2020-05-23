@@ -4,7 +4,10 @@
 static const char* msg_formats[] = {
 	"expected token '%s', got '%s'",
 	"unexpected token '%s'",
-	"unknown type '%s'"
+	"unknown type '%s'",
+	"expected lval '%s'",
+	"attempt to assign to constant '%s'",
+	"unknown symbol '%s'",
 };
 
 void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...) {
@@ -36,6 +39,10 @@ void onyx_message_print(OnyxMessages* msgs) {
 		}
 		msg = msg->next;
 	}
+}
+
+b32 onyx_message_has_errors(OnyxMessages* msgs) {
+	return msgs->first != NULL;
 }
 
 void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs) {

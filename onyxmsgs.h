@@ -12,10 +12,13 @@ typedef enum OnyxMessageType {
 	ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
 	ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
 	ONYX_MESSAGE_TYPE_UNKNOWN_TYPE,
+	ONYX_MESSAGE_TYPE_NOT_LVAL,
+	ONYX_MESSAGE_TYPE_ASSIGN_CONST,
+	ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
 
 	ONYX_MESSAGE_TYPE_COUNT,
 } OnyxMessageType;
-	
+
 typedef struct OnyxMessage {
 	OnyxMessageType type;
 	OnyxFilePos pos;
@@ -31,6 +34,7 @@ typedef struct OnyxMessages {
 
 void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...);
 void onyx_message_print(OnyxMessages* msgs);
+b32 onyx_message_has_errors(OnyxMessages* msgs);
 void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs);
 
 #endif
