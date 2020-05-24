@@ -120,7 +120,18 @@ struct OnyxAstNodeLocal {
 	OnyxTypeInfo *type;
 	OnyxAstNodeLocal *prev_local;
 	OnyxAstNode *shadowed;
-	OnyxAstNode *unused2;
+	OnyxAstNode *unused;
+};
+
+// NOTE: Needs to have shadowed in the same position as OnyxAstNodeLocal
+struct OnyxAstNodeParam {
+	OnyxAstNodeKind kind;
+	u32 flags;
+	OnyxToken *token;			// Symbol name i.e. 'a', 'b'
+	OnyxTypeInfo *type;
+	OnyxAstNodeParam *next;
+	OnyxAstNode *shadowed;
+	u64 param_count;
 };
 
 struct OnyxAstNodeScope {
@@ -141,16 +152,6 @@ struct OnyxAstNodeBlock {
 	OnyxAstNode *next;
 	OnyxAstNode *body;
 	OnyxAstNodeScope *scope; // NOTE: Only set on blocks belonging to functions
-};
-
-struct OnyxAstNodeParam {
-	OnyxAstNodeKind kind;
-	u32 flags;
-	OnyxToken *token;			// Symbol name i.e. 'a', 'b'
-	OnyxTypeInfo *type;
-	OnyxAstNodeParam *next;
-	u64 param_count;
-	OnyxAstNode *right;
 };
 
 struct OnyxAstNodeFuncDef {

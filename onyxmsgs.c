@@ -8,6 +8,7 @@ static const char* msg_formats[] = {
 	"expected lval '%s'",
 	"attempt to assign to constant '%s'",
 	"unknown symbol '%s'",
+	"redefinition of function '%s'",
 };
 
 void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...) {

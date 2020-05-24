@@ -1,19 +1,21 @@
 /* This is a comment */
 
 /* Currently the "foreign" keyword doesn't do anything */
-foreign "console" log :: proc (a i32, b i32) -> i32 ---;
+foreign "console" log :: proc (a i32, b i32) -> i32 ---
 
 export add :: proc (a i32, b i32) -> i32 {
 	/* More comments */
 	return a + b;
-};
+}
+
+c :: proc () -> void ---
 
 export mul :: proc (a i32, b i32) -> i32 {
 	c: const i32 = a - b;
 
 	/*  Don't love this syntax, but it's easy to parse so whatever
 		Inferred type, but constant */
-	d: const = a + 2;
+	d: const = a + b;
 
 	return c * d;
-};
+}

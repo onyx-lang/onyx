@@ -72,7 +72,8 @@ static b32 is_terminating_token(OnyxTokenType token_type);
 static OnyxToken* expect(OnyxParser* parser, OnyxTokenType token_type);
 static OnyxAstNodeScope* enter_scope(OnyxParser* parser);
 static OnyxAstNodeScope* leave_scope(OnyxParser* parser);
-static void insert_local(OnyxParser* parser, OnyxAstNodeLocal* local);
+static void insert_identifier(OnyxParser* parser, OnyxAstNode* ident, b32 is_local);
+static void remove_identifier(OnyxParser* parser, OnyxAstNode* ident);
 static OnyxAstNode* parse_factor(OnyxParser* parser);
 static OnyxAstNode* parse_bin_op(OnyxParser* parser, OnyxAstNode* left);
 static OnyxAstNode* parse_expression(OnyxParser* parser);
@@ -146,16 +147,7 @@ static OnyxAstNodeScope* leave_scope(OnyxParser* parser) {
 	assert(parser->curr_scope != NULL);
 
 	for (OnyxAstNodeLocal *walker = parser->curr_scope->last_local; walker != NULL; walker = walker->prev_local) {
-		onyx_token_null_toggle(*walker->token);
-
-		if (walker->shadowed) {
-			// NOTE: Restore shadowed variable
-			bh_hash_put(OnyxAstNode*, parser->identifiers, walker->token->token, walker->shadowed);
-		} else {
-			bh_hash_delete(OnyxAstNode*, parser->identifiers, walker->token->token);
-		}
-
-		onyx_token_null_toggle(*walker->token);
+		remove_identifier(parser, (OnyxAstNode *) walker);
 	}
 
 	parser->curr_scope = parser->curr_scope->prev_scope;
@@ -174,17 +166,32 @@ static OnyxAstNode* lookup_identifier(OnyxParser* parser, OnyxToken* token) {
 	return ident;
 }
 
-static void insert_local(OnyxParser* parser, OnyxAstNodeLocal* local) {
-	OnyxAstNodeScope* scope = parser->curr_scope;
-	local->prev_local = scope->last_local;
-	scope->last_local = local;
+static void insert_identifier(OnyxParser* parser, OnyxAstNode* ident, b32 is_local) {
+	OnyxAstNodeLocal* local = (OnyxAstNodeLocal *) ident;
+	if (is_local) {
+		OnyxAstNodeScope* scope = parser->curr_scope;
+		local->prev_local = scope->last_local;
+		scope->last_local = local;
+	}
 
 	onyx_token_null_toggle(*local->token);
-	if (bh_hash_has(OnyxAstNodeLocal*, parser->identifiers, local->token->token)) {
+	if (bh_hash_has(OnyxAstNode*, parser->identifiers, local->token->token)) {
 		local->shadowed = bh_hash_get(OnyxAstNode*, parser->identifiers, local->token->token);
 	}
 
 	bh_hash_put(OnyxAstNodeLocal*, parser->identifiers, local->token->token, local);
+	onyx_token_null_toggle(*local->token);
+}
+
+static void remove_identifier(OnyxParser* parser, OnyxAstNode* ident) {
+	OnyxAstNodeLocal* local = (OnyxAstNodeLocal *) ident;
+
+	onyx_token_null_toggle(*local->token);
+	if (local->shadowed) {
+		bh_hash_put(OnyxAstNode*, parser->identifiers, local->token->token, local->shadowed);
+	} else {
+		bh_hash_delete(OnyxAstNode*, parser->identifiers, local->token->token);
+	}
 	onyx_token_null_toggle(*local->token);
 }
 
@@ -296,7 +303,7 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 		local->type = type;
 		local->flags |= flags;
 
-		insert_local(parser, local);
+		insert_identifier(parser, (OnyxAstNode *) local, 1);
 
 		if (parser->curr_token->type == TOKEN_TYPE_SYM_EQUALS) {
 			parser_next_token(parser);
@@ -528,21 +535,16 @@ static OnyxAstNodeFuncDef* parse_function_definition(OnyxParser* parser) {
 	OnyxTypeInfo* return_type = parse_type(parser);
 	func_def->return_type = return_type;
 
-	// BUG: if a param has the same name as a global or function, that global/function
-	// will no longer be in scope after the function body ends
 	for (OnyxAstNodeParam* p = func_def->params; p != NULL; p = p->next) {
-		onyx_token_null_toggle(*p->token);
-		bh_hash_put(OnyxAstNode*, parser->identifiers, p->token->token, (OnyxAstNode*) p);
-		onyx_token_null_toggle(*p->token);
+		insert_identifier(parser, (OnyxAstNode *) p, 0);
 	}
 
 	func_def->body = parse_block(parser, 1);
 
 	for (OnyxAstNodeParam* p = func_def->params; p != NULL; p = p->next) {
-		onyx_token_null_toggle(*p->token);
-		bh_hash_delete(OnyxAstNode*, parser->identifiers, p->token->token);
-		onyx_token_null_toggle(*p->token);
+		remove_identifier(parser, (OnyxAstNode *) p);
 	}
+
 	return func_def;
 }
 
@@ -578,6 +580,23 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
         if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_PROC) {
             OnyxAstNodeFuncDef* func_def = parse_function_definition(parser);
             func_def->token = symbol;
+
+			onyx_token_null_toggle(*symbol);
+
+			if (!bh_hash_has(OnyxAstNode *, parser->identifiers, symbol->token)) {
+				bh_hash_put(OnyxAstNode *, parser->identifiers, symbol->token, (OnyxAstNode *) func_def);
+			} else {
+				onyx_message_add(parser->msgs,
+					ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
+					symbol->pos,
+					symbol->token);
+
+				// NOTE: I really wish C had defer...
+				onyx_token_null_toggle(*symbol);
+				return NULL;
+			}
+
+			onyx_token_null_toggle(*symbol);
             return (OnyxAstNode *) func_def;
 
         } else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_STRUCT) {
