@@ -8,13 +8,13 @@ export add :: proc (a i32, b i32) -> i32 {
 	return a + b;
 }
 
-c :: proc () -> void ---
-
 export mul :: proc (a i32, b i32) -> i32 {
+	/* Typechecked */
 	c: const i32 = a - b;
 
 	/*  Don't love this syntax, but it's easy to parse so whatever
 		Inferred type, but constant */
+	/* a and b are both i32, so i32 + i32 is i32 so d is i32 */
 	d: const = a + b;
 
 	return c * d;

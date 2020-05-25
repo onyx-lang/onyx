@@ -207,6 +207,13 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 	case TOKEN_TYPE_SYMBOL: {
 		OnyxToken* sym_token = expect(parser, TOKEN_TYPE_SYMBOL);
 		OnyxAstNode* sym_node = lookup_identifier(parser, sym_token);
+		if (sym_node == NULL) {
+			onyx_token_null_toggle(*sym_token);
+			onyx_message_add(parser->msgs,
+				ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
+				sym_token->pos, sym_token->token);
+			onyx_token_null_toggle(*sym_token);
+		}
 
 		// TODO: Handle calling a function
 		return sym_node;

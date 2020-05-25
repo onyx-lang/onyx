@@ -9,15 +9,20 @@ WHAT:
 WHY:
 	ONYX was made to help me learn about compiler design.
 
+END GOAL:
+	ONYX will be used to make a simple-ish game for the browser that leverages
+	WASM and WebGL for a performant experience. Language design will reflect the
+	needs of the game programming.
+
 FEATURES:
 	- Strong type system
-	- Smart package loading
-	- Structs and enums
 	- functions (no anonymous functions)
+	- Structs and enums
 	- Control structures
 		if, for, switch
 	- pointers
 	- inferred typing
+	- Smart package loading
 	- defer
 	? polymorphic functions
 
@@ -28,13 +33,13 @@ EXAMPLE CODE:
 
 use "core"; // Looks for "core.onyx" in the current directory
 
-Foo :: struct { x: i32, y: i32 };
+Foo :: struct { x i32, y i32 };
 
-export add :: (a: i32, b: i32) -> i32 {
-	return a + b;	
+export add :: proc (a i32, b i32) -> i32 {
+	return a + b;
 };
 
-foo :: (a: i32) -> Foo {
+foo :: proc (a i32) -> Foo {
 	return Foo { x = a, y = 0 };
 }
 
@@ -42,13 +47,12 @@ MVP CODE:
 
 /* Comments need to be parsed */
 
-export proc add :: (a i32, b i32) -> i32 {
+export add :: proc (a i32, b i32) -> i32 {
 	return a + b;
 }
 
-export proc max :: (a i32, b i32) -> i32 {
+export max :: proc (a i32, b i32) -> i32 {
 	/* Curly braces are required */
-
 	if a > b {
 		return a;
 	} else {
