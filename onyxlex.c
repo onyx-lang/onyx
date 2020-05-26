@@ -230,7 +230,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 
 	// Number literal
 	if (char_is_num(*tokenizer->curr)) {
-		u64 len = 0;
+		u32 len = 1;
 		while (char_is_num(*(tokenizer->curr + 1)) || *(tokenizer->curr + 1) == '.') {
 			len++;
 			INCREMENT_CURR_TOKEN(tokenizer);

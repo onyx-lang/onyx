@@ -54,9 +54,8 @@ int main(int argc, char *argv[]) {
 	if (onyx_message_has_errors(&msgs)) {
 		onyx_message_print(&msgs);
 	} else {
-		// TODO: Make a better AST printer so there aren't infinite loops
-		// onyx_ast_print(program);
-		bh_printf("No errors.\n");
+		onyx_ast_print(program, 0);
+		bh_printf("\nNo errors.\n");
 	}
 
 	bh_file_contents_delete(&fc);

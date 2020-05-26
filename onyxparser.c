@@ -223,6 +223,7 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 		OnyxAstNode* lit_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_LITERAL);
 		lit_node->type = &builtin_types[ONYX_TYPE_INFO_KIND_INT64];
 		lit_node->token = expect(parser, TOKEN_TYPE_LITERAL_NUMERIC);
+		lit_node->flags |= ONYX_AST_FLAG_COMPTIME;
 		return lit_node;
 	}
 

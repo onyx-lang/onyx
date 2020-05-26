@@ -19,3 +19,18 @@ export mul :: proc (a i32, b i32) -> i32 {
 
 	return c * d;
 }
+
+very_long_function_name :: proc () -> void {
+	a:i32;
+	b:i32;
+	c:i32;
+	d:i32;
+	e:i32;
+	f:i32;
+	g:i32;
+	h:i32;
+	i:i32 = 0 + 2;
+	j:i32;
+	k:i32;
+	l:i32;
+}
