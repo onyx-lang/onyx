@@ -1,36 +1,16 @@
-/* This is a comment */
-
-/* Currently the "foreign" keyword doesn't do anything */
-foreign "console" log :: proc (a i32, b i32) -> i32 ---
 
 export add :: proc (a i32, b i32) -> i32 {
-	/* More comments */
 	return a + b;
 }
 
-export mul :: proc (a i32, b i32) -> i32 {
+export mul :: proc (a i32, b i32) -> i64 {
 	/* Typechecked */
-	c: const i32 = a - b;
+	c: const i64 = ((a as i64) - (b as i64));
 
 	/*  Don't love this syntax, but it's easy to parse so whatever
 		Inferred type, but constant */
 	/* a and b are both i32, so i32 + i32 is i32 so d is i32 */
 	d: const = a + b;
 
-	return c * d;
-}
-
-very_long_function_name :: proc () -> void {
-	a:i32;
-	b:i32;
-	c:i32;
-	d:i32;
-	e:i32;
-	f:i32;
-	g:i32;
-	h:i32;
-	i:i32 = 0 + 2;
-	j:i32;
-	k:i32;
-	l:i32;
+	return ((c as i32) * d) as i64;
 }

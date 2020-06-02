@@ -97,6 +97,15 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 		break;
 	}
 
+	case ONYX_AST_NODE_KIND_CAST: {
+		bh_printf("to %s ", node->type->name);
+		onyx_ast_print(node->left, indent + 1);
+		if (node->next) {
+			onyx_ast_print(node->next, indent);
+		}
+		break;
+	}
+
 	default: {
 		onyx_ast_print(node->left, indent + 1);
 		onyx_ast_print(node->right, indent + 1);

@@ -53,17 +53,19 @@ int main(int argc, char *argv[]) {
 	// even if it may have still been generated correctly.
 	if (onyx_message_has_errors(&msgs)) {
 		onyx_message_print(&msgs);
+		goto main_exit;
 	} else {
 		onyx_ast_print(program, 0);
 		bh_printf("\nNo errors.\n");
 	}
 
-	bh_file_contents_delete(&fc);
-	onyx_tokenizer_free(&tokenizer);
-	onyx_parser_free(&parser);
+
+main_exit: // NOTE: Cleanup, since C doesn't have defer
 	bh_arena_free(&msg_arena);
 	bh_arena_free(&ast_arena);
-
+	onyx_parser_free(&parser);
+	onyx_tokenizer_free(&tokenizer);
+	bh_file_contents_delete(&fc);
 
 	return 0;
 }

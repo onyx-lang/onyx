@@ -19,6 +19,7 @@ static const char* onyx_token_type_names[] = {
 	"foreign",		//"TOKEN_TYPE_KEYWORD_FOREIGN",
 	"proc",			//"TOKEN_TYPE_KEYWORD_PROC",
 	"global",		//"TOKEN_TYPE_KEYWORD_GLOBAL",
+	"as", 			//"TOKEN_TYPE_KEYWORD_CAST",
 
 	"->", //"TOKEN_TYPE_RIGHT_ARROW",
 	"<-", //"TOKEN_TYPE_LEFT_ARROW",
@@ -160,6 +161,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("do", TOKEN_TYPE_KEYWORD_DO);
 	LITERAL_TOKEN("proc", TOKEN_TYPE_KEYWORD_PROC);
 	LITERAL_TOKEN("global", TOKEN_TYPE_KEYWORD_GLOBAL);
+	LITERAL_TOKEN("as", TOKEN_TYPE_KEYWORD_CAST);
 	LITERAL_TOKEN("->", TOKEN_TYPE_RIGHT_ARROW);
 	LITERAL_TOKEN("<-", TOKEN_TYPE_RIGHT_ARROW);
 	LITERAL_TOKEN("(", TOKEN_TYPE_OPEN_PAREN);

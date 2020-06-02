@@ -26,36 +26,33 @@ FEATURES:
 	- defer
 	? polymorphic functions
 
-EXAMPLE CODE:
+HOW:
+	Currently there is a multi-phase development process since implementing everything
+	at once would be overwhelming and unsatisfying. The current progress of each stage:
 
-// This is a comment
-// This is also the only way to do comments
+	Stage 1 (MVP):
+		[ ] Can declare procedures
+		[ ] Procedures have params and returns of the following types:
+			- i32, u32
+			- i64, u64
+			- f32, f64
+		[ ] Procedures have locals of the same set of types
+		[ ] Locals are declared in the following way
+			local : (const) (type) (= initial value);
 
-use "core"; // Looks for "core.onyx" in the current directory
+			if const is specified, the value is unmodifiable
+			if type is specified, that is assumed to be the correct type
+			if type is not specified, the type of initial value is used as the type
 
-Foo :: struct { x i32, y i32 };
+		[ ] Five basic math operations are legal:
+			+ - * / %
+		[ ] Math operations are sign aware and only operate on operands of the same type
+		[ ] All casts are explicit using this syntax:
+			X as T
 
-export add :: proc (a i32, b i32) -> i32 {
-	return a + b;
-};
+			casts X to type T
 
-foo :: proc (a i32) -> Foo {
-	return Foo { x = a, y = 0 };
-}
-
-MVP CODE:
-
-/* Comments need to be parsed */
-
-export add :: proc (a i32, b i32) -> i32 {
-	return a + b;
-}
-
-export max :: proc (a i32, b i32) -> i32 {
-	/* Curly braces are required */
-	if a > b {
-		return a;
-	} else {
-		return b;
-	}
-}
+		[ ] Conditional branching works as expected
+		[ ] Curly braces are required for all bodies of blocks
+		[ ] Simple while loop is functioning as expected
+		[ ] break and continue semantics

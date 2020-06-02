@@ -100,6 +100,7 @@ typedef struct OnyxTypeInfo {
 	u32 is_unsigned : 1;
 	u32 is_float : 1;
 	u32 is_bool : 1;
+	u32 is_known : 1;
 } OnyxTypeInfo;
 
 extern OnyxTypeInfo builtin_types[];

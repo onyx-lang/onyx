@@ -9,6 +9,8 @@ static const char* msg_formats[] = {
 	"attempt to assign to constant '%s'",
 	"unknown symbol '%s'",
 	"redefinition of function '%s'",
+	"mismatched types for binary operator, '%s', '%s'",
+	"mismatched types on assignment, '%s', '%s'",
 };
 
 void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...) {

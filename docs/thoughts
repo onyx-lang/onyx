@@ -22,3 +22,5 @@ Type checking at parse time:
 	foo(5) would have a left node of SYMBOL:foo
 	This will be resolved in a later stage between the parsing and semantic pass
 	Type checking and resolving would have to occur afterwards
+
+Creating an IR:
