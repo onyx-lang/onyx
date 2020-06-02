@@ -65,7 +65,7 @@ main_exit: // NOTE: Cleanup, since C doesn't have defer
 	bh_arena_free(&ast_arena);
 	onyx_parser_free(&parser);
 	onyx_tokenizer_free(&tokenizer);
-	bh_file_contents_delete(&fc);
+	bh_file_contents_free(&fc);
 
 	return 0;
 }

@@ -12,5 +12,7 @@ export mul :: proc (a i32, b i32) -> i64 {
 	/* a and b are both i32, so i32 + i32 is i32 so d is i32 */
 	d: const = a + b;
 
+	e: i32 = 10 as i32;
+
 	return ((c as i32) * d) as i64;
 }

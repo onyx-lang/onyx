@@ -315,7 +315,7 @@ i64 bh_file_size(bh_file* file);
 
 bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file);
 bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* filename);
-i32 bh_file_contents_delete(bh_file_contents* contents);
+i32 bh_file_contents_free(bh_file_contents* contents);
 
 #endif
 
@@ -1197,7 +1197,7 @@ bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* fi
 	return fc;
 }
 
-b32 bh_file_contents_delete(bh_file_contents* contents) {
+b32 bh_file_contents_free(bh_file_contents* contents) {
 	bh_free(contents->allocator, contents->data);
 	contents->length = 0;
 	return 1;
