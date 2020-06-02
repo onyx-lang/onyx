@@ -1,16 +1,16 @@
 OBJ_FILES=\
-	onyxlex.o \
-	onyxparser.o \
-	onyxmsgs.o \
-	onyxutils.o \
-	onyx.o
+	src/onyxlex.o \
+	src/onyxparser.o \
+	src/onyxmsgs.o \
+	src/onyxutils.o \
+	src/onyx.o
 
 CC=gcc
-INCLUDES=
+INCLUDES=-I./include
 LIBS=
 FLAGS=-g
 
-%.o: %.c bh.h
+%.o: %.c include/bh.h
 	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
 
 onyx: $(OBJ_FILES)
