@@ -80,7 +80,7 @@ i64 chars_match(char* ptr1, char* ptr2);
 // Helpful macros
 //-------------------------------------------------------------------------------------
 #define bh_offset_of(Type, elem)		((isize)&(((Type)*) 0)->elem)
-#define bh_aligh_of(Type)				bh_offset_of(struct { char c; Type member; }, member)
+#define bh_align_of(Type)				bh_offset_of(struct { char c; Type member; }, member)
 #define bh_swap(Type, a, b)				do { Type tmp = (a); (a) = (b); (b) = tmp; } while(0)
 
 #define bh_pointer_add(ptr, amm)		((void *)((u8 *) ptr + amm))
