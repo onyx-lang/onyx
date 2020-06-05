@@ -1,5 +1,10 @@
 #include "onyxwasm.h"
 
+const WasmType WASM_TYPE_INT32 = 0x7F;
+const WasmType WASM_TYPE_INT64 = 0x7E;
+const WasmType WASM_TYPE_FLOAT32 = 0x7D;
+const WasmType WASM_TYPE_FLOAT64 = 0x7C;
+
 static WasmType onyx_type_to_wasm_type(OnyxTypeInfo* type) {
 	if (type->is_bool) return WASM_TYPE_INT32;
 	if (type->is_int) {
@@ -88,6 +93,6 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {
-	bh_arr_free(module.functypes);
-	bh_arr_free(module.funcs);
+	bh_arr_free(module->functypes);
+	bh_arr_free(module->funcs);
 }

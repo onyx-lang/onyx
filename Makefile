@@ -3,6 +3,7 @@ OBJ_FILES=\
 	src/onyxparser.o \
 	src/onyxmsgs.o \
 	src/onyxutils.o \
+	src/onyxwasm.o \
 	src/onyx.o
 
 CC=gcc

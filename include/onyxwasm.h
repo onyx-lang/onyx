@@ -6,12 +6,12 @@
 
 #include "onyxparser.h"
 
-typedef enum WasmType : char {
-	WASM_TYPE_INT32 = 0x7F,
-	WASM_TYPE_INT64 = 0x7E,
-	WASM_TYPE_FLOAT32 = 0x7D,
-	WASM_TYPE_FLOAT64 = 0x7C
-} WasmType;
+typedef char WasmType;
+
+extern const WasmType WASM_TYPE_INT32;
+extern const WasmType WASM_TYPE_INT64;
+extern const WasmType WASM_TYPE_FLOAT32;
+extern const WasmType WASM_TYPE_FLOAT64;
 
 typedef struct WasmFuncType {
 	// NOTE: For now, WASM only allows for 1 return value.
