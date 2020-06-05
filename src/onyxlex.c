@@ -118,32 +118,14 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	}
 
 	// Comments
-	if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '*') {
+	if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '/') {
 		tokenizer->curr += 2;
 		tk.type = TOKEN_TYPE_COMMENT;
 		tk.token = tokenizer->curr;
-		u16 layers = 1;
 
-		while (layers >= 1) {
+		while (*tokenizer->curr != '\n') {
 			INCREMENT_CURR_TOKEN(tokenizer);
-
-			if (tokenizer->curr == tokenizer->end) {
-				tk.type = TOKEN_TYPE_END_STREAM;
-				break;
-			}
-
-			if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '*') {
-				layers++;
-				INCREMENT_CURR_TOKEN(tokenizer);
-			}
-
-			if (*tokenizer->curr == '*' && *(tokenizer->curr + 1) == '/') {
-				layers--;
-				INCREMENT_CURR_TOKEN(tokenizer);
-			}
 		}
-
-		INCREMENT_CURR_TOKEN(tokenizer);
 
 		tk.length = tokenizer->curr - tk.token - 2;
 		goto token_parsed;

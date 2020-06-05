@@ -23,6 +23,8 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	OnyxAstNodeParam* param = fd->params;
 	i32 param_count = 0;
 	while (param) {
+		// HACK: Using these directly as part of a string feels weird but they are
+		// valid characters so I don't think it is going to be much of an issue
 		*(t++) = (char) onyx_type_to_wasm_type(param->type);
 		param_count++;
 		param = param->next;
@@ -38,6 +40,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 		type_idx = bh_hash_get(i32, mod->type_map, type_repr_buf);
 	} else {
 		// NOTE: Make a new type
+		// TODO: Ensure that this isn't going to break things because of alignment
 		WasmFuncType* type = (WasmFuncType*) bh_alloc(mod->allocator, sizeof(WasmFuncType) + sizeof(WasmType) * param_count);
 		type->return_type = return_type;
 		type->param_count = param_count;
@@ -47,9 +50,9 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 
 		bh_arr_push(mod->functypes, type);
 
-		bh_hash_put(i32, mod->type_map, type_repr_buf, mod->curr_type_idx);
-		type_idx = mod->curr_type_idx;
-		mod->curr_type_idx++;
+		bh_hash_put(i32, mod->type_map, type_repr_buf, mod->next_type_idx);
+		type_idx = mod->next_type_idx;
+		mod->next_type_idx++;
 	}
 }
 
@@ -58,7 +61,7 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 		.allocator = alloc,
 
 		.type_map = NULL,
-		.curr_type_idx = 0,
+		.next_type_idx = 0,
 
 		.functypes = NULL,
 		.funcs = NULL,

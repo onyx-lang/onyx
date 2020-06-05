@@ -16,14 +16,14 @@ typedef enum WasmType : char {
 typedef struct WasmFuncType {
 	// NOTE: For now, WASM only allows for 1 return value.
 	// This may be lifted in the future.
-	WasmType return_type;
 	i32 param_count;
+	WasmType return_type;
 	WasmType param_types[];
 } WasmFuncType;
 
 typedef struct WasmFunc {
-	WasmFuncType* type;
 	i32 idx;
+	i32 type_idx;
 } WasmFunc;
 
 typedef struct OnyxWasmModule {
@@ -33,8 +33,9 @@ typedef struct OnyxWasmModule {
 	// 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
 	// to the function type index if it has been created.
 	bh_hash(i32) type_map;
-	i32 curr_type_idx;
+	i32 next_type_idx;
 
+	// NOTE: This have to be pointers because the type is variadic in size
 	bh_arr(WasmFuncType*) functypes;
 	bh_arr(WasmFunc) funcs;
 } OnyxWasmModule;

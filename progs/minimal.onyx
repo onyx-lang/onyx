@@ -4,12 +4,12 @@ export add :: proc (a i32, b i32) -> i32 {
 }
 
 export mul :: proc (a i32, b i32) -> i64 {
-	/* Typechecked */
+	// Typechecked
 	c: const i64 = ((a as i64) - (b as i64));
 
-	/*  Don't love this syntax, but it's easy to parse so whatever
-		Inferred type, but constant */
-	/* a and b are both i32, so i32 + i32 is i32 so d is i32 */
+	// Don't love this syntax, but it's easy to parse so whatever
+	// Inferred type, but constant
+	// a and b are both i32, so i32 + i32 is i32 so d is i32
 	d: const = a + b;
 
 	e: i32 = 10 as i32;
