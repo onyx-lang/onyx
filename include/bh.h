@@ -1635,6 +1635,12 @@ add_new_element:
 	i32 byte_len = bh_arr_length(arrptr);
 	if (byte_len == 0) byte_len = sizeof(u64);
 	key_length = strlen(key) + 1;
+
+	// NOTE: Align to 16 bytes
+	if ((key_length + 2) % 16 != 0) {
+		key_length = ((((key_length + 2) >> 4) + 1) << 4) - 2;
+	}
+
 	bh__arr_grow(table->allocator, &arrptr, 1, byte_len + elemsize + sizeof(u16) + key_length);
 	bh__arrhead(arrptr)->length = byte_len + elemsize + sizeof(u16) + key_length;
 	table->arrs[index] = arrptr;
@@ -1648,30 +1654,6 @@ add_new_element:
 
 found_matching:
 	return bh_pointer_add(arrptr, -(sizeof(u16) + elemsize));
-
-// OLD:
-//	elemsize += BH__HASH_STORED_KEY_SIZE;
-//
-//	ptr arrptr = table->arrs[index];
-//	i32 len = bh_arr_length(arrptr);
-//
-//	while (len--) {
-//		if (strncmp(key, (char *) arrptr, BH__HASH_STORED_KEY_SIZE) == 0) goto found_matching;
-//		arrptr = bh_pointer_add(arrptr, elemsize);
-//	}
-//
-//	// Didn't find it in the array, make a new one
-//	arrptr = table->arrs[index];
-//	len = bh_arr_length(arrptr);
-//	bh__arr_grow(table->allocator, &arrptr, elemsize, len + 1);
-//	bh__arrhead(arrptr)->length++;
-//	table->arrs[index] = arrptr;
-//
-//	arrptr = bh_pointer_add(arrptr, elemsize * len);
-//	strncpy(arrptr, key, BH__HASH_STORED_KEY_SIZE);
-//
-//found_matching:
-//	return bh_pointer_add(arrptr, BH__HASH_STORED_KEY_SIZE);
 }
 
 b32 bh__hash_has(bh__hash *table, i32 elemsize, char *key) {
@@ -1740,6 +1722,7 @@ void bh__hash_delete(bh__hash *table, i32 elemsize, char *key) {
 			delete_len = elemsize + sizeof(u16) + key_length;
 			goto found_matching;
 		}
+		walker = bh_pointer_add(walker, key_length);
 		byte_offset += elemsize + sizeof(u16) + key_length;
 	}
 
@@ -1750,17 +1733,6 @@ found_matching:
 	bh__arr_deleten((void **) &arrptr, 1, byte_offset, delete_len);
 	table->arrs[index] = arrptr;
 	(*(u64 *) arrptr)--;
-
-// OLD:
-//	while (len && strncmp(key, (char *) walker, BH__HASH_STORED_KEY_SIZE) != 0) {
-//		walker = bh_pointer_add(walker, stride);
-//		i++, len--;
-//	}
-//
-//	if (len == 0) return; // Didn't exist
-//
-//	bh__arr_deleten((void **) &arrptr, stride, i, 1);
-//	table->arrs[index] = arrptr;
 }
 
 bh_hash_iterator bh__hash_iter_setup(bh__hash *table, i32 elemsize) {
