@@ -1749,6 +1749,7 @@ void bh__hash_delete(bh__hash *table, i32 elemsize, char *key) {
 found_matching:
 	bh__arr_deleten((void **) &arrptr, 1, byte_offset, delete_len);
 	table->arrs[index] = arrptr;
+	(*(u64 *) arrptr)--;
 
 // OLD:
 //	while (len && strncmp(key, (char *) walker, BH__HASH_STORED_KEY_SIZE) != 0) {
