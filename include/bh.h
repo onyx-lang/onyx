@@ -546,7 +546,7 @@ typedef struct bh__hash {
 
 	#define bh_hash_iter_setup(T, tab)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_iter_setup((bh__hash *) tab, sizeof(T)))
 	#define bh_hash_iter_key(it)				((char *)(bh_pointer_add(it.entry, it.elemsize + sizeof(u16))))
-	#define bh_hash_iter_value(T, it)			(assert(sizeof(T) == it.elemsize), *(T *)it.entry)
+	#define bh_hash_iter_value(T, it)			(*(T *)it.entry)
 #else
 	#define bh_hash_init(allocator_, tab, hs)	bh__hash_init(allocator_, (bh__hash **)&(tab), hs)
 	#define bh_hash_free(tab)					bh__hash_free((bh__hash **)&(tab))
@@ -1614,10 +1614,16 @@ b32 bh__hash_free(bh__hash **table) {
 
 // Assumes NULL terminated string for key
 ptr bh__hash_put(bh__hash *table, i32 elemsize, char *key) {
+	elemsize += (elemsize & 1);
+
 	u64 index = bh__hash_function(key, 0, table->hash_size);
+	u8 arr_was_new = 0;
 
 	ptr arrptr = table->arrs[index];
-	if (arrptr == NULL) goto add_new_element;
+	if (arrptr == NULL) {
+		arr_was_new = 1;
+		goto add_new_element;
+	}
 	u64 len = *(u64 *) arrptr;
 	arrptr = bh_pointer_add(arrptr, sizeof(u64));
 
@@ -1645,7 +1651,11 @@ add_new_element:
 	bh__arrhead(arrptr)->length = byte_len + elemsize + sizeof(u16) + key_length;
 	table->arrs[index] = arrptr;
 
-	(*(u64 *) arrptr)++;
+	if (arr_was_new) {
+		*(u64 *) arrptr = 1;
+	} else {
+		(*(u64 *) arrptr)++;
+	}
 
 	arrptr = bh_pointer_add(arrptr, byte_len + elemsize);
 	*(u16 *) arrptr = key_length;
@@ -1657,6 +1667,8 @@ found_matching:
 }
 
 b32 bh__hash_has(bh__hash *table, i32 elemsize, char *key) {
+	elemsize += (elemsize & 1);
+
 	u64 index = bh__hash_function(key, 0, table->hash_size);
 
 	ptr arrptr = table->arrs[index];
@@ -1678,6 +1690,8 @@ b32 bh__hash_has(bh__hash *table, i32 elemsize, char *key) {
 }
 
 ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key) {
+	elemsize += (elemsize & 1);
+
 	u64 index = bh__hash_function(key, 0, table->hash_size);
 
 	ptr arrptr = table->arrs[index];
@@ -1701,6 +1715,8 @@ ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key) {
 }
 
 void bh__hash_delete(bh__hash *table, i32 elemsize, char *key) {
+	elemsize += (elemsize & 1);
+
 	u64 index = bh__hash_function(key, 0, table->hash_size);
 
 	ptr arrptr = table->arrs[index], walker;
@@ -1736,6 +1752,8 @@ found_matching:
 }
 
 bh_hash_iterator bh__hash_iter_setup(bh__hash *table, i32 elemsize) {
+	elemsize += (elemsize & 1);
+
 	bh_hash_iterator it = {
 		.tab = table->arrs,
 		.endtab = table->arrs + table->hash_size,
