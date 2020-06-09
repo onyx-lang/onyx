@@ -104,8 +104,8 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 	bh_arr_new(alloc, module.functypes, 4);
 	bh_arr_new(alloc, module.funcs, 4);
 
-	bh_hash_init(bh_heap_allocator(), module.type_map);
-	bh_hash_init(bh_heap_allocator(), module.exports);
+	bh_hash_init(bh_heap_allocator(), module.type_map, 61);
+	bh_hash_init(bh_heap_allocator(), module.exports, 61);
 
 	OnyxAstNode* walker = program;
 	while (walker) {

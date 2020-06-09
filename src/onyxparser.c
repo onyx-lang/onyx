@@ -689,7 +689,7 @@ OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind) {\
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs) {
 	OnyxParser parser;
 
-	bh_hash_init(bh_heap_allocator(), parser.identifiers);
+	bh_hash_init(bh_heap_allocator(), parser.identifiers, 61);
 
 	OnyxTypeInfo* it = &builtin_types[0];
 	while (it->kind != 0xffffffff) {
