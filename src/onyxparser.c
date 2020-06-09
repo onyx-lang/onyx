@@ -544,15 +544,12 @@ static OnyxAstNodeParam* parse_function_params(OnyxParser* parser) {
 	}
 
 	OnyxAstNodeParam* first_param = NULL;
-	u64 param_count = 0;
-
 	OnyxAstNodeParam* curr_param = NULL;
 	OnyxAstNodeParam* trailer = NULL;
 
 	OnyxToken* symbol;
 	while (parser->curr_token->type != TOKEN_TYPE_CLOSE_PAREN) {
 		if (parser->curr_token->type == TOKEN_TYPE_SYM_COMMA) parser_next_token(parser);
-		param_count++;
 
 		symbol = expect(parser, TOKEN_TYPE_SYMBOL);
 
@@ -567,8 +564,6 @@ static OnyxAstNodeParam* parse_function_params(OnyxParser* parser) {
 
 		trailer = curr_param;
 	}
-
-	first_param->param_count = param_count;
 
 	parser_next_token(parser); // Skip the )
 	return first_param;

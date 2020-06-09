@@ -7,6 +7,7 @@
 #include "onyxmsgs.h"
 #include "onyxparser.h"
 #include "onyxutils.h"
+#include "onyxwasm.h"
 
 int main(int argc, char *argv[]) {
 	bh_file source_file;
@@ -59,7 +60,53 @@ int main(int argc, char *argv[]) {
 		bh_printf("\nNo errors.\n");
 	}
 
+	OnyxWasmModule wasm_mod = onyx_wasm_generate_module(alloc, program);
 
+#if 1
+	// NOTE: Ensure type table made correctly
+
+	bh_printf("Type map:\n");
+	bh_hash_iterator type_map_it = bh_hash_iter_setup(i32, wasm_mod.type_map);
+	while (bh_hash_iter_next(&type_map_it)) {
+		const char* key = bh_hash_iter_key(type_map_it);
+		i32 value = bh_hash_iter_value(i32, type_map_it);
+
+		bh_printf("%s -> %d\n", key, value);
+	}
+
+	bh_printf("Type list:\n");
+	WasmFuncType** func_type = wasm_mod.functypes;
+	while (!bh_arr_end(wasm_mod.functypes, func_type)) {
+		for (int p = 0; p < (*func_type)->param_count; p++) {
+			bh_printf("%c ", (*func_type)->param_types[p]);
+		}
+		bh_printf("-> ");
+		bh_printf("%c\n", (*func_type)->return_type);
+
+		func_type++;
+	}
+#endif
+
+#if 1
+	// NOTE: Ensure the export table was built correctly
+
+	bh_printf("Function types:\n");
+	for (WasmFunc* func_it = wasm_mod.funcs; !bh_arr_end(wasm_mod.funcs, func_it); func_it++) {
+		bh_printf("%d\n", func_it->type_idx);
+	}
+
+	bh_printf("Exports:\n");
+	bh_hash_iterator export_it = bh_hash_iter_setup(WasmExport, wasm_mod.exports);
+	while (bh_hash_iter_next(&export_it)) {
+		const char* key = bh_hash_iter_key(export_it);
+		WasmExport value = bh_hash_iter_value(WasmExport, export_it);
+
+		bh_printf("%s: %d %d\n", key, value.kind, value.idx);
+	}
+#endif
+
+
+	onyx_wasm_module_free(&wasm_mod);
 main_exit: // NOTE: Cleanup, since C doesn't have defer
 	bh_arena_free(&msg_arena);
 	bh_arena_free(&ast_arena);

@@ -118,7 +118,7 @@ struct OnyxAstNodeLocal {
 	OnyxTypeInfo *type;
 	OnyxAstNodeLocal *prev_local;
 	OnyxAstNode *shadowed;
-	OnyxAstNode *unused;
+	ptr unused;
 };
 
 // NOTE: Needs to have shadowed in the same position as OnyxAstNodeLocal
@@ -129,7 +129,7 @@ struct OnyxAstNodeParam {
 	OnyxTypeInfo *type;
 	OnyxAstNodeParam *next;
 	OnyxAstNode *shadowed;
-	u64 param_count;
+	ptr unused;
 };
 
 struct OnyxAstNodeScope {

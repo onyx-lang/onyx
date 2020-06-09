@@ -6,7 +6,7 @@
 
 #include "onyxparser.h"
 
-typedef char WasmType;
+typedef u8 WasmType;
 
 extern const WasmType WASM_TYPE_INT32;
 extern const WasmType WASM_TYPE_INT64;
@@ -21,10 +21,22 @@ typedef struct WasmFuncType {
 	WasmType param_types[];
 } WasmFuncType;
 
+
 typedef struct WasmFunc {
-	i32 idx;
 	i32 type_idx;
 } WasmFunc;
+
+typedef enum WasmExportKind {
+	WASM_EXPORT_FUNCTION,
+	WASM_EXPORT_TABLE,
+	WASM_EXPORT_MEMORY,
+	WASM_EXPORT_GLOBAL,
+} WasmExportKind;
+
+typedef struct WasmExport {
+	WasmExportKind kind;
+	i32 idx;
+} WasmExport;
 
 typedef struct OnyxWasmModule {
 	bh_allocator allocator;
@@ -34,10 +46,13 @@ typedef struct OnyxWasmModule {
 	// to the function type index if it has been created.
 	bh_hash(i32) type_map;
 	i32 next_type_idx;
-
 	// NOTE: This have to be pointers because the type is variadic in size
 	bh_arr(WasmFuncType*) functypes;
+
 	bh_arr(WasmFunc) funcs;
+	i32 next_func_idx;
+
+	bh_hash(WasmExport) exports;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program);
