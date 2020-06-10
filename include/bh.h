@@ -375,7 +375,7 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va);
 #ifdef BH_DEBUG
 
 void* bh__debug_malloc(size_t size, const char* file, u64 line);
-void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line);
+void* bh__debug_aligned_alloc(size_t alignment, size_t size, const char* file, u64 line);
 void  bh__debug_free(void* ptr, const char* file, u64 line);
 void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
 
@@ -387,8 +387,8 @@ void* bh__debug_malloc(size_t size, const char* file, u64 line) {
 	return p;
 }
 
-void* bh__debug_aligned_alloc(size_t size, size_t alignment, const char* file, u64 line) {
-	void* p = aligned_alloc(size, alignment);
+void* bh__debug_aligned_alloc(size_t alignment, size_t size, const char* file, u64 line) {
+	void* p = aligned_alloc(alignment, size);
 	bh_printf("[DEBUG] %p = aligned_alloc(%d, %d) at %s:%d\n", p, alignment, size, file, line);
 	return p;
 }
@@ -407,7 +407,7 @@ void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
 #endif
 
 #define malloc(size)					(bh__debug_malloc(size, __FILE__, __LINE__))
-#define aligned_alloc(size, alignment)	(bh__debug_aligned_alloc(size, alignment, __FILE__, __LINE__))
+#define aligned_alloc(alignment, size)	(bh__debug_aligned_alloc(alignment, size, __FILE__, __LINE__))
 #define free(ptr)						(bh__debug_free(ptr, __FILE__, __LINE__))
 #define realloc(ptr, size)				(bh__debug_realloc(ptr, size, __FILE__, __LINE__))
 
