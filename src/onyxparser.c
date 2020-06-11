@@ -433,7 +433,7 @@ static OnyxAstNode* parse_return_statement(OnyxParser* parser) {
 		if (expr == NULL || expr == &error_node) {
 			return &error_node;
 		} else {
-			return_node->next = expr;
+			return_node->left = expr;
 		}
 	}
 

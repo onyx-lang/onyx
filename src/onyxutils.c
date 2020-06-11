@@ -62,6 +62,10 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 			onyx_ast_print((OnyxAstNode *) block->body, indent + 1);
 		}
 
+		if (block->next) {
+			onyx_ast_print(block->next, indent);
+		}
+
 		break;
 	}
 
