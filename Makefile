@@ -1,23 +1,23 @@
 OBJ_FILES=\
-	src/onyxlex.o \
-	src/onyxparser.o \
-	src/onyxmsgs.o \
-	src/onyxutils.o \
-	src/onyxwasm.o \
-	src/onyx.o
+	build/onyxlex.o \
+	build/onyxparser.o \
+	build/onyxmsgs.o \
+	build/onyxutils.o \
+	build/onyxwasm.o \
+	build/onyx.o
 
 CC=gcc
 INCLUDES=-I./include
 LIBS=
 FLAGS=-g
 
-%.o: %.c include/bh.h
+build/%.o: src/%.c include/bh.h
 	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
 
 onyx: $(OBJ_FILES)
-	$(CC) $(FLAGS) $? -o $@ $(LIBS)
+	$(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
 
 clean:
 	rm $(OBJ_FILES) 2>&1 >/dev/null
 
-all: onyx clean
+all: onyx

@@ -69,7 +69,8 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	}
 
 	WasmFunc wasm_func = {
-		.type_idx = type_idx
+		.type_idx = type_idx,
+		.code = NULL,
 	};
 	bh_arr_push(mod->funcs, wasm_func);
 	i32 func_idx = mod->next_func_idx++;
@@ -85,6 +86,33 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 
 		onyx_token_null_toggle(*fd->token);
 	}
+
+	// If there is no body then don't process the code
+	if (fd->body == NULL) return;
+
+	// NOTE: Generate the local map
+	i32 localidx = 0;
+	forll (OnyxAstNodeParam, param, fd->params, next) {
+		onyx_token_null_toggle(*param->token);
+		bh_hash_put(i32, mod->local_map, param->token->token, localidx++);
+		onyx_token_null_toggle(*param->token);
+	}
+
+	forll (OnyxAstNodeLocal, local, fd->body->scope->last_local, prev_local) {
+		onyx_token_null_toggle(*local->token);
+		bh_hash_put(i32, mod->local_map, local->token->token, localidx++);
+		onyx_token_null_toggle(*local->token);
+	}
+
+	bh_printf("\nLocals for function: %b\n", fd->token->token, fd->token->length);
+	bh_hash_each_start(i32, mod->local_map);
+		bh_printf("\t%s -> %d\n", key, value);
+	bh_hash_each_end;
+
+	// Generate code
+
+	// NOTE: Clear the local map on exit of generating this function
+	bh_hash_clear(mod->local_map);
 }
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program) {
@@ -104,6 +132,7 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 	bh_arr_new(alloc, module.functypes, 4);
 	bh_arr_new(alloc, module.funcs, 4);
 
+	bh_hash_init(bh_heap_allocator(), module.local_map, 61);
 	bh_hash_init(bh_heap_allocator(), module.type_map, 61);
 	bh_hash_init(bh_heap_allocator(), module.exports, 61);
 

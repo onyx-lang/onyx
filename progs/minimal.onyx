@@ -3,20 +3,14 @@ export add :: proc (a i32, b i32) -> i32 {
 	return a + b;
 }
 
-export foo :: proc () -> i32 {
+export foo :: proc (foo i32, bar i32) -> i32 {
 	return 10 as i32;
 }
 
 export mul :: proc (a i32, b i32) -> i64 {
 	// Typechecked
-	c: const = a - b;
-
-	// Don't love this syntax, but it's easy to parse so whatever
-	// Inferred type, but constant
-	// a and b are both i32, so i32 + i32 is i32 so d is i32
-	d: const = a + b;
-
-	e: i32 = 10 as i32;
+	c :: a - b;
+	d :: a + b;
 
 	return (c * d) as i64;
 }

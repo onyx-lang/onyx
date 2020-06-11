@@ -11,6 +11,7 @@ static const char* msg_formats[] = {
 	"redefinition of function '%s'",
 	"mismatched types for binary operator, '%s', '%s'",
 	"mismatched types on assignment, '%s', '%s'",
+	"expected expression, got '%s'",
 };
 
 void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...) {

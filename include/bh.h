@@ -9,22 +9,21 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h> // TODO: Replace with needed functions
+#include <stdint.h>
 #include <assert.h>
 
 //-------------------------------------------------------------------------------------
 // Better types
 //-------------------------------------------------------------------------------------
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-typedef unsigned long u64;
-typedef unsigned long long u128;
-typedef signed char i8;
-typedef signed short i16;
-typedef signed int i32;
-typedef signed long i64;
-typedef signed long long i128;
-typedef unsigned long isize;
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef int8_t i8;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
+typedef int64_t isize;
 typedef i32 b32;
 typedef void* ptr;
 
@@ -50,14 +49,40 @@ typedef void* ptr;
 //-------------------------------------------------------------------------------------
 // Better character functions
 //-------------------------------------------------------------------------------------
-b32 char_is_alpha(const char a);
-b32 char_is_num(const char a);
-b32 char_is_alphanum(const char a);
-b32 char_is_whitespace(const char a);
-b32 char_in_range(const char lo, const char hi, const char a);
-char charset_contains(const char* charset, char ch);
-i64 chars_match(char* ptr1, char* ptr2);
+inline b32 char_is_alpha(const char a) {
+	return ('a' <= a && a <= 'z') || ('A' <= a && a <= 'Z');
+}
 
+inline char charset_contains(const char* charset, char ch) {
+	while (*charset) {
+		if (*charset == ch) return ch;
+		charset++;
+	}
+
+	return 0;
+}
+
+inline b32 char_is_num(const char a) {
+	return ('0' <= a && a <= '9');
+}
+
+inline b32 char_is_alphanum(const char a) {
+	return char_is_alpha(a) || char_is_num(a);
+}
+
+inline b32 char_is_whitespace(const char a) {
+	return charset_contains(" \t\r\n", a);
+}
+
+inline b32 char_in_range(const char lo, const char hi, const char a) {
+	return lo <= a <= hi;
+}
+
+inline i64 chars_match(char* ptr1, char* ptr2) {
+	i64 len = 0;
+	while (*ptr2 != '\0' && *ptr1 == *ptr2) ptr1++, ptr2++, len++;
+	return *ptr2 == '\0' ? len : 0;
+}
 
 
 
@@ -87,7 +112,8 @@ i64 chars_match(char* ptr1, char* ptr2);
 #define BH_BIT(x)						(1 << (x))
 #define BH_MASK_SET(var, set, mask) 	((set) ? (var) |= (mask) : (var) &= ~(mask))
 
-
+#define fori(var, lo, hi)				for (i64 var = (lo); var <= (hi); var++)
+#define forll(T, var, start, step)		for (T* var = (start); var != NULL; var = var->step)
 
 
 
@@ -163,6 +189,9 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
 
 
 
+
+
+
 // SCRATCH ALLOCATOR
 typedef struct bh_scratch {
 	bh_allocator backing;
@@ -177,64 +206,6 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 
 
 
-
-
-
-
-//-------------------------------------------------------------------------------------
-// Better strings
-//-------------------------------------------------------------------------------------
-#ifndef BH_NO_STRING
-
-typedef struct bh__string {
-	u64 length;
-	u64 capacity;
-} bh__string;
-
-typedef char bh_string;
-
-#define bh__stringhead(x)		(((bh__string *)(x)) - 1)
-
-#define bh_string_new(x) _Generic((x), \
-	unsigned long: bh_string_new_cap, \
-	unsigned int: bh_string_new_cap, \
-	int: bh_string_new_cap, \
-	long: bh_string_new_cap, \
-	const char*: bh_string_new_str, \
-	char*: bh_string_new_str)(x)
-
-#define bh_string_append(str1, str2) _Generic((str2), \
-	bh_string*: bh_string_append_bh_string, \
-	char*: bh_string_append_cstr, \
-	const char*: bh_string_append_cstr)(str1, str2)
-
-#define bh_string_replace_at(dest, src, offset) _Generic((src), \
-	bh_string*: bh_string_replace_at_bh_string, \
-	char*: bh_string_replace_at_cstr, \
-	const char*: bh_string_replace_at_cstr)(dest, src, offset)
-
-#define bh_string_insert_at(dest, src, offset) _Generic((src), \
-	bh_string*: bh_string_insert_at_bh_string, \
-	char*: bh_string_insert_at_cstr, \
-	const char*: bh_string_insert_at_cstr)(dest, src, offset)
-
-bh_string bh_string_new_cap(unsigned long cap);
-bh_string bh_string_new_str(const char* cstr);
-b32 bh_string_delete(bh_string* str);
-b32 bh_string_ensure_capacity(bh_string* str, u64 cap);
-void bh_string_append_bh_string(bh_string* str1, bh_string* str2);
-void bh_string_append_cstr(bh_string* str1, const char* str2);
-void bh_string_replace_at_bh_string(bh_string* dest, bh_string* src, u64 offset);
-void bh_string_replace_at_cstr(bh_string* dest, const char* src, u64 offset);
-void bh_string_insert_at_bh_string(bh_string* dest, bh_string* src, u64 offset);
-void bh_string_insert_at_cstr(bh_string* dest, const char* src, u64 offset);
-void bh_string_trim_end(bh_string* str, const char* charset);
-void bh_string_trim_begin(bh_string* str, const char* charset);
-void bh_string_trim_end_space(bh_string* str);
-// TEMP
-void bh_string_print(bh_string* str);
-
-#endif
 
 
 
@@ -359,6 +330,8 @@ isize bh_fprintf(bh_file* f, char const *fmt, ...);
 isize bh_fprintf_va(bh_file* f, char const *fmt, va_list va);
 char* bh_bprintf(char const *fmt, ...);
 char* bh_bprintf_va(char const *fmt, va_list va);
+char* bh_aprintf(bh_allocator alloc, const char* fmt, ...);
+char* bh_aprintf_va(bh_allocator alloc, const char* fmt, va_list va);
 isize bh_snprintf(char *str, isize n, char const *fmt, ...);
 isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va);
 
@@ -483,6 +456,8 @@ typedef struct bh__arr {
 #define bh_arr_deleten(arr, i, n)	(bh__arr_deleten((void **) &(arr), sizeof(*(arr)), i, n))
 #define bh_arr_fastdelete(arr, i)	(arr[i] = arr[--bh__arrhead(arr)->length])
 
+#define bh_arr_each(T, var, arr)			for (T* var = (arr); !bh_arr_end((arr), var); var++)
+
 b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_free(void **arr);
@@ -543,6 +518,7 @@ typedef struct bh__hash {
 	#define bh_hash_has(T, tab, key)			(assert(sizeof(T) == sizeof(*(tab))), (bh__hash_has((bh__hash *) tab, sizeof(T), key)))
 	#define bh_hash_get(T, tab, key)			(assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__hash_get((bh__hash *) tab, sizeof(T), key))))
 	#define bh_hash_delete(T, tab, key)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_delete((bh__hash *) tab, sizeof(T), key))
+	#define bh_hash_clear(tab)					(bh__hash_clear((bh__hash *) tab))
 
 	#define bh_hash_iter_setup(T, tab)			(assert(sizeof(T) == sizeof(*(tab))), bh__hash_iter_setup((bh__hash *) tab, sizeof(T)))
 	#define bh_hash_iter_key(it)				((char *)(bh_pointer_add(it.entry, it.elemsize + sizeof(u16))))
@@ -554,11 +530,19 @@ typedef struct bh__hash {
 	#define bh_hash_has(T, tab, key)			(bh__hash_has((bh__hash *) tab, sizeof(T), key))
 	#define bh_hash_get(T, tab, key)			(*((T *) bh__hash_get((bh__hash *) tab, sizeof(T), key)))
 	#define bh_hash_delete(T, tab, key)			(bh__hash_delete((bh__hash *) tab, sizeof(T), key))
+	#define bh_hash_clear(tab)					(bh__hash_clear((bh__hash *) tab))
 
 	#define bh_hash_iter_setup(T, tab)			(bh__hash_iter_setup((bh__hash *) tab, sizeof(T)))
 	#define bh_hash_iter_key(it)				((char *)(bh_pointer_add(it.entry, it.elemsize + sizeof(u16))))
 	#define bh_hash_iter_value(T, it)			(*(T *)it.entry)
 #endif
+
+#define bh_hash_each_start(T, table) { \
+	bh_hash_iterator it = bh_hash_iter_setup(T, (table)); \
+	while (bh_hash_iter_next(&it)) { \
+		const char* key = bh_hash_iter_key(it); \
+		T value = bh_hash_iter_value(T, it);
+#define bh_hash_each_end			} }
 
 b32 bh__hash_init(bh_allocator allocator, bh__hash **table, i32 hash_size);
 b32 bh__hash_free(bh__hash **table);
@@ -566,53 +550,55 @@ ptr bh__hash_put(bh__hash *table, i32 elemsize, char *key);
 b32 bh__hash_has(bh__hash *table, i32 elemsize, char *key);
 ptr bh__hash_get(bh__hash *table, i32 elemsize, char *key);
 void bh__hash_delete(bh__hash *table, i32 elemsize, char *key);
+void bh__hash_clear(bh__hash *table);
 bh_hash_iterator bh__hash_iter_setup(bh__hash *table, i32 elemsize);
 b32 bh_hash_iter_next(bh_hash_iterator* it);
 
 #endif
 
+
+
+
+
+
+//-------------------------------------------------------------------------------
+// OTHER COMMON DATA STRUCTURES
+//-------------------------------------------------------------------------------
+#ifndef BH_NO_DATASTRUCTURES
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#endif // BH_NO_DATASTRUCTURES
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #ifdef BH_DEFINE
 #undef BH_DEFINE
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //-------------------------------------------------------------------------------------
 // IMPLEMENTATIONS
 //-------------------------------------------------------------------------------------
@@ -620,40 +606,15 @@ b32 bh_hash_iter_next(bh_hash_iterator* it);
 //-------------------------------------------------------------------------------------
 // CHAR FUNCTIONS
 //-------------------------------------------------------------------------------------
-b32 char_is_alpha(const char a) {
-	return ('a' <= a && a <= 'z') || ('A' <= a && a <= 'Z');
-}
+extern inline b32 char_is_alpha(const char a);
+extern inline b32 char_is_num(const char a);
+extern inline b32 char_is_alphanum(const char a);
+extern inline char charset_contains(const char* charset, char ch);
+extern inline b32 char_is_whitespace(const char a);
+extern inline b32 char_in_range(const char lo, const char hi, const char a);
+extern inline i64 chars_match(char* ptr1, char* ptr2);
 
-b32 char_is_num(const char a) {
-	return ('0' <= a && a <= '9');
-}
 
-b32 char_is_alphanum(const char a) {
-	return char_is_alpha(a) || char_is_num(a);
-}
-
-b32 char_is_whitespace(const char a) {
-	return charset_contains(" \t\r\n", a);
-}
-
-b32 char_in_range(const char lo, const char hi, const char a) {
-	return lo <= a <= hi;
-}
-
-char charset_contains(const char* charset, char ch) {
-	while (*charset) {
-		if (*charset == ch) return ch;
-		charset++;
-	}
-
-	return 0;
-}
-
-i64 chars_match(char* ptr1, char* ptr2) {
-	i64 len = 0;
-	while (*ptr2 != '\0' && *ptr1 == *ptr2) ptr1++, ptr2++, len++;
-	return *ptr2 == '\0' ? len : 0;
-}
 
 
 
@@ -664,8 +625,6 @@ i64 chars_match(char* ptr1, char* ptr2) {
 //-------------------------------------------------------------------------------------
 // CUSTOM ALLOCATORS IMPLEMENTATION
 //-------------------------------------------------------------------------------------
-
-
 ptr bh_alloc(bh_allocator a, isize size) {
 	return bh_alloc_aligned(a, size, 16);
 }
@@ -689,7 +648,6 @@ void bh_free(bh_allocator a, ptr data) {
 
 
 // HEAP ALLOCATOR IMPLEMENTATION
-
 bh_allocator bh_heap_allocator(void) {
 	return (bh_allocator) {
 		.proc = bh_heap_allocator_proc,
@@ -865,140 +823,6 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
 	return retval;
 }
 
-
-//-------------------------------------------------------------------------------------
-// STRING IMPLEMENTATION (BROKEN)
-//-------------------------------------------------------------------------------------
-#ifndef BH_NO_STRING
-
-bh_string* bh_string_new_cap(unsigned long cap) {
-	bh__string* str;
-	str = (bh__string*) malloc(sizeof(*str) + sizeof(char) * cap + 1);
-	str[0] = 0;
-	return str + 1;
-}
-
-bh_string* bh_string_new_str(const char* cstr) {
-	const i32 len = strlen(cstr);
-	bh__string* str;
-	i32 i;
-
-	str = malloc(sizeof(*str) + sizeof(char) * len + 1);
-	char* data = (char*) (str + 1);
-	for (i = 0; i < len; i++) {
-		data[i] = cstr[i];
-	}
-
-	data[len] = 0; // Always null terminate the string
-
-	str->length = len;
-	str->capacity = len;
-	return str + 1;
-}
-
-b32 bh_string_delete(bh_string** str) {
-	bh__string* strptr = bh__stringhead(*str);
-	free(strptr);
-	str->length = 0;
-	str->capacity = 0;
-	return 1;
-}
-
-b32 bh_string_grow(bh_string** str, u64 cap) {
-	bh__string* strptr = bh__stringhead(*str);
-	if (strptr->capacity >= cap) return 1;
-
-	void* p;
-	p = realloc(strptr, sizeof(*strptr) + sizeof(char) * cap + 1);
-
-	strptr->capacity = cap;
-
-	return 1;
-}
-
-void bh_string_append_bh_string(bh_string** str1, bh_string** str2) {
-	if (!bh_string_ensure_capacity(str1, str1->length + str2->length)) return;
-
-	//TODO: Replace with custom memory management
-	memcpy(str1->data + str1->length, str2->data, str2->length);
-	str1->length += str2->length;
-}
-
-void bh_string_append_cstr(bh_string* str1, const char* str2) {
-	const i32 str2len = strlen(str2);
-	if (!bh_string_ensure_capacity(str1, str1->length + str2len)) return;
-
-	//TODO: Replace with custom memory management
-	memcpy(str1->data + str1->length, str2, str2len);
-	str1->length += str2len;
-}
-
-void bh_string_replace_at_bh_string(bh_string* dest, bh_string* src, u64 offset) {
-	if (offset > dest->length) return;
-	if (!bh_string_ensure_capacity(dest, offset + src->length)) return;
-
-	memcpy(dest->data + offset, src->data, src->length);
-	if (offset + src->length > dest->length)
-		dest->length = offset + src->length;
-}
-
-void bh_string_replace_at_cstr(bh_string* dest, const char* src, u64 offset) {
-	if (offset > dest->length) return;
-	const i32 srclen = strlen(src);
-	if (!bh_string_ensure_capacity(dest, offset + srclen)) return;
-
-	memcpy(dest->data + offset, src, srclen);
-	if (offset + srclen > dest->length)
-		dest->length = offset + srclen;
-}
-
-void bh_string_insert_at_bh_string(bh_string* dest, bh_string* src, u64 offset) {
-	if (!bh_string_ensure_capacity(dest, dest->length + src->length)) return;
-
-	memmove(dest->data + offset + src->length, dest->data + offset, dest->length + src->length - offset);
-	memcpy(dest->data + offset, src->data, src->length);
-	dest->length += src->length;
-}
-
-void bh_string_insert_at_cstr(bh_string* dest, const char* src, u64 offset) {
-	const i32 srclen = strlen(src);
-	if (!bh_string_ensure_capacity(dest, dest->length + srclen)) return;
-
-	// TODO: Use something better. This copies to a seperate buffer first
-	memmove(dest->data + offset + srclen, dest->data + offset, dest->length + srclen - offset);
-	memcpy(dest->data + offset, src, srclen);
-	dest->length += srclen;
-}
-
-
-void bh_string_trim_end(bh_string* str, const char* charset) {
-	while (charset_contains(charset, str->data[str->length - 1]))
-		str->length--;
-}
-
-void bh_string_trim_begin(bh_string* str, const char* charset) {
-	u32 off = 0, i;
-	while (charset_contains(charset, str->data[off])) off++;
-
-	if (off == 0) return;
-
-	for (i = 0; i < str->length - off; i++) {
-		str->data[i] = str->data[i + off];
-	}
-
-	str->length -= off;
-}
-
-void bh_string_trim_end_space(bh_string* str) {
-	bh_string_trim_end(str, " \t\n\r");
-}
-
-// TEMP
-void bh_string_print(bh_string* str) {
-	write(STDOUT_FILENO, str->data, str->length);
-}
-
-#endif // ifndef BH_NO_STRING
 
 
 
@@ -1258,9 +1082,9 @@ isize bh_fprintf(bh_file* f, char const *fmt, ...) {
 }
 
 isize bh_fprintf_va(bh_file* f, char const *fmt, va_list va) {
-	static char buf[4096];
-	isize len = bh_snprintf_va(buf, sizeof(buf), fmt, va);
-	bh_file_write(f, buf, len - 1);
+	static char buffer[4096];
+	isize len = bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
+	bh_file_write(f, buffer, len - 1);
 	return len;
 }
 
@@ -1277,6 +1101,24 @@ char* bh_bprintf_va(char const *fmt, va_list va) {
 	static char buffer[4096];
 	bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
 	return buffer;
+}
+
+char* bh_aprintf(bh_allocator alloc, const char* fmt, ...) {
+	char* res;
+	va_list va;
+	va_start(va, fmt);
+	res = bh_aprintf_va(alloc, fmt, va);
+	va_end(va);
+	return res;
+}
+
+char* bh_aprintf_va(bh_allocator alloc, const char* fmt, va_list va) {
+	static char buffer[4096];
+	isize len = bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
+	char* res = bh_alloc(alloc, len);
+	memcpy(res, buffer, len);
+	res[len - 1] = 0;
+	return res;
 }
 
 isize bh_snprintf(char *str, isize n, char const *fmt, ...) {
@@ -1749,6 +1591,16 @@ found_matching:
 	bh__arr_deleten((void **) &arrptr, 1, byte_offset, delete_len);
 	table->arrs[index] = arrptr;
 	(*(u64 *) arrptr)--;
+}
+
+void bh__hash_clear(bh__hash *table) {
+	for (i32 i = 0; i < table->hash_size; i++) {
+		if (table->arrs[i] != NULL) {
+			// NOTE: Set length property to 0
+			*((u64 *) table->arrs[i]) = 0;
+			bh_arr_set_length(table->arrs[i], 0);
+		}
+	}
 }
 
 bh_hash_iterator bh__hash_iter_setup(bh__hash *table, i32 elemsize) {

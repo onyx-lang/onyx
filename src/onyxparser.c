@@ -324,13 +324,6 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 			{
 				parser_next_token(parser);
 				OnyxTypeInfo* type = &builtin_types[ONYX_TYPE_INFO_KIND_UNKNOWN];
-				u32 flags = ONYX_AST_FLAG_LVAL;
-
-				// NOTE: var: const ...
-				if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_CONST) {
-					parser_next_token(parser);
-					flags |= ONYX_AST_FLAG_CONST;
-				}
 
 				// NOTE: var: type
 				if (parser->curr_token->type == TOKEN_TYPE_SYMBOL) {
@@ -340,16 +333,29 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 				OnyxAstNodeLocal* local = (OnyxAstNodeLocal*) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_LOCAL);
 				local->token = symbol;
 				local->type = type;
-				local->flags |= flags;
+				local->flags |= ONYX_AST_FLAG_LVAL;
 
 				insert_identifier(parser, (OnyxAstNode *) local, 1);
 
-				if (parser->curr_token->type == TOKEN_TYPE_SYM_EQUALS) {
+				if (parser->curr_token->type == TOKEN_TYPE_SYM_EQUALS || parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
+					if (parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
+						local->flags |= ONYX_AST_FLAG_CONST;
+					}
+
 					OnyxAstNode* assignment = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_ASSIGNMENT);
 					assignment->token = parser->curr_token;
 					parser_next_token(parser);
 
 					OnyxAstNode* expr = parse_expression(parser);
+					if (expr == NULL) {
+						onyx_token_null_toggle(*parser->curr_token);
+						onyx_message_add(parser->msgs,
+								ONYX_MESSAGE_TYPE_EXPECTED_EXPRESSION,
+								assignment->token->pos,
+								parser->curr_token->token);
+						onyx_token_null_toggle(*parser->curr_token);
+						return 1;
+					}
 					assignment->right = expr;
 					assignment->left = (OnyxAstNode*) local;
 

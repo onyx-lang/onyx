@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
 #if 0
 	bh_printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
-	for (OnyxToken* it = token_arr; !bh_arr_end(token_arr, it); it++) {
+	bh_arr_each(OnyxToken, it, token_arr) {
 		onyx_token_null_toggle(*it);
 		bh_printf("%s (%s:%l:%l)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
 		onyx_token_null_toggle(*it);
@@ -66,13 +66,9 @@ int main(int argc, char *argv[]) {
 	// NOTE: Ensure type table made correctly
 
 	bh_printf("Type map:\n");
-	bh_hash_iterator type_map_it = bh_hash_iter_setup(i32, wasm_mod.type_map);
-	while (bh_hash_iter_next(&type_map_it)) {
-		const char* key = bh_hash_iter_key(type_map_it);
-		i32 value = bh_hash_iter_value(i32, type_map_it);
-
+	bh_hash_each_start(i32, wasm_mod.type_map);
 		bh_printf("%s -> %d\n", key, value);
-	}
+	bh_hash_each_end;
 
 	bh_printf("Type list:\n");
 	WasmFuncType** func_type = wasm_mod.functypes;
@@ -91,18 +87,14 @@ int main(int argc, char *argv[]) {
 	// NOTE: Ensure the export table was built correctly
 
 	bh_printf("Function types:\n");
-	for (WasmFunc* func_it = wasm_mod.funcs; !bh_arr_end(wasm_mod.funcs, func_it); func_it++) {
+	bh_arr_each(WasmFunc, func_it, wasm_mod.funcs) {
 		bh_printf("%d\n", func_it->type_idx);
 	}
 
 	bh_printf("Exports:\n");
-	bh_hash_iterator export_it = bh_hash_iter_setup(WasmExport, wasm_mod.exports);
-	while (bh_hash_iter_next(&export_it)) {
-		const char* key = bh_hash_iter_key(export_it);
-		WasmExport value = bh_hash_iter_value(WasmExport, export_it);
-
+	bh_hash_each_start(WasmExport, wasm_mod.exports);
 		bh_printf("%s: %d %d\n", key, value.kind, value.idx);
-	}
+	bh_hash_each_end;
 #endif
 
 
