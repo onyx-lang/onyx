@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 
 	OnyxWasmModule wasm_mod = onyx_wasm_generate_module(alloc, program);
 
-#if 1
+#if 0
 	// NOTE: Ensure type table made correctly
 
 	bh_printf("Type map:\n");
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
-#if 1
+#if 0
 	// NOTE: Ensure the export table was built correctly
 
 	bh_printf("Function types:\n");

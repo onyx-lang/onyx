@@ -7,12 +7,14 @@ export foo :: proc (foo i32, bar i32) -> i32 {
 	return 10 as i32;
 }
 
-export diff_square :: proc (a i64, b i32) -> i64 {
+export diff_square :: proc (a i32, b i32) -> i64 {
 	// Typechecked
-	c := a - (b as i64); // Mutable
-	d :: (a as i32) + b; // Constant
+	c := a - b; // Mutable
+	d :: a + b; // Constant
 
-	{ f :: 10 as i32; };
+	{
+		f :: 10;
+	};
 
-	return (c * (d as i64));
+	return (c * d) as i64;
 }

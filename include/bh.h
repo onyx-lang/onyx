@@ -115,6 +115,12 @@ inline i64 chars_match(char* ptr1, char* ptr2) {
 #define fori(var, lo, hi)				for (i64 var = (lo); var <= (hi); var++)
 #define forll(T, var, start, step)		for (T* var = (start); var != NULL; var = var->step)
 
+#ifdef BH_DEBUG
+	#define DEBUG_HERE						__asm("int $3")
+#else
+	#define DEBUG_HERE
+#endif
+
 
 
 
@@ -388,6 +394,37 @@ void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// Flexible buffer
+//-------------------------------------------------------------------------------------
+
+typedef struct bh_buffer {
+	bh_allocator allocator;
+	i32 length, capacity;
+	ptr data;
+} bh_buffer;
+
+#ifndef BH_BUFFER_GROW_FORMULA
+#define BH_BUFFER_GROW_FORMULA(x)			((x) > 0 ? ((x) << 1) : 16)
+#endif
+
+void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 length);
+void bh_buffer_grow(bh_buffer* buffer, i32 length);
+void bh_buffer_append(bh_buffer* buffer, ptr data, i32 length);
+void bh_buffer_concat(bh_buffer* buffer, bh_buffer other);
 
 
 
@@ -1281,6 +1318,67 @@ end_of_format:
 
 	return str - text_start + 1;
 }
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// FLEXIBLE BUFFER IMPLEMENTATION
+//-------------------------------------------------------------------------------------
+#ifndef BH_NO_BUFFER
+
+void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 init_size) {
+	buffer->allocator = alloc;
+	buffer->length = 0;
+	buffer->capacity = init_size;
+	buffer->data = bh_alloc(alloc, init_size);
+}
+
+void bh_buffer_grow(bh_buffer* buffer, i32 length) {
+	if (buffer == NULL) return;
+
+	if (buffer->capacity >= length) {
+		// NOTE: Already have enough room
+		return;
+	}
+
+	i32 newcap = buffer->capacity;
+	while (newcap < length) newcap = BH_BUFFER_GROW_FORMULA(newcap);
+
+	ptr new_data = bh_resize(buffer->allocator, buffer->data, newcap);
+	if (new_data == NULL) return;
+
+	buffer->capacity = newcap;
+	buffer->data = new_data;
+}
+
+void bh_buffer_append(bh_buffer* buffer, ptr data, i32 length) {
+	if (buffer == NULL) return;
+
+	if (buffer->length + length > buffer->capacity) {
+		bh_buffer_grow(buffer, buffer->length + length);
+	}
+
+	memcpy(bh_pointer_add(buffer->data, buffer->length), data, length);
+	buffer->length += length;
+}
+
+void bh_buffer_concat(bh_buffer* buffer, bh_buffer other) {
+	bh_buffer_append(buffer, other.data, other.length);
+}
+
+
+
+
+
+#endif
+
+
+
+
+
+
 
 
 

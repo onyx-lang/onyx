@@ -1,3 +1,4 @@
+#define BH_DEBUG
 #include "onyxwasm.h"
 
 // NOTE: Allows easier testing of types since most of the characters
@@ -206,7 +207,8 @@ static WasmType onyx_type_to_wasm_type(OnyxTypeInfo* type) {
 	return WASM_TYPE_INT32;
 }
 
-static void process_block(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBlock* block, b32 top_level);
+static void process_function_body(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeFuncDef* fd);
+static void process_block(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBlock* block);
 static void process_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* stmt);
 static void process_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* lval);
 static void process_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* assign);
@@ -214,18 +216,22 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 static void process_cast(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* cast);
 static void process_return(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* ret);
 
-static void process_block(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBlock* block, b32 top_level) {
-	if (!top_level) {
-		bh_arr_push(func->code, ((WasmInstruction){ WI_BLOCK_START, 0x40 }));
+static void process_function_body(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeFuncDef* fd) {
+	if (fd->body == NULL) return;
+
+	forll (OnyxAstNode, stmt, fd->body->body, next) {
+		process_statement(mod, func, stmt);
 	}
+}
+
+static void process_block(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBlock* block) {
+	bh_arr_push(func->code, ((WasmInstruction){ WI_BLOCK_START, 0x40 }));
 
 	forll (OnyxAstNode, stmt, block->body, next) {
 		process_statement(mod, func, stmt);
 	}
 
-	if (!top_level) {
-		bh_arr_push(func->code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
-	}
+	bh_arr_push(func->code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
 }
 
 static void process_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* stmt) {
@@ -343,9 +349,10 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 				break;
 			}
 
-		case ONYX_AST_NODE_KIND_BLOCK: process_block(mod, func, (OnyxAstNodeBlock *) expr, 0); break;
+		case ONYX_AST_NODE_KIND_BLOCK: process_block(mod, func, (OnyxAstNodeBlock *) expr); break;
 
 		default:
+			DEBUG_HERE;
 			bh_printf("Unhandled case: %d\n", expr->kind);
 			assert(0);
 	}
@@ -483,7 +490,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	bh_hash_each_end;
 
 	// Generate code
-	process_block(mod, &wasm_func, fd->body, 1);
+	process_function_body(mod, &wasm_func, fd);
 
 	bh_printf("Code for function:\n");
 	bh_arr_each(WasmInstruction, instr, wasm_func.code) {
@@ -533,4 +540,7 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 void onyx_wasm_module_free(OnyxWasmModule* module) {
 	bh_arr_free(module->functypes);
 	bh_arr_free(module->funcs);
+	bh_hash_free(module->local_map);
+	bh_hash_free(module->type_map);
+	bh_hash_free(module->exports);
 }
