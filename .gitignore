@@ -3,3 +3,4 @@
 tags
 test.c
 test
+*.wasm

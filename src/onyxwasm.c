@@ -544,3 +544,21 @@ void onyx_wasm_module_free(OnyxWasmModule* module) {
 	bh_hash_free(module->type_map);
 	bh_hash_free(module->exports);
 }
+
+static const u8 WASM_MAGIC_STRING[] = { 0x00, 0x61, 0x73, 0x6D };
+static const u8 WASM_VERSION[] = { 0x01, 0x00, 0x00, 0x00 };
+
+void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
+	bh_buffer master_buffer;
+	bh_buffer_init(&master_buffer, bh_heap_allocator(), 128);
+	bh_buffer_append(&master_buffer, WASM_MAGIC_STRING, 4);
+	bh_buffer_append(&master_buffer, WASM_VERSION, 4);
+
+	
+
+
+
+
+
+	bh_file_write(&file, master_buffer.data, master_buffer.length);
+}

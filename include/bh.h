@@ -101,6 +101,20 @@ inline i64 chars_match(char* ptr1, char* ptr2) {
 
 
 
+
+
+//-------------------------------------------------------------------------------------
+// Conversion functions
+//-------------------------------------------------------------------------------------
+
+// Converts an unsigned integer to the unsigned LEB128 format
+u8* uint_to_uleb128(u64 n, i32* output_length);
+u8* int_to_leb128(i64 n, i32* output_length);
+
+
+
+
+
 //-------------------------------------------------------------------------------------
 // Helpful macros
 //-------------------------------------------------------------------------------------
@@ -414,7 +428,7 @@ void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
 typedef struct bh_buffer {
 	bh_allocator allocator;
 	i32 length, capacity;
-	ptr data;
+	u8* data;
 } bh_buffer;
 
 #ifndef BH_BUFFER_GROW_FORMULA
@@ -423,8 +437,9 @@ typedef struct bh_buffer {
 
 void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 length);
 void bh_buffer_grow(bh_buffer* buffer, i32 length);
-void bh_buffer_append(bh_buffer* buffer, ptr data, i32 length);
+void bh_buffer_append(bh_buffer* buffer, const void * data, i32 length);
 void bh_buffer_concat(bh_buffer* buffer, bh_buffer other);
+void bh_buffer_write_byte(bh_buffer* buffer, u8 byte);
 
 
 
@@ -863,6 +878,51 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
 
 
 
+//-------------------------------------------------------------------------------------
+// CONVERSION FUNCTIONS IMPLEMENTATION
+//-------------------------------------------------------------------------------------
+u8* uint_to_uleb128(u64 n, i32* output_length) {
+	static u8 buffer[16];
+
+	*output_length = 0;
+	u8* output = buffer;
+	u8 byte;
+	do {
+		byte = n & 0x7f;
+		n >>= 7;
+		if (n != 0) byte |= (1 << 7);
+		*output++ = byte;
+		(*output_length)++;
+	} while (n != 0);
+
+	return buffer;
+}
+
+
+// Converts a signed integer to the signed LEB128 format
+u8* int_to_leb128(i64 n, i32* output_length) {
+	static u8 buffer[16];
+
+	*output_length = 0;
+	u8* output = buffer;
+	b32 more = 1;
+
+	i32 size = 64;
+
+	u8 byte;
+	do {
+		byte = n & 0x7f;
+		n >>= 7;
+
+		more = !(((n == 0) && (byte & 0x40) == 0) || ((n == -1) && (byte & 0x40) != 0));
+		if (more)
+			byte |= 0x80;
+		*output++ = byte;
+		(*output_length)++;
+	} while (more);
+
+	return buffer;
+}
 
 
 
@@ -1353,14 +1413,14 @@ void bh_buffer_grow(bh_buffer* buffer, i32 length) {
 	buffer->data = new_data;
 }
 
-void bh_buffer_append(bh_buffer* buffer, ptr data, i32 length) {
+void bh_buffer_append(bh_buffer* buffer, const void * data, i32 length) {
 	if (buffer == NULL) return;
 
 	if (buffer->length + length > buffer->capacity) {
 		bh_buffer_grow(buffer, buffer->length + length);
 	}
 
-	memcpy(bh_pointer_add(buffer->data, buffer->length), data, length);
+	memcpy(buffer->data + buffer->length, data, length);
 	buffer->length += length;
 }
 
@@ -1368,6 +1428,10 @@ void bh_buffer_concat(bh_buffer* buffer, bh_buffer other) {
 	bh_buffer_append(buffer, other.data, other.length);
 }
 
+void bh_buffer_write_byte(bh_buffer* buffer, u8 byte) {
+	bh_buffer_grow(buffer, buffer->length + 1);
+	buffer->data[buffer->length++] = byte;
+}
 
 
 

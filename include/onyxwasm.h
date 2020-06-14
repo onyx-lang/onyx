@@ -277,5 +277,6 @@ typedef struct OnyxWasmModule {
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program);
 void onyx_wasm_module_free(OnyxWasmModule* module);
+void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 
 #endif

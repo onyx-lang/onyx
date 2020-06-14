@@ -97,6 +97,10 @@ int main(int argc, char *argv[]) {
 	bh_hash_each_end;
 #endif
 
+	bh_file out_file;
+	bh_file_create(&out_file, "out.wasm");
+	onyx_wasm_module_write_to_file(&wasm_mod, out_file);
+	bh_file_close(&out_file);
 
 	onyx_wasm_module_free(&wasm_mod);
 main_exit: // NOTE: Cleanup, since C doesn't have defer
