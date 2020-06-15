@@ -26,6 +26,8 @@ typedef int64_t i64;
 typedef int64_t isize;
 typedef i32 b32;
 typedef void* ptr;
+typedef float f32;
+typedef double f64;
 
 
 
@@ -110,7 +112,8 @@ inline i64 chars_match(char* ptr1, char* ptr2) {
 // Converts an unsigned integer to the unsigned LEB128 format
 u8* uint_to_uleb128(u64 n, i32* output_length);
 u8* int_to_leb128(i64 n, i32* output_length);
-
+u8* float_to_ieee754(f32 f);
+u8* double_to_ieee754(f64 f);
 
 
 
@@ -436,6 +439,7 @@ typedef struct bh_buffer {
 #endif
 
 void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 length);
+void bh_buffer_free(bh_buffer* buffer);
 void bh_buffer_grow(bh_buffer* buffer, i32 length);
 void bh_buffer_append(bh_buffer* buffer, const void * data, i32 length);
 void bh_buffer_concat(bh_buffer* buffer, bh_buffer other);
@@ -924,6 +928,42 @@ u8* int_to_leb128(i64 n, i32* output_length) {
 	return buffer;
 }
 
+// NOTE: This assumes the underlying implementation of float on the host
+// system is already IEEE-754. This is safe to assume in most cases.
+u8* float_to_ieee754(f32 f) {
+	static u8 buffer[4];
+
+	u8* fmem = (u8*) &f;
+	buffer[0] = fmem[3];
+	buffer[1] = fmem[2];
+	buffer[2] = fmem[1];
+	buffer[3] = fmem[0];
+
+	return buffer;
+}
+
+u8* double_to_ieee754(f64 f) {
+	static u8 buffer[8];
+
+	u8* fmem = (u8*) &f;
+	buffer[0] = fmem[7];
+	buffer[1] = fmem[6];
+	buffer[2] = fmem[5];
+	buffer[3] = fmem[4];
+	buffer[4] = fmem[3];
+	buffer[5] = fmem[2];
+	buffer[6] = fmem[1];
+	buffer[7] = fmem[0];
+
+	return buffer;
+}
+
+
+
+
+
+
+
 
 
 
@@ -1393,6 +1433,12 @@ void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 init_size) {
 	buffer->length = 0;
 	buffer->capacity = init_size;
 	buffer->data = bh_alloc(alloc, init_size);
+}
+
+void bh_buffer_free(bh_buffer* buffer) {
+	bh_free(buffer->allocator, buffer->data);
+	buffer->length = 0;
+	buffer->capacity = 0;
 }
 
 void bh_buffer_grow(bh_buffer* buffer, i32 length) {

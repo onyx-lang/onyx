@@ -237,17 +237,24 @@ typedef struct WasmInstruction {
 	WasmInstructionData data;
 } WasmInstruction;
 
+typedef struct WasmFuncLocals {
+	u8 i32_count;
+	u8 i64_count;
+	u8 f32_count;
+	u8 f64_count;
+} WasmFuncLocals;
 
 typedef struct WasmFunc {
 	i32 type_idx;
+	WasmFuncLocals locals;
 	bh_arr(WasmInstruction) code;
 } WasmFunc;
 
 typedef enum WasmExportKind {
-	WASM_EXPORT_FUNCTION,
-	WASM_EXPORT_TABLE,
-	WASM_EXPORT_MEMORY,
-	WASM_EXPORT_GLOBAL,
+	WASM_EXPORT_FUNCTION = 0x00,
+	WASM_EXPORT_TABLE	 = 0x01,
+	WASM_EXPORT_MEMORY	 = 0x02,
+	WASM_EXPORT_GLOBAL	 = 0x03,
 } WasmExportKind;
 
 typedef struct WasmExport {
@@ -273,6 +280,7 @@ typedef struct OnyxWasmModule {
 	i32 next_func_idx;
 
 	bh_hash(WasmExport) exports;
+	i32 export_count;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program);
