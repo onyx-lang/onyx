@@ -583,10 +583,14 @@ static OnyxAstNodeFuncDef* parse_function_definition(OnyxParser* parser) {
 	OnyxAstNodeParam* params = parse_function_params(parser);
 	func_def->params = params;
 
-	expect(parser, TOKEN_TYPE_RIGHT_ARROW);
+	if (parser->curr_token->type == TOKEN_TYPE_RIGHT_ARROW) {
+		expect(parser, TOKEN_TYPE_RIGHT_ARROW);
 
-	OnyxTypeInfo* return_type = parse_type(parser);
-	func_def->return_type = return_type;
+		OnyxTypeInfo* return_type = parse_type(parser);
+		func_def->return_type = return_type;
+	} else {
+		func_def->return_type = &builtin_types[ONYX_TYPE_INFO_KIND_VOID];
+	}
 
 	for (OnyxAstNodeParam* p = func_def->params; p != NULL; p = p->next) {
 		insert_identifier(parser, (OnyxAstNode *) p, 0);

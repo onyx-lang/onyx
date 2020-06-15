@@ -7,7 +7,7 @@ export foo :: proc (foo i32, bar i32) -> i32 {
 	return 10 as i32;
 }
 
-export diff_square :: proc (a i32, b i32) -> i64 {
+export diff_square :: proc (a i32, b i32) -> i32 {
 	// Typechecked
 	c := a - b; // Mutable
 	d :: a + b; // Constant
@@ -16,7 +16,7 @@ export diff_square :: proc (a i32, b i32) -> i64 {
 		f :: 10;
 	};
 
-	return (c * d) as i64;
+	return (c * d) as i32;
 }
 
-export dummy :: proc () -> void { }
+export dummy :: proc () { }

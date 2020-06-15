@@ -205,7 +205,6 @@ static WasmType onyx_type_to_wasm_type(OnyxTypeInfo* type) {
 		if (type->size == 8) return WASM_TYPE_FLOAT64;
 	}
 
-	// TODO: Should produce an error message if this isn't successful
 	return WASM_TYPE_VOID;
 }
 
@@ -458,9 +457,14 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 
 	WasmFunc wasm_func = {
 		.type_idx = type_idx,
+		.locals = {
+			.i32_count = 0,
+			.i64_count = 0,
+			.f32_count = 0,
+			.f64_count = 0,
+		},
 		.code = NULL,
 	};
-	bh_arr_push(mod->funcs, wasm_func);
 	i32 func_idx = mod->next_func_idx++;
 
 	if (fd->flags & ONYX_AST_FLAG_EXPORTED) {
@@ -487,13 +491,31 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 		onyx_token_null_toggle(*param->token);
 	}
 
-	forll (OnyxAstNodeLocal, local, fd->body->scope->last_local, prev_local) {
-		onyx_token_null_toggle(*local->token);
-		bh_hash_put(i32, mod->local_map, local->token->token, localidx++);
-		onyx_token_null_toggle(*local->token);
+	static const WasmType local_types[4] = { WASM_TYPE_INT32, WASM_TYPE_INT64, WASM_TYPE_FLOAT32, WASM_TYPE_FLOAT64 };
+
+	// HACK: This assumes that the order of the count members
+	// is the same as the order of the local_types above
+	u8* count = &wasm_func.locals.i32_count;
+	fori (ti, 0, 3) {
+		forll (OnyxAstNodeLocal, local, fd->body->scope->last_local, prev_local) {
+			if (onyx_type_to_wasm_type(local->type) == local_types[ti]) {
+				onyx_token_null_toggle(*local->token);
+				bh_hash_put(i32, mod->local_map, local->token->token, localidx++);
+				onyx_token_null_toggle(*local->token);
+
+				(*count)++;
+			}
+		}
+
+		count++;
 	}
 
+
 	bh_printf("\nLocals for function: %b\n", fd->token->token, fd->token->length);
+	bh_printf("\tI32 count: %d\n", wasm_func.locals.i32_count);
+	bh_printf("\tI64 count: %d\n", wasm_func.locals.i64_count);
+	bh_printf("\tF32 count: %d\n", wasm_func.locals.f32_count);
+	bh_printf("\tF64 count: %d\n", wasm_func.locals.f64_count);
 	bh_hash_each_start(i32, mod->local_map);
 		bh_printf("\t%s -> %d\n", key, value);
 	bh_hash_each_end;
@@ -505,6 +527,8 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	bh_arr_each(WasmInstruction, instr, wasm_func.code) {
 		bh_printf("\t%s\t%xd\n", wi_string(instr->type), instr->data.i1);
 	}
+
+	bh_arr_push(mod->funcs, wasm_func);
 
 	// NOTE: Clear the local map on exit of generating this function
 	bh_hash_clear(mod->local_map);
@@ -695,6 +719,93 @@ static i32 output_exportsection(OnyxWasmModule* module, bh_buffer* buff) {
 	return buff->length - prev_len;
 }
 
+static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
+	i32 prev_len = buff->length;
+
+	// NOTE: Output vector length
+	i32 total_locals =
+		(i32) (func->locals.i32_count != 0) +
+		(i32) (func->locals.i64_count != 0) +
+		(i32) (func->locals.f32_count != 0) +
+		(i32) (func->locals.f64_count != 0);
+
+	i32 leb_len;
+	u8* leb = uint_to_uleb128((u64) total_locals, &leb_len);
+	bh_buffer_append(buff, leb, leb_len);
+
+	if (func->locals.i32_count != 0) {
+		leb = uint_to_uleb128((u64) func->locals.i32_count, &leb_len);
+		bh_buffer_append(buff, leb, leb_len);
+		bh_buffer_write_byte(buff, WASM_TYPE_INT32);
+	}
+	if (func->locals.i64_count != 0) {
+		leb = uint_to_uleb128((u64) func->locals.i64_count, &leb_len);
+		bh_buffer_append(buff, leb, leb_len);
+		bh_buffer_write_byte(buff, WASM_TYPE_INT64);
+	}
+	if (func->locals.f32_count != 0) {
+		leb = uint_to_uleb128((u64) func->locals.f32_count, &leb_len);
+		bh_buffer_append(buff, leb, leb_len);
+		bh_buffer_write_byte(buff, WASM_TYPE_FLOAT32);
+	}
+	if (func->locals.f64_count != 0) {
+		leb = uint_to_uleb128((u64) func->locals.f64_count, &leb_len);
+		bh_buffer_append(buff, leb, leb_len);
+		bh_buffer_write_byte(buff, WASM_TYPE_FLOAT64);
+	}
+
+	return buff->length - prev_len;
+}
+
+static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
+	i32 leb_len;
+	u8* leb;
+	switch (instr->type) {
+		case WI_LOCAL_GET:
+		case WI_LOCAL_SET:
+			bh_buffer_write_byte(buff, (u8) instr->type);
+			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
+			bh_buffer_append(buff, leb, leb_len);
+			break;
+
+		case WI_BLOCK_START:
+			bh_buffer_write_byte(buff, (u8) instr->type);
+			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
+			bh_buffer_append(buff, leb, leb_len);
+			break;
+
+		case WI_I32_CONST:
+		case WI_I64_CONST:
+			bh_buffer_write_byte(buff, (u8) instr->type);
+			bh_buffer_write_byte(buff, 0); // TODO: Actually output the literal
+			break;
+
+		default:
+			bh_buffer_write_byte(buff, (u8) instr->type);
+	}
+}
+
+static i32 output_code(WasmFunc* func, bh_buffer* buff) {
+
+	bh_buffer code_buff;
+	bh_buffer_init(&code_buff, buff->allocator, 128);
+
+	// Output locals
+	output_locals(func, &code_buff);
+
+	// Output code
+	bh_arr_each(WasmInstruction, instr, func->code) output_instruction(instr, &code_buff);
+
+	i32 leb_len;
+	u8* leb = uint_to_uleb128((u64) code_buff.length, &leb_len);
+	bh_buffer_append(buff, leb, leb_len);
+
+	bh_buffer_concat(buff, code_buff);
+	bh_buffer_free(&code_buff);
+
+	return 0;
+}
+
 static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
 	i32 prev_len = buff->length;
 
@@ -707,8 +818,9 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
 	u8* leb = uint_to_uleb128((u64) bh_arr_length(module->funcs), &leb_len);
 	bh_buffer_append(&vec_buff, leb, leb_len);
 
-	bh_arr_each(WasmFunc, func, module->funcs) {
-	}
+	// DEBUG_HERE;
+
+	bh_arr_each(WasmFunc, func, module->funcs) output_code(func, &vec_buff);
 
 	leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
 	bh_buffer_append(buff, leb, leb_len);
