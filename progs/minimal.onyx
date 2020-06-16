@@ -19,4 +19,6 @@ export diff_square :: proc (a i32, b i32) -> i32 {
 	return (c * d) as i32;
 }
 
-export dummy :: proc () { }
+export main :: proc () {
+	
+}

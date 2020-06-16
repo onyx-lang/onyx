@@ -89,8 +89,8 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 	}
 
 	case ONYX_AST_NODE_KIND_RETURN: {
-		if (node->next) {
-			onyx_ast_print(node->next, indent + 1);
+		if (node->left) {
+			onyx_ast_print(node->left, indent + 1);
 		}
 
 		break;

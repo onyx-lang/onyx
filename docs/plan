@@ -31,28 +31,81 @@ HOW:
 	at once would be overwhelming and unsatisfying. The current progress of each stage:
 
 	Stage 1 (MVP):
-		[ ] Can declare procedures
-		[ ] Procedures have params and returns of the following types:
+		[X] Can declare procedures
+		[X] Procedures have params and returns of the following types:
 			- i32, u32
 			- i64, u64
 			- f32, f64
-		[ ] Procedures have locals of the same set of types
-		[ ] Locals are declared in the following way
-			local : (const) (type) (= initial value);
+		[X] Procedures have locals of the same set of types
+		[X] Locals are declared in the following way
+			local : (type) ((= or :) initial value);
 
-			if const is specified, the value is unmodifiable
+			if : is used, the value is unmodifiable
 			if type is specified, that is assumed to be the correct type
 			if type is not specified, the type of initial value is used as the type
 
-		[ ] Five basic math operations are legal:
+		[X] Five basic math operations are legal:
 			+ - * / %
-		[ ] Math operations are sign aware and only operate on operands of the same type
-		[ ] All casts are explicit using this syntax:
+		[X] Math operations are sign aware and only operate on operands of the same type
+		[X] All casts are explicit using this syntax:
 			X as T
 
 			casts X to type T
 
+		[ ] Numeric literals are parsed and minimum type detected
+		[ ] Comparison operators
+		[ ] Proper boolean type
 		[ ] Conditional branching works as expected
 		[ ] Curly braces are required for all bodies of blocks
 		[ ] Simple while loop is functioning as expected
 		[ ] break and continue semantics
+		[ ] Function calling works for the builtin types
+		[ ] Function return values are type checked
+
+	Stage 2:
+		[ ] Order of symbol declaration is irrelevant
+			Either:
+			make a graph of symbol dependencies and produce a schedule on the graph
+			that would allow for all symbols to be resolved
+
+			OR
+
+			Do as many passes on the parse tree as needed to resolve all symbols.
+			This could be slow but it would be easier than creating a graph
+			scheduling algorithm.
+
+		[ ] Devise and implement a simple set of implicit type casting rules.
+			- Numeric literals always type cast to whatever type is needed (very flexible).
+
+		[ ] Start work on evaluating compile time known values.
+			- An expression marked COMPTIME will be reduced to its value in the parse tree.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

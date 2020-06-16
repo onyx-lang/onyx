@@ -19,13 +19,64 @@ int main(int argc, char *argv[]) {
 
 	bh_allocator alloc = bh_heap_allocator();
 
+	// NOTE: 1st: Read file contents
 	bh_file_contents fc = bh_file_read_contents(alloc, &source_file);
 	bh_file_close(&source_file);
 
+	// NOTE: 2nd: Tokenize the contents
 	OnyxTokenizer tokenizer = onyx_tokenizer_create(alloc, &fc);
 	onyx_lex_tokens(&tokenizer);
 	bh_arr(OnyxToken) token_arr = tokenizer.tokens;
 
+	// NOTE: Create the buffer for where compiler messages will be written
+	bh_arena msg_arena;
+	bh_arena_init(&msg_arena, alloc, 4096);
+	bh_allocator msg_alloc = bh_arena_allocator(&msg_arena);
+
+	OnyxMessages msgs;
+	onyx_message_create(msg_alloc, &msgs);
+
+	// NOTE: Create the arena where AST nodes will exist
+	// Prevents nodes from being scattered across memory due to fragmentation
+	bh_arena ast_arena;
+	bh_arena_init(&ast_arena, alloc, 16 * 1024 * 1024); // 16MB
+	bh_allocator ast_alloc = bh_arena_allocator(&ast_arena);
+
+	// NOTE: 3rd: parse the tokens to an AST
+	OnyxParser parser = onyx_parser_create(ast_alloc, &tokenizer, &msgs);
+	OnyxAstNode* program = onyx_parse(&parser);
+
+	// NOTE: if there are errors, assume the parse tree was generated wrong,
+	// even if it may have still been generated correctly.
+	if (onyx_message_has_errors(&msgs)) {
+		onyx_message_print(&msgs);
+		goto main_exit;
+	} else {
+		// onyx_ast_print(program, 0);
+		bh_printf("\nNo errors.\n");
+	}
+
+	// NOTE: 4th: Generate a WASM module from the parse tree and
+	// write it to a file.
+	OnyxWasmModule wasm_mod = onyx_wasm_generate_module(alloc, program);
+
+	bh_file out_file;
+	bh_file_create(&out_file, "out.wasm");
+	onyx_wasm_module_write_to_file(&wasm_mod, out_file);
+	bh_file_close(&out_file);
+
+	onyx_wasm_module_free(&wasm_mod);
+main_exit: // NOTE: Cleanup, since C doesn't have defer
+	bh_arena_free(&msg_arena);
+	bh_arena_free(&ast_arena);
+	onyx_parser_free(&parser);
+	onyx_tokenizer_free(&tokenizer);
+	bh_file_contents_free(&fc);
+
+	return 0;
+}
+
+// NOTE: Old bits of code that may be useful again at some point.
 #if 0
 	bh_printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
@@ -36,33 +87,7 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
-	bh_arena msg_arena;
-	bh_arena_init(&msg_arena, alloc, 4096);
-	bh_allocator msg_alloc = bh_arena_allocator(&msg_arena);
-
-	OnyxMessages msgs;
-	onyx_message_create(msg_alloc, &msgs);
-
-	bh_arena ast_arena;
-	bh_arena_init(&ast_arena, alloc, 16 * 1024 * 1024); // 16MB
-	bh_allocator ast_alloc = bh_arena_allocator(&ast_arena);
-
-	OnyxParser parser = onyx_parser_create(ast_alloc, &tokenizer, &msgs);
-	OnyxAstNode* program = onyx_parse(&parser);
-
-	// NOTE: if there are errors, assume the parse tree was generated wrong,
-	// even if it may have still been generated correctly.
-	if (onyx_message_has_errors(&msgs)) {
-		onyx_message_print(&msgs);
-		goto main_exit;
-	} else {
-		onyx_ast_print(program, 0);
-		bh_printf("\nNo errors.\n");
-	}
-
-	OnyxWasmModule wasm_mod = onyx_wasm_generate_module(alloc, program);
-
-#if 1
+#if 0
 	// NOTE: Ensure type table made correctly
 
 	bh_printf("Type map:\n");
@@ -83,7 +108,7 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
-#if 1
+#if 0
 	// NOTE: Ensure the export table was built correctly
 
 	bh_printf("Function types:\n");
@@ -96,19 +121,3 @@ int main(int argc, char *argv[]) {
 		bh_printf("%s: %d %d\n", key, value.kind, value.idx);
 	bh_hash_each_end;
 #endif
-
-	bh_file out_file;
-	bh_file_create(&out_file, "out.wasm");
-	onyx_wasm_module_write_to_file(&wasm_mod, out_file);
-	bh_file_close(&out_file);
-
-	onyx_wasm_module_free(&wasm_mod);
-main_exit: // NOTE: Cleanup, since C doesn't have defer
-	bh_arena_free(&msg_arena);
-	bh_arena_free(&ast_arena);
-	onyx_parser_free(&parser);
-	onyx_tokenizer_free(&tokenizer);
-	bh_file_contents_free(&fc);
-
-	return 0;
-}

@@ -510,23 +510,8 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 		count++;
 	}
 
-
-	bh_printf("\nLocals for function: %b\n", fd->token->token, fd->token->length);
-	bh_printf("\tI32 count: %d\n", wasm_func.locals.i32_count);
-	bh_printf("\tI64 count: %d\n", wasm_func.locals.i64_count);
-	bh_printf("\tF32 count: %d\n", wasm_func.locals.f32_count);
-	bh_printf("\tF64 count: %d\n", wasm_func.locals.f64_count);
-	bh_hash_each_start(i32, mod->local_map);
-		bh_printf("\t%s -> %d\n", key, value);
-	bh_hash_each_end;
-
 	// Generate code
 	process_function_body(mod, &wasm_func, fd);
-
-	bh_printf("Code for function:\n");
-	bh_arr_each(WasmInstruction, instr, wasm_func.code) {
-		bh_printf("\t%s\t%xd\n", wi_string(instr->type), instr->data.i1);
-	}
 
 	bh_arr_push(mod->funcs, wasm_func);
 
@@ -719,6 +704,34 @@ static i32 output_exportsection(OnyxWasmModule* module, bh_buffer* buff) {
 	return buff->length - prev_len;
 }
 
+static i32 output_startsection(OnyxWasmModule* module, bh_buffer* buff) {
+	i32 prev_len = buff->length;
+
+	i32 start_idx = -1;
+	bh_hash_each_start(WasmExport, module->exports) {
+		if (value.kind == WASM_EXPORT_FUNCTION) {
+			if (strncmp("main", key, 5) == 0) {
+				start_idx = value.idx;
+				break;
+			}
+		}
+	} bh_hash_each_end;
+
+	if (start_idx != -1) {
+		bh_buffer_write_byte(buff, WASM_SECTION_ID_START);
+
+		i32 start_leb_len, section_leb_len;
+		u8* start_leb = uint_to_uleb128((u64) start_idx, &start_leb_len);
+		u8* section_leb = uint_to_uleb128((u64) start_leb_len, &section_leb_len);
+		bh_buffer_append(buff, section_leb, section_leb_len);
+
+		start_leb = uint_to_uleb128((u64) start_idx, &start_leb_len);
+		bh_buffer_append(buff, start_leb, start_leb_len);
+	}
+
+	return buff->length - prev_len;
+}
+
 static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
 	i32 prev_len = buff->length;
 
@@ -840,8 +853,8 @@ void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
 	output_typesection(module, &master_buffer);
 	output_funcsection(module, &master_buffer);
 	output_exportsection(module, &master_buffer);
+	output_startsection(module, &master_buffer);
 	output_codesection(module, &master_buffer);
-
 
 	bh_file_write(&file, master_buffer.data, master_buffer.length);
 }
