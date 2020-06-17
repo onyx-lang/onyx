@@ -52,11 +52,12 @@ HOW:
 
 			casts X to type T
 
-		[ ] Numeric literals are parsed and minimum type detected
+		[X] Curly braces are required for all bodies of blocks
+		[ ] Numeric literals are parsed
+		[ ] Numeric literals have the minimum type detected (automatically upcasts)
 		[ ] Comparison operators
 		[ ] Proper boolean type
 		[ ] Conditional branching works as expected
-		[ ] Curly braces are required for all bodies of blocks
 		[ ] Simple while loop is functioning as expected
 		[ ] break and continue semantics
 		[ ] Function calling works for the builtin types
@@ -76,6 +77,10 @@ HOW:
 
 		[ ] Devise and implement a simple set of implicit type casting rules.
 			- Numeric literals always type cast to whatever type is needed (very flexible).
+
+		[ ] Strings should work as pointers to data.
+			- Literals should be placed in data section with pointers to the start.
+			- Should strings be null-terminated or a length at the start of the string?
 
 		[ ] Start work on evaluating compile time known values.
 			- An expression marked COMPTIME will be reduced to its value in the parse tree.

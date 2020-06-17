@@ -1,27 +1,21 @@
-/* Comments need to be parsed
- /* nested comments /* are /* okay */ */ */
-*/
-
 foreign console {
 	log :: proc (data ptr, length i32) -> void ---;
 }
 
 export add :: proc (a i32, b i32) -> i32 {
 	return a + b;
-};
+}
 
 export max :: proc (a i32, b i32) -> i32 {
-	/* Curly braces are required */
-	x := "String literal! HERE \\\"Woot Woot\" done";
-
+	// Curly braces are always required
 	if a > b {
 		return a;
 	} else {
 		return b;
 	}
-};
+}
 
-export main :: proc () -> void {
+export main :: proc () {
 	console.log(add(2, 3));
 	console.log(max(5, 10));
-};
+}

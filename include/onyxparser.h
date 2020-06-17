@@ -13,6 +13,7 @@ typedef struct OnyxAstNodeScope OnyxAstNodeScope;
 typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
 typedef struct OnyxAstNodeParam OnyxAstNodeParam;
 typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
+typedef struct OnyxAstNodeCall OnyxAstNodeCall;
 
 typedef struct OnyxParser {
 	OnyxTokenizer *tokenizer; // NOTE: not used since all tokens are lexed before parsing starts
@@ -162,6 +163,18 @@ struct OnyxAstNodeFuncDef {
 	OnyxAstNodeParam *params;
 };
 
+struct OnyxAstNodeCall {
+	OnyxAstNodeKind kind;
+	u32 flags;
+	OnyxToken *token; 			// NOTE: Not specified (undefined)
+	OnyxTypeInfo *type; 		// NOTE: The type that the function returns
+	OnyxAstNode *next;
+	OnyxAstNode *callee;		// NOTE: Function definition node
+	OnyxAstNode *arguments;		// NOTE: Expressions that form the actual param list
+								// They will be chained down using the "next" property
+								// unless this becomes used by something else
+};
+
 union OnyxAstNode {
 
 	// Generic node structure for capturing all binary ops and statements
@@ -180,6 +193,7 @@ union OnyxAstNode {
 	OnyxAstNodeParam as_param;
 	OnyxAstNodeLocal as_local;
 	OnyxAstNodeScope as_scope;
+	OnyxAstNodeCall as_call;
 };
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);

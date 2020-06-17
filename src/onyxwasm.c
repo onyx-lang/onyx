@@ -358,6 +358,12 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 
 		case ONYX_AST_NODE_KIND_BLOCK: process_block(mod, func, (OnyxAstNodeBlock *) expr); break;
 
+		case ONYX_AST_NODE_KIND_CALL:
+			{
+				DEBUG_HERE;
+				break;
+			}
+
 		default:
 			DEBUG_HERE;
 			bh_printf("Unhandled case: %d\n", expr->kind);

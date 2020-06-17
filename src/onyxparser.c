@@ -1,4 +1,3 @@
-
 #include "onyxlex.h"
 #include "onyxmsgs.h"
 #include "onyxparser.h"
@@ -92,7 +91,6 @@ static void parser_next_token(OnyxParser* parser) {
 
 static void parser_prev_token(OnyxParser* parser) {
 	// TODO: This is probably wrong
-	parser->prev_token--;
 	while (parser->prev_token->type == TOKEN_TYPE_COMMENT) parser->prev_token--;
 	parser->curr_token = parser->prev_token;
 	parser->prev_token--;
@@ -214,8 +212,42 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 					onyx_token_null_toggle(*sym_token);
 				}
 
-				// TODO: Handle calling a function
-				return sym_node;
+				if (parser->curr_token->type != TOKEN_TYPE_OPEN_PAREN) {
+					return sym_node;
+				}
+
+				// NOTE: Function call
+				expect(parser, TOKEN_TYPE_OPEN_PAREN);
+
+				OnyxAstNodeCall* call_node = (OnyxAstNodeCall *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_CALL);
+				call_node->callee = sym_node;
+				OnyxAstNode** prev = &call_node->arguments;
+				OnyxAstNode* curr = NULL;
+				while (parser->curr_token->type != TOKEN_TYPE_CLOSE_PAREN) {
+					curr = parse_expression(parser);
+
+					if (curr != NULL && curr->kind != ONYX_AST_NODE_KIND_ERROR) {
+						*prev = curr;
+						prev = &curr->next;
+					}
+
+					if (parser->curr_token->type == TOKEN_TYPE_CLOSE_PAREN)
+						break;
+
+					if (parser->curr_token->type != TOKEN_TYPE_SYM_COMMA) {
+						onyx_message_add(parser->msgs,
+								ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
+								parser->curr_token->pos,
+								onyx_get_token_type_name(TOKEN_TYPE_SYM_COMMA),
+								onyx_get_token_type_name(parser->curr_token->type));
+						return &error_node;
+					}
+
+					parser_next_token(parser);
+				}
+				parser_next_token(parser);
+
+				return (OnyxAstNode *) call_node;
 			}
 
 		case TOKEN_TYPE_LITERAL_NUMERIC:
@@ -246,6 +278,7 @@ static OnyxAstNode* parse_bin_op(OnyxParser* parser, OnyxAstNode* left) {
 	case TOKEN_TYPE_SYM_STAR:		kind = ONYX_AST_NODE_KIND_MULTIPLY; break;
 	case TOKEN_TYPE_SYM_FSLASH:		kind = ONYX_AST_NODE_KIND_DIVIDE; break;
 	case TOKEN_TYPE_SYM_PERCENT:	kind = ONYX_AST_NODE_KIND_MODULUS; break;
+	default: break;
 	}
 
 	if (kind != -1) {
@@ -303,6 +336,7 @@ static OnyxAstNode* parse_expression(OnyxParser* parser) {
 
 				return cast_node;
 			}
+		default: break;
 	}
 
 	return left;
@@ -669,6 +703,8 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
 					break;
 				}
 			}
+
+		default: break;
 	}
 
 	parser_next_token(parser);

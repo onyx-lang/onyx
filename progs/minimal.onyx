@@ -12,13 +12,9 @@ export diff_square :: proc (a i32, b i32) -> i32 {
 	c := a - b; // Mutable
 	d :: a + b; // Constant
 
-	{
-		f :: 10;
-	};
-
 	return (c * d) as i32;
 }
 
 export main :: proc () {
-	
+	add(2, 3);
 }
