@@ -1,13 +1,12 @@
-
-export add :: proc (a i32, b i32) -> i32 {
-	return a + b;
-}
-
-export foo :: proc (foo i32, bar i32) -> i32 {
+foo :: proc () -> i32 {
 	return 10 as i32;
 }
 
-export diff_square :: proc (a i32, b i32) -> i32 {
+add :: proc (a i32, b i32) -> i32 {
+	return a + b;
+}
+
+diff_square :: proc (a i32, b i32) -> i32 {
 	// Typechecked
 	c := a - b; // Mutable
 	d :: a + b; // Constant
@@ -15,6 +14,12 @@ export diff_square :: proc (a i32, b i32) -> i32 {
 	return (c * d) as i32;
 }
 
+export do_stuff :: proc () -> i32 {
+	res := diff_square((2 + 3) as i32, (4 + 5) as i32);
+	res = res + foo();
+    return res;
+}
+
 export main :: proc () {
-	add(2, 3);
+    output :: do_stuff();
 }

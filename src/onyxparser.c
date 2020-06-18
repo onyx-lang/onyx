@@ -153,8 +153,8 @@ static OnyxAstNode* lookup_identifier(OnyxParser* parser, OnyxToken* token) {
 	OnyxAstNode* ident = NULL;
 
 	onyx_token_null_toggle(*token);
-	if (bh_hash_has(OnyxAstNode*, parser->identifiers, token->token)) {
-		ident = bh_hash_get(OnyxAstNode*, parser->identifiers, token->token);
+	if (bh_table_has(OnyxAstNode*, parser->identifiers, token->token)) {
+		ident = bh_table_get(OnyxAstNode*, parser->identifiers, token->token);
 	}
 	onyx_token_null_toggle(*token);
 
@@ -170,11 +170,11 @@ static void insert_identifier(OnyxParser* parser, OnyxAstNode* ident, b32 is_loc
 	}
 
 	onyx_token_null_toggle(*local->token);
-	if (bh_hash_has(OnyxAstNode*, parser->identifiers, local->token->token)) {
-		local->shadowed = bh_hash_get(OnyxAstNode*, parser->identifiers, local->token->token);
+	if (bh_table_has(OnyxAstNode*, parser->identifiers, local->token->token)) {
+		local->shadowed = bh_table_get(OnyxAstNode*, parser->identifiers, local->token->token);
 	}
 
-	bh_hash_put(OnyxAstNodeLocal*, parser->identifiers, local->token->token, local);
+	bh_table_put(OnyxAstNodeLocal*, parser->identifiers, local->token->token, local);
 	onyx_token_null_toggle(*local->token);
 }
 
@@ -183,9 +183,9 @@ static void remove_identifier(OnyxParser* parser, OnyxAstNode* ident) {
 
 	onyx_token_null_toggle(*local->token);
 	if (local->shadowed) {
-		bh_hash_put(OnyxAstNode*, parser->identifiers, local->token->token, local->shadowed);
+		bh_table_put(OnyxAstNode*, parser->identifiers, local->token->token, local->shadowed);
 	} else {
-		bh_hash_delete(OnyxAstNode*, parser->identifiers, local->token->token);
+		bh_table_delete(OnyxAstNode*, parser->identifiers, local->token->token);
 	}
 	onyx_token_null_toggle(*local->token);
 }
@@ -221,6 +221,10 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 
 				OnyxAstNodeCall* call_node = (OnyxAstNodeCall *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_CALL);
 				call_node->callee = sym_node;
+				// NOTE: Return type is stored on function definition's type
+				// This may have to change if we want multiple returns
+				call_node->type = sym_node->type;
+
 				OnyxAstNode** prev = &call_node->arguments;
 				OnyxAstNode* curr = NULL;
 				while (parser->curr_token->type != TOKEN_TYPE_CLOSE_PAREN) {
@@ -301,6 +305,11 @@ static OnyxAstNode* parse_bin_op(OnyxParser* parser, OnyxAstNode* left) {
 		bin_op->left = left;
 		bin_op->right = right;
 		bin_op->type = left->type;
+
+		if ((left->flags & ONYX_AST_FLAG_COMPTIME) != 0 && (right->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
+			bin_op->flags |= ONYX_AST_FLAG_COMPTIME;
+		}
+
 		return bin_op;
 	}
 
@@ -561,10 +570,10 @@ static OnyxTypeInfo* parse_type(OnyxParser* parser) {
 
 	onyx_token_null_toggle(*symbol);
 
-	if (!bh_hash_has(OnyxAstNode*, parser->identifiers, symbol->token)) {
+	if (!bh_table_has(OnyxAstNode*, parser->identifiers, symbol->token)) {
 		onyx_message_add(parser->msgs, ONYX_MESSAGE_TYPE_UNKNOWN_TYPE, symbol->pos, symbol->token);
 	} else {
-		OnyxAstNode* type_info_node = bh_hash_get(OnyxAstNode*, parser->identifiers, symbol->token);
+		OnyxAstNode* type_info_node = bh_table_get(OnyxAstNode*, parser->identifiers, symbol->token);
 
 		if (type_info_node->kind == ONYX_AST_NODE_KIND_TYPE) {
 			type_info = type_info_node->type;
@@ -676,8 +685,8 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
 
 					onyx_token_null_toggle(*symbol);
 
-					if (!bh_hash_has(OnyxAstNode *, parser->identifiers, symbol->token)) {
-						bh_hash_put(OnyxAstNode *, parser->identifiers, symbol->token, (OnyxAstNode *) func_def);
+					if (!bh_table_has(OnyxAstNode *, parser->identifiers, symbol->token)) {
+						bh_table_put(OnyxAstNode *, parser->identifiers, symbol->token, (OnyxAstNode *) func_def);
 					} else {
 						onyx_message_add(parser->msgs,
 								ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
@@ -735,13 +744,13 @@ OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind) {\
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs) {
 	OnyxParser parser;
 
-	bh_hash_init(bh_heap_allocator(), parser.identifiers, 61);
+	bh_table_init(bh_heap_allocator(), parser.identifiers, 61);
 
 	OnyxTypeInfo* it = &builtin_types[0];
 	while (it->kind != 0xffffffff) {
 		OnyxAstNode* tmp = onyx_ast_node_new(alloc, ONYX_AST_NODE_KIND_TYPE);
 		tmp->type = it;
-		bh_hash_put(OnyxAstNode*, parser.identifiers, (char *)it->name, tmp);
+		bh_table_put(OnyxAstNode*, parser.identifiers, (char *)it->name, tmp);
 		it++;
 	}
 
@@ -756,7 +765,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Onyx
 }
 
 void onyx_parser_free(OnyxParser* parser) {
-	bh_hash_free(parser->identifiers);
+	bh_table_free(parser->identifiers);
 }
 
 OnyxAstNode* onyx_parse(OnyxParser *parser) {

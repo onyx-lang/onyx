@@ -1,4 +1,3 @@
-#define BH_NO_STRING
 // #define BH_DEBUG
 #define BH_DEFINE
 #include "bh.h"
@@ -52,9 +51,9 @@ int main(int argc, char *argv[]) {
 		onyx_message_print(&msgs);
 		goto main_exit;
 	} else {
-		// onyx_ast_print(program, 0);
-		bh_printf("\nNo errors.\n");
-	}
+		onyx_ast_print(program, 0);
+	    bh_printf("\nNo errors.\n");
+    }
 
 	// NOTE: 4th: Generate a WASM module from the parse tree and
 	// write it to a file.

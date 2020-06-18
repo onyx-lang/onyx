@@ -249,7 +249,7 @@ static void process_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
 static void process_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* lval) {
 	if (lval->kind == ONYX_AST_NODE_KIND_LOCAL || lval->kind == ONYX_AST_NODE_KIND_PARAM) {
 		onyx_token_null_toggle(*lval->token);
-		i32 localidx = bh_hash_get(i32, mod->local_map, lval->token->token);
+		i32 localidx = bh_table_get(i32, mod->local_map, lval->token->token);
 		onyx_token_null_toggle(*lval->token);
 
 		bh_arr_push(func->code, ((WasmInstruction){ WI_LOCAL_SET, localidx }));
@@ -339,7 +339,7 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 		case ONYX_AST_NODE_KIND_PARAM:
 			{
 				onyx_token_null_toggle(*expr->token);
-				i32 localidx = bh_hash_get(i32, mod->local_map, expr->token->token);
+				i32 localidx = bh_table_get(i32, mod->local_map, expr->token->token);
 				onyx_token_null_toggle(*expr->token);
 
 				bh_arr_push(func->code, ((WasmInstruction){ WI_LOCAL_GET, localidx }));
@@ -360,7 +360,14 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 
 		case ONYX_AST_NODE_KIND_CALL:
 			{
-				DEBUG_HERE;
+				OnyxAstNodeCall* call = &expr->as_call;
+				forll (OnyxAstNode, arg, call->arguments, next) {
+					process_expression(mod, func, arg);
+				}
+
+                i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) call->callee);
+                bh_arr_push(func->code, ((WasmInstruction){ WI_CALL, func_idx }));
+
 				break;
 			}
 
@@ -442,8 +449,8 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	*t = '\0';
 
 	i32 type_idx = 0;
-	if (bh_hash_has(i32, mod->type_map, type_repr_buf)) {
-		type_idx = bh_hash_get(i32, mod->type_map, type_repr_buf);
+	if (bh_table_has(i32, mod->type_map, type_repr_buf)) {
+		type_idx = bh_table_get(i32, mod->type_map, type_repr_buf);
 	} else {
 		// NOTE: Make a new type
 		// TODO: Ensure that this isn't going to break things because of alignment
@@ -456,7 +463,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 
 		bh_arr_push(mod->functypes, type);
 
-		bh_hash_put(i32, mod->type_map, type_repr_buf, mod->next_type_idx);
+		bh_table_put(i32, mod->type_map, type_repr_buf, mod->next_type_idx);
 		type_idx = mod->next_type_idx;
 		mod->next_type_idx++;
 	}
@@ -472,6 +479,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 		.code = NULL,
 	};
 	i32 func_idx = mod->next_func_idx++;
+    bh_imap_put(&mod->func_map, (u64) fd, func_idx);
 
 	if (fd->flags & ONYX_AST_FLAG_EXPORTED) {
 		onyx_token_null_toggle(*fd->token);
@@ -480,7 +488,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 			.kind = WASM_EXPORT_FUNCTION,
 			.idx = func_idx,
 		};
-		bh_hash_put(WasmExport, mod->exports, fd->token->token, wasm_export);
+		bh_table_put(WasmExport, mod->exports, fd->token->token, wasm_export);
 		mod->export_count++;
 
 		onyx_token_null_toggle(*fd->token);
@@ -493,7 +501,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	i32 localidx = 0;
 	forll (OnyxAstNodeParam, param, fd->params, next) {
 		onyx_token_null_toggle(*param->token);
-		bh_hash_put(i32, mod->local_map, param->token->token, localidx++);
+		bh_table_put(i32, mod->local_map, param->token->token, localidx++);
 		onyx_token_null_toggle(*param->token);
 	}
 
@@ -506,7 +514,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 		forll (OnyxAstNodeLocal, local, fd->body->scope->last_local, prev_local) {
 			if (onyx_type_to_wasm_type(local->type) == local_types[ti]) {
 				onyx_token_null_toggle(*local->token);
-				bh_hash_put(i32, mod->local_map, local->token->token, localidx++);
+				bh_table_put(i32, mod->local_map, local->token->token, localidx++);
 				onyx_token_null_toggle(*local->token);
 
 				(*count)++;
@@ -522,7 +530,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	bh_arr_push(mod->funcs, wasm_func);
 
 	// NOTE: Clear the local map on exit of generating this function
-	bh_hash_clear(mod->local_map);
+	bh_table_clear(mod->local_map);
 }
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program) {
@@ -543,9 +551,11 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 	bh_arr_new(alloc, module.functypes, 4);
 	bh_arr_new(alloc, module.funcs, 4);
 
-	bh_hash_init(bh_heap_allocator(), module.local_map, 61);
-	bh_hash_init(bh_heap_allocator(), module.type_map, 61);
-	bh_hash_init(bh_heap_allocator(), module.exports, 61);
+	bh_table_init(bh_heap_allocator(), module.local_map, 61);
+	bh_table_init(bh_heap_allocator(), module.type_map, 61);
+	bh_table_init(bh_heap_allocator(), module.exports, 61);
+
+    bh_imap_init(&module.func_map, bh_heap_allocator());
 
 	OnyxAstNode* walker = program;
 	while (walker) {
@@ -565,9 +575,9 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 void onyx_wasm_module_free(OnyxWasmModule* module) {
 	bh_arr_free(module->functypes);
 	bh_arr_free(module->funcs);
-	bh_hash_free(module->local_map);
-	bh_hash_free(module->type_map);
-	bh_hash_free(module->exports);
+	bh_table_free(module->local_map);
+	bh_table_free(module->type_map);
+	bh_table_free(module->exports);
 }
 
 
@@ -690,7 +700,7 @@ static i32 output_exportsection(OnyxWasmModule* module, bh_buffer* buff) {
 	bh_buffer_append(&vec_buff, leb, leb_len);
 
 	i32 key_len = 0;
-	bh_hash_each_start(WasmExport, module->exports);
+	bh_table_each_start(WasmExport, module->exports);
 		key_len = strlen(key);
 		leb = uint_to_uleb128((u64) key_len, &leb_len);
 		bh_buffer_append(&vec_buff, leb, leb_len);
@@ -699,7 +709,7 @@ static i32 output_exportsection(OnyxWasmModule* module, bh_buffer* buff) {
 		bh_buffer_write_byte(&vec_buff, (u8) (value.kind));
 		leb = uint_to_uleb128((u64) value.idx, &leb_len);
 		bh_buffer_append(&vec_buff, leb, leb_len);
-	bh_hash_each_end;
+	bh_table_each_end;
 
 	leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
 	bh_buffer_append(buff, leb, leb_len);
@@ -714,14 +724,14 @@ static i32 output_startsection(OnyxWasmModule* module, bh_buffer* buff) {
 	i32 prev_len = buff->length;
 
 	i32 start_idx = -1;
-	bh_hash_each_start(WasmExport, module->exports) {
+	bh_table_each_start(WasmExport, module->exports) {
 		if (value.kind == WASM_EXPORT_FUNCTION) {
 			if (strncmp("main", key, 5) == 0) {
 				start_idx = value.idx;
 				break;
 			}
 		}
-	} bh_hash_each_end;
+	} bh_table_each_end;
 
 	if (start_idx != -1) {
 		bh_buffer_write_byte(buff, WASM_SECTION_ID_START);
@@ -798,6 +808,12 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
 			bh_buffer_write_byte(buff, (u8) instr->type);
 			bh_buffer_write_byte(buff, 0); // TODO: Actually output the literal
 			break;
+
+        case WI_CALL:
+            bh_buffer_write_byte(buff, (u8) instr->type);
+            leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+            break;
 
 		default:
 			bh_buffer_write_byte(buff, (u8) instr->type);

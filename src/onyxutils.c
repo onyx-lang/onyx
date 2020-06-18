@@ -98,6 +98,9 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 
 	case ONYX_AST_NODE_KIND_LITERAL: {
 		bh_printf("%b", node->token->token, node->token->length);
+		if (node->next) {
+			onyx_ast_print(node->next, indent);
+		}
 		break;
 	}
 
@@ -106,6 +109,16 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 		onyx_ast_print(node->left, indent + 1);
 		if (node->next) {
 			onyx_ast_print(node->next, indent);
+		}
+		break;
+	}
+
+	case ONYX_AST_NODE_KIND_CALL: {
+		OnyxAstNodeCall* call = &node->as_call;
+		bh_printf("%b", call->callee->token->token, call->callee->token->length);
+		onyx_ast_print(call->arguments, indent + 1);
+		if (call->next) {
+			onyx_ast_print(call->next, indent);
 		}
 		break;
 	}

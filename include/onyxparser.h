@@ -1,7 +1,6 @@
 #ifndef ONYXPARSER_H
 #define ONYXPARSER_H
 
-#define BH_NO_STRING
 #include "bh.h"
 
 #include "onyxlex.h"
@@ -27,7 +26,7 @@ typedef struct OnyxParser {
 	// NOTE: A table of the current identifiers in the current scope.
 	// If the identifier doesn't at the time of parsing, it is an error.
 	// Cleared at the end of a block.
-	bh_hash(OnyxAstNode*) identifiers;
+	bh_table(OnyxAstNode*) identifiers;
 	OnyxAstNodeScope *curr_scope;
 
 	OnyxMessages *msgs;

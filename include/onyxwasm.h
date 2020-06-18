@@ -1,7 +1,6 @@
 #ifndef ONYXWASM_H
 #define ONYXWASM_H
 
-#define BH_NO_STRING
 #include "bh.h"
 
 #include "onyxparser.h"
@@ -266,20 +265,22 @@ typedef struct OnyxWasmModule {
 	bh_allocator allocator;
 
 	// NOTE: Mapping to local indicies currently in scope.
-	bh_hash(i32) local_map;
+	bh_table(i32) local_map;
 
 	// NOTE: Used internally as a map from strings that represent function types,
 	// 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
 	// to the function type index if it has been created.
-	bh_hash(i32) type_map;
+	bh_table(i32) type_map;
 	i32 next_type_idx;
 	// NOTE: This have to be pointers because the type is variadic in size
 	bh_arr(WasmFuncType*) functypes;
 
 	bh_arr(WasmFunc) funcs;
+    // NOTE: Maps from ast node pointers to the function index
+    bh_imap func_map;
 	i32 next_func_idx;
 
-	bh_hash(WasmExport) exports;
+	bh_table(WasmExport) exports;
 	i32 export_count;
 } OnyxWasmModule;
 
