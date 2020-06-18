@@ -97,7 +97,7 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 	}
 
 	case ONYX_AST_NODE_KIND_LITERAL: {
-		bh_printf("%b", node->token->token, node->token->length);
+		bh_printf("(%s) %b", node->type->name, node->token->token, node->token->length);
 		if (node->next) {
 			onyx_ast_print(node->next, indent);
 		}

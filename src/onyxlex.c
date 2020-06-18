@@ -223,6 +223,11 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 			INCREMENT_CURR_TOKEN(tokenizer);
 		}
 
+        if (*(tokenizer->curr + 1) == 'f') {
+            len++;
+            INCREMENT_CURR_TOKEN(tokenizer);
+        }
+
 		tk.type = TOKEN_TYPE_LITERAL_NUMERIC;
 		tk.length = len;
 	}

@@ -7,6 +7,7 @@
 #include "onyxmsgs.h"
 
 typedef union OnyxAstNode OnyxAstNode;
+typedef struct OnyxAstNodeNumLit OnyxAstNodeNumLit;
 typedef struct OnyxAstNodeLocal OnyxAstNodeLocal;
 typedef struct OnyxAstNodeScope OnyxAstNodeScope;
 typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
@@ -111,6 +112,16 @@ typedef enum OnyxAstFlags {
 	ONYX_AST_FLAG_COMPTIME		= BH_BIT(3),
 } OnyxAstFlags;
 
+struct OnyxAstNodeNumLit {
+	OnyxAstNodeKind kind;
+	u32 flags;
+	OnyxToken *token;
+	OnyxTypeInfo *type;
+	OnyxAstNode *next;
+    union { i32 i; i64 l; f32 f; f64 d; } value;
+	ptr unused;
+};
+
 struct OnyxAstNodeLocal {
 	OnyxAstNodeKind kind;
 	u32 flags;
@@ -193,6 +204,7 @@ union OnyxAstNode {
 	OnyxAstNodeLocal as_local;
 	OnyxAstNodeScope as_scope;
 	OnyxAstNodeCall as_call;
+    OnyxAstNodeNumLit as_numlit;
 };
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);

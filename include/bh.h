@@ -112,8 +112,8 @@ inline i64 chars_match(char* ptr1, char* ptr2) {
 // Converts an unsigned integer to the unsigned LEB128 format
 u8* uint_to_uleb128(u64 n, i32* output_length);
 u8* int_to_leb128(i64 n, i32* output_length);
-u8* float_to_ieee754(f32 f);
-u8* double_to_ieee754(f64 f);
+u8* float_to_ieee754(f32 f, b32 reverse);
+u8* double_to_ieee754(f64 f, b32 reverse);
 
 
 
@@ -625,24 +625,25 @@ b32 bh_table_iter_next(bh_table_iterator* it);
 //-------------------------------------------------------------------------------
 #ifndef BH_NO_IMAP
 
-typedef u64 bh_imap_key_t;
+typedef u64 bh_imap_entry_t;
 
 typedef struct bh__imap_entry {
-    bh_imap_key_t key, value;
+    bh_imap_entry_t key, value;
 } bh__imap_entry;
 
 typedef struct bh_imap {
     bh_allocator allocator;
-    bh_arr(bh__imap_entry) keys;
+    bh_arr(bh__imap_entry) entries;
 } bh_imap;
 
 
 void bh_imap_init(bh_imap* imap, bh_allocator alloc);
 void bh_imap_free(bh_imap* imap);
-void bh_imap_put(bh_imap* imap, bh_imap_key_t key, bh_imap_key_t value);
-b32 bh_imap_has(bh_imap* imap, bh_imap_key_t key);
-bh_imap_key_t bh_imap_get(bh_imap* imap, bh_imap_key_t key);
-void bh_imap_delete(bh_imap* imap, bh_imap_key_t key);
+void bh_imap_put(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value);
+b32 bh_imap_has(bh_imap* imap, bh_imap_entry_t key);
+bh_imap_entry_t bh_imap_get(bh_imap* imap, bh_imap_entry_t key);
+void bh_imap_delete(bh_imap* imap, bh_imap_entry_t key);
+void bh_imap_clear(bh_imap* imap);
 
 #ifdef BH_DEFINE
 #endif // BH_DEFINE
@@ -983,30 +984,48 @@ u8* int_to_leb128(i64 n, i32* output_length) {
 
 // NOTE: This assumes the underlying implementation of float on the host
 // system is already IEEE-754. This is safe to assume in most cases.
-u8* float_to_ieee754(f32 f) {
+u8* float_to_ieee754(f32 f, b32 reverse) {
 	static u8 buffer[4];
 
 	u8* fmem = (u8*) &f;
-	buffer[0] = fmem[3];
-	buffer[1] = fmem[2];
-	buffer[2] = fmem[1];
-	buffer[3] = fmem[0];
+    if (reverse) {
+        buffer[0] = fmem[3];
+        buffer[1] = fmem[2];
+        buffer[2] = fmem[1];
+        buffer[3] = fmem[0];
+    } else {
+        buffer[0] = fmem[0];
+        buffer[1] = fmem[1];
+        buffer[2] = fmem[2];
+        buffer[3] = fmem[3];
+    }
 
 	return buffer;
 }
 
-u8* double_to_ieee754(f64 f) {
+u8* double_to_ieee754(f64 f, b32 reverse) {
 	static u8 buffer[8];
 
 	u8* fmem = (u8*) &f;
-	buffer[0] = fmem[7];
-	buffer[1] = fmem[6];
-	buffer[2] = fmem[5];
-	buffer[3] = fmem[4];
-	buffer[4] = fmem[3];
-	buffer[5] = fmem[2];
-	buffer[6] = fmem[1];
-	buffer[7] = fmem[0];
+    if (reverse) {
+        buffer[0] = fmem[7];
+        buffer[1] = fmem[6];
+        buffer[2] = fmem[5];
+        buffer[3] = fmem[4];
+        buffer[4] = fmem[3];
+        buffer[5] = fmem[2];
+        buffer[6] = fmem[1];
+        buffer[7] = fmem[0];
+    } else {
+        buffer[0] = fmem[0];
+        buffer[1] = fmem[1];
+        buffer[2] = fmem[2];
+        buffer[3] = fmem[3];
+        buffer[4] = fmem[4];
+        buffer[5] = fmem[5];
+        buffer[6] = fmem[6];
+        buffer[7] = fmem[7];
+    }
 
 	return buffer;
 }
@@ -1920,25 +1939,25 @@ step_to_next:
 #ifndef BH_NO_IMAP
 void bh_imap_init(bh_imap* imap, bh_allocator alloc) {
     imap->allocator = alloc;
-    imap->keys = NULL;
+    imap->entries = NULL;
 
-    bh_arr_new(alloc, imap->keys, 4);
+    bh_arr_new(alloc, imap->entries, 4);
 }
 
 void bh_imap_free(bh_imap* imap) {
-    bh_arr_free(imap->keys);
-    imap->keys = NULL;
+    bh_arr_free(imap->entries);
+    imap->entries = NULL;
 }
 
-b32 bh__imap_get_index(bh_imap* imap, bh_imap_key_t key, i32* pos) {
+b32 bh__imap_get_index(bh_imap* imap, bh_imap_entry_t key, i32* pos) {
     i32 low = 0;
-    i32 high = bh_arr_length(imap->keys);
+    i32 high = bh_arr_length(imap->entries);
     i32 middle = 0;
     bh__imap_entry tmp;
 
     while (high > low) {
         middle = (high + low) / 2;
-        tmp = imap->keys[middle];
+        tmp = imap->entries[middle];
 
         if (tmp.key == key) {
             if (pos) *pos = middle;
@@ -1955,41 +1974,46 @@ b32 bh__imap_get_index(bh_imap* imap, bh_imap_key_t key, i32* pos) {
     return 0;
 }
 
-void bh_imap_put(bh_imap* imap, bh_imap_key_t key, bh_imap_key_t value) {
+void bh_imap_put(bh_imap* imap, bh_imap_entry_t key, bh_imap_entry_t value) {
     i32 middle = 0;
     b32 found_existing = bh__imap_get_index(imap, key, &middle);
 
     if (found_existing) {
-        imap->keys[middle].value = value;
+        imap->entries[middle].value = value;
     } else {
-        bh_arr_insertn(imap->keys, middle, 1);
-        imap->keys[middle].key = key;
-        imap->keys[middle].value = value;
+        bh_arr_insertn(imap->entries, middle, 1);
+        imap->entries[middle].key = key;
+        imap->entries[middle].value = value;
     }
 }
 
-b32 bh_imap_has(bh_imap* imap, bh_imap_key_t key) {
+b32 bh_imap_has(bh_imap* imap, bh_imap_entry_t key) {
     return bh__imap_get_index(imap, key, NULL);
 }
 
-bh_imap_key_t bh_imap_get(bh_imap* imap, bh_imap_key_t key) {
+bh_imap_entry_t bh_imap_get(bh_imap* imap, bh_imap_entry_t key) {
     i32 middle = 0;
     b32 found_existing = bh__imap_get_index(imap, key, &middle);
 
     if (found_existing) {
-        return imap->keys[middle].value;
+        return imap->entries[middle].value;
     } else {
         return 0;
     }
 }
 
-void bh_imap_delete(bh_imap* imap, bh_imap_key_t key) {
+void bh_imap_delete(bh_imap* imap, bh_imap_entry_t key) {
     i32 middle = 0;
     b32 found_existing = bh__imap_get_index(imap, key, &middle);
 
     if (found_existing) {
-        bh_arr_deleten(imap->keys, middle, 1);
+        bh_arr_deleten(imap->entries, middle, 1);
     }
+}
+
+void bh_imap_clear(bh_imap* imap) {
+    // NOTE: Does not clear out an of the data that was in the map
+    bh_arr_set_length(imap->entries, 0);
 }
 
 #endif // ifndef BH_NO_IMAP

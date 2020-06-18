@@ -264,8 +264,8 @@ typedef struct WasmExport {
 typedef struct OnyxWasmModule {
 	bh_allocator allocator;
 
-	// NOTE: Mapping to local indicies currently in scope.
-	bh_table(i32) local_map;
+	// NOTE: Mapping from local ast node ptrs to indicies
+	bh_imap local_map;
 
 	// NOTE: Used internally as a map from strings that represent function types,
 	// 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )

@@ -65,7 +65,7 @@ typedef struct OnyxFilePos {
 
 typedef struct OnyxToken {
 	OnyxTokenType type;
-	isize length;
+	i32 length;
 	char* token;
 	OnyxFilePos pos;
 } OnyxToken;

@@ -53,8 +53,8 @@ HOW:
 			casts X to type T
 
 		[X] Curly braces are required for all bodies of blocks
-		[ ] Numeric literals are parsed
-		[ ] Numeric literals have the minimum type detected (automatically upcasts)
+		[X] Numeric literals are parsed
+		[X] Numeric literals have the minimum type detected
 		[ ] Comparison operators
 		[ ] Proper boolean type
 		[ ] Conditional branching works as expected
@@ -74,6 +74,8 @@ HOW:
 			Do as many passes on the parse tree as needed to resolve all symbols.
 			This could be slow but it would be easier than creating a graph
 			scheduling algorithm.
+
+        [ ] Consequence of the above, recursion works
 
 		[ ] Devise and implement a simple set of implicit type casting rules.
 			- Numeric literals always type cast to whatever type is needed (very flexible).

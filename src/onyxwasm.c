@@ -248,9 +248,7 @@ static void process_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
 
 static void process_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* lval) {
 	if (lval->kind == ONYX_AST_NODE_KIND_LOCAL || lval->kind == ONYX_AST_NODE_KIND_PARAM) {
-		onyx_token_null_toggle(*lval->token);
-		i32 localidx = bh_table_get(i32, mod->local_map, lval->token->token);
-		onyx_token_null_toggle(*lval->token);
+		i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) lval);
 
 		bh_arr_push(func->code, ((WasmInstruction){ WI_LOCAL_SET, localidx }));
 	} else {
@@ -338,9 +336,7 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 		case ONYX_AST_NODE_KIND_LOCAL:
 		case ONYX_AST_NODE_KIND_PARAM:
 			{
-				onyx_token_null_toggle(*expr->token);
-				i32 localidx = bh_table_get(i32, mod->local_map, expr->token->token);
-				onyx_token_null_toggle(*expr->token);
+				i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) expr);
 
 				bh_arr_push(func->code, ((WasmInstruction){ WI_LOCAL_GET, localidx }));
 				break;
@@ -349,10 +345,25 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 		case ONYX_AST_NODE_KIND_CAST: process_cast(mod, func, expr); break;
 		case ONYX_AST_NODE_KIND_LITERAL:
 			{
-				// TODO: Implement proper literal type detection and parsing
-				i64 value = 0;
+                OnyxAstNodeNumLit* lit = &expr->as_numlit;
+                WasmType lit_type = onyx_type_to_wasm_type(lit->type);
+                WasmInstruction instr = { WI_NOP, 0 };
 
-				bh_arr_push(func->code, ((WasmInstruction){ WI_I64_CONST, value }));
+                if (lit_type == WASM_TYPE_INT32) {
+                    instr.type = WI_I32_CONST;
+                    instr.data.i1 = lit->value.i;
+                } else if (lit_type == WASM_TYPE_INT64) {
+                    instr.type = WI_I64_CONST;
+                    instr.data.l = lit->value.l;
+                } else if (lit_type == WASM_TYPE_FLOAT32) {
+                    instr.type = WI_F32_CONST;
+                    instr.data.f = lit->value.f;
+                } else if (lit_type == WASM_TYPE_FLOAT64) {
+                    instr.type = WI_F64_CONST;
+                    instr.data.d = lit->value.d;
+                }
+
+				bh_arr_push(func->code, instr);
 				break;
 			}
 
@@ -500,9 +511,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	// NOTE: Generate the local map
 	i32 localidx = 0;
 	forll (OnyxAstNodeParam, param, fd->params, next) {
-		onyx_token_null_toggle(*param->token);
-		bh_table_put(i32, mod->local_map, param->token->token, localidx++);
-		onyx_token_null_toggle(*param->token);
+        bh_imap_put(&mod->local_map, (u64) param, localidx++);
 	}
 
 	static const WasmType local_types[4] = { WASM_TYPE_INT32, WASM_TYPE_INT64, WASM_TYPE_FLOAT32, WASM_TYPE_FLOAT64 };
@@ -513,9 +522,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	fori (ti, 0, 3) {
 		forll (OnyxAstNodeLocal, local, fd->body->scope->last_local, prev_local) {
 			if (onyx_type_to_wasm_type(local->type) == local_types[ti]) {
-				onyx_token_null_toggle(*local->token);
-				bh_table_put(i32, mod->local_map, local->token->token, localidx++);
-				onyx_token_null_toggle(*local->token);
+                bh_imap_put(&mod->local_map, (u64) local, localidx++);
 
 				(*count)++;
 			}
@@ -530,7 +537,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	bh_arr_push(mod->funcs, wasm_func);
 
 	// NOTE: Clear the local map on exit of generating this function
-	bh_table_clear(mod->local_map);
+	bh_imap_clear(&mod->local_map);
 }
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program) {
@@ -551,10 +558,10 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 	bh_arr_new(alloc, module.functypes, 4);
 	bh_arr_new(alloc, module.funcs, 4);
 
-	bh_table_init(bh_heap_allocator(), module.local_map, 61);
 	bh_table_init(bh_heap_allocator(), module.type_map, 61);
 	bh_table_init(bh_heap_allocator(), module.exports, 61);
 
+	bh_imap_init(&module.local_map, bh_heap_allocator());
     bh_imap_init(&module.func_map, bh_heap_allocator());
 
 	OnyxAstNode* walker = program;
@@ -575,7 +582,8 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 void onyx_wasm_module_free(OnyxWasmModule* module) {
 	bh_arr_free(module->functypes);
 	bh_arr_free(module->funcs);
-	bh_table_free(module->local_map);
+	bh_imap_free(&module->local_map);
+    bh_imap_free(&module->func_map);
 	bh_table_free(module->type_map);
 	bh_table_free(module->exports);
 }
@@ -789,34 +797,40 @@ static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
 static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
 	i32 leb_len;
 	u8* leb;
+
+    bh_buffer_write_byte(buff, (u8) instr->type);
+
 	switch (instr->type) {
 		case WI_LOCAL_GET:
 		case WI_LOCAL_SET:
-			bh_buffer_write_byte(buff, (u8) instr->type);
+        case WI_CALL:
 			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
 			bh_buffer_append(buff, leb, leb_len);
 			break;
 
 		case WI_BLOCK_START:
-			bh_buffer_write_byte(buff, (u8) instr->type);
 			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
 			bh_buffer_append(buff, leb, leb_len);
 			break;
 
 		case WI_I32_CONST:
-		case WI_I64_CONST:
-			bh_buffer_write_byte(buff, (u8) instr->type);
-			bh_buffer_write_byte(buff, 0); // TODO: Actually output the literal
-			break;
-
-        case WI_CALL:
-            bh_buffer_write_byte(buff, (u8) instr->type);
-            leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
+            leb = int_to_leb128((i64) instr->data.i1, &leb_len);
             bh_buffer_append(buff, leb, leb_len);
             break;
+		case WI_I64_CONST:
+            leb = int_to_leb128((i64) instr->data.l, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+            break;
+		case WI_F32_CONST:
+            leb = float_to_ieee754(instr->data.f, 0);
+            bh_buffer_append(buff, leb, 4);
+            break;
+		case WI_F64_CONST:
+            leb = double_to_ieee754(instr->data.d, 0);
+            bh_buffer_append(buff, leb, 8);
+            break;
 
-		default:
-			bh_buffer_write_byte(buff, (u8) instr->type);
+		default: break;
 	}
 }
 

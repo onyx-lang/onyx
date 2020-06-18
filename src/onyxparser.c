@@ -70,6 +70,7 @@ static OnyxAstNodeScope* enter_scope(OnyxParser* parser);
 static OnyxAstNodeScope* leave_scope(OnyxParser* parser);
 static void insert_identifier(OnyxParser* parser, OnyxAstNode* ident, b32 is_local);
 static void remove_identifier(OnyxParser* parser, OnyxAstNode* ident);
+static OnyxAstNodeNumLit* parse_numeric_literal(OnyxParser* parser);
 static OnyxAstNode* parse_factor(OnyxParser* parser);
 static OnyxAstNode* parse_bin_op(OnyxParser* parser, OnyxAstNode* left);
 static OnyxAstNode* parse_expression(OnyxParser* parser);
@@ -190,6 +191,43 @@ static void remove_identifier(OnyxParser* parser, OnyxAstNode* ident) {
 	onyx_token_null_toggle(*local->token);
 }
 
+static OnyxAstNodeNumLit* parse_numeric_literal(OnyxParser* parser) {
+    OnyxAstNodeNumLit* lit_node = (OnyxAstNodeNumLit *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_LITERAL);
+    lit_node->token = expect(parser, TOKEN_TYPE_LITERAL_NUMERIC);
+    lit_node->flags |= ONYX_AST_FLAG_COMPTIME;
+    lit_node->value.l = 0ll;
+
+    onyx_token_null_toggle(*lit_node->token);
+
+    OnyxTypeInfo* type;
+    char* tok = lit_node->token->token;
+
+    // NOTE: charset_contains() behaves more like string_contains()
+    // so I'm using it in this case
+    if (charset_contains(tok, '.')) {
+        if (tok[lit_node->token->length - 1] == 'f') {
+            type = &builtin_types[ONYX_TYPE_INFO_KIND_FLOAT32];
+            lit_node->value.f = strtof(tok, NULL);
+        } else {
+            type = &builtin_types[ONYX_TYPE_INFO_KIND_FLOAT64];
+            lit_node->value.d = strtod(tok, NULL);
+        }
+    } else {
+        i64 value = strtoll(tok, NULL, 0);
+        if (bh_abs(value) < ((u64) 1 << 32)) {
+            type = &builtin_types[ONYX_TYPE_INFO_KIND_INT32];
+        } else {
+            type = &builtin_types[ONYX_TYPE_INFO_KIND_INT64];
+        }
+
+        lit_node->value.l = value;
+    }
+
+    lit_node->type = type;
+    onyx_token_null_toggle(*lit_node->token);
+    return lit_node;
+}
+
 static OnyxAstNode* parse_factor(OnyxParser* parser) {
 	switch (parser->curr_token->type) {
 		case TOKEN_TYPE_OPEN_PAREN:
@@ -254,14 +292,7 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 				return (OnyxAstNode *) call_node;
 			}
 
-		case TOKEN_TYPE_LITERAL_NUMERIC:
-			{
-				OnyxAstNode* lit_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_LITERAL);
-				lit_node->type = &builtin_types[ONYX_TYPE_INFO_KIND_INT64];
-				lit_node->token = expect(parser, TOKEN_TYPE_LITERAL_NUMERIC);
-				lit_node->flags |= ONYX_AST_FLAG_COMPTIME;
-				return lit_node;
-			}
+        case TOKEN_TYPE_LITERAL_NUMERIC: return (OnyxAstNode *) parse_numeric_literal(parser);
 
 		default:
 			onyx_message_add(parser->msgs,
@@ -585,6 +616,9 @@ static OnyxTypeInfo* parse_type(OnyxParser* parser) {
 }
 
 static OnyxAstNodeParam* parse_function_params(OnyxParser* parser) {
+    if (parser->curr_token->type != TOKEN_TYPE_OPEN_PAREN)
+        return NULL;
+
 	expect(parser, TOKEN_TYPE_OPEN_PAREN);
 
 	if (parser->curr_token->type == TOKEN_TYPE_CLOSE_PAREN) {
