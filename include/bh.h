@@ -582,7 +582,7 @@ typedef struct bh__table {
 #else
 	#define bh_table_init(allocator_, tab, hs)	bh__table_init(allocator_, (bh__table **)&(tab), hs)
 	#define bh_table_free(tab)					bh__table_free((bh__table **)&(tab))
-	#define bh_table_put(T, tab, key, value) 	(*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = value)
+	#define bh_table_put(T, tab, key, value) 	(*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = (T) value)
 	#define bh_table_has(T, tab, key)			(bh__table_has((bh__table *) tab, sizeof(T), key))
 	#define bh_table_get(T, tab, key)			(*((T *) bh__table_get((bh__table *) tab, sizeof(T), key)))
 	#define bh_table_delete(T, tab, key)			(bh__table_delete((bh__table *) tab, sizeof(T), key))

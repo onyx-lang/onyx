@@ -440,7 +440,7 @@ static void process_return(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* ret
 	bh_arr_push(func->code, ((WasmInstruction){ WI_RETURN, 0x00 }));
 }
 
-static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef* fd) {
+static i32 generate_type_idx(OnyxWasmModule* mod, OnyxAstNodeFuncDef* fd) {
 	static char type_repr_buf[128];
 
 	char* t = type_repr_buf;
@@ -479,6 +479,12 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 		mod->next_type_idx++;
 	}
 
+    return type_idx;
+}
+
+static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef* fd) {
+    i32 type_idx = generate_type_idx(mod, fd);
+
 	WasmFunc wasm_func = {
 		.type_idx = type_idx,
 		.locals = {
@@ -496,7 +502,7 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 		onyx_token_null_toggle(*fd->token);
 
 		WasmExport wasm_export = {
-			.kind = WASM_EXPORT_FUNCTION,
+			.kind = WASM_FOREIGN_FUNCTION,
 			.idx = func_idx,
 		};
 		bh_table_put(WasmExport, mod->exports, fd->token->token, wasm_export);
@@ -543,8 +549,24 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	bh_imap_clear(&mod->local_map);
 }
 
-void process_foreign(OnyxWasmModule* module, OnyxAstNodeForeign* foreign) {
-    
+static void process_foreign(OnyxWasmModule* module, OnyxAstNodeForeign* foreign) {
+    if (foreign->import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
+        i32 type_idx = generate_type_idx(module, &foreign->import->as_funcdef);
+
+        WasmImport import = {
+            .kind = WASM_FOREIGN_FUNCTION,
+            .idx = type_idx,
+            .mod = foreign->mod_token,
+            .name = foreign->name_token,
+        };
+
+        bh_arr_push(module->imports, import);
+
+    } else {
+        DEBUG_HERE;
+        // NOTE: Invalid foreign
+        assert(0);
+    }
 }
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program) {
@@ -560,10 +582,14 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 
 		.exports = NULL,
 		.export_count = 0,
+
+        .imports = NULL,
+        .next_import_func_idx = 0,
 	};
 
 	bh_arr_new(alloc, module.functypes, 4);
 	bh_arr_new(alloc, module.funcs, 4);
+    bh_arr_new(alloc, module.imports, 4);
 
 	bh_table_init(bh_heap_allocator(), module.type_map, 61);
 	bh_table_init(bh_heap_allocator(), module.exports, 61);
@@ -571,7 +597,18 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 	bh_imap_init(&module.local_map, bh_heap_allocator());
     bh_imap_init(&module.func_map, bh_heap_allocator());
 
+    // NOTE: Count number of import functions
 	OnyxAstNode* walker = program;
+    while (walker) {
+        if (walker->kind == ONYX_AST_NODE_KIND_FOREIGN
+            && walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
+            module.next_func_idx++;
+        }
+
+        walker = walker->next;
+    }
+
+	walker = program;
 	while (walker) {
 		switch (walker->kind) {
 			case ONYX_AST_NODE_KIND_FUNCDEF:
@@ -635,6 +672,14 @@ static i32 output_vector(void** arr, i32 stride, i32 arrlen, vector_func elem, b
 	}
 
 	return vec_buff->length;
+}
+
+static i32 output_name(const char* start, i32 length, bh_buffer* buff) {
+    i32 leb_len, prev_len = buff->length;
+    u8* leb = uint_to_uleb128((u64) length, &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+    bh_buffer_append(buff, start, length);
+    return buff->length - prev_len;
 }
 
 static i32 output_functype(WasmFuncType* type, bh_buffer* buff) {
@@ -706,6 +751,35 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
 	return buff->length - prev_len;
 }
 
+static i32 output_importsection(OnyxWasmModule* module, bh_buffer* buff) {
+	i32 prev_len = buff->length;
+	bh_buffer_write_byte(buff, WASM_SECTION_ID_IMPORT);
+
+	bh_buffer vec_buff;
+	bh_buffer_init(&vec_buff, buff->allocator, 128);
+
+	i32 leb_len;
+	u8* leb = uint_to_uleb128((u64) (bh_arr_length(module->imports)), &leb_len);
+	bh_buffer_append(&vec_buff, leb, leb_len);
+
+    bh_arr_each(WasmImport, import, module->imports) {
+        output_name(import->mod->token, import->mod->length, &vec_buff);
+        output_name(import->name->token, import->name->length, &vec_buff);
+        bh_buffer_write_byte(&vec_buff, (u8) import->kind);
+
+        leb = uint_to_uleb128((u64) import->idx, &leb_len);
+        bh_buffer_append(&vec_buff, leb, leb_len);
+    }
+
+	leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
+	bh_buffer_append(buff, leb, leb_len);
+
+	bh_buffer_concat(buff, vec_buff);
+	bh_buffer_free(&vec_buff);
+
+	return buff->length - prev_len;
+}
+
 static i32 output_exportsection(OnyxWasmModule* module, bh_buffer* buff) {
 	i32 prev_len = buff->length;
 	bh_buffer_write_byte(buff, WASM_SECTION_ID_EXPORT);
@@ -720,9 +794,7 @@ static i32 output_exportsection(OnyxWasmModule* module, bh_buffer* buff) {
 	i32 key_len = 0;
 	bh_table_each_start(WasmExport, module->exports);
 		key_len = strlen(key);
-		leb = uint_to_uleb128((u64) key_len, &leb_len);
-		bh_buffer_append(&vec_buff, leb, leb_len);
-		bh_buffer_append(&vec_buff, key, key_len);
+        output_name(key, key_len, &vec_buff);
 
 		bh_buffer_write_byte(&vec_buff, (u8) (value.kind));
 		leb = uint_to_uleb128((u64) value.idx, &leb_len);
@@ -743,7 +815,7 @@ static i32 output_startsection(OnyxWasmModule* module, bh_buffer* buff) {
 
 	i32 start_idx = -1;
 	bh_table_each_start(WasmExport, module->exports) {
-		if (value.kind == WASM_EXPORT_FUNCTION) {
+		if (value.kind == WASM_FOREIGN_FUNCTION) {
 			if (strncmp("main", key, 5) == 0) {
 				start_idx = value.idx;
 				break;
@@ -755,11 +827,11 @@ static i32 output_startsection(OnyxWasmModule* module, bh_buffer* buff) {
 		bh_buffer_write_byte(buff, WASM_SECTION_ID_START);
 
 		i32 start_leb_len, section_leb_len;
-		u8* start_leb = uint_to_uleb128((u64) start_idx, &start_leb_len);
+		uint_to_uleb128((u64) start_idx, &start_leb_len);
 		u8* section_leb = uint_to_uleb128((u64) start_leb_len, &section_leb_len);
 		bh_buffer_append(buff, section_leb, section_leb_len);
 
-		start_leb = uint_to_uleb128((u64) start_idx, &start_leb_len);
+		u8* start_leb = uint_to_uleb128((u64) start_idx, &start_leb_len);
 		bh_buffer_append(buff, start_leb, start_leb_len);
 	}
 
@@ -893,6 +965,7 @@ void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
 	bh_buffer_append(&master_buffer, WASM_VERSION, 4);
 
 	output_typesection(module, &master_buffer);
+    output_importsection(module, &master_buffer);
 	output_funcsection(module, &master_buffer);
 	output_exportsection(module, &master_buffer);
 	output_startsection(module, &master_buffer);

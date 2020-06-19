@@ -249,6 +249,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 							ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
 							sym_token->pos, sym_token->token);
 					onyx_token_null_toggle(*sym_token);
+
+                    return sym_node;
 				}
 
 				if (parser->curr_token->type != TOKEN_TYPE_OPEN_PAREN) {
@@ -709,6 +711,26 @@ static OnyxAstNode* parse_top_level_symbol(OnyxParser* parser) {
     }
 }
 
+static b32 define_function(OnyxParser* parser, OnyxAstNodeFuncDef* func) {
+    onyx_token_null_toggle(*func->token);
+
+    if (!bh_table_has(OnyxAstNode *, parser->identifiers, func->token->token)) {
+        bh_table_put(OnyxAstNode *, parser->identifiers, func->token->token, func);
+    } else {
+        onyx_message_add(parser->msgs,
+                ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
+                func->token->pos,
+                func->token->token);
+
+        // NOTE: I really wish C had defer...
+        onyx_token_null_toggle(*func->token);
+        return 0;
+    }
+
+    onyx_token_null_toggle(*func->token);
+    return 1;
+}
+
 static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
 	switch (parser->curr_token->type) {
 		case TOKEN_TYPE_KEYWORD_USE:
@@ -744,23 +766,22 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
                 if (node->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
                     node->token = symbol;
 
-                    onyx_token_null_toggle(*symbol);
-
-                    if (!bh_table_has(OnyxAstNode *, parser->identifiers, symbol->token)) {
-                        bh_table_put(OnyxAstNode *, parser->identifiers, symbol->token, node);
-                    } else {
-                        onyx_message_add(parser->msgs,
-                                ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
-                                symbol->pos,
-                                symbol->token);
-
-                        // NOTE: I really wish C had defer...
-                        onyx_token_null_toggle(*symbol);
+                    if (!define_function(parser, &node->as_funcdef)) {
                         return NULL;
                     }
-
-                    onyx_token_null_toggle(*symbol);
                 }
+
+                if (node->kind == ONYX_AST_NODE_KIND_FOREIGN) {
+                    OnyxAstNodeForeign* foreign = &node->as_foreign;
+
+                    foreign->import->token = symbol;
+                    if (foreign->import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
+                        if (!define_function(parser, &foreign->import->as_funcdef)) {
+                            return NULL;
+                        }
+                    }
+                }
+
                 return node;
 			}
 

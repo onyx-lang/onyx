@@ -18,6 +18,6 @@ onyx: $(OBJ_FILES)
 	$(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
 
 clean:
-	rm $(OBJ_FILES) 2>&1 >/dev/null
+	rm -f $(OBJ_FILES) 2>&1 >/dev/null
 
 all: onyx

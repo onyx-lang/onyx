@@ -25,5 +25,6 @@ export do_stuff :: proc -> i32 {
 }
 
 export main :: proc {
-    output :: do_stuff();
+    output := do_stuff() * (0 - 2);
+    print(output);
 }

@@ -249,17 +249,23 @@ typedef struct WasmFunc {
 	bh_arr(WasmInstruction) code;
 } WasmFunc;
 
-typedef enum WasmExportKind {
-	WASM_EXPORT_FUNCTION = 0x00,
-	WASM_EXPORT_TABLE	 = 0x01,
-	WASM_EXPORT_MEMORY	 = 0x02,
-	WASM_EXPORT_GLOBAL	 = 0x03,
-} WasmExportKind;
+typedef enum WasmForeignKind {
+	WASM_FOREIGN_FUNCTION = 0x00,
+	WASM_FOREIGN_TABLE	 = 0x01,
+	WASM_FOREIGN_MEMORY	 = 0x02,
+	WASM_FOREIGN_GLOBAL	 = 0x03,
+} WasmForeignKind;
 
 typedef struct WasmExport {
-	WasmExportKind kind;
+	WasmForeignKind kind;
 	i32 idx;
 } WasmExport;
+
+typedef struct WasmImport {
+    WasmForeignKind kind;
+    i32 idx;
+    OnyxToken *mod, *name;
+} WasmImport;
 
 typedef struct OnyxWasmModule {
 	bh_allocator allocator;
@@ -271,16 +277,18 @@ typedef struct OnyxWasmModule {
 	// 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
 	// to the function type index if it has been created.
 	bh_table(i32) type_map;
-	i32 next_type_idx;
-	// NOTE: This have to be pointers because the type is variadic in size
-	bh_arr(WasmFuncType*) functypes;
+	bh_arr(WasmFuncType*) functypes; // NOTE: This have to be pointers because the type is variadic in size
 
 	bh_arr(WasmFunc) funcs;
-    // NOTE: Maps from ast node pointers to the function index
-    bh_imap func_map;
-	i32 next_func_idx;
+    bh_imap func_map; // NOTE: Maps from ast node pointers to the function index
 
 	bh_table(WasmExport) exports;
+
+    bh_arr(WasmImport) imports;
+
+	i32 next_type_idx;
+	i32 next_func_idx;
+    i32 next_import_func_idx;
 	i32 export_count;
 } OnyxWasmModule;
 
