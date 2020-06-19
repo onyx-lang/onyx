@@ -373,7 +373,7 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 			{
 				OnyxAstNodeCall* call = &expr->as_call;
 				forll (OnyxAstNode, arg, call->arguments, next) {
-					process_expression(mod, func, arg);
+					process_expression(mod, func, arg->left);
 				}
 
                 i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) call->callee);
@@ -552,6 +552,8 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 static void process_foreign(OnyxWasmModule* module, OnyxAstNodeForeign* foreign) {
     if (foreign->import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
         i32 type_idx = generate_type_idx(module, &foreign->import->as_funcdef);
+
+        bh_imap_put(&module->func_map, (u64) &foreign->import->as_funcdef, module->next_import_func_idx++);
 
         WasmImport import = {
             .kind = WASM_FOREIGN_FUNCTION,

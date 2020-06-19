@@ -23,6 +23,7 @@ static const char* ast_node_names[] = {
 	"LITERAL",
 	"CAST",
 	"PARAM",
+    "ARGUMENT",
 	"CALL",
 	"ASSIGN",
 	"RETURN",
@@ -269,7 +270,9 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 				OnyxAstNode** prev = &call_node->arguments;
 				OnyxAstNode* curr = NULL;
 				while (parser->curr_token->type != TOKEN_TYPE_CLOSE_PAREN) {
-					curr = parse_expression(parser);
+                    curr = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_ARGUMENT);
+					curr->left = parse_expression(parser);
+                    curr->type = curr->left->type;
 
 					if (curr != NULL && curr->kind != ONYX_AST_NODE_KIND_ERROR) {
 						*prev = curr;
