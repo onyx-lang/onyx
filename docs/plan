@@ -55,6 +55,7 @@ HOW:
 		[X] Curly braces are required for all bodies of blocks
 		[X] Numeric literals are parsed
 		[X] Numeric literals have the minimum type detected
+        [ ] Foreign imports (functions only)
 		[ ] Comparison operators
 		[ ] Proper boolean type
 		[ ] Conditional branching works as expected

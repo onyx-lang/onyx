@@ -506,38 +506,45 @@ static void process_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef*
 	}
 
 	// If there is no body then don't process the code
-	if (fd->body == NULL) return;
+	if (fd->body != NULL) {
+        // NOTE: Generate the local map
+        i32 localidx = 0;
+        forll (OnyxAstNodeParam, param, fd->params, next) {
+            bh_imap_put(&mod->local_map, (u64) param, localidx++);
+        }
 
-	// NOTE: Generate the local map
-	i32 localidx = 0;
-	forll (OnyxAstNodeParam, param, fd->params, next) {
-        bh_imap_put(&mod->local_map, (u64) param, localidx++);
-	}
+        static const WasmType local_types[4] = { WASM_TYPE_INT32, WASM_TYPE_INT64, WASM_TYPE_FLOAT32, WASM_TYPE_FLOAT64 };
 
-	static const WasmType local_types[4] = { WASM_TYPE_INT32, WASM_TYPE_INT64, WASM_TYPE_FLOAT32, WASM_TYPE_FLOAT64 };
+        // HACK: This assumes that the order of the count members
+        // is the same as the order of the local_types above
+        u8* count = &wasm_func.locals.i32_count;
+        fori (ti, 0, 3) {
+            forll (OnyxAstNodeLocal, local, fd->body->scope->last_local, prev_local) {
+                if (onyx_type_to_wasm_type(local->type) == local_types[ti]) {
+                    bh_imap_put(&mod->local_map, (u64) local, localidx++);
 
-	// HACK: This assumes that the order of the count members
-	// is the same as the order of the local_types above
-	u8* count = &wasm_func.locals.i32_count;
-	fori (ti, 0, 3) {
-		forll (OnyxAstNodeLocal, local, fd->body->scope->last_local, prev_local) {
-			if (onyx_type_to_wasm_type(local->type) == local_types[ti]) {
-                bh_imap_put(&mod->local_map, (u64) local, localidx++);
+                    (*count)++;
+                }
+            }
 
-				(*count)++;
-			}
-		}
+            count++;
+        }
 
-		count++;
-	}
-
-	// Generate code
-	process_function_body(mod, &wasm_func, fd);
+        // Generate code
+        process_function_body(mod, &wasm_func, fd);
+    } else {
+        // NOTE: Empty bodies still need a block end instruction
+        bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+    }
 
 	bh_arr_push(mod->funcs, wasm_func);
 
 	// NOTE: Clear the local map on exit of generating this function
 	bh_imap_clear(&mod->local_map);
+}
+
+void process_foreign(OnyxWasmModule* module, OnyxAstNodeForeign* foreign) {
+    
 }
 
 OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program) {
@@ -570,6 +577,9 @@ OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* progra
 			case ONYX_AST_NODE_KIND_FUNCDEF:
 				process_function_definition(&module, &walker->as_funcdef);
 				break;
+            case ONYX_AST_NODE_KIND_FOREIGN:
+                process_foreign(&module, &walker->as_foreign);
+                break;
 			default: break;
 		}
 
@@ -804,10 +814,6 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
 		case WI_LOCAL_GET:
 		case WI_LOCAL_SET:
         case WI_CALL:
-			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
-			bh_buffer_append(buff, leb, leb_len);
-			break;
-
 		case WI_BLOCK_START:
 			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
 			bh_buffer_append(buff, leb, leb_len);

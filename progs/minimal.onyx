@@ -1,4 +1,7 @@
-foo :: proc () -> i32 {
+
+print :: foreign "host" "print" proc (value i32) ---
+
+foo :: proc -> i32 {
 	return 10 as i32;
 }
 
@@ -17,6 +20,7 @@ diff_square :: proc (a i32, b i32) -> i32 {
 export do_stuff :: proc -> i32 {
 	res := diff_square((4 + 5) as i32, (2 + 3) as i32);
 	res = res + foo();
+    // res should be 66
     return res;
 }
 

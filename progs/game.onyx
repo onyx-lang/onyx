@@ -1,0 +1,16 @@
+
+gfx_draw_rect :: foreign "gfx" "draw_rect" proc (x i32, y i32, w i32, h i32) ---
+
+update :: proc ---
+
+draw :: proc {
+    draw_rect(0, 0, 100, 100);
+}
+
+export main :: proc {
+
+    while true {
+        update();
+        draw();
+    }
+}

@@ -7,6 +7,7 @@ static const char* ast_node_names[] = {
 	"PROGRAM",
 
 	"FUNCDEF",
+    "FOREIGN",
 	"BLOCK",
 	"SCOPE",
 	"LOCAL",
@@ -682,6 +683,32 @@ static OnyxAstNodeFuncDef* parse_function_definition(OnyxParser* parser) {
 	return func_def;
 }
 
+static OnyxAstNode* parse_top_level_symbol(OnyxParser* parser) {
+    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_PROC) {
+        OnyxAstNodeFuncDef* func_def = parse_function_definition(parser);
+        return (OnyxAstNode *) func_def;
+
+    } else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_STRUCT) {
+        // Handle struct case
+        assert(0);
+    } else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_FOREIGN) {
+        parser_next_token(parser);
+
+        OnyxAstNodeForeign* foreign = (OnyxAstNodeForeign *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_FOREIGN);
+        foreign->mod_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
+        foreign->name_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
+        foreign->import = parse_top_level_symbol(parser);
+
+        return (OnyxAstNode *) foreign;
+    } else {
+        onyx_message_add(parser->msgs,
+                ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
+                parser->curr_token->pos,
+                onyx_get_token_type_name(parser->curr_token->type));
+        return &error_node;
+    }
+}
+
 static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
 	switch (parser->curr_token->type) {
 		case TOKEN_TYPE_KEYWORD_USE:
@@ -713,38 +740,28 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
 				expect(parser, TOKEN_TYPE_SYM_COLON);
 				expect(parser, TOKEN_TYPE_SYM_COLON);
 
-				if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_PROC) {
-					OnyxAstNodeFuncDef* func_def = parse_function_definition(parser);
-					func_def->token = symbol;
+                OnyxAstNode* node = parse_top_level_symbol(parser);
+                if (node->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
+                    node->token = symbol;
 
-					onyx_token_null_toggle(*symbol);
+                    onyx_token_null_toggle(*symbol);
 
-					if (!bh_table_has(OnyxAstNode *, parser->identifiers, symbol->token)) {
-						bh_table_put(OnyxAstNode *, parser->identifiers, symbol->token, (OnyxAstNode *) func_def);
-					} else {
-						onyx_message_add(parser->msgs,
-								ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
-								symbol->pos,
-								symbol->token);
+                    if (!bh_table_has(OnyxAstNode *, parser->identifiers, symbol->token)) {
+                        bh_table_put(OnyxAstNode *, parser->identifiers, symbol->token, node);
+                    } else {
+                        onyx_message_add(parser->msgs,
+                                ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
+                                symbol->pos,
+                                symbol->token);
 
-						// NOTE: I really wish C had defer...
-						onyx_token_null_toggle(*symbol);
-						return NULL;
-					}
+                        // NOTE: I really wish C had defer...
+                        onyx_token_null_toggle(*symbol);
+                        return NULL;
+                    }
 
-					onyx_token_null_toggle(*symbol);
-					return (OnyxAstNode *) func_def;
-
-				} else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_STRUCT) {
-					// Handle struct case
-					assert(0);
-				} else {
-					onyx_message_add(parser->msgs,
-							ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
-							parser->curr_token->pos,
-							onyx_get_token_type_name(parser->curr_token->type));
-					break;
-				}
+                    onyx_token_null_toggle(*symbol);
+                }
+                return node;
 			}
 
 		default: break;

@@ -19,7 +19,8 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 	}
 
 	case ONYX_AST_NODE_KIND_FUNCDEF: {
-		bh_printf("(%b) ", node->token->token, node->token->length);
+        if (node->token)
+            bh_printf("(%b) ", node->token->token, node->token->length);
 		OnyxAstNodeFuncDef* fd = &node->as_funcdef;
 
 		print_indent;
@@ -122,6 +123,22 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 		}
 		break;
 	}
+
+    case ONYX_AST_NODE_KIND_FOREIGN: {
+        OnyxAstNodeForeign* foreign = &node->as_foreign;
+        bh_printf("%b:%b",
+                foreign->mod_token->token, foreign->mod_token->length,
+                foreign->name_token->token, foreign->name_token->length);
+
+        if (foreign->import) {
+            onyx_ast_print(foreign->import, indent + 1);
+        }
+
+		if (foreign->next) {
+			onyx_ast_print(foreign->next, indent);
+		}
+        break;
+    }
 
 	default: {
 		onyx_ast_print(node->left, indent + 1);

@@ -13,6 +13,7 @@ typedef struct OnyxAstNodeScope OnyxAstNodeScope;
 typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
 typedef struct OnyxAstNodeParam OnyxAstNodeParam;
 typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
+typedef struct OnyxAstNodeForeign OnyxAstNodeForeign;
 typedef struct OnyxAstNodeCall OnyxAstNodeCall;
 
 typedef struct OnyxParser {
@@ -40,6 +41,7 @@ typedef enum OnyxAstNodeKind {
 	ONYX_AST_NODE_KIND_PROGRAM,
 
 	ONYX_AST_NODE_KIND_FUNCDEF,
+    ONYX_AST_NODE_KIND_FOREIGN,
 	ONYX_AST_NODE_KIND_BLOCK,
 	ONYX_AST_NODE_KIND_SCOPE,
 	ONYX_AST_NODE_KIND_LOCAL,
@@ -173,6 +175,16 @@ struct OnyxAstNodeFuncDef {
 	OnyxAstNodeParam *params;
 };
 
+struct OnyxAstNodeForeign {
+	OnyxAstNodeKind kind;
+	u32 flags;
+	OnyxToken *mod_token;
+	OnyxTypeInfo *type;
+	OnyxAstNode *next;
+    OnyxToken *name_token;
+	OnyxAstNode *import;
+};
+
 struct OnyxAstNodeCall {
 	OnyxAstNodeKind kind;
 	u32 flags;
@@ -205,6 +217,7 @@ union OnyxAstNode {
 	OnyxAstNodeScope as_scope;
 	OnyxAstNodeCall as_call;
     OnyxAstNodeNumLit as_numlit;
+    OnyxAstNodeForeign as_foreign;
 };
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);
