@@ -11,12 +11,14 @@ add :: proc (a i32, b i32) -> i32 {
 	return a + b;
 }
 
+// NOTE: There is a weird bug here if the else is used instead
+// This is because the WASM embedder does not think that it
+// is possible that all code paths are covered with returning
+// an i32. This will need to be fixed.
 abs :: proc (val i32) -> i32 {
-    if val <= 0 {
-        return -val;
-    } else {
-        return val;
-    };
+    if val <= 0 { return -val; };
+    // else { return val; };
+    return val;
 }
 
 diff_square :: proc (a i32, b i32) -> i32 {
@@ -41,12 +43,13 @@ float_test :: proc -> f32 {
 export main :: proc {
     output := do_stuff();
 
-    if output + 66 {
-        new_output :: -output * 2;
+    if output == -66 {
+        new_output :: abs(output) * 2;
         print(new_output);
 
     } else {
         print(-1);
+
     };
 
     print(output);

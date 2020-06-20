@@ -244,7 +244,8 @@ static void process_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
 		case ONYX_AST_NODE_KIND_RETURN: process_return(mod, func, stmt); break;
 		case ONYX_AST_NODE_KIND_ASSIGNMENT: process_assignment(mod, func, stmt); break;
         case ONYX_AST_NODE_KIND_IF: process_if(mod, func, (OnyxAstNodeIf *) stmt); break;
-		default: process_expression(mod, func, stmt);
+        case ONYX_AST_NODE_KIND_CALL: process_expression(mod, func, stmt); break;
+		default: break;
 	}
 }
 
