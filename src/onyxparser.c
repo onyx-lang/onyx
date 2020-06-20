@@ -341,7 +341,7 @@ static inline i32 get_precedence(OnyxAstNodeKind kind) {
 
 static OnyxAstNode* parse_expression(OnyxParser* parser) {
     bh_arr(OnyxAstNode*) tree_stack = NULL;
-    bh_arr_new(global_scratch_allocator, tree_stack, 1);
+    bh_arr_new(global_scratch_allocator, tree_stack, 4);
     bh_arr_set_length(tree_stack, 0);
 
 	OnyxAstNode* left = parse_factor(parser);
@@ -413,7 +413,39 @@ expression_done:
 }
 
 static OnyxAstNode* parse_if_stmt(OnyxParser* parser) {
-	return &error_node;
+    expect(parser, TOKEN_TYPE_KEYWORD_IF);
+
+    OnyxAstNode* cond = parse_expression(parser);
+    OnyxAstNode* true_block = (OnyxAstNode *) parse_block(parser, 0);
+
+    OnyxAstNodeIf* if_node = (OnyxAstNodeIf *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_IF);
+    OnyxAstNodeIf* root_if = if_node;
+
+    if_node->cond = cond;
+    if_node->true_block = true_block->as_block.body;
+
+    while (parser->curr_token->type == TOKEN_TYPE_KEYWORD_ELSEIF) {
+        parser_next_token(parser);
+        OnyxAstNodeIf* elseif_node = (OnyxAstNodeIf *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_IF);
+
+        cond = parse_expression(parser);
+        true_block = (OnyxAstNode *) parse_block(parser, 0);
+
+        elseif_node->cond = cond;
+        elseif_node->true_block = true_block->as_block.body;
+
+        if_node->false_block = (OnyxAstNode *) elseif_node;
+        if_node = elseif_node;
+    }
+
+    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_ELSE) {
+        parser_next_token(parser);
+
+        OnyxAstNode* false_block = (OnyxAstNode *) parse_block(parser, 0);
+        if_node->false_block = false_block->as_block.body;
+    }
+
+    return (OnyxAstNode *) root_if;
 }
 
 // Returns 1 if the symbol was consumed. Returns 0 otherwise

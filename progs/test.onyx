@@ -1,0 +1,17 @@
+
+// Foreign functions are included this way:
+//      sym_name :: foreign "module" "name" proc ...
+print       :: foreign "host" "print" proc (value i32) ---
+
+get_value   :: foreign "env" "get_val" proc -> i32 ---
+
+
+
+// This is the entry point
+export main :: proc {
+    nineteen :: 5 * 3 + 4;
+    thirty_five :: 5 * (3 + 4) + get_value();
+
+    print(nineteen);
+    print(thirty_five);
+}

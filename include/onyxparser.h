@@ -11,6 +11,7 @@ typedef struct OnyxAstNodeNumLit OnyxAstNodeNumLit;
 typedef struct OnyxAstNodeLocal OnyxAstNodeLocal;
 typedef struct OnyxAstNodeScope OnyxAstNodeScope;
 typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
+typedef struct OnyxAstNodeIf OnyxAstNodeIf;
 typedef struct OnyxAstNodeParam OnyxAstNodeParam;
 typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
 typedef struct OnyxAstNodeForeign OnyxAstNodeForeign;
@@ -162,6 +163,16 @@ struct OnyxAstNodeBlock {
 	OnyxAstNodeScope *scope; // NOTE: Only set on blocks belonging to functions
 };
 
+struct OnyxAstNodeIf {
+    OnyxAstNodeKind kind;
+    u32 flags;
+    OnyxToken *token;    // NOTE: UNUSED
+    OnyxAstNode *false_block;
+    OnyxAstNode *next;
+    OnyxAstNode *cond;
+    OnyxAstNode *true_block;
+};
+
 struct OnyxAstNodeFuncDef {
 	OnyxAstNodeKind kind;
 	u32 flags;
@@ -215,6 +226,7 @@ union OnyxAstNode {
 	OnyxAstNodeCall as_call;
     OnyxAstNodeNumLit as_numlit;
     OnyxAstNodeForeign as_foreign;
+    OnyxAstNodeIf as_if;
 };
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);

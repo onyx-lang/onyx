@@ -12,6 +12,7 @@ static const char* onyx_token_type_names[] = {
 	"export",		//"TOKEN_TYPE_KEYWORD_EXPORT",
 	"if",			//"TOKEN_TYPE_KEYWORD_IF",
 	"else",			//"TOKEN_TYPE_KEYWORD_ELSE",
+	"elseif",		//"TOKEN_TYPE_KEYWORD_ELSEIF",
 	"for",			//"TOKEN_TYPE_KEYWORD_FOR",
 	"do",			//"TOKEN_TYPE_KEYWORD_DO",
 	"return",		//"TOKEN_TYPE_KEYWORD_RETURN",
@@ -138,6 +139,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("export",  1, TOKEN_TYPE_KEYWORD_EXPORT);
 	LITERAL_TOKEN("use",     1, TOKEN_TYPE_KEYWORD_USE);
 	LITERAL_TOKEN("if",      1, TOKEN_TYPE_KEYWORD_IF);
+	LITERAL_TOKEN("elseif",    1, TOKEN_TYPE_KEYWORD_ELSEIF);
 	LITERAL_TOKEN("else",    1, TOKEN_TYPE_KEYWORD_ELSE);
 	LITERAL_TOKEN("foreign", 1, TOKEN_TYPE_KEYWORD_FOREIGN);
 	LITERAL_TOKEN("for",     1, TOKEN_TYPE_KEYWORD_FOR);

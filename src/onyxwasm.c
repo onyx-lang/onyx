@@ -213,6 +213,7 @@ static void process_block(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBlock*
 static void process_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* stmt);
 static void process_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* lval);
 static void process_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* assign);
+static void process_if(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeIf* if_node);
 static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* expr);
 static void process_cast(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* cast);
 static void process_return(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* ret);
@@ -242,6 +243,7 @@ static void process_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
 		case ONYX_AST_NODE_KIND_SCOPE: break;
 		case ONYX_AST_NODE_KIND_RETURN: process_return(mod, func, stmt); break;
 		case ONYX_AST_NODE_KIND_ASSIGNMENT: process_assignment(mod, func, stmt); break;
+        case ONYX_AST_NODE_KIND_IF: process_if(mod, func, (OnyxAstNodeIf *) stmt); break;
 		default: process_expression(mod, func, stmt);
 	}
 }
@@ -254,6 +256,28 @@ static void process_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode
 	} else {
 		assert(("Invalid lval", 0));
 	}
+}
+
+static void process_if(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeIf* if_node) {
+    process_expression(mod, func, if_node->cond);
+    bh_arr_push(func->code, ((WasmInstruction){ WI_IF_START, 0x40 }));
+
+    if (if_node->true_block) {
+        // NOTE: This is kind of gross, but making a function for this doesn't feel right
+        forll (OnyxAstNode, stmt, if_node->true_block, next) {
+            process_statement(mod, func, stmt);
+        }
+    }
+
+    if (if_node->false_block) {
+        bh_arr_push(func->code, ((WasmInstruction){ WI_ELSE, 0x00 }));
+
+        forll (OnyxAstNode, stmt, if_node->false_block, next) {
+            process_statement(mod, func, stmt);
+        }
+    }
+
+    bh_arr_push(func->code, ((WasmInstruction){ WI_IF_END, 0x00 }));
 }
 
 static void process_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* assign) {
@@ -915,6 +939,7 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
 		case WI_LOCAL_SET:
         case WI_CALL:
 		case WI_BLOCK_START:
+		case WI_IF_START:
 			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
 			bh_buffer_append(buff, leb, leb_len);
 			break;
