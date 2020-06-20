@@ -41,9 +41,11 @@ static const char* onyx_token_type_names[] = {
 	";",  // "TOKEN_TYPE_SYM_SEMICOLON",
 	",",  // "TOKEN_TYPE_SYM_COMMA",
 	">",  // "TOKEN_TYPE_SYM_GREATER",
-	">=",  // "TOKEN_TYPE_SYM_GREATER_EQUAL",
+	">=", // "TOKEN_TYPE_SYM_GREATER_EQUAL",
 	"<",  // "TOKEN_TYPE_SYM_LESS",
-	"<=",  // "TOKEN_TYPE_SYM_LESS_EQUAL",
+	"<=", // "TOKEN_TYPE_SYM_LESS_EQUAL",
+	"==", // "TOKEN_TYPE_SYM_EQUALS_EQUALS",
+    "!=", // "TOKEN_TYPE_SYM_NOT_EQUAL",
 	"=",  // "TOKEN_TYPE_SYM_EQUALS",
 	"~",  // "TOKEN_TYPE_SYM_TILDE",
 	"!",  // "TOKEN_TYPE_SYM_BANG",
@@ -152,6 +154,8 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("<-",      0, TOKEN_TYPE_RIGHT_ARROW);
 	LITERAL_TOKEN("<=",      0, TOKEN_TYPE_SYM_LESS_EQUAL);
 	LITERAL_TOKEN(">=",      0, TOKEN_TYPE_SYM_GREATER_EQUAL);
+	LITERAL_TOKEN("==",      0, TOKEN_TYPE_SYM_EQUAL_EQUAL);
+	LITERAL_TOKEN("!=",      0, TOKEN_TYPE_SYM_NOT_EQUAL);
 	LITERAL_TOKEN("(",       0, TOKEN_TYPE_OPEN_PAREN);
 	LITERAL_TOKEN(")",       0, TOKEN_TYPE_CLOSE_PAREN);
 	LITERAL_TOKEN("{",       0, TOKEN_TYPE_OPEN_BRACE);

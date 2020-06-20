@@ -305,36 +305,45 @@ static void process_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 			break; \
 		}
 
+#define BIN_OP_SIGNED_PROCESS(ast_binop, wasm_binop) \
+		case ONYX_AST_NODE_KIND_##ast_binop: \
+			{ \
+				WasmInstructionType instr_type; \
+				switch (expr->type->kind) { \
+					case ONYX_TYPE_INFO_KIND_UINT32: \
+					case ONYX_TYPE_INFO_KIND_INT32: \
+						if (expr->type->is_unsigned) instr_type = WI_I32_##wasm_binop##_U; \
+						else instr_type = WI_I32_##wasm_binop##_S; \
+						break; \
+					case ONYX_TYPE_INFO_KIND_UINT64: \
+					case ONYX_TYPE_INFO_KIND_INT64: \
+						if (expr->type->is_unsigned) instr_type = WI_I64_##wasm_binop##_U; \
+						else instr_type = WI_I64_##wasm_binop##_S; \
+						break; \
+					case ONYX_TYPE_INFO_KIND_FLOAT32: instr_type = WI_F32_##wasm_binop;		break; \
+					case ONYX_TYPE_INFO_KIND_FLOAT64: instr_type = WI_F64_##wasm_binop;		break; \
+					default: assert(("Invalid type", 0)); \
+				} \
+ \
+				process_expression(mod, func, expr->left); \
+				process_expression(mod, func, expr->right); \
+				bh_arr_push(func->code, ((WasmInstruction){ instr_type, 0x00 })); \
+				break; \
+			}
+
 static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* expr) {
 	switch (expr->kind) {
 		BIN_OP_PROCESS(ADD, ADD);
 		BIN_OP_PROCESS(MINUS, SUB);
 		BIN_OP_PROCESS(MULTIPLY, MUL);
+        BIN_OP_SIGNED_PROCESS(DIVIDE, DIV);
 
-		case ONYX_AST_NODE_KIND_DIVIDE:
-			{
-				WasmInstructionType instr_type;
-				switch (expr->type->kind) {
-					case ONYX_TYPE_INFO_KIND_UINT32:
-					case ONYX_TYPE_INFO_KIND_INT32:
-						if (expr->type->is_unsigned) instr_type = WI_I32_DIV_U;
-						else instr_type = WI_I32_DIV_S;
-						break;
-					case ONYX_TYPE_INFO_KIND_UINT64:
-					case ONYX_TYPE_INFO_KIND_INT64:
-						if (expr->type->is_unsigned) instr_type = WI_I64_DIV_U;
-						else instr_type = WI_I64_DIV_S;
-						break;
-					case ONYX_TYPE_INFO_KIND_FLOAT32: instr_type = WI_F32_DIV;		break;
-					case ONYX_TYPE_INFO_KIND_FLOAT64: instr_type = WI_F64_DIV;		break;
-					default: assert(("Invalid type", 0));
-				}
-
-				process_expression(mod, func, expr->left);
-				process_expression(mod, func, expr->right);
-				bh_arr_push(func->code, ((WasmInstruction){ instr_type, 0x00 }));
-				break;
-			}
+        BIN_OP_SIGNED_PROCESS(LESS, LT);
+        BIN_OP_SIGNED_PROCESS(LESS_EQUAL, LE);
+        BIN_OP_SIGNED_PROCESS(GREATER, GT);
+        BIN_OP_SIGNED_PROCESS(GREATER_EQUAL, GE);
+        BIN_OP_PROCESS(EQUAL, EQ);
+        BIN_OP_PROCESS(NOT_EQUAL, NE);
 
 		case ONYX_AST_NODE_KIND_MODULUS:
 			{

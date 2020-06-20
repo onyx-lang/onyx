@@ -146,12 +146,18 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
     case ONYX_AST_NODE_KIND_IF: {
         OnyxAstNodeIf* if_node = &node->as_if;
         if (if_node->cond) {
+            print_indent;
+            bh_printf("Condition:");
             onyx_ast_print(if_node->cond, indent + 1);
         }
         if (if_node->true_block) {
+            print_indent;
+            bh_printf("True block:");
             onyx_ast_print(if_node->true_block, indent + 1);
         }
         if (if_node->false_block) {
+            print_indent;
+            bh_printf("False block:");
             onyx_ast_print(if_node->false_block, indent + 1);
         }
         if (if_node->next) {

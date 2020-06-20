@@ -329,12 +329,23 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 
 static inline i32 get_precedence(OnyxAstNodeKind kind) {
     switch (kind) {
-        case ONYX_AST_NODE_KIND_ADD: return 1;
-        case ONYX_AST_NODE_KIND_MINUS: return 1;
-        case ONYX_AST_NODE_KIND_MULTIPLY: return 2;
-        case ONYX_AST_NODE_KIND_DIVIDE: return 2;
-        case ONYX_AST_NODE_KIND_MODULUS: return 3;
-        case ONYX_AST_NODE_KIND_CAST: return 4;
+        case ONYX_AST_NODE_KIND_EQUAL: return 3;
+        case ONYX_AST_NODE_KIND_NOT_EQUAL: return 3;
+
+        case ONYX_AST_NODE_KIND_LESS_EQUAL: return 4;
+        case ONYX_AST_NODE_KIND_LESS: return 4;
+        case ONYX_AST_NODE_KIND_GREATER_EQUAL: return 4;
+        case ONYX_AST_NODE_KIND_GREATER: return 4;
+
+        case ONYX_AST_NODE_KIND_ADD: return 5;
+        case ONYX_AST_NODE_KIND_MINUS: return 5;
+
+        case ONYX_AST_NODE_KIND_MULTIPLY: return 6;
+        case ONYX_AST_NODE_KIND_DIVIDE: return 6;
+
+        case ONYX_AST_NODE_KIND_MODULUS: return 7;
+
+        case ONYX_AST_NODE_KIND_CAST: return 8;
         default: return -1;
     }
 }
@@ -354,6 +365,13 @@ static OnyxAstNode* parse_expression(OnyxParser* parser) {
     while (1) {
         bin_op_kind = -1;
         switch (parser->curr_token->type) {
+            case TOKEN_TYPE_SYM_EQUAL_EQUAL:    bin_op_kind = ONYX_AST_NODE_KIND_EQUAL; break;
+            case TOKEN_TYPE_SYM_NOT_EQUAL:      bin_op_kind = ONYX_AST_NODE_KIND_NOT_EQUAL; break;
+            case TOKEN_TYPE_SYM_LESS_EQUAL:     bin_op_kind = ONYX_AST_NODE_KIND_LESS_EQUAL; break;
+            case TOKEN_TYPE_SYM_LESS:           bin_op_kind = ONYX_AST_NODE_KIND_LESS; break;
+            case TOKEN_TYPE_SYM_GREATER_EQUAL:  bin_op_kind = ONYX_AST_NODE_KIND_GREATER_EQUAL; break;
+            case TOKEN_TYPE_SYM_GREATER:        bin_op_kind = ONYX_AST_NODE_KIND_GREATER; break;
+
             case TOKEN_TYPE_SYM_PLUS:       bin_op_kind = ONYX_AST_NODE_KIND_ADD; break;
             case TOKEN_TYPE_SYM_MINUS:      bin_op_kind = ONYX_AST_NODE_KIND_MINUS; break;
             case TOKEN_TYPE_SYM_STAR:       bin_op_kind = ONYX_AST_NODE_KIND_MULTIPLY; break;

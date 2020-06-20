@@ -11,6 +11,14 @@ add :: proc (a i32, b i32) -> i32 {
 	return a + b;
 }
 
+abs :: proc (val i32) -> i32 {
+    if val <= 0 {
+        return -val;
+    } else {
+        return val;
+    };
+}
+
 diff_square :: proc (a i32, b i32) -> i32 {
 	// Typechecked
 	c := a - b; // Mutable
