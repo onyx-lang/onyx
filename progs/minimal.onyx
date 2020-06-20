@@ -16,18 +16,18 @@ diff_square :: proc (a i32, b i32) -> i32 {
 	c := a - b; // Mutable
 	d :: a + b; // Constant
 
-	return (c * d) as i32;
+	return c * d;
 }
 
 export do_stuff :: proc -> i32 {
 	res := diff_square((4 + 5) as i32, (2 + 3) as i32);
 	res = res + foo();
-    // res should be 66
-    return res * (0 - 1);
+    // res should be -66
+    return res * -1;
 }
 
-export float_test :: proc -> f32 {
-    return (1.2f + 5.3f);
+float_test :: proc -> f32 {
+    return 3.14159f;
 }
 
 export main :: proc {

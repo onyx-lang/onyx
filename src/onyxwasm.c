@@ -333,6 +333,32 @@ static void process_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 				break;
 			}
 
+        case ONYX_AST_NODE_KIND_NEGATE:
+            {
+                OnyxTypeInfoKind type_kind = expr->type->kind;
+
+                if (type_kind == ONYX_TYPE_INFO_KIND_INT32) {
+                    bh_arr_push(func->code, ((WasmInstruction){ WI_I32_CONST, 0x00 }));
+                    process_expression(mod, func, expr->left);
+                    bh_arr_push(func->code, ((WasmInstruction){ WI_I32_SUB, 0x00 }));
+
+                } else if (type_kind == ONYX_TYPE_INFO_KIND_INT64) {
+                    bh_arr_push(func->code, ((WasmInstruction){ WI_I64_CONST, 0x00 }));
+                    process_expression(mod, func, expr->left);
+                    bh_arr_push(func->code, ((WasmInstruction){ WI_I64_SUB, 0x00 }));
+
+                } else {
+                    process_expression(mod, func, expr->left);
+
+                    if (type_kind == ONYX_TYPE_INFO_KIND_FLOAT32)
+                        bh_arr_push(func->code, ((WasmInstruction){ WI_F32_NEG, 0x00 }));
+
+                    if (type_kind == ONYX_TYPE_INFO_KIND_FLOAT64)
+                        bh_arr_push(func->code, ((WasmInstruction){ WI_F32_NEG, 0x00 }));
+                }
+                break;
+            }
+
 		case ONYX_AST_NODE_KIND_LOCAL:
 		case ONYX_AST_NODE_KIND_PARAM:
 			{

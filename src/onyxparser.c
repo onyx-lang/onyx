@@ -1,6 +1,7 @@
 #include "onyxlex.h"
 #include "onyxmsgs.h"
 #include "onyxparser.h"
+#include "onyxutils.h"
 
 static const char* ast_node_names[] = {
 	"ERROR",
@@ -240,6 +241,22 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 				return expr;
 			}
 
+        case TOKEN_TYPE_SYM_MINUS:
+            {
+                parser_next_token(parser);
+                OnyxAstNode* factor = parse_factor(parser);
+
+                OnyxAstNode* negate_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_NEGATE);
+                negate_node->left = factor;
+                negate_node->type = factor->type;
+
+                if ((factor->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
+                    negate_node->flags |= ONYX_AST_FLAG_COMPTIME;
+                }
+
+                return negate_node;
+            }
+
 		case TOKEN_TYPE_SYMBOL:
 			{
 				OnyxToken* sym_token = expect(parser, TOKEN_TYPE_SYMBOL);
@@ -310,82 +327,89 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 	return NULL;
 }
 
-static OnyxAstNode* parse_bin_op(OnyxParser* parser, OnyxAstNode* left) {
-	OnyxAstNodeKind kind = -1;
-
-	switch (parser->curr_token->type) {
-	case TOKEN_TYPE_SYM_PLUS:		kind = ONYX_AST_NODE_KIND_ADD; break;
-	case TOKEN_TYPE_SYM_MINUS:		kind = ONYX_AST_NODE_KIND_MINUS; break;
-	case TOKEN_TYPE_SYM_STAR:		kind = ONYX_AST_NODE_KIND_MULTIPLY; break;
-	case TOKEN_TYPE_SYM_FSLASH:		kind = ONYX_AST_NODE_KIND_DIVIDE; break;
-	case TOKEN_TYPE_SYM_PERCENT:	kind = ONYX_AST_NODE_KIND_MODULUS; break;
-	default: break;
-	}
-
-	if (kind != -1) {
-		OnyxToken* bin_op_tok = parser->curr_token;
-		parser_next_token(parser);
-
-		OnyxAstNode* right = parse_factor(parser);
-
-		// NOTE: Typechecking like this will not be here for long but
-		// want to start working on it early
-		if (left->type != right->type) {
-			onyx_message_add(parser->msgs,
-				ONYX_MESSAGE_TYPE_BINOP_MISMATCH_TYPE,
-				bin_op_tok->pos,
-				left->type->name, right->type->name);
-			return &error_node;
-		}
-
-		OnyxAstNode* bin_op = onyx_ast_node_new(parser->allocator, kind);
-		bin_op->left = left;
-		bin_op->right = right;
-		bin_op->type = left->type;
-
-		if ((left->flags & ONYX_AST_FLAG_COMPTIME) != 0 && (right->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
-			bin_op->flags |= ONYX_AST_FLAG_COMPTIME;
-		}
-
-		return bin_op;
-	}
-
-	return &error_node;
+static inline i32 get_precedence(OnyxAstNodeKind kind) {
+    switch (kind) {
+        case ONYX_AST_NODE_KIND_ADD: return 1;
+        case ONYX_AST_NODE_KIND_MINUS: return 1;
+        case ONYX_AST_NODE_KIND_MULTIPLY: return 2;
+        case ONYX_AST_NODE_KIND_DIVIDE: return 2;
+        case ONYX_AST_NODE_KIND_MODULUS: return 3;
+        case ONYX_AST_NODE_KIND_CAST: return 4;
+        default: return -1;
+    }
 }
 
 static OnyxAstNode* parse_expression(OnyxParser* parser) {
+    bh_arr(OnyxAstNode*) tree_stack = NULL;
+    bh_arr_new(global_scratch_allocator, tree_stack, 4);
+    bh_arr_set_length(tree_stack, 0);
+
 	OnyxAstNode* left = parse_factor(parser);
+    OnyxAstNode* right;
+    OnyxAstNode* root = left;
 
-	switch (parser->curr_token->type) {
-		case TOKEN_TYPE_SYM_PLUS:
-		case TOKEN_TYPE_SYM_MINUS:
-		case TOKEN_TYPE_SYM_STAR:
-		case TOKEN_TYPE_SYM_FSLASH:
-		case TOKEN_TYPE_SYM_PERCENT:
-			{
-				OnyxAstNode* expr = parse_bin_op(parser, left);
-				return expr;
-			}
-		case TOKEN_TYPE_KEYWORD_CAST:
-			{
-				parser_next_token(parser);
-				OnyxTypeInfo* type = parse_type(parser);
+    i32 bin_op_kind;
+    OnyxToken* bin_op_tok;
 
-				// NOTE: This may be premature in the parser but a cast
-				// node doesn't need to exist if the source and target
-				// types are the same
-				if (type == left->type) return left;
+    while (1) {
+        bin_op_kind = -1;
+        switch (parser->curr_token->type) {
+            case TOKEN_TYPE_SYM_PLUS:       bin_op_kind = ONYX_AST_NODE_KIND_ADD; break;
+            case TOKEN_TYPE_SYM_MINUS:      bin_op_kind = ONYX_AST_NODE_KIND_MINUS; break;
+            case TOKEN_TYPE_SYM_STAR:       bin_op_kind = ONYX_AST_NODE_KIND_MULTIPLY; break;
+            case TOKEN_TYPE_SYM_FSLASH:     bin_op_kind = ONYX_AST_NODE_KIND_DIVIDE; break;
+            case TOKEN_TYPE_SYM_PERCENT:    bin_op_kind = ONYX_AST_NODE_KIND_MODULUS; break;
+            case TOKEN_TYPE_KEYWORD_CAST:   bin_op_kind = ONYX_AST_NODE_KIND_CAST; break;
+            default: goto expression_done;
+        }
 
-				OnyxAstNode* cast_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_CAST);
-				cast_node->type = type;
-				cast_node->left = left;
+        if (bin_op_kind != -1) {
+            bin_op_tok = parser->curr_token;
+            parser_next_token(parser);
 
-				return cast_node;
-			}
-		default: break;
-	}
+            OnyxAstNode* bin_op = onyx_ast_node_new(parser->allocator, bin_op_kind);
 
-	return left;
+            while ( !bh_arr_is_empty(tree_stack) &&
+                    get_precedence(bh_arr_last(tree_stack)->kind) >= get_precedence(bin_op_kind))
+                bh_arr_pop(tree_stack);
+
+            if (bh_arr_is_empty(tree_stack)) {
+                // NOTE: new is now the root node
+                bin_op->left = root;
+                root = bin_op;
+            } else {
+                bin_op->left = bh_arr_last(tree_stack)->right;
+                bh_arr_last(tree_stack)->right = bin_op;
+            }
+
+            bh_arr_push(tree_stack, bin_op);
+
+            if (bin_op_kind == ONYX_AST_NODE_KIND_CAST) {
+                bin_op->type = parse_type(parser);
+            } else {
+                right = parse_factor(parser);
+                if (left->type != right->type) {
+                    onyx_message_add(parser->msgs,
+                        ONYX_MESSAGE_TYPE_BINOP_MISMATCH_TYPE,
+                        bin_op_tok->pos,
+                        left->type->name, right->type->name);
+
+                    find_token(parser, TOKEN_TYPE_SYM_SEMICOLON);
+                    return &error_node;
+                }
+
+                bin_op->right = right;
+                bin_op->type = right->type;
+
+                if ((left->flags & ONYX_AST_FLAG_COMPTIME) != 0 && (right->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
+                    bin_op->flags |= ONYX_AST_FLAG_COMPTIME;
+                }
+            }
+        }
+    }
+
+expression_done:
+	return root;
 }
 
 static OnyxAstNode* parse_if_stmt(OnyxParser* parser) {

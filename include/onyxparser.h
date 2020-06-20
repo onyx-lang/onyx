@@ -21,10 +21,6 @@ typedef struct OnyxParser {
 	OnyxToken *prev_token;
 	OnyxToken *curr_token;
 
-	// BUG: This way of handling identifiers will work for now,
-	// but it will not allow for shadowing. Also, variable names
-	// cannot be the same as any function or global variable.
-	// That will get annoying to program.
 	// NOTE: A table of the current identifiers in the current scope.
 	// If the identifier doesn't at the time of parsing, it is an error.
 	// Cleared at the end of a block.

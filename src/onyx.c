@@ -9,14 +9,18 @@
 #include "onyxwasm.h"
 
 int main(int argc, char *argv[]) {
+
+	bh_allocator alloc = bh_heap_allocator();
+
+    bh_scratch_init(&global_scratch, alloc, 16 * 1024); // NOTE: 16 KB
+    global_scratch_allocator = bh_scratch_allocator(&global_scratch);
+
 	bh_file source_file;
 	bh_file_error err = bh_file_open(&source_file, argv[1]);
 	if (err != BH_FILE_ERROR_NONE) {
 		bh_printf_err("Failed to open file %s\n", argv[1]);
 		return EXIT_FAILURE;
 	}
-
-	bh_allocator alloc = bh_heap_allocator();
 
 	// NOTE: 1st: Read file contents
 	bh_file_contents fc = bh_file_read_contents(alloc, &source_file);
@@ -51,7 +55,7 @@ int main(int argc, char *argv[]) {
 		onyx_message_print(&msgs);
 		goto main_exit;
 	} else {
-		onyx_ast_print(program, 0);
+		// onyx_ast_print(program, 0);
 	    bh_printf("\nNo errors.\n");
     }
 
