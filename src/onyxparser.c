@@ -341,7 +341,7 @@ static inline i32 get_precedence(OnyxAstNodeKind kind) {
 
 static OnyxAstNode* parse_expression(OnyxParser* parser) {
     bh_arr(OnyxAstNode*) tree_stack = NULL;
-    bh_arr_new(global_scratch_allocator, tree_stack, 4);
+    bh_arr_new(global_scratch_allocator, tree_stack, 1);
     bh_arr_set_length(tree_stack, 0);
 
 	OnyxAstNode* left = parse_factor(parser);

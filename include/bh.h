@@ -924,10 +924,24 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
 		}
 	} break;
 
-	case bh_allocator_action_free:
-	case bh_allocator_action_resize:
-		// Do nothing
-		break;
+	case bh_allocator_action_free: break;
+
+	case bh_allocator_action_resize: {
+		if (size > scratch->end - scratch->memory) {
+			return NULL;
+		}
+
+		retval = scratch->curr;
+		scratch->curr += size;
+
+		if (scratch->curr >= scratch->end) {
+			scratch->curr = scratch->memory;
+			retval = scratch->curr;
+		}
+
+        // HACK!!!!!: Using size instead of some kind of "old size"
+        memcpy(retval, prev_memory, size);
+	} break;
 	}
 
 	return retval;
