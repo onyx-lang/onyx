@@ -4,7 +4,7 @@ print_float :: foreign "host" "print" proc (value f32) ---
 print_if    :: foreign "host" "print" proc (i i32, f f32) ---
 
 foo :: proc -> i32 {
-	return 10 as i32;
+	return 10;
 }
 
 add :: proc (a i32, b i32) -> i32 {
@@ -16,7 +16,7 @@ add :: proc (a i32, b i32) -> i32 {
 // is possible that all code paths are covered with returning
 // an i32. This will need to be fixed.
 abs :: proc (val i32) -> i32 {
-    if val <= 0 { return -val; };
+    if val <= 0 { return -val; }
     // else { return val; };
     return val;
 }
@@ -29,10 +29,9 @@ diff_square :: proc (a i32, b i32) -> i32 {
 	return c * d;
 }
 
-export do_stuff :: proc -> i32 {
-	res := diff_square((4 + 5) as i32, (2 + 3) as i32);
+do_stuff :: proc -> i32 {
+	res := diff_square(4 + 5, 2 + 3);
 	res = res + foo();
-    // res should be -66
     return res * -1;
 }
 
@@ -47,10 +46,12 @@ export main :: proc {
         new_output :: abs(output) * 2;
         print(new_output);
 
+    } elseif output == -67 {
+        print(1234);
+
     } else {
         print(-1);
-
-    };
+    }
 
     print(output);
     print_float(float_test());

@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 		onyx_message_print(&msgs);
 		goto main_exit;
 	} else {
-		// onyx_ast_print(program, 0);
+		onyx_ast_print(program, 0);
 	    bh_printf("\nNo errors.\n");
     }
 

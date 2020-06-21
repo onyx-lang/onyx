@@ -77,7 +77,7 @@ static OnyxAstNodeNumLit* parse_numeric_literal(OnyxParser* parser);
 static OnyxAstNode* parse_factor(OnyxParser* parser);
 static OnyxAstNode* parse_bin_op(OnyxParser* parser, OnyxAstNode* left);
 static OnyxAstNode* parse_expression(OnyxParser* parser);
-static OnyxAstNode* parse_if_stmt(OnyxParser* parser);
+static OnyxAstNodeIf* parse_if_stmt(OnyxParser* parser);
 static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret);
 static OnyxAstNode* parse_return_statement(OnyxParser* parser);
 static OnyxAstNodeBlock* parse_block(OnyxParser* parser, b32 belongs_to_function);
@@ -430,7 +430,7 @@ expression_done:
 	return root;
 }
 
-static OnyxAstNode* parse_if_stmt(OnyxParser* parser) {
+static OnyxAstNodeIf* parse_if_stmt(OnyxParser* parser) {
     expect(parser, TOKEN_TYPE_KEYWORD_IF);
 
     OnyxAstNode* cond = parse_expression(parser);
@@ -440,7 +440,8 @@ static OnyxAstNode* parse_if_stmt(OnyxParser* parser) {
     OnyxAstNodeIf* root_if = if_node;
 
     if_node->cond = cond;
-    if_node->true_block = true_block->as_block.body;
+    if (true_block != NULL)
+        if_node->true_block = true_block->as_block.body;
 
     while (parser->curr_token->type == TOKEN_TYPE_KEYWORD_ELSEIF) {
         parser_next_token(parser);
@@ -450,7 +451,8 @@ static OnyxAstNode* parse_if_stmt(OnyxParser* parser) {
         true_block = (OnyxAstNode *) parse_block(parser, 0);
 
         elseif_node->cond = cond;
-        elseif_node->true_block = true_block->as_block.body;
+        if (true_block != NULL)
+            elseif_node->true_block = true_block->as_block.body;
 
         if_node->false_block = (OnyxAstNode *) elseif_node;
         if_node = elseif_node;
@@ -460,10 +462,11 @@ static OnyxAstNode* parse_if_stmt(OnyxParser* parser) {
         parser_next_token(parser);
 
         OnyxAstNode* false_block = (OnyxAstNode *) parse_block(parser, 0);
-        if_node->false_block = false_block->as_block.body;
+        if (false_block != NULL)
+            if_node->false_block = false_block->as_block.body;
     }
 
-    return (OnyxAstNode *) root_if;
+    return root_if;
 }
 
 // Returns 1 if the symbol was consumed. Returns 0 otherwise
@@ -595,19 +598,22 @@ static OnyxAstNode* parse_return_statement(OnyxParser* parser) {
 }
 
 static OnyxAstNode* parse_statement(OnyxParser* parser) {
+    b32 needs_semicolon = 1;
+    OnyxAstNode* retval = NULL;
+
 	switch (parser->curr_token->type) {
 		case TOKEN_TYPE_KEYWORD_RETURN:
-			return parse_return_statement(parser);
+			retval = parse_return_statement(parser);
+            break;
 
 		case TOKEN_TYPE_OPEN_BRACE:
-			return (OnyxAstNode *) parse_block(parser, 0);
+            needs_semicolon = 0;
+			retval = (OnyxAstNode *) parse_block(parser, 0);
+            break;
 
 		case TOKEN_TYPE_SYMBOL:
-			{
-				OnyxAstNode* ret = NULL;
-				if (parse_symbol_statement(parser, &ret)) return ret;
-				// fallthrough
-			}
+            if (parse_symbol_statement(parser, &retval)) break;
+            // fallthrough
 
 		case TOKEN_TYPE_OPEN_PAREN:
 		case TOKEN_TYPE_SYM_PLUS:
@@ -615,14 +621,32 @@ static OnyxAstNode* parse_statement(OnyxParser* parser) {
 		case TOKEN_TYPE_SYM_BANG:
 		case TOKEN_TYPE_LITERAL_NUMERIC:
 		case TOKEN_TYPE_LITERAL_STRING:
-			return parse_expression(parser);
+			retval = parse_expression(parser);
+            break;
 
 		case TOKEN_TYPE_KEYWORD_IF:
-			return parse_if_stmt(parser);
+            needs_semicolon = 0;
+			retval = (OnyxAstNode *) parse_if_stmt(parser);
+            break;
 
 		default:
-			return NULL;
+            break;
 	}
+
+    if (needs_semicolon) {
+		if (parser->curr_token->type != TOKEN_TYPE_SYM_SEMICOLON) {
+			onyx_message_add(parser->msgs,
+				ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
+				parser->curr_token->pos,
+				onyx_get_token_type_name(TOKEN_TYPE_SYM_SEMICOLON),
+				onyx_get_token_type_name(parser->curr_token->type));
+
+			find_token(parser, TOKEN_TYPE_SYM_SEMICOLON);
+		}
+		parser_next_token(parser);
+    }
+
+    return retval;
 }
 
 static OnyxAstNodeBlock* parse_block(OnyxParser* parser, b32 belongs_to_function) {
@@ -651,17 +675,6 @@ static OnyxAstNodeBlock* parse_block(OnyxParser* parser, b32 belongs_to_function
 			*next = stmt;
 			next = &stmt->next;
 		}
-
-		if (parser->curr_token->type != TOKEN_TYPE_SYM_SEMICOLON) {
-			onyx_message_add(parser->msgs,
-				ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
-				parser->curr_token->pos,
-				onyx_get_token_type_name(TOKEN_TYPE_SYM_SEMICOLON),
-				onyx_get_token_type_name(parser->curr_token->type));
-
-			find_token(parser, TOKEN_TYPE_SYM_SEMICOLON);
-		}
-		parser_next_token(parser);
 	}
 
 	expect(parser, TOKEN_TYPE_CLOSE_BRACE);

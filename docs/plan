@@ -56,12 +56,12 @@ HOW:
 		[X] Numeric literals are parsed
 		[X] Numeric literals have the minimum type detected
         [X] Foreign imports (functions only)
-		[ ] Comparison operators
+		[X] Comparison operators
 		[ ] Proper boolean type
-		[ ] Conditional branching works as expected
+		[X] Conditional branching works as expected
 		[ ] Simple while loop is functioning as expected
 		[ ] break and continue semantics
-		[ ] Function calling works for the builtin types
+		[X] Function calling works for the builtin types
 		[ ] Function return values are type checked
 
 	Stage 2:
