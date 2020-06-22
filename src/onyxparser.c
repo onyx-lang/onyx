@@ -209,9 +209,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 				}
 
 				// NOTE: Function call
-				expect(parser, TOKEN_TYPE_OPEN_PAREN);
-
 				OnyxAstNodeCall* call_node = (OnyxAstNodeCall *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_CALL);
+                call_node->token = expect(parser, TOKEN_TYPE_OPEN_PAREN);
 				call_node->callee = sym_node;
 				// NOTE: Return type is stored on function definition's type
 				// This may have to change if we want multiple returns
@@ -319,6 +318,7 @@ static OnyxAstNode* parse_expression(OnyxParser* parser) {
             parser_next_token(parser);
 
             OnyxAstNode* bin_op = onyx_ast_node_new(parser->allocator, bin_op_kind);
+            bin_op->token = bin_op_tok;
 
             while ( !bh_arr_is_empty(tree_stack) &&
                     get_precedence(bh_arr_last(tree_stack)->kind) >= get_precedence(bin_op_kind))
@@ -469,10 +469,9 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 }
 
 static OnyxAstNode* parse_return_statement(OnyxParser* parser) {
-	expect(parser, TOKEN_TYPE_KEYWORD_RETURN);
-
 	OnyxAstNode* return_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_RETURN);
-	return_node->type = &builtin_types[ONYX_TYPE_INFO_KIND_VOID];
+	return_node->token = expect(parser, TOKEN_TYPE_KEYWORD_RETURN);
+
 	OnyxAstNode* expr = NULL;
 
 	if (parser->curr_token->type != TOKEN_TYPE_SYM_SEMICOLON) {

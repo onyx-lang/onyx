@@ -2,6 +2,7 @@
 #include "onyxmsgs.h"
 
 static const char* msg_formats[] = {
+    "%s",
 	"expected token '%s', got '%s'",
 	"unexpected token '%s'",
 	"unknown type '%s'",
@@ -10,8 +11,14 @@ static const char* msg_formats[] = {
 	"unknown symbol '%s'",
 	"redefinition of function '%s'",
 	"mismatched types for binary operator, '%s', '%s'",
-	"mismatched types on assignment, '%s', '%s'",
+	"mismatched types on assignment, expected '%s', got '%s'",
 	"expected expression, got '%s'",
+
+    "returning '%s' from function that returns '%s'",
+    "function '%b' expected type '%s' in position '%d', got '%s'",
+
+    "unable to resolve type for symbol '%b'",
+    "unable to resolve symbol '%b'",
 };
 
 void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...) {

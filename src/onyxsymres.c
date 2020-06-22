@@ -64,7 +64,7 @@ static OnyxAstNode* symbol_resolve(OnyxSemPassState* state, OnyxAstNode* symbol)
                 symbol->token->token);
 
         onyx_token_null_toggle(*symbol->token);
-        return NULL;
+        return symbol;
     }
 
     SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->token);
@@ -159,7 +159,7 @@ static void symres_expression(OnyxSemPassState* state, OnyxAstNode** expr) {
 
         case ONYX_AST_NODE_KIND_CALL: symres_call(state, *expr); break;
 
-        case ONYX_AST_NODE_KIND_BLOCK: symres_block(state, &(*expr)->as_block);
+        case ONYX_AST_NODE_KIND_BLOCK: symres_block(state, &(*expr)->as_block); break;
 
         case ONYX_AST_NODE_KIND_SYMBOL:
             *expr = symbol_resolve(state, *expr);
@@ -281,7 +281,6 @@ void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNode* root_node) {
         walker = walker->next;
     }
 
-    // NOTE: First, resolve all symbols
     walker = root_node;
     while (walker) {
         switch (walker->kind) {

@@ -1,0 +1,276 @@
+#define BH_DEBUG
+#include "onyxsempass.h"
+
+static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFuncDef* func);
+static void typecheck_block(OnyxSemPassState* state, OnyxAstNodeBlock* block);
+static void typecheck_statement_chain(OnyxSemPassState* state, OnyxAstNode* start);
+static void typecheck_statement(OnyxSemPassState* state, OnyxAstNode* stmt);
+static void typecheck_assignment(OnyxSemPassState* state, OnyxAstNode* assign);
+static void typecheck_return(OnyxSemPassState* state, OnyxAstNode* retnode);
+static void typecheck_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode);
+static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call);
+static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr);
+
+static void typecheck_assignment(OnyxSemPassState* state, OnyxAstNode* assign) {
+    if (assign->left->kind == ONYX_AST_NODE_KIND_SYMBOL) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
+                assign->left->token->pos,
+                assign->left->token->token, assign->left->token->length);
+        return;
+    }
+
+    typecheck_expression(state, assign->right);
+
+    if (!assign->left->type->is_known) {
+        assign->left->type = assign->right->type;
+    } else {
+        if (assign->left->type != assign->right->type) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_ASSIGNMENT_TYPE_MISMATCH,
+                    assign->token->pos,
+                    assign->left->type->name, assign->right->type->name);
+            return;
+        }
+    }
+}
+
+static void typecheck_return(OnyxSemPassState* state, OnyxAstNode* retnode) {
+    if (retnode->left) {
+        typecheck_expression(state, retnode->left);
+
+        if (retnode->left->type != state->expected_return_type) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_FUNCTION_RETURN_MISMATCH,
+                    retnode->left->token->pos,
+                    retnode->left->type->name, state->expected_return_type->name);
+        }
+    } else {
+        if (state->expected_return_type->size > 0) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_LITERAL,
+                    retnode->token->pos,
+                    "returning from non-void function without value");
+        }
+    }
+}
+
+static void typecheck_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode) {
+    // NOTE: Add check for boolean type on condition
+    if (ifnode->true_block) typecheck_statement(state, ifnode->true_block);
+    if (ifnode->false_block) typecheck_statement(state, ifnode->false_block);
+}
+
+static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call) {
+    OnyxAstNodeFuncDef* callee = (OnyxAstNodeFuncDef *) call->callee;
+
+    if (callee->kind == ONYX_AST_NODE_KIND_SYMBOL) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
+                callee->token->pos,
+                callee->token->token, callee->token->length);
+        return;
+    }
+
+    call->type = callee->return_type;
+
+    OnyxAstNodeParam* formal_param = callee->params;
+    OnyxAstNode* actual_param = call->arguments;
+
+    i32 arg_pos = 0;
+    while (formal_param != NULL && actual_param != NULL) {
+        typecheck_expression(state, actual_param);
+
+        if (formal_param->type != actual_param->type) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_FUNCTION_PARAM_TYPE_MISMATCH,
+                    call->token->pos,
+                    callee->token->token, callee->token->length,
+                    formal_param->type->name, arg_pos,
+                    actual_param->type->name);
+            return;
+        }
+
+        arg_pos++;
+        formal_param = formal_param->next;
+        actual_param = actual_param->next;
+    }
+
+    if (formal_param != NULL && actual_param == NULL) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_LITERAL,
+                call->token->pos,
+                "too few arguments to function call");
+        return;
+    }
+
+    if (formal_param == NULL && actual_param != NULL) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_LITERAL,
+                call->token->pos,
+                "too many arguments to function call");
+        return;
+    }
+}
+
+static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
+    switch (expr->kind) {
+        case ONYX_AST_NODE_KIND_ADD:
+        case ONYX_AST_NODE_KIND_MINUS:
+        case ONYX_AST_NODE_KIND_MULTIPLY:
+        case ONYX_AST_NODE_KIND_DIVIDE:
+        case ONYX_AST_NODE_KIND_MODULUS:
+        case ONYX_AST_NODE_KIND_EQUAL:
+        case ONYX_AST_NODE_KIND_NOT_EQUAL:
+        case ONYX_AST_NODE_KIND_LESS:
+        case ONYX_AST_NODE_KIND_LESS_EQUAL:
+        case ONYX_AST_NODE_KIND_GREATER:
+        case ONYX_AST_NODE_KIND_GREATER_EQUAL:
+            expr->type = &builtin_types[ONYX_TYPE_INFO_KIND_UNKNOWN];
+
+            typecheck_expression(state, expr->left);
+            typecheck_expression(state, expr->right);
+
+            if (expr->left->type == NULL) {
+                onyx_message_add(state->msgs,
+                        ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
+                        expr->token->pos,
+                        NULL, 0);
+                return;
+            }
+
+            if (expr->right->type == NULL) {
+                onyx_message_add(state->msgs,
+                        ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
+                        expr->token->pos,
+                        NULL, 0);
+                return;
+            }
+
+            if (expr->left->type != expr->right->type) {
+                onyx_message_add(state->msgs,
+                        ONYX_MESSAGE_TYPE_BINOP_MISMATCH_TYPE,
+                        expr->token->pos,
+                        expr->left->type->name,
+                        expr->right->type->name);
+                return;
+            }
+
+            expr->type = expr->left->type;
+            break;
+
+        case ONYX_AST_NODE_KIND_NEGATE:
+            typecheck_expression(state, expr->left);
+            expr->type = expr->left->type;
+            break;
+
+        case ONYX_AST_NODE_KIND_CAST:
+            // NOTE: Do nothing. The resulting type from the cast
+            // is already in the cast expression.
+            break;
+
+        case ONYX_AST_NODE_KIND_CALL:
+            typecheck_call(state, &expr->as_call);
+            break;
+
+        case ONYX_AST_NODE_KIND_BLOCK:
+            typecheck_block(state, &expr->as_block);
+            break;
+
+        case ONYX_AST_NODE_KIND_SYMBOL:
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
+                    expr->token->pos,
+                    expr->token->token, expr->token->length);
+            break;
+
+        case ONYX_AST_NODE_KIND_LOCAL:
+        case ONYX_AST_NODE_KIND_PARAM:
+            if (!expr->type->is_known) {
+                onyx_message_add(state->msgs,
+                        ONYX_MESSAGE_TYPE_LITERAL,
+                        expr->token->pos,
+                        "local variable with unknown type");
+            }
+            break;
+
+        case ONYX_AST_NODE_KIND_ARGUMENT:
+            typecheck_expression(state, expr->left);
+            expr->type = expr->left->type;
+            break;
+
+        case ONYX_AST_NODE_KIND_LITERAL:
+            // NOTE: Literal types should have been decided
+            // in the parser (for now).
+            assert(expr->type->is_known);
+            break;
+
+        default:
+            DEBUG_HERE;
+            break;
+    }
+}
+
+static void typecheck_statement(OnyxSemPassState* state, OnyxAstNode* stmt) {
+    switch (stmt->kind) {
+        case ONYX_AST_NODE_KIND_ASSIGNMENT: typecheck_assignment(state, stmt); break;
+		case ONYX_AST_NODE_KIND_RETURN:     typecheck_return(state, stmt); break;
+        case ONYX_AST_NODE_KIND_IF:         typecheck_if(state, &stmt->as_if); break;
+        case ONYX_AST_NODE_KIND_CALL:       typecheck_call(state, &stmt->as_call); break;
+        case ONYX_AST_NODE_KIND_BLOCK:      typecheck_block(state, &stmt->as_block); break;
+
+        default: break;
+    }
+}
+
+static void typecheck_statement_chain(OnyxSemPassState* state, OnyxAstNode* start) {
+    while (start) {
+        typecheck_statement(state, start);
+        start = start->next;
+    }
+}
+
+static void typecheck_block(OnyxSemPassState* state, OnyxAstNodeBlock* block) {
+    typecheck_statement_chain(state, block->body);
+
+    forll(OnyxAstNodeLocal, local, block->scope->last_local, prev_local) {
+        if (!local->type->is_known) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
+                    local->token->pos,
+                    local->token->token, local->token->length);
+            return;
+        }
+    }
+}
+
+static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFuncDef* func) {
+    forll(OnyxAstNodeParam, param, func->params, next) {
+        if (!param->type->is_known) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_LITERAL,
+                    param->token->pos,
+                    "function parameter types must be known");
+            return;
+        }
+    }
+
+    state->expected_return_type = func->return_type;
+    if (func->body) {
+        typecheck_block(state, func->body);
+    }
+}
+
+void onyx_type_check(OnyxSemPassState* state, OnyxAstNode* root_node) {
+    OnyxAstNode* walker = root_node;
+    while (walker) {
+        switch (walker->kind) {
+            case ONYX_AST_NODE_KIND_FUNCDEF:
+                typecheck_function_defintion(state, &walker->as_funcdef);
+                break;
+            default: break;
+        }
+
+        walker = walker->next;
+    }
+}

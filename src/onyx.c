@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
 	// NOTE: if there are errors, assume the parse tree was generated wrong,
 	// even if it may have still been generated correctly.
 	if (onyx_message_has_errors(&msgs)) {
+        bh_printf("\n\n");
 		onyx_message_print(&msgs);
 		goto main_exit;
 	} else {

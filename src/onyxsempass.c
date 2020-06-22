@@ -19,4 +19,5 @@ OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc
 
 void onyx_sempass(OnyxSemPassState* state, OnyxAstNode* root_node) {
     onyx_resolve_symbols(state, root_node);
+    onyx_type_check(state, root_node);
 }

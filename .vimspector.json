@@ -6,7 +6,7 @@
                 "type": "cppdbg",
                 "request": "launch",
                 "program": "${workspaceFolder}/onyx",
-                "args": ["progs/minimal.onyx"],
+                "args": ["progs/new_minimal.onyx"],
                 "stopAtEntry": true,
                 "cwd": "${workspaceFolder}",
                 "environment": [],

@@ -18,13 +18,20 @@ typedef struct OnyxSemPassState {
 	bh_allocator allocator, node_allocator;
 	OnyxMessages *msgs;
 
+    // NOTE: Used in symbol resolution phase
     OnyxAstNodeScope* curr_scope;
+
+    // NOTE: Used in type checking phase
+    OnyxTypeInfo* expected_return_type;
 
     bh_table(SemPassSymbol *) symbols;
 } OnyxSemPassState;
 
 // NOTE: Resolving all symbols in the tree
 void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNode* root_node);
+
+// NOTE: Inferring and checking types in the tree
+void onyx_type_check(OnyxSemPassState* state, OnyxAstNode* root_node);
 
 // NOTE: Full semantic pass
 OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc, OnyxMessages* msgs);

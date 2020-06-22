@@ -3,6 +3,7 @@ OBJ_FILES=\
 	build/onyxparser.o \
 	build/onyxsempass.o \
 	build/onyxsymres.o \
+	build/onyxtypecheck.o \
 	build/onyxmsgs.o \
 	build/onyxutils.o \
 	build/onyxwasm.o \

@@ -1,18 +1,24 @@
 print :: foreign "host" "print" proc (value i32) ---
 
-diff_square :: proc (a i32, b i32) -> i32 {
-	// Typechecked
-	c := a - b; // Mutable
-	d :: a + b; // Constant
+simple_test :: proc {
+    a: i32 = 5;
+    b: i64 = 6 as i64;
 
-    {
-        c : i32 = a * 2 + foo(5, 2);
-        d : i32 = (c + a) * 2;
+    if a > b {
+        foo := 123;
+        print(foo);
     }
 
-	return c * d;
+    c :: a + foo();
+    print(c);
 }
 
-foo :: proc (a i32, b i32) -> i32 {
-    return a * 5 + b * 7;
+foo :: proc -> i32 {
+    return 10;
+}
+
+print_nums :: proc (a i32, b i32, c i32) {
+    print(a);
+    print(b);
+    print(c);
 }
