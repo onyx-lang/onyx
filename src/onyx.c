@@ -5,6 +5,7 @@
 #include "onyxlex.h"
 #include "onyxmsgs.h"
 #include "onyxparser.h"
+#include "onyxsempass.h"
 #include "onyxutils.h"
 #include "onyxwasm.h"
 
@@ -49,27 +50,39 @@ int main(int argc, char *argv[]) {
 	OnyxParser parser = onyx_parser_create(ast_alloc, &tokenizer, &msgs);
 	OnyxAstNode* program = onyx_parse(&parser);
 
+    bh_printf("BEFORE SYMBOL_RESOLUTION: ");
+    onyx_ast_print(program, 1);
+
+    bh_arena sp_arena;
+    bh_arena_init(&sp_arena, alloc, 16 * 1024);
+    bh_allocator sp_alloc = bh_arena_allocator(&sp_arena);
+
+    OnyxSemPassState sp_state = onyx_sempass_create(sp_alloc, ast_alloc, &msgs);
+    onyx_sempass(&sp_state, program);
+
 	// NOTE: if there are errors, assume the parse tree was generated wrong,
 	// even if it may have still been generated correctly.
 	if (onyx_message_has_errors(&msgs)) {
 		onyx_message_print(&msgs);
 		goto main_exit;
 	} else {
-		onyx_ast_print(program, 0);
+        bh_printf("\n\nAFTER SYMBOL RESOLUTION: ");
+		onyx_ast_print(program, 1);
 	    bh_printf("\nNo errors.\n");
     }
 
 	// NOTE: 4th: Generate a WASM module from the parse tree and
 	// write it to a file.
-	OnyxWasmModule wasm_mod = onyx_wasm_generate_module(alloc, program);
-
-	bh_file out_file;
-	bh_file_create(&out_file, "out.wasm");
-	onyx_wasm_module_write_to_file(&wasm_mod, out_file);
-	bh_file_close(&out_file);
-
-	onyx_wasm_module_free(&wasm_mod);
+//	OnyxWasmModule wasm_mod = onyx_wasm_generate_module(alloc, program);
+//
+//	bh_file out_file;
+//	bh_file_create(&out_file, "out.wasm");
+//	onyx_wasm_module_write_to_file(&wasm_mod, out_file);
+//	bh_file_close(&out_file);
+//
+//	onyx_wasm_module_free(&wasm_mod);
 main_exit: // NOTE: Cleanup, since C doesn't have defer
+	bh_arena_free(&sp_arena);
 	bh_arena_free(&msg_arena);
 	bh_arena_free(&ast_arena);
 	onyx_parser_free(&parser);

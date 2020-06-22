@@ -12,6 +12,7 @@ static const char* ast_node_names[] = {
 	"BLOCK",
 	"SCOPE",
 	"LOCAL",
+    "SYMBOL",
 
 	"ADD",
 	"MINUS",
@@ -80,7 +81,7 @@ static OnyxAstNode* parse_expression(OnyxParser* parser);
 static OnyxAstNodeIf* parse_if_stmt(OnyxParser* parser);
 static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret);
 static OnyxAstNode* parse_return_statement(OnyxParser* parser);
-static OnyxAstNodeBlock* parse_block(OnyxParser* parser, b32 belongs_to_function);
+static OnyxAstNodeBlock* parse_block(OnyxParser* parser);
 static OnyxAstNode* parse_statement(OnyxParser* parser);
 static OnyxTypeInfo* parse_type(OnyxParser* parser);
 static OnyxAstNodeParam* parse_function_params(OnyxParser* parser);
@@ -132,66 +133,6 @@ static OnyxToken* expect(OnyxParser* parser, OnyxTokenType token_type) {
 	}
 
 	return token;
-}
-
-static OnyxAstNodeScope* enter_scope(OnyxParser* parser) {
-	OnyxAstNodeScope* scope = (OnyxAstNodeScope*) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SCOPE);
-	scope->prev_scope = parser->curr_scope;
-	parser->curr_scope = scope;
-	return scope;
-}
-
-static OnyxAstNodeScope* leave_scope(OnyxParser* parser) {
-	// NOTE: Can't leave a scope if there is no scope
-	assert(parser->curr_scope != NULL);
-
-	for (OnyxAstNodeLocal *walker = parser->curr_scope->last_local; walker != NULL; walker = walker->prev_local) {
-		remove_identifier(parser, (OnyxAstNode *) walker);
-	}
-
-	parser->curr_scope = parser->curr_scope->prev_scope;
-	return parser->curr_scope;
-}
-
-static OnyxAstNode* lookup_identifier(OnyxParser* parser, OnyxToken* token) {
-	OnyxAstNode* ident = NULL;
-
-	onyx_token_null_toggle(*token);
-	if (bh_table_has(OnyxAstNode*, parser->identifiers, token->token)) {
-		ident = bh_table_get(OnyxAstNode*, parser->identifiers, token->token);
-	}
-	onyx_token_null_toggle(*token);
-
-	return ident;
-}
-
-static void insert_identifier(OnyxParser* parser, OnyxAstNode* ident, b32 is_local) {
-	OnyxAstNodeLocal* local = (OnyxAstNodeLocal *) ident;
-	if (is_local) {
-		OnyxAstNodeScope* scope = parser->curr_scope;
-		local->prev_local = scope->last_local;
-		scope->last_local = local;
-	}
-
-	onyx_token_null_toggle(*local->token);
-	if (bh_table_has(OnyxAstNode*, parser->identifiers, local->token->token)) {
-		local->shadowed = bh_table_get(OnyxAstNode*, parser->identifiers, local->token->token);
-	}
-
-	bh_table_put(OnyxAstNodeLocal*, parser->identifiers, local->token->token, local);
-	onyx_token_null_toggle(*local->token);
-}
-
-static void remove_identifier(OnyxParser* parser, OnyxAstNode* ident) {
-	OnyxAstNodeLocal* local = (OnyxAstNodeLocal *) ident;
-
-	onyx_token_null_toggle(*local->token);
-	if (local->shadowed) {
-		bh_table_put(OnyxAstNode*, parser->identifiers, local->token->token, local->shadowed);
-	} else {
-		bh_table_delete(OnyxAstNode*, parser->identifiers, local->token->token);
-	}
-	onyx_token_null_toggle(*local->token);
 }
 
 static OnyxAstNodeNumLit* parse_numeric_literal(OnyxParser* parser) {
@@ -260,16 +201,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 		case TOKEN_TYPE_SYMBOL:
 			{
 				OnyxToken* sym_token = expect(parser, TOKEN_TYPE_SYMBOL);
-				OnyxAstNode* sym_node = lookup_identifier(parser, sym_token);
-				if (sym_node == NULL) {
-					onyx_token_null_toggle(*sym_token);
-					onyx_message_add(parser->msgs,
-							ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
-							sym_token->pos, sym_token->token);
-					onyx_token_null_toggle(*sym_token);
-
-                    return sym_node;
-				}
+				OnyxAstNode* sym_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SYMBOL);
+                sym_node->token = sym_token;
 
 				if (parser->curr_token->type != TOKEN_TYPE_OPEN_PAREN) {
 					return sym_node;
@@ -406,16 +339,6 @@ static OnyxAstNode* parse_expression(OnyxParser* parser) {
                 bin_op->type = parse_type(parser);
             } else {
                 right = parse_factor(parser);
-                if (left->type != right->type) {
-                    onyx_message_add(parser->msgs,
-                        ONYX_MESSAGE_TYPE_BINOP_MISMATCH_TYPE,
-                        bin_op_tok->pos,
-                        left->type->name, right->type->name);
-
-                    find_token(parser, TOKEN_TYPE_SYM_SEMICOLON);
-                    return &error_node;
-                }
-
                 bin_op->right = right;
                 bin_op->type = right->type;
 
@@ -434,25 +357,25 @@ static OnyxAstNodeIf* parse_if_stmt(OnyxParser* parser) {
     expect(parser, TOKEN_TYPE_KEYWORD_IF);
 
     OnyxAstNode* cond = parse_expression(parser);
-    OnyxAstNode* true_block = (OnyxAstNode *) parse_block(parser, 0);
+    OnyxAstNode* true_block = (OnyxAstNode *) parse_block(parser);
 
     OnyxAstNodeIf* if_node = (OnyxAstNodeIf *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_IF);
     OnyxAstNodeIf* root_if = if_node;
 
     if_node->cond = cond;
     if (true_block != NULL)
-        if_node->true_block = true_block->as_block.body;
+        if_node->true_block = true_block;
 
     while (parser->curr_token->type == TOKEN_TYPE_KEYWORD_ELSEIF) {
         parser_next_token(parser);
         OnyxAstNodeIf* elseif_node = (OnyxAstNodeIf *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_IF);
 
         cond = parse_expression(parser);
-        true_block = (OnyxAstNode *) parse_block(parser, 0);
+        true_block = (OnyxAstNode *) parse_block(parser);
 
         elseif_node->cond = cond;
         if (true_block != NULL)
-            elseif_node->true_block = true_block->as_block.body;
+            elseif_node->true_block = true_block;
 
         if_node->false_block = (OnyxAstNode *) elseif_node;
         if_node = elseif_node;
@@ -461,9 +384,9 @@ static OnyxAstNodeIf* parse_if_stmt(OnyxParser* parser) {
     if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_ELSE) {
         parser_next_token(parser);
 
-        OnyxAstNode* false_block = (OnyxAstNode *) parse_block(parser, 0);
+        OnyxAstNode* false_block = (OnyxAstNode *) parse_block(parser);
         if (false_block != NULL)
-            if_node->false_block = false_block->as_block.body;
+            if_node->false_block = false_block;
     }
 
     return root_if;
@@ -490,9 +413,8 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 				OnyxAstNodeLocal* local = (OnyxAstNodeLocal*) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_LOCAL);
 				local->token = symbol;
 				local->type = type;
-				local->flags |= ONYX_AST_FLAG_LVAL;
-
-				insert_identifier(parser, (OnyxAstNode *) local, 1);
+				local->flags |= ONYX_AST_FLAG_LVAL; // NOTE: DELETE
+                *ret = (OnyxAstNode *) local;
 
 				if (parser->curr_token->type == TOKEN_TYPE_SYM_EQUALS || parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
 					if (parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
@@ -500,6 +422,7 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 					}
 
 					OnyxAstNode* assignment = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_ASSIGNMENT);
+                    local->next = assignment;
 					assignment->token = parser->curr_token;
 					parser_next_token(parser);
 
@@ -514,18 +437,10 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 						return 1;
 					}
 					assignment->right = expr;
-					assignment->left = (OnyxAstNode*) local;
 
-					if (local->type->is_known && local->type != expr->type) {
-						onyx_message_add(parser->msgs,
-								ONYX_MESSAGE_TYPE_ASSIGNMENT_TYPE_MISMATCH,
-								assignment->token->pos,
-								local->type->name, expr->type->name);
-						return 1;
-					} else if (!local->type->is_known) {
-						local->type = expr->type;
-					}
-					*ret = assignment;
+                    OnyxAstNode* left_symbol = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SYMBOL);
+                    left_symbol->token = symbol;
+					assignment->left = left_symbol;
 				}
 				return 1;
 			}
@@ -535,39 +450,15 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 			{
 				parser_next_token(parser);
 
-				OnyxAstNode* lval = lookup_identifier(parser, symbol);
+				OnyxAstNode* lval = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SYMBOL);
+                lval->token = symbol;
 
-				if (lval != NULL && lval->flags & ONYX_AST_FLAG_LVAL && (lval->flags & ONYX_AST_FLAG_CONST) == 0) {
-					OnyxAstNode* rval = parse_expression(parser);
-					OnyxAstNode* assignment = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_ASSIGNMENT);
-					assignment->right = rval;
-					assignment->left = lval;
-					*ret = assignment;
-					return 1;
-				}
-
-				onyx_token_null_toggle(*symbol);
-				if (lval == NULL) {
-					onyx_message_add(parser->msgs,
-							ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
-							symbol->pos, symbol->token);
-				}
-
-				else if ((lval->flags & ONYX_AST_FLAG_LVAL) == 0) {
-					onyx_message_add(parser->msgs,
-							ONYX_MESSAGE_TYPE_NOT_LVAL,
-							symbol->pos, symbol->token);
-				}
-
-				else if (lval->flags & ONYX_AST_FLAG_CONST) {
-					onyx_message_add(parser->msgs,
-							ONYX_MESSAGE_TYPE_ASSIGN_CONST,
-							symbol->pos, symbol->token);
-				}
-				onyx_token_null_toggle(*symbol);
-
-				find_token(parser, TOKEN_TYPE_SYM_SEMICOLON);
-				return 1;
+                OnyxAstNode* rval = parse_expression(parser);
+                OnyxAstNode* assignment = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_ASSIGNMENT);
+                assignment->right = rval;
+                assignment->left = lval;
+                *ret = assignment;
+                return 1;
 			}
 
 		default:
@@ -608,7 +499,7 @@ static OnyxAstNode* parse_statement(OnyxParser* parser) {
 
 		case TOKEN_TYPE_OPEN_BRACE:
             needs_semicolon = 0;
-			retval = (OnyxAstNode *) parse_block(parser, 0);
+			retval = (OnyxAstNode *) parse_block(parser);
             break;
 
 		case TOKEN_TYPE_SYMBOL:
@@ -649,7 +540,7 @@ static OnyxAstNode* parse_statement(OnyxParser* parser) {
     return retval;
 }
 
-static OnyxAstNodeBlock* parse_block(OnyxParser* parser, b32 belongs_to_function) {
+static OnyxAstNodeBlock* parse_block(OnyxParser* parser) {
 	// --- is for an empty block
 	if (parser->curr_token->type == TOKEN_TYPE_SYM_MINUS) {
 		expect(parser, TOKEN_TYPE_SYM_MINUS);
@@ -661,10 +552,8 @@ static OnyxAstNodeBlock* parse_block(OnyxParser* parser, b32 belongs_to_function
 	expect(parser, TOKEN_TYPE_OPEN_BRACE);
 
 	OnyxAstNodeBlock* block = (OnyxAstNodeBlock *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_BLOCK);
-	if (belongs_to_function) {
-		OnyxAstNodeScope* scope = enter_scope(parser);
-		block->scope = scope;
-	}
+    OnyxAstNodeScope* scope = (OnyxAstNodeScope *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SCOPE);
+    block->scope = scope;
 
 	OnyxAstNode** next = &block->body;
 	OnyxAstNode* stmt = NULL;
@@ -673,15 +562,13 @@ static OnyxAstNodeBlock* parse_block(OnyxParser* parser, b32 belongs_to_function
 
 		if (stmt != NULL && stmt->kind != ONYX_AST_NODE_KIND_ERROR) {
 			*next = stmt;
+
+            while (stmt->next != NULL) stmt = stmt->next;
 			next = &stmt->next;
 		}
 	}
 
 	expect(parser, TOKEN_TYPE_CLOSE_BRACE);
-
-	if (belongs_to_function) {
-		leave_scope(parser);
-	}
 
 	return block;
 }
@@ -762,15 +649,7 @@ static OnyxAstNodeFuncDef* parse_function_definition(OnyxParser* parser) {
 		func_def->return_type = &builtin_types[ONYX_TYPE_INFO_KIND_VOID];
 	}
 
-	for (OnyxAstNodeParam* p = func_def->params; p != NULL; p = p->next) {
-		insert_identifier(parser, (OnyxAstNode *) p, 0);
-	}
-
-	func_def->body = parse_block(parser, 1);
-
-	for (OnyxAstNodeParam* p = func_def->params; p != NULL; p = p->next) {
-		remove_identifier(parser, (OnyxAstNode *) p);
-	}
+	func_def->body = parse_block(parser);
 
 	return func_def;
 }
@@ -799,26 +678,6 @@ static OnyxAstNode* parse_top_level_symbol(OnyxParser* parser) {
                 onyx_get_token_type_name(parser->curr_token->type));
         return &error_node;
     }
-}
-
-static b32 define_function(OnyxParser* parser, OnyxAstNodeFuncDef* func) {
-    onyx_token_null_toggle(*func->token);
-
-    if (!bh_table_has(OnyxAstNode *, parser->identifiers, func->token->token)) {
-        bh_table_put(OnyxAstNode *, parser->identifiers, func->token->token, func);
-    } else {
-        onyx_message_add(parser->msgs,
-                ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
-                func->token->pos,
-                func->token->token);
-
-        // NOTE: I really wish C had defer...
-        onyx_token_null_toggle(*func->token);
-        return 0;
-    }
-
-    onyx_token_null_toggle(*func->token);
-    return 1;
 }
 
 static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
@@ -855,21 +714,12 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
                 OnyxAstNode* node = parse_top_level_symbol(parser);
                 if (node->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
                     node->token = symbol;
-
-                    if (!define_function(parser, &node->as_funcdef)) {
-                        return NULL;
-                    }
                 }
 
                 if (node->kind == ONYX_AST_NODE_KIND_FOREIGN) {
                     OnyxAstNodeForeign* foreign = &node->as_foreign;
 
                     foreign->import->token = symbol;
-                    if (foreign->import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
-                        if (!define_function(parser, &foreign->import->as_funcdef)) {
-                            return NULL;
-                        }
-                    }
                 }
 
                 return node;
@@ -921,7 +771,6 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Onyx
 	parser.curr_token = tokenizer->tokens;
 	parser.prev_token = NULL;
 	parser.msgs = msgs;
-	parser.curr_scope = NULL;
 
 	return parser;
 }
@@ -941,6 +790,8 @@ OnyxAstNode* onyx_parse(OnyxParser *parser) {
 		// Building a linked list of statements down the "next" chain
 		if (curr_stmt != NULL && curr_stmt != &error_node) {
 			*prev_stmt = curr_stmt;
+
+            while (curr_stmt->next != NULL) curr_stmt = curr_stmt->next;
 			prev_stmt = &curr_stmt->next;
 		}
 	}

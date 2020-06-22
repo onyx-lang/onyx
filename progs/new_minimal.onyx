@@ -1,0 +1,13 @@
+print :: foreign "host" "print" proc (value i32) ---
+
+foo :: proc -> i32 {
+    a := 2 + 4;
+    a = 5;
+    bar(a + 1);
+    print(bar(a));
+    return a;
+}
+
+bar :: proc (val i32) -> i32 {
+    return val + 1;
+}

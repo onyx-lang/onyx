@@ -1,6 +1,7 @@
 OBJ_FILES=\
 	build/onyxlex.o \
 	build/onyxparser.o \
+	build/onyxsempass.o \
 	build/onyxmsgs.o \
 	build/onyxutils.o \
 	build/onyxwasm.o \

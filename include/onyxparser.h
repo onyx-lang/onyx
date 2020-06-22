@@ -22,12 +22,9 @@ typedef struct OnyxParser {
 	OnyxToken *prev_token;
 	OnyxToken *curr_token;
 
-	// NOTE: A table of the current identifiers in the current scope.
-	// If the identifier doesn't at the time of parsing, it is an error.
-	// Cleared at the end of a block.
-	bh_table(OnyxAstNode*) identifiers;
-	OnyxAstNodeScope *curr_scope;
-
+    // NOTE: Identifiers currently is only used to resolve type names
+    // at parse time, since these are the only symbols we know.
+    bh_table(OnyxAstNode *) identifiers;
 	OnyxMessages *msgs;
 
 	bh_allocator allocator;
@@ -42,6 +39,7 @@ typedef enum OnyxAstNodeKind {
 	ONYX_AST_NODE_KIND_BLOCK,
 	ONYX_AST_NODE_KIND_SCOPE,
 	ONYX_AST_NODE_KIND_LOCAL,
+    ONYX_AST_NODE_KIND_SYMBOL,
 
 	ONYX_AST_NODE_KIND_ADD,
 	ONYX_AST_NODE_KIND_MINUS,
@@ -119,7 +117,6 @@ struct OnyxAstNodeNumLit {
 	OnyxTypeInfo *type;
 	OnyxAstNode *next;
     union { i32 i; i64 l; f32 f; f64 d; } value;
-	ptr unused;
 };
 
 struct OnyxAstNodeLocal {
@@ -127,20 +124,17 @@ struct OnyxAstNodeLocal {
 	u32 flags;
 	OnyxToken *token;
 	OnyxTypeInfo *type;
+	OnyxAstNode *next;
 	OnyxAstNodeLocal *prev_local;
-	OnyxAstNode *shadowed;
-	ptr unused;
 };
 
-// NOTE: Needs to have shadowed in the same position as OnyxAstNodeLocal
 struct OnyxAstNodeParam {
 	OnyxAstNodeKind kind;
 	u32 flags;
 	OnyxToken *token;			// Symbol name i.e. 'a', 'b'
 	OnyxTypeInfo *type;
 	OnyxAstNodeParam *next;
-	OnyxAstNode *shadowed;
-	ptr unused;
+	OnyxAstNodeLocal *prev_local;
 };
 
 struct OnyxAstNodeScope {
@@ -150,7 +144,6 @@ struct OnyxAstNodeScope {
 	OnyxTypeInfo *type; // NOTE: UNUSED
 	OnyxAstNodeScope *prev_scope;
 	OnyxAstNodeLocal *last_local;
-	OnyxAstNode *unused;
 };
 
 struct OnyxAstNodeBlock {

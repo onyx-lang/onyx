@@ -3,6 +3,33 @@ print       :: foreign "host" "print" proc (value i32) ---
 print_float :: foreign "host" "print" proc (value f32) ---
 print_if    :: foreign "host" "print" proc (i i32, f f32) ---
 
+export main :: proc {
+    output := do_stuff();
+
+    if output == -66 {
+        new_output := abs(output) * 2;
+        print(new_output);
+
+    } elseif output == -67 {
+        new_output := 10;
+        print(1234);
+
+    } else {
+        print(-1);
+    }
+
+    print(output);
+    print_float(float_test());
+
+    print_if(output, float_test());
+}
+
+factorial :: proc (n i32) -> i32 {
+    if n <= 1 { return 1; }
+
+    return n * factorial(n - 1);
+}
+
 foo :: proc -> i32 {
 	return 10;
 }
@@ -26,6 +53,11 @@ diff_square :: proc (a i32, b i32) -> i32 {
 	c := a - b; // Mutable
 	d :: a + b; // Constant
 
+    {
+        c := a * 2;
+        d := (b + a) * 2;
+    }
+
 	return c * d;
 }
 
@@ -37,24 +69,4 @@ do_stuff :: proc -> i32 {
 
 float_test :: proc -> f32 {
     return 3.14159f;
-}
-
-export main :: proc {
-    output := do_stuff();
-
-    if output == -66 {
-        new_output :: abs(output) * 2;
-        print(new_output);
-
-    } elseif output == -67 {
-        print(1234);
-
-    } else {
-        print(-1);
-    }
-
-    print(output);
-    print_float(float_test());
-
-    print_if(output, float_test());
 }

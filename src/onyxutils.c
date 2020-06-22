@@ -88,9 +88,19 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 		if (local->prev_local && indent == 0) {
 			bh_printf(", ");
 			onyx_ast_print((OnyxAstNode *) local->prev_local, 0);
-		}
+		} else if (local->next && indent != 0) {
+            onyx_ast_print(local->next, indent);
+        }
 		break;
 	}
+
+    case ONYX_AST_NODE_KIND_SYMBOL: {
+        bh_printf("%b", node->token->token, node->token->length);
+        if (node->next) {
+            onyx_ast_print(node->next, indent);
+        }
+        break;
+    }
 
 	case ONYX_AST_NODE_KIND_RETURN: {
 		if (node->left) {
@@ -119,7 +129,13 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 
 	case ONYX_AST_NODE_KIND_CALL: {
 		OnyxAstNodeCall* call = &node->as_call;
-		bh_printf("%b", call->callee->token->token, call->callee->token->length);
+        if (call->callee) {
+            if (call->callee->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
+                bh_printf("function: %b", call->callee->token->token, call->callee->token->length);
+            } else {
+                onyx_ast_print(call->callee, indent + 1);
+            }
+        }
 		onyx_ast_print(call->arguments, indent + 1);
 		if (call->next) {
 			onyx_ast_print(call->next, indent);
