@@ -237,6 +237,7 @@ static b32 symres_statement(OnyxSemPassState* state, OnyxAstNode* stmt) {
         case ONYX_AST_NODE_KIND_IF:         symres_if(state, &stmt->as_if);                         return 0;
         case ONYX_AST_NODE_KIND_CALL:       symres_call(state, stmt);                               return 0;
         case ONYX_AST_NODE_KIND_ARGUMENT:   symres_expression(state, (OnyxAstNode **) &stmt->left); return 0;
+        case ONYX_AST_NODE_KIND_BLOCK:      symres_block(state, &stmt->as_block);                   return 0;
 
         default: return 0;
     }
@@ -251,7 +252,7 @@ static void symres_statement_chain(OnyxSemPassState* state, OnyxAstNode* walker,
             walker->next = NULL;
             walker = tmp;
         } else {
-            trailer = &walker;
+            trailer = &walker->next;
             walker = walker->next;
         }
     }
@@ -295,11 +296,6 @@ void onyx_sempass(OnyxSemPassState* state, OnyxAstNode* root_node) {
 
         walker = walker->next;
     }
-
-    bh_printf("\n\n");
-    bh_table_each_start(SemPassSymbol*, state->symbols) {
-        bh_printf("%s -> %l\n", key, (u64) value);
-    } bh_table_each_end;
 
     // NOTE: First, resolve all symbols
     walker = root_node;

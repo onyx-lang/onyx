@@ -153,7 +153,7 @@ struct OnyxAstNodeBlock {
 	OnyxTypeInfo *return_type;
 	OnyxAstNode *next;
 	OnyxAstNode *body;
-	OnyxAstNodeScope *scope; // NOTE: Only set on blocks belonging to functions
+	OnyxAstNodeScope *scope;
 };
 
 struct OnyxAstNodeIf {
