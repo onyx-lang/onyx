@@ -6,9 +6,13 @@ diff_square :: proc (a i32, b i32) -> i32 {
 	d :: a + b; // Constant
 
     {
-        c : i32 = a * 2;
+        c : i32 = a * 2 + foo(5, 2);
         d : i32 = (c + a) * 2;
     }
 
 	return c * d;
+}
+
+foo :: proc (a i32, b i32) -> i32 {
+    return a * 5 + b * 7;
 }
