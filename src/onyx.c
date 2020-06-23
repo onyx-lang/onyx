@@ -50,9 +50,6 @@ int main(int argc, char *argv[]) {
 	OnyxParser parser = onyx_parser_create(ast_alloc, &tokenizer, &msgs);
 	OnyxAstNode* program = onyx_parse(&parser);
 
-    bh_printf("BEFORE SYMBOL_RESOLUTION: ");
-    onyx_ast_print(program, 1);
-
     bh_arena sp_arena;
     bh_arena_init(&sp_arena, alloc, 16 * 1024);
     bh_allocator sp_alloc = bh_arena_allocator(&sp_arena);
@@ -63,12 +60,10 @@ int main(int argc, char *argv[]) {
 	// NOTE: if there are errors, assume the parse tree was generated wrong,
 	// even if it may have still been generated correctly.
 	if (onyx_message_has_errors(&msgs)) {
-        bh_printf("\n\n");
 		onyx_message_print(&msgs);
 		goto main_exit;
 	} else {
-        bh_printf("\n\nAFTER SYMBOL RESOLUTION: ");
-		onyx_ast_print(program, 1);
+		// onyx_ast_print(program, 1);
 	    bh_printf("\nNo errors.\n");
     }
 

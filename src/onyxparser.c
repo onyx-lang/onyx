@@ -448,13 +448,14 @@ static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
 			// NOTE: Assignment
 		case TOKEN_TYPE_SYM_EQUALS:
 			{
+                OnyxAstNode* assignment = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_ASSIGNMENT);
+                assignment->token = parser->curr_token;
 				parser_next_token(parser);
 
 				OnyxAstNode* lval = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SYMBOL);
                 lval->token = symbol;
 
                 OnyxAstNode* rval = parse_expression(parser);
-                OnyxAstNode* assignment = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_ASSIGNMENT);
                 assignment->right = rval;
                 assignment->left = lval;
                 *ret = assignment;
@@ -540,19 +541,19 @@ static OnyxAstNode* parse_statement(OnyxParser* parser) {
 }
 
 static OnyxAstNodeBlock* parse_block(OnyxParser* parser) {
+	OnyxAstNodeBlock* block = (OnyxAstNodeBlock *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_BLOCK);
+    OnyxAstNodeScope* scope = (OnyxAstNodeScope *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SCOPE);
+    block->scope = scope;
+
 	// --- is for an empty block
 	if (parser->curr_token->type == TOKEN_TYPE_SYM_MINUS) {
 		expect(parser, TOKEN_TYPE_SYM_MINUS);
 		expect(parser, TOKEN_TYPE_SYM_MINUS);
 		expect(parser, TOKEN_TYPE_SYM_MINUS);
-		return NULL;
+		return block;
 	}
 
 	expect(parser, TOKEN_TYPE_OPEN_BRACE);
-
-	OnyxAstNodeBlock* block = (OnyxAstNodeBlock *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_BLOCK);
-    OnyxAstNodeScope* scope = (OnyxAstNodeScope *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_SCOPE);
-    block->scope = scope;
 
 	OnyxAstNode** next = &block->body;
 	OnyxAstNode* stmt = NULL;

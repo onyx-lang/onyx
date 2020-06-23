@@ -20,6 +20,22 @@ static void typecheck_assignment(OnyxSemPassState* state, OnyxAstNode* assign) {
         return;
     }
 
+    if ((assign->left->flags & ONYX_AST_FLAG_LVAL) == 0) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_NOT_LVAL,
+                assign->token->pos,
+                assign->left->token->token, assign->left->token->length);
+        return;
+    }
+
+    if ((assign->left->flags & ONYX_AST_FLAG_CONST) != 0 && assign->left->type->is_known) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_ASSIGN_CONST,
+                assign->token->pos,
+                assign->left->token->token, assign->left->token->length);
+        return;
+    }
+
     typecheck_expression(state, assign->right);
 
     if (!assign->left->type->is_known) {
@@ -68,6 +84,14 @@ static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
                 callee->token->pos,
+                callee->token->token, callee->token->length);
+        return;
+    }
+
+    if (callee->kind != ONYX_AST_NODE_KIND_FUNCDEF) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_CALL_NON_FUNCTION,
+                call->token->pos,
                 callee->token->token, callee->token->length);
         return;
     }

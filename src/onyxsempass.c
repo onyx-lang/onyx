@@ -17,7 +17,12 @@ OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc
     return state;
 }
 
+static void collapse_scopes(OnyxAstNode* root_node, OnyxAstNodeScope* prev_scope) {
+
+}
+
 void onyx_sempass(OnyxSemPassState* state, OnyxAstNode* root_node) {
     onyx_resolve_symbols(state, root_node);
     onyx_type_check(state, root_node);
+    collapse_scopes(root_node, NULL);
 }
