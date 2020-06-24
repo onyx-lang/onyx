@@ -245,6 +245,7 @@ static void compile_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
 		case ONYX_AST_NODE_KIND_ASSIGNMENT: compile_assignment(mod, func, stmt); break;
         case ONYX_AST_NODE_KIND_IF: compile_if(mod, func, (OnyxAstNodeIf *) stmt); break;
         case ONYX_AST_NODE_KIND_CALL: compile_expression(mod, func, stmt); break;
+        case ONYX_AST_NODE_KIND_BLOCK: compile_block(mod, func, (OnyxAstNodeBlock *) stmt); break;
 		default: break;
 	}
 }
