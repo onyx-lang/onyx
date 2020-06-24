@@ -1,0 +1,4 @@
+
+other_value :: proc -> i32 {
+    return 8675309 + something_else();
+}

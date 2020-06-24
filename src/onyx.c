@@ -9,6 +9,175 @@
 #include "onyxutils.h"
 #include "onyxwasm.h"
 
+#define VERSION "0.1"
+
+static const char* docstring = "Onyx compiler version " VERSION "\n"
+    "\n"
+    "The standard compiler for the Onyx programming language.\n";
+
+typedef enum CompileAction {
+    ONYX_COMPILE_ACTION_COMPILE,
+    ONYX_COMPILE_ACTION_CHECK_ERRORS,
+    ONYX_COMPILE_ACTION_PRINT_HELP,
+} CompileAction;
+
+typedef struct OnyxCompileOptions {
+    bh_allocator allocator;
+    CompileAction action;
+
+    bh_arr(const char *) files;
+    const char* target_file;
+} OnyxCompileOptions;
+
+typedef enum CompilerProgress {
+    ONYX_COMPILER_PROGRESS_FAILED_READ,
+    ONYX_COMPILER_PROGRESS_FAILED_PARSE,
+    ONYX_COMPILER_PROGRESS_FAILED_SEMPASS,
+    ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN,
+    ONYX_COMPILER_PROGRESS_FAILED_OUTPUT,
+    ONYX_COMPILER_PROGRESS_SUCCESS
+} CompilerProgress;
+
+typedef struct CompilerState {
+    bh_arena token_arena, ast_arena, msg_arena, sp_arena;
+    bh_allocator token_alloc, ast_alloc, msg_alloc, sp_alloc;
+    bh_table(bh_file_contents) loaded_files;
+
+    OnyxMessages msgs;
+    OnyxWasmModule wasm_mod;
+} CompilerState;
+
+static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *argv[]) {
+    OnyxCompileOptions options = {
+        .allocator = alloc,
+        .action = ONYX_COMPILE_ACTION_PRINT_HELP,
+
+        .files = NULL,
+        .target_file = "out.wasm",
+    };
+
+    bh_arr_new(alloc, options.files, 1);
+
+    fori(i, 1, argc - 1) {
+        if (!strcmp(argv[i], "--help")) {
+            options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+            break;
+        }
+        else if (!strcmp(argv[i], "-o")) {
+            options.action = ONYX_COMPILE_ACTION_COMPILE;
+            options.target_file = argv[++i];
+        }
+        else {
+            options.action = ONYX_COMPILE_ACTION_COMPILE;
+            bh_arr_push(options.files, argv[i]);
+        }
+    }
+
+    return options;
+}
+
+void compile_opts_free(OnyxCompileOptions* opts) {
+    bh_arr_free(opts->files);
+}
+
+OnyxAstNodeFile* parse_source_file(bh_file_contents* file_contents, CompilerState* compiler_state) {
+    // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
+	OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
+	onyx_lex_tokens(&tokenizer);
+
+	OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
+	return onyx_parse(&parser);
+}
+
+i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
+
+	bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
+	compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
+
+    onyx_message_create(compiler_state->msg_alloc, &compiler_state->msgs);
+
+    // NOTE: Create the arena for tokens from the lexer
+    bh_arena_init(&compiler_state->token_arena, opts->allocator, 16 * 1024 * 1024); // 16 MB
+    compiler_state->token_alloc = bh_arena_allocator(&compiler_state->token_arena);
+
+	// NOTE: Create the arena where AST nodes will exist
+	// Prevents nodes from being scattered across memory due to fragmentation
+	bh_arena_init(&compiler_state->ast_arena, opts->allocator, 16 * 1024 * 1024); // 16MB
+	compiler_state->ast_alloc = bh_arena_allocator(&compiler_state->ast_arena);
+
+    bh_arena_init(&compiler_state->sp_arena, opts->allocator, 16 * 1024);
+    compiler_state->sp_alloc = bh_arena_allocator(&compiler_state->sp_arena);
+
+    bh_table_init(opts->allocator, compiler_state->loaded_files, 7);
+
+    bh_arr_each(const char *, filename, opts->files) {
+        bh_file file;
+
+        bh_file_error err = bh_file_open(&file, *filename);
+        if (err != BH_FILE_ERROR_NONE) {
+            bh_printf_err("Failed to open file %s\n", filename);
+            return ONYX_COMPILER_PROGRESS_FAILED_READ;
+        }
+
+        bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
+        bh_file_close(&file);
+
+        bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
+    }
+
+    OnyxAstNodeFile* root_file = NULL;
+    OnyxAstNodeFile* prev_file = NULL;
+    bh_table_each_start(bh_file_contents, compiler_state->loaded_files);
+        OnyxAstNodeFile* file_node = parse_source_file(&value, compiler_state);
+
+        if (!root_file) {
+            root_file = file_node;
+        }
+
+        if (prev_file) {
+            prev_file->next = file_node;
+        }
+
+        prev_file = file_node;
+    bh_table_each_end;
+
+    if (onyx_message_has_errors(&compiler_state->msgs)) {
+        return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
+    }
+
+    OnyxSemPassState sp_state = onyx_sempass_create( compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
+    onyx_sempass(&sp_state, root_file);
+
+    if (onyx_message_has_errors(&compiler_state->msgs)) {
+        return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
+    }
+
+    compiler_state->wasm_mod = onyx_wasm_module_create(opts->allocator);
+    onyx_wasm_module_compile(&compiler_state->wasm_mod, root_file);
+
+    if (onyx_message_has_errors(&compiler_state->msgs)) {
+        return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
+    }
+
+    bh_file output_file;
+    if (bh_file_create(&output_file, opts->target_file) != BH_FILE_ERROR_NONE) {
+        return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
+    }
+
+    onyx_wasm_module_write_to_file(&compiler_state->wasm_mod, output_file);
+
+    return ONYX_COMPILER_PROGRESS_SUCCESS;
+}
+
+void compiler_state_free(CompilerState* cs) {
+    bh_arena_free(&cs->ast_arena);
+    bh_arena_free(&cs->msg_arena);
+    bh_arena_free(&cs->token_arena);
+    bh_arena_free(&cs->sp_arena);
+    bh_table_free(cs->loaded_files);
+    onyx_wasm_module_free(&cs->wasm_mod);
+}
+
 int main(int argc, char *argv[]) {
 
 	bh_allocator alloc = bh_heap_allocator();
@@ -16,77 +185,50 @@ int main(int argc, char *argv[]) {
     bh_scratch_init(&global_scratch, alloc, 16 * 1024); // NOTE: 16 KB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
 
-	bh_file source_file;
-	bh_file_error err = bh_file_open(&source_file, argv[1]);
-	if (err != BH_FILE_ERROR_NONE) {
-		bh_printf_err("Failed to open file %s\n", argv[1]);
-		return EXIT_FAILURE;
-	}
+    OnyxCompileOptions compile_opts = compile_opts_parse(alloc, argc, argv);
+    CompilerState compile_state = {
+        .wasm_mod = { 0 }
+    };
 
-	// NOTE: 1st: Read file contents
-	bh_file_contents fc = bh_file_read_contents(alloc, &source_file);
-	bh_file_close(&source_file);
+    CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_FAILED_READ;
 
-	// NOTE: 2nd: Tokenize the contents
-	OnyxTokenizer tokenizer = onyx_tokenizer_create(alloc, &fc);
-	onyx_lex_tokens(&tokenizer);
-	bh_arr(OnyxToken) token_arr = tokenizer.tokens;
+    switch (compile_opts.action) {
+        case ONYX_COMPILE_ACTION_PRINT_HELP:
+            // NOTE: This could probably be made better
+            bh_printf(docstring);
+            return 1;
 
-	// NOTE: Create the buffer for where compiler messages will be written
-	bh_arena msg_arena;
-	bh_arena_init(&msg_arena, alloc, 4096);
-	bh_allocator msg_alloc = bh_arena_allocator(&msg_arena);
+        case ONYX_COMPILE_ACTION_COMPILE:
+            compiler_progress = onyx_compile(&compile_opts, &compile_state);
 
-	OnyxMessages msgs;
-	onyx_message_create(msg_alloc, &msgs);
+            break;
 
-	// NOTE: Create the arena where AST nodes will exist
-	// Prevents nodes from being scattered across memory due to fragmentation
-	bh_arena ast_arena;
-	bh_arena_init(&ast_arena, alloc, 16 * 1024 * 1024); // 16MB
-	bh_allocator ast_alloc = bh_arena_allocator(&ast_arena);
-
-	// NOTE: 3rd: parse the tokens to an AST
-	OnyxParser parser = onyx_parser_create(ast_alloc, &tokenizer, &msgs);
-	OnyxAstNode* program = onyx_parse(&parser);
-
-    bh_arena sp_arena;
-    bh_arena_init(&sp_arena, alloc, 16 * 1024);
-    bh_allocator sp_alloc = bh_arena_allocator(&sp_arena);
-
-    OnyxSemPassState sp_state = onyx_sempass_create(sp_alloc, ast_alloc, &msgs);
-    onyx_sempass(&sp_state, program);
-
-	// NOTE: if there are errors, assume the parse tree was generated wrong,
-	// even if it may have still been generated correctly.
-	if (onyx_message_has_errors(&msgs)) {
-		onyx_message_print(&msgs);
-		goto main_exit;
-	} else {
-		// onyx_ast_print(program, 1);
-	    bh_printf("\nNo errors.\n");
+        default: break;
     }
 
-	// NOTE: 4th: Generate a WASM module from the parse tree and
-	// write it to a file.
-    OnyxWasmModule wasm_mod = onyx_wasm_module_create(alloc);
-    onyx_wasm_module_compile(&wasm_mod, program);
+    switch (compiler_progress) {
+        case ONYX_COMPILER_PROGRESS_FAILED_READ:
+            // NOTE: Do nothing since it was already printed above
+            break;
 
-    bh_file out_file;
-    bh_file_create(&out_file, "out.wasm");
-    onyx_wasm_module_write_to_file(&wasm_mod, out_file);
-    bh_file_close(&out_file);
+        case ONYX_COMPILER_PROGRESS_FAILED_PARSE:
+        case ONYX_COMPILER_PROGRESS_FAILED_SEMPASS:
+        case ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN:
+            onyx_message_print(&compile_state.msgs);
+            break;
 
-    onyx_wasm_module_free(&wasm_mod);
-main_exit: // NOTE: Cleanup, since C doesn't have defer
-	bh_arena_free(&sp_arena);
-	bh_arena_free(&msg_arena);
-	bh_arena_free(&ast_arena);
-	onyx_parser_free(&parser);
-	onyx_tokenizer_free(&tokenizer);
-	bh_file_contents_free(&fc);
+        case ONYX_COMPILER_PROGRESS_FAILED_OUTPUT:
+            bh_printf_err("Failed to open file for writing: '%s'\n", compile_opts.target_file);
+            break;
 
-	return 0;
+        case ONYX_COMPILER_PROGRESS_SUCCESS:
+            bh_printf("Successfully compiled to '%s'\n", compile_opts.target_file);
+            break;
+    }
+
+    compiler_state_free(&compile_state);
+
+	return compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
 // NOTE: Old bits of code that may be useful again at some point.

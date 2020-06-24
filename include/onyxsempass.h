@@ -28,13 +28,13 @@ typedef struct OnyxSemPassState {
 } OnyxSemPassState;
 
 // NOTE: Resolving all symbols in the tree
-void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNode* root_node);
+void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNodeFile* root_node);
 
 // NOTE: Inferring and checking types in the tree
-void onyx_type_check(OnyxSemPassState* state, OnyxAstNode* root_node);
+void onyx_type_check(OnyxSemPassState* state, OnyxAstNodeFile* root_node);
 
 // NOTE: Full semantic pass
 OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc, OnyxMessages* msgs);
-void onyx_sempass(OnyxSemPassState* state, OnyxAstNode* root_node);
+void onyx_sempass(OnyxSemPassState* state, OnyxAstNodeFile* root_node);
 
 #endif

@@ -779,10 +779,10 @@ void onyx_parser_free(OnyxParser* parser) {
 	bh_table_free(parser->identifiers);
 }
 
-OnyxAstNode* onyx_parse(OnyxParser *parser) {
-	OnyxAstNode* program = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_PROGRAM);
+OnyxAstNodeFile* onyx_parse(OnyxParser *parser) {
+	OnyxAstNodeFile* program = (OnyxAstNodeFile *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_PROGRAM);
 
-	OnyxAstNode** prev_stmt = &program->next;
+	OnyxAstNode** prev_stmt = &program->contents;
 	OnyxAstNode* curr_stmt = NULL;
 	while (parser->curr_token->type != TOKEN_TYPE_END_STREAM) {
 		curr_stmt = parse_top_level_statement(parser);

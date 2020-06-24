@@ -16,6 +16,7 @@ typedef struct OnyxAstNodeParam OnyxAstNodeParam;
 typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
 typedef struct OnyxAstNodeForeign OnyxAstNodeForeign;
 typedef struct OnyxAstNodeCall OnyxAstNodeCall;
+typedef struct OnyxAstNodeFile OnyxAstNodeFile;
 
 typedef struct OnyxParser {
 	OnyxTokenizer *tokenizer; // NOTE: not used since all tokens are lexed before parsing starts
@@ -198,6 +199,15 @@ struct OnyxAstNodeCall {
 								// unless this becomes used by something else
 };
 
+struct OnyxAstNodeFile {
+    OnyxAstNodeKind kind;
+    u32 flags;
+    OnyxToken *token;           // NOTE: unused
+    OnyxTypeInfo *type;         // NOTE: unused
+    OnyxAstNodeFile *next;      // NOTE: next file
+    OnyxAstNode *contents;      // NOTE: the first top-level element
+};
+
 union OnyxAstNode {
 
 	// Generic node structure for capturing all binary ops and statements
@@ -220,12 +230,13 @@ union OnyxAstNode {
     OnyxAstNodeNumLit as_numlit;
     OnyxAstNodeForeign as_foreign;
     OnyxAstNodeIf as_if;
+    OnyxAstNodeFile as_file;
 };
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);
 OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
 void onyx_parser_free(OnyxParser* parser);
-OnyxAstNode* onyx_parse(OnyxParser *parser);
+OnyxAstNodeFile* onyx_parse(OnyxParser *parser);
 
 #endif // #ifndef ONYXPARSER_H

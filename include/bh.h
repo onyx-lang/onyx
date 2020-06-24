@@ -1653,6 +1653,8 @@ b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap) {
 }
 
 b32 bh__arr_free(void **arr) {
+    if (*arr == NULL) return 0;
+
 	bh__arr* arrptr = bh__arrhead(*arr);
 	bh_free(arrptr->allocator, arrptr);
 	*arr = NULL;
@@ -1739,6 +1741,8 @@ b32 bh__table_init(bh_allocator allocator, bh__table **table, i32 table_size) {
 }
 
 b32 bh__table_free(bh__table **table) {
+    if (*table == NULL) return 0;
+
 	for (i32 i = 0; i < (*table)->table_size; i++) {
 		if ((*table)->arrs[i] != NULL) {
 			bh_arr_free((*table)->arrs[i]);

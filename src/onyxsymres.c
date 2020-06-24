@@ -261,35 +261,48 @@ static void symres_function_definition(OnyxSemPassState* state, OnyxAstNodeFuncD
     }
 }
 
-void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNode* root_node) {
-    OnyxAstNode* walker = root_node;
-    while (walker) {
-        switch (walker->kind) {
-            case ONYX_AST_NODE_KIND_FUNCDEF:
-                if (!define_function(state, &walker->as_funcdef)) return;
-                break;
+void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNodeFile* root_node) {
+    OnyxAstNode* walker;
+    OnyxAstNodeFile* top_walker = root_node;
+    while (top_walker) {
 
-            case ONYX_AST_NODE_KIND_FOREIGN:
-                if (walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
-                    if (!define_function(state, &walker->as_foreign.import->as_funcdef)) return;
-                }
-                break;
+        walker = top_walker->contents;
+        while (walker) {
+            switch (walker->kind) {
+                case ONYX_AST_NODE_KIND_FUNCDEF:
+                    if (!define_function(state, &walker->as_funcdef)) return;
+                    break;
 
-            default: break;
+                case ONYX_AST_NODE_KIND_FOREIGN:
+                    if (walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
+                        if (!define_function(state, &walker->as_foreign.import->as_funcdef)) return;
+                    }
+                    break;
+
+                default: break;
+            }
+
+            walker = walker->next;
         }
 
-        walker = walker->next;
+        top_walker = top_walker->next;
     }
 
-    walker = root_node;
-    while (walker) {
-        switch (walker->kind) {
-            case ONYX_AST_NODE_KIND_FUNCDEF:
-                symres_function_definition(state, &walker->as_funcdef);
-                break;
-            default: break;
+    top_walker = root_node;
+    while (top_walker) {
+
+        walker = top_walker->contents;
+        while (walker) {
+            switch (walker->kind) {
+                case ONYX_AST_NODE_KIND_FUNCDEF:
+                    symres_function_definition(state, &walker->as_funcdef);
+                    break;
+                default: break;
+            }
+
+            walker = walker->next;
         }
 
-        walker = walker->next;
+        top_walker = top_walker->next;
     }
 }

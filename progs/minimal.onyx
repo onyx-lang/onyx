@@ -19,8 +19,6 @@ export main :: proc {
 
     print(fib(5));
 
-    { a :: 2; b :: 3; print(a + b); }
-
     print(output);
     print_float(float_test());
 

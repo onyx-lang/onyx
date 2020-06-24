@@ -301,16 +301,23 @@ static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFun
     }
 }
 
-void onyx_type_check(OnyxSemPassState* state, OnyxAstNode* root_node) {
-    OnyxAstNode* walker = root_node;
-    while (walker) {
-        switch (walker->kind) {
-            case ONYX_AST_NODE_KIND_FUNCDEF:
-                typecheck_function_defintion(state, &walker->as_funcdef);
-                break;
-            default: break;
+void onyx_type_check(OnyxSemPassState* state, OnyxAstNodeFile* root_node) {
+    OnyxAstNode* walker;
+    OnyxAstNodeFile* top_walker = root_node;
+    while (top_walker) {
+
+        walker = top_walker->contents;
+        while (walker) {
+            switch (walker->kind) {
+                case ONYX_AST_NODE_KIND_FUNCDEF:
+                    typecheck_function_defintion(state, &walker->as_funcdef);
+                    break;
+                default: break;
+            }
+
+            walker = walker->next;
         }
 
-        walker = walker->next;
+        top_walker = top_walker->next;
     }
 }

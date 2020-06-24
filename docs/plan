@@ -78,6 +78,12 @@ HOW:
 
         [X] Consequence of the above, recursion works
 
+        [X] Better compiler interface
+            - Proper command line options
+            - Compiling multiple files at once
+            - Changing output location
+            - Viewing help screen
+
 		[ ] Devise and implement a simple set of implicit type casting rules.
 			- Numeric literals always type cast to whatever type is needed (very flexible).
 
