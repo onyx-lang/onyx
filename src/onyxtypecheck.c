@@ -72,7 +72,15 @@ static void typecheck_return(OnyxSemPassState* state, OnyxAstNode* retnode) {
 }
 
 static void typecheck_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode) {
-    // NOTE: Add check for boolean type on condition
+    typecheck_expression(state, ifnode->cond);
+    if (ifnode->cond->type != &builtin_types[ONYX_TYPE_INFO_KIND_INT32]) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_LITERAL,
+                ifnode->cond->token->pos,
+                "expected integer type for condition");
+        return;
+    }
+
     if (ifnode->true_block) typecheck_statement(state, ifnode->true_block);
     if (ifnode->false_block) typecheck_statement(state, ifnode->false_block);
 }
@@ -275,6 +283,14 @@ static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFun
                     ONYX_MESSAGE_TYPE_LITERAL,
                     param->token->pos,
                     "function parameter types must be known");
+            return;
+        }
+
+        if (param->type->size == 0) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_LITERAL,
+                    param->token->pos,
+                    "function parameters must have non-void types");
             return;
         }
     }

@@ -62,10 +62,10 @@ HOW:
 		[ ] Simple while loop is functioning as expected
 		[ ] break and continue semantics
 		[X] Function calling works for the builtin types
-		[ ] Function return values are type checked
+		[X] Function return values are type checked
 
 	Stage 2:
-		[ ] Order of symbol declaration is irrelevant
+		[X] Order of symbol declaration is irrelevant
 			Either:
 			make a graph of symbol dependencies and produce a schedule on the graph
 			that would allow for all symbols to be resolved
@@ -76,7 +76,7 @@ HOW:
 			This could be slow but it would be easier than creating a graph
 			scheduling algorithm.
 
-        [ ] Consequence of the above, recursion works
+        [X] Consequence of the above, recursion works
 
 		[ ] Devise and implement a simple set of implicit type casting rules.
 			- Numeric literals always type cast to whatever type is needed (very flexible).

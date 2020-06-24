@@ -292,7 +292,8 @@ typedef struct OnyxWasmModule {
 	i32 export_count;
 } OnyxWasmModule;
 
-OnyxWasmModule onyx_wasm_generate_module(bh_allocator alloc, OnyxAstNode* program);
+OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
+void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxAstNode* program);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 

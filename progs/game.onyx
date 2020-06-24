@@ -2,6 +2,8 @@
 gfx_draw_rect :: foreign "gfx" "draw_rect" proc (x i32, y i32, w i32, h i32) ---
 
 export main :: proc {
+    update();
+    draw();
 }
 
 update :: proc {}

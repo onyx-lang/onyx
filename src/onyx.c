@@ -69,14 +69,15 @@ int main(int argc, char *argv[]) {
 
 	// NOTE: 4th: Generate a WASM module from the parse tree and
 	// write it to a file.
-//	OnyxWasmModule wasm_mod = onyx_wasm_generate_module(alloc, program);
-//
-//	bh_file out_file;
-//	bh_file_create(&out_file, "out.wasm");
-//	onyx_wasm_module_write_to_file(&wasm_mod, out_file);
-//	bh_file_close(&out_file);
-//
-//	onyx_wasm_module_free(&wasm_mod);
+    OnyxWasmModule wasm_mod = onyx_wasm_module_create(alloc);
+    onyx_wasm_module_compile(&wasm_mod, program);
+
+    bh_file out_file;
+    bh_file_create(&out_file, "out.wasm");
+    onyx_wasm_module_write_to_file(&wasm_mod, out_file);
+    bh_file_close(&out_file);
+
+    onyx_wasm_module_free(&wasm_mod);
 main_exit: // NOTE: Cleanup, since C doesn't have defer
 	bh_arena_free(&sp_arena);
 	bh_arena_free(&msg_arena);

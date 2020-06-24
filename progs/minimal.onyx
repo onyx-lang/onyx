@@ -4,19 +4,20 @@ print_float :: foreign "host" "print" proc (value f32) ---
 print_if    :: foreign "host" "print" proc (i i32, f f32) ---
 
 export main :: proc {
-    output := do_stuff();
+    output := do_stuff() - 1;
 
     if output == -66 {
         new_output := abs(output) * 2;
         print(new_output);
 
     } elseif output == -67 {
-        new_output := 10;
-        print(1234);
+        print(factorial(6));
 
     } else {
         print(-1);
     }
+
+    print(fib(5));
 
     print(output);
     print_float(float_test());
@@ -46,6 +47,11 @@ abs :: proc (val i32) -> i32 {
     if val <= 0 { return -val; }
     // else { return val; };
     return val;
+}
+
+fib :: proc (n i32) -> i32 {
+    if n <= 1 { return 1; }
+    return fib(n - 1) + fib(n - 2);
 }
 
 diff_square :: proc (a i32, b i32) -> i32 {
