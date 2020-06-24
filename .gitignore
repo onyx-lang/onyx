@@ -5,3 +5,4 @@ test.c
 test
 *.wasm
 *.html
+session.vim
