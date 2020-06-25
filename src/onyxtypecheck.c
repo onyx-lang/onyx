@@ -21,17 +21,17 @@ static void typecheck_assignment(OnyxSemPassState* state, OnyxAstNode* assign) {
         return;
     }
 
-    if ((assign->left->flags & ONYX_AST_FLAG_LVAL) == 0) {
+    if ((assign->left->flags & ONYX_AST_FLAG_CONST) != 0 && assign->left->type->is_known) {
         onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_NOT_LVAL,
+                ONYX_MESSAGE_TYPE_ASSIGN_CONST,
                 assign->token->pos,
                 assign->left->token->token, assign->left->token->length);
         return;
     }
 
-    if ((assign->left->flags & ONYX_AST_FLAG_CONST) != 0 && assign->left->type->is_known) {
+    if ((assign->left->flags & ONYX_AST_FLAG_LVAL) == 0) {
         onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_ASSIGN_CONST,
+                ONYX_MESSAGE_TYPE_NOT_LVAL,
                 assign->token->pos,
                 assign->left->token->token, assign->left->token->length);
         return;
