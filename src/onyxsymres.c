@@ -13,6 +13,7 @@ static void symres_expression(OnyxSemPassState* state, OnyxAstNode** expr);
 static void symres_assignment(OnyxSemPassState* state, OnyxAstNode* assign);
 static void symres_return(OnyxSemPassState* state, OnyxAstNode* ret);
 static void symres_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode);
+static void symres_while(OnyxSemPassState* state, OnyxAstNodeWhile* whilenode);
 static void symres_statement_chain(OnyxSemPassState* state, OnyxAstNode* walker, OnyxAstNode** trailer);
 static b32 symres_statement(OnyxSemPassState* state, OnyxAstNode* stmt);
 static void symres_block(OnyxSemPassState* state, OnyxAstNodeBlock* block);
@@ -212,6 +213,11 @@ static void symres_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode) {
     }
 }
 
+static void symres_while(OnyxSemPassState* state, OnyxAstNodeWhile* whilenode) {
+    symres_expression(state, &whilenode->cond);
+    symres_block(state, whilenode->body);
+}
+
 // NOTE: Returns 1 if the statment should be removed
 static b32 symres_statement(OnyxSemPassState* state, OnyxAstNode* stmt) {
     switch (stmt->kind) {
@@ -219,6 +225,7 @@ static b32 symres_statement(OnyxSemPassState* state, OnyxAstNode* stmt) {
         case ONYX_AST_NODE_KIND_ASSIGNMENT: symres_assignment(state, stmt);                         return 0;
 		case ONYX_AST_NODE_KIND_RETURN:     symres_return(state, stmt);                             return 0;
         case ONYX_AST_NODE_KIND_IF:         symres_if(state, &stmt->as_if);                         return 0;
+        case ONYX_AST_NODE_KIND_WHILE:      symres_while(state, &stmt->as_while);                   return 0;
         case ONYX_AST_NODE_KIND_CALL:       symres_call(state, stmt);                               return 0;
         case ONYX_AST_NODE_KIND_ARGUMENT:   symres_expression(state, (OnyxAstNode **) &stmt->left); return 0;
         case ONYX_AST_NODE_KIND_BLOCK:      symres_block(state, &stmt->as_block);                   return 0;

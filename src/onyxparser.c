@@ -39,7 +39,7 @@ static const char* ast_node_names[] = {
 	"NOT",
 
 	"IF",
-	"LOOP",
+	"WHILE",
 
 	"ONYX_AST_NODE_KIND_COUNT",
 };
@@ -48,7 +48,7 @@ struct OnyxTypeInfo builtin_types[] = {
 	{ ONYX_TYPE_INFO_KIND_UNKNOWN, 0, "unknown" },
 	{ ONYX_TYPE_INFO_KIND_VOID, 0, "void", 0, 0, 0, 0, 1 },
 
-	{ ONYX_TYPE_INFO_KIND_BOOL, 1, "bool", 0, 0, 0, 1, 1 },
+	{ ONYX_TYPE_INFO_KIND_BOOL, 1, "bool", 0, 1, 0, 1, 1 },
 
 	{ ONYX_TYPE_INFO_KIND_UINT32, 4, "u32", 1, 1, 0, 0, 1 },
 	{ ONYX_TYPE_INFO_KIND_UINT64, 8, "u64", 1, 1, 0, 0, 1 },
@@ -79,6 +79,7 @@ static OnyxAstNode* parse_factor(OnyxParser* parser);
 static OnyxAstNode* parse_bin_op(OnyxParser* parser, OnyxAstNode* left);
 static OnyxAstNode* parse_expression(OnyxParser* parser);
 static OnyxAstNodeIf* parse_if_stmt(OnyxParser* parser);
+static OnyxAstNodeWhile* parse_while_stmt(OnyxParser* parser);
 static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret);
 static OnyxAstNode* parse_return_statement(OnyxParser* parser);
 static OnyxAstNodeBlock* parse_block(OnyxParser* parser);
@@ -249,6 +250,24 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 
         case TOKEN_TYPE_LITERAL_NUMERIC: return (OnyxAstNode *) parse_numeric_literal(parser);
 
+        case TOKEN_TYPE_LITERAL_BOOL_TRUE:
+            {
+                OnyxAstNodeNumLit* bool_node = (OnyxAstNodeNumLit *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_LITERAL);
+                bool_node->type = &builtin_types[ONYX_TYPE_INFO_KIND_BOOL];
+                bool_node->token = expect(parser, TOKEN_TYPE_LITERAL_BOOL_TRUE);
+                bool_node->value.i = 1;
+                return (OnyxAstNode *) bool_node;
+            }
+
+        case TOKEN_TYPE_LITERAL_BOOL_FALSE:
+            {
+                OnyxAstNodeNumLit* bool_node = (OnyxAstNodeNumLit *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_LITERAL);
+                bool_node->type = &builtin_types[ONYX_TYPE_INFO_KIND_BOOL];
+                bool_node->token = expect(parser, TOKEN_TYPE_LITERAL_BOOL_FALSE);
+                bool_node->value.i = 0;
+                return (OnyxAstNode *) bool_node;
+            }
+
 		default:
 			onyx_message_add(parser->msgs,
 					ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
@@ -392,6 +411,20 @@ static OnyxAstNodeIf* parse_if_stmt(OnyxParser* parser) {
     return root_if;
 }
 
+static OnyxAstNodeWhile* parse_while_stmt(OnyxParser* parser) {
+    OnyxToken* while_token = expect(parser, TOKEN_TYPE_KEYWORD_WHILE);
+
+    OnyxAstNode* cond = parse_expression(parser);
+    OnyxAstNodeBlock* body = parse_block(parser);
+
+    OnyxAstNodeWhile* while_node = (OnyxAstNodeWhile *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_WHILE);
+    while_node->token = while_token;
+    while_node->cond = cond;
+    while_node->body = body;
+
+    return while_node;
+}
+
 // Returns 1 if the symbol was consumed. Returns 0 otherwise
 // ret is set to the statement to insert
 static b32 parse_symbol_statement(OnyxParser* parser, OnyxAstNode** ret) {
@@ -520,6 +553,11 @@ static OnyxAstNode* parse_statement(OnyxParser* parser) {
 			retval = (OnyxAstNode *) parse_if_stmt(parser);
             break;
 
+        case TOKEN_TYPE_KEYWORD_WHILE:
+            needs_semicolon = 0;
+            retval = (OnyxAstNode *) parse_while_stmt(parser);
+            break;
+
 		default:
             break;
 	}
@@ -619,6 +657,7 @@ static OnyxAstNodeParam* parse_function_params(OnyxParser* parser) {
 		curr_param = (OnyxAstNodeParam *) onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_PARAM);
 		curr_param->token = symbol;
 		curr_param->type = parse_type(parser);
+        curr_param->flags |= ONYX_AST_FLAG_CONST;
 
 		if (first_param == NULL) first_param = curr_param;
 

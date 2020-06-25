@@ -12,6 +12,7 @@ typedef struct OnyxAstNodeLocal OnyxAstNodeLocal;
 typedef struct OnyxAstNodeScope OnyxAstNodeScope;
 typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
 typedef struct OnyxAstNodeIf OnyxAstNodeIf;
+typedef struct OnyxAstNodeWhile OnyxAstNodeWhile;
 typedef struct OnyxAstNodeParam OnyxAstNodeParam;
 typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
 typedef struct OnyxAstNodeForeign OnyxAstNodeForeign;
@@ -60,14 +61,14 @@ typedef enum OnyxAstNodeKind {
 
 	ONYX_AST_NODE_KIND_EQUAL,
 	ONYX_AST_NODE_KIND_NOT_EQUAL,
-	ONYX_AST_NODE_KIND_GREATER,
-	ONYX_AST_NODE_KIND_GREATER_EQUAL,
 	ONYX_AST_NODE_KIND_LESS,
 	ONYX_AST_NODE_KIND_LESS_EQUAL,
+	ONYX_AST_NODE_KIND_GREATER,
+	ONYX_AST_NODE_KIND_GREATER_EQUAL,
 	ONYX_AST_NODE_KIND_NOT,
 
 	ONYX_AST_NODE_KIND_IF,
-	ONYX_AST_NODE_KIND_LOOP,
+	ONYX_AST_NODE_KIND_WHILE,
 
 	ONYX_AST_NODE_KIND_COUNT
 } OnyxAstNodeKind;
@@ -167,6 +168,16 @@ struct OnyxAstNodeIf {
     OnyxAstNode *true_block;
 };
 
+struct OnyxAstNodeWhile {
+    OnyxAstNodeKind kind;
+    u32 flags;
+    OnyxToken *token;   // NOTE: UNUSED
+    OnyxTypeInfo *type;
+    OnyxAstNode *next;
+    OnyxAstNode *cond;
+    OnyxAstNodeBlock *body;
+};
+
 struct OnyxAstNodeFuncDef {
 	OnyxAstNodeKind kind;
 	u32 flags;
@@ -230,6 +241,7 @@ union OnyxAstNode {
     OnyxAstNodeNumLit as_numlit;
     OnyxAstNodeForeign as_foreign;
     OnyxAstNodeIf as_if;
+    OnyxAstNodeWhile as_while;
     OnyxAstNodeFile as_file;
 };
 

@@ -2,20 +2,54 @@
 // Foreign functions are included this way:
 //      sym_name :: foreign "module" "name" proc ...
 
-print       :: foreign "host" "print" proc (value i32) ---
+// TODO: Make this work
+// use "progs/other";
 
-something_else :: proc -> i32 {
-    return 100;
+print_i32 :: foreign "host" "print" proc (value i32) ---
+print_f32 :: foreign "host" "print" proc (value f32) ---
+print_i64 :: foreign "host" "print" proc (value i64) ---
+print_f64 :: foreign "host" "print" proc (value f64) ---
+
+something_else :: proc (n i32) -> i32 {
+    return 100 * n;
 }
 
 // This is the entry point
 export main :: proc {
-    nineteen :: 5 * 3 + 4;
-    thirty_five :: 5 * (3 + 4);
+    i := 0;
+    while i < 10 {
+        print_i32(fib(i));
+        i = i + 1;
+    }
 
-    something :: other_value();
+    i = 0;
+    while i < 10 {
+        print_i32(factorial(i));
+        i = i + 1;
+    }
 
-    print(nineteen);
-    print(thirty_five);
-    print(something);
+    x : i32;
+    y := 0;
+    while y < 10 {
+
+        x = 0;
+        while x < 10 {
+            print_i32(x + y * 10);
+            x = x + 1;
+        }
+
+        y = y + 1;
+    }
+}
+
+export main2 :: proc {
+    big_num := fib(factorial(4));
+    something :: other_value(3);
+
+    condition := big_num < something;
+
+    if condition {
+        print_i32(big_num);
+        print_i32(something);
+    }
 }

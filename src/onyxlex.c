@@ -20,6 +20,7 @@ static const char* onyx_token_type_names[] = {
 	"proc",			//"TOKEN_TYPE_KEYWORD_PROC",
 	"global",		//"TOKEN_TYPE_KEYWORD_GLOBAL",
 	"as", 			//"TOKEN_TYPE_KEYWORD_CAST",
+    "while",        //"TOKEN_TYPE_KEYWORD_WHILE",
 
 	"->", //"TOKEN_TYPE_RIGHT_ARROW",
 	"<-", //"TOKEN_TYPE_LEFT_ARROW",
@@ -55,6 +56,8 @@ static const char* onyx_token_type_names[] = {
 	"TOKEN_TYPE_SYMBOL",
 	"TOKEN_TYPE_LITERAL_STRING",
 	"TOKEN_TYPE_LITERAL_NUMERIC",
+    "true",
+    "false",
 
 	"TOKEN_TYPE_COUNT"
 };
@@ -141,7 +144,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("export",  1, TOKEN_TYPE_KEYWORD_EXPORT);
 	LITERAL_TOKEN("use",     1, TOKEN_TYPE_KEYWORD_USE);
 	LITERAL_TOKEN("if",      1, TOKEN_TYPE_KEYWORD_IF);
-	LITERAL_TOKEN("elseif",    1, TOKEN_TYPE_KEYWORD_ELSEIF);
+	LITERAL_TOKEN("elseif",  1, TOKEN_TYPE_KEYWORD_ELSEIF);
 	LITERAL_TOKEN("else",    1, TOKEN_TYPE_KEYWORD_ELSE);
 	LITERAL_TOKEN("foreign", 1, TOKEN_TYPE_KEYWORD_FOREIGN);
 	LITERAL_TOKEN("for",     1, TOKEN_TYPE_KEYWORD_FOR);
@@ -150,6 +153,9 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 	LITERAL_TOKEN("proc",    1, TOKEN_TYPE_KEYWORD_PROC);
 	LITERAL_TOKEN("global",  1, TOKEN_TYPE_KEYWORD_GLOBAL);
 	LITERAL_TOKEN("as",      1, TOKEN_TYPE_KEYWORD_CAST);
+    LITERAL_TOKEN("while",   1, TOKEN_TYPE_KEYWORD_WHILE);
+    LITERAL_TOKEN("true",    1, TOKEN_TYPE_LITERAL_BOOL_TRUE);
+    LITERAL_TOKEN("false",   1, TOKEN_TYPE_LITERAL_BOOL_FALSE);
 	LITERAL_TOKEN("->",      0, TOKEN_TYPE_RIGHT_ARROW);
 	LITERAL_TOKEN("<-",      0, TOKEN_TYPE_RIGHT_ARROW);
 	LITERAL_TOKEN("<=",      0, TOKEN_TYPE_SYM_LESS_EQUAL);

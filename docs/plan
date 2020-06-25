@@ -57,7 +57,7 @@ HOW:
 		[X] Numeric literals have the minimum type detected
         [X] Foreign imports (functions only)
 		[X] Comparison operators
-		[ ] Proper boolean type
+		[X] Proper boolean type
 		[X] Conditional branching works as expected
 		[ ] Simple while loop is functioning as expected
 		[ ] break and continue semantics
@@ -83,6 +83,12 @@ HOW:
             - Compiling multiple files at once
             - Changing output location
             - Viewing help screen
+
+        [ ] 'use' statements work
+            - Adds '.onyx' to the end of the file name list
+            - Only searches in current directory for now
+
+        [ ] Output 'drop' instruction for functions whose return value isn't used
 
 		[ ] Devise and implement a simple set of implicit type casting rules.
 			- Numeric literals always type cast to whatever type is needed (very flexible).

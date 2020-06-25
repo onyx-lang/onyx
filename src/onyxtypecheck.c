@@ -8,6 +8,7 @@ static void typecheck_statement(OnyxSemPassState* state, OnyxAstNode* stmt);
 static void typecheck_assignment(OnyxSemPassState* state, OnyxAstNode* assign);
 static void typecheck_return(OnyxSemPassState* state, OnyxAstNode* retnode);
 static void typecheck_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode);
+static void typecheck_while(OnyxSemPassState* state, OnyxAstNodeWhile* whilenode);
 static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call);
 static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr);
 
@@ -73,16 +74,29 @@ static void typecheck_return(OnyxSemPassState* state, OnyxAstNode* retnode) {
 
 static void typecheck_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode) {
     typecheck_expression(state, ifnode->cond);
-    if (ifnode->cond->type != &builtin_types[ONYX_TYPE_INFO_KIND_INT32]) {
+    if (ifnode->cond->type != &builtin_types[ONYX_TYPE_INFO_KIND_BOOL]) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
                 ifnode->cond->token->pos,
-                "expected integer type for condition");
+                "expected boolean type for condition");
         return;
     }
 
     if (ifnode->true_block) typecheck_statement(state, ifnode->true_block);
     if (ifnode->false_block) typecheck_statement(state, ifnode->false_block);
+}
+
+static void typecheck_while(OnyxSemPassState* state, OnyxAstNodeWhile* whilenode) {
+    typecheck_expression(state, whilenode->cond);
+    if (whilenode->cond->type != &builtin_types[ONYX_TYPE_INFO_KIND_BOOL]) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_LITERAL,
+                whilenode->cond->token->pos,
+                "expected boolean type for condition");
+        return;
+    }
+
+    typecheck_block(state, whilenode->body);
 }
 
 static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call) {
@@ -188,7 +202,13 @@ static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
                 return;
             }
 
-            expr->type = expr->left->type;
+            if (expr->kind >= ONYX_AST_NODE_KIND_EQUAL
+                    && expr->kind <= ONYX_AST_NODE_KIND_GREATER_EQUAL) {
+                expr->type = &builtin_types[ONYX_TYPE_INFO_KIND_BOOL];
+            } else {
+                expr->type = expr->left->type;
+            }
+
             break;
 
         case ONYX_AST_NODE_KIND_NEGATE:
@@ -248,6 +268,7 @@ static void typecheck_statement(OnyxSemPassState* state, OnyxAstNode* stmt) {
         case ONYX_AST_NODE_KIND_ASSIGNMENT: typecheck_assignment(state, stmt); break;
 		case ONYX_AST_NODE_KIND_RETURN:     typecheck_return(state, stmt); break;
         case ONYX_AST_NODE_KIND_IF:         typecheck_if(state, &stmt->as_if); break;
+        case ONYX_AST_NODE_KIND_WHILE:      typecheck_while(state, &stmt->as_while); break;
         case ONYX_AST_NODE_KIND_CALL:       typecheck_call(state, &stmt->as_call); break;
         case ONYX_AST_NODE_KIND_BLOCK:      typecheck_block(state, &stmt->as_block); break;
 

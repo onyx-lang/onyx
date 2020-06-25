@@ -13,7 +13,12 @@
 
 static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
-    "The standard compiler for the Onyx programming language.\n";
+    "The standard compiler for the Onyx programming language.\n"
+    "\n"
+    " $ onyx [-o <target file>] [--help] <input files>\n"
+    "\n"
+    "   -o <target_file>        Specify the target file\n"
+    "   --help                  Print this help message\n";
 
 typedef enum CompileAction {
     ONYX_COMPILE_ACTION_COMPILE,
@@ -39,7 +44,7 @@ typedef enum CompilerProgress {
 } CompilerProgress;
 
 typedef struct CompilerState {
-    bh_arena token_arena, ast_arena, msg_arena, sp_arena;
+    bh_arena ast_arena, msg_arena, sp_arena;
     bh_allocator token_alloc, ast_alloc, msg_alloc, sp_alloc;
     bh_table(bh_file_contents) loaded_files;
 
@@ -83,8 +88,10 @@ void compile_opts_free(OnyxCompileOptions* opts) {
 OnyxAstNodeFile* parse_source_file(bh_file_contents* file_contents, CompilerState* compiler_state) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
 	OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
+    bh_printf("Lexing  %s\n", file_contents->filename);
 	onyx_lex_tokens(&tokenizer);
 
+    bh_printf("Parsing %s\n", file_contents->filename);
 	OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
 	return onyx_parse(&parser);
 }
@@ -96,9 +103,7 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
 
     onyx_message_create(compiler_state->msg_alloc, &compiler_state->msgs);
 
-    // NOTE: Create the arena for tokens from the lexer
-    bh_arena_init(&compiler_state->token_arena, opts->allocator, 16 * 1024 * 1024); // 16 MB
-    compiler_state->token_alloc = bh_arena_allocator(&compiler_state->token_arena);
+    compiler_state->token_alloc = opts->allocator;
 
 	// NOTE: Create the arena where AST nodes will exist
 	// Prevents nodes from being scattered across memory due to fragmentation
@@ -115,10 +120,11 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
 
         bh_file_error err = bh_file_open(&file, *filename);
         if (err != BH_FILE_ERROR_NONE) {
-            bh_printf_err("Failed to open file %s\n", filename);
+            bh_printf_err("Failed to open file %s\n", *filename);
             return ONYX_COMPILER_PROGRESS_FAILED_READ;
         }
 
+        bh_printf("Reading %s\n", file.filename);
         bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
         bh_file_close(&file);
 
@@ -145,6 +151,7 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
     }
 
+    bh_printf("Checking semantics and types\n");
     OnyxSemPassState sp_state = onyx_sempass_create( compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
     onyx_sempass(&sp_state, root_file);
 
@@ -152,6 +159,7 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
     }
 
+    bh_printf("Creating WASM code\n");
     compiler_state->wasm_mod = onyx_wasm_module_create(opts->allocator);
     onyx_wasm_module_compile(&compiler_state->wasm_mod, root_file);
 
@@ -164,15 +172,17 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
         return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
     }
 
+    bh_printf("Writing WASM to %s\n", output_file.filename);
     onyx_wasm_module_write_to_file(&compiler_state->wasm_mod, output_file);
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
 void compiler_state_free(CompilerState* cs) {
+    // NOTE: There is a memory leak here because the token's aren't freed
+
     bh_arena_free(&cs->ast_arena);
     bh_arena_free(&cs->msg_arena);
-    bh_arena_free(&cs->token_arena);
     bh_arena_free(&cs->sp_arena);
     bh_table_free(cs->loaded_files);
     onyx_wasm_module_free(&cs->wasm_mod);

@@ -1,4 +1,38 @@
 
-other_value :: proc -> i32 {
-    return 8675309 + something_else();
+other_value :: proc (n i32) -> i32 {
+    return 8675309 + something_else(n);
+}
+
+export fib :: proc (n i32) -> i32 {
+    if n == 0 { return 1; }
+    if n == 1 { return 1; }
+
+    a := 0;
+    b := 1;
+
+    count := n;
+
+    while count >= 0 {
+        count = count - 1;
+
+        c :: a + b;
+        b = a;
+        a = c;
+    }
+
+    return a;
+}
+
+export factorial :: proc (n i32) -> i32 {
+    if n <= 1 { return 1; }
+
+    f := 1;
+    i := 2;
+
+    while i <= n {
+        f = f * i;
+        i = i + 1;
+    }
+
+    return f;
 }

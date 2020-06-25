@@ -65,6 +65,9 @@ static void collapse_scopes(OnyxAstNodeFile* root_node) {
                             if (walker->kind == ONYX_AST_NODE_KIND_BLOCK) {
                                 bh_arr_push(traversal_queue, (OnyxAstNodeBlock *) walker);
 
+                            } else if (walker->kind == ONYX_AST_NODE_KIND_WHILE) {
+                                bh_arr_push(traversal_queue, walker->as_while.body);
+
                             } else if (walker->kind == ONYX_AST_NODE_KIND_IF) {
                                 if (walker->as_if.true_block)
                                     bh_arr_push(traversal_queue, (OnyxAstNodeBlock *) walker->as_if.true_block);

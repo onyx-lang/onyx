@@ -214,6 +214,7 @@ static void compile_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
 static void compile_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* lval);
 static void compile_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* assign);
 static void compile_if(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeIf* if_node);
+static void compile_while(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeWhile* while_node);
 static void compile_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* expr);
 static void compile_cast(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* cast);
 static void compile_return(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* ret);
@@ -244,8 +245,10 @@ static void compile_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
 		case ONYX_AST_NODE_KIND_RETURN: compile_return(mod, func, stmt); break;
 		case ONYX_AST_NODE_KIND_ASSIGNMENT: compile_assignment(mod, func, stmt); break;
         case ONYX_AST_NODE_KIND_IF: compile_if(mod, func, (OnyxAstNodeIf *) stmt); break;
+        case ONYX_AST_NODE_KIND_WHILE: compile_while(mod, func, (OnyxAstNodeWhile *) stmt); break;
         case ONYX_AST_NODE_KIND_CALL: compile_expression(mod, func, stmt); break;
         case ONYX_AST_NODE_KIND_BLOCK: compile_block(mod, func, (OnyxAstNodeBlock *) stmt); break;
+
 		default: break;
 	}
 }
@@ -295,6 +298,24 @@ static void compile_if(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeIf* if_no
     bh_arr_push(func->code, ((WasmInstruction){ WI_IF_END, 0x00 }));
 }
 
+static void compile_while(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeWhile* while_node) {
+    bh_arr_push(func->code, ((WasmInstruction){ WI_BLOCK_START, 0x40 }));
+    bh_arr_push(func->code, ((WasmInstruction){ WI_LOOP_START, 0x40 }));
+
+    compile_expression(mod, func, while_node->cond);
+    bh_arr_push(func->code, ((WasmInstruction){ WI_I32_EQZ, 0x00 }));
+    bh_arr_push(func->code, ((WasmInstruction){ WI_COND_JUMP, 0x01 }));
+
+	forll (OnyxAstNode, stmt, while_node->body->body, next) {
+		compile_statement(mod, func, stmt);
+	}
+
+    bh_arr_push(func->code, ((WasmInstruction){ WI_JUMP, 0x00 }));
+
+    bh_arr_push(func->code, ((WasmInstruction){ WI_LOOP_END, 0x00 }));
+    bh_arr_push(func->code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+}
+
 static void compile_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* assign) {
 	compile_expression(mod, func, assign->right);
 	compile_assign_lval(mod, func, assign->left);
@@ -304,7 +325,8 @@ static void compile_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 	case ONYX_AST_NODE_KIND_##ast_binop: \
 		{ \
 			WasmInstructionType instr_type; \
-			switch (expr->type->kind) { \
+			switch (expr->left->type->kind) { \
+                case ONYX_TYPE_INFO_KIND_BOOL: \
 				case ONYX_TYPE_INFO_KIND_UINT32: \
 				case ONYX_TYPE_INFO_KIND_INT32: instr_type = WI_I32_##wasm_binop;		break; \
 				case ONYX_TYPE_INFO_KIND_UINT64: \
@@ -324,15 +346,16 @@ static void compile_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 		case ONYX_AST_NODE_KIND_##ast_binop: \
 			{ \
 				WasmInstructionType instr_type; \
-				switch (expr->type->kind) { \
+				switch (expr->left->type->kind) { \
+                    case ONYX_TYPE_INFO_KIND_BOOL: \
 					case ONYX_TYPE_INFO_KIND_UINT32: \
 					case ONYX_TYPE_INFO_KIND_INT32: \
-						if (expr->type->is_unsigned) instr_type = WI_I32_##wasm_binop##_U; \
+						if (expr->left->type->is_unsigned) instr_type = WI_I32_##wasm_binop##_U; \
 						else instr_type = WI_I32_##wasm_binop##_S; \
 						break; \
 					case ONYX_TYPE_INFO_KIND_UINT64: \
 					case ONYX_TYPE_INFO_KIND_INT64: \
-						if (expr->type->is_unsigned) instr_type = WI_I64_##wasm_binop##_U; \
+						if (expr->left->type->is_unsigned) instr_type = WI_I64_##wasm_binop##_U; \
 						else instr_type = WI_I64_##wasm_binop##_S; \
 						break; \
 					case ONYX_TYPE_INFO_KIND_FLOAT32: instr_type = WI_F32_##wasm_binop;		break; \
@@ -1000,6 +1023,9 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
 		case WI_LOCAL_SET:
         case WI_CALL:
 		case WI_BLOCK_START:
+        case WI_LOOP_START:
+        case WI_JUMP:
+        case WI_COND_JUMP:
 		case WI_IF_START:
 			leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
 			bh_buffer_append(buff, leb, leb_len);
