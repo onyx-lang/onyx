@@ -87,28 +87,28 @@ void compile_opts_free(OnyxCompileOptions* opts) {
 
 OnyxAstNodeFile* parse_source_file(bh_file_contents* file_contents, CompilerState* compiler_state) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
-	OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
+    OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
     bh_printf("Lexing  %s\n", file_contents->filename);
-	onyx_lex_tokens(&tokenizer);
+    onyx_lex_tokens(&tokenizer);
 
     bh_printf("Parsing %s\n", file_contents->filename);
-	OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
-	return onyx_parse(&parser);
+    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
+    return onyx_parse(&parser);
 }
 
 i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
 
-	bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
-	compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
+    bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
+    compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
 
     onyx_message_create(compiler_state->msg_alloc, &compiler_state->msgs);
 
     compiler_state->token_alloc = opts->allocator;
 
-	// NOTE: Create the arena where AST nodes will exist
-	// Prevents nodes from being scattered across memory due to fragmentation
-	bh_arena_init(&compiler_state->ast_arena, opts->allocator, 16 * 1024 * 1024); // 16MB
-	compiler_state->ast_alloc = bh_arena_allocator(&compiler_state->ast_arena);
+    // NOTE: Create the arena where AST nodes will exist
+    // Prevents nodes from being scattered across memory due to fragmentation
+    bh_arena_init(&compiler_state->ast_arena, opts->allocator, 16 * 1024 * 1024); // 16MB
+    compiler_state->ast_alloc = bh_arena_allocator(&compiler_state->ast_arena);
 
     bh_arena_init(&compiler_state->sp_arena, opts->allocator, 16 * 1024);
     compiler_state->sp_alloc = bh_arena_allocator(&compiler_state->sp_arena);
@@ -190,7 +190,7 @@ void compiler_state_free(CompilerState* cs) {
 
 int main(int argc, char *argv[]) {
 
-	bh_allocator alloc = bh_heap_allocator();
+    bh_allocator alloc = bh_heap_allocator();
 
     bh_scratch_init(&global_scratch, alloc, 16 * 1024); // NOTE: 16 KB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
@@ -238,51 +238,51 @@ int main(int argc, char *argv[]) {
 
     compiler_state_free(&compile_state);
 
-	return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
+    return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
 // NOTE: Old bits of code that may be useful again at some point.
 #if 0
-	bh_printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
+    bh_printf("There are %d tokens (Allocated space for %d tokens)\n", bh_arr_length(token_arr), bh_arr_capacity(token_arr));
 
-	bh_arr_each(OnyxToken, it, token_arr) {
-		onyx_token_null_toggle(*it);
-		bh_printf("%s (%s:%l:%l)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
-		onyx_token_null_toggle(*it);
-	}
+    bh_arr_each(OnyxToken, it, token_arr) {
+        onyx_token_null_toggle(*it);
+        bh_printf("%s (%s:%l:%l)\n", onyx_get_token_type_name(it->type), it->pos.filename, it->pos.line, it->pos.column);
+        onyx_token_null_toggle(*it);
+    }
 #endif
 
 #if 0
-	// NOTE: Ensure type table made correctly
+    // NOTE: Ensure type table made correctly
 
-	bh_printf("Type map:\n");
-	bh_hash_each_start(i32, wasm_mod.type_map);
-		bh_printf("%s -> %d\n", key, value);
-	bh_hash_each_end;
+    bh_printf("Type map:\n");
+    bh_hash_each_start(i32, wasm_mod.type_map);
+        bh_printf("%s -> %d\n", key, value);
+    bh_hash_each_end;
 
-	bh_printf("Type list:\n");
-	WasmFuncType** func_type = wasm_mod.functypes;
-	while (!bh_arr_end(wasm_mod.functypes, func_type)) {
-		for (int p = 0; p < (*func_type)->param_count; p++) {
-			bh_printf("%c ", (*func_type)->param_types[p]);
-		}
-		bh_printf("-> ");
-		bh_printf("%c\n", (*func_type)->return_type);
+    bh_printf("Type list:\n");
+    WasmFuncType** func_type = wasm_mod.functypes;
+    while (!bh_arr_end(wasm_mod.functypes, func_type)) {
+        for (int p = 0; p < (*func_type)->param_count; p++) {
+            bh_printf("%c ", (*func_type)->param_types[p]);
+        }
+        bh_printf("-> ");
+        bh_printf("%c\n", (*func_type)->return_type);
 
-		func_type++;
-	}
+        func_type++;
+    }
 #endif
 
 #if 0
-	// NOTE: Ensure the export table was built correctly
+    // NOTE: Ensure the export table was built correctly
 
-	bh_printf("Function types:\n");
-	bh_arr_each(WasmFunc, func_it, wasm_mod.funcs) {
-		bh_printf("%d\n", func_it->type_idx);
-	}
+    bh_printf("Function types:\n");
+    bh_arr_each(WasmFunc, func_it, wasm_mod.funcs) {
+        bh_printf("%d\n", func_it->type_idx);
+    }
 
-	bh_printf("Exports:\n");
-	bh_hash_each_start(WasmExport, wasm_mod.exports);
-		bh_printf("%s: %d %d\n", key, value.kind, value.idx);
-	bh_hash_each_end;
+    bh_printf("Exports:\n");
+    bh_hash_each_start(WasmExport, wasm_mod.exports);
+        bh_printf("%s: %d %d\n", key, value.kind, value.idx);
+    bh_hash_each_end;
 #endif

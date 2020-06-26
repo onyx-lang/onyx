@@ -253,7 +253,7 @@ static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
 static void typecheck_statement(OnyxSemPassState* state, OnyxAstNode* stmt) {
     switch (stmt->kind) {
         case ONYX_AST_NODE_KIND_ASSIGNMENT: typecheck_assignment(state, stmt); break;
-		case ONYX_AST_NODE_KIND_RETURN:     typecheck_return(state, stmt); break;
+        case ONYX_AST_NODE_KIND_RETURN:     typecheck_return(state, stmt); break;
         case ONYX_AST_NODE_KIND_IF:         typecheck_if(state, &stmt->as_if); break;
         case ONYX_AST_NODE_KIND_WHILE:      typecheck_while(state, &stmt->as_while); break;
         case ONYX_AST_NODE_KIND_CALL:       typecheck_call(state, &stmt->as_call); break;

@@ -15,8 +15,8 @@ typedef struct SemPassSymbol {
 typedef struct OnyxSemPassState {
     // NOTE: Adding node_allocator in case we need
     // to make any more node in the tree
-	bh_allocator allocator, node_allocator;
-	OnyxMessages *msgs;
+    bh_allocator allocator, node_allocator;
+    OnyxMessages *msgs;
 
     // NOTE: Used in symbol resolution phase
     OnyxAstNodeScope* curr_scope;

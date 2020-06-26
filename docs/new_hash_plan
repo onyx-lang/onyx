@@ -1,50 +1,50 @@
 The state of the hash implementation right now:
 
-				(allocator + 1021 ptrs = 8192 bytes (HUGE))
-			+---------------------------------------------------------
-table ---->	| allocator | ptr | ptr | ptr | ptr | ptr | ptr | ptr ...
-			+-------------||------------------------------------------
-					      \/
-	  		+--------------+------------------------------------------------------
-	  		| Array header | key (64-bytes) | value | key (64-bytes) | value | ...
-	  		+--------------+------------------------------------------------------
+                (allocator + 1021 ptrs = 8192 bytes (HUGE))
+               +---------------------------------------------------------
+table ---->    | allocator | ptr | ptr | ptr | ptr | ptr | ptr | ptr ...
+               +-------------||------------------------------------------
+                             \/
+              +--------------+------------------------------------------------------
+              | Array header | key (64-bytes) | value | key (64-bytes) | value | ...
+              +--------------+------------------------------------------------------
 
 There are a couple of issues with this implementation:
   * The table of pointers is absolutely huge.
-	It takes up about 2 pages of memory and we are randomly accessing it
-	so it will not be cache efficient.
+    It takes up about 2 pages of memory and we are randomly accessing it
+    so it will not be cache efficient.
   * The keys are always the same size.
-	They are normally way too large, but also they would cut off if you
-	needed a large key.
+    They are normally way too large, but also they would cut off if you
+    needed a large key.
 
 
 
 THIS WORKED VERY WELL!
 Attempt 1 to fix these issues:
 
-				(user defined number of ptrs)
-			+-----------------------------------------------------------
-table ---->	| allocator | hash size | ptr | ptr | ptr | ptr | ptr | ...
-			+-------------------------||--------------------------------
-									  \/
-	  					+--------------+------------------------------------------------------------------------
-	  					| Array header | length | value | key_length | key (null terminated) | v | kl | k | ...
-				        +--------------+------------------------------------------------------------------------
+                (user defined number of ptrs)
+               +-----------------------------------------------------------
+table ---->    | allocator | hash size | ptr | ptr | ptr | ptr | ptr | ...
+               +-------------------------||--------------------------------
+                                         \/
+                          +--------------+------------------------------------------------------------------------
+                          | Array header | length | value | key_length | key (null terminated) | v | kl | k | ...
+                          +--------------+------------------------------------------------------------------------
 
 GOOD:
   * This implementation would allow for any size of key.
-	Initial thoughts:
-	  - Alignment is going to be very important.
-	  - Alignment will need to be by hand.
-	  - Aligning to 8 bytes should be sufficient.
-	  - The array would just be considered as a u8 array, since each element
-		wouldn't be the same size.
-	  - Random access into the array would not be allowed for the same reason.
-	  - Random access will not be needed however.
+    Initial thoughts:
+      - Alignment is going to be very important.
+      - Alignment will need to be by hand.
+      - Aligning to 8 bytes should be sufficient.
+      - The array would just be considered as a u8 array, since each element
+        wouldn't be the same size.
+      - Random access into the array would not be allowed for the same reason.
+      - Random access will not be needed however.
   * This implementation still allows for easy iterator traversal, which is
-	important for the immediate use case.
+    important for the immediate use case.
 
 BAD:
   * The fact that the number of pointers is user defined, the hashing algorithm could
-	be drastically slowed / crippled if they choose a bad number of pointers.
+    be drastically slowed / crippled if they choose a bad number of pointers.
   * This implementation still takes a very large number of allocations.

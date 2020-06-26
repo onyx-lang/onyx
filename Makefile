@@ -1,13 +1,13 @@
 OBJ_FILES=\
-	build/onyxlex.o \
-	build/onyxparser.o \
-	build/onyxsempass.o \
-	build/onyxsymres.o \
-	build/onyxtypecheck.o \
-	build/onyxmsgs.o \
-	build/onyxutils.o \
-	build/onyxwasm.o \
-	build/onyx.o
+    build/onyxlex.o \
+    build/onyxparser.o \
+    build/onyxsempass.o \
+    build/onyxsymres.o \
+    build/onyxtypecheck.o \
+    build/onyxmsgs.o \
+    build/onyxutils.o \
+    build/onyxwasm.o \
+    build/onyx.o
 
 CC=gcc
 INCLUDES=-I./include
@@ -16,15 +16,15 @@ FLAGS=-g
 TARGET=./onyx
 
 build/%.o: src/%.c include/bh.h
-	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
+    $(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
 
 $(TARGET): $(OBJ_FILES)
-	$(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
+    $(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
 
 install: $(TARGET)
-	cp $(TARGET) /usr/bin/
+    cp $(TARGET) /usr/bin/
 
 clean:
-	rm -f $(OBJ_FILES) 2>&1 >/dev/null
+    rm -f $(OBJ_FILES) 2>&1 >/dev/null
 
 all: onyx

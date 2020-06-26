@@ -32,11 +32,11 @@ export main :: proc {
 
     x : i32;
     y := 0;
-    while y < 10 {
+    while y < 5 {
 
         x = 0;
-        while x < 10 {
-            print_i32(x + y * 10);
+        while x < 5 {
+            print_i32((x + y * 5) % 10);
             x = x + 1;
         }
 

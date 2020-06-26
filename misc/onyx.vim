@@ -4,7 +4,7 @@
 " Last Change: 2020 June 20
 
 if exists("b:current_syntax")
-	finish
+    finish
 endif
 
 let s:cpo_save = &cpo
@@ -23,15 +23,15 @@ syn keyword onyxType f64
 
 syn keyword onyxConstant        true false
 
-syn keyword onyxCommentStart	contained TODO NOTE BUG HACK
+syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 
 syn region onyxComment start="//" end="$" keepend contains=onyxCommentStart
 
-hi def link onyxKeyword		    Statement
-hi def link onyxType 		    Type
-hi def link onyxComment		    Comment
-hi def link onyxCommentStart 	Todo
-hi def link onyxConstant        Constant
+hi def link onyxKeyword          Statement
+hi def link onyxType             Type
+hi def link onyxComment          Comment
+hi def link onyxCommentStart     Todo
+hi def link onyxConstant         Constant
 
 let b:current_syntax = "onyx"
 let &cpo = s:cpo_save

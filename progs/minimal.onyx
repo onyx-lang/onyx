@@ -32,11 +32,11 @@ factorial :: proc (n i32) -> i32 {
 }
 
 foo :: proc -> i32 {
-	return 10;
+    return 10;
 }
 
 add :: proc (a i32, b i32) -> i32 {
-	return a + b;
+    return a + b;
 }
 
 // NOTE: There is a weird bug here if the else is used instead
@@ -55,21 +55,21 @@ fib :: proc (n i32) -> i32 {
 }
 
 diff_square :: proc (a i32, b i32) -> i32 {
-	// Typechecked
-	c := a - b; // Mutable
-	d :: a + b; // Constant
+    // Typechecked
+    c := a - b; // Mutable
+    d :: a + b; // Constant
 
     {
         c := a * 2;
         d := (b + a) * 2;
     }
 
-	return c * d;
+    return c * d;
 }
 
 do_stuff :: proc -> i32 {
-	res := diff_square(4 + 5, 2 + 3);
-	res = res + foo();
+    res := diff_square(4 + 5, 2 + 3);
+    res = res + foo();
     return res * -1;
 }
 

@@ -2,79 +2,79 @@ The ONYX Programming Language
 -----------------------------
 
 WHAT:
-	ONYX is a low-ish level programming language designed for use with
-	Web-Assembly 32-bit (WASM). It features some advanced features such
-	as comptime code execution and JS literals for external functions.
+    ONYX is a low-ish level programming language designed for use with
+    Web-Assembly 32-bit (WASM). It features some advanced features such
+    as comptime code execution and JS literals for external functions.
 
 WHY:
-	ONYX was made to help me learn about compiler design.
+    ONYX was made to help me learn about compiler design.
 
 END GOAL:
-	ONYX will be used to make a simple-ish game for the browser that leverages
-	WASM and WebGL for a performant experience. Language design will reflect the
-	needs of the game programming.
+    ONYX will be used to make a simple-ish game for the browser that leverages
+    WASM and WebGL for a performant experience. Language design will reflect the
+    needs of the game programming.
 
 FEATURES:
-	- Strong type system
-	- functions (no anonymous functions)
-	- Structs and enums
-	- Control structures
-		if, for, switch
-	- pointers
-	- inferred typing
-	- Smart package loading
-	- defer
-	? polymorphic functions
+    - Strong type system
+    - functions (no anonymous functions)
+    - Structs and enums
+    - Control structures
+        if, for, switch
+    - pointers
+    - inferred typing
+    - Smart package loading
+    - defer
+    ? polymorphic functions
 
 HOW:
-	Currently there is a multi-phase development process since implementing everything
-	at once would be overwhelming and unsatisfying. The current progress of each stage:
+    Currently there is a multi-phase development process since implementing everything
+    at once would be overwhelming and unsatisfying. The current progress of each stage:
 
-	Stage 1 (MVP):
-		[X] Can declare procedures
-		[X] Procedures have params and returns of the following types:
-			- i32, u32
-			- i64, u64
-			- f32, f64
-		[X] Procedures have locals of the same set of types
-		[X] Locals are declared in the following way
-			local : (type) ((= or :) initial value);
+    Stage 1 (MVP):
+        [X] Can declare procedures
+        [X] Procedures have params and returns of the following types:
+            - i32, u32
+            - i64, u64
+            - f32, f64
+        [X] Procedures have locals of the same set of types
+        [X] Locals are declared in the following way
+            local : (type) ((= or :) initial value);
 
-			if : is used, the value is unmodifiable
-			if type is specified, that is assumed to be the correct type
-			if type is not specified, the type of initial value is used as the type
+            if : is used, the value is unmodifiable
+            if type is specified, that is assumed to be the correct type
+            if type is not specified, the type of initial value is used as the type
 
-		[X] Five basic math operations are legal:
-			+ - * / %
-		[X] Math operations are sign aware and only operate on operands of the same type
-		[X] All casts are explicit using this syntax:
-			X as T
+        [X] Five basic math operations are legal:
+            + - * / %
+        [X] Math operations are sign aware and only operate on operands of the same type
+        [X] All casts are explicit using this syntax:
+            X as T
 
-			casts X to type T
+            casts X to type T
 
-		[X] Curly braces are required for all bodies of blocks
-		[X] Numeric literals are parsed
-		[X] Numeric literals have the minimum type detected
+        [X] Curly braces are required for all bodies of blocks
+        [X] Numeric literals are parsed
+        [X] Numeric literals have the minimum type detected
         [X] Foreign imports (functions only)
-		[X] Comparison operators
-		[X] Proper boolean type
-		[X] Conditional branching works as expected
-		XX] Simple while loop is functioning as expected
-		[ ] break and continue semantics
-		[X] Function calling works for the builtin types
-		[X] Function return values are type checked
+        [X] Comparison operators
+        [X] Proper boolean type
+        [X] Conditional branching works as expected
+        XX] Simple while loop is functioning as expected
+        [ ] break and continue semantics
+        [X] Function calling works for the builtin types
+        [X] Function return values are type checked
 
-	Stage 2:
-		[X] Order of symbol declaration is irrelevant
-			Either:
-			make a graph of symbol dependencies and produce a schedule on the graph
-			that would allow for all symbols to be resolved
+    Stage 2:
+        [X] Order of symbol declaration is irrelevant
+            Either:
+            make a graph of symbol dependencies and produce a schedule on the graph
+            that would allow for all symbols to be resolved
 
-			OR
+            OR
 
-			Do as many passes on the parse tree as needed to resolve all symbols.
-			This could be slow but it would be easier than creating a graph
-			scheduling algorithm.
+            Do as many passes on the parse tree as needed to resolve all symbols.
+            This could be slow but it would be easier than creating a graph
+            scheduling algorithm.
 
         [X] Consequence of the above, recursion works
 
@@ -90,15 +90,15 @@ HOW:
 
         [ ] Output 'drop' instruction for functions whose return value isn't used
 
-		[ ] Devise and implement a simple set of implicit type casting rules.
-			- Numeric literals always type cast to whatever type is needed (very flexible).
+        [ ] Devise and implement a simple set of implicit type casting rules.
+            - Numeric literals always type cast to whatever type is needed (very flexible).
 
-		[ ] Strings should work as pointers to data.
-			- Literals should be placed in data section with pointers to the start.
-			- Should strings be null-terminated or a length at the start of the string?
+        [ ] Strings should work as pointers to data.
+            - Literals should be placed in data section with pointers to the start.
+            - Should strings be null-terminated or a length at the start of the string?
 
-		[ ] Start work on evaluating compile time known values.
-			- An expression marked COMPTIME will be reduced to its value in the parse tree.
+        [ ] Start work on evaluating compile time known values.
+            - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
 
 
