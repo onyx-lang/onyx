@@ -215,8 +215,10 @@ static void compile_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode
 static void compile_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* assign);
 static void compile_if(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeIf* if_node);
 static void compile_while(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeWhile* while_node);
+static void compile_binop(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBinOp* binop);
+static void compile_unaryop(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeUnaryOp* unop);
 static void compile_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* expr);
-static void compile_cast(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* cast);
+static void compile_cast(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeUnaryOp* cast);
 static void compile_return(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* ret);
 
 static void compile_function_body(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeFuncDef* fd) {
@@ -321,105 +323,79 @@ static void compile_assignment(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 	compile_assign_lval(mod, func, assign->left);
 }
 
-#define BIN_OP_PROCESS(ast_binop, wasm_binop) \
-	case ONYX_AST_NODE_KIND_##ast_binop: \
-		{ \
-			WasmInstructionType instr_type; \
-			switch (expr->left->type->kind) { \
-                case ONYX_TYPE_INFO_KIND_BOOL: \
-				case ONYX_TYPE_INFO_KIND_UINT32: \
-				case ONYX_TYPE_INFO_KIND_INT32: instr_type = WI_I32_##wasm_binop;		break; \
-				case ONYX_TYPE_INFO_KIND_UINT64: \
-				case ONYX_TYPE_INFO_KIND_INT64: instr_type = WI_I64_##wasm_binop;		break; \
-				case ONYX_TYPE_INFO_KIND_FLOAT32: instr_type = WI_F32_##wasm_binop;		break; \
-				case ONYX_TYPE_INFO_KIND_FLOAT64: instr_type = WI_F64_##wasm_binop;		break; \
-				default: assert(("Invalid type", 0)); \
-			} \
- \
-			compile_expression(mod, func, expr->left); \
-			compile_expression(mod, func, expr->right); \
-			bh_arr_push(func->code, ((WasmInstruction){ instr_type, 0x00 })); \
-			break; \
-		}
+// NOTE: These need to be in the same order as
+// the OnyxBinaryOp enum
+static const WasmInstructionType binop_map[][4] = {
+    //          I32           I64           F32         F64
+    /* ADD */ { WI_I32_ADD,   WI_I64_ADD,   WI_F32_ADD, WI_F64_ADD },
+    /* SUB */ { WI_I32_SUB,   WI_I64_SUB,   WI_F32_SUB, WI_F64_SUB },
+    /* MUL */ { WI_I32_MUL,   WI_I64_MUL,   WI_F32_MUL, WI_F64_MUL },
+    /* DIV */ { WI_I32_DIV_S, WI_I64_DIV_S, WI_F32_DIV, WI_F64_DIV },
+    /* REM */ { WI_I32_REM_S, WI_I64_REM_S, WI_NOP,     WI_NOP     },
 
-#define BIN_OP_SIGNED_PROCESS(ast_binop, wasm_binop) \
-		case ONYX_AST_NODE_KIND_##ast_binop: \
-			{ \
-				WasmInstructionType instr_type; \
-				switch (expr->left->type->kind) { \
-                    case ONYX_TYPE_INFO_KIND_BOOL: \
-					case ONYX_TYPE_INFO_KIND_UINT32: \
-					case ONYX_TYPE_INFO_KIND_INT32: \
-						if (expr->left->type->is_unsigned) instr_type = WI_I32_##wasm_binop##_U; \
-						else instr_type = WI_I32_##wasm_binop##_S; \
-						break; \
-					case ONYX_TYPE_INFO_KIND_UINT64: \
-					case ONYX_TYPE_INFO_KIND_INT64: \
-						if (expr->left->type->is_unsigned) instr_type = WI_I64_##wasm_binop##_U; \
-						else instr_type = WI_I64_##wasm_binop##_S; \
-						break; \
-					case ONYX_TYPE_INFO_KIND_FLOAT32: instr_type = WI_F32_##wasm_binop;		break; \
-					case ONYX_TYPE_INFO_KIND_FLOAT64: instr_type = WI_F64_##wasm_binop;		break; \
-					default: assert(("Invalid type", 0)); \
-				} \
- \
-				compile_expression(mod, func, expr->left); \
-				compile_expression(mod, func, expr->right); \
-				bh_arr_push(func->code, ((WasmInstruction){ instr_type, 0x00 })); \
-				break; \
-			}
+    /* EQ  */ { WI_I32_EQ,    WI_I64_EQ,    WI_F32_EQ,  WI_F64_EQ },
+    /* NEQ */ { WI_NOP,       WI_NOP,       WI_F32_NE , WI_F64_NE },
+    /* LT  */ { WI_I32_LT_S,  WI_I64_LT_S,  WI_F32_LT,  WI_F64_LT },
+    /* LTE */ { WI_I32_LE_S,  WI_I64_LE_S,  WI_F32_LE,  WI_F64_LE },
+    /* GT  */ { WI_I32_GT_S,  WI_I64_GT_S,  WI_F32_GT,  WI_F64_GT },
+    /* GTE */ { WI_I32_GE_S,  WI_I64_GE_S,  WI_F32_GE,  WI_F64_GE },
+};
 
-static void compile_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* expr) {
-	switch (expr->kind) {
-		BIN_OP_PROCESS(ADD, ADD);
-		BIN_OP_PROCESS(MINUS, SUB);
-		BIN_OP_PROCESS(MULTIPLY, MUL);
-        BIN_OP_SIGNED_PROCESS(DIVIDE, DIV);
+static void compile_binop(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBinOp* binop) {
+    b32 is_sign_significant = 0;
 
-        BIN_OP_SIGNED_PROCESS(LESS, LT);
-        BIN_OP_SIGNED_PROCESS(LESS_EQUAL, LE);
-        BIN_OP_SIGNED_PROCESS(GREATER, GT);
-        BIN_OP_SIGNED_PROCESS(GREATER_EQUAL, GE);
-        BIN_OP_PROCESS(EQUAL, EQ);
-        BIN_OP_PROCESS(NOT_EQUAL, NE);
+    switch (binop->operation) {
+        case ONYX_BINARY_OP_DIVIDE:
+        case ONYX_BINARY_OP_MODULUS:
+        case ONYX_BINARY_OP_LESS:
+        case ONYX_BINARY_OP_LESS_EQUAL:
+        case ONYX_BINARY_OP_GREATER:
+        case ONYX_BINARY_OP_GREATER_EQUAL:
+            is_sign_significant = 1;
 
-		case ONYX_AST_NODE_KIND_MODULUS:
-			{
-				WasmInstructionType instr_type;
-				switch (expr->type->kind) {
-					case ONYX_TYPE_INFO_KIND_INT32:
-						if (expr->type->is_unsigned) instr_type = WI_I32_REM_U;
-						else instr_type = WI_I32_REM_S;
-						break;
-					case ONYX_TYPE_INFO_KIND_INT64:
-						if (expr->type->is_unsigned) instr_type = WI_I64_REM_U;
-						else instr_type = WI_I64_REM_S;
-						break;
-					default: assert(("Invalid type", 0));
-				}
+        default: break;
+    }
 
-				compile_expression(mod, func, expr->left);
-				compile_expression(mod, func, expr->right);
-				bh_arr_push(func->code, ((WasmInstruction){ instr_type, 0x00 }));
-				break;
-			}
+    WasmType operator_type = onyx_type_to_wasm_type(binop->left->type);
+    WasmInstructionType binop_instr = binop_map[binop->operation][operator_type];
 
-        case ONYX_AST_NODE_KIND_NEGATE:
+    if (binop_instr == WI_NOP) {
+        assert(("Invalid type and operation", 0));
+    }
+
+    // NOTE: Use unsigned variant if needed
+    // Unsigned instructions are always right after
+    // the signed equivalent
+    if (is_sign_significant) {
+        if (binop->left->type->is_unsigned) {
+            binop_instr += 1;
+        }
+    }
+
+    compile_expression(mod, func, binop->left);
+    compile_expression(mod, func, binop->right);
+
+    bh_arr_push(func->code, ((WasmInstruction){ binop_instr, 0x00 }));
+}
+
+static void compile_unaryop(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeUnaryOp* unop) {
+    switch (unop->operation) {
+        case ONYX_UNARY_OP_NEGATE:
             {
-                OnyxTypeInfoKind type_kind = expr->type->kind;
+                OnyxTypeInfoKind type_kind = unop->type->kind;
 
                 if (type_kind == ONYX_TYPE_INFO_KIND_INT32) {
                     bh_arr_push(func->code, ((WasmInstruction){ WI_I32_CONST, 0x00 }));
-                    compile_expression(mod, func, expr->left);
+                    compile_expression(mod, func, unop->left);
                     bh_arr_push(func->code, ((WasmInstruction){ WI_I32_SUB, 0x00 }));
 
                 } else if (type_kind == ONYX_TYPE_INFO_KIND_INT64) {
                     bh_arr_push(func->code, ((WasmInstruction){ WI_I64_CONST, 0x00 }));
-                    compile_expression(mod, func, expr->left);
+                    compile_expression(mod, func, unop->left);
                     bh_arr_push(func->code, ((WasmInstruction){ WI_I64_SUB, 0x00 }));
 
                 } else {
-                    compile_expression(mod, func, expr->left);
+                    compile_expression(mod, func, unop->left);
 
                     if (type_kind == ONYX_TYPE_INFO_KIND_FLOAT32)
                         bh_arr_push(func->code, ((WasmInstruction){ WI_F32_NEG, 0x00 }));
@@ -427,8 +403,28 @@ static void compile_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
                     if (type_kind == ONYX_TYPE_INFO_KIND_FLOAT64)
                         bh_arr_push(func->code, ((WasmInstruction){ WI_F32_NEG, 0x00 }));
                 }
+
                 break;
             }
+
+        case ONYX_UNARY_OP_NOT:
+            compile_expression(mod, func, unop->left);
+            bh_arr_push(func->code, ((WasmInstruction){ WI_I32_EQZ, 0x00 }));
+            break;
+
+        case ONYX_UNARY_OP_CAST: compile_cast(mod, func, unop); break;
+    }
+}
+
+static void compile_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* expr) {
+	switch (expr->kind) {
+        case ONYX_AST_NODE_KIND_BIN_OP:
+            compile_binop(mod, func, &expr->as_binop);
+            break;
+
+        case ONYX_AST_NODE_KIND_UNARY_OP:
+            compile_unaryop(mod, func, &expr->as_unaryop);
+            break;
 
 		case ONYX_AST_NODE_KIND_LOCAL:
 		case ONYX_AST_NODE_KIND_PARAM:
@@ -439,7 +435,6 @@ static void compile_expression(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode*
 				break;
 			}
 
-		case ONYX_AST_NODE_KIND_CAST: compile_cast(mod, func, expr); break;
 		case ONYX_AST_NODE_KIND_LITERAL:
 			{
                 OnyxAstNodeNumLit* lit = &expr->as_numlit;
@@ -496,7 +491,7 @@ static const WasmInstructionType cast_map[][6] = {
 	/* F64 */ { WI_I32_FROM_F64_S,	WI_I32_FROM_F64_U,	WI_I64_FROM_F64_S,	WI_I64_FROM_F64_U,	WI_F32_FROM_F64,	WI_NOP,			  },
 };
 
-static void compile_cast(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* cast) {
+static void compile_cast(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeUnaryOp* cast) {
 	compile_expression(mod, func, cast->left);
 
 	OnyxTypeInfo* from = cast->left->type;

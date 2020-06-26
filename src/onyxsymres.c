@@ -131,30 +131,12 @@ static void symres_call(OnyxSemPassState* state, OnyxAstNode* stmt) {
 
 static void symres_expression(OnyxSemPassState* state, OnyxAstNode** expr) {
     switch ((*expr)->kind) {
-        case ONYX_AST_NODE_KIND_ADD:
-        case ONYX_AST_NODE_KIND_MINUS:
-        case ONYX_AST_NODE_KIND_MULTIPLY:
-        case ONYX_AST_NODE_KIND_DIVIDE:
-        case ONYX_AST_NODE_KIND_MODULUS:
-        case ONYX_AST_NODE_KIND_EQUAL:
-        case ONYX_AST_NODE_KIND_NOT_EQUAL:
-        case ONYX_AST_NODE_KIND_LESS:
-        case ONYX_AST_NODE_KIND_LESS_EQUAL:
-        case ONYX_AST_NODE_KIND_GREATER:
-        case ONYX_AST_NODE_KIND_GREATER_EQUAL:
+        case ONYX_AST_NODE_KIND_BIN_OP:
             symres_expression(state, &(*expr)->left);
             symres_expression(state, &(*expr)->right);
             break;
 
-        case ONYX_AST_NODE_KIND_NEGATE:
-            symres_expression(state, &(*expr)->left);
-            break;
-
-        case ONYX_AST_NODE_KIND_CAST:
-            if ((*expr)->type == NULL) {
-                DEBUG_HERE;
-                return;
-            }
+        case ONYX_AST_NODE_KIND_UNARY_OP:
             symres_expression(state, &(*expr)->left);
             break;
 

@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
 
     compiler_state_free(&compile_state);
 
-	return compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS;
+	return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
 // NOTE: Old bits of code that may be useful again at some point.

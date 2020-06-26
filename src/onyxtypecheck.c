@@ -161,17 +161,7 @@ static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call) {
 
 static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
     switch (expr->kind) {
-        case ONYX_AST_NODE_KIND_ADD:
-        case ONYX_AST_NODE_KIND_MINUS:
-        case ONYX_AST_NODE_KIND_MULTIPLY:
-        case ONYX_AST_NODE_KIND_DIVIDE:
-        case ONYX_AST_NODE_KIND_MODULUS:
-        case ONYX_AST_NODE_KIND_EQUAL:
-        case ONYX_AST_NODE_KIND_NOT_EQUAL:
-        case ONYX_AST_NODE_KIND_LESS:
-        case ONYX_AST_NODE_KIND_LESS_EQUAL:
-        case ONYX_AST_NODE_KIND_GREATER:
-        case ONYX_AST_NODE_KIND_GREATER_EQUAL:
+        case ONYX_AST_NODE_KIND_BIN_OP:
             expr->type = &builtin_types[ONYX_TYPE_INFO_KIND_UNKNOWN];
 
             typecheck_expression(state, expr->left);
@@ -202,8 +192,8 @@ static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
                 return;
             }
 
-            if (expr->kind >= ONYX_AST_NODE_KIND_EQUAL
-                    && expr->kind <= ONYX_AST_NODE_KIND_GREATER_EQUAL) {
+            if (expr->as_binop.operation >= ONYX_BINARY_OP_EQUAL
+                    && expr->as_binop.operation <= ONYX_BINARY_OP_GREATER_EQUAL) {
                 expr->type = &builtin_types[ONYX_TYPE_INFO_KIND_BOOL];
             } else {
                 expr->type = expr->left->type;
@@ -211,14 +201,11 @@ static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
 
             break;
 
-        case ONYX_AST_NODE_KIND_NEGATE:
-            typecheck_expression(state, expr->left);
-            expr->type = expr->left->type;
-            break;
-
-        case ONYX_AST_NODE_KIND_CAST:
-            // NOTE: Do nothing. The resulting type from the cast
-            // is already in the cast expression.
+        case ONYX_AST_NODE_KIND_UNARY_OP:
+            if (expr->as_unaryop.operation != ONYX_UNARY_OP_CAST) {
+                typecheck_expression(state, expr->left);
+                expr->type = expr->left->type;
+            }
             break;
 
         case ONYX_AST_NODE_KIND_CALL:

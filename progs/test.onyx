@@ -18,13 +18,15 @@ something_else :: proc (n i32) -> i32 {
 export main :: proc {
     i := 0;
     while i < 10 {
-        print_i32(fib(i));
+        res :: fib(i);
+        print_i32(res);
         i = i + 1;
     }
 
     i = 0;
     while i < 10 {
-        print_i32(factorial(i));
+        res :: factorial(i);
+        print_i32(res);
         i = i + 1;
     }
 

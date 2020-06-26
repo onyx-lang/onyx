@@ -14,12 +14,8 @@ static const char* ast_node_names[] = {
 	"LOCAL",
     "SYMBOL",
 
-	"ADD",
-	"MINUS",
-	"MULTIPLY",
-	"DIVIDE",
-	"MODULUS",
-	"NEGATE",
+    "UN_OP",
+    "BIN_OP",
 
 	"TYPE",
 	"LITERAL",
@@ -29,14 +25,6 @@ static const char* ast_node_names[] = {
 	"CALL",
 	"ASSIGN",
 	"RETURN",
-
-	"EQUAL",
-	"NOT_EQUAL",
-	"GREATER",
-	"GREATER_EQUAL",
-	"LESS",
-	"LESS_EQUAL",
-	"NOT",
 
 	"IF",
 	"WHILE",
@@ -63,7 +51,7 @@ struct OnyxTypeInfo builtin_types[] = {
 	{ 0xffffffff } // Sentinel
 };
 
-static OnyxAstNode error_node = { { ONYX_AST_NODE_KIND_ERROR, 0, NULL, &builtin_types[0], NULL, NULL, NULL } };
+static OnyxAstNode error_node = { { ONYX_AST_NODE_KIND_ERROR, 0, NULL, &builtin_types[0], 0, NULL, NULL, NULL } };
 
 // NOTE: Forward declarations
 static void parser_next_token(OnyxParser* parser);
@@ -174,13 +162,16 @@ static OnyxAstNodeNumLit* parse_numeric_literal(OnyxParser* parser) {
 }
 
 static OnyxAstNode* parse_factor(OnyxParser* parser) {
+    OnyxAstNode* retval = NULL;
+
 	switch (parser->curr_token->type) {
 		case TOKEN_TYPE_OPEN_PAREN:
 			{
 				parser_next_token(parser);
 				OnyxAstNode* expr = parse_expression(parser);
 				expect(parser, TOKEN_TYPE_CLOSE_PAREN);
-				return expr;
+				retval = expr;
+                break;
 			}
 
         case TOKEN_TYPE_SYM_MINUS:
@@ -188,7 +179,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
                 parser_next_token(parser);
                 OnyxAstNode* factor = parse_factor(parser);
 
-                OnyxAstNode* negate_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_NEGATE);
+                OnyxAstNodeUnaryOp* negate_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_UNARY_OP);
+                negate_node->operation = ONYX_UNARY_OP_NEGATE;
                 negate_node->left = factor;
                 negate_node->type = factor->type;
 
@@ -196,7 +188,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
                     negate_node->flags |= ONYX_AST_FLAG_COMPTIME;
                 }
 
-                return negate_node;
+                retval = (OnyxAstNode *) negate_node;
+                break;
             }
 
 		case TOKEN_TYPE_SYMBOL:
@@ -206,7 +199,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
                 sym_node->token = sym_token;
 
 				if (parser->curr_token->type != TOKEN_TYPE_OPEN_PAREN) {
-					return sym_node;
+					retval = sym_node;
+                    break;
 				}
 
 				// NOTE: Function call
@@ -245,10 +239,13 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 				}
 				parser_next_token(parser);
 
-				return (OnyxAstNode *) call_node;
+				retval = (OnyxAstNode *) call_node;
+                break;
 			}
 
-        case TOKEN_TYPE_LITERAL_NUMERIC: return (OnyxAstNode *) parse_numeric_literal(parser);
+        case TOKEN_TYPE_LITERAL_NUMERIC:
+            retval = (OnyxAstNode *) parse_numeric_literal(parser);
+            break;
 
         case TOKEN_TYPE_LITERAL_BOOL_TRUE:
             {
@@ -256,7 +253,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
                 bool_node->type = &builtin_types[ONYX_TYPE_INFO_KIND_BOOL];
                 bool_node->token = expect(parser, TOKEN_TYPE_LITERAL_BOOL_TRUE);
                 bool_node->value.i = 1;
-                return (OnyxAstNode *) bool_node;
+                retval = (OnyxAstNode *) bool_node;
+                break;
             }
 
         case TOKEN_TYPE_LITERAL_BOOL_FALSE:
@@ -265,7 +263,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
                 bool_node->type = &builtin_types[ONYX_TYPE_INFO_KIND_BOOL];
                 bool_node->token = expect(parser, TOKEN_TYPE_LITERAL_BOOL_FALSE);
                 bool_node->value.i = 0;
-                return (OnyxAstNode *) bool_node;
+                retval = (OnyxAstNode *) bool_node;
+                break;
             }
 
 		default:
@@ -273,36 +272,43 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
 					ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
 					parser->curr_token->pos,
 					onyx_get_token_type_name(parser->curr_token->type));
+            return NULL;
 	}
 
-	return NULL;
+    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_CAST) {
+        OnyxAstNodeUnaryOp* cast_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_UNARY_OP);
+        cast_node->operation = ONYX_UNARY_OP_CAST;
+        cast_node->type = parse_type(parser);
+        cast_node->left = retval;
+        retval = (OnyxAstNode *) cast_node;
+    }
+
+    return retval;
 }
 
-static inline i32 get_precedence(OnyxAstNodeKind kind) {
+static inline i32 get_precedence(OnyxBinaryOp kind) {
     switch (kind) {
-        case ONYX_AST_NODE_KIND_EQUAL: return 3;
-        case ONYX_AST_NODE_KIND_NOT_EQUAL: return 3;
+        case ONYX_BINARY_OP_EQUAL: return 3;
+        case ONYX_BINARY_OP_NOT_EQUAL: return 3;
 
-        case ONYX_AST_NODE_KIND_LESS_EQUAL: return 4;
-        case ONYX_AST_NODE_KIND_LESS: return 4;
-        case ONYX_AST_NODE_KIND_GREATER_EQUAL: return 4;
-        case ONYX_AST_NODE_KIND_GREATER: return 4;
+        case ONYX_BINARY_OP_LESS_EQUAL: return 4;
+        case ONYX_BINARY_OP_LESS: return 4;
+        case ONYX_BINARY_OP_GREATER_EQUAL: return 4;
+        case ONYX_BINARY_OP_GREATER: return 4;
 
-        case ONYX_AST_NODE_KIND_ADD: return 5;
-        case ONYX_AST_NODE_KIND_MINUS: return 5;
+        case ONYX_BINARY_OP_ADD: return 5;
+        case ONYX_BINARY_OP_MINUS: return 5;
 
-        case ONYX_AST_NODE_KIND_MULTIPLY: return 6;
-        case ONYX_AST_NODE_KIND_DIVIDE: return 6;
+        case ONYX_BINARY_OP_MULTIPLY: return 6;
+        case ONYX_BINARY_OP_DIVIDE: return 6;
 
-        case ONYX_AST_NODE_KIND_MODULUS: return 7;
-
-        case ONYX_AST_NODE_KIND_CAST: return 8;
+        case ONYX_BINARY_OP_MODULUS: return 7;
         default: return -1;
     }
 }
 
 static OnyxAstNode* parse_expression(OnyxParser* parser) {
-    bh_arr(OnyxAstNode*) tree_stack = NULL;
+    bh_arr(OnyxAstNodeBinOp*) tree_stack = NULL;
     bh_arr_new(global_scratch_allocator, tree_stack, 4);
     bh_arr_set_length(tree_stack, 0);
 
@@ -310,25 +316,24 @@ static OnyxAstNode* parse_expression(OnyxParser* parser) {
     OnyxAstNode* right;
     OnyxAstNode* root = left;
 
-    i32 bin_op_kind;
+    OnyxBinaryOp bin_op_kind;
     OnyxToken* bin_op_tok;
 
     while (1) {
         bin_op_kind = -1;
         switch (parser->curr_token->type) {
-            case TOKEN_TYPE_SYM_EQUAL_EQUAL:    bin_op_kind = ONYX_AST_NODE_KIND_EQUAL; break;
-            case TOKEN_TYPE_SYM_NOT_EQUAL:      bin_op_kind = ONYX_AST_NODE_KIND_NOT_EQUAL; break;
-            case TOKEN_TYPE_SYM_LESS_EQUAL:     bin_op_kind = ONYX_AST_NODE_KIND_LESS_EQUAL; break;
-            case TOKEN_TYPE_SYM_LESS:           bin_op_kind = ONYX_AST_NODE_KIND_LESS; break;
-            case TOKEN_TYPE_SYM_GREATER_EQUAL:  bin_op_kind = ONYX_AST_NODE_KIND_GREATER_EQUAL; break;
-            case TOKEN_TYPE_SYM_GREATER:        bin_op_kind = ONYX_AST_NODE_KIND_GREATER; break;
+            case TOKEN_TYPE_SYM_EQUAL_EQUAL:    bin_op_kind = ONYX_BINARY_OP_EQUAL; break;
+            case TOKEN_TYPE_SYM_NOT_EQUAL:      bin_op_kind = ONYX_BINARY_OP_NOT_EQUAL; break;
+            case TOKEN_TYPE_SYM_LESS_EQUAL:     bin_op_kind = ONYX_BINARY_OP_LESS_EQUAL; break;
+            case TOKEN_TYPE_SYM_LESS:           bin_op_kind = ONYX_BINARY_OP_LESS; break;
+            case TOKEN_TYPE_SYM_GREATER_EQUAL:  bin_op_kind = ONYX_BINARY_OP_GREATER_EQUAL; break;
+            case TOKEN_TYPE_SYM_GREATER:        bin_op_kind = ONYX_BINARY_OP_GREATER; break;
 
-            case TOKEN_TYPE_SYM_PLUS:       bin_op_kind = ONYX_AST_NODE_KIND_ADD; break;
-            case TOKEN_TYPE_SYM_MINUS:      bin_op_kind = ONYX_AST_NODE_KIND_MINUS; break;
-            case TOKEN_TYPE_SYM_STAR:       bin_op_kind = ONYX_AST_NODE_KIND_MULTIPLY; break;
-            case TOKEN_TYPE_SYM_FSLASH:     bin_op_kind = ONYX_AST_NODE_KIND_DIVIDE; break;
-            case TOKEN_TYPE_SYM_PERCENT:    bin_op_kind = ONYX_AST_NODE_KIND_MODULUS; break;
-            case TOKEN_TYPE_KEYWORD_CAST:   bin_op_kind = ONYX_AST_NODE_KIND_CAST; break;
+            case TOKEN_TYPE_SYM_PLUS:       bin_op_kind = ONYX_BINARY_OP_ADD; break;
+            case TOKEN_TYPE_SYM_MINUS:      bin_op_kind = ONYX_BINARY_OP_MINUS; break;
+            case TOKEN_TYPE_SYM_STAR:       bin_op_kind = ONYX_BINARY_OP_MULTIPLY; break;
+            case TOKEN_TYPE_SYM_FSLASH:     bin_op_kind = ONYX_BINARY_OP_DIVIDE; break;
+            case TOKEN_TYPE_SYM_PERCENT:    bin_op_kind = ONYX_BINARY_OP_MODULUS; break;
             default: goto expression_done;
         }
 
@@ -336,34 +341,31 @@ static OnyxAstNode* parse_expression(OnyxParser* parser) {
             bin_op_tok = parser->curr_token;
             parser_next_token(parser);
 
-            OnyxAstNode* bin_op = onyx_ast_node_new(parser->allocator, bin_op_kind);
+            OnyxAstNodeBinOp* bin_op = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_BIN_OP);
+            bin_op->operation = bin_op_kind;
             bin_op->token = bin_op_tok;
 
             while ( !bh_arr_is_empty(tree_stack) &&
-                    get_precedence(bh_arr_last(tree_stack)->kind) >= get_precedence(bin_op_kind))
+                    get_precedence(bh_arr_last(tree_stack)->operation) >= get_precedence(bin_op_kind))
                 bh_arr_pop(tree_stack);
 
             if (bh_arr_is_empty(tree_stack)) {
                 // NOTE: new is now the root node
                 bin_op->left = root;
-                root = bin_op;
+                root = (OnyxAstNode *) bin_op;
             } else {
                 bin_op->left = bh_arr_last(tree_stack)->right;
-                bh_arr_last(tree_stack)->right = bin_op;
+                bh_arr_last(tree_stack)->right = (OnyxAstNode *) bin_op;
             }
 
             bh_arr_push(tree_stack, bin_op);
 
-            if (bin_op_kind == ONYX_AST_NODE_KIND_CAST) {
-                bin_op->type = parse_type(parser);
-            } else {
-                right = parse_factor(parser);
-                bin_op->right = right;
-                bin_op->type = right->type;
+            right = parse_factor(parser);
+            bin_op->right = right;
+            bin_op->type = right->type;
 
-                if ((left->flags & ONYX_AST_FLAG_COMPTIME) != 0 && (right->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
-                    bin_op->flags |= ONYX_AST_FLAG_COMPTIME;
-                }
+            if ((left->flags & ONYX_AST_FLAG_COMPTIME) != 0 && (right->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
+                bin_op->flags |= ONYX_AST_FLAG_COMPTIME;
             }
         }
     }
@@ -556,6 +558,16 @@ static OnyxAstNode* parse_statement(OnyxParser* parser) {
         case TOKEN_TYPE_KEYWORD_WHILE:
             needs_semicolon = 0;
             retval = (OnyxAstNode *) parse_while_stmt(parser);
+            break;
+
+        case TOKEN_TYPE_KEYWORD_BREAK:
+            retval = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_BREAK);
+            retval->token = expect(parser, TOKEN_TYPE_KEYWORD_BREAK);
+            break;
+
+        case TOKEN_TYPE_KEYWORD_CONTINUE:
+            retval = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_CONTINUE);
+            retval->token = expect(parser, TOKEN_TYPE_KEYWORD_CONTINUE);
             break;
 
 		default:
@@ -779,12 +791,14 @@ const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind) {
 	return ast_node_names[kind];
 }
 
-OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind) {\
-	OnyxAstNode* node = (OnyxAstNode *) bh_alloc(alloc, sizeof(OnyxAstNode));
+// NOTE: This returns a void* so I don't need to cast it everytime I use it
+void* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind) {\
+	OnyxAstNode* node =  bh_alloc_item(alloc, OnyxAstNode);
 	node->kind = kind;
 	node->flags = 0;
 	node->token = NULL;
 	node->type = NULL;
+    node->data = 0;
 	node->next = NULL;
 	node->left = NULL;
 	node->right = NULL;

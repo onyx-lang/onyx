@@ -7,6 +7,8 @@
 #include "onyxmsgs.h"
 
 typedef union OnyxAstNode OnyxAstNode;
+typedef struct OnyxAstNodeUnaryOp OnyxAstNodeUnaryOp;
+typedef struct OnyxAstNodeBinOp OnyxAstNodeBinOp;
 typedef struct OnyxAstNodeNumLit OnyxAstNodeNumLit;
 typedef struct OnyxAstNodeLocal OnyxAstNodeLocal;
 typedef struct OnyxAstNodeScope OnyxAstNodeScope;
@@ -43,32 +45,21 @@ typedef enum OnyxAstNodeKind {
 	ONYX_AST_NODE_KIND_LOCAL,
     ONYX_AST_NODE_KIND_SYMBOL,
 
-	ONYX_AST_NODE_KIND_ADD,
-	ONYX_AST_NODE_KIND_MINUS,
-	ONYX_AST_NODE_KIND_MULTIPLY,
-	ONYX_AST_NODE_KIND_DIVIDE,
-	ONYX_AST_NODE_KIND_MODULUS,
-	ONYX_AST_NODE_KIND_NEGATE,
+    ONYX_AST_NODE_KIND_UNARY_OP,
+    ONYX_AST_NODE_KIND_BIN_OP,
 
 	ONYX_AST_NODE_KIND_TYPE,
 	ONYX_AST_NODE_KIND_LITERAL,
-	ONYX_AST_NODE_KIND_CAST,
 	ONYX_AST_NODE_KIND_PARAM,
     ONYX_AST_NODE_KIND_ARGUMENT,
 	ONYX_AST_NODE_KIND_CALL,
 	ONYX_AST_NODE_KIND_ASSIGNMENT,
 	ONYX_AST_NODE_KIND_RETURN,
 
-	ONYX_AST_NODE_KIND_EQUAL,
-	ONYX_AST_NODE_KIND_NOT_EQUAL,
-	ONYX_AST_NODE_KIND_LESS,
-	ONYX_AST_NODE_KIND_LESS_EQUAL,
-	ONYX_AST_NODE_KIND_GREATER,
-	ONYX_AST_NODE_KIND_GREATER_EQUAL,
-	ONYX_AST_NODE_KIND_NOT,
-
 	ONYX_AST_NODE_KIND_IF,
 	ONYX_AST_NODE_KIND_WHILE,
+    ONYX_AST_NODE_KIND_BREAK,
+    ONYX_AST_NODE_KIND_CONTINUE,
 
 	ONYX_AST_NODE_KIND_COUNT
 } OnyxAstNodeKind;
@@ -112,6 +103,48 @@ typedef enum OnyxAstFlags {
 	ONYX_AST_FLAG_COMPTIME		= BH_BIT(3),
 } OnyxAstFlags;
 
+typedef enum OnyxUnaryOp {
+    ONYX_UNARY_OP_NEGATE,
+    ONYX_UNARY_OP_NOT,
+    ONYX_UNARY_OP_CAST,
+} OnyxUnaryOp;
+
+typedef enum OnyxBinaryOp {
+    ONYX_BINARY_OP_ADD,
+    ONYX_BINARY_OP_MINUS,
+    ONYX_BINARY_OP_MULTIPLY,
+    ONYX_BINARY_OP_DIVIDE,
+    ONYX_BINARY_OP_MODULUS,
+
+	ONYX_BINARY_OP_EQUAL,
+	ONYX_BINARY_OP_NOT_EQUAL,
+	ONYX_BINARY_OP_LESS,
+	ONYX_BINARY_OP_LESS_EQUAL,
+	ONYX_BINARY_OP_GREATER,
+	ONYX_BINARY_OP_GREATER_EQUAL,
+} OnyxBinaryOp;
+
+struct OnyxAstNodeBinOp {
+    OnyxAstNodeKind kind;
+    u32 flags;
+    OnyxToken *token;
+    OnyxTypeInfo *type;
+    OnyxBinaryOp operation;
+    OnyxAstNode *next;
+    OnyxAstNode *left;
+    OnyxAstNode *right;
+};
+
+struct OnyxAstNodeUnaryOp {
+    OnyxAstNodeKind kind;
+    u32 flags;
+    OnyxToken *token;
+    OnyxTypeInfo *type;
+    OnyxUnaryOp operation;
+    OnyxAstNode *next;
+    OnyxAstNode *left;
+};
+
 struct OnyxAstNodeNumLit {
 	OnyxAstNodeKind kind;
 	u32 flags;
@@ -126,6 +159,7 @@ struct OnyxAstNodeLocal {
 	u32 flags;
 	OnyxToken *token;
 	OnyxTypeInfo *type;
+    u64 data;                   // NOTE: Unused
 	OnyxAstNode *next;
 	OnyxAstNodeLocal *prev_local;
 };
@@ -133,8 +167,9 @@ struct OnyxAstNodeLocal {
 struct OnyxAstNodeParam {
 	OnyxAstNodeKind kind;
 	u32 flags;
-	OnyxToken *token;			// Symbol name i.e. 'a', 'b'
+	OnyxToken *token;			// NOTE: Symbol name i.e. 'a', 'b'
 	OnyxTypeInfo *type;
+    u64 data;                   // NOTE: UNUSED
 	OnyxAstNodeParam *next;
 	OnyxAstNodeLocal *prev_local;
 };
@@ -144,6 +179,7 @@ struct OnyxAstNodeScope {
 	u32 flags;
 	OnyxToken *token;	// NOTE: UNUSED
 	OnyxTypeInfo *type; // NOTE: UNUSED
+    u64 data;           // NOTE: UNUSED
 	OnyxAstNodeScope *prev_scope;
 	OnyxAstNodeLocal *last_local;
 };
@@ -153,6 +189,7 @@ struct OnyxAstNodeBlock {
 	u32 flags;
 	OnyxToken *token;
 	OnyxTypeInfo *return_type;
+    u64 data;                       // NOTE: UNUSED
 	OnyxAstNode *next;
 	OnyxAstNode *body;
 	OnyxAstNodeScope *scope;
@@ -162,6 +199,7 @@ struct OnyxAstNodeIf {
     OnyxAstNodeKind kind;
     u32 flags;
     OnyxToken *token;    // NOTE: UNUSED
+    u64 data;            // NOTE: UNUSED
     OnyxAstNode *false_block;
     OnyxAstNode *next;
     OnyxAstNode *cond;
@@ -173,6 +211,7 @@ struct OnyxAstNodeWhile {
     u32 flags;
     OnyxToken *token;   // NOTE: UNUSED
     OnyxTypeInfo *type;
+    u64 data;
     OnyxAstNode *next;
     OnyxAstNode *cond;
     OnyxAstNodeBlock *body;
@@ -183,6 +222,7 @@ struct OnyxAstNodeFuncDef {
 	u32 flags;
 	OnyxToken *token; // This will point to the symbol token to identify it
 	OnyxTypeInfo *return_type;
+    u64 data;
 	OnyxAstNode *next;
 	OnyxAstNodeBlock *body;
 	OnyxAstNodeParam *params;
@@ -193,6 +233,7 @@ struct OnyxAstNodeForeign {
 	u32 flags;
 	OnyxToken *mod_token;
 	OnyxTypeInfo *type;
+    u64 data;
 	OnyxAstNode *next;
     OnyxToken *name_token;
 	OnyxAstNode *import;
@@ -201,8 +242,9 @@ struct OnyxAstNodeForeign {
 struct OnyxAstNodeCall {
 	OnyxAstNodeKind kind;
 	u32 flags;
-	OnyxToken *token; 			// NOTE: Not specified (undefined)
+	OnyxToken *token;
 	OnyxTypeInfo *type; 		// NOTE: The type that the function returns
+    u64 data;
 	OnyxAstNode *next;
 	OnyxAstNode *callee;		// NOTE: Function definition node
 	OnyxAstNode *arguments;		// NOTE: Expressions that form the actual param list
@@ -215,6 +257,7 @@ struct OnyxAstNodeFile {
     u32 flags;
     OnyxToken *token;           // NOTE: unused
     OnyxTypeInfo *type;         // NOTE: unused
+    u64 data;
     OnyxAstNodeFile *next;      // NOTE: next file
     OnyxAstNode *contents;      // NOTE: the first top-level element
 };
@@ -227,6 +270,7 @@ union OnyxAstNode {
 		u32 flags;
 		OnyxToken *token;
 		OnyxTypeInfo *type;
+        u64 data;
 		OnyxAstNode *next;
 		OnyxAstNode *left;
 		OnyxAstNode *right;
@@ -239,6 +283,8 @@ union OnyxAstNode {
 	OnyxAstNodeScope as_scope;
 	OnyxAstNodeCall as_call;
     OnyxAstNodeNumLit as_numlit;
+    OnyxAstNodeBinOp as_binop;
+    OnyxAstNodeUnaryOp as_unaryop;
     OnyxAstNodeForeign as_foreign;
     OnyxAstNodeIf as_if;
     OnyxAstNodeWhile as_while;
@@ -246,7 +292,7 @@ union OnyxAstNode {
 };
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);
-OnyxAstNode* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
+void* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
 void onyx_parser_free(OnyxParser* parser);
 OnyxAstNodeFile* onyx_parse(OnyxParser *parser);

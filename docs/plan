@@ -59,7 +59,7 @@ HOW:
 		[X] Comparison operators
 		[X] Proper boolean type
 		[X] Conditional branching works as expected
-		[ ] Simple while loop is functioning as expected
+		XX] Simple while loop is functioning as expected
 		[ ] break and continue semantics
 		[X] Function calling works for the builtin types
 		[X] Function return values are type checked
