@@ -17,6 +17,7 @@ This a small list of things I want in the language when all is said and done. Ma
 | Completed | Top-level function declarations only |
 | Completed | Static symbol resolution where order does not matter |
 | Completed | Link to externally defined functions (WASM imports) |
-| In Progress | Standard C-style control flow |
+| Completed | Standard C-style control flow |
+| Not Started | Global variables (WASM globals) |
 | Not Started | Pointers |
 | Not Started | Structured data |
