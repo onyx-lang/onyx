@@ -1,5 +1,4 @@
 #ifndef ONYXPARSER_H
-                negate_node->operation = ONYX_UNARY_OP_NEGATE;
 #define ONYXPARSER_H
 
 #include "bh.h"

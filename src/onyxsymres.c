@@ -75,20 +75,20 @@ static OnyxAstNode* symbol_resolve(OnyxSemPassState* state, OnyxAstNode* symbol)
 }
 
 static void scope_enter(OnyxSemPassState* state, OnyxAstNodeScope* scope) {
-	scope->prev_scope = state->curr_scope;
-	state->curr_scope = scope;
+    scope->prev_scope = state->curr_scope;
+    state->curr_scope = scope;
 }
 
 static OnyxAstNodeScope* scope_leave(OnyxSemPassState* state) {
-	// NOTE: Can't leave a scope if there is no scope
-	assert(state->curr_scope != NULL);
+    // NOTE: Can't leave a scope if there is no scope
+    assert(state->curr_scope != NULL);
 
-	for (OnyxAstNodeLocal *walker = state->curr_scope->last_local; walker != NULL; walker = walker->prev_local) {
-		symbol_remove(state, (OnyxAstNode *) walker);
-	}
+    for (OnyxAstNodeLocal *walker = state->curr_scope->last_local; walker != NULL; walker = walker->prev_local) {
+        symbol_remove(state, (OnyxAstNode *) walker);
+    }
 
-	state->curr_scope = state->curr_scope->prev_scope;
-	return state->curr_scope;
+    state->curr_scope = state->curr_scope->prev_scope;
+    return state->curr_scope;
 }
 
 static b32 define_function(OnyxSemPassState* state, OnyxAstNodeFuncDef* func) {
@@ -205,7 +205,7 @@ static b32 symres_statement(OnyxSemPassState* state, OnyxAstNode* stmt) {
     switch (stmt->kind) {
         case ONYX_AST_NODE_KIND_LOCAL:      symres_local(state, (OnyxAstNodeLocal **) &stmt);       return 1;
         case ONYX_AST_NODE_KIND_ASSIGNMENT: symres_assignment(state, stmt);                         return 0;
-		case ONYX_AST_NODE_KIND_RETURN:     symres_return(state, stmt);                             return 0;
+        case ONYX_AST_NODE_KIND_RETURN:     symres_return(state, stmt);                             return 0;
         case ONYX_AST_NODE_KIND_IF:         symres_if(state, &stmt->as_if);                         return 0;
         case ONYX_AST_NODE_KIND_WHILE:      symres_while(state, &stmt->as_while);                   return 0;
         case ONYX_AST_NODE_KIND_CALL:       symres_call(state, stmt);                               return 0;

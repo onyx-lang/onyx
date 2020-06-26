@@ -16,15 +16,15 @@ FLAGS=-g
 TARGET=./onyx
 
 build/%.o: src/%.c include/bh.h
-    $(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
+	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
 
 $(TARGET): $(OBJ_FILES)
-    $(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
+	$(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
 
 install: $(TARGET)
-    cp $(TARGET) /usr/bin/
+	cp $(TARGET) /usr/bin/
 
 clean:
-    rm -f $(OBJ_FILES) 2>&1 >/dev/null
+	rm -f $(OBJ_FILES) 2>&1 >/dev/null
 
 all: onyx
