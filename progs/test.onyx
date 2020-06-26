@@ -36,9 +36,16 @@ export main :: proc {
 
         x = 0;
         while x < 5 {
+            if x == 3 {
+                x = x + 1;
+                continue;
+            }
+
             print_i32((x + y * 5) % 10);
             x = x + 1;
         }
+
+        if y > 2 { break; }
 
         y = y + 1;
     }

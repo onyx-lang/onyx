@@ -241,6 +241,28 @@ static void compile_block(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBlock*
     bh_arr_push(func->code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
 }
 
+static void compile_structured_jump(OnyxWasmModule* mod, WasmFunc* func, b32 jump_backward) {
+    i32 labelidx = 0;
+    u8 wanted = jump_backward ? 2 : 1;
+    b32 success = 0;
+
+    i32 len = bh_arr_length(mod->structured_jump_target) - 1;
+    for (u8* t = &bh_arr_last(mod->structured_jump_target); len >= 0; len--, t--) {
+        if (*t == wanted) {
+            success = 1;
+            break;
+        }
+
+        labelidx++;
+    }
+
+    if (success) {
+        bh_arr_push(func->code, ((WasmInstruction){ WI_JUMP, labelidx }));
+    } else {
+        assert(("Invalid structured jump", 0));
+    }
+}
+
 static void compile_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* stmt) {
     switch (stmt->kind) {
         case ONYX_AST_NODE_KIND_SCOPE: break;
@@ -248,6 +270,8 @@ static void compile_statement(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode* 
         case ONYX_AST_NODE_KIND_ASSIGNMENT: compile_assignment(mod, func, stmt); break;
         case ONYX_AST_NODE_KIND_IF: compile_if(mod, func, (OnyxAstNodeIf *) stmt); break;
         case ONYX_AST_NODE_KIND_WHILE: compile_while(mod, func, (OnyxAstNodeWhile *) stmt); break;
+        case ONYX_AST_NODE_KIND_BREAK: compile_structured_jump(mod, func, 0); break;
+        case ONYX_AST_NODE_KIND_CONTINUE: compile_structured_jump(mod, func, 1); break;
         case ONYX_AST_NODE_KIND_CALL: compile_expression(mod, func, stmt); break;
         case ONYX_AST_NODE_KIND_BLOCK: compile_block(mod, func, (OnyxAstNodeBlock *) stmt); break;
 
@@ -268,6 +292,8 @@ static void compile_assign_lval(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNode
 static void compile_if(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeIf* if_node) {
     compile_expression(mod, func, if_node->cond);
     bh_arr_push(func->code, ((WasmInstruction){ WI_IF_START, 0x40 }));
+
+    bh_arr_push(mod->structured_jump_target, 0);
 
     if (if_node->true_block) {
         // NOTE: This is kind of gross, but making a function for this doesn't feel right
@@ -297,6 +323,8 @@ static void compile_if(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeIf* if_no
         }
     }
 
+    bh_arr_pop(mod->structured_jump_target);
+
     bh_arr_push(func->code, ((WasmInstruction){ WI_IF_END, 0x00 }));
 }
 
@@ -308,9 +336,15 @@ static void compile_while(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeWhile*
     bh_arr_push(func->code, ((WasmInstruction){ WI_I32_EQZ, 0x00 }));
     bh_arr_push(func->code, ((WasmInstruction){ WI_COND_JUMP, 0x01 }));
 
+    bh_arr_push(mod->structured_jump_target, 1);
+    bh_arr_push(mod->structured_jump_target, 2);
+
     forll (OnyxAstNode, stmt, while_node->body->body, next) {
         compile_statement(mod, func, stmt);
     }
+
+    bh_arr_pop(mod->structured_jump_target);
+    bh_arr_pop(mod->structured_jump_target);
 
     bh_arr_push(func->code, ((WasmInstruction){ WI_JUMP, 0x00 }));
 
@@ -357,7 +391,13 @@ static void compile_binop(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBinOp*
     }
 
     WasmType operator_type = onyx_type_to_wasm_type(binop->left->type);
-    WasmInstructionType binop_instr = binop_map[binop->operation][operator_type];
+    i32 optype = 0;
+    if (operator_type == WASM_TYPE_INT32) optype = 0;
+    else if (operator_type == WASM_TYPE_INT64) optype = 1;
+    else if (operator_type == WASM_TYPE_FLOAT32) optype = 2;
+    else if (operator_type == WASM_TYPE_FLOAT64) optype = 3;
+
+    WasmInstructionType binop_instr = binop_map[(i32) binop->operation][optype];
 
     if (binop_instr == WI_NOP) {
         assert(("Invalid type and operation", 0));
@@ -368,7 +408,7 @@ static void compile_binop(OnyxWasmModule* mod, WasmFunc* func, OnyxAstNodeBinOp*
     // the signed equivalent
     if (is_sign_significant) {
         if (binop->left->type->is_unsigned) {
-            binop_instr += 1;
+            binop_instr = (WasmInstructionType) ((i32) binop_instr + 1);
         }
     }
 
@@ -677,11 +717,17 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .imports = NULL,
         .next_import_func_idx = 0,
+
+        .structured_jump_target = NULL,
     };
 
     bh_arr_new(alloc, module.functypes, 4);
     bh_arr_new(alloc, module.funcs, 4);
     bh_arr_new(alloc, module.imports, 4);
+
+    // NOTE: 16 is probably needlessly large
+    bh_arr_new(bh_heap_allocator(), module.structured_jump_target, 16);
+    bh_arr_set_length(module.structured_jump_target, 0);
 
     bh_table_init(bh_heap_allocator(), module.type_map, 61);
     bh_table_init(bh_heap_allocator(), module.exports, 61);

@@ -470,49 +470,49 @@ typedef struct bh__arr {
 } bh__arr;
 
 #ifndef BH_ARR_GROW_FORMULA
-#define BH_ARR_GROW_FORMULA(x)        ((x) > 0 ? ((x) << 1) : 4)
+#define BH_ARR_GROW_FORMULA(x)       ((x) > 0 ? ((x) << 1) : 4)
 #endif
 
 #define bh_arr(T)                    T*
-#define bh__arrhead(arr)            (((bh__arr *)(arr)) - 1)
+#define bh__arrhead(arr)             (((bh__arr *)(arr)) - 1)
 
 #define bh_arr_allocator(arr)        (arr ? bh__arrhead(arr)->allocator : bh_heap_allocator())
-#define bh_arr_length(arr)             (arr ? bh__arrhead(arr)->length : 0)
+#define bh_arr_length(arr)           (arr ? bh__arrhead(arr)->length : 0)
 #define bh_arr_capacity(arr)         (arr ? bh__arrhead(arr)->capacity : 0)
-#define bh_arr_size(arr)            (arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
-#define bh_arr_valid(arr, i)        (arr ? (i32)(i) < bh__arrhead(arr)->length : 0)
+#define bh_arr_size(arr)             (arr ? bh__arrhead(arr)->capacity * sizeof(*(arr)) : 0)
+#define bh_arr_valid(arr, i)         (arr ? (i32)(i) < bh__arrhead(arr)->length : 0)
 
-#define bh_arr_pop(arr)                ((arr)[--bh__arrhead(arr)->length])
-#define bh_arr_last(arr)            ((arr)[bh__arrhead(arr)->length - 1])
-#define bh_arr_end(arr, i)            ((i) >= &(arr)[bh_arr_length(arr)])
+#define bh_arr_pop(arr)              ((arr)[--bh__arrhead(arr)->length])
+#define bh_arr_last(arr)             ((arr)[bh__arrhead(arr)->length - 1])
+#define bh_arr_end(arr, i)           ((i) >= &(arr)[bh_arr_length(arr)])
 
 #define bh_arr_new(allocator_, arr, cap)    (bh__arr_grow((allocator_), (void**) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_free(arr)                    (bh__arr_free((void**) &(arr)))
 #define bh_arr_copy(allocator_, arr)        (bh__arr_copy((allocator_), (arr), sizeof(*(arr))))
 
-#define bh_arr_grow(arr, cap)         (bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), cap))
+#define bh_arr_grow(arr, cap)          (bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_shrink(arr, cap)        (bh__arr_shrink((void **) &(arr), sizeof(*(arr)), cap))
-#define bh_arr_set_length(arr, n)    ( \
+#define bh_arr_set_length(arr, n)      ( \
     bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), n), \
     bh__arrhead(arr)->length = n)
 
-#define bh_arr_insertn(arr, i, n)    (bh__arr_insertn((void **) &(arr), sizeof(*(arr)), i, n))
+#define bh_arr_insertn(arr, i, n)      (bh__arr_insertn((void **) &(arr), sizeof(*(arr)), i, n))
 
-#define bh_arr_insert_end(arr, n)    ( \
+#define bh_arr_insert_end(arr, n)      ( \
     bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + n), \
     bh__arrhead(arr)->length += n)
 
-#define bh_arr_push(arr, value)     ( \
+#define bh_arr_push(arr, value)       ( \
     bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1), \
     arr[bh__arrhead(arr)->length++] = value)
 
-#define bh_arr_is_empty(arr)        (arr ? bh__arrhead(arr)->length == 0 : 1)
-#define bh_arr_clear(arr)            (arr ? (bh__arrhead(arr)->length = 0) : 0)
+#define bh_arr_is_empty(arr)          (arr ? bh__arrhead(arr)->length == 0 : 1)
+#define bh_arr_clear(arr)             (arr ? (bh__arrhead(arr)->length = 0) : 0)
 
-#define bh_arr_deleten(arr, i, n)    (bh__arr_deleten((void **) &(arr), sizeof(*(arr)), i, n))
-#define bh_arr_fastdelete(arr, i)    (arr[i] = arr[--bh__arrhead(arr)->length])
+#define bh_arr_deleten(arr, i, n)     (bh__arr_deleten((void **) &(arr), sizeof(*(arr)), i, n))
+#define bh_arr_fastdelete(arr, i)     (arr[i] = arr[--bh__arrhead(arr)->length])
 
-#define bh_arr_each(T, var, arr)            for (T* var = (arr); !bh_arr_end((arr), var); var++)
+#define bh_arr_each(T, var, arr)      for (T* var = (arr); !bh_arr_end((arr), var); var++)
 
 b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap);
@@ -570,26 +570,26 @@ typedef struct bh__table {
 #ifdef BH_TABLE_SIZE_SAFE
     #define bh_table_init(allocator_, tab, hs)    bh__table_init(allocator_, (bh__table **)&(tab), hs)
     #define bh_table_free(tab)                    bh__table_free((bh__table **)&(tab))
-    #define bh_table_put(T, tab, key, value)     (assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = (T) value))
-    #define bh_table_has(T, tab, key)            (assert(sizeof(T) == sizeof(*(tab))), (bh__table_has((bh__table *) tab, sizeof(T), key)))
-    #define bh_table_get(T, tab, key)            (assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__table_get((bh__table *) tab, sizeof(T), key))))
-    #define bh_table_delete(T, tab, key)            (assert(sizeof(T) == sizeof(*(tab))), bh__table_delete((bh__table *) tab, sizeof(T), key))
-    #define bh_table_clear(tab)                    (bh__table_clear((bh__table *) tab))
+    #define bh_table_put(T, tab, key, value)      (assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = (T) value))
+    #define bh_table_has(T, tab, key)             (assert(sizeof(T) == sizeof(*(tab))), (bh__table_has((bh__table *) tab, sizeof(T), key)))
+    #define bh_table_get(T, tab, key)             (assert(sizeof(T) == sizeof(*(tab))), (*((T *) bh__table_get((bh__table *) tab, sizeof(T), key))))
+    #define bh_table_delete(T, tab, key)          (assert(sizeof(T) == sizeof(*(tab))), bh__table_delete((bh__table *) tab, sizeof(T), key))
+    #define bh_table_clear(tab)                   (bh__table_clear((bh__table *) tab))
 
-    #define bh_table_iter_setup(T, tab)            (assert(sizeof(T) == sizeof(*(tab))), bh__table_iter_setup((bh__table *) tab, sizeof(T)))
-    #define bh_table_iter_key(it)                ((char *)(bh_pointer_add(it.entry, it.elemsize + sizeof(u16))))
+    #define bh_table_iter_setup(T, tab)           (assert(sizeof(T) == sizeof(*(tab))), bh__table_iter_setup((bh__table *) tab, sizeof(T)))
+    #define bh_table_iter_key(it)                 ((char *)(bh_pointer_add(it.entry, it.elemsize + sizeof(u16))))
     #define bh_table_iter_value(T, it)            (*(T *)it.entry)
 #else
     #define bh_table_init(allocator_, tab, hs)    bh__table_init(allocator_, (bh__table **)&(tab), hs)
     #define bh_table_free(tab)                    bh__table_free((bh__table **)&(tab))
-    #define bh_table_put(T, tab, key, value)     (*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = (T) value)
-    #define bh_table_has(T, tab, key)            (bh__table_has((bh__table *) tab, sizeof(T), key))
-    #define bh_table_get(T, tab, key)            (*((T *) bh__table_get((bh__table *) tab, sizeof(T), key)))
-    #define bh_table_delete(T, tab, key)            (bh__table_delete((bh__table *) tab, sizeof(T), key))
-    #define bh_table_clear(tab)                    (bh__table_clear((bh__table *) tab))
+    #define bh_table_put(T, tab, key, value)      (*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = (T) value)
+    #define bh_table_has(T, tab, key)             (bh__table_has((bh__table *) tab, sizeof(T), key))
+    #define bh_table_get(T, tab, key)             (*((T *) bh__table_get((bh__table *) tab, sizeof(T), key)))
+    #define bh_table_delete(T, tab, key)          (bh__table_delete((bh__table *) tab, sizeof(T), key))
+    #define bh_table_clear(tab)                   (bh__table_clear((bh__table *) tab))
 
-    #define bh_table_iter_setup(T, tab)            (bh__table_iter_setup((bh__table *) tab, sizeof(T)))
-    #define bh_table_iter_key(it)                ((char *)(bh_pointer_add(it.entry, it.elemsize + sizeof(u16))))
+    #define bh_table_iter_setup(T, tab)           (bh__table_iter_setup((bh__table *) tab, sizeof(T)))
+    #define bh_table_iter_key(it)                 ((char *)(bh_pointer_add(it.entry, it.elemsize + sizeof(u16))))
     #define bh_table_iter_value(T, it)            (*(T *)it.entry)
 #endif
 
