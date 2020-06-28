@@ -191,6 +191,16 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc);
 
 
 
+// MANAGED HEAP ALLOCATOR
+typedef struct bh_managed_heap {
+    ptr* pointers; // Actually a bh_arr
+} bh_managed_heap;
+
+void bh_managed_heap_init(bh_managed_heap* mh);
+void bh_managed_heap_free(bh_managed_heap* mh);
+bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh);
+BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc);
+
 
 
 // ARENA ALLOCATOR
@@ -789,6 +799,88 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
     return retval;
 }
+
+
+
+
+
+
+// MANAGED HEAP ALLOCATOR IMPLEMENTATION
+void bh_managed_heap_init(bh_managed_heap* mh) {
+    mh->pointers = NULL;
+
+    bh_arr_new(bh_heap_allocator(), mh->pointers, 4);
+}
+
+void bh_managed_heap_free(bh_managed_heap* mh) {
+    bh_arr_each(ptr, p, mh->pointers) {
+        free(*p);
+    }
+
+    bh_arr_free(mh->pointers);
+}
+
+bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh) {
+    return (bh_allocator) {
+        .proc = bh_managed_heap_allocator_proc,
+        .data = mh
+    };
+}
+
+BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
+    bh_managed_heap* mh = (bh_managed_heap *) data;
+    ptr retval = NULL;
+
+    switch (action) {
+    case bh_allocator_action_alloc: {
+        retval = aligned_alloc(alignment, size);
+
+        if (flags & bh_allocator_flag_clear && retval != NULL) {
+            memset(retval, 0, size);
+        }
+
+        if (retval != NULL)
+            bh_arr_push(mh->pointers, retval);
+    } break;
+
+    case bh_allocator_action_resize: {
+        i32 replace_idx = 0;
+        b32 found = 0;
+
+        bh_arr_each(ptr, p, mh->pointers) {
+            if (*p == prev_memory) {
+                found = 1;
+                break;
+            }
+
+            replace_idx++;
+        }
+
+        retval = realloc(prev_memory, size);
+        mh->pointers[replace_idx] = retval;
+    } break;
+
+    case bh_allocator_action_free: {
+        i32 free_idx = 0;
+        b32 found = 0;
+
+        bh_arr_each(ptr, p, mh->pointers) {
+            if (*p == prev_memory) {
+                found = 1;
+                break;
+            }
+
+            free_idx++;
+        }
+
+        bh_arr_fastdelete(mh->pointers, free_idx);
+        free(prev_memory);
+    } break;
+    }
+
+    return retval;
+}
+
 
 
 
