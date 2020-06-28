@@ -5,6 +5,9 @@
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
 
+bh_managed_heap global_heap;
+bh_allocator global_heap_allocator;
+
 #define print_indent { if (indent > 0) bh_printf("\n"); for (int i = 0; i < indent; i++) bh_printf("  "); }
 
 void onyx_ast_print(OnyxAstNode* node, i32 indent) {

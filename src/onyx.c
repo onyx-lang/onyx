@@ -190,12 +190,13 @@ void compiler_state_free(CompilerState* cs) {
 
 int main(int argc, char *argv[]) {
 
-    bh_allocator alloc = bh_heap_allocator();
-
-    bh_scratch_init(&global_scratch, alloc, 16 * 1024); // NOTE: 16 KB
+    bh_scratch_init(&global_scratch, bh_heap_allocator(), 16 * 1024); // NOTE: 16 KB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
 
-    OnyxCompileOptions compile_opts = compile_opts_parse(alloc, argc, argv);
+    bh_managed_heap_init(&global_heap);
+    global_heap_allocator = bh_managed_heap_allocator(&global_heap);
+
+    OnyxCompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
     CompilerState compile_state = {
         .wasm_mod = { 0 }
     };
