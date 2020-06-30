@@ -12,6 +12,7 @@ static const char* ast_node_names[] = {
     "BLOCK",
     "SCOPE",
     "LOCAL",
+    "GLOBAL",
     "SYMBOL",
 
     "UN_OP",
@@ -19,7 +20,6 @@ static const char* ast_node_names[] = {
 
     "TYPE",
     "LITERAL",
-    "CAST",
     "PARAM",
     "ARGUMENT",
     "CALL",
@@ -28,6 +28,8 @@ static const char* ast_node_names[] = {
 
     "IF",
     "WHILE",
+    "BREAK",
+    "CONTINUE",
 
     "ONYX_AST_NODE_KIND_COUNT",
 };
@@ -705,29 +707,50 @@ static OnyxAstNodeFuncDef* parse_function_definition(OnyxParser* parser) {
     return func_def;
 }
 
-static OnyxAstNode* parse_top_level_symbol(OnyxParser* parser) {
+static OnyxAstNode* parse_foreign(OnyxParser* parser) {
+    expect(parser, TOKEN_TYPE_KEYWORD_FOREIGN);
+
+    OnyxAstNodeForeign* foreign = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_FOREIGN);
+    foreign->mod_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
+    foreign->name_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
+
     if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_PROC) {
-        OnyxAstNodeFuncDef* func_def = parse_function_definition(parser);
-        return (OnyxAstNode *) func_def;
+        foreign->import = (OnyxAstNode *) parse_function_definition(parser);
+
+    } else {
+        OnyxTypeInfo* type = parse_type(parser);
+
+        OnyxAstNodeGlobal* global = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_GLOBAL);
+        global->type = type;
+        global->flags |= ONYX_AST_FLAG_LVAL;
+
+        foreign->import = (OnyxAstNode *) global;
+    }
+
+    return (OnyxAstNode *) foreign;
+}
+
+static OnyxAstNode* parse_top_level_constant_symbol(OnyxParser* parser) {
+    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_PROC) {
+        return (OnyxAstNode *) parse_function_definition(parser);
 
     } else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_STRUCT) {
         // Handle struct case
         assert(0);
+
     } else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_FOREIGN) {
-        parser_next_token(parser);
+        return (OnyxAstNode *) parse_foreign(parser);
 
-        OnyxAstNodeForeign* foreign = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_FOREIGN);
-        foreign->mod_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
-        foreign->name_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
-        foreign->import = parse_top_level_symbol(parser);
-
-        return (OnyxAstNode *) foreign;
     } else {
-        onyx_message_add(parser->msgs,
-                ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
-                parser->curr_token->pos,
-                onyx_get_token_type_name(parser->curr_token->type));
-        return &error_node;
+        // Global constant with initial value
+        OnyxAstNodeGlobal* global = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_GLOBAL);
+        global->initial_value = parse_expression(parser);
+        global->type = &builtin_types[ONYX_TYPE_INFO_KIND_UNKNOWN];
+        global->flags |= ONYX_AST_FLAG_CONST;
+        global->flags |= ONYX_AST_FLAG_LVAL;
+        global->flags |= ONYX_AST_FLAG_COMPTIME;
+
+        return (OnyxAstNode *) global;
     }
 }
 
@@ -760,20 +783,42 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
                 parser_next_token(parser);
 
                 expect(parser, TOKEN_TYPE_SYM_COLON);
-                expect(parser, TOKEN_TYPE_SYM_COLON);
 
-                OnyxAstNode* node = parse_top_level_symbol(parser);
-                if (node->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
-                    node->token = symbol;
+                if (parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
+                    parser_next_token(parser);
+
+                    OnyxAstNode* node = parse_top_level_constant_symbol(parser);
+
+                    if (node->kind == ONYX_AST_NODE_KIND_FOREIGN) {
+                        node->as_foreign.import->token = symbol;
+
+                    } else {
+                        node->token = symbol;
+                    }
+
+                    return node;
+
+                } else if (parser->curr_token->type == TOKEN_TYPE_SYM_EQUALS) {
+                    parser_next_token(parser);
+
+                    OnyxAstNodeGlobal* global = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_GLOBAL);
+                    global->token = symbol;
+                    global->flags |= ONYX_AST_FLAG_LVAL;
+                    global->initial_value = parse_expression(parser);
+                    global->type = &builtin_types[ONYX_TYPE_INFO_KIND_UNKNOWN];
+
+                    return (OnyxAstNode *) global;
+
+                } else {
+                    onyx_token_null_toggle(*parser->curr_token);
+                    onyx_message_add(parser->msgs,
+                            ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
+                            parser->curr_token->pos,
+                            parser->curr_token->token);
+                    onyx_token_null_toggle(*parser->curr_token);
                 }
 
-                if (node->kind == ONYX_AST_NODE_KIND_FOREIGN) {
-                    OnyxAstNodeForeign* foreign = &node->as_foreign;
-
-                    foreign->import->token = symbol;
-                }
-
-                return node;
+                return &error_node;
             }
 
         default: break;

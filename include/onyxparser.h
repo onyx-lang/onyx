@@ -18,6 +18,7 @@ typedef struct OnyxAstNodeWhile OnyxAstNodeWhile;
 typedef struct OnyxAstNodeParam OnyxAstNodeParam;
 typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
 typedef struct OnyxAstNodeForeign OnyxAstNodeForeign;
+typedef struct OnyxAstNodeGlobal OnyxAstNodeGlobal;
 typedef struct OnyxAstNodeCall OnyxAstNodeCall;
 typedef struct OnyxAstNodeFile OnyxAstNodeFile;
 
@@ -43,6 +44,7 @@ typedef enum OnyxAstNodeKind {
     ONYX_AST_NODE_KIND_BLOCK,
     ONYX_AST_NODE_KIND_SCOPE,
     ONYX_AST_NODE_KIND_LOCAL,
+    ONYX_AST_NODE_KIND_GLOBAL,
     ONYX_AST_NODE_KIND_SYMBOL,
 
     ONYX_AST_NODE_KIND_UNARY_OP,
@@ -150,6 +152,7 @@ struct OnyxAstNodeNumLit {
     u32 flags;
     OnyxToken *token;
     OnyxTypeInfo *type;
+    u64 data;
     OnyxAstNode *next;
     union { i32 i; i64 l; f32 f; f64 d; } value;
 };
@@ -239,6 +242,16 @@ struct OnyxAstNodeForeign {
     OnyxAstNode *import;
 };
 
+struct OnyxAstNodeGlobal {
+    OnyxAstNodeKind kind;
+    u32 flags;
+    OnyxToken *token;
+    OnyxTypeInfo *type;
+    u64 data;
+    OnyxAstNode* next;
+    OnyxAstNode* initial_value;
+};
+
 struct OnyxAstNodeCall {
     OnyxAstNodeKind kind;
     u32 flags;
@@ -286,6 +299,7 @@ union OnyxAstNode {
     OnyxAstNodeBinOp as_binop;
     OnyxAstNodeUnaryOp as_unaryop;
     OnyxAstNodeForeign as_foreign;
+    OnyxAstNodeGlobal as_global;
     OnyxAstNodeIf as_if;
     OnyxAstNodeWhile as_while;
     OnyxAstNodeFile as_file;

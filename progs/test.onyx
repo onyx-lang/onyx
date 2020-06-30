@@ -22,6 +22,8 @@ something_else :: proc (n i32) -> i32 {
 // symbol := 5                  Global mutable variable
 // symbol : i32                 Global mutable i32 (defaults to 0 initial value)
 
+global_value := 5 + 6;
+
 // This is the entry point
 export main :: proc {
     i := 0;

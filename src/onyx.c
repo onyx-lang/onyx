@@ -30,6 +30,8 @@ typedef struct OnyxCompileOptions {
     bh_allocator allocator;
     CompileAction action;
 
+    u32 print_ast : 1;
+
     bh_arr(const char *) files;
     const char* target_file;
 } OnyxCompileOptions;
@@ -57,6 +59,8 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
         .allocator = alloc,
         .action = ONYX_COMPILE_ACTION_PRINT_HELP,
 
+        .print_ast = 0,
+
         .files = NULL,
         .target_file = "out.wasm",
     };
@@ -71,6 +75,9 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
         else if (!strcmp(argv[i], "-o")) {
             options.action = ONYX_COMPILE_ACTION_COMPILE;
             options.target_file = argv[++i];
+        }
+        else if (!strcmp(argv[i], "-ast")) {
+            options.print_ast = 1;
         }
         else {
             options.action = ONYX_COMPILE_ACTION_COMPILE;
@@ -136,6 +143,11 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
     bh_table_each_start(bh_file_contents, compiler_state->loaded_files);
         OnyxAstNodeFile* file_node = parse_source_file(&value, compiler_state);
 
+        if (opts->print_ast) {
+            onyx_ast_print((OnyxAstNode *) file_node, 0);
+            bh_printf("\n");
+        }
+
         if (!root_file) {
             root_file = file_node;
         }
@@ -154,6 +166,11 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
     bh_printf("Checking semantics and types\n");
     OnyxSemPassState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
     onyx_sempass(&sp_state, root_file);
+
+    if (opts->print_ast) {
+        onyx_ast_print((OnyxAstNode *) root_file, 0);
+        bh_printf("\n");
+    }
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;

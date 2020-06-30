@@ -18,8 +18,12 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
 
     switch (node->kind) {
     case ONYX_AST_NODE_KIND_PROGRAM: {
+        OnyxAstNodeFile* file_node = &node->as_file;
+        if (file_node->contents)
+            onyx_ast_print(file_node->contents, indent + 1);
+
         if (node->next)
-            onyx_ast_print(node->next, indent + 1);
+            onyx_ast_print(node->next, indent);
 
         break;
     }
@@ -93,6 +97,19 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
             onyx_ast_print((OnyxAstNode *) local->prev_local, 0);
         } else if (local->next && indent != 0) {
             onyx_ast_print(local->next, indent);
+        }
+        break;
+    }
+
+    case ONYX_AST_NODE_KIND_GLOBAL: {
+        OnyxAstNodeGlobal* global = &node->as_global;
+        bh_printf("%b %s", global->token->token, global->token->length, global->type->name);
+        if (global->initial_value) {
+            onyx_ast_print(global->initial_value, indent + 1);
+        }
+
+        if (node->next) {
+            onyx_ast_print(node->next, indent);
         }
         break;
     }
@@ -173,6 +190,19 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
         if (if_node->next) {
             onyx_ast_print(if_node->next, indent);
         }
+        break;
+    }
+
+    case ONYX_AST_NODE_KIND_BIN_OP: {
+        OnyxAstNodeBinOp* binop = &node->as_binop;
+        bh_printf("%b", binop->token->token, binop->token->length);
+
+        onyx_ast_print(node->left, indent + 1);
+        onyx_ast_print(node->right, indent + 1);
+        if (node->next) {
+            onyx_ast_print(node->next, indent);
+        }
+
         break;
     }
 
