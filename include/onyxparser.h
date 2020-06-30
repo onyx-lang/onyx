@@ -99,7 +99,7 @@ typedef enum OnyxAstFlags {
     // Top-level flags
     ONYX_AST_FLAG_EXPORTED        = BH_BIT(0),
     ONYX_AST_FLAG_LVAL            = BH_BIT(1),
-    ONYX_AST_FLAG_CONST            = BH_BIT(2),
+    ONYX_AST_FLAG_CONST           = BH_BIT(2),
     ONYX_AST_FLAG_COMPTIME        = BH_BIT(3),
 } OnyxAstFlags;
 

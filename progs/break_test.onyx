@@ -3,6 +3,11 @@ print :: foreign "host" "print" proc (val i32) ---
 
 export main :: proc {
 
+    while true {
+        print(8000);
+        break;
+    }
+
     x := 0;
     while x < 10 {
 

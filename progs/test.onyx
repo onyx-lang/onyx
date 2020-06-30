@@ -14,6 +14,14 @@ something_else :: proc (n i32) -> i32 {
     return 100 * n;
 }
 
+// symbol :: proc {}            Global function
+// symbol :: struct { x i32, y i32 }
+// symbol :: foreign "" "" proc Global foreign function
+// symbol :: foreign "" "" i32  Global foreign mutable i32
+// symbol :: 5                  Global constant value
+// symbol := 5                  Global mutable variable
+// symbol : i32                 Global mutable i32 (defaults to 0 initial value)
+
 // This is the entry point
 export main :: proc {
     i := 0;

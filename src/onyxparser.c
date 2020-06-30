@@ -792,7 +792,7 @@ const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind) {
 }
 
 // NOTE: This returns a void* so I don't need to cast it everytime I use it
-void* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind) {\
+void* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind) {
     OnyxAstNode* node =  bh_alloc_item(alloc, OnyxAstNode);
     node->kind = kind;
     node->flags = 0;

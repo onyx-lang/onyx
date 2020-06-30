@@ -10,10 +10,10 @@ endif
 let s:cpo_save = &cpo
 set cpo&vim
 
-syn keyword onyxKeyword struct proc use export foreign global
+syn keyword onyxKeyword struct proc use export foreign
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while loop return do
-syn keyword onyxKeyword return
+syn keyword onyxKeyword break continue return
 syn keyword onyxKeyword as
 
 syn keyword onyxType i32

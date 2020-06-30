@@ -152,7 +152,7 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
     }
 
     bh_printf("Checking semantics and types\n");
-    OnyxSemPassState sp_state = onyx_sempass_create( compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
+    OnyxSemPassState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
     onyx_sempass(&sp_state, root_file);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
@@ -179,8 +179,6 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
 }
 
 void compiler_state_free(CompilerState* cs) {
-    // NOTE: There is a memory leak here because the token's aren't freed
-
     bh_arena_free(&cs->ast_arena);
     bh_arena_free(&cs->msg_arena);
     bh_arena_free(&cs->sp_arena);
@@ -238,6 +236,8 @@ int main(int argc, char *argv[]) {
     }
 
     compiler_state_free(&compile_state);
+
+    bh_managed_heap_free(&global_heap);
 
     return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
 }
