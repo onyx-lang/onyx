@@ -766,6 +766,21 @@ static void compile_global_declaration(OnyxWasmModule* module, OnyxAstNodeGlobal
         return;
     }
 
+    if ((global->flags & ONYX_AST_FLAG_EXPORTED) != 0) {
+        onyx_token_null_toggle(*global->token);
+
+        i32 global_idx = (i32) bh_imap_get(&module->func_map, (u64) global);
+
+        WasmExport wasm_export = {
+            .kind = WASM_FOREIGN_GLOBAL,
+            .idx = global_idx,
+        };
+        bh_table_put(WasmExport, module->exports, global->token->token, wasm_export);
+        module->export_count++;
+
+        onyx_token_null_toggle(*global->token);
+    }
+
     compile_expression(module, &glob.initial_value, global->initial_value);
     bh_arr_push(module->globals, glob);
 }

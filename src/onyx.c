@@ -221,7 +221,6 @@ int main(int argc, char *argv[]) {
 
         case ONYX_COMPILE_ACTION_COMPILE:
             compiler_progress = onyx_compile(&compile_opts, &compile_state);
-
             break;
 
         default: break;

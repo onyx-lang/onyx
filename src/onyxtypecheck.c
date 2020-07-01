@@ -270,7 +270,7 @@ static void typecheck_global(OnyxSemPassState* state, OnyxAstNodeGlobal* global)
                         ONYX_MESSAGE_TYPE_GLOBAL_TYPE_MISMATCH,
                         global->token->pos,
                         global->token->token, global->token->length,
-                        global->type->name, global->initial_value->type);
+                        global->type->name, global->initial_value->type->name);
                 return;
             }
         } else {

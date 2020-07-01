@@ -11,7 +11,7 @@ print_i64 :: foreign "host" "print" proc (value i64) ---
 print_f64 :: foreign "host" "print" proc (value f64) ---
 
 something_else :: proc (n i32) -> i32 {
-    return 100 * n;
+    return 100 * n + global_value;
 }
 
 // symbol :: proc {}            Global function
@@ -20,16 +20,11 @@ something_else :: proc (n i32) -> i32 {
 // symbol :: foreign "" "" i32  Global foreign mutable i32
 // symbol :: 5                  Global constant value
 // symbol := 5                  Global mutable variable
-// symbol : i32                 Global mutable i32 (defaults to 0 initial value)
 
-global_value := 5;
-foreign_global :: foreign "dummy" "global" i32
+export global_value := 100
 
 // This is the entry point
-export main :: proc {
-    print_i32(global_value);
-    print_i32(foreign_global);
-
+export main2 :: proc {
     i := 0;
     while i < 10 {
         res :: fib(i);
@@ -65,14 +60,19 @@ export main :: proc {
     }
 }
 
-export main2 :: proc {
+export main :: proc {
     big_num := fib(factorial(4));
-    something :: other_value(3);
+    something :: other_value(0);
+
+    global_value = 1000;
+    something_else :: other_value(0);
 
     condition := big_num < something;
 
     if condition {
         print_i32(big_num);
         print_i32(something);
+        print_i32(something_else);
     }
 }
+

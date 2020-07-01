@@ -278,6 +278,8 @@ static OnyxAstNode* parse_factor(OnyxParser* parser) {
     }
 
     if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_CAST) {
+        parser_next_token(parser);
+
         OnyxAstNodeUnaryOp* cast_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_UNARY_OP);
         cast_node->operation = ONYX_UNARY_OP_CAST;
         cast_node->type = parse_type(parser);
@@ -784,10 +786,20 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
 
                 expect(parser, TOKEN_TYPE_SYM_COLON);
 
+                OnyxTypeInfo* type = &builtin_types[ONYX_TYPE_INFO_KIND_UNKNOWN];
+
+                if (parser->curr_token->type == TOKEN_TYPE_SYMBOL) {
+                    type = parse_type(parser);
+                }
+
                 if (parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
                     parser_next_token(parser);
 
                     OnyxAstNode* node = parse_top_level_constant_symbol(parser);
+
+                    if (node->kind == ONYX_AST_NODE_KIND_GLOBAL) {
+                        node->type = type;
+                    }
 
                     if (node->kind == ONYX_AST_NODE_KIND_FOREIGN) {
                         node->as_foreign.import->token = symbol;
@@ -805,7 +817,7 @@ static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
                     global->token = symbol;
                     global->flags |= ONYX_AST_FLAG_LVAL;
                     global->initial_value = parse_expression(parser);
-                    global->type = &builtin_types[ONYX_TYPE_INFO_KIND_UNKNOWN];
+                    global->type = type;
 
                     return (OnyxAstNode *) global;
 
