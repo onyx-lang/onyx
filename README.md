@@ -19,5 +19,6 @@ This a small list of things I want in the language when all is said and done. Ma
 | Completed | Link to externally defined functions (WASM imports) |
 | Completed | Standard C-style control flow |
 | In Progress | Global variables (WASM globals) |
+| In Progress | Dynamic file inclusion |
 | Not Started | Pointers |
 | Not Started | Structured data |
