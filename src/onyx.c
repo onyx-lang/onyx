@@ -167,17 +167,12 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
     OnyxSemPassState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
     onyx_sempass(&sp_state, root_file);
 
-    if (opts->print_ast) {
-        onyx_ast_print((OnyxAstNode *) root_file, 0);
-        bh_printf("\n");
-    }
-
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
     }
 
     bh_printf("Creating WASM code\n");
-    compiler_state->wasm_mod = onyx_wasm_module_create(opts->allocator);
+    compiler_state->wasm_mod = onyx_wasm_module_create(opts->allocator, &compiler_state->msgs);
     onyx_wasm_module_compile(&compiler_state->wasm_mod, root_file);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {

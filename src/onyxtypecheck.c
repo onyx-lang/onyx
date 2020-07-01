@@ -11,6 +11,7 @@ static void typecheck_if(OnyxSemPassState* state, OnyxAstNodeIf* ifnode);
 static void typecheck_while(OnyxSemPassState* state, OnyxAstNodeWhile* whilenode);
 static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call);
 static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr);
+static void typecheck_global(OnyxSemPassState* state, OnyxAstNodeGlobal* global);
 
 static void typecheck_assignment(OnyxSemPassState* state, OnyxAstNode* assign) {
     if (assign->left->kind == ONYX_AST_NODE_KIND_SYMBOL) {
@@ -233,6 +234,15 @@ static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
             }
             break;
 
+        case ONYX_AST_NODE_KIND_GLOBAL:
+            if (!expr->type->is_known) {
+                onyx_message_add(state->msgs,
+                        ONYX_MESSAGE_TYPE_LITERAL,
+                        expr->token->pos,
+                        "global with unknown type");
+            }
+            break;
+
         case ONYX_AST_NODE_KIND_ARGUMENT:
             typecheck_expression(state, expr->left);
             expr->type = expr->left->type;
@@ -247,6 +257,34 @@ static void typecheck_expression(OnyxSemPassState* state, OnyxAstNode* expr) {
         default:
             DEBUG_HERE;
             break;
+    }
+}
+
+static void typecheck_global(OnyxSemPassState* state, OnyxAstNodeGlobal* global) {
+    if (global->initial_value) {
+        typecheck_expression(state, global->initial_value);
+
+        if (global->type->is_known) {
+            if (global->type != global->initial_value->type) {
+                onyx_message_add(state->msgs,
+                        ONYX_MESSAGE_TYPE_GLOBAL_TYPE_MISMATCH,
+                        global->token->pos,
+                        global->token->token, global->token->length,
+                        global->type->name, global->initial_value->type);
+                return;
+            }
+        } else {
+            if (global->initial_value->type)
+                global->type = global->initial_value->type;
+        }
+
+    } else {
+        if (!global->type || !global->type->is_known) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_LITERAL,
+                    global->token->pos,
+                    "global variable with unknown type");
+        }
     }
 }
 
@@ -310,8 +348,30 @@ static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFun
 }
 
 void onyx_type_check(OnyxSemPassState* state, OnyxAstNodeFile* root_node) {
+    // TODO: This code is very ugly, but the types of globals need to
+    // be resolved before any function can use them
+
     OnyxAstNode* walker;
     OnyxAstNodeFile* top_walker = root_node;
+    while (top_walker) {
+
+        walker = top_walker->contents;
+        while (walker) {
+            switch (walker->kind) {
+                case ONYX_AST_NODE_KIND_GLOBAL:
+                    typecheck_global(state, &walker->as_global);
+                    break;
+
+                default: break;
+            }
+
+            walker = walker->next;
+        }
+
+        top_walker = top_walker->next;
+    }
+
+    top_walker = root_node;
     while (top_walker) {
 
         walker = top_walker->contents;
@@ -320,6 +380,7 @@ void onyx_type_check(OnyxSemPassState* state, OnyxAstNodeFile* root_node) {
                 case ONYX_AST_NODE_KIND_FUNCDEF:
                     typecheck_function_defintion(state, &walker->as_funcdef);
                     break;
+
                 default: break;
             }
 

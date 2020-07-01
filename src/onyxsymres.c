@@ -2,11 +2,11 @@
 #include "onyxsempass.h"
 
 static void symbol_introduce(OnyxSemPassState* state, OnyxAstNode* symbol);
+static b32 symbol_unique_introduce(OnyxSemPassState* state, OnyxAstNode* symbol);
 static void symbol_remove(OnyxSemPassState* state, OnyxAstNode* symbol);
 static OnyxAstNode* symbol_resolve(OnyxSemPassState* state, OnyxAstNode* symbol);
 static void scope_enter(OnyxSemPassState* state, OnyxAstNodeScope* scope);
 static OnyxAstNodeScope* scope_leave(OnyxSemPassState* state);
-static b32 define_function(OnyxSemPassState* state, OnyxAstNodeFuncDef* func);
 static void symres_local(OnyxSemPassState* state, OnyxAstNodeLocal** local);
 static void symres_call(OnyxSemPassState* state, OnyxAstNode* call);
 static void symres_expression(OnyxSemPassState* state, OnyxAstNode** expr);
@@ -91,27 +91,27 @@ static OnyxAstNodeScope* scope_leave(OnyxSemPassState* state) {
     return state->curr_scope;
 }
 
-static b32 define_function(OnyxSemPassState* state, OnyxAstNodeFuncDef* func) {
-    onyx_token_null_toggle(*func->token);
+static b32 symbol_unique_introduce(OnyxSemPassState* state, OnyxAstNode* symbol) {
+    onyx_token_null_toggle(*symbol->token);
 
     // NOTE: If the function hasn't already been defined
-    if (!bh_table_has(SemPassSymbol *, state->symbols, func->token->token)) {
+    if (!bh_table_has(SemPassSymbol *, state->symbols, symbol->token->token)) {
         SemPassSymbol* sp_sym = bh_alloc_item(state->allocator, SemPassSymbol);
-        sp_sym->node = (OnyxAstNode *) func;
+        sp_sym->node = symbol;
         sp_sym->shadowed = NULL;
-        bh_table_put(SemPassSymbol *, state->symbols, func->token->token, sp_sym);
+        bh_table_put(SemPassSymbol *, state->symbols, symbol->token->token, sp_sym);
     } else {
         onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_FUNCTION_REDEFINITION,
-                func->token->pos,
-                func->token->token);
+                ONYX_MESSAGE_TYPE_CONFLICTING_GLOBALS,
+                symbol->token->pos,
+                symbol->token->token);
 
         // NOTE: I really wish C had defer...
-        onyx_token_null_toggle(*func->token);
+        onyx_token_null_toggle(*symbol->token);
         return 0;
     }
 
-    onyx_token_null_toggle(*func->token);
+    onyx_token_null_toggle(*symbol->token);
     return 1;
 }
 
@@ -259,12 +259,14 @@ void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNodeFile* root_node) {
         while (walker) {
             switch (walker->kind) {
                 case ONYX_AST_NODE_KIND_FUNCDEF:
-                    if (!define_function(state, &walker->as_funcdef)) return;
+                case ONYX_AST_NODE_KIND_GLOBAL:
+                    if (!symbol_unique_introduce(state, walker)) return;
                     break;
 
                 case ONYX_AST_NODE_KIND_FOREIGN:
-                    if (walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
-                        if (!define_function(state, &walker->as_foreign.import->as_funcdef)) return;
+                    if (walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_FUNCDEF
+                            || walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_GLOBAL) {
+                        if (!symbol_unique_introduce(state, walker->as_foreign.import)) return;
                     }
                     break;
 

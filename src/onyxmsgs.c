@@ -9,9 +9,10 @@ static const char* msg_formats[] = {
     "expected lval '%b'",
     "attempt to assign to constant '%b'",
     "unknown symbol '%s'",
-    "redefinition of function '%s'",
+    "conflicting declarations of global '%s'",
     "mismatched types for binary operator, '%s', '%s'",
     "mismatched types on assignment, expected '%s', got '%s'",
+    "mismatched types for global '%b'; expected '%s', got '%s'",
     "expected expression, got '%s'",
     "attempt to call non-function, '%b'",
 

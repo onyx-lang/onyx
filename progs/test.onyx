@@ -22,10 +22,14 @@ something_else :: proc (n i32) -> i32 {
 // symbol := 5                  Global mutable variable
 // symbol : i32                 Global mutable i32 (defaults to 0 initial value)
 
-global_value := 5 + 6;
+global_value := 5;
+foreign_global :: foreign "dummy" "global" i32
 
 // This is the entry point
 export main :: proc {
+    print_i32(global_value);
+    print_i32(foreign_global);
+
     i := 0;
     while i < 10 {
         res :: fib(i);

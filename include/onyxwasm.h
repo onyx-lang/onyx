@@ -4,6 +4,7 @@
 #include "bh.h"
 
 #include "onyxparser.h"
+#include "onyxmsgs.h"
 
 typedef u8 WasmType;
 
@@ -249,6 +250,12 @@ typedef struct WasmFunc {
     bh_arr(WasmInstruction) code;
 } WasmFunc;
 
+typedef struct WasmGlobal {
+    WasmType type;
+    u8 mutable;
+    bh_arr(WasmInstruction) initial_value;
+} WasmGlobal;
+
 typedef enum WasmForeignKind {
     WASM_FOREIGN_FUNCTION   = 0x00,
     WASM_FOREIGN_TABLE      = 0x01,
@@ -269,9 +276,11 @@ typedef struct WasmImport {
 
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
+    OnyxMessages* msgs;
 
     // NOTE: Mapping from local ast node ptrs to indicies
     bh_imap local_map;
+    bh_imap global_map;
 
     bh_arr(u8) structured_jump_target;
 
@@ -288,13 +297,17 @@ typedef struct OnyxWasmModule {
 
     bh_arr(WasmImport) imports;
 
-    i32 next_type_idx;
-    i32 next_func_idx;
-    i32 next_import_func_idx;
-    i32 export_count;
+    bh_arr(WasmGlobal) globals;
+
+    u16 next_type_idx;
+    u16 next_func_idx;
+    u16 next_import_func_idx;
+    u16 next_global_idx;
+    u16 next_import_global_idx;
+    u16 export_count;
 } OnyxWasmModule;
 
-OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
+OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs);
 void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxAstNodeFile* program);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
