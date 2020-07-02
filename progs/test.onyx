@@ -49,6 +49,8 @@ export main2 :: proc {
 }
 
 export main :: proc {
+    print_bool(in_unit_circle(0.5f, 0.5f));
+
     big_num := fib(factorial(4));
     something :: other_value(0);
 

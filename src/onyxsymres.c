@@ -17,7 +17,7 @@ static void symres_while(OnyxSemPassState* state, OnyxAstNodeWhile* whilenode);
 static void symres_statement_chain(OnyxSemPassState* state, OnyxAstNode* walker, OnyxAstNode** trailer);
 static b32 symres_statement(OnyxSemPassState* state, OnyxAstNode* stmt);
 static void symres_block(OnyxSemPassState* state, OnyxAstNodeBlock* block);
-static void symres_function_definition(OnyxSemPassState* state, OnyxAstNodeFuncDef* func);
+static void symres_function(OnyxSemPassState* state, OnyxAstNodeFunction* func);
 
 static void symbol_introduce(OnyxSemPassState* state, OnyxAstNode* symbol) {
     onyx_token_null_toggle(*symbol->token);
@@ -238,7 +238,7 @@ static void symres_block(OnyxSemPassState* state, OnyxAstNodeBlock* block) {
     scope_leave(state);
 }
 
-static void symres_function_definition(OnyxSemPassState* state, OnyxAstNodeFuncDef* func) {
+static void symres_function(OnyxSemPassState* state, OnyxAstNodeFunction* func) {
     forll(OnyxAstNodeParam, param, func->params, next) {
         symbol_introduce(state, (OnyxAstNode *) param);
     }
@@ -250,50 +250,24 @@ static void symres_function_definition(OnyxSemPassState* state, OnyxAstNodeFuncD
     }
 }
 
-void onyx_resolve_symbols(OnyxSemPassState* state, OnyxAstNodeFile* root_node) {
-    OnyxAstNode* walker;
-    OnyxAstNodeFile* top_walker = root_node;
-    while (top_walker) {
+void onyx_resolve_symbols(OnyxSemPassState* state, OnyxProgram* program) {
 
-        walker = top_walker->contents;
-        while (walker) {
-            switch (walker->kind) {
-                case ONYX_AST_NODE_KIND_FUNCDEF:
-                case ONYX_AST_NODE_KIND_GLOBAL:
-                    if (!symbol_unique_introduce(state, walker)) return;
-                    break;
+    // NOTE: First, introduce all global symbols
+    bh_arr_each(OnyxAstNodeGlobal *, global, program->globals)
+        if (!symbol_unique_introduce(state, (OnyxAstNode *) *global)) return;
 
-                case ONYX_AST_NODE_KIND_FOREIGN:
-                    if (walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_FUNCDEF
-                            || walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_GLOBAL) {
-                        if (!symbol_unique_introduce(state, walker->as_foreign.import)) return;
-                    }
-                    break;
+    bh_arr_each(OnyxAstNodeFunction *, function, program->functions)
+        if (!symbol_unique_introduce(state, (OnyxAstNode *) *function)) return;
 
-                default: break;
-            }
+    bh_arr_each(OnyxAstNodeForeign *, foreign, program->foreigns) {
+        OnyxAstNodeKind import_kind = (*foreign)->import->kind;
 
-            walker = walker->next;
-        }
-
-        top_walker = top_walker->next;
+        if (import_kind == ONYX_AST_NODE_KIND_FUNCTION || import_kind == ONYX_AST_NODE_KIND_GLOBAL)
+            if (!symbol_unique_introduce(state, (*foreign)->import)) return;
     }
 
-    top_walker = root_node;
-    while (top_walker) {
 
-        walker = top_walker->contents;
-        while (walker) {
-            switch (walker->kind) {
-                case ONYX_AST_NODE_KIND_FUNCDEF:
-                    symres_function_definition(state, &walker->as_funcdef);
-                    break;
-                default: break;
-            }
-
-            walker = walker->next;
-        }
-
-        top_walker = top_walker->next;
-    }
+    // NOTE: Then, resolve all symbols in all functions
+    bh_arr_each(OnyxAstNodeFunction *, function, program->functions)
+        symres_function(state, *function);
 }

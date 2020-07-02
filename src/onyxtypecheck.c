@@ -1,7 +1,7 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
 
-static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFuncDef* func);
+static void typecheck_function(OnyxSemPassState* state, OnyxAstNodeFunction* func);
 static void typecheck_block(OnyxSemPassState* state, OnyxAstNodeBlock* block);
 static void typecheck_statement_chain(OnyxSemPassState* state, OnyxAstNode* start);
 static void typecheck_statement(OnyxSemPassState* state, OnyxAstNode* stmt);
@@ -101,7 +101,7 @@ static void typecheck_while(OnyxSemPassState* state, OnyxAstNodeWhile* whilenode
 }
 
 static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call) {
-    OnyxAstNodeFuncDef* callee = (OnyxAstNodeFuncDef *) call->callee;
+    OnyxAstNodeFunction* callee = (OnyxAstNodeFunction *) call->callee;
 
     if (callee->kind == ONYX_AST_NODE_KIND_SYMBOL) {
         onyx_message_add(state->msgs,
@@ -111,7 +111,7 @@ static void typecheck_call(OnyxSemPassState* state, OnyxAstNodeCall* call) {
         return;
     }
 
-    if (callee->kind != ONYX_AST_NODE_KIND_FUNCDEF) {
+    if (callee->kind != ONYX_AST_NODE_KIND_FUNCTION) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_CALL_NON_FUNCTION,
                 call->token->pos,
@@ -322,7 +322,7 @@ static void typecheck_block(OnyxSemPassState* state, OnyxAstNodeBlock* block) {
     }
 }
 
-static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFuncDef* func) {
+static void typecheck_function(OnyxSemPassState* state, OnyxAstNodeFunction* func) {
     forll(OnyxAstNodeParam, param, func->params, next) {
         if (!param->type->is_known) {
             onyx_message_add(state->msgs,
@@ -347,46 +347,11 @@ static void typecheck_function_defintion(OnyxSemPassState* state, OnyxAstNodeFun
     }
 }
 
-void onyx_type_check(OnyxSemPassState* state, OnyxAstNodeFile* root_node) {
-    // TODO: This code is very ugly, but the types of globals need to
-    // be resolved before any function can use them
+void onyx_type_check(OnyxSemPassState* state, OnyxProgram* program) {
 
-    OnyxAstNode* walker;
-    OnyxAstNodeFile* top_walker = root_node;
-    while (top_walker) {
+    bh_arr_each(OnyxAstNodeGlobal *, global, program->globals)
+        typecheck_global(state, *global);
 
-        walker = top_walker->contents;
-        while (walker) {
-            switch (walker->kind) {
-                case ONYX_AST_NODE_KIND_GLOBAL:
-                    typecheck_global(state, &walker->as_global);
-                    break;
-
-                default: break;
-            }
-
-            walker = walker->next;
-        }
-
-        top_walker = top_walker->next;
-    }
-
-    top_walker = root_node;
-    while (top_walker) {
-
-        walker = top_walker->contents;
-        while (walker) {
-            switch (walker->kind) {
-                case ONYX_AST_NODE_KIND_FUNCDEF:
-                    typecheck_function_defintion(state, &walker->as_funcdef);
-                    break;
-
-                default: break;
-            }
-
-            walker = walker->next;
-        }
-
-        top_walker = top_walker->next;
-    }
+    bh_arr_each(OnyxAstNodeFunction *, function, program->functions)
+        typecheck_function(state, *function);
 }

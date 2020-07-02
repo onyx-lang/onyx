@@ -17,17 +17,6 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
     bh_printf("(%d) %s ", node->flags, onyx_ast_node_kind_string(node->kind));
 
     switch (node->kind) {
-    case ONYX_AST_NODE_KIND_PROGRAM: {
-        OnyxAstNodeFile* file_node = &node->as_file;
-        if (file_node->contents)
-            onyx_ast_print(file_node->contents, indent + 1);
-
-        if (node->next)
-            onyx_ast_print(node->next, indent);
-
-        break;
-    }
-
     case ONYX_AST_NODE_KIND_USE: {
          OnyxAstNodeUse* use_node = &node->as_use;
          bh_printf("%b", use_node->filename->token, use_node->filename->length);
@@ -38,10 +27,10 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
          break;
      }
 
-    case ONYX_AST_NODE_KIND_FUNCDEF: {
+    case ONYX_AST_NODE_KIND_FUNCTION: {
         if (node->token)
             bh_printf("(%b) ", node->token->token, node->token->length);
-        OnyxAstNodeFuncDef* fd = &node->as_funcdef;
+        OnyxAstNodeFunction* fd = &node->as_function;
 
         print_indent;
         bh_printf("Params ");
@@ -151,7 +140,7 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
     case ONYX_AST_NODE_KIND_CALL: {
         OnyxAstNodeCall* call = &node->as_call;
         if (call->callee) {
-            if (call->callee->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
+            if (call->callee->kind == ONYX_AST_NODE_KIND_FUNCTION) {
                 bh_printf("function: %b", call->callee->token->token, call->callee->token->length);
             } else {
                 onyx_ast_print(call->callee, indent + 1);

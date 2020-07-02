@@ -16,12 +16,11 @@ typedef struct OnyxAstNodeBlock OnyxAstNodeBlock;
 typedef struct OnyxAstNodeIf OnyxAstNodeIf;
 typedef struct OnyxAstNodeWhile OnyxAstNodeWhile;
 typedef struct OnyxAstNodeParam OnyxAstNodeParam;
-typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
+typedef struct OnyxAstNodeFunction OnyxAstNodeFunction;
 typedef struct OnyxAstNodeForeign OnyxAstNodeForeign;
 typedef struct OnyxAstNodeGlobal OnyxAstNodeGlobal;
 typedef struct OnyxAstNodeCall OnyxAstNodeCall;
 typedef struct OnyxAstNodeUse OnyxAstNodeUse;
-typedef struct OnyxAstNodeFile OnyxAstNodeFile;
 
 typedef struct OnyxParser {
     OnyxTokenizer *tokenizer; // NOTE: not used since all tokens are lexed before parsing starts
@@ -41,7 +40,7 @@ typedef enum OnyxAstNodeKind {
     ONYX_AST_NODE_KIND_PROGRAM,
     ONYX_AST_NODE_KIND_USE,
 
-    ONYX_AST_NODE_KIND_FUNCDEF,
+    ONYX_AST_NODE_KIND_FUNCTION,
     ONYX_AST_NODE_KIND_FOREIGN,
     ONYX_AST_NODE_KIND_BLOCK,
     ONYX_AST_NODE_KIND_SCOPE,
@@ -222,7 +221,7 @@ struct OnyxAstNodeWhile {
     OnyxAstNodeBlock *body;
 };
 
-struct OnyxAstNodeFuncDef {
+struct OnyxAstNodeFunction {
     OnyxAstNodeKind kind;
     u32 flags;
     OnyxToken *token; // This will point to the symbol token to identify it
@@ -262,7 +261,7 @@ struct OnyxAstNodeCall {
     u64 data;
     OnyxAstNode *next;
     OnyxAstNode *callee;        // NOTE: Function definition node
-    OnyxAstNode *arguments;        // NOTE: Expressions that form the actual param list
+    OnyxAstNode *arguments;     // NOTE: Expressions that form the actual param list
                                 // They will be chained down using the "next" property
                                 // unless this becomes used by something else
 };
@@ -275,16 +274,6 @@ struct OnyxAstNodeUse {
     u64 data;
     OnyxAstNode *next;
     OnyxToken *filename;
-};
-
-struct OnyxAstNodeFile {
-    OnyxAstNodeKind kind;
-    u32 flags;
-    OnyxToken *token;           // NOTE: unused
-    OnyxTypeInfo *type;         // NOTE: unused
-    u64 data;
-    OnyxAstNodeFile *next;      // NOTE: next file
-    OnyxAstNode *contents;      // NOTE: the first top-level element
 };
 
 union OnyxAstNode {
@@ -302,7 +291,6 @@ union OnyxAstNode {
     };
 
     OnyxAstNodeBlock as_block;
-    OnyxAstNodeFuncDef as_funcdef;
     OnyxAstNodeParam as_param;
     OnyxAstNodeLocal as_local;
     OnyxAstNodeScope as_scope;
@@ -310,18 +298,25 @@ union OnyxAstNode {
     OnyxAstNodeNumLit as_numlit;
     OnyxAstNodeBinOp as_binop;
     OnyxAstNodeUnaryOp as_unaryop;
-    OnyxAstNodeForeign as_foreign;
-    OnyxAstNodeGlobal as_global;
     OnyxAstNodeIf as_if;
     OnyxAstNodeWhile as_while;
     OnyxAstNodeUse as_use;
-    OnyxAstNodeFile as_file;
+    OnyxAstNodeFunction as_function;
+    OnyxAstNodeGlobal as_global;
+    OnyxAstNodeForeign as_foreign;
 };
+
+typedef struct OnyxProgram {
+    bh_arr(OnyxAstNodeUse *) uses;
+    bh_arr(OnyxAstNodeGlobal *) globals;
+    bh_arr(OnyxAstNodeFunction *) functions;
+    bh_arr(OnyxAstNodeForeign *) foreigns;
+} OnyxProgram;
 
 const char* onyx_ast_node_kind_string(OnyxAstNodeKind kind);
 void* onyx_ast_node_new(bh_allocator alloc, OnyxAstNodeKind kind);
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
 void onyx_parser_free(OnyxParser* parser);
-OnyxAstNodeFile* onyx_parse(OnyxParser *parser);
+OnyxAstNode* onyx_parse(OnyxParser *parser);
 
 #endif // #ifndef ONYXPARSER_H

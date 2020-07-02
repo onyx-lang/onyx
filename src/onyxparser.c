@@ -8,7 +8,7 @@ static const char* ast_node_names[] = {
     "PROGRAM",
     "USE",
 
-    "FUNCDEF",
+    "FUNCTION",
     "FOREIGN",
     "BLOCK",
     "SCOPE",
@@ -77,7 +77,7 @@ static OnyxAstNodeBlock* parse_block(OnyxParser* parser);
 static OnyxAstNode* parse_statement(OnyxParser* parser);
 static OnyxTypeInfo* parse_type(OnyxParser* parser);
 static OnyxAstNodeParam* parse_function_params(OnyxParser* parser);
-static OnyxAstNodeFuncDef* parse_function_definition(OnyxParser* parser);
+static OnyxAstNodeFunction* parse_function_definition(OnyxParser* parser);
 static OnyxAstNode* parse_top_level_statement(OnyxParser* parser);
 
 static void parser_next_token(OnyxParser* parser) {
@@ -689,10 +689,10 @@ static OnyxAstNodeParam* parse_function_params(OnyxParser* parser) {
     return first_param;
 }
 
-static OnyxAstNodeFuncDef* parse_function_definition(OnyxParser* parser) {
+static OnyxAstNodeFunction* parse_function_definition(OnyxParser* parser) {
     expect(parser, TOKEN_TYPE_KEYWORD_PROC);
 
-    OnyxAstNodeFuncDef* func_def = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_FUNCDEF);
+    OnyxAstNodeFunction* func_def = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_FUNCTION);
 
     OnyxAstNodeParam* params = parse_function_params(parser);
     func_def->params = params;
@@ -896,10 +896,10 @@ void onyx_parser_free(OnyxParser* parser) {
     bh_table_free(parser->identifiers);
 }
 
-OnyxAstNodeFile* onyx_parse(OnyxParser *parser) {
-    OnyxAstNodeFile* program = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_PROGRAM);
+OnyxAstNode* onyx_parse(OnyxParser *parser) {
+    OnyxAstNode* program = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_PROGRAM);
 
-    OnyxAstNode** prev_stmt = &program->contents;
+    OnyxAstNode** prev_stmt = &program->next;
     OnyxAstNode* curr_stmt = NULL;
     while (parser->curr_token->type != TOKEN_TYPE_END_STREAM) {
         curr_stmt = parse_top_level_statement(parser);

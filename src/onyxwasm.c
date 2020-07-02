@@ -209,7 +209,7 @@ static WasmType onyx_type_to_wasm_type(OnyxTypeInfo* type) {
     return WASM_TYPE_VOID;
 }
 
-static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNodeFuncDef* fd);
+static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNodeFunction* fd);
 static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNodeBlock* block);
 static void compile_statement(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNode* stmt);
 static void compile_assign_lval(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNode* lval);
@@ -222,7 +222,7 @@ static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pco
 static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNodeUnaryOp* cast);
 static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNode* ret);
 
-static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNodeFuncDef* fd) {
+static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, OnyxAstNodeFunction* fd) {
     if (fd->body == NULL) return;
 
     bh_arr(WasmInstruction) code = *pcode;
@@ -639,7 +639,7 @@ static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, 
     *pcode = code;
 }
 
-static i32 generate_type_idx(OnyxWasmModule* mod, OnyxAstNodeFuncDef* fd) {
+static i32 generate_type_idx(OnyxWasmModule* mod, OnyxAstNodeFunction* fd) {
     static char type_repr_buf[128];
 
     char* t = type_repr_buf;
@@ -681,7 +681,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, OnyxAstNodeFuncDef* fd) {
     return type_idx;
 }
 
-static void compile_function_definition(OnyxWasmModule* mod, OnyxAstNodeFuncDef* fd) {
+static void compile_function(OnyxWasmModule* mod, OnyxAstNodeFunction* fd) {
     i32 type_idx = generate_type_idx(mod, fd);
 
     WasmFunc wasm_func = {
@@ -786,8 +786,8 @@ static void compile_global_declaration(OnyxWasmModule* module, OnyxAstNodeGlobal
 }
 
 static void compile_foreign(OnyxWasmModule* module, OnyxAstNodeForeign* foreign) {
-    if (foreign->import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
-        i32 type_idx = generate_type_idx(module, &foreign->import->as_funcdef);
+    if (foreign->import->kind == ONYX_AST_NODE_KIND_FUNCTION) {
+        i32 type_idx = generate_type_idx(module, &foreign->import->as_function);
 
         WasmImport import = {
             .kind = WASM_FOREIGN_FUNCTION,
@@ -861,88 +861,37 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
     return module;
 }
 
-void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxAstNodeFile* program) {
-    OnyxAstNode* walker;
-    OnyxAstNodeFile* top_walker = program;
-    while (top_walker) {
+void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program) {
 
-        walker = top_walker->contents;
-        while (walker) {
-            if (walker->kind == ONYX_AST_NODE_KIND_FOREIGN) {
-                if (walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_FUNCDEF)
-                    module->next_func_idx++;
+    // NOTE: First, introduce all indicies for globals and functions
+    bh_arr_each(OnyxAstNodeForeign *, foreign, program->foreigns) {
+        OnyxAstNodeKind import_kind = (*foreign)->import->kind;
 
-                if (walker->as_foreign.import->kind == ONYX_AST_NODE_KIND_GLOBAL)
-                    module->next_global_idx++;
-            }
-
-            walker = walker->next;
+        if (import_kind == ONYX_AST_NODE_KIND_FUNCTION) {
+            module->next_func_idx++;
+            bh_imap_put(&module->func_map, (u64) (*foreign)->import, module->next_import_func_idx++);
+        }
+        else if (import_kind == ONYX_AST_NODE_KIND_GLOBAL) {
+            module->next_global_idx++;
+            bh_imap_put(&module->global_map, (u64) (*foreign)->import, module->next_import_func_idx++);
         }
 
-        top_walker = top_walker->next;
+        compile_foreign(module, *foreign);
     }
 
-    top_walker = program;
-    while (top_walker) {
+    bh_arr_each(OnyxAstNodeFunction *, function, program->functions)
+        bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
 
-        walker = top_walker->contents;
-        while (walker) {
-            if (walker->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
-                i32 func_idx = module->next_func_idx++;
-                bh_imap_put(&module->func_map, (u64) walker, func_idx);
-            }
+    bh_arr_each(OnyxAstNodeGlobal *, global, program->globals)
+        bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
 
-            if (walker->kind == ONYX_AST_NODE_KIND_GLOBAL) {
-                i32 global_idx = module->next_global_idx++;
-                bh_imap_put(&module->global_map, (u64) walker, global_idx);
-            }
 
-            if (walker->kind == ONYX_AST_NODE_KIND_FOREIGN) {
-                OnyxAstNodeForeign* foreign = &walker->as_foreign;
+    // NOTE: Then, compile everything
+    bh_arr_each(OnyxAstNodeFunction *, function, program->functions)
+        compile_function(module, *function);
 
-                if (foreign->import->kind == ONYX_AST_NODE_KIND_FUNCDEF) {
-                    i32 func_idx = module->next_import_func_idx++;
-                    bh_imap_put(&module->func_map, (u64) foreign->import, func_idx);
-                }
-
-                if (foreign->import->kind == ONYX_AST_NODE_KIND_GLOBAL) {
-                    i32 global_idx = module->next_import_global_idx++;
-                    bh_imap_put(&module->global_map, (u64) foreign->import, global_idx);
-                }
-            }
-
-            walker = walker->next;
-        }
-
-        top_walker = top_walker->next;
-    }
-
-    top_walker = program;
-    while (top_walker) {
-
-        walker = top_walker->contents;
-        while (walker) {
-            switch (walker->kind) {
-                case ONYX_AST_NODE_KIND_FUNCDEF:
-                    compile_function_definition(module, &walker->as_funcdef);
-                    break;
-
-                case ONYX_AST_NODE_KIND_GLOBAL:
-                    compile_global_declaration(module, &walker->as_global);
-                    break;
-
-                case ONYX_AST_NODE_KIND_FOREIGN:
-                    compile_foreign(module, &walker->as_foreign);
-                    break;
-
-                default: break;
-            }
-
-            walker = walker->next;
-        }
-
-        top_walker = top_walker->next;
-    }
+    bh_arr_each(OnyxAstNodeGlobal *, global, program->globals)
+        compile_global_declaration(module, *global);
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {

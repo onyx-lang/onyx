@@ -55,10 +55,8 @@ typedef struct CompilerState {
     bh_table(bh_file_contents) loaded_files;
     bh_arr(const char *) queued_files;
 
-    OnyxAstNodeFile* first_file;
-    OnyxAstNodeFile* last_processed_file;
-
     OnyxMessages msgs;
+    OnyxProgram program;
     OnyxWasmModule wasm_mod;
 } CompilerState;
 
@@ -100,7 +98,7 @@ void compile_opts_free(OnyxCompileOptions* opts) {
     bh_arr_free(opts->files);
 }
 
-OnyxAstNodeFile* parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
+OnyxAstNode* parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
     OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
     bh_printf("[Lexing]       %s\n", file_contents->filename);
@@ -126,42 +124,55 @@ CompilerProgress process_source_file(CompilerState* compiler_state, OnyxCompileO
     bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
     bh_file_close(&file);
 
-    bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     // NOTE: Need to reget the value out of the table so token references work
+    bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
 
-    OnyxAstNodeFile* file_node = parse_source_file(compiler_state, &fc);
+    OnyxAstNode* root_node = parse_source_file(compiler_state, &fc);
 
     if (opts->print_ast) {
-        onyx_ast_print((OnyxAstNode *) file_node, 0);
+        onyx_ast_print(root_node, 0);
         bh_printf("\n");
     }
 
-    if (!compiler_state->first_file)
-        compiler_state->first_file = file_node;
-
-    if (compiler_state->last_processed_file)
-        compiler_state->last_processed_file->next = file_node;
-
-    compiler_state->last_processed_file = file_node;
-
-
-    // HACK: This is very cobbled together right now but it will
-    // do for now
-    OnyxAstNode* walker = file_node->contents;
+    OnyxAstNode* walker = root_node;
     while (walker) {
-        if (walker->kind == ONYX_AST_NODE_KIND_USE) {
-            OnyxAstNodeUse* use_node = &walker->as_use;
+        switch (walker->kind) {
+            case ONYX_AST_NODE_KIND_USE:
+                bh_arr_push(compiler_state->program.uses, &walker->as_use);
+                break;
 
-            char* formatted_name = bh_aprintf(
-                    global_heap_allocator,
-                    "%b.onyx",
-                    use_node->filename->token, use_node->filename->length);
+            case ONYX_AST_NODE_KIND_GLOBAL:
+                bh_arr_push(compiler_state->program.globals, &walker->as_global);
+                break;
 
-            bh_arr_push(compiler_state->queued_files, formatted_name);
+            case ONYX_AST_NODE_KIND_FOREIGN:
+                bh_arr_push(compiler_state->program.foreigns, &walker->as_foreign);
+                break;
+
+            case ONYX_AST_NODE_KIND_FUNCTION:
+                bh_arr_push(compiler_state->program.functions, &walker->as_function);
+                break;
+
+            case ONYX_AST_NODE_KIND_PROGRAM:
+                // Dummy initial node
+                break;
+
+            default:
+                assert(("Invalid top level node", 0));
+                break;
         }
 
         walker = walker->next;
+    }
+
+    bh_arr_each(OnyxAstNodeUse *, use_node, compiler_state->program.uses) {
+        char* formatted_name = bh_aprintf(
+                global_heap_allocator,
+                "%b.onyx",
+                (*use_node)->filename->token, (*use_node)->filename->length);
+
+        bh_arr_push(compiler_state->queued_files, formatted_name);
     }
 
 
@@ -212,7 +223,7 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
     // NOTE: Check types and semantic rules
     bh_printf("[Checking semantics]\n");
     OnyxSemPassState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
-    onyx_sempass(&sp_state, compiler_state->first_file);
+    onyx_sempass(&sp_state, &compiler_state->program);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
@@ -222,7 +233,7 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
     // NOTE: Generate WASM instructions
     bh_printf("[Generating WASM]\n");
     compiler_state->wasm_mod = onyx_wasm_module_create(opts->allocator, &compiler_state->msgs);
-    onyx_wasm_module_compile(&compiler_state->wasm_mod, compiler_state->first_file);
+    onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->program);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
@@ -259,8 +270,19 @@ int main(int argc, char *argv[]) {
 
     OnyxCompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
     CompilerState compile_state = {
+        .program = {
+            .uses = NULL,
+            .foreigns = NULL,
+            .globals = NULL,
+            .functions = NULL
+        },
         .wasm_mod = { 0 }
     };
+
+    bh_arr_new(global_heap_allocator, compile_state.program.uses, 4);
+    bh_arr_new(global_heap_allocator, compile_state.program.foreigns, 4);
+    bh_arr_new(global_heap_allocator, compile_state.program.globals, 4);
+    bh_arr_new(global_heap_allocator, compile_state.program.functions, 4);
 
     CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_FAILED_READ;
 
