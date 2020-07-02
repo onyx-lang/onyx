@@ -13,12 +13,15 @@
 
 static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
-    "The standard compiler for the Onyx programming language.\n"
+    "The compiler for the Onyx programming language.\n"
     "\n"
-    " $ onyx [-o <target file>] [--help] <input files>\n"
-    "\n"
-    "   -o <target_file>        Specify the target file\n"
-    "   --help                  Print this help message\n";
+    "Usage:\n"
+    "\tonyx [-o <target file>] [-ast] <input files>\n"
+    "\tonyx -help\n"
+    "\nFlags:\n"
+    "\t-o <target_file>        Specify the target file (default: out.wasm)\n"
+    "\t-ast                    Print the abstract syntax tree after parsing\n"
+    "\t-help                   Print this help message\n";
 
 typedef enum CompileAction {
     ONYX_COMPILE_ACTION_COMPILE,
@@ -48,7 +51,12 @@ typedef enum CompilerProgress {
 typedef struct CompilerState {
     bh_arena ast_arena, msg_arena, sp_arena;
     bh_allocator token_alloc, ast_alloc, msg_alloc, sp_alloc;
+
     bh_table(bh_file_contents) loaded_files;
+    bh_arr(const char *) queued_files;
+
+    OnyxAstNodeFile* first_file;
+    OnyxAstNodeFile* last_processed_file;
 
     OnyxMessages msgs;
     OnyxWasmModule wasm_mod;
@@ -68,7 +76,7 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
     bh_arr_new(alloc, options.files, 1);
 
     fori(i, 1, argc - 1) {
-        if (!strcmp(argv[i], "--help")) {
+        if (!strcmp(argv[i], "-help")) {
             options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
             break;
         }
@@ -92,15 +100,76 @@ void compile_opts_free(OnyxCompileOptions* opts) {
     bh_arr_free(opts->files);
 }
 
-OnyxAstNodeFile* parse_source_file(bh_file_contents* file_contents, CompilerState* compiler_state) {
+OnyxAstNodeFile* parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
     OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
-    bh_printf("Lexing  %s\n", file_contents->filename);
+    bh_printf("[Lexing]       %s\n", file_contents->filename);
     onyx_lex_tokens(&tokenizer);
 
-    bh_printf("Parsing %s\n", file_contents->filename);
+    bh_printf("[Parsing]      %s\n", file_contents->filename);
     OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
     return onyx_parse(&parser);
+}
+
+CompilerProgress process_source_file(CompilerState* compiler_state, OnyxCompileOptions* opts, char* filename) {
+    if (bh_table_has(bh_file_contents, compiler_state->loaded_files, filename)) return ONYX_COMPILER_PROGRESS_SUCCESS;
+
+    bh_file file;
+
+    bh_file_error err = bh_file_open(&file, filename);
+    if (err != BH_FILE_ERROR_NONE) {
+        bh_printf_err("Failed to open file %s\n", filename);
+        return ONYX_COMPILER_PROGRESS_FAILED_READ;
+    }
+
+    bh_printf("[Reading]      %s\n", file.filename);
+    bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
+    bh_file_close(&file);
+
+    bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
+    // NOTE: Need to reget the value out of the table so token references work
+    fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
+
+    OnyxAstNodeFile* file_node = parse_source_file(compiler_state, &fc);
+
+    if (opts->print_ast) {
+        onyx_ast_print((OnyxAstNode *) file_node, 0);
+        bh_printf("\n");
+    }
+
+    if (!compiler_state->first_file)
+        compiler_state->first_file = file_node;
+
+    if (compiler_state->last_processed_file)
+        compiler_state->last_processed_file->next = file_node;
+
+    compiler_state->last_processed_file = file_node;
+
+
+    // HACK: This is very cobbled together right now but it will
+    // do for now
+    OnyxAstNode* walker = file_node->contents;
+    while (walker) {
+        if (walker->kind == ONYX_AST_NODE_KIND_USE) {
+            OnyxAstNodeUse* use_node = &walker->as_use;
+
+            char* formatted_name = bh_aprintf(
+                    global_heap_allocator,
+                    "%b.onyx",
+                    use_node->filename->token, use_node->filename->length);
+
+            bh_arr_push(compiler_state->queued_files, formatted_name);
+        }
+
+        walker = walker->next;
+    }
+
+
+    if (onyx_message_has_errors(&compiler_state->msgs)) {
+        return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
+    } else {
+        return ONYX_COMPILER_PROGRESS_SUCCESS;
+    }
 }
 
 i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
@@ -120,71 +189,53 @@ i32 onyx_compile(OnyxCompileOptions* opts, CompilerState* compiler_state) {
     bh_arena_init(&compiler_state->sp_arena, opts->allocator, 16 * 1024);
     compiler_state->sp_alloc = bh_arena_allocator(&compiler_state->sp_arena);
 
-    bh_table_init(opts->allocator, compiler_state->loaded_files, 7);
+    bh_table_init(opts->allocator, compiler_state->loaded_files, 15);
 
-    bh_arr_each(const char *, filename, opts->files) {
-        bh_file file;
+    bh_arr_new(opts->allocator, compiler_state->queued_files, 4);
 
-        bh_file_error err = bh_file_open(&file, *filename);
-        if (err != BH_FILE_ERROR_NONE) {
-            bh_printf_err("Failed to open file %s\n", *filename);
-            return ONYX_COMPILER_PROGRESS_FAILED_READ;
-        }
+    // NOTE: Add all files passed by command line to the queue
+    bh_arr_each(const char *, filename, opts->files)
+        bh_arr_push(compiler_state->queued_files, (char *) *filename);
 
-        bh_printf("Reading %s\n", file.filename);
-        bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
-        bh_file_close(&file);
 
-        bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
+    // NOTE: While the queue is not empty, process the next file
+    while (!bh_arr_is_empty(compiler_state->queued_files)) {
+        CompilerProgress result = process_source_file(compiler_state, opts, (char *) compiler_state->queued_files[0]);
+
+        if (result != ONYX_COMPILER_PROGRESS_SUCCESS)
+            return result;
+
+        bh_arr_fastdelete(compiler_state->queued_files, 0);
     }
 
-    OnyxAstNodeFile* root_file = NULL;
-    OnyxAstNodeFile* prev_file = NULL;
-    bh_table_each_start(bh_file_contents, compiler_state->loaded_files);
-        OnyxAstNodeFile* file_node = parse_source_file(&value, compiler_state);
 
-        if (opts->print_ast) {
-            onyx_ast_print((OnyxAstNode *) file_node, 0);
-            bh_printf("\n");
-        }
-
-        if (!root_file) {
-            root_file = file_node;
-        }
-
-        if (prev_file) {
-            prev_file->next = file_node;
-        }
-
-        prev_file = file_node;
-    bh_table_each_end;
-
-    if (onyx_message_has_errors(&compiler_state->msgs)) {
-        return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
-    }
-
-    bh_printf("Checking semantics and types\n");
+    // NOTE: Check types and semantic rules
+    bh_printf("[Checking semantics]\n");
     OnyxSemPassState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
-    onyx_sempass(&sp_state, root_file);
+    onyx_sempass(&sp_state, compiler_state->first_file);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
     }
 
-    bh_printf("Creating WASM code\n");
+
+    // NOTE: Generate WASM instructions
+    bh_printf("[Generating WASM]\n");
     compiler_state->wasm_mod = onyx_wasm_module_create(opts->allocator, &compiler_state->msgs);
-    onyx_wasm_module_compile(&compiler_state->wasm_mod, root_file);
+    onyx_wasm_module_compile(&compiler_state->wasm_mod, compiler_state->first_file);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
     }
 
+
+    // NOTE: Output to file
     bh_file output_file;
     if (bh_file_create(&output_file, opts->target_file) != BH_FILE_ERROR_NONE) {
         return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
     }
 
-    bh_printf("Writing WASM to %s\n", output_file.filename);
+    bh_printf("[Writing WASM] %s\n", output_file.filename);
     onyx_wasm_module_write_to_file(&compiler_state->wasm_mod, output_file);
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;

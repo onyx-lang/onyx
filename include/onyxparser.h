@@ -20,6 +20,7 @@ typedef struct OnyxAstNodeFuncDef OnyxAstNodeFuncDef;
 typedef struct OnyxAstNodeForeign OnyxAstNodeForeign;
 typedef struct OnyxAstNodeGlobal OnyxAstNodeGlobal;
 typedef struct OnyxAstNodeCall OnyxAstNodeCall;
+typedef struct OnyxAstNodeUse OnyxAstNodeUse;
 typedef struct OnyxAstNodeFile OnyxAstNodeFile;
 
 typedef struct OnyxParser {
@@ -38,6 +39,7 @@ typedef struct OnyxParser {
 typedef enum OnyxAstNodeKind {
     ONYX_AST_NODE_KIND_ERROR,
     ONYX_AST_NODE_KIND_PROGRAM,
+    ONYX_AST_NODE_KIND_USE,
 
     ONYX_AST_NODE_KIND_FUNCDEF,
     ONYX_AST_NODE_KIND_FOREIGN,
@@ -265,6 +267,16 @@ struct OnyxAstNodeCall {
                                 // unless this becomes used by something else
 };
 
+struct OnyxAstNodeUse {
+    OnyxAstNodeKind kind;
+    u32 flags;
+    OnyxToken *token;
+    OnyxTypeInfo *type;
+    u64 data;
+    OnyxAstNode *next;
+    OnyxToken *filename;
+};
+
 struct OnyxAstNodeFile {
     OnyxAstNodeKind kind;
     u32 flags;
@@ -302,6 +314,7 @@ union OnyxAstNode {
     OnyxAstNodeGlobal as_global;
     OnyxAstNodeIf as_if;
     OnyxAstNodeWhile as_while;
+    OnyxAstNodeUse as_use;
     OnyxAstNodeFile as_file;
 };
 

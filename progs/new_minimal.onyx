@@ -1,4 +1,4 @@
-print :: foreign "host" "print" proc (value i32) ---
+print :: foreign "host" "print" proc (value: i32) ---
 
 simple_test :: proc {
     a: i32 = 5;
@@ -13,7 +13,7 @@ simple_test :: proc {
     print(c);
 }
 
-fib :: proc (n i32) -> i32 {
+fib :: proc (n: i32) -> i32 {
     if n <= 1 { return 1; }
 
     return fib(n - 1) + fib(n - 2);
@@ -23,7 +23,7 @@ foo :: proc -> i32 {
     return 10;
 }
 
-print_nums :: proc (a i32, b i32, c i32) {
+print_nums :: proc (a: i32, b: i32, c: i32) {
     print(a);
     print(b);
     print(c);

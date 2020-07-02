@@ -16,8 +16,9 @@ syn keyword onyxKeyword for while loop return do
 syn keyword onyxKeyword break continue return
 syn keyword onyxKeyword as
 
-syn keyword onyxType i32
-syn keyword onyxType i64
+syn keyword onyxType unknown bool
+syn keyword onyxType i32 u32
+syn keyword onyxType i64 u64
 syn keyword onyxType f32
 syn keyword onyxType f64
 

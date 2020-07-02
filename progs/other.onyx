@@ -1,9 +1,11 @@
 
-other_value :: proc (n i32) -> i32 {
+use "progs/test"
+
+other_value :: proc (n: i32) -> i32 {
     return 8675309 + something_else(n) + global_value;
 }
 
-export fib :: proc (n i32) -> i32 {
+export fib :: proc (n: i32) -> i32 {
     if n == 0 { return 1; }
     if n == 1 { return 1; }
 
@@ -23,7 +25,7 @@ export fib :: proc (n i32) -> i32 {
     return a;
 }
 
-export factorial :: proc (n i32) -> i32 {
+export factorial :: proc (n: i32) -> i32 {
     if n <= 1 { return 1; }
 
     f := 1;

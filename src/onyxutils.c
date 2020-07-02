@@ -28,6 +28,16 @@ void onyx_ast_print(OnyxAstNode* node, i32 indent) {
         break;
     }
 
+    case ONYX_AST_NODE_KIND_USE: {
+         OnyxAstNodeUse* use_node = &node->as_use;
+         bh_printf("%b", use_node->filename->token, use_node->filename->length);
+
+         if (use_node->next)
+             onyx_ast_print(use_node->next, indent);
+
+         break;
+     }
+
     case ONYX_AST_NODE_KIND_FUNCDEF: {
         if (node->token)
             bh_printf("(%b) ", node->token->token, node->token->length);

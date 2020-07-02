@@ -1,0 +1,5 @@
+print_bool :: foreign "host" "print" proc (value: bool) ---
+print_i32  :: foreign "host" "print" proc (value: i32) ---
+print_f32  :: foreign "host" "print" proc (value: f32) ---
+print_i64  :: foreign "host" "print" proc (value: i64) ---
+print_f64  :: foreign "host" "print" proc (value: f64) ---

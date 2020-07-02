@@ -1,7 +1,7 @@
 
-print       :: foreign "host" "print" proc (value i32) ---
-print_float :: foreign "host" "print" proc (value f32) ---
-print_if    :: foreign "host" "print" proc (i i32, f f32) ---
+print       :: foreign "host" "print" proc (value: i32) ---
+print_float :: foreign "host" "print" proc (value: f32) ---
+print_if    :: foreign "host" "print" proc (i: i32, f: f32) ---
 
 export main :: proc {
     output := do_stuff() - 1;
@@ -25,7 +25,7 @@ export main :: proc {
     print_if(output, float_test());
 }
 
-factorial :: proc (n i32) -> i32 {
+factorial :: proc (n: i32) -> i32 {
     if n <= 1 { return 1; }
 
     return n * factorial(n - 1);
@@ -35,7 +35,7 @@ foo :: proc -> i32 {
     return 10;
 }
 
-add :: proc (a i32, b i32) -> i32 {
+add :: proc (a: i32, b: i32) -> i32 {
     return a + b;
 }
 
@@ -43,18 +43,18 @@ add :: proc (a i32, b i32) -> i32 {
 // This is because the WASM embedder does not think that it
 // is possible that all code paths are covered with returning
 // an i32. This will need to be fixed.
-abs :: proc (val i32) -> i32 {
+abs :: proc (val: i32) -> i32 {
     if val <= 0 { return -val; }
     // else { return val; };
     return val;
 }
 
-fib :: proc (n i32) -> i32 {
+fib :: proc (n: i32) -> i32 {
     if n <= 1 { return 1; }
     return fib(n - 1) + fib(n - 2);
 }
 
-diff_square :: proc (a i32, b i32) -> i32 {
+diff_square :: proc (a: i32, b: i32) -> i32 {
     // Typechecked
     c := a - b; // Mutable
     d :: a + b; // Constant

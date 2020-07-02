@@ -1,27 +1,15 @@
+use "progs/print_funcs"
+use "progs/other"
 
-// Foreign functions are included this way:
-//      sym_name :: foreign "module" "name" proc ...
-
-// TODO: Make this work
-// use "progs/other";
-
-print_i32 :: foreign "host" "print" proc (value i32) ---
-print_f32 :: foreign "host" "print" proc (value f32) ---
-print_i64 :: foreign "host" "print" proc (value i64) ---
-print_f64 :: foreign "host" "print" proc (value f64) ---
-
-something_else :: proc (n i32) -> i32 {
+something_else :: proc (n: i32) -> i32 {
     return 100 * n + global_value;
 }
 
-// symbol :: proc {}            Global function
-// symbol :: struct { x i32, y i32 }
-// symbol :: foreign "" "" proc Global foreign function
-// symbol :: foreign "" "" i32  Global foreign mutable i32
-// symbol :: 5                  Global constant value
-// symbol := 5                  Global mutable variable
+global_value := 100
 
-export global_value := 100
+export in_unit_circle :: proc (x: f32, y: f32) -> bool {
+    return (x * x) + (y * y) < 1.0f;
+}
 
 // This is the entry point
 export main2 :: proc {

@@ -1,26 +1,18 @@
-Type checking at parse time:
-    Why couldn't this work?
-    * Every variable is of known type or the type must be known by immediate assignment
-    * This requires that functions are declared in a particular order like C
-    * This also requires immediate evaluation of external symbols (C #include style)
-        - Don't like this at all
-        - Want a proper module system <<<<
+Memory design:
+    - Pointers will work very similar to how they do in C
+        - A pointer is a u32
+        - Pointers will be notated:
+            ^u32  <- Pointer to u32
 
-    /* foo.onyx */
-    foo :: proc (a i32) -> f32 {
-        return a as f32;
-    }
+        - Pointer operations will be:
+            * will take the address of a value
+                - This operation will not be defined well for a while
+                - You can't take the address of a local since it doesn't exist in memory
 
+            << will take the value out of a pointer
 
-    /* main.onyx */
-    use "foo";
-
-    export main :: proc () -> void {
-        a := 2.0f + foo(5);
-    }
-
-    foo(5) would have a left node of SYMBOL:foo
-    This will be resolved in a later stage between the parsing and semantic pass
-    Type checking and resolving would have to occur afterwards
-
-Creating an IR:
+            Example use:
+            {{{
+                ptr: ^i32 = 0; // Address starting at 0
+                ptr_ptr := ^ptr;
+            }}}

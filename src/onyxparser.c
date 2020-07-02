@@ -6,6 +6,7 @@
 static const char* ast_node_names[] = {
     "ERROR",
     "PROGRAM",
+    "USE",
 
     "FUNCDEF",
     "FOREIGN",
@@ -669,6 +670,7 @@ static OnyxAstNodeParam* parse_function_params(OnyxParser* parser) {
         if (parser->curr_token->type == TOKEN_TYPE_SYM_COMMA) parser_next_token(parser);
 
         symbol = expect(parser, TOKEN_TYPE_SYMBOL);
+        expect(parser, TOKEN_TYPE_SYM_COLON);
 
         curr_param = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_PARAM);
         curr_param->token = symbol;
@@ -759,8 +761,13 @@ static OnyxAstNode* parse_top_level_constant_symbol(OnyxParser* parser) {
 static OnyxAstNode* parse_top_level_statement(OnyxParser* parser) {
     switch (parser->curr_token->type) {
         case TOKEN_TYPE_KEYWORD_USE:
-            assert(0);
-            break;
+            {
+                OnyxAstNodeUse* use_node = onyx_ast_node_new(parser->allocator, ONYX_AST_NODE_KIND_USE);
+                use_node->token = expect(parser, TOKEN_TYPE_KEYWORD_USE);
+                use_node->filename = expect(parser, TOKEN_TYPE_LITERAL_STRING);
+
+                return (OnyxAstNode *) use_node;
+            }
 
         case TOKEN_TYPE_KEYWORD_EXPORT:
             {

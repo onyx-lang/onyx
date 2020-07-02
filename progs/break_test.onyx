@@ -1,5 +1,5 @@
 
-print :: foreign "host" "print" proc (val i32) ---
+print :: foreign "host" "print" proc (val: i32) ---
 
 export main :: proc {
 
