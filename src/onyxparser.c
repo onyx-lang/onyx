@@ -6,38 +6,6 @@
 // NOTE: The one weird define you need to know before read the code below
 #define make_node(nclass, kind) onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
 
-static const char* ast_node_names[] = {
-    "ERROR",
-    "PROGRAM",
-    "USE",
-
-    "FUNCTION",
-    "FOREIGN",
-    "BLOCK",
-    "SCOPE",
-    "LOCAL",
-    "GLOBAL",
-    "SYMBOL",
-
-    "UN_OP",
-    "BIN_OP",
-
-    "TYPE",
-    "LITERAL",
-    "PARAM",
-    "ARGUMENT",
-    "CALL",
-    "ASSIGN",
-    "RETURN",
-
-    "IF",
-    "WHILE",
-    "BREAK",
-    "CONTINUE",
-
-    "AST_NODE_KIND_COUNT",
-};
-
 struct TypeInfo builtin_types[] = {
     { TYPE_INFO_KIND_UNKNOWN, 0, "unknown" },
     { TYPE_INFO_KIND_VOID, 0, "void", 0, 0, 0, 0, 1 },
@@ -526,6 +494,7 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
 
                 AstNodeAssign* assign_node = make_node(AstNodeAssign, AST_NODE_KIND_ASSIGNMENT);
 
+                // TODO: Maybe I don't need to make another lval node?
                 AstNode* lval = make_node(AstNode, AST_NODE_KIND_SYMBOL);
                 lval->token = symbol;
                 assign_node->lval = (AstNodeTyped *) lval;
@@ -884,10 +853,6 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
 
 
-
-const char* onyx_ast_node_kind_string(AstNodeKind kind) {
-    return ast_node_names[kind];
-}
 
 // NOTE: This returns a void* so I don't need to cast it everytime I use it
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstNodeKind kind) {

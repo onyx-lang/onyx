@@ -4,7 +4,7 @@
 #include "bh.h"
 
 #include "onyxlex.h"
-#include "onyxparser.h"
+#include "onyxastnodes.h"
 #include "onyxmsgs.h"
 
 typedef struct SemPassSymbol {

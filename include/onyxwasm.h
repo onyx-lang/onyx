@@ -3,7 +3,7 @@
 
 #include "bh.h"
 
-#include "onyxparser.h"
+#include "onyxastnodes.h"
 #include "onyxmsgs.h"
 
 typedef u8 WasmType;

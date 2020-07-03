@@ -1,12 +1,50 @@
 #include "onyxutils.h"
 #include "onyxlex.h"
-#include "onyxparser.h"
+#include "onyxastnodes.h"
 
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
 
 bh_managed_heap global_heap;
 bh_allocator global_heap_allocator;
+
+static const char* ast_node_names[] = {
+    "ERROR",
+    "PROGRAM",
+    "USE",
+
+    "FUNCTION",
+    "FOREIGN",
+    "BLOCK",
+    "SCOPE",
+    "LOCAL",
+    "GLOBAL",
+    "SYMBOL",
+
+    "UN_OP",
+    "BIN_OP",
+
+    "TYPE",
+    "LITERAL",
+    "PARAM",
+    "ARGUMENT",
+    "CALL",
+    "ASSIGN",
+    "RETURN",
+
+    "IF",
+    "WHILE",
+    "BREAK",
+    "CONTINUE",
+
+    "AST_NODE_KIND_COUNT",
+};
+
+const char* onyx_ast_node_kind_string(AstNodeKind kind) {
+    return ast_node_names[kind];
+}
+
+
 
 #define print_indent { if (indent > 0) bh_printf("\n"); for (int i = 0; i < indent; i++) bh_printf("  "); }
 
