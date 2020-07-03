@@ -17,14 +17,14 @@ export main2 :: proc {
     while i < 10 {
         res :: fib(i);
         print_i32(res);
-        i = i + 1;
+        i += 1;
     }
 
     i = 0;
     while i < 10 {
         res :: factorial(i);
         print_i32(res);
-        i = i + 1;
+        i += 1;
     }
 
     x : i32;
@@ -34,17 +34,17 @@ export main2 :: proc {
         x = 0;
         while x < 5 {
             if x == 3 {
-                x = x + 1;
+                x += 1;
                 continue;
             }
 
             print_i32((x + y * 5) % 10);
-            x = x + 1;
+            x += 1;
         }
 
         if y > 2 { break; }
 
-        y = y + 1;
+        y += 1;
     }
 }
 

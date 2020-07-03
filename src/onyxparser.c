@@ -499,6 +499,43 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                 return 1;
             }
 
+        case TOKEN_TYPE_SYM_PLUS_EQUAL:
+        case TOKEN_TYPE_SYM_MINUS_EQUAL:
+        case TOKEN_TYPE_SYM_STAR_EQUAL:
+        case TOKEN_TYPE_SYM_FSLASH_EQUAL:
+        case TOKEN_TYPE_SYM_PERCENT_EQUAL:
+            {
+                OnyxBinaryOp bin_op;
+                if      (parser->curr_token->type == TOKEN_TYPE_SYM_PLUS_EQUAL)    bin_op = ONYX_BINARY_OP_ADD;
+                else if (parser->curr_token->type == TOKEN_TYPE_SYM_MINUS_EQUAL)   bin_op = ONYX_BINARY_OP_MINUS;
+                else if (parser->curr_token->type == TOKEN_TYPE_SYM_STAR_EQUAL)    bin_op = ONYX_BINARY_OP_MULTIPLY;
+                else if (parser->curr_token->type == TOKEN_TYPE_SYM_FSLASH_EQUAL)  bin_op = ONYX_BINARY_OP_DIVIDE;
+                else if (parser->curr_token->type == TOKEN_TYPE_SYM_PERCENT_EQUAL) bin_op = ONYX_BINARY_OP_MODULUS;
+
+                parser_next_token(parser);
+
+                AstNodeTyped* expr = parse_expression(parser);
+
+                AstNodeBinOp* bin_op_node = make_node(AstNodeBinOp, AST_NODE_KIND_BIN_OP);
+                bin_op_node->operation = bin_op;
+
+                AstNode* bin_op_left = make_node(AstNode, AST_NODE_KIND_SYMBOL);
+                bin_op_left->token = symbol;
+                bin_op_node->left = (AstNodeTyped *) bin_op_left;
+                bin_op_node->right = expr;
+
+                AstNodeAssign* assign_node = make_node(AstNodeAssign, AST_NODE_KIND_ASSIGNMENT);
+
+                AstNode* lval = make_node(AstNode, AST_NODE_KIND_SYMBOL);
+                lval->token = symbol;
+                assign_node->lval = (AstNodeTyped *) lval;
+                assign_node->expr = (AstNodeTyped *) bin_op_node;
+
+                *ret = (AstNode *) assign_node;
+
+                return 1;
+            }
+
         default:
             parser_prev_token(parser);
     }

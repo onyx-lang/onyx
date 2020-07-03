@@ -14,7 +14,7 @@ export fib :: proc (n: i32) -> i32 {
     count := n;
 
     while count >= 0 {
-        count = count - 1;
+        count -= 1;
 
         c :: a + b;
         b = a;
@@ -31,8 +31,8 @@ export factorial :: proc (n: i32) -> i32 {
     i := 2;
 
     while i <= n {
-        f = f * i;
-        i = i + 1;
+        f *= i;
+        i += 1;
     }
 
     return f;
