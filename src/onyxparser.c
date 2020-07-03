@@ -65,15 +65,10 @@ static void parser_prev_token(OnyxParser* parser) {
 }
 
 static b32 is_terminating_token(TokenType token_type) {
-    switch (token_type) {
-    case TOKEN_TYPE_SYM_SEMICOLON:
-    case TOKEN_TYPE_CLOSE_BRACE:
-    case TOKEN_TYPE_OPEN_BRACE:
-    case TOKEN_TYPE_END_STREAM:
-        return 1;
-    default:
-        return 0;
-    }
+    return (token_type == ';')
+        || (token_type == '}')
+        || (token_type == '{')
+        || (token_type == TOKEN_TYPE_END_STREAM);
 }
 
 static void find_token(OnyxParser* parser, TokenType token_type) {
@@ -138,17 +133,17 @@ static AstNodeNumLit* parse_numeric_literal(OnyxParser* parser) {
 static AstNodeTyped* parse_factor(OnyxParser* parser) {
     AstNodeTyped* retval = NULL;
 
-    switch (parser->curr_token->type) {
-        case TOKEN_TYPE_OPEN_PAREN:
+    switch ((u16) parser->curr_token->type) {
+        case '(':
             {
                 parser_next_token(parser);
                 AstNodeTyped* expr = parse_expression(parser);
-                expect(parser, TOKEN_TYPE_CLOSE_PAREN);
+                expect(parser, ')');
                 retval = expr;
                 break;
             }
 
-        case TOKEN_TYPE_SYM_MINUS:
+        case '-':
             {
                 parser_next_token(parser);
                 AstNodeTyped* factor = parse_factor(parser);
@@ -171,19 +166,19 @@ static AstNodeTyped* parse_factor(OnyxParser* parser) {
                 AstNodeTyped* sym_node = make_node(AstNode, AST_NODE_KIND_SYMBOL);
                 sym_node->token = sym_token;
 
-                if (parser->curr_token->type != TOKEN_TYPE_OPEN_PAREN) {
+                if (parser->curr_token->type != '(') {
                     retval = sym_node;
                     break;
                 }
 
                 // NOTE: Function call
                 AstNodeCall* call_node = make_node(AstNodeCall, AST_NODE_KIND_CALL);
-                call_node->base.token = expect(parser, TOKEN_TYPE_OPEN_PAREN);
+                call_node->base.token = expect(parser, '(');
                 call_node->callee = (AstNode *) sym_node;
 
                 AstNodeArgument** prev = &call_node->arguments;
                 AstNodeArgument* curr = NULL;
-                while (parser->curr_token->type != TOKEN_TYPE_CLOSE_PAREN) {
+                while (parser->curr_token->type != ')') {
                     curr = make_node(AstNodeArgument, AST_NODE_KIND_ARGUMENT);
                     curr->value = parse_expression(parser);
 
@@ -192,14 +187,14 @@ static AstNodeTyped* parse_factor(OnyxParser* parser) {
                         prev = (AstNodeArgument **) &curr->base.next;
                     }
 
-                    if (parser->curr_token->type == TOKEN_TYPE_CLOSE_PAREN)
+                    if (parser->curr_token->type == ')')
                         break;
 
-                    if (parser->curr_token->type != TOKEN_TYPE_SYM_COMMA) {
+                    if (parser->curr_token->type != ',') {
                         onyx_message_add(parser->msgs,
                                 ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
                                 parser->curr_token->pos,
-                                onyx_get_token_type_name(TOKEN_TYPE_SYM_COMMA),
+                                onyx_get_token_type_name(','),
                                 onyx_get_token_type_name(parser->curr_token->type));
                         return (AstNodeTyped *) &error_node;
                     }
@@ -292,19 +287,19 @@ static AstNodeTyped* parse_expression(OnyxParser* parser) {
 
     while (1) {
         bin_op_kind = -1;
-        switch (parser->curr_token->type) {
-            case TOKEN_TYPE_SYM_EQUAL_EQUAL:    bin_op_kind = ONYX_BINARY_OP_EQUAL; break;
-            case TOKEN_TYPE_SYM_NOT_EQUAL:      bin_op_kind = ONYX_BINARY_OP_NOT_EQUAL; break;
-            case TOKEN_TYPE_SYM_LESS_EQUAL:     bin_op_kind = ONYX_BINARY_OP_LESS_EQUAL; break;
-            case TOKEN_TYPE_SYM_LESS:           bin_op_kind = ONYX_BINARY_OP_LESS; break;
-            case TOKEN_TYPE_SYM_GREATER_EQUAL:  bin_op_kind = ONYX_BINARY_OP_GREATER_EQUAL; break;
-            case TOKEN_TYPE_SYM_GREATER:        bin_op_kind = ONYX_BINARY_OP_GREATER; break;
+        switch ((u16) parser->curr_token->type) {
+            case TOKEN_TYPE_EQUAL_EQUAL:    bin_op_kind = ONYX_BINARY_OP_EQUAL; break;
+            case TOKEN_TYPE_NOT_EQUAL:      bin_op_kind = ONYX_BINARY_OP_NOT_EQUAL; break;
+            case TOKEN_TYPE_LESS_EQUAL:     bin_op_kind = ONYX_BINARY_OP_LESS_EQUAL; break;
+            case TOKEN_TYPE_GREATER_EQUAL:  bin_op_kind = ONYX_BINARY_OP_GREATER_EQUAL; break;
+            case '<':                       bin_op_kind = ONYX_BINARY_OP_LESS; break;
+            case '>':                       bin_op_kind = ONYX_BINARY_OP_GREATER; break;
 
-            case TOKEN_TYPE_SYM_PLUS:       bin_op_kind = ONYX_BINARY_OP_ADD; break;
-            case TOKEN_TYPE_SYM_MINUS:      bin_op_kind = ONYX_BINARY_OP_MINUS; break;
-            case TOKEN_TYPE_SYM_STAR:       bin_op_kind = ONYX_BINARY_OP_MULTIPLY; break;
-            case TOKEN_TYPE_SYM_FSLASH:     bin_op_kind = ONYX_BINARY_OP_DIVIDE; break;
-            case TOKEN_TYPE_SYM_PERCENT:    bin_op_kind = ONYX_BINARY_OP_MODULUS; break;
+            case '+':                       bin_op_kind = ONYX_BINARY_OP_ADD; break;
+            case '-':                       bin_op_kind = ONYX_BINARY_OP_MINUS; break;
+            case '*':                       bin_op_kind = ONYX_BINARY_OP_MULTIPLY; break;
+            case '/':                       bin_op_kind = ONYX_BINARY_OP_DIVIDE; break;
+            case '%':                       bin_op_kind = ONYX_BINARY_OP_MODULUS; break;
             default: goto expression_done;
         }
 
@@ -403,9 +398,9 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
     if (parser->curr_token->type != TOKEN_TYPE_SYMBOL) return 0;
     OnyxToken* symbol = expect(parser, TOKEN_TYPE_SYMBOL);
 
-    switch (parser->curr_token->type) {
+    switch ((u16) parser->curr_token->type) {
         // NOTE: Declaration
-        case TOKEN_TYPE_SYM_COLON:
+        case ':':
             {
                 parser_next_token(parser);
                 TypeInfo* type = &builtin_types[TYPE_INFO_KIND_UNKNOWN];
@@ -421,8 +416,8 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                 local->base.flags |= ONYX_AST_FLAG_LVAL; // NOTE: DELETE
                 *ret = (AstNode *) local;
 
-                if (parser->curr_token->type == TOKEN_TYPE_SYM_EQUALS || parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
-                    if (parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
+                if (parser->curr_token->type == '=' || parser->curr_token->type == ':') {
+                    if (parser->curr_token->type == ':') {
                         local->base.flags |= ONYX_AST_FLAG_CONST;
                     }
 
@@ -451,7 +446,7 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
             }
 
             // NOTE: Assignment
-        case TOKEN_TYPE_SYM_EQUALS:
+        case '=':
             {
                 AstNodeAssign* assignment = make_node(AstNodeAssign, AST_NODE_KIND_ASSIGNMENT);
                 assignment->base.token = parser->curr_token;
@@ -467,18 +462,18 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                 return 1;
             }
 
-        case TOKEN_TYPE_SYM_PLUS_EQUAL:
-        case TOKEN_TYPE_SYM_MINUS_EQUAL:
-        case TOKEN_TYPE_SYM_STAR_EQUAL:
-        case TOKEN_TYPE_SYM_FSLASH_EQUAL:
-        case TOKEN_TYPE_SYM_PERCENT_EQUAL:
+        case TOKEN_TYPE_PLUS_EQUAL:
+        case TOKEN_TYPE_MINUS_EQUAL:
+        case TOKEN_TYPE_STAR_EQUAL:
+        case TOKEN_TYPE_FSLASH_EQUAL:
+        case TOKEN_TYPE_PERCENT_EQUAL:
             {
                 OnyxBinaryOp bin_op;
-                if      (parser->curr_token->type == TOKEN_TYPE_SYM_PLUS_EQUAL)    bin_op = ONYX_BINARY_OP_ADD;
-                else if (parser->curr_token->type == TOKEN_TYPE_SYM_MINUS_EQUAL)   bin_op = ONYX_BINARY_OP_MINUS;
-                else if (parser->curr_token->type == TOKEN_TYPE_SYM_STAR_EQUAL)    bin_op = ONYX_BINARY_OP_MULTIPLY;
-                else if (parser->curr_token->type == TOKEN_TYPE_SYM_FSLASH_EQUAL)  bin_op = ONYX_BINARY_OP_DIVIDE;
-                else if (parser->curr_token->type == TOKEN_TYPE_SYM_PERCENT_EQUAL) bin_op = ONYX_BINARY_OP_MODULUS;
+                if      (parser->curr_token->type == TOKEN_TYPE_PLUS_EQUAL)    bin_op = ONYX_BINARY_OP_ADD;
+                else if (parser->curr_token->type == TOKEN_TYPE_MINUS_EQUAL)   bin_op = ONYX_BINARY_OP_MINUS;
+                else if (parser->curr_token->type == TOKEN_TYPE_STAR_EQUAL)    bin_op = ONYX_BINARY_OP_MULTIPLY;
+                else if (parser->curr_token->type == TOKEN_TYPE_FSLASH_EQUAL)  bin_op = ONYX_BINARY_OP_DIVIDE;
+                else if (parser->curr_token->type == TOKEN_TYPE_PERCENT_EQUAL) bin_op = ONYX_BINARY_OP_MODULUS;
 
                 parser_next_token(parser);
 
@@ -518,7 +513,7 @@ static AstNodeReturn* parse_return_statement(OnyxParser* parser) {
 
     AstNodeTyped* expr = NULL;
 
-    if (parser->curr_token->type != TOKEN_TYPE_SYM_SEMICOLON) {
+    if (parser->curr_token->type != ';') {
         expr = parse_expression(parser);
 
         if (expr == NULL || expr == (AstNodeTyped *) &error_node) {
@@ -535,12 +530,12 @@ static AstNode* parse_statement(OnyxParser* parser) {
     b32 needs_semicolon = 1;
     AstNode* retval = NULL;
 
-    switch (parser->curr_token->type) {
+    switch ((u16) parser->curr_token->type) {
         case TOKEN_TYPE_KEYWORD_RETURN:
             retval = (AstNode *) parse_return_statement(parser);
             break;
 
-        case TOKEN_TYPE_OPEN_BRACE:
+        case '{':
             needs_semicolon = 0;
             retval = (AstNode *) parse_block(parser);
             break;
@@ -549,10 +544,10 @@ static AstNode* parse_statement(OnyxParser* parser) {
             if (parse_symbol_statement(parser, &retval)) break;
             // fallthrough
 
-        case TOKEN_TYPE_OPEN_PAREN:
-        case TOKEN_TYPE_SYM_PLUS:
-        case TOKEN_TYPE_SYM_MINUS:
-        case TOKEN_TYPE_SYM_BANG:
+        case '(':
+        case '+':
+        case '-':
+        case '!':
         case TOKEN_TYPE_LITERAL_NUMERIC:
         case TOKEN_TYPE_LITERAL_STRING:
             retval = (AstNode *) parse_expression(parser);
@@ -583,14 +578,14 @@ static AstNode* parse_statement(OnyxParser* parser) {
     }
 
     if (needs_semicolon) {
-        if (parser->curr_token->type != TOKEN_TYPE_SYM_SEMICOLON) {
+        if (parser->curr_token->type != ';') {
             onyx_message_add(parser->msgs,
                 ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
                 parser->curr_token->pos,
-                onyx_get_token_type_name(TOKEN_TYPE_SYM_SEMICOLON),
+                onyx_get_token_type_name(';'),
                 onyx_get_token_type_name(parser->curr_token->type));
 
-            find_token(parser, TOKEN_TYPE_SYM_SEMICOLON);
+            find_token(parser, ';');
         }
         parser_next_token(parser);
     }
@@ -604,18 +599,18 @@ static AstNodeBlock* parse_block(OnyxParser* parser) {
     block->scope = scope;
 
     // --- is for an empty block
-    if (parser->curr_token->type == TOKEN_TYPE_SYM_MINUS) {
-        expect(parser, TOKEN_TYPE_SYM_MINUS);
-        expect(parser, TOKEN_TYPE_SYM_MINUS);
-        expect(parser, TOKEN_TYPE_SYM_MINUS);
+    if (parser->curr_token->type == '-') {
+        expect(parser, '-');
+        expect(parser, '-');
+        expect(parser, '-');
         return block;
     }
 
-    expect(parser, TOKEN_TYPE_OPEN_BRACE);
+    expect(parser, '{');
 
     AstNode** next = &block->body;
     AstNode* stmt = NULL;
-    while (parser->curr_token->type != TOKEN_TYPE_CLOSE_BRACE) {
+    while (parser->curr_token->type != '}') {
         stmt = parse_statement(parser);
 
         if (stmt != NULL && stmt->kind != AST_NODE_KIND_ERROR) {
@@ -626,7 +621,7 @@ static AstNodeBlock* parse_block(OnyxParser* parser) {
         }
     }
 
-    expect(parser, TOKEN_TYPE_CLOSE_BRACE);
+    expect(parser, '}');
 
     return block;
 }
@@ -654,12 +649,12 @@ static TypeInfo* parse_type(OnyxParser* parser) {
 }
 
 static AstNodeLocal* parse_function_params(OnyxParser* parser) {
-    if (parser->curr_token->type != TOKEN_TYPE_OPEN_PAREN)
+    if (parser->curr_token->type != '(')
         return NULL;
 
-    expect(parser, TOKEN_TYPE_OPEN_PAREN);
+    expect(parser, '(');
 
-    if (parser->curr_token->type == TOKEN_TYPE_CLOSE_PAREN) {
+    if (parser->curr_token->type == ')') {
         parser_next_token(parser);
         return NULL;
     }
@@ -669,11 +664,11 @@ static AstNodeLocal* parse_function_params(OnyxParser* parser) {
     AstNodeLocal* trailer = NULL;
 
     OnyxToken* symbol;
-    while (parser->curr_token->type != TOKEN_TYPE_CLOSE_PAREN) {
-        if (parser->curr_token->type == TOKEN_TYPE_SYM_COMMA) parser_next_token(parser);
+    while (parser->curr_token->type != ')') {
+        if (parser->curr_token->type == ',') parser_next_token(parser);
 
         symbol = expect(parser, TOKEN_TYPE_SYMBOL);
-        expect(parser, TOKEN_TYPE_SYM_COLON);
+        expect(parser, ':');
 
         curr_param = make_node(AstNodeLocal, AST_NODE_KIND_PARAM);
         curr_param->base.token = symbol;
@@ -794,7 +789,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 OnyxToken* symbol = parser->curr_token;
                 parser_next_token(parser);
 
-                expect(parser, TOKEN_TYPE_SYM_COLON);
+                expect(parser, ':');
 
                 TypeInfo* type = &builtin_types[TYPE_INFO_KIND_UNKNOWN];
 
@@ -802,7 +797,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     type = parse_type(parser);
                 }
 
-                if (parser->curr_token->type == TOKEN_TYPE_SYM_COLON) {
+                if (parser->curr_token->type == ':') {
                     parser_next_token(parser);
 
                     AstNode* node = parse_top_level_constant_symbol(parser);
@@ -820,7 +815,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                     return node;
 
-                } else if (parser->curr_token->type == TOKEN_TYPE_SYM_EQUALS) {
+                } else if (parser->curr_token->type == '=') {
                     parser_next_token(parser);
 
                     AstNodeGlobal* global = make_node(AstNodeGlobal, AST_NODE_KIND_GLOBAL);
