@@ -1,7 +1,7 @@
 #include "bh.h"
 #include "onyxlex.h"
 
-static const char* onyx_token_type_names[] = {
+static const char* token_type_names[] = {
     "TOKEN_TYPE_UNKNOWN",
     "TOKEN_TYPE_END_STREAM",
 
@@ -76,7 +76,7 @@ static const char* onyx_token_type_names[] = {
 }
 #endif
 
-static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, b32 is_word, OnyxTokenType type) {
+static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, b32 is_word, TokenType type) {
     i64 len = chars_match(tokenizer->curr, lit);
     if (len > 0) {
         if (is_word && char_is_alphanum(*(tokenizer->curr + len)) || charset_contains("_$", *(tokenizer->curr + len)))
@@ -95,14 +95,14 @@ static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, b32 is_
     return 0;
 }
 
-const char* onyx_get_token_type_name(OnyxTokenType tkn_type) {
-    return onyx_token_type_names[tkn_type];
+const char* onyx_get_token_type_name(TokenType tkn_type) {
+    return token_type_names[tkn_type];
 }
 
-void onyx_token_null_toggle(OnyxToken tkn) {
+void onyx_token_null_toggle(OnyxToken* tkn) {
     static char backup = 0;
-    char tmp = tkn.token[tkn.length];
-    tkn.token[tkn.length] = backup;
+    char tmp = tkn->token[tkn->length];
+    tkn->token[tkn->length] = backup;
     backup = tmp;
 }
 

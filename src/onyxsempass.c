@@ -13,7 +13,7 @@ OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc
         .symbols = NULL,
     };
 
-    bh_table_init(bh_heap_allocator(), state.symbols, 61);
+    bh_table_init(global_heap_allocator, state.symbols, 61);
 
     return state;
 }
@@ -24,29 +24,29 @@ OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc
 // defined in sub-scopes up to the function-block level. This is a
 // requirement of WASM, but not of other targets.
 static void collapse_scopes(OnyxProgram* program) {
-    bh_arr(OnyxAstNodeBlock*) traversal_queue = NULL;
+    bh_arr(AstNodeBlock*) traversal_queue = NULL;
     bh_arr_new(global_scratch_allocator, traversal_queue, 4);
     bh_arr_set_length(traversal_queue, 0);
 
-    bh_arr_each(OnyxAstNodeFunction *, func, program->functions) {
-        OnyxAstNodeScope* top_scope = (*func)->body->scope;
+    bh_arr_each(AstNodeFunction *, func, program->functions) {
+        AstNodeScope* top_scope = (*func)->body->scope;
 
         bh_arr_push(traversal_queue, (*func)->body);
         while (!bh_arr_is_empty(traversal_queue)) {
-            OnyxAstNodeBlock* block = traversal_queue[0];
+            AstNodeBlock* block = traversal_queue[0];
 
-            if (block->kind == ONYX_AST_NODE_KIND_IF) {
-                OnyxAstNodeIf* if_node = (OnyxAstNodeIf *) block;
+            if (block->base.kind == AST_NODE_KIND_IF) {
+                AstNodeIf* if_node = (AstNodeIf *) block;
                 if (if_node->true_block)
-                    bh_arr_push(traversal_queue, (OnyxAstNodeBlock *) if_node->true_block);
+                    bh_arr_push(traversal_queue, (AstNodeBlock *) if_node->true_block);
 
                 if (if_node->false_block)
-                    bh_arr_push(traversal_queue, (OnyxAstNodeBlock *) if_node->false_block);
+                    bh_arr_push(traversal_queue, (AstNodeBlock *) if_node->false_block);
 
             } else {
 
                 if (block->scope != top_scope && block->scope->last_local != NULL) {
-                    OnyxAstNodeLocal* last_local = block->scope->last_local;
+                    AstNodeLocal* last_local = block->scope->last_local;
                     while (last_local && last_local->prev_local != NULL) last_local = last_local->prev_local;
 
                     last_local->prev_local = top_scope->last_local;
@@ -54,20 +54,20 @@ static void collapse_scopes(OnyxProgram* program) {
                     block->scope->last_local = NULL;
                 }
 
-                OnyxAstNode* walker = block->body;
+                AstNode* walker = block->body;
                 while (walker) {
-                    if (walker->kind == ONYX_AST_NODE_KIND_BLOCK) {
-                        bh_arr_push(traversal_queue, (OnyxAstNodeBlock *) walker);
+                    if (walker->kind == AST_NODE_KIND_BLOCK) {
+                        bh_arr_push(traversal_queue, (AstNodeBlock *) walker);
 
-                    } else if (walker->kind == ONYX_AST_NODE_KIND_WHILE) {
-                        bh_arr_push(traversal_queue, walker->as_while.body);
+                    } else if (walker->kind == AST_NODE_KIND_WHILE) {
+                        bh_arr_push(traversal_queue, ((AstNodeWhile *) walker)->body);
 
-                    } else if (walker->kind == ONYX_AST_NODE_KIND_IF) {
-                        if (walker->as_if.true_block)
-                            bh_arr_push(traversal_queue, (OnyxAstNodeBlock *) walker->as_if.true_block);
+                    } else if (walker->kind == AST_NODE_KIND_IF) {
+                        if (((AstNodeIf *) walker)->true_block)
+                            bh_arr_push(traversal_queue, (AstNodeBlock *) ((AstNodeIf *) walker)->true_block);
 
-                        if (walker->as_if.false_block)
-                            bh_arr_push(traversal_queue, (OnyxAstNodeBlock *) walker->as_if.false_block);
+                        if (((AstNodeIf *) walker)->false_block)
+                            bh_arr_push(traversal_queue, (AstNodeBlock *) ((AstNodeIf *) walker)->false_block);
                     }
 
                     walker = walker->next;

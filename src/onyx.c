@@ -106,7 +106,7 @@ static void compile_opts_free(OnyxCompileOptions* opts) {
     bh_arr_free(opts->files);
 }
 
-static OnyxAstNode* parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
+static AstNode* parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
     if (compiler_state->options->verbose_output)
         bh_printf("[Lexing]       %s\n", file_contents->filename);
@@ -142,33 +142,33 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
 
-    OnyxAstNode* root_node = parse_source_file(compiler_state, &fc);
+    AstNode* root_node = parse_source_file(compiler_state, &fc);
 
     if (compiler_state->options->print_ast) {
         onyx_ast_print(root_node, 0);
         bh_printf("\n");
     }
 
-    OnyxAstNode* walker = root_node;
+    AstNode* walker = root_node;
     while (walker) {
         switch (walker->kind) {
-            case ONYX_AST_NODE_KIND_USE:
-                bh_arr_push(compiler_state->program.uses, &walker->as_use);
+            case AST_NODE_KIND_USE:
+                bh_arr_push(compiler_state->program.uses, (AstNodeUse *) walker);
                 break;
 
-            case ONYX_AST_NODE_KIND_GLOBAL:
-                bh_arr_push(compiler_state->program.globals, &walker->as_global);
+            case AST_NODE_KIND_GLOBAL:
+                bh_arr_push(compiler_state->program.globals, (AstNodeGlobal *) walker);
                 break;
 
-            case ONYX_AST_NODE_KIND_FOREIGN:
-                bh_arr_push(compiler_state->program.foreigns, &walker->as_foreign);
+            case AST_NODE_KIND_FOREIGN:
+                bh_arr_push(compiler_state->program.foreigns, (AstNodeForeign *) walker);
                 break;
 
-            case ONYX_AST_NODE_KIND_FUNCTION:
-                bh_arr_push(compiler_state->program.functions, &walker->as_function);
+            case AST_NODE_KIND_FUNCTION:
+                bh_arr_push(compiler_state->program.functions, (AstNodeFunction *) walker);
                 break;
 
-            case ONYX_AST_NODE_KIND_PROGRAM:
+            case AST_NODE_KIND_PROGRAM:
                 // Dummy initial node
                 break;
 
@@ -180,7 +180,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         walker = walker->next;
     }
 
-    bh_arr_each(OnyxAstNodeUse *, use_node, compiler_state->program.uses) {
+    bh_arr_each(AstNodeUse *, use_node, compiler_state->program.uses) {
         char* formatted_name = bh_aprintf(
                 global_heap_allocator,
                 "%b.onyx",

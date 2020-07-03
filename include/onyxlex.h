@@ -3,7 +3,7 @@
 
 #include "bh.h"
 
-typedef enum OnyxTokenType {
+typedef enum TokenType {
     TOKEN_TYPE_UNKNOWN,
     TOKEN_TYPE_END_STREAM,
 
@@ -61,7 +61,7 @@ typedef enum OnyxTokenType {
     TOKEN_TYPE_LITERAL_BOOL_FALSE,
 
     TOKEN_TYPE_COUNT
-} OnyxTokenType;
+} TokenType;
 
 typedef struct OnyxFilePos {
     const char* filename;
@@ -69,7 +69,7 @@ typedef struct OnyxFilePos {
 } OnyxFilePos;
 
 typedef struct OnyxToken {
-    OnyxTokenType type;
+    TokenType type;
     i32 length;
     char* token;
     OnyxFilePos pos;
@@ -86,8 +86,8 @@ typedef struct OnyxTokenizer {
     bh_arr(OnyxToken) tokens;
 } OnyxTokenizer;
 
-const char* onyx_get_token_type_name(OnyxTokenType tkn_type);
-void onyx_token_null_toggle(OnyxToken tkn);
+const char* onyx_get_token_type_name(TokenType tkn_type);
+void onyx_token_null_toggle(OnyxToken* tkn);
 OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer);
 OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc);
 void onyx_tokenizer_free(OnyxTokenizer* tokenizer);

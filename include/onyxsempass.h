@@ -8,7 +8,7 @@
 #include "onyxmsgs.h"
 
 typedef struct SemPassSymbol {
-    OnyxAstNode *node;
+    AstNode *node;
     struct SemPassSymbol *shadowed;
 } SemPassSymbol;
 
@@ -19,10 +19,10 @@ typedef struct OnyxSemPassState {
     OnyxMessages *msgs;
 
     // NOTE: Used in symbol resolution phase
-    OnyxAstNodeScope* curr_scope;
+    AstNodeScope* curr_scope;
 
     // NOTE: Used in type checking phase
-    OnyxTypeInfo* expected_return_type;
+    TypeInfo* expected_return_type;
 
     bh_table(SemPassSymbol *) symbols;
 } OnyxSemPassState;
