@@ -324,29 +324,29 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
 
     bh_arr_push(mod->structured_jump_target, 0);
 
-    if (if_node->true_block) {
+    if (if_node->true_block.as_if) {
         // NOTE: This is kind of gross, but making a function for this doesn't feel right
 
-        if (if_node->true_block->kind == AST_NODE_KIND_IF) {
-            forll (AstNode, stmt, if_node->true_block, next) {
+        if (if_node->true_block.as_if->base.kind == AST_NODE_KIND_IF) {
+            forll (AstNode, stmt, (AstNode *) if_node->true_block.as_if, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->true_block->kind == AST_NODE_KIND_BLOCK) {
-            forll (AstNode, stmt, ((AstNodeBlock *) if_node->true_block)->body, next) {
+        } else if (if_node->true_block.as_if->base.kind == AST_NODE_KIND_BLOCK) {
+            forll (AstNode, stmt, if_node->true_block.as_block->body, next) {
                 compile_statement(mod, &code, stmt);
             }
         }
     }
 
-    if (if_node->false_block) {
+    if (if_node->false_block.as_if) {
         bh_arr_push(code, ((WasmInstruction){ WI_ELSE, 0x00 }));
 
-        if (if_node->false_block->kind == AST_NODE_KIND_IF) {
-            forll (AstNode, stmt, if_node->false_block, next) {
+        if (if_node->false_block.as_if->base.kind == AST_NODE_KIND_IF) {
+            forll (AstNode, stmt, (AstNode *) if_node->false_block.as_if, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->false_block->kind == AST_NODE_KIND_BLOCK) {
-            forll (AstNode, stmt, ((AstNodeBlock *) if_node->false_block)->body, next) {
+        } else if (if_node->false_block.as_if->base.kind == AST_NODE_KIND_BLOCK) {
+            forll (AstNode, stmt, if_node->false_block.as_block->body, next) {
                 compile_statement(mod, &code, stmt);
             }
         }
@@ -875,7 +875,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program) {
         }
         else if (import_kind == AST_NODE_KIND_GLOBAL) {
             module->next_global_idx++;
-            bh_imap_put(&module->global_map, (u64) (*foreign)->import, module->next_import_func_idx++);
+            bh_imap_put(&module->global_map, (u64) (*foreign)->import, module->next_import_global_idx++);
         }
 
         compile_foreign(module, *foreign);

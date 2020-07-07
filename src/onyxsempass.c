@@ -37,11 +37,11 @@ static void collapse_scopes(OnyxProgram* program) {
 
             if (block->base.kind == AST_NODE_KIND_IF) {
                 AstNodeIf* if_node = (AstNodeIf *) block;
-                if (if_node->true_block)
-                    bh_arr_push(traversal_queue, (AstNodeBlock *) if_node->true_block);
+                if (if_node->true_block.as_block != NULL)
+                    bh_arr_push(traversal_queue, if_node->true_block.as_block);
 
-                if (if_node->false_block)
-                    bh_arr_push(traversal_queue, (AstNodeBlock *) if_node->false_block);
+                if (if_node->false_block.as_block != NULL)
+                    bh_arr_push(traversal_queue, if_node->false_block.as_block);
 
             } else {
 
@@ -63,11 +63,11 @@ static void collapse_scopes(OnyxProgram* program) {
                         bh_arr_push(traversal_queue, ((AstNodeWhile *) walker)->body);
 
                     } else if (walker->kind == AST_NODE_KIND_IF) {
-                        if (((AstNodeIf *) walker)->true_block)
-                            bh_arr_push(traversal_queue, (AstNodeBlock *) ((AstNodeIf *) walker)->true_block);
+                        if (((AstNodeIf *) walker)->true_block.as_block != NULL)
+                            bh_arr_push(traversal_queue, ((AstNodeIf *) walker)->true_block.as_block);
 
-                        if (((AstNodeIf *) walker)->false_block)
-                            bh_arr_push(traversal_queue, (AstNodeBlock *) ((AstNodeIf *) walker)->false_block);
+                        if (((AstNodeIf *) walker)->false_block.as_block != NULL)
+                            bh_arr_push(traversal_queue, ((AstNodeIf *) walker)->false_block.as_block);
                     }
 
                     walker = walker->next;

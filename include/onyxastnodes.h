@@ -91,6 +91,10 @@ typedef enum OnyxAstFlags {
     ONYX_AST_FLAG_LVAL            = BH_BIT(1),
     ONYX_AST_FLAG_CONST           = BH_BIT(2),
     ONYX_AST_FLAG_COMPTIME        = BH_BIT(3),
+
+    // Function flags
+    ONYX_AST_FLAG_INLINE          = BH_BIT(8),
+    ONYX_AST_FLAG_INTRINSIC       = BH_BIT(9),
 } OnyxAstFlags;
 
 typedef enum OnyxUnaryOp {
@@ -192,8 +196,11 @@ struct AstNodeIf {
     AstNode base;
 
     AstNodeTyped *cond;
-    AstNode *true_block;
-    AstNode *false_block;
+
+    union {
+        AstNodeIf *as_if;
+        AstNodeBlock* as_block;
+    } true_block, false_block;
 };
 
 struct AstNodeWhile {

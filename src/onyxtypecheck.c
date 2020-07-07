@@ -83,8 +83,8 @@ static void typecheck_if(OnyxSemPassState* state, AstNodeIf* ifnode) {
         return;
     }
 
-    if (ifnode->true_block) typecheck_statement(state, ifnode->true_block);
-    if (ifnode->false_block) typecheck_statement(state, ifnode->false_block);
+    if (ifnode->true_block.as_if) typecheck_statement(state,  (AstNode *) ifnode->true_block.as_block);
+    if (ifnode->false_block.as_if) typecheck_statement(state, (AstNode *) ifnode->false_block.as_block);
 }
 
 static void typecheck_while(OnyxSemPassState* state, AstNodeWhile* whilenode) {

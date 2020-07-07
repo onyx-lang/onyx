@@ -196,15 +196,15 @@ void onyx_ast_print(AstNode* node, i32 indent) {
                 bh_printf("Condition:");
                 onyx_ast_print((AstNode *) if_node->cond, indent + 1);
             }
-            if (if_node->true_block) {
+            if (if_node->true_block.as_if) {
                 print_indent;
                 bh_printf("True block:");
-                onyx_ast_print(if_node->true_block, indent + 1);
+                onyx_ast_print((AstNode *) if_node->true_block.as_if, indent + 1);
             }
-            if (if_node->false_block) {
+            if (if_node->false_block.as_if) {
                 print_indent;
                 bh_printf("False block:");
-                onyx_ast_print(if_node->false_block, indent + 1);
+                onyx_ast_print((AstNode *) if_node->false_block.as_if, indent + 1);
             }
 
             break;

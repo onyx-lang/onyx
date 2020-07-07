@@ -172,22 +172,22 @@ static void symres_return(OnyxSemPassState* state, AstNodeReturn* ret) {
 
 static void symres_if(OnyxSemPassState* state, AstNodeIf* ifnode) {
     symres_expression(state, (AstNode **) &ifnode->cond);
-    if (ifnode->true_block) {
-        if (ifnode->true_block->kind == AST_NODE_KIND_BLOCK)
-            symres_block(state, (AstNodeBlock *) ifnode->true_block);
+    if (ifnode->true_block.as_if != NULL) {
+        if (ifnode->true_block.as_if->base.kind == AST_NODE_KIND_BLOCK)
+            symres_block(state, ifnode->true_block.as_block);
 
-        else if (ifnode->true_block->kind == AST_NODE_KIND_IF)
-            symres_if(state, (AstNodeIf *) ifnode->true_block);
+        else if (ifnode->true_block.as_if->base.kind == AST_NODE_KIND_IF)
+            symres_if(state, ifnode->true_block.as_if);
 
         else DEBUG_HERE;
     }
 
-    if (ifnode->false_block) {
-        if (ifnode->false_block->kind == AST_NODE_KIND_BLOCK)
-            symres_block(state, (AstNodeBlock *) ifnode->false_block);
+    if (ifnode->false_block.as_if != NULL) {
+        if (ifnode->false_block.as_if->base.kind == AST_NODE_KIND_BLOCK)
+            symres_block(state, ifnode->false_block.as_block);
 
-        else if (ifnode->false_block->kind == AST_NODE_KIND_IF)
-            symres_if(state, (AstNodeIf *) ifnode->false_block);
+        else if (ifnode->false_block.as_if->base.kind == AST_NODE_KIND_IF)
+            symres_if(state, ifnode->false_block.as_if);
 
         else DEBUG_HERE;
     }
