@@ -9,7 +9,7 @@ OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc
 
         .msgs = msgs,
 
-        .curr_scope = NULL,
+        .curr_local_group = NULL,
         .symbols = NULL,
     };
 
@@ -29,7 +29,7 @@ static void collapse_scopes(OnyxProgram* program) {
     bh_arr_set_length(traversal_queue, 0);
 
     bh_arr_each(AstNodeFunction *, func, program->functions) {
-        AstNodeScope* top_scope = (*func)->body->scope;
+        AstNodeLocalGroup* top_locals = (*func)->body->locals;
 
         bh_arr_push(traversal_queue, (*func)->body);
         while (!bh_arr_is_empty(traversal_queue)) {
@@ -45,13 +45,13 @@ static void collapse_scopes(OnyxProgram* program) {
 
             } else {
 
-                if (block->scope != top_scope && block->scope->last_local != NULL) {
-                    AstNodeLocal* last_local = block->scope->last_local;
+                if (block->locals != top_locals && block->locals->last_local != NULL) {
+                    AstNodeLocal* last_local = block->locals->last_local;
                     while (last_local && last_local->prev_local != NULL) last_local = last_local->prev_local;
 
-                    last_local->prev_local = top_scope->last_local;
-                    top_scope->last_local = block->scope->last_local;
-                    block->scope->last_local = NULL;
+                    last_local->prev_local = top_locals->last_local;
+                    top_locals->last_local = block->locals->last_local;
+                    block->locals->last_local = NULL;
                 }
 
                 AstNode* walker = block->body;

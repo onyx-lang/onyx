@@ -311,7 +311,7 @@ static void typecheck_statement_chain(OnyxSemPassState* state, AstNode* start) {
 static void typecheck_block(OnyxSemPassState* state, AstNodeBlock* block) {
     typecheck_statement_chain(state, block->body);
 
-    forll(AstNodeLocal, local, block->scope->last_local, prev_local) {
+    forll(AstNodeLocal, local, block->locals->last_local, prev_local) {
         if (!local->base.type->is_known) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,

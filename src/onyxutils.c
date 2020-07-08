@@ -45,6 +45,10 @@ const char* onyx_ast_node_kind_string(AstNodeKind kind) {
 }
 
 
+void onyx_ast_print(AstNode* node, i32 indent) {
+    assert(0);
+}
+#if 0
 
 #define print_indent { if (indent > 0) bh_printf("\n"); for (int i = 0; i < indent; i++) bh_printf("  "); }
 
@@ -227,3 +231,5 @@ void onyx_ast_print(AstNode* node, i32 indent) {
         node = node->next;
     }
 }
+
+#endif

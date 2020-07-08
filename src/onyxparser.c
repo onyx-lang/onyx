@@ -590,8 +590,8 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
 static AstNodeBlock* parse_block(OnyxParser* parser) {
     AstNodeBlock* block = make_node(AstNodeBlock, AST_NODE_KIND_BLOCK);
-    AstNodeScope* scope = make_node(AstNodeScope, AST_NODE_KIND_SCOPE);
-    block->scope = scope;
+    AstNodeLocalGroup* lg = make_node(AstNodeLocalGroup, AST_NODE_KIND_LOCAL_GROUP);
+    block->locals = lg;
 
     // --- is for an empty block
     if (parser->curr_token->type == '-') {

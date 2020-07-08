@@ -10,7 +10,7 @@ typedef struct AstNodeBinOp AstNodeBinOp;
 typedef struct AstNodeAssign AstNodeAssign;
 typedef struct AstNodeNumLit AstNodeNumLit;
 typedef struct AstNodeLocal AstNodeLocal;
-typedef struct AstNodeScope AstNodeScope;
+typedef struct AstNodeLocalGroup AstNodeLocalGroup;
 typedef struct AstNodeReturn AstNodeReturn;
 typedef struct AstNodeBlock AstNodeBlock;
 typedef struct AstNodeIf AstNodeIf;
@@ -30,7 +30,7 @@ typedef enum AstNodeKind {
     AST_NODE_KIND_FUNCTION,
     AST_NODE_KIND_FOREIGN,
     AST_NODE_KIND_BLOCK,
-    AST_NODE_KIND_SCOPE,
+    AST_NODE_KIND_LOCAL_GROUP,
     AST_NODE_KIND_LOCAL,
     AST_NODE_KIND_GLOBAL,
     AST_NODE_KIND_SYMBOL,
@@ -178,10 +178,10 @@ struct AstNodeReturn {
     AstNodeTyped* expr;
 };
 
-struct AstNodeScope {
+struct AstNodeLocalGroup {
     AstNode base;
 
-    AstNodeScope *prev_scope;
+    AstNodeLocalGroup *prev_group;
     AstNodeLocal *last_local;
 };
 
@@ -189,7 +189,7 @@ struct AstNodeBlock {
     AstNode base;
 
     AstNode *body;
-    AstNodeScope *scope;
+    AstNodeLocalGroup *locals;
 };
 
 struct AstNodeIf {

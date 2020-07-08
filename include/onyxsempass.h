@@ -19,11 +19,12 @@ typedef struct OnyxSemPassState {
     OnyxMessages *msgs;
 
     // NOTE: Used in symbol resolution phase
-    AstNodeScope* curr_scope;
+    AstNodeLocalGroup* curr_local_group;
 
     // NOTE: Used in type checking phase
     TypeInfo* expected_return_type;
 
+    // NOTE: All symbols a given point that we can resolve
     bh_table(SemPassSymbol *) symbols;
 } OnyxSemPassState;
 

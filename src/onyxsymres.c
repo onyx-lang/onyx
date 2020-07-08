@@ -5,8 +5,8 @@ static void symbol_introduce(OnyxSemPassState* state, AstNode* symbol);
 static b32 symbol_unique_introduce(OnyxSemPassState* state, AstNode* symbol);
 static void symbol_remove(OnyxSemPassState* state, AstNode* symbol);
 static AstNode* symbol_resolve(OnyxSemPassState* state, AstNode* symbol);
-static void scope_enter(OnyxSemPassState* state, AstNodeScope* scope);
-static AstNodeScope* scope_leave(OnyxSemPassState* state);
+static void local_group_enter(OnyxSemPassState* state, AstNodeLocalGroup* local_group);
+static void local_group_leave(OnyxSemPassState* state);
 static void symres_local(OnyxSemPassState* state, AstNodeLocal** local);
 static void symres_call(OnyxSemPassState* state, AstNodeCall* call);
 static void symres_expression(OnyxSemPassState* state, AstNode** expr);
@@ -34,8 +34,8 @@ static void symbol_introduce(OnyxSemPassState* state, AstNode* symbol) {
 
     if (symbol->kind == AST_NODE_KIND_LOCAL) {
         AstNodeLocal* local = (AstNodeLocal *) symbol;
-        local->prev_local = state->curr_scope->last_local;
-        state->curr_scope->last_local = local;
+        local->prev_local = state->curr_local_group->last_local;
+        state->curr_local_group->last_local = local;
     }
 
     onyx_token_null_toggle(symbol->token);
@@ -74,21 +74,19 @@ static AstNode* symbol_resolve(OnyxSemPassState* state, AstNode* symbol) {
     return sp_sym->node;
 }
 
-static void scope_enter(OnyxSemPassState* state, AstNodeScope* scope) {
-    scope->prev_scope = state->curr_scope;
-    state->curr_scope = scope;
+static void local_group_enter(OnyxSemPassState* state, AstNodeLocalGroup* local_group) {
+    local_group->prev_group = state->curr_local_group;
+    state->curr_local_group = local_group;
 }
 
-static AstNodeScope* scope_leave(OnyxSemPassState* state) {
-    // NOTE: Can't leave a scope if there is no scope
-    assert(state->curr_scope != NULL);
+static void local_group_leave(OnyxSemPassState* state) {
+    assert(state->curr_local_group != NULL);
 
-    for (AstNodeLocal *walker = state->curr_scope->last_local; walker != NULL; walker = walker->prev_local) {
+    for (AstNodeLocal *walker = state->curr_local_group->last_local; walker != NULL; walker = walker->prev_local) {
         symbol_remove(state, (AstNode *) walker);
     }
 
-    state->curr_scope = state->curr_scope->prev_scope;
-    return state->curr_scope;
+    state->curr_local_group = state->curr_local_group->prev_group;
 }
 
 static b32 symbol_unique_introduce(OnyxSemPassState* state, AstNode* symbol) {
@@ -230,10 +228,10 @@ static void symres_statement_chain(OnyxSemPassState* state, AstNode* walker, Ast
 }
 
 static void symres_block(OnyxSemPassState* state, AstNodeBlock* block) {
-    scope_enter(state, block->scope);
+    local_group_enter(state, block->locals);
     if (block->body)
         symres_statement_chain(state, block->body, &block->body);
-    scope_leave(state);
+    local_group_leave(state);
 }
 
 static void symres_function(OnyxSemPassState* state, AstNodeFunction* func) {

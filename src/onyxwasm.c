@@ -280,7 +280,6 @@ static void compile_statement(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcod
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (stmt->kind) {
-        case AST_NODE_KIND_SCOPE: break;
         case AST_NODE_KIND_RETURN: compile_return(mod, &code, (AstNodeReturn *) stmt); break;
         case AST_NODE_KIND_ASSIGNMENT: compile_assignment(mod, &code, (AstNodeAssign *) stmt); break;
         case AST_NODE_KIND_IF: compile_if(mod, &code, (AstNodeIf *) stmt); break;
@@ -671,7 +670,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstNodeFunction* fd) {
         type->param_count = param_count;
 
         // HACK ish thing
-         memcpy(type->param_types, type_repr_buf, type->param_count);
+        memcpy(type->param_types, type_repr_buf, type->param_count);
 
         bh_arr_push(mod->functypes, type);
 
@@ -728,7 +727,7 @@ static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
         // is the same as the order of the local_types above
         u8* count = &wasm_func.locals.i32_count;
         fori (ti, 0, 3) {
-            forll (AstNodeLocal, local, fd->body->scope->last_local, prev_local) {
+            forll (AstNodeLocal, local, fd->body->locals->last_local, prev_local) {
                 if (onyx_type_to_wasm_type(local->base.type) == local_types[ti]) {
                     bh_imap_put(&mod->local_map, (u64) local, localidx++);
 
