@@ -1,0 +1,19 @@
+The current way I do symbol resolution is:
+    - Join all top level symbols at parse time into a single struct
+    - Add all top level symbols to a string table that maps from
+        their name to their AST node
+    - Then step through every function linearly and resolve each symbol using the table
+        * Function locals are added when they are declared and then removed at the end
+            of their scope as would be expected
+
+This method works, but it is not great and feels like a hack.
+    - References to other things are just pointers to the AST node
+    - This produces a heavy reliance on the AST instead of other, more efficient data structures
+
+
+
+
+PROPOSED NEW METHOD:
+    Every top level declaration will add a declinfo entry that will contain the following information:
+        - Identifier
+        - Pointer to AST node

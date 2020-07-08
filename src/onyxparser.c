@@ -32,10 +32,6 @@ static void parser_next_token(OnyxParser* parser);
 static void parser_prev_token(OnyxParser* parser);
 static b32 is_terminating_token(TokenType token_type);
 static OnyxToken* expect(OnyxParser* parser, TokenType token_type);
-static AstNodeScope* enter_scope(OnyxParser* parser);
-static AstNodeScope* leave_scope(OnyxParser* parser);
-static void insert_identifier(OnyxParser* parser, AstNode* ident, b32 is_local);
-static void remove_identifier(OnyxParser* parser, AstNode* ident);
 static AstNodeNumLit* parse_numeric_literal(OnyxParser* parser);
 static AstNodeTyped* parse_factor(OnyxParser* parser);
 static AstNodeTyped* parse_expression(OnyxParser* parser);
@@ -901,22 +897,21 @@ void onyx_parser_free(OnyxParser* parser) {
     bh_table_free(parser->identifiers);
 }
 
-AstNode* onyx_parse(OnyxParser *parser) {
-    AstNode* program = make_node(AstNode, AST_NODE_KIND_PROGRAM);
+bh_arr(AstNode *) onyx_parse(OnyxParser *parser) {
+    bh_arr(AstNode *) top_level_nodes = NULL;
+    bh_arr_new(global_heap_allocator, top_level_nodes, 4);
 
-    AstNode** prev_stmt = &program->next;
-    AstNode* curr_stmt = NULL;
     while (parser->curr_token->type != TOKEN_TYPE_END_STREAM) {
-        curr_stmt = parse_top_level_statement(parser);
+        AstNode* curr_stmt = parse_top_level_statement(parser);
 
         // Building a linked list of statements down the "next" chain
         if (curr_stmt != NULL && curr_stmt != &error_node) {
-            *prev_stmt = curr_stmt;
-
-            while (curr_stmt->next != NULL) curr_stmt = curr_stmt->next;
-            prev_stmt = &curr_stmt->next;
+            while (curr_stmt != NULL) {
+                bh_arr_push(top_level_nodes, curr_stmt);
+                curr_stmt = curr_stmt->next;
+            }
         }
     }
 
-    return program;
+    return top_level_nodes;
 }

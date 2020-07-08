@@ -1,0 +1,11 @@
+Some optimizations to make to the output WASM:
+    [ ] local.set followed by local.get turns into local.tee
+    [ ] Dead code elimination
+        - Function level: If a function is not explicitly called or exported, it may be removed
+        - Local level: If a local is not read, it may be removed
+    [ ] Add compile-time evaluation for simple operations
+    [ ] If statement compile-time condition evaluation
+        - If the condition of an if statement is compile time known, only generate the case that
+            is used
+    [ ] Inline-ing functions that have been explicitly marked
+

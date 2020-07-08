@@ -106,7 +106,7 @@ static void compile_opts_free(OnyxCompileOptions* opts) {
     bh_arr_free(opts->files);
 }
 
-static AstNode* parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
+static bh_arr(AstNode *) parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
     if (compiler_state->options->verbose_output)
         bh_printf("[Lexing]       %s\n", file_contents->filename);
@@ -142,42 +142,30 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
 
-    AstNode* root_node = parse_source_file(compiler_state, &fc);
+    bh_arr(AstNode *) top_nodes = parse_source_file(compiler_state, &fc);
 
-    if (compiler_state->options->print_ast) {
-        onyx_ast_print(root_node, 0);
-        bh_printf("\n");
-    }
-
-    AstNode* walker = root_node;
-    while (walker) {
-        switch (walker->kind) {
+    bh_arr_each(AstNode *, node, top_nodes) {
+        switch ((*node)->kind) {
             case AST_NODE_KIND_USE:
-                bh_arr_push(compiler_state->program.uses, (AstNodeUse *) walker);
+                bh_arr_push(compiler_state->program.uses, (AstNodeUse *) (*node));
                 break;
 
             case AST_NODE_KIND_GLOBAL:
-                bh_arr_push(compiler_state->program.globals, (AstNodeGlobal *) walker);
+                bh_arr_push(compiler_state->program.globals, (AstNodeGlobal *) (*node));
                 break;
 
             case AST_NODE_KIND_FOREIGN:
-                bh_arr_push(compiler_state->program.foreigns, (AstNodeForeign *) walker);
+                bh_arr_push(compiler_state->program.foreigns, (AstNodeForeign *) (*node));
                 break;
 
             case AST_NODE_KIND_FUNCTION:
-                bh_arr_push(compiler_state->program.functions, (AstNodeFunction *) walker);
-                break;
-
-            case AST_NODE_KIND_PROGRAM:
-                // Dummy initial node
+                bh_arr_push(compiler_state->program.functions, (AstNodeFunction *) (*node));
                 break;
 
             default:
                 assert(("Invalid top level node", 0));
                 break;
         }
-
-        walker = walker->next;
     }
 
     bh_arr_each(AstNodeUse *, use_node, compiler_state->program.uses) {
