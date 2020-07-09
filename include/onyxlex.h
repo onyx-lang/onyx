@@ -48,13 +48,14 @@ typedef enum TokenType {
 
 typedef struct OnyxFilePos {
     const char* filename;
-    u64 line, column;
+    char* line_start;
+    u32 line, column;
 } OnyxFilePos;
 
 typedef struct OnyxToken {
     TokenType type;
     i32 length;
-    char* token;
+    char* text;
     OnyxFilePos pos;
 } OnyxToken;
 

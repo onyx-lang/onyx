@@ -801,7 +801,7 @@ static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
             .kind = WASM_FOREIGN_FUNCTION,
             .idx = func_idx,
         };
-        bh_table_put(WasmExport, mod->exports, fd->base.token->token, wasm_export);
+        bh_table_put(WasmExport, mod->exports, fd->base.token->text, wasm_export);
         mod->export_count++;
 
         onyx_token_null_toggle(fd->base.token);
@@ -870,7 +870,7 @@ static void compile_global_declaration(OnyxWasmModule* module, AstNodeGlobal* gl
             .kind = WASM_FOREIGN_GLOBAL,
             .idx = global_idx,
         };
-        bh_table_put(WasmExport, module->exports, global->base.token->token, wasm_export);
+        bh_table_put(WasmExport, module->exports, global->base.token->text, wasm_export);
         module->export_count++;
 
         onyx_token_null_toggle(global->base.token);
@@ -1161,8 +1161,8 @@ static i32 output_importsection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     bh_arr_each(WasmImport, import, module->imports) {
-        output_name(import->mod->token, import->mod->length, &vec_buff);
-        output_name(import->name->token, import->name->length, &vec_buff);
+        output_name(import->mod->text, import->mod->length, &vec_buff);
+        output_name(import->name->text, import->name->length, &vec_buff);
         bh_buffer_write_byte(&vec_buff, (u8) import->kind);
 
         leb = uint_to_uleb128((u64) import->idx, &leb_len);

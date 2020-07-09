@@ -26,11 +26,11 @@ static void symbol_introduce(OnyxSemPassState* state, AstNode* symbol) {
     sp_sym->node = symbol;
     sp_sym->shadowed = NULL;
 
-    if (bh_table_has(SemPassSymbol *, state->symbols, symbol->token->token)) {
-        sp_sym->shadowed = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->token);
+    if (bh_table_has(SemPassSymbol *, state->symbols, symbol->token->text)) {
+        sp_sym->shadowed = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->text);
     }
 
-    bh_table_put(SemPassSymbol *, state->symbols, symbol->token->token, sp_sym);
+    bh_table_put(SemPassSymbol *, state->symbols, symbol->token->text, sp_sym);
 
     if (symbol->kind == AST_NODE_KIND_LOCAL) {
         AstNodeLocal* local = (AstNodeLocal *) symbol;
@@ -44,12 +44,12 @@ static void symbol_introduce(OnyxSemPassState* state, AstNode* symbol) {
 static void symbol_remove(OnyxSemPassState* state, AstNode* symbol) {
     onyx_token_null_toggle(symbol->token);
 
-    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->token);
+    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->text);
 
     if (sp_sym->shadowed) {
-        bh_table_put(SemPassSymbol *, state->symbols, symbol->token->token, sp_sym->shadowed);
+        bh_table_put(SemPassSymbol *, state->symbols, symbol->token->text, sp_sym->shadowed);
     } else {
-        bh_table_delete(SemPassSymbol *, state->symbols, symbol->token->token);
+        bh_table_delete(SemPassSymbol *, state->symbols, symbol->token->text);
     }
 
     onyx_token_null_toggle(symbol->token);
@@ -58,17 +58,17 @@ static void symbol_remove(OnyxSemPassState* state, AstNode* symbol) {
 static AstNode* symbol_resolve(OnyxSemPassState* state, AstNode* symbol) {
     onyx_token_null_toggle(symbol->token);
 
-    if (!bh_table_has(SemPassSymbol *, state->symbols, symbol->token->token)) {
+    if (!bh_table_has(SemPassSymbol *, state->symbols, symbol->token->text)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
                 symbol->token->pos,
-                symbol->token->token);
+                symbol->token->text);
 
         onyx_token_null_toggle(symbol->token);
         return symbol;
     }
 
-    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->token);
+    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->text);
 
     onyx_token_null_toggle(symbol->token);
     return sp_sym->node;
@@ -93,16 +93,16 @@ static b32 symbol_unique_introduce(OnyxSemPassState* state, AstNode* symbol) {
     onyx_token_null_toggle(symbol->token);
 
     // NOTE: If the function hasn't already been defined
-    if (!bh_table_has(SemPassSymbol *, state->symbols, symbol->token->token)) {
+    if (!bh_table_has(SemPassSymbol *, state->symbols, symbol->token->text)) {
         SemPassSymbol* sp_sym = bh_alloc_item(state->allocator, SemPassSymbol);
         sp_sym->node = symbol;
         sp_sym->shadowed = NULL;
-        bh_table_put(SemPassSymbol *, state->symbols, symbol->token->token, sp_sym);
+        bh_table_put(SemPassSymbol *, state->symbols, symbol->token->text, sp_sym);
     } else {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_CONFLICTING_GLOBALS,
                 symbol->token->pos,
-                symbol->token->token);
+                symbol->token->text);
 
         // NOTE: I really wish C had defer...
         onyx_token_null_toggle(symbol->token);

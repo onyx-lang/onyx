@@ -174,7 +174,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         char* formatted_name = bh_aprintf(
                 global_heap_allocator,
                 "%b.onyx",
-                (*use_node)->filename->token, (*use_node)->filename->length);
+                (*use_node)->filename->text, (*use_node)->filename->length);
 
         bh_arr_push(compiler_state->queued_files, formatted_name);
     }
@@ -198,7 +198,9 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
     bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
     compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
 
-    onyx_message_create(compiler_state->msg_alloc, &compiler_state->msgs);
+    bh_table_init(opts->allocator, compiler_state->loaded_files, 15);
+
+    onyx_message_create(compiler_state->msg_alloc, &compiler_state->msgs, &compiler_state->loaded_files);
 
     compiler_state->token_alloc = opts->allocator;
 
@@ -209,8 +211,6 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
 
     bh_arena_init(&compiler_state->sp_arena, opts->allocator, 16 * 1024);
     compiler_state->sp_alloc = bh_arena_allocator(&compiler_state->sp_arena);
-
-    bh_table_init(opts->allocator, compiler_state->loaded_files, 15);
 
     bh_arr_new(opts->allocator, compiler_state->queued_files, 4);
 

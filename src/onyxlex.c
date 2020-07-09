@@ -66,7 +66,7 @@ static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, b32 is_
             return 0;
 
         tk->type = type;
-        tk->token = tokenizer->curr;
+        tk->text = tokenizer->curr;
         tk->length = len;
         tk->pos.line = tokenizer->line_number;
         tk->pos.column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
@@ -88,8 +88,8 @@ const char* onyx_get_token_type_name(TokenType tkn_type) {
 
 void onyx_token_null_toggle(OnyxToken* tkn) {
     static char backup = 0;
-    char tmp = tkn->token[tkn->length];
-    tkn->token[tkn->length] = backup;
+    char tmp = tkn->text[tkn->length];
+    tkn->text[tkn->length] = backup;
     backup = tmp;
 }
 
@@ -101,8 +101,9 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         INCREMENT_CURR_TOKEN(tokenizer)
 
     tk.type = TOKEN_TYPE_UNKNOWN;
-    tk.token = tokenizer->curr;
+    tk.text = tokenizer->curr;
     tk.length = 1;
+    tk.pos.line_start = tokenizer->line_start;
     tk.pos.filename = tokenizer->filename;
     tk.pos.line = tokenizer->line_number;
     tk.pos.column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
@@ -116,13 +117,13 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '/') {
         tokenizer->curr += 2;
         tk.type = TOKEN_TYPE_COMMENT;
-        tk.token = tokenizer->curr;
+        tk.text = tokenizer->curr;
 
         while (*tokenizer->curr != '\n') {
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        tk.length = tokenizer->curr - tk.token - 2;
+        tk.length = tokenizer->curr - tk.text - 2;
         goto token_parsed;
     }
 
@@ -154,7 +155,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     LITERAL_TOKEN("%=",         0, TOKEN_TYPE_PERCENT_EQUAL);
 
     // Symbols
-    if (char_is_alpha(*tk.token)) {
+    if (char_is_alpha(*tk.text)) {
         u64 len = 0;
         while (char_is_alphanum(*tokenizer->curr) || charset_contains("_$", *tokenizer->curr)) {
             len++;
@@ -167,7 +168,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     }
 
     // String literal
-    if (*tk.token == '"') {
+    if (*tk.text == '"') {
         u64 len = 0;
         u64 slash_count = 0;
 
@@ -188,7 +189,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
 
         INCREMENT_CURR_TOKEN(tokenizer);
 
-        tk.token++;
+        tk.text++;
         tk.type = TOKEN_TYPE_LITERAL_STRING;
         tk.length = len;
         goto token_parsed;

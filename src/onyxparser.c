@@ -97,7 +97,7 @@ static AstNodeNumLit* parse_numeric_literal(OnyxParser* parser) {
     onyx_token_null_toggle(lit_node->base.token);
 
     TypeInfo* type;
-    char* tok = lit_node->base.token->token;
+    char* tok = lit_node->base.token->text;
 
     // NOTE: charset_contains() behaves more like string_contains()
     // so I'm using it in this case
@@ -427,7 +427,7 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                         onyx_message_add(parser->msgs,
                                 ONYX_MESSAGE_TYPE_EXPECTED_EXPRESSION,
                                 assignment->base.token->pos,
-                                parser->curr_token->token);
+                                parser->curr_token->text);
                         onyx_token_null_toggle(parser->curr_token);
                         return 1;
                     }
@@ -629,10 +629,10 @@ static TypeInfo* parse_type(OnyxParser* parser) {
 
     onyx_token_null_toggle(symbol);
 
-    if (!bh_table_has(AstNode*, parser->identifiers, symbol->token)) {
-        onyx_message_add(parser->msgs, ONYX_MESSAGE_TYPE_UNKNOWN_TYPE, symbol->pos, symbol->token);
+    if (!bh_table_has(AstNode*, parser->identifiers, symbol->text)) {
+        onyx_message_add(parser->msgs, ONYX_MESSAGE_TYPE_UNKNOWN_TYPE, symbol->pos, symbol->text);
     } else {
-        AstNodeTyped* type_info_node = bh_table_get(AstNodeTyped*, parser->identifiers, symbol->token);
+        AstNodeTyped* type_info_node = bh_table_get(AstNodeTyped*, parser->identifiers, symbol->text);
 
         if (type_info_node->kind == AST_NODE_KIND_TYPE) {
             type_info = type_info_node->type;
@@ -688,7 +688,7 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
     expect(parser, '#');
     OnyxToken* sym = expect(parser, TOKEN_TYPE_SYMBOL);
 
-    return strncmp(dir, sym->token, sym->length) == 0;
+    return strncmp(dir, sym->text, sym->length) == 0;
 }
 
 static AstNodeFunction* parse_function_definition(OnyxParser* parser) {
@@ -845,7 +845,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     onyx_message_add(parser->msgs,
                             ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
                             parser->curr_token->pos,
-                            parser->curr_token->token);
+                            parser->curr_token->text);
                     onyx_token_null_toggle(parser->curr_token);
                 }
 

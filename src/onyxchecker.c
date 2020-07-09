@@ -18,7 +18,7 @@ static void check_assignment(OnyxSemPassState* state, AstNodeAssign* assign) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
                 assign->lval->token->pos,
-                assign->lval->token->token, assign->lval->token->length);
+                assign->lval->token->text, assign->lval->token->length);
         return;
     }
 
@@ -26,7 +26,7 @@ static void check_assignment(OnyxSemPassState* state, AstNodeAssign* assign) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_ASSIGN_CONST,
                 assign->base.token->pos,
-                assign->lval->token->token, assign->lval->token->length);
+                assign->lval->token->text, assign->lval->token->length);
         return;
     }
 
@@ -34,7 +34,7 @@ static void check_assignment(OnyxSemPassState* state, AstNodeAssign* assign) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_NOT_LVAL,
                 assign->base.token->pos,
-                assign->lval->token->token, assign->lval->token->length);
+                assign->lval->token->text, assign->lval->token->length);
         return;
     }
 
@@ -107,7 +107,7 @@ static void check_call(OnyxSemPassState* state, AstNodeCall* call) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
                 callee->base.token->pos,
-                callee->base.token->token, callee->base.token->length);
+                callee->base.token->text, callee->base.token->length);
         return;
     }
 
@@ -115,7 +115,7 @@ static void check_call(OnyxSemPassState* state, AstNodeCall* call) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_CALL_NON_FUNCTION,
                 call->base.token->pos,
-                callee->base.token->token, callee->base.token->length);
+                callee->base.token->text, callee->base.token->length);
         return;
     }
 
@@ -127,7 +127,7 @@ static void check_call(OnyxSemPassState* state, AstNodeCall* call) {
 
         onyx_token_null_toggle(callee->base.token);
 
-        char* intr_name = callee->base.token->token;
+        char* intr_name = callee->base.token->text;
         OnyxIntrinsic intrinsic = ONYX_INTRINSIC_UNDEFINED;
 
         if (!strcmp("memory_size", intr_name))       intrinsic = ONYX_INTRINSIC_MEMORY_SIZE;
@@ -195,7 +195,7 @@ static void check_call(OnyxSemPassState* state, AstNodeCall* call) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_FUNCTION_PARAM_TYPE_MISMATCH,
                     call->base.token->pos,
-                    callee->base.token->token, callee->base.token->length,
+                    callee->base.token->text, callee->base.token->length,
                     formal_param->base.type->name, arg_pos,
                     actual_param->base.type->name);
             return;
@@ -284,7 +284,7 @@ static void check_expression(OnyxSemPassState* state, AstNodeTyped* expr) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
                     expr->token->pos,
-                    expr->token->token, expr->token->length);
+                    expr->token->text, expr->token->length);
             break;
 
         case AST_NODE_KIND_LOCAL:
@@ -332,7 +332,7 @@ static void check_global(OnyxSemPassState* state, AstNodeGlobal* global) {
                 onyx_message_add(state->msgs,
                         ONYX_MESSAGE_TYPE_GLOBAL_TYPE_MISMATCH,
                         global->base.token->pos,
-                        global->base.token->token, global->base.token->length,
+                        global->base.token->text, global->base.token->length,
                         global->base.type->name, global->initial_value->type->name);
                 return;
             }
@@ -379,7 +379,7 @@ static void check_block(OnyxSemPassState* state, AstNodeBlock* block) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
                     local->base.token->pos,
-                    local->base.token->token, local->base.token->length);
+                    local->base.token->text, local->base.token->length);
             return;
         }
     }

@@ -42,12 +42,16 @@ typedef struct OnyxMessage {
 typedef struct OnyxMessages {
     bh_allocator allocator;
 
+    // NOTE: Pointer to a table mapping file paths to
+    // their file contents. Used for better error messages
+    bh_table(bh_file_contents)* file_contents;
+
     OnyxMessage* first;
 } OnyxMessages;
 
 void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...);
 void onyx_message_print(OnyxMessages* msgs);
 b32 onyx_message_has_errors(OnyxMessages* msgs);
-void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs);
+void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs, bh_table(bh_file_contents)* files);
 
 #endif

@@ -62,7 +62,6 @@ export main2 :: proc {
 // }
 
 export main :: proc {
-    print_i32(shl_i32(16, 2));
     print_f32(sqrt_f32(2.0f));
 
     print_i32(5 * 6 + 2 * 3);

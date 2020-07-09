@@ -1,5 +1,6 @@
 
 #include "onyxmsgs.h"
+#include "onyxutils.h"
 
 static const char* msg_formats[] = {
     "%s",
@@ -41,12 +42,32 @@ void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos,
     *walker = msg;
 }
 
+static void print_detailed_message(OnyxMessage* msg, bh_file_contents* fc) {
+    bh_printf("(%s:%l:%l) %s\n", msg->pos.filename, msg->pos.line, msg->pos.column, msg->text);
+
+    i32 linelength = 0;
+    char* walker = msg->pos.line_start;
+    while (*walker != '\n') linelength++, walker++;
+
+    bh_printf("| %b\n", msg->pos.line_start, linelength);
+
+    char* pointer_str = bh_alloc_array(global_scratch_allocator, char, linelength);
+    memset(pointer_str, 0, linelength);
+    memset(pointer_str, '~', msg->pos.column - 1);
+    pointer_str[msg->pos.column - 1] = '^';
+
+    bh_printf("|~%s\n", pointer_str);
+}
+
 void onyx_message_print(OnyxMessages* msgs) {
     OnyxMessage* msg = msgs->first;
+    i32 msg_count = 3;
 
-    while (msg) {
+    while (msg && msg_count--) {
         if (msg->pos.filename) {
-            bh_printf("(%s:%l:%l) %s\n", msg->pos.filename, msg->pos.line, msg->pos.column, msg->text);
+            bh_file_contents* fc = &bh_table_get(bh_file_contents, *msgs->file_contents, (char *) msg->pos.filename);
+
+            print_detailed_message(msg, fc);
         } else {
             bh_printf("(%l:%l) %s\n", msg->pos.line, msg->pos.column, msg->text);
         }
@@ -58,7 +79,8 @@ b32 onyx_message_has_errors(OnyxMessages* msgs) {
     return msgs->first != NULL;
 }
 
-void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs) {
+void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs, bh_table(bh_file_contents)* files) {
     msgs->allocator = allocator;
     msgs->first = NULL;
+    msgs->file_contents = files;
 }
