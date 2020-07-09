@@ -194,7 +194,7 @@ static void check_call(OnyxSemPassState* state, AstNodeCall* call) {
         if (formal_param->base.type != actual_param->base.type) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_FUNCTION_PARAM_TYPE_MISMATCH,
-                    call->base.token->pos,
+                    actual_param->value->token->pos,
                     callee->base.token->text, callee->base.token->length,
                     formal_param->base.type->name, arg_pos,
                     actual_param->base.type->name);

@@ -688,7 +688,12 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
     expect(parser, '#');
     OnyxToken* sym = expect(parser, TOKEN_TYPE_SYMBOL);
 
-    return strncmp(dir, sym->text, sym->length) == 0;
+    b32 match = (strlen(dir) == sym->length) && (strncmp(dir, sym->text, sym->length) == 0);
+    if (!match) {
+        parser_prev_token(parser);
+        parser_prev_token(parser);
+    }
+    return match;
 }
 
 static AstNodeFunction* parse_function_definition(OnyxParser* parser) {
@@ -703,6 +708,16 @@ static AstNodeFunction* parse_function_definition(OnyxParser* parser) {
 
         else if (parse_possible_directive(parser, "inline")) {
             func_def->base.flags |= ONYX_AST_FLAG_INLINE;
+        }
+
+        else {
+            OnyxToken* directive_token = expect(parser, '#');
+            OnyxToken* symbol_token = expect(parser, TOKEN_TYPE_SYMBOL);
+
+            onyx_message_add(parser->msgs,
+                    ONYX_MESSAGE_TYPE_UNKNOWN_DIRECTIVE,
+                    directive_token->pos,
+                    symbol_token->text, symbol_token->length);
         }
     }
 

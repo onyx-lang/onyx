@@ -10,6 +10,8 @@ static const char* msg_formats[] = {
     "expected lval '%b'",
     "attempt to assign to constant '%b'",
     "unknown symbol '%s'",
+    "unknown directive '%b'",
+
     "conflicting declarations of global '%s'",
     "mismatched types for binary operator, '%s', '%s'",
     "mismatched types on assignment, expected '%s', got '%s'",
@@ -63,7 +65,7 @@ void onyx_message_print(OnyxMessages* msgs) {
     OnyxMessage* msg = msgs->first;
     i32 msg_count = 3;
 
-    while (msg && msg_count--) {
+    while (msg && msg_count-- > 0) {
         if (msg->pos.filename) {
             bh_file_contents* fc = &bh_table_get(bh_file_contents, *msgs->file_contents, (char *) msg->pos.filename);
 
