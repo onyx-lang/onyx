@@ -144,10 +144,12 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
 
     bh_arr(AstNode *) top_nodes = parse_source_file(compiler_state, &fc);
 
+    bh_arr(AstNodeUse *) uses = NULL;
+
     bh_arr_each(AstNode *, node, top_nodes) {
         switch ((*node)->kind) {
             case AST_NODE_KIND_USE:
-                bh_arr_push(compiler_state->program.uses, (AstNodeUse *) (*node));
+                bh_arr_push(uses, (AstNodeUse *) *node);
                 break;
 
             case AST_NODE_KIND_GLOBAL:
@@ -168,7 +170,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         }
     }
 
-    bh_arr_each(AstNodeUse *, use_node, compiler_state->program.uses) {
+    bh_arr_each(AstNodeUse *, use_node, uses) {
         char* formatted_name = bh_aprintf(
                 global_heap_allocator,
                 "%b.onyx",
@@ -177,6 +179,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         bh_arr_push(compiler_state->queued_files, formatted_name);
     }
 
+    bh_arr_free(uses);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
@@ -188,7 +191,6 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
 static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOptions* opts) {
     compiler_state->options = opts;
 
-    bh_arr_new(global_heap_allocator, compiler_state->program.uses, 4);
     bh_arr_new(global_heap_allocator, compiler_state->program.foreigns, 4);
     bh_arr_new(global_heap_allocator, compiler_state->program.globals, 4);
     bh_arr_new(global_heap_allocator, compiler_state->program.functions, 4);
@@ -287,7 +289,6 @@ int main(int argc, char *argv[]) {
     OnyxCompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
     CompilerState compile_state = {
         .program = {
-            .uses = NULL,
             .foreigns = NULL,
             .globals = NULL,
             .functions = NULL

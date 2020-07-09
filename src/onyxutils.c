@@ -29,6 +29,7 @@ static const char* ast_node_names[] = {
     "PARAM",
     "ARGUMENT",
     "CALL",
+    "INTRINSIC_CALL",
     "ASSIGN",
     "RETURN",
 

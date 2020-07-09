@@ -19,6 +19,7 @@ typedef struct AstNodeFunction AstNodeFunction;
 typedef struct AstNodeForeign AstNodeForeign;
 typedef struct AstNodeGlobal AstNodeGlobal;
 typedef struct AstNodeCall AstNodeCall;
+typedef struct AstNodeIntrinsicCall AstNodeIntrinsicCall;
 typedef struct AstNodeArgument AstNodeArgument;
 typedef struct AstNodeUse AstNodeUse;
 
@@ -43,6 +44,7 @@ typedef enum AstNodeKind {
     AST_NODE_KIND_PARAM,
     AST_NODE_KIND_ARGUMENT,
     AST_NODE_KIND_CALL,
+    AST_NODE_KIND_INTRINSIC_CALL,
     AST_NODE_KIND_ASSIGNMENT,
     AST_NODE_KIND_RETURN,
 
@@ -233,16 +235,32 @@ struct AstNodeGlobal {
 struct AstNodeCall {
     AstNodeTyped base;
 
-    AstNode *callee;                // NOTE: Function definition node
     AstNodeArgument *arguments;     // NOTE: Expressions that form the actual param list
                                     // They will be chained down using the "next" property
                                     // unless this becomes used by something else
+    AstNode *callee;                // NOTE: Function definition node
 };
 
 struct AstNodeArgument {
     AstNodeTyped base;
 
     AstNodeTyped *value;
+};
+
+typedef enum OnyxIntrinsic {
+    ONYX_INTRINSIC_UNDEFINED,
+
+    ONYX_INTRINSIC_FLOAT32_SQRT,
+    ONYX_INTRINSIC_FLOAT64_SQRT,
+} OnyxIntrinsic;
+
+// NOTE: This needs to have 'arguments' in the
+// same position as AstNodeCall
+struct AstNodeIntrinsicCall {
+    AstNodeTyped base;
+
+    AstNodeArgument *arguments;
+    OnyxIntrinsic intrinsic;
 };
 
 struct AstNodeUse {
@@ -252,7 +270,6 @@ struct AstNodeUse {
 };
 
 typedef struct OnyxProgram {
-    bh_arr(AstNodeUse *) uses;
     bh_arr(AstNodeGlobal *) globals;
     bh_arr(AstNodeFunction *) functions;
     bh_arr(AstNodeForeign *) foreigns;

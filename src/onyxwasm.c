@@ -218,6 +218,8 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
 static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeWhile* while_node);
 static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeBinOp* binop);
 static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeUnaryOp* unop);
+static void compile_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeCall* call);
+static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeIntrinsicCall* call);
 static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeTyped* expr);
 static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeUnaryOp* cast);
 static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeReturn* ret);
@@ -286,8 +288,13 @@ static void compile_statement(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcod
         case AST_NODE_KIND_WHILE: compile_while(mod, &code, (AstNodeWhile *) stmt); break;
         case AST_NODE_KIND_BREAK: compile_structured_jump(mod, &code, 0); break;
         case AST_NODE_KIND_CONTINUE: compile_structured_jump(mod, &code, 1); break;
-        case AST_NODE_KIND_CALL: compile_expression(mod, &code, (AstNodeTyped *) stmt); break;
         case AST_NODE_KIND_BLOCK: compile_block(mod, &code, (AstNodeBlock *) stmt); break;
+
+        case AST_NODE_KIND_CALL:
+        case AST_NODE_KIND_INTRINSIC_CALL:
+            compile_expression(mod, &code, (AstNodeTyped *) stmt);
+            break;
+
 
         default: break;
     }
@@ -493,10 +500,60 @@ static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode,
 
         case ONYX_UNARY_OP_NOT:
             compile_expression(mod, &code, unop->expr);
+
             bh_arr_push(code, ((WasmInstruction){ WI_I32_EQZ, 0x00 }));
             break;
 
         case ONYX_UNARY_OP_CAST: compile_cast(mod, &code, unop); break;
+    }
+
+    *pcode = code;
+}
+
+static void compile_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeCall* call) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    for (AstNodeArgument *arg = call->arguments;
+            arg != NULL;
+            arg = (AstNodeArgument *) arg->base.next) {
+        compile_expression(mod, &code, arg->value);
+    }
+
+    i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) call->callee);
+    bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
+
+    *pcode = code;
+}
+
+static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeIntrinsicCall* call) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    i32 place_arguments_normally = 1;
+
+    // NOTE: Doing this in case there becomes intrinsics that the arguments
+    // are not placed as they normally would be
+    if (0) place_arguments_normally = 0;
+
+    if (place_arguments_normally) {
+        for (AstNodeArgument *arg = call->arguments;
+                arg != NULL;
+                arg = (AstNodeArgument *) arg->base.next) {
+            compile_expression(mod, &code, arg->value);
+        }
+    }
+
+    switch (call->intrinsic) {
+        case ONYX_INTRINSIC_UNDEFINED:
+            assert(0);
+            break;
+
+        case ONYX_INTRINSIC_FLOAT32_SQRT:
+            bh_arr_push(code, ((WasmInstruction){ WI_F32_SQRT, 0x00}));
+            break;
+
+        case ONYX_INTRINSIC_FLOAT64_SQRT:
+            bh_arr_push(code, ((WasmInstruction){ WI_F64_SQRT, 0x00 }));
+            break;
     }
 
     *pcode = code;
@@ -557,20 +614,14 @@ static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pco
 
         case AST_NODE_KIND_BLOCK: compile_block(mod, &code, (AstNodeBlock *) expr); break;
 
+
         case AST_NODE_KIND_CALL:
-            {
-                AstNodeCall* call = (AstNodeCall *) expr;
-                for (AstNodeArgument *arg = call->arguments;
-                        arg != NULL;
-                        arg = (AstNodeArgument *) arg->base.next) {
-                    compile_expression(mod, &code, arg->value);
-                }
+            compile_call(mod, &code, (AstNodeCall *) expr);
+            break;
 
-                i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) call->callee);
-                bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
-
-                break;
-            }
+        case AST_NODE_KIND_INTRINSIC_CALL:
+            compile_intrinsic_call(mod, &code, (AstNodeIntrinsicCall *) expr);
+            break;
 
         default:
             DEBUG_HERE;
@@ -683,6 +734,9 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstNodeFunction* fd) {
 }
 
 static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
+    // NOTE: Don't compile intrinsics
+    if (fd->base.flags & ONYX_AST_FLAG_INTRINSIC) return;
+
     i32 type_idx = generate_type_idx(mod, fd);
 
     WasmFunc wasm_func = {
@@ -880,8 +934,10 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program) {
         compile_foreign(module, *foreign);
     }
 
-    bh_arr_each(AstNodeFunction *, function, program->functions)
-        bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
+    bh_arr_each(AstNodeFunction *, function, program->functions) {
+        if (((*function)->base.flags & ONYX_AST_FLAG_INTRINSIC) == 0)
+            bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
+    }
 
     bh_arr_each(AstNodeGlobal *, global, program->globals)
         bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);

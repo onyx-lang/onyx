@@ -12,7 +12,7 @@ export in_unit_circle :: proc (x: f32, y: f32) -> bool {
 }
 
 sqrt_f32 ::
-    proc #intrinsic #inline
+    proc #intrinsic
     (val: f32) -> f32 ---
 
 // This is the entry point
@@ -51,6 +51,18 @@ export main2 :: proc {
         y += 1;
     }
 }
+
+// Foo :: struct {
+//     bar       : Bar;
+//     something : i32;
+//     other     : i64;
+// }
+//
+// Bar :: struct {
+//     x : f32;
+//     y : f32;
+//     z : f32;
+// }
 
 export main :: proc {
     print_f32(sqrt_f32(2.0f));
