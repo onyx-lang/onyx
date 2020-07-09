@@ -209,6 +209,9 @@ static WasmType onyx_type_to_wasm_type(TypeInfo* type) {
     return WASM_TYPE_VOID;
 }
 
+#define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }));
+#define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }));
+
 static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeFunction* fd);
 static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeBlock* block);
 static void compile_statement(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNode* stmt);
@@ -233,7 +236,7 @@ static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* 
         compile_statement(mod, &code, stmt);
     }
 
-    bh_arr_push(code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+    WI(WI_BLOCK_END);
 
     *pcode = code;
 }
@@ -241,13 +244,13 @@ static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* 
 static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeBlock* block) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    bh_arr_push(code, ((WasmInstruction){ WI_BLOCK_START, 0x40 }));
+    WID(WI_BLOCK_START, 0x40);
 
     forll (AstNode, stmt, block->body, next) {
         compile_statement(mod, &code, stmt);
     }
 
-    bh_arr_push(code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+    WI(WI_BLOCK_END);
 
     *pcode = code;
 }
@@ -270,7 +273,7 @@ static void compile_structured_jump(OnyxWasmModule* mod, bh_arr(WasmInstruction)
     }
 
     if (success) {
-        bh_arr_push(code, ((WasmInstruction){ WI_JUMP, labelidx }));
+        WID(WI_JUMP, labelidx);
     } else {
         assert(("Invalid structured jump", 0));
     }
@@ -308,12 +311,12 @@ static void compile_assign_lval(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pc
     if (lval->kind == AST_NODE_KIND_LOCAL || lval->kind == AST_NODE_KIND_PARAM) {
         i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) lval);
 
-        bh_arr_push(code, ((WasmInstruction){ WI_LOCAL_SET, localidx }));
+        WID(WI_LOCAL_SET, localidx);
 
     } else if (lval->kind == AST_NODE_KIND_GLOBAL) {
         i32 globalidx = (i32) bh_imap_get(&mod->global_map, (u64) lval);
 
-        bh_arr_push(code, ((WasmInstruction){ WI_GLOBAL_SET, globalidx }));
+        WID(WI_GLOBAL_SET, globalidx);
 
     } else {
         assert(("Invalid lval", 0));
@@ -326,7 +329,7 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
     bh_arr(WasmInstruction) code = *pcode;
 
     compile_expression(mod, &code, if_node->cond);
-    bh_arr_push(code, ((WasmInstruction){ WI_IF_START, 0x40 }));
+    WID(WI_IF_START, 0x40);
 
     bh_arr_push(mod->structured_jump_target, 0);
 
@@ -345,7 +348,7 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
     }
 
     if (if_node->false_block.as_if) {
-        bh_arr_push(code, ((WasmInstruction){ WI_ELSE, 0x00 }));
+        WI(WI_ELSE);
 
         if (if_node->false_block.as_if->base.kind == AST_NODE_KIND_IF) {
             forll (AstNode, stmt, (AstNode *) if_node->false_block.as_if, next) {
@@ -360,7 +363,7 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
 
     bh_arr_pop(mod->structured_jump_target);
 
-    bh_arr_push(code, ((WasmInstruction){ WI_IF_END, 0x00 }));
+    WI(WI_IF_END);
 
     *pcode = code;
 }
@@ -368,12 +371,12 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
 static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeWhile* while_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    bh_arr_push(code, ((WasmInstruction){ WI_BLOCK_START, 0x40 }));
-    bh_arr_push(code, ((WasmInstruction){ WI_LOOP_START, 0x40 }));
+    WID(WI_BLOCK_START, 0x40);
+    WID(WI_LOOP_START, 0x40);
 
     compile_expression(mod, &code, while_node->cond);
-    bh_arr_push(code, ((WasmInstruction){ WI_I32_EQZ, 0x00 }));
-    bh_arr_push(code, ((WasmInstruction){ WI_COND_JUMP, 0x01 }));
+    WI(WI_I32_EQZ);
+    WID(WI_COND_JUMP, 0x01);
 
     bh_arr_push(mod->structured_jump_target, 1);
     bh_arr_push(mod->structured_jump_target, 2);
@@ -385,10 +388,10 @@ static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, A
     bh_arr_pop(mod->structured_jump_target);
     bh_arr_pop(mod->structured_jump_target);
 
-    bh_arr_push(code, ((WasmInstruction){ WI_JUMP, 0x00 }));
+    WID(WI_JUMP, 0x00);
 
-    bh_arr_push(code, ((WasmInstruction){ WI_LOOP_END, 0x00 }));
-    bh_arr_push(code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+    WI(WI_LOOP_END);
+    WI(WI_BLOCK_END);
 
     *pcode = code;
 }
@@ -462,7 +465,7 @@ static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, A
     compile_expression(mod, &code, binop->left);
     compile_expression(mod, &code, binop->right);
 
-    bh_arr_push(code, ((WasmInstruction){ binop_instr, 0x00 }));
+    WI(binop_instr);
 
     *pcode = code;
 }
@@ -476,23 +479,23 @@ static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode,
                 TypeInfoKind type_kind = unop->base.type->kind;
 
                 if (type_kind == TYPE_INFO_KIND_INT32) {
-                    bh_arr_push(code, ((WasmInstruction){ WI_I32_CONST, 0x00 }));
+                    WID(WI_I32_CONST, 0x00);
                     compile_expression(mod, &code, unop->expr);
-                    bh_arr_push(code, ((WasmInstruction){ WI_I32_SUB, 0x00 }));
+                    WI(WI_I32_SUB);
 
                 } else if (type_kind == TYPE_INFO_KIND_INT64) {
-                    bh_arr_push(code, ((WasmInstruction){ WI_I64_CONST, 0x00 }));
+                    WID(WI_I64_CONST, 0x00);
                     compile_expression(mod, &code, unop->expr);
-                    bh_arr_push(code, ((WasmInstruction){ WI_I64_SUB, 0x00 }));
+                    WI(WI_I64_SUB);
 
                 } else {
                     compile_expression(mod, &code, unop->expr);
 
                     if (type_kind == TYPE_INFO_KIND_FLOAT32)
-                        bh_arr_push(code, ((WasmInstruction){ WI_F32_NEG, 0x00 }));
+                        WI(WI_F32_NEG);
 
                     if (type_kind == TYPE_INFO_KIND_FLOAT64)
-                        bh_arr_push(code, ((WasmInstruction){ WI_F32_NEG, 0x00 }));
+                        WI(WI_F64_NEG);
                 }
 
                 break;
@@ -501,7 +504,7 @@ static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode,
         case ONYX_UNARY_OP_NOT:
             compile_expression(mod, &code, unop->expr);
 
-            bh_arr_push(code, ((WasmInstruction){ WI_I32_EQZ, 0x00 }));
+            WI(WI_I32_EQZ);
             break;
 
         case ONYX_UNARY_OP_CAST: compile_cast(mod, &code, unop); break;
@@ -543,17 +546,54 @@ static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)*
     }
 
     switch (call->intrinsic) {
-        case ONYX_INTRINSIC_UNDEFINED:
-            assert(0);
-            break;
+        case ONYX_INTRINSIC_MEMORY_SIZE:  WID(WI_MEMORY_SIZE, 0x00); break;
+        case ONYX_INTRINSIC_MEMORY_GROW:  WID(WI_MEMORY_GROW, 0x00); break;
 
-        case ONYX_INTRINSIC_FLOAT32_SQRT:
-            bh_arr_push(code, ((WasmInstruction){ WI_F32_SQRT, 0x00}));
-            break;
+        case ONYX_INTRINSIC_I32_CLZ:      WI(WI_I32_CLZ); break;
+        case ONYX_INTRINSIC_I32_CTZ:      WI(WI_I32_CTZ); break;
+        case ONYX_INTRINSIC_I32_POPCNT:   WI(WI_I32_POPCNT); break;
+        case ONYX_INTRINSIC_I32_AND:      WI(WI_I32_AND); break;
+        case ONYX_INTRINSIC_I32_OR:       WI(WI_I32_OR); break;
+        case ONYX_INTRINSIC_I32_XOR:      WI(WI_I32_XOR); break;
+        case ONYX_INTRINSIC_I32_SHL:      WI(WI_I32_SHL); break;
+        case ONYX_INTRINSIC_I32_SLR:      WI(WI_I32_SHR_U); break;
+        case ONYX_INTRINSIC_I32_SAR:      WI(WI_I32_SHR_S); break;
+        case ONYX_INTRINSIC_I32_ROTL:     WI(WI_I32_ROTL); break;
+        case ONYX_INTRINSIC_I32_ROTR:     WI(WI_I32_ROTR); break;
 
-        case ONYX_INTRINSIC_FLOAT64_SQRT:
-            bh_arr_push(code, ((WasmInstruction){ WI_F64_SQRT, 0x00 }));
-            break;
+        case ONYX_INTRINSIC_I64_CLZ:      WI(WI_I64_CLZ); break;
+        case ONYX_INTRINSIC_I64_CTZ:      WI(WI_I64_CTZ); break;
+        case ONYX_INTRINSIC_I64_POPCNT:   WI(WI_I64_POPCNT); break;
+        case ONYX_INTRINSIC_I64_AND:      WI(WI_I64_AND); break;
+        case ONYX_INTRINSIC_I64_OR:       WI(WI_I64_OR); break;
+        case ONYX_INTRINSIC_I64_XOR:      WI(WI_I64_XOR); break;
+        case ONYX_INTRINSIC_I64_SHL:      WI(WI_I64_SHL); break;
+        case ONYX_INTRINSIC_I64_SLR:      WI(WI_I64_SHR_U); break;
+        case ONYX_INTRINSIC_I64_SAR:      WI(WI_I64_SHR_S); break;
+        case ONYX_INTRINSIC_I64_ROTL:     WI(WI_I64_ROTL); break;
+        case ONYX_INTRINSIC_I64_ROTR:     WI(WI_I64_ROTR); break;
+
+        case ONYX_INTRINSIC_F32_ABS:      WI(WI_F32_ABS); break;
+        case ONYX_INTRINSIC_F32_CEIL:     WI(WI_F32_CEIL); break;
+        case ONYX_INTRINSIC_F32_FLOOR:    WI(WI_F32_FLOOR); break;
+        case ONYX_INTRINSIC_F32_TRUNC:    WI(WI_F32_TRUNC); break;
+        case ONYX_INTRINSIC_F32_NEAREST:  WI(WI_F32_NEAREST); break;
+        case ONYX_INTRINSIC_F32_SQRT:     WI(WI_F32_SQRT); break;
+        case ONYX_INTRINSIC_F32_MIN:      WI(WI_F32_MIN); break;
+        case ONYX_INTRINSIC_F32_MAX:      WI(WI_F32_MAX); break;
+        case ONYX_INTRINSIC_F32_COPYSIGN: WI(WI_F32_COPYSIGN); break;
+
+        case ONYX_INTRINSIC_F64_ABS:      WI(WI_F64_ABS); break;
+        case ONYX_INTRINSIC_F64_CEIL:     WI(WI_F64_CEIL); break;
+        case ONYX_INTRINSIC_F64_FLOOR:    WI(WI_F64_FLOOR); break;
+        case ONYX_INTRINSIC_F64_TRUNC:    WI(WI_F64_TRUNC); break;
+        case ONYX_INTRINSIC_F64_NEAREST:  WI(WI_F64_NEAREST); break;
+        case ONYX_INTRINSIC_F64_SQRT:     WI(WI_F64_SQRT); break;
+        case ONYX_INTRINSIC_F64_MIN:      WI(WI_F64_MIN); break;
+        case ONYX_INTRINSIC_F64_MAX:      WI(WI_F64_MAX); break;
+        case ONYX_INTRINSIC_F64_COPYSIGN: WI(WI_F64_COPYSIGN); break;
+
+        default: assert(("Unsupported intrinsic", 0));
     }
 
     *pcode = code;
@@ -576,7 +616,7 @@ static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pco
             {
                 i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) expr);
 
-                bh_arr_push(code, ((WasmInstruction){ WI_LOCAL_GET, localidx }));
+                WID(WI_LOCAL_GET, localidx);
                 break;
             }
 
@@ -584,7 +624,7 @@ static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pco
             {
                 i32 globalidx = (i32) bh_imap_get(&mod->global_map, (u64) expr);
 
-                bh_arr_push(code, ((WasmInstruction){ WI_GLOBAL_GET, globalidx }));
+                WID(WI_GLOBAL_GET, globalidx);
                 break;
             }
 
@@ -673,7 +713,7 @@ static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, As
 
     WasmInstructionType cast_op = cast_map[fromidx][toidx];
     if (cast_op != WI_NOP) {
-        bh_arr_push(code, ((WasmInstruction){ cast_op, 0x00 }));
+        WI(cast_op);
     }
 
     *pcode = code;
@@ -686,7 +726,7 @@ static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, 
         compile_expression(mod, &code, ret->expr);
     }
 
-    bh_arr_push(code, ((WasmInstruction){ WI_RETURN, 0x00 }));
+    WI(WI_RETURN);
 
     *pcode = code;
 }
@@ -1256,6 +1296,8 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
         case WI_JUMP:
         case WI_COND_JUMP:
         case WI_IF_START:
+        case WI_MEMORY_SIZE:
+        case WI_MEMORY_GROW:
             leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
             bh_buffer_append(buff, leb, leb_len);
             break;

@@ -11,9 +11,53 @@ export in_unit_circle :: proc (x: f32, y: f32) -> bool {
     return (x * x) + (y * y) < 1.0f;
 }
 
-sqrt_f32 ::
-    proc #intrinsic
-    (val: f32) -> f32 ---
+memory_size  :: proc #intrinsic -> i32 ---
+memory_grow  :: proc #intrinsic -> i32 ---
+
+clz_i32      :: proc #intrinsic (val: i32) -> i32 ---
+ctz_i32      :: proc #intrinsic (val: i32) -> i32 ---
+popcnt_i32   :: proc #intrinsic (val: i32) -> i32 ---
+and_i32      :: proc #intrinsic (val: i32) -> i32 ---
+or_i32       :: proc #intrinsic (val: i32) -> i32 ---
+xor_i32      :: proc #intrinsic (val: i32) -> i32 ---
+shl_i32      :: proc #intrinsic (val: i32) -> i32 ---
+slr_i32      :: proc #intrinsic (val: i32) -> i32 ---
+sar_i32      :: proc #intrinsic (val: i32) -> i32 ---
+rotl_i32     :: proc #intrinsic (val: i32) -> i32 ---
+rotr_i32     :: proc #intrinsic (val: i32) -> i32 ---
+
+clz_i64      :: proc #intrinsic (val: i64) -> i64 ---
+ctz_i64      :: proc #intrinsic (val: i64) -> i64 ---
+popcnt_i64   :: proc #intrinsic (val: i64) -> i64 ---
+and_i64      :: proc #intrinsic (val: i64) -> i64 ---
+or_i64       :: proc #intrinsic (val: i64) -> i64 ---
+xor_i64      :: proc #intrinsic (val: i64) -> i64 ---
+shl_i64      :: proc #intrinsic (val: i64) -> i64 ---
+slr_i64      :: proc #intrinsic (val: i64) -> i64 ---
+sar_i64      :: proc #intrinsic (val: i64) -> i64 ---
+rotl_i64     :: proc #intrinsic (val: i64) -> i64 ---
+rotr_i64     :: proc #intrinsic (val: i64) -> i64 ---
+
+abs_f32      :: proc #intrinsic (val: f32) -> f32 ---
+ceil_f32     :: proc #intrinsic (val: f32) -> f32 ---
+floor_f32    :: proc #intrinsic (val: f32) -> f32 ---
+trunc_f32    :: proc #intrinsic (val: f32) -> f32 ---
+nearest_f32  :: proc #intrinsic (val: f32) -> f32 ---
+sqrt_f32     :: proc #intrinsic (val: f32) -> f32 ---
+min_f32      :: proc #intrinsic (val: f32) -> f32 ---
+max_f32      :: proc #intrinsic (val: f32) -> f32 ---
+copysign_f32 :: proc #intrinsic (val: f32) -> f32 ---
+
+abs_f64      :: proc #intrinsic (val: f64) -> f64 ---
+ceil_f64     :: proc #intrinsic (val: f64) -> f64 ---
+floor_f64    :: proc #intrinsic (val: f64) -> f64 ---
+trunc_f64    :: proc #intrinsic (val: f64) -> f64 ---
+nearest_f64  :: proc #intrinsic (val: f64) -> f64 ---
+sqrt_f64     :: proc #intrinsic (val: f64) -> f64 ---
+min_f64      :: proc #intrinsic (val: f64) -> f64 ---
+max_f64      :: proc #intrinsic (val: f64) -> f64 ---
+copysign_f64 :: proc #intrinsic (val: f64) -> f64 ---
+
 
 // This is the entry point
 export main2 :: proc {
@@ -66,6 +110,7 @@ export main2 :: proc {
 
 export main :: proc {
     print_f32(sqrt_f32(2.0f));
+
     print_i32(5 * 6 + 2 * 3);
     print_bool(in_unit_circle(0.5f, 0.5f));
 
