@@ -41,7 +41,7 @@ static const char* ast_node_names[] = {
     "AST_NODE_KIND_COUNT",
 };
 
-const char* onyx_ast_node_kind_string(AstNodeKind kind) {
+const char* onyx_ast_node_kind_string(AstKind kind) {
     return ast_node_names[kind];
 }
 

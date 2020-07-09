@@ -79,10 +79,10 @@ static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, b32 is_
 }
 
 const char* onyx_get_token_type_name(TokenType tkn_type) {
-    if (tkn_type < TOKEN_TYPE_ASCII_END) {
+    if (tkn_type < Token_Type_Ascii_End) {
         return bh_aprintf(global_scratch_allocator, "%c", (char) tkn_type);
     } else {
-        return token_type_names[tkn_type - TOKEN_TYPE_ASCII_END];
+        return token_type_names[tkn_type - Token_Type_Ascii_End];
     }
 }
 
@@ -100,7 +100,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     while (char_is_whitespace(*tokenizer->curr) && tokenizer->curr != tokenizer->end)
         INCREMENT_CURR_TOKEN(tokenizer)
 
-    tk.type = TOKEN_TYPE_UNKNOWN;
+    tk.type = Token_Type_Unknown;
     tk.text = tokenizer->curr;
     tk.length = 1;
     tk.pos.line_start = tokenizer->line_start;
@@ -109,14 +109,14 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     tk.pos.column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
 
     if (tokenizer->curr == tokenizer->end) {
-        tk.type = TOKEN_TYPE_END_STREAM;
+        tk.type = Token_Type_End_Stream;
         goto token_parsed;
     }
 
     // Comments
     if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '/') {
         tokenizer->curr += 2;
-        tk.type = TOKEN_TYPE_COMMENT;
+        tk.type = Token_Type_Comment;
         tk.text = tokenizer->curr;
 
         while (*tokenizer->curr != '\n') {
@@ -127,32 +127,32 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         goto token_parsed;
     }
 
-    LITERAL_TOKEN("struct",     1, TOKEN_TYPE_KEYWORD_STRUCT);
-    LITERAL_TOKEN("export",     1, TOKEN_TYPE_KEYWORD_EXPORT);
-    LITERAL_TOKEN("use",        1, TOKEN_TYPE_KEYWORD_USE);
-    LITERAL_TOKEN("if",         1, TOKEN_TYPE_KEYWORD_IF);
-    LITERAL_TOKEN("elseif",     1, TOKEN_TYPE_KEYWORD_ELSEIF);
-    LITERAL_TOKEN("else",       1, TOKEN_TYPE_KEYWORD_ELSE);
-    LITERAL_TOKEN("foreign",    1, TOKEN_TYPE_KEYWORD_FOREIGN);
-    LITERAL_TOKEN("return",     1, TOKEN_TYPE_KEYWORD_RETURN);
-    LITERAL_TOKEN("proc",       1, TOKEN_TYPE_KEYWORD_PROC);
-    LITERAL_TOKEN("as",         1, TOKEN_TYPE_KEYWORD_CAST);
-    LITERAL_TOKEN("while",      1, TOKEN_TYPE_KEYWORD_WHILE);
-    LITERAL_TOKEN("break",      1, TOKEN_TYPE_KEYWORD_BREAK);
-    LITERAL_TOKEN("continue",   1, TOKEN_TYPE_KEYWORD_CONTINUE);
-    LITERAL_TOKEN("true",       1, TOKEN_TYPE_LITERAL_BOOL_TRUE);
-    LITERAL_TOKEN("false",      1, TOKEN_TYPE_LITERAL_BOOL_FALSE);
-    LITERAL_TOKEN("->",         0, TOKEN_TYPE_RIGHT_ARROW);
-    LITERAL_TOKEN("<-",         0, TOKEN_TYPE_RIGHT_ARROW);
-    LITERAL_TOKEN("<=",         0, TOKEN_TYPE_LESS_EQUAL);
-    LITERAL_TOKEN(">=",         0, TOKEN_TYPE_GREATER_EQUAL);
-    LITERAL_TOKEN("==",         0, TOKEN_TYPE_EQUAL_EQUAL);
-    LITERAL_TOKEN("!=",         0, TOKEN_TYPE_NOT_EQUAL);
-    LITERAL_TOKEN("+=",         0, TOKEN_TYPE_PLUS_EQUAL);
-    LITERAL_TOKEN("-=",         0, TOKEN_TYPE_MINUS_EQUAL);
-    LITERAL_TOKEN("*=",         0, TOKEN_TYPE_STAR_EQUAL);
-    LITERAL_TOKEN("/=",         0, TOKEN_TYPE_FSLASH_EQUAL);
-    LITERAL_TOKEN("%=",         0, TOKEN_TYPE_PERCENT_EQUAL);
+    LITERAL_TOKEN("struct",     1, Token_Type_Keyword_Struct);
+    LITERAL_TOKEN("export",     1, Token_Type_Keyword_Export);
+    LITERAL_TOKEN("use",        1, Token_Type_Keyword_Use);
+    LITERAL_TOKEN("if",         1, Token_Type_Keyword_If);
+    LITERAL_TOKEN("elseif",     1, Token_Type_Keyword_Elseif);
+    LITERAL_TOKEN("else",       1, Token_Type_Keyword_Else);
+    LITERAL_TOKEN("foreign",    1, Token_Type_Keyword_Foreign);
+    LITERAL_TOKEN("return",     1, Token_Type_Keyword_Return);
+    LITERAL_TOKEN("proc",       1, Token_Type_Keyword_Proc);
+    LITERAL_TOKEN("as",         1, Token_Type_Keyword_Cast);
+    LITERAL_TOKEN("while",      1, Token_Type_Keyword_While);
+    LITERAL_TOKEN("break",      1, Token_Type_Keyword_Break);
+    LITERAL_TOKEN("continue",   1, Token_Type_Keyword_Continue);
+    LITERAL_TOKEN("true",       1, Token_Type_Literal_True);
+    LITERAL_TOKEN("false",      1, Token_Type_Literal_False);
+    LITERAL_TOKEN("->",         0, Token_Type_Right_Arrow);
+    LITERAL_TOKEN("<-",         0, Token_Type_Right_Arrow);
+    LITERAL_TOKEN("<=",         0, Token_Type_Less_Equal);
+    LITERAL_TOKEN(">=",         0, Token_Type_Greater_Equal);
+    LITERAL_TOKEN("==",         0, Token_Type_Equal_Equal);
+    LITERAL_TOKEN("!=",         0, Token_Type_Not_Equal);
+    LITERAL_TOKEN("+=",         0, Token_Type_Plus_Equal);
+    LITERAL_TOKEN("-=",         0, Token_Type_Minus_Equal);
+    LITERAL_TOKEN("*=",         0, Token_Type_Star_Equal);
+    LITERAL_TOKEN("/=",         0, Token_Type_Fslash_Equal);
+    LITERAL_TOKEN("%=",         0, Token_Type_Percent_Equal);
 
     // Symbols
     if (char_is_alpha(*tk.text)) {
@@ -163,7 +163,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         }
 
         tk.length = len;
-        tk.type = TOKEN_TYPE_SYMBOL;
+        tk.type = Token_Type_Symbol;
         goto token_parsed;
     }
 
@@ -190,7 +190,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         INCREMENT_CURR_TOKEN(tokenizer);
 
         tk.text++;
-        tk.type = TOKEN_TYPE_LITERAL_STRING;
+        tk.type = Token_Type_Literal_String;
         tk.length = len;
         goto token_parsed;
     }
@@ -208,7 +208,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        tk.type = TOKEN_TYPE_LITERAL_NUMERIC;
+        tk.type = Token_Type_Literal_Numeric;
         tk.length = len;
 
         INCREMENT_CURR_TOKEN(tokenizer);
@@ -249,5 +249,5 @@ void onyx_lex_tokens(OnyxTokenizer* tokenizer) {
     OnyxToken* tk;
     do {
         tk = onyx_get_token(tokenizer);
-    } while (tk->type != TOKEN_TYPE_END_STREAM);
+    } while (tk->type != Token_Type_End_Stream);
 }

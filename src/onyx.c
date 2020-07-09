@@ -144,24 +144,24 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
 
     bh_arr(AstNode *) top_nodes = parse_source_file(compiler_state, &fc);
 
-    bh_arr(AstNodeUse *) uses = NULL;
+    bh_arr(AstUse *) uses = NULL;
 
     bh_arr_each(AstNode *, node, top_nodes) {
         switch ((*node)->kind) {
-            case AST_NODE_KIND_USE:
-                bh_arr_push(uses, (AstNodeUse *) *node);
+            case Ast_Kind_Use:
+                bh_arr_push(uses, (AstUse *) *node);
                 break;
 
-            case AST_NODE_KIND_GLOBAL:
-                bh_arr_push(compiler_state->program.globals, (AstNodeGlobal *) (*node));
+            case Ast_Kind_Global:
+                bh_arr_push(compiler_state->program.globals, (AstGlobal *) (*node));
                 break;
 
-            case AST_NODE_KIND_FOREIGN:
-                bh_arr_push(compiler_state->program.foreigns, (AstNodeForeign *) (*node));
+            case Ast_Kind_Foreign:
+                bh_arr_push(compiler_state->program.foreigns, (AstForeign *) (*node));
                 break;
 
-            case AST_NODE_KIND_FUNCTION:
-                bh_arr_push(compiler_state->program.functions, (AstNodeFunction *) (*node));
+            case Ast_Kind_Function:
+                bh_arr_push(compiler_state->program.functions, (AstFunction *) (*node));
                 break;
 
             default:
@@ -170,7 +170,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         }
     }
 
-    bh_arr_each(AstNodeUse *, use_node, uses) {
+    bh_arr_each(AstUse *, use_node, uses) {
         char* formatted_name = bh_aprintf(
                 global_heap_allocator,
                 "%b.onyx",

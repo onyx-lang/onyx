@@ -24,19 +24,19 @@ OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc
 // defined in sub-scopes up to the function-block level. This is a
 // requirement of WASM, but not of other targets.
 static void collapse_scopes(OnyxProgram* program) {
-    bh_arr(AstNodeBlock*) traversal_queue = NULL;
+    bh_arr(AstBlock*) traversal_queue = NULL;
     bh_arr_new(global_scratch_allocator, traversal_queue, 4);
     bh_arr_set_length(traversal_queue, 0);
 
-    bh_arr_each(AstNodeFunction *, func, program->functions) {
-        AstNodeLocalGroup* top_locals = (*func)->body->locals;
+    bh_arr_each(AstFunction *, func, program->functions) {
+        AstLocalGroup* top_locals = (*func)->body->locals;
 
         bh_arr_push(traversal_queue, (*func)->body);
         while (!bh_arr_is_empty(traversal_queue)) {
-            AstNodeBlock* block = traversal_queue[0];
+            AstBlock* block = traversal_queue[0];
 
-            if (block->base.kind == AST_NODE_KIND_IF) {
-                AstNodeIf* if_node = (AstNodeIf *) block;
+            if (block->base.kind == Ast_Kind_If) {
+                AstIf* if_node = (AstIf *) block;
                 if (if_node->true_block.as_block != NULL)
                     bh_arr_push(traversal_queue, if_node->true_block.as_block);
 
@@ -46,7 +46,7 @@ static void collapse_scopes(OnyxProgram* program) {
             } else {
 
                 if (block->locals != top_locals && block->locals->last_local != NULL) {
-                    AstNodeLocal* last_local = block->locals->last_local;
+                    AstLocal* last_local = block->locals->last_local;
                     while (last_local && last_local->prev_local != NULL) last_local = last_local->prev_local;
 
                     last_local->prev_local = top_locals->last_local;
@@ -56,18 +56,18 @@ static void collapse_scopes(OnyxProgram* program) {
 
                 AstNode* walker = block->body;
                 while (walker) {
-                    if (walker->kind == AST_NODE_KIND_BLOCK) {
-                        bh_arr_push(traversal_queue, (AstNodeBlock *) walker);
+                    if (walker->kind == Ast_Kind_Block) {
+                        bh_arr_push(traversal_queue, (AstBlock *) walker);
 
-                    } else if (walker->kind == AST_NODE_KIND_WHILE) {
-                        bh_arr_push(traversal_queue, ((AstNodeWhile *) walker)->body);
+                    } else if (walker->kind == Ast_Kind_While) {
+                        bh_arr_push(traversal_queue, ((AstWhile *) walker)->body);
 
-                    } else if (walker->kind == AST_NODE_KIND_IF) {
-                        if (((AstNodeIf *) walker)->true_block.as_block != NULL)
-                            bh_arr_push(traversal_queue, ((AstNodeIf *) walker)->true_block.as_block);
+                    } else if (walker->kind == Ast_Kind_If) {
+                        if (((AstIf *) walker)->true_block.as_block != NULL)
+                            bh_arr_push(traversal_queue, ((AstIf *) walker)->true_block.as_block);
 
-                        if (((AstNodeIf *) walker)->false_block.as_block != NULL)
-                            bh_arr_push(traversal_queue, ((AstNodeIf *) walker)->false_block.as_block);
+                        if (((AstIf *) walker)->false_block.as_block != NULL)
+                            bh_arr_push(traversal_queue, ((AstIf *) walker)->false_block.as_block);
                     }
 
                     walker = walker->next;

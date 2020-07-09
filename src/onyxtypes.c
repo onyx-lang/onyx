@@ -1,0 +1,49 @@
+#include "onyxtypes.h"
+
+Type basic_types[] = {
+    { Type_Kind_Basic, { Basic_Kind_Void,                    0,                       0, "void"   } },
+
+    { Type_Kind_Basic, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1, "bool"   } },
+
+    { Type_Kind_Basic, { Basic_Kind_I8,     Basic_Flag_Integer,                       1, "i8"     } },
+    { Type_Kind_Basic, { Basic_Kind_I16,    Basic_Flag_Integer,                       2, "i16"    } },
+    { Type_Kind_Basic, { Basic_Kind_I32,    Basic_Flag_Integer,                       4, "i32"    } },
+    { Type_Kind_Basic, { Basic_Kind_I64,    Basic_Flag_Integer,                       8, "i64"    } },
+
+    { Type_Kind_Basic, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1, "u8"     } },
+    { Type_Kind_Basic, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2, "u16"    } },
+    { Type_Kind_Basic, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4, "u32"    } },
+    { Type_Kind_Basic, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8, "u64"    } },
+
+    { Type_Kind_Basic, { Basic_Kind_F32,    Basic_Flag_Float,                         4, "f32"    } },
+    { Type_Kind_Basic, { Basic_Kind_F64,    Basic_Flag_Float,                         8, "f64"    } },
+
+    { Type_Kind_Basic, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4, "rawptr" } },
+};
+
+b32 types_are_compatible(Type* t1, Type* t2) {
+    // NOTE: If they are pointing to the same thing,
+    // it is safe to assume they are the same type
+    if (t1 == t2) return 1;
+
+    switch (t1->kind) {
+        case Type_Kind_Basic:
+            if (t2->kind == Type_Kind_Basic) {
+                // HACK: Not sure if this is right way to check this?
+                return t1 == t2;
+            }
+            break;
+
+        case Type_Kind_Pointer:
+            if (t2->kind == Type_Kind_Pointer) {
+                return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
+            }
+            break;
+
+        default:
+            assert(("Invalid type", 0));
+            break;
+    }
+
+    return 0;
+}

@@ -25,36 +25,36 @@ struct TypeInfo builtin_types[] = {
     { 0xffffffff } // Sentinel
 };
 
-static AstNode error_node = { AST_NODE_KIND_ERROR, 0, NULL, NULL };
+static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 
 // NOTE: Forward declarations
 static void parser_next_token(OnyxParser* parser);
 static void parser_prev_token(OnyxParser* parser);
 static b32 is_terminating_token(TokenType token_type);
 static OnyxToken* expect(OnyxParser* parser, TokenType token_type);
-static AstNodeNumLit* parse_numeric_literal(OnyxParser* parser);
-static AstNodeTyped* parse_factor(OnyxParser* parser);
-static AstNodeTyped* parse_expression(OnyxParser* parser);
-static AstNodeIf* parse_if_stmt(OnyxParser* parser);
-static AstNodeWhile* parse_while_stmt(OnyxParser* parser);
+static AstNumLit* parse_numeric_literal(OnyxParser* parser);
+static AstTyped* parse_factor(OnyxParser* parser);
+static AstTyped* parse_expression(OnyxParser* parser);
+static AstIf* parse_if_stmt(OnyxParser* parser);
+static AstWhile* parse_while_stmt(OnyxParser* parser);
 static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret);
-static AstNodeReturn* parse_return_statement(OnyxParser* parser);
-static AstNodeBlock* parse_block(OnyxParser* parser);
+static AstReturn* parse_return_statement(OnyxParser* parser);
+static AstBlock* parse_block(OnyxParser* parser);
 static AstNode* parse_statement(OnyxParser* parser);
-static TypeInfo* parse_type(OnyxParser* parser);
-static AstNodeLocal* parse_function_params(OnyxParser* parser);
-static AstNodeFunction* parse_function_definition(OnyxParser* parser);
+static AstNode* parse_type(OnyxParser* parser);
+static AstLocal* parse_function_params(OnyxParser* parser);
+static AstFunction* parse_function_definition(OnyxParser* parser);
 static AstNode* parse_top_level_statement(OnyxParser* parser);
 
 static void parser_next_token(OnyxParser* parser) {
     parser->prev_token = parser->curr_token;
     parser->curr_token++;
-    while (parser->curr_token->type == TOKEN_TYPE_COMMENT) parser->curr_token++;
+    while (parser->curr_token->type == Token_Type_Comment) parser->curr_token++;
 }
 
 static void parser_prev_token(OnyxParser* parser) {
     // TODO: This is probably wrong
-    while (parser->prev_token->type == TOKEN_TYPE_COMMENT) parser->prev_token--;
+    while (parser->prev_token->type == Token_Type_Comment) parser->prev_token--;
     parser->curr_token = parser->prev_token;
     parser->prev_token--;
 }
@@ -63,7 +63,7 @@ static b32 is_terminating_token(TokenType token_type) {
     return (token_type == ';')
         || (token_type == '}')
         || (token_type == '{')
-        || (token_type == TOKEN_TYPE_END_STREAM);
+        || (token_type == Token_Type_End_Stream);
 }
 
 static void find_token(OnyxParser* parser, TokenType token_type) {
@@ -88,10 +88,10 @@ static OnyxToken* expect(OnyxParser* parser, TokenType token_type) {
     return token;
 }
 
-static AstNodeNumLit* parse_numeric_literal(OnyxParser* parser) {
-    AstNodeNumLit* lit_node = make_node(AstNodeNumLit, AST_NODE_KIND_LITERAL);
-    lit_node->base.token = expect(parser, TOKEN_TYPE_LITERAL_NUMERIC);
-    lit_node->base.flags |= ONYX_AST_FLAG_COMPTIME;
+static AstNumLit* parse_numeric_literal(OnyxParser* parser) {
+    AstNumLit* lit_node = make_node(AstNumLit, Ast_Kind_Literal);
+    lit_node->base.token = expect(parser, Token_Type_Literal_Numeric);
+    lit_node->base.flags |= Ast_Flag_Comptime;
     lit_node->value.l = 0ll;
 
     onyx_token_null_toggle(lit_node->base.token);
@@ -125,14 +125,14 @@ static AstNodeNumLit* parse_numeric_literal(OnyxParser* parser) {
     return lit_node;
 }
 
-static AstNodeTyped* parse_factor(OnyxParser* parser) {
-    AstNodeTyped* retval = NULL;
+static AstTyped* parse_factor(OnyxParser* parser) {
+    AstTyped* retval = NULL;
 
     switch ((u16) parser->curr_token->type) {
         case '(':
             {
                 parser_next_token(parser);
-                AstNodeTyped* expr = parse_expression(parser);
+                AstTyped* expr = parse_expression(parser);
                 expect(parser, ')');
                 retval = expr;
                 break;
@@ -141,24 +141,24 @@ static AstNodeTyped* parse_factor(OnyxParser* parser) {
         case '-':
             {
                 parser_next_token(parser);
-                AstNodeTyped* factor = parse_factor(parser);
+                AstTyped* factor = parse_factor(parser);
 
-                AstNodeUnaryOp* negate_node = make_node(AstNodeUnaryOp, AST_NODE_KIND_UNARY_OP);
-                negate_node->operation = ONYX_UNARY_OP_NEGATE;
+                AstUnaryOp* negate_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+                negate_node->operation = Unary_Op_Negate;
                 negate_node->expr = factor;
 
-                if ((factor->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
-                    negate_node->base.flags |= ONYX_AST_FLAG_COMPTIME;
+                if ((factor->flags & Ast_Flag_Comptime) != 0) {
+                    negate_node->base.flags |= Ast_Flag_Comptime;
                 }
 
-                retval = (AstNodeTyped *) negate_node;
+                retval = (AstTyped *) negate_node;
                 break;
             }
 
-        case TOKEN_TYPE_SYMBOL:
+        case Token_Type_Symbol:
             {
-                OnyxToken* sym_token = expect(parser, TOKEN_TYPE_SYMBOL);
-                AstNodeTyped* sym_node = make_node(AstNode, AST_NODE_KIND_SYMBOL);
+                OnyxToken* sym_token = expect(parser, Token_Type_Symbol);
+                AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);
                 sym_node->token = sym_token;
 
                 if (parser->curr_token->type != '(') {
@@ -167,19 +167,19 @@ static AstNodeTyped* parse_factor(OnyxParser* parser) {
                 }
 
                 // NOTE: Function call
-                AstNodeCall* call_node = make_node(AstNodeCall, AST_NODE_KIND_CALL);
+                AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
                 call_node->base.token = expect(parser, '(');
                 call_node->callee = (AstNode *) sym_node;
 
-                AstNodeArgument** prev = &call_node->arguments;
-                AstNodeArgument* curr = NULL;
+                AstArgument** prev = &call_node->arguments;
+                AstArgument* curr = NULL;
                 while (parser->curr_token->type != ')') {
-                    curr = make_node(AstNodeArgument, AST_NODE_KIND_ARGUMENT);
+                    curr = make_node(AstArgument, Ast_Kind_Argument);
                     curr->value = parse_expression(parser);
 
-                    if (curr != NULL && curr->base.kind != AST_NODE_KIND_ERROR) {
+                    if (curr != NULL && curr->base.kind != Ast_Kind_Error) {
                         *prev = curr;
-                        prev = (AstNodeArgument **) &curr->base.next;
+                        prev = (AstArgument **) &curr->base.next;
                     }
 
                     if (parser->curr_token->type == ')')
@@ -191,38 +191,38 @@ static AstNodeTyped* parse_factor(OnyxParser* parser) {
                                 parser->curr_token->pos,
                                 onyx_get_token_type_name(','),
                                 onyx_get_token_type_name(parser->curr_token->type));
-                        return (AstNodeTyped *) &error_node;
+                        return (AstTyped *) &error_node;
                     }
 
                     parser_next_token(parser);
                 }
                 parser_next_token(parser);
 
-                retval = (AstNodeTyped *) call_node;
+                retval = (AstTyped *) call_node;
                 break;
             }
 
-        case TOKEN_TYPE_LITERAL_NUMERIC:
-            retval = (AstNodeTyped *) parse_numeric_literal(parser);
+        case Token_Type_Literal_Numeric:
+            retval = (AstTyped *) parse_numeric_literal(parser);
             break;
 
-        case TOKEN_TYPE_LITERAL_BOOL_TRUE:
+        case Token_Type_Literal_True:
             {
-                AstNodeNumLit* bool_node = make_node(AstNodeNumLit, AST_NODE_KIND_LITERAL);
+                AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_Literal);
                 bool_node->base.type = &builtin_types[TYPE_INFO_KIND_BOOL];
-                bool_node->base.token = expect(parser, TOKEN_TYPE_LITERAL_BOOL_TRUE);
+                bool_node->base.token = expect(parser, Token_Type_Literal_True);
                 bool_node->value.i = 1;
-                retval = (AstNodeTyped *) bool_node;
+                retval = (AstTyped *) bool_node;
                 break;
             }
 
-        case TOKEN_TYPE_LITERAL_BOOL_FALSE:
+        case Token_Type_Literal_False:
             {
-                AstNodeNumLit* bool_node = make_node(AstNodeNumLit, AST_NODE_KIND_LITERAL);
+                AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_Literal);
                 bool_node->base.type = &builtin_types[TYPE_INFO_KIND_BOOL];
-                bool_node->base.token = expect(parser, TOKEN_TYPE_LITERAL_BOOL_FALSE);
+                bool_node->base.token = expect(parser, Token_Type_Literal_False);
                 bool_node->value.i = 0;
-                retval = (AstNodeTyped *) bool_node;
+                retval = (AstTyped *) bool_node;
                 break;
             }
 
@@ -234,67 +234,67 @@ static AstNodeTyped* parse_factor(OnyxParser* parser) {
             return NULL;
     }
 
-    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_CAST) {
+    if (parser->curr_token->type == Token_Type_Keyword_Cast) {
         parser_next_token(parser);
 
-        AstNodeUnaryOp* cast_node = make_node(AstNodeUnaryOp, AST_NODE_KIND_UNARY_OP);
+        AstUnaryOp* cast_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
         cast_node->base.type = parse_type(parser);
-        cast_node->operation = ONYX_UNARY_OP_CAST;
+        cast_node->operation = Unary_Op_Cast;
         cast_node->expr = retval;
-        retval = (AstNodeTyped *) cast_node;
+        retval = (AstTyped *) cast_node;
     }
 
     return retval;
 }
 
-static inline i32 get_precedence(OnyxBinaryOp kind) {
+static inline i32 get_precedence(BinaryOp kind) {
     switch (kind) {
-        case ONYX_BINARY_OP_EQUAL: return 3;
-        case ONYX_BINARY_OP_NOT_EQUAL: return 3;
+        case Binary_Op_Equal: return 3;
+        case Binary_Op_Not_Equal: return 3;
 
-        case ONYX_BINARY_OP_LESS_EQUAL: return 4;
-        case ONYX_BINARY_OP_LESS: return 4;
-        case ONYX_BINARY_OP_GREATER_EQUAL: return 4;
-        case ONYX_BINARY_OP_GREATER: return 4;
+        case Binary_Op_Less_Equal: return 4;
+        case Binary_Op_Less: return 4;
+        case Binary_Op_Greater_Equal: return 4;
+        case Binary_Op_Greater: return 4;
 
-        case ONYX_BINARY_OP_ADD: return 5;
-        case ONYX_BINARY_OP_MINUS: return 5;
+        case Binary_Op_Add: return 5;
+        case Binary_Op_Minus: return 5;
 
-        case ONYX_BINARY_OP_MULTIPLY: return 6;
-        case ONYX_BINARY_OP_DIVIDE: return 6;
+        case Binary_Op_Multiply: return 6;
+        case Binary_Op_Divide: return 6;
 
-        case ONYX_BINARY_OP_MODULUS: return 7;
+        case Binary_Op_Modulus: return 7;
         default: return -1;
     }
 }
 
-static AstNodeTyped* parse_expression(OnyxParser* parser) {
-    bh_arr(AstNodeBinOp*) tree_stack = NULL;
+static AstTyped* parse_expression(OnyxParser* parser) {
+    bh_arr(AstBinaryOp*) tree_stack = NULL;
     bh_arr_new(global_scratch_allocator, tree_stack, 4);
     bh_arr_set_length(tree_stack, 0);
 
-    AstNodeTyped* left = parse_factor(parser);
-    AstNodeTyped* right;
-    AstNodeTyped* root = left;
+    AstTyped* left = parse_factor(parser);
+    AstTyped* right;
+    AstTyped* root = left;
 
-    OnyxBinaryOp bin_op_kind;
+    BinaryOp bin_op_kind;
     OnyxToken* bin_op_tok;
 
     while (1) {
         bin_op_kind = -1;
         switch ((u16) parser->curr_token->type) {
-            case TOKEN_TYPE_EQUAL_EQUAL:    bin_op_kind = ONYX_BINARY_OP_EQUAL; break;
-            case TOKEN_TYPE_NOT_EQUAL:      bin_op_kind = ONYX_BINARY_OP_NOT_EQUAL; break;
-            case TOKEN_TYPE_LESS_EQUAL:     bin_op_kind = ONYX_BINARY_OP_LESS_EQUAL; break;
-            case TOKEN_TYPE_GREATER_EQUAL:  bin_op_kind = ONYX_BINARY_OP_GREATER_EQUAL; break;
-            case '<':                       bin_op_kind = ONYX_BINARY_OP_LESS; break;
-            case '>':                       bin_op_kind = ONYX_BINARY_OP_GREATER; break;
+            case Token_Type_Equal_Equal:    bin_op_kind = Binary_Op_Equal; break;
+            case Token_Type_Not_Equal:      bin_op_kind = Binary_Op_Not_Equal; break;
+            case Token_Type_Less_Equal:     bin_op_kind = Binary_Op_Less_Equal; break;
+            case Token_Type_Greater_Equal:  bin_op_kind = Binary_Op_Greater_Equal; break;
+            case '<':                       bin_op_kind = Binary_Op_Less; break;
+            case '>':                       bin_op_kind = Binary_Op_Greater; break;
 
-            case '+':                       bin_op_kind = ONYX_BINARY_OP_ADD; break;
-            case '-':                       bin_op_kind = ONYX_BINARY_OP_MINUS; break;
-            case '*':                       bin_op_kind = ONYX_BINARY_OP_MULTIPLY; break;
-            case '/':                       bin_op_kind = ONYX_BINARY_OP_DIVIDE; break;
-            case '%':                       bin_op_kind = ONYX_BINARY_OP_MODULUS; break;
+            case '+':                       bin_op_kind = Binary_Op_Add; break;
+            case '-':                       bin_op_kind = Binary_Op_Minus; break;
+            case '*':                       bin_op_kind = Binary_Op_Multiply; break;
+            case '/':                       bin_op_kind = Binary_Op_Divide; break;
+            case '%':                       bin_op_kind = Binary_Op_Modulus; break;
             default: goto expression_done;
         }
 
@@ -302,7 +302,7 @@ static AstNodeTyped* parse_expression(OnyxParser* parser) {
             bin_op_tok = parser->curr_token;
             parser_next_token(parser);
 
-            AstNodeBinOp* bin_op = make_node(AstNodeBinOp, AST_NODE_KIND_BIN_OP);
+            AstBinaryOp* bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
             bin_op->operation = bin_op_kind;
             bin_op->base.token = bin_op_tok;
 
@@ -313,10 +313,10 @@ static AstNodeTyped* parse_expression(OnyxParser* parser) {
             if (bh_arr_is_empty(tree_stack)) {
                 // NOTE: new is now the root node
                 bin_op->left = root;
-                root = (AstNodeTyped *) bin_op;
+                root = (AstTyped *) bin_op;
             } else {
                 bin_op->left = bh_arr_last(tree_stack)->right;
-                bh_arr_last(tree_stack)->right = (AstNodeTyped *) bin_op;
+                bh_arr_last(tree_stack)->right = (AstTyped *) bin_op;
             }
 
             bh_arr_push(tree_stack, bin_op);
@@ -324,8 +324,8 @@ static AstNodeTyped* parse_expression(OnyxParser* parser) {
             right = parse_factor(parser);
             bin_op->right = right;
 
-            if ((left->flags & ONYX_AST_FLAG_COMPTIME) != 0 && (right->flags & ONYX_AST_FLAG_COMPTIME) != 0) {
-                bin_op->base.flags |= ONYX_AST_FLAG_COMPTIME;
+            if ((left->flags & Ast_Flag_Comptime) != 0 && (right->flags & Ast_Flag_Comptime) != 0) {
+                bin_op->base.flags |= Ast_Flag_Comptime;
             }
         }
     }
@@ -334,22 +334,22 @@ expression_done:
     return root;
 }
 
-static AstNodeIf* parse_if_stmt(OnyxParser* parser) {
-    expect(parser, TOKEN_TYPE_KEYWORD_IF);
+static AstIf* parse_if_stmt(OnyxParser* parser) {
+    expect(parser, Token_Type_Keyword_If);
 
-    AstNodeTyped* cond = parse_expression(parser);
-    AstNodeBlock* true_block = parse_block(parser);
+    AstTyped* cond = parse_expression(parser);
+    AstBlock* true_block = parse_block(parser);
 
-    AstNodeIf* if_node = make_node(AstNodeIf, AST_NODE_KIND_IF);
-    AstNodeIf* root_if = if_node;
+    AstIf* if_node = make_node(AstIf, Ast_Kind_If);
+    AstIf* root_if = if_node;
 
     if_node->cond = cond;
     if (true_block != NULL)
         if_node->true_block.as_block = true_block;
 
-    while (parser->curr_token->type == TOKEN_TYPE_KEYWORD_ELSEIF) {
+    while (parser->curr_token->type == Token_Type_Keyword_Elseif) {
         parser_next_token(parser);
-        AstNodeIf* elseif_node = make_node(AstNodeIf, AST_NODE_KIND_IF);
+        AstIf* elseif_node = make_node(AstIf, Ast_Kind_If);
 
         cond = parse_expression(parser);
         true_block = parse_block(parser);
@@ -362,10 +362,10 @@ static AstNodeIf* parse_if_stmt(OnyxParser* parser) {
         if_node = elseif_node;
     }
 
-    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_ELSE) {
+    if (parser->curr_token->type == Token_Type_Keyword_Else) {
         parser_next_token(parser);
 
-        AstNodeBlock* false_block = parse_block(parser);
+        AstBlock* false_block = parse_block(parser);
         if (false_block != NULL)
             if_node->false_block.as_block = false_block;
     }
@@ -373,13 +373,13 @@ static AstNodeIf* parse_if_stmt(OnyxParser* parser) {
     return root_if;
 }
 
-static AstNodeWhile* parse_while_stmt(OnyxParser* parser) {
-    OnyxToken* while_token = expect(parser, TOKEN_TYPE_KEYWORD_WHILE);
+static AstWhile* parse_while_stmt(OnyxParser* parser) {
+    OnyxToken* while_token = expect(parser, Token_Type_Keyword_While);
 
-    AstNodeTyped* cond = parse_expression(parser);
-    AstNodeBlock* body = parse_block(parser);
+    AstTyped* cond = parse_expression(parser);
+    AstBlock* body = parse_block(parser);
 
-    AstNodeWhile* while_node = make_node(AstNodeWhile, AST_NODE_KIND_WHILE);
+    AstWhile* while_node = make_node(AstWhile, Ast_Kind_While);
     while_node->base.token = while_token;
     while_node->cond = cond;
     while_node->body = body;
@@ -390,8 +390,8 @@ static AstNodeWhile* parse_while_stmt(OnyxParser* parser) {
 // Returns 1 if the symbol was consumed. Returns 0 otherwise
 // ret is set to the statement to insert
 static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
-    if (parser->curr_token->type != TOKEN_TYPE_SYMBOL) return 0;
-    OnyxToken* symbol = expect(parser, TOKEN_TYPE_SYMBOL);
+    if (parser->curr_token->type != Token_Type_Symbol) return 0;
+    OnyxToken* symbol = expect(parser, Token_Type_Symbol);
 
     switch ((u16) parser->curr_token->type) {
         // NOTE: Declaration
@@ -401,27 +401,27 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                 TypeInfo* type = &builtin_types[TYPE_INFO_KIND_UNKNOWN];
 
                 // NOTE: var: type
-                if (parser->curr_token->type == TOKEN_TYPE_SYMBOL) {
+                if (parser->curr_token->type == Token_Type_Symbol) {
                     type = parse_type(parser);
                 }
 
-                AstNodeLocal* local = make_node(AstNodeLocal, AST_NODE_KIND_LOCAL);
+                AstLocal* local = make_node(AstLocal, Ast_Kind_Local);
                 local->base.token = symbol;
                 local->base.type = type;
-                local->base.flags |= ONYX_AST_FLAG_LVAL; // NOTE: DELETE
+                local->base.flags |= Ast_Flag_Lval; // NOTE: DELETE
                 *ret = (AstNode *) local;
 
                 if (parser->curr_token->type == '=' || parser->curr_token->type == ':') {
                     if (parser->curr_token->type == ':') {
-                        local->base.flags |= ONYX_AST_FLAG_CONST;
+                        local->base.flags |= Ast_Flag_Const;
                     }
 
-                    AstNodeAssign* assignment = make_node(AstNodeAssign, AST_NODE_KIND_ASSIGNMENT);
+                    AstAssign* assignment = make_node(AstAssign, Ast_Kind_Assignment);
                     local->base.next = (AstNode *) assignment;
                     assignment->base.token = parser->curr_token;
                     parser_next_token(parser);
 
-                    AstNodeTyped* expr = parse_expression(parser);
+                    AstTyped* expr = parse_expression(parser);
                     if (expr == NULL) {
                         onyx_token_null_toggle(parser->curr_token);
                         onyx_message_add(parser->msgs,
@@ -433,9 +433,9 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                     }
                     assignment->expr = expr;
 
-                    AstNode* left_symbol = make_node(AstNode, AST_NODE_KIND_SYMBOL);
+                    AstNode* left_symbol = make_node(AstNode, Ast_Kind_Symbol);
                     left_symbol->token = symbol;
-                    assignment->lval = (AstNodeTyped *) left_symbol;
+                    assignment->lval = (AstTyped *) left_symbol;
                 }
                 return 1;
             }
@@ -443,52 +443,52 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
             // NOTE: Assignment
         case '=':
             {
-                AstNodeAssign* assignment = make_node(AstNodeAssign, AST_NODE_KIND_ASSIGNMENT);
+                AstAssign* assignment = make_node(AstAssign, Ast_Kind_Assignment);
                 assignment->base.token = parser->curr_token;
                 parser_next_token(parser);
 
-                AstNode* lval = make_node(AstNode, AST_NODE_KIND_SYMBOL);
+                AstNode* lval = make_node(AstNode, Ast_Kind_Symbol);
                 lval->token = symbol;
 
-                AstNodeTyped* rval = parse_expression(parser);
+                AstTyped* rval = parse_expression(parser);
                 assignment->expr = rval;
-                assignment->lval = (AstNodeTyped *) lval;
+                assignment->lval = (AstTyped *) lval;
                 *ret = (AstNode *) assignment;
                 return 1;
             }
 
-        case TOKEN_TYPE_PLUS_EQUAL:
-        case TOKEN_TYPE_MINUS_EQUAL:
-        case TOKEN_TYPE_STAR_EQUAL:
-        case TOKEN_TYPE_FSLASH_EQUAL:
-        case TOKEN_TYPE_PERCENT_EQUAL:
+        case Token_Type_Plus_Equal:
+        case Token_Type_Minus_Equal:
+        case Token_Type_Star_Equal:
+        case Token_Type_Fslash_Equal:
+        case Token_Type_Percent_Equal:
             {
-                OnyxBinaryOp bin_op;
-                if      (parser->curr_token->type == TOKEN_TYPE_PLUS_EQUAL)    bin_op = ONYX_BINARY_OP_ADD;
-                else if (parser->curr_token->type == TOKEN_TYPE_MINUS_EQUAL)   bin_op = ONYX_BINARY_OP_MINUS;
-                else if (parser->curr_token->type == TOKEN_TYPE_STAR_EQUAL)    bin_op = ONYX_BINARY_OP_MULTIPLY;
-                else if (parser->curr_token->type == TOKEN_TYPE_FSLASH_EQUAL)  bin_op = ONYX_BINARY_OP_DIVIDE;
-                else if (parser->curr_token->type == TOKEN_TYPE_PERCENT_EQUAL) bin_op = ONYX_BINARY_OP_MODULUS;
+                BinaryOp bin_op;
+                if      (parser->curr_token->type == Token_Type_Plus_Equal)    bin_op = Binary_Op_Add;
+                else if (parser->curr_token->type == Token_Type_Minus_Equal)   bin_op = Binary_Op_Minus;
+                else if (parser->curr_token->type == Token_Type_Star_Equal)    bin_op = Binary_Op_Multiply;
+                else if (parser->curr_token->type == Token_Type_Fslash_Equal)  bin_op = Binary_Op_Divide;
+                else if (parser->curr_token->type == Token_Type_Percent_Equal) bin_op = Binary_Op_Modulus;
 
                 parser_next_token(parser);
 
-                AstNodeTyped* expr = parse_expression(parser);
+                AstTyped* expr = parse_expression(parser);
 
-                AstNodeBinOp* bin_op_node = make_node(AstNodeBinOp, AST_NODE_KIND_BIN_OP);
+                AstBinaryOp* bin_op_node = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
                 bin_op_node->operation = bin_op;
 
-                AstNode* bin_op_left = make_node(AstNode, AST_NODE_KIND_SYMBOL);
+                AstNode* bin_op_left = make_node(AstNode, Ast_Kind_Symbol);
                 bin_op_left->token = symbol;
-                bin_op_node->left = (AstNodeTyped *) bin_op_left;
+                bin_op_node->left = (AstTyped *) bin_op_left;
                 bin_op_node->right = expr;
 
-                AstNodeAssign* assign_node = make_node(AstNodeAssign, AST_NODE_KIND_ASSIGNMENT);
+                AstAssign* assign_node = make_node(AstAssign, Ast_Kind_Assignment);
 
                 // TODO: Maybe I don't need to make another lval node?
-                AstNode* lval = make_node(AstNode, AST_NODE_KIND_SYMBOL);
+                AstNode* lval = make_node(AstNode, Ast_Kind_Symbol);
                 lval->token = symbol;
-                assign_node->lval = (AstNodeTyped *) lval;
-                assign_node->expr = (AstNodeTyped *) bin_op_node;
+                assign_node->lval = (AstTyped *) lval;
+                assign_node->expr = (AstTyped *) bin_op_node;
 
                 *ret = (AstNode *) assign_node;
 
@@ -502,17 +502,17 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
     return 0;
 }
 
-static AstNodeReturn* parse_return_statement(OnyxParser* parser) {
-    AstNodeReturn* return_node = make_node(AstNodeReturn, AST_NODE_KIND_RETURN);
-    return_node->base.token = expect(parser, TOKEN_TYPE_KEYWORD_RETURN);
+static AstReturn* parse_return_statement(OnyxParser* parser) {
+    AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
+    return_node->base.token = expect(parser, Token_Type_Keyword_Return);
 
-    AstNodeTyped* expr = NULL;
+    AstTyped* expr = NULL;
 
     if (parser->curr_token->type != ';') {
         expr = parse_expression(parser);
 
-        if (expr == NULL || expr == (AstNodeTyped *) &error_node) {
-            return (AstNodeReturn *) &error_node;
+        if (expr == NULL || expr == (AstTyped *) &error_node) {
+            return (AstReturn *) &error_node;
         } else {
             return_node->expr = expr;
         }
@@ -526,7 +526,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
     AstNode* retval = NULL;
 
     switch ((u16) parser->curr_token->type) {
-        case TOKEN_TYPE_KEYWORD_RETURN:
+        case Token_Type_Keyword_Return:
             retval = (AstNode *) parse_return_statement(parser);
             break;
 
@@ -535,7 +535,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             retval = (AstNode *) parse_block(parser);
             break;
 
-        case TOKEN_TYPE_SYMBOL:
+        case Token_Type_Symbol:
             if (parse_symbol_statement(parser, &retval)) break;
             // fallthrough
 
@@ -543,29 +543,29 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case '+':
         case '-':
         case '!':
-        case TOKEN_TYPE_LITERAL_NUMERIC:
-        case TOKEN_TYPE_LITERAL_STRING:
+        case Token_Type_Literal_Numeric:
+        case Token_Type_Literal_String:
             retval = (AstNode *) parse_expression(parser);
             break;
 
-        case TOKEN_TYPE_KEYWORD_IF:
+        case Token_Type_Keyword_If:
             needs_semicolon = 0;
             retval = (AstNode *) parse_if_stmt(parser);
             break;
 
-        case TOKEN_TYPE_KEYWORD_WHILE:
+        case Token_Type_Keyword_While:
             needs_semicolon = 0;
             retval = (AstNode *) parse_while_stmt(parser);
             break;
 
-        case TOKEN_TYPE_KEYWORD_BREAK:
-            retval = make_node(AstNode, AST_NODE_KIND_BREAK);
-            retval->token = expect(parser, TOKEN_TYPE_KEYWORD_BREAK);
+        case Token_Type_Keyword_Break:
+            retval = make_node(AstNode, Ast_Kind_Break);
+            retval->token = expect(parser, Token_Type_Keyword_Break);
             break;
 
-        case TOKEN_TYPE_KEYWORD_CONTINUE:
-            retval = make_node(AstNode, AST_NODE_KIND_BREAK);
-            retval->token = expect(parser, TOKEN_TYPE_KEYWORD_CONTINUE);
+        case Token_Type_Keyword_Continue:
+            retval = make_node(AstNode, Ast_Kind_Break);
+            retval->token = expect(parser, Token_Type_Keyword_Continue);
             break;
 
         default:
@@ -588,9 +588,9 @@ static AstNode* parse_statement(OnyxParser* parser) {
     return retval;
 }
 
-static AstNodeBlock* parse_block(OnyxParser* parser) {
-    AstNodeBlock* block = make_node(AstNodeBlock, AST_NODE_KIND_BLOCK);
-    AstNodeLocalGroup* lg = make_node(AstNodeLocalGroup, AST_NODE_KIND_LOCAL_GROUP);
+static AstBlock* parse_block(OnyxParser* parser) {
+    AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
+    AstLocalGroup* lg = make_node(AstLocalGroup, Ast_Kind_Local_Group);
     block->locals = lg;
 
     // --- is for an empty block
@@ -608,7 +608,7 @@ static AstNodeBlock* parse_block(OnyxParser* parser) {
     while (parser->curr_token->type != '}') {
         stmt = parse_statement(parser);
 
-        if (stmt != NULL && stmt->kind != AST_NODE_KIND_ERROR) {
+        if (stmt != NULL && stmt->kind != Ast_Kind_Error) {
             *next = stmt;
 
             while (stmt->next != NULL) stmt = stmt->next;
@@ -624,7 +624,7 @@ static AstNodeBlock* parse_block(OnyxParser* parser) {
 static TypeInfo* parse_type(OnyxParser* parser) {
     TypeInfo* type_info = &builtin_types[TYPE_INFO_KIND_UNKNOWN];
 
-    OnyxToken* symbol = expect(parser, TOKEN_TYPE_SYMBOL);
+    OnyxToken* symbol = expect(parser, Token_Type_Symbol);
     if (symbol == NULL) return type_info;
 
     onyx_token_null_toggle(symbol);
@@ -632,9 +632,9 @@ static TypeInfo* parse_type(OnyxParser* parser) {
     if (!bh_table_has(AstNode*, parser->identifiers, symbol->text)) {
         onyx_message_add(parser->msgs, ONYX_MESSAGE_TYPE_UNKNOWN_TYPE, symbol->pos, symbol->text);
     } else {
-        AstNodeTyped* type_info_node = bh_table_get(AstNodeTyped*, parser->identifiers, symbol->text);
+        AstTyped* type_info_node = bh_table_get(AstTyped*, parser->identifiers, symbol->text);
 
-        if (type_info_node->kind == AST_NODE_KIND_TYPE) {
+        if (type_info_node->kind == Ast_Kind_Type) {
             type_info = type_info_node->type;
         }
     }
@@ -643,7 +643,7 @@ static TypeInfo* parse_type(OnyxParser* parser) {
     return type_info;
 }
 
-static AstNodeLocal* parse_function_params(OnyxParser* parser) {
+static AstLocal* parse_function_params(OnyxParser* parser) {
     if (parser->curr_token->type != '(')
         return NULL;
 
@@ -654,20 +654,20 @@ static AstNodeLocal* parse_function_params(OnyxParser* parser) {
         return NULL;
     }
 
-    AstNodeLocal* first_param = NULL;
-    AstNodeLocal* curr_param = NULL;
-    AstNodeLocal* trailer = NULL;
+    AstLocal* first_param = NULL;
+    AstLocal* curr_param = NULL;
+    AstLocal* trailer = NULL;
 
     OnyxToken* symbol;
     while (parser->curr_token->type != ')') {
         if (parser->curr_token->type == ',') parser_next_token(parser);
 
-        symbol = expect(parser, TOKEN_TYPE_SYMBOL);
+        symbol = expect(parser, Token_Type_Symbol);
         expect(parser, ':');
 
-        curr_param = make_node(AstNodeLocal, AST_NODE_KIND_PARAM);
+        curr_param = make_node(AstLocal, Ast_Kind_Param);
         curr_param->base.token = symbol;
-        curr_param->base.flags |= ONYX_AST_FLAG_CONST;
+        curr_param->base.flags |= Ast_Flag_Const;
         curr_param->base.type = parse_type(parser);
 
         if (first_param == NULL) first_param = curr_param;
@@ -686,7 +686,7 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
     if (parser->curr_token->type != '#') return 0;
 
     expect(parser, '#');
-    OnyxToken* sym = expect(parser, TOKEN_TYPE_SYMBOL);
+    OnyxToken* sym = expect(parser, Token_Type_Symbol);
 
     b32 match = (strlen(dir) == sym->length) && (strncmp(dir, sym->text, sym->length) == 0);
     if (!match) {
@@ -696,23 +696,23 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
     return match;
 }
 
-static AstNodeFunction* parse_function_definition(OnyxParser* parser) {
-    expect(parser, TOKEN_TYPE_KEYWORD_PROC);
+static AstFunction* parse_function_definition(OnyxParser* parser) {
+    expect(parser, Token_Type_Keyword_Proc);
 
-    AstNodeFunction* func_def = make_node(AstNodeFunction, AST_NODE_KIND_FUNCTION);
+    AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
 
     while (parser->curr_token->type == '#') {
         if (parse_possible_directive(parser, "intrinsic")) {
-            func_def->base.flags |= ONYX_AST_FLAG_INTRINSIC;
+            func_def->base.flags |= Ast_Flag_Intrinsic;
         }
 
         else if (parse_possible_directive(parser, "inline")) {
-            func_def->base.flags |= ONYX_AST_FLAG_INLINE;
+            func_def->base.flags |= Ast_Flag_Inline;
         }
 
         else {
             OnyxToken* directive_token = expect(parser, '#');
-            OnyxToken* symbol_token = expect(parser, TOKEN_TYPE_SYMBOL);
+            OnyxToken* symbol_token = expect(parser, Token_Type_Symbol);
 
             onyx_message_add(parser->msgs,
                     ONYX_MESSAGE_TYPE_UNKNOWN_DIRECTIVE,
@@ -721,11 +721,11 @@ static AstNodeFunction* parse_function_definition(OnyxParser* parser) {
         }
     }
 
-    AstNodeLocal* params = parse_function_params(parser);
+    AstLocal* params = parse_function_params(parser);
     func_def->params = params;
 
-    if (parser->curr_token->type == TOKEN_TYPE_RIGHT_ARROW) {
-        expect(parser, TOKEN_TYPE_RIGHT_ARROW);
+    if (parser->curr_token->type == Token_Type_Right_Arrow) {
+        expect(parser, Token_Type_Right_Arrow);
 
         TypeInfo* return_type = parse_type(parser);
         func_def->base.type = return_type;
@@ -739,21 +739,21 @@ static AstNodeFunction* parse_function_definition(OnyxParser* parser) {
 }
 
 static AstNode* parse_foreign(OnyxParser* parser) {
-    expect(parser, TOKEN_TYPE_KEYWORD_FOREIGN);
+    expect(parser, Token_Type_Keyword_Foreign);
 
-    AstNodeForeign* foreign = make_node(AstNodeForeign, AST_NODE_KIND_FOREIGN);
-    foreign->mod_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
-    foreign->name_token = expect(parser, TOKEN_TYPE_LITERAL_STRING);
+    AstForeign* foreign = make_node(AstForeign, Ast_Kind_Foreign);
+    foreign->mod_token = expect(parser, Token_Type_Literal_String);
+    foreign->name_token = expect(parser, Token_Type_Literal_String);
 
-    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_PROC) {
+    if (parser->curr_token->type == Token_Type_Keyword_Proc) {
         foreign->import = (AstNode *) parse_function_definition(parser);
 
     } else {
         TypeInfo* type = parse_type(parser);
 
-        AstNodeGlobal* global = make_node(AstNodeGlobal, AST_NODE_KIND_GLOBAL);
+        AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
         global->base.type = type;
-        global->base.flags |= ONYX_AST_FLAG_LVAL;
+        global->base.flags |= Ast_Flag_Lval;
 
         foreign->import = (AstNode *) global;
     }
@@ -762,24 +762,24 @@ static AstNode* parse_foreign(OnyxParser* parser) {
 }
 
 static AstNode* parse_top_level_constant_symbol(OnyxParser* parser) {
-    if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_PROC) {
+    if (parser->curr_token->type == Token_Type_Keyword_Proc) {
         return (AstNode *) parse_function_definition(parser);
 
-    } else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_STRUCT) {
+    } else if (parser->curr_token->type == Token_Type_Keyword_Struct) {
         // Handle struct case
         assert(0);
 
-    } else if (parser->curr_token->type == TOKEN_TYPE_KEYWORD_FOREIGN) {
+    } else if (parser->curr_token->type == Token_Type_Keyword_Foreign) {
         return (AstNode *) parse_foreign(parser);
 
     } else {
         // Global constant with initial value
-        AstNodeGlobal* global = make_node(AstNodeGlobal, AST_NODE_KIND_GLOBAL);
+        AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
         global->initial_value = parse_expression(parser);
         global->base.type = &builtin_types[TYPE_INFO_KIND_UNKNOWN];
-        global->base.flags |= ONYX_AST_FLAG_CONST;
-        global->base.flags |= ONYX_AST_FLAG_LVAL;
-        global->base.flags |= ONYX_AST_FLAG_COMPTIME;
+        global->base.flags |= Ast_Flag_Const;
+        global->base.flags |= Ast_Flag_Lval;
+        global->base.flags |= Ast_Flag_Comptime;
 
         return (AstNode *) global;
     }
@@ -787,33 +787,33 @@ static AstNode* parse_top_level_constant_symbol(OnyxParser* parser) {
 
 static AstNode* parse_top_level_statement(OnyxParser* parser) {
     switch (parser->curr_token->type) {
-        case TOKEN_TYPE_KEYWORD_USE:
+        case Token_Type_Keyword_Use:
             {
-                AstNodeUse* use_node = make_node(AstNodeUse, AST_NODE_KIND_USE);
-                use_node->base.token = expect(parser, TOKEN_TYPE_KEYWORD_USE);
-                use_node->filename = expect(parser, TOKEN_TYPE_LITERAL_STRING);
+                AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
+                use_node->base.token = expect(parser, Token_Type_Keyword_Use);
+                use_node->filename = expect(parser, Token_Type_Literal_String);
 
                 return (AstNode *) use_node;
             }
 
-        case TOKEN_TYPE_KEYWORD_EXPORT:
+        case Token_Type_Keyword_Export:
             {
-                expect(parser, TOKEN_TYPE_KEYWORD_EXPORT);
-                if (parser->curr_token->type != TOKEN_TYPE_SYMBOL) {
+                expect(parser, Token_Type_Keyword_Export);
+                if (parser->curr_token->type != Token_Type_Symbol) {
                     onyx_message_add(parser->msgs,
                             ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
                             parser->curr_token->pos,
-                            onyx_get_token_type_name(TOKEN_TYPE_SYMBOL),
+                            onyx_get_token_type_name(Token_Type_Symbol),
                             onyx_get_token_type_name(parser->curr_token->type));
                     break;
                 }
 
                 AstNode* top_level_decl = parse_top_level_statement(parser);
-                top_level_decl->flags |= ONYX_AST_FLAG_EXPORTED;
+                top_level_decl->flags |= Ast_Flag_Exported;
                 return top_level_decl;
             }
 
-        case TOKEN_TYPE_SYMBOL:
+        case Token_Type_Symbol:
             {
                 OnyxToken* symbol = parser->curr_token;
                 parser_next_token(parser);
@@ -822,7 +822,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                 TypeInfo* type = &builtin_types[TYPE_INFO_KIND_UNKNOWN];
 
-                if (parser->curr_token->type == TOKEN_TYPE_SYMBOL) {
+                if (parser->curr_token->type == Token_Type_Symbol) {
                     type = parse_type(parser);
                 }
 
@@ -831,12 +831,12 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                     AstNode* node = parse_top_level_constant_symbol(parser);
 
-                    if (node->kind == AST_NODE_KIND_GLOBAL) {
-                        ((AstNodeGlobal *) node)->base.type = type;
+                    if (node->kind == Ast_Kind_Global) {
+                        ((AstGlobal *) node)->base.type = type;
                     }
 
-                    if (node->kind == AST_NODE_KIND_FOREIGN) {
-                        ((AstNodeForeign *) node)->import->token = symbol;
+                    if (node->kind == Ast_Kind_Foreign) {
+                        ((AstForeign *) node)->import->token = symbol;
 
                     } else {
                         node->token = symbol;
@@ -847,9 +847,9 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 } else if (parser->curr_token->type == '=') {
                     parser_next_token(parser);
 
-                    AstNodeGlobal* global = make_node(AstNodeGlobal, AST_NODE_KIND_GLOBAL);
+                    AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
                     global->base.token = symbol;
-                    global->base.flags |= ONYX_AST_FLAG_LVAL;
+                    global->base.flags |= Ast_Flag_Lval;
                     global->initial_value = parse_expression(parser);
                     global->base.type = type;
 
@@ -879,11 +879,11 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
 
 // NOTE: This returns a void* so I don't need to cast it everytime I use it
-void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstNodeKind kind) {
+void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
     void* node = bh_alloc(alloc, size);
 
     memset(node, 0, size);
-    *(AstNodeKind *) node = kind;
+    *(AstKind *) node = kind;
 
     return node;
 }
@@ -895,7 +895,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Onyx
 
     TypeInfo* it = &builtin_types[0];
     while (it->kind != 0xffffffff) {
-        AstNodeTyped* tmp = onyx_ast_node_new(alloc, sizeof(AstNodeTyped), AST_NODE_KIND_TYPE);
+        AstTyped* tmp = onyx_ast_node_new(alloc, sizeof(AstTyped), Ast_Kind_Type);
         tmp->type = it;
         bh_table_put(AstNode*, parser.identifiers, (char *)it->name, tmp);
         it++;
@@ -916,7 +916,7 @@ bh_arr(AstNode *) onyx_parse(OnyxParser *parser) {
     bh_arr(AstNode *) top_level_nodes = NULL;
     bh_arr_new(global_heap_allocator, top_level_nodes, 4);
 
-    while (parser->curr_token->type != TOKEN_TYPE_END_STREAM) {
+    while (parser->curr_token->type != Token_Type_End_Stream) {
         AstNode* curr_stmt = parse_top_level_statement(parser);
 
         // Building a linked list of statements down the "next" chain

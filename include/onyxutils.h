@@ -8,6 +8,6 @@ extern bh_allocator global_scratch_allocator;
 extern bh_managed_heap global_heap;
 extern bh_allocator global_heap_allocator;
 
-const char* onyx_ast_node_kind_string(AstNodeKind kind);
+const char* onyx_ast_node_kind_string(AstKind kind);
 
 void onyx_ast_print(AstNode* program, i32 indent);

@@ -212,22 +212,22 @@ static WasmType onyx_type_to_wasm_type(TypeInfo* type) {
 #define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }));
 #define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }));
 
-static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeFunction* fd);
-static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeBlock* block);
+static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstFunction* fd);
+static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstBlock* block);
 static void compile_statement(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNode* stmt);
-static void compile_assign_lval(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeTyped* lval);
-static void compile_assignment(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeAssign* assign);
-static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeIf* if_node);
-static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeWhile* while_node);
-static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeBinOp* binop);
-static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeUnaryOp* unop);
-static void compile_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeCall* call);
-static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeIntrinsicCall* call);
-static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeTyped* expr);
-static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeUnaryOp* cast);
-static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeReturn* ret);
+static void compile_assign_lval(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstTyped* lval);
+static void compile_assignment(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstAssign* assign);
+static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstIf* if_node);
+static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstWhile* while_node);
+static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstBinaryOp* binop);
+static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstUnaryOp* unop);
+static void compile_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstCall* call);
+static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstIntrinsicCall* call);
+static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstTyped* expr);
+static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstUnaryOp* cast);
+static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstReturn* ret);
 
-static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeFunction* fd) {
+static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstFunction* fd) {
     if (fd->body == NULL) return;
 
     bh_arr(WasmInstruction) code = *pcode;
@@ -241,7 +241,7 @@ static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* 
     *pcode = code;
 }
 
-static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeBlock* block) {
+static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstBlock* block) {
     bh_arr(WasmInstruction) code = *pcode;
 
     WID(WI_BLOCK_START, 0x40);
@@ -285,17 +285,17 @@ static void compile_statement(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcod
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (stmt->kind) {
-        case AST_NODE_KIND_RETURN: compile_return(mod, &code, (AstNodeReturn *) stmt); break;
-        case AST_NODE_KIND_ASSIGNMENT: compile_assignment(mod, &code, (AstNodeAssign *) stmt); break;
-        case AST_NODE_KIND_IF: compile_if(mod, &code, (AstNodeIf *) stmt); break;
-        case AST_NODE_KIND_WHILE: compile_while(mod, &code, (AstNodeWhile *) stmt); break;
-        case AST_NODE_KIND_BREAK: compile_structured_jump(mod, &code, 0); break;
-        case AST_NODE_KIND_CONTINUE: compile_structured_jump(mod, &code, 1); break;
-        case AST_NODE_KIND_BLOCK: compile_block(mod, &code, (AstNodeBlock *) stmt); break;
+        case Ast_Kind_Return: compile_return(mod, &code, (AstReturn *) stmt); break;
+        case Ast_Kind_Assignment: compile_assignment(mod, &code, (AstAssign *) stmt); break;
+        case Ast_Kind_If: compile_if(mod, &code, (AstIf *) stmt); break;
+        case Ast_Kind_While: compile_while(mod, &code, (AstWhile *) stmt); break;
+        case Ast_Kind_Break: compile_structured_jump(mod, &code, 0); break;
+        case Ast_Kind_Continue: compile_structured_jump(mod, &code, 1); break;
+        case Ast_Kind_Block: compile_block(mod, &code, (AstBlock *) stmt); break;
 
-        case AST_NODE_KIND_CALL:
-        case AST_NODE_KIND_INTRINSIC_CALL:
-            compile_expression(mod, &code, (AstNodeTyped *) stmt);
+        case Ast_Kind_Call:
+        case Ast_Kind_Intrinsic_Call:
+            compile_expression(mod, &code, (AstTyped *) stmt);
             break;
 
 
@@ -305,15 +305,15 @@ static void compile_statement(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcod
     *pcode = code;
 }
 
-static void compile_assign_lval(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeTyped* lval) {
+static void compile_assign_lval(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstTyped* lval) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (lval->kind == AST_NODE_KIND_LOCAL || lval->kind == AST_NODE_KIND_PARAM) {
+    if (lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param) {
         i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) lval);
 
         WID(WI_LOCAL_SET, localidx);
 
-    } else if (lval->kind == AST_NODE_KIND_GLOBAL) {
+    } else if (lval->kind == Ast_Kind_Global) {
         i32 globalidx = (i32) bh_imap_get(&mod->global_map, (u64) lval);
 
         WID(WI_GLOBAL_SET, globalidx);
@@ -325,7 +325,7 @@ static void compile_assign_lval(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pc
     *pcode = code;
 }
 
-static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeIf* if_node) {
+static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstIf* if_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     compile_expression(mod, &code, if_node->cond);
@@ -336,11 +336,11 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
     if (if_node->true_block.as_if) {
         // NOTE: This is kind of gross, but making a function for this doesn't feel right
 
-        if (if_node->true_block.as_if->base.kind == AST_NODE_KIND_IF) {
+        if (if_node->true_block.as_if->base.kind == Ast_Kind_If) {
             forll (AstNode, stmt, (AstNode *) if_node->true_block.as_if, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->true_block.as_if->base.kind == AST_NODE_KIND_BLOCK) {
+        } else if (if_node->true_block.as_if->base.kind == Ast_Kind_Block) {
             forll (AstNode, stmt, if_node->true_block.as_block->body, next) {
                 compile_statement(mod, &code, stmt);
             }
@@ -350,11 +350,11 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
     if (if_node->false_block.as_if) {
         WI(WI_ELSE);
 
-        if (if_node->false_block.as_if->base.kind == AST_NODE_KIND_IF) {
+        if (if_node->false_block.as_if->base.kind == Ast_Kind_If) {
             forll (AstNode, stmt, (AstNode *) if_node->false_block.as_if, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->false_block.as_if->base.kind == AST_NODE_KIND_BLOCK) {
+        } else if (if_node->false_block.as_if->base.kind == Ast_Kind_Block) {
             forll (AstNode, stmt, if_node->false_block.as_block->body, next) {
                 compile_statement(mod, &code, stmt);
             }
@@ -368,7 +368,7 @@ static void compile_if(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstN
     *pcode = code;
 }
 
-static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeWhile* while_node) {
+static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstWhile* while_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     WID(WI_BLOCK_START, 0x40);
@@ -396,7 +396,7 @@ static void compile_while(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, A
     *pcode = code;
 }
 
-static void compile_assignment(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeAssign* assign) {
+static void compile_assignment(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstAssign* assign) {
     bh_arr(WasmInstruction) code = *pcode;
 
     compile_expression(mod, &code, assign->expr);
@@ -423,18 +423,18 @@ static const WasmInstructionType binop_map[][4] = {
     /* GTE */ { WI_I32_GE_S,  WI_I64_GE_S,  WI_F32_GE,  WI_F64_GE },
 };
 
-static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeBinOp* binop) {
+static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstBinaryOp* binop) {
     bh_arr(WasmInstruction) code = *pcode;
 
     b32 is_sign_significant = 0;
 
     switch (binop->operation) {
-        case ONYX_BINARY_OP_DIVIDE:
-        case ONYX_BINARY_OP_MODULUS:
-        case ONYX_BINARY_OP_LESS:
-        case ONYX_BINARY_OP_LESS_EQUAL:
-        case ONYX_BINARY_OP_GREATER:
-        case ONYX_BINARY_OP_GREATER_EQUAL:
+        case Binary_Op_Divide:
+        case Binary_Op_Modulus:
+        case Binary_Op_Less:
+        case Binary_Op_Less_Equal:
+        case Binary_Op_Greater:
+        case Binary_Op_Greater_Equal:
             is_sign_significant = 1;
 
         default: break;
@@ -470,11 +470,11 @@ static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, A
     *pcode = code;
 }
 
-static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeUnaryOp* unop) {
+static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstUnaryOp* unop) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (unop->operation) {
-        case ONYX_UNARY_OP_NEGATE:
+        case Unary_Op_Negate:
             {
                 TypeInfoKind type_kind = unop->base.type->kind;
 
@@ -501,24 +501,24 @@ static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode,
                 break;
             }
 
-        case ONYX_UNARY_OP_NOT:
+        case Unary_Op_Not:
             compile_expression(mod, &code, unop->expr);
 
             WI(WI_I32_EQZ);
             break;
 
-        case ONYX_UNARY_OP_CAST: compile_cast(mod, &code, unop); break;
+        case Unary_Op_Cast: compile_cast(mod, &code, unop); break;
     }
 
     *pcode = code;
 }
 
-static void compile_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeCall* call) {
+static void compile_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    for (AstNodeArgument *arg = call->arguments;
+    for (AstArgument *arg = call->arguments;
             arg != NULL;
-            arg = (AstNodeArgument *) arg->base.next) {
+            arg = (AstArgument *) arg->base.next) {
         compile_expression(mod, &code, arg->value);
     }
 
@@ -528,7 +528,7 @@ static void compile_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, As
     *pcode = code;
 }
 
-static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeIntrinsicCall* call) {
+static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstIntrinsicCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
     i32 place_arguments_normally = 1;
@@ -538,9 +538,9 @@ static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)*
     if (0) place_arguments_normally = 0;
 
     if (place_arguments_normally) {
-        for (AstNodeArgument *arg = call->arguments;
+        for (AstArgument *arg = call->arguments;
                 arg != NULL;
-                arg = (AstNodeArgument *) arg->base.next) {
+                arg = (AstArgument *) arg->base.next) {
             compile_expression(mod, &code, arg->value);
         }
     }
@@ -599,20 +599,20 @@ static void compile_intrinsic_call(OnyxWasmModule* mod, bh_arr(WasmInstruction)*
     *pcode = code;
 }
 
-static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeTyped* expr) {
+static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (expr->kind) {
-        case AST_NODE_KIND_BIN_OP:
-            compile_binop(mod, &code, (AstNodeBinOp *) expr);
+        case Ast_Kind_Binary_Op:
+            compile_binop(mod, &code, (AstBinaryOp *) expr);
             break;
 
-        case AST_NODE_KIND_UNARY_OP:
-            compile_unaryop(mod, &code, (AstNodeUnaryOp *) expr);
+        case Ast_Kind_Unary_Op:
+            compile_unaryop(mod, &code, (AstUnaryOp *) expr);
             break;
 
-        case AST_NODE_KIND_LOCAL:
-        case AST_NODE_KIND_PARAM:
+        case Ast_Kind_Local:
+        case Ast_Kind_Param:
             {
                 i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) expr);
 
@@ -620,7 +620,7 @@ static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pco
                 break;
             }
 
-        case AST_NODE_KIND_GLOBAL:
+        case Ast_Kind_Global:
             {
                 i32 globalidx = (i32) bh_imap_get(&mod->global_map, (u64) expr);
 
@@ -628,9 +628,9 @@ static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pco
                 break;
             }
 
-        case AST_NODE_KIND_LITERAL:
+        case Ast_Kind_Literal:
             {
-                AstNodeNumLit* lit = (AstNodeNumLit *) expr;
+                AstNumLit* lit = (AstNumLit *) expr;
                 WasmType lit_type = onyx_type_to_wasm_type(lit->base.type);
                 WasmInstruction instr = { WI_NOP, 0 };
 
@@ -652,15 +652,15 @@ static void compile_expression(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pco
                 break;
             }
 
-        case AST_NODE_KIND_BLOCK: compile_block(mod, &code, (AstNodeBlock *) expr); break;
+        case Ast_Kind_Block: compile_block(mod, &code, (AstBlock *) expr); break;
 
 
-        case AST_NODE_KIND_CALL:
-            compile_call(mod, &code, (AstNodeCall *) expr);
+        case Ast_Kind_Call:
+            compile_call(mod, &code, (AstCall *) expr);
             break;
 
-        case AST_NODE_KIND_INTRINSIC_CALL:
-            compile_intrinsic_call(mod, &code, (AstNodeIntrinsicCall *) expr);
+        case Ast_Kind_Intrinsic_Call:
+            compile_intrinsic_call(mod, &code, (AstIntrinsicCall *) expr);
             break;
 
         default:
@@ -682,7 +682,7 @@ static const WasmInstructionType cast_map[][6] = {
     /* F64 */ { WI_I32_FROM_F64_S, WI_I32_FROM_F64_U, WI_I64_FROM_F64_S, WI_I64_FROM_F64_U, WI_F32_FROM_F64,   WI_NOP,           },
 };
 
-static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeUnaryOp* cast) {
+static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstUnaryOp* cast) {
     bh_arr(WasmInstruction) code = *pcode;
 
     compile_expression(mod, &code, cast->expr);
@@ -719,7 +719,7 @@ static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, As
     *pcode = code;
 }
 
-static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstNodeReturn* ret) {
+static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstReturn* ret) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (ret->expr) {
@@ -731,18 +731,18 @@ static void compile_return(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, 
     *pcode = code;
 }
 
-static i32 generate_type_idx(OnyxWasmModule* mod, AstNodeFunction* fd) {
+static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
     static char type_repr_buf[128];
 
     char* t = type_repr_buf;
-    AstNodeLocal* param = fd->params;
+    AstLocal* param = fd->params;
     i32 param_count = 0;
     while (param) {
         // HACK: Using these directly as part of a string feels weird but they are
         // valid characters so I don't think it is going to be much of an issue
         *(t++) = (char) onyx_type_to_wasm_type(param->base.type);
         param_count++;
-        param = (AstNodeLocal *) param->base.next;
+        param = (AstLocal *) param->base.next;
     }
     *(t++) = ':';
 
@@ -773,9 +773,9 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstNodeFunction* fd) {
     return type_idx;
 }
 
-static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
+static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     // NOTE: Don't compile intrinsics
-    if (fd->base.flags & ONYX_AST_FLAG_INTRINSIC) return;
+    if (fd->base.flags & Ast_Flag_Intrinsic) return;
 
     i32 type_idx = generate_type_idx(mod, fd);
 
@@ -792,7 +792,7 @@ static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
 
     bh_arr_new(mod->allocator, wasm_func.code, 4);
 
-    if (fd->base.flags & ONYX_AST_FLAG_EXPORTED) {
+    if (fd->base.flags & Ast_Flag_Exported) {
         onyx_token_null_toggle(fd->base.token);
 
         i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) fd);
@@ -811,7 +811,7 @@ static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
     if (fd->body != NULL) {
         // NOTE: Generate the local map
         i32 localidx = 0;
-        for (AstNodeLocal *param = fd->params; param != NULL; param = (AstNodeLocal *) param->base.next) {
+        for (AstLocal *param = fd->params; param != NULL; param = (AstLocal *) param->base.next) {
             bh_imap_put(&mod->local_map, (u64) param, localidx++);
         }
 
@@ -821,7 +821,7 @@ static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
         // is the same as the order of the local_types above
         u8* count = &wasm_func.locals.i32_count;
         fori (ti, 0, 3) {
-            forll (AstNodeLocal, local, fd->body->locals->last_local, prev_local) {
+            forll (AstLocal, local, fd->body->locals->last_local, prev_local) {
                 if (onyx_type_to_wasm_type(local->base.type) == local_types[ti]) {
                     bh_imap_put(&mod->local_map, (u64) local, localidx++);
 
@@ -846,10 +846,10 @@ static void compile_function(OnyxWasmModule* mod, AstNodeFunction* fd) {
     bh_imap_clear(&mod->local_map);
 }
 
-static void compile_global_declaration(OnyxWasmModule* module, AstNodeGlobal* global) {
+static void compile_global_declaration(OnyxWasmModule* module, AstGlobal* global) {
     WasmGlobal glob = {
         .type = onyx_type_to_wasm_type(global->base.type),
-        .mutable = (global->base.flags & ONYX_AST_FLAG_CONST) == 0,
+        .mutable = (global->base.flags & Ast_Flag_Const) == 0,
         .initial_value = NULL,
     };
 
@@ -861,7 +861,7 @@ static void compile_global_declaration(OnyxWasmModule* module, AstNodeGlobal* gl
         return;
     }
 
-    if ((global->base.flags & ONYX_AST_FLAG_EXPORTED) != 0) {
+    if ((global->base.flags & Ast_Flag_Exported) != 0) {
         onyx_token_null_toggle(global->base.token);
 
         i32 global_idx = (i32) bh_imap_get(&module->func_map, (u64) global);
@@ -880,9 +880,9 @@ static void compile_global_declaration(OnyxWasmModule* module, AstNodeGlobal* gl
     bh_arr_push(module->globals, glob);
 }
 
-static void compile_foreign(OnyxWasmModule* module, AstNodeForeign* foreign) {
-    if (foreign->import->kind == AST_NODE_KIND_FUNCTION) {
-        i32 type_idx = generate_type_idx(module, (AstNodeFunction *) foreign->import);
+static void compile_foreign(OnyxWasmModule* module, AstForeign* foreign) {
+    if (foreign->import->kind == Ast_Kind_Function) {
+        i32 type_idx = generate_type_idx(module, (AstFunction *) foreign->import);
 
         WasmImport import = {
             .kind = WASM_FOREIGN_FUNCTION,
@@ -893,8 +893,8 @@ static void compile_foreign(OnyxWasmModule* module, AstNodeForeign* foreign) {
 
         bh_arr_push(module->imports, import);
 
-    } else if (foreign->import->kind == AST_NODE_KIND_GLOBAL) {
-        WasmType global_type = onyx_type_to_wasm_type(((AstNodeGlobal *) foreign->import)->base.type);
+    } else if (foreign->import->kind == Ast_Kind_Global) {
+        WasmType global_type = onyx_type_to_wasm_type(((AstGlobal *) foreign->import)->base.type);
 
         WasmImport import = {
             .kind = WASM_FOREIGN_GLOBAL,
@@ -959,14 +959,14 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
 void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program) {
 
     // NOTE: First, introduce all indicies for globals and functions
-    bh_arr_each(AstNodeForeign *, foreign, program->foreigns) {
-        AstNodeKind import_kind = (*foreign)->import->kind;
+    bh_arr_each(AstForeign *, foreign, program->foreigns) {
+        AstKind import_kind = (*foreign)->import->kind;
 
-        if (import_kind == AST_NODE_KIND_FUNCTION) {
+        if (import_kind == Ast_Kind_Function) {
             module->next_func_idx++;
             bh_imap_put(&module->func_map, (u64) (*foreign)->import, module->next_import_func_idx++);
         }
-        else if (import_kind == AST_NODE_KIND_GLOBAL) {
+        else if (import_kind == Ast_Kind_Global) {
             module->next_global_idx++;
             bh_imap_put(&module->global_map, (u64) (*foreign)->import, module->next_import_global_idx++);
         }
@@ -974,20 +974,20 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program) {
         compile_foreign(module, *foreign);
     }
 
-    bh_arr_each(AstNodeFunction *, function, program->functions) {
-        if (((*function)->base.flags & ONYX_AST_FLAG_INTRINSIC) == 0)
+    bh_arr_each(AstFunction *, function, program->functions) {
+        if (((*function)->base.flags & Ast_Flag_Intrinsic) == 0)
             bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
     }
 
-    bh_arr_each(AstNodeGlobal *, global, program->globals)
+    bh_arr_each(AstGlobal *, global, program->globals)
         bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
 
 
     // NOTE: Then, compile everything
-    bh_arr_each(AstNodeFunction *, function, program->functions)
+    bh_arr_each(AstFunction *, function, program->functions)
         compile_function(module, *function);
 
-    bh_arr_each(AstNodeGlobal *, global, program->globals)
+    bh_arr_each(AstGlobal *, global, program->globals)
         compile_global_declaration(module, *global);
 }
 

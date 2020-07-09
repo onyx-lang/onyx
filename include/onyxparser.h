@@ -20,8 +20,8 @@ typedef struct OnyxParser {
     bh_allocator allocator;
 } OnyxParser;
 
-const char* onyx_ast_node_kind_string(AstNodeKind kind);
-void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstNodeKind kind);
+const char* onyx_ast_node_kind_string(AstKind kind);
+void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind);
 OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
 void onyx_parser_free(OnyxParser* parser);
 bh_arr(AstNode *) onyx_parse(OnyxParser *parser);
