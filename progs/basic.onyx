@@ -1,0 +1,9 @@
+use "progs/intrinsics"
+
+test :: proc (a: bool) -> i32 {
+    return 0;
+}
+
+export main :: proc {
+    a : i32 = 0;
+}

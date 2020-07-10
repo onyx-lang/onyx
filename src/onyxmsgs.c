@@ -63,7 +63,7 @@ static void print_detailed_message(OnyxMessage* msg, bh_file_contents* fc) {
 
 void onyx_message_print(OnyxMessages* msgs) {
     OnyxMessage* msg = msgs->first;
-    i32 msg_count = 3;
+    i32 msg_count = 1000;
 
     while (msg && msg_count-- > 0) {
         if (msg->pos.filename) {

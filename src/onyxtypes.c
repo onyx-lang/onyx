@@ -1,5 +1,7 @@
 #include "onyxtypes.h"
+#include "onyxastnodes.h"
 
+// NOTE: These have to be in the same order as Basiuc
 Type basic_types[] = {
     { Type_Kind_Basic, { Basic_Kind_Void,                    0,                       0, "void"   } },
 
@@ -46,4 +48,27 @@ b32 types_are_compatible(Type* t1, Type* t2) {
     }
 
     return 0;
+}
+
+Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
+    if (type_node == NULL) return NULL;
+
+    switch (type_node->kind) {
+        case Ast_Kind_Pointer_Type: {
+            TypePointer* ptr_type = bh_alloc_item(alloc, TypePointer);
+
+            ptr_type->base.flags |= Basic_Flag_Pointer;
+            ptr_type->base.size = 4;
+            ptr_type->elem = type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem);
+
+            return (Type *) ptr_type;
+        }
+
+        case Ast_Kind_Basic_Type:
+            return ((AstBasicType *) type_node)->type;
+
+        default:
+            assert(("Node is not a type node", 0));
+            return NULL;
+    }
 }

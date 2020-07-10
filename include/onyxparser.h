@@ -12,9 +12,6 @@ typedef struct OnyxParser {
     OnyxToken *prev_token;
     OnyxToken *curr_token;
 
-    // NOTE: Identifiers currently is only used to resolve type names
-    // at parse time, since these are the only symbols we know.
-    bh_table(AstNode *) identifiers;
     OnyxMessages *msgs;
 
     bh_allocator allocator;

@@ -48,7 +48,7 @@ typedef struct Type Type;
 
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                       \
-    TYPE_KIND(Pointer, struct { Type *elem; })
+    TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })
 
 typedef enum TypeKind {
     Type_Kind_Invalid,
@@ -82,5 +82,8 @@ struct Type {
 
 extern Type basic_types[];
 
+struct AstType;
+b32 types_are_compatible(Type* t1, Type* t2);
+Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 
 #endif // #ifndef ONYX_TYPES

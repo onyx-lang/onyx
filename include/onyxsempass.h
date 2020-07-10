@@ -22,7 +22,7 @@ typedef struct OnyxSemPassState {
     AstLocalGroup* curr_local_group;
 
     // NOTE: Used in type checking phase
-    TypeInfo* expected_return_type;
+    Type* expected_return_type;
 
     // NOTE: All symbols a given point that we can resolve
     bh_table(SemPassSymbol *) symbols;

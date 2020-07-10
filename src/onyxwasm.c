@@ -195,15 +195,23 @@ static const char* wi_string(WasmInstructionType wit) {
     }
 }
 
-static WasmType onyx_type_to_wasm_type(TypeInfo* type) {
-    if (type->is_bool) return WASM_TYPE_INT32;
-    else if (type->is_int) {
-        if (type->size == 4) return WASM_TYPE_INT32;
-        if (type->size == 8) return WASM_TYPE_INT64;
+static WasmType onyx_type_to_wasm_type(Type* type) {
+    if (type->kind == Type_Kind_Pointer) {
+        return WASM_TYPE_INT32;
     }
-    else if (type->is_float) {
-        if (type->size == 4) return WASM_TYPE_FLOAT32;
-        if (type->size == 8) return WASM_TYPE_FLOAT64;
+
+    if (type->kind == Type_Kind_Basic) {
+        TypeBasic* basic = &type->Basic;
+        if (basic->flags & Basic_Flag_Boolean) return WASM_TYPE_INT32;
+        if (basic->flags & Basic_Flag_Integer) {
+            if (basic->size <= 4) return WASM_TYPE_INT32;
+            if (basic->size == 8) return WASM_TYPE_INT64;
+        }
+        if (basic->flags & Basic_Flag_Float) {
+            if (basic->size <= 4) return WASM_TYPE_FLOAT32;
+            if (basic->size == 8) return WASM_TYPE_FLOAT64;;
+        }
+        if (basic->size == 0) return WASM_TYPE_VOID;
     }
 
     return WASM_TYPE_VOID;
@@ -457,7 +465,7 @@ static void compile_binop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, A
     // Unsigned instructions are always right after
     // the signed equivalent
     if (is_sign_significant) {
-        if (binop->left->type->is_unsigned) {
+        if (binop->left->type->Basic.flags & Basic_Flag_Unsigned) {
             binop_instr = (WasmInstructionType) ((i32) binop_instr + 1);
         }
     }
@@ -476,25 +484,29 @@ static void compile_unaryop(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode,
     switch (unop->operation) {
         case Unary_Op_Negate:
             {
-                TypeInfoKind type_kind = unop->base.type->kind;
+                TypeBasic* type = &unop->base.type->Basic;
 
-                if (type_kind == TYPE_INFO_KIND_INT32) {
+                if (type->kind == Basic_Kind_I32
+                        || type->kind == Basic_Kind_I16
+                        || type->kind == Basic_Kind_I8) {
                     WID(WI_I32_CONST, 0x00);
                     compile_expression(mod, &code, unop->expr);
                     WI(WI_I32_SUB);
 
-                } else if (type_kind == TYPE_INFO_KIND_INT64) {
+                }
+                else if (type->kind == Basic_Kind_I64) {
                     WID(WI_I64_CONST, 0x00);
                     compile_expression(mod, &code, unop->expr);
                     WI(WI_I64_SUB);
 
-                } else {
+                }
+                else {
                     compile_expression(mod, &code, unop->expr);
 
-                    if (type_kind == TYPE_INFO_KIND_FLOAT32)
+                    if (type->kind == Basic_Kind_F32)
                         WI(WI_F32_NEG);
 
-                    if (type_kind == TYPE_INFO_KIND_FLOAT64)
+                    if (type->kind == Basic_Kind_F64)
                         WI(WI_F64_NEG);
                 }
 
@@ -687,28 +699,34 @@ static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, As
 
     compile_expression(mod, &code, cast->expr);
 
-    TypeInfo* from = cast->expr->type;
-    TypeInfo* to = cast->base.type;
+    Type* from = cast->expr->type;
+    Type* to = cast->base.type;
 
     i32 fromidx = 0, toidx = 0;
-    if (from->is_int) {
-        if (from->size == 4 && !from->is_unsigned) fromidx = 0;
-        else if (from->size == 4 && from->is_unsigned) fromidx = 1;
-        else if (from->size == 8 && !from->is_unsigned) fromidx = 2;
-        else if (from->size == 8 && from->is_unsigned) fromidx = 3;
-    } else if (from->is_float) {
-        if (from->size == 4) fromidx = 4;
-        else if (from->size == 8) fromidx = 5;
+    if (from->Basic.flags & Basic_Flag_Numeric) {
+        b32 unsign = (from->Basic.flags & Basic_Flag_Unsigned) != 0;
+
+        if (from->Basic.size == 4 && !unsign) fromidx = 0;
+        else if (from->Basic.size == 4 && unsign) fromidx = 1;
+        else if (from->Basic.size == 8 && !unsign) fromidx = 2;
+        else if (from->Basic.size == 8 && unsign) fromidx = 3;
+    }
+    else if (from->Basic.flags & Basic_Flag_Float) {
+        if (from->Basic.size == 4) fromidx = 4;
+        else if (from->Basic.size == 8) fromidx = 5;
     }
 
-    if (to->is_int) {
-        if (to->size == 4 && !to->is_unsigned) toidx = 0;
-        else if (to->size == 4 && to->is_unsigned) toidx = 1;
-        else if (to->size == 8 && !to->is_unsigned) toidx = 2;
-        else if (to->size == 8 && to->is_unsigned) toidx = 3;
-    } else if (to->is_float) {
-        if (to->size == 4) toidx = 4;
-        else if (to->size == 8) toidx = 5;
+    if (to->Basic.flags & Basic_Flag_Numeric) {
+        b32 unsign = (to->Basic.flags & Basic_Flag_Unsigned) != 0;
+
+        if (to->Basic.size == 4 && !unsign) toidx = 0;
+        else if (to->Basic.size == 4 && unsign) toidx = 1;
+        else if (to->Basic.size == 8 && !unsign) toidx = 2;
+        else if (to->Basic.size == 8 && unsign) toidx = 3;
+    }
+    else if (to->Basic.flags & Basic_Flag_Float) {
+        if (to->Basic.size == 4) toidx = 4;
+        else if (to->Basic.size == 8) toidx = 5;
     }
 
     WasmInstructionType cast_op = cast_map[fromidx][toidx];
