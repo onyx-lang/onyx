@@ -1,9 +1,17 @@
 use "progs/intrinsics"
 
+pointer_test :: proc {
+    p : ^i32 = 0 as ^i32;
+}
+
+print :: foreign "host" "print" proc (val: i32) ---
+
 test :: proc (a: bool) -> i32 {
     return 0;
 }
 
 export main :: proc {
     a : i32 = 0;
+
+    print(a);
 }

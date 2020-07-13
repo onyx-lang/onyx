@@ -395,7 +395,8 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                 AstType* type_node = NULL;
 
                 // NOTE: var: type
-                if (parser->curr_token->type == Token_Type_Symbol) {
+                if (parser->curr_token->type != ':'
+                        && parser->curr_token->type != '=') {
                     type_node = parse_type(parser);
                 }
 
@@ -621,6 +622,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
     while (1) {
         if (parser->curr_token->type == '^') {
+            parser_next_token(parser);
             AstPointerType* new = make_node(AstPointerType, Ast_Kind_Pointer_Type);
             *next_insertion = (AstType *) new;
             next_insertion = &new->elem;

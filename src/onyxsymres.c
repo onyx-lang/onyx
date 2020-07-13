@@ -324,6 +324,12 @@ void onyx_resolve_symbols(OnyxSemPassState* state, OnyxProgram* program) {
             if (!symbol_unique_introduce(state, (*foreign)->import)) return;
     }
 
+    bh_arr_each(AstForeign *, foreign, program->foreigns) {
+        if ((*foreign)->import->kind == Ast_Kind_Function) {
+            symres_function(state, (AstFunction *) (*foreign)->import);
+        }
+    }
+
 
     // NOTE: Then, resolve all symbols in all functions
     bh_arr_each(AstFunction *, function, program->functions)
