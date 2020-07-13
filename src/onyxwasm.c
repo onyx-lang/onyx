@@ -703,7 +703,7 @@ static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, As
     Type* to = cast->base.type;
 
     i32 fromidx = 0, toidx = 0;
-    if (from->Basic.flags & Basic_Flag_Numeric) {
+    if (from->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (from->Basic.flags & Basic_Flag_Unsigned) != 0;
 
         if (from->Basic.size == 4 && !unsign) fromidx = 0;
@@ -716,7 +716,7 @@ static void compile_cast(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, As
         else if (from->Basic.size == 8) fromidx = 5;
     }
 
-    if (to->Basic.flags & Basic_Flag_Numeric) {
+    if (to->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (to->Basic.flags & Basic_Flag_Unsigned) != 0;
 
         if (to->Basic.size == 4 && !unsign) toidx = 0;

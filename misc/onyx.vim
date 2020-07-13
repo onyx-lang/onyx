@@ -16,11 +16,14 @@ syn keyword onyxKeyword for while loop return do
 syn keyword onyxKeyword break continue return
 syn keyword onyxKeyword as
 
-syn keyword onyxType unknown bool
+syn keyword onyxType unknown bool void
+syn keyword onyxType i8 u8
+syn keyword onyxType i16 u16
 syn keyword onyxType i32 u32
 syn keyword onyxType i64 u64
 syn keyword onyxType f32
 syn keyword onyxType f64
+syn keyword onyxType rawptr
 
 syn keyword onyxConstant        true false
 
