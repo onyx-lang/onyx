@@ -84,3 +84,7 @@ const char* type_get_name(Type* type) {
         default: return "unknown";
     }
 }
+
+b32 type_is_pointer(Type* type) {
+    return type->kind == Type_Kind_Pointer || (type->Basic.flags & Basic_Flag_Pointer) != 0;
+}

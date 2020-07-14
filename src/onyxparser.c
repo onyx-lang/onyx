@@ -169,6 +169,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstArgument* curr = NULL;
                 while (parser->curr_token->type != ')') {
                     curr = make_node(AstArgument, Ast_Kind_Argument);
+                    curr->base.token = parser->curr_token;
                     curr->value = parse_expression(parser);
 
                     if (curr != NULL && curr->base.kind != Ast_Kind_Error) {
@@ -203,7 +204,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case Token_Type_Literal_True:
             {
                 AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_Literal);
-                bool_node->base.type_node = (AstType *) &basic_type_i8;
+                bool_node->base.type_node = (AstType *) &basic_type_bool;
                 bool_node->base.token = expect(parser, Token_Type_Literal_True);
                 bool_node->value.i = 1;
                 retval = (AstTyped *) bool_node;
@@ -213,7 +214,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case Token_Type_Literal_False:
             {
                 AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_Literal);
-                bool_node->base.type_node = (AstType *) &basic_type_i8;
+                bool_node->base.type_node = (AstType *) &basic_type_bool;
                 bool_node->base.token = expect(parser, Token_Type_Literal_False);
                 bool_node->value.i = 0;
                 retval = (AstTyped *) bool_node;
@@ -465,12 +466,12 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                 else if (parser->curr_token->type == Token_Type_Fslash_Equal)  bin_op = Binary_Op_Divide;
                 else if (parser->curr_token->type == Token_Type_Percent_Equal) bin_op = Binary_Op_Modulus;
 
-                parser_next_token(parser);
-
-                AstTyped* expr = parse_expression(parser);
-
                 AstBinaryOp* bin_op_node = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
                 bin_op_node->operation = bin_op;
+                bin_op_node->base.token = parser->curr_token;
+
+                parser_next_token(parser);
+                AstTyped* expr = parse_expression(parser);
 
                 AstNode* bin_op_left = make_node(AstNode, Ast_Kind_Symbol);
                 bin_op_left->token = symbol;
@@ -478,6 +479,7 @@ static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
                 bin_op_node->right = expr;
 
                 AstAssign* assign_node = make_node(AstAssign, Ast_Kind_Assignment);
+                assign_node->base.token = bin_op_node->base.token;
 
                 // TODO: Maybe I don't need to make another lval node?
                 AstNode* lval = make_node(AstNode, Ast_Kind_Symbol);
@@ -624,6 +626,7 @@ static AstType* parse_type(OnyxParser* parser) {
         if (parser->curr_token->type == '^') {
             parser_next_token(parser);
             AstPointerType* new = make_node(AstPointerType, Ast_Kind_Pointer_Type);
+            new->base.flags |= Basic_Flag_Pointer;
             *next_insertion = (AstType *) new;
             next_insertion = &new->elem;
         }

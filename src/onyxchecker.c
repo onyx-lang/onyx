@@ -23,10 +23,6 @@ static void check_assignment(OnyxSemPassState* state, AstAssign* assign) {
         return;
     }
 
-    if (assign->lval->type == NULL) {
-        assign->lval->type = type_build_from_ast(state->node_allocator, assign->lval->type_node);
-    }
-
     if ((assign->lval->flags & Ast_Flag_Const) != 0 && assign->lval->type != NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_ASSIGN_CONST,
@@ -41,6 +37,10 @@ static void check_assignment(OnyxSemPassState* state, AstAssign* assign) {
                 assign->base.token->pos,
                 assign->lval->token->text, assign->lval->token->length);
         return;
+    }
+
+    if (assign->lval->type == NULL) {
+        assign->lval->type = type_build_from_ast(state->node_allocator, assign->lval->type_node);
     }
 
     check_expression(state, assign->expr);
@@ -216,7 +216,7 @@ static void check_call(OnyxSemPassState* state, AstCall* call) {
         if (!types_are_compatible(formal_param->base.type, actual_param->base.type)) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_FUNCTION_PARAM_TYPE_MISMATCH,
-                    actual_param->value->token->pos,
+                    actual_param->base.token->pos,
                     callee->base.token->text, callee->base.token->length,
                     type_get_name(formal_param->base.type),
                     arg_pos,
@@ -266,10 +266,8 @@ static void check_binaryop(OnyxSemPassState* state, AstBinaryOp* binop) {
         return;
     }
 
-    if (binop->left->type->kind == Type_Kind_Pointer
-            || binop->right->type->kind == Type_Kind_Pointer
-            || (binop->left->type->Basic.flags & Basic_Flag_Pointer)
-            || (binop->right->type->Basic.flags & Basic_Flag_Pointer)) {
+    if (type_is_pointer(binop->left->type)
+            || type_is_pointer(binop->right->type)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
                 binop->base.token->pos,
@@ -309,8 +307,6 @@ static void check_expression(OnyxSemPassState* state, AstTyped* expr) {
 
             if (((AstUnaryOp *) expr)->operation != Unary_Op_Cast) {
                 expr->type = ((AstUnaryOp *) expr)->expr->type;
-            } else {
-                expr->type = type_build_from_ast(state->node_allocator, expr->type_node);
             }
             break;
 

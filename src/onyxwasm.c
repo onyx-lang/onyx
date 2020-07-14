@@ -252,6 +252,7 @@ static void compile_function_body(OnyxWasmModule* mod, bh_arr(WasmInstruction)* 
 static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, AstBlock* block) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    bh_arr_push(mod->structured_jump_target, 1);
     WID(WI_BLOCK_START, 0x40);
 
     forll (AstNode, stmt, block->body, next) {
@@ -259,6 +260,7 @@ static void compile_block(OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, A
     }
 
     WI(WI_BLOCK_END);
+    bh_arr_pop(mod->structured_jump_target);
 
     *pcode = code;
 }
@@ -424,7 +426,7 @@ static const WasmInstructionType binop_map[][4] = {
     /* REM */ { WI_I32_REM_S, WI_I64_REM_S, WI_NOP,     WI_NOP     },
 
     /* EQ  */ { WI_I32_EQ,    WI_I64_EQ,    WI_F32_EQ,  WI_F64_EQ },
-    /* NEQ */ { WI_NOP,       WI_NOP,       WI_F32_NE , WI_F64_NE },
+    /* NEQ */ { WI_I32_NE,    WI_I64_NE,    WI_F32_NE , WI_F64_NE },
     /* LT  */ { WI_I32_LT_S,  WI_I64_LT_S,  WI_F32_LT,  WI_F64_LT },
     /* LTE */ { WI_I32_LE_S,  WI_I64_LE_S,  WI_F32_LE,  WI_F64_LE },
     /* GT  */ { WI_I32_GT_S,  WI_I64_GT_S,  WI_F32_GT,  WI_F64_GT },

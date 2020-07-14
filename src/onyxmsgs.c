@@ -2,6 +2,8 @@
 #include "onyxmsgs.h"
 #include "onyxutils.h"
 
+#define MAX_MSGS 5
+
 static const char* msg_formats[] = {
     "%s",
     "expected token '%s', got '%s'",
@@ -63,7 +65,7 @@ static void print_detailed_message(OnyxMessage* msg, bh_file_contents* fc) {
 
 void onyx_message_print(OnyxMessages* msgs) {
     OnyxMessage* msg = msgs->first;
-    i32 msg_count = 1000;
+    i32 msg_count = MAX_MSGS;
 
     while (msg && msg_count-- > 0) {
         if (msg->pos.filename) {

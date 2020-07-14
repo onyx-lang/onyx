@@ -87,4 +87,6 @@ b32 types_are_compatible(Type* t1, Type* t2);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 const char* type_get_name(Type* type);
 
+b32 type_is_pointer(Type* type);
+
 #endif // #ifndef ONYX_TYPES
