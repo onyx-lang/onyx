@@ -26,24 +26,25 @@ typedef enum TokenType {
 
     Token_Type_Right_Arrow          = 272,
     Token_Type_Left_Arrow           = 273,
+    Token_Type_Empty_Block          = 274,
 
-    Token_Type_Greater_Equal        = 274,
-    Token_Type_Less_Equal           = 275,
-    Token_Type_Equal_Equal          = 276,
-    Token_Type_Not_Equal            = 277,
-    Token_Type_Plus_Equal           = 278,
-    Token_Type_Minus_Equal          = 279,
-    Token_Type_Star_Equal           = 280,
-    Token_Type_Fslash_Equal         = 281,
-    Token_Type_Percent_Equal        = 282,
+    Token_Type_Greater_Equal        = 275,
+    Token_Type_Less_Equal           = 276,
+    Token_Type_Equal_Equal          = 277,
+    Token_Type_Not_Equal            = 278,
+    Token_Type_Plus_Equal           = 279,
+    Token_Type_Minus_Equal          = 280,
+    Token_Type_Star_Equal           = 281,
+    Token_Type_Fslash_Equal         = 282,
+    Token_Type_Percent_Equal        = 283,
 
-    Token_Type_Symbol               = 283,
-    Token_Type_Literal_String       = 284,
-    Token_Type_Literal_Numeric      = 285,
-    Token_Type_Literal_True         = 286,
-    Token_Type_Literal_False        = 287,
+    Token_Type_Symbol               = 284,
+    Token_Type_Literal_String       = 285,
+    Token_Type_Literal_Numeric      = 286,
+    Token_Type_Literal_True         = 287,
+    Token_Type_Literal_False        = 288,
 
-    Token_Type_Count                = 288
+    Token_Type_Count                = 289,
 } TokenType;
 
 typedef struct OnyxFilePos {

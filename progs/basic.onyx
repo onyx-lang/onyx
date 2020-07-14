@@ -10,10 +10,25 @@ test :: proc (a: bool) -> bool {
     return !a;
 }
 
+foo :: proc (n: i32) -> i32 {
+    a :: shl_i32(n, 1);
+    b :: shl_i32(n, 2);
+    return or_i32(a, b);
+}
+
 export main :: proc {
-    a : i32 = 0;
+    a := 16;
+    print(clz_i32(a));
+
+    b := 1 + foo(2);
+    print(b);
+
+    if b == 13
+        ---
+    else {
+        print(1024);
+    }
 
     cond :: true;
-
     print(test(cond) as i32);
 }

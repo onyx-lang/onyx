@@ -244,7 +244,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             return NULL;
     }
 
-    if (parser->curr_token->type == Token_Type_Keyword_Cast) {
+    while (parser->curr_token->type == Token_Type_Keyword_Cast) {
         parser_next_token(parser);
 
         AstUnaryOp* cast_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
@@ -605,11 +605,9 @@ static AstBlock* parse_block(OnyxParser* parser) {
     AstLocalGroup* lg = make_node(AstLocalGroup, Ast_Kind_Local_Group);
     block->locals = lg;
 
-    // --- is for an empty block
-    if (parser->curr_token->type == '-') {
-        expect(parser, '-');
-        expect(parser, '-');
-        expect(parser, '-');
+    // NOTE: --- is for an empty block
+    if (parser->curr_token->type == Token_Type_Empty_Block) {
+        expect(parser, Token_Type_Empty_Block);
         return block;
     }
 

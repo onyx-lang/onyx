@@ -242,7 +242,7 @@ static b32 symres_statement(OnyxSemPassState* state, AstNode* stmt) {
         case Ast_Kind_Assignment: symres_assignment(state, (AstAssign *) stmt);            return 0;
         case Ast_Kind_Return:     symres_return(state, (AstReturn *) stmt);                return 0;
         case Ast_Kind_If:         symres_if(state, (AstIf *) stmt);                        return 0;
-        case Ast_Kind_While:      symres_while(state, (AstWhile *) stmt);                 return 0;
+        case Ast_Kind_While:      symres_while(state, (AstWhile *) stmt);                  return 0;
         case Ast_Kind_Call:       symres_call(state, (AstCall *) stmt);                    return 0;
         case Ast_Kind_Argument:   symres_expression(state, (AstTyped **) &((AstArgument *)stmt)->value); return 0;
         case Ast_Kind_Block:      symres_block(state, (AstBlock *) stmt);                  return 0;

@@ -8,32 +8,33 @@ static const char* token_type_names[] = {
 
     "TOKEN_TYPE_COMMENT",
 
-    "struct",        //"TOKEN_TYPE_KEYWORD_STRUCT",
-    "use",            //"TOKEN_TYPE_KEYWORD_USE",
-    "export",        //"TOKEN_TYPE_KEYWORD_EXPORT",
-    "if",            //"TOKEN_TYPE_KEYWORD_IF",
-    "else",            //"TOKEN_TYPE_KEYWORD_ELSE",
-    "elseif",        //"TOKEN_TYPE_KEYWORD_ELSEIF",
-    "return",        //"TOKEN_TYPE_KEYWORD_RETURN",
-    "foreign",        //"TOKEN_TYPE_KEYWORD_FOREIGN",
-    "proc",            //"TOKEN_TYPE_KEYWORD_PROC",
-    "as",             //"TOKEN_TYPE_KEYWORD_CAST",
-    "while",        //"TOKEN_TYPE_KEYWORD_WHILE",
-    "break",        //"TOKEN_TYPE_KEYWORD_BREAK",
-    "continue",     //"TOKEN_TYPE_KEYWORD_CONTINUE,
+    "struct",
+    "use",
+    "export",
+    "if",
+    "else",
+    "elseif",
+    "return",
+    "foreign",
+    "proc",
+    "as",
+    "while",
+    "break",
+    "continue",
 
-    "->", //"TOKEN_TYPE_RIGHT_ARROW",
-    "<-", //"TOKEN_TYPE_LEFT_ARROW",
+    "->",
+    "<-",
+    "---",
 
-    ">=", // "TOKEN_TYPE_SYM_GREATER_EQUAL",
-    "<=", // "TOKEN_TYPE_SYM_LESS_EQUAL",
-    "==", // "TOKEN_TYPE_SYM_EQUALS_EQUALS",
-    "!=", // "TOKEN_TYPE_SYM_NOT_EQUAL",
-    "+=", // "TOKEN_TYPE_SYM_PLUS_EQUAL",
-    "-=", // "TOKEN_TYPE_SYM_MINUS_EQUAL",
-    "*=", // "TOKEN_TYPE_SYM_STAR_EQUAL",
-    "/=", // "TOKEN_TYPE_SYM_FSLASH_EQUAL",
-    "%=", // "TOKEN_TYPE_SYM_PERCENT_EQUAL",
+    ">=",
+    "<=",
+    "==",
+    "!=",
+    "+=",
+    "-=",
+    "*=",
+    "/=",
+    "%=",
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
@@ -144,6 +145,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     LITERAL_TOKEN("false",      1, Token_Type_Literal_False);
     LITERAL_TOKEN("->",         0, Token_Type_Right_Arrow);
     LITERAL_TOKEN("<-",         0, Token_Type_Right_Arrow);
+    LITERAL_TOKEN("---",        0, Token_Type_Empty_Block);
     LITERAL_TOKEN("<=",         0, Token_Type_Less_Equal);
     LITERAL_TOKEN(">=",         0, Token_Type_Greater_Equal);
     LITERAL_TOKEN("==",         0, Token_Type_Equal_Equal);
