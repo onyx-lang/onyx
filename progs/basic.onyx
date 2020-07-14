@@ -6,12 +6,14 @@ pointer_test :: proc {
 
 print :: foreign "host" "print" proc (val: i32) ---
 
-test :: proc (a: bool) -> i32 {
-    return 0;
+test :: proc (a: bool) -> bool {
+    return !a;
 }
 
 export main :: proc {
     a : i32 = 0;
 
-    print(a);
+    cond :: true;
+
+    print(test(cond) as i32);
 }

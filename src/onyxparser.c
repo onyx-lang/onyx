@@ -149,6 +149,21 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
+        case '!':
+            {
+                AstUnaryOp* not_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+                not_node->operation = Unary_Op_Not;
+                not_node->base.token = expect(parser, '!');
+                not_node->expr = parse_factor(parser);
+
+                if ((not_node->expr->flags & Ast_Flag_Comptime) != 0) {
+                    not_node->base.flags |= Ast_Flag_Comptime;
+                }
+
+                retval = (AstTyped *) not_node;
+                break;
+            }
+
         case Token_Type_Symbol:
             {
                 OnyxToken* sym_token = expect(parser, Token_Type_Symbol);
