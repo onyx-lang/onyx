@@ -27,19 +27,20 @@ static void parser_next_token(OnyxParser* parser);
 static void parser_prev_token(OnyxParser* parser);
 static b32 is_terminating_token(TokenType token_type);
 static OnyxToken* expect(OnyxParser* parser, TokenType token_type);
-static AstNumLit* parse_numeric_literal(OnyxParser* parser);
-static AstTyped* parse_factor(OnyxParser* parser);
-static AstTyped* parse_expression(OnyxParser* parser);
-static AstIf* parse_if_stmt(OnyxParser* parser);
-static AstWhile* parse_while_stmt(OnyxParser* parser);
-static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret);
-static AstReturn* parse_return_statement(OnyxParser* parser);
-static AstBlock* parse_block(OnyxParser* parser);
-static AstNode* parse_statement(OnyxParser* parser);
-static AstType* parse_type(OnyxParser* parser);
-static AstLocal* parse_function_params(OnyxParser* parser);
+
+static AstNumLit*   parse_numeric_literal(OnyxParser* parser);
+static AstTyped*    parse_factor(OnyxParser* parser);
+static AstTyped*    parse_expression(OnyxParser* parser);
+static AstIf*       parse_if_stmt(OnyxParser* parser);
+static AstWhile*    parse_while_stmt(OnyxParser* parser);
+static b32          parse_symbol_statement(OnyxParser* parser, AstNode** ret);
+static AstReturn*   parse_return_statement(OnyxParser* parser);
+static AstBlock*    parse_block(OnyxParser* parser);
+static AstNode*     parse_statement(OnyxParser* parser);
+static AstType*     parse_type(OnyxParser* parser);
+static AstLocal*    parse_function_params(OnyxParser* parser);
 static AstFunction* parse_function_definition(OnyxParser* parser);
-static AstNode* parse_top_level_statement(OnyxParser* parser);
+static AstNode*     parse_top_level_statement(OnyxParser* parser);
 
 static void parser_next_token(OnyxParser* parser) {
     parser->prev_token = parser->curr_token;
@@ -233,6 +234,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 bool_node->base.token = expect(parser, Token_Type_Literal_False);
                 bool_node->value.i = 0;
                 retval = (AstTyped *) bool_node;
+                break;
+            }
+
+        case Token_Type_Keyword_Proc:
+            {
+                AstFunction* func_node = parse_function_definition(parser);
+
+                bh_arr_push(parser->results.nodes_to_process, (AstNode *) func_node);
+
+                retval = (AstTyped *) func_node;
                 break;
             }
 
@@ -736,6 +747,26 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             func_def->base.flags |= Ast_Flag_Inline;
         }
 
+        else if (parse_possible_directive(parser, "foreign")) {
+            func_def->foreign_module = expect(parser, Token_Type_Literal_String);
+            func_def->foreign_name   = expect(parser, Token_Type_Literal_String);
+
+            func_def->base.flags |= Ast_Flag_Foreign;
+        }
+
+        else if (parse_possible_directive(parser, "export")) {
+            func_def->base.flags |= Ast_Flag_Exported;
+
+            if (parser->curr_token->type == Token_Type_Literal_String) {
+                OnyxToken* str_token = expect(parser, Token_Type_Literal_String);
+                func_def->exported_name =
+                    bh_aprintf(global_heap_allocator,
+                            "%b",
+                            str_token->text,
+                            str_token->length);
+            }
+        }
+
         else {
             OnyxToken* directive_token = expect(parser, '#');
             OnyxToken* symbol_token = expect(parser, Token_Type_Symbol);
@@ -764,50 +795,52 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
     return func_def;
 }
 
-static AstNode* parse_foreign(OnyxParser* parser) {
-    expect(parser, Token_Type_Keyword_Foreign);
+// static AstNode* parse_foreign(OnyxParser* parser) {
+//     expect(parser, Token_Type_Keyword_Foreign);
+//
+//     AstForeign* foreign = make_node(AstForeign, Ast_Kind_Foreign);
+//     foreign->mod_token = expect(parser, Token_Type_Literal_String);
+//     foreign->name_token = expect(parser, Token_Type_Literal_String);
+//
+//     if (parser->curr_token->type == Token_Type_Keyword_Proc) {
+//         foreign->import = (AstNode *) parse_function_definition(parser);
+//
+//     } else {
+//         AstType* type = parse_type(parser);
+//
+//         AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
+//         global->base.type_node = type;
+//         global->base.flags |= Ast_Flag_Lval;
+//
+//         foreign->import = (AstNode *) global;
+//     }
+//
+//     return (AstNode *) foreign;
+// }
 
-    AstForeign* foreign = make_node(AstForeign, Ast_Kind_Foreign);
-    foreign->mod_token = expect(parser, Token_Type_Literal_String);
-    foreign->name_token = expect(parser, Token_Type_Literal_String);
+static AstTyped* parse_top_level_constant_symbol(OnyxParser* parser) {
+//     if (parser->curr_token->type == Token_Type_Keyword_Proc) {
+//        return (AstNode *) parse_function_definition(parser);
+//
+//    } else if (parser->curr_token->type == Token_Type_Keyword_Struct) {
+//        // Handle struct case
+//        assert(0);
+//
+//    } else if (parser->curr_token->type == Token_Type_Keyword_Foreign) {
+//        return (AstNode *) parse_foreign(parser);
+//
+//    } else {
+//        // Global constant with initial value
+//        AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
+//        global->initial_value = parse_expression(parser);
+//        global->base.flags |= Ast_Flag_Const;
+//        global->base.flags |= Ast_Flag_Lval;
+//        global->base.flags |= Ast_Flag_Comptime;
+//
+//        return (AstNode *) global;
+//    }
 
-    if (parser->curr_token->type == Token_Type_Keyword_Proc) {
-        foreign->import = (AstNode *) parse_function_definition(parser);
-
-    } else {
-        AstType* type = parse_type(parser);
-
-        AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
-        global->base.type_node = type;
-        global->base.flags |= Ast_Flag_Lval;
-
-        foreign->import = (AstNode *) global;
-    }
-
-    return (AstNode *) foreign;
-}
-
-static AstNode* parse_top_level_constant_symbol(OnyxParser* parser) {
-    if (parser->curr_token->type == Token_Type_Keyword_Proc) {
-        return (AstNode *) parse_function_definition(parser);
-
-    } else if (parser->curr_token->type == Token_Type_Keyword_Struct) {
-        // Handle struct case
-        assert(0);
-
-    } else if (parser->curr_token->type == Token_Type_Keyword_Foreign) {
-        return (AstNode *) parse_foreign(parser);
-
-    } else {
-        // Global constant with initial value
-        AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
-        global->initial_value = parse_expression(parser);
-        global->base.flags |= Ast_Flag_Const;
-        global->base.flags |= Ast_Flag_Lval;
-        global->base.flags |= Ast_Flag_Comptime;
-
-        return (AstNode *) global;
-    }
+    return parse_expression(parser);
 }
 
 static AstNode* parse_top_level_statement(OnyxParser* parser) {
@@ -821,75 +854,28 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 return (AstNode *) use_node;
             }
 
-        case Token_Type_Keyword_Export:
-            {
-                expect(parser, Token_Type_Keyword_Export);
-                if (parser->curr_token->type != Token_Type_Symbol) {
-                    onyx_message_add(parser->msgs,
-                            ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
-                            parser->curr_token->pos,
-                            onyx_get_token_type_name(Token_Type_Symbol),
-                            onyx_get_token_type_name(parser->curr_token->type));
-                    break;
-                }
-
-                AstNode* top_level_decl = parse_top_level_statement(parser);
-                top_level_decl->flags |= Ast_Flag_Exported;
-                return top_level_decl;
-            }
-
         case Token_Type_Symbol:
             {
                 OnyxToken* symbol = parser->curr_token;
                 parser_next_token(parser);
 
                 expect(parser, ':');
+                expect(parser, ':');
 
-                AstType* type = NULL;
+                AstTyped* node = parse_top_level_constant_symbol(parser);
 
-                if (parser->curr_token->type == Token_Type_Symbol) {
-                    type = parse_type(parser);
-                }
-
-                if (parser->curr_token->type == ':') {
-                    parser_next_token(parser);
-
-                    AstNode* node = parse_top_level_constant_symbol(parser);
-
-                    if (node->kind == Ast_Kind_Global) {
-                        ((AstGlobal *) node)->base.type_node = type;
-                    }
-
-                    if (node->kind == Ast_Kind_Foreign) {
-                        ((AstForeign *) node)->import->token = symbol;
-
-                    } else {
-                        node->token = symbol;
-                    }
-
-                    return node;
-
-                } else if (parser->curr_token->type == '=') {
-                    parser_next_token(parser);
-
-                    AstGlobal* global = make_node(AstGlobal, Ast_Kind_Global);
-                    global->base.token = symbol;
-                    global->base.flags |= Ast_Flag_Lval;
-                    global->initial_value = parse_expression(parser);
-                    global->base.type_node = type;
-
-                    return (AstNode *) global;
-
+                if (node->kind == Ast_Kind_Function) {
+                    node->token = symbol;
                 } else {
-                    onyx_token_null_toggle(parser->curr_token);
-                    onyx_message_add(parser->msgs,
-                            ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
-                            parser->curr_token->pos,
-                            parser->curr_token->text);
-                    onyx_token_null_toggle(parser->curr_token);
+                    // HACK
+                    bh_arr_push(parser->results.nodes_to_process, (AstNode *) node);
                 }
 
-                return &error_node;
+                AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+                binding->base.token = symbol;
+                binding->node = (AstNode *) node;
+
+                return (AstNode *) binding;
             }
 
         default: break;
@@ -919,28 +905,44 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Onyx
     parser.allocator = alloc;
     parser.tokenizer = tokenizer;
     parser.curr_token = tokenizer->tokens;
-    parser.prev_token = NULL; parser.msgs = msgs;
+    parser.prev_token = NULL;
+    parser.msgs = msgs;
+
+    parser.results = (ParseResults) {
+        .allocator = global_heap_allocator,
+
+        .uses = NULL,
+        .bindings = NULL,
+        .nodes_to_process = NULL,
+    };
+
+    bh_arr_new(parser.results.allocator, parser.results.uses, 4);
+    bh_arr_new(parser.results.allocator, parser.results.bindings, 4);
+    bh_arr_new(parser.results.allocator, parser.results.nodes_to_process, 4);
+
     return parser;
 }
 
 void onyx_parser_free(OnyxParser* parser) {
 }
 
-bh_arr(AstNode *) onyx_parse(OnyxParser *parser) {
-    bh_arr(AstNode *) top_level_nodes = NULL;
-    bh_arr_new(global_heap_allocator, top_level_nodes, 4);
-
+ParseResults onyx_parse(OnyxParser *parser) {
     while (parser->curr_token->type != Token_Type_End_Stream) {
         AstNode* curr_stmt = parse_top_level_statement(parser);
 
-        // Building a linked list of statements down the "next" chain
         if (curr_stmt != NULL && curr_stmt != &error_node) {
             while (curr_stmt != NULL) {
-                bh_arr_push(top_level_nodes, curr_stmt);
+
+                switch (curr_stmt->kind) {
+                    case Ast_Kind_Use:     bh_arr_push(parser->results.uses, (AstUse *) curr_stmt); break;
+                    case Ast_Kind_Binding: bh_arr_push(parser->results.bindings, (AstBinding *) curr_stmt); break;
+                    default: assert(("Invalid top level node", 0));
+                }
+
                 curr_stmt = curr_stmt->next;
             }
         }
     }
 
-    return top_level_nodes;
+    return parser->results;
 }

@@ -1,13 +1,14 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
 
-static void symbol_introduce(OnyxSemPassState* state, AstNode* symbol);
+static void symbol_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstNode* symbol);
 static void symbol_basic_type_introduce(OnyxSemPassState* state, AstBasicType* basic_type);
-static b32 symbol_unique_introduce(OnyxSemPassState* state, AstNode* symbol);
-static void symbol_remove(OnyxSemPassState* state, AstNode* symbol);
-static AstNode* symbol_resolve(OnyxSemPassState* state, AstNode* symbol);
+static b32 symbol_unique_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstNode* symbol);
+static void symbol_remove(OnyxSemPassState* state, OnyxToken* tkn);
+static AstNode* symbol_resolve(OnyxSemPassState* state, OnyxToken* tkn);
 static void local_group_enter(OnyxSemPassState* state, AstLocalGroup* local_group);
 static void local_group_leave(OnyxSemPassState* state);
+
 static void symres_local(OnyxSemPassState* state, AstLocal** local);
 static void symres_call(OnyxSemPassState* state, AstCall* call);
 static void symres_expression(OnyxSemPassState* state, AstTyped** expr);
@@ -16,23 +17,23 @@ static void symres_return(OnyxSemPassState* state, AstReturn* ret);
 static void symres_if(OnyxSemPassState* state, AstIf* ifnode);
 static void symres_while(OnyxSemPassState* state, AstWhile* whilenode);
 static void symres_statement_chain(OnyxSemPassState* state, AstNode* walker, AstNode** trailer);
-static b32 symres_statement(OnyxSemPassState* state, AstNode* stmt);
+static b32  symres_statement(OnyxSemPassState* state, AstNode* stmt);
 static void symres_block(OnyxSemPassState* state, AstBlock* block);
 static void symres_function(OnyxSemPassState* state, AstFunction* func);
 static AstType* symres_type(OnyxSemPassState* state, AstType* type);
 
-static void symbol_introduce(OnyxSemPassState* state, AstNode* symbol) {
-    onyx_token_null_toggle(symbol->token);
+static void symbol_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstNode* symbol) {
+    onyx_token_null_toggle(tkn);
 
     SemPassSymbol* sp_sym = (SemPassSymbol *) bh_alloc_item(state->allocator, SemPassSymbol);
     sp_sym->node = symbol;
     sp_sym->shadowed = NULL;
 
-    if (bh_table_has(SemPassSymbol *, state->symbols, symbol->token->text)) {
-        sp_sym->shadowed = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->text);
+    if (bh_table_has(SemPassSymbol *, state->symbols, tkn->text)) {
+        sp_sym->shadowed = bh_table_get(SemPassSymbol *, state->symbols, tkn->text);
     }
 
-    bh_table_put(SemPassSymbol *, state->symbols, symbol->token->text, sp_sym);
+    bh_table_put(SemPassSymbol *, state->symbols, tkn->text, sp_sym);
 
     if (symbol->kind == Ast_Kind_Local) {
         AstLocal* local = (AstLocal *) symbol;
@@ -40,39 +41,39 @@ static void symbol_introduce(OnyxSemPassState* state, AstNode* symbol) {
         state->curr_local_group->last_local = local;
     }
 
-    onyx_token_null_toggle(symbol->token);
+    onyx_token_null_toggle(tkn);
 }
 
-static void symbol_remove(OnyxSemPassState* state, AstNode* symbol) {
-    onyx_token_null_toggle(symbol->token);
+static void symbol_remove(OnyxSemPassState* state, OnyxToken* tkn) {
+    onyx_token_null_toggle(tkn);
 
-    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->text);
+    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, tkn->text);
 
     if (sp_sym->shadowed) {
-        bh_table_put(SemPassSymbol *, state->symbols, symbol->token->text, sp_sym->shadowed);
+        bh_table_put(SemPassSymbol *, state->symbols, tkn->text, sp_sym->shadowed);
     } else {
-        bh_table_delete(SemPassSymbol *, state->symbols, symbol->token->text);
+        bh_table_delete(SemPassSymbol *, state->symbols, tkn->text);
     }
 
-    onyx_token_null_toggle(symbol->token);
+    onyx_token_null_toggle(tkn);
 }
 
-static AstNode* symbol_resolve(OnyxSemPassState* state, AstNode* symbol) {
-    onyx_token_null_toggle(symbol->token);
+static AstNode* symbol_resolve(OnyxSemPassState* state, OnyxToken* tkn) {
+    onyx_token_null_toggle(tkn);
 
-    if (!bh_table_has(SemPassSymbol *, state->symbols, symbol->token->text)) {
+    if (!bh_table_has(SemPassSymbol *, state->symbols, tkn->text)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
-                symbol->token->pos,
-                symbol->token->text);
+                tkn->pos,
+                tkn->text);
 
-        onyx_token_null_toggle(symbol->token);
-        return symbol;
+        onyx_token_null_toggle(tkn);
+        return NULL;
     }
 
-    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, symbol->token->text);
+    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, tkn->text);
 
-    onyx_token_null_toggle(symbol->token);
+    onyx_token_null_toggle(tkn);
     return sp_sym->node;
 }
 
@@ -85,7 +86,7 @@ static void local_group_leave(OnyxSemPassState* state) {
     assert(state->curr_local_group != NULL);
 
     for (AstLocal *walker = state->curr_local_group->last_local; walker != NULL; walker = walker->prev_local) {
-        symbol_remove(state, (AstNode *) walker);
+        symbol_remove(state, walker->base.token);
     }
 
     state->curr_local_group = state->curr_local_group->prev_group;
@@ -98,27 +99,27 @@ static void symbol_basic_type_introduce(OnyxSemPassState* state, AstBasicType* b
     bh_table_put(SemPassSymbol *, state->symbols, basic_type->base.name, sp_sym);
 }
 
-static b32 symbol_unique_introduce(OnyxSemPassState* state, AstNode* symbol) {
-    onyx_token_null_toggle(symbol->token);
+static b32 symbol_unique_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstNode* symbol) {
+    onyx_token_null_toggle(tkn);
 
     // NOTE: If the function hasn't already been defined
-    if (!bh_table_has(SemPassSymbol *, state->symbols, symbol->token->text)) {
+    if (!bh_table_has(SemPassSymbol *, state->symbols, tkn->text)) {
         SemPassSymbol* sp_sym = bh_alloc_item(state->allocator, SemPassSymbol);
         sp_sym->node = symbol;
         sp_sym->shadowed = NULL;
-        bh_table_put(SemPassSymbol *, state->symbols, symbol->token->text, sp_sym);
+        bh_table_put(SemPassSymbol *, state->symbols, tkn->text, sp_sym);
     } else {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_CONFLICTING_GLOBALS,
-                symbol->token->pos,
-                symbol->token->text);
+                tkn->pos,
+                tkn->text);
 
         // NOTE: I really wish C had defer...
-        onyx_token_null_toggle(symbol->token);
+        onyx_token_null_toggle(tkn);
         return 0;
     }
 
-    onyx_token_null_toggle(symbol->token);
+    onyx_token_null_toggle(tkn);
     return 1;
 }
 
@@ -126,7 +127,7 @@ static AstType* symres_type(OnyxSemPassState* state, AstType* type) {
     if (type == NULL) return NULL;
 
     if (type->kind == Ast_Kind_Symbol) {
-        return (AstType *) symbol_resolve(state, (AstNode *) type);
+        return (AstType *) symbol_resolve(state, ((AstNode *) type)->token);
     }
 
     // NOTE: Already resolved
@@ -143,11 +144,11 @@ static AstType* symres_type(OnyxSemPassState* state, AstType* type) {
 
 static void symres_local(OnyxSemPassState* state, AstLocal** local) {
     (*local)->base.type_node = symres_type(state, (*local)->base.type_node);
-    symbol_introduce(state, (AstNode *) *local);
+    symbol_introduce(state, (*local)->base.token, (AstNode *) *local);
 }
 
 static void symres_call(OnyxSemPassState* state, AstCall* call) {
-    AstNode* callee = symbol_resolve(state, call->callee);
+    AstNode* callee = symbol_resolve(state, call->callee->token);
     if (callee) call->callee = callee;
     else DEBUG_HERE;
 
@@ -178,7 +179,7 @@ static void symres_expression(OnyxSemPassState* state, AstTyped** expr) {
         case Ast_Kind_Block: symres_block(state, (AstBlock *) *expr); break;
 
         case Ast_Kind_Symbol:
-            *expr = (AstTyped *) symbol_resolve(state, (AstNode *) *expr);
+            *expr = (AstTyped *) symbol_resolve(state, ((AstNode *) *expr)->token);
             break;
 
         // NOTE: This is a good case, since it means the symbol is already resolved
@@ -195,7 +196,7 @@ static void symres_expression(OnyxSemPassState* state, AstTyped** expr) {
 }
 
 static void symres_assignment(OnyxSemPassState* state, AstAssign* assign) {
-    AstTyped* lval = (AstTyped *) symbol_resolve(state, (AstNode *) assign->lval);
+    AstTyped* lval = (AstTyped *) symbol_resolve(state, assign->lval->token);
     if (lval == NULL) return;
     assign->lval = lval;
 
@@ -277,7 +278,7 @@ static void symres_function(OnyxSemPassState* state, AstFunction* func) {
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->base.next) {
         param->base.type_node = symres_type(state, param->base.type_node);
 
-        symbol_introduce(state, (AstNode *) param);
+        symbol_introduce(state, param->base.token, (AstNode *) param);
     }
 
     if (func->base.type_node != NULL) {
@@ -289,7 +290,27 @@ static void symres_function(OnyxSemPassState* state, AstFunction* func) {
     symres_block(state, func->body);
 
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->base.next) {
-        symbol_remove(state, (AstNode *) param);
+        symbol_remove(state, param->base.token);
+    }
+}
+
+static void symres_top_node(OnyxSemPassState* state, AstNode** node) {
+    switch ((*node)->kind) {
+        case Ast_Kind_Call:
+        case Ast_Kind_Unary_Op:
+        case Ast_Kind_Binary_Op:
+        case Ast_Kind_Literal:
+        case Ast_Kind_Symbol:
+             symres_expression(state, (AstTyped **) node);
+             break;
+
+        case Ast_Kind_Function:
+             symres_function(state, (AstFunction *) *node);
+             break;
+
+        default:
+             DEBUG_HERE;
+             break;
     }
 }
 
@@ -311,26 +332,29 @@ void onyx_resolve_symbols(OnyxSemPassState* state, OnyxProgram* program) {
     symbol_basic_type_introduce(state, &basic_type_rawptr);
 
     // NOTE: Introduce all global symbols
-    bh_arr_each(AstGlobal *, global, program->globals)
-        if (!symbol_unique_introduce(state, (AstNode *) *global)) return;
+    // bh_arr_each(AstGlobal *, global, program->globals)
+    //     if (!symbol_unique_introduce(state, (AstNode *) *global)) return;
 
-    bh_arr_each(AstFunction *, function, program->functions)
-        if (!symbol_unique_introduce(state, (AstNode *) *function)) return;
+    // bh_arr_each(AstFunction *, function, program->functions)
+    //     if (!symbol_unique_introduce(state, (AstNode *) *function)) return;
 
-    bh_arr_each(AstForeign *, foreign, program->foreigns) {
-        AstKind import_kind = (*foreign)->import->kind;
+    // bh_arr_each(AstForeign *, foreign, program->foreigns) {
+    //     AstKind import_kind = (*foreign)->import->kind;
 
-        if (import_kind == Ast_Kind_Function || import_kind == Ast_Kind_Global)
-            if (!symbol_unique_introduce(state, (*foreign)->import)) return;
-    }
+    //     if (import_kind == Ast_Kind_Function || import_kind == Ast_Kind_Global)
+    //         if (!symbol_unique_introduce(state, (*foreign)->import)) return;
+    // }
 
-    // NOTE: Then, resolve all symbols in all functions
-    bh_arr_each(AstForeign *, foreign, program->foreigns) {
-        if ((*foreign)->import->kind == Ast_Kind_Function) {
-            symres_function(state, (AstFunction *) (*foreign)->import);
-        }
-    }
+    // // NOTE: Then, resolve all symbols in all functions
+    // bh_arr_each(AstForeign *, foreign, program->foreigns) {
+    //     if ((*foreign)->import->kind == Ast_Kind_Function) {
+    //         symres_function(state, (AstFunction *) (*foreign)->import);
+    //     }
+    // }
 
-    bh_arr_each(AstFunction *, function, program->functions)
-        symres_function(state, *function);
+    bh_arr_each(AstBinding *, binding, program->top_level_bindings)
+        if (!symbol_unique_introduce(state, (*binding)->base.token, (*binding)->node)) return;
+
+    bh_arr_each(AstNode *, node, program->nodes_to_process)
+        symres_top_node(state, node);
 }

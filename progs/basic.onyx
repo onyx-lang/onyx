@@ -4,7 +4,9 @@ pointer_test :: proc {
     p := 0 as ^i32;
 }
 
-print :: foreign "host" "print" proc (val: i32) ---
+print :: proc
+    #foreign "host" "print"
+    (val: i32) ---
 
 test :: proc (a: bool) -> bool {
     return !a;
@@ -16,9 +18,21 @@ foo :: proc (n: i32) -> i32 {
     return or_i32(a, b);
 }
 
-export main :: proc {
+// THOUGHT: This could be a WASM global that is immutable and it
+// would be accessed using global.get
+// OR
+// This could be immediately substituted in the expression tree. i.e.
+//      4 + global       =>       4 + (5 * 2 + 6)
+global :: 5 * 2 + 6
+
+// WASM globals would be declared as such:
+// wasm_global :: global i32
+
+main :: proc #export {
     a := 16;
     print(clz_i32(a));
+
+    print(4 + global);
 
     b := 1 + foo(2);
     print(b);

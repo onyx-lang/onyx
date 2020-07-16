@@ -11,28 +11,33 @@ typedef struct AstBinOp AstBinaryOp;
 typedef struct AstAssign AstAssign;
 typedef struct AstNumLit AstNumLit;
 typedef struct AstLocal AstLocal;
-typedef struct AstLocalGroup AstLocalGroup;
 typedef struct AstReturn AstReturn;
-typedef struct AstBlock AstBlock;
-typedef struct AstIf AstIf;
-typedef struct AstWhile AstWhile;
-typedef struct AstFunction AstFunction;
-typedef struct AstForeign AstForeign;
-typedef struct AstGlobal AstGlobal;
 typedef struct AstCall AstCall;
 typedef struct AstIntrinsicCall AstIntrinsicCall;
 typedef struct AstArgument AstArgument;
-typedef struct AstUse AstUse;
+
+typedef struct AstBlock AstBlock;
+typedef struct AstIf AstIf;
+typedef struct AstWhile AstWhile;
+typedef struct AstLocalGroup AstLocalGroup;
 
 typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
 typedef struct AstPointerType AstPointerType;
+typedef struct AstFunctionType AstFunctionType;
+
+typedef struct AstBinding AstBinding;
+typedef struct AstFunction AstFunction;
+typedef struct AstForeign AstForeign;
+typedef struct AstGlobal AstGlobal;
+typedef struct AstUse AstUse;
 
 typedef enum AstKind {
     Ast_Kind_Error,
     Ast_Kind_Program,
     Ast_Kind_Use,
 
+    Ast_Kind_Binding,
     Ast_Kind_Function,
     Ast_Kind_Foreign,
     Ast_Kind_Block,
@@ -44,9 +49,12 @@ typedef enum AstKind {
     Ast_Kind_Unary_Op,
     Ast_Kind_Binary_Op,
 
+    Ast_Kind_Type_Start,
     Ast_Kind_Type,
     Ast_Kind_Basic_Type,
     Ast_Kind_Pointer_Type,
+    Ast_Kind_Function_Type,
+    Ast_Kind_Type_End,
 
     Ast_Kind_Literal,
     Ast_Kind_Param,
@@ -76,6 +84,7 @@ typedef enum AstFlags {
     // Function flags
     Ast_Flag_Inline          = BH_BIT(8),
     Ast_Flag_Intrinsic       = BH_BIT(9),
+    Ast_Flag_Foreign         = BH_BIT(10),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -137,10 +146,10 @@ struct AstTyped {
 // Expression Nodes
 struct AstBinOp         { AstTyped base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped base; UnaryOp operation; AstTyped *expr; };
-struct AstAssign        { AstNode base;  AstTyped* lval; AstTyped* expr; };
+struct AstAssign        { AstNode  base; AstTyped* lval; AstTyped* expr; };
 struct AstNumLit        { AstTyped base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstLocal         { AstTyped base; AstLocal *prev_local; };
-struct AstReturn        { AstNode base;  AstTyped* expr; };
+struct AstReturn        { AstNode  base; AstTyped* expr; };
 struct AstCall          { AstTyped base; AstArgument *arguments; AstNode *callee; };
 struct AstArgument      { AstTyped base; AstTyped *value; };
 
@@ -166,12 +175,26 @@ struct AstIf {
 struct AstType          { AstKind kind; u32 flags; char* name; };
 struct AstBasicType     { AstType base; Type* type; };
 struct AstPointerType   { AstType base; AstType* elem; };
+struct AstFunctionType  { AstType base; bh_arr(AstType *) params; AstType* results; };
 
 // Top level nodes
-struct AstFunction      { AstTyped base; AstBlock *body; AstLocal *params; };
-struct AstForeign       { AstNode base;  OnyxToken *mod_token, *name_token; AstNode *import; };
+struct AstBinding       { AstTyped base; AstNode* node; };
+struct AstForeign       { AstNode  base; OnyxToken *mod_token, *name_token; AstNode *import; };
 struct AstGlobal        { AstTyped base; AstTyped *initial_value; };
-struct AstUse           { AstNode base;  OnyxToken *filename; };
+struct AstUse           { AstNode  base; OnyxToken *filename; };
+struct AstFunction      {
+    AstTyped base;
+
+    AstBlock *body;
+    AstLocal *params;
+
+    // NOTE: Used when a function is exported with a specific name
+    char* exported_name;
+
+    // NOTE: Used when the function is declared as foreign
+    OnyxToken* foreign_module;
+    OnyxToken* foreign_name;
+};
 
 typedef enum OnyxIntrinsic {
     ONYX_INTRINSIC_UNDEFINED,
@@ -206,9 +229,10 @@ typedef enum OnyxIntrinsic {
 struct AstIntrinsicCall { AstTyped base; AstArgument *arguments; OnyxIntrinsic intrinsic; };
 
 typedef struct OnyxProgram {
-    bh_arr(AstGlobal *) globals;
+    bh_arr(AstBinding *)  top_level_bindings;
+    bh_arr(AstNode *)     nodes_to_process;
+
     bh_arr(AstFunction *) functions;
-    bh_arr(AstForeign *) foreigns;
 } OnyxProgram;
 
 

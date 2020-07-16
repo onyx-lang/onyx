@@ -13,6 +13,7 @@ static const char* ast_node_names[] = {
     "PROGRAM",
     "USE",
 
+    "BINDING",
     "FUNCTION",
     "FOREIGN",
     "BLOCK",
@@ -24,7 +25,12 @@ static const char* ast_node_names[] = {
     "UN_OP",
     "BIN_OP",
 
+    "TYPE_START (BAD)"
     "TYPE",
+    "POINTER_TYPE",
+    "FUNCTION_TYPE",
+    "TYPE_END (BAD)"
+
     "LITERAL",
     "PARAM",
     "ARGUMENT",

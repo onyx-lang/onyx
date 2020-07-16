@@ -106,7 +106,7 @@ static void compile_opts_free(OnyxCompileOptions* opts) {
     bh_arr_free(opts->files);
 }
 
-static bh_arr(AstNode *) parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
+static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
     if (compiler_state->options->verbose_output)
         bh_printf("[Lexing]       %s\n", file_contents->filename);
@@ -142,35 +142,9 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
 
-    bh_arr(AstNode *) top_nodes = parse_source_file(compiler_state, &fc);
+    ParseResults results = parse_source_file(compiler_state, &fc);
 
-    bh_arr(AstUse *) uses = NULL;
-
-    bh_arr_each(AstNode *, node, top_nodes) {
-        switch ((*node)->kind) {
-            case Ast_Kind_Use:
-                bh_arr_push(uses, (AstUse *) *node);
-                break;
-
-            case Ast_Kind_Global:
-                bh_arr_push(compiler_state->program.globals, (AstGlobal *) (*node));
-                break;
-
-            case Ast_Kind_Foreign:
-                bh_arr_push(compiler_state->program.foreigns, (AstForeign *) (*node));
-                break;
-
-            case Ast_Kind_Function:
-                bh_arr_push(compiler_state->program.functions, (AstFunction *) (*node));
-                break;
-
-            default:
-                assert(("Invalid top level node", 0));
-                break;
-        }
-    }
-
-    bh_arr_each(AstUse *, use_node, uses) {
+    bh_arr_each(AstUse *, use_node, results.uses) {
         char* formatted_name = bh_aprintf(
                 global_heap_allocator,
                 "%b.onyx",
@@ -179,7 +153,11 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         bh_arr_push(compiler_state->queued_files, formatted_name);
     }
 
-    bh_arr_free(uses);
+    bh_arr_each(AstBinding *, binding_node, results.bindings)
+        bh_arr_push(compiler_state->program.top_level_bindings, *binding_node);
+
+    bh_arr_each(AstNode *, node, results.nodes_to_process)
+        bh_arr_push(compiler_state->program.nodes_to_process, *node);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
@@ -191,8 +169,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
 static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOptions* opts) {
     compiler_state->options = opts;
 
-    bh_arr_new(global_heap_allocator, compiler_state->program.foreigns, 4);
-    bh_arr_new(global_heap_allocator, compiler_state->program.globals, 4);
+    bh_arr_new(global_heap_allocator, compiler_state->program.top_level_bindings, 4);
     bh_arr_new(global_heap_allocator, compiler_state->program.functions, 4);
 
     bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
@@ -289,9 +266,10 @@ int main(int argc, char *argv[]) {
     OnyxCompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
     CompilerState compile_state = {
         .program = {
-            .foreigns = NULL,
-            .globals = NULL,
-            .functions = NULL
+            .top_level_bindings = NULL,
+            .nodes_to_process   = NULL,
+
+            .functions = NULL,
         },
         .wasm_mod = { 0 }
     };

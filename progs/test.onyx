@@ -6,17 +6,46 @@ something_else :: proc (n: i32) -> i32 {
     return 100 * n + global_value;
 }
 
-global_value := 100
-
-export in_unit_circle :: proc (x: f32, y: f32) -> bool {
+in_unit_circle :: proc #export (x: f32, y: f32) -> bool {
     return (x * x) + (y * y) < 1.0f;
 }
 
+echo :: proc (n: i32) -> i32 {
+    print_i32(n);
+    return n;
+}
+
+global_value :: echo(fib(4) * 2);
+
+local_brute :: proc {
+
+    a := 123;
+    b := 123.0f;
+    c := 123.0;
+
+    {
+        a := 5.0f;
+        b := 12.3;
+
+        print_f32(a);
+        print_f64(b);
+    }
+
+    print_i32(a);
+    print_f32(b);
+    print_f64(c);
+}
+
+main3 :: proc #export {
+    local_brute();
+}
+
+
 // This is the entry point
-export main2 :: proc {
+main2 :: proc #export {
     i := 0;
     while i < 10 {
-        res :: fib(i);
+        res :: clz_i32(fib(i));
         print_i32(res);
         i += 1;
     }
@@ -61,7 +90,7 @@ export main2 :: proc {
 //     z : f32;
 // }
 
-export main :: proc {
+main :: proc #export {
     print_i32(clz_i32(16));
     print_f32(sqrt_f32(2.0f));
 
@@ -69,10 +98,9 @@ export main :: proc {
     print_bool(in_unit_circle(0.5f, 0.5f));
 
     big_num := fib(factorial(4));
-    something :: other_value(0);
 
-    global_value = 1000;
-    something_else :: other_value(0);
+    something       :: other_value(0);
+    something_else  :: other_value(1);
 
     condition := big_num < something;
 

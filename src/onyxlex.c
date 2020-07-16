@@ -129,12 +129,12 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     }
 
     LITERAL_TOKEN("struct",     1, Token_Type_Keyword_Struct);
-    LITERAL_TOKEN("export",     1, Token_Type_Keyword_Export);
+//     LITERAL_TOKEN("export",     1, Token_Type_Keyword_Export);
     LITERAL_TOKEN("use",        1, Token_Type_Keyword_Use);
     LITERAL_TOKEN("if",         1, Token_Type_Keyword_If);
     LITERAL_TOKEN("elseif",     1, Token_Type_Keyword_Elseif);
     LITERAL_TOKEN("else",       1, Token_Type_Keyword_Else);
-    LITERAL_TOKEN("foreign",    1, Token_Type_Keyword_Foreign);
+    // LITERAL_TOKEN("foreign",    1, Token_Type_Keyword_Foreign);
     LITERAL_TOKEN("return",     1, Token_Type_Keyword_Return);
     LITERAL_TOKEN("proc",       1, Token_Type_Keyword_Proc);
     LITERAL_TOKEN("as",         1, Token_Type_Keyword_Cast);
