@@ -175,7 +175,7 @@ struct AstIf {
 struct AstType          { AstKind kind; u32 flags; char* name; };
 struct AstBasicType     { AstType base; Type* type; };
 struct AstPointerType   { AstType base; AstType* elem; };
-struct AstFunctionType  { AstType base; bh_arr(AstType *) params; AstType* results; };
+struct AstFunctionType  { AstType base; AstType* return_type; u64 param_count; AstType* params[]; };
 
 // Top level nodes
 struct AstBinding       { AstTyped base; AstNode* node; };

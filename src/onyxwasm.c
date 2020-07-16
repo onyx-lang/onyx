@@ -756,18 +756,18 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
     static char type_repr_buf[128];
 
     char* t = type_repr_buf;
-    AstLocal* param = fd->params;
-    i32 param_count = 0;
-    while (param) {
+    Type** param_type = fd->base.type->Function.params;
+    i32 param_count = fd->base.type->Function.param_count;
+    i32 params_left = param_count;
+    while (params_left-- > 0) {
         // HACK: Using these directly as part of a string feels weird but they are
         // valid characters so I don't think it is going to be much of an issue
-        *(t++) = (char) onyx_type_to_wasm_type(param->base.type);
-        param_count++;
-        param = (AstLocal *) param->base.next;
+        *(t++) = (char) onyx_type_to_wasm_type(*param_type);
+        param_type++;
     }
     *(t++) = ':';
 
-    WasmType return_type = onyx_type_to_wasm_type(fd->base.type);
+    WasmType return_type = onyx_type_to_wasm_type(fd->base.type->Function.return_type);
     *(t++) = (char) return_type;
     *t = '\0';
 

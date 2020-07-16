@@ -138,6 +138,19 @@ static AstType* symres_type(OnyxSemPassState* state, AstType* type) {
         return type;
     }
 
+    if (type->kind == Ast_Kind_Function_Type) {
+        AstFunctionType* ftype = (AstFunctionType *) type;
+
+        ftype->return_type = symres_type(state, ftype->return_type);
+
+        if (ftype->param_count > 0)
+            fori (i, 0, ftype->param_count - 1) {
+                ftype->params[i] = symres_type(state, ftype->params[i]);
+            }
+
+        return type;
+    }
+
     assert(("Bad type node", 0));
     return NULL;
 }
@@ -149,8 +162,17 @@ static void symres_local(OnyxSemPassState* state, AstLocal** local) {
 
 static void symres_call(OnyxSemPassState* state, AstCall* call) {
     AstNode* callee = symbol_resolve(state, call->callee->token);
-    if (callee) call->callee = callee;
-    else DEBUG_HERE;
+    if (callee)
+        call->callee = callee;
+    else {
+        onyx_token_null_toggle(call->callee->token);
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
+                call->callee->token->pos,
+                call->callee->token->text);
+        onyx_token_null_toggle(call->callee->token);
+        return;
+    }
 
     symres_statement_chain(state, (AstNode *) call->arguments, (AstNode **) &call->arguments);
 }
@@ -185,6 +207,7 @@ static void symres_expression(OnyxSemPassState* state, AstTyped** expr) {
         // NOTE: This is a good case, since it means the symbol is already resolved
         case Ast_Kind_Local: break;
 
+        case Ast_Kind_Function:
         case Ast_Kind_Literal:
             (*expr)->type_node = symres_type(state, (*expr)->type_node);
             break;
@@ -282,9 +305,7 @@ static void symres_function(OnyxSemPassState* state, AstFunction* func) {
     }
 
     if (func->base.type_node != NULL) {
-        if (func->base.type_node->kind == Ast_Kind_Symbol) {
-            func->base.type_node = symres_type(state, func->base.type_node);
-        }
+        func->base.type_node = symres_type(state, func->base.type_node);
     }
 
     symres_block(state, func->body);
@@ -330,27 +351,6 @@ void onyx_resolve_symbols(OnyxSemPassState* state, ParserOutput* program) {
     symbol_basic_type_introduce(state, &basic_type_f32);
     symbol_basic_type_introduce(state, &basic_type_f64);
     symbol_basic_type_introduce(state, &basic_type_rawptr);
-
-    // NOTE: Introduce all global symbols
-    // bh_arr_each(AstGlobal *, global, program->globals)
-    //     if (!symbol_unique_introduce(state, (AstNode *) *global)) return;
-
-    // bh_arr_each(AstFunction *, function, program->functions)
-    //     if (!symbol_unique_introduce(state, (AstNode *) *function)) return;
-
-    // bh_arr_each(AstForeign *, foreign, program->foreigns) {
-    //     AstKind import_kind = (*foreign)->import->kind;
-
-    //     if (import_kind == Ast_Kind_Function || import_kind == Ast_Kind_Global)
-    //         if (!symbol_unique_introduce(state, (*foreign)->import)) return;
-    // }
-
-    // // NOTE: Then, resolve all symbols in all functions
-    // bh_arr_each(AstForeign *, foreign, program->foreigns) {
-    //     if ((*foreign)->import->kind == Ast_Kind_Function) {
-    //         symres_function(state, (AstFunction *) (*foreign)->import);
-    //     }
-    // }
 
     bh_arr_each(AstBinding *, binding, program->top_level_bindings)
         if (!symbol_unique_introduce(state, (*binding)->base.token, (*binding)->node)) return;

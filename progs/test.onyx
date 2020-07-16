@@ -40,7 +40,6 @@ main3 :: proc #export {
     local_brute();
 }
 
-
 // This is the entry point
 main2 :: proc #export {
     i := 0;

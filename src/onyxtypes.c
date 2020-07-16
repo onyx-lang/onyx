@@ -4,23 +4,23 @@
 
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
-    { Type_Kind_Basic, { Basic_Kind_Void,                    0,                       0, "void"   } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Void,                    0,                       0, "void"   } },
 
-    { Type_Kind_Basic, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1, "bool"   } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1, "bool"   } },
 
-    { Type_Kind_Basic, { Basic_Kind_I8,     Basic_Flag_Integer,                       1, "i8"     } },
-    { Type_Kind_Basic, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1, "u8"     } },
-    { Type_Kind_Basic, { Basic_Kind_I16,    Basic_Flag_Integer,                       2, "i16"    } },
-    { Type_Kind_Basic, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2, "u16"    } },
-    { Type_Kind_Basic, { Basic_Kind_I32,    Basic_Flag_Integer,                       4, "i32"    } },
-    { Type_Kind_Basic, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4, "u32"    } },
-    { Type_Kind_Basic, { Basic_Kind_I64,    Basic_Flag_Integer,                       8, "i64"    } },
-    { Type_Kind_Basic, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8, "u64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I8,     Basic_Flag_Integer,                       1, "i8"     } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1, "u8"     } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I16,    Basic_Flag_Integer,                       2, "i16"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2, "u16"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I32,    Basic_Flag_Integer,                       4, "i32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4, "u32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I64,    Basic_Flag_Integer,                       8, "i64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8, "u64"    } },
 
-    { Type_Kind_Basic, { Basic_Kind_F32,    Basic_Flag_Float,                         4, "f32"    } },
-    { Type_Kind_Basic, { Basic_Kind_F64,    Basic_Flag_Float,                         8, "f64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4, "f32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8, "f64"    } },
 
-    { Type_Kind_Basic, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4, "rawptr" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4, "rawptr" } },
 };
 
 b32 types_are_compatible(Type* t1, Type* t2) {
@@ -64,6 +64,24 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             ptr_type->Pointer.elem = type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem);
 
             return (Type *) ptr_type;
+        }
+
+        case Ast_Kind_Function_Type: {
+            AstFunctionType* ftype_node = (AstFunctionType *) type_node;
+            u64 param_count = ftype_node->param_count;
+
+            Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
+
+            func_type->kind = Type_Kind_Function;
+            func_type->Function.param_count = param_count;
+            func_type->Function.return_type = type_build_from_ast(alloc, ftype_node->return_type);
+
+            if (param_count > 0)
+                fori (i, 0, param_count - 1) {
+                    func_type->Function.params[i] = type_build_from_ast(alloc, ftype_node->params[i]);
+                }
+
+            return func_type;
         }
 
         case Ast_Kind_Basic_Type:

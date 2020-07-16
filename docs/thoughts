@@ -14,7 +14,7 @@ Memory design:
             Example use:
             {{{
                 ptr: ^i32 = 0; // Address starting at 0
-                ptr_ptr := ^ptr;
+                ptr_ptr := *ptr;
             }}}
 
 

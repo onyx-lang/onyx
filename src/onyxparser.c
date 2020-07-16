@@ -781,14 +781,33 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
     AstLocal* params = parse_function_params(parser);
     func_def->params = params;
 
+    AstType* return_type = (AstType *) &basic_type_void;
     if (parser->curr_token->type == Token_Type_Right_Arrow) {
         expect(parser, Token_Type_Right_Arrow);
 
-        AstType* return_type = parse_type(parser);
-        func_def->base.type_node = return_type;
-    } else {
-        func_def->base.type_node = (AstType *) &basic_type_void;
+        return_type = parse_type(parser);
     }
+
+    u64 param_count = 0;
+    for (AstLocal* param = params;
+            param != NULL;
+            param = (AstLocal *) param->base.next)
+        param_count++;
+
+    AstFunctionType* type_node = bh_alloc(parser->allocator, sizeof(AstFunctionType) + param_count * sizeof(AstType *));
+    type_node->base.kind = Ast_Kind_Function_Type;
+    type_node->param_count = param_count;
+    type_node->return_type = return_type;
+
+    u32 i = 0;
+    for (AstLocal* param = params;
+            param != NULL;
+            param = (AstLocal *) param->base.next) {
+        type_node->params[i] = param->base.type_node;
+        i++;
+    }
+
+    func_def->base.type_node = (AstType *) type_node;
 
     func_def->body = parse_block(parser);
 

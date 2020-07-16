@@ -47,8 +47,9 @@ typedef struct TypeBasic {
 typedef struct Type Type;
 
 #define TYPE_KINDS \
-    TYPE_KIND(Basic, TypeBasic)                       \
-    TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })  // TypePointer utilizes the elements of TypeBasic
+    TYPE_KIND(Basic, TypeBasic)                                 \
+    TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })  \
+    TYPE_KIND(Function, struct { Type *return_type; u64 param_count; Type* params[]; })
 
 typedef enum TypeKind {
     Type_Kind_Invalid,
@@ -71,13 +72,13 @@ enum TypeFlag {
 struct Type {
     TypeKind kind;
 
+    u32 flags;
+
     union {
 #define TYPE_KIND(k, ...) Type##k k;
         TYPE_KINDS
 #undef TYPE_KIND
     };
-
-    u32 flags;
 };
 
 extern Type basic_types[];

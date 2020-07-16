@@ -134,7 +134,11 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
         return 1;
     }
 
-    if (callee->base.kind != Ast_Kind_Function) {
+    if (callee->base.type == NULL) {
+        callee->base.type = type_build_from_ast(state->node_allocator, callee->base.type_node);
+    }
+
+    if (callee->base.type->kind != Type_Kind_Function) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_CALL_NON_FUNCTION,
                 call->base.token->pos,
@@ -205,10 +209,7 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
         onyx_token_null_toggle(callee->base.token);
     }
 
-    if (callee->base.type == NULL) {
-        callee->base.type = type_build_from_ast(state->node_allocator, callee->base.type_node);
-    }
-    call->base.type = callee->base.type;
+    call->base.type = callee->base.type->Function.return_type;
 
     AstLocal* formal_param = callee->params;
     AstArgument* actual_param = call->arguments;
@@ -372,6 +373,8 @@ static b32 check_expression(OnyxSemPassState* state, AstTyped* expr) {
             assert(expr->type != NULL);
             break;
 
+        case Ast_Kind_Function: break;
+
         default:
             retval = 1;
             DEBUG_HERE;
@@ -477,7 +480,6 @@ static b32 check_function(OnyxSemPassState* state, AstFunction* func) {
         }
     }
 
-    // NOTE: Acutally the return type
     if (func->base.type == NULL) {
         func->base.type = type_build_from_ast(state->node_allocator, func->base.type_node);
     }
@@ -508,7 +510,7 @@ static b32 check_function(OnyxSemPassState* state, AstFunction* func) {
         }
     }
 
-    state->expected_return_type = func->base.type;
+    state->expected_return_type = func->base.type->Function.return_type;
     if (func->body) {
         return check_block(state, func->body);
     }
