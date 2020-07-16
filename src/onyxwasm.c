@@ -980,31 +980,14 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
     bh_table_init(global_heap_allocator, module.type_map, 61);
     bh_table_init(global_heap_allocator, module.exports, 61);
 
-    bh_imap_init(&module.local_map,  global_heap_allocator);
-    bh_imap_init(&module.func_map,   global_heap_allocator);
-    bh_imap_init(&module.global_map, global_heap_allocator);
+    bh_imap_init(&module.local_map,  global_heap_allocator, 16);
+    bh_imap_init(&module.func_map,   global_heap_allocator, 16);
+    bh_imap_init(&module.global_map, global_heap_allocator, 16);
 
     return module;
 }
 
 void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program) {
-
-    // NOTE: First, introduce all indicies for globals and functions
-    // bh_arr_each(AstForeign *, foreign, program->foreigns) {
-    //     AstKind import_kind = (*foreign)->import->kind;
-
-    //     if (import_kind == Ast_Kind_Function) {
-    //         module->next_func_idx++;
-    //         bh_imap_put(&module->func_map, (u64) (*foreign)->import, module->next_import_func_idx++);
-    //     }
-    //     else if (import_kind == Ast_Kind_Global) {
-    //         module->next_global_idx++;
-    //         bh_imap_put(&module->global_map, (u64) (*foreign)->import, module->next_import_global_idx++);
-    //     }
-
-    //     compile_foreign(module, *foreign);
-    // }
-
     bh_arr_each(AstFunction *, function, program->functions) {
         if ((*function)->base.flags & Ast_Flag_Foreign) {
             bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
