@@ -314,7 +314,7 @@ static void symres_top_node(OnyxSemPassState* state, AstNode** node) {
     }
 }
 
-void onyx_resolve_symbols(OnyxSemPassState* state, OnyxProgram* program) {
+void onyx_resolve_symbols(OnyxSemPassState* state, ParserOutput* program) {
 
     // NOTE: Add types to global scope
     symbol_basic_type_introduce(state, &basic_type_void);

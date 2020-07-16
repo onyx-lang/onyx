@@ -518,30 +518,19 @@ static b32 check_function(OnyxSemPassState* state, AstFunction* func) {
 
 static b32 check_node(OnyxSemPassState* state, AstNode* node) {
     switch (node->kind) {
-        case Ast_Kind_Function: return check_function(state, (AstFunction *) node);
-        case Ast_Kind_Block: return check_block(state, (AstBlock *) node);
-        case Ast_Kind_Assignment: return check_assignment(state, (AstAssign *) node);
-        case Ast_Kind_Return: return check_return(state, (AstReturn *) node);
-        case Ast_Kind_If: return check_if(state, (AstIf *) node);
-        case Ast_Kind_While: return check_while(state, (AstWhile *) node);
-        case Ast_Kind_Call: return check_call(state, (AstCall *) node);
-        case Ast_Kind_Binary_Op: return check_binaryop(state, (AstBinaryOp *) node);
-        default: return check_expression(state, (AstTyped *) node);
+        case Ast_Kind_Function:     return check_function(state, (AstFunction *) node);
+        case Ast_Kind_Block:        return check_block(state, (AstBlock *) node);
+        case Ast_Kind_Assignment:   return check_assignment(state, (AstAssign *) node);
+        case Ast_Kind_Return:       return check_return(state, (AstReturn *) node);
+        case Ast_Kind_If:           return check_if(state, (AstIf *) node);
+        case Ast_Kind_While:        return check_while(state, (AstWhile *) node);
+        case Ast_Kind_Call:         return check_call(state, (AstCall *) node);
+        case Ast_Kind_Binary_Op:    return check_binaryop(state, (AstBinaryOp *) node);
+        default:                    return check_expression(state, (AstTyped *) node);
     }
 }
 
-void onyx_type_check(OnyxSemPassState* state, OnyxProgram* program) {
-
-    // bh_arr_each(AstForeign *, foreign, program->foreigns)
-    //     if ((*foreign)->import->kind == Ast_Kind_Function)
-    //         check_function(state, (AstFunction *) (*foreign)->import);
-
-    // bh_arr_each(AstGlobal *, global, program->globals)
-    //     check_global(state, *global);
-
-    // bh_arr_each(AstFunction *, function, program->functions)
-    //     check_function(state, *function);
-
+void onyx_type_check(OnyxSemPassState* state, ParserOutput* program) {
     bh_arr_each(AstNode *, node, program->nodes_to_process) {
         check_node(state, *node);
 

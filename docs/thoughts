@@ -57,9 +57,6 @@ Treating top level declarations differently:
         global :: 5     - This would replace all instances of 'global' with the integer constant
                             5. This would not make a global in WASM.
 
-        global := 5     - This would work as expected but will make generating the WASM more difficult.
-                            This feature may wait to come back.
-
         global :: i32   - This would work as a type alias. 'global' would have the type node as it's 'node'
 
         print :: proc #foriegn "host" "print" (...) ---
@@ -102,3 +99,5 @@ Explicit overriden functions:
 
         min(2, 5);
         min(4.5, 10.4);
+
+

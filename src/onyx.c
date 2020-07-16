@@ -60,7 +60,7 @@ typedef struct CompilerState {
     bh_arr(const char *) queued_files;
 
     OnyxMessages msgs;
-    OnyxProgram program;
+    ParserOutput parse_output;
     OnyxWasmModule wasm_mod;
 } CompilerState;
 
@@ -154,10 +154,10 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     }
 
     bh_arr_each(AstBinding *, binding_node, results.bindings)
-        bh_arr_push(compiler_state->program.top_level_bindings, *binding_node);
+        bh_arr_push(compiler_state->parse_output.top_level_bindings, *binding_node);
 
     bh_arr_each(AstNode *, node, results.nodes_to_process)
-        bh_arr_push(compiler_state->program.nodes_to_process, *node);
+        bh_arr_push(compiler_state->parse_output.nodes_to_process, *node);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
@@ -169,8 +169,9 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
 static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOptions* opts) {
     compiler_state->options = opts;
 
-    bh_arr_new(global_heap_allocator, compiler_state->program.top_level_bindings, 4);
-    bh_arr_new(global_heap_allocator, compiler_state->program.functions, 4);
+    bh_arr_new(global_heap_allocator, compiler_state->parse_output.top_level_bindings, 4);
+    bh_arr_new(global_heap_allocator, compiler_state->parse_output.nodes_to_process, 4);
+    bh_arr_new(global_heap_allocator, compiler_state->parse_output.functions, 4);
 
     bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
     compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
@@ -214,7 +215,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_printf("[Checking semantics]\n");
 
     OnyxSemPassState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
-    onyx_sempass(&sp_state, &compiler_state->program);
+    onyx_sempass(&sp_state, &compiler_state->parse_output);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
@@ -226,7 +227,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_printf("[Generating WASM]\n");
 
     compiler_state->wasm_mod = onyx_wasm_module_create(compiler_state->options->allocator, &compiler_state->msgs);
-    onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->program);
+    onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->parse_output);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
@@ -265,7 +266,7 @@ int main(int argc, char *argv[]) {
 
     OnyxCompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
     CompilerState compile_state = {
-        .program = {
+        .parse_output = {
             .top_level_bindings = NULL,
             .nodes_to_process   = NULL,
 

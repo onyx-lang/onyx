@@ -228,12 +228,13 @@ typedef enum OnyxIntrinsic {
 // same position as AstNodeCall
 struct AstIntrinsicCall { AstTyped base; AstArgument *arguments; OnyxIntrinsic intrinsic; };
 
-typedef struct OnyxProgram {
+// NOTE: Simple data structure for storing what comes out of the parser
+typedef struct ParserOutput {
     bh_arr(AstBinding *)  top_level_bindings;
     bh_arr(AstNode *)     nodes_to_process;
 
     bh_arr(AstFunction *) functions;
-} OnyxProgram;
+} ParserOutput;
 
 
 

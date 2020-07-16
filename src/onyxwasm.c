@@ -209,7 +209,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
         }
         if (basic->flags & Basic_Flag_Float) {
             if (basic->size <= 4) return WASM_TYPE_FLOAT32;
-            if (basic->size == 8) return WASM_TYPE_FLOAT64;;
+            if (basic->size == 8) return WASM_TYPE_FLOAT64;
         }
         if (basic->size == 0) return WASM_TYPE_VOID;
     }
@@ -296,13 +296,13 @@ COMPILE_FUNC(statement, AstNode* stmt) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (stmt->kind) {
-        case Ast_Kind_Return: compile_return(mod, &code, (AstReturn *) stmt); break;
+        case Ast_Kind_Return:     compile_return(mod, &code, (AstReturn *) stmt); break;
         case Ast_Kind_Assignment: compile_assignment(mod, &code, (AstAssign *) stmt); break;
-        case Ast_Kind_If: compile_if(mod, &code, (AstIf *) stmt); break;
-        case Ast_Kind_While: compile_while(mod, &code, (AstWhile *) stmt); break;
-        case Ast_Kind_Break: compile_structured_jump(mod, &code, 0); break;
-        case Ast_Kind_Continue: compile_structured_jump(mod, &code, 1); break;
-        case Ast_Kind_Block: compile_block(mod, &code, (AstBlock *) stmt); break;
+        case Ast_Kind_If:         compile_if(mod, &code, (AstIf *) stmt); break;
+        case Ast_Kind_While:      compile_while(mod, &code, (AstWhile *) stmt); break;
+        case Ast_Kind_Break:      compile_structured_jump(mod, &code, 0); break;
+        case Ast_Kind_Continue:   compile_structured_jump(mod, &code, 1); break;
+        case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt); break;
 
         case Ast_Kind_Call:
         case Ast_Kind_Intrinsic_Call:
@@ -453,8 +453,8 @@ COMPILE_FUNC(binop, AstBinaryOp* binop) {
 
     WasmType operator_type = onyx_type_to_wasm_type(binop->left->type);
     i32 optype = 0;
-    if (operator_type == WASM_TYPE_INT32) optype = 0;
-    else if (operator_type == WASM_TYPE_INT64) optype = 1;
+    if      (operator_type == WASM_TYPE_INT32)   optype = 0;
+    else if (operator_type == WASM_TYPE_INT64)   optype = 1;
     else if (operator_type == WASM_TYPE_FLOAT32) optype = 2;
     else if (operator_type == WASM_TYPE_FLOAT64) optype = 3;
 
@@ -961,8 +961,6 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
         .export_count = 0,
 
         .imports = NULL,
-        .next_import_func_idx = 0,
-        .next_import_global_idx = 0,
 
         .globals = NULL,
         .next_global_idx = 0,
@@ -989,7 +987,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
     return module;
 }
 
-void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program) {
+void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program) {
 
     // NOTE: First, introduce all indicies for globals and functions
     // bh_arr_each(AstForeign *, foreign, program->foreigns) {
@@ -1015,7 +1013,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program) {
 
     bh_arr_each(AstFunction *, function, program->functions) {
         if ((*function)->base.flags & Ast_Flag_Foreign) continue;
-        
+
         if (((*function)->base.flags & Ast_Flag_Intrinsic) == 0)
             bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
     }

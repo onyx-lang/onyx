@@ -24,11 +24,11 @@ local_brute :: proc {
     c := 123.0;
 
     {
-        a := 5.0f;
-        b := 12.3;
+        d := 5.0f;
+        e := 12.3;
 
-        print_f32(a);
-        print_f64(b);
+        print_f32(d);
+        print_f64(e);
     }
 
     print_i32(a);
@@ -91,6 +91,8 @@ main2 :: proc #export {
 // }
 
 main :: proc #export {
+    local_brute();
+
     print_i32(clz_i32(16));
     print_f32(sqrt_f32(2.0f));
 

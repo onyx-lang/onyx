@@ -5,6 +5,7 @@
 
 #include "onyxastnodes.h"
 #include "onyxmsgs.h"
+#include "onyxir.h"
 
 typedef u8 WasmType;
 
@@ -301,14 +302,12 @@ typedef struct OnyxWasmModule {
 
     u16 next_type_idx;
     u16 next_func_idx;
-    u16 next_import_func_idx;
     u16 next_global_idx;
-    u16 next_import_global_idx;
     u16 export_count;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs);
-void onyx_wasm_module_compile(OnyxWasmModule* module, OnyxProgram* program);
+void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 
