@@ -734,13 +734,18 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
 }
 
 static AstFunction* parse_function_definition(OnyxParser* parser) {
-    expect(parser, Token_Type_Keyword_Proc);
 
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
+    func_def->base.token = expect(parser, Token_Type_Keyword_Proc);
 
     while (parser->curr_token->type == '#') {
         if (parse_possible_directive(parser, "intrinsic")) {
             func_def->base.flags |= Ast_Flag_Intrinsic;
+
+            if (parser->curr_token->type == Token_Type_Literal_String) {
+                OnyxToken* str_token = expect(parser, Token_Type_Literal_String);
+                func_def->intrinsic_name = str_token;
+            }
         }
 
         else if (parse_possible_directive(parser, "inline")) {
@@ -759,11 +764,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
 
             if (parser->curr_token->type == Token_Type_Literal_String) {
                 OnyxToken* str_token = expect(parser, Token_Type_Literal_String);
-                func_def->exported_name =
-                    bh_aprintf(global_heap_allocator,
-                            "%b",
-                            str_token->text,
-                            str_token->length);
+                func_def->exported_name = str_token;
             }
         }
 
@@ -884,7 +885,10 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 AstTyped* node = parse_top_level_constant_symbol(parser);
 
                 if (node->kind == Ast_Kind_Function) {
-                    node->token = symbol;
+                    AstFunction* func = (AstFunction *) node;
+
+                    if (func->exported_name == NULL)
+                        func->exported_name = symbol;
                 } else {
                     // HACK
                     bh_arr_push(parser->results.nodes_to_process, (AstNode *) node);

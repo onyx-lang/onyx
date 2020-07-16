@@ -1,3 +1,5 @@
+use "progs/test"
+
 other_value :: proc (n: i32) -> i32 {
     return 8675309 + something_else(n) + global_value;
 }

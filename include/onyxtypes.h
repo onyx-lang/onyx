@@ -89,5 +89,6 @@ Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 const char* type_get_name(Type* type);
 
 b32 type_is_pointer(Type* type);
+b32 type_is_bool(Type* type);
 
 #endif // #ifndef ONYX_TYPES

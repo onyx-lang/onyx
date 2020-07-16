@@ -106,3 +106,7 @@ const char* type_get_name(Type* type) {
 b32 type_is_pointer(Type* type) {
     return type->kind == Type_Kind_Pointer || (type->Basic.flags & Basic_Flag_Pointer) != 0;
 }
+
+b32 type_is_bool(Type* type) {
+    return type != NULL && type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Bool;
+}

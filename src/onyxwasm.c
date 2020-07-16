@@ -826,7 +826,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     bh_arr_new(mod->allocator, wasm_func.code, 4);
 
     if (fd->base.flags & Ast_Flag_Exported) {
-        onyx_token_null_toggle(fd->base.token);
+        onyx_token_null_toggle(fd->exported_name);
 
         i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) fd);
 
@@ -834,10 +834,10 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
             .kind = WASM_FOREIGN_FUNCTION,
             .idx = func_idx,
         };
-        bh_table_put(WasmExport, mod->exports, fd->base.token->text, wasm_export);
+        bh_table_put(WasmExport, mod->exports, fd->exported_name->text, wasm_export);
         mod->export_count++;
 
-        onyx_token_null_toggle(fd->base.token);
+        onyx_token_null_toggle(fd->exported_name);
     }
 
     // If there is no body then don't process the code

@@ -188,8 +188,11 @@ struct AstFunction      {
     AstBlock *body;
     AstLocal *params;
 
-    // NOTE: Used when a function is exported with a specific name
-    char* exported_name;
+    union {
+        // NOTE: Used when a function is exported with a specific name
+        OnyxToken* exported_name;
+        OnyxToken* intrinsic_name;
+    };
 
     // NOTE: Used when the function is declared as foreign
     OnyxToken* foreign_module;

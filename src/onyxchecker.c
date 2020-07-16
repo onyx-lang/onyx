@@ -89,10 +89,7 @@ static b32 check_return(OnyxSemPassState* state, AstReturn* retnode) {
 static b32 check_if(OnyxSemPassState* state, AstIf* ifnode) {
     if (check_expression(state, ifnode->cond)) return 1;
 
-    if (ifnode->cond->type == NULL
-            || ifnode->cond->type->kind != Type_Kind_Basic
-            || ifnode->cond->type->Basic.kind != Basic_Kind_Bool) {
-
+    if (!type_is_bool(ifnode->cond->type)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
                 ifnode->cond->token->pos,
@@ -109,10 +106,7 @@ static b32 check_if(OnyxSemPassState* state, AstIf* ifnode) {
 static b32 check_while(OnyxSemPassState* state, AstWhile* whilenode) {
     if (check_expression(state, whilenode->cond)) return 1;
 
-    if (whilenode->cond->type == NULL
-            || whilenode->cond->type->kind != Type_Kind_Basic
-            || whilenode->cond->type->Basic.kind != Basic_Kind_Bool) {
-
+    if (!type_is_bool(whilenode->cond->type)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
                 whilenode->cond->token->pos,
@@ -152,9 +146,9 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
         call->base.kind = Ast_Kind_Intrinsic_Call;
         call->callee = NULL;
 
-        onyx_token_null_toggle(callee->base.token);
+        onyx_token_null_toggle(callee->intrinsic_name);
 
-        char* intr_name = callee->base.token->text;
+        char* intr_name = callee->intrinsic_name->text;
         OnyxIntrinsic intrinsic = ONYX_INTRINSIC_UNDEFINED;
 
         if (!strcmp("memory_size", intr_name))       intrinsic = ONYX_INTRINSIC_MEMORY_SIZE;
@@ -206,7 +200,7 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
 
         ((AstIntrinsicCall *)call)->intrinsic = intrinsic;
 
-        onyx_token_null_toggle(callee->base.token);
+        onyx_token_null_toggle(callee->intrinsic_name);
     }
 
     call->base.type = callee->base.type->Function.return_type;
@@ -506,6 +500,14 @@ static b32 check_function(OnyxSemPassState* state, AstFunction* func) {
                     ONYX_MESSAGE_TYPE_LITERAL,
                     func->base.token->pos,
                     "exporting a inlined function");
+            return 1;
+        }
+
+        if (func->exported_name == NULL) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_LITERAL,
+                    func->base.token->pos,
+                    "exporting function without a name");
             return 1;
         }
     }
