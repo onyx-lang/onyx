@@ -1,23 +1,49 @@
 use "progs/intrinsics"
 use "progs/print_funcs"
 
-main :: proc #export {
-    print_i32(memory_size());
-
-    arr := 0 as ^i64;
-
-    arr[0] = 10 as i64;
-    arr[1] = 20 as i64;
-    arr[2] = 30 as i64;
-    arr[3] = 40 as i64;
-
+// NOTE: in-place insertion sort
+sort :: proc (src: ^i32, len: i32) {
     i := 0;
-    while i < 4 {
-        arr[i] += 1 as i64;
-        arr[i] *= 2 as i64;
+    while i < len {
+        smallest := i;
 
-        print_i64(arr[i]);
+        j := i + 1;
+        while j < len {
+            if src[j] < src[smallest] smallest = j;
+            j += 1;
+        }
+
+        tmp :: src[smallest];
+        src[smallest] = src[i];
+        src[i] = tmp;
+
         i += 1;
     }
+}
+
+print_i32arr :: proc (arr: ^i32, len: i32) {
+    i := 0;
+    while i < len {
+        print_i32(arr[i]);
+        i += 1;
+    }
+}
+
+main :: proc #export {
+    arr := 0 as ^i32;
+    len :: 10;
+
+    i := 0;
+    while i < len {
+        arr[i] = (len - i) * 10;
+        i += 1;
+    }
+
+    print_i32arr(arr, len);
+
+    sort(arr, len);
+
+    print_i32(1234567);
+    print_i32arr(arr, len);
 }
 
