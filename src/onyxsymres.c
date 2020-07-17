@@ -9,6 +9,7 @@ static AstNode* symbol_resolve(OnyxSemPassState* state, OnyxToken* tkn);
 static void local_group_enter(OnyxSemPassState* state, AstLocalGroup* local_group);
 static void local_group_leave(OnyxSemPassState* state);
 
+static AstType* symres_type(OnyxSemPassState* state, AstType* type);
 static void symres_local(OnyxSemPassState* state, AstLocal** local);
 static void symres_call(OnyxSemPassState* state, AstCall* call);
 static void symres_expression(OnyxSemPassState* state, AstTyped** expr);
@@ -20,10 +21,10 @@ static void symres_statement_chain(OnyxSemPassState* state, AstNode* walker, Ast
 static b32  symres_statement(OnyxSemPassState* state, AstNode* stmt);
 static void symres_block(OnyxSemPassState* state, AstBlock* block);
 static void symres_function(OnyxSemPassState* state, AstFunction* func);
-static AstType* symres_type(OnyxSemPassState* state, AstType* type);
+static void symres_global(OnyxSemPassState* state, AstGlobal* global);
 
 static void symbol_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstNode* symbol) {
-    onyx_token_null_toggle(tkn);
+    token_toggle_end(tkn);
 
     SemPassSymbol* sp_sym = (SemPassSymbol *) bh_alloc_item(state->allocator, SemPassSymbol);
     sp_sym->node = symbol;
@@ -41,11 +42,11 @@ static void symbol_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstNode* s
         state->curr_local_group->last_local = local;
     }
 
-    onyx_token_null_toggle(tkn);
+    token_toggle_end(tkn);
 }
 
 static void symbol_remove(OnyxSemPassState* state, OnyxToken* tkn) {
-    onyx_token_null_toggle(tkn);
+    token_toggle_end(tkn);
 
     SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, tkn->text);
 
@@ -55,26 +56,32 @@ static void symbol_remove(OnyxSemPassState* state, OnyxToken* tkn) {
         bh_table_delete(SemPassSymbol *, state->symbols, tkn->text);
     }
 
-    onyx_token_null_toggle(tkn);
+    token_toggle_end(tkn);
 }
 
 static AstNode* symbol_resolve(OnyxSemPassState* state, OnyxToken* tkn) {
-    onyx_token_null_toggle(tkn);
+    AstNode* res = NULL;
 
-    if (!bh_table_has(SemPassSymbol *, state->symbols, tkn->text)) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
-                tkn->pos,
-                tkn->text);
+    while (res == NULL || res->kind == Ast_Kind_Symbol) {
+        token_toggle_end(tkn);
 
-        onyx_token_null_toggle(tkn);
-        return NULL;
+        if (!bh_table_has(SemPassSymbol *, state->symbols, tkn->text)) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
+                    tkn->pos,
+                    tkn->text);
+
+            token_toggle_end(tkn);
+            return NULL;
+        }
+
+        res = bh_table_get(SemPassSymbol *, state->symbols, tkn->text)->node;
+        token_toggle_end(tkn);
+
+        tkn = res->token;
     }
 
-    SemPassSymbol* sp_sym = bh_table_get(SemPassSymbol *, state->symbols, tkn->text);
-
-    onyx_token_null_toggle(tkn);
-    return sp_sym->node;
+    return res;
 }
 
 static void local_group_enter(OnyxSemPassState* state, AstLocalGroup* local_group) {
@@ -100,7 +107,7 @@ static void symbol_basic_type_introduce(OnyxSemPassState* state, AstBasicType* b
 }
 
 static b32 symbol_unique_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstNode* symbol) {
-    onyx_token_null_toggle(tkn);
+    token_toggle_end(tkn);
 
     // NOTE: If the function hasn't already been defined
     if (!bh_table_has(SemPassSymbol *, state->symbols, tkn->text)) {
@@ -115,11 +122,11 @@ static b32 symbol_unique_introduce(OnyxSemPassState* state, OnyxToken* tkn, AstN
                 tkn->text);
 
         // NOTE: I really wish C had defer...
-        onyx_token_null_toggle(tkn);
+        token_toggle_end(tkn);
         return 0;
     }
 
-    onyx_token_null_toggle(tkn);
+    token_toggle_end(tkn);
     return 1;
 }
 
@@ -165,12 +172,12 @@ static void symres_call(OnyxSemPassState* state, AstCall* call) {
     if (callee)
         call->callee = callee;
     else {
-        onyx_token_null_toggle(call->callee->token);
+        token_toggle_end(call->callee->token);
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
                 call->callee->token->pos,
                 call->callee->token->text);
-        onyx_token_null_toggle(call->callee->token);
+        token_toggle_end(call->callee->token);
         return;
     }
 
@@ -315,6 +322,10 @@ static void symres_function(OnyxSemPassState* state, AstFunction* func) {
     }
 }
 
+static void symres_global(OnyxSemPassState* state, AstGlobal* global) {
+    global->base.type_node = symres_type(state, global->base.type_node);
+}
+
 static void symres_top_node(OnyxSemPassState* state, AstNode** node) {
     switch ((*node)->kind) {
         case Ast_Kind_Call:
@@ -323,6 +334,10 @@ static void symres_top_node(OnyxSemPassState* state, AstNode** node) {
         case Ast_Kind_Literal:
         case Ast_Kind_Symbol:
              symres_expression(state, (AstTyped **) node);
+             break;
+
+        case Ast_Kind_Global:
+             symres_global(state, (AstGlobal *) *node);
              break;
 
         case Ast_Kind_Function:

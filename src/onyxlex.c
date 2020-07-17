@@ -15,7 +15,7 @@ static const char* token_type_names[] = {
     "else",
     "elseif",
     "return",
-    "foreign",
+    "global",
     "proc",
     "as",
     "while",
@@ -79,7 +79,7 @@ static b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, b32 is_
     return 0;
 }
 
-const char* onyx_get_token_type_name(TokenType tkn_type) {
+const char* token_name(TokenType tkn_type) {
     if (tkn_type < Token_Type_Ascii_End) {
         return bh_aprintf(global_scratch_allocator, "%c", (char) tkn_type);
     } else {
@@ -87,7 +87,7 @@ const char* onyx_get_token_type_name(TokenType tkn_type) {
     }
 }
 
-void onyx_token_null_toggle(OnyxToken* tkn) {
+void token_toggle_end(OnyxToken* tkn) {
     static char backup = 0;
     char tmp = tkn->text[tkn->length];
     tkn->text[tkn->length] = backup;
@@ -129,12 +129,11 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     }
 
     LITERAL_TOKEN("struct",     1, Token_Type_Keyword_Struct);
-//     LITERAL_TOKEN("export",     1, Token_Type_Keyword_Export);
     LITERAL_TOKEN("use",        1, Token_Type_Keyword_Use);
     LITERAL_TOKEN("if",         1, Token_Type_Keyword_If);
     LITERAL_TOKEN("elseif",     1, Token_Type_Keyword_Elseif);
     LITERAL_TOKEN("else",       1, Token_Type_Keyword_Else);
-    // LITERAL_TOKEN("foreign",    1, Token_Type_Keyword_Foreign);
+    LITERAL_TOKEN("global",     1, Token_Type_Keyword_Global);
     LITERAL_TOKEN("return",     1, Token_Type_Keyword_Return);
     LITERAL_TOKEN("proc",       1, Token_Type_Keyword_Proc);
     LITERAL_TOKEN("as",         1, Token_Type_Keyword_Cast);

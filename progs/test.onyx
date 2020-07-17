@@ -17,8 +17,9 @@ echo :: proc (n: i32) -> i32 {
 
 global_value :: echo(fib(4) * 2);
 
-local_brute :: proc {
+test_proc :: local_brute;
 
+local_brute :: proc {
     a := 123;
     b := 123.0f;
     c := 123.0;
@@ -34,10 +35,6 @@ local_brute :: proc {
     print_i32(a);
     print_f32(b);
     print_f64(c);
-}
-
-main3 :: proc #export {
-    local_brute();
 }
 
 // This is the entry point
@@ -90,6 +87,7 @@ main2 :: proc #export {
 // }
 
 main :: proc #export {
+    test_proc();
     local_brute();
 
     print_i32(clz_i32(16));

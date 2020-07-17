@@ -17,7 +17,7 @@ typedef enum TokenType {
     Token_Type_Keyword_Else         = 263,
     Token_Type_Keyword_Elseif       = 264,
     Token_Type_Keyword_Return       = 265,
-    Token_Type_Keyword_Foreign      = 266,
+    Token_Type_Keyword_Global       = 266,
     Token_Type_Keyword_Proc         = 267,
     Token_Type_Keyword_Cast         = 268,
     Token_Type_Keyword_While        = 269,
@@ -71,8 +71,8 @@ typedef struct OnyxTokenizer {
     bh_arr(OnyxToken) tokens;
 } OnyxTokenizer;
 
-const char* onyx_get_token_type_name(TokenType tkn_type);
-void onyx_token_null_toggle(OnyxToken* tkn);
+const char* token_name(TokenType tkn_type);
+void token_toggle_end(OnyxToken* tkn);
 OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer);
 OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc);
 void onyx_tokenizer_free(OnyxTokenizer* tokenizer);

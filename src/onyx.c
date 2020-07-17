@@ -172,6 +172,7 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
     bh_arr_new(global_heap_allocator, compiler_state->parse_output.top_level_bindings, 4);
     bh_arr_new(global_heap_allocator, compiler_state->parse_output.nodes_to_process, 4);
     bh_arr_new(global_heap_allocator, compiler_state->parse_output.functions, 4);
+    bh_arr_new(global_heap_allocator, compiler_state->parse_output.globals, 4);
 
     bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
     compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
@@ -271,6 +272,7 @@ int main(int argc, char *argv[]) {
             .nodes_to_process   = NULL,
 
             .functions = NULL,
+            .globals   = NULL,
         },
         .wasm_mod = { 0 }
     };

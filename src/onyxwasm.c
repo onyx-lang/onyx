@@ -5,17 +5,17 @@
 // NOTE: Allows easier testing of types since most of the characters
 // corresponding to these values are not printable
 #if 1
-const WasmType WASM_TYPE_INT32 = 0x7F;
-const WasmType WASM_TYPE_INT64 = 0x7E;
-const WasmType WASM_TYPE_FLOAT32 = 0x7D;
-const WasmType WASM_TYPE_FLOAT64 = 0x7C;
-const WasmType WASM_TYPE_VOID = 0x00;
+#define WASM_TYPE_INT32   0x7F
+#define WASM_TYPE_INT64   0x7E
+#define WASM_TYPE_FLOAT32 0x7D
+#define WASM_TYPE_FLOAT64 0x7C
+#define WASM_TYPE_VOID    0x00
 #else
-const WasmType WASM_TYPE_INT32 = 'A';
-const WasmType WASM_TYPE_INT64 = 'B';
-const WasmType WASM_TYPE_FLOAT32 = 'C';
-const WasmType WASM_TYPE_FLOAT64 = 'D';
-const WasmType WASM_TYPE_VOID = '\0';
+#define WASM_TYPE_INT32   'A'
+#define WASM_TYPE_INT64   'B'
+#define WASM_TYPE_FLOAT32 'C'
+#define WASM_TYPE_FLOAT64 'D'
+#define WASM_TYPE_VOID    'E'
 #endif
 
 static const char* wi_string(WasmInstructionType wit) {
@@ -826,7 +826,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     bh_arr_new(mod->allocator, wasm_func.code, 4);
 
     if (fd->base.flags & Ast_Flag_Exported) {
-        onyx_token_null_toggle(fd->exported_name);
+        token_toggle_end(fd->exported_name);
 
         i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) fd);
 
@@ -837,7 +837,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
         bh_table_put(WasmExport, mod->exports, fd->exported_name->text, wasm_export);
         mod->export_count++;
 
-        onyx_token_null_toggle(fd->exported_name);
+        token_toggle_end(fd->exported_name);
     }
 
     // If there is no body then don't process the code
@@ -880,22 +880,28 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
 }
 
 static void compile_global_declaration(OnyxWasmModule* module, AstGlobal* global) {
+    WasmType global_type = onyx_type_to_wasm_type(global->base.type);
+
+    if (global->base.flags & Ast_Flag_Foreign) {
+        WasmImport import = {
+            .kind = WASM_FOREIGN_GLOBAL,
+            .idx  = global_type,
+            .mod  = global->foreign_module,
+            .name = global->foreign_name,
+        };
+
+        bh_arr_push(module->imports, import);
+        return;
+    }
+
     WasmGlobal glob = {
-        .type = onyx_type_to_wasm_type(global->base.type),
+        .type = global_type,
         .mutable = (global->base.flags & Ast_Flag_Const) == 0,
         .initial_value = NULL,
     };
 
-    if (!global->initial_value) {
-        onyx_message_add(module->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
-                global->base.token->pos,
-                "global without initial value");
-        return;
-    }
-
     if ((global->base.flags & Ast_Flag_Exported) != 0) {
-        onyx_token_null_toggle(global->base.token);
+        token_toggle_end(global->exported_name);
 
         i32 global_idx = (i32) bh_imap_get(&module->func_map, (u64) global);
 
@@ -903,46 +909,24 @@ static void compile_global_declaration(OnyxWasmModule* module, AstGlobal* global
             .kind = WASM_FOREIGN_GLOBAL,
             .idx = global_idx,
         };
-        bh_table_put(WasmExport, module->exports, global->base.token->text, wasm_export);
+        bh_table_put(WasmExport, module->exports, global->exported_name->text, wasm_export);
         module->export_count++;
 
-        onyx_token_null_toggle(global->base.token);
+        token_toggle_end(global->exported_name);
     }
 
-    compile_expression(module, &glob.initial_value, global->initial_value);
+    bh_arr_new(global_heap_allocator, glob.initial_value, 1);
+
+    switch (global_type) {
+        case WASM_TYPE_INT32:   bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_I32_CONST, 0 })); break;
+        case WASM_TYPE_INT64:   bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_I64_CONST, 0 })); break;
+        case WASM_TYPE_FLOAT32: bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_F32_CONST, 0 })); break;
+        case WASM_TYPE_FLOAT64: bh_arr_push(glob.initial_value, ((WasmInstruction) { WI_F64_CONST, 0 })); break;
+
+        default: assert(("Invalid global type", 0)); break;
+    }
+
     bh_arr_push(module->globals, glob);
-}
-
-static void compile_foreign(OnyxWasmModule* module, AstForeign* foreign) {
-    if (foreign->import->kind == Ast_Kind_Function) {
-        i32 type_idx = generate_type_idx(module, (AstFunction *) foreign->import);
-
-        WasmImport import = {
-            .kind = WASM_FOREIGN_FUNCTION,
-            .idx = type_idx,
-            .mod = foreign->mod_token,
-            .name = foreign->name_token,
-        };
-
-        bh_arr_push(module->imports, import);
-
-    } else if (foreign->import->kind == Ast_Kind_Global) {
-        WasmType global_type = onyx_type_to_wasm_type(((AstGlobal *) foreign->import)->base.type);
-
-        WasmImport import = {
-            .kind = WASM_FOREIGN_GLOBAL,
-            .idx = global_type,
-            .mod = foreign->mod_token,
-            .name = foreign->name_token,
-        };
-
-        bh_arr_push(module->imports, import);
-
-    } else {
-        DEBUG_HERE;
-        // NOTE: Invalid foreign
-        assert(0);
-    }
 }
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
@@ -994,6 +978,12 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program) {
         }
     }
 
+    bh_arr_each(AstGlobal *, global, program->globals) {
+        if ((*global)->base.flags & Ast_Flag_Foreign) {
+            bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
+        }
+    }
+
     bh_arr_each(AstFunction *, function, program->functions) {
         if ((*function)->base.flags & Ast_Flag_Foreign) continue;
 
@@ -1001,7 +991,16 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program) {
             bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
     }
 
+    bh_arr_each(AstGlobal *, global, program->globals) {
+        if ((*global)->base.flags & Ast_Flag_Foreign) continue;
+
+        bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
+    }
+
     // NOTE: Then, compile everything
+    bh_arr_each(AstGlobal *, global, program->globals)
+        compile_global_declaration(module, *global);
+
     bh_arr_each(AstFunction *, function, program->functions)
         compile_function(module, *function);
 

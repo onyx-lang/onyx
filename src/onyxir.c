@@ -90,25 +90,25 @@ IR_FUNC(ir_function, AstFunction* ast_func) {
     func->is_intrinsic = (ast_func->base.flags & Ast_Flag_Intrinsic) != 0;
 
     if (func->is_intrinsic) {
-        onyx_token_null_toggle(ast_func->base.token);
+        token_toggle_end(ast_func->base.token);
         func->intrinsic = intrinsic_lookup(ast_func->base.token->text);
-        onyx_token_null_toggle(ast_func->base.token);
+        token_toggle_end(ast_func->base.token);
     }
 
     else if (func->is_exported) {
-        onyx_token_null_toggle(ast_func->base.token);
+        token_toggle_end(ast_func->base.token);
         func->exported_name = bh_aprintf(c->allocator, "%s", ast_func->base.token->text);
-        onyx_token_null_toggle(ast_func->base.token);
+        token_toggle_end(ast_func->base.token);
     }
 
     else if (func->is_foreign) {
-        onyx_token_null_toggle(ast_func->foreign_module);
+        token_toggle_end(ast_func->foreign_module);
         func->foreign_module = bh_aprintf(c->allocator, "%s", ast_func->foreign_module);
-        onyx_token_null_toggle(ast_func->foreign_module);
+        token_toggle_end(ast_func->foreign_module);
 
-        onyx_token_null_toggle(ast_func->foreign_name);
+        token_toggle_end(ast_func->foreign_name);
         func->foreign_module = bh_aprintf(c->allocator, "%s", ast_func->foreign_name);
-        onyx_token_null_toggle(ast_func->foreign_name);
+        token_toggle_end(ast_func->foreign_name);
     }
 
     if (func->body != NULL) {

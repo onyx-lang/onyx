@@ -180,8 +180,21 @@ struct AstFunctionType  { AstType base; AstType* return_type; u64 param_count; A
 // Top level nodes
 struct AstBinding       { AstTyped base; AstNode* node; };
 struct AstForeign       { AstNode  base; OnyxToken *mod_token, *name_token; AstNode *import; };
-struct AstGlobal        { AstTyped base; AstTyped *initial_value; };
 struct AstUse           { AstNode  base; OnyxToken *filename; };
+struct AstGlobal        {
+    AstTyped base;
+
+    union {
+        // NOTE: Used when a global is exported with a specific name
+        OnyxToken* exported_name;
+
+        // NOTE: Used when the global is declared as foreign
+        struct {
+            OnyxToken* foreign_module;
+            OnyxToken* foreign_name;
+        };
+    };
+};
 struct AstFunction      {
     AstTyped base;
 
@@ -192,11 +205,13 @@ struct AstFunction      {
         // NOTE: Used when a function is exported with a specific name
         OnyxToken* exported_name;
         OnyxToken* intrinsic_name;
-    };
 
-    // NOTE: Used when the function is declared as foreign
-    OnyxToken* foreign_module;
-    OnyxToken* foreign_name;
+        // NOTE: Used when the function is declared as foreign
+        struct {
+            OnyxToken* foreign_module;
+            OnyxToken* foreign_name;
+        };
+    };
 };
 
 typedef enum OnyxIntrinsic {
@@ -237,6 +252,7 @@ typedef struct ParserOutput {
     bh_arr(AstNode *)     nodes_to_process;
 
     bh_arr(AstFunction *) functions;
+    bh_arr(AstGlobal *)   globals;
 } ParserOutput;
 
 

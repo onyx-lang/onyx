@@ -23,8 +23,8 @@ typedef struct OnyxParser {
 
     // NOTE: not used since all tokens are lexed before parsing starts
     OnyxTokenizer *tokenizer;
-    OnyxToken *prev_token;
-    OnyxToken *curr_token;
+    OnyxToken *prev;
+    OnyxToken *curr;
 
     OnyxMessages *msgs;
 

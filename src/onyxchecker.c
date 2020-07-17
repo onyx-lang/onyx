@@ -146,7 +146,7 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
         call->base.kind = Ast_Kind_Intrinsic_Call;
         call->callee = NULL;
 
-        onyx_token_null_toggle(callee->intrinsic_name);
+        token_toggle_end(callee->intrinsic_name);
 
         char* intr_name = callee->intrinsic_name->text;
         OnyxIntrinsic intrinsic = ONYX_INTRINSIC_UNDEFINED;
@@ -200,7 +200,7 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
 
         ((AstIntrinsicCall *)call)->intrinsic = intrinsic;
 
-        onyx_token_null_toggle(callee->intrinsic_name);
+        token_toggle_end(callee->intrinsic_name);
     }
 
     call->base.type = callee->base.type->Function.return_type;
@@ -379,34 +379,16 @@ static b32 check_expression(OnyxSemPassState* state, AstTyped* expr) {
 }
 
 static b32 check_global(OnyxSemPassState* state, AstGlobal* global) {
-    if (global->initial_value) {
-        if (check_expression(state, global->initial_value)) return 1;
-
-        if (global->base.type == NULL) {
-            global->base.type = type_build_from_ast(state->node_allocator, global->base.type_node);
-        }
-
-        if (global->base.type != NULL) {
-            if (!types_are_compatible(global->base.type, global->initial_value->type)) {
-                onyx_message_add(state->msgs,
-                        ONYX_MESSAGE_TYPE_GLOBAL_TYPE_MISMATCH,
-                        global->base.token->pos,
-                        global->base.token->text, global->base.token->length,
-                        type_get_name(global->base.type),
-                        type_get_name(global->initial_value->type));
-                return 1;
-            }
-        } else {
-            if (global->initial_value->type)
-                global->base.type = global->initial_value->type;
-        }
-    }
+    if (global->base.type == NULL)
+        global->base.type = type_build_from_ast(state->allocator, global->base.type_node);
 
     if (global->base.type == NULL) {
         onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+                ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
                 global->base.token->pos,
-                "global variable with unknown type");
+                global->exported_name->text,
+                global->exported_name->length);
+
         return 1;
     }
 
@@ -540,6 +522,10 @@ void onyx_type_check(OnyxSemPassState* state, ParserOutput* program) {
 
         if ((*node)->kind == Ast_Kind_Function) {
             bh_arr_push(program->functions, (AstFunction *) *node);
+        }
+
+        if ((*node)->kind == Ast_Kind_Global) {
+            bh_arr_push(program->globals, (AstGlobal *) *node);
         }
     }
 }
