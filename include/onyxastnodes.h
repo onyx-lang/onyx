@@ -4,8 +4,6 @@
 #include "onyxlex.h"
 #include "onyxtypes.h"
 
-typedef struct AstNode AstNode;
-typedef struct AstTyped AstTyped;
 typedef struct AstUnaryOp AstUnaryOp;
 typedef struct AstBinOp AstBinaryOp;
 typedef struct AstAssign AstAssign;
@@ -21,7 +19,6 @@ typedef struct AstIf AstIf;
 typedef struct AstWhile AstWhile;
 typedef struct AstLocalGroup AstLocalGroup;
 
-typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
 typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
@@ -115,50 +112,69 @@ typedef enum BinaryOp {
 // arguments existing in AstNode. I do this to avoid a nested
 // "inheiritance" where you would have to say node.base.base.next
 // for example
-struct AstNode {
-    AstKind kind;
-    u32 flags;
-    OnyxToken *token;
-    AstNode *next;
-};
 
-struct AstTyped {
-    AstKind kind;
-    u32 flags;
-    OnyxToken *token;
-    AstNode *next;
-
-    // NOTE: 'type_node' is filled out by the parser.
-    // For a type such as '^^i32', the tree would look something like
-    //
-    //      Typed Thing -> AstPointerType -> AstPointerType -> AstNode (symbol node)
-    //
-    // The symbol node will be filled out during symbol resolution.
-    // It will end up pointing to an AstBasicType that corresponds to
-    // the underlying type.
-    //
-    // 'type' is filled out afterwards. If it is NULL, the Type* is built
-    // using the type_node. This can then be used to typecheck this node.
-    AstType *type_node;
-    Type *type;
+#define AstNode_members {     \
+    AstKind kind;             \
+    u32 flags;                \
+    OnyxToken *token;         \
+    AstNode *next;            \
 };
+#define AstNode_base struct AstNode_members;
+
+typedef struct AstNode AstNode;
+struct AstNode AstNode_members;
+
+// Type Nodes
+// NOTE: This node is very similar to an AstNode, just
+// without the 'next' member. This is because types
+// can't be in expressions so a 'next' thing
+// doesn't make sense.
+#define AstType_members { AstKind kind; u32 flags; char* name; }
+#define AstType_base struct AstType_members;
+
+typedef struct AstType AstType;
+struct AstType AstType_members;
+
+// NOTE: 'type_node' is filled out by the parser.                                               \
+// For a type such as '^^i32', the tree would look something like
+//
+//      Typed Thing -> AstPointerType -> AstPointerType -> AstNode (symbol node)
+//
+// The symbol node will be filled out during symbol resolution.
+// It will end up pointing to an AstBasicType that corresponds to
+// the underlying type.
+//
+// 'type' is filled out afterwards. If it is NULL, the Type* is built
+// using the type_node. This can then be used to typecheck this node.
+#define AstTyped_members     { \
+    AstKind kind;              \
+    u32 flags;                 \
+    OnyxToken *token;          \
+    AstNode *next;             \
+    AstType *type_node;        \
+    Type *type;                \
+}
+#define AstTyped_base struct AstTyped_members;
+
+typedef struct AstTyped AstTyped;
+struct AstTyped AstTyped_members;
 
 // Expression Nodes
-struct AstBinOp         { AstTyped base; BinaryOp operation; AstTyped *left, *right; };
-struct AstUnaryOp       { AstTyped base; UnaryOp operation; AstTyped *expr; };
-struct AstAssign        { AstNode  base; AstTyped* lval; AstTyped* expr; };
-struct AstNumLit        { AstTyped base; union { i32 i; i64 l; f32 f; f64 d; } value; };
-struct AstLocal         { AstTyped base; AstLocal *prev_local; };
-struct AstReturn        { AstNode  base; AstTyped* expr; };
-struct AstCall          { AstTyped base; AstArgument *arguments; AstNode *callee; };
-struct AstArgument      { AstTyped base; AstTyped *value; };
+struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
+struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
+struct AstAssign        { AstNode_base;  AstTyped* lval; AstTyped* expr; };
+struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
+struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
+struct AstReturn        { AstNode_base;  AstTyped* expr; };
+struct AstCall          { AstTyped_base; AstArgument *arguments; AstNode *callee; };
+struct AstArgument      { AstTyped_base; AstTyped *value; };
 
 // Structure Nodes
-struct AstLocalGroup    { AstNode base; AstLocalGroup *prev_group; AstLocal *last_local; };
-struct AstBlock         { AstNode base; AstNode *body; AstLocalGroup *locals; };
-struct AstWhile         { AstNode base; AstTyped *cond; AstBlock *body; };
+struct AstLocalGroup    { AstNode_base;  AstLocalGroup *prev_group; AstLocal *last_local; };
+struct AstBlock         { AstNode_base;  AstNode *body; AstLocalGroup *locals; };
+struct AstWhile         { AstNode_base;  AstTyped *cond; AstBlock *body; };
 struct AstIf {
-    AstNode base;
+    AstNode_base;
     AstTyped *cond;
 
     union {
@@ -167,22 +183,16 @@ struct AstIf {
     } true_block, false_block;
 };
 
-// Type Nodes
-// NOTE: This node is very similar to an AstNode, just
-// without the 'next' member. This is because types
-// can't be in expressions so a 'next' thing
-// doesn't make sense.
-struct AstType          { AstKind kind; u32 flags; char* name; };
-struct AstBasicType     { AstType base; Type* type; };
-struct AstPointerType   { AstType base; AstType* elem; };
-struct AstFunctionType  { AstType base; AstType* return_type; u64 param_count; AstType* params[]; };
+struct AstBasicType     { AstType_base; Type* type; };
+struct AstPointerType   { AstType_base; AstType* elem; };
+struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; AstType* params[]; };
 
 // Top level nodes
-struct AstBinding       { AstTyped base; AstNode* node; };
-struct AstForeign       { AstNode  base; OnyxToken *mod_token, *name_token; AstNode *import; };
-struct AstUse           { AstNode  base; OnyxToken *filename; };
+struct AstBinding       { AstTyped_base; AstNode* node; };
+struct AstForeign       { AstNode_base;  OnyxToken *mod_token, *name_token; AstNode *import; };
+struct AstUse           { AstNode_base;  OnyxToken *filename; };
 struct AstGlobal        {
-    AstTyped base;
+    AstTyped_base;
 
     union {
         // NOTE: Used when a global is exported with a specific name
@@ -196,7 +206,7 @@ struct AstGlobal        {
     };
 };
 struct AstFunction      {
-    AstTyped base;
+    AstTyped_base;
 
     AstBlock *body;
     AstLocal *params;
@@ -244,7 +254,7 @@ typedef enum OnyxIntrinsic {
 
 // NOTE: This needs to have 'arguments' in the
 // same position as AstNodeCall
-struct AstIntrinsicCall { AstTyped base; AstArgument *arguments; OnyxIntrinsic intrinsic; };
+struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; OnyxIntrinsic intrinsic; };
 
 // NOTE: Simple data structure for storing what comes out of the parser
 typedef struct ParserOutput {

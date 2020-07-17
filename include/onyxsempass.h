@@ -7,12 +7,12 @@
 #include "onyxastnodes.h"
 #include "onyxmsgs.h"
 
-typedef struct SemPassSymbol {
+typedef struct SemSymbol {
     AstNode *node;
-    struct SemPassSymbol *shadowed;
-} SemPassSymbol;
+    struct SemSymbol *shadowed;
+} SemSymbol;
 
-typedef struct OnyxSemPassState {
+typedef struct SemState {
     // NOTE: Adding node_allocator in case we need
     // to make any more node in the tree
     bh_allocator allocator, node_allocator;
@@ -25,17 +25,17 @@ typedef struct OnyxSemPassState {
     Type* expected_return_type;
 
     // NOTE: All symbols a given point that we can resolve
-    bh_table(SemPassSymbol *) symbols;
-} OnyxSemPassState;
+    bh_table(SemSymbol *) symbols;
+} SemState;
 
 // NOTE: Resolving all symbols in the tree
-void onyx_resolve_symbols(OnyxSemPassState* state, ParserOutput* program);
+void onyx_resolve_symbols(SemState* state, ParserOutput* program);
 
 // NOTE: Inferring and checking types in the tree
-void onyx_type_check(OnyxSemPassState* state, ParserOutput* program);
+void onyx_type_check(SemState* state, ParserOutput* program);
 
 // NOTE: Full semantic pass
-OnyxSemPassState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc, OnyxMessages* msgs);
-void onyx_sempass(OnyxSemPassState* state, ParserOutput* program);
+SemState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc, OnyxMessages* msgs);
+void onyx_sempass(SemState* state, ParserOutput* program);
 
 #endif
