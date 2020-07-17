@@ -4,6 +4,8 @@
 #include "onyxlex.h"
 #include "onyxtypes.h"
 
+typedef struct AstNode AstNode;
+typedef struct AstTyped AstTyped;
 typedef struct AstUnaryOp AstUnaryOp;
 typedef struct AstBinOp AstBinaryOp;
 typedef struct AstAssign AstAssign;
@@ -19,6 +21,7 @@ typedef struct AstIf AstIf;
 typedef struct AstWhile AstWhile;
 typedef struct AstLocalGroup AstLocalGroup;
 
+typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
 typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
