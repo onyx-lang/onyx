@@ -282,23 +282,20 @@ typedef struct OnyxWasmModule {
     // NOTE: Mapping from local ast node ptrs to indicies
     bh_imap local_map;
     bh_imap global_map;
-
-    bh_arr(u8) structured_jump_target;
+    bh_imap func_map; // NOTE: Maps from ast node pointers to the function index
 
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
     // to the function type index if it has been created.
     bh_table(i32) type_map;
-    bh_arr(WasmFuncType*) functypes; // NOTE: This have to be pointers because the type is variadic in size
 
-    bh_arr(WasmFunc) funcs;
-    bh_imap func_map; // NOTE: Maps from ast node pointers to the function index
+    bh_arr(u8) structured_jump_target;
 
-    bh_table(WasmExport) exports;
-
+    bh_arr(WasmFuncType*) types; // NOTE: This have to be pointers because the type is variadic in size
     bh_arr(WasmImport) imports;
-
+    bh_table(WasmExport) exports;
     bh_arr(WasmGlobal) globals;
+    bh_arr(WasmFunc) funcs;
 
     u16 next_type_idx;
     u16 next_func_idx;

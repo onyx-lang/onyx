@@ -110,12 +110,6 @@ typedef enum BinaryOp {
 
 
 // Base Nodes
-
-// NOTE: AstNode and AstTyped need to be EXACTLY the same for all
-// arguments existing in AstNode. I do this to avoid a nested
-// "inheiritance" where you would have to say node.base.base.next
-// for example
-
 #define AstNode_members {     \
     AstKind kind;             \
     u32 flags;                \
@@ -137,10 +131,7 @@ struct AstNode AstNode_members;
 // 'type' is filled out afterwards. If it is NULL, the Type* is built
 // using the type_node. This can then be used to typecheck this node.
 #define AstTyped_members     { \
-    AstKind kind;              \
-    u32 flags;                 \
-    OnyxToken *token;          \
-    AstNode *next;             \
+    AstNode_base;              \
     AstType *type_node;        \
     Type *type;                \
 }
@@ -160,15 +151,13 @@ struct AstArgument      { AstTyped_base; AstTyped *value; };
 // Structure Nodes
 struct AstLocalGroup    { AstNode_base;  AstLocalGroup *prev_group; AstLocal *last_local; };
 struct AstBlock         { AstNode_base;  AstNode *body; AstLocalGroup *locals; };
-struct AstWhile         { AstNode_base;  AstTyped *cond; AstBlock *body; };
+struct AstWhile         { AstNode_base;  AstTyped *cond; AstNode *stmt; };
 struct AstIf {
     AstNode_base;
     AstTyped *cond;
 
-    union {
-        AstIf *as_if;
-        AstBlock* as_block;
-    } true_block, false_block;
+    AstNode* true_stmt;
+    AstNode* false_stmt;
 };
 
 // Type Nodes
@@ -207,6 +196,7 @@ struct AstFunction      {
 
     AstBlock *body;
     AstLocal *params;
+    bh_arr(AstLocal *) locals;
 
     union {
         // NOTE: Used when a function is exported with a specific name

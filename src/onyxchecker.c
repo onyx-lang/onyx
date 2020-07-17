@@ -97,8 +97,8 @@ static b32 check_if(SemState* state, AstIf* ifnode) {
         return 1;
     }
 
-    if (ifnode->true_block.as_if)  if (check_statement(state, (AstNode *) ifnode->true_block.as_block))  return 1;
-    if (ifnode->false_block.as_if) if (check_statement(state, (AstNode *) ifnode->false_block.as_block)) return 1;
+    if (ifnode->true_stmt)  if (check_statement(state, ifnode->true_stmt))  return 1;
+    if (ifnode->false_stmt) if (check_statement(state, ifnode->false_stmt)) return 1;
 
     return 0;
 }
@@ -114,7 +114,7 @@ static b32 check_while(SemState* state, AstWhile* whilenode) {
         return 1;
     }
 
-    return check_block(state, whilenode->body);
+    return check_statement(state, whilenode->stmt);
 }
 
 static b32 check_call(SemState* state, AstCall* call) {

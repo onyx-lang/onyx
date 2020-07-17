@@ -6,6 +6,10 @@ print :: proc
     #foreign "host" "print"
     (val: i32) ---
 
+printf :: proc
+    #foreign "host" "print"
+    (val: f32) ---
+
 test :: proc (a: bool) -> bool {
     return !a;
 }
@@ -36,11 +40,25 @@ main :: proc #export {
     print(4 + global_value);
 
     b := 1 + foo(2);
+    if b == 13 b = 10;
     print(b);
 
-    if b == 13 {}
-    else {
-        print(1024);
+    if b == 13 print(5678);
+    else       print(1024);
+
+    if b == 13 ---
+
+    while true {
+        while true {
+            while true {
+                foo := 20;
+                foo = global_value + 10;
+                print(foo);
+                break;
+            }
+            break;
+        }
+        break;
     }
 
     cond :: true;

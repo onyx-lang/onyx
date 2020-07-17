@@ -344,31 +344,25 @@ COMPILE_FUNC(if, AstIf* if_node) {
 
     bh_arr_push(mod->structured_jump_target, 0);
 
-    if (if_node->true_block.as_if) {
-        // NOTE: This is kind of gross, but making a function for this doesn't feel right
-
-        if (if_node->true_block.as_if->kind == Ast_Kind_If) {
-            forll (AstNode, stmt, (AstNode *) if_node->true_block.as_if, next) {
+    if (if_node->true_stmt) {
+        if (if_node->true_stmt->kind == Ast_Kind_Block) {
+            forll (AstNode, stmt, ((AstBlock *) if_node->true_stmt)->body, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->true_block.as_if->kind == Ast_Kind_Block) {
-            forll (AstNode, stmt, if_node->true_block.as_block->body, next) {
-                compile_statement(mod, &code, stmt);
-            }
+        } else {
+            compile_statement(mod, &code, if_node->true_stmt);
         }
     }
 
-    if (if_node->false_block.as_if) {
+    if (if_node->false_stmt) {
         WI(WI_ELSE);
 
-        if (if_node->false_block.as_if->kind == Ast_Kind_If) {
-            forll (AstNode, stmt, (AstNode *) if_node->false_block.as_if, next) {
+        if (if_node->false_stmt->kind == Ast_Kind_Block) {
+            forll (AstNode, stmt, ((AstBlock *) if_node->false_stmt)->body, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->false_block.as_if->kind == Ast_Kind_Block) {
-            forll (AstNode, stmt, if_node->false_block.as_block->body, next) {
-                compile_statement(mod, &code, stmt);
-            }
+        } else {
+            compile_statement(mod, &code, if_node->false_stmt);
         }
     }
 
@@ -392,8 +386,12 @@ COMPILE_FUNC(while, AstWhile* while_node) {
     bh_arr_push(mod->structured_jump_target, 1);
     bh_arr_push(mod->structured_jump_target, 2);
 
-    forll (AstNode, stmt, while_node->body->body, next) {
-        compile_statement(mod, &code, stmt);
+    if (while_node->stmt->kind == Ast_Kind_Block) {
+        forll (AstNode, stmt, ((AstBlock *) while_node->stmt)->body, next) {
+            compile_statement(mod, &code, stmt);
+        }
+    } else {
+        compile_statement(mod, &code, while_node->stmt);
     }
 
     bh_arr_pop(mod->structured_jump_target);
@@ -784,7 +782,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
         // HACK ish thing
         memcpy(type->param_types, type_repr_buf, type->param_count);
 
-        bh_arr_push(mod->functypes, type);
+        bh_arr_push(mod->types, type);
 
         bh_table_put(i32, mod->type_map, type_repr_buf, mod->next_type_idx);
         type_idx = mod->next_type_idx;
@@ -854,9 +852,9 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
         // is the same as the order of the local_types above
         u8* count = &wasm_func.locals.i32_count;
         fori (ti, 0, 3) {
-            forll (AstLocal, local, fd->body->locals->last_local, prev_local) {
-                if (onyx_type_to_wasm_type(local->type) == local_types[ti]) {
-                    bh_imap_put(&mod->local_map, (u64) local, localidx++);
+            bh_arr_each(AstLocal *, local, fd->locals) {
+                if (onyx_type_to_wasm_type((*local)->type) == local_types[ti]) {
+                    bh_imap_put(&mod->local_map, (u64) *local, localidx++);
 
                     (*count)++;
                 }
@@ -936,7 +934,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
 
         .type_map = NULL,
         .next_type_idx = 0,
-        .functypes = NULL,
+        .types = NULL,
 
         .funcs = NULL,
         .next_func_idx = 0,
@@ -952,7 +950,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
         .structured_jump_target = NULL,
     };
 
-    bh_arr_new(alloc, module.functypes, 4);
+    bh_arr_new(alloc, module.types, 4);
     bh_arr_new(alloc, module.funcs, 4);
     bh_arr_new(alloc, module.imports, 4);
     bh_arr_new(alloc, module.globals, 4);
@@ -1009,7 +1007,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program) {
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {
-    bh_arr_free(module->functypes);
+    bh_arr_free(module->types);
     bh_arr_free(module->funcs);
     bh_imap_free(&module->local_map);
     bh_imap_free(&module->func_map);
@@ -1094,9 +1092,9 @@ static i32 output_typesection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_init(&vec_buff, buff->allocator, 128);
 
     i32 vec_len = output_vector(
-            (void**) module->functypes,
+            (void**) module->types,
             sizeof(WasmFuncType*),
-            bh_arr_length(module->functypes),
+            bh_arr_length(module->types),
             (vector_func *) output_functype,
             &vec_buff);
 

@@ -100,4 +100,6 @@ Explicit overriden functions:
         min(2, 5);
         min(4.5, 10.4);
 
-
+Some WASM intruction optimizations:
+    - local.set followed by local.get -> local.tee
+    - Any code after unconditional break before 'end' can be removed

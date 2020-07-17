@@ -368,41 +368,41 @@ expression_done:
     return root;
 }
 
-// 'if' <expr> <block> ('elseif' <cond> <block>)* ('else' <block>)?
+// 'if' <expr> <stmt> ('elseif' <cond> <stmt>)* ('else' <block>)?
 static AstIf* parse_if_stmt(OnyxParser* parser) {
     expect_token(parser, Token_Type_Keyword_If);
 
     AstTyped* cond = parse_expression(parser);
-    AstBlock* true_block = parse_block(parser);
+    AstNode*  true_stmt = parse_statement(parser);
 
     AstIf* if_node = make_node(AstIf, Ast_Kind_If);
     AstIf* root_if = if_node;
 
     if_node->cond = cond;
-    if (true_block != NULL)
-        if_node->true_block.as_block = true_block;
+    if (true_stmt != NULL)
+        if_node->true_stmt = true_stmt;
 
     while (parser->curr->type == Token_Type_Keyword_Elseif) {
         consume_token(parser);
         AstIf* elseif_node = make_node(AstIf, Ast_Kind_If);
 
         cond = parse_expression(parser);
-        true_block = parse_block(parser);
+        true_stmt = parse_statement(parser);
 
         elseif_node->cond = cond;
-        if (true_block != NULL)
-            elseif_node->true_block.as_block = true_block;
+        if (true_stmt != NULL)
+            elseif_node->true_stmt = true_stmt;
 
-        if_node->false_block.as_if = elseif_node;
+        if_node->false_stmt = (AstNode *) elseif_node;
         if_node = elseif_node;
     }
 
     if (parser->curr->type == Token_Type_Keyword_Else) {
         consume_token(parser);
 
-        AstBlock* false_block = parse_block(parser);
-        if (false_block != NULL)
-            if_node->false_block.as_block = false_block;
+        AstNode* false_stmt = parse_statement(parser);
+        if (false_stmt != NULL)
+            if_node->false_stmt = false_stmt;
     }
 
     return root_if;
@@ -413,12 +413,12 @@ static AstWhile* parse_while_stmt(OnyxParser* parser) {
     OnyxToken* while_token = expect_token(parser, Token_Type_Keyword_While);
 
     AstTyped* cond = parse_expression(parser);
-    AstBlock* body = parse_block(parser);
+    AstNode*  stmt = parse_statement(parser);
 
     AstWhile* while_node = make_node(AstWhile, Ast_Kind_While);
     while_node->token = while_token;
     while_node->cond = cond;
-    while_node->body = body;
+    while_node->stmt = stmt;
 
     return while_node;
 }
@@ -588,6 +588,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
 
         case '{':
+        case Token_Type_Empty_Block:
             needs_semicolon = 0;
             retval = (AstNode *) parse_block(parser);
             break;
@@ -779,6 +780,7 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
 static AstFunction* parse_function_definition(OnyxParser* parser) {
 
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
+    bh_arr_new(global_heap_allocator, func_def->locals, 4);
     func_def->token = expect_token(parser, Token_Type_Keyword_Proc);
 
     while (parser->curr->type == '#') {

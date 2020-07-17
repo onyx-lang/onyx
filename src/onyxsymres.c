@@ -40,6 +40,8 @@ static void symbol_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol) {
         AstLocal* local = (AstLocal *) symbol;
         local->prev_local = state->curr_local_group->last_local;
         state->curr_local_group->last_local = local;
+
+        bh_arr_push(state->curr_function->locals, local);
     }
 
     token_toggle_end(tkn);
@@ -164,6 +166,7 @@ static AstType* symres_type(SemState* state, AstType* type) {
 
 static void symres_local(SemState* state, AstLocal** local) {
     (*local)->type_node = symres_type(state, (*local)->type_node);
+
     symbol_introduce(state, (*local)->token, (AstNode *) *local);
 }
 
@@ -240,30 +243,20 @@ static void symres_return(SemState* state, AstReturn* ret) {
 
 static void symres_if(SemState* state, AstIf* ifnode) {
     symres_expression(state, &ifnode->cond);
-    if (ifnode->true_block.as_if != NULL) {
-        if (ifnode->true_block.as_if->kind == Ast_Kind_Block)
-            symres_block(state, ifnode->true_block.as_block);
 
-        else if (ifnode->true_block.as_if->kind == Ast_Kind_If)
-            symres_if(state, ifnode->true_block.as_if);
-
-        else DEBUG_HERE;
-    }
-
-    if (ifnode->false_block.as_if != NULL) {
-        if (ifnode->false_block.as_if->kind == Ast_Kind_Block)
-            symres_block(state, ifnode->false_block.as_block);
-
-        else if (ifnode->false_block.as_if->kind == Ast_Kind_If)
-            symres_if(state, ifnode->false_block.as_if);
-
-        else DEBUG_HERE;
-    }
+    // BUG: This will not work for the following case:
+    //  if cond foo := 10
+    //  else foo := 20
+    //
+    // The declaration will cause a problem but semantically the above
+    // doesn't make sense.
+    if (ifnode->true_stmt != NULL)  symres_statement(state, ifnode->true_stmt);
+    if (ifnode->false_stmt != NULL) symres_statement(state, ifnode->false_stmt);
 }
 
 static void symres_while(SemState* state, AstWhile* whilenode) {
     symres_expression(state, &whilenode->cond);
-    symres_block(state, whilenode->body);
+    symres_statement(state, whilenode->stmt);
 }
 
 // NOTE: Returns 1 if the statment should be removed
@@ -315,6 +308,7 @@ static void symres_function(SemState* state, AstFunction* func) {
         func->type_node = symres_type(state, func->type_node);
     }
 
+    state->curr_function = func;
     symres_block(state, func->body);
 
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {

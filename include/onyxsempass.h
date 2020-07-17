@@ -20,6 +20,7 @@ typedef struct SemState {
 
     // NOTE: Used in symbol resolution phase
     AstLocalGroup* curr_local_group;
+    AstFunction*   curr_function;
 
     // NOTE: Used in type checking phase
     Type* expected_return_type;
