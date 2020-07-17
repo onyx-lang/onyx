@@ -94,12 +94,32 @@ inline i64 chars_match(char* ptr1, char* ptr2) {
 //-------------------------------------------------------------------------------------
 // Better math functions
 //-------------------------------------------------------------------------------------
-#define bh_max(a, b)        ((a) > (b) ? (a) : (b))
-#define bh_min(a, b)        ((a) < (b) ? (a) : (b))
+#define bh_max(a, b)         ((a) > (b) ? (a) : (b))
+#define bh_min(a, b)         ((a) < (b) ? (a) : (b))
 #define bh_clamp(v, a, b)    (bh_min((b), bh_max((a), (v))))
 #define bh_abs(x)            ((x) < 0 ? -(x) : (x))
 
+static inline u64 log2_dumb(u64 n) {
+    switch (n) {
+    case 1:    return 0;
+    case 2:    return 1;
+    case 4:    return 2;
+    case 8:    return 3;
+    case 16:   return 4;
+    case 32:   return 5;
+    case 64:   return 6;
+    case 128:  return 7;
+    case 256:  return 8;
+    case 512:  return 9;
+    case 1024: return 10;
+    case 2048: return 11;
+    case 4096: return 12;
+    case 8192: return 13;
 
+    // Don't need all of them right now
+    default:   return 0;
+    }
+}
 
 
 

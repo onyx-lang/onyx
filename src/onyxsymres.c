@@ -13,7 +13,6 @@ static AstType* symres_type(SemState* state, AstType* type);
 static void symres_local(SemState* state, AstLocal** local);
 static void symres_call(SemState* state, AstCall* call);
 static void symres_expression(SemState* state, AstTyped** expr);
-static void symres_assignment(SemState* state, AstAssign* assign);
 static void symres_return(SemState* state, AstReturn* ret);
 static void symres_if(SemState* state, AstIf* ifnode);
 static void symres_while(SemState* state, AstWhile* whilenode);
@@ -222,18 +221,15 @@ static void symres_expression(SemState* state, AstTyped** expr) {
             (*expr)->type_node = symres_type(state, (*expr)->type_node);
             break;
 
+        case Ast_Kind_Array_Access:
+            symres_expression(state, &((AstArrayAccess *)(*expr))->addr);
+            symres_expression(state, &((AstArrayAccess *)(*expr))->expr);
+            break;
+
         default:
             DEBUG_HERE;
             break;
     }
-}
-
-static void symres_assignment(SemState* state, AstAssign* assign) {
-    AstTyped* lval = (AstTyped *) symbol_resolve(state, assign->lval->token);
-    if (lval == NULL) return;
-    assign->lval = lval;
-
-    symres_expression(state, &assign->expr);
 }
 
 static void symres_return(SemState* state, AstReturn* ret) {
@@ -263,7 +259,6 @@ static void symres_while(SemState* state, AstWhile* whilenode) {
 static b32 symres_statement(SemState* state, AstNode* stmt) {
     switch (stmt->kind) {
         case Ast_Kind_Local:      symres_local(state, (AstLocal **) &stmt);                return 1;
-        case Ast_Kind_Assignment: symres_assignment(state, (AstAssign *) stmt);            return 0;
         case Ast_Kind_Return:     symres_return(state, (AstReturn *) stmt);                return 0;
         case Ast_Kind_If:         symres_if(state, (AstIf *) stmt);                        return 0;
         case Ast_Kind_While:      symres_while(state, (AstWhile *) stmt);                  return 0;
@@ -271,7 +266,10 @@ static b32 symres_statement(SemState* state, AstNode* stmt) {
         case Ast_Kind_Argument:   symres_expression(state, (AstTyped **) &((AstArgument *)stmt)->value); return 0;
         case Ast_Kind_Block:      symres_block(state, (AstBlock *) stmt);                  return 0;
 
-        default: return 0;
+        case Ast_Kind_Break:      return 0;
+        case Ast_Kind_Continue:   return 0;
+
+        default:                  symres_expression(state, (AstTyped **) &stmt);           return 0;
     }
 }
 

@@ -6,15 +6,18 @@
 
 typedef struct AstNode AstNode;
 typedef struct AstTyped AstTyped;
-typedef struct AstUnaryOp AstUnaryOp;
+
 typedef struct AstBinOp AstBinaryOp;
-typedef struct AstAssign AstAssign;
+typedef struct AstUnaryOp AstUnaryOp;
 typedef struct AstNumLit AstNumLit;
 typedef struct AstLocal AstLocal;
-typedef struct AstReturn AstReturn;
 typedef struct AstCall AstCall;
 typedef struct AstIntrinsicCall AstIntrinsicCall;
 typedef struct AstArgument AstArgument;
+typedef struct AstArrayAccess AstArrayAccess;
+
+typedef struct AstAssign AstAssign;
+typedef struct AstReturn AstReturn;
 
 typedef struct AstBlock AstBlock;
 typedef struct AstIf AstIf;
@@ -61,8 +64,8 @@ typedef enum AstKind {
     Ast_Kind_Argument,
     Ast_Kind_Call,
     Ast_Kind_Intrinsic_Call,
-    Ast_Kind_Assignment,
     Ast_Kind_Return,
+    Ast_Kind_Array_Access,
 
     Ast_Kind_If,
     Ast_Kind_While,
@@ -77,14 +80,16 @@ typedef enum AstKind {
 typedef enum AstFlags {
     // Top-level flags
     Ast_Flag_Exported        = BH_BIT(0),
-    Ast_Flag_Lval            = BH_BIT(1),
+    Ast_Flag_Foreign         = BH_BIT(1),
     Ast_Flag_Const           = BH_BIT(2),
     Ast_Flag_Comptime        = BH_BIT(3),
 
     // Function flags
     Ast_Flag_Inline          = BH_BIT(8),
     Ast_Flag_Intrinsic       = BH_BIT(9),
-    Ast_Flag_Foreign         = BH_BIT(10),
+
+    // Expression flags
+    Ast_Flag_Expr_Ignored    = BH_BIT(8),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -94,19 +99,56 @@ typedef enum UnaryOp {
 } UnaryOp;
 
 typedef enum BinaryOp {
-    Binary_Op_Add           = 0,
-    Binary_Op_Minus         = 1,
-    Binary_Op_Multiply      = 2,
-    Binary_Op_Divide        = 3,
-    Binary_Op_Modulus       = 4,
+    Binary_Op_Add             = 0,
+    Binary_Op_Minus           = 1,
+    Binary_Op_Multiply        = 2,
+    Binary_Op_Divide          = 3,
+    Binary_Op_Modulus         = 4,
 
-    Binary_Op_Equal         = 5,
-    Binary_Op_Not_Equal     = 6,
-    Binary_Op_Less          = 7,
-    Binary_Op_Less_Equal    = 8,
-    Binary_Op_Greater       = 9,
-    Binary_Op_Greater_Equal = 10,
+    Binary_Op_Equal           = 5,
+    Binary_Op_Not_Equal       = 6,
+    Binary_Op_Less            = 7,
+    Binary_Op_Less_Equal      = 8,
+    Binary_Op_Greater         = 9,
+    Binary_Op_Greater_Equal   = 10,
+
+    Binary_Op_Assign_Start    = 11,
+    Binary_Op_Assign          = 12,
+    Binary_Op_Assign_Add      = 13,
+    Binary_Op_Assign_Minus    = 14,
+    Binary_Op_Assign_Multiply = 15,
+    Binary_Op_Assign_Divide   = 16,
+    Binary_Op_Assign_Modulus  = 17,
+    Binary_Op_Assign_End      = 18,
 } BinaryOp;
+
+typedef enum OnyxIntrinsic {
+    ONYX_INTRINSIC_UNDEFINED,
+
+    ONYX_INTRINSIC_MEMORY_SIZE, ONYX_INTRINSIC_MEMORY_GROW,
+
+    ONYX_INTRINSIC_I32_CLZ,   ONYX_INTRINSIC_I32_CTZ, ONYX_INTRINSIC_I32_POPCNT,
+    ONYX_INTRINSIC_I32_AND,   ONYX_INTRINSIC_I32_OR,  ONYX_INTRINSIC_I32_XOR,
+    ONYX_INTRINSIC_I32_SHL,   ONYX_INTRINSIC_I32_SLR, ONYX_INTRINSIC_I32_SAR,
+    ONYX_INTRINSIC_I32_ROTL,  ONYX_INTRINSIC_I32_ROTR,
+
+    ONYX_INTRINSIC_I64_CLZ,   ONYX_INTRINSIC_I64_CTZ, ONYX_INTRINSIC_I64_POPCNT,
+    ONYX_INTRINSIC_I64_AND,   ONYX_INTRINSIC_I64_OR,  ONYX_INTRINSIC_I64_XOR,
+    ONYX_INTRINSIC_I64_SHL,   ONYX_INTRINSIC_I64_SLR, ONYX_INTRINSIC_I64_SAR,
+    ONYX_INTRINSIC_I64_ROTL,  ONYX_INTRINSIC_I64_ROTR,
+
+    ONYX_INTRINSIC_F32_ABS,   ONYX_INTRINSIC_F32_SQRT,
+    ONYX_INTRINSIC_F32_CEIL,  ONYX_INTRINSIC_F32_FLOOR,
+    ONYX_INTRINSIC_F32_TRUNC, ONYX_INTRINSIC_F32_NEAREST,
+    ONYX_INTRINSIC_F32_MIN,   ONYX_INTRINSIC_F32_MAX,
+    ONYX_INTRINSIC_F32_COPYSIGN,
+
+    ONYX_INTRINSIC_F64_ABS,   ONYX_INTRINSIC_F64_SQRT,
+    ONYX_INTRINSIC_F64_CEIL,  ONYX_INTRINSIC_F64_FLOOR,
+    ONYX_INTRINSIC_F64_TRUNC, ONYX_INTRINSIC_F64_NEAREST,
+    ONYX_INTRINSIC_F64_MIN,   ONYX_INTRINSIC_F64_MAX,
+    ONYX_INTRINSIC_F64_COPYSIGN,
+} OnyxIntrinsic;
 
 
 // Base Nodes
@@ -141,12 +183,15 @@ struct AstTyped AstTyped_members;
 // Expression Nodes
 struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
-struct AstAssign        { AstNode_base;  AstTyped* lval; AstTyped* expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
-struct AstReturn        { AstNode_base;  AstTyped* expr; };
 struct AstCall          { AstTyped_base; AstArgument *arguments; AstNode *callee; };
+struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; OnyxIntrinsic intrinsic; };
 struct AstArgument      { AstTyped_base; AstTyped *value; };
+struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
+
+// Intruction Node
+struct AstReturn        { AstNode_base;  AstTyped* expr; };
 
 // Structure Nodes
 struct AstLocalGroup    { AstNode_base;  AstLocalGroup *prev_group; AstLocal *last_local; };
@@ -211,38 +256,6 @@ struct AstFunction      {
     };
 };
 
-typedef enum OnyxIntrinsic {
-    ONYX_INTRINSIC_UNDEFINED,
-
-    ONYX_INTRINSIC_MEMORY_SIZE, ONYX_INTRINSIC_MEMORY_GROW,
-
-    ONYX_INTRINSIC_I32_CLZ,   ONYX_INTRINSIC_I32_CTZ, ONYX_INTRINSIC_I32_POPCNT,
-    ONYX_INTRINSIC_I32_AND,   ONYX_INTRINSIC_I32_OR,  ONYX_INTRINSIC_I32_XOR,
-    ONYX_INTRINSIC_I32_SHL,   ONYX_INTRINSIC_I32_SLR, ONYX_INTRINSIC_I32_SAR,
-    ONYX_INTRINSIC_I32_ROTL,  ONYX_INTRINSIC_I32_ROTR,
-
-    ONYX_INTRINSIC_I64_CLZ,   ONYX_INTRINSIC_I64_CTZ, ONYX_INTRINSIC_I64_POPCNT,
-    ONYX_INTRINSIC_I64_AND,   ONYX_INTRINSIC_I64_OR,  ONYX_INTRINSIC_I64_XOR,
-    ONYX_INTRINSIC_I64_SHL,   ONYX_INTRINSIC_I64_SLR, ONYX_INTRINSIC_I64_SAR,
-    ONYX_INTRINSIC_I64_ROTL,  ONYX_INTRINSIC_I64_ROTR,
-
-    ONYX_INTRINSIC_F32_ABS,   ONYX_INTRINSIC_F32_SQRT,
-    ONYX_INTRINSIC_F32_CEIL,  ONYX_INTRINSIC_F32_FLOOR,
-    ONYX_INTRINSIC_F32_TRUNC, ONYX_INTRINSIC_F32_NEAREST,
-    ONYX_INTRINSIC_F32_MIN,   ONYX_INTRINSIC_F32_MAX,
-    ONYX_INTRINSIC_F32_COPYSIGN,
-
-    ONYX_INTRINSIC_F64_ABS,   ONYX_INTRINSIC_F64_SQRT,
-    ONYX_INTRINSIC_F64_CEIL,  ONYX_INTRINSIC_F64_FLOOR,
-    ONYX_INTRINSIC_F64_TRUNC, ONYX_INTRINSIC_F64_NEAREST,
-    ONYX_INTRINSIC_F64_MIN,   ONYX_INTRINSIC_F64_MAX,
-    ONYX_INTRINSIC_F64_COPYSIGN,
-} OnyxIntrinsic;
-
-// NOTE: This needs to have 'arguments' in the
-// same position as AstNodeCall
-struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; OnyxIntrinsic intrinsic; };
-
 // NOTE: Simple data structure for storing what comes out of the parser
 typedef struct ParserOutput {
     bh_arr(AstBinding *)  top_level_bindings;
@@ -270,5 +283,18 @@ extern AstBasicType basic_type_u64;
 extern AstBasicType basic_type_f32;
 extern AstBasicType basic_type_f64;
 extern AstBasicType basic_type_rawptr;
+
+
+// NOTE: Useful inlined functions
+static inline b32 is_lval(AstNode* node) {
+    return (node->kind == Ast_Kind_Local)
+        || (node->kind == Ast_Kind_Global)
+        || (node->kind == Ast_Kind_Array_Access);
+}
+
+static inline b32 binop_is_assignment(AstBinaryOp* binop) {
+    return (binop->operation >= Binary_Op_Assign_Start
+            && binop->operation <= Binary_Op_Assign_End);
+}
 
 #endif // #ifndef ONYXASTNODES_H

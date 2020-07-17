@@ -31,7 +31,7 @@ global_value :: 5 * 2 + 6
 wasm_global :: global i32
 
 main :: proc #export {
-    a := 16;
+    a : i32 = 16;
     print(clz_i32(a));
 
     wasm_global = 5 + global_value;
@@ -40,7 +40,7 @@ main :: proc #export {
     print(4 + global_value);
 
     b := 1 + foo(2);
-    if b == 13 b = 10;
+    if b == 13 b += 10;
     print(b);
 
     if b == 13 print(5678);

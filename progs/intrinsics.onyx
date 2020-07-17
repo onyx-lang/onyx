@@ -1,5 +1,5 @@
 memory_size  :: proc #intrinsic -> i32 ---
-memory_grow  :: proc #intrinsic -> i32 ---
+memory_grow  :: proc #intrinsic (val: i32) -> i32 ---
 
 clz_i32      :: proc #intrinsic (val: i32) -> i32 ---
 ctz_i32      :: proc #intrinsic (val: i32) -> i32 ---

@@ -2,7 +2,7 @@
 #include "onyxmsgs.h"
 #include "onyxutils.h"
 
-#define MAX_MSGS 5
+#define MAX_MSGS 10
 
 static const char* msg_formats[] = {
     "%s",

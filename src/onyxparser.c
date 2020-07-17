@@ -33,7 +33,7 @@ static AstTyped*    parse_factor(OnyxParser* parser);
 static AstTyped*    parse_expression(OnyxParser* parser);
 static AstIf*       parse_if_stmt(OnyxParser* parser);
 static AstWhile*    parse_while_stmt(OnyxParser* parser);
-static b32          parse_symbol_statement(OnyxParser* parser, AstNode** ret);
+static b32          parse_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*   parse_return_statement(OnyxParser* parser);
 static AstBlock*    parse_block(OnyxParser* parser);
 static AstNode*     parse_statement(OnyxParser* parser);
@@ -256,6 +256,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             return NULL;
     }
 
+    while (parser->curr->type == '[') {
+        AstArrayAccess* aa_node = make_node(AstArrayAccess, Ast_Kind_Array_Access);
+        aa_node->token = expect_token(parser, '[');
+        aa_node->addr  = retval;
+        aa_node->expr  = parse_expression(parser);
+
+        expect_token(parser, ']');
+
+        retval = (AstTyped *) aa_node;
+    }
+
     while (parser->curr->type == Token_Type_Keyword_Cast) {
         consume_token(parser);
 
@@ -266,41 +277,56 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         retval = (AstTyped *) cast_node;
     }
 
+
     return retval;
 }
 
 static inline i32 get_precedence(BinaryOp kind) {
     switch (kind) {
-        case Binary_Op_Equal: return 3;
-        case Binary_Op_Not_Equal: return 3;
+        case Binary_Op_Assign:          return 2;
+        case Binary_Op_Assign_Add:      return 2;
+        case Binary_Op_Assign_Minus:    return 2;
+        case Binary_Op_Assign_Multiply: return 2;
+        case Binary_Op_Assign_Divide:   return 2;
+        case Binary_Op_Assign_Modulus:  return 2;
 
-        case Binary_Op_Less_Equal: return 4;
-        case Binary_Op_Less: return 4;
-        case Binary_Op_Greater_Equal: return 4;
-        case Binary_Op_Greater: return 4;
+        case Binary_Op_Equal:           return 3;
+        case Binary_Op_Not_Equal:       return 3;
 
-        case Binary_Op_Add: return 5;
-        case Binary_Op_Minus: return 5;
+        case Binary_Op_Less_Equal:      return 4;
+        case Binary_Op_Less:            return 4;
+        case Binary_Op_Greater_Equal:   return 4;
+        case Binary_Op_Greater:         return 4;
 
-        case Binary_Op_Multiply: return 6;
-        case Binary_Op_Divide: return 6;
+        case Binary_Op_Add:             return 5;
+        case Binary_Op_Minus:           return 5;
 
-        case Binary_Op_Modulus: return 7;
-        default: return -1;
+        case Binary_Op_Multiply:        return 6;
+        case Binary_Op_Divide:          return 6;
+
+        case Binary_Op_Modulus:         return 7;
+
+        default:                        return -1;
     }
 }
 
-// <factor> + <factor>
-// <factor> - <factor>
-// <factor> * <factor>
-// <factor> / <factor>
-// <factor> % <factor>
-// <factor> == <factor>
-// <factor> != <factor>
-// <factor> <= <factor>
-// <factor> >= <factor>
-// <factor> < <factor>
-// <factor> > <factor>
+// <expr> +  <expr>
+// <expr> -  <expr>
+// <expr> *  <expr>
+// <expr> /  <expr>
+// <expr> %  <expr>
+// <expr> == <expr>
+// <expr> != <expr>
+// <expr> <= <expr>
+// <expr> >= <expr>
+// <expr> <  <expr>
+// <expr> >  <expr>
+// <expr> =  <expr>
+// <expr> += <expr>
+// <expr> -= <expr>
+// <expr> *= <expr>
+// <expr> /= <expr>
+// <expr> %= <expr>
 // With expected precedence rules
 static AstTyped* parse_expression(OnyxParser* parser) {
     bh_arr(AstBinaryOp*) tree_stack = NULL;
@@ -329,6 +355,13 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             case '*':                       bin_op_kind = Binary_Op_Multiply; break;
             case '/':                       bin_op_kind = Binary_Op_Divide; break;
             case '%':                       bin_op_kind = Binary_Op_Modulus; break;
+
+            case '=':                       bin_op_kind = Binary_Op_Assign; break;
+            case Token_Type_Plus_Equal:     bin_op_kind = Binary_Op_Assign_Add; break;
+            case Token_Type_Minus_Equal:    bin_op_kind = Binary_Op_Assign_Minus; break;
+            case Token_Type_Star_Equal:     bin_op_kind = Binary_Op_Assign_Multiply; break;
+            case Token_Type_Fslash_Equal:   bin_op_kind = Binary_Op_Assign_Divide; break;
+            case Token_Type_Percent_Equal:  bin_op_kind = Binary_Op_Assign_Modulus; break;
             default: goto expression_done;
         }
 
@@ -429,125 +462,54 @@ static AstWhile* parse_while_stmt(OnyxParser* parser) {
 // <symbol> : <type> : <expr>
 // <symbol> := <expr>
 // <symbol> :: <expr>
-// <symbol> = <expr>
-// <symbol> += <expr>
-// <symbol> -= <expr>
-// <symbol> *= <expr>
-// <symbol> /= <expr>
-// <symbol> %= <expr>
-static b32 parse_symbol_statement(OnyxParser* parser, AstNode** ret) {
+static b32 parse_symbol_declaration(OnyxParser* parser, AstNode** ret) {
     if (parser->curr->type != Token_Type_Symbol) return 0;
+    if ((parser->curr + 1)->type != ':')         return 0;
+
     OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+    consume_token(parser);
+    AstType* type_node = NULL;
 
-    switch ((u16) parser->curr->type) {
-        // NOTE: Declaration
-        case ':':
-            {
-                consume_token(parser);
-                AstType* type_node = NULL;
-
-                // NOTE: var: type
-                if (parser->curr->type != ':'
-                        && parser->curr->type != '=') {
-                    type_node = parse_type(parser);
-                }
-
-                AstLocal* local = make_node(AstLocal, Ast_Kind_Local);
-                local->token = symbol;
-                local->type_node = type_node;
-                local->flags |= Ast_Flag_Lval; // NOTE: DELETE
-                *ret = (AstNode *) local;
-
-                if (parser->curr->type == '=' || parser->curr->type == ':') {
-                    if (parser->curr->type == ':') {
-                        local->flags |= Ast_Flag_Const;
-                    }
-
-                    AstAssign* assignment = make_node(AstAssign, Ast_Kind_Assignment);
-                    local->next = (AstNode *) assignment;
-                    assignment->token = parser->curr;
-                    consume_token(parser);
-
-                    AstTyped* expr = parse_expression(parser);
-                    if (expr == NULL) {
-                        token_toggle_end(parser->curr);
-                        onyx_message_add(parser->msgs,
-                                ONYX_MESSAGE_TYPE_EXPECTED_EXPRESSION,
-                                assignment->token->pos,
-                                parser->curr->text);
-                        token_toggle_end(parser->curr);
-                        return 1;
-                    }
-                    assignment->expr = expr;
-
-                    AstNode* left_symbol = make_node(AstNode, Ast_Kind_Symbol);
-                    left_symbol->token = symbol;
-                    assignment->lval = (AstTyped *) left_symbol;
-                }
-                return 1;
-            }
-
-            // NOTE: Assignment
-        case '=':
-            {
-                AstAssign* assignment = make_node(AstAssign, Ast_Kind_Assignment);
-                assignment->token = parser->curr;
-                consume_token(parser);
-
-                AstNode* lval = make_node(AstNode, Ast_Kind_Symbol);
-                lval->token = symbol;
-
-                AstTyped* rval = parse_expression(parser);
-                assignment->expr = rval;
-                assignment->lval = (AstTyped *) lval;
-                *ret = (AstNode *) assignment;
-                return 1;
-            }
-
-        case Token_Type_Plus_Equal:
-        case Token_Type_Minus_Equal:
-        case Token_Type_Star_Equal:
-        case Token_Type_Fslash_Equal:
-        case Token_Type_Percent_Equal:
-            {
-                BinaryOp bin_op;
-                if      (parser->curr->type == Token_Type_Plus_Equal)    bin_op = Binary_Op_Add;
-                else if (parser->curr->type == Token_Type_Minus_Equal)   bin_op = Binary_Op_Minus;
-                else if (parser->curr->type == Token_Type_Star_Equal)    bin_op = Binary_Op_Multiply;
-                else if (parser->curr->type == Token_Type_Fslash_Equal)  bin_op = Binary_Op_Divide;
-                else if (parser->curr->type == Token_Type_Percent_Equal) bin_op = Binary_Op_Modulus;
-
-                AstBinaryOp* bin_op_node = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
-                bin_op_node->operation = bin_op;
-                bin_op_node->token = parser->curr;
-
-                consume_token(parser);
-                AstTyped* expr = parse_expression(parser);
-
-                AstNode* bin_op_left = make_node(AstNode, Ast_Kind_Symbol);
-                bin_op_left->token = symbol;
-                bin_op_node->left = (AstTyped *) bin_op_left;
-                bin_op_node->right = expr;
-
-                AstAssign* assign_node = make_node(AstAssign, Ast_Kind_Assignment);
-                assign_node->token = bin_op_node->token;
-
-                // TODO: Maybe I don't need to make another lval node?
-                AstNode* lval = make_node(AstNode, Ast_Kind_Symbol);
-                lval->token = symbol;
-                assign_node->lval = (AstTyped *) lval;
-                assign_node->expr = (AstTyped *) bin_op_node;
-
-                *ret = (AstNode *) assign_node;
-
-                return 1;
-            }
-
-        default:
-            unconsume_token(parser);
+    // NOTE: var: type
+    if (parser->curr->type != ':'
+            && parser->curr->type != '=') {
+        type_node = parse_type(parser);
     }
 
-    return 0;
+    AstLocal* local = make_node(AstLocal, Ast_Kind_Local);
+    local->token = symbol;
+    local->type_node = type_node;
+    *ret = (AstNode *) local;
+
+    if (parser->curr->type == '=' || parser->curr->type == ':') {
+        if (parser->curr->type == ':') {
+            local->flags |= Ast_Flag_Const;
+        }
+
+        AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+        assignment->operation = Binary_Op_Assign;
+        local->next = (AstNode *) assignment;
+        assignment->token = parser->curr;
+        consume_token(parser);
+
+        AstTyped* expr = parse_expression(parser);
+        if (expr == NULL) {
+            token_toggle_end(parser->curr);
+            onyx_message_add(parser->msgs,
+                    ONYX_MESSAGE_TYPE_EXPECTED_EXPRESSION,
+                    assignment->token->pos,
+                    parser->curr->text);
+            token_toggle_end(parser->curr);
+            return 1;
+        }
+        assignment->right = expr;
+
+        AstNode* left_symbol = make_node(AstNode, Ast_Kind_Symbol);
+        left_symbol->token = symbol;
+        assignment->left = (AstTyped *) left_symbol;
+    }
+
+    return 1;
 }
 
 // 'return' <expr>?
@@ -594,7 +556,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
 
         case Token_Type_Symbol:
-            if (parse_symbol_statement(parser, &retval)) break;
+            if (parse_symbol_declaration(parser, &retval)) break;
             // fallthrough
 
         case '(':
@@ -894,8 +856,6 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
     }
 
     global_node->type_node = parse_type(parser);
-    global_node->flags |= Ast_Flag_Lval;
-
 
     bh_arr_push(parser->results.nodes_to_process, (AstNode *) global_node);
 

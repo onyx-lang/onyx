@@ -217,15 +217,14 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
     return WASM_TYPE_VOID;
 }
 
-#define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }));
-#define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }));
+#define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }))
+#define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }))
 #define COMPILE_FUNC(kind, ...) static void compile_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
 
 COMPILE_FUNC(function_body,  AstFunction* fd);
 COMPILE_FUNC(block,          AstBlock* block);
 COMPILE_FUNC(statement,      AstNode* stmt);
-COMPILE_FUNC(assign_lval,    AstTyped* lval);
-COMPILE_FUNC(assignment,     AstAssign* assign);
+COMPILE_FUNC(assignment,     AstBinaryOp* assign);
 COMPILE_FUNC(if,             AstIf* if_node);
 COMPILE_FUNC(while,          AstWhile* while_node);
 COMPILE_FUNC(binop,          AstBinaryOp* binop);
@@ -297,37 +296,57 @@ COMPILE_FUNC(statement, AstNode* stmt) {
 
     switch (stmt->kind) {
         case Ast_Kind_Return:     compile_return(mod, &code, (AstReturn *) stmt); break;
-        case Ast_Kind_Assignment: compile_assignment(mod, &code, (AstAssign *) stmt); break;
         case Ast_Kind_If:         compile_if(mod, &code, (AstIf *) stmt); break;
         case Ast_Kind_While:      compile_while(mod, &code, (AstWhile *) stmt); break;
         case Ast_Kind_Break:      compile_structured_jump(mod, &code, 0); break;
         case Ast_Kind_Continue:   compile_structured_jump(mod, &code, 1); break;
         case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt); break;
-
-        case Ast_Kind_Call:
-        case Ast_Kind_Intrinsic_Call:
-            compile_expression(mod, &code, (AstTyped *) stmt);
-            break;
-
-
-        default: break;
+        default:                  compile_expression(mod, &code, (AstTyped *) stmt); break;
     }
 
     *pcode = code;
 }
 
-COMPILE_FUNC(assign_lval, AstTyped* lval) {
+COMPILE_FUNC(assignment, AstBinaryOp* assign) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param) {
+    AstTyped* lval = assign->left;
+
+    if (lval->kind == Ast_Kind_Local) {
         i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) lval);
 
+        compile_expression(mod, &code, assign->right);
         WID(WI_LOCAL_SET, localidx);
 
     } else if (lval->kind == Ast_Kind_Global) {
         i32 globalidx = (i32) bh_imap_get(&mod->global_map, (u64) lval);
 
+        compile_expression(mod, &code, assign->right);
         WID(WI_GLOBAL_SET, globalidx);
+
+    } else if (lval->kind == Ast_Kind_Array_Access) {
+        AstArrayAccess* aa = (AstArrayAccess *) lval;
+        WID(WI_I32_CONST, aa->elem_size);
+        compile_expression(mod, &code, aa->expr);
+        WI(WI_I32_MUL);
+        compile_expression(mod, &code, aa->addr);
+        WI(WI_I32_ADD);
+
+        compile_expression(mod, &code, assign->right);
+
+        i32 store_size = aa->type->Basic.size;
+        i32 is_integer = (aa->type->Basic.flags & Basic_Flag_Integer)
+                      || (aa->type->Basic.flags & Basic_Flag_Pointer);
+
+        if (is_integer) {
+            if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { 0, 0 }));
+            else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { 1, 0 }));
+            else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { 2, 0 }));
+            else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { 3, 0 }));
+        } else {
+            if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { 2, 0 }));
+            else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { 3, 0 }));
+        }
 
     } else {
         assert(("Invalid lval", 0));
@@ -405,15 +424,6 @@ COMPILE_FUNC(while, AstWhile* while_node) {
     *pcode = code;
 }
 
-COMPILE_FUNC(assignment, AstAssign* assign) {
-    bh_arr(WasmInstruction) code = *pcode;
-
-    compile_expression(mod, &code, assign->expr);
-    compile_assign_lval(mod, &code, assign->lval);
-
-    *pcode = code;
-}
-
 // NOTE: These need to be in the same order as
 // the OnyxBinaryOp enum
 static const WasmInstructionType binop_map[][4] = {
@@ -434,6 +444,12 @@ static const WasmInstructionType binop_map[][4] = {
 
 COMPILE_FUNC(binop, AstBinaryOp* binop) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    if (binop_is_assignment(binop)) {
+        compile_assignment(mod, &code, binop);
+        *pcode = code;
+        return;
+    }
 
     b32 is_sign_significant = 0;
 
@@ -667,7 +683,6 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Block: compile_block(mod, &code, (AstBlock *) expr); break;
 
-
         case Ast_Kind_Call:
             compile_call(mod, &code, (AstCall *) expr);
             break;
@@ -676,9 +691,46 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             compile_intrinsic_call(mod, &code, (AstIntrinsicCall *) expr);
             break;
 
+        case Ast_Kind_Array_Access: {
+            AstArrayAccess* aa = (AstArrayAccess *) expr;
+            WID(WI_I32_CONST, aa->elem_size);
+            compile_expression(mod, &code, aa->expr);
+            WI(WI_I32_MUL);
+            compile_expression(mod, &code, aa->addr);
+            WI(WI_I32_ADD);
+
+            i32 load_size   = aa->type->Basic.size;
+            i32 is_integer  = (aa->type->Basic.flags & Basic_Flag_Integer)
+                           || (aa->type->Basic.flags & Basic_Flag_Pointer);
+            i32 is_unsigned = aa->type->Basic.flags & Basic_Flag_Unsigned;
+
+            WasmInstructionType instr = WI_NOP;
+            i32 alignment = log2_dumb(load_size);
+
+            if (is_integer) {
+                if      (load_size == 1) instr = WI_I32_LOAD_8_S;
+                else if (load_size == 2) instr = WI_I32_LOAD_16_S;
+                else if (load_size == 4) instr = WI_I32_LOAD;
+                else if (load_size == 8) instr = WI_I64_LOAD;
+
+                if (alignment < 4 && is_unsigned) instr += 1;
+            } else {
+                if      (load_size == 4) instr = WI_F32_LOAD;
+                else if (load_size == 8) instr = WI_F64_LOAD;
+            }
+
+            if (instr != WI_NOP) {
+                WID(instr, ((WasmInstructionData) { alignment, 0 }));
+            } else {
+                DEBUG_HERE;
+            }
+
+            break;
+        }
+
         default:
-            DEBUG_HERE;
             bh_printf("Unhandled case: %d\n", expr->kind);
+            DEBUG_HERE;
             assert(0);
     }
 
@@ -1064,6 +1116,23 @@ static i32 output_name(const char* start, i32 length, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
+static i32 output_limits(i32 min, i32 max, bh_buffer* buff) {
+    i32 leb_len, prev_len = buff->length;
+    u8* leb;
+
+    bh_buffer_write_byte(buff, (max >= 0) ? 0x01 : 0x00);
+
+    leb = uint_to_uleb128((u64) min, &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+
+    if (max >= 0) {
+        leb = uint_to_uleb128((u64) max, &leb_len);
+        bh_buffer_append(buff, leb, leb_len);
+    }
+
+    return buff->length - prev_len;
+}
+
 static i32 output_functype(WasmFuncType* type, bh_buffer* buff) {
     i32 prev_len = buff->length;
 
@@ -1123,6 +1192,28 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
         leb = uint_to_uleb128((u64) (func->type_idx), &leb_len);
         bh_buffer_append(&vec_buff, leb, leb_len);
     }
+
+    leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+
+    bh_buffer_concat(buff, vec_buff);
+    bh_buffer_free(&vec_buff);
+
+    return buff->length - prev_len;
+}
+
+static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
+    i32 prev_len = buff->length;
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_MEMORY);
+
+    bh_buffer vec_buff;
+    bh_buffer_init(&vec_buff, buff->allocator, 128);
+
+    i32 leb_len;
+    u8* leb = uint_to_uleb128((u64) 1, &leb_len);
+    bh_buffer_append(&vec_buff, leb, leb_len);
+
+    output_limits(4, 20, &vec_buff);
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -1317,6 +1408,35 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
             bh_buffer_append(buff, leb, leb_len);
             break;
 
+        case WI_I32_STORE:
+        case WI_I32_STORE_8:
+        case WI_I32_STORE_16:
+        case WI_I64_STORE:
+        case WI_I64_STORE_8:
+        case WI_I64_STORE_16:
+        case WI_I64_STORE_32:
+        case WI_F32_STORE:
+        case WI_F64_STORE:
+        case WI_I32_LOAD:
+        case WI_I32_LOAD_8_S:
+        case WI_I32_LOAD_8_U:
+        case WI_I32_LOAD_16_S:
+        case WI_I32_LOAD_16_U:
+        case WI_I64_LOAD:
+        case WI_I64_LOAD_8_S:
+        case WI_I64_LOAD_8_U:
+        case WI_I64_LOAD_16_S:
+        case WI_I64_LOAD_16_U:
+        case WI_I64_LOAD_32_S:
+        case WI_I64_LOAD_32_U:
+        case WI_F32_LOAD:
+        case WI_F64_LOAD:
+            leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+            leb = uint_to_uleb128((u64) instr->data.i2, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+            break;
+
         case WI_I32_CONST:
             leb = int_to_leb128((i64) instr->data.i1, &leb_len);
             bh_buffer_append(buff, leb, leb_len);
@@ -1393,6 +1513,7 @@ void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
     output_typesection(module, &master_buffer);
     output_importsection(module, &master_buffer);
     output_funcsection(module, &master_buffer);
+    output_memorysection(module, &master_buffer);
     output_globalsection(module, &master_buffer);
     output_exportsection(module, &master_buffer);
     output_startsection(module, &master_buffer);

@@ -1,65 +1,19 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
+#include "onyxparser.h"
 
 static b32 check_function(SemState* state, AstFunction* func);
 static b32 check_block(SemState* state, AstBlock* block);
 static b32 check_statement_chain(SemState* state, AstNode* start);
 static b32 check_statement(SemState* state, AstNode* stmt);
-static b32 check_assignment(SemState* state, AstAssign* assign);
 static b32 check_return(SemState* state, AstReturn* retnode);
 static b32 check_if(SemState* state, AstIf* ifnode);
 static b32 check_while(SemState* state, AstWhile* whilenode);
 static b32 check_call(SemState* state, AstCall* call);
 static b32 check_binaryop(SemState* state, AstBinaryOp* binop);
 static b32 check_expression(SemState* state, AstTyped* expr);
+static b32 check_array_access(SemState* state, AstArrayAccess* expr);
 static b32 check_global(SemState* state, AstGlobal* global);
-
-static b32 check_assignment(SemState* state, AstAssign* assign) {
-    if (assign->lval->kind == Ast_Kind_Symbol) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
-                assign->lval->token->pos,
-                assign->lval->token->text, assign->lval->token->length);
-        return 1;
-    }
-
-    if ((assign->lval->flags & Ast_Flag_Const) != 0 && assign->lval->type != NULL) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_ASSIGN_CONST,
-                assign->token->pos,
-                assign->lval->token->text, assign->lval->token->length);
-        return 1;
-    }
-
-    if ((assign->lval->flags & Ast_Flag_Lval) == 0) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_NOT_LVAL,
-                assign->token->pos,
-                assign->lval->token->text, assign->lval->token->length);
-        return 1;
-    }
-
-    if (assign->lval->type == NULL) {
-        assign->lval->type = type_build_from_ast(state->node_allocator, assign->lval->type_node);
-    }
-
-    if (check_expression(state, assign->expr)) return 1;
-
-    if (assign->lval->type == NULL) {
-        assign->lval->type = assign->expr->type;
-    } else {
-        if (!types_are_compatible(assign->lval->type, assign->expr->type)) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_ASSIGNMENT_TYPE_MISMATCH,
-                    assign->token->pos,
-                    type_get_name(assign->lval->type),
-                    type_get_name(assign->expr->type));
-            return 1;
-        }
-    }
-
-    return 0;
-}
 
 static b32 check_return(SemState* state, AstReturn* retnode) {
     if (retnode->expr) {
@@ -255,6 +209,63 @@ static b32 check_binaryop(SemState* state, AstBinaryOp* binop) {
     if (check_expression(state, binop->left)) return 1;
     if (check_expression(state, binop->right)) return 1;
 
+    if (binop_is_assignment(binop)) {
+        if (!is_lval((AstNode *) binop->left)) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_NOT_LVAL,
+                    binop->token->pos,
+                    binop->left->token->text, binop->left->token->length);
+            return 1;
+        }
+
+        if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_ASSIGN_CONST,
+                    binop->token->pos,
+                    binop->left->token->text, binop->left->token->length);
+            return 1;
+        }
+
+        if (binop->operation == Binary_Op_Assign) {
+            // NOTE: Raw assignment
+            if (binop->left->type == NULL) {
+                binop->left->type = binop->right->type;
+            }
+
+        } else {
+            // NOTE: +=, -=, ...
+
+            AstBinaryOp* binop_node = onyx_ast_node_new(
+                    state->node_allocator,
+                    sizeof(AstBinaryOp),
+                    Ast_Kind_Binary_Op);
+
+            binop_node->token = binop->token;
+            binop_node->left  = binop->left;
+            binop_node->right = binop->right;
+            binop_node->type  = binop->right->type;
+
+            if      (binop->operation == Binary_Op_Assign_Add)      binop_node->operation = Binary_Op_Add;
+            else if (binop->operation == Binary_Op_Assign_Minus)    binop_node->operation = Binary_Op_Minus;
+            else if (binop->operation == Binary_Op_Assign_Multiply) binop_node->operation = Binary_Op_Multiply;
+            else if (binop->operation == Binary_Op_Assign_Divide)   binop_node->operation = Binary_Op_Divide;
+            else if (binop->operation == Binary_Op_Assign_Modulus)  binop_node->operation = Binary_Op_Modulus;
+
+            binop->right = (AstTyped *) binop_node;
+            binop->operation = Binary_Op_Assign;
+        }
+
+    } else {
+        if (type_is_pointer(binop->left->type)
+                || type_is_pointer(binop->right->type)) {
+            onyx_message_add(state->msgs,
+                    ONYX_MESSAGE_TYPE_LITERAL,
+                    binop->token->pos,
+                    "binary operations are not supported for pointers (yet).");
+            return 1;
+        }
+    }
+
     if (binop->left->type == NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
@@ -271,14 +282,6 @@ static b32 check_binaryop(SemState* state, AstBinaryOp* binop) {
         return 1;
     }
 
-    if (type_is_pointer(binop->left->type)
-            || type_is_pointer(binop->right->type)) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
-                binop->token->pos,
-                "binary operations are not supported for pointers (yet).");
-        return 1;
-    }
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
         onyx_message_add(state->msgs,
@@ -295,6 +298,33 @@ static b32 check_binaryop(SemState* state, AstBinaryOp* binop) {
     } else {
         binop->type = binop->left->type;
     }
+
+    return 0;
+}
+
+static b32 check_array_access(SemState* state, AstArrayAccess* aa) {
+    check_expression(state, aa->addr);
+    check_expression(state, aa->expr);
+
+    if (!type_is_pointer(aa->addr->type)) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_LITERAL,
+                aa->addr->token->pos,
+                "expected pointer type for left of array access");
+        return 1;
+    }
+
+    if (aa->expr->type->kind != Type_Kind_Basic
+            || (aa->expr->type->Basic.flags & Basic_Flag_Integer) == 0) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_LITERAL,
+                aa->expr->token->pos,
+                "expected integer type for index");
+        return 1;
+    }
+
+    aa->type = aa->addr->type->Pointer.elem;
+    aa->elem_size = aa->type->Basic.size;
 
     return 0;
 }
@@ -335,7 +365,6 @@ static b32 check_expression(SemState* state, AstTyped* expr) {
             retval = 1;
             break;
 
-        case Ast_Kind_Local:
         case Ast_Kind_Param:
             if (expr->type == NULL) {
                 onyx_message_add(state->msgs,
@@ -344,6 +373,12 @@ static b32 check_expression(SemState* state, AstTyped* expr) {
                         "local variable with unknown type");
                 retval = 1;
             }
+            break;
+
+        case Ast_Kind_Local: break;
+
+        case Ast_Kind_Array_Access:
+            retval = check_array_access(state, (AstArrayAccess *) expr);
             break;
 
         case Ast_Kind_Global:
@@ -397,14 +432,15 @@ static b32 check_global(SemState* state, AstGlobal* global) {
 
 static b32 check_statement(SemState* state, AstNode* stmt) {
     switch (stmt->kind) {
-        case Ast_Kind_Assignment: return check_assignment(state, (AstAssign *) stmt);
         case Ast_Kind_Return:     return check_return(state, (AstReturn *) stmt);
         case Ast_Kind_If:         return check_if(state, (AstIf *) stmt);
         case Ast_Kind_While:      return check_while(state, (AstWhile *) stmt);
         case Ast_Kind_Call:       return check_call(state, (AstCall *) stmt);
         case Ast_Kind_Block:      return check_block(state, (AstBlock *) stmt);
 
-        default: return 0;
+        default:
+            stmt->flags |= Ast_Flag_Expr_Ignored;
+            return check_expression(state, (AstTyped *) stmt);
     }
 }
 
@@ -506,7 +542,6 @@ static b32 check_node(SemState* state, AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:     return check_function(state, (AstFunction *) node);
         case Ast_Kind_Block:        return check_block(state, (AstBlock *) node);
-        case Ast_Kind_Assignment:   return check_assignment(state, (AstAssign *) node);
         case Ast_Kind_Return:       return check_return(state, (AstReturn *) node);
         case Ast_Kind_If:           return check_if(state, (AstIf *) node);
         case Ast_Kind_While:        return check_while(state, (AstWhile *) node);

@@ -1,0 +1,23 @@
+use "progs/intrinsics"
+use "progs/print_funcs"
+
+main :: proc #export {
+    print_i32(memory_size());
+
+    arr := 0 as ^i64;
+
+    arr[0] = 10 as i64;
+    arr[1] = 20 as i64;
+    arr[2] = 30 as i64;
+    arr[3] = 40 as i64;
+
+    i := 0;
+    while i < 4 {
+        arr[i] += 1 as i64;
+        arr[i] *= 2 as i64;
+
+        print_i64(arr[i]);
+        i += 1;
+    }
+}
+
