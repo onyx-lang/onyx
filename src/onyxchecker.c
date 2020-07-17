@@ -1,20 +1,20 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
 
-static b32 check_function(OnyxSemPassState* state, AstFunction* func);
-static b32 check_block(OnyxSemPassState* state, AstBlock* block);
-static b32 check_statement_chain(OnyxSemPassState* state, AstNode* start);
-static b32 check_statement(OnyxSemPassState* state, AstNode* stmt);
-static b32 check_assignment(OnyxSemPassState* state, AstAssign* assign);
-static b32 check_return(OnyxSemPassState* state, AstReturn* retnode);
-static b32 check_if(OnyxSemPassState* state, AstIf* ifnode);
-static b32 check_while(OnyxSemPassState* state, AstWhile* whilenode);
-static b32 check_call(OnyxSemPassState* state, AstCall* call);
-static b32 check_binaryop(OnyxSemPassState* state, AstBinaryOp* binop);
-static b32 check_expression(OnyxSemPassState* state, AstTyped* expr);
-static b32 check_global(OnyxSemPassState* state, AstGlobal* global);
+static b32 check_function(SemState* state, AstFunction* func);
+static b32 check_block(SemState* state, AstBlock* block);
+static b32 check_statement_chain(SemState* state, AstNode* start);
+static b32 check_statement(SemState* state, AstNode* stmt);
+static b32 check_assignment(SemState* state, AstAssign* assign);
+static b32 check_return(SemState* state, AstReturn* retnode);
+static b32 check_if(SemState* state, AstIf* ifnode);
+static b32 check_while(SemState* state, AstWhile* whilenode);
+static b32 check_call(SemState* state, AstCall* call);
+static b32 check_binaryop(SemState* state, AstBinaryOp* binop);
+static b32 check_expression(SemState* state, AstTyped* expr);
+static b32 check_global(SemState* state, AstGlobal* global);
 
-static b32 check_assignment(OnyxSemPassState* state, AstAssign* assign) {
+static b32 check_assignment(SemState* state, AstAssign* assign) {
     if (assign->lval->kind == Ast_Kind_Symbol) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
@@ -26,7 +26,7 @@ static b32 check_assignment(OnyxSemPassState* state, AstAssign* assign) {
     if ((assign->lval->flags & Ast_Flag_Const) != 0 && assign->lval->type != NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_ASSIGN_CONST,
-                assign->base.token->pos,
+                assign->token->pos,
                 assign->lval->token->text, assign->lval->token->length);
         return 1;
     }
@@ -34,7 +34,7 @@ static b32 check_assignment(OnyxSemPassState* state, AstAssign* assign) {
     if ((assign->lval->flags & Ast_Flag_Lval) == 0) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_NOT_LVAL,
-                assign->base.token->pos,
+                assign->token->pos,
                 assign->lval->token->text, assign->lval->token->length);
         return 1;
     }
@@ -51,7 +51,7 @@ static b32 check_assignment(OnyxSemPassState* state, AstAssign* assign) {
         if (!types_are_compatible(assign->lval->type, assign->expr->type)) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_ASSIGNMENT_TYPE_MISMATCH,
-                    assign->base.token->pos,
+                    assign->token->pos,
                     type_get_name(assign->lval->type),
                     type_get_name(assign->expr->type));
             return 1;
@@ -61,7 +61,7 @@ static b32 check_assignment(OnyxSemPassState* state, AstAssign* assign) {
     return 0;
 }
 
-static b32 check_return(OnyxSemPassState* state, AstReturn* retnode) {
+static b32 check_return(SemState* state, AstReturn* retnode) {
     if (retnode->expr) {
         if (check_expression(state, retnode->expr)) return 1;
 
@@ -77,7 +77,7 @@ static b32 check_return(OnyxSemPassState* state, AstReturn* retnode) {
         if (state->expected_return_type->Basic.size > 0) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_LITERAL,
-                    retnode->base.token->pos,
+                    retnode->token->pos,
                     "returning from non-void function without value");
             return 1;
         }
@@ -86,7 +86,7 @@ static b32 check_return(OnyxSemPassState* state, AstReturn* retnode) {
     return 0;
 }
 
-static b32 check_if(OnyxSemPassState* state, AstIf* ifnode) {
+static b32 check_if(SemState* state, AstIf* ifnode) {
     if (check_expression(state, ifnode->cond)) return 1;
 
     if (!type_is_bool(ifnode->cond->type)) {
@@ -103,7 +103,7 @@ static b32 check_if(OnyxSemPassState* state, AstIf* ifnode) {
     return 0;
 }
 
-static b32 check_while(OnyxSemPassState* state, AstWhile* whilenode) {
+static b32 check_while(SemState* state, AstWhile* whilenode) {
     if (check_expression(state, whilenode->cond)) return 1;
 
     if (!type_is_bool(whilenode->cond->type)) {
@@ -117,33 +117,33 @@ static b32 check_while(OnyxSemPassState* state, AstWhile* whilenode) {
     return check_block(state, whilenode->body);
 }
 
-static b32 check_call(OnyxSemPassState* state, AstCall* call) {
+static b32 check_call(SemState* state, AstCall* call) {
     AstFunction* callee = (AstFunction *) call->callee;
 
-    if (callee->base.kind == Ast_Kind_Symbol) {
+    if (callee->kind == Ast_Kind_Symbol) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
-                callee->base.token->pos,
-                callee->base.token->text, callee->base.token->length);
+                callee->token->pos,
+                callee->token->text, callee->token->length);
         return 1;
     }
 
-    if (callee->base.type == NULL) {
-        callee->base.type = type_build_from_ast(state->node_allocator, callee->base.type_node);
+    if (callee->type == NULL) {
+        callee->type = type_build_from_ast(state->node_allocator, callee->type_node);
     }
 
-    if (callee->base.type->kind != Type_Kind_Function) {
+    if (callee->type->kind != Type_Kind_Function) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_CALL_NON_FUNCTION,
-                call->base.token->pos,
-                callee->base.token->text, callee->base.token->length);
+                call->token->pos,
+                callee->token->text, callee->token->length);
         return 1;
     }
 
     // NOTE: If we calling an intrinsic function, translate the
     // call into an intrinsic call node.
-    if (callee->base.flags & Ast_Flag_Intrinsic) {
-        call->base.kind = Ast_Kind_Intrinsic_Call;
+    if (callee->flags & Ast_Flag_Intrinsic) {
+        call->kind = Ast_Kind_Intrinsic_Call;
         call->callee = NULL;
 
         token_toggle_end(callee->intrinsic_name);
@@ -203,7 +203,7 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
         token_toggle_end(callee->intrinsic_name);
     }
 
-    call->base.type = callee->base.type->Function.return_type;
+    call->type = callee->type->Function.return_type;
 
     AstLocal* formal_param = callee->params;
     AstArgument* actual_param = call->arguments;
@@ -212,30 +212,30 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
     while (formal_param != NULL && actual_param != NULL) {
         if (check_expression(state, (AstTyped *) actual_param)) return 1;
 
-        if (formal_param->base.type == NULL) {
-            formal_param->base.type = type_build_from_ast(state->node_allocator, formal_param->base.type_node);
+        if (formal_param->type == NULL) {
+            formal_param->type = type_build_from_ast(state->node_allocator, formal_param->type_node);
         }
 
-        if (!types_are_compatible(formal_param->base.type, actual_param->base.type)) {
+        if (!types_are_compatible(formal_param->type, actual_param->type)) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_FUNCTION_PARAM_TYPE_MISMATCH,
-                    actual_param->base.token->pos,
-                    callee->base.token->text, callee->base.token->length,
-                    type_get_name(formal_param->base.type),
+                    actual_param->token->pos,
+                    callee->token->text, callee->token->length,
+                    type_get_name(formal_param->type),
                     arg_pos,
-                    type_get_name(actual_param->base.type));
+                    type_get_name(actual_param->type));
             return 1;
         }
 
         arg_pos++;
-        formal_param = (AstLocal *) formal_param->base.next;
-        actual_param = (AstArgument *) actual_param->base.next;
+        formal_param = (AstLocal *) formal_param->next;
+        actual_param = (AstArgument *) actual_param->next;
     }
 
     if (formal_param != NULL && actual_param == NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
-                call->base.token->pos,
+                call->token->pos,
                 "too few arguments to function call");
         return 1;
     }
@@ -243,7 +243,7 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
     if (formal_param == NULL && actual_param != NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
-                call->base.token->pos,
+                call->token->pos,
                 "too many arguments to function call");
         return 1;
     }
@@ -251,14 +251,14 @@ static b32 check_call(OnyxSemPassState* state, AstCall* call) {
     return 0;
 }
 
-static b32 check_binaryop(OnyxSemPassState* state, AstBinaryOp* binop) {
+static b32 check_binaryop(SemState* state, AstBinaryOp* binop) {
     if (check_expression(state, binop->left)) return 1;
     if (check_expression(state, binop->right)) return 1;
 
     if (binop->left->type == NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
-                binop->base.token->pos,
+                binop->token->pos,
                 NULL, 0);
         return 1;
     }
@@ -266,7 +266,7 @@ static b32 check_binaryop(OnyxSemPassState* state, AstBinaryOp* binop) {
     if (binop->right->type == NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
-                binop->base.token->pos,
+                binop->token->pos,
                 NULL, 0);
         return 1;
     }
@@ -275,7 +275,7 @@ static b32 check_binaryop(OnyxSemPassState* state, AstBinaryOp* binop) {
             || type_is_pointer(binop->right->type)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
-                binop->base.token->pos,
+                binop->token->pos,
                 "binary operations are not supported for pointers (yet).");
         return 1;
     }
@@ -283,7 +283,7 @@ static b32 check_binaryop(OnyxSemPassState* state, AstBinaryOp* binop) {
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_BINOP_MISMATCH_TYPE,
-                binop->base.token->pos,
+                binop->token->pos,
                 type_get_name(binop->left->type),
                 type_get_name(binop->right->type));
         return 1;
@@ -291,15 +291,15 @@ static b32 check_binaryop(OnyxSemPassState* state, AstBinaryOp* binop) {
 
     if (binop->operation >= Binary_Op_Equal
             && binop->operation <= Binary_Op_Greater_Equal) {
-        binop->base.type = &basic_types[Basic_Kind_Bool];
+        binop->type = &basic_types[Basic_Kind_Bool];
     } else {
-        binop->base.type = binop->left->type;
+        binop->type = binop->left->type;
     }
 
     return 0;
 }
 
-static b32 check_expression(OnyxSemPassState* state, AstTyped* expr) {
+static b32 check_expression(SemState* state, AstTyped* expr) {
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
@@ -378,14 +378,14 @@ static b32 check_expression(OnyxSemPassState* state, AstTyped* expr) {
     return retval;
 }
 
-static b32 check_global(OnyxSemPassState* state, AstGlobal* global) {
-    if (global->base.type == NULL)
-        global->base.type = type_build_from_ast(state->allocator, global->base.type_node);
+static b32 check_global(SemState* state, AstGlobal* global) {
+    if (global->type == NULL)
+        global->type = type_build_from_ast(state->allocator, global->type_node);
 
-    if (global->base.type == NULL) {
+    if (global->type == NULL) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
-                global->base.token->pos,
+                global->token->pos,
                 global->exported_name->text,
                 global->exported_name->length);
 
@@ -395,7 +395,7 @@ static b32 check_global(OnyxSemPassState* state, AstGlobal* global) {
     return 0;
 }
 
-static b32 check_statement(OnyxSemPassState* state, AstNode* stmt) {
+static b32 check_statement(SemState* state, AstNode* stmt) {
     switch (stmt->kind) {
         case Ast_Kind_Assignment: return check_assignment(state, (AstAssign *) stmt);
         case Ast_Kind_Return:     return check_return(state, (AstReturn *) stmt);
@@ -408,7 +408,7 @@ static b32 check_statement(OnyxSemPassState* state, AstNode* stmt) {
     }
 }
 
-static b32 check_statement_chain(OnyxSemPassState* state, AstNode* start) {
+static b32 check_statement_chain(SemState* state, AstNode* start) {
     while (start) {
         if (check_statement(state, start)) return 1;
         start = start->next;
@@ -417,15 +417,15 @@ static b32 check_statement_chain(OnyxSemPassState* state, AstNode* start) {
     return 0;
 }
 
-static b32 check_block(OnyxSemPassState* state, AstBlock* block) {
+static b32 check_block(SemState* state, AstBlock* block) {
     if (check_statement_chain(state, block->body)) return 1;
 
     forll(AstLocal, local, block->locals->last_local, prev_local) {
-        if (local->base.type == NULL) {
+        if (local->type == NULL) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
-                    local->base.token->pos,
-                    local->base.token->text, local->base.token->length);
+                    local->token->pos,
+                    local->token->text, local->token->length);
             return 1;
         }
     }
@@ -433,54 +433,54 @@ static b32 check_block(OnyxSemPassState* state, AstBlock* block) {
     return 0;
 }
 
-static b32 check_function(OnyxSemPassState* state, AstFunction* func) {
-    for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->base.next) {
-        if (param->base.type == NULL) {
-            param->base.type = type_build_from_ast(state->node_allocator, param->base.type_node);
+static b32 check_function(SemState* state, AstFunction* func) {
+    for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
+        if (param->type == NULL) {
+            param->type = type_build_from_ast(state->node_allocator, param->type_node);
         }
 
-        if (param->base.type == NULL) {
+        if (param->type == NULL) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_LITERAL,
-                    param->base.token->pos,
+                    param->token->pos,
                     "function parameter types must be known");
             return 1;
         }
 
-        if (param->base.type->Basic.size == 0) {
+        if (param->type->Basic.size == 0) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_LITERAL,
-                    param->base.token->pos,
+                    param->token->pos,
                     "function parameters must have non-void types");
             return 1;
         }
     }
 
-    if (func->base.type == NULL) {
-        func->base.type = type_build_from_ast(state->node_allocator, func->base.type_node);
+    if (func->type == NULL) {
+        func->type = type_build_from_ast(state->node_allocator, func->type_node);
     }
 
-    if ((func->base.flags & Ast_Flag_Exported) != 0) {
-        if ((func->base.flags & Ast_Flag_Foreign) != 0) {
+    if ((func->flags & Ast_Flag_Exported) != 0) {
+        if ((func->flags & Ast_Flag_Foreign) != 0) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_LITERAL,
-                    func->base.token->pos,
+                    func->token->pos,
                     "exporting a foreign function");
             return 1;
         }
 
-        if ((func->base.flags & Ast_Flag_Intrinsic) != 0) {
+        if ((func->flags & Ast_Flag_Intrinsic) != 0) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_LITERAL,
-                    func->base.token->pos,
+                    func->token->pos,
                     "exporting a intrinsic function");
             return 1;
         }
 
-        if ((func->base.flags & Ast_Flag_Inline) != 0) {
+        if ((func->flags & Ast_Flag_Inline) != 0) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_LITERAL,
-                    func->base.token->pos,
+                    func->token->pos,
                     "exporting a inlined function");
             return 1;
         }
@@ -488,13 +488,13 @@ static b32 check_function(OnyxSemPassState* state, AstFunction* func) {
         if (func->exported_name == NULL) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_LITERAL,
-                    func->base.token->pos,
+                    func->token->pos,
                     "exporting function without a name");
             return 1;
         }
     }
 
-    state->expected_return_type = func->base.type->Function.return_type;
+    state->expected_return_type = func->type->Function.return_type;
     if (func->body) {
         return check_block(state, func->body);
     }
@@ -502,7 +502,7 @@ static b32 check_function(OnyxSemPassState* state, AstFunction* func) {
     return 0;
 }
 
-static b32 check_node(OnyxSemPassState* state, AstNode* node) {
+static b32 check_node(SemState* state, AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:     return check_function(state, (AstFunction *) node);
         case Ast_Kind_Block:        return check_block(state, (AstBlock *) node);
@@ -516,7 +516,7 @@ static b32 check_node(OnyxSemPassState* state, AstNode* node) {
     }
 }
 
-void onyx_type_check(OnyxSemPassState* state, ParserOutput* program) {
+void onyx_type_check(SemState* state, ParserOutput* program) {
     bh_arr_each(AstNode *, node, program->nodes_to_process) {
         check_node(state, *node);
 

@@ -347,11 +347,11 @@ COMPILE_FUNC(if, AstIf* if_node) {
     if (if_node->true_block.as_if) {
         // NOTE: This is kind of gross, but making a function for this doesn't feel right
 
-        if (if_node->true_block.as_if->base.kind == Ast_Kind_If) {
+        if (if_node->true_block.as_if->kind == Ast_Kind_If) {
             forll (AstNode, stmt, (AstNode *) if_node->true_block.as_if, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->true_block.as_if->base.kind == Ast_Kind_Block) {
+        } else if (if_node->true_block.as_if->kind == Ast_Kind_Block) {
             forll (AstNode, stmt, if_node->true_block.as_block->body, next) {
                 compile_statement(mod, &code, stmt);
             }
@@ -361,11 +361,11 @@ COMPILE_FUNC(if, AstIf* if_node) {
     if (if_node->false_block.as_if) {
         WI(WI_ELSE);
 
-        if (if_node->false_block.as_if->base.kind == Ast_Kind_If) {
+        if (if_node->false_block.as_if->kind == Ast_Kind_If) {
             forll (AstNode, stmt, (AstNode *) if_node->false_block.as_if, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else if (if_node->false_block.as_if->base.kind == Ast_Kind_Block) {
+        } else if (if_node->false_block.as_if->kind == Ast_Kind_Block) {
             forll (AstNode, stmt, if_node->false_block.as_block->body, next) {
                 compile_statement(mod, &code, stmt);
             }
@@ -487,7 +487,7 @@ COMPILE_FUNC(unaryop, AstUnaryOp* unop) {
     switch (unop->operation) {
         case Unary_Op_Negate:
             {
-                TypeBasic* type = &unop->base.type->Basic;
+                TypeBasic* type = &unop->type->Basic;
 
                 if (type->kind == Basic_Kind_I32
                         || type->kind == Basic_Kind_I16
@@ -533,7 +533,7 @@ COMPILE_FUNC(call, AstCall* call) {
 
     for (AstArgument *arg = call->arguments;
             arg != NULL;
-            arg = (AstArgument *) arg->base.next) {
+            arg = (AstArgument *) arg->next) {
         compile_expression(mod, &code, arg->value);
     }
 
@@ -555,7 +555,7 @@ COMPILE_FUNC(intrinsic_call, AstIntrinsicCall* call) {
     if (place_arguments_normally) {
         for (AstArgument *arg = call->arguments;
                 arg != NULL;
-                arg = (AstArgument *) arg->base.next) {
+                arg = (AstArgument *) arg->next) {
             compile_expression(mod, &code, arg->value);
         }
     }
@@ -646,7 +646,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Literal:
             {
                 AstNumLit* lit = (AstNumLit *) expr;
-                WasmType lit_type = onyx_type_to_wasm_type(lit->base.type);
+                WasmType lit_type = onyx_type_to_wasm_type(lit->type);
                 WasmInstruction instr = { WI_NOP, 0 };
 
                 if (lit_type == WASM_TYPE_INT32) {
@@ -703,7 +703,7 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
     compile_expression(mod, &code, cast->expr);
 
     Type* from = cast->expr->type;
-    Type* to = cast->base.type;
+    Type* to = cast->type;
 
     i32 fromidx = 0, toidx = 0;
     if (from->Basic.flags & Basic_Flag_Integer) {
@@ -756,8 +756,8 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
     static char type_repr_buf[128];
 
     char* t = type_repr_buf;
-    Type** param_type = fd->base.type->Function.params;
-    i32 param_count = fd->base.type->Function.param_count;
+    Type** param_type = fd->type->Function.params;
+    i32 param_count = fd->type->Function.param_count;
     i32 params_left = param_count;
     while (params_left-- > 0) {
         // HACK: Using these directly as part of a string feels weird but they are
@@ -767,7 +767,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
     }
     *(t++) = ':';
 
-    WasmType return_type = onyx_type_to_wasm_type(fd->base.type->Function.return_type);
+    WasmType return_type = onyx_type_to_wasm_type(fd->type->Function.return_type);
     *(t++) = (char) return_type;
     *t = '\0';
 
@@ -796,11 +796,11 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
 
 static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     // NOTE: Don't compile intrinsics
-    if (fd->base.flags & Ast_Flag_Intrinsic) return;
+    if (fd->flags & Ast_Flag_Intrinsic) return;
 
     i32 type_idx = generate_type_idx(mod, fd);
 
-    if (fd->base.flags & Ast_Flag_Foreign) {
+    if (fd->flags & Ast_Flag_Foreign) {
         WasmImport import = {
             .kind = WASM_FOREIGN_FUNCTION,
             .idx  = type_idx,
@@ -825,7 +825,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     bh_arr_new(mod->allocator, wasm_func.code, 4);
 
-    if (fd->base.flags & Ast_Flag_Exported) {
+    if (fd->flags & Ast_Flag_Exported) {
         token_toggle_end(fd->exported_name);
 
         i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) fd);
@@ -844,7 +844,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (fd->body != NULL) {
         // NOTE: Generate the local map
         i32 localidx = 0;
-        for (AstLocal *param = fd->params; param != NULL; param = (AstLocal *) param->base.next) {
+        for (AstLocal *param = fd->params; param != NULL; param = (AstLocal *) param->next) {
             bh_imap_put(&mod->local_map, (u64) param, localidx++);
         }
 
@@ -855,7 +855,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
         u8* count = &wasm_func.locals.i32_count;
         fori (ti, 0, 3) {
             forll (AstLocal, local, fd->body->locals->last_local, prev_local) {
-                if (onyx_type_to_wasm_type(local->base.type) == local_types[ti]) {
+                if (onyx_type_to_wasm_type(local->type) == local_types[ti]) {
                     bh_imap_put(&mod->local_map, (u64) local, localidx++);
 
                     (*count)++;
@@ -880,9 +880,9 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
 }
 
 static void compile_global_declaration(OnyxWasmModule* module, AstGlobal* global) {
-    WasmType global_type = onyx_type_to_wasm_type(global->base.type);
+    WasmType global_type = onyx_type_to_wasm_type(global->type);
 
-    if (global->base.flags & Ast_Flag_Foreign) {
+    if (global->flags & Ast_Flag_Foreign) {
         WasmImport import = {
             .kind = WASM_FOREIGN_GLOBAL,
             .idx  = global_type,
@@ -896,11 +896,11 @@ static void compile_global_declaration(OnyxWasmModule* module, AstGlobal* global
 
     WasmGlobal glob = {
         .type = global_type,
-        .mutable = (global->base.flags & Ast_Flag_Const) == 0,
+        .mutable = (global->flags & Ast_Flag_Const) == 0,
         .initial_value = NULL,
     };
 
-    if ((global->base.flags & Ast_Flag_Exported) != 0) {
+    if ((global->flags & Ast_Flag_Exported) != 0) {
         token_toggle_end(global->exported_name);
 
         i32 global_idx = (i32) bh_imap_get(&module->func_map, (u64) global);
@@ -973,26 +973,26 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
 
 void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program) {
     bh_arr_each(AstFunction *, function, program->functions) {
-        if ((*function)->base.flags & Ast_Flag_Foreign) {
+        if ((*function)->flags & Ast_Flag_Foreign) {
             bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
         }
     }
 
     bh_arr_each(AstGlobal *, global, program->globals) {
-        if ((*global)->base.flags & Ast_Flag_Foreign) {
+        if ((*global)->flags & Ast_Flag_Foreign) {
             bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
         }
     }
 
     bh_arr_each(AstFunction *, function, program->functions) {
-        if ((*function)->base.flags & Ast_Flag_Foreign) continue;
+        if ((*function)->flags & Ast_Flag_Foreign) continue;
 
-        if (((*function)->base.flags & Ast_Flag_Intrinsic) == 0)
+        if (((*function)->flags & Ast_Flag_Intrinsic) == 0)
             bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
     }
 
     bh_arr_each(AstGlobal *, global, program->globals) {
-        if ((*global)->base.flags & Ast_Flag_Foreign) continue;
+        if ((*global)->flags & Ast_Flag_Foreign) continue;
 
         bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
     }

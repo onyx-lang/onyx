@@ -53,7 +53,7 @@ typedef enum CompilerProgress {
 typedef struct CompilerState {
     OnyxCompileOptions* options;
 
-    bh_arena ast_arena, msg_arena, sp_arena;
+    bh_arena                  ast_arena, msg_arena, sp_arena;
     bh_allocator token_alloc, ast_alloc, msg_alloc, sp_alloc;
 
     bh_table(bh_file_contents) loaded_files;
@@ -215,7 +215,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     if (compiler_state->options->verbose_output)
         bh_printf("[Checking semantics]\n");
 
-    OnyxSemPassState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
+    SemState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
     onyx_sempass(&sp_state, &compiler_state->parse_output);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
@@ -266,17 +266,8 @@ int main(int argc, char *argv[]) {
     global_heap_allocator = bh_managed_heap_allocator(&global_heap);
 
     OnyxCompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
-    CompilerState compile_state = {
-        .parse_output = {
-            .top_level_bindings = NULL,
-            .nodes_to_process   = NULL,
 
-            .functions = NULL,
-            .globals   = NULL,
-        },
-        .wasm_mod = { 0 }
-    };
-
+    CompilerState compile_state = { 0 };
     compiler_state_init(&compile_state, &compile_opts);
 
     CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_FAILED_READ;
