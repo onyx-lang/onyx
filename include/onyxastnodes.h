@@ -4,8 +4,6 @@
 #include "onyxlex.h"
 #include "onyxtypes.h"
 
-typedef struct AstNode AstNode;
-typedef struct AstTyped AstTyped;
 typedef struct AstUnaryOp AstUnaryOp;
 typedef struct AstBinOp AstBinaryOp;
 typedef struct AstAssign AstAssign;
@@ -21,7 +19,6 @@ typedef struct AstIf AstIf;
 typedef struct AstWhile AstWhile;
 typedef struct AstLocalGroup AstLocalGroup;
 
-typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
 typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
@@ -179,6 +176,7 @@ struct AstIf {
 #define AstType_members { AstKind kind; u32 flags; char* name; }
 #define AstType_base struct AstType_members;
 struct AstType AstType_members;
+
 struct AstBasicType     { AstType_base; Type* type; };
 struct AstPointerType   { AstType_base; AstType* elem; };
 struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; AstType* params[]; };
