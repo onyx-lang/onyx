@@ -2,26 +2,28 @@
 #include "onyxsempass.h"
 #include "onyxparser.h"
 
-static b32 check_block(SemState* state, AstBlock* block);
-static b32 check_statement_chain(SemState* state, AstNode* start);
-static b32 check_statement(SemState* state, AstNode* stmt);
-static b32 check_return(SemState* state, AstReturn* retnode);
-static b32 check_if(SemState* state, AstIf* ifnode);
-static b32 check_while(SemState* state, AstWhile* whilenode);
-static b32 check_call(SemState* state, AstCall* call);
-static b32 check_binaryop(SemState* state, AstBinaryOp* binop);
-static b32 check_expression(SemState* state, AstTyped* expr);
-static b32 check_array_access(SemState* state, AstArrayAccess* expr);
-static b32 check_global(SemState* state, AstGlobal* global);
-static b32 check_function(SemState* state, AstFunction* func);
-static b32 check_overloaded_function(SemState* state, AstOverloadedFunction* func);
+#define CHECK(kind, ...) static b32 check_ ## kind (SemState* state, __VA_ARGS__)
+
+CHECK(block, AstBlock* block);
+CHECK(statement_chain, AstNode* start);
+CHECK(statement, AstNode* stmt);
+CHECK(return, AstReturn* retnode);
+CHECK(if, AstIf* ifnode);
+CHECK(while, AstWhile* whilenode);
+CHECK(call, AstCall* call);
+CHECK(binaryop, AstBinaryOp* binop);
+CHECK(expression, AstTyped* expr);
+CHECK(array_access, AstArrayAccess* expr);
+CHECK(global, AstGlobal* global);
+CHECK(function, AstFunction* func);
+CHECK(overloaded_function, AstOverloadedFunction* func);
 
 static inline void fill_in_type(SemState* state, AstTyped* node) {
     if (node->type == NULL)
         node->type = type_build_from_ast(state->allocator, node->type_node);
 }
 
-static b32 check_return(SemState* state, AstReturn* retnode) {
+CHECK(return, AstReturn* retnode) {
     if (retnode->expr) {
         if (check_expression(state, retnode->expr)) return 1;
 
@@ -46,7 +48,7 @@ static b32 check_return(SemState* state, AstReturn* retnode) {
     return 0;
 }
 
-static b32 check_if(SemState* state, AstIf* ifnode) {
+CHECK(if, AstIf* ifnode) {
     if (check_expression(state, ifnode->cond)) return 1;
 
     if (!type_is_bool(ifnode->cond->type)) {
@@ -63,7 +65,7 @@ static b32 check_if(SemState* state, AstIf* ifnode) {
     return 0;
 }
 
-static b32 check_while(SemState* state, AstWhile* whilenode) {
+CHECK(while, AstWhile* whilenode) {
     if (check_expression(state, whilenode->cond)) return 1;
 
     if (!type_is_bool(whilenode->cond->type)) {
@@ -112,7 +114,7 @@ no_match:
     return NULL;
 }
 
-static b32 check_call(SemState* state, AstCall* call) {
+CHECK(call, AstCall* call) {
     AstFunction* callee = (AstFunction *) call->callee;
 
     if (callee->kind == Ast_Kind_Symbol) {
@@ -255,7 +257,7 @@ static b32 check_call(SemState* state, AstCall* call) {
     return 0;
 }
 
-static b32 check_binaryop(SemState* state, AstBinaryOp* binop) {
+CHECK(binaryop, AstBinaryOp* binop) {
     if (check_expression(state, binop->left)) return 1;
     if (check_expression(state, binop->right)) return 1;
 
@@ -352,7 +354,7 @@ static b32 check_binaryop(SemState* state, AstBinaryOp* binop) {
     return 0;
 }
 
-static b32 check_array_access(SemState* state, AstArrayAccess* aa) {
+CHECK(array_access, AstArrayAccess* aa) {
     check_expression(state, aa->addr);
     check_expression(state, aa->expr);
 
@@ -379,7 +381,7 @@ static b32 check_array_access(SemState* state, AstArrayAccess* aa) {
     return 0;
 }
 
-static b32 check_expression(SemState* state, AstTyped* expr) {
+CHECK(expression, AstTyped* expr) {
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
@@ -462,7 +464,7 @@ static b32 check_expression(SemState* state, AstTyped* expr) {
     return retval;
 }
 
-static b32 check_global(SemState* state, AstGlobal* global) {
+CHECK(global, AstGlobal* global) {
     fill_in_type(state, (AstTyped *) global);
 
     if (global->type == NULL) {
@@ -478,7 +480,7 @@ static b32 check_global(SemState* state, AstGlobal* global) {
     return 0;
 }
 
-static b32 check_statement(SemState* state, AstNode* stmt) {
+CHECK(statement, AstNode* stmt) {
     switch (stmt->kind) {
         case Ast_Kind_Return:     return check_return(state, (AstReturn *) stmt);
         case Ast_Kind_If:         return check_if(state, (AstIf *) stmt);
@@ -495,7 +497,7 @@ static b32 check_statement(SemState* state, AstNode* stmt) {
     }
 }
 
-static b32 check_statement_chain(SemState* state, AstNode* start) {
+CHECK(statement_chain, AstNode* start) {
     while (start) {
         if (check_statement(state, start)) return 1;
         start = start->next;
@@ -504,7 +506,7 @@ static b32 check_statement_chain(SemState* state, AstNode* start) {
     return 0;
 }
 
-static b32 check_block(SemState* state, AstBlock* block) {
+CHECK(block, AstBlock* block) {
     if (check_statement_chain(state, block->body)) return 1;
 
     forll(AstLocal, local, block->locals->last_local, prev_local) {
@@ -520,7 +522,7 @@ static b32 check_block(SemState* state, AstBlock* block) {
     return 0;
 }
 
-static b32 check_function(SemState* state, AstFunction* func) {
+CHECK(function, AstFunction* func) {
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
         fill_in_type(state, (AstTyped *) param);
 
@@ -585,7 +587,7 @@ static b32 check_function(SemState* state, AstFunction* func) {
     return 0;
 }
 
-static b32 check_overloaded_function(SemState* state, AstOverloadedFunction* func) {
+CHECK(overloaded_function, AstOverloadedFunction* func) {
     bh_arr_each(AstTyped *, node, func->overloads) {
         if ((*node)->kind == Ast_Kind_Overloaded_Function) {
             onyx_message_add(state->msgs,
@@ -609,7 +611,7 @@ static b32 check_overloaded_function(SemState* state, AstOverloadedFunction* fun
     return 0;
 }
 
-static b32 check_node(SemState* state, AstNode* node) {
+CHECK(node, AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function(state, (AstFunction *) node);
         case Ast_Kind_Overloaded_Function:  return check_overloaded_function(state, (AstOverloadedFunction *) node);
