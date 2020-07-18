@@ -268,9 +268,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
     }
 
     while (parser->curr->type == Token_Type_Keyword_Cast) {
-        consume_token(parser);
 
         AstUnaryOp* cast_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+        cast_node->token = expect_token(parser, Token_Type_Keyword_Cast);
         cast_node->type_node = parse_type(parser);
         cast_node->operation = Unary_Op_Cast;
         cast_node->expr = retval;

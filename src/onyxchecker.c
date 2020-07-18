@@ -213,7 +213,7 @@ static b32 check_binaryop(SemState* state, AstBinaryOp* binop) {
         if (!is_lval((AstNode *) binop->left)) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_NOT_LVAL,
-                    binop->token->pos,
+                    binop->left->token->pos,
                     binop->left->token->text, binop->left->token->length);
             return 1;
         }
