@@ -15,6 +15,7 @@ static const char* ast_node_names[] = {
 
     "BINDING",
     "FUNCTION",
+    "OVERLOADED_FUNCTION",
     "FOREIGN",
     "BLOCK",
     "SCOPE",

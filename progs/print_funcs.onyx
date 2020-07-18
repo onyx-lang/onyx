@@ -3,3 +3,11 @@ print_i32  :: proc #foreign "host" "print" (value: i32) ---
 print_f32  :: proc #foreign "host" "print" (value: f32) ---
 print_i64  :: proc #foreign "host" "print" (value: i64) ---
 print_f64  :: proc #foreign "host" "print" (value: f64) ---
+
+print :: proc #overloaded {
+    print_bool,
+    print_i32,
+    print_f32,
+    print_i64,
+    print_f64
+}

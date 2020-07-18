@@ -21,6 +21,7 @@ static b32  symres_statement(SemState* state, AstNode* stmt);
 static void symres_block(SemState* state, AstBlock* block);
 static void symres_function(SemState* state, AstFunction* func);
 static void symres_global(SemState* state, AstGlobal* global);
+static void symres_overloaded_function(SemState* state, AstOverloadedFunction* ofunc);
 
 static void symbol_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol) {
     token_toggle_end(tkn);
@@ -318,6 +319,14 @@ static void symres_global(SemState* state, AstGlobal* global) {
     global->type_node = symres_type(state, global->type_node);
 }
 
+static void symres_overloaded_function(SemState* state, AstOverloadedFunction* ofunc) {
+    bh_arr_each(AstTyped *, node, ofunc->overloads) {
+        if ((*node)->kind == Ast_Kind_Symbol) {
+            *node = (AstTyped *) symbol_resolve(state, (*node)->token);
+        }
+    }
+}
+
 static void symres_top_node(SemState* state, AstNode** node) {
     switch ((*node)->kind) {
         case Ast_Kind_Call:
@@ -334,6 +343,10 @@ static void symres_top_node(SemState* state, AstNode** node) {
 
         case Ast_Kind_Function:
              symres_function(state, (AstFunction *) *node);
+             break;
+
+        case Ast_Kind_Overloaded_Function:
+             symres_overloaded_function(state, (AstOverloadedFunction *) *node);
              break;
 
         default:

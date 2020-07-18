@@ -1,6 +1,24 @@
 use "progs/intrinsics"
 use "progs/print_funcs"
 
+global_arr :: global ^i32;
+
+min_i32 :: proc (a: i32, b: i32) -> i32 {
+    least := a;
+    if b < a least = b;
+    return least;
+}
+
+min_i64 :: proc (a: i64, b: i64) -> i64 {
+    least := a;
+    if b < a least = b;
+    return least;
+}
+
+min :: proc #overloaded {
+    min_i32, min_i64, min_f32, min_f64
+}
+
 // NOTE: in-place insertion sort
 sort :: proc (src: ^i32, len: i32) {
     i := 0;
@@ -21,17 +39,17 @@ sort :: proc (src: ^i32, len: i32) {
     }
 }
 
-global_arr :: global ^i32;
-
-print_i32arr :: proc (arr: ^i32, len: i32) {
+printarr :: proc (arr: ^i32, len: i32) {
     i := 0;
     while i < len {
-        print_i32(arr[i]);
+        print(arr[i]);
         i += 1;
     }
 }
 
 main :: proc #export {
+    print(min(10.0, 12.0));
+
     global_arr = 0 as ^i32;
     len :: 10;
 
@@ -41,11 +59,11 @@ main :: proc #export {
         i += 1;
     }
 
-    print_i32arr(global_arr, len);
+    printarr(global_arr, len);
 
     sort(global_arr, len);
 
-    print_i32(1234567);
-    print_i32arr(global_arr, len);
+    print(1234567);
+    printarr(global_arr, len);
 }
 

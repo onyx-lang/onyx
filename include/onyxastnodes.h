@@ -30,10 +30,10 @@ typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
 
 typedef struct AstBinding AstBinding;
-typedef struct AstFunction AstFunction;
-typedef struct AstForeign AstForeign;
-typedef struct AstGlobal AstGlobal;
 typedef struct AstUse AstUse;
+typedef struct AstGlobal AstGlobal;
+typedef struct AstFunction AstFunction;
+typedef struct AstOverloadedFunction AstOverloadedFunction;
 
 typedef enum AstKind {
     Ast_Kind_Error,
@@ -42,6 +42,7 @@ typedef enum AstKind {
 
     Ast_Kind_Binding,
     Ast_Kind_Function,
+    Ast_Kind_Overloaded_Function,
     Ast_Kind_Foreign,
     Ast_Kind_Block,
     Ast_Kind_Local_Group,
@@ -254,6 +255,11 @@ struct AstFunction      {
             OnyxToken* foreign_name;
         };
     };
+};
+struct AstOverloadedFunction {
+    AstTyped_base;
+
+    bh_arr(AstTyped *) overloads;
 };
 
 // NOTE: Simple data structure for storing what comes out of the parser

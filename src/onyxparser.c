@@ -740,12 +740,32 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
 
 // 'proc' <directive>* <func_params> ('->' <type>)? <block>
 static AstFunction* parse_function_definition(OnyxParser* parser) {
-
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     bh_arr_new(global_heap_allocator, func_def->locals, 4);
     func_def->token = expect_token(parser, Token_Type_Keyword_Proc);
 
     while (parser->curr->type == '#') {
+        if (parse_possible_directive(parser, "overloaded")) {
+            AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
+            ofunc->token = func_def->token;
+
+            bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
+
+            expect_token(parser, '{');
+            while (parser->curr->type != '}') {
+                AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);
+                sym_node->token = expect_token(parser, Token_Type_Symbol);
+
+                bh_arr_push(ofunc->overloads, sym_node);
+
+                if (parser->curr->type != '}')
+                    expect_token(parser, ',');
+            }
+
+            consume_token(parser);
+            return (AstFunction *) ofunc;
+        }
+
         if (parse_possible_directive(parser, "intrinsic")) {
             func_def->flags |= Ast_Flag_Intrinsic;
 
@@ -913,7 +933,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     if (global->exported_name == NULL)
                         global->exported_name = symbol;
 
-                } else {
+                } else if (node->kind != Ast_Kind_Overloaded_Function) {
                     // HACK
                     bh_arr_push(parser->results.nodes_to_process, (AstNode *) node);
                 }

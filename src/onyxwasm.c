@@ -1213,7 +1213,7 @@ static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
     u8* leb = uint_to_uleb128((u64) 1, &leb_len);
     bh_buffer_append(&vec_buff, leb, leb_len);
 
-    output_limits(4, 20, &vec_buff);
+    output_limits(4, -1, &vec_buff);
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
