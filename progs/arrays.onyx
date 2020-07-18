@@ -47,7 +47,8 @@ printarr :: proc (arr: ^i32, len: i32) {
     }
 }
 
-main :: proc #export {
+// Don't need to bind this function to a symbol
+proc #export "main" {
     print(min(10.0, 12.0));
 
     global_arr = 0 as ^i32;

@@ -125,7 +125,6 @@ static AstNumLit* parse_numeric_literal(OnyxParser* parser) {
 // ( <expr> )
 // - <factor>
 // ! <factor>
-// proc ...
 // <symbol> ( '(' <exprlist> ')' )?
 // <numlit>
 // 'true'
@@ -330,6 +329,7 @@ static inline i32 get_precedence(BinaryOp kind) {
 // <expr> *= <expr>
 // <expr> /= <expr>
 // <expr> %= <expr>
+// <factor>
 // With expected precedence rules
 static AstTyped* parse_expression(OnyxParser* parser) {
     bh_arr(AstBinaryOp*) tree_stack = NULL;
@@ -885,6 +885,9 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
     return (AstTyped *) global_node;
 }
 
+// <proc>
+// <global>
+// <expr>
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Proc) {
         AstFunction* func_node = parse_function_definition(parser);
@@ -913,6 +916,10 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                 return (AstNode *) use_node;
             }
+
+        case Token_Type_Keyword_Proc:
+            parse_top_level_expression(parser);
+            return NULL;
 
         case Token_Type_Symbol:
             {
