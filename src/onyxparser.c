@@ -191,6 +191,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
                 call_node->token = expect_token(parser, '(');
                 call_node->callee = (AstNode *) sym_node;
+                call_node->arg_count = 0;
 
                 AstArgument** prev = &call_node->arguments;
                 AstArgument* curr = NULL;
@@ -202,6 +203,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     if (curr != NULL && curr->kind != Ast_Kind_Error) {
                         *prev = curr;
                         prev = (AstArgument **) &curr->next;
+
+                        call_node->arg_count++;
                     }
 
                     if (parser->curr->type == ')')

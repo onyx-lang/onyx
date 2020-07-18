@@ -186,8 +186,8 @@ struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *ri
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
-struct AstCall          { AstTyped_base; AstArgument *arguments; AstNode *callee; };
-struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; OnyxIntrinsic intrinsic; };
+struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstNode *callee; };
+struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
 struct AstArgument      { AstTyped_base; AstTyped *value; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 

@@ -78,11 +78,6 @@ static b32 check_while(SemState* state, AstWhile* whilenode) {
 }
 
 static AstTyped* match_overloaded_function(SemState* state, AstCall* call, AstOverloadedFunction* ofunc) {
-    u64 param_count = 0;
-    for (AstArgument* arg = call->arguments;
-            arg != NULL;
-            arg = (AstArgument *) arg->next) param_count++;
-
     bh_arr_each(AstTyped *, node, ofunc->overloads) {
         AstFunction* overload = (AstFunction *) *node;
 
@@ -90,7 +85,7 @@ static AstTyped* match_overloaded_function(SemState* state, AstCall* call, AstOv
 
         TypeFunction* ol_type = &overload->type->Function;
 
-        if (ol_type->param_count != param_count) continue;
+        if (ol_type->param_count != call->arg_count) continue;
 
         AstArgument* arg = call->arguments;
         Type** param_type = ol_type->params;
@@ -490,6 +485,9 @@ static b32 check_statement(SemState* state, AstNode* stmt) {
         case Ast_Kind_While:      return check_while(state, (AstWhile *) stmt);
         case Ast_Kind_Call:       return check_call(state, (AstCall *) stmt);
         case Ast_Kind_Block:      return check_block(state, (AstBlock *) stmt);
+
+        case Ast_Kind_Break:      return 0;
+        case Ast_Kind_Continue:   return 0;
 
         default:
             stmt->flags |= Ast_Flag_Expr_Ignored;
