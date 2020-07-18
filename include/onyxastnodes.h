@@ -271,16 +271,37 @@ struct AstOverloadedFunction {
     bh_arr(AstTyped *) overloads;
 };
 
+
+// NOTE: An Entity represents something will need to be
+// processed later down the pipeline.
+typedef enum EntityType {
+    Entity_Type_Unknown,
+    Entity_Type_Function,
+    Entity_Type_Overloaded_Function,
+    Entity_Type_Global,
+    Entity_Type_Expression
+} EntityType;
+
+typedef struct Entity {
+    EntityType type;
+
+    union {
+        AstFunction*           function;
+        AstOverloadedFunction* overloaded_function;
+        AstGlobal*             global;
+        AstTyped*              expr;
+    };
+} Entity;
+
+
 // NOTE: Simple data structure for storing what comes out of the parser
-typedef struct ParserOutput {
-    bh_arr(AstBinding *)  top_level_bindings;
-    bh_arr(AstNode *)     nodes_to_process;
+typedef struct ProgramInfo {
+    bh_arr(AstBinding *)  bindings;
+    bh_arr(Entity)        entities;
 
-    bh_arr(AstFunction *) functions;
-    bh_arr(AstGlobal *)   globals;
-} ParserOutput;
-
-
+    u32 foreign_func_count;
+    u32 foreign_global_count;
+} ProgramInfo;
 
 
 

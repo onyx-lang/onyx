@@ -279,10 +279,11 @@ typedef struct OnyxWasmModule {
     bh_allocator allocator;
     OnyxMessages* msgs;
 
+    // NOTE: Mapping ptrs to function / global indicies
+    bh_imap index_map;
+
     // NOTE: Mapping from local ast node ptrs to indicies
     bh_imap local_map;
-    bh_imap global_map;
-    bh_imap func_map; // NOTE: Maps from ast node pointers to the function index
 
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
@@ -292,19 +293,21 @@ typedef struct OnyxWasmModule {
     bh_arr(u8) structured_jump_target;
 
     bh_arr(WasmFuncType*) types; // NOTE: This have to be pointers because the type is variadic in size
-    bh_arr(WasmImport) imports;
-    bh_table(WasmExport) exports;
-    bh_arr(WasmGlobal) globals;
-    bh_arr(WasmFunc) funcs;
+    bh_arr(WasmImport)    imports;
+    bh_table(WasmExport)  exports;
+    bh_arr(WasmGlobal)    globals;
+    bh_arr(WasmFunc)      funcs;
 
-    u16 next_type_idx;
-    u16 next_func_idx;
-    u16 next_global_idx;
-    u16 export_count;
+    u32 next_type_idx;
+    u32 export_count;
+    u32 next_func_idx;
+    u32 next_foreign_func_idx;
+    u32 next_global_idx;
+    u32 next_foreign_global_idx;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs);
-void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program);
+void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 

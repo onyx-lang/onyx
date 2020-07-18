@@ -16,7 +16,7 @@ SemState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc, OnyxMe
     return state;
 }
 
-void onyx_sempass(SemState* state, ParserOutput* program) {
+void onyx_sempass(SemState* state, ProgramInfo* program) {
     onyx_resolve_symbols(state, program);
     if (onyx_message_has_errors(state->msgs)) return;
 

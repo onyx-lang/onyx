@@ -291,35 +291,7 @@ static void symres_overloaded_function(SemState* state, AstOverloadedFunction* o
     }
 }
 
-static void symres_top_node(SemState* state, AstNode** node) {
-    switch ((*node)->kind) {
-        case Ast_Kind_Call:
-        case Ast_Kind_Unary_Op:
-        case Ast_Kind_Binary_Op:
-        case Ast_Kind_Literal:
-        case Ast_Kind_Symbol:
-             symres_expression(state, (AstTyped **) node);
-             break;
-
-        case Ast_Kind_Global:
-             symres_global(state, (AstGlobal *) *node);
-             break;
-
-        case Ast_Kind_Function:
-             symres_function(state, (AstFunction *) *node);
-             break;
-
-        case Ast_Kind_Overloaded_Function:
-             symres_overloaded_function(state, (AstOverloadedFunction *) *node);
-             break;
-
-        default:
-             DEBUG_HERE;
-             break;
-    }
-}
-
-void onyx_resolve_symbols(SemState* state, ParserOutput* program) {
+void onyx_resolve_symbols(SemState* state, ProgramInfo* program) {
 
     state->global_scope = scope_create(state->node_allocator, NULL);
     scope_enter(state, state->global_scope);
@@ -339,9 +311,17 @@ void onyx_resolve_symbols(SemState* state, ParserOutput* program) {
     symbol_basic_type_introduce(state, &basic_type_f64);
     symbol_basic_type_introduce(state, &basic_type_rawptr);
 
-    bh_arr_each(AstBinding *, binding, program->top_level_bindings)
+    bh_arr_each(AstBinding *, binding, program->bindings)
         if (!symbol_introduce(state, (*binding)->token, (*binding)->node)) return;
 
-    bh_arr_each(AstNode *, node, program->nodes_to_process)
-        symres_top_node(state, node);
+    bh_arr_each(Entity, entity, program->entities) {
+        switch (entity->type) {
+            case Entity_Type_Function:            symres_function(state, entity->function); break;
+            case Entity_Type_Overloaded_Function: symres_overloaded_function(state, entity->overloaded_function); break;
+            case Entity_Type_Global:              symres_global(state, entity->global); break;
+            case Entity_Type_Expression:          symres_expression(state, &entity->expr); break;
+
+            default: break;
+        }
+    }
 }

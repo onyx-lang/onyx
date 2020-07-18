@@ -23,13 +23,13 @@ typedef struct SemState {
 } SemState;
 
 // NOTE: Resolving all symbols in the tree
-void onyx_resolve_symbols(SemState* state, ParserOutput* program);
+void onyx_resolve_symbols(SemState* state, ProgramInfo* program);
 
 // NOTE: Inferring and checking types in the tree
-void onyx_type_check(SemState* state, ParserOutput* program);
+void onyx_type_check(SemState* state, ProgramInfo* program);
 
 // NOTE: Full semantic pass
 SemState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc, OnyxMessages* msgs);
-void onyx_sempass(SemState* state, ParserOutput* program);
+void onyx_sempass(SemState* state, ProgramInfo* program);
 
 #endif

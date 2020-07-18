@@ -41,29 +41,6 @@ typedef struct OnyxCompileOptions {
     const char* target_file;
 } OnyxCompileOptions;
 
-typedef enum CompilerProgress {
-    ONYX_COMPILER_PROGRESS_FAILED_READ,
-    ONYX_COMPILER_PROGRESS_FAILED_PARSE,
-    ONYX_COMPILER_PROGRESS_FAILED_SEMPASS,
-    ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN,
-    ONYX_COMPILER_PROGRESS_FAILED_OUTPUT,
-    ONYX_COMPILER_PROGRESS_SUCCESS
-} CompilerProgress;
-
-typedef struct CompilerState {
-    OnyxCompileOptions* options;
-
-    bh_arena                  ast_arena, msg_arena, sp_arena;
-    bh_allocator token_alloc, ast_alloc, msg_alloc, sp_alloc;
-
-    bh_table(bh_file_contents) loaded_files;
-    bh_arr(const char *) queued_files;
-
-    OnyxMessages msgs;
-    ParserOutput parse_output;
-    OnyxWasmModule wasm_mod;
-} CompilerState;
-
 static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *argv[]) {
     OnyxCompileOptions options = {
         .allocator = alloc,
@@ -106,73 +83,38 @@ static void compile_opts_free(OnyxCompileOptions* opts) {
     bh_arr_free(opts->files);
 }
 
-static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
-    // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
-    if (compiler_state->options->verbose_output)
-        bh_printf("[Lexing]       %s\n", file_contents->filename);
 
-    OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
-    onyx_lex_tokens(&tokenizer);
 
-    if (compiler_state->options->verbose_output)
-        bh_printf("[Parsing]      %s\n", file_contents->filename);
 
-    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
-    return onyx_parse(&parser);
-}
 
-static CompilerProgress process_source_file(CompilerState* compiler_state, char* filename) {
-    if (bh_table_has(bh_file_contents, compiler_state->loaded_files, filename)) return ONYX_COMPILER_PROGRESS_SUCCESS;
+typedef enum CompilerProgress {
+    ONYX_COMPILER_PROGRESS_FAILED_READ,
+    ONYX_COMPILER_PROGRESS_FAILED_PARSE,
+    ONYX_COMPILER_PROGRESS_FAILED_SEMPASS,
+    ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN,
+    ONYX_COMPILER_PROGRESS_FAILED_OUTPUT,
+    ONYX_COMPILER_PROGRESS_SUCCESS
+} CompilerProgress;
 
-    bh_file file;
+typedef struct CompilerState {
+    OnyxCompileOptions* options;
 
-    bh_file_error err = bh_file_open(&file, filename);
-    if (err != BH_FILE_ERROR_NONE) {
-        bh_printf_err("Failed to open file %s\n", filename);
-        return ONYX_COMPILER_PROGRESS_FAILED_READ;
-    }
+    bh_arena                  ast_arena, msg_arena, sp_arena;
+    bh_allocator token_alloc, ast_alloc, msg_alloc, sp_alloc;
 
-    if (compiler_state->options->verbose_output)
-        bh_printf("[Reading]      %s\n", file.filename);
+    bh_table(bh_file_contents) loaded_files;
+    bh_arr(const char *) queued_files;
 
-    bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
-    bh_file_close(&file);
-
-    // NOTE: Need to reget the value out of the table so token references work
-    bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
-    fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
-
-    ParseResults results = parse_source_file(compiler_state, &fc);
-
-    bh_arr_each(AstUse *, use_node, results.uses) {
-        char* formatted_name = bh_aprintf(
-                global_heap_allocator,
-                "%b.onyx",
-                (*use_node)->filename->text, (*use_node)->filename->length);
-
-        bh_arr_push(compiler_state->queued_files, formatted_name);
-    }
-
-    bh_arr_each(AstBinding *, binding_node, results.bindings)
-        bh_arr_push(compiler_state->parse_output.top_level_bindings, *binding_node);
-
-    bh_arr_each(AstNode *, node, results.nodes_to_process)
-        bh_arr_push(compiler_state->parse_output.nodes_to_process, *node);
-
-    if (onyx_message_has_errors(&compiler_state->msgs)) {
-        return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
-    } else {
-        return ONYX_COMPILER_PROGRESS_SUCCESS;
-    }
-}
+    OnyxMessages msgs;
+    ProgramInfo prog_info;
+    OnyxWasmModule wasm_mod;
+} CompilerState;
 
 static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOptions* opts) {
     compiler_state->options = opts;
 
-    bh_arr_new(global_heap_allocator, compiler_state->parse_output.top_level_bindings, 4);
-    bh_arr_new(global_heap_allocator, compiler_state->parse_output.nodes_to_process, 4);
-    bh_arr_new(global_heap_allocator, compiler_state->parse_output.functions, 4);
-    bh_arr_new(global_heap_allocator, compiler_state->parse_output.globals, 4);
+    bh_arr_new(global_heap_allocator, compiler_state->prog_info.bindings, 4);
+    bh_arr_new(global_heap_allocator, compiler_state->prog_info.entities, 4);
 
     bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
     compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
@@ -198,6 +140,108 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
         bh_arr_push(compiler_state->queued_files, (char *) *filename);
 }
 
+static void compiler_state_free(CompilerState* cs) {
+    bh_arena_free(&cs->ast_arena);
+    bh_arena_free(&cs->msg_arena);
+    bh_arena_free(&cs->sp_arena);
+    bh_table_free(cs->loaded_files);
+    onyx_wasm_module_free(&cs->wasm_mod);
+}
+
+
+
+
+
+static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
+    // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
+    if (compiler_state->options->verbose_output)
+        bh_printf("[Lexing]       %s\n", file_contents->filename);
+
+    OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
+    onyx_lex_tokens(&tokenizer);
+
+    if (compiler_state->options->verbose_output)
+        bh_printf("[Parsing]      %s\n", file_contents->filename);
+
+    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
+    return onyx_parse(&parser);
+}
+
+static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
+    bh_arr_each(AstUse *, use_node, results->uses) {
+        char* formatted_name = bh_aprintf(
+                global_heap_allocator,
+                "%b.onyx",
+                (*use_node)->filename->text, (*use_node)->filename->length);
+
+        bh_arr_push(compiler_state->queued_files, formatted_name);
+    }
+
+    bh_arr_each(AstBinding *, binding_node, results->bindings)
+        bh_arr_push(compiler_state->prog_info.bindings, *binding_node);
+
+    bh_arr_each(AstNode *, node, results->nodes_to_process) {
+        Entity ent = { Entity_Type_Unknown };
+
+        AstKind nkind    = (*node)->kind;
+        switch (nkind) {
+            case Ast_Kind_Function:
+                ent.type     = Entity_Type_Function;
+                ent.function = (AstFunction *) *node;
+                break;
+
+            case Ast_Kind_Overloaded_Function:
+                ent.type                = Entity_Type_Overloaded_Function;
+                ent.overloaded_function = (AstOverloadedFunction *) *node;
+                break;
+
+            case Ast_Kind_Global:
+                ent.type   = Entity_Type_Global;
+                ent.global = (AstGlobal *) *node;
+                break;
+
+            default:
+                ent.type = Entity_Type_Expression;
+                ent.expr = (AstTyped *) *node;
+                break;
+        }
+
+        bh_arr_push(compiler_state->prog_info.entities, ent);
+    }
+}
+
+static CompilerProgress process_source_file(CompilerState* compiler_state, char* filename) {
+    if (bh_table_has(bh_file_contents, compiler_state->loaded_files, filename)) return ONYX_COMPILER_PROGRESS_SUCCESS;
+
+    bh_file file;
+
+    bh_file_error err = bh_file_open(&file, filename);
+    if (err != BH_FILE_ERROR_NONE) {
+        bh_printf_err("Failed to open file %s\n", filename);
+        return ONYX_COMPILER_PROGRESS_FAILED_READ;
+    }
+
+    if (compiler_state->options->verbose_output)
+        bh_printf("[Reading]      %s\n", file.filename);
+
+    bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
+    bh_file_close(&file);
+
+    // NOTE: Need to reget the value out of the table so token references work
+    bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
+    fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
+
+    ParseResults results = parse_source_file(compiler_state, &fc);
+    merge_parse_results(compiler_state, &results);
+
+    if (onyx_message_has_errors(&compiler_state->msgs)) {
+        return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
+    } else {
+        return ONYX_COMPILER_PROGRESS_SUCCESS;
+    }
+}
+
+
 static i32 onyx_compile(CompilerState* compiler_state) {
 
     // NOTE: While the queue is not empty, process the next file
@@ -216,7 +260,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_printf("[Checking semantics]\n");
 
     SemState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
-    onyx_sempass(&sp_state, &compiler_state->parse_output);
+    onyx_sempass(&sp_state, &compiler_state->prog_info);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
@@ -228,7 +272,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_printf("[Generating WASM]\n");
 
     compiler_state->wasm_mod = onyx_wasm_module_create(compiler_state->options->allocator, &compiler_state->msgs);
-    onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->parse_output);
+    onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->prog_info);
 
     if (onyx_message_has_errors(&compiler_state->msgs)) {
         return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
@@ -247,14 +291,6 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     onyx_wasm_module_write_to_file(&compiler_state->wasm_mod, output_file);
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
-}
-
-static void compiler_state_free(CompilerState* cs) {
-    bh_arena_free(&cs->ast_arena);
-    bh_arena_free(&cs->msg_arena);
-    bh_arena_free(&cs->sp_arena);
-    bh_table_free(cs->loaded_files);
-    onyx_wasm_module_free(&cs->wasm_mod);
 }
 
 int main(int argc, char *argv[]) {

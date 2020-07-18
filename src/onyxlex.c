@@ -107,7 +107,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     tk.pos.line_start = tokenizer->line_start;
     tk.pos.filename = tokenizer->filename;
     tk.pos.line = tokenizer->line_number;
-    tk.pos.column = (i32)(tokenizer->curr - tokenizer->line_start) + 1;
+    tk.pos.column = (u16)(tokenizer->curr - tokenizer->line_start) + 1;
 
     if (tokenizer->curr == tokenizer->end) {
         tk.type = Token_Type_End_Stream;
@@ -220,6 +220,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     INCREMENT_CURR_TOKEN(tokenizer);
 
 token_parsed:
+    tk.pos.length = (u16) tk.length;
     bh_arr_push(tokenizer->tokens, tk);
 
     return &tokenizer->tokens[bh_arr_length(tokenizer->tokens) - 1];

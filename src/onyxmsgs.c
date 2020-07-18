@@ -56,11 +56,12 @@ static void print_detailed_message(OnyxMessage* msg, bh_file_contents* fc) {
     bh_printf("| %b\n", msg->pos.line_start, linelength);
 
     char* pointer_str = bh_alloc_array(global_scratch_allocator, char, linelength);
-    memset(pointer_str, 0, linelength);
-    memset(pointer_str, '~', msg->pos.column - 1);
+    memset(pointer_str, ' ', linelength);
+    memset(pointer_str + msg->pos.column, '~', msg->pos.length - 1);
     pointer_str[msg->pos.column - 1] = '^';
+    pointer_str[msg->pos.column + msg->pos.length - 1] = 0;
 
-    bh_printf("|~%s\n", pointer_str);
+    bh_printf("| %s\n", pointer_str);
 }
 
 void onyx_message_print(OnyxMessages* msgs) {

@@ -361,7 +361,7 @@ CHECK(array_access, AstArrayAccess* aa) {
     if (!type_is_pointer(aa->addr->type)) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
-                aa->addr->token->pos,
+                aa->token->pos,
                 "expected pointer type for left of array access");
         return 1;
     }
@@ -370,7 +370,7 @@ CHECK(array_access, AstArrayAccess* aa) {
             || (aa->expr->type->Basic.flags & Basic_Flag_Integer) == 0) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_LITERAL,
-                aa->expr->token->pos,
+                aa->token->pos,
                 "expected integer type for index");
         return 1;
     }
@@ -625,16 +625,30 @@ CHECK(node, AstNode* node) {
     }
 }
 
-void onyx_type_check(SemState* state, ParserOutput* program) {
-    bh_arr_each(AstNode *, node, program->nodes_to_process) {
-        check_node(state, *node);
+void onyx_type_check(SemState* state, ProgramInfo* program) {
+    bh_arr_each(Entity, entity, program->entities) {
+        switch (entity->type) {
+            case Entity_Type_Function:
+                if (entity->function->flags & Ast_Kind_Foreign) program->foreign_func_count++;
 
-        if ((*node)->kind == Ast_Kind_Function) {
-            bh_arr_push(program->functions, (AstFunction *) *node);
-        }
+                if (check_function(state, entity->function)) return;
+                break;
 
-        if ((*node)->kind == Ast_Kind_Global) {
-            bh_arr_push(program->globals, (AstGlobal *) *node);
+            case Entity_Type_Overloaded_Function:
+                if (check_overloaded_function(state, entity->overloaded_function)) return;
+                break;
+
+            case Entity_Type_Global:
+                if (entity->global->flags & Ast_Kind_Foreign) program->foreign_global_count++;
+
+                if (check_global(state, entity->global)) return;
+                break;
+
+            case Entity_Type_Expression:
+                if (check_expression(state, entity->expr)) return;
+                break;
+
+            default: DEBUG_HERE; break;
         }
     }
 }

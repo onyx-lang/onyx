@@ -319,7 +319,7 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
         WID(WI_LOCAL_SET, localidx);
 
     } else if (lval->kind == Ast_Kind_Global) {
-        i32 globalidx = (i32) bh_imap_get(&mod->global_map, (u64) lval);
+        i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) lval);
 
         compile_expression(mod, &code, assign->right);
         WID(WI_GLOBAL_SET, globalidx);
@@ -553,7 +553,7 @@ COMPILE_FUNC(call, AstCall* call) {
         compile_expression(mod, &code, arg->value);
     }
 
-    i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) call->callee);
+    i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) call->callee);
     bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
 
     *pcode = code;
@@ -653,7 +653,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Global:
             {
-                i32 globalidx = (i32) bh_imap_get(&mod->global_map, (u64) expr);
+                i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) expr);
 
                 WID(WI_GLOBAL_GET, globalidx);
                 break;
@@ -880,7 +880,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (fd->flags & Ast_Flag_Exported) {
         token_toggle_end(fd->exported_name);
 
-        i32 func_idx = (i32) bh_imap_get(&mod->func_map, (u64) fd);
+        i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) fd);
 
         WasmExport wasm_export = {
             .kind = WASM_FOREIGN_FUNCTION,
@@ -931,7 +931,7 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     bh_imap_clear(&mod->local_map);
 }
 
-static void compile_global_declaration(OnyxWasmModule* module, AstGlobal* global) {
+static void compile_global(OnyxWasmModule* module, AstGlobal* global) {
     WasmType global_type = onyx_type_to_wasm_type(global->type);
 
     if (global->flags & Ast_Flag_Foreign) {
@@ -955,7 +955,7 @@ static void compile_global_declaration(OnyxWasmModule* module, AstGlobal* global
     if ((global->flags & Ast_Flag_Exported) != 0) {
         token_toggle_end(global->exported_name);
 
-        i32 global_idx = (i32) bh_imap_get(&module->func_map, (u64) global);
+        i32 global_idx = (i32) bh_imap_get(&module->index_map, (u64) global);
 
         WasmExport wasm_export = {
             .kind = WASM_FOREIGN_GLOBAL,
@@ -992,6 +992,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
 
         .funcs = NULL,
         .next_func_idx = 0,
+        .next_foreign_func_idx = 0,
 
         .exports = NULL,
         .export_count = 0,
@@ -1000,6 +1001,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
 
         .globals = NULL,
         .next_global_idx = 0,
+        .next_foreign_global_idx = 0,
 
         .structured_jump_target = NULL,
     };
@@ -1016,55 +1018,63 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
     bh_table_init(global_heap_allocator, module.type_map, 61);
     bh_table_init(global_heap_allocator, module.exports, 61);
 
-    bh_imap_init(&module.local_map,  global_heap_allocator, 16);
-    bh_imap_init(&module.func_map,   global_heap_allocator, 16);
-    bh_imap_init(&module.global_map, global_heap_allocator, 16);
+    bh_imap_init(&module.index_map, global_heap_allocator, 128);
+    bh_imap_init(&module.local_map, global_heap_allocator, 16);
 
     return module;
 }
 
-void onyx_wasm_module_compile(OnyxWasmModule* module, ParserOutput* program) {
-    bh_arr_each(AstFunction *, function, program->functions) {
-        if ((*function)->flags & Ast_Flag_Foreign) {
-            bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
+void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
+
+    module->next_func_idx   = program->foreign_func_count;
+    module->next_global_idx = program->foreign_global_count;
+
+    // NOTE: First, assign indicies to all functions / globals
+    bh_arr_each(Entity, entity, program->entities) {
+        switch (entity->type) {
+            case Entity_Type_Function: {
+                if (entity->function->flags & Ast_Flag_Intrinsic) break;
+
+                u64 func_idx;
+                if ((entity->function->flags & Ast_Flag_Foreign) != 0)
+                    func_idx = module->next_foreign_func_idx++;
+                else
+                    func_idx = module->next_func_idx++;
+
+                bh_imap_put(&module->index_map, (u64) entity->function, func_idx);
+                break;
+            }
+
+            case Entity_Type_Global: {
+                u64 global_idx;
+                if ((entity->global->flags & Ast_Flag_Foreign) != 0)
+                    global_idx = module->next_foreign_global_idx++;
+                else
+                    global_idx = module->next_global_idx++;
+
+                bh_imap_put(&module->index_map, (u64) entity->global, global_idx);
+                break;
+            }
+
+            default: break;
         }
-    }
-
-    bh_arr_each(AstGlobal *, global, program->globals) {
-        if ((*global)->flags & Ast_Flag_Foreign) {
-            bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
-        }
-    }
-
-    bh_arr_each(AstFunction *, function, program->functions) {
-        if ((*function)->flags & Ast_Flag_Foreign) continue;
-
-        if (((*function)->flags & Ast_Flag_Intrinsic) == 0)
-            bh_imap_put(&module->func_map, (u64) *function, module->next_func_idx++);
-    }
-
-    bh_arr_each(AstGlobal *, global, program->globals) {
-        if ((*global)->flags & Ast_Flag_Foreign) continue;
-
-        bh_imap_put(&module->global_map, (u64) *global, module->next_global_idx++);
     }
 
     // NOTE: Then, compile everything
-    bh_arr_each(AstGlobal *, global, program->globals)
-        compile_global_declaration(module, *global);
-
-    bh_arr_each(AstFunction *, function, program->functions)
-        compile_function(module, *function);
-
-    // bh_arr_each(AstGlobal *, global, program->globals)
-    //     compile_global_declaration(module, *global);
+    bh_arr_each(Entity, entity, program->entities) {
+        switch (entity->type) {
+            case Entity_Type_Function: compile_function(module, entity->function); break;
+            case Entity_Type_Global:   compile_global(module,   entity->global); break;
+            default: break;
+        }
+    }
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {
     bh_arr_free(module->types);
     bh_arr_free(module->funcs);
     bh_imap_free(&module->local_map);
-    bh_imap_free(&module->func_map);
+    bh_imap_free(&module->index_map);
     bh_table_free(module->type_map);
     bh_table_free(module->exports);
 }

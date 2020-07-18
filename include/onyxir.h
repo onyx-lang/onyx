@@ -53,6 +53,6 @@ typedef struct IrContext {
 
 IrContext ir_context_create(bh_allocator allocator);
 void ir_context_free(IrContext* context);
-void ir_generate(IrContext* context, ParserOutput parse_output);
+void ir_generate(IrContext* context, ProgramInfo parse_output);
 
 #endif // #ifndef ONYXIR_H
