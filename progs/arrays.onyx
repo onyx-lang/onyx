@@ -21,6 +21,8 @@ sort :: proc (src: ^i32, len: i32) {
     }
 }
 
+global_arr :: global ^i32;
+
 print_i32arr :: proc (arr: ^i32, len: i32) {
     i := 0;
     while i < len {
@@ -30,20 +32,20 @@ print_i32arr :: proc (arr: ^i32, len: i32) {
 }
 
 main :: proc #export {
-    arr := 0 as ^i32;
+    global_arr = 0 as ^i32;
     len :: 10;
 
     i := 0;
     while i < len {
-        arr[i] = (len - i) * 10;
+        global_arr[i] = (len - i) * 10;
         i += 1;
     }
 
-    print_i32arr(arr, len);
+    print_i32arr(global_arr, len);
 
-    sort(arr, len);
+    sort(global_arr, len);
 
     print_i32(1234567);
-    print_i32arr(arr, len);
+    print_i32arr(global_arr, len);
 }
 
