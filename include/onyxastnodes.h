@@ -4,6 +4,7 @@
 #include "onyxlex.h"
 #include "onyxtypes.h"
 
+
 typedef struct AstNode AstNode;
 typedef struct AstTyped AstTyped;
 
@@ -22,7 +23,6 @@ typedef struct AstReturn AstReturn;
 typedef struct AstBlock AstBlock;
 typedef struct AstIf AstIf;
 typedef struct AstWhile AstWhile;
-typedef struct AstLocalGroup AstLocalGroup;
 
 typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
@@ -34,6 +34,15 @@ typedef struct AstUse AstUse;
 typedef struct AstGlobal AstGlobal;
 typedef struct AstFunction AstFunction;
 typedef struct AstOverloadedFunction AstOverloadedFunction;
+
+
+typedef struct Scope {
+    struct Scope *parent;
+    bh_table(AstNode *) symbols;
+} Scope;
+
+extern Scope* scope_create(bh_allocator a, Scope* parent);
+
 
 typedef enum AstKind {
     Ast_Kind_Error,
@@ -195,8 +204,7 @@ struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 ele
 struct AstReturn        { AstNode_base;  AstTyped* expr; };
 
 // Structure Nodes
-struct AstLocalGroup    { AstNode_base;  AstLocalGroup *prev_group; AstLocal *last_local; };
-struct AstBlock         { AstNode_base;  AstNode *body; AstLocalGroup *locals; };
+struct AstBlock         { AstNode_base;  AstNode *body; Scope *scope; };
 struct AstWhile         { AstNode_base;  AstTyped *cond; AstNode *stmt; };
 struct AstIf {
     AstNode_base;
@@ -240,6 +248,7 @@ struct AstGlobal        {
 struct AstFunction      {
     AstTyped_base;
 
+    Scope *scope;
     AstBlock *body;
     AstLocal *params;
     bh_arr(AstLocal *) locals;

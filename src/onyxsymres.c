@@ -1,13 +1,11 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
 
-static void symbol_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol);
-static void symbol_basic_type_introduce(SemState* state, AstBasicType* basic_type);
-static b32 symbol_unique_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol);
-static void symbol_remove(SemState* state, OnyxToken* tkn);
+static b32  symbol_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol);
 static AstNode* symbol_resolve(SemState* state, OnyxToken* tkn);
-static void local_group_enter(SemState* state, AstLocalGroup* local_group);
-static void local_group_leave(SemState* state);
+static void symbol_basic_type_introduce(SemState* state, AstBasicType* basic_type);
+static void scope_enter(SemState* state, Scope* new_scope);
+static void scope_leave(SemState* state);
 
 static AstType* symres_type(SemState* state, AstType* type);
 static void symres_local(SemState* state, AstLocal** local);
@@ -23,113 +21,71 @@ static void symres_function(SemState* state, AstFunction* func);
 static void symres_global(SemState* state, AstGlobal* global);
 static void symres_overloaded_function(SemState* state, AstOverloadedFunction* ofunc);
 
-static void symbol_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol) {
+static b32 symbol_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol) {
     token_toggle_end(tkn);
 
-    SemSymbol* sp_sym = (SemSymbol *) bh_alloc_item(state->allocator, SemSymbol);
-    sp_sym->node = symbol;
-    sp_sym->shadowed = NULL;
-
-    if (bh_table_has(SemSymbol *, state->symbols, tkn->text)) {
-        sp_sym->shadowed = bh_table_get(SemSymbol *, state->symbols, tkn->text);
-    }
-
-    bh_table_put(SemSymbol *, state->symbols, tkn->text, sp_sym);
-
-    if (symbol->kind == Ast_Kind_Local) {
-        AstLocal* local = (AstLocal *) symbol;
-        local->prev_local = state->curr_local_group->last_local;
-        state->curr_local_group->last_local = local;
-
-        bh_arr_push(state->curr_function->locals, local);
-    }
-
-    token_toggle_end(tkn);
-}
-
-static void symbol_remove(SemState* state, OnyxToken* tkn) {
-    token_toggle_end(tkn);
-
-    SemSymbol* sp_sym = bh_table_get(SemSymbol *, state->symbols, tkn->text);
-
-    if (sp_sym->shadowed) {
-        bh_table_put(SemSymbol *, state->symbols, tkn->text, sp_sym->shadowed);
-    } else {
-        bh_table_delete(SemSymbol *, state->symbols, tkn->text);
-    }
-
-    token_toggle_end(tkn);
-}
-
-static AstNode* symbol_resolve(SemState* state, OnyxToken* tkn) {
-    AstNode* res = NULL;
-
-    while (res == NULL || res->kind == Ast_Kind_Symbol) {
-        token_toggle_end(tkn);
-
-        if (!bh_table_has(SemSymbol *, state->symbols, tkn->text)) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
-                    tkn->pos,
-                    tkn->text);
-
-            token_toggle_end(tkn);
-            return NULL;
-        }
-
-        res = bh_table_get(SemSymbol *, state->symbols, tkn->text)->node;
-        token_toggle_end(tkn);
-
-        tkn = res->token;
-    }
-
-    return res;
-}
-
-static void local_group_enter(SemState* state, AstLocalGroup* local_group) {
-    local_group->prev_group = state->curr_local_group;
-    state->curr_local_group = local_group;
-}
-
-static void local_group_leave(SemState* state) {
-    assert(state->curr_local_group != NULL);
-
-    for (AstLocal *walker = state->curr_local_group->last_local; walker != NULL; walker = walker->prev_local) {
-        symbol_remove(state, walker->token);
-    }
-
-    state->curr_local_group = state->curr_local_group->prev_group;
-}
-
-static void symbol_basic_type_introduce(SemState* state, AstBasicType* basic_type) {
-    SemSymbol* sp_sym = bh_alloc_item(state->allocator, SemSymbol);
-    sp_sym->node = (AstNode *) basic_type;
-    sp_sym->shadowed = NULL;
-    bh_table_put(SemSymbol *, state->symbols, basic_type->name, sp_sym);
-}
-
-static b32 symbol_unique_introduce(SemState* state, OnyxToken* tkn, AstNode* symbol) {
-    token_toggle_end(tkn);
-
-    // NOTE: If the function hasn't already been defined
-    if (!bh_table_has(SemSymbol *, state->symbols, tkn->text)) {
-        SemSymbol* sp_sym = bh_alloc_item(state->allocator, SemSymbol);
-        sp_sym->node = symbol;
-        sp_sym->shadowed = NULL;
-        bh_table_put(SemSymbol *, state->symbols, tkn->text, sp_sym);
-    } else {
+    if (bh_table_has(AstNode *, state->curr_scope->symbols, tkn->text)) {
         onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_CONFLICTING_GLOBALS,
+                ONYX_MESSAGE_TYPE_REDECLARE_SYMBOL,
                 tkn->pos,
                 tkn->text);
-
-        // NOTE: I really wish C had defer...
         token_toggle_end(tkn);
         return 0;
     }
 
+    bh_table_put(AstNode *, state->curr_scope->symbols, tkn->text, symbol);
+
+    if (symbol->kind == Ast_Kind_Local)
+        bh_arr_push(state->curr_function->locals, (AstLocal *) symbol);
+
     token_toggle_end(tkn);
     return 1;
+}
+
+static void symbol_basic_type_introduce(SemState* state, AstBasicType* basic_type) {
+    bh_table_put(AstNode *, state->curr_scope->symbols, basic_type->name, (AstNode *) basic_type);
+}
+
+static AstNode* symbol_resolve(SemState* state, OnyxToken* tkn) {
+    token_toggle_end(tkn);
+
+    AstNode* res = NULL;
+    Scope* scope = state->curr_scope;
+
+    while (res == NULL && scope != NULL) {
+        if (bh_table_has(AstNode *, scope->symbols, tkn->text)) {
+            res = bh_table_get(AstNode *, scope->symbols, tkn->text);
+        } else {
+            scope = scope->parent;
+        }
+    }
+
+    if (res == NULL ) {
+        onyx_message_add(state->msgs,
+                ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
+                tkn->pos,
+                tkn->text);
+
+        token_toggle_end(tkn);
+        return NULL;
+    }
+
+    if (res->kind == Ast_Kind_Symbol) {
+        token_toggle_end(tkn);
+        return symbol_resolve(state, res->token);
+    }
+
+    token_toggle_end(tkn);
+    return res;
+}
+
+static void scope_enter(SemState* state, Scope* new_scope) {
+    new_scope->parent = state->curr_scope;
+    state->curr_scope = new_scope;
+}
+
+static void scope_leave(SemState* state) {
+    state->curr_scope = state->curr_scope->parent;
 }
 
 static AstType* symres_type(SemState* state, AstType* type) {
@@ -290,13 +246,23 @@ static void symres_statement_chain(SemState* state, AstNode* walker, AstNode** t
 }
 
 static void symres_block(SemState* state, AstBlock* block) {
-    local_group_enter(state, block->locals);
+    if (block->scope == NULL)
+        block->scope = scope_create(state->node_allocator, state->curr_scope);
+
+    scope_enter(state, block->scope);
+
     if (block->body)
         symres_statement_chain(state, block->body, &block->body);
-    local_group_leave(state);
+
+    scope_leave(state);
 }
 
 static void symres_function(SemState* state, AstFunction* func) {
+    if (func->scope == NULL)
+        func->scope = scope_create(state->node_allocator, state->curr_scope);
+
+    scope_enter(state, func->scope);
+
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
         param->type_node = symres_type(state, param->type_node);
 
@@ -310,9 +276,7 @@ static void symres_function(SemState* state, AstFunction* func) {
     state->curr_function = func;
     symres_block(state, func->body);
 
-    for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
-        symbol_remove(state, param->token);
-    }
+    scope_leave(state);
 }
 
 static void symres_global(SemState* state, AstGlobal* global) {
@@ -357,6 +321,9 @@ static void symres_top_node(SemState* state, AstNode** node) {
 
 void onyx_resolve_symbols(SemState* state, ParserOutput* program) {
 
+    state->global_scope = scope_create(state->node_allocator, NULL);
+    scope_enter(state, state->global_scope);
+
     // NOTE: Add types to global scope
     symbol_basic_type_introduce(state, &basic_type_void);
     symbol_basic_type_introduce(state, &basic_type_bool);
@@ -373,7 +340,7 @@ void onyx_resolve_symbols(SemState* state, ParserOutput* program) {
     symbol_basic_type_introduce(state, &basic_type_rawptr);
 
     bh_arr_each(AstBinding *, binding, program->top_level_bindings)
-        if (!symbol_unique_introduce(state, (*binding)->token, (*binding)->node)) return;
+        if (!symbol_introduce(state, (*binding)->token, (*binding)->node)) return;
 
     bh_arr_each(AstNode *, node, program->nodes_to_process)
         symres_top_node(state, node);

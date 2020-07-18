@@ -7,13 +7,11 @@ SemState onyx_sempass_create(bh_allocator alloc, bh_allocator node_alloc, OnyxMe
         .allocator = alloc,
         .node_allocator = node_alloc,
 
+        .global_scope = NULL,
+        .curr_scope = NULL,
+
         .msgs = msgs,
-
-        .curr_local_group = NULL,
-        .symbols = NULL,
     };
-
-    bh_table_init(global_heap_allocator, state.symbols, 61);
 
     return state;
 }

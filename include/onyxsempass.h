@@ -7,11 +7,6 @@
 #include "onyxastnodes.h"
 #include "onyxmsgs.h"
 
-typedef struct SemSymbol {
-    AstNode *node;
-    struct SemSymbol *shadowed;
-} SemSymbol;
-
 typedef struct SemState {
     // NOTE: Adding node_allocator in case we need
     // to make any more node in the tree
@@ -19,14 +14,12 @@ typedef struct SemState {
     OnyxMessages *msgs;
 
     // NOTE: Used in symbol resolution phase
-    AstLocalGroup* curr_local_group;
+    Scope*         global_scope;
+    Scope*         curr_scope;
     AstFunction*   curr_function;
 
     // NOTE: Used in type checking phase
     Type* expected_return_type;
-
-    // NOTE: All symbols a given point that we can resolve
-    bh_table(SemSymbol *) symbols;
 } SemState;
 
 // NOTE: Resolving all symbols in the tree

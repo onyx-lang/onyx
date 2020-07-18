@@ -52,6 +52,18 @@ const char* onyx_ast_node_kind_string(AstKind kind) {
 }
 
 
+
+
+Scope* scope_create(bh_allocator a, Scope* parent) {
+    Scope* scope = bh_alloc_item(a, Scope);
+    scope->parent = parent;
+    scope->symbols = NULL;
+
+    bh_table_init(global_heap_allocator, scope->symbols, 16);
+
+    return scope;
+}
+
 void onyx_ast_print(AstNode* node, i32 indent) {
     assert(0);
 }

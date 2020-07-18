@@ -615,8 +615,6 @@ static AstNode* parse_statement(OnyxParser* parser) {
 // '{' <stmtlist> '}'
 static AstBlock* parse_block(OnyxParser* parser) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
-    AstLocalGroup* lg = make_node(AstLocalGroup, Ast_Kind_Local_Group);
-    block->locals = lg;
 
     // NOTE: --- is for an empty block
     if (parser->curr->type == Token_Type_Empty_Block) {

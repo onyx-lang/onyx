@@ -509,15 +509,15 @@ CHECK(statement_chain, AstNode* start) {
 CHECK(block, AstBlock* block) {
     if (check_statement_chain(state, block->body)) return 1;
 
-    forll(AstLocal, local, block->locals->last_local, prev_local) {
-        if (local->type == NULL) {
+    bh_table_each_start(AstTyped *, block->scope->symbols);
+        if (value->type == NULL) {
             onyx_message_add(state->msgs,
                     ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
-                    local->token->pos,
-                    local->token->text, local->token->length);
+                    value->token->pos,
+                    value->token->text, value->token->length);
             return 1;
         }
-    }
+    bh_table_each_end;
 
     return 0;
 }

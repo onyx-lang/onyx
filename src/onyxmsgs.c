@@ -14,7 +14,7 @@ static const char* msg_formats[] = {
     "unknown symbol '%s'",
     "unknown directive '%b'",
 
-    "conflicting declarations of global '%s'",
+    "redeclaration of symbol '%s'",
     "mismatched types for binary operator, '%s', '%s'",
     "mismatched types on assignment, expected '%s', got '%s'",
     "mismatched types for global '%b'; expected '%s', got '%s'",
