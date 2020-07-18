@@ -326,9 +326,11 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
 
     } else if (lval->kind == Ast_Kind_Array_Access) {
         AstArrayAccess* aa = (AstArrayAccess *) lval;
-        WID(WI_I32_CONST, aa->elem_size);
         compile_expression(mod, &code, aa->expr);
-        WI(WI_I32_MUL);
+        if (aa->elem_size != 1) {
+            WID(WI_I32_CONST, aa->elem_size);
+            WI(WI_I32_MUL);
+        }
         compile_expression(mod, &code, aa->addr);
         WI(WI_I32_ADD);
 

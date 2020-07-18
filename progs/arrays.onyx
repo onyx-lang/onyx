@@ -39,14 +39,6 @@ sort :: proc (src: ^i32, len: i32) {
     }
 }
 
-printarr :: proc (arr: ^i32, len: i32) {
-    i := 0;
-    while i < len {
-        print(arr[i]);
-        i += 1;
-    }
-}
-
 // Don't need to bind this function to a symbol
 proc #export "main" {
     print(min(10.0, 12.0));
@@ -60,11 +52,10 @@ proc #export "main" {
         i += 1;
     }
 
-    printarr(global_arr, len);
+    print(global_arr, len);
 
     sort(global_arr, len);
 
     print(1234567);
-    printarr(global_arr, len);
+    print(global_arr, len);
 }
-
