@@ -16,6 +16,8 @@ typedef struct AstLocal AstLocal;
 typedef struct AstCall AstCall;
 typedef struct AstIntrinsicCall AstIntrinsicCall;
 typedef struct AstArgument AstArgument;
+typedef struct AstAddressOf AstAddressOf;
+typedef struct AstDereference AstDereference;
 typedef struct AstArrayAccess AstArrayAccess;
 
 typedef struct AstAssign AstAssign;
@@ -77,6 +79,8 @@ typedef enum AstKind {
     Ast_Kind_Call,
     Ast_Kind_Intrinsic_Call,
     Ast_Kind_Return,
+    Ast_Kind_Address_Of,
+    Ast_Kind_Dereference,
     Ast_Kind_Array_Access,
 
     Ast_Kind_If,
@@ -201,6 +205,8 @@ struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
 struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstNode *callee; };
 struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
 struct AstArgument      { AstTyped_base; AstTyped *value; };
+struct AstAddressOf     { AstTyped_base; AstTyped *expr; }; 
+struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 
 // Intruction Node

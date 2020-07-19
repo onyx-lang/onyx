@@ -44,12 +44,8 @@ other_str :: "I can't believe this \n actually fricken worked!";
 str_test :: proc {
     hello_str :: "Hello World!";
 
-    walker := other_str;
-    while walker[0] != 0 as u8 {
-        print(walker[0] as i32);
-
-        walker = (walker as i32 + 1) as ^u8;
-    }
+    // Address of and dereference cancel each other out
+    print(^*hello_str);
 
     print("This is a test"[10] as i32);
 }

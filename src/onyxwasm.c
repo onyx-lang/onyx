@@ -192,6 +192,11 @@ static const char* wi_string(WasmInstructionType wit) {
         case WI_I64_REINTERPRET_F64: return "WI_I64_REINTERPRET_F64";
         case WI_F32_REINTERPRET_I32: return "WI_F32_REINTERPRET_I32";
         case WI_F64_REINTERPRET_I64: return "WI_F64_REINTERPRET_I64";
+        case WI_I32_EXTEND_8_S: return "WI_I32_EXTEND_8_S";
+        case WI_I32_EXTEND_16_S: return "WI_I32_EXTEND_16_S";
+        case WI_I64_EXTEND_8_S: return "WI_I64_EXTEND_8_S";
+        case WI_I64_EXTEND_16_S: return "WI_I64_EXTEND_16_S";
+        case WI_I64_EXTEND_32_S: return "WI_I64_EXTEND_32_S";
     }
 }
 
@@ -682,6 +687,70 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Intrinsic_Call: compile_intrinsic_call(mod, &code, (AstIntrinsicCall *) expr); break;
         case Ast_Kind_Binary_Op:      compile_binop(mod, &code, (AstBinaryOp *) expr); break;
         case Ast_Kind_Unary_Op:       compile_unaryop(mod, &code, (AstUnaryOp *) expr); break;
+
+        case Ast_Kind_Address_Of: {
+            AstAddressOf* aof = (AstAddressOf *) expr;
+
+            switch (aof->expr->kind) {
+                case Ast_Kind_Dereference: {
+                    compile_expression(mod, &code, ((AstDereference *) aof->expr)->expr);
+                    break;
+                }
+
+                case Ast_Kind_Array_Access: {
+                    AstArrayAccess* aa = (AstArrayAccess *) aof->expr;
+
+                    compile_expression(mod, &code, aa->expr);
+                    if (aa->elem_size != 1) {
+                        WID(WI_I32_CONST, aa->elem_size);
+                        WI(WI_I32_MUL);
+                    }
+                    compile_expression(mod, &code, aa->addr);
+                    WI(WI_I32_ADD);
+                    break;
+                }
+
+                default:
+                    onyx_message_add(Msg_Type_Literal,
+                            aof->token->pos,
+                            "unsupported address of");
+                }
+
+            break;
+        }
+
+        case Ast_Kind_Dereference: {
+            AstDereference* deref = (AstDereference *) expr;
+            compile_expression(mod, &code, deref->expr);
+
+            i32 load_size   = deref->type->Basic.size;
+            i32 is_integer  = (deref->type->Basic.flags & Basic_Flag_Integer)
+                           || (deref->type->Basic.flags & Basic_Flag_Pointer);
+            i32 is_unsigned = deref->type->Basic.flags & Basic_Flag_Unsigned;
+
+            WasmInstructionType instr = WI_NOP;
+            i32 alignment = log2_dumb(load_size);
+
+            if (is_integer) {
+                if      (load_size == 1) instr = WI_I32_LOAD_8_S;
+                else if (load_size == 2) instr = WI_I32_LOAD_16_S;
+                else if (load_size == 4) instr = WI_I32_LOAD;
+                else if (load_size == 8) instr = WI_I64_LOAD;
+
+                if (alignment < 4 && is_unsigned) instr += 1;
+            } else {
+                if      (load_size == 4) instr = WI_F32_LOAD;
+                else if (load_size == 8) instr = WI_F64_LOAD;
+            }
+
+            if (instr != WI_NOP) {
+                WID(instr, ((WasmInstructionData) { alignment, 0 }));
+            } else {
+                DEBUG_HERE;
+            }
+
+            break;
+        }
 
         case Ast_Kind_Array_Access: {
             AstArrayAccess* aa = (AstArrayAccess *) expr;

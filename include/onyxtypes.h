@@ -86,6 +86,9 @@ extern Type basic_types[];
 struct AstType;
 b32 types_are_compatible(Type* t1, Type* t2);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
+
+Type* type_make_pointer(bh_allocator alloc, Type* to);
+
 const char* type_get_name(Type* type);
 
 b32 type_is_pointer(Type* type);

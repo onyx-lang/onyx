@@ -13,6 +13,8 @@ CHECK(while, AstWhile* whilenode);
 CHECK(call, AstCall* call);
 CHECK(binaryop, AstBinaryOp* binop);
 CHECK(expression, AstTyped* expr);
+CHECK(address_of, AstAddressOf* aof);
+CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
 CHECK(global, AstGlobal* global);
 CHECK(function, AstFunction* func);
@@ -338,9 +340,47 @@ CHECK(binaryop, AstBinaryOp* binop) {
     return 0;
 }
 
+CHECK(address_of, AstAddressOf* aof) {
+    if (check_expression(aof->expr)) return 1;
+
+    if (aof->expr->kind != Ast_Kind_Array_Access
+            && aof->expr->kind != Ast_Kind_Dereference) {
+        onyx_message_add(Msg_Type_Literal,
+                aof->token->pos,
+                "cannot take the address of this");
+        return 1;
+    }
+
+    aof->type = type_make_pointer(semstate.allocator, aof->expr->type);
+
+    return 0;
+}
+
+CHECK(dereference, AstDereference* deref) {
+    if (check_expression(deref->expr)) return 1;
+
+    if (!type_is_pointer(deref->expr->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                deref->token->pos,
+                "cannot dereference non-pointer");
+        return 1;
+    }
+
+    if (deref->expr->type == basic_type_rawptr.type) {
+        onyx_message_add(Msg_Type_Literal,
+                deref->token->pos,
+                "cannot dereference rawptr");
+        return 1;
+    }
+
+    deref->type = deref->expr->type->Pointer.elem;
+
+    return 0;
+}
+
 CHECK(array_access, AstArrayAccess* aa) {
-    check_expression(aa->addr);
-    check_expression(aa->expr);
+    if (check_expression(aa->addr)) return 1;
+    if (check_expression(aa->expr)) return 1;
 
     if (!type_is_pointer(aa->addr->type)) {
         onyx_message_add(Msg_Type_Literal,
@@ -406,9 +446,9 @@ CHECK(expression, AstTyped* expr) {
 
         case Ast_Kind_Local: break;
 
-        case Ast_Kind_Array_Access:
-            retval = check_array_access((AstArrayAccess *) expr);
-            break;
+        case Ast_Kind_Address_Of:   retval = check_address_of((AstAddressOf *) expr); break;
+        case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
+        case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {

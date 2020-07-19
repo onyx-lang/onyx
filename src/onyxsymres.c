@@ -172,6 +172,14 @@ static void symres_expression(AstTyped** expr) {
             (*expr)->type_node = symres_type((*expr)->type_node);
             break;
 
+        case Ast_Kind_Address_Of:
+            symres_expression(&((AstAddressOf *)(*expr))->expr);
+            break;
+
+        case Ast_Kind_Dereference:
+            symres_expression(&((AstDereference *)(*expr))->expr);
+            break;
+
         case Ast_Kind_Array_Access:
             symres_expression(&((AstArrayAccess *)(*expr))->addr);
             symres_expression(&((AstArrayAccess *)(*expr))->expr);

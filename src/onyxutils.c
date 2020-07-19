@@ -38,6 +38,8 @@ static const char* ast_node_names[] = {
     "ARGUMENT",
     "CALL",
     "RETURN",
+    "ADDRESS OF",
+    "DEREFERENCE",
     "ARRAY_ACCESS",
 
     "IF",

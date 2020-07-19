@@ -36,6 +36,15 @@ print_f64arr :: proc (arr: ^f64, len: i32) {
     }
 }
 
+// NOTE: print null-terminated string
+print_str :: proc (str: ^u8) {
+    c := str;
+    while *c != 0 as u8 {
+        print((*c) as i32);
+        c = (c as i32 + 1) as ^u8;
+    }
+}
+
 print :: proc #overloaded {
     print_bool,
     print_i32,
@@ -47,4 +56,6 @@ print :: proc #overloaded {
     print_i64arr,
     print_f32arr,
     print_f64arr,
+
+    print_str,
 }

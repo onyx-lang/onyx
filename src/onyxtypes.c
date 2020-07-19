@@ -56,14 +56,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
     switch (type_node->kind) {
         case Ast_Kind_Pointer_Type: {
-            Type* ptr_type = bh_alloc_item(alloc, Type);
-
-            ptr_type->kind = Type_Kind_Pointer;
-            ptr_type->Pointer.base.flags |= Basic_Flag_Pointer;
-            ptr_type->Pointer.base.size = 4;
-            ptr_type->Pointer.elem = type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem);
-
-            return (Type *) ptr_type;
+            return type_make_pointer(alloc, type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem));
         }
 
         case Ast_Kind_Function_Type: {
@@ -91,6 +84,17 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             assert(("Node is not a type node", 0));
             return NULL;
     }
+}
+
+Type* type_make_pointer(bh_allocator alloc, Type* to) {
+    Type* ptr_type = bh_alloc_item(alloc, Type);
+
+    ptr_type->kind = Type_Kind_Pointer;
+    ptr_type->Pointer.base.flags |= Basic_Flag_Pointer;
+    ptr_type->Pointer.base.size = 4;
+    ptr_type->Pointer.elem = to;
+
+    return ptr_type;
 }
 
 const char* type_get_name(Type* type) {
