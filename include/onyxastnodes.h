@@ -11,6 +11,7 @@ typedef struct AstTyped AstTyped;
 typedef struct AstBinOp AstBinaryOp;
 typedef struct AstUnaryOp AstUnaryOp;
 typedef struct AstNumLit AstNumLit;
+typedef struct AstStrLit AstStrLit;
 typedef struct AstLocal AstLocal;
 typedef struct AstCall AstCall;
 typedef struct AstIntrinsicCall AstIntrinsicCall;
@@ -69,7 +70,8 @@ typedef enum AstKind {
     Ast_Kind_Function_Type,
     Ast_Kind_Type_End,
 
-    Ast_Kind_Literal,
+    Ast_Kind_NumLit,
+    Ast_Kind_StrLit,
     Ast_Kind_Param,
     Ast_Kind_Argument,
     Ast_Kind_Call,
@@ -194,6 +196,7 @@ struct AstTyped AstTyped_members;
 struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
+struct AstStrLit        { AstTyped_base; u64 addr; };
 struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
 struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstNode *callee; };
 struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
@@ -279,6 +282,7 @@ typedef enum EntityType {
     Entity_Type_Function,
     Entity_Type_Overloaded_Function,
     Entity_Type_Global,
+    Entity_Type_String_Literal,
     Entity_Type_Expression
 } EntityType;
 
@@ -286,10 +290,11 @@ typedef struct Entity {
     EntityType type;
 
     union {
-        AstFunction*           function;
-        AstOverloadedFunction* overloaded_function;
-        AstGlobal*             global;
-        AstTyped*              expr;
+        AstFunction           *function;
+        AstOverloadedFunction *overloaded_function;
+        AstGlobal             *global;
+        AstTyped              *expr;
+        AstStrLit             *strlit;
     };
 } Entity;
 

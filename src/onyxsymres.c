@@ -158,12 +158,8 @@ static void symres_expression(SemState* state, AstTyped** expr) {
             symres_expression(state, &((AstBinaryOp *)(*expr))->right);
             break;
 
-        case Ast_Kind_Unary_Op:
-            symres_unaryop(state, (AstUnaryOp **) expr);
-            break;
-
+        case Ast_Kind_Unary_Op: symres_unaryop(state, (AstUnaryOp **) expr); break;
         case Ast_Kind_Call: symres_call(state, (AstCall *) *expr); break;
-
         case Ast_Kind_Block: symres_block(state, (AstBlock *) *expr); break;
 
         case Ast_Kind_Symbol:
@@ -174,7 +170,8 @@ static void symres_expression(SemState* state, AstTyped** expr) {
         case Ast_Kind_Local: break;
 
         case Ast_Kind_Function:
-        case Ast_Kind_Literal:
+        case Ast_Kind_NumLit:
+        case Ast_Kind_StrLit:
             (*expr)->type_node = symres_type(state, (*expr)->type_node);
             break;
 

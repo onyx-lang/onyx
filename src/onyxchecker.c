@@ -322,7 +322,7 @@ CHECK(binaryop, AstBinaryOp* binop) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
                 binop->token->pos,
-                NULL, 0);
+                binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
@@ -330,7 +330,7 @@ CHECK(binaryop, AstBinaryOp* binop) {
         onyx_message_add(state->msgs,
                 ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
                 binop->token->pos,
-                NULL, 0);
+                binop->right->token->text, binop->right->token->length);
         return 1;
     }
 
@@ -446,12 +446,13 @@ CHECK(expression, AstTyped* expr) {
             expr->type = ((AstArgument *) expr)->value->type;
             break;
 
-        case Ast_Kind_Literal:
+        case Ast_Kind_NumLit:
             // NOTE: Literal types should have been decided
             // in the parser (for now).
             assert(expr->type != NULL);
             break;
 
+        case Ast_Kind_StrLit: break;
         case Ast_Kind_Function: break;
         case Ast_Kind_Overloaded_Function: break;
 
@@ -647,6 +648,8 @@ void onyx_type_check(SemState* state, ProgramInfo* program) {
             case Entity_Type_Expression:
                 if (check_expression(state, entity->expr)) return;
                 break;
+
+            case Entity_Type_String_Literal: break;
 
             default: DEBUG_HERE; break;
         }

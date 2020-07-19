@@ -32,7 +32,8 @@ static const char* ast_node_names[] = {
     "FUNCTION_TYPE",
     "TYPE_END (BAD)"
 
-    "LITERAL",
+    "NUMERIC LITERAL",
+    "STRING LITERAL",
     "PARAM",
     "ARGUMENT",
     "CALL",

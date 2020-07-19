@@ -87,7 +87,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
 }
 
 static AstNumLit* parse_numeric_literal(OnyxParser* parser) {
-    AstNumLit* lit_node = make_node(AstNumLit, Ast_Kind_Literal);
+    AstNumLit* lit_node = make_node(AstNumLit, Ast_Kind_NumLit);
     lit_node->token = expect_token(parser, Token_Type_Literal_Numeric);
     lit_node->flags |= Ast_Flag_Comptime;
     lit_node->value.l = 0ll;
@@ -230,25 +230,39 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             retval = (AstTyped *) parse_numeric_literal(parser);
             break;
 
-        case Token_Type_Literal_True:
-            {
-                AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_Literal);
-                bool_node->type_node = (AstType *) &basic_type_bool;
-                bool_node->token = expect_token(parser, Token_Type_Literal_True);
-                bool_node->value.i = 1;
-                retval = (AstTyped *) bool_node;
-                break;
-            }
+        case Token_Type_Literal_String: {
+            AstPointerType* str_type = make_node(AstPointerType, Ast_Kind_Pointer_Type);
+            str_type->flags |= Basic_Flag_Pointer;
+            str_type->elem = (AstType *) &basic_type_u8;
 
-        case Token_Type_Literal_False:
-            {
-                AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_Literal);
-                bool_node->type_node = (AstType *) &basic_type_bool;
-                bool_node->token = expect_token(parser, Token_Type_Literal_False);
-                bool_node->value.i = 0;
-                retval = (AstTyped *) bool_node;
-                break;
-            }
+            AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
+            str_node->token     = expect_token(parser, Token_Type_Literal_String);
+            str_node->type_node = (AstType *) str_type;
+            str_node->addr      = 0;
+
+            bh_arr_push(parser->results.nodes_to_process, (AstNode *) str_node);
+
+            retval = (AstTyped *) str_node;
+            break;
+        }
+
+        case Token_Type_Literal_True: {
+            AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_NumLit);
+            bool_node->type_node = (AstType *) &basic_type_bool;
+            bool_node->token = expect_token(parser, Token_Type_Literal_True);
+            bool_node->value.i = 1;
+            retval = (AstTyped *) bool_node;
+            break;
+        }
+
+        case Token_Type_Literal_False: {
+            AstNumLit* bool_node = make_node(AstNumLit, Ast_Kind_NumLit);
+            bool_node->type_node = (AstType *) &basic_type_bool;
+            bool_node->token = expect_token(parser, Token_Type_Literal_False);
+            bool_node->value.i = 0;
+            retval = (AstTyped *) bool_node;
+            break;
+        }
 
         default:
             onyx_message_add(parser->msgs,
@@ -941,7 +955,8 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     if (global->exported_name == NULL)
                         global->exported_name = symbol;
 
-                } else if (node->kind != Ast_Kind_Overloaded_Function) {
+                } else if (node->kind != Ast_Kind_Overloaded_Function
+                        && node->kind != Ast_Kind_StrLit) {
                     // HACK
                     bh_arr_push(parser->results.nodes_to_process, (AstNode *) node);
                 }

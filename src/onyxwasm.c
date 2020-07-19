@@ -634,70 +634,62 @@ COMPILE_FUNC(expression, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (expr->kind) {
-        case Ast_Kind_Binary_Op:
-            compile_binop(mod, &code, (AstBinaryOp *) expr);
-            break;
-
-        case Ast_Kind_Unary_Op:
-            compile_unaryop(mod, &code, (AstUnaryOp *) expr);
-            break;
-
         case Ast_Kind_Local:
-        case Ast_Kind_Param:
-            {
-                i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) expr);
+        case Ast_Kind_Param: {
+            i32 localidx = (i32) bh_imap_get(&mod->local_map, (u64) expr);
 
-                WID(WI_LOCAL_GET, localidx);
-                break;
-            }
-
-        case Ast_Kind_Global:
-            {
-                i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) expr);
-
-                WID(WI_GLOBAL_GET, globalidx);
-                break;
-            }
-
-        case Ast_Kind_Literal:
-            {
-                AstNumLit* lit = (AstNumLit *) expr;
-                WasmType lit_type = onyx_type_to_wasm_type(lit->type);
-                WasmInstruction instr = { WI_NOP, 0 };
-
-                if (lit_type == WASM_TYPE_INT32) {
-                    instr.type = WI_I32_CONST;
-                    instr.data.i1 = lit->value.i;
-                } else if (lit_type == WASM_TYPE_INT64) {
-                    instr.type = WI_I64_CONST;
-                    instr.data.l = lit->value.l;
-                } else if (lit_type == WASM_TYPE_FLOAT32) {
-                    instr.type = WI_F32_CONST;
-                    instr.data.f = lit->value.f;
-                } else if (lit_type == WASM_TYPE_FLOAT64) {
-                    instr.type = WI_F64_CONST;
-                    instr.data.d = lit->value.d;
-                }
-
-                bh_arr_push(code, instr);
-                break;
-            }
-
-        case Ast_Kind_Block: compile_block(mod, &code, (AstBlock *) expr); break;
-
-        case Ast_Kind_Call:
-            compile_call(mod, &code, (AstCall *) expr);
+            WID(WI_LOCAL_GET, localidx);
             break;
+        }
 
-        case Ast_Kind_Intrinsic_Call:
-            compile_intrinsic_call(mod, &code, (AstIntrinsicCall *) expr);
+        case Ast_Kind_Global: {
+            i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) expr);
+
+            WID(WI_GLOBAL_GET, globalidx);
             break;
+        }
+
+        case Ast_Kind_NumLit: {
+            AstNumLit* lit = (AstNumLit *) expr;
+            WasmType lit_type = onyx_type_to_wasm_type(lit->type);
+            WasmInstruction instr = { WI_NOP, 0 };
+
+            if (lit_type == WASM_TYPE_INT32) {
+                instr.type = WI_I32_CONST;
+                instr.data.i1 = lit->value.i;
+            } else if (lit_type == WASM_TYPE_INT64) {
+                instr.type = WI_I64_CONST;
+                instr.data.l = lit->value.l;
+            } else if (lit_type == WASM_TYPE_FLOAT32) {
+                instr.type = WI_F32_CONST;
+                instr.data.f = lit->value.f;
+            } else if (lit_type == WASM_TYPE_FLOAT64) {
+                instr.type = WI_F64_CONST;
+                instr.data.d = lit->value.d;
+            }
+
+            bh_arr_push(code, instr);
+            break;
+        }
+
+        case Ast_Kind_StrLit: {
+            WID(WI_I32_CONST, ((AstStrLit *) expr)->addr);
+            break;
+        }
+
+        case Ast_Kind_Block:          compile_block(mod, &code, (AstBlock *) expr); break;
+        case Ast_Kind_Call:           compile_call(mod, &code, (AstCall *) expr); break;
+        case Ast_Kind_Intrinsic_Call: compile_intrinsic_call(mod, &code, (AstIntrinsicCall *) expr); break;
+        case Ast_Kind_Binary_Op:      compile_binop(mod, &code, (AstBinaryOp *) expr); break;
+        case Ast_Kind_Unary_Op:       compile_unaryop(mod, &code, (AstUnaryOp *) expr); break;
 
         case Ast_Kind_Array_Access: {
             AstArrayAccess* aa = (AstArrayAccess *) expr;
-            WID(WI_I32_CONST, aa->elem_size);
             compile_expression(mod, &code, aa->expr);
-            WI(WI_I32_MUL);
+            if (aa->elem_size != 1) {
+                WID(WI_I32_CONST, aa->elem_size);
+                WI(WI_I32_MUL);
+            }
             compile_expression(mod, &code, aa->addr);
             WI(WI_I32_ADD);
 
@@ -981,6 +973,47 @@ static void compile_global(OnyxWasmModule* module, AstGlobal* global) {
     bh_arr_push(module->globals, glob);
 }
 
+static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
+
+    // NOTE: Allocating more than necessary, but there are no cases
+    // in a string literal that create more bytes than already
+    // existed. You can create less however ('\n' => 0x0a).
+    i8* strdata = bh_alloc_array(global_heap_allocator, i8, strlit->token->length + 1);
+
+    i8* src = (i8 *) strlit->token->text;
+    i8* des = strdata;
+    for (i32 i = 0, len = strlit->token->length; i < len; i++) {
+        if (src[i] == '\\') {
+            i++;
+            switch (src[i]) {
+            case 'n': *des++ = '\n'; break;
+            case 't': *des++ = '\t'; break;
+            case 'r': *des++ = '\r'; break;
+            case 'v': *des++ = '\v'; break;
+            case 'e': *des++ = '\e'; break;
+            default:  *des++ = '\\';
+                      *des++ = src[i];
+            }
+        } else {
+            *des++ = src[i];
+        }
+    }
+    *des++ = '\0';
+
+    u32 length = (u32) (des - strdata);
+
+    WasmDatum datum = {
+        .offset = mod->next_datum_offset,
+        .length = length,
+        .data = strdata,
+    };
+
+    strlit->addr = (u32) mod->next_datum_offset,
+    mod->next_datum_offset += length;
+
+    bh_arr_push(mod->data, datum);
+}
+
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
     OnyxWasmModule module = {
         .allocator = alloc,
@@ -1003,6 +1036,9 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
         .next_global_idx = 0,
         .next_foreign_global_idx = 0,
 
+        .data = NULL,
+        .next_datum_offset = 0,
+
         .structured_jump_target = NULL,
     };
 
@@ -1010,6 +1046,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
     bh_arr_new(alloc, module.funcs, 4);
     bh_arr_new(alloc, module.imports, 4);
     bh_arr_new(alloc, module.globals, 4);
+    bh_arr_new(alloc, module.data, 4);
 
     // NOTE: 16 is probably needlessly large
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
@@ -1025,7 +1062,6 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
 }
 
 void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
-
     module->next_func_idx   = program->foreign_func_count;
     module->next_global_idx = program->foreign_global_count;
 
@@ -1056,9 +1092,16 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
                 break;
             }
 
+            case Entity_Type_String_Literal: {
+                compile_string_literal(module, (AstStrLit *) entity->strlit);
+            }
+
             default: break;
         }
     }
+
+
+
 
     // NOTE: Then, compile everything
     bh_arr_each(Entity, entity, program->entities) {
@@ -1516,6 +1559,41 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
+static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
+    i32 prev_len = buff->length;
+
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_DATA);
+
+    bh_buffer vec_buff;
+    bh_buffer_init(&vec_buff, buff->allocator, 128);
+
+    i32 leb_len;
+    u8* leb = uint_to_uleb128((u64) bh_arr_length(module->data), &leb_len);
+    bh_buffer_append(&vec_buff, leb, leb_len);
+
+    bh_arr_each(WasmDatum, datum, module->data) {
+        // NOTE: 0x00 memory index
+        bh_buffer_write_byte(&vec_buff, 0x00);
+
+        bh_buffer_write_byte(&vec_buff, WI_I32_CONST);
+        leb = int_to_leb128((i64) datum->offset, &leb_len);
+        bh_buffer_append(&vec_buff, leb, leb_len);
+        bh_buffer_write_byte(&vec_buff, WI_BLOCK_END);
+
+        leb = uint_to_uleb128((u64) datum->length, &leb_len);
+        bh_buffer_append(&vec_buff, leb, leb_len);
+        fori (i, 0, datum->length - 1) bh_buffer_write_byte(&vec_buff, ((u8 *) datum->data)[i]);
+    }
+
+    leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+
+    bh_buffer_concat(buff, vec_buff);
+    bh_buffer_free(&vec_buff);
+
+    return buff->length - prev_len;
+}
+
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
     bh_buffer master_buffer;
     bh_buffer_init(&master_buffer, global_heap_allocator, 128);
@@ -1530,6 +1608,7 @@ void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
     output_exportsection(module, &master_buffer);
     output_startsection(module, &master_buffer);
     output_codesection(module, &master_buffer);
+    output_datasection(module, &master_buffer);
 
     bh_file_write(&file, master_buffer.data, master_buffer.length);
 }

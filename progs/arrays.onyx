@@ -39,8 +39,21 @@ sort :: proc (src: ^i32, len: i32) {
     }
 }
 
+other_str :: "I can't believe this \n actually fricken worked!";
+
+str_test :: proc #export "main" {
+    hello_str :: "Hello World!";
+
+    walker := other_str;
+    while walker[0] != 0 as u8 {
+        print(walker[0] as i32);
+
+        walker = (walker as i32 + 1) as ^u8;
+    }
+}
+
 // Don't need to bind this function to a symbol
-proc #export "main" {
+proc #export "main2" {
     print(min(10.0, 12.0));
 
     global_arr = 0 as ^i32;

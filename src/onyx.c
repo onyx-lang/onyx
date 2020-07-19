@@ -183,7 +183,7 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
     bh_arr_each(AstNode *, node, results->nodes_to_process) {
         Entity ent = { Entity_Type_Unknown };
 
-        AstKind nkind    = (*node)->kind;
+        AstKind nkind = (*node)->kind;
         switch (nkind) {
             case Ast_Kind_Function:
                 ent.type     = Entity_Type_Function;
@@ -198,6 +198,11 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
             case Ast_Kind_Global:
                 ent.type   = Entity_Type_Global;
                 ent.global = (AstGlobal *) *node;
+                break;
+
+            case Ast_Kind_StrLit:
+                ent.type   = Entity_Type_String_Literal;
+                ent.strlit = (AstStrLit *) *node;
                 break;
 
             default:

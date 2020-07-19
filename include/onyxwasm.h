@@ -221,6 +221,12 @@ typedef enum WasmInstructionType {
     WI_I64_REINTERPRET_F64           = 0xBD,
     WI_F32_REINTERPRET_I32           = 0xBE,
     WI_F64_REINTERPRET_I64           = 0xBF,
+
+    WI_I32_EXTEND_8_S                = 0xC0,
+    WI_I32_EXTEND_16_S               = 0xC1,
+    WI_I64_EXTEND_8_S                = 0xC2,
+    WI_I64_EXTEND_16_S               = 0xC3,
+    WI_I64_EXTEND_32_S               = 0xC4,
 } WasmInstructionType;
 
 typedef union {
@@ -275,6 +281,11 @@ typedef struct WasmImport {
     OnyxToken *mod, *name;
 } WasmImport;
 
+typedef struct WasmDatum {
+    u32 offset, length;
+    ptr data;
+} WasmDatum;
+
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
     OnyxMessages* msgs;
@@ -297,6 +308,7 @@ typedef struct OnyxWasmModule {
     bh_table(WasmExport)  exports;
     bh_arr(WasmGlobal)    globals;
     bh_arr(WasmFunc)      funcs;
+    bh_arr(WasmDatum)     data;
 
     u32 next_type_idx;
     u32 export_count;
@@ -304,6 +316,7 @@ typedef struct OnyxWasmModule {
     u32 next_foreign_func_idx;
     u32 next_global_idx;
     u32 next_foreign_global_idx;
+    u32 next_datum_offset;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs);
