@@ -288,7 +288,6 @@ typedef struct WasmDatum {
 
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
-    OnyxMessages* msgs;
 
     // NOTE: Mapping ptrs to function / global indicies
     bh_imap index_map;
@@ -319,7 +318,7 @@ typedef struct OnyxWasmModule {
     u32 next_datum_offset;
 } OnyxWasmModule;
 
-OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs);
+OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
 void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);

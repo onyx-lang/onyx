@@ -4,6 +4,8 @@
 
 #define MAX_MSGS 10
 
+OnyxMessages msgs;
+
 static const char* msg_formats[] = {
     "%s",
     "expected token '%s', got '%s'",
@@ -28,8 +30,14 @@ static const char* msg_formats[] = {
     "unable to resolve symbol '%b'",
 };
 
-void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...) {
-    OnyxMessage* msg = bh_alloc_item(msgs->allocator, OnyxMessage);
+void onyx_message_init(bh_allocator allocator, bh_table(bh_file_contents)* files) {
+    msgs.allocator = allocator;
+    msgs.first = NULL;
+    msgs.file_contents = files;
+}
+
+void onyx_message_add(MsgType type, OnyxFilePos pos, ...) {
+    Message* msg = bh_alloc_item(msgs.allocator, Message);
     msg->type = type;
     msg->pos = pos;
 
@@ -38,7 +46,7 @@ void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos,
     bh_snprintf_va(msg->text, ONYX_MSG_BUFFER_SIZE, msg_formats[type], arg_list);
     va_end(arg_list);
 
-    OnyxMessage** walker = &msgs->first;
+    Message** walker = &msgs.first;
     while (*walker && (*walker)->pos.line < pos.line) walker = &(*walker)->next;
     while (*walker && (*walker)->pos.line == pos.line && (*walker)->pos.column < pos.column) walker = &(*walker)->next;
 
@@ -46,7 +54,7 @@ void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos,
     *walker = msg;
 }
 
-static void print_detailed_message(OnyxMessage* msg, bh_file_contents* fc) {
+static void print_detailed_message(Message* msg, bh_file_contents* fc) {
     bh_printf("(%s:%l:%l) %s\n", msg->pos.filename, msg->pos.line, msg->pos.column, msg->text);
 
     i32 linelength = 0;
@@ -64,13 +72,13 @@ static void print_detailed_message(OnyxMessage* msg, bh_file_contents* fc) {
     bh_printf("| %s\n", pointer_str);
 }
 
-void onyx_message_print(OnyxMessages* msgs) {
-    OnyxMessage* msg = msgs->first;
+void onyx_message_print() {
+    Message* msg = msgs.first;
     i32 msg_count = MAX_MSGS;
 
     while (msg && msg_count-- > 0) {
         if (msg->pos.filename) {
-            bh_file_contents* fc = &bh_table_get(bh_file_contents, *msgs->file_contents, (char *) msg->pos.filename);
+            bh_file_contents* fc = &bh_table_get(bh_file_contents, *msgs.file_contents, (char *) msg->pos.filename);
 
             print_detailed_message(msg, fc);
         } else {
@@ -80,12 +88,6 @@ void onyx_message_print(OnyxMessages* msgs) {
     }
 }
 
-b32 onyx_message_has_errors(OnyxMessages* msgs) {
-    return msgs->first != NULL;
-}
-
-void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs, bh_table(bh_file_contents)* files) {
-    msgs->allocator = allocator;
-    msgs->first = NULL;
-    msgs->file_contents = files;
+b32 onyx_message_has_errors() {
+    return msgs.first != NULL;
 }

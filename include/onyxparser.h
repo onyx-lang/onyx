@@ -26,14 +26,12 @@ typedef struct OnyxParser {
     OnyxToken *prev;
     OnyxToken *curr;
 
-    OnyxMessages *msgs;
-
     ParseResults results;
 } OnyxParser;
 
 const char* onyx_ast_node_kind_string(AstKind kind);
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind);
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs);
+OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer);
 void onyx_parser_free(OnyxParser* parser);
 ParseResults onyx_parse(OnyxParser *parser);
 

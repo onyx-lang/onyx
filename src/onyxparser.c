@@ -76,8 +76,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     consume_token(parser);
 
     if (token->type != token_type) {
-        onyx_message_add(parser->msgs,
-                         ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
+        onyx_message_add(Msg_Type_Expected_Token,
                          token->pos,
                          token_name(token_type), token_name(token->type));
         return NULL;
@@ -210,8 +209,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                         break;
 
                     if (parser->curr->type != ',') {
-                        onyx_message_add(parser->msgs,
-                                ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
+                        onyx_message_add(Msg_Type_Expected_Token,
                                 parser->curr->pos,
                                 token_name(','),
                                 token_name(parser->curr->type));
@@ -265,8 +263,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         default:
-            onyx_message_add(parser->msgs,
-                    ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
+            onyx_message_add(Msg_Type_Unexpected_Token,
                     parser->curr->pos,
                     token_name(parser->curr->type));
             return NULL;
@@ -512,8 +509,7 @@ static b32 parse_symbol_declaration(OnyxParser* parser, AstNode** ret) {
         AstTyped* expr = parse_expression(parser);
         if (expr == NULL) {
             token_toggle_end(parser->curr);
-            onyx_message_add(parser->msgs,
-                    ONYX_MESSAGE_TYPE_EXPECTED_EXPRESSION,
+            onyx_message_add(Msg_Type_Expected_Expression,
                     assignment->token->pos,
                     parser->curr->text);
             token_toggle_end(parser->curr);
@@ -611,8 +607,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
     if (needs_semicolon) {
         if (parser->curr->type != ';') {
-            onyx_message_add(parser->msgs,
-                ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
+            onyx_message_add(Msg_Type_Expected_Token,
                 parser->curr->pos,
                 token_name(';'),
                 token_name(parser->curr->type));
@@ -680,8 +675,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
         else {
             token_toggle_end(parser->curr);
-            onyx_message_add(parser->msgs,
-                    ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
+            onyx_message_add(Msg_Type_Unexpected_Token,
                     parser->curr->pos,
                     parser->curr->text);
             token_toggle_end(parser->curr);
@@ -814,8 +808,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_message_add(parser->msgs,
-                    ONYX_MESSAGE_TYPE_UNKNOWN_DIRECTIVE,
+            onyx_message_add(Msg_Type_Unknown_Directive,
                     directive_token->pos,
                     symbol_token->text, symbol_token->length);
         }
@@ -883,8 +876,7 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_message_add(parser->msgs,
-                    ONYX_MESSAGE_TYPE_UNKNOWN_DIRECTIVE,
+            onyx_message_add(Msg_Type_Unknown_Directive,
                     directive_token->pos,
                     symbol_token->text, symbol_token->length);
         }
@@ -989,14 +981,13 @@ void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
     return node;
 }
 
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, OnyxMessages* msgs) {
+OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     OnyxParser parser;
 
     parser.allocator = alloc;
     parser.tokenizer = tokenizer;
     parser.curr = tokenizer->tokens;
     parser.prev = NULL;
-    parser.msgs = msgs;
 
     parser.results = (ParseResults) {
         .allocator = global_heap_allocator,

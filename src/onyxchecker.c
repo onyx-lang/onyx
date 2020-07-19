@@ -2,7 +2,7 @@
 #include "onyxsempass.h"
 #include "onyxparser.h"
 
-#define CHECK(kind, ...) static b32 check_ ## kind (SemState* state, __VA_ARGS__)
+#define CHECK(kind, ...) static b32 check_ ## kind (__VA_ARGS__)
 
 CHECK(block, AstBlock* block);
 CHECK(statement_chain, AstNode* start);
@@ -18,27 +18,25 @@ CHECK(global, AstGlobal* global);
 CHECK(function, AstFunction* func);
 CHECK(overloaded_function, AstOverloadedFunction* func);
 
-static inline void fill_in_type(SemState* state, AstTyped* node) {
+static inline void fill_in_type(AstTyped* node) {
     if (node->type == NULL)
-        node->type = type_build_from_ast(state->allocator, node->type_node);
+        node->type = type_build_from_ast(semstate.allocator, node->type_node);
 }
 
 CHECK(return, AstReturn* retnode) {
     if (retnode->expr) {
-        if (check_expression(state, retnode->expr)) return 1;
+        if (check_expression(retnode->expr)) return 1;
 
-        if (!types_are_compatible(retnode->expr->type, state->expected_return_type)) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_FUNCTION_RETURN_MISMATCH,
+        if (!types_are_compatible(retnode->expr->type, semstate.expected_return_type)) {
+            onyx_message_add(Msg_Type_Function_Return_Mismatch,
                     retnode->expr->token->pos,
                     type_get_name(retnode->expr->type),
-                    type_get_name(state->expected_return_type));
+                    type_get_name(semstate.expected_return_type));
             return 1;
         }
     } else {
-        if (state->expected_return_type->Basic.size > 0) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+        if (semstate.expected_return_type->Basic.size > 0) {
+            onyx_message_add(Msg_Type_Literal,
                     retnode->token->pos,
                     "returning from non-void function without value");
             return 1;
@@ -49,41 +47,39 @@ CHECK(return, AstReturn* retnode) {
 }
 
 CHECK(if, AstIf* ifnode) {
-    if (check_expression(state, ifnode->cond)) return 1;
+    if (check_expression(ifnode->cond)) return 1;
 
     if (!type_is_bool(ifnode->cond->type)) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+        onyx_message_add(Msg_Type_Literal,
                 ifnode->cond->token->pos,
                 "expected boolean type for condition");
         return 1;
     }
 
-    if (ifnode->true_stmt)  if (check_statement(state, ifnode->true_stmt))  return 1;
-    if (ifnode->false_stmt) if (check_statement(state, ifnode->false_stmt)) return 1;
+    if (ifnode->true_stmt)  if (check_statement(ifnode->true_stmt))  return 1;
+    if (ifnode->false_stmt) if (check_statement(ifnode->false_stmt)) return 1;
 
     return 0;
 }
 
 CHECK(while, AstWhile* whilenode) {
-    if (check_expression(state, whilenode->cond)) return 1;
+    if (check_expression(whilenode->cond)) return 1;
 
     if (!type_is_bool(whilenode->cond->type)) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+        onyx_message_add(Msg_Type_Literal,
                 whilenode->cond->token->pos,
                 "expected boolean type for condition");
         return 1;
     }
 
-    return check_statement(state, whilenode->stmt);
+    return check_statement(whilenode->stmt);
 }
 
-static AstTyped* match_overloaded_function(SemState* state, AstCall* call, AstOverloadedFunction* ofunc) {
+static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction* ofunc) {
     bh_arr_each(AstTyped *, node, ofunc->overloads) {
         AstFunction* overload = (AstFunction *) *node;
 
-        fill_in_type(state, (AstTyped *) overload);
+        fill_in_type((AstTyped *) overload);
 
         TypeFunction* ol_type = &overload->type->Function;
 
@@ -92,7 +88,7 @@ static AstTyped* match_overloaded_function(SemState* state, AstCall* call, AstOv
         AstArgument* arg = call->arguments;
         Type** param_type = ol_type->params;
         while (arg != NULL) {
-            fill_in_type(state, (AstTyped *) arg);
+            fill_in_type((AstTyped *) arg);
 
             if (!types_are_compatible(*param_type, arg->type)) goto no_match;
 
@@ -106,8 +102,7 @@ no_match:
         continue;
     }
 
-    onyx_message_add(state->msgs,
-            ONYX_MESSAGE_TYPE_LITERAL,
+    onyx_message_add(Msg_Type_Literal,
             call->token->pos,
             "unable to match overloaded function");
 
@@ -118,8 +113,7 @@ CHECK(call, AstCall* call) {
     AstFunction* callee = (AstFunction *) call->callee;
 
     if (callee->kind == Ast_Kind_Symbol) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
+        onyx_message_add(Msg_Type_Unresolved_Symbol,
                 callee->token->pos,
                 callee->token->text, callee->token->length);
         return 1;
@@ -128,23 +122,22 @@ CHECK(call, AstCall* call) {
     // NOTE: Check arguments
     AstArgument* actual_param = call->arguments;
     while (actual_param != NULL) {
-        if (check_expression(state, (AstTyped *) actual_param)) return 1;
+        if (check_expression((AstTyped *) actual_param)) return 1;
         actual_param = (AstArgument *) actual_param->next;
     }
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
-        call->callee = (AstNode *) match_overloaded_function(state, call, (AstOverloadedFunction *) callee);
+        call->callee = (AstNode *) match_overloaded_function(call, (AstOverloadedFunction *) callee);
         callee = (AstFunction *) call->callee;
 
         if (callee == NULL) return 1;
     }
 
     // NOTE: Build callee's type
-    fill_in_type(state, (AstTyped *) callee);
+    fill_in_type((AstTyped *) callee);
 
     if (callee->type->kind != Type_Kind_Function) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_CALL_NON_FUNCTION,
+        onyx_message_add(Msg_Type_Call_Non_Function,
                 call->token->pos,
                 callee->token->text, callee->token->length);
         return 1;
@@ -220,11 +213,10 @@ CHECK(call, AstCall* call) {
 
     i32 arg_pos = 0;
     while (formal_param != NULL && actual_param != NULL) {
-        fill_in_type(state, (AstTyped *) formal_param);
+        fill_in_type((AstTyped *) formal_param);
 
         if (!types_are_compatible(formal_param->type, actual_param->type)) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_FUNCTION_PARAM_TYPE_MISMATCH,
+            onyx_message_add(Msg_Type_Function_Param_Mismatch,
                     actual_param->token->pos,
                     callee->token->text, callee->token->length,
                     type_get_name(formal_param->type),
@@ -239,16 +231,14 @@ CHECK(call, AstCall* call) {
     }
 
     if (formal_param != NULL && actual_param == NULL) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+        onyx_message_add(Msg_Type_Literal,
                 call->token->pos,
                 "too few arguments to function call");
         return 1;
     }
 
     if (formal_param == NULL && actual_param != NULL) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+        onyx_message_add(Msg_Type_Literal,
                 call->token->pos,
                 "too many arguments to function call");
         return 1;
@@ -258,21 +248,19 @@ CHECK(call, AstCall* call) {
 }
 
 CHECK(binaryop, AstBinaryOp* binop) {
-    if (check_expression(state, binop->left)) return 1;
-    if (check_expression(state, binop->right)) return 1;
+    if (check_expression(binop->left)) return 1;
+    if (check_expression(binop->right)) return 1;
 
     if (binop_is_assignment(binop)) {
         if (!is_lval((AstNode *) binop->left)) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_NOT_LVAL,
+            onyx_message_add(Msg_Type_Not_Lval,
                     binop->left->token->pos,
                     binop->left->token->text, binop->left->token->length);
             return 1;
         }
 
         if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_ASSIGN_CONST,
+            onyx_message_add(Msg_Type_Assign_Const,
                     binop->token->pos,
                     binop->left->token->text, binop->left->token->length);
             return 1;
@@ -288,7 +276,7 @@ CHECK(binaryop, AstBinaryOp* binop) {
             // NOTE: +=, -=, ...
 
             AstBinaryOp* binop_node = onyx_ast_node_new(
-                    state->node_allocator,
+                    semstate.node_allocator,
                     sizeof(AstBinaryOp),
                     Ast_Kind_Binary_Op);
 
@@ -310,8 +298,7 @@ CHECK(binaryop, AstBinaryOp* binop) {
     } else {
         if (type_is_pointer(binop->left->type)
                 || type_is_pointer(binop->right->type)) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     binop->token->pos,
                     "binary operations are not supported for pointers (yet).");
             return 1;
@@ -319,16 +306,14 @@ CHECK(binaryop, AstBinaryOp* binop) {
     }
 
     if (binop->left->type == NULL) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
+        onyx_message_add(Msg_Type_Unresolved_Type,
                 binop->token->pos,
                 binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
     if (binop->right->type == NULL) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
+        onyx_message_add(Msg_Type_Unresolved_Type,
                 binop->token->pos,
                 binop->right->token->text, binop->right->token->length);
         return 1;
@@ -336,8 +321,7 @@ CHECK(binaryop, AstBinaryOp* binop) {
 
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_BINOP_MISMATCH_TYPE,
+        onyx_message_add(Msg_Type_Binop_Mismatch,
                 binop->token->pos,
                 type_get_name(binop->left->type),
                 type_get_name(binop->right->type));
@@ -355,12 +339,11 @@ CHECK(binaryop, AstBinaryOp* binop) {
 }
 
 CHECK(array_access, AstArrayAccess* aa) {
-    check_expression(state, aa->addr);
-    check_expression(state, aa->expr);
+    check_expression(aa->addr);
+    check_expression(aa->expr);
 
     if (!type_is_pointer(aa->addr->type)) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+        onyx_message_add(Msg_Type_Literal,
                 aa->token->pos,
                 "expected pointer type for left of array access");
         return 1;
@@ -368,8 +351,7 @@ CHECK(array_access, AstArrayAccess* aa) {
 
     if (aa->expr->type->kind != Type_Kind_Basic
             || (aa->expr->type->Basic.flags & Basic_Flag_Integer) == 0) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+        onyx_message_add(Msg_Type_Literal,
                 aa->token->pos,
                 "expected integer type for index");
         return 1;
@@ -383,33 +365,31 @@ CHECK(array_access, AstArrayAccess* aa) {
 
 CHECK(expression, AstTyped* expr) {
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_LITERAL,
+        onyx_message_add(Msg_Type_Literal,
                 (OnyxFilePos) { 0 },
                 "type used as part of an expression");
         return 1;
     }
 
-    fill_in_type(state, expr);
+    fill_in_type(expr);
 
     i32 retval = 0;
     switch (expr->kind) {
-        case Ast_Kind_Binary_Op: retval = check_binaryop(state, (AstBinaryOp *) expr); break;
+        case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp *) expr); break;
 
         case Ast_Kind_Unary_Op:
-            retval = check_expression(state, ((AstUnaryOp *) expr)->expr);
+            retval = check_expression(((AstUnaryOp *) expr)->expr);
 
             if (((AstUnaryOp *) expr)->operation != Unary_Op_Cast) {
                 expr->type = ((AstUnaryOp *) expr)->expr->type;
             }
             break;
 
-        case Ast_Kind_Call:  retval = check_call(state, (AstCall *) expr); break;
-        case Ast_Kind_Block: retval = check_block(state, (AstBlock *) expr); break;
+        case Ast_Kind_Call:  retval = check_call((AstCall *) expr); break;
+        case Ast_Kind_Block: retval = check_block((AstBlock *) expr); break;
 
         case Ast_Kind_Symbol:
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
+            onyx_message_add(Msg_Type_Unresolved_Symbol,
                     expr->token->pos,
                     expr->token->text, expr->token->length);
             retval = 1;
@@ -417,8 +397,7 @@ CHECK(expression, AstTyped* expr) {
 
         case Ast_Kind_Param:
             if (expr->type == NULL) {
-                onyx_message_add(state->msgs,
-                        ONYX_MESSAGE_TYPE_LITERAL,
+                onyx_message_add(Msg_Type_Literal,
                         expr->token->pos,
                         "local variable with unknown type");
                 retval = 1;
@@ -428,13 +407,12 @@ CHECK(expression, AstTyped* expr) {
         case Ast_Kind_Local: break;
 
         case Ast_Kind_Array_Access:
-            retval = check_array_access(state, (AstArrayAccess *) expr);
+            retval = check_array_access((AstArrayAccess *) expr);
             break;
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {
-                onyx_message_add(state->msgs,
-                        ONYX_MESSAGE_TYPE_LITERAL,
+                onyx_message_add(Msg_Type_Literal,
                         expr->token->pos,
                         "global with unknown type");
                 retval = 1;
@@ -442,7 +420,7 @@ CHECK(expression, AstTyped* expr) {
             break;
 
         case Ast_Kind_Argument:
-            retval = check_expression(state, ((AstArgument *) expr)->value);
+            retval = check_expression(((AstArgument *) expr)->value);
             expr->type = ((AstArgument *) expr)->value->type;
             break;
 
@@ -466,11 +444,10 @@ CHECK(expression, AstTyped* expr) {
 }
 
 CHECK(global, AstGlobal* global) {
-    fill_in_type(state, (AstTyped *) global);
+    fill_in_type((AstTyped *) global);
 
     if (global->type == NULL) {
-        onyx_message_add(state->msgs,
-                ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
+        onyx_message_add(Msg_Type_Unresolved_Type,
                 global->token->pos,
                 global->exported_name->text,
                 global->exported_name->length);
@@ -483,24 +460,24 @@ CHECK(global, AstGlobal* global) {
 
 CHECK(statement, AstNode* stmt) {
     switch (stmt->kind) {
-        case Ast_Kind_Return:     return check_return(state, (AstReturn *) stmt);
-        case Ast_Kind_If:         return check_if(state, (AstIf *) stmt);
-        case Ast_Kind_While:      return check_while(state, (AstWhile *) stmt);
-        case Ast_Kind_Call:       return check_call(state, (AstCall *) stmt);
-        case Ast_Kind_Block:      return check_block(state, (AstBlock *) stmt);
+        case Ast_Kind_Return:     return check_return((AstReturn *) stmt);
+        case Ast_Kind_If:         return check_if((AstIf *) stmt);
+        case Ast_Kind_While:      return check_while((AstWhile *) stmt);
+        case Ast_Kind_Call:       return check_call((AstCall *) stmt);
+        case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
 
         case Ast_Kind_Break:      return 0;
         case Ast_Kind_Continue:   return 0;
 
         default:
             stmt->flags |= Ast_Flag_Expr_Ignored;
-            return check_expression(state, (AstTyped *) stmt);
+            return check_expression((AstTyped *) stmt);
     }
 }
 
 CHECK(statement_chain, AstNode* start) {
     while (start) {
-        if (check_statement(state, start)) return 1;
+        if (check_statement(start)) return 1;
         start = start->next;
     }
 
@@ -508,12 +485,11 @@ CHECK(statement_chain, AstNode* start) {
 }
 
 CHECK(block, AstBlock* block) {
-    if (check_statement_chain(state, block->body)) return 1;
+    if (check_statement_chain(block->body)) return 1;
 
     bh_table_each_start(AstTyped *, block->scope->symbols);
         if (value->type == NULL) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
+            onyx_message_add(Msg_Type_Unresolved_Type,
                     value->token->pos,
                     value->token->text, value->token->length);
             return 1;
@@ -525,64 +501,58 @@ CHECK(block, AstBlock* block) {
 
 CHECK(function, AstFunction* func) {
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
-        fill_in_type(state, (AstTyped *) param);
+        fill_in_type((AstTyped *) param);
 
         if (param->type == NULL) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     param->token->pos,
                     "function parameter types must be known");
             return 1;
         }
 
         if (param->type->Basic.size == 0) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     param->token->pos,
                     "function parameters must have non-void types");
             return 1;
         }
     }
 
-    fill_in_type(state, (AstTyped *) func);
+    fill_in_type((AstTyped *) func);
 
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     func->token->pos,
                     "exporting a foreign function");
             return 1;
         }
 
         if ((func->flags & Ast_Flag_Intrinsic) != 0) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     func->token->pos,
                     "exporting a intrinsic function");
             return 1;
         }
 
         if ((func->flags & Ast_Flag_Inline) != 0) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     func->token->pos,
                     "exporting a inlined function");
             return 1;
         }
 
         if (func->exported_name == NULL) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     func->token->pos,
                     "exporting function without a name");
             return 1;
         }
     }
 
-    state->expected_return_type = func->type->Function.return_type;
+    semstate.expected_return_type = func->type->Function.return_type;
     if (func->body) {
-        return check_block(state, func->body);
+        return check_block(func->body);
     }
 
     return 0;
@@ -591,8 +561,7 @@ CHECK(function, AstFunction* func) {
 CHECK(overloaded_function, AstOverloadedFunction* func) {
     bh_arr_each(AstTyped *, node, func->overloads) {
         if ((*node)->kind == Ast_Kind_Overloaded_Function) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     (*node)->token->pos,
                     "overload option can not be another overloaded function (yet)");
 
@@ -600,8 +569,7 @@ CHECK(overloaded_function, AstOverloadedFunction* func) {
         }
 
         if ((*node)->kind != Ast_Kind_Function) {
-            onyx_message_add(state->msgs,
-                    ONYX_MESSAGE_TYPE_LITERAL,
+            onyx_message_add(Msg_Type_Literal,
                     (*node)->token->pos,
                     "overload option not function");
 
@@ -614,39 +582,39 @@ CHECK(overloaded_function, AstOverloadedFunction* func) {
 
 CHECK(node, AstNode* node) {
     switch (node->kind) {
-        case Ast_Kind_Function:             return check_function(state, (AstFunction *) node);
-        case Ast_Kind_Overloaded_Function:  return check_overloaded_function(state, (AstOverloadedFunction *) node);
-        case Ast_Kind_Block:                return check_block(state, (AstBlock *) node);
-        case Ast_Kind_Return:               return check_return(state, (AstReturn *) node);
-        case Ast_Kind_If:                   return check_if(state, (AstIf *) node);
-        case Ast_Kind_While:                return check_while(state, (AstWhile *) node);
-        case Ast_Kind_Call:                 return check_call(state, (AstCall *) node);
-        case Ast_Kind_Binary_Op:            return check_binaryop(state, (AstBinaryOp *) node);
-        default:                            return check_expression(state, (AstTyped *) node);
+        case Ast_Kind_Function:             return check_function((AstFunction *) node);
+        case Ast_Kind_Overloaded_Function:  return check_overloaded_function((AstOverloadedFunction *) node);
+        case Ast_Kind_Block:                return check_block((AstBlock *) node);
+        case Ast_Kind_Return:               return check_return((AstReturn *) node);
+        case Ast_Kind_If:                   return check_if((AstIf *) node);
+        case Ast_Kind_While:                return check_while((AstWhile *) node);
+        case Ast_Kind_Call:                 return check_call((AstCall *) node);
+        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp *) node);
+        default:                            return check_expression((AstTyped *) node);
     }
 }
 
-void onyx_type_check(SemState* state, ProgramInfo* program) {
+void onyx_type_check(ProgramInfo* program) {
     bh_arr_each(Entity, entity, program->entities) {
         switch (entity->type) {
             case Entity_Type_Function:
                 if (entity->function->flags & Ast_Kind_Foreign) program->foreign_func_count++;
 
-                if (check_function(state, entity->function)) return;
+                if (check_function(entity->function)) return;
                 break;
 
             case Entity_Type_Overloaded_Function:
-                if (check_overloaded_function(state, entity->overloaded_function)) return;
+                if (check_overloaded_function(entity->overloaded_function)) return;
                 break;
 
             case Entity_Type_Global:
                 if (entity->global->flags & Ast_Kind_Foreign) program->foreign_global_count++;
 
-                if (check_global(state, entity->global)) return;
+                if (check_global(entity->global)) return;
                 break;
 
             case Entity_Type_Expression:
-                if (check_expression(state, entity->expr)) return;
+                if (check_expression(entity->expr)) return;
                 break;
 
             case Entity_Type_String_Literal: break;

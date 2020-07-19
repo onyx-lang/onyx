@@ -105,7 +105,6 @@ typedef struct CompilerState {
     bh_table(bh_file_contents) loaded_files;
     bh_arr(const char *) queued_files;
 
-    OnyxMessages msgs;
     ProgramInfo prog_info;
     OnyxWasmModule wasm_mod;
 } CompilerState;
@@ -121,7 +120,7 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
 
     bh_table_init(opts->allocator, compiler_state->loaded_files, 15);
 
-    onyx_message_create(compiler_state->msg_alloc, &compiler_state->msgs, &compiler_state->loaded_files);
+    onyx_message_init(compiler_state->msg_alloc, &compiler_state->loaded_files);
 
     compiler_state->token_alloc = opts->allocator;
 
@@ -163,7 +162,7 @@ static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_con
     if (compiler_state->options->verbose_output)
         bh_printf("[Parsing]      %s\n", file_contents->filename);
 
-    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->msgs);
+    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer);
     return onyx_parse(&parser);
 }
 
@@ -239,7 +238,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     ParseResults results = parse_source_file(compiler_state, &fc);
     merge_parse_results(compiler_state, &results);
 
-    if (onyx_message_has_errors(&compiler_state->msgs)) {
+    if (onyx_message_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
     } else {
         return ONYX_COMPILER_PROGRESS_SUCCESS;
@@ -264,10 +263,10 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     if (compiler_state->options->verbose_output)
         bh_printf("[Checking semantics]\n");
 
-    SemState sp_state = onyx_sempass_create(compiler_state->sp_alloc, compiler_state->ast_alloc, &compiler_state->msgs);
-    onyx_sempass(&sp_state, &compiler_state->prog_info);
+    onyx_sempass_init(compiler_state->sp_alloc, compiler_state->ast_alloc);
+    onyx_sempass(&compiler_state->prog_info);
 
-    if (onyx_message_has_errors(&compiler_state->msgs)) {
+    if (onyx_message_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
     }
 
@@ -276,10 +275,10 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     if (compiler_state->options->verbose_output)
         bh_printf("[Generating WASM]\n");
 
-    compiler_state->wasm_mod = onyx_wasm_module_create(compiler_state->options->allocator, &compiler_state->msgs);
+    compiler_state->wasm_mod = onyx_wasm_module_create(compiler_state->options->allocator);
     onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->prog_info);
 
-    if (onyx_message_has_errors(&compiler_state->msgs)) {
+    if (onyx_message_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
     }
 
@@ -334,7 +333,7 @@ int main(int argc, char *argv[]) {
         case ONYX_COMPILER_PROGRESS_FAILED_PARSE:
         case ONYX_COMPILER_PROGRESS_FAILED_SEMPASS:
         case ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN:
-            onyx_message_print(&compile_state.msgs);
+            onyx_message_print();
             break;
 
         case ONYX_COMPILER_PROGRESS_FAILED_OUTPUT:

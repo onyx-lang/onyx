@@ -8,38 +8,38 @@
 
 #define ONYX_MSG_BUFFER_SIZE 256
 
-typedef enum OnyxMessageType {
-    ONYX_MESSAGE_TYPE_LITERAL,
-    ONYX_MESSAGE_TYPE_EXPECTED_TOKEN,
-    ONYX_MESSAGE_TYPE_UNEXPECTED_TOKEN,
-    ONYX_MESSAGE_TYPE_UNKNOWN_TYPE,
-    ONYX_MESSAGE_TYPE_NOT_LVAL,
-    ONYX_MESSAGE_TYPE_ASSIGN_CONST,
-    ONYX_MESSAGE_TYPE_UNKNOWN_SYMBOL,
-    ONYX_MESSAGE_TYPE_UNKNOWN_DIRECTIVE,
+typedef enum MsgType {
+    Msg_Type_Literal,
+    Msg_Type_Expected_Token,
+    Msg_Type_Unexpected_Token,
+    Msg_Type_Unknown_Type,
+    Msg_Type_Not_Lval,
+    Msg_Type_Assign_Const,
+    Msg_Type_Unknown_Symbol,
+    Msg_Type_Unknown_Directive,
 
-    ONYX_MESSAGE_TYPE_REDECLARE_SYMBOL,
-    ONYX_MESSAGE_TYPE_BINOP_MISMATCH_TYPE,
-    ONYX_MESSAGE_TYPE_ASSIGNMENT_TYPE_MISMATCH,
-    ONYX_MESSAGE_TYPE_GLOBAL_TYPE_MISMATCH,
-    ONYX_MESSAGE_TYPE_EXPECTED_EXPRESSION,
-    ONYX_MESSAGE_TYPE_CALL_NON_FUNCTION,
+    Msg_Type_Redeclare_Symbol,
+    Msg_Type_Binop_Mismatch,
+    Msg_Type_Assignment_Mismatch,
+    Msg_Type_Global_Type_Mismatch,
+    Msg_Type_Expected_Expression,
+    Msg_Type_Call_Non_Function,
 
-    ONYX_MESSAGE_TYPE_FUNCTION_RETURN_MISMATCH,
-    ONYX_MESSAGE_TYPE_FUNCTION_PARAM_TYPE_MISMATCH,
+    Msg_Type_Function_Return_Mismatch,
+    Msg_Type_Function_Param_Mismatch,
 
-    ONYX_MESSAGE_TYPE_UNRESOLVED_TYPE,
-    ONYX_MESSAGE_TYPE_UNRESOLVED_SYMBOL,
+    Msg_Type_Unresolved_Type,
+    Msg_Type_Unresolved_Symbol,
 
-    ONYX_MESSAGE_TYPE_COUNT,
-} OnyxMessageType;
+    Msg_Type_Count,
+} MsgType;
 
-typedef struct OnyxMessage {
-    OnyxMessageType type;
+typedef struct Message {
+    MsgType type;
     OnyxFilePos pos;
-    struct OnyxMessage* next;
+    struct Message* next;
     char text[ONYX_MSG_BUFFER_SIZE];
-} OnyxMessage;
+} Message;
 
 typedef struct OnyxMessages {
     bh_allocator allocator;
@@ -48,12 +48,14 @@ typedef struct OnyxMessages {
     // their file contents. Used for better error messages
     bh_table(bh_file_contents)* file_contents;
 
-    OnyxMessage* first;
+    Message* first;
 } OnyxMessages;
 
-void onyx_message_add(OnyxMessages* msgs, OnyxMessageType type, OnyxFilePos pos, ...);
-void onyx_message_print(OnyxMessages* msgs);
-b32 onyx_message_has_errors(OnyxMessages* msgs);
-void onyx_message_create(bh_allocator allocator, OnyxMessages* msgs, bh_table(bh_file_contents)* files);
+extern OnyxMessages msgs;
+
+void onyx_message_init(bh_allocator allocator, bh_table(bh_file_contents)* files);
+void onyx_message_add(MsgType type, OnyxFilePos pos, ...);
+void onyx_message_print();
+b32  onyx_message_has_errors();
 
 #endif

@@ -1014,10 +1014,9 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     bh_arr_push(mod->data, datum);
 }
 
-OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc, OnyxMessages* msgs) {
+OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     OnyxWasmModule module = {
         .allocator = alloc,
-        .msgs = msgs,
 
         .type_map = NULL,
         .next_type_idx = 0,
