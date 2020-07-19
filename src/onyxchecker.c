@@ -79,9 +79,10 @@ CHECK(while, AstWhile* whilenode) {
 }
 
 CHECK(for, AstFor* fornode) {
-    check_expression(fornode->start);
-    check_expression(fornode->end);
-    if (fornode->step) check_expression(fornode->step);
+    if (check_expression(fornode->start)) return 1;
+    if (check_expression(fornode->end)) return 1;
+    if (fornode->step)
+        if (check_expression(fornode->step)) return 1;
 
     // HACK
     if (fornode->start->type != &basic_types[Basic_Kind_I32]) {
@@ -98,7 +99,7 @@ CHECK(for, AstFor* fornode) {
         return 1;
     }
 
-    check_statement(fornode->stmt);
+    if (check_statement(fornode->stmt)) return 1;
 
     return 0;
 }
