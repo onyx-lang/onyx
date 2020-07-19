@@ -39,19 +39,26 @@ sort :: proc (src: ^i32, len: i32) {
     }
 }
 
-other_str :: "I can't believe this \n actually fricken worked!";
+for_test :: proc {
+    // 0 to 9
+    for i: 0, 10 print(i);
+}
 
-str_test :: proc {
+str_test :: proc #export "main" {
     hello_str :: "Hello World!";
 
     // Address of and dereference cancel each other out
     print(^*hello_str);
 
-    print("This is a test"[10] as i32);
+    print(hello_str, 5);
+
+    for i: 0, 10, 2 print(i);
+
+    for y: 0, 5 for x: 0, 5 print(x + y * 5);
 }
 
 // Don't need to bind this function to a symbol
-proc #export "main" {
+proc #export "main2" {
     print(min(10.0, 12.0));
 
     global_arr = 128 as ^i32;

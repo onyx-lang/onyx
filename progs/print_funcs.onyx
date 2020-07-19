@@ -45,6 +45,10 @@ print_str :: proc (str: ^u8) {
     }
 }
 
+print_str_len :: proc (str: ^u8, len: i32) {
+    for i: 0, len print(str[i] as i32);
+}
+
 print :: proc #overloaded {
     print_bool,
     print_i32,
@@ -58,4 +62,5 @@ print :: proc #overloaded {
     print_f64arr,
 
     print_str,
+    print_str_len,
 }

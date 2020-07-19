@@ -232,6 +232,7 @@ COMPILE_FUNC(statement,      AstNode* stmt);
 COMPILE_FUNC(assignment,     AstBinaryOp* assign);
 COMPILE_FUNC(if,             AstIf* if_node);
 COMPILE_FUNC(while,          AstWhile* while_node);
+COMPILE_FUNC(for,            AstFor* for_node);
 COMPILE_FUNC(binop,          AstBinaryOp* binop);
 COMPILE_FUNC(unaryop,        AstUnaryOp* unop);
 COMPILE_FUNC(call,           AstCall* call);
@@ -303,6 +304,7 @@ COMPILE_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_Return:     compile_return(mod, &code, (AstReturn *) stmt); break;
         case Ast_Kind_If:         compile_if(mod, &code, (AstIf *) stmt); break;
         case Ast_Kind_While:      compile_while(mod, &code, (AstWhile *) stmt); break;
+        case Ast_Kind_For:        compile_for(mod, &code, (AstFor *) stmt); break;
         case Ast_Kind_Break:      compile_structured_jump(mod, &code, 0); break;
         case Ast_Kind_Continue:   compile_structured_jump(mod, &code, 1); break;
         case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt); break;
@@ -419,6 +421,52 @@ COMPILE_FUNC(while, AstWhile* while_node) {
     } else {
         compile_statement(mod, &code, while_node->stmt);
     }
+
+    bh_arr_pop(mod->structured_jump_target);
+    bh_arr_pop(mod->structured_jump_target);
+
+    WID(WI_JUMP, 0x00);
+
+    WI(WI_LOOP_END);
+    WI(WI_BLOCK_END);
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(for, AstFor* for_node) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    i32 it_idx = (i32) bh_imap_get(&mod->local_map, (u64) for_node->var);
+
+    compile_expression(mod, &code, for_node->start);
+    WID(WI_LOCAL_SET, it_idx);
+
+    WID(WI_BLOCK_START, 0x40);
+    WID(WI_LOOP_START, 0x40);
+
+    bh_arr_push(mod->structured_jump_target, 1);
+    bh_arr_push(mod->structured_jump_target, 2);
+
+    WID(WI_LOCAL_GET, it_idx);
+    compile_expression(mod, &code, for_node->end);
+    WI(WI_I32_GE_S);
+    WID(WI_COND_JUMP, 0x01);
+
+    if (for_node->stmt->kind == Ast_Kind_Block) {
+        forll (AstNode, stmt, ((AstBlock *) for_node->stmt)->body, next) {
+            compile_statement(mod, &code, stmt);
+        }
+    } else {
+        compile_statement(mod, &code, for_node->stmt);
+    }
+
+    if (for_node->step == NULL)
+        WID(WI_I32_CONST, 0x01);
+    else
+        compile_expression(mod, &code, for_node->step);
+    WID(WI_LOCAL_GET, it_idx);
+    WI(WI_I32_ADD);
+    WID(WI_LOCAL_SET, it_idx);
 
     bh_arr_pop(mod->structured_jump_target);
     bh_arr_pop(mod->structured_jump_target);
@@ -1517,6 +1565,7 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
     switch (instr->type) {
         case WI_LOCAL_GET:
         case WI_LOCAL_SET:
+        case WI_LOCAL_TEE:
         case WI_GLOBAL_GET:
         case WI_GLOBAL_SET:
         case WI_CALL:

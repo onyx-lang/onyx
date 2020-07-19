@@ -33,6 +33,7 @@ static AstTyped*    parse_factor(OnyxParser* parser);
 static AstTyped*    parse_expression(OnyxParser* parser);
 static AstIf*       parse_if_stmt(OnyxParser* parser);
 static AstWhile*    parse_while_stmt(OnyxParser* parser);
+static AstFor*      parse_for_stmt(OnyxParser* parser);
 static b32          parse_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*   parse_return_statement(OnyxParser* parser);
 static AstBlock*    parse_block(OnyxParser* parser);
@@ -484,6 +485,31 @@ static AstWhile* parse_while_stmt(OnyxParser* parser) {
     return while_node;
 }
 
+static AstFor* parse_for_stmt(OnyxParser* parser) {
+    AstFor* for_node = make_node(AstFor, Ast_Kind_For);
+    for_node->token = expect_token(parser, Token_Type_Keyword_For);
+
+    AstLocal* var_node = make_node(AstLocal, Ast_Kind_Local);
+    var_node->token = expect_token(parser, Token_Type_Symbol);
+    var_node->type_node = (AstType *) &basic_type_i32;
+
+    for_node->var = var_node;
+
+    expect_token(parser, ':');
+    for_node->start = parse_expression(parser);
+    expect_token(parser, ',');
+    for_node->end = parse_expression(parser);
+
+    if (parser->curr->type == ',') {
+        consume_token(parser);
+        for_node->step = parse_expression(parser);
+    }
+
+    for_node->stmt = parse_statement(parser);
+
+    return for_node;
+}
+
 // Returns 1 if the symbol was consumed. Returns 0 otherwise
 // ret is set to the statement to insert
 // <symbol> : <type> = <expr>
@@ -603,6 +629,11 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Keyword_While:
             needs_semicolon = 0;
             retval = (AstNode *) parse_while_stmt(parser);
+            break;
+
+        case Token_Type_Keyword_For:
+            needs_semicolon = 0;
+            retval = (AstNode *) parse_for_stmt(parser);
             break;
 
         case Token_Type_Keyword_Break:

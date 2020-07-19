@@ -10,6 +10,7 @@ CHECK(statement, AstNode* stmt);
 CHECK(return, AstReturn* retnode);
 CHECK(if, AstIf* ifnode);
 CHECK(while, AstWhile* whilenode);
+CHECK(for, AstFor* fornode);
 CHECK(call, AstCall* call);
 CHECK(binaryop, AstBinaryOp* binop);
 CHECK(expression, AstTyped* expr);
@@ -75,6 +76,31 @@ CHECK(while, AstWhile* whilenode) {
     }
 
     return check_statement(whilenode->stmt);
+}
+
+CHECK(for, AstFor* fornode) {
+    check_expression(fornode->start);
+    check_expression(fornode->end);
+    if (fornode->step) check_expression(fornode->step);
+
+    // HACK
+    if (fornode->start->type != &basic_types[Basic_Kind_I32]) {
+        onyx_message_add(Msg_Type_Literal,
+                fornode->start->token->pos,
+                "expected expression of type i32 for start");
+        return 1;
+    }
+
+    if (fornode->end->type != &basic_types[Basic_Kind_I32]) {
+        onyx_message_add(Msg_Type_Literal,
+                fornode->end->token->pos,
+                "expected expression of type i32 for end");
+        return 1;
+    }
+
+    check_statement(fornode->stmt);
+
+    return 0;
 }
 
 static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction* ofunc) {
@@ -503,6 +529,7 @@ CHECK(statement, AstNode* stmt) {
         case Ast_Kind_Return:     return check_return((AstReturn *) stmt);
         case Ast_Kind_If:         return check_if((AstIf *) stmt);
         case Ast_Kind_While:      return check_while((AstWhile *) stmt);
+        case Ast_Kind_For:        return check_for((AstFor *) stmt);
         case Ast_Kind_Call:       return check_call((AstCall *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
 

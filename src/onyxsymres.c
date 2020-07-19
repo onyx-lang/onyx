@@ -14,6 +14,7 @@ static void symres_expression(AstTyped** expr);
 static void symres_return(AstReturn* ret);
 static void symres_if(AstIf* ifnode);
 static void symres_while(AstWhile* whilenode);
+static void symres_for(AstFor* fornode);
 static void symres_statement_chain(AstNode* walker, AstNode** trailer);
 static b32  symres_statement(AstNode* stmt);
 static void symres_block(AstBlock* block);
@@ -214,6 +215,21 @@ static void symres_while(AstWhile* whilenode) {
     symres_statement(whilenode->stmt);
 }
 
+static void symres_for(AstFor* fornode) {
+    fornode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+    scope_enter(fornode->scope);
+
+    symbol_introduce(fornode->var->token, (AstNode *) fornode->var);
+
+    symres_expression(&fornode->start);
+    symres_expression(&fornode->end);
+    if (fornode->step) symres_expression(&fornode->step);
+
+    symres_statement(fornode->stmt);
+
+    scope_leave();
+}
+
 // NOTE: Returns 1 if the statment should be removed
 static b32 symres_statement(AstNode* stmt) {
     switch (stmt->kind) {
@@ -221,6 +237,7 @@ static b32 symres_statement(AstNode* stmt) {
         case Ast_Kind_Return:     symres_return((AstReturn *) stmt);                return 0;
         case Ast_Kind_If:         symres_if((AstIf *) stmt);                        return 0;
         case Ast_Kind_While:      symres_while((AstWhile *) stmt);                  return 0;
+        case Ast_Kind_For:        symres_for((AstFor *) stmt);                      return 0;
         case Ast_Kind_Call:       symres_call((AstCall *) stmt);                    return 0;
         case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *)stmt)->value); return 0;
         case Ast_Kind_Block:      symres_block((AstBlock *) stmt);                  return 0;

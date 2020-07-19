@@ -21,37 +21,38 @@ typedef enum TokenType {
     Token_Type_Keyword_Proc         = 267,
     Token_Type_Keyword_Cast         = 268,
     Token_Type_Keyword_While        = 269,
-    Token_Type_Keyword_Break        = 270,
-    Token_Type_Keyword_Continue     = 271,
+    Token_Type_Keyword_For          = 270,
+    Token_Type_Keyword_Break        = 271,
+    Token_Type_Keyword_Continue     = 272,
 
-    Token_Type_Right_Arrow          = 272,
-    Token_Type_Left_Arrow           = 273,
-    Token_Type_Empty_Block          = 274,
+    Token_Type_Right_Arrow          = 273,
+    Token_Type_Left_Arrow           = 274,
+    Token_Type_Empty_Block          = 275,
 
-    Token_Type_Greater_Equal        = 275,
-    Token_Type_Less_Equal           = 276,
-    Token_Type_Equal_Equal          = 277,
-    Token_Type_Not_Equal            = 278,
-    Token_Type_Plus_Equal           = 279,
-    Token_Type_Minus_Equal          = 280,
-    Token_Type_Star_Equal           = 281,
-    Token_Type_Fslash_Equal         = 282,
-    Token_Type_Percent_Equal        = 283,
+    Token_Type_Greater_Equal        = 276,
+    Token_Type_Less_Equal           = 277,
+    Token_Type_Equal_Equal          = 278,
+    Token_Type_Not_Equal            = 279,
+    Token_Type_Plus_Equal           = 280,
+    Token_Type_Minus_Equal          = 281,
+    Token_Type_Star_Equal           = 282,
+    Token_Type_Fslash_Equal         = 283,
+    Token_Type_Percent_Equal        = 284,
 
-    Token_Type_Symbol               = 284,
-    Token_Type_Literal_String       = 285,
-    Token_Type_Literal_Numeric      = 286,
-    Token_Type_Literal_True         = 287,
-    Token_Type_Literal_False        = 288,
+    Token_Type_Symbol               = 285,
+    Token_Type_Literal_String       = 286,
+    Token_Type_Literal_Numeric      = 287,
+    Token_Type_Literal_True         = 288,
+    Token_Type_Literal_False        = 289,
 
-    Token_Type_Count                = 289,
+    Token_Type_Count                = 290,
 } TokenType;
 
 typedef struct OnyxFilePos {
     const char* filename;
     char* line_start;
     u32 line;
-    
+
     // NOTE: This assumes that no line is no longer than 2^16 chars
     u16 column, length;
 } OnyxFilePos;

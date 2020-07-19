@@ -43,6 +43,7 @@ static const char* ast_node_names[] = {
     "ARRAY_ACCESS",
 
     "IF",
+    "FOR",
     "WHILE",
     "BREAK",
     "CONTINUE",

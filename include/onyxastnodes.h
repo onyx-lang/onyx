@@ -25,6 +25,7 @@ typedef struct AstReturn AstReturn;
 
 typedef struct AstBlock AstBlock;
 typedef struct AstIf AstIf;
+typedef struct AstFor AstFor;
 typedef struct AstWhile AstWhile;
 
 typedef struct AstType AstType;
@@ -84,6 +85,7 @@ typedef enum AstKind {
     Ast_Kind_Array_Access,
 
     Ast_Kind_If,
+    Ast_Kind_For,
     Ast_Kind_While,
     Ast_Kind_Break,
     Ast_Kind_Continue,
@@ -205,7 +207,7 @@ struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
 struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstNode *callee; };
 struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
 struct AstArgument      { AstTyped_base; AstTyped *value; };
-struct AstAddressOf     { AstTyped_base; AstTyped *expr; }; 
+struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 
@@ -215,6 +217,19 @@ struct AstReturn        { AstNode_base;  AstTyped* expr; };
 // Structure Nodes
 struct AstBlock         { AstNode_base;  AstNode *body; Scope *scope; };
 struct AstWhile         { AstNode_base;  AstTyped *cond; AstNode *stmt; };
+struct AstFor           {
+    AstNode_base;
+
+    // NOTE: Stores the iteration variable
+    Scope *scope;
+
+    // NOTE: Local defining the iteration variable
+    AstLocal* var;
+
+    AstTyped *start, *end, *step;
+
+    AstNode *stmt;
+};
 struct AstIf {
     AstNode_base;
     AstTyped *cond;
