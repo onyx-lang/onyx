@@ -20,8 +20,8 @@ typedef struct AstAddressOf AstAddressOf;
 typedef struct AstDereference AstDereference;
 typedef struct AstArrayAccess AstArrayAccess;
 typedef struct AstFieldAccess AstFieldAccess;
+typedef struct AstSizeOf AstSizeOf;
 
-typedef struct AstAssign AstAssign;
 typedef struct AstReturn AstReturn;
 
 typedef struct AstBlock AstBlock;
@@ -90,6 +90,7 @@ typedef enum AstKind {
     Ast_Kind_Dereference,
     Ast_Kind_Array_Access,
     Ast_Kind_Field_Access,
+    Ast_Kind_Size_Of,
 
     Ast_Kind_If,
     Ast_Kind_For,
@@ -189,7 +190,7 @@ typedef enum OnyxIntrinsic {
 #define AstNode_base struct AstNode_members;
 struct AstNode AstNode_members;
 
-// NOTE: 'type_node' is filled out by the parser.                                               \
+// NOTE: 'type_node' is filled out by the parser.                                               
 // For a type such as '^^i32', the tree would look something like
 //
 //      Typed Thing -> AstPointerType -> AstPointerType -> AstNode (symbol node)
@@ -221,6 +222,7 @@ struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
+struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 
 // Intruction Node
 struct AstReturn        { AstNode_base;  AstTyped* expr; };

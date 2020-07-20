@@ -15,7 +15,8 @@ AstBasicType basic_type_f32    = { { Ast_Kind_Basic_Type, 0, NULL, "f32"    }, &
 AstBasicType basic_type_f64    = { { Ast_Kind_Basic_Type, 0, NULL, "f64"    }, &basic_types[Basic_Kind_F64]   };
 AstBasicType basic_type_rawptr = { { Ast_Kind_Basic_Type, 0, NULL, "rawptr" }, &basic_types[Basic_Kind_Rawptr] };
 
-AstNumLit builtin_heap_start = { Ast_Kind_NumLit, Ast_Flag_Const, NULL, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
+static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
+AstNumLit builtin_heap_start = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
 
 const BuiltinSymbol builtin_symbols[] = {
     { "void",       (AstNode *) &basic_type_void },
@@ -46,6 +47,7 @@ static void scope_leave();
 static AstType* symres_type(AstType* type);
 static void symres_local(AstLocal** local);
 static void symres_call(AstCall* call);
+static void symres_size_of(AstSizeOf* so);
 static void symres_expression(AstTyped** expr);
 static void symres_return(AstReturn* ret);
 static void symres_if(AstIf* ifnode);
@@ -190,6 +192,11 @@ static void symres_call(AstCall* call) {
     symres_statement_chain((AstNode *) call->arguments, (AstNode **) &call->arguments);
 }
 
+static void symres_size_of(AstSizeOf* so) {
+    so->type_node = symres_type(so->type_node);
+    so->so_type = symres_type(so->so_type);
+}
+
 static void symres_unaryop(AstUnaryOp** unaryop) {
     if ((*unaryop)->operation == Unary_Op_Cast) {
         (*unaryop)->type_node = symres_type((*unaryop)->type_node);
@@ -222,21 +229,14 @@ static void symres_expression(AstTyped** expr) {
             (*expr)->type_node = symres_type((*expr)->type_node);
             break;
 
-        case Ast_Kind_Address_Of:
-            symres_expression(&((AstAddressOf *)(*expr))->expr);
-            break;
-
-        case Ast_Kind_Dereference:
-            symres_expression(&((AstDereference *)(*expr))->expr);
-            break;
+        case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
+        case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
+        case Ast_Kind_Field_Access: symres_expression(&((AstFieldAccess *)(*expr))->expr); break;
+        case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
 
         case Ast_Kind_Array_Access:
             symres_expression(&((AstArrayAccess *)(*expr))->addr);
             symres_expression(&((AstArrayAccess *)(*expr))->expr);
-            break;
-
-        case Ast_Kind_Field_Access:
-            symres_expression(&((AstFieldAccess *)(*expr))->expr);
             break;
 
         default:

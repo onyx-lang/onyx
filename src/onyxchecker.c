@@ -19,6 +19,7 @@ CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
 CHECK(field_access, AstFieldAccess* field);
+CHECK(size_of, AstSizeOf* so);
 CHECK(global, AstGlobal* global);
 CHECK(function, AstFunction* func);
 CHECK(overloaded_function, AstOverloadedFunction* func);
@@ -462,6 +463,12 @@ CHECK(field_access, AstFieldAccess* field) {
     return 0;
 }
 
+CHECK(size_of, AstSizeOf* so) {
+    so->size = type_size_of(type_build_from_ast(semstate.allocator, so->so_type));
+
+    return 0;
+}
+
 CHECK(expression, AstTyped* expr) {
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         onyx_message_add(Msg_Type_Literal,
@@ -509,6 +516,7 @@ CHECK(expression, AstTyped* expr) {
         case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
         case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess *) expr); break;
+        case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {

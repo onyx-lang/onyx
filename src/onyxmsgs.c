@@ -11,7 +11,7 @@ static const char* msg_formats[] = {
     "expected token '%s', got '%s'",
     "unexpected token '%s'",
     "unknown type '%s'",
-    "expected lval '%b'",
+    "cannot assign to '%b'",
     "attempt to assign to constant '%b'",
     "unknown symbol '%s'",
     "unknown directive '%b'",

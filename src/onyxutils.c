@@ -45,6 +45,7 @@ static const char* ast_node_names[] = {
     "DEREFERENCE",
     "ARRAY_ACCESS",
     "FIELD_ACCESS",
+    "SIZE OF",
 
     "IF",
     "FOR",

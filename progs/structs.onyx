@@ -28,7 +28,7 @@ alloc :: proc (size: u32) -> rawptr {
 }
 
 foo_make :: proc -> ^Foo {
-    return alloc(40) as ^Foo; 
+    return alloc(sizeof Foo) as ^Foo; 
 }
 
 foo_get :: proc (fooarr: ^Foo, i: i32) -> ^Foo {
@@ -42,12 +42,11 @@ proc #export "main" {
 
     // foo.foo = other_foo;
     // print(foo.foo.i);
-
     foo1 := foo_make();
     foo1.v.y = 123.0f;
     print(foo1.v.y);
 
-    foo := alloc(40* 5) as ^Foo;
+    foo := alloc(sizeof Foo * 5) as ^Foo;
 
     for i: 1, 6 {
         foo[i - 1].v.x = (i + 3) as f32;
@@ -86,44 +85,44 @@ Mut1 :: struct {
 
 Mut2 :: struct {
     foo : i32;
-    other : ^Foo;
+    other : ^Mut1;
 }
 
-mut_func :: proc #export (mut: ^Mut1) -> ^Foo {
+mut_func :: proc #export (mut: ^Mut1) -> ^Mut1 {
     return mut.other.other;
 }
 
 
 Link :: struct {
     data : i32;
-    other_data : i32;
     next : ^Link;
 }
 
-link_create :: proc (data: i32, parent: ^Link) -> ^Link {
-    link := alloc(12) as ^Link;
+link_create :: proc (data: i32, parent: ^^Link) {
+    link := alloc(sizeof Link) as ^Link;
     link.data = data;
-    link.other_data = 1234;
-    link.next = parent;
-    return link;
+    link.next = *parent;
+    *parent = link;
 }
 
 link_print :: proc (start: ^Link) {
     walker := start;
     while (walker as i32) != 0 {
-        print(walker.next.data);
+        print(walker.data);
         walker = walker.next;
     }
 }
 
 link_test :: proc #export "main2" {
-    dummy :: "H";
+    node_head := alloc(sizeof ^Link) as ^^Link;
+    *node_head = 0 as ^Link;
 
-    node1 := link_create(1, 0 as ^Link);
-    node2 := link_create(2, node1);
-    node3 := link_create(3, node2);
-    node4 := link_create(4, node3);
-    node5 := link_create(5, node4);
+    link_create(0, node_head);
+    link_create(1, node_head);
+    link_create(2, node_head);
+    link_create(3, node_head);
+    link_create(4, node_head);
 
-    link_print(node5);
+
+    link_print(*node_head);
 }

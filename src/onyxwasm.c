@@ -378,17 +378,24 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
     i32 store_size = type_size_of(type);
-    i32 is_integer = (type->Basic.flags & Basic_Flag_Integer)
-                  || (type->Basic.flags & Basic_Flag_Pointer);
+    i32 is_basic   = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
+    i32 is_integer = is_basic &&
+                    ((type->Basic.flags & Basic_Flag_Integer)
+                  || (type->Basic.flags & Basic_Flag_Pointer));
+    i32 is_float   = is_basic && type->Basic.flags & Basic_Flag_Float;
 
     if (is_integer) {
         if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { alignment, offset }));
-    } else {
+    } else if (is_float) {
         if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
+    } else {
+        onyx_message_add(Msg_Type_Literal,
+            (OnyxFilePos) { 0 },
+            "failed to generate store instruction");
     }
 
     *pcode = code;
@@ -398,9 +405,12 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
     i32 load_size   = type_size_of(type);
-    i32 is_integer  = (type->Basic.flags & Basic_Flag_Integer)
-                   || (type->Basic.flags & Basic_Flag_Pointer);
-    i32 is_unsigned = type->Basic.flags & Basic_Flag_Unsigned;
+    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
+    i32 is_integer  = is_basic &&
+                     ((type->Basic.flags & Basic_Flag_Integer)
+                   || (type->Basic.flags & Basic_Flag_Pointer));
+    i32 is_float    = is_basic && type->Basic.flags & Basic_Flag_Float;
+    i32 is_unsigned = is_basic && type->Basic.flags & Basic_Flag_Unsigned;
 
     WasmInstructionType instr = WI_NOP;
     i32 alignment = type_get_alignment_log2(type);
@@ -412,7 +422,7 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
         else if (load_size == 8) instr = WI_I64_LOAD;
 
         if (load_size < 4 && is_unsigned) instr += 1;
-    } else {
+    } else if (is_float) {
         if      (load_size == 4) instr = WI_F32_LOAD;
         else if (load_size == 8) instr = WI_F64_LOAD;
     }
@@ -618,36 +628,35 @@ COMPILE_FUNC(unaryop, AstUnaryOp* unop) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (unop->operation) {
-        case Unary_Op_Negate:
-            {
-                TypeBasic* type = &unop->type->Basic;
+        case Unary_Op_Negate: {
+            TypeBasic* type = &unop->type->Basic;
 
-                if (type->kind == Basic_Kind_I32
-                        || type->kind == Basic_Kind_I16
-                        || type->kind == Basic_Kind_I8) {
-                    WID(WI_I32_CONST, 0x00);
-                    compile_expression(mod, &code, unop->expr);
-                    WI(WI_I32_SUB);
+            if (type->kind == Basic_Kind_I32
+                    || type->kind == Basic_Kind_I16
+                    || type->kind == Basic_Kind_I8) {
+                WID(WI_I32_CONST, 0x00);
+                compile_expression(mod, &code, unop->expr);
+                WI(WI_I32_SUB);
 
-                }
-                else if (type->kind == Basic_Kind_I64) {
-                    WID(WI_I64_CONST, 0x00);
-                    compile_expression(mod, &code, unop->expr);
-                    WI(WI_I64_SUB);
-
-                }
-                else {
-                    compile_expression(mod, &code, unop->expr);
-
-                    if (type->kind == Basic_Kind_F32)
-                        WI(WI_F32_NEG);
-
-                    if (type->kind == Basic_Kind_F64)
-                        WI(WI_F64_NEG);
-                }
-
-                break;
             }
+            else if (type->kind == Basic_Kind_I64) {
+                WID(WI_I64_CONST, 0x00);
+                compile_expression(mod, &code, unop->expr);
+                WI(WI_I64_SUB);
+
+            }
+            else {
+                compile_expression(mod, &code, unop->expr);
+
+                if (type->kind == Basic_Kind_F32)
+                    WI(WI_F32_NEG);
+
+                if (type->kind == Basic_Kind_F64)
+                    WI(WI_F64_NEG);
+            }
+
+            break;
+        }
 
         case Unary_Op_Not:
             compile_expression(mod, &code, unop->expr);
@@ -892,6 +901,12 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Size_Of: {
+            AstSizeOf* so = (AstSizeOf *) expr;
+            WID(WI_I32_CONST, so->size);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -921,6 +936,14 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
 
     Type* from = cast->expr->type;
     Type* to = cast->type;
+
+    if (from->kind == Type_Kind_Struct || to->kind == Type_Kind_Struct) {
+        onyx_message_add(Msg_Type_Literal,
+                cast->token->pos,
+                "cannot cast to or from a struct");
+        WI(WI_DROP);
+        return;
+    }
 
     i32 fromidx = -1, toidx = -1;
     if (from->Basic.flags & Basic_Flag_Pointer) {
