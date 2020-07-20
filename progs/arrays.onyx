@@ -87,23 +87,23 @@ alloc :: proc (size: u32) -> rawptr {
     heap_u32    :: __heap_start as ^u32;
 
     curr_offset := *heap_u32;
-    if curr_offset == 0 as u32 curr_offset = 8 as u32;
+    if curr_offset == 0 curr_offset = 8;
 
     *heap_u32   = curr_offset + size;
 
     return ((__heap_start as u32) + curr_offset) as rawptr;
 }
 
-
+alloc_2darr :: proc (rows: u32, cols: u32) -> ^^i32 {
+    arr := alloc(rows * 4) as ^^i32;
+    for i: 0, cols arr[i] = alloc(cols * 4) as ^i32;
+    return arr;
+}
 
 
 
 multi_arr_test :: proc #export "main" {
-    arrs := alloc((10 * 4) as u32) as ^^i32;
-
-    for i: 0, 10 {
-        arrs[i] = alloc((10 * 4) as u32) as ^i32;
-    }
+    arrs := alloc_2darr(10, 10);
 
     for y: 0, 10 for x: 0, 10 arrs[y][x] = x + y * 10;
     for y: 0, 10 for x: 0, 10 print(arrs[x][y]);

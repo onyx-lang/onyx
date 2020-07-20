@@ -33,7 +33,11 @@ b32 types_are_compatible(Type* t1, Type* t2) {
         case Type_Kind_Basic:
             if (t2->kind == Type_Kind_Basic) {
                 // HACK: Not sure if this is right way to check this?
-                return t1 == t2;
+                if (t1 == t2) return 1;
+
+                if ((t1->Basic.flags & Basic_Flag_Integer) && (t2->Basic.flags & Basic_Flag_Integer)) {
+                    return t1->Basic.size == t2->Basic.size;
+                }
             }
             break;
 

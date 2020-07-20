@@ -85,19 +85,28 @@ CHECK(for, AstFor* fornode) {
         if (check_expression(fornode->step)) return 1;
 
     // HACK
-    if (fornode->start->type != &basic_types[Basic_Kind_I32]) {
+    if (!types_are_compatible(fornode->start->type, &basic_types[Basic_Kind_I32])) {
         onyx_message_add(Msg_Type_Literal,
                 fornode->start->token->pos,
                 "expected expression of type i32 for start");
         return 1;
     }
 
-    if (fornode->end->type != &basic_types[Basic_Kind_I32]) {
+    if (!types_are_compatible(fornode->end->type, &basic_types[Basic_Kind_I32])) {
         onyx_message_add(Msg_Type_Literal,
                 fornode->end->token->pos,
                 "expected expression of type i32 for end");
         return 1;
     }
+
+    if (fornode->step)
+        if (!types_are_compatible(fornode->step->type, &basic_types[Basic_Kind_I32])) {
+            onyx_message_add(Msg_Type_Literal,
+                    fornode->start->token->pos,
+                    "expected expression of type i32 for step");
+            return 1;
+        }
+
 
     if (check_statement(fornode->stmt)) return 1;
 
