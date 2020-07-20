@@ -277,3 +277,11 @@ b32 type_is_struct(Type* type) {
 b32 type_is_bool(Type* type) {
     return type != NULL && type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Bool;
 }
+
+b32 type_results_in_void(Type* type) {
+    return (type == NULL)
+        || (type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Void)
+        || (   (type->kind == Type_Kind_Function)
+            && (type->Function.return_type->kind == Type_Kind_Basic)
+            && (type->Function.return_type->Basic.kind == Basic_Kind_Void));
+}

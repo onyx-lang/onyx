@@ -913,6 +913,10 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             assert(0);
     }
 
+    if (expr->flags & Ast_Flag_Expr_Ignored &&
+        !type_results_in_void(expr->type))
+        WI(WI_DROP);
+
     *pcode = code;
 }
 

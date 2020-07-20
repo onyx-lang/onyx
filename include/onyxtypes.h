@@ -104,5 +104,6 @@ StructMember type_struct_lookup_member(Type* type, char* member);
 b32 type_is_pointer(Type* type);
 b32 type_is_struct(Type* type);
 b32 type_is_bool(Type* type);
+b32 type_results_in_void(Type* type);
 
 #endif // #ifndef ONYX_TYPES

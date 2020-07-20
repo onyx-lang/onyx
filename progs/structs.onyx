@@ -105,12 +105,17 @@ link_create :: proc (data: i32, parent: ^^Link) {
     *parent = link;
 }
 
-link_print :: proc (start: ^Link) {
+link_print :: proc (start: ^Link) -> i32 {
+    count := 0;
+
     walker := start;
     while (walker as i32) != 0 {
         print(walker.data);
         walker = walker.next;
+        count += 1;
     }
+
+    return count;
 }
 
 link_test :: proc #export "main2" {

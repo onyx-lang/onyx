@@ -380,6 +380,8 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
     if (binop->operation >= Binary_Op_Equal
             && binop->operation <= Binary_Op_Greater_Equal) {
         binop->type = &basic_types[Basic_Kind_Bool];
+    } else if (binop_is_assignment(binop)) {
+        binop->type = &basic_types[Basic_Kind_Void];
     } else {
         binop->type = binop->left->type;
     }
@@ -575,16 +577,17 @@ CHECK(global, AstGlobal* global) {
 
 CHECK(statement, AstNode* stmt) {
     switch (stmt->kind) {
+        case Ast_Kind_Break:      return 0;
+        case Ast_Kind_Continue:   return 0;
+
         case Ast_Kind_Return:     return check_return((AstReturn *) stmt);
         case Ast_Kind_If:         return check_if((AstIf *) stmt);
         case Ast_Kind_While:      return check_while((AstWhile *) stmt);
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
-        case Ast_Kind_Call:       return check_call((AstCall *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
-        case Ast_Kind_Binary_Op:  return check_binaryop((AstBinaryOp *) stmt, 1);
-
-        case Ast_Kind_Break:      return 0;
-        case Ast_Kind_Continue:   return 0;
+        case Ast_Kind_Binary_Op:
+            stmt->flags |= Ast_Flag_Expr_Ignored;
+            return check_binaryop((AstBinaryOp *) stmt, 1);
 
         default:
             stmt->flags |= Ast_Flag_Expr_Ignored;
