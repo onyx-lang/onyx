@@ -19,6 +19,7 @@ static const char* token_type_names[] = {
     "proc",
     "as",
     "while",
+    "for",
     "break",
     "continue",
 
@@ -157,7 +158,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     LITERAL_TOKEN("%=",         0, Token_Type_Percent_Equal);
 
     // Symbols
-    if (char_is_alpha(*tk.text)) {
+    if (char_is_alpha(*tk.text) || *tokenizer->curr == '_') {
         u64 len = 0;
         while (char_is_alphanum(*tokenizer->curr) || charset_contains("_$", *tokenizer->curr)) {
             len++;

@@ -212,6 +212,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
             if (basic->size <= 4) return WASM_TYPE_INT32;
             if (basic->size == 8) return WASM_TYPE_INT64;
         }
+        if (basic->flags & Basic_Flag_Pointer) return WASM_TYPE_INT32;
         if (basic->flags & Basic_Flag_Float) {
             if (basic->size <= 4) return WASM_TYPE_FLOAT32;
             if (basic->size == 8) return WASM_TYPE_FLOAT64;
@@ -848,14 +849,17 @@ COMPILE_FUNC(expression, AstTyped* expr) {
     *pcode = code;
 }
 
-static const WasmInstructionType cast_map[][6] = {
-    //          I32                  U32                I64              U64                F32                F64
-    /* I32 */ { WI_NOP,            WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_F32_FROM_I32_S, WI_F64_FROM_I32_S },
-    /* U32 */ { WI_NOP,            WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_F32_FROM_I32_U, WI_F64_FROM_I32_U },
-    /* I64 */ { WI_I32_FROM_I64,   WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_S, WI_F64_FROM_I64_S },
-    /* U64 */ { WI_I32_FROM_I64,   WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_U, WI_F64_FROM_I64_U },
-    /* F32 */ { WI_I32_FROM_F32_S, WI_I32_FROM_F32_U, WI_I64_FROM_F32_S, WI_I64_FROM_F32_U, WI_NOP,            WI_F64_FROM_F32   },
-    /* F64 */ { WI_I32_FROM_F64_S, WI_I32_FROM_F64_U, WI_I64_FROM_F64_S, WI_I64_FROM_F64_U, WI_F32_FROM_F64,   WI_NOP,           },
+static const WasmInstructionType cast_map[][9] = {
+    //          I8              I16                 I32                 U32                I64                U64                F32                F64                PTR
+    /* I8  */ { WI_NOP,         WI_I32_EXTEND_8_S,  WI_I32_EXTEND_8_S,  WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_UNREACHABLE },
+    /* I16 */ { WI_NOP,         WI_NOP,             WI_I32_EXTEND_16_S, WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_F32_FROM_I32_U, WI_F64_FROM_I32_U, WI_UNREACHABLE },
+    /* I32 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_F32_FROM_I32_S, WI_F64_FROM_I32_S, WI_NOP },
+    /* U32 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_F32_FROM_I32_U, WI_F64_FROM_I32_U, WI_NOP },
+    /* I64 */ { WI_NOP,         WI_NOP,             WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_S, WI_F64_FROM_I64_S, WI_I32_FROM_I64 },
+    /* U64 */ { WI_NOP,         WI_NOP,             WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_U, WI_F64_FROM_I64_U, WI_I32_FROM_I64 },
+    /* F32 */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_I32_FROM_F32_S,  WI_I32_FROM_F32_U, WI_I64_FROM_F32_S, WI_I64_FROM_F32_U, WI_NOP,            WI_F64_FROM_F32,   WI_UNREACHABLE },
+    /* F64 */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_I32_FROM_F64_S,  WI_I32_FROM_F64_U, WI_I64_FROM_F64_S, WI_I64_FROM_F64_U, WI_F32_FROM_F64,   WI_NOP,            WI_UNREACHABLE },
+    /* PTR */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_NOP },
 };
 
 COMPILE_FUNC(cast, AstUnaryOp* cast) {
@@ -866,36 +870,57 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
     Type* from = cast->expr->type;
     Type* to = cast->type;
 
-    i32 fromidx = 0, toidx = 0;
+    i32 fromidx = -1, toidx = -1;
     if (from->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (from->Basic.flags & Basic_Flag_Unsigned) != 0;
 
-        if (from->Basic.size == 4 && !unsign) fromidx = 0;
-        else if (from->Basic.size == 4 && unsign) fromidx = 1;
-        else if (from->Basic.size == 8 && !unsign) fromidx = 2;
-        else if (from->Basic.size == 8 && unsign) fromidx = 3;
+        if      (from->Basic.size == 1 && !unsign) fromidx = 0;
+        else if (from->Basic.size == 1 && unsign)  fromidx = -1;
+        else if (from->Basic.size == 2 && !unsign) fromidx = 1;
+        else if (from->Basic.size == 2 && unsign)  fromidx = -1;
+        else if (from->Basic.size == 4 && !unsign) fromidx = 2;
+        else if (from->Basic.size == 4 && unsign)  fromidx = 3;
+        else if (from->Basic.size == 8 && !unsign) fromidx = 4;
+        else if (from->Basic.size == 8 && unsign)  fromidx = 5;
     }
     else if (from->Basic.flags & Basic_Flag_Float) {
-        if (from->Basic.size == 4) fromidx = 4;
-        else if (from->Basic.size == 8) fromidx = 5;
+        if      (from->Basic.size == 4) fromidx = 6;
+        else if (from->Basic.size == 8) fromidx = 7;
+    }
+    else if (from->Basic.flags & Basic_Flag_Pointer) {
+        fromidx = 8;
     }
 
     if (to->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (to->Basic.flags & Basic_Flag_Unsigned) != 0;
 
-        if (to->Basic.size == 4 && !unsign) toidx = 0;
-        else if (to->Basic.size == 4 && unsign) toidx = 1;
-        else if (to->Basic.size == 8 && !unsign) toidx = 2;
-        else if (to->Basic.size == 8 && unsign) toidx = 3;
+        if      (to->Basic.size == 1 && !unsign) toidx = 0;
+        else if (to->Basic.size == 1 && unsign)  toidx = -1;
+        else if (to->Basic.size == 2 && !unsign) toidx = 1;
+        else if (to->Basic.size == 2 && unsign)  toidx = -1;
+        else if (to->Basic.size == 4 && !unsign) toidx = 2;
+        else if (to->Basic.size == 4 && unsign)  toidx = 3;
+        else if (to->Basic.size == 8 && !unsign) toidx = 4;
+        else if (to->Basic.size == 8 && unsign)  toidx = 5;
     }
     else if (to->Basic.flags & Basic_Flag_Float) {
-        if (to->Basic.size == 4) toidx = 4;
-        else if (to->Basic.size == 8) toidx = 5;
+        if      (to->Basic.size == 4) toidx = 6;
+        else if (to->Basic.size == 8) toidx = 7;
+    }
+    else if (to->Basic.flags & Basic_Flag_Pointer) {
+        toidx = 8;
     }
 
-    WasmInstructionType cast_op = cast_map[fromidx][toidx];
-    if (cast_op != WI_NOP) {
-        WI(cast_op);
+    if (fromidx != -1 && toidx != -1) {
+        WasmInstructionType cast_op = cast_map[fromidx][toidx];
+        if (cast_op == WI_UNREACHABLE) {
+            onyx_message_add(Msg_Type_Literal,
+                    cast->token->pos,
+                    "bad cast");
+        }
+        else if (cast_op != WI_NOP) {
+            WI(cast_op);
+        }
     }
 
     *pcode = code;
@@ -1216,8 +1241,11 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
         }
     }
 
-
-
+    // NOTE: Round up to the nearest multiple of 16
+    builtin_heap_start.value.i =
+        (module->next_datum_offset & 15)
+        ? ((module->next_datum_offset >> 4) + 1) << 4
+        : module->next_datum_offset;
 
     // NOTE: Then, compile everything
     bh_arr_each(Entity, entity, program->entities) {

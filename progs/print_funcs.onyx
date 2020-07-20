@@ -5,35 +5,19 @@ print_i64  :: proc #foreign "host" "print" (value: i64) ---
 print_f64  :: proc #foreign "host" "print" (value: f64) ---
 
 print_i32arr :: proc (arr: ^i32, len: i32) {
-    i := 0;
-    while i < len {
-        print(arr[i]);
-        i += 1;
-    }
+    for i: 0, len print(arr[i]);
 }
 
 print_i64arr :: proc (arr: ^i64, len: i32) {
-    i := 0;
-    while i < len {
-        print(arr[i]);
-        i += 1;
-    }
+    for i: 0, len print(arr[i]);
 }
 
 print_f32arr :: proc (arr: ^f32, len: i32) {
-    i := 0;
-    while i < len {
-        print(arr[i]);
-        i += 1;
-    }
+    for i: 0, len print(arr[i]);
 }
 
 print_f64arr :: proc (arr: ^f64, len: i32) {
-    i := 0;
-    while i < len {
-        print(arr[i]);
-        i += 1;
-    }
+    for i: 0, len print(arr[i]);
 }
 
 // NOTE: print null-terminated string

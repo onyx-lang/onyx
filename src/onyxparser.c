@@ -8,20 +8,6 @@
 
 static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 
-AstBasicType basic_type_void   = { { Ast_Kind_Basic_Type, 0, "void"   }, &basic_types[Basic_Kind_Void]  };
-AstBasicType basic_type_bool   = { { Ast_Kind_Basic_Type, 0, "bool"   }, &basic_types[Basic_Kind_Bool]  };
-AstBasicType basic_type_i8     = { { Ast_Kind_Basic_Type, 0, "i8"     }, &basic_types[Basic_Kind_I8]    };
-AstBasicType basic_type_u8     = { { Ast_Kind_Basic_Type, 0, "u8"     }, &basic_types[Basic_Kind_U8]    };
-AstBasicType basic_type_i16    = { { Ast_Kind_Basic_Type, 0, "i16"    }, &basic_types[Basic_Kind_I16]   };
-AstBasicType basic_type_u16    = { { Ast_Kind_Basic_Type, 0, "u16"    }, &basic_types[Basic_Kind_U16]   };
-AstBasicType basic_type_i32    = { { Ast_Kind_Basic_Type, 0, "i32"    }, &basic_types[Basic_Kind_I32]   };
-AstBasicType basic_type_u32    = { { Ast_Kind_Basic_Type, 0, "u32"    }, &basic_types[Basic_Kind_U32]   };
-AstBasicType basic_type_i64    = { { Ast_Kind_Basic_Type, 0, "i64"    }, &basic_types[Basic_Kind_I64]   };
-AstBasicType basic_type_u64    = { { Ast_Kind_Basic_Type, 0, "u64"    }, &basic_types[Basic_Kind_U64]   };
-AstBasicType basic_type_f32    = { { Ast_Kind_Basic_Type, 0, "f32"    }, &basic_types[Basic_Kind_F32]   };
-AstBasicType basic_type_f64    = { { Ast_Kind_Basic_Type, 0, "f64"    }, &basic_types[Basic_Kind_F64]   };
-AstBasicType basic_type_rawptr = { { Ast_Kind_Basic_Type, 0, "rawptr" }, &basic_types[Basic_Kind_Rawptr] };
-
 // NOTE: Forward declarations
 static void consume_token(OnyxParser* parser);
 static void unconsume_token(OnyxParser* parser);

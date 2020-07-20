@@ -1,9 +1,45 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
 
+AstBasicType basic_type_void   = { { Ast_Kind_Basic_Type, 0, "void"   }, &basic_types[Basic_Kind_Void]  };
+AstBasicType basic_type_bool   = { { Ast_Kind_Basic_Type, 0, "bool"   }, &basic_types[Basic_Kind_Bool]  };
+AstBasicType basic_type_i8     = { { Ast_Kind_Basic_Type, 0, "i8"     }, &basic_types[Basic_Kind_I8]    };
+AstBasicType basic_type_u8     = { { Ast_Kind_Basic_Type, 0, "u8"     }, &basic_types[Basic_Kind_U8]    };
+AstBasicType basic_type_i16    = { { Ast_Kind_Basic_Type, 0, "i16"    }, &basic_types[Basic_Kind_I16]   };
+AstBasicType basic_type_u16    = { { Ast_Kind_Basic_Type, 0, "u16"    }, &basic_types[Basic_Kind_U16]   };
+AstBasicType basic_type_i32    = { { Ast_Kind_Basic_Type, 0, "i32"    }, &basic_types[Basic_Kind_I32]   };
+AstBasicType basic_type_u32    = { { Ast_Kind_Basic_Type, 0, "u32"    }, &basic_types[Basic_Kind_U32]   };
+AstBasicType basic_type_i64    = { { Ast_Kind_Basic_Type, 0, "i64"    }, &basic_types[Basic_Kind_I64]   };
+AstBasicType basic_type_u64    = { { Ast_Kind_Basic_Type, 0, "u64"    }, &basic_types[Basic_Kind_U64]   };
+AstBasicType basic_type_f32    = { { Ast_Kind_Basic_Type, 0, "f32"    }, &basic_types[Basic_Kind_F32]   };
+AstBasicType basic_type_f64    = { { Ast_Kind_Basic_Type, 0, "f64"    }, &basic_types[Basic_Kind_F64]   };
+AstBasicType basic_type_rawptr = { { Ast_Kind_Basic_Type, 0, "rawptr" }, &basic_types[Basic_Kind_Rawptr] };
+
+AstNumLit builtin_heap_start = { Ast_Kind_NumLit, 0, NULL, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
+
+const BuiltinSymbol builtin_symbols[] = {
+    { "void",       (AstNode *) &basic_type_void },
+    { "bool",       (AstNode *) &basic_type_bool },
+    { "i8",         (AstNode *) &basic_type_i8 },
+    { "u8",         (AstNode *) &basic_type_u8 },
+    { "i16",        (AstNode *) &basic_type_i16 },
+    { "u16",        (AstNode *) &basic_type_u16 },
+    { "i32",        (AstNode *) &basic_type_i32 },
+    { "u32",        (AstNode *) &basic_type_u32 },
+    { "i64",        (AstNode *) &basic_type_i64 },
+    { "u64",        (AstNode *) &basic_type_u64 },
+    { "f32",        (AstNode *) &basic_type_f32 },
+    { "f64",        (AstNode *) &basic_type_f64 },
+    { "rawptr",     (AstNode *) &basic_type_rawptr },
+
+    { "__heap_start", (AstNode *) &builtin_heap_start },
+
+    { NULL, NULL },
+};
+
 static b32  symbol_introduce(OnyxToken* tkn, AstNode* symbol);
+static void symbol_builtin_introduce(char* sym, AstNode *node);
 static AstNode* symbol_resolve(OnyxToken* tkn);
-static void symbol_basic_type_introduce(AstBasicType* basic_type);
 static void scope_enter(Scope* new_scope);
 static void scope_leave();
 
@@ -42,8 +78,8 @@ static b32 symbol_introduce(OnyxToken* tkn, AstNode* symbol) {
     return 1;
 }
 
-static void symbol_basic_type_introduce(AstBasicType* basic_type) {
-    bh_table_put(AstNode *, semstate.curr_scope->symbols, basic_type->name, (AstNode *) basic_type);
+static void symbol_builtin_introduce(char* sym, AstNode *node) {
+    bh_table_put(AstNode *, semstate.curr_scope->symbols, sym, node);
 }
 
 static AstNode* symbol_resolve(OnyxToken* tkn) {
@@ -316,19 +352,11 @@ void onyx_resolve_symbols(ProgramInfo* program) {
     scope_enter(semstate.global_scope);
 
     // NOTE: Add types to global scope
-    symbol_basic_type_introduce(&basic_type_void);
-    symbol_basic_type_introduce(&basic_type_bool);
-    symbol_basic_type_introduce(&basic_type_i8);
-    symbol_basic_type_introduce(&basic_type_u8);
-    symbol_basic_type_introduce(&basic_type_i16);
-    symbol_basic_type_introduce(&basic_type_u16);
-    symbol_basic_type_introduce(&basic_type_i32);
-    symbol_basic_type_introduce(&basic_type_u32);
-    symbol_basic_type_introduce(&basic_type_i64);
-    symbol_basic_type_introduce(&basic_type_u64);
-    symbol_basic_type_introduce(&basic_type_f32);
-    symbol_basic_type_introduce(&basic_type_f64);
-    symbol_basic_type_introduce(&basic_type_rawptr);
+    BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
+    while (bsym->sym != NULL) {
+        symbol_builtin_introduce(bsym->sym, bsym->node);
+        bsym++;
+    }
 
     bh_arr_each(AstBinding *, binding, program->bindings)
         if (!symbol_introduce((*binding)->token, (*binding)->node)) return;

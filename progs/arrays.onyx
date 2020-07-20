@@ -21,21 +21,15 @@ min :: proc #overloaded {
 
 // NOTE: in-place insertion sort
 sort :: proc (src: ^i32, len: i32) {
-    i := 0;
-    while i < len {
+    for i: 0, len {
         smallest := i;
 
-        j := i + 1;
-        while j < len {
+        for j: i + 1, len
             if src[j] < src[smallest] smallest = j;
-            j += 1;
-        }
 
         tmp :: src[smallest];
         src[smallest] = src[i];
         src[i] = tmp;
-
-        i += 1;
     }
 }
 
@@ -44,8 +38,8 @@ for_test :: proc {
     for i: 0, 10 print(i);
 }
 
-str_test :: proc #export "main" {
-    hello_str :: "Hello World!";
+str_test :: proc #export {
+    hello_str :: "Hello World! 123";
 
     // Address of and dereference cancel each other out
     print(^*hello_str);
@@ -58,17 +52,13 @@ str_test :: proc #export "main" {
 }
 
 // Don't need to bind this function to a symbol
-proc #export "main2" {
-    print(min(10.0, 12.0));
+proc #export "main" {
+    print(__heap_start as i32);
 
-    global_arr = 128 as ^i32;
+    global_arr = __heap_start as ^i32;
     len :: 10;
 
-    i := 0;
-    while i < len {
-        global_arr[i] = (len - i) * 10;
-        i += 1;
-    }
+    for i: 0, len global_arr[i] = (len - i) * 10;
 
     print(global_arr, len);
 
@@ -76,6 +66,4 @@ proc #export "main2" {
 
     print(1234567);
     print(global_arr, len);
-
-    str_test();
 }

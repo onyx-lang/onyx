@@ -346,6 +346,16 @@ extern AstBasicType basic_type_f32;
 extern AstBasicType basic_type_f64;
 extern AstBasicType basic_type_rawptr;
 
+extern AstNumLit builtin_heap_start;
+
+typedef struct BuiltinSymbol {
+    char*    sym;
+    AstNode* node;
+} BuiltinSymbol;
+
+extern const BuiltinSymbol builtin_symbols[];
+
+
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {
