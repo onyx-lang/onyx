@@ -100,8 +100,6 @@ alloc_2darr :: proc (rows: u32, cols: u32) -> ^^i32 {
     return arr;
 }
 
-
-
 multi_arr_test :: proc #export "main" {
     arrs := alloc_2darr(10, 10);
 

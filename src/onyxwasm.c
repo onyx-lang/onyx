@@ -890,7 +890,10 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
     Type* to = cast->type;
 
     i32 fromidx = -1, toidx = -1;
-    if (from->Basic.flags & Basic_Flag_Integer) {
+    if (from->Basic.flags & Basic_Flag_Pointer) {
+        fromidx = 8;
+    }
+    else if (from->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (from->Basic.flags & Basic_Flag_Unsigned) != 0;
 
         if      (from->Basic.size == 1 && !unsign) fromidx = 0;
@@ -906,11 +909,11 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
         if      (from->Basic.size == 4) fromidx = 6;
         else if (from->Basic.size == 8) fromidx = 7;
     }
-    else if (from->Basic.flags & Basic_Flag_Pointer) {
-        fromidx = 8;
-    }
 
-    if (to->Basic.flags & Basic_Flag_Integer) {
+    if (to->Basic.flags & Basic_Flag_Pointer) {
+        toidx = 8;
+    }
+    else if (to->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (to->Basic.flags & Basic_Flag_Unsigned) != 0;
 
         if      (to->Basic.size == 1 && !unsign) toidx = 0;
@@ -925,9 +928,6 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
     else if (to->Basic.flags & Basic_Flag_Float) {
         if      (to->Basic.size == 4) toidx = 6;
         else if (to->Basic.size == 8) toidx = 7;
-    }
-    else if (to->Basic.flags & Basic_Flag_Pointer) {
-        toidx = 8;
     }
 
     if (fromidx != -1 && toidx != -1) {
