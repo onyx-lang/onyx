@@ -13,7 +13,7 @@ CHECK(if, AstIf* ifnode);
 CHECK(while, AstWhile* whilenode);
 CHECK(for, AstFor* fornode);
 CHECK(call, AstCall* call);
-CHECK(binaryop, AstBinaryOp* binop);
+CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok);
 CHECK(expression, AstTyped* expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
@@ -289,11 +289,18 @@ CHECK(call, AstCall* call) {
     return 0;
 }
 
-CHECK(binaryop, AstBinaryOp* binop) {
+CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
     if (check_expression(binop->left)) return 1;
     if (check_expression(binop->right)) return 1;
 
     if (binop_is_assignment(binop)) {
+        if (!assignment_is_ok) {
+            onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "assignment not valid in expression");
+            return 1;
+        }
+
         if (!is_lval((AstNode *) binop->left)) {
             onyx_message_add(Msg_Type_Not_Lval,
                     binop->left->token->pos,
@@ -481,7 +488,7 @@ CHECK(expression, AstTyped* expr) {
 
     i32 retval = 0;
     switch (expr->kind) {
-        case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp *) expr); break;
+        case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp *) expr, 0); break;
 
         case Ast_Kind_Unary_Op:
             retval = check_expression(((AstUnaryOp *) expr)->expr);
@@ -574,6 +581,7 @@ CHECK(statement, AstNode* stmt) {
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
         case Ast_Kind_Call:       return check_call((AstCall *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
+        case Ast_Kind_Binary_Op:  return check_binaryop((AstBinaryOp *) stmt, 1);
 
         case Ast_Kind_Break:      return 0;
         case Ast_Kind_Continue:   return 0;
@@ -726,7 +734,7 @@ CHECK(node, AstNode* node) {
         case Ast_Kind_If:                   return check_if((AstIf *) node);
         case Ast_Kind_While:                return check_while((AstWhile *) node);
         case Ast_Kind_Call:                 return check_call((AstCall *) node);
-        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp *) node);
+        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp *) node, 1);
         default:                            return check_expression((AstTyped *) node);
     }
 }

@@ -123,6 +123,5 @@ link_test :: proc #export "main2" {
     link_create(3, node_head);
     link_create(4, node_head);
 
-
     link_print(*node_head);
 }
