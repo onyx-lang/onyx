@@ -52,11 +52,15 @@ str_test :: proc #export {
 }
 
 // Don't need to bind this function to a symbol
-proc #export "main" {
+proc #export "main2" {
     print(__heap_start as i32);
 
-    global_arr = __heap_start as ^i32;
     len :: 10;
+    global_arr = alloc((len * 4) as u32) as ^i32;
+    other_arr := alloc((len * 4) as u32) as ^i32;
+
+    print(global_arr as i32);
+    print(other_arr as i32);
 
     for i: 0, len global_arr[i] = (len - i) * 10;
 
@@ -66,4 +70,41 @@ proc #export "main" {
 
     print(1234567);
     print(global_arr, len);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+alloc :: proc (size: u32) -> rawptr {
+    heap_u32    :: __heap_start as ^u32;
+
+    curr_offset := *heap_u32;
+    if curr_offset == 0 as u32 curr_offset = 8 as u32;
+
+    *heap_u32   = curr_offset + size;
+
+    return ((__heap_start as u32) + curr_offset) as rawptr;
+}
+
+
+
+
+
+multi_arr_test :: proc #export "main" {
+    arrs := alloc((10 * 4) as u32) as ^^i32;
+
+    for i: 0, 10 {
+        arrs[i] = alloc((10 * 4) as u32) as ^i32;
+    }
+
+    for y: 0, 10 for x: 0, 10 arrs[y][x] = x + y * 10;
+    for y: 0, 10 for x: 0, 10 print(arrs[x][y]);
 }

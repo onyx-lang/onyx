@@ -361,6 +361,7 @@ extern const BuiltinSymbol builtin_symbols[];
 static inline b32 is_lval(AstNode* node) {
     return (node->kind == Ast_Kind_Local)
         || (node->kind == Ast_Kind_Global)
+        || (node->kind == Ast_Kind_Dereference)
         || (node->kind == Ast_Kind_Array_Access);
 }
 

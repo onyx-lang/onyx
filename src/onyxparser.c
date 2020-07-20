@@ -602,6 +602,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case '+':
         case '-':
         case '!':
+        case '*':
         case Token_Type_Literal_Numeric:
         case Token_Type_Literal_String:
             retval = (AstNode *) parse_expression(parser);

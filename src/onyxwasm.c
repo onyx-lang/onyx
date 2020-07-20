@@ -332,6 +332,25 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
         compile_expression(mod, &code, assign->right);
         WID(WI_GLOBAL_SET, globalidx);
 
+    } else if (lval->kind == Ast_Kind_Dereference) {
+        AstDereference* deref = (AstDereference *) lval;
+        compile_expression(mod, &code, deref->expr);
+        compile_expression(mod, &code, assign->right);
+
+        i32 store_size = deref->type->Basic.size;
+        i32 is_integer = (deref->type->Basic.flags & Basic_Flag_Integer)
+                      || (deref->type->Basic.flags & Basic_Flag_Pointer);
+
+        if (is_integer) {
+            if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { 0, 0 }));
+            else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { 1, 0 }));
+            else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { 2, 0 }));
+            else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { 3, 0 }));
+        } else {
+            if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { 2, 0 }));
+            else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { 3, 0 }));
+        }
+
     } else if (lval->kind == Ast_Kind_Array_Access) {
         AstArrayAccess* aa = (AstArrayAccess *) lval;
         compile_expression(mod, &code, aa->expr);
@@ -786,7 +805,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                 else if (load_size == 4) instr = WI_I32_LOAD;
                 else if (load_size == 8) instr = WI_I64_LOAD;
 
-                if (alignment < 4 && is_unsigned) instr += 1;
+                if (load_size < 4 && is_unsigned) instr += 1;
             } else {
                 if      (load_size == 4) instr = WI_F32_LOAD;
                 else if (load_size == 8) instr = WI_F64_LOAD;
@@ -825,7 +844,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                 else if (load_size == 4) instr = WI_I32_LOAD;
                 else if (load_size == 8) instr = WI_I64_LOAD;
 
-                if (alignment < 4 && is_unsigned) instr += 1;
+                if (load_size < 4 && is_unsigned) instr += 1;
             } else {
                 if      (load_size == 4) instr = WI_F32_LOAD;
                 else if (load_size == 8) instr = WI_F64_LOAD;

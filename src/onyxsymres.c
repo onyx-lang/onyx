@@ -15,7 +15,7 @@ AstBasicType basic_type_f32    = { { Ast_Kind_Basic_Type, 0, "f32"    }, &basic_
 AstBasicType basic_type_f64    = { { Ast_Kind_Basic_Type, 0, "f64"    }, &basic_types[Basic_Kind_F64]   };
 AstBasicType basic_type_rawptr = { { Ast_Kind_Basic_Type, 0, "rawptr" }, &basic_types[Basic_Kind_Rawptr] };
 
-AstNumLit builtin_heap_start = { Ast_Kind_NumLit, 0, NULL, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
+AstNumLit builtin_heap_start = { Ast_Kind_NumLit, Ast_Flag_Const, NULL, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
 
 const BuiltinSymbol builtin_symbols[] = {
     { "void",       (AstNode *) &basic_type_void },
