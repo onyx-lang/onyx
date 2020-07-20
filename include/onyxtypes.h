@@ -46,10 +46,16 @@ typedef struct TypeBasic {
 // NOTE: Forward declaration for some of the types below
 typedef struct Type Type;
 
+typedef struct StructMember {
+    u64 offset;
+    Type *type;
+} StructMember;
+
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                                 \
     TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })  \
-    TYPE_KIND(Function, struct { Type *return_type; u64 param_count; Type* params[]; })
+    TYPE_KIND(Function, struct { Type *return_type; u64 param_count; Type* params[]; }) \
+    TYPE_KIND(Struct, struct { char* name; u32 size; u32 mem_count; bh_table(StructMember) members; })
 
 typedef enum TypeKind {
     Type_Kind_Invalid,
@@ -85,13 +91,18 @@ extern Type basic_types[];
 
 struct AstType;
 b32 types_are_compatible(Type* t1, Type* t2);
+u32 type_size_of(Type* type);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
 
 const char* type_get_name(Type* type);
+u32 type_get_alignment_log2(Type* type);
+
+StructMember type_struct_lookup_member(Type* type, char* member);
 
 b32 type_is_pointer(Type* type);
+b32 type_is_struct(Type* type);
 b32 type_is_bool(Type* type);
 
 #endif // #ifndef ONYX_TYPES

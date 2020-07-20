@@ -1,6 +1,7 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
 #include "onyxparser.h"
+#include "onyxutils.h"
 
 #define CHECK(kind, ...) static b32 check_ ## kind (__VA_ARGS__)
 
@@ -17,9 +18,11 @@ CHECK(expression, AstTyped* expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
+CHECK(field_access, AstFieldAccess* field);
 CHECK(global, AstGlobal* global);
 CHECK(function, AstFunction* func);
 CHECK(overloaded_function, AstOverloadedFunction* func);
+CHECK(struct, AstStructType* s_node);
 
 static inline void fill_in_type(AstTyped* node) {
     if (node->type == NULL)
@@ -380,7 +383,8 @@ CHECK(address_of, AstAddressOf* aof) {
     if (check_expression(aof->expr)) return 1;
 
     if (aof->expr->kind != Ast_Kind_Array_Access
-            && aof->expr->kind != Ast_Kind_Dereference) {
+            && aof->expr->kind != Ast_Kind_Dereference
+            && aof->expr->kind != Ast_Kind_Field_Access) {
         onyx_message_add(Msg_Type_Literal,
                 aof->token->pos,
                 "cannot take the address of this");
@@ -434,7 +438,26 @@ CHECK(array_access, AstArrayAccess* aa) {
     }
 
     aa->type = aa->addr->type->Pointer.elem;
-    aa->elem_size = aa->type->Basic.size;
+    aa->elem_size = type_size_of(aa->type);
+
+    return 0;
+}
+
+CHECK(field_access, AstFieldAccess* field) {
+    if (check_expression(field->expr)) return 1;
+
+    if (!type_is_struct(field->expr->type)) {
+        onyx_message_add(Msg_Type_Literal,
+            field->token->pos,
+            "expected expression of kind struct or pointer to struct");
+        return 1;
+    }
+
+    token_toggle_end(field->token);
+    StructMember smem = type_struct_lookup_member(field->expr->type, field->token->text);
+    field->offset = smem.offset;
+    field->type = smem.type;
+    token_toggle_end(field->token);
 
     return 0;
 }
@@ -485,6 +508,7 @@ CHECK(expression, AstTyped* expr) {
         case Ast_Kind_Address_Of:   retval = check_address_of((AstAddressOf *) expr); break;
         case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
+        case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess *) expr); break;
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {
@@ -657,6 +681,34 @@ CHECK(overloaded_function, AstOverloadedFunction* func) {
     return 0;
 }
 
+CHECK(struct, AstStructType* s_node) {
+    bh_table(i32) mem_set;
+    bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
+
+    bh_arr_each(AstStructMember *, member, s_node->members) {
+        token_toggle_end((*member)->token);
+
+        if (bh_table_has(i32, mem_set, (*member)->token->text)) {
+            onyx_message_add(Msg_Type_Duplicate_Member,
+                    (*member)->token->pos,
+                    (*member)->token->text);
+
+            token_toggle_end((*member)->token);
+            return 1;
+        }
+
+        bh_table_put(i32, mem_set, (*member)->token->text, 1);
+        token_toggle_end((*member)->token);
+    }
+
+    bh_table_free(mem_set);
+
+    // NOTE: fills in the stcache
+    type_build_from_ast(semstate.allocator, (AstType *) s_node);
+
+    return 0;
+}
+
 CHECK(node, AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -694,7 +746,14 @@ void onyx_type_check(ProgramInfo* program) {
                 if (check_expression(entity->expr)) return;
                 break;
 
+            case Entity_Type_Struct:
+                if (check_struct(entity->struct_type)) return;
+                break;
+
             case Entity_Type_String_Literal: break;
+
+            case Entity_Type_Function_Header: break;
+            case Entity_Type_Global_Header: break;
 
             default: DEBUG_HERE; break;
         }

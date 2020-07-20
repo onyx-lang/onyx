@@ -26,11 +26,14 @@ static const char* ast_node_names[] = {
     "UN_OP",
     "BIN_OP",
 
-    "TYPE_START (BAD)"
+    "TYPE_START (BAD)",
     "TYPE",
     "POINTER_TYPE",
     "FUNCTION_TYPE",
-    "TYPE_END (BAD)"
+    "STRUCT TYPE",
+    "TYPE_END (BAD)",
+
+    "STRUCT MEMBER",
 
     "NUMERIC LITERAL",
     "STRING LITERAL",
@@ -41,6 +44,7 @@ static const char* ast_node_names[] = {
     "ADDRESS OF",
     "DEREFERENCE",
     "ARRAY_ACCESS",
+    "FIELD_ACCESS",
 
     "IF",
     "FOR",

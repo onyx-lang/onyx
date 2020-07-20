@@ -227,20 +227,24 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
 #define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }))
 #define COMPILE_FUNC(kind, ...) static void compile_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
 
-COMPILE_FUNC(function_body,  AstFunction* fd);
-COMPILE_FUNC(block,          AstBlock* block);
-COMPILE_FUNC(statement,      AstNode* stmt);
-COMPILE_FUNC(assignment,     AstBinaryOp* assign);
-COMPILE_FUNC(if,             AstIf* if_node);
-COMPILE_FUNC(while,          AstWhile* while_node);
-COMPILE_FUNC(for,            AstFor* for_node);
-COMPILE_FUNC(binop,          AstBinaryOp* binop);
-COMPILE_FUNC(unaryop,        AstUnaryOp* unop);
-COMPILE_FUNC(call,           AstCall* call);
-COMPILE_FUNC(intrinsic_call, AstIntrinsicCall* call);
-COMPILE_FUNC(expression,     AstTyped* expr);
-COMPILE_FUNC(cast,           AstUnaryOp* cast);
-COMPILE_FUNC(return,         AstReturn* ret);
+COMPILE_FUNC(function_body,         AstFunction* fd);
+COMPILE_FUNC(block,                 AstBlock* block);
+COMPILE_FUNC(statement,             AstNode* stmt);
+COMPILE_FUNC(assignment,            AstBinaryOp* assign);
+COMPILE_FUNC(store_instruction,     Type* type, u32 alignment, u32 offset);
+COMPILE_FUNC(load_instruction,      Type* type, u32 offset);
+COMPILE_FUNC(if,                    AstIf* if_node);
+COMPILE_FUNC(while,                 AstWhile* while_node);
+COMPILE_FUNC(for,                   AstFor* for_node);
+COMPILE_FUNC(binop,                 AstBinaryOp* binop);
+COMPILE_FUNC(unaryop,               AstUnaryOp* unop);
+COMPILE_FUNC(call,                  AstCall* call);
+COMPILE_FUNC(intrinsic_call,        AstIntrinsicCall* call);
+COMPILE_FUNC(array_access_location, AstArrayAccess* aa);
+COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return);
+COMPILE_FUNC(expression,            AstTyped* expr);
+COMPILE_FUNC(cast,                  AstUnaryOp* cast);
+COMPILE_FUNC(return,                AstReturn* ret);
 
 COMPILE_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
@@ -337,48 +341,88 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
         compile_expression(mod, &code, deref->expr);
         compile_expression(mod, &code, assign->right);
 
-        i32 store_size = deref->type->Basic.size;
-        i32 is_integer = (deref->type->Basic.flags & Basic_Flag_Integer)
-                      || (deref->type->Basic.flags & Basic_Flag_Pointer);
-
-        if (is_integer) {
-            if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { 0, 0 }));
-            else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { 1, 0 }));
-            else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { 2, 0 }));
-            else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { 3, 0 }));
-        } else {
-            if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { 2, 0 }));
-            else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { 3, 0 }));
-        }
+        compile_store_instruction(mod, &code,
+                deref->type,
+                type_get_alignment_log2(deref->type),
+                0);
 
     } else if (lval->kind == Ast_Kind_Array_Access) {
         AstArrayAccess* aa = (AstArrayAccess *) lval;
-        compile_expression(mod, &code, aa->expr);
-        if (aa->elem_size != 1) {
-            WID(WI_I32_CONST, aa->elem_size);
-            WI(WI_I32_MUL);
-        }
-        compile_expression(mod, &code, aa->addr);
-        WI(WI_I32_ADD);
-
+        compile_array_access_location(mod, &code, aa);
         compile_expression(mod, &code, assign->right);
 
-        i32 store_size = aa->type->Basic.size;
-        i32 is_integer = (aa->type->Basic.flags & Basic_Flag_Integer)
-                      || (aa->type->Basic.flags & Basic_Flag_Pointer);
+        compile_store_instruction(mod, &code,
+                aa->type,
+                type_get_alignment_log2(aa->type),
+                0);
 
-        if (is_integer) {
-            if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { 0, 0 }));
-            else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { 1, 0 }));
-            else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { 2, 0 }));
-            else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { 3, 0 }));
-        } else {
-            if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { 2, 0 }));
-            else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { 3, 0 }));
-        }
+    } else if (lval->kind == Ast_Kind_Field_Access) {
+        AstFieldAccess* field = (AstFieldAccess *) lval;
 
+        u64 offset = 0;
+        compile_field_access_location(mod, &code, field, &offset);
+        compile_expression(mod, &code, assign->right);
+
+        compile_store_instruction(mod, &code,
+                field->type,
+                type_get_alignment_log2(field->type),
+                offset);
     } else {
         assert(("Invalid lval", 0));
+    }
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    i32 store_size = type_size_of(type);
+    i32 is_integer = (type->Basic.flags & Basic_Flag_Integer)
+                  || (type->Basic.flags & Basic_Flag_Pointer);
+
+    if (is_integer) {
+        if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { alignment, offset }));
+    } else {
+        if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
+    }
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    i32 load_size   = type_size_of(type);
+    i32 is_integer  = (type->Basic.flags & Basic_Flag_Integer)
+                   || (type->Basic.flags & Basic_Flag_Pointer);
+    i32 is_unsigned = type->Basic.flags & Basic_Flag_Unsigned;
+
+    WasmInstructionType instr = WI_NOP;
+    i32 alignment = type_get_alignment_log2(type);
+
+    if (is_integer) {
+        if      (load_size == 1) instr = WI_I32_LOAD_8_S;
+        else if (load_size == 2) instr = WI_I32_LOAD_16_S;
+        else if (load_size == 4) instr = WI_I32_LOAD;
+        else if (load_size == 8) instr = WI_I64_LOAD;
+
+        if (load_size < 4 && is_unsigned) instr += 1;
+    } else {
+        if      (load_size == 4) instr = WI_F32_LOAD;
+        else if (load_size == 8) instr = WI_F64_LOAD;
+    }
+
+    WID(instr, ((WasmInstructionData) { alignment, offset }));
+
+    if (instr == WI_NOP) {
+        onyx_message_add(Msg_Type_Literal,
+                (OnyxFilePos) { 0 },
+                "failed to generate load instruction");
     }
 
     *pcode = code;
@@ -703,6 +747,42 @@ COMPILE_FUNC(intrinsic_call, AstIntrinsicCall* call) {
     *pcode = code;
 }
 
+COMPILE_FUNC(array_access_location, AstArrayAccess* aa) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    compile_expression(mod, &code, aa->expr);
+    if (aa->elem_size != 1) {
+        WID(WI_I32_CONST, aa->elem_size);
+        WI(WI_I32_MUL);
+    }
+    compile_expression(mod, &code, aa->addr);
+    WI(WI_I32_ADD);
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 offset = field->offset;
+    AstTyped* source_expr = field->expr;
+    while (source_expr->kind == Ast_Kind_Field_Access
+            && (source_expr->type->kind == Type_Kind_Struct)) {
+        offset += ((AstFieldAccess *) source_expr)->offset;
+        source_expr = (AstTyped *) ((AstFieldAccess *) source_expr)->expr;
+    }
+
+    if (source_expr->kind == Ast_Kind_Array_Access) {
+        compile_array_access_location(mod, &code, (AstArrayAccess *) source_expr);
+    } else {
+        compile_expression(mod, &code, source_expr);
+    }
+
+    *offset_return = offset;
+
+    *pcode = code;
+}
+
 COMPILE_FUNC(expression, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -767,13 +847,15 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
                 case Ast_Kind_Array_Access: {
                     AstArrayAccess* aa = (AstArrayAccess *) aof->expr;
+                    compile_array_access_location(mod, &code, aa);
+                    break;
+                }
 
-                    compile_expression(mod, &code, aa->expr);
-                    if (aa->elem_size != 1) {
-                        WID(WI_I32_CONST, aa->elem_size);
-                        WI(WI_I32_MUL);
-                    }
-                    compile_expression(mod, &code, aa->addr);
+                case Ast_Kind_Field_Access: {
+                    AstFieldAccess* field = (AstFieldAccess *) aof->expr;
+                    u64 offset = 0;
+                    compile_field_access_location(mod, &code, field, &offset);
+                    WID(WI_I32_CONST, offset);
                     WI(WI_I32_ADD);
                     break;
                 }
@@ -790,72 +872,23 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Dereference: {
             AstDereference* deref = (AstDereference *) expr;
             compile_expression(mod, &code, deref->expr);
-
-            i32 load_size   = deref->type->Basic.size;
-            i32 is_integer  = (deref->type->Basic.flags & Basic_Flag_Integer)
-                           || (deref->type->Basic.flags & Basic_Flag_Pointer);
-            i32 is_unsigned = deref->type->Basic.flags & Basic_Flag_Unsigned;
-
-            WasmInstructionType instr = WI_NOP;
-            i32 alignment = log2_dumb(load_size);
-
-            if (is_integer) {
-                if      (load_size == 1) instr = WI_I32_LOAD_8_S;
-                else if (load_size == 2) instr = WI_I32_LOAD_16_S;
-                else if (load_size == 4) instr = WI_I32_LOAD;
-                else if (load_size == 8) instr = WI_I64_LOAD;
-
-                if (load_size < 4 && is_unsigned) instr += 1;
-            } else {
-                if      (load_size == 4) instr = WI_F32_LOAD;
-                else if (load_size == 8) instr = WI_F64_LOAD;
-            }
-
-            if (instr != WI_NOP) {
-                WID(instr, ((WasmInstructionData) { alignment, 0 }));
-            } else {
-                DEBUG_HERE;
-            }
-
+            compile_load_instruction(mod, &code, deref->type, 0);
             break;
         }
 
         case Ast_Kind_Array_Access: {
             AstArrayAccess* aa = (AstArrayAccess *) expr;
-            compile_expression(mod, &code, aa->expr);
-            if (aa->elem_size != 1) {
-                WID(WI_I32_CONST, aa->elem_size);
-                WI(WI_I32_MUL);
-            }
-            compile_expression(mod, &code, aa->addr);
-            WI(WI_I32_ADD);
+            compile_array_access_location(mod, &code, aa);
+            compile_load_instruction(mod, &code, aa->type, 0);
+            break;
+        }
 
-            i32 load_size   = aa->type->Basic.size;
-            i32 is_integer  = (aa->type->Basic.flags & Basic_Flag_Integer)
-                           || (aa->type->Basic.flags & Basic_Flag_Pointer);
-            i32 is_unsigned = aa->type->Basic.flags & Basic_Flag_Unsigned;
+        case Ast_Kind_Field_Access: {
+            AstFieldAccess* field = (AstFieldAccess* ) expr;
 
-            WasmInstructionType instr = WI_NOP;
-            i32 alignment = log2_dumb(load_size);
-
-            if (is_integer) {
-                if      (load_size == 1) instr = WI_I32_LOAD_8_S;
-                else if (load_size == 2) instr = WI_I32_LOAD_16_S;
-                else if (load_size == 4) instr = WI_I32_LOAD;
-                else if (load_size == 8) instr = WI_I64_LOAD;
-
-                if (load_size < 4 && is_unsigned) instr += 1;
-            } else {
-                if      (load_size == 4) instr = WI_F32_LOAD;
-                else if (load_size == 8) instr = WI_F64_LOAD;
-            }
-
-            if (instr != WI_NOP) {
-                WID(instr, ((WasmInstructionData) { alignment, 0 }));
-            } else {
-                DEBUG_HERE;
-            }
-
+            u64 offset = 0;
+            compile_field_access_location(mod, &code, field, &offset);
+            compile_load_instruction(mod, &code, field->type, offset);
             break;
         }
 
@@ -1225,10 +1258,9 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
     module->next_func_idx   = program->foreign_func_count;
     module->next_global_idx = program->foreign_global_count;
 
-    // NOTE: First, assign indicies to all functions / globals
     bh_arr_each(Entity, entity, program->entities) {
         switch (entity->type) {
-            case Entity_Type_Function: {
+            case Entity_Type_Function_Header: {
                 if (entity->function->flags & Ast_Flag_Intrinsic) break;
 
                 u64 func_idx;
@@ -1241,7 +1273,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
                 break;
             }
 
-            case Entity_Type_Global: {
+            case Entity_Type_Global_Header: {
                 u64 global_idx;
                 if ((entity->global->flags & Ast_Flag_Foreign) != 0)
                     global_idx = module->next_foreign_global_idx++;
@@ -1254,23 +1286,19 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
 
             case Entity_Type_String_Literal: {
                 compile_string_literal(module, (AstStrLit *) entity->strlit);
+
+                // HACK: To put this here
+                // NOTE: Round up to the nearest multiple of 16
+                builtin_heap_start.value.i =
+                    (module->next_datum_offset & 15)
+                    ? ((module->next_datum_offset >> 4) + 1) << 4
+                    : module->next_datum_offset;
+                break;
             }
 
-            default: break;
-        }
-    }
-
-    // NOTE: Round up to the nearest multiple of 16
-    builtin_heap_start.value.i =
-        (module->next_datum_offset & 15)
-        ? ((module->next_datum_offset >> 4) + 1) << 4
-        : module->next_datum_offset;
-
-    // NOTE: Then, compile everything
-    bh_arr_each(Entity, entity, program->entities) {
-        switch (entity->type) {
             case Entity_Type_Function: compile_function(module, entity->function); break;
             case Entity_Type_Global:   compile_global(module,   entity->global); break;
+
             default: break;
         }
     }

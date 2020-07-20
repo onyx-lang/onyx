@@ -166,6 +166,10 @@ static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_con
     return onyx_parse(&parser);
 }
 
+static i32 sort_entities(const void* e1, const void* e2) {
+    return ((Entity *)e1)->type - ((Entity *)e2)->type;
+}
+
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
     bh_arr_each(AstUse *, use_node, results->uses) {
         char* formatted_name = bh_aprintf(
@@ -179,39 +183,66 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
     bh_arr_each(AstBinding *, binding_node, results->bindings)
         bh_arr_push(compiler_state->prog_info.bindings, *binding_node);
 
+    Entity ent;
     bh_arr_each(AstNode *, node, results->nodes_to_process) {
-        Entity ent = { Entity_Type_Unknown };
-
         AstKind nkind = (*node)->kind;
         switch (nkind) {
-            case Ast_Kind_Function:
+            case Ast_Kind_Function: {
+                ent.type     = Entity_Type_Function_Header;
+                ent.function = (AstFunction *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+
                 ent.type     = Entity_Type_Function;
                 ent.function = (AstFunction *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
+            }
 
-            case Ast_Kind_Overloaded_Function:
+            case Ast_Kind_Overloaded_Function: {
                 ent.type                = Entity_Type_Overloaded_Function;
                 ent.overloaded_function = (AstOverloadedFunction *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
+            }
 
-            case Ast_Kind_Global:
+            case Ast_Kind_Global: {
+                ent.type   = Entity_Type_Global_Header;
+                ent.global = (AstGlobal *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+
                 ent.type   = Entity_Type_Global;
                 ent.global = (AstGlobal *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
+            }
 
-            case Ast_Kind_StrLit:
+            case Ast_Kind_StrLit: {
                 ent.type   = Entity_Type_String_Literal;
                 ent.strlit = (AstStrLit *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
+            }
 
-            default:
+            case Ast_Kind_Struct_Type: {
+                ent.type = Entity_Type_Struct;
+                ent.struct_type = (AstStructType *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+                break;
+            }
+
+            default: {
                 ent.type = Entity_Type_Expression;
                 ent.expr = (AstTyped *) *node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
+            }
         }
-
-        bh_arr_push(compiler_state->prog_info.entities, ent);
     }
+
+    qsort(compiler_state->prog_info.entities,
+            bh_arr_length(compiler_state->prog_info.entities),
+            sizeof(Entity),
+            sort_entities);
 }
 
 static CompilerProgress process_source_file(CompilerState* compiler_state, char* filename) {

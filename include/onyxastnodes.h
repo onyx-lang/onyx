@@ -19,6 +19,7 @@ typedef struct AstArgument AstArgument;
 typedef struct AstAddressOf AstAddressOf;
 typedef struct AstDereference AstDereference;
 typedef struct AstArrayAccess AstArrayAccess;
+typedef struct AstFieldAccess AstFieldAccess;
 
 typedef struct AstAssign AstAssign;
 typedef struct AstReturn AstReturn;
@@ -32,6 +33,8 @@ typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
 typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
+typedef struct AstStructType AstStructType;
+typedef struct AstStructMember AstStructMember;
 
 typedef struct AstBinding AstBinding;
 typedef struct AstUse AstUse;
@@ -71,7 +74,10 @@ typedef enum AstKind {
     Ast_Kind_Basic_Type,
     Ast_Kind_Pointer_Type,
     Ast_Kind_Function_Type,
+    Ast_Kind_Struct_Type,
     Ast_Kind_Type_End,
+
+    Ast_Kind_Struct_Member,
 
     Ast_Kind_NumLit,
     Ast_Kind_StrLit,
@@ -83,6 +89,7 @@ typedef enum AstKind {
     Ast_Kind_Address_Of,
     Ast_Kind_Dereference,
     Ast_Kind_Array_Access,
+    Ast_Kind_Field_Access,
 
     Ast_Kind_If,
     Ast_Kind_For,
@@ -97,17 +104,20 @@ typedef enum AstKind {
 // only 32-bits of flags to play with
 typedef enum AstFlags {
     // Top-level flags
-    Ast_Flag_Exported        = BH_BIT(0),
-    Ast_Flag_Foreign         = BH_BIT(1),
-    Ast_Flag_Const           = BH_BIT(2),
-    Ast_Flag_Comptime        = BH_BIT(3),
+    Ast_Flag_Exported         = BH_BIT(0),
+    Ast_Flag_Foreign          = BH_BIT(1),
+    Ast_Flag_Const            = BH_BIT(2),
+    Ast_Flag_Comptime         = BH_BIT(3),
 
     // Function flags
-    Ast_Flag_Inline          = BH_BIT(8),
-    Ast_Flag_Intrinsic       = BH_BIT(9),
+    Ast_Flag_Inline           = BH_BIT(8),
+    Ast_Flag_Intrinsic        = BH_BIT(9),
 
     // Expression flags
-    Ast_Flag_Expr_Ignored    = BH_BIT(8),
+    Ast_Flag_Expr_Ignored     = BH_BIT(8),
+    
+    // Type flags
+    Ast_Flag_Type_Is_Resolved = BH_BIT(8),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -210,6 +220,7 @@ struct AstArgument      { AstTyped_base; AstTyped *value; };
 struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
+struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
 
 // Intruction Node
 struct AstReturn        { AstNode_base;  AstTyped* expr; };
@@ -243,13 +254,24 @@ struct AstIf {
 // without the 'next' member. This is because types
 // can't be in expressions so a 'next' thing
 // doesn't make sense.
-#define AstType_members { AstKind kind; u32 flags; char* name; }
+#define AstType_members { AstKind kind; u32 flags; OnyxToken* token; char* name; }
 #define AstType_base struct AstType_members;
 struct AstType AstType_members;
 
 struct AstBasicType     { AstType_base; Type* type; };
 struct AstPointerType   { AstType_base; AstType* elem; };
 struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; AstType* params[]; };
+struct AstStructType {
+    AstType_base;
+
+    bh_arr(AstStructMember *) members;
+
+    // NOTE: Used to cache the actual type, since building
+    // a struct type is kind of complicated and should
+    // only happen once.
+    Type *stcache;
+};
+struct AstStructMember { AstTyped_base; u64 offset; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
@@ -300,11 +322,14 @@ struct AstOverloadedFunction {
 // processed later down the pipeline.
 typedef enum EntityType {
     Entity_Type_Unknown,
-    Entity_Type_Function,
-    Entity_Type_Overloaded_Function,
-    Entity_Type_Global,
+    Entity_Type_Function_Header,
+    Entity_Type_Global_Header,
+    Entity_Type_Expression,
     Entity_Type_String_Literal,
-    Entity_Type_Expression
+    Entity_Type_Struct,
+    Entity_Type_Global,
+    Entity_Type_Overloaded_Function,
+    Entity_Type_Function,
 } EntityType;
 
 typedef struct Entity {
@@ -316,6 +341,7 @@ typedef struct Entity {
         AstGlobal             *global;
         AstTyped              *expr;
         AstStrLit             *strlit;
+        AstStructType         *struct_type;
     };
 } Entity;
 
@@ -362,7 +388,8 @@ static inline b32 is_lval(AstNode* node) {
     return (node->kind == Ast_Kind_Local)
         || (node->kind == Ast_Kind_Global)
         || (node->kind == Ast_Kind_Dereference)
-        || (node->kind == Ast_Kind_Array_Access);
+        || (node->kind == Ast_Kind_Array_Access)
+        || (node->kind == Ast_Kind_Field_Access);
 }
 
 static inline b32 binop_is_assignment(AstBinaryOp* binop) {

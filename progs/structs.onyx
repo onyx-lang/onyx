@@ -1,0 +1,129 @@
+use "progs/print_funcs"
+use "progs/intrinsics"
+
+Vec3 :: struct {
+    x : f32;
+    y : f32;
+    z : f32;
+}
+
+Foo :: struct {
+    v   : Vec3;
+    i   : i32;
+    l   : i64;
+    f   : f32;
+    d   : f64;
+    foo : ^Foo;
+}
+
+alloc :: proc (size: u32) -> rawptr {
+    heap_u32    :: __heap_start as ^u32;
+
+    curr_offset := *heap_u32;
+    if curr_offset == 0 curr_offset = 8;
+
+    *heap_u32   = curr_offset + size;
+
+    return ((__heap_start as u32) + curr_offset) as rawptr;
+}
+
+foo_make :: proc -> ^Foo {
+    return alloc(40) as ^Foo; 
+}
+
+foo_get :: proc (fooarr: ^Foo, i: i32) -> ^Foo {
+    return ^fooarr[i];
+}
+
+proc #export "main" {
+    // foo := foo_make();
+    // other_foo := foo_make();
+    // other_foo.i = 1234;
+
+    // foo.foo = other_foo;
+    // print(foo.foo.i);
+
+    foo1 := foo_make();
+    foo1.v.y = 123.0f;
+    print(foo1.v.y);
+
+    foo := alloc(40* 5) as ^Foo;
+
+    for i: 1, 6 {
+        foo[i - 1].v.x = (i + 3) as f32;
+        foo[i - 1].v.y = (i + 4) as f32;
+
+        foo[i - 1].i = i;
+        foo[i - 1].l = (i * 10) as i64;
+        foo[i - 1].f = (i * 100) as f32;
+        foo[i - 1].d = (i * 1000) as f64;
+
+        foo[i - 1].foo = foo;
+    }
+
+    print(foo[3].v.x); // 7
+    print(foo[4].i); // 5
+    print(foo[2].d); // 3000.0
+    print(foo[3].f); // 400.0
+    print(foo[0].l); // 10
+
+    print(foo as i32);
+    print((^(foo[3].l)) as i32); // 84
+
+    print(foo[2].foo[4].foo[3].f); // 400.0
+
+    foo_get(foo, 2).f = 1234.5f;
+    print(foo[2].f);
+
+    print(1000000000000);
+    link_test();
+}
+
+Mut1 :: struct {
+    bar : i32;
+    other : Mut2;
+}
+
+Mut2 :: struct {
+    foo : i32;
+    other : ^Foo;
+}
+
+mut_func :: proc #export (mut: ^Mut1) -> ^Foo {
+    return mut.other.other;
+}
+
+
+Link :: struct {
+    data : i32;
+    other_data : i32;
+    next : ^Link;
+}
+
+link_create :: proc (data: i32, parent: ^Link) -> ^Link {
+    link := alloc(12) as ^Link;
+    link.data = data;
+    link.other_data = 1234;
+    link.next = parent;
+    return link;
+}
+
+link_print :: proc (start: ^Link) {
+    walker := start;
+    while (walker as i32) != 0 {
+        print(walker.next.data);
+        walker = walker.next;
+    }
+}
+
+link_test :: proc #export "main2" {
+    dummy :: "H";
+
+    node1 := link_create(1, 0 as ^Link);
+    node2 := link_create(2, node1);
+    node3 := link_create(3, node2);
+    node4 := link_create(4, node3);
+    node5 := link_create(5, node4);
+
+    link_print(node5);
+}

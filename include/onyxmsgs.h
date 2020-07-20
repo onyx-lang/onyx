@@ -28,6 +28,8 @@ typedef enum MsgType {
     Msg_Type_Function_Return_Mismatch,
     Msg_Type_Function_Param_Mismatch,
 
+    Msg_Type_Duplicate_Member,
+
     Msg_Type_Unresolved_Type,
     Msg_Type_Unresolved_Symbol,
 

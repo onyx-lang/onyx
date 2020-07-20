@@ -26,6 +26,8 @@ static const char* msg_formats[] = {
     "returning '%s' from function that returns '%s'",
     "function '%b' expected type '%s' in position '%d', got '%s'",
 
+    "duplicate declaration of struct member '%s'",
+
     "unable to resolve type for symbol '%b'",
     "unable to resolve symbol '%b'",
 };
