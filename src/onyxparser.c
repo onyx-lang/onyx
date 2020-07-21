@@ -726,10 +726,28 @@ static AstType* parse_type(OnyxParser* parser) {
             next_insertion = &new->elem;
         }
 
+        else if (parser->curr->type == '[') {
+           AstArrayType* new = make_node(AstArrayType, Ast_Kind_Array_Type);
+           new->token = expect_token(parser, '[');
+
+           if (parser->curr->type != ']')
+               new->count_expr = parse_expression(parser);
+
+           expect_token(parser, ']');
+           *next_insertion = (AstType *) new;
+           next_insertion = &new->elem;
+        }
+
         else if (parser->curr->type == Token_Type_Symbol) {
             AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
             symbol_node->token = expect_token(parser, Token_Type_Symbol);
             *next_insertion = (AstType *) symbol_node;
+            next_insertion = NULL;
+        }
+
+        else if (parser->curr->type == Token_Type_Keyword_Struct) {
+            AstStructType* s_node = parse_struct(parser);
+            *next_insertion = (AstType *) s_node;
             next_insertion = NULL;
         }
 
@@ -768,6 +786,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
         bh_arr_push(s_node->members, mem);
     }
+
+    expect_token(parser, '}');
 
     return s_node;
 }

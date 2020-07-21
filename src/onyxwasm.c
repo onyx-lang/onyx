@@ -205,6 +205,10 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
         return WASM_TYPE_INT32;
     }
 
+    if (type->kind == Type_Kind_Array) {
+        return WASM_TYPE_INT32;
+    }
+
     if (type->kind == Type_Kind_Basic) {
         TypeBasic* basic = &type->Basic;
         if (basic->flags & Basic_Flag_Boolean) return WASM_TYPE_INT32;
@@ -240,7 +244,7 @@ COMPILE_FUNC(binop,                 AstBinaryOp* binop);
 COMPILE_FUNC(unaryop,               AstUnaryOp* unop);
 COMPILE_FUNC(call,                  AstCall* call);
 COMPILE_FUNC(intrinsic_call,        AstIntrinsicCall* call);
-COMPILE_FUNC(array_access_location, AstArrayAccess* aa);
+COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return);
 COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return);
 COMPILE_FUNC(expression,            AstTyped* expr);
 COMPILE_FUNC(cast,                  AstUnaryOp* cast);
@@ -348,13 +352,15 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
 
     } else if (lval->kind == Ast_Kind_Array_Access) {
         AstArrayAccess* aa = (AstArrayAccess *) lval;
-        compile_array_access_location(mod, &code, aa);
+
+        u64 offset = 0;
+        compile_array_access_location(mod, &code, aa, &offset);
         compile_expression(mod, &code, assign->right);
 
         compile_store_instruction(mod, &code,
                 aa->type,
                 type_get_alignment_log2(aa->type),
-                0);
+                offset);
 
     } else if (lval->kind == Ast_Kind_Field_Access) {
         AstFieldAccess* field = (AstFieldAccess *) lval;
@@ -756,8 +762,10 @@ COMPILE_FUNC(intrinsic_call, AstIntrinsicCall* call) {
     *pcode = code;
 }
 
-COMPILE_FUNC(array_access_location, AstArrayAccess* aa) {
+COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    *offset_return = 0;
 
     compile_expression(mod, &code, aa->expr);
     if (aa->elem_size != 1) {
@@ -782,7 +790,9 @@ COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
     }
 
     if (source_expr->kind == Ast_Kind_Array_Access) {
-        compile_array_access_location(mod, &code, (AstArrayAccess *) source_expr);
+        u64 o2 = 0;
+        compile_array_access_location(mod, &code, (AstArrayAccess *) source_expr, &o2);
+        offset += o2;
     } else {
         compile_expression(mod, &code, source_expr);
     }
@@ -856,7 +866,12 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
                 case Ast_Kind_Array_Access: {
                     AstArrayAccess* aa = (AstArrayAccess *) aof->expr;
-                    compile_array_access_location(mod, &code, aa);
+                    u64 offset = 0;
+                    compile_array_access_location(mod, &code, aa, &offset);
+                    if (offset != 0) {
+                        WID(WI_I32_CONST, offset);
+                        WI(WI_I32_ADD);
+                    }
                     break;
                 }
 
@@ -864,8 +879,10 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                     AstFieldAccess* field = (AstFieldAccess *) aof->expr;
                     u64 offset = 0;
                     compile_field_access_location(mod, &code, field, &offset);
-                    WID(WI_I32_CONST, offset);
-                    WI(WI_I32_ADD);
+                    if (offset != 0) {
+                        WID(WI_I32_CONST, offset);
+                        WI(WI_I32_ADD);
+                    }
                     break;
                 }
 
@@ -887,8 +904,9 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Array_Access: {
             AstArrayAccess* aa = (AstArrayAccess *) expr;
-            compile_array_access_location(mod, &code, aa);
-            compile_load_instruction(mod, &code, aa->type, 0);
+            u64 offset = 0;
+            compile_array_access_location(mod, &code, aa, &offset);
+            compile_load_instruction(mod, &code, aa->type, offset);
             break;
         }
 
@@ -945,6 +963,11 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
         onyx_message_add(Msg_Type_Literal,
                 cast->token->pos,
                 "cannot cast to or from a struct");
+        WI(WI_DROP);
+        return;
+    }
+
+    if (to->kind == Type_Kind_Basic && to->Basic.kind == Basic_Kind_Void) {
         WI(WI_DROP);
         return;
     }

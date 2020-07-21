@@ -33,6 +33,7 @@ typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
 typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
+typedef struct AstArrayType AstArrayType;
 typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
 
@@ -74,6 +75,7 @@ typedef enum AstKind {
     Ast_Kind_Basic_Type,
     Ast_Kind_Pointer_Type,
     Ast_Kind_Function_Type,
+    Ast_Kind_Array_Type,
     Ast_Kind_Struct_Type,
     Ast_Kind_Type_End,
 
@@ -263,6 +265,7 @@ struct AstType AstType_members;
 struct AstBasicType     { AstType_base; Type* type; };
 struct AstPointerType   { AstType_base; AstType* elem; };
 struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; AstType* params[]; };
+struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstStructType {
     AstType_base;
 

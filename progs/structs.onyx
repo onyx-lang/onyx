@@ -1,6 +1,8 @@
 use "progs/print_funcs"
 use "progs/intrinsics"
 
+N :: 5
+
 Vec3 :: struct {
     x : f32;
     y : f32;
@@ -31,7 +33,7 @@ foo_make :: proc -> ^Foo {
     return alloc(sizeof Foo) as ^Foo; 
 }
 
-foo_get :: proc (fooarr: ^Foo, i: i32) -> ^Foo {
+foo_get :: proc (fooarr: []Foo, i: i32) -> ^Foo {
     return ^fooarr[i];
 }
 
@@ -46,7 +48,7 @@ proc #export "main" {
     foo1.v.y = 123.0f;
     print(foo1.v.y);
 
-    foo := alloc(sizeof Foo * 5) as ^Foo;
+    foo := alloc(sizeof [N]Foo) as [N]Foo;
 
     for i: 1, 6 {
         foo[i - 1].v.x = (i + 3) as f32;
@@ -57,7 +59,7 @@ proc #export "main" {
         foo[i - 1].f = (i * 100) as f32;
         foo[i - 1].d = (i * 1000) as f64;
 
-        foo[i - 1].foo = foo;
+        foo[i - 1].foo = foo as ^Foo;
     }
 
     print(foo[3].v.x); // 7
@@ -76,6 +78,12 @@ proc #export "main" {
 
     print(1000000000000);
     link_test();
+
+    print(foo[3].v.x); // 7
+    print(foo[4].i); // 5
+    print(foo[2].d); // 3000.0
+    print(foo[3].f); // 400.0
+    print(foo[0].l); // 10
 }
 
 Mut1 :: struct {
@@ -130,3 +138,25 @@ link_test :: proc #export "main2" {
 
     link_print(*node_head);
 }
+
+
+
+// TODO: Make everything below this comment work
+// SOA :: struct {
+//     x : [3]i32;
+//     y : [3]i32;
+// }
+
+// soa_test :: proc #export "main" {
+//     m_arr := alloc(sizeof [5][5]i32) as [5][5]i32;
+
+//     for y: 0, 5 {
+//         for x: 0, 5 {
+//             m_arr[y][x] = x + y * 5;
+//         }
+//     }
+
+//     print(m_arr[2][4]); // 14
+
+//     print(sizeof SOA);
+// }

@@ -30,6 +30,7 @@ static const char* ast_node_names[] = {
     "TYPE",
     "POINTER_TYPE",
     "FUNCTION_TYPE",
+    "ARRAY TYPE",
     "STRUCT TYPE",
     "TYPE_END (BAD)",
 

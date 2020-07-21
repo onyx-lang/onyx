@@ -166,6 +166,15 @@ static AstType* symres_type(AstType* type) {
         return type;
     }
 
+    if (type->kind == Ast_Kind_Array_Type) {
+        AstArrayType* a_node = (AstArrayType *) type;
+
+        if (a_node->count_expr) symres_expression(&a_node->count_expr);
+        a_node->elem = symres_type(a_node->elem);
+
+        return type;
+    }
+
     assert(("Bad type node", 0));
     return NULL;
 }

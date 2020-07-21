@@ -4,19 +4,19 @@ print_f32  :: proc #foreign "host" "print" (value: f32) ---
 print_i64  :: proc #foreign "host" "print" (value: i64) ---
 print_f64  :: proc #foreign "host" "print" (value: f64) ---
 
-print_i32arr :: proc (arr: ^i32, len: i32) {
+print_i32arr :: proc (arr: [] i32, len: i32) {
     for i: 0, len print(arr[i]);
 }
 
-print_i64arr :: proc (arr: ^i64, len: i32) {
+print_i64arr :: proc (arr: [] i64, len: i32) {
     for i: 0, len print(arr[i]);
 }
 
-print_f32arr :: proc (arr: ^f32, len: i32) {
+print_f32arr :: proc (arr: [] f32, len: i32) {
     for i: 0, len print(arr[i]);
 }
 
-print_f64arr :: proc (arr: ^f64, len: i32) {
+print_f64arr :: proc (arr: [] f64, len: i32) {
     for i: 0, len print(arr[i]);
 }
 
@@ -29,7 +29,7 @@ print_str :: proc (str: ^u8) {
     }
 }
 
-print_str_len :: proc (str: ^u8, len: i32) {
+print_str_len :: proc (str: [] u8, len: i32) {
     for i: 0, len print(str[i] as i32);
 }
 

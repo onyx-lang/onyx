@@ -435,7 +435,7 @@ CHECK(array_access, AstArrayAccess* aa) {
     if (!type_is_pointer(aa->addr->type)) {
         onyx_message_add(Msg_Type_Literal,
                 aa->token->pos,
-                "expected pointer type for left of array access");
+                "expected pointer or array type for left of array access");
         return 1;
     }
 
@@ -447,7 +447,17 @@ CHECK(array_access, AstArrayAccess* aa) {
         return 1;
     }
 
-    aa->type = aa->addr->type->Pointer.elem;
+    if (aa->addr->type->kind == Type_Kind_Pointer)
+        aa->type = aa->addr->type->Pointer.elem;
+    else if (aa->addr->type->kind == Type_Kind_Array)
+        aa->type = aa->addr->type->Array.elem;
+    else {
+        onyx_message_add(Msg_Type_Literal,
+                aa->token->pos,
+                "invalid type for left of array access");
+        return 1;
+    }
+
     aa->elem_size = type_size_of(aa->type);
 
     return 0;

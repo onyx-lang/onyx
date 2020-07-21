@@ -48,7 +48,8 @@ b32 types_are_surface_compatible(Type* t1, Type* t2) {
         case Type_Kind_Struct: {
             if (t2->kind != Type_Kind_Struct) return 0;
             if (t1->Struct.mem_count != t2->Struct.mem_count) return 0;
-            if (strcmp(t1->Struct.name, t2->Struct.name) == 0) return 1;
+            if (t1->Struct.name && t2->Struct.name)
+                if (strcmp(t1->Struct.name, t2->Struct.name) == 0) return 1;
 
             b32 works = 1;
             bh_table_each_start(StructMember, t1->Struct.members);
@@ -91,16 +92,27 @@ b32 types_are_compatible(Type* t1, Type* t2) {
             }
             break;
 
-        case Type_Kind_Pointer:
+        case Type_Kind_Pointer: {
             if (t2->kind == Type_Kind_Pointer) {
                 return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
             }
             break;
+        }
+
+        case Type_Kind_Array: {
+            if (t2->kind != Type_Kind_Array) return 0;
+
+            if (t1->Array.count != 0)
+                if (t1->Array.count != t2->Array.count) return 0;
+
+            return types_are_compatible(t1->Array.elem, t2->Array.elem);
+        }
 
         case Type_Kind_Struct: {
             if (t2->kind != Type_Kind_Struct) return 0;
             if (t1->Struct.mem_count != t2->Struct.mem_count) return 0;
-            if (strcmp(t1->Struct.name, t2->Struct.name) == 0) return 1;
+            if (t1->Struct.name && t2->Struct.name)
+                if (strcmp(t1->Struct.name, t2->Struct.name) == 0) return 1;
 
             b32 works = 1;
             bh_table_each_start(StructMember, t1->Struct.members);
@@ -132,6 +144,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Basic:    return type->Basic.size;
         case Type_Kind_Pointer:  return 4;
         case Type_Kind_Function: return 0;
+        case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
         default:                 return 0;
     }
@@ -161,6 +174,33 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 }
 
             return func_type;
+        }
+
+        case Ast_Kind_Array_Type: {
+            AstArrayType* a_node = (AstArrayType *) type_node;
+
+            Type* a_type = bh_alloc(alloc, sizeof(Type));
+            a_type->kind = Type_Kind_Array;
+            a_type->Array.elem = type_build_from_ast(alloc, a_node->elem);
+
+            u32 count = 0;
+            if (a_node->count_expr) {
+                a_node->count_expr->type = type_build_from_ast(alloc, a_node->count_expr->type_node);
+
+                // NOTE: Currently, the count_expr has to be an I32 literal
+                if (a_node->count_expr->kind != Ast_Kind_NumLit
+                    || a_node->count_expr->type->kind != Type_Kind_Basic
+                    || a_node->count_expr->type->Basic.kind != Basic_Kind_I32) {
+                    return NULL;
+                }
+
+                count = ((AstNumLit *) a_node->count_expr)->value.i;
+            }
+
+            a_type->Array.count = count;
+            a_type->Array.size = type_size_of(a_type->Array.elem) * count;
+
+            return a_type;
         }
 
         case Ast_Kind_Struct_Type: {
@@ -230,7 +270,12 @@ const char* type_get_name(Type* type) {
     switch (type->kind) {
         case Type_Kind_Basic: return type->Basic.name;
         case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "^%s", type_get_name(type->Pointer.elem));
-        case Type_Kind_Struct: return type->Struct.name;
+        case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_name(type->Array.elem));
+        case Type_Kind_Struct:
+            if (type->Struct.name)
+                return type->Struct.name;
+            else
+                return "<anonymous struct>";
         default: return "unknown";
     }
 }
@@ -265,7 +310,8 @@ StructMember type_struct_lookup_member(Type* type, char* member) {
 }
 
 b32 type_is_pointer(Type* type) {
-    return type->kind == Type_Kind_Pointer || (type->Basic.flags & Basic_Flag_Pointer) != 0;
+    return (type->kind == Type_Kind_Pointer)
+        || (type->kind == Type_Kind_Array);
 }
 
 b32 type_is_struct(Type* type) {

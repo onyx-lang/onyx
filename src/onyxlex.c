@@ -22,6 +22,7 @@ static const char* token_type_names[] = {
     "for",
     "break",
     "continue",
+    "sizeof",
 
     "->",
     "<-",
@@ -121,7 +122,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         tk.type = Token_Type_Comment;
         tk.text = tokenizer->curr;
 
-        while (*tokenizer->curr != '\n') {
+        while (*tokenizer->curr != '\n' && tokenizer->curr != tokenizer->end) {
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
