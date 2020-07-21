@@ -1,0 +1,50 @@
+%YAML 1.2
+---
+# See http://www.sublimetext.com/docs/3/syntax.html
+name: Onyx
+file_extensions:
+  - onyx
+scope: source.onyx
+contexts:
+  main:
+    # Strings begin and end with quotes, and use backslashes as an escape
+    # character
+    - match: '"'
+      scope: punctuation.definition.string.begin.onyx
+      push: double_quoted_string
+
+    # Comments begin with a '//' and finish at the end of the line
+    - match: '//'
+      scope: punctuation.definition.comment.onyx
+      push: line_comment
+
+    # Keywords are if, else for and while.
+    # Note that blackslashes don't need to be escaped within single quoted
+    # strings in YAML. When using single quoted strings, only single quotes
+    # need to be escaped: this is done by using two single quotes next to each
+    # other.
+    - match: '\b(struct|proc|use|global|if|elseif|else|for|while|do|break|continue|return|as|sizeof)\b'
+      scope: keyword.control.onyx
+
+    - match: '\b(unknown|bool|void|i8|u8|i16|u16|i32|u32|i64|u64|f32|f64|rawptr)\b'
+      scope: keyword.type.onyx
+
+    - match: '\b(true|false)\b'
+      scope: constant.boolean.onyx
+
+    # Numbers
+    - match: '\b(-)?[0-9.]+\b'
+      scope: constant.numeric.onyx
+
+  double_quoted_string:
+    - meta_scope: string.quoted.double.onyx
+    - match: '\\.'
+      scope: constant.character.escape.onyx
+    - match: '"'
+      scope: punctuation.definition.string.end.onyx
+      pop: true
+
+  line_comment:
+    - meta_scope: comment.line.onyx
+    - match: $
+      pop: true
