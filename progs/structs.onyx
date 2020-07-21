@@ -37,7 +37,7 @@ foo_get :: proc (fooarr: []Foo, i: i32) -> ^Foo {
     return ^fooarr[i];
 }
 
-proc #export "main" {
+proc #export "main3" {
     // foo := foo_make();
     // other_foo := foo_make();
     // other_foo.i = 1234;
@@ -126,7 +126,7 @@ link_print :: proc (start: ^Link) -> i32 {
     return count;
 }
 
-link_test :: proc #export "main2" {
+link_test :: proc #export "main4" {
     node_head := alloc(sizeof ^Link) as ^^Link;
     *node_head = 0 as ^Link;
 
@@ -142,21 +142,63 @@ link_test :: proc #export "main2" {
 
 
 // TODO: Make everything below this comment work
-// SOA :: struct {
-//     x : [3]i32;
-//     y : [3]i32;
-// }
+multi_arr :: proc #export "main2" {
+    arr1 := alloc(sizeof [5][5] i32) as [5][5] i32; // Sizeof 25 * 4
+    arr2 := alloc(sizeof [5]^ i32) as [5]^ i32; // Sizeof 20
 
-// soa_test :: proc #export "main" {
-//     m_arr := alloc(sizeof [5][5]i32) as [5][5]i32;
+    arr2[3][2] = 5; // (arr1 + (3 * 5 * 4) + (2 * 4))
+    print(arr2[3][2]);
+    // arr2[3][2] = 5; // (arr1[3] + 2 * 4)
+}
 
-//     for y: 0, 5 {
-//         for x: 0, 5 {
-//             m_arr[y][x] = x + y * 5;
-//         }
-//     }
+Vec2 :: struct {
+    x : i32;
+    y : i32;
+}
 
-//     print(m_arr[2][4]); // 14
+SOA :: struct {
+    positions  : [10] Vec2;
+    velocities : [10] Vec2;
+    things     : [10] ^Vec2;
+}
 
-//     print(sizeof SOA);
-// }
+vec2_set :: proc (v: ^Vec2) {
+    v.x = 1234;
+    v.y = 5678;
+}
+
+soa_test :: proc #export "main" {
+
+    // print(sizeof SOA);  // 240
+
+    soa := alloc(sizeof SOA + 20 * sizeof Vec2) as ^SOA;
+
+    for i: 0, 10 {
+        soa.things[i] = alloc(sizeof Vec2) as ^Vec2;
+    }
+
+    soa.velocities[2].x = 10;
+    soa.velocities[2].y = 12;
+    soa.positions[5].x = 1;
+    soa.positions[5].y = 2;
+    soa.positions[2].x = 1001;
+    vec2_set(^(soa.positions[6]));
+    vec2_set(soa.things[2]);
+
+    print(soa.positions[5].y);
+    print(soa.velocities[2].x);
+    print(soa.things[2].x);
+    print(soa.things[2].y);
+    print(soa.positions[6].x);
+    print(soa.positions[6].y);
+
+    m_arr := alloc(sizeof [5][5]i32) as [5][5]i32;
+
+    for y: 0, 5 {
+        for x: 0, 5 {
+            m_arr[y][x] = x + y * 5;
+        }
+    }
+    
+    for i: 0, 25 print((m_arr as [] i32)[i]);
+}

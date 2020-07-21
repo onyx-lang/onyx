@@ -1,7 +1,7 @@
 use "progs/intrinsics"
 use "progs/print_funcs"
 
-global_arr :: global ^i32;
+global_arr :: global []i32;
 
 min_i32 :: proc (a: i32, b: i32) -> i32 {
     least := a;
@@ -20,7 +20,7 @@ min :: proc #overloaded {
 }
 
 // NOTE: in-place insertion sort
-sort :: proc (src: ^i32, len: i32) {
+sort :: proc (src: []i32, len: i32) {
     for i: 0, len {
         smallest := i;
 
@@ -44,7 +44,7 @@ str_test :: proc #export {
     // Address of and dereference cancel each other out
     print(^*hello_str);
 
-    print(hello_str, 5);
+    print(hello_str as []u8, 5);
 
     for i: 0, 10, 2 print(i);
 
@@ -56,8 +56,8 @@ proc #export "main2" {
     print(__heap_start as i32);
 
     len :: 10;
-    global_arr = alloc((len * 4) as u32) as ^i32;
-    other_arr := alloc((len * 4) as u32) as ^i32;
+    global_arr = alloc(sizeof [10]i32) as []i32;
+    other_arr := alloc((len * 4) as u32) as []i32;
 
     print(global_arr as i32);
     print(other_arr as i32);
@@ -94,8 +94,8 @@ alloc :: proc (size: u32) -> rawptr {
     return ((__heap_start as u32) + curr_offset) as rawptr;
 }
 
-alloc_2darr :: proc (rows: u32, cols: u32) -> ^^i32 {
-    arr := alloc(rows * 4) as ^^i32;
+alloc_2darr :: proc (rows: u32, cols: u32) -> []^i32 {
+    arr := alloc(rows * 4) as []^i32;
     for i: 0, cols arr[i] = alloc(cols * 4) as ^i32;
     return arr;
 }

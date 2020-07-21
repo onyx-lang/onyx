@@ -88,6 +88,8 @@ CHECK(for, AstFor* fornode) {
     if (fornode->step)
         if (check_expression(fornode->step)) return 1;
 
+    if (check_expression((AstTyped *) fornode->var)) return 1;
+
     // HACK
     if (!types_are_compatible(fornode->start->type, &basic_types[Basic_Kind_I32])) {
         onyx_message_add(Msg_Type_Literal,
@@ -474,11 +476,20 @@ CHECK(field_access, AstFieldAccess* field) {
     }
 
     token_toggle_end(field->token);
-    StructMember smem = type_struct_lookup_member(field->expr->type, field->token->text);
+    StructMember smem;
+    if (!type_struct_lookup_member(field->expr->type, field->token->text, &smem)) {
+        onyx_message_add(Msg_Type_No_Field,
+            field->token->pos,
+            field->token->text,
+            type_get_name(field->expr->type));
+        token_toggle_end(field->token);
+        return 1;
+    }
+
     field->offset = smem.offset;
     field->type = smem.type;
-    token_toggle_end(field->token);
 
+    token_toggle_end(field->token);
     return 0;
 }
 

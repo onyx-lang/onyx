@@ -100,9 +100,10 @@ Type* type_make_pointer(bh_allocator alloc, Type* to);
 const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);
 
-StructMember type_struct_lookup_member(Type* type, char* member);
+b32 type_struct_lookup_member(Type* type, char* member, StructMember* smem);
 
 b32 type_is_pointer(Type* type);
+b32 type_is_array(Type* tyoe);
 b32 type_is_struct(Type* type);
 b32 type_is_bool(Type* type);
 b32 type_results_in_void(Type* type);

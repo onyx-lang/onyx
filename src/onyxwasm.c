@@ -385,12 +385,13 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
 
     i32 store_size = type_size_of(type);
     i32 is_basic   = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
-    i32 is_integer = is_basic &&
-                    ((type->Basic.flags & Basic_Flag_Integer)
-                  || (type->Basic.flags & Basic_Flag_Pointer));
-    i32 is_float   = is_basic && type->Basic.flags & Basic_Flag_Float;
+    i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
+    i32 is_integer  = is_basic && (type->Basic.flags & Basic_Flag_Integer);
+    i32 is_float    = is_basic && type->Basic.flags & Basic_Flag_Float;
 
-    if (is_integer) {
+    if (is_pointer) {
+        WID(WI_I32_STORE, ((WasmInstructionData) { alignment, offset }));
+    } else if (is_integer) {
         if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
@@ -399,9 +400,9 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
         if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
     } else {
-        onyx_message_add(Msg_Type_Literal,
+        onyx_message_add(Msg_Type_Failed_Gen_Store,
             (OnyxFilePos) { 0 },
-            "failed to generate store instruction");
+            type_get_name(type));
     }
 
     *pcode = code;
@@ -412,23 +413,26 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
 
     i32 load_size   = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
-    i32 is_integer  = is_basic &&
-                     ((type->Basic.flags & Basic_Flag_Integer)
-                   || (type->Basic.flags & Basic_Flag_Pointer));
+    i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
+    i32 is_integer  = is_basic && (type->Basic.flags & Basic_Flag_Integer);
     i32 is_float    = is_basic && type->Basic.flags & Basic_Flag_Float;
     i32 is_unsigned = is_basic && type->Basic.flags & Basic_Flag_Unsigned;
 
     WasmInstructionType instr = WI_NOP;
     i32 alignment = type_get_alignment_log2(type);
 
-    if (is_integer) {
+    if (is_pointer) {
+        instr = WI_I32_LOAD;
+    }
+    else if (is_integer) {
         if      (load_size == 1) instr = WI_I32_LOAD_8_S;
         else if (load_size == 2) instr = WI_I32_LOAD_16_S;
         else if (load_size == 4) instr = WI_I32_LOAD;
         else if (load_size == 8) instr = WI_I64_LOAD;
 
         if (load_size < 4 && is_unsigned) instr += 1;
-    } else if (is_float) {
+    }
+    else if (is_float) {
         if      (load_size == 4) instr = WI_F32_LOAD;
         else if (load_size == 8) instr = WI_F64_LOAD;
     }
@@ -436,9 +440,9 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     WID(instr, ((WasmInstructionData) { alignment, offset }));
 
     if (instr == WI_NOP) {
-        onyx_message_add(Msg_Type_Literal,
+        onyx_message_add(Msg_Type_Failed_Gen_Load,
                 (OnyxFilePos) { 0 },
-                "failed to generate load instruction");
+                type_get_name(type));
     }
 
     *pcode = code;
@@ -765,15 +769,25 @@ COMPILE_FUNC(intrinsic_call, AstIntrinsicCall* call) {
 COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    *offset_return = 0;
-
     compile_expression(mod, &code, aa->expr);
     if (aa->elem_size != 1) {
         WID(WI_I32_CONST, aa->elem_size);
         WI(WI_I32_MUL);
     }
-    compile_expression(mod, &code, aa->addr);
+
+    u64 offset = 0;
+    if (aa->addr->kind == Ast_Kind_Array_Access
+        && aa->addr->type->kind == Type_Kind_Array) {
+        compile_array_access_location(mod, &code, (AstArrayAccess *) aa->addr, &offset);
+    } else if (aa->addr->kind == Ast_Kind_Field_Access
+        && aa->addr->type->kind == Type_Kind_Array) {
+        compile_field_access_location(mod, &code, (AstFieldAccess *) aa->addr, &offset);
+    } else {
+        compile_expression(mod, &code, aa->addr);
+    }
     WI(WI_I32_ADD);
+
+    *offset_return += offset;
 
     *pcode = code;
 }
@@ -789,7 +803,8 @@ COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         source_expr = (AstTyped *) ((AstFieldAccess *) source_expr)->expr;
     }
 
-    if (source_expr->kind == Ast_Kind_Array_Access) {
+    if (source_expr->kind == Ast_Kind_Array_Access
+        && source_expr->type->kind != Type_Kind_Pointer) {
         u64 o2 = 0;
         compile_array_access_location(mod, &code, (AstArrayAccess *) source_expr, &o2);
         offset += o2;
@@ -1307,6 +1322,13 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
     module->next_func_idx   = program->foreign_func_count;
     module->next_global_idx = program->foreign_global_count;
+
+    WasmExport mem_export = {
+        .kind = WASM_FOREIGN_MEMORY,
+        .idx = 0,
+    };
+    bh_table_put(WasmExport, module->exports, "memory", mem_export);
+    module->export_count++;
 
     bh_arr_each(Entity, entity, program->entities) {
         switch (entity->type) {

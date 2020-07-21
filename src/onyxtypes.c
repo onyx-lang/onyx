@@ -298,20 +298,24 @@ u32 type_get_alignment_log2(Type* type) {
     return 2;
 }
 
-StructMember type_struct_lookup_member(Type* type, char* member) {
-    if (!type_is_struct(type)) return (StructMember) { 0 };
+b32 type_struct_lookup_member(Type* type, char* member, StructMember* smem) {
+    if (!type_is_struct(type)) return 0;
     if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
 
     TypeStruct* stype = &type->Struct;
 
-    if (!bh_table_has(StructMember, stype->members, member)) return (StructMember) { 0 };
-    StructMember smem = bh_table_get(StructMember, stype->members, member);
-    return smem;
+    if (!bh_table_has(StructMember, stype->members, member)) return 0;
+    *smem = bh_table_get(StructMember, stype->members, member);
+    return 1;
 }
 
 b32 type_is_pointer(Type* type) {
     return (type->kind == Type_Kind_Pointer)
         || (type->kind == Type_Kind_Array);
+}
+
+b32 type_is_array(Type* type) {
+    return type->kind == Type_Kind_Array;
 }
 
 b32 type_is_struct(Type* type) {

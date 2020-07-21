@@ -27,9 +27,13 @@ static const char* msg_formats[] = {
     "function '%b' expected type '%s' in position '%d', got '%s'",
 
     "duplicate declaration of struct member '%s'",
+    "field '%s' does not exist on '%s'",
 
     "unable to resolve type for symbol '%b'",
     "unable to resolve symbol '%b'",
+
+    "failed to generate load instruction for type '%s'",
+    "failed to generate store instruction for type '%s'",
 };
 
 void onyx_message_init(bh_allocator allocator, bh_table(bh_file_contents)* files) {
