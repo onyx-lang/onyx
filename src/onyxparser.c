@@ -192,47 +192,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);
             sym_node->token = sym_token;
 
-            if (parser->curr->type != '(') {
-                retval = sym_node;
-                break;
-            }
-
-            // NOTE: Function call
-            AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
-            call_node->token = expect_token(parser, '(');
-            call_node->callee = (AstNode *) sym_node;
-            call_node->arg_count = 0;
-
-            AstArgument** prev = &call_node->arguments;
-            AstArgument* curr = NULL;
-            while (parser->curr->type != ')') {
-                curr = make_node(AstArgument, Ast_Kind_Argument);
-                curr->token = parser->curr;
-                curr->value = parse_expression(parser);
-
-                if (curr != NULL && curr->kind != Ast_Kind_Error) {
-                    *prev = curr;
-                    prev = (AstArgument **) &curr->next;
-
-                    call_node->arg_count++;
-                }
-
-                if (parser->curr->type == ')')
-                    break;
-
-                if (parser->curr->type != ',') {
-                    onyx_message_add(Msg_Type_Expected_Token,
-                            parser->curr->pos,
-                            token_name(','),
-                            token_name(parser->curr->type));
-                    return (AstTyped *) &error_node;
-                }
-
-                consume_token(parser);
-            }
-            consume_token(parser);
-
-            retval = (AstTyped *) call_node;
+            retval = sym_node;
             break;
         }
 
@@ -282,7 +242,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
     }
 
     while (parser->curr->type == '[' || parser->curr->type == Token_Type_Keyword_Cast
-        || parser->curr->type == '.') {
+        || parser->curr->type == '.' || parser->curr->type == '(') {
 
         switch ((u16) parser->curr->type) {
             case '[': {
@@ -315,6 +275,45 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 cast_node->expr = retval;
 
                 retval = (AstTyped *) cast_node;
+                break;
+            }
+
+            case '(': {
+                AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
+                call_node->token = expect_token(parser, '(');
+                call_node->callee = (AstNode *) retval;
+                call_node->arg_count = 0;
+
+                AstArgument** prev = &call_node->arguments;
+                AstArgument* curr = NULL;
+                while (parser->curr->type != ')') {
+                    curr = make_node(AstArgument, Ast_Kind_Argument);
+                    curr->token = parser->curr;
+                    curr->value = parse_expression(parser);
+
+                    if (curr != NULL && curr->kind != Ast_Kind_Error) {
+                        *prev = curr;
+                        prev = (AstArgument **) &curr->next;
+
+                        call_node->arg_count++;
+                    }
+
+                    if (parser->curr->type == ')')
+                        break;
+
+                    if (parser->curr->type != ',') {
+                        onyx_message_add(Msg_Type_Expected_Token,
+                                parser->curr->pos,
+                                token_name(','),
+                                token_name(parser->curr->type));
+                        return (AstTyped *) &error_node;
+                    }
+
+                    consume_token(parser);
+                }
+                consume_token(parser);
+
+                retval = (AstTyped *) call_node;
                 break;
             }
         }

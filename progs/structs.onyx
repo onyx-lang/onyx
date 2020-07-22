@@ -3,12 +3,6 @@ use "progs/intrinsics"
 
 N :: 5
 
-Vec3 :: struct {
-    x : f32;
-    y : f32;
-    z : f32;
-}
-
 Foo :: struct {
     v   : Vec3;
     i   : i32;
@@ -35,55 +29,6 @@ foo_make :: proc -> ^Foo {
 
 foo_get :: proc (fooarr: []Foo, i: i32) -> ^Foo {
     return ^fooarr[i];
-}
-
-proc #export "main3" {
-    // foo := foo_make();
-    // other_foo := foo_make();
-    // other_foo.i = 1234;
-
-    // foo.foo = other_foo;
-    // print(foo.foo.i);
-    foo1 := foo_make();
-    foo1.v.y = 123.0f;
-    print(foo1.v.y);
-
-    foo := alloc(sizeof [N]Foo) as [N]Foo;
-
-    for i: 1, 6 {
-        foo[i - 1].v.x = (i + 3) as f32;
-        foo[i - 1].v.y = (i + 4) as f32;
-
-        foo[i - 1].i = i;
-        foo[i - 1].l = (i * 10) as i64;
-        foo[i - 1].f = (i * 100) as f32;
-        foo[i - 1].d = (i * 1000) as f64;
-
-        foo[i - 1].foo = foo as ^Foo;
-    }
-
-    print(foo[3].v.x); // 7
-    print(foo[4].i); // 5
-    print(foo[2].d); // 3000.0
-    print(foo[3].f); // 400.0
-    print(foo[0].l); // 10
-
-    print(foo as i32);
-    print((^(foo[3].l)) as i32); // 84
-
-    print(foo[2].foo[4].foo[3].f); // 400.0
-
-    foo_get(foo, 2).f = 1234.5f;
-    print(foo[2].f);
-
-    print(1000000000000);
-    link_test();
-
-    print(foo[3].v.x); // 7
-    print(foo[4].i); // 5
-    print(foo[2].d); // 3000.0
-    print(foo[3].f); // 400.0
-    print(foo[0].l); // 10
 }
 
 Mut1 :: struct {
@@ -156,6 +101,45 @@ Vec2 :: struct {
     y : i32;
 }
 
+Vec3 :: struct {
+    x : i32;
+    y : i32;
+    z : i32;
+}
+
+v2magnitude :: proc (v: ^Vec2) -> f32 {
+    return sqrt_f32((v.x * v.x + v.y * v.y) as f32);
+}
+
+v3magnitude :: proc (v: ^Vec3) -> f32 {
+    return sqrt_f32((v.x * v.x + v.y * v.y + v.z * v.z) as f32);
+}
+
+magnitude :: proc #overloaded { v2magnitude, v3magnitude };
+
+minus :: proc (n: i32, k: i32) -> i32 {
+    return n - k;
+}
+
+foo :: proc (f: (i32, i32) -> i32) -> i32 {
+    return f(5, 6);
+}
+
+proc #export "main" {
+    v2 := alloc(sizeof Vec2) as ^Vec2;
+    v2.x = 5;
+    v2.y = 12;
+    print(v2.magnitude());
+
+    v3 := alloc(sizeof Vec3) as ^Vec3;
+    v3.x = 1;
+    v3.y = 1;
+    v3.z = 1;
+    print(v3.magnitude());
+
+    print((1).minus(2));
+}
+
 SOA :: struct {
     positions  : [10] Vec2;
     velocities : [10] Vec2;
@@ -167,7 +151,7 @@ vec2_set :: proc (v: ^Vec2) {
     v.y = 5678;
 }
 
-soa_test :: proc #export "main" {
+soa_test :: proc #export "main9" {
 
     // print(sizeof SOA);  // 240
 
@@ -185,6 +169,8 @@ soa_test :: proc #export "main" {
     vec2_set(^(soa.positions[6]));
     vec2_set(soa.things[2]);
 
+    print((^(soa.positions[6])).v2magnitude());
+
     print(soa.positions[5].y);
     print(soa.velocities[2].x);
     print(soa.things[2].x);
@@ -199,6 +185,6 @@ soa_test :: proc #export "main" {
             m_arr[y][x] = x + y * 5;
         }
     }
-    
+
     for i: 0, 25 print((m_arr as [] i32)[i]);
 }

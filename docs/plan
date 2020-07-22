@@ -88,23 +88,30 @@ HOW:
             - Adds '.onyx' to the end of the file name list
             - Only searches in current directory for now
 
-        [ ] Completely overhaul the type system
+        [X] Completely overhaul the type system
             - Keep the builtins
             - Add pointers
             - Add structs
 
-        [ ] Output 'drop' instruction for functions whose return value isn't used
+        [X] Output 'drop' instruction for functions whose return value isn't used
 
         [ ] Devise and implement a simple set of implicit type casting rules.
             - Numeric literals always type cast to whatever type is needed (very flexible).
 
-        [ ] Strings should work as pointers to data.
+        [X] Strings should work as pointers to data.
             - Literals should be placed in data section with pointers to the start.
             - Should strings be null-terminated or a length at the start of the string?
 
+        [ ] Struct splatting in arguments and parameters
+
+        [X] UFC syntax for structs
+
+        [ ] Enum types
+
+        [ ] Procedures as arguments
+
         [ ] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
-
 
 
 
