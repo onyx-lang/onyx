@@ -14,11 +14,11 @@ CHECK(while, AstWhile* whilenode);
 CHECK(for, AstFor* fornode);
 CHECK(call, AstCall* call);
 CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok);
-CHECK(expression, AstTyped* expr);
+CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
-CHECK(field_access, AstFieldAccess* field);
+CHECK(field_access, AstFieldAccess** pfield);
 CHECK(size_of, AstSizeOf* so);
 CHECK(global, AstGlobal* global);
 CHECK(function, AstFunction* func);
@@ -33,7 +33,7 @@ static inline void fill_in_type(AstTyped* node) {
 
 CHECK(return, AstReturn* retnode) {
     if (retnode->expr) {
-        if (check_expression(retnode->expr)) return 1;
+        if (check_expression(&retnode->expr)) return 1;
 
         if (!types_are_compatible(retnode->expr->type, semstate.expected_return_type)) {
             onyx_message_add(Msg_Type_Function_Return_Mismatch,
@@ -55,7 +55,7 @@ CHECK(return, AstReturn* retnode) {
 }
 
 CHECK(if, AstIf* ifnode) {
-    if (check_expression(ifnode->cond)) return 1;
+    if (check_expression(&ifnode->cond)) return 1;
 
     if (!type_is_bool(ifnode->cond->type)) {
         onyx_message_add(Msg_Type_Literal,
@@ -71,7 +71,7 @@ CHECK(if, AstIf* ifnode) {
 }
 
 CHECK(while, AstWhile* whilenode) {
-    if (check_expression(whilenode->cond)) return 1;
+    if (check_expression(&whilenode->cond)) return 1;
 
     if (!type_is_bool(whilenode->cond->type)) {
         onyx_message_add(Msg_Type_Literal,
@@ -84,12 +84,12 @@ CHECK(while, AstWhile* whilenode) {
 }
 
 CHECK(for, AstFor* fornode) {
-    if (check_expression(fornode->start)) return 1;
-    if (check_expression(fornode->end)) return 1;
+    if (check_expression(&fornode->start)) return 1;
+    if (check_expression(&fornode->end)) return 1;
     if (fornode->step)
-        if (check_expression(fornode->step)) return 1;
+        if (check_expression(&fornode->step)) return 1;
 
-    if (check_expression((AstTyped *) fornode->var)) return 1;
+    if (check_expression((AstTyped **) &fornode->var)) return 1;
 
     // HACK
     if (!types_are_compatible(fornode->start->type, &basic_types[Basic_Kind_I32])) {
@@ -168,10 +168,17 @@ CHECK(call, AstCall* call) {
     AstNode** prev_param = (AstNode **) &call->arguments;
     AstArgument* actual_param = call->arguments;
     while (actual_param != NULL) {
-        if (check_expression((AstTyped *) actual_param)) return 1;
+        if (check_expression((AstTyped **) &actual_param)) return 1;
 
         // NOTE: Splat structures into multiple arguments
         if (actual_param->type->kind == Type_Kind_Struct) {
+            if (!type_struct_is_simple(actual_param->type)) {
+                onyx_message_add(Msg_Type_Literal,
+                    actual_param->token->pos,
+                    "can only splat simple structure. nested structures or struct of arrays is not allowed.");
+                return 1;
+            }
+
             bh_arr_each(StructMember *, smem, actual_param->type->Struct.memarr) {
                 AstFieldAccess* field = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
                 field->expr = actual_param->value;
@@ -323,8 +330,8 @@ CHECK(call, AstCall* call) {
 }
 
 CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
-    if (check_expression(binop->left)) return 1;
-    if (check_expression(binop->right)) return 1;
+    if (check_expression(&binop->left)) return 1;
+    if (check_expression(&binop->right)) return 1;
 
     if (binop_is_assignment(binop)) {
         if (!assignment_is_ok) {
@@ -423,7 +430,7 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
 }
 
 CHECK(address_of, AstAddressOf* aof) {
-    if (check_expression(aof->expr)) return 1;
+    if (check_expression(&aof->expr)) return 1;
 
     if (aof->expr->kind != Ast_Kind_Array_Access
             && aof->expr->kind != Ast_Kind_Dereference
@@ -440,7 +447,7 @@ CHECK(address_of, AstAddressOf* aof) {
 }
 
 CHECK(dereference, AstDereference* deref) {
-    if (check_expression(deref->expr)) return 1;
+    if (check_expression(&deref->expr)) return 1;
 
     if (!type_is_pointer(deref->expr->type)) {
         onyx_message_add(Msg_Type_Literal,
@@ -462,8 +469,8 @@ CHECK(dereference, AstDereference* deref) {
 }
 
 CHECK(array_access, AstArrayAccess* aa) {
-    if (check_expression(aa->addr)) return 1;
-    if (check_expression(aa->expr)) return 1;
+    if (check_expression(&aa->addr)) return 1;
+    if (check_expression(&aa->expr)) return 1;
 
     if (!type_is_pointer(aa->addr->type)) {
         onyx_message_add(Msg_Type_Literal,
@@ -496,8 +503,9 @@ CHECK(array_access, AstArrayAccess* aa) {
     return 0;
 }
 
-CHECK(field_access, AstFieldAccess* field) {
-    if (check_expression(field->expr)) return 1;
+CHECK(field_access, AstFieldAccess** pfield) {
+    AstFieldAccess* field = *pfield;
+    if (check_expression(&field->expr)) return 1;
 
     if (!type_is_struct(field->expr->type)) {
         onyx_message_add(Msg_Type_Literal,
@@ -517,6 +525,18 @@ CHECK(field_access, AstFieldAccess* field) {
         return 1;
     }
 
+    if (field->expr->flags & Ast_Flag_Param_Splatted) {
+        AstLocal* param = (AstLocal *) field->expr;
+
+        u32 steps = smem.idx + 1;
+        while (steps--) param = (AstLocal *) param->next;
+
+        // NOTE: Not actually a field access
+        *pfield = (AstFieldAccess *) param;
+        token_toggle_end(field->token);
+        return 0;
+    }
+
     field->offset = smem.offset;
     field->type = smem.type;
 
@@ -530,7 +550,8 @@ CHECK(size_of, AstSizeOf* so) {
     return 0;
 }
 
-CHECK(expression, AstTyped* expr) {
+CHECK(expression, AstTyped** pexpr) {
+    AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         onyx_message_add(Msg_Type_Literal,
                 (OnyxFilePos) { 0 },
@@ -545,7 +566,7 @@ CHECK(expression, AstTyped* expr) {
         case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp *) expr, 0); break;
 
         case Ast_Kind_Unary_Op:
-            retval = check_expression(((AstUnaryOp *) expr)->expr);
+            retval = check_expression(&((AstUnaryOp *) expr)->expr);
 
             if (((AstUnaryOp *) expr)->operation != Unary_Op_Cast) {
                 expr->type = ((AstUnaryOp *) expr)->expr->type;
@@ -576,7 +597,7 @@ CHECK(expression, AstTyped* expr) {
         case Ast_Kind_Address_Of:   retval = check_address_of((AstAddressOf *) expr); break;
         case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
-        case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess *) expr); break;
+        case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
 
         case Ast_Kind_Global:
@@ -589,7 +610,7 @@ CHECK(expression, AstTyped* expr) {
             break;
 
         case Ast_Kind_Argument:
-            retval = check_expression(((AstArgument *) expr)->value);
+            retval = check_expression(&((AstArgument *) expr)->value);
             expr->type = ((AstArgument *) expr)->value->type;
             break;
 
@@ -643,7 +664,7 @@ CHECK(statement, AstNode* stmt) {
 
         default:
             stmt->flags |= Ast_Flag_Expr_Ignored;
-            return check_expression((AstTyped *) stmt);
+            return check_expression((AstTyped **) &stmt);
     }
 }
 
@@ -706,6 +727,13 @@ CHECK(struct, AstStructType* s_node) {
     bh_table(i32) mem_set;
     bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
 
+    if (bh_arr_length(s_node->members) == 0) {
+        onyx_message_add(Msg_Type_Literal,
+                s_node->token->pos,
+                "empty structure");
+        return 1;
+    }
+
     bh_arr_each(AstStructMember *, member, s_node->members) {
         token_toggle_end((*member)->token);
 
@@ -731,7 +759,11 @@ CHECK(struct, AstStructType* s_node) {
 }
 
 CHECK(function_header, AstFunction* func) {
-    for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
+    i32 changed_params = 0;
+
+    AstLocal **prev_param = &func->params;
+    AstLocal *param = func->params;
+    while (param != NULL) {
         fill_in_type((AstTyped *) param);
 
         if (param->type == NULL) {
@@ -741,15 +773,63 @@ CHECK(function_header, AstFunction* func) {
             return 1;
         }
 
-        if (param->type->Basic.size == 0) {
+        if (param->type->kind != Type_Kind_Array
+            && type_size_of(param->type) == 0) {
             onyx_message_add(Msg_Type_Literal,
                     param->token->pos,
                     "function parameters must have non-void types");
             return 1;
         }
+
+        if (param->type->kind == Type_Kind_Struct) {
+            param->flags |= Ast_Flag_Param_Splatted;
+
+            if (!type_struct_is_simple(param->type)) {
+                onyx_message_add(Msg_Type_Literal,
+                    param->token->pos,
+                    "only simple structures can be passed by value");
+                return 1;
+            }
+
+            changed_params = 1;
+
+            AstLocal *first_new_param = NULL, *last_new_param = NULL;
+            AstLocal** insertion = prev_param;
+            bh_arr_each(StructMember *, smem, param->type->Struct.memarr) {
+                AstLocal* new_param = onyx_ast_node_new(semstate.node_allocator, sizeof(AstLocal), Ast_Kind_Param);
+                new_param->token = param->token;
+                new_param->type = (*smem)->type;
+                new_param->flags |= Ast_Flag_Const;
+
+                if (first_new_param == NULL) first_new_param = new_param;
+                last_new_param = new_param;
+
+                *insertion = new_param;
+                insertion = (AstLocal **) &new_param->next;
+            }
+
+            *prev_param = first_new_param;
+            last_new_param->next = param->next;
+            param->next = (AstNode *) first_new_param;
+
+            prev_param = (AstLocal **) &last_new_param->next;
+        } else {
+            prev_param = (AstLocal **) &param->next;
+        }
+
+        param = (AstLocal *) param->next;
     }
 
-    fill_in_type((AstTyped *) func);
+    if (changed_params) {
+        // NOTE: Need to rebuild the function parameters in a special way once the are modified.
+        // This may/will get cleaned up at a later point.
+
+        func->type = type_build_function_type(
+            semstate.node_allocator, func,
+            ((AstFunctionType *) func->type_node)->return_type);
+    } else {
+        fill_in_type((AstTyped *) func);
+    }
 
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {
@@ -794,7 +874,7 @@ CHECK(node, AstNode* node) {
         case Ast_Kind_While:                return check_while((AstWhile *) node);
         case Ast_Kind_Call:                 return check_call((AstCall *) node);
         case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp *) node, 1);
-        default:                            return check_expression((AstTyped *) node);
+        default:                            return check_expression((AstTyped **) &node);
     }
 }
 
@@ -821,7 +901,7 @@ void onyx_type_check(ProgramInfo* program) {
                 break;
 
             case Entity_Type_Expression:
-                if (check_expression(entity->expr)) return;
+                if (check_expression(&entity->expr)) return;
                 break;
 
             case Entity_Type_Struct:

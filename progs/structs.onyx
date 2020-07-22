@@ -133,7 +133,7 @@ proc #export "main" {
     v3.z = 1;
     print(v3.magnitude());
 
-    vec2_splat(*v2, *(v3 as ^Vec2));
+    vec2_splat(*v2, *v3);
 
     print((1).minus(2));
 }
@@ -149,12 +149,13 @@ vec2_set :: proc (v: ^Vec2) {
     v.y = 5678;
 }
 
-vec2_splat :: proc (vx: i32, vy: i32, other: i32, otherother: i32) {
+vec2_splat :: proc (vx: i32, vy: i32, other: Vec3) {
+    print(other.x);
+    print(other.y);
+    print(other.z);
+
     print(vx);
     print(vy);
-
-    print(other);
-    print(otherother);
 }
 
 soa_test :: proc #export "main9" {

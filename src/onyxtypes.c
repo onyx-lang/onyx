@@ -45,6 +45,15 @@ b32 types_are_surface_compatible(Type* t1, Type* t2) {
             if (t2->kind == Type_Kind_Pointer) return 1;
             break;
 
+        case Type_Kind_Array: {
+            if (t2->kind != Type_Kind_Array) return 0;
+
+            if (t1->Array.count != 0)
+                if (t1->Array.count != t2->Array.count) return 0;
+
+            return types_are_compatible(t1->Array.elem, t2->Array.elem);
+        }
+
         case Type_Kind_Struct: {
             if (t2->kind != Type_Kind_Struct) return 0;
             if (t1->Struct.mem_count != t2->Struct.mem_count) return 0;
@@ -219,6 +228,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             u32 offset = 0;
             u32 min_alignment = 1;
+            u32 idx = 0;
             bh_arr_each(AstStructMember *, member, s_node->members) {
                 (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
@@ -226,7 +236,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 StructMember smem = {
                     .offset = offset,
-                    .type = (*member)->type
+                    .type = (*member)->type,
+                    .idx = idx,
                 };
 
                 token_toggle_end((*member)->token);
@@ -235,6 +246,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 token_toggle_end((*member)->token);
 
                 offset += type_size_of((*member)->type);
+                idx++;
             }
 
             // TODO: Again, add alignment
@@ -254,6 +266,33 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             assert(("Node is not a type node", 0));
             return NULL;
     }
+}
+
+// NOTE: Kinda hacky way of building the functions type
+Type* type_build_function_type(bh_allocator alloc, AstFunction* func, AstType* return_type) {
+    u64 param_count = 0;
+    for (AstLocal* param = func->params;
+            param != NULL;
+            param = (AstLocal *) param->next)
+        param_count++;
+
+    AstFunctionType* old_ftype = (AstFunctionType *) func->type_node;
+    Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
+
+    func_type->kind = Type_Kind_Function;
+    func_type->Function.param_count = param_count;
+    func_type->Function.return_type = type_build_from_ast(alloc, return_type);
+
+    if (param_count > 0) {
+        i32 i = 0;
+        for (AstLocal* param = func->params;
+                param != NULL;
+                param = (AstLocal *) param->next) {
+            func_type->Function.params[i++] = param->type;
+        }
+    }
+
+    return func_type;
 }
 
 Type* type_make_pointer(bh_allocator alloc, Type* to) {
@@ -310,6 +349,21 @@ b32 type_struct_lookup_member(Type* type, char* member, StructMember* smem) {
     if (!bh_table_has(StructMember, stype->members, member)) return 0;
     *smem = bh_table_get(StructMember, stype->members, member);
     return 1;
+}
+
+b32 type_struct_is_simple(Type* type) {
+    if (type->kind != Type_Kind_Struct) return 0;
+
+    b32 is_simple = 1;
+    bh_table_each_start(StructMember, type->Struct.members);
+        if (value.type->kind == Type_Kind_Struct
+            || value.type->kind == Type_Kind_Array) {
+            is_simple = 0;
+            break;
+        }
+    bh_table_each_end;
+
+    return is_simple;
 }
 
 b32 type_is_pointer(Type* type) {

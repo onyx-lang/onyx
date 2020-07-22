@@ -201,6 +201,10 @@ static const char* wi_string(WasmInstructionType wit) {
 }
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
+    if (type->kind == Type_Kind_Struct) {
+        DEBUG_HERE;
+    }
+
     if (type->kind == Type_Kind_Pointer) {
         return WASM_TYPE_INT32;
     }

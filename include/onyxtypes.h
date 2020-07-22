@@ -47,7 +47,7 @@ typedef struct TypeBasic {
 typedef struct Type Type;
 
 typedef struct StructMember {
-    u64 offset;
+    u32 offset, idx;
     Type *type;
 } StructMember;
 
@@ -101,9 +101,13 @@ struct Type {
 extern Type basic_types[];
 
 struct AstType;
+struct AstFunction;
+
 b32 types_are_compatible(Type* t1, Type* t2);
 u32 type_size_of(Type* type);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
+
+Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func, struct AstType* return_type);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
 
@@ -111,6 +115,7 @@ const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);
 
 b32 type_struct_lookup_member(Type* type, char* member, StructMember* smem);
+b32 type_struct_is_simple(Type* type);
 
 b32 type_is_pointer(Type* type);
 b32 type_is_array(Type* tyoe);
