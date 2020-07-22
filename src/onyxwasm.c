@@ -280,16 +280,19 @@ COMPILE_FUNC(block, AstBlock* block) {
     *pcode = code;
 }
 
-COMPILE_FUNC(structured_jump, b32 jump_backward) {
+COMPILE_FUNC(structured_jump, i32 jump_count) {
     bh_arr(WasmInstruction) code = *pcode;
 
     i32 labelidx = 0;
-    u8 wanted = jump_backward ? 2 : 1;
+    u8 wanted = (jump_count < 0) ? 2 : 1;
     b32 success = 0;
+
+    if (jump_count < 0) jump_count = -jump_count;
 
     i32 len = bh_arr_length(mod->structured_jump_target) - 1;
     for (u8* t = &bh_arr_last(mod->structured_jump_target); len >= 0; len--, t--) {
-        if (*t == wanted) {
+        if (*t == wanted) jump_count--;
+        if (jump_count == 0) {
             success = 1;
             break;
         }
@@ -314,8 +317,8 @@ COMPILE_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_If:         compile_if(mod, &code, (AstIf *) stmt); break;
         case Ast_Kind_While:      compile_while(mod, &code, (AstWhile *) stmt); break;
         case Ast_Kind_For:        compile_for(mod, &code, (AstFor *) stmt); break;
-        case Ast_Kind_Break:      compile_structured_jump(mod, &code, 0); break;
-        case Ast_Kind_Continue:   compile_structured_jump(mod, &code, 1); break;
+        case Ast_Kind_Break:      compile_structured_jump(mod, &code, ((AstBreak *) stmt)->count); break;
+        case Ast_Kind_Continue:   compile_structured_jump(mod, &code, -((AstContinue *) stmt)->count); break;
         case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt); break;
         default:                  compile_expression(mod, &code, (AstTyped *) stmt); break;
     }

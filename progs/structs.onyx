@@ -162,7 +162,7 @@ soa_test :: proc #export "main9" {
     soa.positions[5].x = 1;
     soa.positions[5].y = 2;
     soa.positions[2].x = 1001;
-    vec2_set(^(soa.positions[6]));
+    (^(soa.positions[6])).vec2_set();
     vec2_set(soa.things[2]);
 
     print((^(soa.positions[6])).v2magnitude());

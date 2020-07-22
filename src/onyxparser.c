@@ -650,15 +650,35 @@ static AstNode* parse_statement(OnyxParser* parser) {
             retval = (AstNode *) parse_for_stmt(parser);
             break;
 
-        case Token_Type_Keyword_Break:
-            retval = make_node(AstNode, Ast_Kind_Break);
-            retval->token = expect_token(parser, Token_Type_Keyword_Break);
-            break;
+        case Token_Type_Keyword_Break: {
+            AstBreak* bnode = make_node(AstBreak, Ast_Kind_Break);
+            bnode->token = expect_token(parser, Token_Type_Keyword_Break);
 
-        case Token_Type_Keyword_Continue:
-            retval = make_node(AstNode, Ast_Kind_Break);
-            retval->token = expect_token(parser, Token_Type_Keyword_Continue);
+            u64 count = 1;
+            while (parser->curr->type == Token_Type_Keyword_Break) {
+                consume_token(parser);
+                count++;
+            }
+            bnode->count = count;
+
+            retval = (AstNode *) bnode;
             break;
+        }
+
+        case Token_Type_Keyword_Continue: {
+            AstContinue* cnode = make_node(AstBreak, Ast_Kind_Continue);
+            cnode->token = expect_token(parser, Token_Type_Keyword_Continue);
+
+            u64 count = 1;
+            while (parser->curr->type == Token_Type_Keyword_Continue) {
+                consume_token(parser);
+                count++;
+            }
+            cnode->count = count;
+
+            retval = (AstNode *) cnode;
+            break;
+        }
 
         default:
             break;

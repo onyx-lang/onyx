@@ -23,6 +23,8 @@ typedef struct AstFieldAccess AstFieldAccess;
 typedef struct AstSizeOf AstSizeOf;
 
 typedef struct AstReturn AstReturn;
+typedef struct AstBreak AstBreak;
+typedef struct AstContinue AstContinue;
 
 typedef struct AstBlock AstBlock;
 typedef struct AstIf AstIf;
@@ -227,11 +229,13 @@ struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 
 // Intruction Node
-struct AstReturn        { AstNode_base;  AstTyped* expr; };
+struct AstReturn        { AstNode_base; AstTyped* expr; };
+struct AstBreak         { AstNode_base; u64 count; };
+struct AstContinue      { AstNode_base; u64 count; };
 
 // Structure Nodes
-struct AstBlock         { AstNode_base;  AstNode *body; Scope *scope; };
-struct AstWhile         { AstNode_base;  AstTyped *cond; AstNode *stmt; };
+struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; };
+struct AstWhile         { AstNode_base; AstTyped *cond; AstNode *stmt; };
 struct AstFor           {
     AstNode_base;
 
