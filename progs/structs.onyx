@@ -121,10 +121,6 @@ minus :: proc (n: i32, k: i32) -> i32 {
     return n - k;
 }
 
-foo :: proc (f: (i32, i32) -> i32) -> i32 {
-    return f(5, 6);
-}
-
 proc #export "main" {
     v2 := alloc(sizeof Vec2) as ^Vec2;
     v2.x = 5;

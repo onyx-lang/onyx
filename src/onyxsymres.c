@@ -47,7 +47,7 @@ static void scope_leave();
 
 static AstType* symres_type(AstType* type);
 static void symres_local(AstLocal** local);
-static void symres_call(AstCall** pcall);
+static void symres_call(AstCall* call);
 static void symres_size_of(AstSizeOf* so);
 static void symres_expression(AstTyped** expr);
 static void symres_return(AstReturn* ret);
@@ -186,9 +186,7 @@ static void symres_local(AstLocal** local) {
     symbol_introduce((*local)->token, (AstNode *) *local);
 }
 
-static void symres_call(AstCall** pcall) {
-    AstCall* call = *pcall;
-
+static void symres_call(AstCall* call) {
     if (call->callee->kind == Ast_Kind_Field_Access) {
         AstFieldAccess* fa = (AstFieldAccess *) call->callee;
 
@@ -200,11 +198,9 @@ static void symres_call(AstCall** pcall) {
         implicit_arg->token = fa->expr->token;
         implicit_arg->next = (AstNode *) call->arguments;
 
-        (*pcall)->callee = (AstNode *) symbol;
-        (*pcall)->arguments = implicit_arg;
-        (*pcall)->arg_count++;
-
-        call = *pcall;
+        call->callee = (AstNode *) symbol;
+        call->arguments = implicit_arg;
+        call->arg_count++;
     }
 
     AstNode* callee = symbol_resolve(call->callee->token);
@@ -243,7 +239,7 @@ static void symres_expression(AstTyped** expr) {
             break;
 
         case Ast_Kind_Unary_Op: symres_unaryop((AstUnaryOp **) expr); break;
-        case Ast_Kind_Call: symres_call((AstCall **) expr); break;
+        case Ast_Kind_Call: symres_call((AstCall *) *expr); break;
         case Ast_Kind_Block: symres_block((AstBlock *) *expr); break;
 
         case Ast_Kind_Symbol:
@@ -321,7 +317,7 @@ static b32 symres_statement(AstNode* stmt) {
         case Ast_Kind_If:         symres_if((AstIf *) stmt);                        return 0;
         case Ast_Kind_While:      symres_while((AstWhile *) stmt);                  return 0;
         case Ast_Kind_For:        symres_for((AstFor *) stmt);                      return 0;
-        case Ast_Kind_Call:       symres_call((AstCall **) &stmt);                  return 0;
+        case Ast_Kind_Call:       symres_call((AstCall *) stmt);                    return 0;
         case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *)stmt)->value); return 0;
         case Ast_Kind_Block:      symres_block((AstBlock *) stmt);                  return 0;
 
