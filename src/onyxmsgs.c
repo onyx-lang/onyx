@@ -67,13 +67,13 @@ static void print_detailed_message(Message* msg, bh_file_contents* fc) {
     char* walker = msg->pos.line_start;
     while (*walker != '\n') linelength++, walker++;
 
-    i32 numlen = bh_printf(" %d |", msg->pos.line);
+    i32 numlen = bh_printf(" %d | ", msg->pos.line);
     bh_printf("%b\n", msg->pos.line_start, linelength);
 
     char* pointer_str = bh_alloc_array(global_scratch_allocator, char, linelength + numlen);
     memset(pointer_str, ' ', linelength + numlen);
-    memset(pointer_str + msg->pos.column + numlen, '~', msg->pos.length - 1);
-    pointer_str[msg->pos.column + numlen - 1] = '^';
+    memset(pointer_str + msg->pos.column + numlen - 1, '~', msg->pos.length - 1);
+    pointer_str[msg->pos.column + numlen - 2] = '^';
     pointer_str[msg->pos.column + numlen + msg->pos.length - 1] = 0;
 
     bh_printf("%s\n", pointer_str);

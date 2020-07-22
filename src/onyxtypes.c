@@ -213,7 +213,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             s_type->Struct.name = s_node->name;
             s_type->Struct.mem_count = bh_arr_length(s_node->members);
+            s_type->Struct.memarr = NULL;
             bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count);
+            bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
 
             u32 offset = 0;
             u32 min_alignment = 1;
@@ -229,6 +231,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 token_toggle_end((*member)->token);
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
+                bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, (*member)->token->text));
                 token_toggle_end((*member)->token);
 
                 offset += type_size_of((*member)->type);

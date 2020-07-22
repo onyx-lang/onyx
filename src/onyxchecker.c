@@ -24,6 +24,7 @@ CHECK(global, AstGlobal* global);
 CHECK(function, AstFunction* func);
 CHECK(overloaded_function, AstOverloadedFunction* func);
 CHECK(struct, AstStructType* s_node);
+CHECK(function_header, AstFunction* func);
 
 static inline void fill_in_type(AstTyped* node) {
     if (node->type == NULL)
@@ -163,10 +164,40 @@ CHECK(call, AstCall* call) {
         return 1;
     }
 
-    // NOTE: Check arguments
+    // NOTE: Check arguments and splat structs
+    AstNode** prev_param = (AstNode **) &call->arguments;
     AstArgument* actual_param = call->arguments;
     while (actual_param != NULL) {
         if (check_expression((AstTyped *) actual_param)) return 1;
+
+        // NOTE: Splat structures into multiple arguments
+        if (actual_param->type->kind == Type_Kind_Struct) {
+            bh_arr_each(StructMember *, smem, actual_param->type->Struct.memarr) {
+                AstFieldAccess* field = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
+                field->expr = actual_param->value;
+
+                // HACK: Since dereferences are not used for struct types, we need a
+                // special case here.
+                if (field->expr->kind == Ast_Kind_Dereference) {
+                    field->expr = ((AstDereference *) field->expr)->expr;
+                }
+
+                field->offset = (*smem)->offset;
+                field->type = (*smem)->type;
+
+                AstArgument* arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
+                arg->value = (AstTyped *) field;
+                arg->type = field->type;
+                arg->token = actual_param->token;
+                arg->next = actual_param->next;
+
+                *prev_param = (AstNode *) arg;
+                prev_param = (AstNode **) &arg->next;
+            }
+        } else {
+            prev_param = (AstNode **) &actual_param->next;
+        }
+
         actual_param = (AstArgument *) actual_param->next;
     }
 
@@ -641,56 +672,6 @@ CHECK(block, AstBlock* block) {
 }
 
 CHECK(function, AstFunction* func) {
-    for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
-        fill_in_type((AstTyped *) param);
-
-        if (param->type == NULL) {
-            onyx_message_add(Msg_Type_Literal,
-                    param->token->pos,
-                    "function parameter types must be known");
-            return 1;
-        }
-
-        if (param->type->Basic.size == 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    param->token->pos,
-                    "function parameters must have non-void types");
-            return 1;
-        }
-    }
-
-    fill_in_type((AstTyped *) func);
-
-    if ((func->flags & Ast_Flag_Exported) != 0) {
-        if ((func->flags & Ast_Flag_Foreign) != 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting a foreign function");
-            return 1;
-        }
-
-        if ((func->flags & Ast_Flag_Intrinsic) != 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting a intrinsic function");
-            return 1;
-        }
-
-        if ((func->flags & Ast_Flag_Inline) != 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting a inlined function");
-            return 1;
-        }
-
-        if (func->exported_name == NULL) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting function without a name");
-            return 1;
-        }
-    }
-
     semstate.expected_return_type = func->type->Function.return_type;
     if (func->body) {
         return check_block(func->body);
@@ -749,6 +730,60 @@ CHECK(struct, AstStructType* s_node) {
     return 0;
 }
 
+CHECK(function_header, AstFunction* func) {
+    for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
+        fill_in_type((AstTyped *) param);
+
+        if (param->type == NULL) {
+            onyx_message_add(Msg_Type_Literal,
+                    param->token->pos,
+                    "function parameter types must be known");
+            return 1;
+        }
+
+        if (param->type->Basic.size == 0) {
+            onyx_message_add(Msg_Type_Literal,
+                    param->token->pos,
+                    "function parameters must have non-void types");
+            return 1;
+        }
+    }
+
+    fill_in_type((AstTyped *) func);
+
+    if ((func->flags & Ast_Flag_Exported) != 0) {
+        if ((func->flags & Ast_Flag_Foreign) != 0) {
+            onyx_message_add(Msg_Type_Literal,
+                    func->token->pos,
+                    "exporting a foreign function");
+            return 1;
+        }
+
+        if ((func->flags & Ast_Flag_Intrinsic) != 0) {
+            onyx_message_add(Msg_Type_Literal,
+                    func->token->pos,
+                    "exporting a intrinsic function");
+            return 1;
+        }
+
+        if ((func->flags & Ast_Flag_Inline) != 0) {
+            onyx_message_add(Msg_Type_Literal,
+                    func->token->pos,
+                    "exporting a inlined function");
+            return 1;
+        }
+
+        if (func->exported_name == NULL) {
+            onyx_message_add(Msg_Type_Literal,
+                    func->token->pos,
+                    "exporting function without a name");
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 CHECK(node, AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -766,9 +801,12 @@ CHECK(node, AstNode* node) {
 void onyx_type_check(ProgramInfo* program) {
     bh_arr_each(Entity, entity, program->entities) {
         switch (entity->type) {
-            case Entity_Type_Function:
+            case Entity_Type_Function_Header:
                 if (entity->function->flags & Ast_Kind_Foreign) program->foreign_func_count++;
+                if (check_function_header(entity->function)) return;
+                break;
 
+            case Entity_Type_Function:
                 if (check_function(entity->function)) return;
                 break;
 
@@ -792,7 +830,6 @@ void onyx_type_check(ProgramInfo* program) {
 
             case Entity_Type_String_Literal: break;
 
-            case Entity_Type_Function_Header: break;
             case Entity_Type_Global_Header: break;
 
             default: DEBUG_HERE; break;

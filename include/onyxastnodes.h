@@ -331,11 +331,11 @@ struct AstOverloadedFunction {
 // processed later down the pipeline.
 typedef enum EntityType {
     Entity_Type_Unknown,
+    Entity_Type_String_Literal,
+    Entity_Type_Struct,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
     Entity_Type_Expression,
-    Entity_Type_String_Literal,
-    Entity_Type_Struct,
     Entity_Type_Global,
     Entity_Type_Overloaded_Function,
     Entity_Type_Function,

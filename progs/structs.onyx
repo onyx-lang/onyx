@@ -95,7 +95,7 @@ multi_arr :: proc #export "main2" {
     print(arr2[3][2]);
     // arr2[3][2] = 5; // (arr1[3] + 2 * 4)
 }
-
+                
 Vec2 :: struct {
     x : i32;
     y : i32;
@@ -133,6 +133,8 @@ proc #export "main" {
     v3.z = 1;
     print(v3.magnitude());
 
+    vec2_splat(*v2, *(v3 as ^Vec2));
+
     print((1).minus(2));
 }
 
@@ -145,6 +147,14 @@ SOA :: struct {
 vec2_set :: proc (v: ^Vec2) {
     v.x = 1234;
     v.y = 5678;
+}
+
+vec2_splat :: proc (vx: i32, vy: i32, other: i32, otherother: i32) {
+    print(vx);
+    print(vy);
+
+    print(other);
+    print(otherother);
 }
 
 soa_test :: proc #export "main9" {
