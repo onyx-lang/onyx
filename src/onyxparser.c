@@ -330,6 +330,12 @@ static inline i32 get_precedence(BinaryOp kind) {
         case Binary_Op_Assign_Multiply: return 1;
         case Binary_Op_Assign_Divide:   return 1;
         case Binary_Op_Assign_Modulus:  return 1;
+        case Binary_Op_Assign_And:      return 1;
+        case Binary_Op_Assign_Or:       return 1;
+        case Binary_Op_Assign_Xor:      return 1;
+        case Binary_Op_Assign_Shl:      return 1;
+        case Binary_Op_Assign_Shr:      return 1;
+        case Binary_Op_Assign_Sar:      return 1;
 
         case Binary_Op_Bool_And:        return 2;
         case Binary_Op_Bool_Or:         return 2;
@@ -343,13 +349,17 @@ static inline i32 get_precedence(BinaryOp kind) {
         case Binary_Op_Greater_Equal:   return 4;
         case Binary_Op_Greater:         return 4;
 
-        case Binary_Op_Add:             return 5;
-        case Binary_Op_Minus:           return 5;
+        case Binary_Op_And:             return 5;
+        case Binary_Op_Or:              return 5;
+        case Binary_Op_Xor:             return 5;
 
-        case Binary_Op_Multiply:        return 6;
-        case Binary_Op_Divide:          return 6;
+        case Binary_Op_Add:             return 6;
+        case Binary_Op_Minus:           return 6;
 
-        case Binary_Op_Modulus:         return 7;
+        case Binary_Op_Multiply:        return 7;
+        case Binary_Op_Divide:          return 7;
+
+        case Binary_Op_Modulus:         return 8;
 
         default:                        return -1;
     }
@@ -389,29 +399,42 @@ static AstTyped* parse_expression(OnyxParser* parser) {
     while (1) {
         bin_op_kind = -1;
         switch ((u16) parser->curr->type) {
-            case Token_Type_Equal_Equal:    bin_op_kind = Binary_Op_Equal; break;
-            case Token_Type_Not_Equal:      bin_op_kind = Binary_Op_Not_Equal; break;
-            case Token_Type_Less_Equal:     bin_op_kind = Binary_Op_Less_Equal; break;
-            case Token_Type_Greater_Equal:  bin_op_kind = Binary_Op_Greater_Equal; break;
-            case '<':                       bin_op_kind = Binary_Op_Less; break;
-            case '>':                       bin_op_kind = Binary_Op_Greater; break;
+            case Token_Type_Equal_Equal:       bin_op_kind = Binary_Op_Equal; break;
+            case Token_Type_Not_Equal:         bin_op_kind = Binary_Op_Not_Equal; break;
+            case Token_Type_Less_Equal:        bin_op_kind = Binary_Op_Less_Equal; break;
+            case Token_Type_Greater_Equal:     bin_op_kind = Binary_Op_Greater_Equal; break;
+            case '<':                          bin_op_kind = Binary_Op_Less; break;
+            case '>':                          bin_op_kind = Binary_Op_Greater; break;
 
-            case '+':                       bin_op_kind = Binary_Op_Add; break;
-            case '-':                       bin_op_kind = Binary_Op_Minus; break;
-            case '*':                       bin_op_kind = Binary_Op_Multiply; break;
-            case '/':                       bin_op_kind = Binary_Op_Divide; break;
-            case '%':                       bin_op_kind = Binary_Op_Modulus; break;
+            case '+':                          bin_op_kind = Binary_Op_Add; break;
+            case '-':                          bin_op_kind = Binary_Op_Minus; break;
+            case '*':                          bin_op_kind = Binary_Op_Multiply; break;
+            case '/':                          bin_op_kind = Binary_Op_Divide; break;
+            case '%':                          bin_op_kind = Binary_Op_Modulus; break;
 
-            case Token_Type_And_And:        bin_op_kind = Binary_Op_Bool_And; break;
-            case Token_Type_Or_Or:          bin_op_kind = Binary_Op_Bool_Or; break;
-            case Token_Type_Xor_Xor:        bin_op_kind = Binary_Op_Bool_Xor; break;
+            case '&':                          bin_op_kind = Binary_Op_And; break;
+            case '|':                          bin_op_kind = Binary_Op_Or; break;
+            case '^':                          bin_op_kind = Binary_Op_Xor; break;
+            case Token_Type_Shift_Left:        bin_op_kind = Binary_Op_Shl; break;
+            case Token_Type_Shift_Right:       bin_op_kind = Binary_Op_Shr; break;
+            case Token_Type_Shift_Arith_Right: bin_op_kind = Binary_Op_Sar; break;
 
-            case '=':                       bin_op_kind = Binary_Op_Assign; break;
-            case Token_Type_Plus_Equal:     bin_op_kind = Binary_Op_Assign_Add; break;
-            case Token_Type_Minus_Equal:    bin_op_kind = Binary_Op_Assign_Minus; break;
-            case Token_Type_Star_Equal:     bin_op_kind = Binary_Op_Assign_Multiply; break;
-            case Token_Type_Fslash_Equal:   bin_op_kind = Binary_Op_Assign_Divide; break;
-            case Token_Type_Percent_Equal:  bin_op_kind = Binary_Op_Assign_Modulus; break;
+            case Token_Type_And_And:           bin_op_kind = Binary_Op_Bool_And; break;
+            case Token_Type_Or_Or:             bin_op_kind = Binary_Op_Bool_Or; break;
+            case Token_Type_Xor_Xor:           bin_op_kind = Binary_Op_Bool_Xor; break;
+
+            case '=':                          bin_op_kind = Binary_Op_Assign; break;
+            case Token_Type_Plus_Equal:        bin_op_kind = Binary_Op_Assign_Add; break;
+            case Token_Type_Minus_Equal:       bin_op_kind = Binary_Op_Assign_Minus; break;
+            case Token_Type_Star_Equal:        bin_op_kind = Binary_Op_Assign_Multiply; break;
+            case Token_Type_Fslash_Equal:      bin_op_kind = Binary_Op_Assign_Divide; break;
+            case Token_Type_Percent_Equal:     bin_op_kind = Binary_Op_Assign_Modulus; break;
+            case Token_Type_And_Equal:         bin_op_kind = Binary_Op_Assign_And; break;
+            case Token_Type_Or_Equal:          bin_op_kind = Binary_Op_Assign_Or; break;
+            case Token_Type_Xor_Equal:         bin_op_kind = Binary_Op_Assign_Xor; break;
+            case Token_Type_Shl_Equal:         bin_op_kind = Binary_Op_Assign_Shl; break;
+            case Token_Type_Shr_Equal:         bin_op_kind = Binary_Op_Assign_Shr; break;
+            case Token_Type_Sar_Equal:         bin_op_kind = Binary_Op_Assign_Sar; break;
             default: goto expression_done;
         }
 

@@ -381,6 +381,12 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
             else if (binop->operation == Binary_Op_Assign_Multiply) binop_node->operation = Binary_Op_Multiply;
             else if (binop->operation == Binary_Op_Assign_Divide)   binop_node->operation = Binary_Op_Divide;
             else if (binop->operation == Binary_Op_Assign_Modulus)  binop_node->operation = Binary_Op_Modulus;
+            else if (binop->operation == Binary_Op_Assign_And)      binop_node->operation = Binary_Op_And;
+            else if (binop->operation == Binary_Op_Assign_Or)       binop_node->operation = Binary_Op_Or;
+            else if (binop->operation == Binary_Op_Assign_Xor)      binop_node->operation = Binary_Op_Xor;
+            else if (binop->operation == Binary_Op_Assign_Shl)      binop_node->operation = Binary_Op_Shl;
+            else if (binop->operation == Binary_Op_Assign_Shr)      binop_node->operation = Binary_Op_Shr;
+            else if (binop->operation == Binary_Op_Assign_Sar)      binop_node->operation = Binary_Op_Sar;
 
             binop->right = (AstTyped *) binop_node;
             binop->operation = Binary_Op_Assign;
@@ -430,7 +436,7 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         }
 
         binop->type = &basic_types[Basic_Kind_Bool];
-        
+
     } else if (binop->operation >= Binary_Op_Equal
             && binop->operation <= Binary_Op_Greater_Equal) {
         binop->type = &basic_types[Basic_Kind_Bool];

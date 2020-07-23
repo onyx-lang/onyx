@@ -84,4 +84,11 @@ proc #export "main" {
 	v3.z = 13.0f;
 
 	print(v3.magnitude());
+
+	foo := 5;
+	foo <<= 2;
+	foo &= 6;
+	foo |= 5;
+	foo >>= 1;
+	print(foo);
 }

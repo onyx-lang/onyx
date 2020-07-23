@@ -574,22 +574,29 @@ COMPILE_FUNC(for, AstFor* for_node) {
 // the OnyxBinaryOp enum
 static const WasmInstructionType binop_map[][4] = {
     //          I32           I64           F32         F64
-    /* ADD */ { WI_I32_ADD,   WI_I64_ADD,   WI_F32_ADD, WI_F64_ADD },
-    /* SUB */ { WI_I32_SUB,   WI_I64_SUB,   WI_F32_SUB, WI_F64_SUB },
-    /* MUL */ { WI_I32_MUL,   WI_I64_MUL,   WI_F32_MUL, WI_F64_MUL },
-    /* DIV */ { WI_I32_DIV_S, WI_I64_DIV_S, WI_F32_DIV, WI_F64_DIV },
-    /* REM */ { WI_I32_REM_S, WI_I64_REM_S, WI_NOP,     WI_NOP     },
+    /* ADD */  { WI_I32_ADD,   WI_I64_ADD,   WI_F32_ADD, WI_F64_ADD },
+    /* SUB */  { WI_I32_SUB,   WI_I64_SUB,   WI_F32_SUB, WI_F64_SUB },
+    /* MUL */  { WI_I32_MUL,   WI_I64_MUL,   WI_F32_MUL, WI_F64_MUL },
+    /* DIV */  { WI_I32_DIV_S, WI_I64_DIV_S, WI_F32_DIV, WI_F64_DIV },
+    /* REM */  { WI_I32_REM_S, WI_I64_REM_S, WI_NOP,     WI_NOP     },
 
-    /* EQ  */ { WI_I32_EQ,    WI_I64_EQ,    WI_F32_EQ,  WI_F64_EQ },
-    /* NEQ */ { WI_I32_NE,    WI_I64_NE,    WI_F32_NE , WI_F64_NE },
-    /* LT  */ { WI_I32_LT_S,  WI_I64_LT_S,  WI_F32_LT,  WI_F64_LT },
-    /* LTE */ { WI_I32_LE_S,  WI_I64_LE_S,  WI_F32_LE,  WI_F64_LE },
-    /* GT  */ { WI_I32_GT_S,  WI_I64_GT_S,  WI_F32_GT,  WI_F64_GT },
-    /* GTE */ { WI_I32_GE_S,  WI_I64_GE_S,  WI_F32_GE,  WI_F64_GE },
+    /* EQ  */  { WI_I32_EQ,    WI_I64_EQ,    WI_F32_EQ,  WI_F64_EQ },
+    /* NEQ */  { WI_I32_NE,    WI_I64_NE,    WI_F32_NE , WI_F64_NE },
+    /* LT  */  { WI_I32_LT_S,  WI_I64_LT_S,  WI_F32_LT,  WI_F64_LT },
+    /* LTE */  { WI_I32_LE_S,  WI_I64_LE_S,  WI_F32_LE,  WI_F64_LE },
+    /* GT  */  { WI_I32_GT_S,  WI_I64_GT_S,  WI_F32_GT,  WI_F64_GT },
+    /* GTE */  { WI_I32_GE_S,  WI_I64_GE_S,  WI_F32_GE,  WI_F64_GE },
 
-    /* AND */ { WI_I32_AND,   WI_I64_AND,   WI_NOP,     WI_NOP },
-    /* OR  */ { WI_I32_OR,    WI_I64_OR,    WI_NOP,     WI_NOP },
-    /* XOR */ { WI_I32_XOR,   WI_I64_XOR,   WI_NOP,     WI_NOP },
+    /* AND */  { WI_I32_AND,   WI_I64_AND,   WI_NOP,     WI_NOP },
+    /* OR  */  { WI_I32_OR,    WI_I64_OR,    WI_NOP,     WI_NOP },
+    /* XOR */  { WI_I32_XOR,   WI_I64_XOR,   WI_NOP,     WI_NOP },
+    /* SHL */  { WI_I32_SHL,   WI_I64_SHL,   WI_NOP,     WI_NOP },
+    /* SHR */  { WI_I32_SHR_U, WI_I64_SHR_U, WI_NOP,     WI_NOP },
+    /* SAR */  { WI_I32_SHR_S, WI_I64_SHR_S, WI_NOP,     WI_NOP },
+
+    /* BAND */ { WI_I32_AND,   WI_I64_AND,   WI_NOP,     WI_NOP },
+    /* BOR  */ { WI_I32_OR,    WI_I64_OR,    WI_NOP,     WI_NOP },
+    /* BXOR */ { WI_I32_XOR,   WI_I64_XOR,   WI_NOP,     WI_NOP },
 };
 
 COMPILE_FUNC(binop, AstBinaryOp* binop) {

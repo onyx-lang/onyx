@@ -108,9 +108,13 @@ HOW:
 
         [X] Logical boolean operators
 
-        [ ] Bitwise operators
+        [X] Bitwise operators
+
+        [ ] Dead code elimination
 
         [ ] Enum types
+
+        [ ] Static pointers to sized data
 
         [ ] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
