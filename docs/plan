@@ -110,7 +110,10 @@ HOW:
 
         [X] Bitwise operators
 
-        [ ] Dead code elimination
+        [X] Dead code elimination
+            - Start with uncalled functions being removed
+            - Foreign functions will rename in the code because it is turning out
+                to be a nightmare to remove them. Lot's of refactoring... ugh
 
         [ ] Enum types
 

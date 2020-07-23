@@ -15,6 +15,8 @@ void onyx_sempass_init(bh_allocator alloc, bh_allocator node_alloc) {
 }
 
 void onyx_sempass(ProgramInfo* program) {
+    semstate.program = program;
+
     onyx_resolve_symbols(program);
     if (onyx_message_has_errors()) return;
 

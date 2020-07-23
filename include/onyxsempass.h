@@ -12,6 +12,9 @@ typedef struct SemState {
     // to make any more node in the tree
     bh_allocator allocator, node_allocator;
 
+    // NOTE: Used wherever
+    ProgramInfo* program;
+
     // NOTE: Used in symbol resolution phase
     Scope*         global_scope;
     Scope*         curr_scope;
@@ -24,10 +27,10 @@ typedef struct SemState {
 extern SemState semstate;
 
 // NOTE: Resolving all symbols in the tree
-void onyx_resolve_symbols(ProgramInfo* program);
+void onyx_resolve_symbols();
 
 // NOTE: Inferring and checking types in the tree
-void onyx_type_check(ProgramInfo* program);
+void onyx_type_check();
 
 // NOTE: Full semantic pass
 void onyx_sempass_init(bh_allocator alloc, bh_allocator node_alloc);

@@ -328,6 +328,8 @@ CHECK(call, AstCall* call) {
         return 1;
     }
 
+    callee->flags |= Ast_Flag_Function_Used;
+
     return 0;
 }
 
@@ -426,7 +428,7 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
     }
 
     if (binop->operation >= Binary_Op_Bool_And
-            && binop->operation <= Binary_Op_Bool_Xor) {
+            && binop->operation <= Binary_Op_Bool_Or) {
 
         if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
             onyx_message_add(Msg_Type_Literal,
@@ -900,11 +902,13 @@ CHECK(node, AstNode* node) {
     }
 }
 
-void onyx_type_check(ProgramInfo* program) {
-    bh_arr_each(Entity, entity, program->entities) {
+void onyx_type_check() {
+    bh_arr_each(Entity, entity, semstate.program->entities) {
         switch (entity->type) {
             case Entity_Type_Function_Header:
-                if (entity->function->flags & Ast_Kind_Foreign) program->foreign_func_count++;
+                if (entity->function->flags & Ast_Kind_Foreign)
+                    semstate.program->foreign_func_count++;
+                
                 if (check_function_header(entity->function)) return;
                 break;
 
@@ -917,7 +921,8 @@ void onyx_type_check(ProgramInfo* program) {
                 break;
 
             case Entity_Type_Global:
-                if (entity->global->flags & Ast_Kind_Foreign) program->foreign_global_count++;
+                if (entity->global->flags & Ast_Kind_Foreign)
+                    semstate.program->foreign_global_count++;
 
                 if (check_global(entity->global)) return;
                 break;

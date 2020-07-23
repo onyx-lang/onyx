@@ -389,7 +389,7 @@ static void symres_overloaded_function(AstOverloadedFunction* ofunc) {
     }
 }
 
-void onyx_resolve_symbols(ProgramInfo* program) {
+void onyx_resolve_symbols() {
 
     semstate.global_scope = scope_create(semstate.node_allocator, NULL);
     scope_enter(semstate.global_scope);
@@ -401,10 +401,10 @@ void onyx_resolve_symbols(ProgramInfo* program) {
         bsym++;
     }
 
-    bh_arr_each(AstBinding *, binding, program->bindings)
+    bh_arr_each(AstBinding *, binding, semstate.program->bindings)
         if (!symbol_introduce((*binding)->token, (*binding)->node)) return;
 
-    bh_arr_each(Entity, entity, program->entities) {
+    bh_arr_each(Entity, entity, semstate.program->entities) {
         switch (entity->type) {
             case Entity_Type_Function:            symres_function(entity->function); break;
             case Entity_Type_Overloaded_Function: symres_overloaded_function(entity->overloaded_function); break;

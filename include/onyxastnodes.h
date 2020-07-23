@@ -117,6 +117,7 @@ typedef enum AstFlags {
     // Function flags
     Ast_Flag_Inline           = BH_BIT(8),
     Ast_Flag_Intrinsic        = BH_BIT(9),
+    Ast_Flag_Function_Used    = BH_BIT(10),
 
     // Expression flags
     Ast_Flag_Expr_Ignored     = BH_BIT(8),
@@ -155,22 +156,21 @@ typedef enum BinaryOp {
 
     Binary_Op_Bool_And        = 17,
     Binary_Op_Bool_Or         = 18,
-    Binary_Op_Bool_Xor        = 19,
 
-    Binary_Op_Assign_Start    = 20,
-    Binary_Op_Assign          = 21,
-    Binary_Op_Assign_Add      = 22,
-    Binary_Op_Assign_Minus    = 23,
-    Binary_Op_Assign_Multiply = 24,
-    Binary_Op_Assign_Divide   = 25,
-    Binary_Op_Assign_Modulus  = 26,
-    Binary_Op_Assign_And      = 27,
-    Binary_Op_Assign_Or       = 28,
-    Binary_Op_Assign_Xor      = 29,
-    Binary_Op_Assign_Shl      = 30,
-    Binary_Op_Assign_Shr      = 31,
-    Binary_Op_Assign_Sar      = 32,
-    Binary_Op_Assign_End      = 33,
+    Binary_Op_Assign_Start    = 19,
+    Binary_Op_Assign          = 20,
+    Binary_Op_Assign_Add      = 21,
+    Binary_Op_Assign_Minus    = 22,
+    Binary_Op_Assign_Multiply = 23,
+    Binary_Op_Assign_Divide   = 24,
+    Binary_Op_Assign_Modulus  = 25,
+    Binary_Op_Assign_And      = 26,
+    Binary_Op_Assign_Or       = 27,
+    Binary_Op_Assign_Xor      = 28,
+    Binary_Op_Assign_Shl      = 29,
+    Binary_Op_Assign_Shr      = 30,
+    Binary_Op_Assign_Sar      = 31,
+    Binary_Op_Assign_End      = 32,
 } BinaryOp;
 
 typedef enum OnyxIntrinsic {

@@ -596,7 +596,6 @@ static const WasmInstructionType binop_map[][4] = {
 
     /* BAND */ { WI_I32_AND,   WI_I64_AND,   WI_NOP,     WI_NOP },
     /* BOR  */ { WI_I32_OR,    WI_I64_OR,    WI_NOP,     WI_NOP },
-    /* BXOR */ { WI_I32_XOR,   WI_I64_XOR,   WI_NOP,     WI_NOP },
 };
 
 COMPILE_FUNC(binop, AstBinaryOp* binop) {
@@ -1115,9 +1114,27 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
     return type_idx;
 }
 
+static inline b32 should_compile_function(AstFunction* fd) {
+    // NOTE: Don't output intrinsic functions
+    if (fd->flags & Ast_Flag_Intrinsic) return 0;
+
+    if (fd->flags & Ast_Flag_Foreign) return 1;
+
+    // NOTE: Don't output functions that are not used, only if
+    // they are also not exported.
+    if ((fd->flags & Ast_Flag_Function_Used) == 0) {
+        if (fd->flags & Ast_Flag_Exported) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
-    // NOTE: Don't compile intrinsics
-    if (fd->flags & Ast_Flag_Intrinsic) return;
+    if (!should_compile_function(fd)) return;
 
     i32 type_idx = generate_type_idx(mod, fd);
 
@@ -1351,7 +1368,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
     bh_arr_each(Entity, entity, program->entities) {
         switch (entity->type) {
             case Entity_Type_Function_Header: {
-                if (entity->function->flags & Ast_Flag_Intrinsic) break;
+                if (!should_compile_function(entity->function)) break;
 
                 u64 func_idx;
                 if ((entity->function->flags & Ast_Flag_Foreign) != 0)
