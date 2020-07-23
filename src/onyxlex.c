@@ -149,6 +149,9 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     LITERAL_TOKEN("->",         0, Token_Type_Right_Arrow);
     LITERAL_TOKEN("<-",         0, Token_Type_Right_Arrow);
     LITERAL_TOKEN("---",        0, Token_Type_Empty_Block);
+    LITERAL_TOKEN("&&",         0, Token_Type_And_And);
+    LITERAL_TOKEN("||",         0, Token_Type_Or_Or);
+    LITERAL_TOKEN("^^",         0, Token_Type_Xor_Xor);
     LITERAL_TOKEN("<=",         0, Token_Type_Less_Equal);
     LITERAL_TOKEN(">=",         0, Token_Type_Greater_Equal);
     LITERAL_TOKEN("==",         0, Token_Type_Equal_Equal);

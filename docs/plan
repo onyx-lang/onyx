@@ -102,17 +102,22 @@ HOW:
             - Literals should be placed in data section with pointers to the start.
             - Should strings be null-terminated or a length at the start of the string?
 
-        [ ] Struct splatting in arguments and parameters
+        [X] Struct splatting in arguments and parameters
 
         [X] UFC syntax for structs
 
-        [ ] Enum types
+        [X] Logical boolean operators
 
-        [ ] Procedures as arguments
+        [ ] Bitwise operators
+
+        [ ] Enum types
 
         [ ] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
+        [ ] Switch statements
+
+        [ ] Procedures as arguments
 
 
 

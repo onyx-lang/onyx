@@ -39,14 +39,17 @@ typedef enum TokenType {
     Token_Type_Star_Equal           = 283,
     Token_Type_Fslash_Equal         = 284,
     Token_Type_Percent_Equal        = 285,
+    Token_Type_And_And              = 286,
+    Token_Type_Or_Or                = 287,
+    Token_Type_Xor_Xor              = 288,
 
-    Token_Type_Symbol               = 286,
-    Token_Type_Literal_String       = 287,
-    Token_Type_Literal_Numeric      = 288,
-    Token_Type_Literal_True         = 289,
-    Token_Type_Literal_False        = 290,
+    Token_Type_Symbol               = 289,
+    Token_Type_Literal_String       = 290,
+    Token_Type_Literal_Numeric      = 291,
+    Token_Type_Literal_True         = 292,
+    Token_Type_Literal_False        = 293,
 
-    Token_Type_Count                = 291,
+    Token_Type_Count                = 294,
 } TokenType;
 
 typedef struct OnyxFilePos {

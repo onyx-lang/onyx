@@ -198,6 +198,8 @@ CHECK(call, AstCall* call) {
                 arg->token = actual_param->token;
                 arg->next = actual_param->next;
 
+                call->arg_count++;
+
                 *prev_param = (AstNode *) arg;
                 prev_param = (AstNode **) &arg->next;
             }
@@ -417,11 +419,25 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         return 1;
     }
 
-    if (binop->operation >= Binary_Op_Equal
+    if (binop->operation >= Binary_Op_Bool_And
+            && binop->operation <= Binary_Op_Bool_Xor) {
+
+        if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
+            onyx_message_add(Msg_Type_Literal,
+                    binop->token->pos,
+                    "boolean operator expects boolean types for both operands");
+            return 1;
+        }
+
+        binop->type = &basic_types[Basic_Kind_Bool];
+        
+    } else if (binop->operation >= Binary_Op_Equal
             && binop->operation <= Binary_Op_Greater_Equal) {
         binop->type = &basic_types[Basic_Kind_Bool];
+
     } else if (binop_is_assignment(binop)) {
         binop->type = &basic_types[Basic_Kind_Void];
+
     } else {
         binop->type = binop->left->type;
     }

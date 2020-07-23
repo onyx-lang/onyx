@@ -146,14 +146,18 @@ typedef enum BinaryOp {
     Binary_Op_Greater         = 9,
     Binary_Op_Greater_Equal   = 10,
 
-    Binary_Op_Assign_Start    = 11,
-    Binary_Op_Assign          = 12,
-    Binary_Op_Assign_Add      = 13,
-    Binary_Op_Assign_Minus    = 14,
-    Binary_Op_Assign_Multiply = 15,
-    Binary_Op_Assign_Divide   = 16,
-    Binary_Op_Assign_Modulus  = 17,
-    Binary_Op_Assign_End      = 18,
+    Binary_Op_Bool_And        = 11,
+    Binary_Op_Bool_Or         = 12,
+    Binary_Op_Bool_Xor        = 13,
+
+    Binary_Op_Assign_Start    = 14,
+    Binary_Op_Assign          = 15,
+    Binary_Op_Assign_Add      = 16,
+    Binary_Op_Assign_Minus    = 17,
+    Binary_Op_Assign_Multiply = 18,
+    Binary_Op_Assign_Divide   = 19,
+    Binary_Op_Assign_Modulus  = 20,
+    Binary_Op_Assign_End      = 21,
 } BinaryOp;
 
 typedef enum OnyxIntrinsic {

@@ -121,6 +121,20 @@ minus :: proc (n: i32, k: i32) -> i32 {
     return n - k;
 }
 
+Fool :: struct {
+    bar : ^Bar;
+}
+
+Bar :: struct {
+    i: i32;
+    j: i64;
+}
+
+print_bar :: proc (bar: Bar) {
+    print(bar.i);
+    print(bar.j);
+}
+
 proc #export "main" {
     v2 := alloc(sizeof Vec2) as ^Vec2;
     v2.x = 5;
@@ -133,9 +147,16 @@ proc #export "main" {
     v3.z = 1;
     print(v3.magnitude());
 
-    vec2_splat(*v2, *v3);
+    (*v2).vec2_splat(*v3);
 
     print((1).minus(2));
+
+    foo := alloc(sizeof Fool) as ^Fool;
+    foo.bar = alloc(sizeof Bar) as ^Bar;
+    foo.bar.i = 50;
+    foo.bar.j = 70 as i64;
+
+    (*foo.bar).print_bar();
 }
 
 SOA :: struct {
@@ -149,13 +170,13 @@ vec2_set :: proc (v: ^Vec2) {
     v.y = 5678;
 }
 
-vec2_splat :: proc (vx: i32, vy: i32, other: Vec3) {
+vec2_splat :: proc (v: Vec2, other: Vec3) {
     print(other.x);
     print(other.y);
     print(other.z);
 
-    print(vx);
-    print(vy);
+    print(v.x);
+    print(v.y);
 }
 
 soa_test :: proc #export "main9" {

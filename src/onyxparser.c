@@ -324,12 +324,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
 static inline i32 get_precedence(BinaryOp kind) {
     switch (kind) {
-        case Binary_Op_Assign:          return 2;
-        case Binary_Op_Assign_Add:      return 2;
-        case Binary_Op_Assign_Minus:    return 2;
-        case Binary_Op_Assign_Multiply: return 2;
-        case Binary_Op_Assign_Divide:   return 2;
-        case Binary_Op_Assign_Modulus:  return 2;
+        case Binary_Op_Assign:          return 1;
+        case Binary_Op_Assign_Add:      return 1;
+        case Binary_Op_Assign_Minus:    return 1;
+        case Binary_Op_Assign_Multiply: return 1;
+        case Binary_Op_Assign_Divide:   return 1;
+        case Binary_Op_Assign_Modulus:  return 1;
+
+        case Binary_Op_Bool_And:        return 2;
+        case Binary_Op_Bool_Or:         return 2;
+        case Binary_Op_Bool_Xor:        return 2;
 
         case Binary_Op_Equal:           return 3;
         case Binary_Op_Not_Equal:       return 3;
@@ -397,6 +401,10 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             case '*':                       bin_op_kind = Binary_Op_Multiply; break;
             case '/':                       bin_op_kind = Binary_Op_Divide; break;
             case '%':                       bin_op_kind = Binary_Op_Modulus; break;
+
+            case Token_Type_And_And:        bin_op_kind = Binary_Op_Bool_And; break;
+            case Token_Type_Or_Or:          bin_op_kind = Binary_Op_Bool_Or; break;
+            case Token_Type_Xor_Xor:        bin_op_kind = Binary_Op_Bool_Xor; break;
 
             case '=':                       bin_op_kind = Binary_Op_Assign; break;
             case Token_Type_Plus_Equal:     bin_op_kind = Binary_Op_Assign_Add; break;

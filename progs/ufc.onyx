@@ -1,0 +1,87 @@
+use "progs/intrinsics"
+use "progs/print_funcs"
+
+alloc :: proc (size: u32) -> rawptr {
+    heap_u32    :: __heap_start as ^u32;
+
+    curr_offset := *heap_u32;
+    if curr_offset == 0 curr_offset = 8;
+
+    *heap_u32   = curr_offset + size;
+
+    return ((__heap_start as u32) + curr_offset) as rawptr;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Vec2 :: struct {
+	x : f32;
+	y : f32;
+}
+
+vec2_magnitude :: proc (v: ^Vec2) -> i32 {
+	return sqrt_f32(v.x * v.x + v.y * v.y) as i32;
+}
+
+Vec3 :: struct {
+	x : f32;
+	y : f32;
+	z : f32;
+}
+
+vec3_magnitude :: proc (v: ^Vec3) -> f32 {
+	return sqrt_f32(v.x * v.x + v.y * v.y + v.z * v.z);	
+}
+
+magnitude :: proc #overloaded {
+	vec2_magnitude,
+	vec3_magnitude,
+}
+
+dot :: proc (v: Vec2, u: Vec2) -> f32 {
+	return v.x * u.x + v.y * u.y;
+}
+
+proc #export "main" {
+	vec := alloc(sizeof Vec2) as ^Vec2;
+	vec.x = 5.0f;
+	vec.y = 12.0f;
+
+	print(vec.x);
+	print(vec.y);
+
+	mag :: vec.magnitude();
+
+	print(mag);
+
+	print((*vec).dot(1.0f, 1.0f));
+	print(dot(2.0f, 4.0f, -6.0f, 3.0f));
+
+
+	v3 := alloc(sizeof Vec3) as ^Vec3;
+	v3.x = 5.0f;
+	v3.y = 12.0f;
+	v3.z = 13.0f;
+
+	print(v3.magnitude());
+}

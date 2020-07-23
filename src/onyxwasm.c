@@ -586,6 +586,10 @@ static const WasmInstructionType binop_map[][4] = {
     /* LTE */ { WI_I32_LE_S,  WI_I64_LE_S,  WI_F32_LE,  WI_F64_LE },
     /* GT  */ { WI_I32_GT_S,  WI_I64_GT_S,  WI_F32_GT,  WI_F64_GT },
     /* GTE */ { WI_I32_GE_S,  WI_I64_GE_S,  WI_F32_GE,  WI_F64_GE },
+
+    /* AND */ { WI_I32_AND,   WI_I64_AND,   WI_NOP,     WI_NOP },
+    /* OR  */ { WI_I32_OR,    WI_I64_OR,    WI_NOP,     WI_NOP },
+    /* XOR */ { WI_I32_XOR,   WI_I64_XOR,   WI_NOP,     WI_NOP },
 };
 
 COMPILE_FUNC(binop, AstBinaryOp* binop) {
