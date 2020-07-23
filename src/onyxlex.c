@@ -143,6 +143,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     }
 
     LITERAL_TOKEN("struct",     1, Token_Type_Keyword_Struct);
+    LITERAL_TOKEN("enum"  ,     1, Token_Type_Keyword_Enum);
     LITERAL_TOKEN("use",        1, Token_Type_Keyword_Use);
     LITERAL_TOKEN("if",         1, Token_Type_Keyword_If);
     LITERAL_TOKEN("elseif",     1, Token_Type_Keyword_Elseif);

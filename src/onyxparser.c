@@ -1056,6 +1056,10 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     else if (parser->curr->type == Token_Type_Keyword_Struct) {
         return (AstTyped *) parse_struct(parser);
     }
+    else if (parser->curr->type == Token_Type_Keyword_Enum) {
+        consume_token(parser);
+        return (AstTyped *) &error_node;
+    }
     else {
         return parse_expression(parser);
     }

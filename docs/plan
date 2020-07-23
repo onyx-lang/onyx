@@ -115,6 +115,8 @@ HOW:
             - Foreign functions will rename in the code because it is turning out
                 to be a nightmare to remove them. Lot's of refactoring... ugh
 
+        [ ] Package system
+
         [ ] Enum types
 
         [ ] Static pointers to sized data

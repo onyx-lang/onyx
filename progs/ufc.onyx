@@ -62,6 +62,10 @@ dot :: proc (v: Vec2, u: Vec2) -> f32 {
 	return v.x * u.x + v.y * u.y;
 }
 
+
+// SomeType :: enum (u32) { Value1, Value2 }
+
+
 proc #export "main" {
 	vec := alloc(sizeof Vec2) as ^Vec2;
 	vec.x = 5.0f;
