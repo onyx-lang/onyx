@@ -73,6 +73,15 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     return token;
 }
 
+static void add_node_to_process(OnyxParser* parser, AstNode* node) {
+    bh_arr_push(parser->results.nodes_to_process, ((NodeToProcess) {
+        .scope = parser->package_scope,
+        .node = node,
+    }));
+}
+
+
+
 static AstNumLit* parse_numeric_literal(OnyxParser* parser) {
     AstNumLit* lit_node = make_node(AstNumLit, Ast_Kind_NumLit);
     lit_node->token = expect_token(parser, Token_Type_Literal_Numeric);
@@ -210,7 +219,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             str_node->type_node = (AstType *) str_type;
             str_node->addr      = 0;
 
-            bh_arr_push(parser->results.nodes_to_process, (AstNode *) str_node);
+            add_node_to_process(parser, (AstNode *) str_node);
 
             retval = (AstTyped *) str_node;
             break;
@@ -1034,7 +1043,7 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
 
     global_node->type_node = parse_type(parser);
 
-    bh_arr_push(parser->results.nodes_to_process, (AstNode *) global_node);
+    add_node_to_process(parser, (AstNode *) global_node);
 
     return (AstTyped *) global_node;
 }
@@ -1046,7 +1055,7 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Proc) {
         AstFunction* func_node = parse_function_definition(parser);
 
-        bh_arr_push(parser->results.nodes_to_process, (AstNode *) func_node);
+        add_node_to_process(parser, (AstNode *) func_node);
 
         return (AstTyped *) func_node;
     }
@@ -1070,11 +1079,51 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
 static AstNode* parse_top_level_statement(OnyxParser* parser) {
     switch (parser->curr->type) {
         case Token_Type_Keyword_Use: {
-            AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
-            use_node->token = expect_token(parser, Token_Type_Keyword_Use);
-            use_node->filename = expect_token(parser, Token_Type_Literal_String);
+            OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
 
-            return (AstNode *) use_node;
+            if (parser->curr->type == Token_Type_Keyword_Package) {
+                consume_token(parser);
+
+                AstUsePackage* upack = make_node(AstUsePackage, Ast_Kind_Use_Package);
+                upack->token = use_token;
+
+                AstNode* pack_symbol = make_node(AstNode, Ast_Kind_Symbol);
+                pack_symbol->token = expect_token(parser, Token_Type_Symbol);
+                upack->package = (AstPackage *) pack_symbol;
+
+                // followed by 'as'
+                if (parser->curr->type == Token_Type_Keyword_Cast) {
+                    consume_token(parser);
+                    upack->alias = expect_token(parser, Token_Type_Symbol);
+                }
+
+                if (parser->curr->type == '{') {
+                    consume_token(parser);
+
+                    bh_arr_new(global_heap_allocator, upack->only, 4);
+
+                    while (parser->curr->type != '}') {
+                        OnyxToken* only_token = expect_token(parser, Token_Type_Symbol);
+
+                        bh_arr_push(upack->only, only_token);
+
+                        if (parser->curr->type != '}')
+                            expect_token(parser, ',');
+                    }
+
+                    consume_token(parser);
+                }
+
+                add_node_to_process(parser, (AstNode *) upack);
+                return NULL;
+                
+            } else {
+                AstIncludeFile* include = make_node(AstIncludeFile, Ast_Kind_Include_File);
+                include->token = use_token;
+                include->filename = expect_token(parser, Token_Type_Literal_String);
+
+                return (AstNode *) include;
+            }
         }
 
         case Token_Type_Keyword_Proc:
@@ -1111,7 +1160,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 }
 
                 // HACK
-                bh_arr_push(parser->results.nodes_to_process, (AstNode *) node);
+                add_node_to_process(parser, (AstNode *) node);
             }
 
             AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
@@ -1142,24 +1191,23 @@ void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
     return node;
 }
 
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
+OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, ProgramInfo* program) {
     OnyxParser parser;
 
     parser.allocator = alloc;
     parser.tokenizer = tokenizer;
     parser.curr = tokenizer->tokens;
     parser.prev = NULL;
+    parser.program = program;
 
     parser.results = (ParseResults) {
         .allocator = global_heap_allocator,
 
-        .uses = NULL,
-        .bindings = NULL,
+        .files = NULL,
         .nodes_to_process = NULL,
     };
 
-    bh_arr_new(parser.results.allocator, parser.results.uses, 4);
-    bh_arr_new(parser.results.allocator, parser.results.bindings, 4);
+    bh_arr_new(parser.results.allocator, parser.results.files, 4);
     bh_arr_new(parser.results.allocator, parser.results.nodes_to_process, 4);
 
     return parser;
@@ -1169,6 +1217,31 @@ void onyx_parser_free(OnyxParser* parser) {
 }
 
 ParseResults onyx_parse(OnyxParser *parser) {
+    if (parser->curr->type == Token_Type_Keyword_Package) {
+        consume_token(parser);
+
+        OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+
+        token_toggle_end(symbol);
+        Package *package = program_info_package_lookup_or_create(
+            parser->program,
+            symbol->text,
+            parser->program->global_scope,
+            parser->allocator);
+        token_toggle_end(symbol);
+
+        parser->package_scope = package->scope;
+
+    } else {
+        Package *package = program_info_package_lookup_or_create(
+            parser->program,
+            "main",
+            parser->program->global_scope,
+            parser->allocator);
+
+        parser->package_scope = package->scope;
+    }
+
     while (parser->curr->type != Token_Type_End_Stream) {
         AstNode* curr_stmt = parse_top_level_statement(parser);
 
@@ -1176,8 +1249,14 @@ ParseResults onyx_parse(OnyxParser *parser) {
             while (curr_stmt != NULL) {
 
                 switch (curr_stmt->kind) {
-                    case Ast_Kind_Use:     bh_arr_push(parser->results.uses, (AstUse *) curr_stmt); break;
-                    case Ast_Kind_Binding: bh_arr_push(parser->results.bindings, (AstBinding *) curr_stmt); break;
+                    case Ast_Kind_Include_File: bh_arr_push(parser->results.files, (AstIncludeFile *) curr_stmt); break;
+                    case Ast_Kind_Binding: {
+                        symbol_introduce(parser->package_scope,
+                            ((AstBinding *) curr_stmt)->token,
+                            ((AstBinding *) curr_stmt)->node);
+                        break;
+                    }
+
                     default: assert(("Invalid top level node", 0));
                 }
 

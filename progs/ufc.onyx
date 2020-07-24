@@ -1,6 +1,8 @@
 use "progs/intrinsics"
 use "progs/print_funcs"
 
+use package printing as printing
+
 alloc :: proc (size: u32) -> rawptr {
     heap_u32    :: __heap_start as ^u32;
 
@@ -71,15 +73,15 @@ proc #export "main" {
 	vec.x = 5.0f;
 	vec.y = 12.0f;
 
-	print(vec.x);
-	print(vec.y);
+	printing.print(vec.x);
+	printing.print(vec.y);
 
 	mag :: vec.magnitude();
 
-	print(mag);
+	printing.print(mag);
 
-	print((*vec).dot(1.0f, 1.0f));
-	print(dot(2.0f, 4.0f, -6.0f, 3.0f));
+	printing.print((*vec).dot(1.0f, 1.0f));
+	printing.print(dot(2.0f, 4.0f, -6.0f, 3.0f));
 
 
 	v3 := alloc(sizeof Vec3) as ^Vec3;
@@ -87,12 +89,12 @@ proc #export "main" {
 	v3.y = 12.0f;
 	v3.z = 13.0f;
 
-	print(v3.magnitude());
+	printing.print(v3.magnitude());
 
 	foo := 5;
 	foo <<= 2;
 	foo &= 6;
 	foo |= 5;
 	foo >>= 1;
-	print(foo);
+	printing.print(foo);
 }

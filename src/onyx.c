@@ -112,8 +112,7 @@ typedef struct CompilerState {
 static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOptions* opts) {
     compiler_state->options = opts;
 
-    bh_arr_new(global_heap_allocator, compiler_state->prog_info.bindings, 4);
-    bh_arr_new(global_heap_allocator, compiler_state->prog_info.entities, 4);
+    program_info_init(&compiler_state->prog_info, global_heap_allocator);
 
     bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
     compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
@@ -162,7 +161,7 @@ static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_con
     if (compiler_state->options->verbose_output)
         bh_printf("[Parsing]      %s\n", file_contents->filename);
 
-    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer);
+    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->prog_info);
     return onyx_parse(&parser);
 }
 
@@ -171,68 +170,76 @@ static i32 sort_entities(const void* e1, const void* e2) {
 }
 
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
-    bh_arr_each(AstUse *, use_node, results->uses) {
+    bh_arr_each(AstIncludeFile *, include, results->files) {
         char* formatted_name = bh_aprintf(
                 global_heap_allocator,
                 "%b.onyx",
-                (*use_node)->filename->text, (*use_node)->filename->length);
+                (*include)->filename->text, (*include)->filename->length);
 
         bh_arr_push(compiler_state->queued_files, formatted_name);
     }
 
-    bh_arr_each(AstBinding *, binding_node, results->bindings)
-        bh_arr_push(compiler_state->prog_info.bindings, *binding_node);
-
     Entity ent;
-    bh_arr_each(AstNode *, node, results->nodes_to_process) {
-        AstKind nkind = (*node)->kind;
+    bh_arr_each(NodeToProcess, n, results->nodes_to_process) {
+        AstNode* node = n->node;
+        AstKind nkind = node->kind;
+
+        ent.scope = n->scope;
+
         switch (nkind) {
             case Ast_Kind_Function: {
                 ent.type     = Entity_Type_Function_Header;
-                ent.function = (AstFunction *) *node;
+                ent.function = (AstFunction *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
 
                 ent.type     = Entity_Type_Function;
-                ent.function = (AstFunction *) *node;
+                ent.function = (AstFunction *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }
 
             case Ast_Kind_Overloaded_Function: {
                 ent.type                = Entity_Type_Overloaded_Function;
-                ent.overloaded_function = (AstOverloadedFunction *) *node;
+                ent.overloaded_function = (AstOverloadedFunction *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }
 
             case Ast_Kind_Global: {
                 ent.type   = Entity_Type_Global_Header;
-                ent.global = (AstGlobal *) *node;
+                ent.global = (AstGlobal *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
 
                 ent.type   = Entity_Type_Global;
-                ent.global = (AstGlobal *) *node;
+                ent.global = (AstGlobal *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }
 
             case Ast_Kind_StrLit: {
                 ent.type   = Entity_Type_String_Literal;
-                ent.strlit = (AstStrLit *) *node;
+                ent.strlit = (AstStrLit *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }
 
             case Ast_Kind_Struct_Type: {
                 ent.type = Entity_Type_Struct;
-                ent.struct_type = (AstStructType *) *node;
+                ent.struct_type = (AstStructType *) node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+                break;
+            }
+
+            case Ast_Kind_Use_Package: {
+                ent.type = Entity_Type_Use_Package;
+                ent.use_package = (AstUsePackage *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }
 
             default: {
                 ent.type = Entity_Type_Expression;
-                ent.expr = (AstTyped *) *node;
+                ent.expr = (AstTyped *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }

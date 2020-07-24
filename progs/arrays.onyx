@@ -1,6 +1,8 @@
 use "progs/intrinsics"
 use "progs/print_funcs"
 
+use package printing
+
 global_arr :: global []i32;
 
 min_i32 :: proc (a: i32, b: i32) -> i32 {
@@ -71,7 +73,6 @@ proc #export "main2" {
     print(1234567);
     print(global_arr, len);
 }
-
 
 
 

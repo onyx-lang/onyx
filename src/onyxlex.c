@@ -8,9 +8,10 @@ static const char* token_type_names[] = {
 
     "TOKEN_TYPE_COMMENT",
 
+    "package",
     "struct",
+    "enum",
     "use",
-    "export",
     "if",
     "else",
     "elseif",
@@ -42,13 +43,12 @@ static const char* token_type_names[] = {
     "^=",
     "&&",
     "||",
-    "^^",
     "<<",
     ">>",
     ">>>",
     "<<=",
     ">>=",
-    ">>>="
+    ">>>=",
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
@@ -142,6 +142,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         goto token_parsed;
     }
 
+    LITERAL_TOKEN("package",    1, Token_Type_Keyword_Package);
     LITERAL_TOKEN("struct",     1, Token_Type_Keyword_Struct);
     LITERAL_TOKEN("enum"  ,     1, Token_Type_Keyword_Enum);
     LITERAL_TOKEN("use",        1, Token_Type_Keyword_Use);

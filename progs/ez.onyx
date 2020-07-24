@@ -1,0 +1,24 @@
+use "progs/print_funcs"
+
+use package printing
+
+Foo :: struct {
+	x : i32;
+	y : i32;
+}
+
+foo_sum :: proc (foo: ^Foo) -> i32 {
+	return foo.x + foo.y;
+}
+
+proc #export "main" {
+	foo := __heap_start as ^Foo;
+	foo.x = 123;
+	foo.y = 321;
+	print(foo.foo_sum());
+
+
+	print(1234);
+
+	print_f32(123.0f);
+}

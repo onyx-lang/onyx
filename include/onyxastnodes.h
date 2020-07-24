@@ -40,11 +40,14 @@ typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
 
 typedef struct AstBinding AstBinding;
-typedef struct AstUse AstUse;
+typedef struct AstIncludeFile AstIncludeFile;
+typedef struct AstUsePackage AstUsePackage;
 typedef struct AstGlobal AstGlobal;
 typedef struct AstFunction AstFunction;
 typedef struct AstOverloadedFunction AstOverloadedFunction;
 
+typedef struct AstPackage AstPackage;
+typedef struct Package Package;
 
 typedef struct Scope {
     struct Scope *parent;
@@ -57,7 +60,9 @@ extern Scope* scope_create(bh_allocator a, Scope* parent);
 typedef enum AstKind {
     Ast_Kind_Error,
     Ast_Kind_Program,
-    Ast_Kind_Use,
+    Ast_Kind_Package,
+    Ast_Kind_Include_File,
+    Ast_Kind_Use_Package,
 
     Ast_Kind_Binding,
     Ast_Kind_Function,
@@ -302,8 +307,15 @@ struct AstStructMember { AstTyped_base; u64 offset; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
-struct AstForeign       { AstNode_base;  OnyxToken *mod_token, *name_token; AstNode *import; };
-struct AstUse           { AstNode_base;  OnyxToken *filename; };
+struct AstForeign       { AstNode_base; OnyxToken *mod_token, *name_token; AstNode *import; };
+struct AstIncludeFile   { AstNode_base; OnyxToken *filename; };
+struct AstUsePackage    {
+    AstNode_base;
+
+    AstPackage *package;
+    OnyxToken *alias;
+    bh_arr(OnyxToken *) only;
+};
 struct AstGlobal        {
     AstTyped_base;
 
@@ -343,12 +355,18 @@ struct AstOverloadedFunction {
 
     bh_arr(AstTyped *) overloads;
 };
+struct AstPackage {
+    AstNode_base;
+
+    Package* package;
+};
 
 
 // NOTE: An Entity represents something will need to be
 // processed later down the pipeline.
 typedef enum EntityType {
     Entity_Type_Unknown,
+    Entity_Type_Use_Package,
     Entity_Type_String_Literal,
     Entity_Type_Struct,
     Entity_Type_Function_Header,
@@ -361,8 +379,10 @@ typedef enum EntityType {
 
 typedef struct Entity {
     EntityType type;
+    Scope *scope;
 
     union {
+        AstUsePackage         *use_package;
         AstFunction           *function;
         AstOverloadedFunction *overloaded_function;
         AstGlobal             *global;
@@ -372,10 +392,16 @@ typedef struct Entity {
     };
 } Entity;
 
+struct Package {
+    char *name;
+    Scope *scope;
+};
 
 // NOTE: Simple data structure for storing what comes out of the parser
 typedef struct ProgramInfo {
-    bh_arr(AstBinding *)  bindings;
+    Scope *global_scope;
+
+    bh_table(Package *)   packages;
     bh_arr(Entity)        entities;
 
     u32 foreign_func_count;

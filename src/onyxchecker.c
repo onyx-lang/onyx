@@ -906,7 +906,7 @@ void onyx_type_check() {
     bh_arr_each(Entity, entity, semstate.program->entities) {
         switch (entity->type) {
             case Entity_Type_Function_Header:
-                if (entity->function->flags & Ast_Kind_Foreign)
+                if (entity->function->flags & Ast_Flag_Foreign)
                     semstate.program->foreign_func_count++;
                 
                 if (check_function_header(entity->function)) return;
@@ -921,7 +921,7 @@ void onyx_type_check() {
                 break;
 
             case Entity_Type_Global:
-                if (entity->global->flags & Ast_Kind_Foreign)
+                if (entity->global->flags & Ast_Flag_Foreign)
                     semstate.program->foreign_global_count++;
 
                 if (check_global(entity->global)) return;
@@ -938,6 +938,8 @@ void onyx_type_check() {
             case Entity_Type_String_Literal: break;
 
             case Entity_Type_Global_Header: break;
+
+            case Entity_Type_Use_Package: break;
 
             default: DEBUG_HERE; break;
         }

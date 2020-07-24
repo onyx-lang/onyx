@@ -1,6 +1,8 @@
 use "progs/print_funcs"
 use "progs/intrinsics"
 
+use package printing
+
 N :: 5
 
 Foo :: struct {

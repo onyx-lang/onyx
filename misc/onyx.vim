@@ -10,13 +10,13 @@ endif
 let s:cpo_save = &cpo
 set cpo&vim
 
-syn keyword onyxKeyword struct proc use global
+syn keyword onyxKeyword package struct proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword break continue return
 syn keyword onyxKeyword as sizeof
 
-syn keyword onyxType unknown bool void
+syn keyword onyxType bool void
 syn keyword onyxType i8 u8
 syn keyword onyxType i16 u16
 syn keyword onyxType i32 u32

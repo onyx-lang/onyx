@@ -1,6 +1,7 @@
 #include "onyxutils.h"
 #include "onyxlex.h"
 #include "onyxastnodes.h"
+#include "onyxmsgs.h"
 
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
@@ -10,6 +11,7 @@ bh_allocator global_heap_allocator;
 
 static const char* ast_node_names[] = {
     "ERROR",
+    "PACKAGE",
     "PROGRAM",
     "USE",
 
@@ -62,7 +64,41 @@ const char* onyx_ast_node_kind_string(AstKind kind) {
 }
 
 
+void program_info_init(ProgramInfo* prog, bh_allocator alloc) {
+    prog->global_scope = scope_create(alloc, NULL);
 
+    bh_table_init(alloc, prog->packages, 16);
+
+    prog->entities = NULL;
+    bh_arr_new(alloc, prog->entities, 4);
+}
+
+Package* program_info_package_lookup(ProgramInfo* prog, char* package_name) {
+    if (bh_table_has(Package *, prog->packages, package_name)) {
+        return bh_table_get(Package *, prog->packages, package_name);
+    } else {
+        return NULL;
+    }
+}
+
+Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_name, Scope* parent_scope, bh_allocator alloc) {
+    if (bh_table_has(Package *, prog->packages, package_name)) {
+        return bh_table_get(Package *, prog->packages, package_name);
+
+    } else {
+        Package* package = bh_alloc_item(alloc, Package);
+
+        char* pac_name = bh_alloc_array(alloc, char, strlen(package_name) + 1);
+        memcpy(pac_name, package_name, strlen(package_name) + 1);
+
+        package->name = pac_name;
+        package->scope = scope_create(alloc, parent_scope);
+
+        bh_table_put(Package *, prog->packages, pac_name, package);
+
+        return package;
+    }
+}
 
 Scope* scope_create(bh_allocator a, Scope* parent) {
     Scope* scope = bh_alloc_item(a, Scope);
@@ -73,6 +109,69 @@ Scope* scope_create(bh_allocator a, Scope* parent) {
 
     return scope;
 }
+
+void scope_include(Scope* target, Scope* source) {
+    bh_table_each_start(AstNode *, source->symbols);
+        symbol_raw_introduce(target, (char *) key, value->token->pos, value);
+    bh_table_each_end;
+}
+
+b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
+    token_toggle_end(tkn);
+
+    b32 ret = symbol_raw_introduce(scope, tkn->text, tkn->pos, symbol);
+
+    token_toggle_end(tkn);
+    return ret;
+}
+
+b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
+
+    if (bh_table_has(AstNode *, scope->symbols, name)) {
+        onyx_message_add(Msg_Type_Redeclare_Symbol, pos, name);
+        return 0;
+    }
+
+    bh_table_put(AstNode *, scope->symbols, name, symbol);
+    return 1;
+}
+
+void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
+    bh_table_put(AstNode *, scope->symbols, sym, node);
+}
+
+AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
+    token_toggle_end(tkn);
+
+    AstNode* res = NULL;
+    Scope* scope = start_scope;
+
+    while (res == NULL && scope != NULL) {
+        if (bh_table_has(AstNode *, scope->symbols, tkn->text)) {
+            res = bh_table_get(AstNode *, scope->symbols, tkn->text);
+        } else {
+            scope = scope->parent;
+        }
+    }
+
+    if (res == NULL ) {
+        onyx_message_add(Msg_Type_Unknown_Symbol,
+                tkn->pos,
+                tkn->text);
+
+        token_toggle_end(tkn);
+        return NULL;
+    }
+
+    if (res->kind == Ast_Kind_Symbol) {
+        token_toggle_end(tkn);
+        return symbol_resolve(start_scope, res->token);
+    }
+
+    token_toggle_end(tkn);
+    return res;
+}
+
 
 void onyx_ast_print(AstNode* node, i32 indent) {
     assert(0);

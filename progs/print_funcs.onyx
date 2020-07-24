@@ -1,3 +1,5 @@
+package printing
+
 print_bool :: proc #foreign "host" "print" (value: bool) ---
 print_i32  :: proc #foreign "host" "print" (value: i32) ---
 print_f32  :: proc #foreign "host" "print" (value: f32) ---

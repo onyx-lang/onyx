@@ -1,6 +1,7 @@
 #define BH_DEBUG
 #include "onyxsempass.h"
 #include "onyxparser.h"
+#include "onyxutils.h"
 
 AstBasicType basic_type_void   = { { Ast_Kind_Basic_Type, 0, NULL, "void"   }, &basic_types[Basic_Kind_Void]  };
 AstBasicType basic_type_bool   = { { Ast_Kind_Basic_Type, 0, NULL, "bool"   }, &basic_types[Basic_Kind_Bool]  };
@@ -39,9 +40,6 @@ const BuiltinSymbol builtin_symbols[] = {
     { NULL, NULL },
 };
 
-static b32  symbol_introduce(OnyxToken* tkn, AstNode* symbol);
-static void symbol_builtin_introduce(char* sym, AstNode *node);
-static AstNode* symbol_resolve(OnyxToken* tkn);
 static void scope_enter(Scope* new_scope);
 static void scope_leave();
 
@@ -49,6 +47,7 @@ static AstType* symres_type(AstType* type);
 static void symres_local(AstLocal** local);
 static void symres_call(AstCall* call);
 static void symres_size_of(AstSizeOf* so);
+static void symres_field_access(AstFieldAccess** fa);
 static void symres_expression(AstTyped** expr);
 static void symres_return(AstReturn* ret);
 static void symres_if(AstIf* ifnode);
@@ -60,62 +59,7 @@ static void symres_block(AstBlock* block);
 static void symres_function(AstFunction* func);
 static void symres_global(AstGlobal* global);
 static void symres_overloaded_function(AstOverloadedFunction* ofunc);
-
-static b32 symbol_introduce(OnyxToken* tkn, AstNode* symbol) {
-    token_toggle_end(tkn);
-
-    if (bh_table_has(AstNode *, semstate.curr_scope->symbols, tkn->text)) {
-        onyx_message_add(Msg_Type_Redeclare_Symbol,
-                tkn->pos,
-                tkn->text);
-        token_toggle_end(tkn);
-        return 0;
-    }
-
-    bh_table_put(AstNode *, semstate.curr_scope->symbols, tkn->text, symbol);
-
-    if (symbol->kind == Ast_Kind_Local)
-        bh_arr_push(semstate.curr_function->locals, (AstLocal *) symbol);
-
-    token_toggle_end(tkn);
-    return 1;
-}
-
-static void symbol_builtin_introduce(char* sym, AstNode *node) {
-    bh_table_put(AstNode *, semstate.curr_scope->symbols, sym, node);
-}
-
-static AstNode* symbol_resolve(OnyxToken* tkn) {
-    token_toggle_end(tkn);
-
-    AstNode* res = NULL;
-    Scope* scope = semstate.curr_scope;
-
-    while (res == NULL && scope != NULL) {
-        if (bh_table_has(AstNode *, scope->symbols, tkn->text)) {
-            res = bh_table_get(AstNode *, scope->symbols, tkn->text);
-        } else {
-            scope = scope->parent;
-        }
-    }
-
-    if (res == NULL ) {
-        onyx_message_add(Msg_Type_Unknown_Symbol,
-                tkn->pos,
-                tkn->text);
-
-        token_toggle_end(tkn);
-        return NULL;
-    }
-
-    if (res->kind == Ast_Kind_Symbol) {
-        token_toggle_end(tkn);
-        return symbol_resolve(res->token);
-    }
-
-    token_toggle_end(tkn);
-    return res;
-}
+static void symres_use_package(AstUsePackage* package);
 
 static void scope_enter(Scope* new_scope) {
     new_scope->parent = semstate.curr_scope;
@@ -130,7 +74,7 @@ static AstType* symres_type(AstType* type) {
     if (type == NULL) return NULL;
 
     if (type->kind == Ast_Kind_Symbol) {
-        return (AstType *) symbol_resolve(((AstNode *) type)->token);
+        return (AstType *) symbol_resolve(semstate.curr_scope, ((AstNode *) type)->token);
     }
 
     // NOTE: Already resolved
@@ -183,36 +127,27 @@ static AstType* symres_type(AstType* type) {
 static void symres_local(AstLocal** local) {
     (*local)->type_node = symres_type((*local)->type_node);
 
-    symbol_introduce((*local)->token, (AstNode *) *local);
+    bh_arr_push(semstate.curr_function->locals, *local);
+
+    symbol_introduce(semstate.curr_scope, (*local)->token, (AstNode *) *local);
 }
 
 static void symres_call(AstCall* call) {
+    symres_expression((AstTyped **) &call->callee);
+    if (call->callee == NULL) return;
+
     if (call->callee->kind == Ast_Kind_Field_Access) {
         AstFieldAccess* fa = (AstFieldAccess *) call->callee;
-
-        AstTyped* symbol = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTyped), Ast_Kind_Symbol);
-        symbol->token = fa->token;
+        if (fa->expr == NULL) return;
 
         AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
         implicit_arg->value = fa->expr;
         implicit_arg->token = fa->expr->token;
         implicit_arg->next = (AstNode *) call->arguments;
 
-        call->callee = (AstNode *) symbol;
+        call->callee = symbol_resolve(semstate.curr_scope, fa->token);
         call->arguments = implicit_arg;
         call->arg_count++;
-    }
-
-    AstNode* callee = symbol_resolve(call->callee->token);
-    if (callee)
-        call->callee = callee;
-    else {
-        token_toggle_end(call->callee->token);
-        onyx_message_add(Msg_Type_Unknown_Symbol,
-                call->callee->token->pos,
-                call->callee->token->text);
-        token_toggle_end(call->callee->token);
-        return;
     }
 
     symres_statement_chain((AstNode *) call->arguments, (AstNode **) &call->arguments);
@@ -221,6 +156,20 @@ static void symres_call(AstCall* call) {
 static void symres_size_of(AstSizeOf* so) {
     so->type_node = symres_type(so->type_node);
     so->so_type = symres_type(so->so_type);
+}
+
+static void symres_field_access(AstFieldAccess** fa) {
+    symres_expression(&(*fa)->expr);
+    if ((*fa)->expr == NULL) return;
+
+    if ((*fa)->expr->kind == Ast_Kind_Package) {
+        AstPackage* package = (AstPackage *) (*fa)->expr;
+        AstNode* n = symbol_resolve(package->package->scope, (*fa)->token);
+        if (n) {
+            // NOTE: not field access
+            *fa = (AstFieldAccess *) n;
+        }
+    }
 }
 
 static void symres_unaryop(AstUnaryOp** unaryop) {
@@ -243,7 +192,7 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Block: symres_block((AstBlock *) *expr); break;
 
         case Ast_Kind_Symbol:
-            *expr = (AstTyped *) symbol_resolve(((AstNode *) *expr)->token);
+            *expr = (AstTyped *) symbol_resolve(semstate.curr_scope, ((AstNode *) *expr)->token);
             break;
 
         // NOTE: This is a good case, since it means the symbol is already resolved
@@ -257,7 +206,7 @@ static void symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
         case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
-        case Ast_Kind_Field_Access: symres_expression(&((AstFieldAccess *)(*expr))->expr); break;
+        case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
         case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
 
         case Ast_Kind_Array_Access:
@@ -298,7 +247,8 @@ static void symres_for(AstFor* fornode) {
     fornode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
     scope_enter(fornode->scope);
 
-    symbol_introduce(fornode->var->token, (AstNode *) fornode->var);
+    bh_arr_push(semstate.curr_function->locals, fornode->var);
+    symbol_introduce(semstate.curr_scope, fornode->var->token, (AstNode *) fornode->var);
 
     symres_expression(&fornode->start);
     symres_expression(&fornode->end);
@@ -364,7 +314,7 @@ static void symres_function(AstFunction* func) {
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
         param->type_node = symres_type(param->type_node);
 
-        symbol_introduce(param->token, (AstNode *) param);
+        symbol_introduce(semstate.curr_scope, param->token, (AstNode *) param);
     }
 
     if (func->type_node != NULL) {
@@ -384,28 +334,66 @@ static void symres_global(AstGlobal* global) {
 static void symres_overloaded_function(AstOverloadedFunction* ofunc) {
     bh_arr_each(AstTyped *, node, ofunc->overloads) {
         if ((*node)->kind == Ast_Kind_Symbol) {
-            *node = (AstTyped *) symbol_resolve((*node)->token);
+            *node = (AstTyped *) symbol_resolve(semstate.curr_scope, (*node)->token);
         }
     }
 }
 
+static void symres_use_package(AstUsePackage* package) {
+    token_toggle_end(package->package->token);
+    Package* p = program_info_package_lookup(semstate.program, package->package->token->text);
+    token_toggle_end(package->package->token);
+
+    if (p == NULL) {
+        onyx_message_add(Msg_Type_Literal,
+            package->token->pos,
+            "package not found in included source files");
+        return;
+    }
+
+    if (p->scope == semstate.curr_scope) return;
+
+    if (package->alias != NULL) {
+        AstPackage *pac_node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstPackage), Ast_Kind_Package);
+        pac_node->package = p;
+
+        symbol_introduce(semstate.curr_scope, package->alias, (AstNode *) pac_node);
+    }
+
+    if (package->only != NULL) {
+        bh_arr_each(OnyxToken *, tkn, package->only) {
+
+            AstNode* thing = symbol_resolve(p->scope, *tkn);
+            if (thing == NULL) {
+                onyx_message_add(Msg_Type_Literal,
+                    (*tkn)->pos,
+                    "not found in package");
+                return;
+            }
+            symbol_introduce(semstate.curr_scope, *tkn, thing);
+        }
+    }
+
+    if (package->alias == NULL && package->only == NULL)
+        scope_include(semstate.curr_scope, p->scope);
+}
+
 void onyx_resolve_symbols() {
 
-    semstate.global_scope = scope_create(semstate.node_allocator, NULL);
-    scope_enter(semstate.global_scope);
+    semstate.curr_scope = semstate.program->global_scope;
 
     // NOTE: Add types to global scope
     BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
     while (bsym->sym != NULL) {
-        symbol_builtin_introduce(bsym->sym, bsym->node);
+        symbol_builtin_introduce(semstate.curr_scope, bsym->sym, bsym->node);
         bsym++;
     }
 
-    bh_arr_each(AstBinding *, binding, semstate.program->bindings)
-        if (!symbol_introduce((*binding)->token, (*binding)->node)) return;
-
     bh_arr_each(Entity, entity, semstate.program->entities) {
+        scope_enter(entity->scope);
+
         switch (entity->type) {
+            case Entity_Type_Use_Package:         symres_use_package(entity->use_package); break;
             case Entity_Type_Function:            symres_function(entity->function); break;
             case Entity_Type_Overloaded_Function: symres_overloaded_function(entity->overloaded_function); break;
             case Entity_Type_Global:              symres_global(entity->global); break;
@@ -414,5 +402,7 @@ void onyx_resolve_symbols() {
 
             default: break;
         }
+
+        scope_leave();
     }
 }

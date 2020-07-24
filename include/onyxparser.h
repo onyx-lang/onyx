@@ -7,19 +7,26 @@
 #include "onyxmsgs.h"
 #include "onyxastnodes.h"
 
+typedef struct NodeToProcess {
+    Scope *scope;
+    AstNode *node;
+} NodeToProcess;
+
 typedef struct ParseResults {
     // NOTE: The allocator used to make the arrays below
     bh_allocator allocator;
 
-    bh_arr(AstUse *) uses;
-    bh_arr(AstBinding *) bindings;
+    bh_arr(AstIncludeFile *) files;
 
     // NOTE: Contains all the nodes that will need some processing (symbol resolution, type checking)
-    bh_arr(AstNode *) nodes_to_process;
+    bh_arr(NodeToProcess) nodes_to_process;
 } ParseResults;
 
 typedef struct OnyxParser {
     bh_allocator allocator;
+
+    ProgramInfo *program;
+    Scope *package_scope;
 
     // NOTE: not used since all tokens are lexed before parsing starts
     OnyxTokenizer *tokenizer;
@@ -31,7 +38,7 @@ typedef struct OnyxParser {
 
 const char* onyx_ast_node_kind_string(AstKind kind);
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind);
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer);
+OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, ProgramInfo *program);
 void onyx_parser_free(OnyxParser* parser);
 ParseResults onyx_parse(OnyxParser *parser);
 
