@@ -32,3 +32,4 @@ proc #export "main" {
 
     print_f32(123.0f);
 }
+

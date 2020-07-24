@@ -377,7 +377,7 @@ typedef enum EntityType {
 
 typedef struct Entity {
     EntityType type;
-    Scope *scope;
+    Package *package;
 
     union {
         AstUsePackage         *use_package;
@@ -392,7 +392,9 @@ typedef struct Entity {
 
 struct Package {
     char *name;
+
     Scope *scope;
+    Scope *include_scope;
 };
 
 // NOTE: Simple data structure for storing what comes out of the parser

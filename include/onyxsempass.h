@@ -16,6 +16,7 @@ typedef struct SemState {
     ProgramInfo* program;
 
     // NOTE: Used in symbol resolution phase
+    Package*       curr_package;
     Scope*         global_scope;
     Scope*         curr_scope;
     AstFunction*   curr_function;

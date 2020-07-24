@@ -62,7 +62,8 @@ static void symres_overloaded_function(AstOverloadedFunction* ofunc);
 static void symres_use_package(AstUsePackage* package);
 
 static void scope_enter(Scope* new_scope) {
-    new_scope->parent = semstate.curr_scope;
+    if (new_scope->parent == NULL)
+        new_scope->parent = semstate.curr_scope;
     semstate.curr_scope = new_scope;
 }
 
@@ -368,8 +369,9 @@ static void symres_use_package(AstUsePackage* package) {
     if (package->alias != NULL) {
         AstPackage *pac_node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstPackage), Ast_Kind_Package);
         pac_node->package = p;
+        pac_node->token = package->alias;
 
-        symbol_introduce(semstate.curr_scope, package->alias, (AstNode *) pac_node);
+        symbol_introduce(semstate.curr_package->include_scope, package->alias, (AstNode *) pac_node);
     }
 
     if (package->only != NULL) {
@@ -382,12 +384,12 @@ static void symres_use_package(AstUsePackage* package) {
                     "not found in package");
                 return;
             }
-            symbol_introduce(semstate.curr_scope, *tkn, thing);
+            symbol_introduce(semstate.curr_package->include_scope, *tkn, thing);
         }
     }
 
     if (package->alias == NULL && package->only == NULL)
-        scope_include(semstate.curr_scope, p->scope);
+        scope_include(semstate.curr_package->include_scope, p->scope);
 }
 
 void onyx_resolve_symbols() {
@@ -402,7 +404,8 @@ void onyx_resolve_symbols() {
     }
 
     bh_arr_each(Entity, entity, semstate.program->entities) {
-        scope_enter(entity->scope);
+        scope_enter(entity->package->scope);
+        semstate.curr_package = entity->package;
 
         switch (entity->type) {
             case Entity_Type_Use_Package:         symres_use_package(entity->use_package); break;

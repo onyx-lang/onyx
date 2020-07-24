@@ -184,7 +184,7 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
         AstNode* node = n->node;
         AstKind nkind = node->kind;
 
-        ent.scope = n->scope;
+        ent.package = n->package;
 
         switch (nkind) {
             case Ast_Kind_Function: {

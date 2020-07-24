@@ -75,7 +75,8 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
 
 static void add_node_to_process(OnyxParser* parser, AstNode* node) {
     bh_arr_push(parser->results.nodes_to_process, ((NodeToProcess) {
-        .scope = parser->package_scope,
+        .package = parser->package,
+        .scope = parser->package->scope,
         .node = node,
     }));
 }
@@ -1241,7 +1242,7 @@ ParseResults onyx_parse(OnyxParser *parser) {
             parser->allocator);
         token_toggle_end(symbol);
 
-        parser->package_scope = package->scope;
+        parser->package = package;
 
     } else {
         Package *package = program_info_package_lookup_or_create(
@@ -1250,7 +1251,7 @@ ParseResults onyx_parse(OnyxParser *parser) {
             parser->program->global_scope,
             parser->allocator);
 
-        parser->package_scope = package->scope;
+        parser->package = package;
     }
 
     while (parser->curr->type != Token_Type_End_Stream) {
@@ -1262,7 +1263,7 @@ ParseResults onyx_parse(OnyxParser *parser) {
                 switch (curr_stmt->kind) {
                     case Ast_Kind_Include_File: bh_arr_push(parser->results.files, (AstIncludeFile *) curr_stmt); break;
                     case Ast_Kind_Binding: {
-                        symbol_introduce(parser->package_scope,
+                        symbol_introduce(parser->package->scope,
                             ((AstBinding *) curr_stmt)->token,
                             ((AstBinding *) curr_stmt)->node);
                         break;

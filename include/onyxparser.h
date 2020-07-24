@@ -9,6 +9,7 @@
 
 typedef struct NodeToProcess {
     Scope *scope;
+    Package *package;
     AstNode *node;
 } NodeToProcess;
 
@@ -26,7 +27,7 @@ typedef struct OnyxParser {
     bh_allocator allocator;
 
     ProgramInfo *program;
-    Scope *package_scope;
+    Package *package;
 
     // NOTE: not used since all tokens are lexed before parsing starts
     OnyxTokenizer *tokenizer;

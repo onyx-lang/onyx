@@ -91,7 +91,8 @@ Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_
         memcpy(pac_name, package_name, strlen(package_name) + 1);
 
         package->name = pac_name;
-        package->scope = scope_create(alloc, parent_scope);
+        package->include_scope = scope_create(alloc, parent_scope);
+        package->scope = scope_create(alloc, package->include_scope);
 
         bh_table_put(Package *, prog->packages, pac_name, package);
 
@@ -153,7 +154,7 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
         }
     }
 
-    if (res == NULL ) {
+    if (res == NULL) {
         onyx_message_add(Msg_Type_Unknown_Symbol,
                 tkn->pos,
                 tkn->text);
