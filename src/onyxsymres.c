@@ -3,6 +3,7 @@
 #include "onyxparser.h"
 #include "onyxutils.h"
 
+
 AstBasicType basic_type_void   = { { Ast_Kind_Basic_Type, 0, NULL, "void"   }, &basic_types[Basic_Kind_Void]  };
 AstBasicType basic_type_bool   = { { Ast_Kind_Basic_Type, 0, NULL, "bool"   }, &basic_types[Basic_Kind_Bool]  };
 AstBasicType basic_type_i8     = { { Ast_Kind_Basic_Type, 0, NULL, "i8"     }, &basic_types[Basic_Kind_I8]    };
@@ -371,7 +372,7 @@ static void symres_use_package(AstUsePackage* package) {
         pac_node->package = p;
         pac_node->token = package->alias;
 
-        symbol_introduce(semstate.curr_package->include_scope, package->alias, (AstNode *) pac_node);
+        symbol_introduce(semstate.curr_package->scope, package->alias, (AstNode *) pac_node);
     }
 
     if (package->only != NULL) {
@@ -384,7 +385,7 @@ static void symres_use_package(AstUsePackage* package) {
                     "not found in package");
                 return;
             }
-            symbol_introduce(semstate.curr_package->include_scope, *tkn, thing);
+            symbol_introduce(semstate.curr_package->scope, *tkn, thing);
         }
     }
 
