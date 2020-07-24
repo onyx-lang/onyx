@@ -798,7 +798,18 @@ static AstType* parse_type(OnyxParser* parser) {
         else if (parser->curr->type == Token_Type_Symbol) {
             AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
             symbol_node->token = expect_token(parser, Token_Type_Symbol);
-            *next_insertion = (AstType *) symbol_node;
+
+            if (parser->curr->type == '.') {
+                consume_token(parser);
+                AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
+                field->token = expect_token(parser, Token_Type_Symbol);
+                field->expr  = (AstTyped *) symbol_node;
+
+                *next_insertion = (AstType *) field;
+            } else {
+                *next_insertion = (AstType *) symbol_node;
+            }
+
             next_insertion = NULL;
         }
 

@@ -77,6 +77,19 @@ static AstType* symres_type(AstType* type) {
         return (AstType *) symbol_resolve(semstate.curr_scope, ((AstNode *) type)->token);
     }
 
+    if (type->kind == Ast_Kind_Field_Access) {
+        AstFieldAccess* field = (AstFieldAccess *) type;
+        symres_field_access(&field);
+        
+        if (!node_is_type((AstNode *) field)) {
+            onyx_message_add(Msg_Type_Literal,
+                    type->token->pos,
+                    "field access did not result in a type");
+        }
+
+        return (AstType *) field;
+    }
+
     // NOTE: Already resolved
     if (type->kind == Ast_Kind_Basic_Type) return type;
 
@@ -159,6 +172,7 @@ static void symres_size_of(AstSizeOf* so) {
 }
 
 static void symres_field_access(AstFieldAccess** fa) {
+    if ((*fa)->expr == NULL) return;
     symres_expression(&(*fa)->expr);
     if ((*fa)->expr == NULL) return;
 
@@ -195,8 +209,6 @@ static void symres_expression(AstTyped** expr) {
             *expr = (AstTyped *) symbol_resolve(semstate.curr_scope, ((AstNode *) *expr)->token);
             break;
 
-        // NOTE: This is a good case, since it means the symbol is already resolved
-        case Ast_Kind_Local: break;
 
         case Ast_Kind_Function:
         case Ast_Kind_NumLit:
@@ -214,9 +226,9 @@ static void symres_expression(AstTyped** expr) {
             symres_expression(&((AstArrayAccess *)(*expr))->expr);
             break;
 
-        default:
-            DEBUG_HERE;
-            break;
+        // NOTE: This is a good case, since it means the symbol is already resolved
+        case Ast_Kind_Local:
+        default: break;
     }
 }
 

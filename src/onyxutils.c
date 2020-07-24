@@ -18,7 +18,6 @@ static const char* ast_node_names[] = {
     "BINDING",
     "FUNCTION",
     "OVERLOADED_FUNCTION",
-    "FOREIGN",
     "BLOCK",
     "SCOPE",
     "LOCAL",
@@ -105,7 +104,7 @@ Scope* scope_create(bh_allocator a, Scope* parent) {
     scope->parent = parent;
     scope->symbols = NULL;
 
-    bh_table_init(global_heap_allocator, scope->symbols, 16);
+    bh_table_init(global_heap_allocator, scope->symbols, 64);
 
     return scope;
 }

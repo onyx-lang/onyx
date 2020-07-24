@@ -1,24 +1,34 @@
 use "progs/print_funcs"
 
-use package printing
+use package printing as p {
+    print_f32, PrintableArray
+}
 
 Foo :: struct {
-	x : i32;
-	y : i32;
+    x : i32;
+    y : i32;
 }
 
 foo_sum :: proc (foo: ^Foo) -> i32 {
-	return foo.x + foo.y;
+    return foo.x + foo.y;
+}
+
+asdf :: proc (pa: PrintableArray) {
+    for i: 0, pa.len p.print(pa.data[i] as i32);
 }
 
 proc #export "main" {
-	foo := __heap_start as ^Foo;
-	foo.x = 123;
-	foo.y = 321;
-	print(foo.foo_sum());
+    foo := __heap_start as ^Foo;
+    foo.x = 123;
+    foo.y = 321;
+    p.print(foo.foo_sum());
 
+    pa := (__heap_start as i32 + 8) as ^p.PrintableArray;
+    pa.data = __heap_start as ^u8;
+    pa.len = 5;
+    asdf(*pa);
 
-	print(1234);
+    p.print(1234);
 
-	print_f32(123.0f);
+    print_f32(123.0f);
 }

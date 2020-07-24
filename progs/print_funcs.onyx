@@ -6,6 +6,11 @@ print_f32  :: proc #foreign "host" "print" (value: f32) ---
 print_i64  :: proc #foreign "host" "print" (value: i64) ---
 print_f64  :: proc #foreign "host" "print" (value: f64) ---
 
+PrintableArray :: struct {
+    data: ^u8;
+    len: i32;
+}
+
 print_i32arr :: proc (arr: [] i32, len: i32) {
     for i: 0, len print(arr[i]);
 }

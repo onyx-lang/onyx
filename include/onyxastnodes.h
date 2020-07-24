@@ -67,7 +67,6 @@ typedef enum AstKind {
     Ast_Kind_Binding,
     Ast_Kind_Function,
     Ast_Kind_Overloaded_Function,
-    Ast_Kind_Foreign,
     Ast_Kind_Block,
     Ast_Kind_Local_Group,
     Ast_Kind_Local,
@@ -307,7 +306,6 @@ struct AstStructMember { AstTyped_base; u64 offset; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
-struct AstForeign       { AstNode_base; OnyxToken *mod_token, *name_token; AstNode *import; };
 struct AstIncludeFile   { AstNode_base; OnyxToken *filename; };
 struct AstUsePackage    {
     AstNode_base;
@@ -448,6 +446,10 @@ static inline b32 is_lval(AstNode* node) {
 static inline b32 binop_is_assignment(AstBinaryOp* binop) {
     return (binop->operation >= Binary_Op_Assign_Start
             && binop->operation <= Binary_Op_Assign_End);
+}
+
+static inline b32 node_is_type(AstNode* node) {
+    return (node->kind > Ast_Kind_Type_Start) && (node->kind < Ast_Kind_Type_End);
 }
 
 #endif // #ifndef ONYXASTNODES_H
