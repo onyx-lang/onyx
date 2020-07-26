@@ -17,19 +17,13 @@ asdf :: proc (pa: PrintableArray) {
     for i: 0, pa.len print(pa.data[i] as i32);
 }
 
-SomeType :: enum (u16) {
-    Value1;
-    Value2;
-    Value3 = 80;
-    Value4;
-}
+SomeType :: enum #flags { Value1; Value2; Value3; Value4; }
 
 print_st :: proc (st: SomeType) {
     print(st as i32);
 }
 
 proc #export "main" {
-
     st := SomeType.Value4;
     print_st(st);
 

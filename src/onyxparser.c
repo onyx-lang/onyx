@@ -1077,6 +1077,19 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 
     bh_arr_new(global_heap_allocator, enum_node->values, 4);
 
+    while (parser->curr->type == '#') {
+        if (parse_possible_directive(parser, "flags")) {
+            enum_node->flags |= Ast_Flag_Enum_Is_Flags;
+        } else {
+            OnyxToken* directive_token = expect_token(parser, '#');
+            OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
+
+            onyx_message_add(Msg_Type_Unknown_Directive,
+                    directive_token->pos,
+                    symbol_token->text, symbol_token->length);
+        }
+    }
+
     AstType* backing = (AstType *) &basic_type_u32;
     if (parser->curr->type == '(') {
         consume_token(parser);
@@ -1096,8 +1109,10 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
         evalue->token = expect_token(parser, Token_Type_Symbol);
         evalue->type_node = (AstType *) enum_node;
 
-        if (parser->curr->type == '=') {
+        if (parser->curr->type == ':') {
             consume_token(parser);
+            expect_token(parser, ':');
+            
             evalue->value = parse_numeric_literal(parser);
         }
 

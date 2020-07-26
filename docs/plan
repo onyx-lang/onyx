@@ -117,7 +117,7 @@ HOW:
 
         [X] Package system
 
-        [ ] Enum types
+        [X] Enum types
 
         [ ] Static pointers to sized data
 

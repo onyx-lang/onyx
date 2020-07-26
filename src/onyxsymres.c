@@ -421,7 +421,7 @@ static void symres_enum(AstEnumType* enum_node) {
     enum_node->backing_type = type_build_from_ast(semstate.allocator, enum_node->backing);
     enum_node->scope = scope_create(semstate.node_allocator, NULL);
 
-    u64 next_assign_value = 0;
+    u64 next_assign_value = (enum_node->flags & Ast_Flag_Enum_Is_Flags) ? 1 : 0;
     bh_arr_each(AstEnumValue *, value, enum_node->values) {
         symbol_introduce(enum_node->scope, (*value)->token, (AstNode *) *value);
 
@@ -446,7 +446,11 @@ static void symres_enum(AstEnumType* enum_node) {
             (*value)->value = num;
         }
 
-        next_assign_value++;
+        if (enum_node->flags & Ast_Flag_Enum_Is_Flags) {
+            next_assign_value <<= 1;
+        } else { 
+            next_assign_value++;
+        }
     }
 }
 

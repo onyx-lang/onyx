@@ -135,6 +135,9 @@ typedef enum AstFlags {
     
     // Type flags
     Ast_Flag_Type_Is_Resolved = BH_BIT(8),
+
+    // Enum flags
+    Ast_Flag_Enum_Is_Flags    = BH_BIT(11),
 } AstFlags;
 
 typedef enum UnaryOp {
