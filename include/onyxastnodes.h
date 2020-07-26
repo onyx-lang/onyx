@@ -38,6 +38,8 @@ typedef struct AstFunctionType AstFunctionType;
 typedef struct AstArrayType AstArrayType;
 typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
+typedef struct AstEnumType AstEnumType;
+typedef struct AstEnumValue AstEnumValue;
 
 typedef struct AstBinding AstBinding;
 typedef struct AstIncludeFile AstIncludeFile;
@@ -83,9 +85,11 @@ typedef enum AstKind {
     Ast_Kind_Function_Type,
     Ast_Kind_Array_Type,
     Ast_Kind_Struct_Type,
+    Ast_Kind_Enum_Type,
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
+    Ast_Kind_Enum_Value,
 
     Ast_Kind_NumLit,
     Ast_Kind_StrLit,
@@ -303,6 +307,19 @@ struct AstStructType {
     Type *stcache;
 };
 struct AstStructMember { AstTyped_base; u64 offset; };
+struct AstEnumType {
+    AstType_base;
+    Scope *scope;
+
+    AstType *backing;
+    Type    *backing_type;
+
+    bh_arr(AstEnumValue *) values;
+
+    // NOTE: Used to cache the actual type for the same reason as above.
+    Type *etcache;
+};
+struct AstEnumValue { AstTyped_base; AstNumLit* value; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
@@ -359,13 +376,13 @@ struct AstPackage {
     Package* package;
 };
 
-
 // NOTE: An Entity represents something will need to be
 // processed later down the pipeline.
 typedef enum EntityType {
     Entity_Type_Unknown,
     Entity_Type_Use_Package,
     Entity_Type_String_Literal,
+    Entity_Type_Enum,
     Entity_Type_Struct,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
@@ -387,6 +404,7 @@ typedef struct Entity {
         AstTyped              *expr;
         AstStrLit             *strlit;
         AstStructType         *struct_type;
+        AstEnumType           *enum_type;
     };
 } Entity;
 

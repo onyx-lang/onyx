@@ -75,6 +75,11 @@ b32 types_are_surface_compatible(Type* t1, Type* t2) {
             return works;
         }
 
+        case Type_Kind_Enum: {
+            if (t2->kind != Type_Kind_Enum) return 0;
+            return t1 == t2;
+        }
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -138,6 +143,11 @@ b32 types_are_compatible(Type* t1, Type* t2) {
             return works;
         }
 
+        case Type_Kind_Enum: {
+            if (t2->kind != Type_Kind_Enum) return 0;
+            return t1 == t2;
+        }
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -155,6 +165,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Function: return 0;
         case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
+        case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
         default:                 return 0;
     }
 }
@@ -255,6 +266,20 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return s_type;
         }
 
+        case Ast_Kind_Enum_Type: {
+            AstEnumType* enum_node = (AstEnumType *) type_node;
+            if (enum_node->etcache) return enum_node->etcache;
+
+            Type* enum_type = bh_alloc(alloc, sizeof(Type));
+            enum_node->etcache = enum_type;
+
+            enum_type->kind = Type_Kind_Enum;
+            enum_type->Enum.backing = enum_node->backing_type;
+            enum_type->Enum.name = enum_node->name;
+
+            return enum_type;
+        }
+
         case Ast_Kind_Basic_Type:
             return ((AstBasicType *) type_node)->type;
 
@@ -318,6 +343,11 @@ const char* type_get_name(Type* type) {
                 return type->Struct.name;
             else
                 return "<anonymous struct>";
+        case Type_Kind_Enum:
+            if (type->Enum.name)
+                return type->Enum.name;
+            else
+                return "<anonymous enum>";
         default: return "unknown";
     }
 }

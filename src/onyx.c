@@ -230,6 +230,13 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 break;
             }
 
+            case Ast_Kind_Enum_Type: {
+                ent.type = Entity_Type_Enum;
+                ent.enum_type = (AstEnumType *) node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+                break;
+            }
+
             case Ast_Kind_Use_Package: {
                 ent.type = Entity_Type_Use_Package;
                 ent.use_package = (AstUsePackage *) node;

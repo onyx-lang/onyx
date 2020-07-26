@@ -52,21 +52,22 @@ typedef struct StructMember {
 } StructMember;
 
 #define TYPE_KINDS \
-    TYPE_KIND(Basic, TypeBasic)                                 \
-    TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })  \
-    TYPE_KIND(Function, struct {                                \
-        Type *return_type;                                      \
-        u64 param_count;                                        \
-        Type* params[];                                         \
-    })                                                          \
-    TYPE_KIND(Struct, struct {                                  \
-        char* name;                                             \
-        u32 size;                                               \
-        u32 mem_count;                                          \
-        bh_table(StructMember) members;                         \
-        bh_arr(StructMember *) memarr;                          \
-    })                                                          \
-    TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; })
+    TYPE_KIND(Basic, TypeBasic)                                   \
+    TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })    \
+    TYPE_KIND(Function, struct {                                  \
+        Type *return_type;                                        \
+        u64 param_count;                                          \
+        Type* params[];                                           \
+    })                                                            \
+    TYPE_KIND(Struct, struct {                                    \
+        char* name;                                               \
+        u32 size;                                                 \
+        u32 mem_count;                                            \
+        bh_table(StructMember) members;                           \
+        bh_arr(StructMember *) memarr;                            \
+    })                                                            \
+    TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
+    TYPE_KIND(Enum, struct { char* name; Type* backing; }) 
 
 typedef enum TypeKind {
     Type_Kind_Invalid,

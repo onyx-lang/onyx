@@ -205,6 +205,10 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
         DEBUG_HERE;
     }
 
+    if (type->kind == Type_Kind_Enum) {
+        return onyx_type_to_wasm_type(type->Enum.backing);
+    }
+
     if (type->kind == Type_Kind_Pointer) {
         return WASM_TYPE_INT32;
     }
@@ -390,8 +394,12 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
 COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    if (type->kind == Type_Kind_Enum) {
+        type = type->Enum.backing;
+    }
+
     i32 store_size = type_size_of(type);
-    i32 is_basic   = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
+    i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
     i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
     i32 is_integer  = is_basic && (type->Basic.flags & Basic_Flag_Integer);
     i32 is_float    = is_basic && type->Basic.flags & Basic_Flag_Float;
@@ -417,6 +425,10 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
 
 COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
+    
+    if (type->kind == Type_Kind_Enum) {
+        type = type->Enum.backing;
+    }
 
     i32 load_size   = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
@@ -954,6 +966,23 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Size_Of: {
             AstSizeOf* so = (AstSizeOf *) expr;
             WID(WI_I32_CONST, so->size);
+            break;
+        }
+
+        case Ast_Kind_Enum_Value: {
+            AstEnumValue* ev = (AstEnumValue *) expr;
+            WasmType backing_type = onyx_type_to_wasm_type(ev->type);
+            if (backing_type == WASM_TYPE_INT32) {
+                WID(WI_I32_CONST, ev->value->value.i);
+            }
+            else if (backing_type == WASM_TYPE_INT64) {
+                WID(WI_I64_CONST, ev->value->value.l);
+            }
+            else {
+                onyx_message_add(Msg_Type_Literal,
+                    ev->token->pos,
+                    "invalid backing type for enum");
+            }
             break;
         }
 

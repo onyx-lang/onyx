@@ -647,6 +647,7 @@ CHECK(expression, AstTyped** pexpr) {
         case Ast_Kind_StrLit: break;
         case Ast_Kind_Function: break;
         case Ast_Kind_Overloaded_Function: break;
+        case Ast_Kind_Enum_Value: break;
 
         default:
             retval = 1;
@@ -934,6 +935,8 @@ void onyx_type_check() {
             case Entity_Type_Struct:
                 if (check_struct(entity->struct_type)) return;
                 break;
+
+            case Entity_Type_Enum: break;
 
             case Entity_Type_String_Literal: break;
 

@@ -61,6 +61,7 @@ static void symres_function(AstFunction* func);
 static void symres_global(AstGlobal* global);
 static void symres_overloaded_function(AstOverloadedFunction* ofunc);
 static void symres_use_package(AstUsePackage* package);
+static void symres_enum(AstEnumType* enum_node);
 
 static void scope_enter(Scope* new_scope) {
     if (new_scope->parent == NULL)
@@ -184,6 +185,17 @@ static void symres_field_access(AstFieldAccess** fa) {
         if (n) {
             // NOTE: not field access
             *fa = (AstFieldAccess *) n;
+            return;
+        }
+    }
+
+    if ((*fa)->expr->kind == Ast_Kind_Enum_Type) {
+        AstEnumType* etype = (AstEnumType *) (*fa)->expr;
+        AstNode* n = symbol_resolve(etype->scope, (*fa)->token);
+        if (n) {
+            // NOTE: not field access
+            *fa = (AstFieldAccess *) n;
+            return;
         }
     }
 }
@@ -393,6 +405,44 @@ static void symres_use_package(AstUsePackage* package) {
         scope_include(semstate.curr_package->include_scope, p->scope);
 }
 
+static void symres_enum(AstEnumType* enum_node) {
+    if (enum_node->backing->kind == Ast_Kind_Symbol) {
+        enum_node->backing = (AstType *) symbol_resolve(semstate.curr_scope, enum_node->backing->token);
+    }
+    if (enum_node->backing == NULL) return;
+
+    enum_node->backing_type = type_build_from_ast(semstate.allocator, enum_node->backing);
+    enum_node->scope = scope_create(semstate.node_allocator, NULL);
+
+    u64 next_assign_value = 0;
+    bh_arr_each(AstEnumValue *, value, enum_node->values) {
+        symbol_introduce(enum_node->scope, (*value)->token, (AstNode *) *value);
+
+        if ((*value)->value != NULL) {
+            // HACK
+            if ((*value)->value->type_node == (AstType *) &basic_type_i32) {
+                next_assign_value = (*value)->value->value.i;
+            } else if ((*value)->value->type_node == (AstType *) &basic_type_i64) {
+                next_assign_value = (*value)->value->value.l;
+            } else {
+                onyx_message_add(Msg_Type_Literal,
+                    (*value)->value->token->pos,
+                    "expected numeric integer literal for enum initialization");
+                return;
+            }
+
+        } else {
+            AstNumLit* num = onyx_ast_node_new(semstate.node_allocator, sizeof(AstNumLit), Ast_Kind_NumLit);
+            num->value.l = next_assign_value;
+            num->type_node = enum_node->backing;
+            num->type = enum_node->backing_type;
+            (*value)->value = num;
+        }
+
+        next_assign_value++;
+    }
+}
+
 void onyx_resolve_symbols() {
 
     semstate.curr_scope = semstate.program->global_scope;
@@ -415,6 +465,7 @@ void onyx_resolve_symbols() {
             case Entity_Type_Global:              symres_global(entity->global); break;
             case Entity_Type_Expression:          symres_expression(&entity->expr); break;
             case Entity_Type_Struct:              symres_type((AstType *) entity->struct_type); break;
+            case Entity_Type_Enum:                symres_enum(entity->enum_type); break;
 
             default: break;
         }

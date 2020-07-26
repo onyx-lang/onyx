@@ -1,12 +1,12 @@
 use "progs/print_funcs"
 
-use package printing as p {
-    print_f32, PrintableArray
-}
+use package printing
 
 Foo :: struct {
     x : i32;
     y : i32;
+
+    st : SomeType;
 }
 
 foo_sum :: proc (foo: ^Foo) -> i32 {
@@ -14,21 +14,39 @@ foo_sum :: proc (foo: ^Foo) -> i32 {
 }
 
 asdf :: proc (pa: PrintableArray) {
-    for i: 0, pa.len p.print(pa.data[i] as i32);
+    for i: 0, pa.len print(pa.data[i] as i32);
+}
+
+SomeType :: enum (u16) {
+    Value1;
+    Value2;
+    Value3 = 80;
+    Value4;
+}
+
+print_st :: proc (st: SomeType) {
+    print(st as i32);
 }
 
 proc #export "main" {
+
+    st := SomeType.Value4;
+    print_st(st);
+
     foo := __heap_start as ^Foo;
     foo.x = 123;
     foo.y = 321;
-    p.print(foo.foo_sum());
+    foo.st = st;
+    print(sizeof Foo);
+    print(foo.foo_sum());
+    print_st(foo.st);
 
-    pa := (__heap_start as i32 + 8) as ^p.PrintableArray;
+    pa := (__heap_start as i32 + sizeof Foo) as ^PrintableArray;
     pa.data = __heap_start as ^u8;
     pa.len = 5;
     asdf(*pa);
 
-    p.print(1234);
+    print(1234);
 
     print_f32(123.0f);
 }

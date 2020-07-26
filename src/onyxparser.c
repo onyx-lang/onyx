@@ -29,6 +29,7 @@ static AstStructType* parse_struct(OnyxParser* parser);
 static AstLocal*      parse_function_params(OnyxParser* parser);
 static AstFunction*   parse_function_definition(OnyxParser* parser);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
+static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstNode*       parse_top_level_statement(OnyxParser* parser);
 
@@ -1060,6 +1061,46 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
     return (AstTyped *) global_node;
 }
 
+static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
+    AstEnumType* enum_node = make_node(AstEnumType, Ast_Kind_Enum_Type);
+    enum_node->token = expect_token(parser, Token_Type_Keyword_Enum);
+
+    bh_arr_new(global_heap_allocator, enum_node->values, 4);
+
+    AstType* backing = (AstType *) &basic_type_u32;
+    if (parser->curr->type == '(') {
+        consume_token(parser);
+
+        AstNode* backing_sym = make_node(AstNode, Ast_Kind_Symbol);
+        backing_sym->token = expect_token(parser, Token_Type_Symbol);
+        backing = (AstType *) backing_sym;
+
+        expect_token(parser, ')');
+    }
+    enum_node->backing = backing;
+
+    expect_token(parser, '{');
+
+    while (parser->curr->type != '}') {
+        AstEnumValue* evalue = make_node(AstEnumValue, Ast_Kind_Enum_Value);
+        evalue->token = expect_token(parser, Token_Type_Symbol);
+        evalue->type_node = (AstType *) enum_node;
+
+        if (parser->curr->type == '=') {
+            consume_token(parser);
+            evalue->value = parse_numeric_literal(parser);
+        }
+
+        expect_token(parser, ';');
+
+        bh_arr_push(enum_node->values, evalue);
+    }
+
+    expect_token(parser, '}');
+
+    return enum_node;
+}
+
 // <proc>
 // <global>
 // <expr>
@@ -1078,8 +1119,7 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         return (AstTyped *) parse_struct(parser);
     }
     else if (parser->curr->type == Token_Type_Keyword_Enum) {
-        consume_token(parser);
-        return (AstTyped *) &error_node;
+        return (AstTyped *) parse_enum_declaration(parser);
     }
     else {
         return parse_expression(parser);
@@ -1166,7 +1206,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
             } else if (node->kind != Ast_Kind_Overloaded_Function
                     && node->kind != Ast_Kind_StrLit) {
 
-                if (node->kind == Ast_Kind_Struct_Type) {
+                if (node->kind == Ast_Kind_Struct_Type || node->kind == Ast_Kind_Enum_Type) {
                     ((AstStructType *)node)->name = bh_aprintf(global_heap_allocator,
                         "%b", symbol->text, symbol->length);
                 }
