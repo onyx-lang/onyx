@@ -26,6 +26,7 @@ typedef enum TokenType {
     Token_Type_Keyword_Break,
     Token_Type_Keyword_Continue,
     Token_Type_Keyword_Sizeof,
+    Token_Type_Keyword_Alignof,
 
     Token_Type_Right_Arrow,
     Token_Type_Left_Arrow,

@@ -24,6 +24,7 @@ static const char* token_type_names[] = {
     "break",
     "continue",
     "sizeof",
+    "alignof",
 
     "->",
     "<-",
@@ -158,6 +159,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     LITERAL_TOKEN("break",      1, Token_Type_Keyword_Break);
     LITERAL_TOKEN("continue",   1, Token_Type_Keyword_Continue);
     LITERAL_TOKEN("sizeof",     1, Token_Type_Keyword_Sizeof);
+    LITERAL_TOKEN("alignof",    1, Token_Type_Keyword_Alignof);
     LITERAL_TOKEN("true",       1, Token_Type_Literal_True);
     LITERAL_TOKEN("false",      1, Token_Type_Literal_False);
     LITERAL_TOKEN("->",         0, Token_Type_Right_Arrow);

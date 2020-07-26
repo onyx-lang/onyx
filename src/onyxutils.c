@@ -50,6 +50,7 @@ static const char* ast_node_names[] = {
     "ARRAY_ACCESS",
     "FIELD_ACCESS",
     "SIZE OF",
+    "ALIGN OF"
 
     "IF",
     "FOR",

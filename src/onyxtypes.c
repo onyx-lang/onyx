@@ -4,23 +4,23 @@
 
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
-    { Type_Kind_Basic, 0, { Basic_Kind_Void,                    0,                       0, "void"   } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Void,                    0,                       0, 1, "void"   } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1, "bool"   } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1, 1, "bool"   } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_I8,     Basic_Flag_Integer,                       1, "i8"     } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1, "u8"     } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I16,    Basic_Flag_Integer,                       2, "i16"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2, "u16"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I32,    Basic_Flag_Integer,                       4, "i32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4, "u32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I64,    Basic_Flag_Integer,                       8, "i64"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8, "u64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I8,     Basic_Flag_Integer,                       1, 1, "i8"     } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1, 1, "u8"     } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I16,    Basic_Flag_Integer,                       2, 2, "i16"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2, 2, "u16"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I32,    Basic_Flag_Integer,                       4, 4, "i32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4, 4, "u32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I64,    Basic_Flag_Integer,                       8, 8, "i64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8, 8, "u64"    } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4, "f32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8, "f64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4, 4, "f32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8, 4, "f64"    } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4, "rawptr" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4, 4, "rawptr" } },
 };
 
 b32 types_are_surface_compatible(Type* t1, Type* t2) {
@@ -170,6 +170,20 @@ u32 type_size_of(Type* type) {
     }
 }
 
+u32 type_alignment_of(Type* type) {
+    if (type == NULL) return 1;
+
+    switch (type->kind) {
+        case Type_Kind_Basic:    return type->Basic.alignment;
+        case Type_Kind_Pointer:  return 4;
+        case Type_Kind_Function: return 1;
+        case Type_Kind_Array:    return type_alignment_of(type->Array.elem);
+        case Type_Kind_Struct:   return type->Struct.aligment;
+        case Type_Kind_Enum:     return type_alignment_of(type->Enum.backing);
+        default: return 1;
+    }
+}
+
 Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
     if (type_node == NULL) return NULL;
 
@@ -238,12 +252,17 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
 
             u32 offset = 0;
-            u32 min_alignment = 1;
+            u32 alignment = 1, mem_alignment;
             u32 idx = 0;
             bh_arr_each(AstStructMember *, member, s_node->members) {
                 (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 // TODO: Add alignment checking here
+                mem_alignment = type_alignment_of((*member)->type);
+                if (mem_alignment > alignment) alignment = mem_alignment;
+                if (offset % alignment != 0) {
+                    offset += alignment - (offset % alignment);
+                }
 
                 StructMember smem = {
                     .offset = offset,
@@ -260,7 +279,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 idx++;
             }
 
-            // TODO: Again, add alignment
+            s_type->Struct.aligment = alignment;
+            
+            if (offset % alignment != 0) {
+                offset += alignment - (offset % alignment);
+            }
             s_type->Struct.size = offset;
 
             return s_type;

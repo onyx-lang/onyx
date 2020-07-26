@@ -39,7 +39,7 @@ enum BasicFlag {
 typedef struct TypeBasic {
     enum BasicKind kind;
     u32 flags;
-    i64 size; // NOTE: In bytes
+    u32 size, alignment; // NOTE: In bytes
     const char* name;
 } TypeBasic;
 
@@ -62,7 +62,7 @@ typedef struct StructMember {
     TYPE_KIND(Struct, struct {                                    \
         char* name;                                               \
         u32 size;                                                 \
-        u32 mem_count;                                            \
+        u16 aligment, mem_count;                                  \
         bh_table(StructMember) members;                           \
         bh_arr(StructMember *) memarr;                            \
     })                                                            \
@@ -106,6 +106,7 @@ struct AstFunction;
 
 b32 types_are_compatible(Type* t1, Type* t2);
 u32 type_size_of(Type* type);
+u32 type_alignment_of(Type* type);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 
 Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func, struct AstType* return_type);

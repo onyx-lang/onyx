@@ -198,6 +198,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Keyword_Alignof: {
+            AstAlignOf* ao_node = make_node(AstAlignOf, Ast_Kind_Align_Of);
+            ao_node->token = expect_token(parser, Token_Type_Keyword_Alignof);
+            ao_node->ao_type = (AstType *) parse_type(parser);
+            ao_node->type_node = (AstType *) &basic_type_i32;
+
+            retval = (AstTyped *) ao_node;
+            break;
+        }
+
         case Token_Type_Symbol: {
             OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
             AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);

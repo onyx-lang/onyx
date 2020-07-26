@@ -37,6 +37,7 @@ proc #export "main" {
     foo.x = 123;
     foo.y = 321;
     foo.st = st;
+    print(alignof Foo);
     print(sizeof Foo);
     print(foo.foo_sum());
     print_st(foo.st);

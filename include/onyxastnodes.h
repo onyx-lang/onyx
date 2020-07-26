@@ -21,6 +21,7 @@ typedef struct AstDereference AstDereference;
 typedef struct AstArrayAccess AstArrayAccess;
 typedef struct AstFieldAccess AstFieldAccess;
 typedef struct AstSizeOf AstSizeOf;
+typedef struct AstAlignOf AstAlignOf;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstBreak AstBreak;
@@ -103,6 +104,7 @@ typedef enum AstKind {
     Ast_Kind_Array_Access,
     Ast_Kind_Field_Access,
     Ast_Kind_Size_Of,
+    Ast_Kind_Align_Of,
 
     Ast_Kind_If,
     Ast_Kind_For,
@@ -253,6 +255,7 @@ struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
+struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
 
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };

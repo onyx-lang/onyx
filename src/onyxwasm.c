@@ -425,7 +425,7 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
 
 COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
-    
+
     if (type->kind == Type_Kind_Enum) {
         type = type->Enum.backing;
     }
@@ -966,6 +966,12 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Size_Of: {
             AstSizeOf* so = (AstSizeOf *) expr;
             WID(WI_I32_CONST, so->size);
+            break;
+        }
+
+        case Ast_Kind_Align_Of: {
+            AstAlignOf* ao = (AstAlignOf *) expr;
+            WID(WI_I32_CONST, ao->alignment);
             break;
         }
 

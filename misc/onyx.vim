@@ -14,7 +14,7 @@ syn keyword onyxKeyword package struct proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword break continue return
-syn keyword onyxKeyword as sizeof
+syn keyword onyxKeyword as sizeof alignof
 
 syn keyword onyxType bool void
 syn keyword onyxType i8 u8

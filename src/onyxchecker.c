@@ -20,6 +20,7 @@ CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
 CHECK(field_access, AstFieldAccess** pfield);
 CHECK(size_of, AstSizeOf* so);
+CHECK(align_of, AstAlignOf* ao);
 CHECK(global, AstGlobal* global);
 CHECK(function, AstFunction* func);
 CHECK(overloaded_function, AstOverloadedFunction* func);
@@ -574,6 +575,12 @@ CHECK(size_of, AstSizeOf* so) {
     return 0;
 }
 
+CHECK(align_of, AstAlignOf* ao) {
+    ao->alignment = type_alignment_of(type_build_from_ast(semstate.allocator, ao->ao_type));
+
+    return 0;
+}
+
 CHECK(expression, AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
@@ -623,6 +630,7 @@ CHECK(expression, AstTyped** pexpr) {
         case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
         case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
+        case Ast_Kind_Align_Of:     retval = check_align_of((AstAlignOf *) expr); break;
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {

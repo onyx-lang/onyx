@@ -48,6 +48,7 @@ static AstType* symres_type(AstType* type);
 static void symres_local(AstLocal** local);
 static void symres_call(AstCall* call);
 static void symres_size_of(AstSizeOf* so);
+static void symres_align_of(AstAlignOf* so);
 static void symres_field_access(AstFieldAccess** fa);
 static void symres_expression(AstTyped** expr);
 static void symres_return(AstReturn* ret);
@@ -174,6 +175,11 @@ static void symres_size_of(AstSizeOf* so) {
     so->so_type = symres_type(so->so_type);
 }
 
+static void symres_align_of(AstAlignOf* ao) {
+    ao->type_node = symres_type(ao->type_node);
+    ao->ao_type = symres_type(ao->ao_type);
+}
+
 static void symres_field_access(AstFieldAccess** fa) {
     if ((*fa)->expr == NULL) return;
     symres_expression(&(*fa)->expr);
@@ -234,6 +240,7 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
         case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
         case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
+        case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
 
         case Ast_Kind_Array_Access:
             symres_expression(&((AstArrayAccess *)(*expr))->addr);
