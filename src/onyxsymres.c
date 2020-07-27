@@ -365,7 +365,12 @@ static void symres_function(AstFunction* func) {
                     fa->type_node = (*mem)->type_node;
                     fa->expr = (AstTyped *) param;
 
-                    symbol_introduce(semstate.curr_scope, (*mem)->token, (AstNode *) fa);
+                    token_toggle_end((*mem)->token);
+                    symbol_raw_introduce(semstate.curr_scope,
+                            (*mem)->token->text,
+                            param->token->pos,
+                            (AstNode *) fa);
+                    token_toggle_end((*mem)->token);
                 }
             }
         }

@@ -64,6 +64,10 @@ dot :: proc (v: Vec2, u: Vec2) -> f32 {
 	return v.x * u.x + v.y * u.y;
 }
 
+asdf :: proc (use v: ^Vec2, use u: ^Vec2) -> f32 {
+	return x + x;
+}
+
 
 // SomeType :: enum (u32) { Value1, Value2 }
 
