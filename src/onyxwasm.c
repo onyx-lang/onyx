@@ -1067,6 +1067,14 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (to->kind == Type_Kind_Function) {
+        onyx_message_add(Msg_Type_Literal,
+                cast->token->pos,
+                "cannot cast to a function");
+        WI(WI_DROP);
+        return;
+    }
+
     if (to->kind == Type_Kind_Basic && to->Basic.kind == Basic_Kind_Void) {
         WI(WI_DROP);
         return;

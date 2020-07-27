@@ -173,6 +173,13 @@ CHECK(call, AstCall* call) {
     while (actual_param != NULL) {
         if (check_expression((AstTyped **) &actual_param)) return 1;
 
+        if (actual_param->value->kind == Ast_Kind_Overloaded_Function) {
+            onyx_message_add(Msg_Type_Literal,
+                    actual_param->token->pos,
+                    "cannot pass overloaded functions as parameters.");
+            return 1;
+        }
+
         // NOTE: Splat structures into multiple arguments
         if (actual_param->type->kind == Type_Kind_Struct) {
             if (!type_struct_is_simple(actual_param->type)) {

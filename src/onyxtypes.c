@@ -154,6 +154,8 @@ b32 types_are_compatible(Type* t1, Type* t2) {
             if (t2->kind != Type_Kind_Function) return 0;
             if (t1->Function.param_count != t2->Function.param_count) return 0;
 
+            if (!types_are_compatible(t1->Function.return_type, t2->Function.return_type)) return 0;
+
             fori (i, 0, t1->Function.param_count - 1) {
                 if (!types_are_compatible(t1->Function.params[i], t2->Function.params[i])) return 0;
             }

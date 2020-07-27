@@ -3,7 +3,7 @@ use "progs/intrinsics"
 
 use package printing
 
-call_me :: proc (f: proc (i32), val: i32) {
+call_me :: proc (f: proc (i32) -> i32, val: i32) {
 	f(val);
 }
 
@@ -25,8 +25,15 @@ execute :: proc (use dc: ^DeferredCall) -> i32 {
     return func(left, right);
 }
 
+echo :: proc (i: i32) -> i32 {
+    print(i);
+    return i;
+}
+
 proc #export "main" {
-	call_me(print_i32, 10);
+	call_me(echo, 10);
+
+    print(add as i32);
 
     funcs[0] = add;
     funcs[1] = sub;
