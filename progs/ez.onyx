@@ -14,7 +14,7 @@ Foo :: struct {
 }
 
 foo_sum :: proc (use this: ^Foo) -> i32 {
-    this.foo_other();
+    foo_other(this);
     return x + y;
 }
 
@@ -62,7 +62,7 @@ proc #export "main" {
     foo.st = st;
     print(alignof Foo);
     print(sizeof Foo);
-    print(foo.foo_sum());
+    print(foo_sum(foo));
     print_st(foo.st, 20);
 
     pa := (__heap_start as i32 + sizeof Foo) as ^PrintableArray;

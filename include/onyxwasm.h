@@ -295,6 +295,9 @@ typedef struct OnyxWasmModule {
     // NOTE: Mapping from local ast node ptrs to indicies
     bh_imap local_map;
 
+    // NOTE: Mapping ptrs to elements
+    bh_imap elem_map;
+
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
     // to the function type index if it has been created.
@@ -308,15 +311,16 @@ typedef struct OnyxWasmModule {
     bh_arr(WasmGlobal)    globals;
     bh_arr(WasmFunc)      funcs;
     bh_arr(WasmDatum)     data;
+    bh_arr(i32)           elems;
 
-    u32 next_type_idx;
     u32 export_count;
-    u32 element_count;
+    u32 next_type_idx;
     u32 next_func_idx;
     u32 next_foreign_func_idx;
     u32 next_global_idx;
     u32 next_foreign_global_idx;
     u32 next_datum_offset;
+    u32 next_elem_idx;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);

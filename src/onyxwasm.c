@@ -240,6 +240,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
 }
 
 static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft);
+static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func);
 
 #define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }))
 #define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }))
@@ -915,8 +916,8 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Function: {
-            i32 funcidx = bh_imap_get(&mod->index_map, (u64) expr);
-            WID(WI_I32_CONST, funcidx);
+            i32 elemidx = get_element_idx(mod, (AstFunction *) expr);
+            WID(WI_I32_CONST, elemidx);
             break;
         }
 
@@ -1192,6 +1193,22 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     return type_idx;
 }
 
+static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
+    if (bh_imap_has(&mod->elem_map, (u64) func)) {
+        return bh_imap_get(&mod->elem_map, (u64) func);
+    } else {
+        i32 idx = mod->next_elem_idx;
+        bh_imap_put(&mod->elem_map, (u64) func, idx);
+
+        i32 func_idx = bh_imap_get(&mod->index_map, (u64) func);
+        bh_arr_push(mod->elems, func_idx);
+
+        mod->next_elem_idx++;
+
+        return idx;
+    }
+}
+
 static inline b32 should_compile_function(AstFunction* fd) {
     // NOTE: Don't output intrinsic functions
     if (fd->flags & Ast_Flag_Intrinsic) return 0;
@@ -1431,7 +1448,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .data = NULL,
         .next_datum_offset = 0,
 
-        .element_count = 0,
+        .elems = NULL,
+        .next_elem_idx = 0,
 
         .structured_jump_target = NULL,
     };
@@ -1441,6 +1459,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.imports, 4);
     bh_arr_new(alloc, module.globals, 4);
     bh_arr_new(alloc, module.data, 4);
+    bh_arr_new(alloc, module.elems, 4);
 
     // NOTE: 16 is probably needlessly large
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
@@ -1451,6 +1470,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
     bh_imap_init(&module.index_map, global_heap_allocator, 128);
     bh_imap_init(&module.local_map, global_heap_allocator, 16);
+    bh_imap_init(&module.elem_map,  global_heap_allocator, 16);
 
     return module;
 }
@@ -1470,7 +1490,6 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
         switch (entity->type) {
             case Entity_Type_Function_Header: {
                 if (!should_compile_function(entity->function)) break;
-                module->element_count++;
 
                 u64 func_idx;
                 if ((entity->function->flags & Ast_Flag_Foreign) != 0)
@@ -1670,6 +1689,8 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
+    if (bh_arr_length(module->elems) == 0) return 0;
+
     i32 prev_len = buff->length;
     bh_buffer_write_byte(buff, WASM_SECTION_ID_TABLE);
 
@@ -1682,7 +1703,7 @@ static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
 
     // NOTE: funcrefs are the only valid table element type
     bh_buffer_write_byte(&vec_buff, 0x70);
-    output_limits(module->element_count, -1, &vec_buff);
+    output_limits(bh_arr_length(module->elems), -1, &vec_buff);
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -1839,14 +1860,14 @@ static i32 output_startsection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_elemsection(OnyxWasmModule* module, bh_buffer* buff) {
+    if (bh_arr_length(module->elems) == 0) return 0;
+
     i32 prev_len = buff->length;
 
     bh_buffer_write_byte(buff, WASM_SECTION_ID_ELEMENT);
 
     bh_buffer vec_buff;
     bh_buffer_init(&vec_buff, buff->allocator, 128);
-
-    u32 func_count = bh_arr_length(module->funcs) + module->next_foreign_func_idx;
 
     i32 leb_len;
     u8* leb;
@@ -1861,11 +1882,11 @@ static i32 output_elemsection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_write_byte(&vec_buff, 0x00);
     bh_buffer_write_byte(&vec_buff, WI_BLOCK_END);
 
-    leb = uint_to_uleb128((u64) func_count, &leb_len);
+    leb = uint_to_uleb128((u64) bh_arr_length(module->elems), &leb_len);
     bh_buffer_append(&vec_buff, leb, leb_len);
 
-    fori (funcidx, 0, func_count - 1) {
-        leb = uint_to_uleb128((u64) funcidx, &leb_len);
+    bh_arr_each(i32, elem, module->elems) {
+        leb = uint_to_uleb128((u64) *elem, &leb_len);
         bh_buffer_append(&vec_buff, leb, leb_len);
     }
 

@@ -30,6 +30,18 @@ echo :: proc (i: i32) -> i32 {
     return i;
 }
 
+I32Array :: struct {
+    length : i32;
+    data   : ^i32;
+}
+
+array_map :: proc (arr: I32Array, map: proc (i32) -> i32) {
+    for i: 0, arr.length arr.data[i] = map(arr.data[i]);
+}
+
+minus_one :: proc (n: i32) -> i32 { return n - 1; }
+double :: proc (n: i32) -> i32 { return n << 1; }
+
 proc #export "main" {
 	call_me(echo, 10);
 
@@ -48,4 +60,14 @@ proc #export "main" {
     dc.right = 19;
 
     print(execute(dc));
+
+    len :: 10;
+    data := (__heap_start as i32 + sizeof DeferredCall) as ^i32;
+    for i: 0, len data[i] = i;
+    print(data as [] i32, len);
+
+    add_one :: proc (n: i32) -> i32 { return n + 1; };
+
+    array_map(len, data, add_one);
+    print(data as [] i32, len);
 }

@@ -255,6 +255,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Keyword_Proc: {
+            retval = (AstTyped *) parse_function_definition(parser);
+            retval->flags |= Ast_Flag_Function_Used;
+
+            // TODO: Maybe move this somewhere else?
+            add_node_to_process(parser, (AstNode *) retval);
+
+            break;
+        }
+
         default:
             onyx_message_add(Msg_Type_Unexpected_Token,
                     parser->curr->pos,
