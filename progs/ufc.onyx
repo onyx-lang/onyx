@@ -41,8 +41,8 @@ Vec2 :: struct {
 	y : f32;
 }
 
-vec2_magnitude :: proc (v: ^Vec2) -> i32 {
-	return sqrt_f32(v.x * v.x + v.y * v.y) as i32;
+vec2_magnitude :: proc (use v: ^Vec2) -> i32 {
+	return sqrt_f32(x * x + y * y) as i32;
 }
 
 Vec3 :: struct {
@@ -51,8 +51,8 @@ Vec3 :: struct {
 	z : f32;
 }
 
-vec3_magnitude :: proc (v: ^Vec3) -> f32 {
-	return sqrt_f32(v.x * v.x + v.y * v.y + v.z * v.z);	
+vec3_magnitude :: proc (use v: ^Vec3) -> f32 {
+	return sqrt_f32(x * x + y * y + z * z);	
 }
 
 magnitude :: proc #overloaded {

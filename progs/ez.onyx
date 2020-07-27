@@ -1,9 +1,9 @@
 use "progs/print_funcs"
+use "progs/intrinsics"
 
 use package printing {
     print, PrintableArray,
-    print_f32 as pf32,
-    print_buf
+    print_f32 as pf32
 }
 
 Foo :: struct {
@@ -13,8 +13,8 @@ Foo :: struct {
     st : SomeType;
 }
 
-foo_sum :: proc (foo: ^Foo) -> i32 {
-    return foo.x + foo.y;
+foo_sum :: proc (use foo: ^Foo) -> i32 {
+    return x + y;
 }
 
 asdf :: proc (pa: PrintableArray) {
@@ -28,7 +28,7 @@ SomeType :: enum {
     Value4;
 }
 
-print_st :: proc (st: SomeType) {
+print_st :: proc (st: SomeType, other: i32) {
     print(st as i32);
 }
 
@@ -42,16 +42,14 @@ proc #export "main" {
 
     print(__heap_start as i32);
 
-    print(print_buf as i32);
-
     single_int = 10 as u8;
     print(single_int as i32);
 
     array[4].y = 1234;
     print(array[4].y);
 
-    st := SomeType.Value4;
-    print_st(st);
+    st: SomeType = SomeType.Value4;
+    print_st(st, 10);
 
     foo := __heap_start as ^Foo;
     foo.x = 123;
@@ -60,7 +58,7 @@ proc #export "main" {
     print(alignof Foo);
     print(sizeof Foo);
     print(foo.foo_sum());
-    print_st(foo.st);
+    print_st(foo.st, 20);
 
     pa := (__heap_start as i32 + sizeof Foo) as ^PrintableArray;
     pa.data = __heap_start as ^u8;
@@ -69,6 +67,6 @@ proc #export "main" {
 
     print(1234);
 
-    pf32(123.0f);
+    pf32(sqrt_f32(123.0f));
 }
 

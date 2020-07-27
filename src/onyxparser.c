@@ -889,9 +889,13 @@ static AstLocal* parse_function_params(OnyxParser* parser) {
     AstLocal* curr_param = NULL;
     AstLocal* trailer = NULL;
 
+    b32 param_use = 0;
     OnyxToken* symbol;
     while (parser->curr->type != ')') {
-        if (parser->curr->type == ',') consume_token(parser);
+        if (parser->curr->type == Token_Type_Keyword_Use) {
+            consume_token(parser);
+            param_use = 1;
+        }
 
         symbol = expect_token(parser, Token_Type_Symbol);
         expect_token(parser, ':');
@@ -901,12 +905,20 @@ static AstLocal* parse_function_params(OnyxParser* parser) {
         curr_param->flags |= Ast_Flag_Const;
         curr_param->type_node = parse_type(parser);
 
+        if (param_use) {
+            curr_param->flags |= Ast_Flag_Param_Use;
+            param_use = 0;
+        }
+
         if (first_param == NULL) first_param = curr_param;
 
         curr_param->next = NULL;
         if (trailer) trailer->next = (AstNode *) curr_param;
 
         trailer = curr_param;
+
+        if (parser->curr->type != ')')
+            expect_token(parser, ',');
     }
 
     consume_token(parser); // Skip the )

@@ -1,9 +1,5 @@
 package printing
 
-use package main {
-    N as buf_size
-}
-
 print_bool :: proc #foreign "host" "print" (value: bool) ---
 print_i32  :: proc #foreign "host" "print" (value: i32) ---
 print_f32  :: proc #foreign "host" "print" (value: f32) ---
@@ -59,5 +55,3 @@ print :: proc #overloaded {
     print_str,
     print_str_len,
 }
-
-print_buf : [buf_size] u8

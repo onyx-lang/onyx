@@ -119,11 +119,16 @@ HOW:
 
         [X] Enum types
 
-        [ ] Static pointers to sized data
+        [X] Static pointers to sized data
 
-        [ ] 'using' parameters
+        [X] 'using' parameters
             - The following example will bring the members of the struct into the scope as field accesses
               and allow for a more OO style programming, without diving into the crap that is OO
+
+              foo :: proc (use data: ^Data, other_arg: i32) {
+                  member1_of_data = other_arg;
+                  bar(member2_of_data);
+              }
 
         [ ] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.

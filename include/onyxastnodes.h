@@ -136,6 +136,7 @@ typedef enum AstFlags {
     // Expression flags
     Ast_Flag_Expr_Ignored     = BH_BIT(8),
     Ast_Flag_Param_Splatted   = BH_BIT(9),
+    Ast_Flag_Param_Use        = BH_BIT(10),
     
     // Type flags
     Ast_Flag_Type_Is_Resolved = BH_BIT(8),

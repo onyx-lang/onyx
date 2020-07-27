@@ -349,6 +349,26 @@ static void symres_function(AstFunction* func) {
         param->type_node = symres_type(param->type_node);
 
         symbol_introduce(semstate.curr_scope, param->token, (AstNode *) param);
+
+        if (param->flags & Ast_Flag_Param_Use) {
+            if (param->type_node->kind != Ast_Kind_Pointer_Type
+                || ((AstPointerType *) param->type_node)->elem->kind != Ast_Kind_Struct_Type) {
+                onyx_message_add(Msg_Type_Literal,
+                        param->token->pos,
+                        "can only 'use' pointers to structures.");
+            } else {
+                AstStructType* st = (AstStructType *) ((AstPointerType *) param->type_node)->elem;
+
+                bh_arr_each(AstStructMember *, mem, st->members) {
+                    AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
+                    fa->token = (*mem)->token;
+                    fa->type_node = (*mem)->type_node;
+                    fa->expr = (AstTyped *) param;
+
+                    symbol_introduce(semstate.curr_scope, (*mem)->token, (AstNode *) fa);
+                }
+            }
+        }
     }
 
     if (func->type_node != NULL) {
