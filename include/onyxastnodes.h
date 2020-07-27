@@ -137,7 +137,7 @@ typedef enum AstFlags {
     Ast_Flag_Expr_Ignored     = BH_BIT(8),
     Ast_Flag_Param_Splatted   = BH_BIT(9),
     Ast_Flag_Param_Use        = BH_BIT(10),
-    
+
     // Type flags
     Ast_Flag_Type_Is_Resolved = BH_BIT(8),
 
@@ -230,7 +230,7 @@ typedef enum OnyxIntrinsic {
 #define AstNode_base struct AstNode_members;
 struct AstNode AstNode_members;
 
-// NOTE: 'type_node' is filled out by the parser.                                               
+// NOTE: 'type_node' is filled out by the parser.
 // For a type such as '^^i32', the tree would look something like
 //
 //      Typed Thing -> AstPointerType -> AstPointerType -> AstNode (symbol node)
@@ -255,7 +255,7 @@ struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 addr; };
 struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
-struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstNode *callee; };
+struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstTyped *callee; };
 struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
 struct AstArgument      { AstTyped_base; AstTyped *value; };
 struct AstAddressOf     { AstTyped_base; AstTyped *expr; };

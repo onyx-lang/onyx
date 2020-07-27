@@ -85,7 +85,7 @@ static AstType* symres_type(AstType* type) {
     if (type->kind == Ast_Kind_Field_Access) {
         AstFieldAccess* field = (AstFieldAccess *) type;
         symres_field_access(&field);
-        
+
         if (!node_is_type((AstNode *) field)) {
             onyx_message_add(Msg_Type_Literal,
                     type->token->pos,
@@ -154,19 +154,23 @@ static void symres_call(AstCall* call) {
     symres_expression((AstTyped **) &call->callee);
     if (call->callee == NULL) return;
 
-    if (call->callee->kind == Ast_Kind_Field_Access) {
-        AstFieldAccess* fa = (AstFieldAccess *) call->callee;
-        if (fa->expr == NULL) return;
+    // NOTE: Disabling UFC now. Causes too many problems.
+    // Especially since structs can have function pointers as members,
+    // so x.y(...) is ambiguous.
+    //
+    // if (call->callee->kind == Ast_Kind_Field_Access) {
+    //     AstFieldAccess* fa = (AstFieldAccess *) call->callee;
+    //     if (fa->expr == NULL) return;
 
-        AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
-        implicit_arg->value = fa->expr;
-        implicit_arg->token = fa->expr->token;
-        implicit_arg->next = (AstNode *) call->arguments;
+    //     AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
+    //     implicit_arg->value = fa->expr;
+    //     implicit_arg->token = fa->expr->token;
+    //     implicit_arg->next = (AstNode *) call->arguments;
 
-        call->callee = symbol_resolve(semstate.curr_scope, fa->token);
-        call->arguments = implicit_arg;
-        call->arg_count++;
-    }
+    //     call->callee = (AstTyped *) symbol_resolve(semstate.curr_scope, fa->token);
+    //     call->arguments = implicit_arg;
+    //     call->arg_count++;
+    // }
 
     symres_statement_chain((AstNode *) call->arguments, (AstNode **) &call->arguments);
 }
@@ -217,19 +221,23 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
 
 static void symres_expression(AstTyped** expr) {
     switch ((*expr)->kind) {
+        case Ast_Kind_Symbol:
+            *expr = (AstTyped *) symbol_resolve(semstate.curr_scope, ((AstNode *) *expr)->token);
+            break;
+
         case Ast_Kind_Binary_Op:
             symres_expression(&((AstBinaryOp *)(*expr))->left);
             symres_expression(&((AstBinaryOp *)(*expr))->right);
             break;
 
-        case Ast_Kind_Unary_Op: symres_unaryop((AstUnaryOp **) expr); break;
-        case Ast_Kind_Call: symres_call((AstCall *) *expr); break;
-        case Ast_Kind_Block: symres_block((AstBlock *) *expr); break;
-
-        case Ast_Kind_Symbol:
-            *expr = (AstTyped *) symbol_resolve(semstate.curr_scope, ((AstNode *) *expr)->token);
-            break;
-
+        case Ast_Kind_Unary_Op:     symres_unaryop((AstUnaryOp **) expr); break;
+        case Ast_Kind_Call:         symres_call((AstCall *) *expr); break;
+        case Ast_Kind_Block:        symres_block((AstBlock *) *expr); break;
+        case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
+        case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
+        case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
+        case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
+        case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
 
         case Ast_Kind_Function:
         case Ast_Kind_NumLit:
@@ -237,19 +245,11 @@ static void symres_expression(AstTyped** expr) {
             (*expr)->type_node = symres_type((*expr)->type_node);
             break;
 
-        case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
-        case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
-        case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
-        case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
-        case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
-
         case Ast_Kind_Array_Access:
             symres_expression(&((AstArrayAccess *)(*expr))->addr);
             symres_expression(&((AstArrayAccess *)(*expr))->expr);
             break;
 
-        // NOTE: This is a good case, since it means the symbol is already resolved
-        case Ast_Kind_Local:
         default: break;
     }
 }
@@ -347,12 +347,12 @@ static void symres_function(AstFunction* func) {
 
     for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
         param->type_node = symres_type(param->type_node);
+        param->type = type_build_from_ast(semstate.allocator, param->type_node);
 
         symbol_introduce(semstate.curr_scope, param->token, (AstNode *) param);
 
         if (param->flags & Ast_Flag_Param_Use) {
-            if (param->type_node->kind != Ast_Kind_Pointer_Type
-                || ((AstPointerType *) param->type_node)->elem->kind != Ast_Kind_Struct_Type) {
+            if (param->type->kind != Type_Kind_Pointer || param->type->Pointer.elem->kind != Type_Kind_Struct) {
                 onyx_message_add(Msg_Type_Literal,
                         param->token->pos,
                         "can only 'use' pointers to structures.");
@@ -474,7 +474,7 @@ static void symres_enum(AstEnumType* enum_node) {
 
         if (enum_node->flags & Ast_Flag_Enum_Is_Flags) {
             next_assign_value <<= 1;
-        } else { 
+        } else {
             next_assign_value++;
         }
     }

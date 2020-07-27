@@ -1,3 +1,4 @@
+#define BH_DEBUG
 #include "onyxtypes.h"
 #include "onyxastnodes.h"
 #include "onyxutils.h"
@@ -144,8 +145,20 @@ b32 types_are_compatible(Type* t1, Type* t2) {
         }
 
         case Type_Kind_Enum: {
-            if (t2->kind != Type_Kind_Enum) return 0;
-            return t1 == t2;
+            return 0;
+            // if (t2->kind != Type_Kind_Enum) return 0;
+            // return t1 == t2;
+        }
+
+        case Type_Kind_Function: {
+            if (t2->kind != Type_Kind_Function) return 0;
+            if (t1->Function.param_count != t2->Function.param_count) return 0;
+
+            fori (i, 0, t1->Function.param_count - 1) {
+                if (!types_are_compatible(t1->Function.params[i], t2->Function.params[i])) return 0;
+            }
+
+            return 1;
         }
 
         default:
@@ -162,7 +175,7 @@ u32 type_size_of(Type* type) {
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.size;
         case Type_Kind_Pointer:  return 4;
-        case Type_Kind_Function: return 0;
+        case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
@@ -176,7 +189,7 @@ u32 type_alignment_of(Type* type) {
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.alignment;
         case Type_Kind_Pointer:  return 4;
-        case Type_Kind_Function: return 1;
+        case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type_alignment_of(type->Array.elem);
         case Type_Kind_Struct:   return type->Struct.aligment;
         case Type_Kind_Enum:     return type_alignment_of(type->Enum.backing);
@@ -280,7 +293,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             }
 
             s_type->Struct.aligment = alignment;
-            
+
             if (offset % alignment != 0) {
                 offset += alignment - (offset % alignment);
             }
@@ -371,6 +384,9 @@ const char* type_get_name(Type* type) {
                 return type->Enum.name;
             else
                 return "<anonymous enum>";
+
+        case Type_Kind_Function: return bh_aprintf(global_scratch_allocator, "proc (...) -> %s", type_get_name(type->Function.return_type));
+
         default: return "unknown";
     }
 }

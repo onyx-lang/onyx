@@ -217,6 +217,10 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
         return WASM_TYPE_INT32;
     }
 
+    if (type->kind == Type_Kind_Function) {
+        return WASM_TYPE_INT32;
+    }
+
     if (type->kind == Type_Kind_Basic) {
         TypeBasic* basic = &type->Basic;
         if (basic->flags & Basic_Flag_Boolean) return WASM_TYPE_INT32;
@@ -234,6 +238,8 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
 
     return WASM_TYPE_VOID;
 }
+
+static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft);
 
 #define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }))
 #define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }))
@@ -398,6 +404,10 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
         type = type->Enum.backing;
     }
 
+    if (type->kind == Type_Kind_Function) {
+        type = &basic_types[Basic_Kind_U32];
+    }
+
     i32 store_size = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
     i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
@@ -428,6 +438,10 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
 
     if (type->kind == Type_Kind_Enum) {
         type = type->Enum.backing;
+    }
+
+    if (type->kind == Type_Kind_Function) {
+        type = &basic_types[Basic_Kind_U32];
     }
 
     i32 load_size   = type_size_of(type);
@@ -718,8 +732,15 @@ COMPILE_FUNC(call, AstCall* call) {
         compile_expression(mod, &code, arg->value);
     }
 
-    i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) call->callee);
-    bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
+    if (call->callee->kind == Ast_Kind_Function) {
+        i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) call->callee);
+        bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
+    } else {
+        compile_expression(mod, &code, call->callee);
+
+        i32 type_idx = generate_type_idx(mod, call->callee->type);
+        WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
+    }
 
     *pcode = code;
 }
@@ -890,6 +911,12 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_StrLit: {
             WID(WI_I32_CONST, ((AstStrLit *) expr)->addr);
+            break;
+        }
+
+        case Ast_Kind_Function: {
+            i32 funcidx = bh_imap_get(&mod->index_map, (u64) expr);
+            WID(WI_I32_CONST, funcidx);
             break;
         }
 
@@ -1113,12 +1140,14 @@ COMPILE_FUNC(return, AstReturn* ret) {
     *pcode = code;
 }
 
-static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
+static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
+    if (ft->kind != Type_Kind_Function) return -1;
+
     static char type_repr_buf[128];
 
     char* t = type_repr_buf;
-    Type** param_type = fd->type->Function.params;
-    i32 param_count = fd->type->Function.param_count;
+    Type** param_type = ft->Function.params;
+    i32 param_count = ft->Function.param_count;
     i32 params_left = param_count;
     while (params_left-- > 0) {
         // HACK: Using these directly as part of a string feels weird but they are
@@ -1128,7 +1157,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, AstFunction* fd) {
     }
     *(t++) = ':';
 
-    WasmType return_type = onyx_type_to_wasm_type(fd->type->Function.return_type);
+    WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
     *(t++) = (char) return_type;
     *t = '\0';
 
@@ -1177,7 +1206,7 @@ static inline b32 should_compile_function(AstFunction* fd) {
 static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (!should_compile_function(fd)) return;
 
-    i32 type_idx = generate_type_idx(mod, fd);
+    i32 type_idx = generate_type_idx(mod, fd->type);
 
     if (fd->flags & Ast_Flag_Foreign) {
         WasmImport import = {
@@ -1394,6 +1423,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .data = NULL,
         .next_datum_offset = 0,
 
+        .element_count = 0,
+
         .structured_jump_target = NULL,
     };
 
@@ -1431,6 +1462,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
         switch (entity->type) {
             case Entity_Type_Function_Header: {
                 if (!should_compile_function(entity->function)) break;
+                module->element_count++;
 
                 u64 func_idx;
                 if ((entity->function->flags & Ast_Flag_Foreign) != 0)
@@ -1467,7 +1499,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
 
             case Entity_Type_Memory_Reservation: {
                 compile_memory_reservation(module, (AstMemRes *) entity->mem_res);
-                
+
                 // HACK: To put this here
                 // NOTE: Round up to the nearest multiple of 16
                 builtin_heap_start.value.i =
@@ -1629,6 +1661,30 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
+static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
+    i32 prev_len = buff->length;
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_TABLE);
+
+    bh_buffer vec_buff;
+    bh_buffer_init(&vec_buff, buff->allocator, 128);
+
+    i32 leb_len;
+    u8* leb = uint_to_uleb128((u64) 1, &leb_len);
+    bh_buffer_append(&vec_buff, leb, leb_len);
+
+    // NOTE: funcrefs are the only valid table element type
+    bh_buffer_write_byte(&vec_buff, 0x70);
+    output_limits(module->element_count, -1, &vec_buff);
+
+    leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+
+    bh_buffer_concat(buff, vec_buff);
+    bh_buffer_free(&vec_buff);
+
+    return buff->length - prev_len;
+}
+
 static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
     i32 prev_len = buff->length;
     bh_buffer_write_byte(buff, WASM_SECTION_ID_MEMORY);
@@ -1774,6 +1830,46 @@ static i32 output_startsection(OnyxWasmModule* module, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
+static i32 output_elemsection(OnyxWasmModule* module, bh_buffer* buff) {
+    i32 prev_len = buff->length;
+
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_ELEMENT);
+
+    bh_buffer vec_buff;
+    bh_buffer_init(&vec_buff, buff->allocator, 128);
+
+    u32 func_count = bh_arr_length(module->funcs) + module->next_foreign_func_idx;
+
+    i32 leb_len;
+    u8* leb;
+
+    // NOTE: 0x01 count of elems
+    bh_buffer_write_byte(&vec_buff, 0x01);
+
+    // NOTE: 0x00 table index
+    bh_buffer_write_byte(&vec_buff, 0x00);
+
+    bh_buffer_write_byte(&vec_buff, WI_I32_CONST);
+    bh_buffer_write_byte(&vec_buff, 0x00);
+    bh_buffer_write_byte(&vec_buff, WI_BLOCK_END);
+
+    leb = uint_to_uleb128((u64) func_count, &leb_len);
+    bh_buffer_append(&vec_buff, leb, leb_len);
+
+    fori (funcidx, 0, func_count - 1) {
+        leb = uint_to_uleb128((u64) funcidx, &leb_len);
+        bh_buffer_append(&vec_buff, leb, leb_len);
+    }
+
+    leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+
+    bh_buffer_concat(buff, vec_buff);
+    bh_buffer_free(&vec_buff);
+
+    return buff->length - prev_len;
+}
+
 static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
     i32 prev_len = buff->length;
 
@@ -1836,6 +1932,7 @@ static void output_instruction(WasmInstruction* instr, bh_buffer* buff) {
             bh_buffer_append(buff, leb, leb_len);
             break;
 
+        case WI_CALL_INDIRECT:
         case WI_I32_STORE:
         case WI_I32_STORE_8:
         case WI_I32_STORE_16:
@@ -1978,10 +2075,12 @@ void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
     output_typesection(module, &master_buffer);
     output_importsection(module, &master_buffer);
     output_funcsection(module, &master_buffer);
+    output_tablesection(module, &master_buffer);
     output_memorysection(module, &master_buffer);
     output_globalsection(module, &master_buffer);
     output_exportsection(module, &master_buffer);
     output_startsection(module, &master_buffer);
+    output_elemsection(module, &master_buffer);
     output_codesection(module, &master_buffer);
     output_datasection(module, &master_buffer);
 

@@ -302,7 +302,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             case '(': {
                 AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
                 call_node->token = expect_token(parser, '(');
-                call_node->callee = (AstNode *) retval;
+                call_node->callee = retval;
                 call_node->arg_count = 0;
 
                 AstArgument** prev = &call_node->arguments;
@@ -807,6 +807,42 @@ static AstType* parse_type(OnyxParser* parser) {
            next_insertion = &new->elem;
         }
 
+        else if (parser->curr->type == Token_Type_Keyword_Proc) {
+            OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
+
+            bh_arr(AstType *) params = NULL;
+            bh_arr_new(global_scratch_allocator, params, 4);
+
+            expect_token(parser, '(');
+            while (parser->curr->type != ')') {
+                AstType* param_type = parse_type(parser);
+                bh_arr_push(params, param_type);
+
+                if (parser->curr->type != ')')
+                    expect_token(parser, ',');
+            }
+            consume_token(parser);
+
+            AstType* return_type = (AstType *) &basic_type_void;
+            if (parser->curr->type == Token_Type_Right_Arrow) {
+                consume_token(parser);
+                return_type = parse_type(parser);
+            }
+
+            u64 param_count = bh_arr_length(params);
+            AstFunctionType* new = onyx_ast_node_new(parser->allocator,
+                    sizeof(AstFunctionType) + sizeof(AstType) * param_count,
+                    Ast_Kind_Function_Type);
+            new->token = proc_token;
+            new->param_count = param_count;
+            new->return_type = return_type;
+
+            fori (i, 0, param_count - 1) new->params[i] = params[i];
+
+            *next_insertion = (AstType *) new;
+            next_insertion = NULL;
+        }
+
         else if (parser->curr->type == Token_Type_Symbol) {
             AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
             symbol_node->token = expect_token(parser, Token_Type_Symbol);
@@ -1124,7 +1160,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
         if (parser->curr->type == ':') {
             consume_token(parser);
             expect_token(parser, ':');
-            
+
             evalue->value = parse_numeric_literal(parser);
         }
 
@@ -1213,7 +1249,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                 add_node_to_process(parser, (AstNode *) upack);
                 return NULL;
-                
+
             } else {
                 AstIncludeFile* include = make_node(AstIncludeFile, Ast_Kind_Include_File);
                 include->token = use_token;

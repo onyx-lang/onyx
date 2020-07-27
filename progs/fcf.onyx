@@ -1,0 +1,44 @@
+use "progs/print_funcs"
+use "progs/intrinsics"
+
+use package printing
+
+call_me :: proc (f: proc (i32), val: i32) {
+	f(val);
+}
+
+funcs : [5] proc (i32, i32) -> i32
+
+add :: proc (a: i32, b: i32) -> i32 { return a + b; }
+sub :: proc (a: i32, b: i32) -> i32 { return a - b; }
+mul :: proc (a: i32, b: i32) -> i32 { return a * b; }
+div :: proc (a: i32, b: i32) -> i32 { return a / b; }
+mod :: proc (a: i32, b: i32) -> i32 { return a % b; }
+
+DeferredCall :: struct {
+    func  : proc (i32, i32) -> i32;
+    left  : i32;
+    right : i32;
+}
+
+execute :: proc (use dc: ^DeferredCall) -> i32 {
+    return func(left, right);
+}
+
+proc #export "main" {
+	call_me(print_i32, 10);
+
+    funcs[0] = add;
+    funcs[1] = sub;
+    funcs[3] = div;
+    funcs[4] = mod;
+
+    print(funcs[0](10, 3));
+
+    dc := __heap_start as ^DeferredCall;
+    dc.func = mod;
+    dc.left = 40;
+    dc.right = 19;
+
+    print(execute(dc));
+}

@@ -165,6 +165,8 @@ CHECK(call, AstCall* call) {
         return 1;
     }
 
+    if (check_expression(&call->callee)) return 1;
+
     // NOTE: Check arguments and splat structs
     AstNode** prev_param = (AstNode **) &call->arguments;
     AstArgument* actual_param = call->arguments;
@@ -212,7 +214,7 @@ CHECK(call, AstCall* call) {
     }
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
-        call->callee = (AstNode *) match_overloaded_function(call, (AstOverloadedFunction *) callee);
+        call->callee = match_overloaded_function(call, (AstOverloadedFunction *) callee);
         callee = (AstFunction *) call->callee;
 
         if (callee == NULL) return 1;
@@ -293,36 +295,34 @@ CHECK(call, AstCall* call) {
 
     call->type = callee->type->Function.return_type;
 
-    AstLocal* formal_param = callee->params;
+    Type** formal_param = &callee->type->Function.params[0];
     actual_param = call->arguments;
 
     i32 arg_pos = 0;
     while (formal_param != NULL && actual_param != NULL) {
-        fill_in_type((AstTyped *) formal_param);
-
-        if (!types_are_compatible(formal_param->type, actual_param->type)) {
+        if (!types_are_compatible(*formal_param, actual_param->type)) {
             onyx_message_add(Msg_Type_Function_Param_Mismatch,
                     actual_param->token->pos,
                     callee->token->text, callee->token->length,
-                    type_get_name(formal_param->type),
+                    type_get_name(*formal_param),
                     arg_pos,
                     type_get_name(actual_param->type));
             return 1;
         }
 
         arg_pos++;
-        formal_param = (AstLocal *) formal_param->next;
+        formal_param++;
         actual_param = (AstArgument *) actual_param->next;
     }
 
-    if (formal_param != NULL && actual_param == NULL) {
+    if (arg_pos < callee->type->Function.param_count) {
         onyx_message_add(Msg_Type_Literal,
                 call->token->pos,
                 "too few arguments to function call");
         return 1;
     }
 
-    if (formal_param == NULL && actual_param != NULL) {
+    if (arg_pos > callee->type->Function.param_count) {
         onyx_message_add(Msg_Type_Literal,
                 call->token->pos,
                 "too many arguments to function call");
@@ -652,8 +652,11 @@ CHECK(expression, AstTyped** pexpr) {
             assert(expr->type != NULL);
             break;
 
+        case Ast_Kind_Function:
+            expr->flags |= Ast_Flag_Function_Used;
+            break;
+
         case Ast_Kind_StrLit: break;
-        case Ast_Kind_Function: break;
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;
 
@@ -919,7 +922,7 @@ void onyx_type_check() {
             case Entity_Type_Function_Header:
                 if (entity->function->flags & Ast_Flag_Foreign)
                     semstate.program->foreign_func_count++;
-                
+
                 if (check_function_header(entity->function)) return;
                 break;
 
