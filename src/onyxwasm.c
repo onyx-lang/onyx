@@ -1358,19 +1358,16 @@ static void compile_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
         offset += alignment - (offset % alignment);
     }
 
-    ptr data = bh_alloc_array(global_heap_allocator, i8, size);
-    memset(data, 0, size);
-
-    WasmDatum datum = {
-        .offset = offset,
-        .length = size,
-        .data = data
-    };
+    // WasmDatum datum = {
+    //     .offset = offset,
+    //     .length = size,
+    //     .data = NULL
+    // };
 
     memres->addr = offset;
     mod->next_datum_offset = offset + size;
 
-    bh_arr_push(mod->data, datum);
+    // bh_arr_push(mod->data, datum);
 }
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
@@ -1948,6 +1945,8 @@ static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     bh_arr_each(WasmDatum, datum, module->data) {
+        if (datum->data == NULL) continue;
+
         // NOTE: 0x00 memory index
         bh_buffer_write_byte(&vec_buff, 0x00);
 

@@ -13,8 +13,13 @@ Foo :: struct {
     st : SomeType;
 }
 
-foo_sum :: proc (use foo: ^Foo) -> i32 {
+foo_sum :: proc (use this: ^Foo) -> i32 {
+    this.foo_other();
     return x + y;
+}
+
+foo_other :: proc (use this: ^Foo) {
+    print(st as i32);
 }
 
 asdf :: proc (pa: PrintableArray) {
@@ -32,18 +37,18 @@ print_st :: proc (st: SomeType, other: i32) {
     print(st as i32);
 }
 
-single_int : u8
+single_int : u32
 
-array : [N] Foo
 N :: 1024
+array : [N] Foo
 
 proc #export "main" {
     print("Hello World! this is slightly longer\n");
 
     print(__heap_start as i32);
 
-    single_int = 10 as u8;
-    print(single_int as i32);
+    single_int = 10;
+    print(single_int);
 
     array[4].y = 1234;
     print(array[4].y);
