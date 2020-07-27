@@ -63,6 +63,7 @@ static void symres_global(AstGlobal* global);
 static void symres_overloaded_function(AstOverloadedFunction* ofunc);
 static void symres_use_package(AstUsePackage* package);
 static void symres_enum(AstEnumType* enum_node);
+static void symres_memres(AstMemRes** memres);
 
 static void scope_enter(Scope* new_scope) {
     if (new_scope->parent == NULL)
@@ -395,16 +396,16 @@ static void symres_use_package(AstUsePackage* package) {
     }
 
     if (package->only != NULL) {
-        bh_arr_each(OnyxToken *, tkn, package->only) {
+        bh_arr_each(AstAlias *, alias, package->only) {
 
-            AstNode* thing = symbol_resolve(p->scope, *tkn);
+            AstNode* thing = symbol_resolve(p->scope, (*alias)->token);
             if (thing == NULL) {
                 onyx_message_add(Msg_Type_Literal,
-                    (*tkn)->pos,
+                    (*alias)->token->pos,
                     "not found in package");
                 return;
             }
-            symbol_introduce(semstate.curr_package->scope, *tkn, thing);
+            symbol_introduce(semstate.curr_package->scope, (*alias)->alias, thing);
         }
     }
 
@@ -454,6 +455,29 @@ static void symres_enum(AstEnumType* enum_node) {
     }
 }
 
+static void symres_memres(AstMemRes** memres) {
+    (*memres)->type_node = symres_type((*memres)->type_node);
+    (*memres)->type = type_build_from_ast(semstate.allocator, (*memres)->type_node);
+
+    if ((*memres)->type->kind != Type_Kind_Array) {
+        Type* ptr_type = type_make_pointer(semstate.allocator, (*memres)->type);
+        (*memres)->type = ptr_type;
+
+        AstMemRes* new_memres = onyx_ast_node_new(semstate.node_allocator, sizeof(AstMemRes), Ast_Kind_Memres);
+        memcpy(new_memres, (*memres), sizeof(AstMemRes));
+
+        // BIG HACK: converting the (*memres) node to a dereference node to not break
+        // already resolved symbols
+        ((AstDereference *) (*memres))->kind = Ast_Kind_Dereference;
+        ((AstDereference *) (*memres))->type_node = (*memres)->type_node;
+        ((AstDereference *) (*memres))->type = (*memres)->type->Pointer.elem;
+        ((AstDereference *) (*memres))->expr = (AstTyped *) new_memres;
+
+        // BUT retain the 'old' memres in the entity list
+        *memres = new_memres;
+    }
+}
+
 void onyx_resolve_symbols() {
 
     semstate.curr_scope = semstate.program->global_scope;
@@ -477,6 +501,7 @@ void onyx_resolve_symbols() {
             case Entity_Type_Expression:          symres_expression(&entity->expr); break;
             case Entity_Type_Struct:              symres_type((AstType *) entity->struct_type); break;
             case Entity_Type_Enum:                symres_enum(entity->enum_type); break;
+            case Entity_Type_Memory_Reservation:  symres_memres(&entity->mem_res); break;
 
             default: break;
         }

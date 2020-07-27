@@ -992,6 +992,12 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Memres: {
+            AstMemRes* memres = (AstMemRes *) expr;
+            WID(WI_I32_CONST, memres->addr);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -1343,6 +1349,30 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     bh_arr_push(mod->data, datum);
 }
 
+static void compile_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
+    u64 alignment = type_alignment_of(memres->type);
+    u64 size = type_size_of(memres->type);
+
+    u32 offset = mod->next_datum_offset;
+    if (offset % alignment != 0) {
+        offset += alignment - (offset % alignment);
+    }
+
+    ptr data = bh_alloc_array(global_heap_allocator, i8, size);
+    memset(data, 0, size);
+
+    WasmDatum datum = {
+        .offset = offset,
+        .length = size,
+        .data = data
+    };
+
+    memres->addr = offset;
+    mod->next_datum_offset = offset + size;
+
+    bh_arr_push(mod->data, datum);
+}
+
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     OnyxWasmModule module = {
         .allocator = alloc,
@@ -1429,6 +1459,18 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
             case Entity_Type_String_Literal: {
                 compile_string_literal(module, (AstStrLit *) entity->strlit);
 
+                // HACK: To put this here
+                // NOTE: Round up to the nearest multiple of 16
+                builtin_heap_start.value.i =
+                    (module->next_datum_offset & 15)
+                    ? ((module->next_datum_offset >> 4) + 1) << 4
+                    : module->next_datum_offset;
+                break;
+            }
+
+            case Entity_Type_Memory_Reservation: {
+                compile_memory_reservation(module, (AstMemRes *) entity->mem_res);
+                
                 // HACK: To put this here
                 // NOTE: Round up to the nearest multiple of 16
                 builtin_heap_start.value.i =

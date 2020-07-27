@@ -657,6 +657,8 @@ CHECK(expression, AstTyped** pexpr) {
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;
 
+        case Ast_Kind_Memres: break;
+
         default:
             retval = 1;
             DEBUG_HERE;
@@ -951,6 +953,8 @@ void onyx_type_check() {
             case Entity_Type_Global_Header: break;
 
             case Entity_Type_Use_Package: break;
+
+            case Entity_Type_Memory_Reservation: break;
 
             default: DEBUG_HERE; break;
         }

@@ -1180,9 +1180,17 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     bh_arr_new(global_heap_allocator, upack->only, 4);
 
                     while (parser->curr->type != '}') {
-                        OnyxToken* only_token = expect_token(parser, Token_Type_Symbol);
+                        AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
+                        alias->token = expect_token(parser, Token_Type_Symbol);
 
-                        bh_arr_push(upack->only, only_token);
+                        if (parser->curr->type == Token_Type_Keyword_Cast) {
+                            consume_token(parser);
+                            alias->alias = expect_token(parser, Token_Type_Symbol);
+                        } else {
+                            alias->alias = alias->token;
+                        }
+
+                        bh_arr_push(upack->only, alias);
 
                         if (parser->curr->type != '}')
                             expect_token(parser, ',');
@@ -1212,39 +1220,61 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
             consume_token(parser);
 
             expect_token(parser, ':');
-            expect_token(parser, ':');
 
-            AstTyped* node = parse_top_level_expression(parser);
+            if (parser->curr->type == ':') {
+                expect_token(parser, ':');
 
-            if (node->kind == Ast_Kind_Function) {
-                AstFunction* func = (AstFunction *) node;
+                AstTyped* node = parse_top_level_expression(parser);
 
-                if (func->exported_name == NULL)
-                    func->exported_name = symbol;
+                if (node->kind == Ast_Kind_Function) {
+                    AstFunction* func = (AstFunction *) node;
 
-            } else if (node->kind == Ast_Kind_Global) {
-                AstGlobal* global = (AstGlobal *) node;
+                    if (func->exported_name == NULL)
+                        func->exported_name = symbol;
 
-                if (global->exported_name == NULL)
-                    global->exported_name = symbol;
+                } else if (node->kind == Ast_Kind_Global) {
+                    AstGlobal* global = (AstGlobal *) node;
 
-            } else if (node->kind != Ast_Kind_Overloaded_Function
-                    && node->kind != Ast_Kind_StrLit) {
+                    if (global->exported_name == NULL)
+                        global->exported_name = symbol;
 
-                if (node->kind == Ast_Kind_Struct_Type || node->kind == Ast_Kind_Enum_Type) {
-                    ((AstStructType *)node)->name = bh_aprintf(global_heap_allocator,
-                        "%b", symbol->text, symbol->length);
+                } else if (node->kind != Ast_Kind_Overloaded_Function
+                        && node->kind != Ast_Kind_StrLit) {
+
+                    if (node->kind == Ast_Kind_Struct_Type || node->kind == Ast_Kind_Enum_Type) {
+                        ((AstStructType *)node)->name = bh_aprintf(global_heap_allocator,
+                            "%b", symbol->text, symbol->length);
+                    }
+
+                    // HACK
+                    add_node_to_process(parser, (AstNode *) node);
                 }
 
-                // HACK
-                add_node_to_process(parser, (AstNode *) node);
+                AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+                binding->token = symbol;
+                binding->node = (AstNode *) node;
+
+                return (AstNode *) binding;
+            } else {
+                if (parser->curr->type == '=') {
+                    onyx_message_add(Msg_Type_Literal,
+                            parser->curr->pos,
+                            "assigning initial values to memory reservations isn't allowed yet.");
+                    break;
+                }
+
+                AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
+                memres->token = symbol;
+                memres->type_node = parse_type(parser);
+
+                add_node_to_process(parser, (AstNode *) memres);
+
+                AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+                binding->token = symbol;
+                binding->node = (AstNode *) memres;
+
+                return (AstNode *) binding;
             }
-
-            AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
-            binding->token = symbol;
-            binding->node = (AstNode *) node;
-
-            return (AstNode *) binding;
         }
 
         default: break;

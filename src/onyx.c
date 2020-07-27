@@ -244,6 +244,13 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 break;
             }
 
+            case Ast_Kind_Memres: {
+                ent.type = Entity_Type_Memory_Reservation;
+                ent.mem_res = (AstMemRes *) node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+                break;
+            }
+
             default: {
                 ent.type = Entity_Type_Expression;
                 ent.expr = (AstTyped *) node;

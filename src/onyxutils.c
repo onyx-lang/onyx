@@ -14,6 +14,7 @@ static const char* ast_node_names[] = {
     "PACKAGE",
     "PROGRAM",
     "USE",
+    "ALIAS",
 
     "BINDING",
     "FUNCTION",

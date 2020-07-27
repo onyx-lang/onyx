@@ -1,6 +1,10 @@
 use "progs/print_funcs"
 
-use package printing
+use package printing {
+    print, PrintableArray,
+    print_f32 as pf32,
+    print_buf
+}
 
 Foo :: struct {
     x : i32;
@@ -17,13 +21,35 @@ asdf :: proc (pa: PrintableArray) {
     for i: 0, pa.len print(pa.data[i] as i32);
 }
 
-SomeType :: enum #flags { Value1; Value2; Value3; Value4; }
+SomeType :: enum {
+    Value1;
+    Value2;
+    Value3;
+    Value4;
+}
 
 print_st :: proc (st: SomeType) {
     print(st as i32);
 }
 
+single_int : u8
+
+array : [N] Foo
+N :: 1024
+
 proc #export "main" {
+    print("Hello World! this is slightly longer\n");
+
+    print(__heap_start as i32);
+
+    print(print_buf as i32);
+
+    single_int = 10 as u8;
+    print(single_int as i32);
+
+    array[4].y = 1234;
+    print(array[4].y);
+
     st := SomeType.Value4;
     print_st(st);
 
@@ -43,6 +69,6 @@ proc #export "main" {
 
     print(1234);
 
-    print_f32(123.0f);
+    pf32(123.0f);
 }
 

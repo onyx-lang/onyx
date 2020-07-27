@@ -43,8 +43,10 @@ typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
 
 typedef struct AstBinding AstBinding;
+typedef struct AstMemRes AstMemRes;
 typedef struct AstIncludeFile AstIncludeFile;
 typedef struct AstUsePackage AstUsePackage;
+typedef struct AstAlias AstAlias;
 typedef struct AstGlobal AstGlobal;
 typedef struct AstFunction AstFunction;
 typedef struct AstOverloadedFunction AstOverloadedFunction;
@@ -66,6 +68,8 @@ typedef enum AstKind {
     Ast_Kind_Package,
     Ast_Kind_Include_File,
     Ast_Kind_Use_Package,
+    Ast_Kind_Alias,
+    Ast_Kind_Memres,
 
     Ast_Kind_Binding,
     Ast_Kind_Function,
@@ -329,13 +333,18 @@ struct AstEnumValue { AstTyped_base; AstNumLit* value; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
+struct AstMemRes        { AstTyped_base; u64 addr; };           // HACK: This has to be the same size as AstDereference
 struct AstIncludeFile   { AstNode_base; OnyxToken *filename; };
 struct AstUsePackage    {
     AstNode_base;
 
     AstPackage *package;
     OnyxToken *alias;
-    bh_arr(OnyxToken *) only;
+    bh_arr(AstAlias *) only;
+};
+struct AstAlias         {
+    AstNode_base;
+    OnyxToken *alias;
 };
 struct AstGlobal        {
     AstTyped_base;
@@ -390,6 +399,7 @@ typedef enum EntityType {
     Entity_Type_String_Literal,
     Entity_Type_Enum,
     Entity_Type_Struct,
+    Entity_Type_Memory_Reservation,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
     Entity_Type_Expression,
@@ -411,6 +421,7 @@ typedef struct Entity {
         AstStrLit             *strlit;
         AstStructType         *struct_type;
         AstEnumType           *enum_type;
+        AstMemRes             *mem_res;
     };
 } Entity;
 

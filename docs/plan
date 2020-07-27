@@ -121,6 +121,10 @@ HOW:
 
         [ ] Static pointers to sized data
 
+        [ ] 'using' parameters
+            - The following example will bring the members of the struct into the scope as field accesses
+              and allow for a more OO style programming, without diving into the crap that is OO
+
         [ ] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
