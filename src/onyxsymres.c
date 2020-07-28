@@ -489,7 +489,7 @@ static void symres_memres(AstMemRes** memres) {
     (*memres)->type_node = symres_type((*memres)->type_node);
     (*memres)->type = type_build_from_ast(semstate.allocator, (*memres)->type_node);
 
-    if ((*memres)->type->kind != Type_Kind_Array) {
+    if ((*memres)->type->kind != Type_Kind_Array && (*memres)->type->kind != Type_Kind_Struct) {
         Type* ptr_type = type_make_pointer(semstate.allocator, (*memres)->type);
         (*memres)->type = ptr_type;
 

@@ -382,6 +382,9 @@ static inline i32 get_precedence(BinaryOp kind) {
         case Binary_Op_And:             return 5;
         case Binary_Op_Or:              return 5;
         case Binary_Op_Xor:             return 5;
+        case Binary_Op_Shl:             return 5;
+        case Binary_Op_Shr:             return 5;
+        case Binary_Op_Sar:             return 5;
 
         case Binary_Op_Add:             return 6;
         case Binary_Op_Minus:           return 6;
