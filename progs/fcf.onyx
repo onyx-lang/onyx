@@ -4,7 +4,7 @@ use "progs/intrinsics"
 use package printing
 
 call_me :: proc (f: proc (i32) -> i32, val: i32) {
-	f(val);
+    f(val);
 }
 
 funcs : [5] proc (i32, i32) -> i32
@@ -15,8 +15,11 @@ mul :: proc (a: i32, b: i32) -> i32 { return a * b; }
 div :: proc (a: i32, b: i32) -> i32 { return a / b; }
 mod :: proc (a: i32, b: i32) -> i32 { return a % b; }
 
+deferred_proc :: #type proc (i32, i32) -> i32
+my_int :: #type i32;
+
 DeferredCall :: struct {
-    func  : proc (i32, i32) -> i32;
+    func  : deferred_proc;
     left  : i32;
     right : i32;
 }
@@ -43,9 +46,9 @@ minus_one :: proc (n: i32) -> i32 { return n - 1; }
 double :: proc (n: i32) -> i32 { return n << 1; }
 
 proc #export "main" {
-	call_me(echo, 10);
+    call_me(echo, 10);
 
-    print(add as i32);
+    print(add as my_int);
 
     funcs[0] = add;
     funcs[1] = sub;
@@ -56,7 +59,7 @@ proc #export "main" {
     for i: 0, 5 print(funcs[i](10, 3));
 
     dc := __heap_start as ^DeferredCall;
-    dc.func = mod;
+    dc.func = add;
     dc.left = 40;
     dc.right = 19;
 
@@ -71,4 +74,35 @@ proc #export "main" {
 
     array_map(len, data, add_one);
     print(data as [] i32, len);
+
+    cheese := Cheeses.Cheddar;
+
+    // Closest thing to a switch statement at the moment
+    {
+        if cheese == Cheeses.Cheddar {
+            print(1);
+            break;
+        }
+
+        print(2);
+
+        if cheese == Cheeses.Muenster {
+            print(10);
+            break;
+        }
+
+        print(2);
+
+        if cheese == Cheeses.Mozerella {
+            print(100);
+            break;
+        }
+    }
+
+}
+
+Cheeses :: enum {
+    Cheddar;
+    Muenster;
+    Mozerella;
 }

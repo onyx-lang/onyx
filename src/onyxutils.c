@@ -34,7 +34,8 @@ static const char* ast_node_names[] = {
     "FUNCTION_TYPE",
     "ARRAY TYPE",
     "STRUCT TYPE",
-    "ENUM TYPE"
+    "ENUM TYPE",
+    "TYPE_ALIAS",
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",

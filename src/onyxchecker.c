@@ -952,8 +952,9 @@ void onyx_type_check() {
                 if (check_expression(&entity->expr)) return;
                 break;
 
-            case Entity_Type_Struct:
-                if (check_struct(entity->struct_type)) return;
+            case Entity_Type_Type_Alias:
+                if (entity->type_alias->kind == Ast_Kind_Struct_Type)
+                    if (check_struct((AstStructType *) entity->type_alias)) return;
                 break;
 
             case Entity_Type_Enum: break;

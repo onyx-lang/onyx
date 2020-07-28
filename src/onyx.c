@@ -223,9 +223,10 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 break;
             }
 
+            case Ast_Kind_Type_Alias:
             case Ast_Kind_Struct_Type: {
-                ent.type = Entity_Type_Struct;
-                ent.struct_type = (AstStructType *) node;
+                ent.type = Entity_Type_Type_Alias;
+                ent.type_alias = (AstType *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }

@@ -78,6 +78,11 @@ static void scope_leave() {
 static AstType* symres_type(AstType* type) {
     if (type == NULL) return NULL;
 
+    if (type->kind == Ast_Kind_Type_Alias) {
+        ((AstTypeAlias *) type)->to = symres_type(((AstTypeAlias *) type)->to);
+        return type;
+    }
+
     if (type->kind == Ast_Kind_Symbol) {
         return (AstType *) symbol_resolve(semstate.curr_scope, ((AstNode *) type)->token);
     }
@@ -524,7 +529,7 @@ void onyx_resolve_symbols() {
             case Entity_Type_Overloaded_Function: symres_overloaded_function(entity->overloaded_function); break;
             case Entity_Type_Global:              symres_global(entity->global); break;
             case Entity_Type_Expression:          symres_expression(&entity->expr); break;
-            case Entity_Type_Struct:              symres_type((AstType *) entity->struct_type); break;
+            case Entity_Type_Type_Alias:          entity->type_alias = symres_type(entity->type_alias); break;
             case Entity_Type_Enum:                symres_enum(entity->enum_type); break;
             case Entity_Type_Memory_Reservation:  symres_memres(&entity->mem_res); break;
 

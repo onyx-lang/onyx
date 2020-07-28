@@ -1201,6 +1201,11 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     else if (parser->curr->type == Token_Type_Keyword_Struct) {
         return (AstTyped *) parse_struct(parser);
     }
+    else if (parse_possible_directive(parser, "type")) {
+        AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
+        alias->to = parse_type(parser);
+        return (AstTyped *) alias;
+    }
     else if (parser->curr->type == Token_Type_Keyword_Enum) {
         return (AstTyped *) parse_enum_declaration(parser);
     }

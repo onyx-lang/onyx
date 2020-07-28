@@ -41,6 +41,7 @@ typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
 typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
+typedef struct AstTypeAlias AstTypeAlias;
 
 typedef struct AstBinding AstBinding;
 typedef struct AstMemRes AstMemRes;
@@ -91,6 +92,7 @@ typedef enum AstKind {
     Ast_Kind_Array_Type,
     Ast_Kind_Struct_Type,
     Ast_Kind_Enum_Type,
+    Ast_Kind_Type_Alias,
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
@@ -331,6 +333,7 @@ struct AstEnumType {
     Type *etcache;
 };
 struct AstEnumValue { AstTyped_base; AstNumLit* value; };
+struct AstTypeAlias { AstType_base; AstType* to; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
@@ -399,7 +402,7 @@ typedef enum EntityType {
     Entity_Type_Use_Package,
     Entity_Type_String_Literal,
     Entity_Type_Enum,
-    Entity_Type_Struct,
+    Entity_Type_Type_Alias,
     Entity_Type_Memory_Reservation,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
@@ -420,7 +423,7 @@ typedef struct Entity {
         AstGlobal             *global;
         AstTyped              *expr;
         AstStrLit             *strlit;
-        AstStructType         *struct_type;
+        AstType               *type_alias;
         AstEnumType           *enum_type;
         AstMemRes             *mem_res;
     };
