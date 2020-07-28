@@ -130,12 +130,12 @@ HOW:
                   bar(member2_of_data);
               }
 
+        [X] Procedures as arguments
+
         [ ] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
         [ ] Switch statements
-
-        [ ] Procedures as arguments
 
 
 

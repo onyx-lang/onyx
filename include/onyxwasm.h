@@ -5,7 +5,6 @@
 
 #include "onyxastnodes.h"
 #include "onyxmsgs.h"
-#include "onyxir.h"
 
 typedef u8 WasmType;
 
