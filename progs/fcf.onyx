@@ -49,10 +49,11 @@ proc #export "main" {
 
     funcs[0] = add;
     funcs[1] = sub;
+    funcs[2] = mul;
     funcs[3] = div;
     funcs[4] = mod;
 
-    print(funcs[0](10, 3));
+    for i: 0, 5 print(funcs[i](10, 3));
 
     dc := __heap_start as ^DeferredCall;
     dc.func = mod;

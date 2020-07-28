@@ -22,12 +22,12 @@ min :: proc #overloaded {
 }
 
 // NOTE: in-place insertion sort
-sort :: proc (src: []i32, len: i32) {
+sort :: proc (src: []i32, len: i32, cmp: proc (i32, i32) -> i32) {
     for i: 0, len {
         smallest := i;
 
         for j: i + 1, len
-            if src[j] < src[smallest] smallest = j;
+            if cmp(src[j], src[smallest]) < 0 smallest = j;
 
         tmp :: src[smallest];
         src[smallest] = src[i];
@@ -53,22 +53,23 @@ str_test :: proc #export {
     for y: 0, 5 for x: 0, 5 print(x + y * 5);
 }
 
-// Don't need to bind this function to a symbol
-proc #export "main2" {
-    print(__heap_start as i32);
+abs_i32 :: proc (n: i32) -> i32 {
+    if n < 0 return -n;
+    return n;
+}
 
+// Don't need to bind this function to a symbol
+proc #export "main" {
     len :: 10;
     global_arr = alloc(sizeof [10]i32) as []i32;
-    other_arr := alloc((len * 4) as u32) as []i32;
-
-    print(global_arr as i32);
-    print(other_arr as i32);
 
     for i: 0, len global_arr[i] = (len - i) * 10;
 
     print(global_arr, len);
 
-    sort(global_arr, len);
+    sort(global_arr, len, proc (a: i32, b: i32) -> i32 {
+        return abs_i32(a - 50) - abs_i32(b - 50);
+    });
 
     print(1234567);
     print(global_arr, len);
@@ -101,7 +102,7 @@ alloc_2darr :: proc (rows: u32, cols: u32) -> []^i32 {
     return arr;
 }
 
-multi_arr_test :: proc #export "main" {
+multi_arr_test :: proc #export "main2" {
     arrs := alloc_2darr(10, 10);
 
     for y: 0, 10 for x: 0, 10 arrs[y][x] = x + y * 10;
