@@ -19,6 +19,7 @@ static const char* token_type_names[] = {
     "global",
     "proc",
     "as",
+    "cast",
     "while",
     "for",
     "break",
@@ -153,7 +154,8 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     LITERAL_TOKEN("global",     1, Token_Type_Keyword_Global);
     LITERAL_TOKEN("return",     1, Token_Type_Keyword_Return);
     LITERAL_TOKEN("proc",       1, Token_Type_Keyword_Proc);
-    LITERAL_TOKEN("as",         1, Token_Type_Keyword_Cast);
+    LITERAL_TOKEN("as",         1, Token_Type_Keyword_As);
+    LITERAL_TOKEN("cast",       1, Token_Type_Keyword_Cast);
     LITERAL_TOKEN("while",      1, Token_Type_Keyword_While);
     LITERAL_TOKEN("for",        1, Token_Type_Keyword_For);
     LITERAL_TOKEN("break",      1, Token_Type_Keyword_Break);

@@ -43,12 +43,12 @@ array_map :: proc (arr: I32Array, map: proc (i32) -> i32) {
 }
 
 minus_one :: proc (n: i32) -> i32 { return n - 1; }
-double :: proc (n: i32) -> i32 { return n << 1; }
+double    :: proc (n: i32) -> i32 { return n << 1; }
 
 proc #export "main" {
     call_me(echo, 10);
 
-    print(add as my_int);
+    print(cast(my_int) add);
 
     funcs[0] = add;
     funcs[1] = sub;
@@ -58,7 +58,7 @@ proc #export "main" {
 
     for i: 0, 5 print(funcs[i](10, 3));
 
-    dc := __heap_start as ^DeferredCall;
+    dc := cast(^DeferredCall) __heap_start;
     dc.func = add;
     dc.left = 40;
     dc.right = 19;
@@ -66,14 +66,14 @@ proc #export "main" {
     print(execute(dc));
 
     len :: 10;
-    data := (__heap_start as i32 + sizeof DeferredCall) as ^i32;
+    data := cast(^i32) (cast(i32) __heap_start + sizeof DeferredCall);
     for i: 0, len data[i] = i;
-    print(data as [] i32, len);
+    print(cast([] i32) data, len);
 
     add_one :: proc (n: i32) -> i32 { return n + 1; };
 
     array_map(len, data, add_one);
-    print(data as [] i32, len);
+    print(cast([] i32) data, len);
 
     cheese := Cheeses.Cheddar;
 
@@ -98,7 +98,6 @@ proc #export "main" {
             break;
         }
     }
-
 }
 
 Cheeses :: enum {

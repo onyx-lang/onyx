@@ -188,6 +188,19 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Keyword_Cast: {
+            AstUnaryOp* cast_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+            cast_node->token = expect_token(parser, Token_Type_Keyword_Cast);
+            expect_token(parser, '(');
+            cast_node->type_node = parse_type(parser);
+            expect_token(parser, ')');
+            cast_node->operation = Unary_Op_Cast;
+            cast_node->expr = parse_factor(parser);
+
+            retval = (AstTyped *) cast_node;
+            break;
+        }
+
         case Token_Type_Keyword_Sizeof: {
             AstSizeOf* so_node = make_node(AstSizeOf, Ast_Kind_Size_Of);
             so_node->token = expect_token(parser, Token_Type_Keyword_Sizeof);
@@ -272,8 +285,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             return NULL;
     }
 
-    while (parser->curr->type == '[' || parser->curr->type == Token_Type_Keyword_Cast
-        || parser->curr->type == '.' || parser->curr->type == '(') {
+    while (parser->curr->type == '[' || parser->curr->type == '.' || parser->curr->type == '(') {
 
         switch ((u16) parser->curr->type) {
             case '[': {
@@ -295,17 +307,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 field->expr  = retval;
 
                 retval = (AstTyped *) field;
-                break;
-            }
-
-            case Token_Type_Keyword_Cast: {
-                AstUnaryOp* cast_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
-                cast_node->token = expect_token(parser, Token_Type_Keyword_Cast);
-                cast_node->type_node = parse_type(parser);
-                cast_node->operation = Unary_Op_Cast;
-                cast_node->expr = retval;
-
-                retval = (AstTyped *) cast_node;
                 break;
             }
 
@@ -1234,8 +1235,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 pack_symbol->token = expect_token(parser, Token_Type_Symbol);
                 upack->package = (AstPackage *) pack_symbol;
 
-                // followed by 'as'
-                if (parser->curr->type == Token_Type_Keyword_Cast) {
+                if (parser->curr->type == Token_Type_Keyword_As) {
                     consume_token(parser);
                     upack->alias = expect_token(parser, Token_Type_Symbol);
                 }
@@ -1249,7 +1249,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                         AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
                         alias->token = expect_token(parser, Token_Type_Symbol);
 
-                        if (parser->curr->type == Token_Type_Keyword_Cast) {
+                        if (parser->curr->type == Token_Type_Keyword_As) {
                             consume_token(parser);
                             alias->alias = expect_token(parser, Token_Type_Symbol);
                         } else {

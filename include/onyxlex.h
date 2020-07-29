@@ -20,6 +20,7 @@ typedef enum TokenType {
     Token_Type_Keyword_Return,
     Token_Type_Keyword_Global,
     Token_Type_Keyword_Proc,
+    Token_Type_Keyword_As,
     Token_Type_Keyword_Cast,
     Token_Type_Keyword_While,
     Token_Type_Keyword_For,

@@ -14,7 +14,7 @@ syn keyword onyxKeyword package struct proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword break continue return
-syn keyword onyxKeyword as sizeof alignof
+syn keyword onyxKeyword as cast sizeof alignof
 
 syn keyword onyxType bool void
 syn keyword onyxType i8 u8
@@ -31,11 +31,14 @@ syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 
 syn region onyxComment start="//" end="$" keepend contains=onyxCommentStart
 
+syn region onyxDirective start="#" end=" " keepend
+
 hi def link onyxKeyword          Statement
 hi def link onyxType             Type
 hi def link onyxComment          Comment
 hi def link onyxCommentStart     Todo
 hi def link onyxConstant         Constant
+hi def link onyxDirective        Constant
 
 let b:current_syntax = "onyx"
 let &cpo = s:cpo_save

@@ -15,18 +15,18 @@ Foo :: struct {
 }
 
 alloc :: proc (size: u32) -> rawptr {
-    heap_u32    :: __heap_start as ^u32;
+    heap_u32    :: cast(^u32) __heap_start;
 
     curr_offset := *heap_u32;
     if curr_offset == 0 curr_offset = 8;
 
     *heap_u32   = curr_offset + size;
 
-    return ((__heap_start as u32) + curr_offset) as rawptr;
+    return cast(rawptr) (cast(u32) __heap_start + curr_offset);
 }
 
 foo_make :: proc -> ^Foo {
-    return alloc(sizeof Foo) as ^Foo; 
+    return cast(^Foo) alloc(sizeof Foo);
 }
 
 foo_get :: proc (fooarr: []Foo, i: i32) -> ^Foo {
@@ -54,7 +54,7 @@ Link :: struct {
 }
 
 link_create :: proc (data: i32, parent: ^^Link) {
-    link := alloc(sizeof Link) as ^Link;
+    link := cast(^Link) alloc(sizeof Link);
     link.data = data;
     link.next = *parent;
     *parent = link;
@@ -64,7 +64,7 @@ link_print :: proc (start: ^Link) -> i32 {
     count := 0;
 
     walker := start;
-    while (walker as i32) != 0 {
+    while cast(i32) walker != 0 {
         print(walker.data);
         walker = walker.next;
         count += 1;
@@ -74,8 +74,8 @@ link_print :: proc (start: ^Link) -> i32 {
 }
 
 link_test :: proc #export "main4" {
-    node_head := alloc(sizeof ^Link) as ^^Link;
-    *node_head = 0 as ^Link;
+    node_head := cast(^^Link) alloc(sizeof ^Link);
+    *node_head = cast(^Link) 0;
 
     link_create(0, node_head);
     link_create(1, node_head);
@@ -90,8 +90,8 @@ link_test :: proc #export "main4" {
 
 // TODO: Make everything below this comment work
 multi_arr :: proc #export "main2" {
-    arr1 := alloc(sizeof [5][5] i32) as [5][5] i32; // Sizeof 25 * 4
-    arr2 := alloc(sizeof [5]^ i32) as [5]^ i32; // Sizeof 20
+    arr1 := cast([5][5] i32) alloc(sizeof [5][5] i32); // Sizeof 25 * 4
+    arr2 := cast([5] ^i32) alloc(sizeof [5]^ i32); // Sizeof 20
 
     arr2[3][2] = 5; // (arr1 + (3 * 5 * 4) + (2 * 4))
     print(arr2[3][2]);
@@ -110,11 +110,11 @@ Vec3 :: struct {
 }
 
 v2magnitude :: proc (v: ^Vec2) -> f32 {
-    return sqrt_f32((v.x * v.x + v.y * v.y) as f32);
+    return sqrt_f32(cast(f32) (v.x * v.x + v.y * v.y));
 }
 
 v3magnitude :: proc (v: ^Vec3) -> f32 {
-    return sqrt_f32((v.x * v.x + v.y * v.y + v.z * v.z) as f32);
+    return sqrt_f32(cast(f32) (v.x * v.x + v.y * v.y + v.z * v.z));
 }
 
 magnitude :: proc #overloaded { v2magnitude, v3magnitude };
@@ -138,12 +138,12 @@ print_bar :: proc (bar: Bar) {
 }
 
 proc #export "main" {
-    v2 := alloc(sizeof Vec2) as ^Vec2;
+    v2 := cast(^Vec2) alloc(sizeof Vec2);
     v2.x = 5;
     v2.y = 12;
     print(v2.magnitude());
 
-    v3 := alloc(sizeof Vec3) as ^Vec3;
+    v3 := cast(^Vec3) alloc(sizeof Vec3);
     v3.x = 1;
     v3.y = 1;
     v3.z = 1;
@@ -153,10 +153,10 @@ proc #export "main" {
 
     print((1).minus(2));
 
-    foo := alloc(sizeof Fool) as ^Fool;
-    foo.bar = alloc(sizeof Bar) as ^Bar;
+    foo := cast(^Fool) alloc(sizeof Fool);
+    foo.bar = cast(^Bar) alloc(sizeof Bar);
     foo.bar.i = 50;
-    foo.bar.j = 70 as i64;
+    foo.bar.j = cast(i64) 70;
 
     (*foo.bar).print_bar();
 }
@@ -185,10 +185,10 @@ soa_test :: proc #export "main9" {
 
     // print(sizeof SOA);  // 240
 
-    soa := alloc(sizeof SOA + 20 * sizeof Vec2) as ^SOA;
+    soa := cast(^SOA) alloc(sizeof SOA + 20 * sizeof Vec2);
 
     for i: 0, 10 {
-        soa.things[i] = alloc(sizeof Vec2) as ^Vec2;
+        soa.things[i] = cast(^Vec2) alloc(sizeof Vec2);
     }
 
     soa.velocities[2].x = 10;
@@ -208,7 +208,7 @@ soa_test :: proc #export "main9" {
     print(soa.positions[6].x);
     print(soa.positions[6].y);
 
-    m_arr := alloc(sizeof [5][5]i32) as [5][5]i32;
+    m_arr := cast([5][5] i32) alloc(sizeof [5][5]i32);
 
     for y: 0, 5 {
         for x: 0, 5 {
@@ -216,5 +216,5 @@ soa_test :: proc #export "main9" {
         }
     }
 
-    for i: 0, 25 print((m_arr as [] i32)[i]);
+    for i: 0, 25 print((cast([] i32) m_arr)[i]);
 }

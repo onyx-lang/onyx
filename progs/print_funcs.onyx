@@ -30,14 +30,14 @@ print_f64arr :: proc (arr: [] f64, len: i32) {
 // NOTE: print null-terminated string
 print_str :: proc (str: ^u8) {
     c := str;
-    while *c != 0 as u8 {
-        print((*c) as i32);
-        c = (c as i32 + 1) as ^u8;
+    while *c != cast(u8) 0 {
+        print(cast(i32) (*c));
+        c = cast(^u8) (cast(i32) c + 1);
     }
 }
 
 print_str_len :: proc (str: [] u8, len: i32) {
-    for i: 0, len print(str[i] as i32);
+    for i: 0, len print(cast(i32) str[i]);
 }
 
 print :: proc #overloaded {

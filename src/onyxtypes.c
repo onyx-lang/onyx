@@ -39,6 +39,10 @@ b32 types_are_surface_compatible(Type* t1, Type* t2) {
                 if ((t1->Basic.flags & Basic_Flag_Integer) && (t2->Basic.flags & Basic_Flag_Integer)) {
                     return t1->Basic.size == t2->Basic.size;
                 }
+
+                if (t1->Basic.kind == Basic_Kind_Rawptr && type_is_pointer(t2)) {
+                    return 1;
+                }
             }
             break;
 
@@ -105,12 +109,20 @@ b32 types_are_compatible(Type* t1, Type* t2) {
                     return t1->Basic.size == t2->Basic.size;
                 }
             }
+
+            if (t1->Basic.kind == Basic_Kind_Rawptr && type_is_pointer(t2)) {
+                return 1;
+            }
             break;
 
         case Type_Kind_Pointer: {
             if (t2->kind == Type_Kind_Pointer) {
                 return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
             }
+
+            if (t2->kind == Type_Kind_Basic && t2->Basic.kind == Basic_Kind_Rawptr)
+                return 1;
+
             break;
         }
 

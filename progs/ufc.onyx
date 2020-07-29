@@ -1,17 +1,20 @@
+// EVERYTHING IN THIS FILE IS VERY BROKEN SINCE UFC HAS BEEN
+// DISABLED.
+
 use "progs/intrinsics"
 use "progs/print_funcs"
 
 use package printing as printing
 
 alloc :: proc (size: u32) -> rawptr {
-    heap_u32    :: __heap_start as ^u32;
+    heap_u32    :: cast(^u32) __heap_start;
 
     curr_offset := *heap_u32;
     if curr_offset == 0 curr_offset = 8;
 
     *heap_u32   = curr_offset + size;
 
-    return ((__heap_start as u32) + curr_offset) as rawptr;
+    return cast(rawptr) (cast(u32) __heap_start + curr_offset);
 }
 
 
@@ -42,7 +45,7 @@ Vec2 :: struct {
 }
 
 vec2_magnitude :: proc (use v: ^Vec2) -> i32 {
-	return sqrt_f32(x * x + y * y) as i32;
+	return cast(i32) sqrt_f32(x * x + y * y);
 }
 
 Vec3 :: struct {
@@ -69,7 +72,7 @@ dot :: proc (v: Vec2, u: Vec2) -> f32 {
 
 
 proc #export "main" {
-	vec := alloc(sizeof Vec2) as ^Vec2;
+	vec := cast(^Vec2) alloc(sizeof Vec2);
 	vec.x = 5.0f;
 	vec.y = 12.0f;
 
@@ -84,7 +87,7 @@ proc #export "main" {
 	printing.print(dot(2.0f, 4.0f, -6.0f, 3.0f));
 
 
-	v3 := alloc(sizeof Vec3) as ^Vec3;
+	v3 := cast(^Vec3) alloc(sizeof Vec3);
 	v3.x = 5.0f;
 	v3.y = 12.0f;
 	v3.z = 13.0f;

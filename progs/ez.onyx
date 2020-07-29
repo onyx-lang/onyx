@@ -19,11 +19,11 @@ foo_sum :: proc (use this: ^Foo) -> i32 {
 }
 
 foo_other :: proc (use this: ^Foo) {
-    print(st as i32);
+    print(cast(i32) st);
 }
 
 asdf :: proc (pa: PrintableArray) {
-    for i: 0, pa.len print(pa.data[i] as i32);
+    for i: 0, pa.len print(cast(i32) pa.data[i]);
 }
 
 SomeType :: enum {
@@ -34,7 +34,7 @@ SomeType :: enum {
 }
 
 print_st :: proc (st: SomeType, other: i32) {
-    print(st as i32);
+    print(cast(i32) st);
 }
 
 single_int : u32
@@ -45,7 +45,7 @@ array : [N] Foo
 proc #export "main" {
     print("Hello World! this is slightly longer\n");
 
-    print(__heap_start as i32);
+    print(cast(i32) __heap_start);
 
     single_int = 10;
     print(single_int);
@@ -56,7 +56,7 @@ proc #export "main" {
     st: SomeType = SomeType.Value4;
     print_st(st, 10);
 
-    foo := __heap_start as ^Foo;
+    foo := cast(^Foo) __heap_start;
     foo.x = 123;
     foo.y = 321;
     foo.st = st;
@@ -65,8 +65,8 @@ proc #export "main" {
     print(foo_sum(foo));
     print_st(foo.st, 20);
 
-    pa := (__heap_start as i32 + sizeof Foo) as ^PrintableArray;
-    pa.data = __heap_start as ^u8;
+    pa := cast(^PrintableArray) (cast(i32) __heap_start + sizeof Foo);
+    pa.data = cast(^u8) __heap_start;
     pa.len = 5;
     asdf(*pa);
 

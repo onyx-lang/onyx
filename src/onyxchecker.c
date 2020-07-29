@@ -403,8 +403,9 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         }
 
     } else {
-        if (type_is_pointer(binop->left->type)
-                || type_is_pointer(binop->right->type)) {
+        if (!binop_is_compare(binop) &&
+                (type_is_pointer(binop->left->type)
+                || type_is_pointer(binop->right->type))) {
             onyx_message_add(Msg_Type_Literal,
                     binop->token->pos,
                     "binary operations are not supported for pointers (yet).");

@@ -62,7 +62,7 @@ main :: proc #export {
     }
 
     cond :: true;
-    print(test(cond) as i32);
+    print(cast(i32) test(cond));
 }
 
 use "progs/intrinsics"

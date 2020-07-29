@@ -46,7 +46,7 @@ str_test :: proc #export {
     // Address of and dereference cancel each other out
     print(^*hello_str);
 
-    print(hello_str as []u8, 5);
+    print(cast([] u8) hello_str, 5);
 
     for i: 0, 10, 2 print(i);
 
@@ -61,7 +61,7 @@ abs_i32 :: proc (n: i32) -> i32 {
 // Don't need to bind this function to a symbol
 proc #export "main" {
     len :: 10;
-    global_arr = alloc(sizeof [10]i32) as []i32;
+    global_arr = cast([] i32) alloc(sizeof [10]i32);
 
     for i: 0, len global_arr[i] = (len - i) * 10;
 
@@ -86,19 +86,19 @@ proc #export "main" {
 
 
 alloc :: proc (size: u32) -> rawptr {
-    heap_u32    :: __heap_start as ^u32;
+    heap_u32    :: cast(^i32) __heap_start;
 
     curr_offset := *heap_u32;
     if curr_offset == 0 curr_offset = 8;
 
     *heap_u32   = curr_offset + size;
 
-    return ((__heap_start as u32) + curr_offset) as rawptr;
+    return cast(rawptr) (cast(u32) __heap_start  + curr_offset);
 }
 
 alloc_2darr :: proc (rows: u32, cols: u32) -> []^i32 {
-    arr := alloc(rows * 4) as []^i32;
-    for i: 0, cols arr[i] = alloc(cols * 4) as ^i32;
+    arr := cast([] ^i32) alloc(rows * 4);
+    for i: 0, cols arr[i] = cast(^i32) alloc(cols * 4);
     return arr;
 }
 
