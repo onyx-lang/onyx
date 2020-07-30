@@ -705,6 +705,21 @@ CHECK(statement, AstNode* stmt) {
         case Ast_Kind_While:      return check_while((AstWhile *) stmt);
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
+        case Ast_Kind_Defer: {
+            if (!semstate.defer_allowed) {
+                onyx_message_add(Msg_Type_Literal,
+                    stmt->token->pos,
+                    "deferred statement not allowed in deferred block");
+                return 1;
+            }
+
+            semstate.defer_allowed = 0;
+            b32 state = check_statement(((AstDefer *) stmt)->stmt);
+            semstate.defer_allowed = 1;
+
+            return state;
+        }
+
         case Ast_Kind_Binary_Op:
             stmt->flags |= Ast_Flag_Expr_Ignored;
             return check_binaryop((AstBinaryOp *) stmt, 1);

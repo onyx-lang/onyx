@@ -23,6 +23,8 @@ typedef struct SemState {
 
     // NOTE: Used in type checking phase
     Type* expected_return_type;
+
+    u32 defer_allowed : 1;
 } SemState;
 
 extern SemState semstate;

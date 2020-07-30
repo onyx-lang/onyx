@@ -11,6 +11,8 @@ void onyx_sempass_init(bh_allocator alloc, bh_allocator node_alloc) {
 
         .global_scope = NULL,
         .curr_scope = NULL,
+
+        .defer_allowed = 1,
     };
 }
 

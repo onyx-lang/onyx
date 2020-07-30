@@ -285,6 +285,11 @@ typedef struct WasmDatum {
     ptr data;
 } WasmDatum;
 
+typedef struct DeferredStmt {
+    u64 depth;
+    AstNode *stmt;
+} DeferredStmt;
+
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
 
@@ -296,6 +301,8 @@ typedef struct OnyxWasmModule {
 
     // NOTE: Mapping ptrs to elements
     bh_imap elem_map;
+
+    bh_arr(DeferredStmt) deferred_stmts;
 
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )

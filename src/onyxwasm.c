@@ -255,6 +255,8 @@ COMPILE_FUNC(load_instruction,      Type* type, u32 offset);
 COMPILE_FUNC(if,                    AstIf* if_node);
 COMPILE_FUNC(while,                 AstWhile* while_node);
 COMPILE_FUNC(for,                   AstFor* for_node);
+COMPILE_FUNC(defer,                 AstDefer* defer);
+COMPILE_FUNC(deferred_stmts,        AstNode* node);
 COMPILE_FUNC(binop,                 AstBinaryOp* binop);
 COMPILE_FUNC(unaryop,               AstUnaryOp* unop);
 COMPILE_FUNC(call,                  AstCall* call);
@@ -274,6 +276,8 @@ COMPILE_FUNC(function_body, AstFunction* fd) {
         compile_statement(mod, &code, stmt);
     }
 
+    compile_deferred_stmts(mod, &code, (AstNode *) fd);
+
     WI(WI_BLOCK_END);
 
     *pcode = code;
@@ -288,6 +292,8 @@ COMPILE_FUNC(block, AstBlock* block) {
     forll (AstNode, stmt, block->body, next) {
         compile_statement(mod, &code, stmt);
     }
+
+    compile_deferred_stmts(mod, &code, (AstNode *) block);
 
     WI(WI_BLOCK_END);
     bh_arr_pop(mod->structured_jump_target);
@@ -335,6 +341,7 @@ COMPILE_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_Break:      compile_structured_jump(mod, &code, ((AstBreak *) stmt)->count); break;
         case Ast_Kind_Continue:   compile_structured_jump(mod, &code, -((AstContinue *) stmt)->count); break;
         case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt); break;
+        case Ast_Kind_Defer:      compile_defer(mod, &code, (AstDefer *) stmt); break;
         default:                  compile_expression(mod, &code, (AstTyped *) stmt); break;
     }
 
@@ -512,6 +519,8 @@ COMPILE_FUNC(if, AstIf* if_node) {
         }
     }
 
+    compile_deferred_stmts(mod, &code, (AstNode *) if_node);
+
     bh_arr_pop(mod->structured_jump_target);
 
     WI(WI_IF_END);
@@ -542,6 +551,8 @@ COMPILE_FUNC(while, AstWhile* while_node) {
 
     bh_arr_pop(mod->structured_jump_target);
     bh_arr_pop(mod->structured_jump_target);
+
+    compile_deferred_stmts(mod, &code, (AstNode *) while_node);
 
     WID(WI_JUMP, 0x00);
 
@@ -586,6 +597,8 @@ COMPILE_FUNC(for, AstFor* for_node) {
     WI(WI_I32_ADD);
     WID(WI_LOCAL_SET, it_idx);
 
+    compile_deferred_stmts(mod, &code, (AstNode *) for_node);
+
     bh_arr_pop(mod->structured_jump_target);
     bh_arr_pop(mod->structured_jump_target);
 
@@ -593,6 +606,26 @@ COMPILE_FUNC(for, AstFor* for_node) {
 
     WI(WI_LOOP_END);
     WI(WI_BLOCK_END);
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(defer, AstDefer* defer) {
+    bh_arr_push(mod->deferred_stmts, ((DeferredStmt) {
+        .depth = bh_arr_length(mod->structured_jump_target),
+        .stmt = defer->stmt,
+    }));
+}
+
+COMPILE_FUNC(deferred_stmts, AstNode* node) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 depth = bh_arr_length(mod->structured_jump_target);
+
+    while (bh_arr_last(mod->deferred_stmts).depth == depth) {
+        compile_statement(mod, &code, bh_arr_last(mod->deferred_stmts).stmt);
+        bh_arr_pop(mod->deferred_stmts);
+    }
 
     *pcode = code;
 }
@@ -1162,6 +1195,16 @@ COMPILE_FUNC(return, AstReturn* ret) {
         compile_expression(mod, &code, ret->expr);
     }
 
+    compile_deferred_stmts(mod, &code, (AstNode *) ret);
+
+    if (bh_arr_length(mod->deferred_stmts) != 0) {
+        i32 i = bh_arr_length(mod->deferred_stmts) - 1;
+        while (i >= 0) {
+            compile_statement(mod, &code, mod->deferred_stmts[i].stmt);
+            i--;
+        } 
+    }
+
     WI(WI_RETURN);
 
     *pcode = code;
@@ -1489,6 +1532,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_imap_init(&module.index_map, global_heap_allocator, 128);
     bh_imap_init(&module.local_map, global_heap_allocator, 16);
     bh_imap_init(&module.elem_map,  global_heap_allocator, 16);
+
+    bh_arr_new(global_heap_allocator, module.deferred_stmts, 4);
 
     return module;
 }

@@ -744,6 +744,17 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Keyword_Defer: {
+            needs_semicolon = 0;
+
+            AstDefer* defer = make_node(AstDefer, Ast_Kind_Defer);
+            defer->token = expect_token(parser, Token_Type_Keyword_Defer);
+            defer->stmt  = parse_statement(parser);
+
+            retval = (AstNode *) defer;
+            break;
+        }
+
         default:
             break;
     }

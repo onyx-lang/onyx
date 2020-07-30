@@ -13,7 +13,7 @@ set cpo&vim
 syn keyword onyxKeyword package struct proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
-syn keyword onyxKeyword break continue return
+syn keyword onyxKeyword break continue return defer
 syn keyword onyxKeyword as cast sizeof alignof
 
 syn keyword onyxType bool void
@@ -25,7 +25,7 @@ syn keyword onyxType f32
 syn keyword onyxType f64
 syn keyword onyxType rawptr
 
-syn keyword onyxConstant        true false
+syn keyword onyxConstant        true false null
 
 syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 

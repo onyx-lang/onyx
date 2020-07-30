@@ -31,6 +31,7 @@ typedef struct AstBlock AstBlock;
 typedef struct AstIf AstIf;
 typedef struct AstFor AstFor;
 typedef struct AstWhile AstWhile;
+typedef struct AstDefer AstDefer;
 
 typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
@@ -117,6 +118,7 @@ typedef enum AstKind {
     Ast_Kind_While,
     Ast_Kind_Break,
     Ast_Kind_Continue,
+    Ast_Kind_Defer,
 
     Ast_Kind_Count
 } AstKind;
@@ -275,6 +277,7 @@ struct AstContinue      { AstNode_base; u64 count; };
 // Structure Nodes
 struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; };
 struct AstWhile         { AstNode_base; AstTyped *cond; AstNode *stmt; };
+struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {
     AstNode_base;
 

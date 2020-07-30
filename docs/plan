@@ -132,13 +132,17 @@ HOW:
 
         [X] Procedures as arguments
 
-        [ ] Deferred statements
+        [X] Deferred statements
 
         [ ] Pointer math
 
         [ ] Better checking for casts
 
         [ ] Hex literals
+
+        [ ] #file_contents
+
+        [ ] #initialize structs
 
         [ ] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
