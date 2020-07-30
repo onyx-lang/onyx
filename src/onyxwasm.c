@@ -1071,6 +1071,7 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
                 cast->token->pos,
                 "cannot cast to or from a struct");
         WI(WI_DROP);
+        *pcode = code;
         return;
     }
 
@@ -1079,11 +1080,22 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
                 cast->token->pos,
                 "cannot cast to a function");
         WI(WI_DROP);
+        *pcode = code;
+        return;
+    }
+
+    if (from->kind == Type_Kind_Basic && from->Basic.kind == Basic_Kind_Void) {
+        onyx_message_add(Msg_Type_Literal,
+                cast->token->pos,
+                "cannot cast from void");
+        WI(WI_DROP);
+        *pcode = code;
         return;
     }
 
     if (to->kind == Type_Kind_Basic && to->Basic.kind == Basic_Kind_Void) {
         WI(WI_DROP);
+        *pcode = code;
         return;
     }
 
