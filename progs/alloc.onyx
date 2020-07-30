@@ -1,4 +1,4 @@
-package alloc
+package memory
 
 use "progs/intrinsics"
 
@@ -11,6 +11,35 @@ use package intrinsics {
 // Need to define this somewhere
 null :: cast(rawptr) 0;
 
+AllocAction :: enum {
+    Alloc;
+    Free;
+    Resize;
+}
+
+Allocator :: struct {
+    data: rawptr;
+    func: alloc_proc; 
+}
+
+alloc_proc :: #type proc (rawptr, AllocAction, u32, u32, rawptr) -> rawptr;
+
+alloc :: proc (a: ^Allocator, size: u32) -> rawptr {
+    return a.func(a.data, AllocAction.Alloc, size, 16, null);
+}
+
+free :: proc (a: ^Allocator, ptr: rawptr) {
+    a.func(a.data, AllocAction.Free, 0, 0, ptr);
+}
+
+
+
+
+
+
+
+heap_allocator : Allocator;
+
 heap_state : struct {
     free_list       : ^heap_block;
     next_alloc      : rawptr;
@@ -18,7 +47,7 @@ heap_state : struct {
 }
 
 heap_block :: struct {
-    size : i32;
+    size : u32;
     next : ^heap_block;
 }
 
@@ -26,16 +55,17 @@ heap_init :: proc {
     heap_state.free_list = null;
     heap_state.next_alloc = __heap_start;
     heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
+
+    heap_allocator.data = null;
+    heap_allocator.func = heap_alloc_proc;
 }
 
-heap_align_to :: 16
-
-heap_alloc :: proc (size_: i32) -> rawptr {
+heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
     if size_ == 0 return null;
 
     size := size_ + sizeof heap_block;
-    if size % heap_align_to != 0 {
-        size += heap_align_to - (size % heap_align_to);
+    if size % align != 0 {
+        size += align - (size % align);
     }
 
     prev := ^heap_state.free_list;
@@ -62,13 +92,36 @@ heap_alloc :: proc (size_: i32) -> rawptr {
 
         return cast(rawptr) (cast(u32) ret + sizeof heap_block);
     }
-    
-    // grow the memory with memory_grow
-    return cast(rawptr) -1;
+
+    new_pages :: (size - heap_state.remaining_space) >> 16;
+    if memory_grow(new_pages) == -1 {
+        // out of memory    
+        return null;
+    }
+    heap_state.remaining_space += new_pages << 16;
+
+    ret := cast(^heap_block) heap_state.next_alloc;
+    ret.size = size;
+    ret.next = null;
+
+    heap_state.next_alloc = cast(rawptr) (cast(u32) heap_state.next_alloc + size);
+    heap_state.remaining_space -= size;
+
+    return cast(rawptr) (cast(u32) ret + sizeof heap_block);
 }
 
 heap_free :: proc (ptr: rawptr) {
     hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
     hb_ptr.next = heap_state.free_list;
     heap_state.free_list = hb_ptr;
+}
+
+heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    if aa == AllocAction.Alloc return heap_alloc(size, align);
+    if aa == AllocAction.Free {
+        heap_free(oldptr);
+        return null;
+    }
+
+    return null;
 }

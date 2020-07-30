@@ -467,7 +467,8 @@ CHECK(address_of, AstAddressOf* aof) {
 
     if (aof->expr->kind != Ast_Kind_Array_Access
             && aof->expr->kind != Ast_Kind_Dereference
-            && aof->expr->kind != Ast_Kind_Field_Access) {
+            && aof->expr->kind != Ast_Kind_Field_Access
+            && aof->expr->kind != Ast_Kind_Memres) {
         onyx_message_add(Msg_Type_Literal,
                 aof->token->pos,
                 "cannot take the address of this");

@@ -1312,6 +1312,10 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                             "%b", symbol->text, symbol->length);
                     }
 
+                    if (node->kind == Ast_Kind_Type_Alias) {
+                        node->token = symbol;
+                    }
+
                     // HACK
                     add_node_to_process(parser, (AstNode *) node);
                 }

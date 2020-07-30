@@ -1,17 +1,17 @@
 use "progs/alloc"
 use "progs/print_funcs"
 
-use package alloc
+use package memory
 use package printing
 
 proc #export "main" {
 	asdf :: "staring asdfkjasd asdflkjasdflkajsdflk";
 	heap_init();
 
-	first := cast([] i32) heap_alloc(sizeof [4] i32);
+	first := cast([] i32) alloc(^heap_allocator, sizeof [4] i32);
 	for i: 0, 4 first[i] = i * 2;
 
-	second := cast([] f32) heap_alloc(sizeof [24] f32);
+	second := cast([] f32) alloc(^heap_allocator, sizeof [24] f32);
 	for i: 0, 24 second[i] = cast(f32) i;
 
 	print(cast(u32) first);
@@ -20,22 +20,19 @@ proc #export "main" {
 	for i: 0, 4 print(first[i]);
 	for i: 0, 24 print(second[i]);
 
-	heap_free(first);
+	free(^heap_allocator, first);
 
-	third := cast(^i32) heap_alloc(sizeof i32);
+	third := cast(^i32) alloc(^heap_allocator, sizeof i32);
 
 	print(cast(u32) third);
 	*third = 1234;
 	print(*third);
 
-	heap_free(second);
+	free(^heap_allocator, second);
 
-	fourth := cast([] i32) heap_alloc(sizeof [128]i32);
+	fourth := cast([] i32) alloc(^heap_allocator, sizeof [128]i32);
 	print(cast(u32) fourth);
 
-	fifth := cast(^i32) heap_alloc(sizeof i32);
+	fifth := cast(^i32) alloc(^heap_allocator, sizeof i32);
 	print(cast(u32) fifth);
-
-	sixth := heap_alloc(8 << 16);
-	print(cast(u32) sixth);
 }

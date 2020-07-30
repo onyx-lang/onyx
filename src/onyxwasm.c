@@ -958,6 +958,12 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                     break;
                 }
 
+                case Ast_Kind_Memres: {
+                    AstMemRes* memres = (AstMemRes *) aof->expr;
+                    WID(WI_I32_CONST, memres->addr);
+                    break;
+                }
+
                 default:
                     onyx_message_add(Msg_Type_Literal,
                             aof->token->pos,
