@@ -549,10 +549,10 @@ COMPILE_FUNC(while, AstWhile* while_node) {
         compile_statement(mod, &code, while_node->stmt);
     }
 
-    bh_arr_pop(mod->structured_jump_target);
-    bh_arr_pop(mod->structured_jump_target);
-
     compile_deferred_stmts(mod, &code, (AstNode *) while_node);
+
+    bh_arr_pop(mod->structured_jump_target);
+    bh_arr_pop(mod->structured_jump_target);
 
     WID(WI_JUMP, 0x00);
 
@@ -618,6 +618,8 @@ COMPILE_FUNC(defer, AstDefer* defer) {
 }
 
 COMPILE_FUNC(deferred_stmts, AstNode* node) {
+    if (bh_arr_length(mod->deferred_stmts) == 0) return;
+
     bh_arr(WasmInstruction) code = *pcode;
 
     u64 depth = bh_arr_length(mod->structured_jump_target);
