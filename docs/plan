@@ -140,6 +140,8 @@ HOW:
 
         [ ] Hex literals
 
+        [ ] All code paths return correct value
+
         [ ] #file_contents
 
         [ ] #initialize structs

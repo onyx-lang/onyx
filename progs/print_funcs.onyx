@@ -12,19 +12,19 @@ PrintableArray :: struct {
 }
 
 print_i32arr :: proc (arr: [] i32, len: i32) {
-    for i: 0, len print(arr[i]);
+    for i: 0, len do print(arr[i]);
 }
 
 print_i64arr :: proc (arr: [] i64, len: i32) {
-    for i: 0, len print(arr[i]);
+    for i: 0, len do print(arr[i]);
 }
 
 print_f32arr :: proc (arr: [] f32, len: i32) {
-    for i: 0, len print(arr[i]);
+    for i: 0, len do print(arr[i]);
 }
 
 print_f64arr :: proc (arr: [] f64, len: i32) {
-    for i: 0, len print(arr[i]);
+    for i: 0, len do print(arr[i]);
 }
 
 // NOTE: print null-terminated string
@@ -37,7 +37,7 @@ print_str :: proc (str: ^u8) {
 }
 
 print_str_len :: proc (str: [] u8, len: i32) {
-    for i: 0, len print(cast(i32) str[i]);
+    for i: 0, len do print(cast(i32) str[i]);
 }
 
 print :: proc #overloaded {

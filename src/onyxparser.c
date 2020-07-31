@@ -512,7 +512,7 @@ static AstIf* parse_if_stmt(OnyxParser* parser) {
     expect_token(parser, Token_Type_Keyword_If);
 
     AstTyped* cond = parse_expression(parser);
-    AstNode*  true_stmt = parse_statement(parser);
+    AstBlock* true_stmt = parse_block(parser);
 
     AstIf* if_node = make_node(AstIf, Ast_Kind_If);
     AstIf* root_if = if_node;
@@ -526,20 +526,20 @@ static AstIf* parse_if_stmt(OnyxParser* parser) {
         AstIf* elseif_node = make_node(AstIf, Ast_Kind_If);
 
         cond = parse_expression(parser);
-        true_stmt = parse_statement(parser);
+        true_stmt = parse_block(parser);
 
         elseif_node->cond = cond;
         if (true_stmt != NULL)
             elseif_node->true_stmt = true_stmt;
 
-        if_node->false_stmt = (AstNode *) elseif_node;
+        if_node->false_stmt = (AstBlock *) elseif_node;
         if_node = elseif_node;
     }
 
     if (parser->curr->type == Token_Type_Keyword_Else) {
         consume_token(parser);
 
-        AstNode* false_stmt = parse_statement(parser);
+        AstBlock* false_stmt = parse_block(parser);
         if (false_stmt != NULL)
             if_node->false_stmt = false_stmt;
     }
@@ -552,7 +552,7 @@ static AstWhile* parse_while_stmt(OnyxParser* parser) {
     OnyxToken* while_token = expect_token(parser, Token_Type_Keyword_While);
 
     AstTyped* cond = parse_expression(parser);
-    AstNode*  stmt = parse_statement(parser);
+    AstBlock* stmt = parse_block(parser);
 
     AstWhile* while_node = make_node(AstWhile, Ast_Kind_While);
     while_node->token = while_token;
@@ -582,7 +582,7 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         for_node->step = parse_expression(parser);
     }
 
-    for_node->stmt = parse_statement(parser);
+    for_node->stmt = parse_block(parser);
 
     return for_node;
 }
@@ -681,6 +681,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
         case '{':
         case Token_Type_Empty_Block:
+        case Token_Type_Keyword_Do:
             needs_semicolon = 0;
             retval = (AstNode *) parse_block(parser);
             break;
@@ -785,6 +786,17 @@ static AstBlock* parse_block(OnyxParser* parser) {
         return block;
     }
 
+    if (parser->curr->type == Token_Type_Keyword_Do) {
+        consume_token(parser);
+        block->body = parse_statement(parser);
+        return block;
+    }
+
+    if (parser->curr->type != '{') {
+        expect_token(parser, '{');
+        find_token(parser, '}');
+        return block;
+    }
     expect_token(parser, '{');
 
     AstNode** next = &block->body;

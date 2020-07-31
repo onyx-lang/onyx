@@ -65,8 +65,8 @@ CHECK(if, AstIf* ifnode) {
         return 1;
     }
 
-    if (ifnode->true_stmt)  if (check_statement(ifnode->true_stmt))  return 1;
-    if (ifnode->false_stmt) if (check_statement(ifnode->false_stmt)) return 1;
+    if (ifnode->true_stmt)  if (check_statement((AstNode *) ifnode->true_stmt))  return 1;
+    if (ifnode->false_stmt) if (check_statement((AstNode *) ifnode->false_stmt)) return 1;
 
     return 0;
 }
@@ -81,7 +81,7 @@ CHECK(while, AstWhile* whilenode) {
         return 1;
     }
 
-    return check_statement(whilenode->stmt);
+    return check_block(whilenode->stmt);
 }
 
 CHECK(for, AstFor* fornode) {
@@ -116,7 +116,7 @@ CHECK(for, AstFor* fornode) {
         }
 
 
-    if (check_statement(fornode->stmt)) return 1;
+    if (check_block(fornode->stmt)) return 1;
 
     return 0;
 }

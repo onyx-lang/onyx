@@ -6,10 +6,10 @@ use package printing
 
 deferred_example :: proc -> i32 {
     arr := cast([] i32) malloc(sizeof [8] i32);
-    defer if cast(rawptr) arr != null mfree(arr);
+    defer if cast(rawptr) arr != null do mfree(arr);
 
-    for i: 0, 8 arr[i] = i * i;
-    for i: 0, 8 print(arr[i]);
+    for i: 0, 8 do arr[i] = i * i;
+    for i: 0, 8 do print(arr[i]);
 
     return arr[1] + arr[7];
 }
@@ -21,16 +21,16 @@ proc #export "main" {
     print(deferred_example());
 
     first := cast([] i32) malloc(sizeof [4] i32);
-    for i: 0, 4 first[i] = i * 2;
+    for i: 0, 4 do first[i] = i * 2;
 
     second := cast([] f32) malloc(sizeof [24] f32);
-    for i: 0, 24 second[i] = cast(f32) i;
+    for i: 0, 24 do second[i] = cast(f32) i;
 
     print(cast(u32) first);
     print(cast(u32) second);
 
-    for i: 0, 4 print(first[i]);
-    for i: 0, 24 print(second[i]);
+    for i: 0, 4  do print(first[i]);
+    for i: 0, 24 do print(second[i]);
 
     mfree(first);
 

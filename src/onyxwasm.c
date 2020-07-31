@@ -498,24 +498,20 @@ COMPILE_FUNC(if, AstIf* if_node) {
     bh_arr_push(mod->structured_jump_target, 0);
 
     if (if_node->true_stmt) {
-        if (if_node->true_stmt->kind == Ast_Kind_Block) {
-            forll (AstNode, stmt, ((AstBlock *) if_node->true_stmt)->body, next) {
-                compile_statement(mod, &code, stmt);
-            }
-        } else {
-            compile_statement(mod, &code, if_node->true_stmt);
+        forll (AstNode, stmt, if_node->true_stmt->body, next) {
+            compile_statement(mod, &code, stmt);
         }
     }
 
     if (if_node->false_stmt) {
         WI(WI_ELSE);
 
-        if (if_node->false_stmt->kind == Ast_Kind_Block) {
+        if (if_node->false_stmt->kind == Ast_Kind_If) {
+            compile_if(mod, &code, (AstIf *) if_node->false_stmt);
+        } else {
             forll (AstNode, stmt, ((AstBlock *) if_node->false_stmt)->body, next) {
                 compile_statement(mod, &code, stmt);
             }
-        } else {
-            compile_statement(mod, &code, if_node->false_stmt);
         }
     }
 
@@ -541,12 +537,8 @@ COMPILE_FUNC(while, AstWhile* while_node) {
     bh_arr_push(mod->structured_jump_target, 1);
     bh_arr_push(mod->structured_jump_target, 2);
 
-    if (while_node->stmt->kind == Ast_Kind_Block) {
-        forll (AstNode, stmt, ((AstBlock *) while_node->stmt)->body, next) {
-            compile_statement(mod, &code, stmt);
-        }
-    } else {
-        compile_statement(mod, &code, while_node->stmt);
+    forll (AstNode, stmt, while_node->stmt->body, next) {
+        compile_statement(mod, &code, stmt);
     }
 
     compile_deferred_stmts(mod, &code, (AstNode *) while_node);
@@ -581,12 +573,8 @@ COMPILE_FUNC(for, AstFor* for_node) {
     WI(WI_I32_GE_S);
     WID(WI_COND_JUMP, 0x01);
 
-    if (for_node->stmt->kind == Ast_Kind_Block) {
-        forll (AstNode, stmt, ((AstBlock *) for_node->stmt)->body, next) {
-            compile_statement(mod, &code, stmt);
-        }
-    } else {
-        compile_statement(mod, &code, for_node->stmt);
+    forll (AstNode, stmt, for_node->stmt->body, next) {
+        compile_statement(mod, &code, stmt);
     }
 
     if (for_node->step == NULL)

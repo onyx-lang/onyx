@@ -276,7 +276,7 @@ struct AstContinue      { AstNode_base; u64 count; };
 
 // Structure Nodes
 struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; };
-struct AstWhile         { AstNode_base; AstTyped *cond; AstNode *stmt; };
+struct AstWhile         { AstNode_base; AstTyped *cond; AstBlock *stmt; };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {
     AstNode_base;
@@ -289,14 +289,14 @@ struct AstFor           {
 
     AstTyped *start, *end, *step;
 
-    AstNode *stmt;
+    AstBlock *stmt;
 };
 struct AstIf {
     AstNode_base;
     AstTyped *cond;
 
-    AstNode* true_stmt;
-    AstNode* false_stmt;
+    AstBlock *true_stmt;
+    AstBlock *false_stmt;
 };
 
 // Type Nodes

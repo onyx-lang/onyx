@@ -273,13 +273,13 @@ static void symres_if(AstIf* ifnode) {
     //
     // The declaration will cause a problem but semantically the above
     // doesn't make sense.
-    if (ifnode->true_stmt != NULL)  symres_statement(ifnode->true_stmt);
-    if (ifnode->false_stmt != NULL) symres_statement(ifnode->false_stmt);
+    if (ifnode->true_stmt != NULL)  symres_statement((AstNode *) ifnode->true_stmt);
+    if (ifnode->false_stmt != NULL) symres_statement((AstNode *) ifnode->false_stmt);
 }
 
 static void symres_while(AstWhile* whilenode) {
     symres_expression(&whilenode->cond);
-    symres_statement(whilenode->stmt);
+    symres_block(whilenode->stmt);
 }
 
 static void symres_for(AstFor* fornode) {
@@ -293,7 +293,7 @@ static void symres_for(AstFor* fornode) {
     symres_expression(&fornode->end);
     if (fornode->step) symres_expression(&fornode->step);
 
-    symres_statement(fornode->stmt);
+    symres_block(fornode->stmt);
 
     scope_leave();
 }

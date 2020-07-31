@@ -59,7 +59,7 @@ heap_init :: proc {
 }
 
 heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
-    if size_ == 0 return null;
+    if size_ == 0 do return null;
 
     size := size_ + sizeof heap_block;
     if size % align != 0 {
@@ -91,7 +91,7 @@ heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
         return cast(rawptr) (cast(u32) ret + sizeof heap_block);
     }
 
-    new_pages :: (size - heap_state.remaining_space) >> 16;
+    new_pages :: ((size - heap_state.remaining_space) >> 16) + 1;
     if memory_grow(new_pages) == -1 {
         // out of memory    
         return null;
@@ -121,7 +121,7 @@ heap_free :: proc (ptr: rawptr) {
 }
 
 heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    if aa == AllocAction.Alloc return heap_alloc(size, align);
+    if aa == AllocAction.Alloc do return heap_alloc(size, align);
     if aa == AllocAction.Free {
         heap_free(oldptr);
         return null;
