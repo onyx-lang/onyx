@@ -341,76 +341,172 @@ CHECK(call, AstCall* call) {
     return 0;
 }
 
+CHECK(binop_assignment, AstBinaryOp* binop, b32 assignment_is_ok) {
+    if (!assignment_is_ok) {
+        onyx_message_add(Msg_Type_Literal,
+            binop->token->pos,
+            "assignment not valid in expression");
+        return 1;
+    }
+
+    if (!is_lval((AstNode *) binop->left)) {
+        onyx_message_add(Msg_Type_Not_Lval,
+                binop->left->token->pos,
+                binop->left->token->text, binop->left->token->length);
+        return 1;
+    }
+
+    if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL) {
+        onyx_message_add(Msg_Type_Assign_Const,
+                binop->token->pos,
+                binop->left->token->text, binop->left->token->length);
+        return 1;
+    }
+
+    if (binop->right->type == NULL) {
+        onyx_message_add(Msg_Type_Unresolved_Type,
+                binop->token->pos,
+                binop->right->token->text, binop->right->token->length);
+        return 1;
+    }
+
+    if (binop->operation == Binary_Op_Assign) {
+        // NOTE: Raw assignment
+
+        // NOTE: This is the 'type inference' system. Very stupid, but very easy.
+        // If a left operand has an unknown type, fill it in with the type of
+        // the right hand side.
+        if (binop->left->type == NULL) binop->left->type = binop->right->type;
+
+    } else {
+        // NOTE: +=, -=, ...
+
+        AstBinaryOp* binop_node = onyx_ast_node_new(
+                semstate.node_allocator,
+                sizeof(AstBinaryOp),
+                Ast_Kind_Binary_Op);
+
+        binop_node->token = binop->token;
+        binop_node->left  = binop->left;
+        binop_node->right = binop->right;
+        binop_node->type  = binop->right->type;
+
+        if      (binop->operation == Binary_Op_Assign_Add)      binop_node->operation = Binary_Op_Add;
+        else if (binop->operation == Binary_Op_Assign_Minus)    binop_node->operation = Binary_Op_Minus;
+        else if (binop->operation == Binary_Op_Assign_Multiply) binop_node->operation = Binary_Op_Multiply;
+        else if (binop->operation == Binary_Op_Assign_Divide)   binop_node->operation = Binary_Op_Divide;
+        else if (binop->operation == Binary_Op_Assign_Modulus)  binop_node->operation = Binary_Op_Modulus;
+        else if (binop->operation == Binary_Op_Assign_And)      binop_node->operation = Binary_Op_And;
+        else if (binop->operation == Binary_Op_Assign_Or)       binop_node->operation = Binary_Op_Or;
+        else if (binop->operation == Binary_Op_Assign_Xor)      binop_node->operation = Binary_Op_Xor;
+        else if (binop->operation == Binary_Op_Assign_Shl)      binop_node->operation = Binary_Op_Shl;
+        else if (binop->operation == Binary_Op_Assign_Shr)      binop_node->operation = Binary_Op_Shr;
+        else if (binop->operation == Binary_Op_Assign_Sar)      binop_node->operation = Binary_Op_Sar;
+
+        binop->right = (AstTyped *) binop_node;
+        binop->operation = Binary_Op_Assign;
+
+        if (check_binaryop(binop_node, 0)) return 1;
+    }
+
+    if (!types_are_compatible(binop->left->type, binop->right->type)) {
+        onyx_message_add(Msg_Type_Binop_Mismatch,
+                binop->token->pos,
+                type_get_name(binop->left->type),
+                type_get_name(binop->right->type));
+        return 1;
+    }
+
+    binop->type = &basic_types[Basic_Kind_Void];
+
+    return 0;
+}
+
+CHECK(binaryop_compare, AstBinaryOp* binop) {
+    if (binop->left->type == NULL) {
+        onyx_message_add(Msg_Type_Unresolved_Type,
+                binop->token->pos,
+                binop->left->token->text, binop->left->token->length);
+        return 1;
+    }
+
+    if (binop->right->type == NULL) {
+        onyx_message_add(Msg_Type_Unresolved_Type,
+                binop->token->pos,
+                binop->right->token->text, binop->right->token->length);
+        return 1;
+    }
+
+    if (!types_are_compatible(binop->left->type, binop->right->type)) {
+        onyx_message_add(Msg_Type_Binop_Mismatch,
+                binop->token->pos,
+                type_get_name(binop->left->type),
+                type_get_name(binop->right->type));
+        return 1;
+    }
+
+    binop->type = &basic_types[Basic_Kind_Bool];
+    return 0;
+}
+
+CHECK(binaryop_bool, AstBinaryOp* binop) {
+    if (binop->left->type == NULL) {
+        onyx_message_add(Msg_Type_Unresolved_Type,
+                binop->token->pos,
+                binop->left->token->text, binop->left->token->length);
+        return 1;
+    }
+
+    if (binop->right->type == NULL) {
+        onyx_message_add(Msg_Type_Unresolved_Type,
+                binop->token->pos,
+                binop->right->token->text, binop->right->token->length);
+        return 1;
+    }
+
+    if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "boolean operator expects boolean types for both operands");
+        return 1;
+    }
+
+    binop->type = &basic_types[Basic_Kind_Bool];
+    return 0;
+}
+
 CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
     if (check_expression(&binop->left)) return 1;
     if (check_expression(&binop->right)) return 1;
 
-    if (binop_is_assignment(binop)) {
-        if (!assignment_is_ok) {
-            onyx_message_add(Msg_Type_Literal,
+    if (binop_is_assignment(binop)) return check_binop_assignment(binop, assignment_is_ok);
+    if (binop_is_compare(binop))    return check_binaryop_compare(binop);
+    if (binop->operation == Binary_Op_Bool_And
+        || binop->operation == Binary_Op_Bool_Or)
+        return check_binaryop_bool(binop);
+
+    if (type_is_pointer(binop->right->type)) {
+        onyx_message_add(Msg_Type_Literal,
                 binop->token->pos,
-                "assignment not valid in expression");
-            return 1;
-        }
+                "right side of binary operator is a pointer");
+        return 1;
+    }
 
-        if (!is_lval((AstNode *) binop->left)) {
-            onyx_message_add(Msg_Type_Not_Lval,
-                    binop->left->token->pos,
-                    binop->left->token->text, binop->left->token->length);
-            return 1;
-        }
+    if (binop->left->type->kind == Type_Kind_Basic
+        && binop->left->type->Basic.kind == Basic_Kind_Rawptr
+        && !binop_is_compare(binop)) {
+        onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "cannot operate on a rawptr");
+        return 1;
+    }
 
-        if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL) {
-            onyx_message_add(Msg_Type_Assign_Const,
-                    binop->token->pos,
-                    binop->left->token->text, binop->left->token->length);
-            return 1;
-        }
-
-        if (binop->operation == Binary_Op_Assign) {
-            // NOTE: Raw assignment
-            if (binop->left->type == NULL) {
-                binop->left->type = binop->right->type;
-            }
-
-        } else {
-            // NOTE: +=, -=, ...
-
-            AstBinaryOp* binop_node = onyx_ast_node_new(
-                    semstate.node_allocator,
-                    sizeof(AstBinaryOp),
-                    Ast_Kind_Binary_Op);
-
-            binop_node->token = binop->token;
-            binop_node->left  = binop->left;
-            binop_node->right = binop->right;
-            binop_node->type  = binop->right->type;
-
-            if      (binop->operation == Binary_Op_Assign_Add)      binop_node->operation = Binary_Op_Add;
-            else if (binop->operation == Binary_Op_Assign_Minus)    binop_node->operation = Binary_Op_Minus;
-            else if (binop->operation == Binary_Op_Assign_Multiply) binop_node->operation = Binary_Op_Multiply;
-            else if (binop->operation == Binary_Op_Assign_Divide)   binop_node->operation = Binary_Op_Divide;
-            else if (binop->operation == Binary_Op_Assign_Modulus)  binop_node->operation = Binary_Op_Modulus;
-            else if (binop->operation == Binary_Op_Assign_And)      binop_node->operation = Binary_Op_And;
-            else if (binop->operation == Binary_Op_Assign_Or)       binop_node->operation = Binary_Op_Or;
-            else if (binop->operation == Binary_Op_Assign_Xor)      binop_node->operation = Binary_Op_Xor;
-            else if (binop->operation == Binary_Op_Assign_Shl)      binop_node->operation = Binary_Op_Shl;
-            else if (binop->operation == Binary_Op_Assign_Shr)      binop_node->operation = Binary_Op_Shr;
-            else if (binop->operation == Binary_Op_Assign_Sar)      binop_node->operation = Binary_Op_Sar;
-
-            binop->right = (AstTyped *) binop_node;
-            binop->operation = Binary_Op_Assign;
-        }
-
-    } else {
-        if (!binop_is_compare(binop) &&
-                (type_is_pointer(binop->left->type)
-                || type_is_pointer(binop->right->type))) {
-            onyx_message_add(Msg_Type_Literal,
-                    binop->token->pos,
-                    "binary operations are not supported for pointers (yet).");
-            return 1;
-        }
+    b32 lptr = type_is_pointer(binop->left->type);
+    if (lptr && (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus)) {
+        onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "this operator is not supported for these operands");
+        return 1;
     }
 
     if (binop->left->type == NULL) {
@@ -427,6 +523,40 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         return 1;
     }
 
+    if (lptr) {
+        if (!type_is_integer(binop->right->type)) {
+            onyx_message_add(Msg_Type_Literal,
+                    binop->right->token->pos,
+                    "expected integer type");
+            return 1;
+        }
+
+        AstNumLit* numlit = onyx_ast_node_new(
+                semstate.node_allocator,
+                sizeof(AstNumLit),
+                Ast_Kind_NumLit);
+
+        numlit->token = binop->right->token;
+        numlit->type = binop->right->type;
+        numlit->value.i = type_size_of(binop->left->type->Pointer.elem);
+
+        AstBinaryOp* binop_node = onyx_ast_node_new(
+                semstate.node_allocator,
+                sizeof(AstBinaryOp),
+                Ast_Kind_Binary_Op);
+
+        binop_node->token = binop->token;
+        binop_node->left  = binop->right;
+        binop_node->right = (AstTyped *) numlit;
+        binop_node->type  = binop->right->type;
+        binop_node->operation = Binary_Op_Multiply;
+
+        if (check_binaryop(binop_node, 0)) return 1;
+
+        binop->right = (AstTyped *) binop_node;
+        binop->type = binop->left->type;
+        binop->right->type = binop->left->type;
+    }
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
         onyx_message_add(Msg_Type_Binop_Mismatch,
@@ -436,29 +566,7 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         return 1;
     }
 
-    if (binop->operation >= Binary_Op_Bool_And
-            && binop->operation <= Binary_Op_Bool_Or) {
-
-        if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
-            onyx_message_add(Msg_Type_Literal,
-                    binop->token->pos,
-                    "boolean operator expects boolean types for both operands");
-            return 1;
-        }
-
-        binop->type = &basic_types[Basic_Kind_Bool];
-
-    } else if (binop->operation >= Binary_Op_Equal
-            && binop->operation <= Binary_Op_Greater_Equal) {
-        binop->type = &basic_types[Basic_Kind_Bool];
-
-    } else if (binop_is_assignment(binop)) {
-        binop->type = &basic_types[Basic_Kind_Void];
-
-    } else {
-        binop->type = binop->left->type;
-    }
-
+    binop->type = binop->left->type;
     return 0;
 }
 

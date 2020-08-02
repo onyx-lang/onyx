@@ -5,13 +5,19 @@ use package memory
 use package printing
 
 deferred_example :: proc -> i32 {
-    arr := cast([] i32) malloc(sizeof [8] i32);
-    defer if cast(rawptr) arr != null do mfree(arr);
+    arr := cast([] i64) malloc(sizeof [8] i64);
+    if cast(rawptr) arr == null do return 0;
+    defer mfree(arr);
 
-    for i: 0, 8 do arr[i] = i * i;
-    for i: 0, 8 do print(arr[i]);
+    for i: 0, 8 do arr[i] = cast(i64) (i * i);
 
-    return arr[1] + arr[7];
+    walker := cast(^i64) arr;
+    for _: 0, 8 {
+        print(*(walker + 2));
+        walker += 1;
+    }
+
+    return cast(i32) (arr[1] + arr[7]);
 }
 
 proc #export "main" {

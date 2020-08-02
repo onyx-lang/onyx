@@ -471,6 +471,12 @@ b32 type_is_bool(Type* type) {
     return type != NULL && type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Bool;
 }
 
+b32 type_is_integer(Type* type) {
+    if (type->kind != Type_Kind_Basic) return 0;
+
+    return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U64;
+}
+
 b32 type_results_in_void(Type* type) {
     return (type == NULL)
         || (type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Void)

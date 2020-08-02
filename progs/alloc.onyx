@@ -112,9 +112,7 @@ heap_free :: proc (ptr: rawptr) {
     hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
 
     // DEBUGGING: Fills freed memory with 0's
-    for i: 0, hb_ptr.size {
-        (cast(^u8) ptr)[i] = cast(u8) 0;
-    }
+    // for i: 0, hb_ptr.size do (cast(^u8) ptr)[i] = cast(u8) 0;
 
     hb_ptr.next = heap_state.free_list;
     heap_state.free_list = hb_ptr;
