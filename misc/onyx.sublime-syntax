@@ -36,6 +36,9 @@ contexts:
     - match: '\b(-)?[0-9.]+\b'
       scope: constant.numeric.onyx
 
+    - match: '\b0x[0-9A-Fa-f]+\b'
+      scope: constant.numeric.onyx
+
     - match: '#[a-zA-Z]+'
       scope: keyword.other.onyx
 

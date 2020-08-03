@@ -140,9 +140,9 @@ HOW:
         [X] #private
             - symbol is scoped to package and not brought in from a 'use package' statement
 
-        [ ] Better checking for casts
+        [X] Hex literals
 
-        [ ] Hex literals
+        [ ] Better checking for casts
 
         [ ] All code paths return correct value
 

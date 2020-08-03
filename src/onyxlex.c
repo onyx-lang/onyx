@@ -233,6 +233,23 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
         goto token_parsed;
     }
 
+    // Hex literal
+    if (*tokenizer->curr == '0' && *(tokenizer->curr + 1) == 'x' && char_is_num(*(tokenizer->curr + 2))) {
+        INCREMENT_CURR_TOKEN(tokenizer);
+        INCREMENT_CURR_TOKEN(tokenizer);
+        u32 len = 3;
+        while (char_is_num(*(tokenizer->curr + 1)) || charset_contains("abcdefABCDEF", *(tokenizer->curr + 1))) {
+            len++;
+            INCREMENT_CURR_TOKEN(tokenizer);
+        }
+
+        tk.type = Token_Type_Literal_Numeric;
+        tk.length = len;
+
+        INCREMENT_CURR_TOKEN(tokenizer);
+        goto token_parsed;
+    }
+
     // Number literal
     if (char_is_num(*tokenizer->curr)) {
         u32 len = 1;
