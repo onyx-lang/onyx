@@ -13,7 +13,7 @@ deferred_example :: proc -> i32 {
 
     walker := cast(^i64) arr;
     for _: 0, 8 {
-        print(*(walker + 2));
+        print(*walker);
         walker += 1;
     }
 
@@ -21,7 +21,7 @@ deferred_example :: proc -> i32 {
 }
 
 proc #export "main" {
-    asdf :: "staring asdfkjasd asdflkjasdflkajsdflk";
+    asdf :: "staring asdfkjasd asdflkjasdflkajsdflya";
     heap_init();
 
     print(deferred_example());

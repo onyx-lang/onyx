@@ -36,6 +36,9 @@ contexts:
     - match: '\b(-)?[0-9.]+\b'
       scope: constant.numeric.onyx
 
+    - match: '#[a-zA-Z]+'
+      scope: keyword.other.onyx
+
   double_quoted_string:
     - meta_scope: string.quoted.double.onyx
     - match: '\\.'

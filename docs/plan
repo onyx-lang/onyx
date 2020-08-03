@@ -134,7 +134,11 @@ HOW:
 
         [X] Deferred statements
 
-        [ ] Pointer math
+        [X] Pointer math
+            - Addition and subtraction
+
+        [X] #private
+            - symbol is scoped to package and not brought in from a 'use package' statement
 
         [ ] Better checking for casts
 

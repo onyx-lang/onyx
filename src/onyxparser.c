@@ -1244,6 +1244,11 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
 // 'use' <string>
 // <symbol> :: <expr>
 static AstNode* parse_top_level_statement(OnyxParser* parser) {
+    b32 is_private = 0;
+    if (parse_possible_directive(parser, "private")) {
+        is_private = 1;
+    }
+
     switch (parser->curr->type) {
         case Token_Type_Keyword_Use: {
             OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
@@ -1315,6 +1320,9 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                 AstTyped* node = parse_top_level_expression(parser);
 
+                if (is_private)
+                    node->flags |= Ast_Flag_Private_Package;
+
                 if (node->kind == Ast_Kind_Function) {
                     AstFunction* func = (AstFunction *) node;
 
@@ -1359,6 +1367,9 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
                 memres->token = symbol;
                 memres->type_node = parse_type(parser);
+
+                if (is_private)
+                    memres->flags |= Ast_Flag_Private_Package;
 
                 add_node_to_process(parser, (AstNode *) memres);
 
@@ -1451,9 +1462,15 @@ ParseResults onyx_parse(OnyxParser *parser) {
                 switch (curr_stmt->kind) {
                     case Ast_Kind_Include_File: bh_arr_push(parser->results.files, (AstIncludeFile *) curr_stmt); break;
                     case Ast_Kind_Binding: {
-                        symbol_introduce(parser->package->scope,
-                            ((AstBinding *) curr_stmt)->token,
-                            ((AstBinding *) curr_stmt)->node);
+                        if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_Package) {
+                            symbol_introduce(parser->package->private_scope,
+                                ((AstBinding *) curr_stmt)->token,
+                                ((AstBinding *) curr_stmt)->node);
+                        } else {
+                            symbol_introduce(parser->package->scope,
+                                ((AstBinding *) curr_stmt)->token,
+                                ((AstBinding *) curr_stmt)->node);
+                        }
                         break;
                     }
 

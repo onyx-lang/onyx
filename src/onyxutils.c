@@ -99,6 +99,7 @@ Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_
         package->name = pac_name;
         package->include_scope = scope_create(alloc, parent_scope);
         package->scope = scope_create(alloc, package->include_scope);
+        package->private_scope = scope_create(alloc, package->scope);
 
         bh_table_put(Package *, prog->packages, pac_name, package);
 

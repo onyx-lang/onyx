@@ -436,6 +436,7 @@ static void symres_use_package(AstUsePackage* package) {
                     "not found in package");
                 return;
             }
+
             symbol_introduce(semstate.curr_package->scope, (*alias)->alias, thing);
         }
     }
@@ -521,7 +522,7 @@ void onyx_resolve_symbols() {
     }
 
     bh_arr_each(Entity, entity, semstate.program->entities) {
-        scope_enter(entity->package->scope);
+        scope_enter(entity->package->private_scope);
         semstate.curr_package = entity->package;
 
         switch (entity->type) {

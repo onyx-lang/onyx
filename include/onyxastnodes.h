@@ -131,6 +131,7 @@ typedef enum AstFlags {
     Ast_Flag_Foreign          = BH_BIT(1),
     Ast_Flag_Const            = BH_BIT(2),
     Ast_Flag_Comptime         = BH_BIT(3),
+    Ast_Flag_Private_Package  = BH_BIT(4),
 
     // Function flags
     Ast_Flag_Inline           = BH_BIT(8),
@@ -437,6 +438,7 @@ struct Package {
 
     Scope *scope;
     Scope *include_scope;
+    Scope *private_scope;
 };
 
 // NOTE: Simple data structure for storing what comes out of the parser
