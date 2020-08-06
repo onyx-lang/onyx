@@ -223,6 +223,13 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 break;
             }
 
+            case Ast_Kind_File_Contents: {
+                ent.type = Entity_Type_File_Contents;
+                ent.file_contents = (AstFileContents *) node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+                break;
+            }
+
             case Ast_Kind_Type_Alias:
             case Ast_Kind_Struct_Type: {
                 ent.type = Entity_Type_Type_Alias;

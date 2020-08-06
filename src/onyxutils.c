@@ -53,6 +53,7 @@ static const char* ast_node_names[] = {
     "FIELD_ACCESS",
     "SIZE OF",
     "ALIGN OF"
+    "FILE CONTENTS"
 
     "IF",
     "FOR",

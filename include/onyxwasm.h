@@ -309,6 +309,8 @@ typedef struct OnyxWasmModule {
     // to the function type index if it has been created.
     bh_table(i32) type_map;
 
+    bh_table(u32) loaded_file_offsets;
+
     bh_arr(u8) structured_jump_target;
 
     bh_arr(WasmFuncType*) types; // NOTE: This have to be pointers because the type is variadic in size

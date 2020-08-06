@@ -22,6 +22,7 @@ typedef struct AstArrayAccess AstArrayAccess;
 typedef struct AstFieldAccess AstFieldAccess;
 typedef struct AstSizeOf AstSizeOf;
 typedef struct AstAlignOf AstAlignOf;
+typedef struct AstFileContents AstFileContents;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstBreak AstBreak;
@@ -112,6 +113,7 @@ typedef enum AstKind {
     Ast_Kind_Field_Access,
     Ast_Kind_Size_Of,
     Ast_Kind_Align_Of,
+    Ast_Kind_File_Contents,
 
     Ast_Kind_If,
     Ast_Kind_For,
@@ -269,6 +271,7 @@ struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 ele
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
+struct AstFileContents  { AstTyped_base; OnyxToken *filename; };
 
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
@@ -405,6 +408,7 @@ typedef enum EntityType {
     Entity_Type_Unknown,
     Entity_Type_Use_Package,
     Entity_Type_String_Literal,
+    Entity_Type_File_Contents,
     Entity_Type_Enum,
     Entity_Type_Type_Alias,
     Entity_Type_Memory_Reservation,
@@ -427,6 +431,7 @@ typedef struct Entity {
         AstGlobal             *global;
         AstTyped              *expr;
         AstStrLit             *strlit;
+        AstFileContents       *file_contents;
         AstType               *type_alias;
         AstEnumType           *enum_type;
         AstMemRes             *mem_res;

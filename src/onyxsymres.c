@@ -489,6 +489,8 @@ static void symres_enum(AstEnumType* enum_node) {
 
 static void symres_memres(AstMemRes** memres) {
     (*memres)->type_node = symres_type((*memres)->type_node);
+    if ((*memres)->type_node == NULL) return;
+
     (*memres)->type = type_build_from_ast(semstate.allocator, (*memres)->type_node);
 
     if ((*memres)->type->kind != Type_Kind_Array && (*memres)->type->kind != Type_Kind_Struct) {

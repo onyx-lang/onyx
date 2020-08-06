@@ -234,7 +234,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     }
 
     // Hex literal
-    if (*tokenizer->curr == '0' && *(tokenizer->curr + 1) == 'x' && char_is_num(*(tokenizer->curr + 2))) {
+    if (*tokenizer->curr == '0' && *(tokenizer->curr + 1) == 'x' && charset_contains("0123456789abcdefABCDEF", *(tokenizer->curr + 2))) {
         INCREMENT_CURR_TOKEN(tokenizer);
         INCREMENT_CURR_TOKEN(tokenizer);
         u32 len = 3;

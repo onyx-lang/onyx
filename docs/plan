@@ -142,11 +142,11 @@ HOW:
 
         [X] Hex literals
 
+        [X] #file_contents
+
         [ ] Better checking for casts
 
         [ ] All code paths return correct value
-
-        [ ] #file_contents
 
         [ ] #initialize structs
 

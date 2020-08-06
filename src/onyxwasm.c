@@ -1055,6 +1055,17 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_File_Contents: {
+            AstFileContents* fc = (AstFileContents *) expr;
+            token_toggle_end(fc->filename);
+
+            u32 offset = bh_table_get(u32, mod->loaded_file_offsets, fc->filename->text);
+            WID(WI_I32_CONST, offset);
+
+            token_toggle_end(fc->filename);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -1426,6 +1437,10 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
         if (src[i] == '\\') {
             i++;
             switch (src[i]) {
+            case '0': *des++ = '\0'; break;
+            case 'a': *des++ = '\a'; break;
+            case 'b': *des++ = '\b'; break;
+            case 'f': *des++ = '\f'; break;
             case 'n': *des++ = '\n'; break;
             case 't': *des++ = '\t'; break;
             case 'r': *des++ = '\r'; break;
@@ -1475,6 +1490,46 @@ static void compile_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     // bh_arr_push(mod->data, datum);
 }
 
+static void compile_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
+    token_toggle_end(fc->filename);
+
+    if (bh_table_has(u32, mod->loaded_file_offsets, fc->filename->text)) {
+        token_toggle_end(fc->filename);
+        return;
+    }
+
+    u32 offset = mod->next_datum_offset;
+    if (offset % 16 != 0)
+        offset += 16 - (offset % 16);
+    bh_table_put(u32, mod->loaded_file_offsets, fc->filename->text, offset);
+
+    if (!bh_file_exists(fc->filename->text)) {
+        onyx_message_add(Msg_Type_File_Not_Found,
+                fc->filename->pos,
+                fc->filename->text);
+        
+        token_toggle_end(fc->filename);
+        return;
+    }
+
+    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, fc->filename->text);
+    u8* actual_data = bh_alloc(global_heap_allocator, contents.length + 1);
+    u32 length = contents.length + 1;
+    memcpy(actual_data, contents.data, contents.length);
+    actual_data[contents.length] = 0;
+    bh_file_contents_free(&contents);
+
+    WasmDatum datum = {
+        .offset = offset,
+        .length = length,
+        .data = actual_data,
+    };
+
+    bh_arr_push(mod->data, datum);
+
+    token_toggle_end(fc->filename);
+}
+
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     OnyxWasmModule module = {
         .allocator = alloc,
@@ -1518,6 +1573,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
     bh_table_init(global_heap_allocator, module.type_map, 61);
     bh_table_init(global_heap_allocator, module.exports, 61);
+    bh_table_init(global_heap_allocator, module.loaded_file_offsets, 7);
 
     bh_imap_init(&module.index_map, global_heap_allocator, 128);
     bh_imap_init(&module.local_map, global_heap_allocator, 16);
@@ -1540,6 +1596,14 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
     module->export_count++;
 
     bh_arr_each(Entity, entity, program->entities) {
+
+        // HACK: To put this here
+        // NOTE: Round up to the nearest multiple of 16
+        builtin_heap_start.value.i =
+            (module->next_datum_offset & 15)
+            ? ((module->next_datum_offset >> 4) + 1) << 4
+            : module->next_datum_offset;
+
         switch (entity->type) {
             case Entity_Type_Function_Header: {
                 if (!should_compile_function(entity->function)) break;
@@ -1567,25 +1631,16 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
 
             case Entity_Type_String_Literal: {
                 compile_string_literal(module, (AstStrLit *) entity->strlit);
+                break;
+            }
 
-                // HACK: To put this here
-                // NOTE: Round up to the nearest multiple of 16
-                builtin_heap_start.value.i =
-                    (module->next_datum_offset & 15)
-                    ? ((module->next_datum_offset >> 4) + 1) << 4
-                    : module->next_datum_offset;
+            case Entity_Type_File_Contents: {
+                compile_file_contents(module, (AstFileContents *) entity->file_contents);
                 break;
             }
 
             case Entity_Type_Memory_Reservation: {
                 compile_memory_reservation(module, (AstMemRes *) entity->mem_res);
-
-                // HACK: To put this here
-                // NOTE: Round up to the nearest multiple of 16
-                builtin_heap_start.value.i =
-                    (module->next_datum_offset & 15)
-                    ? ((module->next_datum_offset >> 4) + 1) << 4
-                    : module->next_datum_offset;
                 break;
             }
 

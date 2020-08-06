@@ -21,7 +21,7 @@ deferred_example :: proc -> i32 {
 }
 
 proc #export "main" {
-    asdf :: "staring asdfkjasd asdflkjasdflkajsdflya";
+    print(#file_contents "progs/filetest");
     heap_init();
 
     print(deferred_example());

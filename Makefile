@@ -1,3 +1,5 @@
+RELEASE=1
+
 OBJ_FILES=\
 	build/onyxlex.o \
 	build/onyxparser.o \
@@ -13,8 +15,13 @@ OBJ_FILES=\
 CC=gcc
 INCLUDES=-I./include
 LIBS=
-FLAGS=-g
 TARGET=./onyx
+
+ifeq ($(RELEASE), 1)
+	FLAGS=-O2
+else
+	FLAGS=-g
+endif
 
 build/%.o: src/%.c include/bh.h
 	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)

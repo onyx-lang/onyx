@@ -27,6 +27,7 @@ static AstNode*       parse_statement(OnyxParser* parser);
 static AstType*       parse_type(OnyxParser* parser);
 static AstStructType* parse_struct(OnyxParser* parser);
 static AstLocal*      parse_function_params(OnyxParser* parser);
+static b32            parse_possible_directive(OnyxParser* parser, const char* dir);
 static AstFunction*   parse_function_definition(OnyxParser* parser);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
@@ -286,6 +287,29 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             add_node_to_process(parser, (AstNode *) retval);
 
             break;
+        }
+
+        case '#': {
+            if (parse_possible_directive(parser, "file_contents")) {
+                AstPointerType* fc_type = make_node(AstPointerType, Ast_Kind_Pointer_Type);
+                fc_type->flags |= Basic_Flag_Pointer;
+                fc_type->elem = (AstType *) &basic_type_u8;
+
+                AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
+                fc->token = parser->prev - 1;
+                fc->filename = expect_token(parser, Token_Type_Literal_String);
+                fc->type_node = (AstType *) fc_type;
+
+                add_node_to_process(parser, (AstNode *) fc);
+
+                retval = (AstTyped *) fc;
+                break;
+            }
+
+            onyx_message_add(Msg_Type_Literal,
+                    parser->curr->pos,
+                    "invalid directive in expression.");
+            return NULL;
         }
 
         default:

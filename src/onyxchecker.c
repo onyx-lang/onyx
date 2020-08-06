@@ -774,6 +774,7 @@ CHECK(expression, AstTyped** pexpr) {
             break;
 
         case Ast_Kind_StrLit: break;
+        case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;
 
@@ -1085,6 +1086,8 @@ void onyx_type_check() {
             case Entity_Type_Enum: break;
 
             case Entity_Type_String_Literal: break;
+
+            case Entity_Type_File_Contents: break;
 
             case Entity_Type_Global_Header: break;
 

@@ -331,6 +331,7 @@ bh_file_error bh_file_close(bh_file* file);
 i32 bh_file_read(bh_file* file, void* buffer, isize buff_size);
 i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
 i64 bh_file_size(bh_file* file);
+b32 bh_file_exists(char const* filename);
 
 #define bh_file_read_contents(allocator_, x) _Generic((x), \
     bh_file*: bh_file_read_contents_bh_file, \
@@ -1362,6 +1363,11 @@ b32 bh_file_contents_free(bh_file_contents* contents) {
     bh_free(contents->allocator, contents->data);
     contents->length = 0;
     return 1;
+}
+
+b32 bh_file_exists(char const* filename) {
+    struct stat s;
+    return stat(filename, &s) != -1;
 }
 
 #endif // ifndef BH_NO_FILE

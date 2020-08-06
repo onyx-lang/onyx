@@ -34,6 +34,8 @@ static const char* msg_formats[] = {
 
     "failed to generate load instruction for type '%s'",
     "failed to generate store instruction for type '%s'",
+
+    "file not found '%s'",
 };
 
 void onyx_message_init(bh_allocator allocator, bh_table(bh_file_contents)* files) {

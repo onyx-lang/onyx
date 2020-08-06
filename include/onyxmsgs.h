@@ -36,6 +36,7 @@ typedef enum MsgType {
 
     Msg_Type_Failed_Gen_Load,
     Msg_Type_Failed_Gen_Store,
+    Msg_Type_File_Not_Found,
 
     Msg_Type_Count,
 } MsgType;
