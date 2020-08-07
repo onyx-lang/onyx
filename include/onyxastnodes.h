@@ -129,27 +129,32 @@ typedef enum AstKind {
 // only 32-bits of flags to play with
 typedef enum AstFlags {
     // Top-level flags
-    Ast_Flag_Exported         = BH_BIT(0),
-    Ast_Flag_Foreign          = BH_BIT(1),
-    Ast_Flag_Const            = BH_BIT(2),
-    Ast_Flag_Comptime         = BH_BIT(3),
-    Ast_Flag_Private_Package  = BH_BIT(4),
+    Ast_Flag_Exported          = BH_BIT(0),
+    Ast_Flag_Foreign           = BH_BIT(1),
+    Ast_Flag_Const             = BH_BIT(2),
+    Ast_Flag_Comptime          = BH_BIT(3),
+    Ast_Flag_Private_Package   = BH_BIT(4),
+
+    // Global flags
+    Ast_Flag_Global_Stack_Top  = BH_BIT(8),
+    Ast_Flag_Global_Stack_Base = BH_BIT(9),
 
     // Function flags
-    Ast_Flag_Inline           = BH_BIT(8),
-    Ast_Flag_Intrinsic        = BH_BIT(9),
-    Ast_Flag_Function_Used    = BH_BIT(10),
+    Ast_Flag_Inline            = BH_BIT(8),
+    Ast_Flag_Intrinsic         = BH_BIT(9),
+    Ast_Flag_Function_Used     = BH_BIT(10),
+    Ast_Flag_No_Stack          = BH_BIT(11),
 
     // Expression flags
-    Ast_Flag_Expr_Ignored     = BH_BIT(8),
-    Ast_Flag_Param_Splatted   = BH_BIT(9),
-    Ast_Flag_Param_Use        = BH_BIT(10),
+    Ast_Flag_Expr_Ignored      = BH_BIT(8),
+    Ast_Flag_Param_Splatted    = BH_BIT(9),
+    Ast_Flag_Param_Use         = BH_BIT(10),
 
     // Type flags
-    Ast_Flag_Type_Is_Resolved = BH_BIT(8),
+    Ast_Flag_Type_Is_Resolved  = BH_BIT(8),
 
     // Enum flags
-    Ast_Flag_Enum_Is_Flags    = BH_BIT(11),
+    Ast_Flag_Enum_Is_Flags     = BH_BIT(11),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -475,6 +480,8 @@ extern AstBasicType basic_type_f64;
 extern AstBasicType basic_type_rawptr;
 
 extern AstNumLit builtin_heap_start;
+extern AstGlobal builtin_stack_base;
+extern AstGlobal builtin_stack_top;
 
 typedef struct BuiltinSymbol {
     char*    sym;

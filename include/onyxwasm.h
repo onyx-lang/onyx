@@ -258,7 +258,7 @@ typedef struct WasmFunc {
 
 typedef struct WasmGlobal {
     WasmType type;
-    u8 mutable;
+    u32 mutable : 1;
     bh_arr(WasmInstruction) initial_value;
 } WasmGlobal;
 
@@ -296,7 +296,7 @@ typedef struct OnyxWasmModule {
     // NOTE: Mapping ptrs to function / global indicies
     bh_imap index_map;
 
-    // NOTE: Mapping from local ast node ptrs to indicies
+    // NOTE: Mapping from local ast node ptrs to indicies or offsets, depending on the mode
     bh_imap local_map;
 
     // NOTE: Mapping ptrs to elements
@@ -329,6 +329,8 @@ typedef struct OnyxWasmModule {
     u32 next_foreign_global_idx;
     u32 next_datum_offset;
     u32 next_elem_idx;
+
+    u32 *stack_top_ptr, *stack_base_ptr;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);

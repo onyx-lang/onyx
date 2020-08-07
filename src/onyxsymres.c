@@ -19,7 +19,11 @@ AstBasicType basic_type_f64    = { { Ast_Kind_Basic_Type, 0, NULL, "f64"    }, &
 AstBasicType basic_type_rawptr = { { Ast_Kind_Basic_Type, 0, NULL, "rawptr" }, &basic_types[Basic_Kind_Rawptr] };
 
 static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
+static OnyxToken builtin_stack_base_token = { Token_Type_Symbol, 12, "__stack_base ", { 0 } };
+static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
 AstNumLit builtin_heap_start = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
+AstGlobal builtin_stack_base = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Base, &builtin_stack_base_token, NULL, (AstType *) &basic_type_rawptr, NULL };
+AstGlobal builtin_stack_top  = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token,  NULL, (AstType *) &basic_type_rawptr, NULL };
 
 const BuiltinSymbol builtin_symbols[] = {
     { "void",       (AstNode *) &basic_type_void },
@@ -37,6 +41,8 @@ const BuiltinSymbol builtin_symbols[] = {
     { "rawptr",     (AstNode *) &basic_type_rawptr },
 
     { "__heap_start", (AstNode *) &builtin_heap_start },
+    { "__stack_base", (AstNode *) &builtin_stack_base },
+    { "__stack_top",  (AstNode *) &builtin_stack_top },
 
     { NULL, NULL },
 };
@@ -524,8 +530,10 @@ void onyx_resolve_symbols() {
     }
 
     bh_arr_each(Entity, entity, semstate.program->entities) {
-        scope_enter(entity->package->private_scope);
-        semstate.curr_package = entity->package;
+        if (entity->package) {
+            scope_enter(entity->package->private_scope);
+            semstate.curr_package = entity->package;
+        }
 
         switch (entity->type) {
             case Entity_Type_Use_Package:         symres_use_package(entity->use_package); break;
@@ -540,6 +548,6 @@ void onyx_resolve_symbols() {
             default: break;
         }
 
-        scope_leave();
+        if (entity->package) scope_leave();
     }
 }

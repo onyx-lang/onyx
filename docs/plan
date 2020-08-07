@@ -144,6 +144,14 @@ HOW:
 
         [X] #file_contents
 
+        [X] Convert to using a proper stack based system
+
+        [ ] Be smart about when to use the stack versus use the wasm locals
+
+        [ ] Array literals
+
+        [ ] Properly checking binary operators
+
         [ ] Better checking for casts
 
         [ ] All code paths return correct value

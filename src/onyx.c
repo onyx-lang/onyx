@@ -267,11 +267,6 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
             }
         }
     }
-
-    qsort(compiler_state->prog_info.entities,
-            bh_arr_length(compiler_state->prog_info.entities),
-            sizeof(Entity),
-            sort_entities);
 }
 
 static CompilerProgress process_source_file(CompilerState* compiler_state, char* filename) {
@@ -318,6 +313,28 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_arr_fastdelete(compiler_state->queued_files, 0);
     }
 
+    // Add builtin one-time entities
+    bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
+        .type = Entity_Type_Global_Header,
+        .global = &builtin_stack_base
+    }));
+    bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
+        .type = Entity_Type_Global_Header,
+        .global = &builtin_stack_top
+    }));
+    bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
+        .type = Entity_Type_Global,
+        .global = &builtin_stack_base
+    }));
+    bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
+        .type = Entity_Type_Global,
+        .global = &builtin_stack_top
+    }));
+
+    qsort(compiler_state->prog_info.entities,
+            bh_arr_length(compiler_state->prog_info.entities),
+            sizeof(Entity),
+            sort_entities);
 
     // NOTE: Check types and semantic rules
     if (compiler_state->options->verbose_output)

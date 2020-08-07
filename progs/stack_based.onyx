@@ -1,0 +1,28 @@
+package main
+
+use "progs/print_funcs"
+
+use package printing
+
+ret_val :: proc (x: i32, y: i32) -> i32 {
+    big_arr : [128] i32;
+    big_arr[127] = 1234;
+    return big_arr[127] + x + y;
+}
+
+main :: proc #export {
+    print("Hello, World!");
+    print(cast(i32) __heap_start);
+    a := 12345;
+
+    arr : [5] i32;
+    arr[0] = 10;
+    arr[1] = 20;
+    arr[2] = 30;
+    arr[3] = 40;
+    arr[4] = 50;
+
+    print(ret_val(10, 4));
+    
+    for i: 0, 5 do print(arr[i]);
+}
