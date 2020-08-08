@@ -202,7 +202,7 @@ static const char* wi_string(WasmInstructionType wit) {
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
     if (type->kind == Type_Kind_Struct) {
-        DEBUG_HERE;
+        return WASM_TYPE_VOID;
     }
 
     if (type->kind == Type_Kind_Enum) {
@@ -451,6 +451,15 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
 
 COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    if (type->kind == Type_Kind_Array) {
+        if (offset != 0) {
+            WID(WI_I32_CONST, offset);
+            WI(WI_I32_ADD);
+        }
+
+        return;
+    }
 
     if (type->kind == Type_Kind_Enum) {
         type = type->Enum.backing;
