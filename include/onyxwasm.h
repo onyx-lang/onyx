@@ -290,6 +290,8 @@ typedef struct DeferredStmt {
     AstNode *stmt;
 } DeferredStmt;
 
+#define LOCAL_IS_WASM 0x8000000000000
+
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
 
@@ -321,6 +323,7 @@ typedef struct OnyxWasmModule {
     bh_arr(WasmDatum)     data;
     bh_arr(i32)           elems;
 
+    // NOTE: Set of things used when compiling; not part of the actual module
     u32 export_count;
     u32 next_type_idx;
     u32 next_func_idx;
@@ -331,6 +334,8 @@ typedef struct OnyxWasmModule {
     u32 next_elem_idx;
 
     u32 *stack_top_ptr, *stack_base_ptr;
+
+    b32 has_stack_locals : 1;
 } OnyxWasmModule;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);

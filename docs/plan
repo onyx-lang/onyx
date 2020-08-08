@@ -146,7 +146,7 @@ HOW:
 
         [X] Convert to using a proper stack based system
 
-        [ ] Be smart about when to use the stack versus use the wasm locals
+        [X] Be smart about when to use the stack versus use the wasm locals
 
         [ ] Array literals
 

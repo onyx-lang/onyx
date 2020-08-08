@@ -584,6 +584,8 @@ CHECK(address_of, AstAddressOf* aof) {
         return 1;
     }
 
+    aof->expr->flags |= Ast_Flag_Address_Taken;
+
     aof->type = type_make_pointer(semstate.allocator, aof->expr->type);
 
     return 0;

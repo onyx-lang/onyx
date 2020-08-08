@@ -1,8 +1,10 @@
 package main
 
 use "progs/print_funcs"
+use "progs/alloc"
 
 use package printing
+use package memory
 
 ret_val :: proc (x: i32, y: i32) -> i32 {
     big_arr : [128] i32;
@@ -10,19 +12,56 @@ ret_val :: proc (x: i32, y: i32) -> i32 {
     return big_arr[127] + x + y;
 }
 
+N :: 10
+
+sumN :: proc (x: [N] i32) -> i32 {
+    s := 0;
+    for i: 0, N do s += x[i];
+    return s;
+}
+
+summing :: proc (x: ^i32) -> i32 {
+    s := 0;
+    for i: 0, N do s += x[i];
+    return s;
+}
+
+Vec3 :: struct {
+    x: i32;
+    y: i32;
+    z: i32;
+}
+
+mag_squared :: proc (v: Vec3) -> i32 {
+    return v.x * v.x + v.y * v.y + v.z * v.z;
+}
+
+stuff :: #file_contents "Makefile"
+
 main :: proc #export {
+    heap_init();
     print("Hello, World!");
     print(cast(i32) __heap_start);
+
     a := 12345;
 
-    arr : [5] i32;
+    arr: [N] i32;
     arr[0] = 10;
     arr[1] = 20;
     arr[2] = 30;
     arr[3] = 40;
     arr[4] = 50;
+    arr[9] = 123;
+    print(sumN(arr));
+    print(summing(cast(^i32) arr));
+
+    v: Vec3;
+    v.x = 2;
+    v.y = 4;
+    v.z = 10;
+    print(mag_squared(v));
 
     print(ret_val(10, 4));
     
-    for i: 0, 5 do print(arr[i]);
+    for i: 0, N do print(arr[i]);
 }

@@ -355,10 +355,17 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
     AstTyped* lval = assign->left;
 
     if (lval->kind == Ast_Kind_Local) {
-        u64 offset = 0;
-        compile_local_location(mod, &code, (AstLocal *) lval, &offset);
-        compile_expression(mod, &code, assign->right);
-        compile_store_instruction(mod, &code, lval->type, type_get_alignment_log2(lval->type), offset);
+        if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
+            u32 localidx = (u32) (bh_imap_get(&mod->local_map, (u64) lval) & ~LOCAL_IS_WASM);
+            compile_expression(mod, &code, assign->right);
+            WID(WI_LOCAL_SET, localidx);
+
+        } else {
+            u64 offset = 0;
+            compile_local_location(mod, &code, (AstLocal *) lval, &offset);
+            compile_expression(mod, &code, assign->right);
+            compile_store_instruction(mod, &code, lval->type, type_get_alignment_log2(lval->type), offset);
+        }
 
     } else if (lval->kind == Ast_Kind_Global) {
         i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) lval);
@@ -558,15 +565,20 @@ COMPILE_FUNC(while, AstWhile* while_node) {
 COMPILE_FUNC(for, AstFor* for_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    // i32 it_idx = (i32) bh_imap_get(&mod->local_map, (u64) for_node->var);
-
     AstLocal* var = for_node->var;
-
+    u64 tmp = bh_imap_get(&mod->local_map, (u64) var);
+    b32 it_is_local = (b32) ((tmp & LOCAL_IS_WASM) != 0);
+    u32 it_idx = (u32) (tmp & ~LOCAL_IS_WASM);
     u64 offset = 0;
-    compile_local_location(mod, &code, var, &offset);
-    compile_expression(mod, &code, for_node->start);
-    compile_store_instruction(mod, &code, var->type, type_get_alignment_log2(var->type), offset);
-    //WID(WI_LOCAL_SET, it_idx);
+
+    if (it_is_local) {
+        compile_expression(mod, &code, for_node->start);
+        WID(WI_LOCAL_SET, it_idx);
+    } else {
+        compile_local_location(mod, &code, var, &offset);
+        compile_expression(mod, &code, for_node->start);
+        compile_store_instruction(mod, &code, var->type, type_get_alignment_log2(var->type), offset);
+    }
 
     WID(WI_BLOCK_START, 0x40);
     WID(WI_LOOP_START, 0x40);
@@ -574,10 +586,13 @@ COMPILE_FUNC(for, AstFor* for_node) {
     bh_arr_push(mod->structured_jump_target, 1);
     bh_arr_push(mod->structured_jump_target, 2);
 
-    offset = 0;
-    compile_local_location(mod, &code, var, &offset);
-    compile_load_instruction(mod, &code, var->type, offset);
-    // WID(WI_LOCAL_GET, it_idx);
+    if (it_is_local) {
+        WID(WI_LOCAL_GET, it_idx);
+    } else {
+        offset = 0;
+        compile_local_location(mod, &code, var, &offset);
+        compile_load_instruction(mod, &code, var->type, offset);
+    }
     compile_expression(mod, &code, for_node->end);
     WI(WI_I32_GE_S);
     WID(WI_COND_JUMP, 0x01);
@@ -586,19 +601,27 @@ COMPILE_FUNC(for, AstFor* for_node) {
         compile_statement(mod, &code, stmt);
     }
 
-    offset = 0;
-    compile_local_location(mod, &code, var, &offset);
-    offset = 0;
-    compile_local_location(mod, &code, var, &offset);
-    compile_load_instruction(mod, &code, var->type, offset);
-    if (for_node->step == NULL)
-        WID(WI_I32_CONST, 0x01);
-    else
-        compile_expression(mod, &code, for_node->step);
-    // WID(WI_LOCAL_GET, it_idx);
-    WI(WI_I32_ADD);
-    compile_store_instruction(mod, &code, var->type, type_get_alignment_log2(var->type), offset);
-    //WID(WI_LOCAL_SET, it_idx);
+    if (it_is_local) {
+        WID(WI_LOCAL_GET, it_idx);
+        if (for_node->step == NULL)
+            WID(WI_I32_CONST, 0x01);
+        else
+            compile_expression(mod, &code, for_node->step);
+        WI(WI_I32_ADD);
+        WID(WI_LOCAL_SET, it_idx);
+    } else {
+        offset = 0;
+        compile_local_location(mod, &code, var, &offset);
+        offset = 0;
+        compile_local_location(mod, &code, var, &offset);
+        compile_load_instruction(mod, &code, var->type, offset);
+        if (for_node->step == NULL)
+            WID(WI_I32_CONST, 0x01);
+        else
+            compile_expression(mod, &code, for_node->step);
+        WI(WI_I32_ADD);
+        compile_store_instruction(mod, &code, var->type, type_get_alignment_log2(var->type), offset);
+    }
 
     compile_deferred_stmts(mod, &code, (AstNode *) for_node);
 
@@ -939,9 +962,21 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Local: {
-            u64 offset = 0;
-            compile_local_location(mod, &code, (AstLocal *) expr, &offset);
-            compile_load_instruction(mod, &code, expr->type, offset);
+            u64 tmp = bh_imap_get(&mod->local_map, (u64) expr);
+            if (tmp & LOCAL_IS_WASM) {
+                WID(WI_LOCAL_GET, (u32) (tmp & ~LOCAL_IS_WASM));
+            } else {
+                u64 offset = 0;
+                compile_local_location(mod, &code, (AstLocal *) expr, &offset);
+
+                if (expr->type->kind != Type_Kind_Array) {
+                    compile_load_instruction(mod, &code, expr->type, offset);
+                } else {
+                    WID(WI_I32_CONST, offset);
+                    WI(WI_I32_ADD);
+                }
+            }
+            
             break;
         }
 
@@ -1256,7 +1291,8 @@ COMPILE_FUNC(return, AstReturn* ret) {
         } 
     }
 
-    compile_stack_leave(mod, &code, 0);
+    if (mod->has_stack_locals)
+        compile_stack_leave(mod, &code, 0);
 
     WI(WI_RETURN);
 
@@ -1386,6 +1422,13 @@ static inline b32 should_compile_function(AstFunction* fd) {
     return 1;
 }
 
+static b32 local_is_wasm_local(AstLocal* local) {
+    if (local->flags & Ast_Flag_Address_Taken) return 1;
+    if (local->type->kind == Type_Kind_Basic) return 1;
+    if (local->type->kind == Type_Kind_Pointer) return 1;
+    return 0;
+}
+
 static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (!should_compile_function(fd)) return;
 
@@ -1433,31 +1476,37 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     // If there is no body then don't process the code
     if (fd->body != NULL) {
-        // // NOTE: Generate the local map
-        i32 localidx = 0;
+        // NOTE: Generate the local map
+        u64 localidx = 0;
         for (AstLocal *param = fd->params; param != NULL; param = (AstLocal *) param->next) {
-            bh_imap_put(&mod->local_map, (u64) param, localidx++);
+            bh_imap_put(&mod->local_map, (u64) param, localidx++ | LOCAL_IS_WASM);
         }
 
-        // static const WasmType local_types[4] = { WASM_TYPE_INT32, WASM_TYPE_INT64, WASM_TYPE_FLOAT32, WASM_TYPE_FLOAT64 };
+        static const WasmType local_types[4] = { WASM_TYPE_INT32, WASM_TYPE_INT64, WASM_TYPE_FLOAT32, WASM_TYPE_FLOAT64 };
 
-        // // HACK: This assumes that the order of the count members
-        // // is the same as the order of the local_types above
-        // u8* count = &wasm_func.locals.i32_count;
-        // fori (ti, 0, 3) {
-        //     bh_arr_each(AstLocal *, local, fd->locals) {
-        //         if (onyx_type_to_wasm_type((*local)->type) == local_types[ti]) {
-        //             bh_imap_put(&mod->local_map, (u64) *local, localidx++);
+        // HACK: This assumes that the order of the count members
+        // is the same as the order of the local_types above
+        u8* count = &wasm_func.locals.i32_count;
+        fori (ti, 0, 3) {
+            bh_arr_each(AstLocal *, local, fd->locals) {
+                if (!local_is_wasm_local(*local)) continue;
 
-        //             (*count)++;
-        //         }
-        //     }
+                if (onyx_type_to_wasm_type((*local)->type) == local_types[ti]) {
+                    bh_imap_put(&mod->local_map, (u64) *local, localidx++ | LOCAL_IS_WASM);
 
-        //     count++;
-        // }
+                    (*count)++;
+                }
+            }
 
-        i32 offset = 0;
+            count++;
+        }
+
+        b32 has_stack_locals = 0;
+        u64 offset = 0;
         bh_arr_each(AstLocal *, local, fd->locals) {
+            if (local_is_wasm_local(*local)) continue;
+
+            has_stack_locals = 1;
             u32 size  = type_size_of((*local)->type);
             u32 align = type_alignment_of((*local)->type);
             if (offset % align != 0)
@@ -1471,9 +1520,14 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
             offset += 16 - (offset % 16);
 
         // Generate code
-        compile_stack_enter(mod, &wasm_func.code, (u64) offset);
+        if (has_stack_locals)
+            compile_stack_enter(mod, &wasm_func.code, (u64) offset);
+
+        mod->has_stack_locals = has_stack_locals;
         compile_function_body(mod, &wasm_func.code, fd);
-        compile_stack_leave(mod, &wasm_func.code, 0);
+
+        if (has_stack_locals)
+            compile_stack_leave(mod, &wasm_func.code, 0);
     }
 
     bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));

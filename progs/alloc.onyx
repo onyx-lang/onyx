@@ -2,6 +2,7 @@ package memory
 
 use "progs/intrinsics"
 
+use package printing { print }
 use package intrinsics {
     memory_size, memory_grow
 }
@@ -15,12 +16,12 @@ AllocAction :: enum {
     Resize;
 }
 
+alloc_proc :: #type proc (rawptr, AllocAction, u32, u32, rawptr) -> rawptr;
+
 Allocator :: struct {
     data: rawptr;
     func: alloc_proc; 
 }
-
-alloc_proc :: #type proc (rawptr, AllocAction, u32, u32, rawptr) -> rawptr;
 
 alloc :: proc (use a: ^Allocator, size: u32) -> rawptr {
     return func(data, AllocAction.Alloc, size, 16, null);
