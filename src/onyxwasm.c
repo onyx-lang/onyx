@@ -976,7 +976,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                     WI(WI_I32_ADD);
                 }
             }
-            
+
             break;
         }
 
@@ -1034,8 +1034,10 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                 case Ast_Kind_Local: {
                     u64 offset = 0;
                     compile_local_location(mod, &code, (AstLocal *) aof->expr, &offset);
-                    WID(WI_I32_CONST, offset);
-                    WI(WI_I32_ADD);
+                    if (offset != 0) {
+                        WID(WI_I32_CONST, offset);
+                        WI(WI_I32_ADD);
+                    }
                     break;
                 }
 
@@ -1423,7 +1425,7 @@ static inline b32 should_compile_function(AstFunction* fd) {
 }
 
 static b32 local_is_wasm_local(AstLocal* local) {
-    if (local->flags & Ast_Flag_Address_Taken) return 1;
+    if (local->flags & Ast_Flag_Address_Taken) return 0;
     if (local->type->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Pointer) return 1;
     return 0;

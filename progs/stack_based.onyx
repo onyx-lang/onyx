@@ -8,6 +8,8 @@ use package memory
 
 ret_val :: proc (x: i32, y: i32) -> i32 {
     big_arr : [128] i32;
+    big_arr[0] = 1234;
+    big_arr[1] = 1234;
     big_arr[127] = 1234;
     return big_arr[127] + x + y;
 }
@@ -22,7 +24,10 @@ sumN :: proc (x: [N] i32) -> i32 {
 
 summing :: proc (x: ^i32) -> i32 {
     s := 0;
-    for i: 0, N do s += x[i];
+    for i: 0, N {
+        tmp :: ^i;
+        s += x[i];
+    }
     return s;
 }
 
