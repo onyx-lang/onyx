@@ -136,8 +136,8 @@ typedef enum AstFlags {
     Ast_Flag_Private_Package   = BH_BIT(4),
 
     // Global flags
-    Ast_Flag_Global_Stack_Top  = BH_BIT(8),
-    Ast_Flag_Global_Stack_Base = BH_BIT(9),
+    Ast_Flag_Global_Stack_Top  = BH_BIT(30),
+    Ast_Flag_Global_Stack_Base = BH_BIT(31),
 
     // Function flags
     Ast_Flag_Inline            = BH_BIT(8),

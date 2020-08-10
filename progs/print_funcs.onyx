@@ -32,7 +32,7 @@ print_str_by_byte :: proc (str: ^u8) {
     c := str;
     while *c != cast(u8) 0 {
         print(cast(i32) (*c));
-        c = cast(^u8) (cast(i32) c + 1);
+        c += 1;
     }
 }
 
@@ -42,41 +42,68 @@ print_str_len :: proc (str: [] u8, len: i32) {
     for i: 0, len do print(cast(i32) str[i]);
 }
 
-print_u64 :: proc (n_: u64) {
+print_u64_with_base :: proc (n_: u64, base: u64) {
     n := n_;
     str: [128] u8;
+    for i: 0, 128 do str[i] = cast(u8) 0;
+
     c := cast(^u8) ^str[127];
     *c = cast(u8) 0;
     c -= 1;
 
-    if n == cast(u64) 0 {
+    if n == 0l {
         *c = cast(u8) 0x30;
         c -= 1;
     } else {
-        while n > cast(u64) 0 {
-            m :: n % cast(u64) 10;
+        while n > 0l {
+            m :: n % base;
 
             ch := cast(u8) 0;
-            if m == cast(u64) 0 do ch = cast(u8) 0x30;
-            if m == cast(u64) 1 do ch = cast(u8) 0x31;
-            if m == cast(u64) 2 do ch = cast(u8) 0x32;
-            if m == cast(u64) 3 do ch = cast(u8) 0x33;
-            if m == cast(u64) 4 do ch = cast(u8) 0x34;
-            if m == cast(u64) 5 do ch = cast(u8) 0x35;
-            if m == cast(u64) 6 do ch = cast(u8) 0x36;
-            if m == cast(u64) 7 do ch = cast(u8) 0x37;
-            if m == cast(u64) 8 do ch = cast(u8) 0x38;
-            if m == cast(u64) 9 do ch = cast(u8) 0x39;
+            if m == 0l do ch = cast(u8) 0x30;
+            if m == 1l do ch = cast(u8) 0x31;
+            if m == 2l do ch = cast(u8) 0x32;
+            if m == 3l do ch = cast(u8) 0x33;
+            if m == 4l do ch = cast(u8) 0x34;
+            if m == 5l do ch = cast(u8) 0x35;
+            if m == 6l do ch = cast(u8) 0x36;
+            if m == 7l do ch = cast(u8) 0x37;
+            if m == 8l do ch = cast(u8) 0x38;
+            if m == 9l do ch = cast(u8) 0x39;
+            if m == 10l do ch = cast(u8) 0x41;
+            if m == 11l do ch = cast(u8) 0x42;
+            if m == 12l do ch = cast(u8) 0x43;
+            if m == 13l do ch = cast(u8) 0x44;
+            if m == 14l do ch = cast(u8) 0x45;
+            if m == 15l do ch = cast(u8) 0x46;
 
             *c = ch;
             c -= 1;
 
-            n /= cast(u64) 10;
+            n /= base;
         }
+    }
+
+    if base == 16l {
+        *c = cast(u8) 0x78;
+        c -= 1;
+        *c = cast(u8) 0x30;
+        c -= 1;
+    }
+
+    if base == 2l {
+        *c = cast(u8) 0x62;
+        c -= 1;
+        *c = cast(u8) 0x30;
+        c -= 1;
     }
 
     print(c + 1);
 }
+
+print_u64 :: proc (n: u64) do print_u64_with_base(n, 10l);
+print_hex :: proc (n: u64) do print_u64_with_base(n, 16l);
+print_bin :: proc (n: u64) do print_u64_with_base(n, 2l);
+print_ptr :: proc (p: rawptr) do print_hex(cast(u64) p);
 
 print :: proc #overloaded {
     print_bool,

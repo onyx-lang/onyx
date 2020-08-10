@@ -47,7 +47,11 @@ vec_add :: proc (v: Vec3, u: Vec3, use out: ^Vec3) {
 start :: proc #export {
     heap_init();
     print("Hello, World!");
-    print(cast(i32) __heap_start);
+    print_ptr(__heap_start);
+    print_ptr(__stack_base);
+    print_ptr(__stack_top);
+    print_bin(42l);
+    print_hex(42l);
 
     a := 12345;
 
@@ -88,4 +92,5 @@ start :: proc #export {
         soa.y[i] = i * i;
     }
     print(soa.y[3]);
+    print_ptr(^soa.y[3]);
 }
