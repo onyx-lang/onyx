@@ -24,10 +24,7 @@ sumN :: proc (x: [N] i32) -> i32 {
 
 summing :: proc (x: ^i32) -> i32 {
     s := 0;
-    for i: 0, N {
-        tmp :: ^i;
-        s += x[i];
-    }
+    for i: 0, N do s += x[i];
     return s;
 }
 
@@ -41,32 +38,54 @@ mag_squared :: proc (v: Vec3) -> i32 {
     return v.x * v.x + v.y * v.y + v.z * v.z;
 }
 
-stuff :: #file_contents "Makefile"
+vec_add :: proc (v: Vec3, u: Vec3, use out: ^Vec3) {
+    x = v.x + u.x;
+    y = v.y + u.y;
+    z = v.z + u.z;
+}
 
-main :: proc #export {
+start :: proc #export {
     heap_init();
     print("Hello, World!");
     print(cast(i32) __heap_start);
 
     a := 12345;
 
-    arr: [N] i32;
-    arr[0] = 10;
-    arr[1] = 20;
-    arr[2] = 30;
-    arr[3] = 40;
-    arr[4] = 50;
-    arr[9] = 123;
-    print(sumN(arr));
-    print(summing(cast(^i32) arr));
+    arr: [N][N] i32;
+    arr[1][0] = 10;
+    arr[1][1] = 20;
+    arr[1][2] = 30;
+    arr[1][3] = 40;
+    arr[1][4] = 50;
+    arr[1][9] = 123;
+    print(sumN(arr[1]));
+    print(summing(cast(^i32) arr[1]));
 
-    v: Vec3;
-    v.x = 2;
-    v.y = 4;
-    v.z = 10;
-    print(mag_squared(v));
+    v1: Vec3;
+    v1.x = 2;
+    v1.y = 4;
+    v1.z = 10;
+
+    v2: Vec3;
+    v2.x = 4;
+    v2.y = 2;
+    v2.z = 1;
+
+    v3: Vec3;
+    vec_add(v1, v2, ^v3);
+    print(v3.x);
+    print(v3.y);
+    print(v3.z);
+    print(mag_squared(v3));
 
     print(ret_val(10, 4));
     
-    for i: 0, N do print(arr[i]);
+    for i: 0, N do print(arr[1][i]);
+
+    soa: struct { x: [5] i32; y: [5] i32; };
+    for i: 0, 5 {
+        soa.x[i] = i;
+        soa.y[i] = i * i;
+    }
+    print(soa.y[3]);
 }

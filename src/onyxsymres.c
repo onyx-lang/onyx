@@ -297,7 +297,7 @@ static void symres_for(AstFor* fornode) {
 
     symres_expression(&fornode->start);
     symres_expression(&fornode->end);
-    if (fornode->step) symres_expression(&fornode->step);
+    symres_expression(&fornode->step);
 
     symres_block(fornode->stmt);
 

@@ -101,22 +101,39 @@ inline i64 chars_match(char* ptr1, char* ptr2) {
 
 static inline u64 log2_dumb(u64 n) {
     switch (n) {
-    case 1:    return 0;
-    case 2:    return 1;
-    case 4:    return 2;
-    case 8:    return 3;
-    case 16:   return 4;
-    case 32:   return 5;
-    case 64:   return 6;
-    case 128:  return 7;
-    case 256:  return 8;
-    case 512:  return 9;
-    case 1024: return 10;
-    case 2048: return 11;
-    case 4096: return 12;
-    case 8192: return 13;
+    case 1 << 0:  return 0;
+    case 1 << 1:  return 1;
+    case 1 << 2:  return 2;
+    case 1 << 3:  return 3;
+    case 1 << 4:  return 4;
+    case 1 << 5:  return 5;
+    case 1 << 6:  return 6;
+    case 1 << 7:  return 7;
+    case 1 << 8:  return 8;
+    case 1 << 9:  return 9;
+    case 1 << 10: return 10;
+    case 1 << 11: return 11;
+    case 1 << 12: return 12;
+    case 1 << 13: return 13;
+    case 1 << 14: return 14;
+    case 1 << 15: return 15;
+    case 1 << 16: return 16;
+    case 1 << 17: return 17;
+    case 1 << 18: return 18;
+    case 1 << 19: return 19;
+    case 1 << 20: return 20;
+    case 1 << 21: return 21;
+    case 1 << 22: return 22;
+    case 1 << 23: return 23;
+    case 1 << 24: return 24;
+    case 1 << 25: return 25;
+    case 1 << 26: return 26;
+    case 1 << 27: return 27;
+    case 1 << 28: return 28;
+    case 1 << 29: return 29;
+    case 1 << 30: return 30;
+    case 1 << 31: return 31;
 
-    // Don't need all of them right now
     default:   return 0;
     }
 }
@@ -256,6 +273,17 @@ void bh_scratch_free(bh_scratch* scratch);
 bh_allocator bh_scratch_allocator(bh_scratch* scratch);
 BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 
+
+
+
+
+
+
+//-------------------------------------------------------------------------------------
+// Allocator based string functions
+//-------------------------------------------------------------------------------------
+
+char* bh_strdup(bh_allocator a, char* str);
 
 
 
@@ -1169,9 +1197,19 @@ u8* double_to_ieee754(f64 f, b32 reverse) {
 
 
 
+//-------------------------------------------------------------------------------------
+// STRING IMPLEMENTATION
+//-------------------------------------------------------------------------------------
+char* bh_strdup(bh_allocator a, char* str) {
+    u32 len = strlen(str);
+    char* buf = bh_alloc(a, len + 1);
 
+    char* t = buf;
+    while (*t++ = *str++);
 
-
+    *t = 0;
+    return buf;
+}
 
 
 
@@ -1336,7 +1374,7 @@ i64 bh_file_size(bh_file* file) {
 bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file) {
     bh_file_contents fc = {
         .allocator = alloc,
-        .filename  = file->filename,
+        .filename  = bh_strdup(alloc, (char *) file->filename),
         .length = 0, .data = NULL
     };
 

@@ -5,7 +5,7 @@ use package memory
 use package printing
 
 deferred_example :: proc -> i32 {
-    arr := cast([] i64) malloc(sizeof [8] i64);
+    arr := cast(^i64) malloc(sizeof [8] i64);
     if cast(rawptr) arr == null do return 0;
     defer mfree(arr);
 
@@ -13,23 +13,23 @@ deferred_example :: proc -> i32 {
 
     walker := cast(^i64) arr;
     for _: 0, 8 {
-        print(*walker);
+        print_u64(cast(i64) *walker);
         walker += 1;
     }
 
     return cast(i32) (arr[1] + arr[7]);
 }
 
-proc #export "main" {
+proc #export "start" {
     print(#file_contents "progs/filetest");
     heap_init();
 
     print(deferred_example());
 
-    first := cast([] i32) malloc(sizeof [4] i32);
+    first: [4] i32;
     for i: 0, 4 do first[i] = i * 2;
 
-    second := cast([] f32) malloc(sizeof [24] f32);
+    second := cast(^f32) malloc(sizeof [24] f32);
     for i: 0, 24 do second[i] = cast(f32) i;
 
     print(cast(u32) first);
@@ -48,7 +48,7 @@ proc #export "main" {
 
     mfree(second);
 
-    fourth := cast([] i32) malloc(sizeof [128]i32);
+    fourth := cast(^i32) malloc(sizeof [128]i32);
     print(cast(u32) fourth);
 
     fifth := cast(^i32) malloc(sizeof i32);

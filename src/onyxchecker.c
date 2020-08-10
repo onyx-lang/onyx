@@ -87,33 +87,45 @@ CHECK(while, AstWhile* whilenode) {
 CHECK(for, AstFor* fornode) {
     if (check_expression(&fornode->start)) return 1;
     if (check_expression(&fornode->end)) return 1;
-    if (fornode->step)
-        if (check_expression(&fornode->step)) return 1;
+    if (check_expression(&fornode->step)) return 1;
 
+    fornode->var->type_node = fornode->start->type_node;
     if (check_expression((AstTyped **) &fornode->var)) return 1;
 
-    // HACK
-    if (!types_are_compatible(fornode->start->type, &basic_types[Basic_Kind_I32])) {
+    if (!type_is_integer(fornode->start->type)) {
         onyx_message_add(Msg_Type_Literal,
                 fornode->start->token->pos,
-                "expected expression of type i32 for start");
+                "expected expression of integer type for start");
         return 1;
     }
 
-    if (!types_are_compatible(fornode->end->type, &basic_types[Basic_Kind_I32])) {
+    if (!type_is_integer(fornode->end->type)) {
         onyx_message_add(Msg_Type_Literal,
                 fornode->end->token->pos,
-                "expected expression of type i32 for end");
+                "expected expression of integer type for end");
         return 1;
     }
 
-    if (fornode->step)
-        if (!types_are_compatible(fornode->step->type, &basic_types[Basic_Kind_I32])) {
-            onyx_message_add(Msg_Type_Literal,
-                    fornode->start->token->pos,
-                    "expected expression of type i32 for step");
-            return 1;
-        }
+    if (!type_is_integer(fornode->step->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                fornode->step->token->pos,
+                "expected expression of integer type for step");
+        return 1;
+    }
+
+    if (!types_are_compatible(fornode->end->type, fornode->start->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                fornode->end->token->pos,
+                "type of end does not match type of start");
+        return 1;
+    }
+
+    if (!types_are_compatible(fornode->step->type, fornode->start->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                fornode->start->token->pos,
+                "type of step does not match type of start");
+        return 1;
+    }
 
 
     if (check_block(fornode->stmt)) return 1;

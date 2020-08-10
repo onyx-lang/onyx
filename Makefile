@@ -1,4 +1,4 @@
-RELEASE=0
+RELEASE=1
 
 OBJ_FILES=\
 	build/onyxlex.o \

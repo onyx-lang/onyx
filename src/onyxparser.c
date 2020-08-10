@@ -612,6 +612,10 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     if (parser->curr->type == ',') {
         consume_token(parser);
         for_node->step = parse_expression(parser);
+    } else {
+        for_node->step = make_node(AstNumLit, Ast_Kind_NumLit);
+        for_node->step->type_node = (AstType *) &basic_type_i32;
+        ((AstNumLit *) for_node->step)->value.i = 1;
     }
 
     for_node->stmt = parse_block(parser);

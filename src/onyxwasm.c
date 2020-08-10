@@ -580,6 +580,11 @@ COMPILE_FUNC(for, AstFor* for_node) {
     u32 it_idx = (u32) (tmp & ~LOCAL_IS_WASM);
     u64 offset = 0;
 
+    WasmType var_type = onyx_type_to_wasm_type(for_node->var->type);
+    assert(var_type == WASM_TYPE_INT32 || var_type == WASM_TYPE_INT64);
+    WasmInstructionType add_instr = var_type == WASM_TYPE_INT32 ? WI_I32_ADD  : WI_I64_ADD;
+    WasmInstructionType ge_instr  = var_type == WASM_TYPE_INT32 ? WI_I32_GE_S : WI_I64_GE_S;
+
     if (it_is_local) {
         compile_expression(mod, &code, for_node->start);
         WID(WI_LOCAL_SET, it_idx);
@@ -603,7 +608,7 @@ COMPILE_FUNC(for, AstFor* for_node) {
         compile_load_instruction(mod, &code, var->type, offset);
     }
     compile_expression(mod, &code, for_node->end);
-    WI(WI_I32_GE_S);
+    WI(ge_instr);
     WID(WI_COND_JUMP, 0x01);
 
     forll (AstNode, stmt, for_node->stmt->body, next) {
@@ -612,11 +617,8 @@ COMPILE_FUNC(for, AstFor* for_node) {
 
     if (it_is_local) {
         WID(WI_LOCAL_GET, it_idx);
-        if (for_node->step == NULL)
-            WID(WI_I32_CONST, 0x01);
-        else
-            compile_expression(mod, &code, for_node->step);
-        WI(WI_I32_ADD);
+        compile_expression(mod, &code, for_node->step);
+        WI(add_instr);
         WID(WI_LOCAL_SET, it_idx);
     } else {
         offset = 0;
@@ -624,11 +626,8 @@ COMPILE_FUNC(for, AstFor* for_node) {
         offset = 0;
         compile_local_location(mod, &code, var, &offset);
         compile_load_instruction(mod, &code, var->type, offset);
-        if (for_node->step == NULL)
-            WID(WI_I32_CONST, 0x01);
-        else
-            compile_expression(mod, &code, for_node->step);
-        WI(WI_I32_ADD);
+        compile_expression(mod, &code, for_node->step);
+        WI(add_instr);
         compile_store_instruction(mod, &code, var->type, type_get_alignment_log2(var->type), offset);
     }
 
@@ -980,7 +979,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
                 if (expr->type->kind != Type_Kind_Array) {
                     compile_load_instruction(mod, &code, expr->type, offset);
-                } else {
+                } else if (offset != 0) {
                     WID(WI_I32_CONST, offset);
                     WI(WI_I32_ADD);
                 }

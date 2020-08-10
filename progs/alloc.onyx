@@ -39,12 +39,14 @@ free :: proc (use a: ^Allocator, ptr: rawptr) {
 
 heap_allocator : Allocator;
 
+#private
 heap_state : struct {
     free_list       : ^heap_block;
     next_alloc      : rawptr;
     remaining_space : u32;
 }
 
+#private
 heap_block :: struct {
     size : u32;
     next : ^heap_block;
@@ -59,6 +61,7 @@ heap_init :: proc {
     heap_allocator.func = heap_alloc_proc;
 }
 
+#private
 heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
     if size_ == 0 do return null;
 
@@ -109,6 +112,7 @@ heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
     return cast(rawptr) (cast(u32) ret + sizeof heap_block);
 }
 
+#private
 heap_free :: proc (ptr: rawptr) {
     hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
 
@@ -119,6 +123,7 @@ heap_free :: proc (ptr: rawptr) {
     heap_state.free_list = hb_ptr;
 }
 
+#private
 heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     if aa == AllocAction.Alloc do return heap_alloc(size, align);
     if aa == AllocAction.Free {
@@ -129,10 +134,5 @@ heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, o
     return null;
 }
 
-malloc :: proc (size: u32) -> rawptr {
-    return alloc(^heap_allocator, size);
-}
-
-mfree :: proc (ptr: rawptr) {
-    free(^heap_allocator, ptr);
-}
+malloc :: proc (size: u32) -> rawptr do return alloc(^heap_allocator, size);
+mfree  :: proc (ptr: rawptr) do free(^heap_allocator, ptr);

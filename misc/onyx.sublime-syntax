@@ -33,7 +33,7 @@ contexts:
       scope: constant.boolean.onyx
 
     # Numbers
-    - match: '\b(-)?[0-9.]+\b'
+    - match: '\b(-)?[0-9.]+(f|l)?\b'
       scope: constant.numeric.onyx
 
     - match: '\b0x[0-9A-Fa-f]+\b'

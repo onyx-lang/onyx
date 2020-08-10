@@ -148,18 +148,31 @@ HOW:
 
         [X] Be smart about when to use the stack versus use the wasm locals
 
-        [ ] Array literals
+        [ ] Better numeric literals
+            - suffix 'f' for float32
+            - no suffix 'f', but has decimal for float64
+            - suffix 'l' for int64
+            - nothing special for i32 or below
+
+        [ ] Char literals
 
         [ ] Properly checking binary operators
+            - Shouldn't be able to add two structs/arrays together
+
+        [ ] Array literals
 
         [ ] Better checking for casts
+            - Checking which things are allowed to cast to/from should be checked in the checker,
+                not in the wasm generatation
+
+        [ ] Start work on evaluating compile time known values.
+            - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
         [ ] All code paths return correct value
 
         [ ] #initialize structs
 
-        [ ] Start work on evaluating compile time known values.
-            - An expression marked COMPTIME will be reduced to its value in the parse tree.
+        [ ] Variadic arguments
 
         [ ] Switch statements
 
