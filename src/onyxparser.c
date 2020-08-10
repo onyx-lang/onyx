@@ -169,10 +169,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             negate_node->operation = Unary_Op_Negate;
             negate_node->expr = factor;
 
-            if ((factor->flags & Ast_Flag_Comptime) != 0) {
-                negate_node->flags |= Ast_Flag_Comptime;
-            }
-
             retval = (AstTyped *) negate_node;
             break;
         }
@@ -182,10 +178,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             not_node->operation = Unary_Op_Not;
             not_node->token = expect_token(parser, '!');
             not_node->expr = parse_factor(parser);
-
-            if ((not_node->expr->flags & Ast_Flag_Comptime) != 0) {
-                not_node->flags |= Ast_Flag_Comptime;
-            }
 
             retval = (AstTyped *) not_node;
             break;
@@ -572,10 +564,6 @@ static AstTyped* parse_expression(OnyxParser* parser) {
 
             right = parse_factor(parser);
             bin_op->right = right;
-
-            if ((left->flags & Ast_Flag_Comptime) != 0 && (right->flags & Ast_Flag_Comptime) != 0) {
-                bin_op->flags |= Ast_Flag_Comptime;
-            }
         }
     }
 
@@ -1460,16 +1448,21 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                 return (AstNode *) binding;
             } else {
-                if (parser->curr->type == '=') {
-                    onyx_message_add(Msg_Type_Literal,
-                            parser->curr->pos,
-                            "assigning initial values to memory reservations isn't allowed yet.");
-                    break;
-                }
-
                 AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
                 memres->token = symbol;
-                memres->type_node = parse_type(parser);
+
+                if (parser->curr->type == '=') {
+                    consume_token(parser);
+                    memres->initial_value = parse_expression(parser);
+
+                } else {
+                    memres->type_node = parse_type(parser);
+
+                    if (parser->curr->type == '=') {
+                        consume_token(parser);
+                        memres->initial_value = parse_expression(parser);
+                    }
+                }
 
                 if (is_private)
                     memres->flags |= Ast_Flag_Private_Package;

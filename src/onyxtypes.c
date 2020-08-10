@@ -483,6 +483,11 @@ b32 type_is_numeric(Type* type) {
     return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_F64;
 }
 
+b32 type_is_compound(Type* type) {
+    return type->kind == Type_Kind_Array
+        || type->kind == Type_Kind_Struct;
+}
+
 b32 type_results_in_void(Type* type) {
     return (type == NULL)
         || (type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Void)

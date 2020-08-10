@@ -495,11 +495,26 @@ static void symres_enum(AstEnumType* enum_node) {
 
 static void symres_memres(AstMemRes** memres) {
     (*memres)->type_node = symres_type((*memres)->type_node);
-    if ((*memres)->type_node == NULL) return;
+    if ((*memres)->initial_value != NULL) {
+        symres_expression(&(*memres)->initial_value);
+
+        if (((*memres)->initial_value->flags & Ast_Flag_Comptime) == 0) {
+            onyx_message_add(Msg_Type_Literal,
+                    (*memres)->initial_value->token->pos,
+                    "top level expressions must be compile time known");
+            return;
+        }
+
+        if ((*memres)->type_node == NULL)
+            (*memres)->type_node = (*memres)->initial_value->type_node;
+
+    } else {
+        if ((*memres)->type_node == NULL) return;
+    }
 
     (*memres)->type = type_build_from_ast(semstate.allocator, (*memres)->type_node);
 
-    if ((*memres)->type->kind != Type_Kind_Array && (*memres)->type->kind != Type_Kind_Struct) {
+    if (!type_is_compound((*memres)->type)) {
         Type* ptr_type = type_make_pointer(semstate.allocator, (*memres)->type);
         (*memres)->type = ptr_type;
 

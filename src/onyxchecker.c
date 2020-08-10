@@ -26,6 +26,7 @@ CHECK(function, AstFunction* func);
 CHECK(overloaded_function, AstOverloadedFunction* func);
 CHECK(struct, AstStructType* s_node);
 CHECK(function_header, AstFunction* func);
+CHECK(memres, AstMemRes* memres);
 
 static inline void fill_in_type(AstTyped* node) {
     if (node->type == NULL)
@@ -1071,6 +1072,27 @@ CHECK(function_header, AstFunction* func) {
     return 0;
 }
 
+CHECK(memres, AstMemRes* memres) {
+    fill_in_type((AstTyped *) memres);
+
+    if (memres->initial_value != NULL) {
+        fill_in_type(memres->initial_value);
+
+        Type* memres_type = memres->type;
+        if (!type_is_compound(memres_type)) memres_type = memres_type->Pointer.elem;
+
+        if (!types_are_compatible(memres_type, memres->initial_value->type)) {
+            onyx_message_add(Msg_Type_Binop_Mismatch,
+                    memres->token->pos,
+                    type_get_name(memres_type),
+                    type_get_name(memres->initial_value->type));
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
 CHECK(node, AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -1119,6 +1141,10 @@ void onyx_type_check() {
                     if (check_struct((AstStructType *) entity->type_alias)) return;
                 break;
 
+            case Entity_Type_Memory_Reservation:
+                if (check_memres(entity->mem_res)) return;
+                break;
+
             case Entity_Type_Enum: break;
 
             case Entity_Type_String_Literal: break;
@@ -1128,8 +1154,6 @@ void onyx_type_check() {
             case Entity_Type_Global_Header: break;
 
             case Entity_Type_Use_Package: break;
-
-            case Entity_Type_Memory_Reservation: break;
 
             default: DEBUG_HERE; break;
         }

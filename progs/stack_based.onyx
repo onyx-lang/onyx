@@ -44,9 +44,12 @@ vec_add :: proc (v: Vec3, u: Vec3, use out: ^Vec3) {
     z = v.z + u.z;
 }
 
+some_value := #char "A";
+
 start :: proc #export {
     heap_init();
     print("Hello, World!");
+    print_hex(cast(u64) some_value);
     print("Hello, World!");
     print_ptr(__heap_start);
     print_ptr(__stack_base);
@@ -54,9 +57,7 @@ start :: proc #export {
     print_bin(42l);
     print_hex(42l);
 
-    for i: #char "a", #char "f" {
-        print_hex(cast(u64) i);
-    }
+    for i: #char "a", #char "f" do print_hex(cast(u64) i);
 
     a := 12345;
 

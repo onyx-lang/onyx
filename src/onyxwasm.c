@@ -1645,25 +1645,72 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     bh_arr_push(mod->data, datum);
 }
 
+static void compile_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
+    switch (node->kind) {
+    case Ast_Kind_NumLit: {
+        switch (node->type->Basic.kind) {
+        case Basic_Kind_Bool:
+        case Basic_Kind_I8:
+        case Basic_Kind_U8:
+        case Basic_Kind_I16:
+        case Basic_Kind_U16:
+        case Basic_Kind_I32:
+        case Basic_Kind_U32:
+        case Basic_Kind_Rawptr:
+            *((i32 *) data) = ((AstNumLit *) node)->value.i;
+            return;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64:
+            *((i64 *) data) = ((AstNumLit *) node)->value.l;
+            return;
+
+        case Basic_Kind_F32:
+            *((f32 *) data) = ((AstNumLit *) node)->value.f;
+            return;
+
+        case Basic_Kind_F64:
+            *((f64 *) data) = ((AstNumLit *) node)->value.d;
+            return;
+
+        default: break;
+        }
+
+        //fallthrough
+    }
+    default: onyx_message_add(Msg_Type_Literal,
+            node->token->pos,
+            "invalid data");
+    }
+}
+
 static void compile_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
-    u64 alignment = type_alignment_of(memres->type);
-    u64 size = type_size_of(memres->type);
+    Type* effective_type = memres->type;
+    if (!type_is_compound(effective_type)) effective_type = effective_type->Pointer.elem;
+
+    u64 alignment = type_alignment_of(effective_type);
+    u64 size = type_size_of(effective_type);
 
     u32 offset = mod->next_datum_offset;
     if (offset % alignment != 0) {
         offset += alignment - (offset % alignment);
     }
 
-    // WasmDatum datum = {
-    //     .offset = offset,
-    //     .length = size,
-    //     .data = NULL
-    // };
+    if (memres->initial_value != NULL) {
+        u8* data = bh_alloc(mod->allocator, size);
+        compile_raw_data(mod, data, memres->initial_value);
+
+        WasmDatum datum = {
+            .offset = offset,
+            .length = size,
+            .data = data,
+        };
+
+        bh_arr_push(mod->data, datum);
+    }
 
     memres->addr = offset;
     mod->next_datum_offset = offset + size;
-
-    // bh_arr_push(mod->data, datum);
 }
 
 static void compile_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
