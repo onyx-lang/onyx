@@ -11,9 +11,9 @@ deferred_example :: proc -> i32 {
 
     for i: 0, 8 do arr[i] = cast(i64) (i * i);
 
-    walker := cast(^i64) arr;
+    walker := arr;
     for _: 0, 8 {
-        print_u64(cast(i64) *walker);
+        print_u64(*walker);
         walker += 1;
     }
 

@@ -156,7 +156,7 @@ HOW:
 
         [X] Char literals
 
-        [ ] Properly checking binary operators
+        [X] Properly checking binary operators
             - Shouldn't be able to add two structs/arrays together
 
         [ ] Array literals

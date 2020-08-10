@@ -504,6 +504,20 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         || binop->operation == Binary_Op_Bool_Or)
         return check_binaryop_bool(binop);
 
+    if (!type_is_numeric(binop->left->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "expected numeric type for left side of binary operator");
+        return 1;
+    }
+
+    if (!type_is_numeric(binop->right->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "expected numeric type for right side of binary operator");
+        return 1;
+    }
+
     if (type_is_pointer(binop->right->type)) {
         onyx_message_add(Msg_Type_Literal,
                 binop->token->pos,
