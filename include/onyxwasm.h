@@ -230,7 +230,7 @@ typedef enum WasmInstructionType {
 
 typedef union {
     struct {
-        u32 i1, i2;
+        i32 i1, i2;
     };
     i64 l;
     float f;

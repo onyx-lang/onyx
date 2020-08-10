@@ -2,6 +2,7 @@
 #include "onyxlex.h"
 #include "onyxastnodes.h"
 #include "onyxmsgs.h"
+#include "onyxparser.h"
 
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
@@ -179,9 +180,129 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     return res;
 }
 
+#define REDUCE_BINOP_ALL(op) \
+    if (type_is_small_integer(res->type) || type_is_bool(res->type)) { \
+        res->value.i = left->value.i op right->value.i; \
+    } else if (type_is_integer(res->type)) { \
+        res->value.l = left->value.l op right->value.l; \
+    } else if (res->type->Basic.kind == Basic_Kind_F32) { \
+        res->value.f = left->value.f op right->value.f; \
+    } else if (res->type->Basic.kind == Basic_Kind_F64) { \
+        res->value.d = left->value.d op right->value.d; \
+    } \
+    break;
+
+#define REDUCE_BINOP_INT(op) \
+    if (type_is_small_integer(res->type) || type_is_bool(res->type)) { \
+        res->value.i = left->value.i op right->value.i; \
+    } else if (type_is_integer(res->type)) { \
+        res->value.l = left->value.l op right->value.l; \
+    } \
+    break;
+
+#define REDUCE_BINOP_BOOL(op) \
+    if (type_is_bool(res->type)) { \
+        res->value.i = left->value.i op right->value.i; \
+    } \
+    break;
 
 
+AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 
+AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
+    AstNumLit* left =  (AstNumLit *) ast_reduce(a, node->left);
+    AstNumLit* right = (AstNumLit *) ast_reduce(a, node->right);
+
+    if (left->kind != Ast_Kind_NumLit || right->kind != Ast_Kind_NumLit) {
+        node->left  = (AstTyped *) left;
+        node->right = (AstTyped *) right;
+        return (AstNumLit *) node;
+    }
+
+    AstNumLit* res = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    res->token = node->token;
+    res->flags |= Ast_Flag_Comptime;
+    res->type_node = node->type_node;
+    res->type = node->type;
+
+    switch (node->operation) {
+    case Binary_Op_Add:           REDUCE_BINOP_ALL(+);
+    case Binary_Op_Minus:         REDUCE_BINOP_ALL(-);
+    case Binary_Op_Multiply:      REDUCE_BINOP_ALL(*);
+    case Binary_Op_Divide:        REDUCE_BINOP_ALL(/);
+    case Binary_Op_Modulus:       REDUCE_BINOP_INT(%);
+
+    case Binary_Op_Equal:         REDUCE_BINOP_ALL(==);
+    case Binary_Op_Not_Equal:     REDUCE_BINOP_ALL(!=);
+    case Binary_Op_Less:          REDUCE_BINOP_ALL(<);
+    case Binary_Op_Less_Equal:    REDUCE_BINOP_ALL(<=);
+    case Binary_Op_Greater:       REDUCE_BINOP_ALL(>);
+    case Binary_Op_Greater_Equal: REDUCE_BINOP_ALL(>=);
+
+    case Binary_Op_And:           REDUCE_BINOP_INT(&);
+    case Binary_Op_Or:            REDUCE_BINOP_INT(|);
+    case Binary_Op_Xor:           REDUCE_BINOP_INT(^);
+    case Binary_Op_Shl:           REDUCE_BINOP_INT(<<);
+    case Binary_Op_Shr:           REDUCE_BINOP_INT(>>);
+    case Binary_Op_Sar:           REDUCE_BINOP_INT(>>);
+
+    case Binary_Op_Bool_And:      REDUCE_BINOP_BOOL(&&);
+    case Binary_Op_Bool_Or:       REDUCE_BINOP_BOOL(||);
+
+    default: break;
+    }
+
+    return res;
+}
+
+#define REDUCE_UNOP(op) \
+    if (type_is_small_integer(unop->type) || type_is_bool(unop->type)) { \
+        res->value.i = op ((AstNumLit *) unop->expr)->value.i; \
+    } else if (type_is_integer(unop->type)) { \
+        res->value.l = op ((AstNumLit *) unop->expr)->value.l; \
+    } else if (unop->type->Basic.kind == Basic_Kind_F32) { \
+        res->value.f = op ((AstNumLit *) unop->expr)->value.f; \
+    } else if (unop->type->Basic.kind == Basic_Kind_F64) { \
+        res->value.d = op ((AstNumLit *) unop->expr)->value.d; \
+    } \
+    break;
+
+AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
+    unop->expr = ast_reduce(a, unop->expr);
+
+    if (unop->expr->kind != Ast_Kind_NumLit) {
+        return (AstTyped *) unop;
+    }
+
+    AstNumLit* res = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    res->token = unop->token;
+    res->flags |= Ast_Flag_Comptime;
+    res->type_node = unop->type_node;
+    res->type = unop->type;
+
+    switch (unop->operation) {
+        case Unary_Op_Negate: REDUCE_UNOP(-);
+        case Unary_Op_Not: {
+            if (type_is_bool(res->type)) res->value.i = ! ((AstNumLit *) unop->expr)->value.i;
+            break;
+        }
+
+        default: return (AstTyped *) unop;
+    }
+
+    return (AstTyped *) res;
+}
+
+AstTyped* ast_reduce(bh_allocator a, AstTyped* node) {
+    assert(node->flags & Ast_Flag_Comptime);
+
+    switch (node->kind) {
+        case Ast_Kind_Binary_Op: return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
+        case Ast_Kind_Unary_Op:  return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
+        case Ast_Kind_NumLit:    return node;
+        default:                 return NULL; 
+    }
+}
 
 void promote_numlit_to_larger(AstNumLit* num) {
     assert(num->type != NULL);

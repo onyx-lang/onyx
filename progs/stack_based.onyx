@@ -44,7 +44,7 @@ vec_add :: proc (v: Vec3, u: Vec3, use out: ^Vec3) {
     z = v.z + u.z;
 }
 
-some_value := #char "A";
+some_value := 20 + 30 * 4 + 15 / 5;
 
 start :: proc #export {
     heap_init();
@@ -56,6 +56,8 @@ start :: proc #export {
     print_ptr(__stack_top);
     print_bin(42l);
     print_hex(42l);
+
+    print(cast(u32) (#char "a" + #char "0"));
 
     for i: #char "a", #char "f" do print_hex(cast(u64) i);
 

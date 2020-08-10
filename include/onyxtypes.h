@@ -123,6 +123,7 @@ b32 type_is_pointer(Type* type);
 b32 type_is_array(Type* tyoe);
 b32 type_is_struct(Type* type);
 b32 type_is_bool(Type* type);
+b32 type_is_small_integer(Type* type);
 b32 type_is_integer(Type* type);
 b32 type_is_numeric(Type* type);
 b32 type_is_compound(Type* type);

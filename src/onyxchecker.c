@@ -13,7 +13,8 @@ CHECK(if, AstIf* ifnode);
 CHECK(while, AstWhile* whilenode);
 CHECK(for, AstFor* fornode);
 CHECK(call, AstCall* call);
-CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok);
+CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok);
+CHECK(unaryop, AstUnaryOp** punop);
 CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
@@ -426,7 +427,7 @@ CHECK(binop_assignment, AstBinaryOp* binop, b32 assignment_is_ok) {
         binop->right = (AstTyped *) binop_node;
         binop->operation = Binary_Op_Assign;
 
-        if (check_binaryop(binop_node, 0)) return 1;
+        if (check_binaryop(&binop_node, 0)) return 1;
     }
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
@@ -442,7 +443,9 @@ CHECK(binop_assignment, AstBinaryOp* binop, b32 assignment_is_ok) {
     return 0;
 }
 
-CHECK(binaryop_compare, AstBinaryOp* binop) {
+CHECK(binaryop_compare, AstBinaryOp** pbinop) {
+    AstBinaryOp* binop = *pbinop;
+
     if (binop->left->type == NULL) {
         onyx_message_add(Msg_Type_Unresolved_Type,
                 binop->token->pos,
@@ -469,7 +472,9 @@ CHECK(binaryop_compare, AstBinaryOp* binop) {
     return 0;
 }
 
-CHECK(binaryop_bool, AstBinaryOp* binop) {
+CHECK(binaryop_bool, AstBinaryOp** pbinop) {
+    AstBinaryOp* binop = *pbinop;
+
     if (binop->left->type == NULL) {
         onyx_message_add(Msg_Type_Unresolved_Type,
                 binop->token->pos,
@@ -495,15 +500,21 @@ CHECK(binaryop_bool, AstBinaryOp* binop) {
     return 0;
 }
 
-CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
+CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok) {
+    AstBinaryOp* binop = *pbinop;
+
     if (check_expression(&binop->left)) return 1;
     if (check_expression(&binop->right)) return 1;
 
+    if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
+        binop->flags |= Ast_Flag_Comptime;
+    }
+
     if (binop_is_assignment(binop)) return check_binop_assignment(binop, assignment_is_ok);
-    if (binop_is_compare(binop))    return check_binaryop_compare(binop);
+    if (binop_is_compare(binop))    return check_binaryop_compare(pbinop);
     if (binop->operation == Binary_Op_Bool_And
         || binop->operation == Binary_Op_Bool_Or)
-        return check_binaryop_bool(binop);
+        return check_binaryop_bool(pbinop);
 
     if (binop->left->type == NULL) {
         onyx_message_add(Msg_Type_Unresolved_Type,
@@ -585,7 +596,7 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         binop_node->type  = binop->right->type;
         binop_node->operation = Binary_Op_Multiply;
 
-        if (check_binaryop(binop_node, 0)) return 1;
+        if (check_binaryop(&binop_node, 0)) return 1;
 
         binop->right = (AstTyped *) binop_node;
         binop->type = binop->left->type;
@@ -601,6 +612,30 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
     }
 
     binop->type = binop->left->type;
+
+    if (binop->flags & Ast_Flag_Comptime) {
+        // NOTE: Not a binary op
+        *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
+    }
+
+    return 0;
+}
+
+CHECK(unaryop, AstUnaryOp** punop) {
+    AstUnaryOp* unaryop = *punop;
+
+    if (check_expression(&unaryop->expr)) return 1;
+
+    if (unaryop->operation != Unary_Op_Cast) {
+        unaryop->type = unaryop->expr->type;
+    }
+
+    if (unaryop->expr->flags & Ast_Flag_Comptime) {
+        unaryop->flags |= Ast_Flag_Comptime;
+        // NOTE: Not a unary op
+        *punop = (AstUnaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) unaryop);
+    }
+
     return 0;
 }
 
@@ -748,15 +783,8 @@ CHECK(expression, AstTyped** pexpr) {
 
     i32 retval = 0;
     switch (expr->kind) {
-        case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp *) expr, 0); break;
-
-        case Ast_Kind_Unary_Op:
-            retval = check_expression(&((AstUnaryOp *) expr)->expr);
-
-            if (((AstUnaryOp *) expr)->operation != Unary_Op_Cast) {
-                expr->type = ((AstUnaryOp *) expr)->expr->type;
-            }
-            break;
+        case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp **) pexpr, 0); break;
+        case Ast_Kind_Unary_Op:  retval = check_unaryop((AstUnaryOp **) pexpr); break;
 
         case Ast_Kind_Call:  retval = check_call((AstCall *) expr); break;
         case Ast_Kind_Block: retval = check_block((AstBlock *) expr); break;
@@ -868,7 +896,7 @@ CHECK(statement, AstNode* stmt) {
 
         case Ast_Kind_Binary_Op:
             stmt->flags |= Ast_Flag_Expr_Ignored;
-            return check_binaryop((AstBinaryOp *) stmt, 1);
+            return check_binaryop((AstBinaryOp **) &stmt, 1);
 
         default:
             stmt->flags |= Ast_Flag_Expr_Ignored;
@@ -1077,6 +1105,14 @@ CHECK(memres, AstMemRes* memres) {
 
     if (memres->initial_value != NULL) {
         fill_in_type(memres->initial_value);
+        check_expression(&memres->initial_value);
+
+        if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
+            onyx_message_add(Msg_Type_Literal,
+                    memres->initial_value->token->pos,
+                    "top level expressions must be compile time known");
+            return 1;
+        }
 
         Type* memres_type = memres->type;
         if (!type_is_compound(memres_type)) memres_type = memres_type->Pointer.elem;
@@ -1102,7 +1138,7 @@ CHECK(node, AstNode* node) {
         case Ast_Kind_If:                   return check_if((AstIf *) node);
         case Ast_Kind_While:                return check_while((AstWhile *) node);
         case Ast_Kind_Call:                 return check_call((AstCall *) node);
-        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp *) node, 1);
+        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp **) &node, 1);
         default:                            return check_expression((AstTyped **) &node);
     }
 }

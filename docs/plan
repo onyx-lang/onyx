@@ -172,7 +172,7 @@ HOW:
             - Checking which things are allowed to cast to/from should be checked in the checker,
                 not in the wasm generatation
 
-        [ ] Start work on evaluating compile time known values.
+        [X] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
         [ ] All code paths return correct value

@@ -493,6 +493,7 @@ extern const BuiltinSymbol builtin_symbols[];
 
 
 // NOTE: Useful not inlined functions
+AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 void promote_numlit_to_larger(AstNumLit* num);
 
 // NOTE: Useful inlined functions

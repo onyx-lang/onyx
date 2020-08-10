@@ -228,6 +228,9 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
     }
 
     symres_expression(&(*unaryop)->expr);
+
+    if ((*unaryop)->type_node == NULL)
+        (*unaryop)->type_node = ((AstUnaryOp *)(*unaryop))->expr->type_node;
 }
 
 static void symres_expression(AstTyped** expr) {
@@ -239,6 +242,8 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Binary_Op:
             symres_expression(&((AstBinaryOp *)(*expr))->left);
             symres_expression(&((AstBinaryOp *)(*expr))->right);
+
+            (*expr)->type_node = ((AstBinaryOp *)(*expr))->left->type_node;
             break;
 
         case Ast_Kind_Unary_Op:     symres_unaryop((AstUnaryOp **) expr); break;
@@ -497,13 +502,6 @@ static void symres_memres(AstMemRes** memres) {
     (*memres)->type_node = symres_type((*memres)->type_node);
     if ((*memres)->initial_value != NULL) {
         symres_expression(&(*memres)->initial_value);
-
-        if (((*memres)->initial_value->flags & Ast_Flag_Comptime) == 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    (*memres)->initial_value->token->pos,
-                    "top level expressions must be compile time known");
-            return;
-        }
 
         if ((*memres)->type_node == NULL)
             (*memres)->type_node = (*memres)->initial_value->type_node;
