@@ -48,33 +48,33 @@ print_u64_with_base :: proc (n_: u64, base: u64) {
     for i: 0, 128 do str[i] = cast(u8) 0;
 
     c := cast(^u8) ^str[127];
-    *c = cast(u8) 0;
+    *c = #char "\0";
     c -= 1;
 
     if n == 0l {
-        *c = cast(u8) 0x30;
+        *c = #char "0";
         c -= 1;
     } else {
         while n > 0l {
             m :: n % base;
 
             ch := cast(u8) 0;
-            if m == 0l do ch = cast(u8) 0x30;
-            if m == 1l do ch = cast(u8) 0x31;
-            if m == 2l do ch = cast(u8) 0x32;
-            if m == 3l do ch = cast(u8) 0x33;
-            if m == 4l do ch = cast(u8) 0x34;
-            if m == 5l do ch = cast(u8) 0x35;
-            if m == 6l do ch = cast(u8) 0x36;
-            if m == 7l do ch = cast(u8) 0x37;
-            if m == 8l do ch = cast(u8) 0x38;
-            if m == 9l do ch = cast(u8) 0x39;
-            if m == 10l do ch = cast(u8) 0x41;
-            if m == 11l do ch = cast(u8) 0x42;
-            if m == 12l do ch = cast(u8) 0x43;
-            if m == 13l do ch = cast(u8) 0x44;
-            if m == 14l do ch = cast(u8) 0x45;
-            if m == 15l do ch = cast(u8) 0x46;
+            if m == 0l do  ch = #char "0";
+            if m == 1l do  ch = #char "1";
+            if m == 2l do  ch = #char "2";
+            if m == 3l do  ch = #char "3";
+            if m == 4l do  ch = #char "4";
+            if m == 5l do  ch = #char "5";
+            if m == 6l do  ch = #char "6";
+            if m == 7l do  ch = #char "7";
+            if m == 8l do  ch = #char "8";
+            if m == 9l do  ch = #char "9";
+            if m == 10l do ch = #char "A";
+            if m == 11l do ch = #char "B";
+            if m == 12l do ch = #char "C";
+            if m == 13l do ch = #char "D";
+            if m == 14l do ch = #char "E";
+            if m == 15l do ch = #char "F";
 
             *c = ch;
             c -= 1;
@@ -84,16 +84,16 @@ print_u64_with_base :: proc (n_: u64, base: u64) {
     }
 
     if base == 16l {
-        *c = cast(u8) 0x78;
+        *c = #char "x";
         c -= 1;
-        *c = cast(u8) 0x30;
+        *c = #char "0";
         c -= 1;
     }
 
     if base == 2l {
-        *c = cast(u8) 0x62;
+        *c = #char "b";
         c -= 1;
-        *c = cast(u8) 0x30;
+        *c = #char "0";
         c -= 1;
     }
 

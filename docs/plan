@@ -148,13 +148,13 @@ HOW:
 
         [X] Be smart about when to use the stack versus use the wasm locals
 
-        [ ] Better numeric literals
+        [X] Better numeric literals
             - suffix 'f' for float32
             - no suffix 'f', but has decimal for float64
             - suffix 'l' for int64
             - nothing special for i32 or below
 
-        [ ] Char literals
+        [X] Char literals
 
         [ ] Properly checking binary operators
             - Shouldn't be able to add two structs/arrays together

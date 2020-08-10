@@ -53,6 +53,8 @@ start :: proc #export {
     print_bin(42l);
     print_hex(42l);
 
+    print_hex(cast(u64) #char "a");
+
     a := 12345;
 
     arr: [N][N] i32;

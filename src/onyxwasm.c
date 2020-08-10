@@ -1174,17 +1174,19 @@ COMPILE_FUNC(expression, AstTyped* expr) {
     *pcode = code;
 }
 
-static const WasmInstructionType cast_map[][9] = {
-    //          I8              I16                 I32                 U32                I64                U64                F32                F64                PTR
-    /* I8  */ { WI_NOP,         WI_I32_EXTEND_8_S,  WI_I32_EXTEND_8_S,  WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_UNREACHABLE },
-    /* I16 */ { WI_NOP,         WI_NOP,             WI_I32_EXTEND_16_S, WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_F32_FROM_I32_U, WI_F64_FROM_I32_U, WI_UNREACHABLE },
-    /* I32 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_F32_FROM_I32_S, WI_F64_FROM_I32_S, WI_NOP },
-    /* U32 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_F32_FROM_I32_U, WI_F64_FROM_I32_U, WI_NOP },
-    /* I64 */ { WI_NOP,         WI_NOP,             WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_S, WI_F64_FROM_I64_S, WI_I32_FROM_I64 },
-    /* U64 */ { WI_NOP,         WI_NOP,             WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_U, WI_F64_FROM_I64_U, WI_I32_FROM_I64 },
-    /* F32 */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_I32_FROM_F32_S,  WI_I32_FROM_F32_U, WI_I64_FROM_F32_S, WI_I64_FROM_F32_U, WI_NOP,            WI_F64_FROM_F32,   WI_UNREACHABLE },
-    /* F64 */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_I32_FROM_F64_S,  WI_I32_FROM_F64_U, WI_I64_FROM_F64_S, WI_I64_FROM_F64_U, WI_F32_FROM_F64,   WI_NOP,            WI_UNREACHABLE },
-    /* PTR */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_NOP },
+static const WasmInstructionType cast_map[][11] = {
+    //          I8              U8                  I16                 U16                I32                 U32                I64                U64                F32                F64                PTR
+    /* I8  */ { WI_NOP,         WI_NOP,             WI_I32_EXTEND_8_S,  WI_NOP,            WI_I32_EXTEND_8_S,  WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_UNREACHABLE },
+    /* U8  */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_UNREACHABLE },
+    /* I16 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_I32_EXTEND_16_S, WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_UNREACHABLE },
+    /* U16 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_UNREACHABLE },
+    /* I32 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_NOP,             WI_NOP,            WI_I64_FROM_I32_S, WI_I64_FROM_I32_S, WI_F32_FROM_I32_S, WI_F64_FROM_I32_S, WI_NOP },
+    /* U32 */ { WI_NOP,         WI_NOP,             WI_NOP,             WI_NOP,            WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_F32_FROM_I32_U, WI_F64_FROM_I32_U, WI_NOP },
+    /* I64 */ { WI_NOP,         WI_I32_FROM_I64,    WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_S, WI_F64_FROM_I64_S, WI_I32_FROM_I64 },
+    /* U64 */ { WI_NOP,         WI_I32_FROM_I64,    WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_I32_FROM_I64,    WI_I32_FROM_I64,   WI_NOP,            WI_NOP,            WI_F32_FROM_I64_U, WI_F64_FROM_I64_U, WI_I32_FROM_I64 },
+    /* F32 */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_UNREACHABLE,     WI_UNREACHABLE,    WI_I32_FROM_F32_S,  WI_I32_FROM_F32_U, WI_I64_FROM_F32_S, WI_I64_FROM_F32_U, WI_NOP,            WI_F64_FROM_F32,   WI_UNREACHABLE },
+    /* F64 */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_UNREACHABLE,     WI_UNREACHABLE,    WI_I32_FROM_F64_S,  WI_I32_FROM_F64_U, WI_I64_FROM_F64_S, WI_I64_FROM_F64_U, WI_F32_FROM_F64,   WI_NOP,            WI_UNREACHABLE },
+    /* PTR */ { WI_UNREACHABLE, WI_UNREACHABLE,     WI_UNREACHABLE,     WI_UNREACHABLE,    WI_NOP,             WI_NOP,            WI_I64_FROM_I32_U, WI_I64_FROM_I32_U, WI_UNREACHABLE,    WI_UNREACHABLE,    WI_NOP },
 };
 
 COMPILE_FUNC(cast, AstUnaryOp* cast) {
@@ -1229,49 +1231,36 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
     }
 
     i32 fromidx = -1, toidx = -1;
-    if (from->Basic.flags & Basic_Flag_Pointer) {
-        fromidx = 8;
+    if (from->Basic.flags & Basic_Flag_Pointer || from->kind == Type_Kind_Array) {
+        fromidx = 10;
     }
     else if (from->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (from->Basic.flags & Basic_Flag_Unsigned) != 0;
 
-        if      (from->Basic.size == 1 && !unsign) fromidx = 0;
-        else if (from->Basic.size == 1 && unsign)  fromidx = -1;
-        else if (from->Basic.size == 2 && !unsign) fromidx = 1;
-        else if (from->Basic.size == 2 && unsign)  fromidx = -1;
-        else if (from->Basic.size == 4 && !unsign) fromidx = 2;
-        else if (from->Basic.size == 4 && unsign)  fromidx = 3;
-        else if (from->Basic.size == 8 && !unsign) fromidx = 4;
-        else if (from->Basic.size == 8 && unsign)  fromidx = 5;
+        fromidx = log2_dumb(from->Basic.size) * 2 + unsign;
     }
     else if (from->Basic.flags & Basic_Flag_Float) {
-        if      (from->Basic.size == 4) fromidx = 6;
-        else if (from->Basic.size == 8) fromidx = 7;
+        if      (from->Basic.size == 4) fromidx = 8;
+        else if (from->Basic.size == 8) fromidx = 9;
     }
 
-    if (to->Basic.flags & Basic_Flag_Pointer) {
-        toidx = 8;
+    if (to->Basic.flags & Basic_Flag_Pointer || to->kind == Type_Kind_Array) {
+        toidx = 10;
     }
     else if (to->Basic.flags & Basic_Flag_Integer) {
         b32 unsign = (to->Basic.flags & Basic_Flag_Unsigned) != 0;
 
-        if      (to->Basic.size == 1 && !unsign) toidx = 0;
-        else if (to->Basic.size == 1 && unsign)  toidx = -1;
-        else if (to->Basic.size == 2 && !unsign) toidx = 1;
-        else if (to->Basic.size == 2 && unsign)  toidx = -1;
-        else if (to->Basic.size == 4 && !unsign) toidx = 2;
-        else if (to->Basic.size == 4 && unsign)  toidx = 3;
-        else if (to->Basic.size == 8 && !unsign) toidx = 4;
-        else if (to->Basic.size == 8 && unsign)  toidx = 5;
+        toidx = log2_dumb(to->Basic.size) * 2 + unsign;
     }
     else if (to->Basic.flags & Basic_Flag_Float) {
-        if      (to->Basic.size == 4) toidx = 6;
-        else if (to->Basic.size == 8) toidx = 7;
+        if      (to->Basic.size == 4) toidx = 8;
+        else if (to->Basic.size == 8) toidx = 9;
     }
 
     if (fromidx != -1 && toidx != -1) {
         WasmInstructionType cast_op = cast_map[fromidx][toidx];
         if (cast_op == WI_UNREACHABLE) {
+            bh_printf("%d %d\n", fromidx, toidx);
             onyx_message_add(Msg_Type_Literal,
                     cast->token->pos,
                     "bad cast");

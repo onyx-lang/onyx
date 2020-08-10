@@ -319,6 +319,38 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) fc;
                 break;
             }
+            else if (parse_possible_directive(parser, "char")) {
+                AstNumLit* char_lit = make_node(AstNumLit, Ast_Kind_NumLit);
+                char_lit->flags |= Ast_Flag_Comptime;
+                char_lit->type_node = (AstType *) &basic_type_u8;
+
+                char_lit->token = expect_token(parser, Token_Type_Literal_String);
+
+                if (char_lit->token->text[0] != '\\') {
+                    char_lit->value.i = char_lit->token->text[0];
+                } else {
+                    switch (char_lit->token->text[1]) {
+                        case '0': char_lit->value.i = '\0'; break;
+                        case 'a': char_lit->value.i = '\a'; break;
+                        case 'b': char_lit->value.i = '\b'; break;
+                        case 'f': char_lit->value.i = '\f'; break;
+                        case 'n': char_lit->value.i = '\n'; break;
+                        case 't': char_lit->value.i = '\t'; break;
+                        case 'r': char_lit->value.i = '\r'; break;
+                        case 'v': char_lit->value.i = '\v'; break;
+                        case 'e': char_lit->value.i = '\e'; break;
+                        default: {
+                            onyx_message_add(Msg_Type_Literal,
+                                    char_lit->token->pos,
+                                    "invalid escaped character");
+                            break;
+                        }
+                    }
+                }
+
+                retval = (AstTyped *) char_lit;
+                break;
+            }
 
             onyx_message_add(Msg_Type_Literal,
                     parser->curr->pos,
