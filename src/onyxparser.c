@@ -14,7 +14,8 @@ static void unconsume_token(OnyxParser* parser);
 static b32 is_terminating_token(TokenType token_type);
 static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type);
 
-static AstNumLit*     parse_numeric_literal(OnyxParser* parser);
+static AstNumLit*     parse_int_literal(OnyxParser* parser);
+static AstNumLit*     parse_float_literal(OnyxParser* parser);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_expression(OnyxParser* parser);
 static AstIf*         parse_if_stmt(OnyxParser* parser);
@@ -95,40 +96,49 @@ static void add_node_to_process(OnyxParser* parser, AstNode* node) {
 
 
 
-static AstNumLit* parse_numeric_literal(OnyxParser* parser) {
-    AstNumLit* lit_node = make_node(AstNumLit, Ast_Kind_NumLit);
-    lit_node->token = expect_token(parser, Token_Type_Literal_Numeric);
-    lit_node->flags |= Ast_Flag_Comptime;
-    lit_node->value.l = 0ll;
+static AstNumLit* parse_int_literal(OnyxParser* parser) {
+    AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
+    int_node->token = expect_token(parser, Token_Type_Literal_Integer);
+    int_node->flags |= Ast_Flag_Comptime;
+    int_node->value.l = 0ll;
 
-    AstType* type;
-    token_toggle_end(lit_node->token);
-    char* tok = lit_node->token->text;
+    AstType* type = (AstType *) &basic_type_i32;
+    token_toggle_end(int_node->token);
 
-    // NOTE: charset_contains() behaves more like string_contains()
-    // so I'm using it in this case
-    if (charset_contains(tok, '.')) {
-        if (tok[lit_node->token->length - 1] == 'f') {
-            type = (AstType *) &basic_type_f32;
-            lit_node->value.f = strtof(tok, NULL);
-        } else {
-            type = (AstType *) &basic_type_f64;
-            lit_node->value.d = strtod(tok, NULL);
-        }
-    } else {
-        i64 value = strtoll(tok, NULL, 0);
-        if (bh_abs(value) < ((u64) 1 << 32)) {
-            type = (AstType *) &basic_type_i32;
-        } else {
-            type = (AstType *) &basic_type_i64;
-        }
-
-        lit_node->value.l = value;
+    char* first_invalid = NULL;
+    i64 value = strtoll(int_node->token->text, &first_invalid, 0);
+    if (bh_abs(value) > ((u64) 1 << 32) || *first_invalid == 'l') {
+        type = (AstType *) &basic_type_i64;
     }
 
-    lit_node->type_node = type;
-    token_toggle_end(lit_node->token);
-    return lit_node;
+    int_node->value.l = value;
+    int_node->type_node = type;
+
+    token_toggle_end(int_node->token);
+    return int_node;
+}
+
+static AstNumLit* parse_float_literal(OnyxParser* parser) {
+    AstNumLit* float_node = make_node(AstNumLit, Ast_Kind_NumLit);
+    float_node->token = expect_token(parser, Token_Type_Literal_Float);
+    float_node->flags |= Ast_Flag_Comptime;
+    float_node->value.d = 0.0;
+
+    AstType* type = (AstType *) &basic_type_f64;
+    token_toggle_end(float_node->token);
+
+    if (float_node->token->text[float_node->token->length - 1] == 'f') {
+        type = (AstType *) &basic_type_f32;
+        float_node->value.f = strtof(float_node->token->text, NULL);
+    } else {
+        type = (AstType *) &basic_type_f64;
+        float_node->value.d = strtod(float_node->token->text, NULL);
+    }
+
+    float_node->type_node = type;
+
+    token_toggle_end(float_node->token);
+    return float_node;
 }
 
 // ( <expr> )
@@ -241,8 +251,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
-        case Token_Type_Literal_Numeric:
-            retval = (AstTyped *) parse_numeric_literal(parser);
+        case Token_Type_Literal_Integer:
+            retval = (AstTyped *) parse_int_literal(parser);
+            break;
+
+        case Token_Type_Literal_Float:
+            retval = (AstTyped *) parse_float_literal(parser);
             break;
 
         case Token_Type_Literal_String: {
@@ -731,7 +745,8 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case '-':
         case '!':
         case '*':
-        case Token_Type_Literal_Numeric:
+        case Token_Type_Literal_Integer:
+        case Token_Type_Literal_Float:
         case Token_Type_Literal_String:
             retval = (AstNode *) parse_expression(parser);
             break;
@@ -1252,7 +1267,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
             consume_token(parser);
             expect_token(parser, ':');
 
-            evalue->value = parse_numeric_literal(parser);
+            evalue->value = parse_int_literal(parser);
         }
 
         expect_token(parser, ';');

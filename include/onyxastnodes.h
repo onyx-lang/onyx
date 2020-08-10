@@ -492,6 +492,8 @@ typedef struct BuiltinSymbol {
 extern const BuiltinSymbol builtin_symbols[];
 
 
+// NOTE: Useful not inlined functions
+void promote_numlit_to_larger(AstNumLit* num);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

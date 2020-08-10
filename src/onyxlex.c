@@ -56,7 +56,8 @@ static const char* token_type_names[] = {
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
-    "TOKEN_TYPE_LITERAL_NUMERIC",
+    "TOKEN_TYPE_LITERAL_INTEGER",
+    "TOKEN_TYPE_LITERAL_FLOAT",
     "true",
     "false",
 
@@ -243,7 +244,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        tk.type = Token_Type_Literal_Numeric;
+        tk.type = Token_Type_Literal_Integer;
         tk.length = len;
 
         INCREMENT_CURR_TOKEN(tokenizer);
@@ -251,19 +252,36 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     }
 
     // Number literal
-    if (char_is_num(*tokenizer->curr)) {
+    if (char_is_num(*tokenizer->curr)
+        || (*(tokenizer->curr) == '.' && char_is_num(*(tokenizer->curr + 1)))) {
+        tk.type = Token_Type_Literal_Integer;
+
+        b32 hit_decimal = 0;
+        if (*tokenizer->curr == '.') hit_decimal = 1;
+
         u32 len = 1;
-        while (char_is_num(*(tokenizer->curr + 1)) || *(tokenizer->curr + 1) == '.') {
+        while (char_is_num(*(tokenizer->curr + 1)) || (!hit_decimal && *(tokenizer->curr + 1) == '.')) {
+            len++;
+            INCREMENT_CURR_TOKEN(tokenizer);
+
+            if (*tokenizer->curr == '.') hit_decimal = 1;
+        }
+
+       if (!hit_decimal && *(tokenizer->curr + 1) == 'l') {
+            tk.type = Token_Type_Literal_Integer;
+
+            len++;
+            INCREMENT_CURR_TOKEN(tokenizer);
+        }
+        else if (*(tokenizer->curr + 1) == 'f') {
+            tk.type = Token_Type_Literal_Float;
+
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
         }
 
-        if (*(tokenizer->curr + 1) == 'f') {
-            len++;
-            INCREMENT_CURR_TOKEN(tokenizer);
-        }
+        if (hit_decimal) tk.type = Token_Type_Literal_Float;
 
-        tk.type = Token_Type_Literal_Numeric;
         tk.length = len;
 
         INCREMENT_CURR_TOKEN(tokenizer);

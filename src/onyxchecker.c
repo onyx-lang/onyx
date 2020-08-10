@@ -113,6 +113,13 @@ CHECK(for, AstFor* fornode) {
         return 1;
     }
 
+    // NOTE: Auto promote implicit step to the type of start
+    if (fornode->step->kind == Ast_Kind_NumLit) {
+        fornode->step->type_node = fornode->start->type_node;
+        fornode->step->type = fornode->start->type;
+        promote_numlit_to_larger((AstNumLit *) fornode->step);
+    }
+
     if (!types_are_compatible(fornode->end->type, fornode->start->type)) {
         onyx_message_add(Msg_Type_Literal,
                 fornode->end->token->pos,
