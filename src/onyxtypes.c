@@ -410,19 +410,10 @@ const char* type_get_name(Type* type) {
 
 u32 type_get_alignment_log2(Type* type) {
     i32 store_size = type_size_of(type);
-    i32 is_integer = (type->Basic.flags & Basic_Flag_Integer)
-                  || (type->Basic.flags & Basic_Flag_Pointer);
-
-    if (is_integer) {
-        if      (store_size == 1) return 0;
-        else if (store_size == 2) return 1;
-        else if (store_size == 4) return 2;
-        else if (store_size == 8) return 3;
-    } else {
-        if      (store_size == 4) return 2;
-        else if (store_size == 8) return 3;
-    }
-
+    if      (store_size == 1) return 0;
+    else if (store_size == 2) return 1;
+    else if (store_size == 4) return 2;
+    else if (store_size == 8) return 3;
     return 2;
 }
 

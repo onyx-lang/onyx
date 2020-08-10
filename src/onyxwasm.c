@@ -424,11 +424,11 @@ COMPILE_FUNC(store_instruction, Type* type, u32 alignment, u32 offset) {
         type = &basic_types[Basic_Kind_U32];
     }
 
-    i32 store_size = type_size_of(type);
+    i32 store_size  = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
     i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
     i32 is_integer  = is_basic && (type->Basic.flags & Basic_Flag_Integer);
-    i32 is_float    = is_basic && type->Basic.flags & Basic_Flag_Float;
+    i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
 
     if (is_pointer) {
         WID(WI_I32_STORE, ((WasmInstructionData) { alignment, offset }));
@@ -473,8 +473,8 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
     i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
     i32 is_integer  = is_basic && (type->Basic.flags & Basic_Flag_Integer);
-    i32 is_float    = is_basic && type->Basic.flags & Basic_Flag_Float;
-    i32 is_unsigned = is_basic && type->Basic.flags & Basic_Flag_Unsigned;
+    i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
+    i32 is_unsigned = is_basic && (type->Basic.flags & Basic_Flag_Unsigned);
 
     WasmInstructionType instr = WI_NOP;
     i32 alignment = type_get_alignment_log2(type);
@@ -1697,7 +1697,7 @@ static void compile_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     }
 
     if (memres->initial_value != NULL) {
-        u8* data = bh_alloc(mod->allocator, size);
+        u8* data = bh_alloc(global_heap_allocator, size);
         compile_raw_data(mod, data, memres->initial_value);
 
         WasmDatum datum = {

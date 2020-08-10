@@ -1206,8 +1206,6 @@ char* bh_strdup(bh_allocator a, char* str) {
 
     char* t = buf;
     while (*t++ = *str++);
-
-    *t = 0;
     return buf;
 }
 
@@ -2096,7 +2094,7 @@ b32 bh_table_iter_next(bh_table_iterator* it) {
 
 step_to_next:
     // Step forward to find next valid
-    while (*it->tab == NULL && it->tab != it->endtab) {
+    while (it->tab != it->endtab && *it->tab == NULL) {
         it->tab++;
     }
 

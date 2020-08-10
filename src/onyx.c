@@ -424,6 +424,7 @@ int main(int argc, char *argv[]) {
 
     compiler_state_free(&compile_state);
 
+    bh_scratch_free(&global_scratch);
     bh_managed_heap_free(&global_heap);
 
     return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
