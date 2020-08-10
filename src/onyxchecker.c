@@ -30,6 +30,10 @@ CHECK(function_header, AstFunction* func);
 CHECK(memres, AstMemRes* memres);
 
 static inline void fill_in_type(AstTyped* node) {
+    if (node->type_node && node->type_node->kind == Ast_Kind_Array_Type) {
+        if (((AstArrayType *) node->type_node)->count_expr) check_expression(&((AstArrayType *) node->type_node)->count_expr);
+    }
+
     if (node->type == NULL)
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
 }

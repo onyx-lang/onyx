@@ -101,4 +101,8 @@ start :: proc #export {
     }
     print(soa.y[3]);
     print_ptr(^soa.y[3]);
+
+    fancy : [5 + 3 * 4] i32;
+    fancy[2] = 123;
+    print(fancy[2]);
 }
