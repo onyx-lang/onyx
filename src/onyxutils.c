@@ -206,9 +206,6 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     } \
     break;
 
-
-AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
-
 AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
     AstNumLit* left =  (AstNumLit *) ast_reduce(a, node->left);
     AstNumLit* right = (AstNumLit *) ast_reduce(a, node->right);

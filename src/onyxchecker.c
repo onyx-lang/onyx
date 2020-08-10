@@ -473,6 +473,11 @@ CHECK(binaryop_compare, AstBinaryOp** pbinop) {
     }
 
     binop->type = &basic_types[Basic_Kind_Bool];
+    if (binop->flags & Ast_Flag_Comptime) {
+        // NOTE: Not a binary op
+        *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
+    }
+    
     return 0;
 }
 
@@ -501,6 +506,11 @@ CHECK(binaryop_bool, AstBinaryOp** pbinop) {
     }
 
     binop->type = &basic_types[Basic_Kind_Bool];
+
+    if (binop->flags & Ast_Flag_Comptime) {
+        // NOTE: Not a binary op
+        *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
+    }
     return 0;
 }
 
@@ -621,7 +631,6 @@ CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok) {
         // NOTE: Not a binary op
         *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
     }
-
     return 0;
 }
 
