@@ -504,6 +504,20 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         || binop->operation == Binary_Op_Bool_Or)
         return check_binaryop_bool(binop);
 
+    if (binop->left->type == NULL) {
+        onyx_message_add(Msg_Type_Unresolved_Type,
+                binop->token->pos,
+                binop->left->token->text, binop->left->token->length);
+        return 1;
+    }
+
+    if (binop->right->type == NULL) {
+        onyx_message_add(Msg_Type_Unresolved_Type,
+                binop->token->pos,
+                binop->right->token->text, binop->right->token->length);
+        return 1;
+    }
+
     if (!type_is_numeric(binop->left->type) && !type_is_pointer(binop->left->type)) {
         onyx_message_add(Msg_Type_Literal,
                 binop->token->pos,
@@ -539,20 +553,6 @@ CHECK(binaryop, AstBinaryOp* binop, b32 assignment_is_ok) {
         onyx_message_add(Msg_Type_Literal,
                 binop->token->pos,
                 "this operator is not supported for these operands");
-        return 1;
-    }
-
-    if (binop->left->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
-                binop->left->token->text, binop->left->token->length);
-        return 1;
-    }
-
-    if (binop->right->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
-                binop->right->token->text, binop->right->token->length);
         return 1;
     }
 

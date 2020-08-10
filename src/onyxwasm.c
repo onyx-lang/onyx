@@ -1624,6 +1624,11 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     }
     *des++ = '\0';
 
+    if (bh_table_has(u32, mod->string_literals, (char *) strdata)) {
+        strlit->addr = bh_table_get(u32, mod->string_literals, (char *) strdata);
+        return;
+    }
+
     u32 length = (u32) (des - strdata);
 
     WasmDatum datum = {
@@ -1634,6 +1639,8 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
 
     strlit->addr = (u32) mod->next_datum_offset,
     mod->next_datum_offset += length;
+
+    bh_table_put(u32, mod->string_literals, (char *) strdata, strlit->addr);
 
     bh_arr_push(mod->data, datum);
 }
@@ -1748,6 +1755,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_table_init(global_heap_allocator, module.type_map, 61);
     bh_table_init(global_heap_allocator, module.exports, 61);
     bh_table_init(global_heap_allocator, module.loaded_file_offsets, 7);
+    bh_table_init(global_heap_allocator, module.string_literals, 16);
 
     bh_imap_init(&module.index_map, global_heap_allocator, 128);
     bh_imap_init(&module.local_map, global_heap_allocator, 16);
