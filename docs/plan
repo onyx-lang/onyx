@@ -159,14 +159,16 @@ HOW:
         [X] Properly checking binary operators
             - Shouldn't be able to add two structs/arrays together
 
+        [X] Include other directories to search for files
+
+        [ ] 'use' enums and packages at an arbitrary scope
+
         [ ] Array literals
 
         [ ] Struct literals
 
         [ ] Top level variable initialization
             - Works for numeric literals
-
-        [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] Better checking for casts
             - Checking which things are allowed to cast to/from should be checked in the checker,

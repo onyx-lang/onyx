@@ -283,6 +283,7 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 // Allocator based string functions
 //-------------------------------------------------------------------------------------
 
+b32 bh_str_ends_with(char* str, char* end);
 char* bh_strdup(bh_allocator a, char* str);
 
 
@@ -1200,6 +1201,18 @@ u8* double_to_ieee754(f64 f, b32 reverse) {
 //-------------------------------------------------------------------------------------
 // STRING IMPLEMENTATION
 //-------------------------------------------------------------------------------------
+b32 bh_str_ends_with(char* str, char* end) {
+    i32 slen = strlen(str);
+    i32 elen = strlen(end);
+
+    char* s = str + slen - 1;
+    char* e = end + elen - 1;
+
+    while (*e == *s && e != end && s != str) e--, s--;
+
+    return e == end;
+}
+
 char* bh_strdup(bh_allocator a, char* str) {
     u32 len = strlen(str);
     char* buf = bh_alloc(a, len + 1);

@@ -37,6 +37,7 @@ typedef struct OnyxCompileOptions {
     u32 verbose_output : 1;
     u32 print_ast : 1;
 
+    bh_arr(const char *) included_folders;
     bh_arr(const char *) files;
     const char* target_file;
 } OnyxCompileOptions;
@@ -54,6 +55,10 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
     };
 
     bh_arr_new(alloc, options.files, 1);
+    bh_arr_new(alloc, options.included_folders, 1);
+
+    // NOTE: Add the current folder
+    bh_arr_push(options.included_folders, ".");
 
     fori(i, 1, argc - 1) {
         if (!strcmp(argv[i], "-help")) {
@@ -69,6 +74,10 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
         }
         else if (!strcmp(argv[i], "-verbose")) {
             options.verbose_output = 1;
+        }
+        else if (!strcmp(argv[i], "-I")) {
+            options.action = ONYX_COMPILE_ACTION_COMPILE;
+            bh_arr_push(options.included_folders, argv[++i]);
         }
         else {
             options.action = ONYX_COMPILE_ACTION_COMPILE;
@@ -148,7 +157,30 @@ static void compiler_state_free(CompilerState* cs) {
 
 
 
+static char* lookup_included_file(CompilerState* cs, OnyxToken* filename) {
+    static char path[256];
+    fori (i, 0, 511) path[i] = 0;
 
+    static char fn[128];
+    token_toggle_end(filename);
+    if (!bh_str_ends_with(filename->text, ".onyx")) {
+        bh_snprintf(fn, 128, "%s.onyx", filename->text);
+    } else {
+        bh_snprintf(fn, 128, "%s", filename->text);
+    }
+    token_toggle_end(filename);
+
+    bh_arr_each(const char *, folder, cs->options->included_folders) {
+        if ((*folder)[strlen(*folder) - 1] != '/')
+            bh_snprintf(path, 256, "%s/%s", *folder, fn);
+        else
+            bh_snprintf(path, 256, "%s%s", *folder, fn);
+
+        if (bh_file_exists(path)) return path;
+    }
+
+    return fn;
+}
 
 static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
     // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
@@ -171,10 +203,8 @@ static i32 sort_entities(const void* e1, const void* e2) {
 
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
     bh_arr_each(AstIncludeFile *, include, results->files) {
-        char* formatted_name = bh_aprintf(
-                global_heap_allocator,
-                "%b.onyx",
-                (*include)->filename->text, (*include)->filename->length);
+        char* filename = lookup_included_file(compiler_state, (*include)->filename);
+        char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         bh_arr_push(compiler_state->queued_files, formatted_name);
     }

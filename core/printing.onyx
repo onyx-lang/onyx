@@ -45,7 +45,7 @@ print_str_len :: proc (str: [] u8, len: i32) {
 print_u64_with_base :: proc (n_: u64, base: u64) {
     n := n_;
     str: [128] u8;
-    for i: 0, 128 do str[i] = cast(u8) 0;
+    for i: 0, 128 do str[i] = #char "\0";
 
     c := cast(^u8) ^str[127];
     *c = #char "\0";

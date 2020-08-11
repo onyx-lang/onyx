@@ -1,6 +1,6 @@
 package memory
 
-use "progs/intrinsics"
+use "intrinsics"
 
 use package printing { print }
 use package intrinsics {
