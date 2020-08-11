@@ -12,10 +12,13 @@ bh_allocator global_heap_allocator;
 
 static const char* ast_node_names[] = {
     "ERROR",
-    "PACKAGE",
     "PROGRAM",
-    "USE",
+    "PACKAGE",
+    "INCLUDE FILE",
+    "INCLUDE FOLDER",
+    "USE PACKAGE",
     "ALIAS",
+    "MEMORY RESERVATION"
 
     "BINDING",
     "FUNCTION",

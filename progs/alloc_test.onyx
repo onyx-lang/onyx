@@ -1,5 +1,5 @@
-use "progs/alloc"
-use "progs/print_funcs"
+#include_file "alloc"
+#include_file "printing"
 
 use package memory
 use package printing

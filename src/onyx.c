@@ -90,6 +90,7 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
 
 static void compile_opts_free(OnyxCompileOptions* opts) {
     bh_arr_free(opts->files);
+    bh_arr_free(opts->included_folders);
 }
 
 
@@ -159,9 +160,10 @@ static void compiler_state_free(CompilerState* cs) {
 
 static char* lookup_included_file(CompilerState* cs, OnyxToken* filename) {
     static char path[256];
-    fori (i, 0, 511) path[i] = 0;
+    fori (i, 0, 255) path[i] = 0;
 
     static char fn[128];
+    fori (i, 0, 127) fn[i] = 0;
     token_toggle_end(filename);
     if (!bh_str_ends_with(filename->text, ".onyx")) {
         bh_snprintf(fn, 128, "%s.onyx", filename->text);
@@ -202,11 +204,16 @@ static i32 sort_entities(const void* e1, const void* e2) {
 }
 
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
-    bh_arr_each(AstIncludeFile *, include, results->files) {
-        char* filename = lookup_included_file(compiler_state, (*include)->filename);
-        char* formatted_name = bh_strdup(global_heap_allocator, filename);
+    bh_arr_each(AstInclude *, include, results->includes) {
+        if ((*include)->kind == Ast_Kind_Include_File) {
+            char* filename = lookup_included_file(compiler_state, (*include)->name);
+            char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
-        bh_arr_push(compiler_state->queued_files, formatted_name);
+            bh_arr_push(compiler_state->queued_files, formatted_name);
+        } else if ((*include)->kind == Ast_Kind_Include_Folder) {
+            const char* folder = bh_aprintf(global_heap_allocator, "%b", (*include)->name->text, (*include)->name->length);
+            bh_arr_push(compiler_state->options->included_folders, folder);
+        }
     }
 
     Entity ent;

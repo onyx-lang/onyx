@@ -1,7 +1,9 @@
 package main
 
-use "printing"
-use "alloc"
+#include_folder "./core"
+
+#include_file "printing"
+#include_file "alloc"
 
 use package printing
 use package memory

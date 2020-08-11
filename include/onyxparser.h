@@ -17,7 +17,7 @@ typedef struct ParseResults {
     // NOTE: The allocator used to make the arrays below
     bh_allocator allocator;
 
-    bh_arr(AstIncludeFile *) files;
+    bh_arr(AstInclude *) includes;
 
     // NOTE: Contains all the nodes that will need some processing (symbol resolution, type checking)
     bh_arr(NodeToProcess) nodes_to_process;

@@ -1,11 +1,8 @@
 package memory
 
-use "intrinsics"
+#include_file "intrinsics"
 
-use package printing { print }
-use package intrinsics {
-    memory_size, memory_grow
-}
+use package intrinsics { memory_size, memory_grow }
 
 // Need to define this somewhere
 null :: cast(rawptr) 0;

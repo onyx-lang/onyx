@@ -1338,62 +1338,53 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
         is_private = 1;
     }
 
-    switch (parser->curr->type) {
+    switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
 
-            if (parser->curr->type == Token_Type_Keyword_Package) {
+            expect_token(parser, Token_Type_Keyword_Package);
+
+            AstUsePackage* upack = make_node(AstUsePackage, Ast_Kind_Use_Package);
+            upack->token = use_token;
+
+            AstNode* pack_symbol = make_node(AstNode, Ast_Kind_Symbol);
+            pack_symbol->token = expect_token(parser, Token_Type_Symbol);
+            upack->package = (AstPackage *) pack_symbol;
+
+            if (parser->curr->type == Token_Type_Keyword_As) {
+                consume_token(parser);
+                upack->alias = expect_token(parser, Token_Type_Symbol);
+            }
+
+            if (parser->curr->type == '{') {
                 consume_token(parser);
 
-                AstUsePackage* upack = make_node(AstUsePackage, Ast_Kind_Use_Package);
-                upack->token = use_token;
+                bh_arr_new(global_heap_allocator, upack->only, 4);
 
-                AstNode* pack_symbol = make_node(AstNode, Ast_Kind_Symbol);
-                pack_symbol->token = expect_token(parser, Token_Type_Symbol);
-                upack->package = (AstPackage *) pack_symbol;
+                while (parser->curr->type != '}') {
+                    if (parser->hit_unexpected_token) return NULL;
 
-                if (parser->curr->type == Token_Type_Keyword_As) {
-                    consume_token(parser);
-                    upack->alias = expect_token(parser, Token_Type_Symbol);
-                }
+                    AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
+                    alias->token = expect_token(parser, Token_Type_Symbol);
 
-                if (parser->curr->type == '{') {
-                    consume_token(parser);
-
-                    bh_arr_new(global_heap_allocator, upack->only, 4);
-
-                    while (parser->curr->type != '}') {
-                        if (parser->hit_unexpected_token) return NULL;
-
-                        AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
-                        alias->token = expect_token(parser, Token_Type_Symbol);
-
-                        if (parser->curr->type == Token_Type_Keyword_As) {
-                            consume_token(parser);
-                            alias->alias = expect_token(parser, Token_Type_Symbol);
-                        } else {
-                            alias->alias = alias->token;
-                        }
-
-                        bh_arr_push(upack->only, alias);
-
-                        if (parser->curr->type != '}')
-                            expect_token(parser, ',');
+                    if (parser->curr->type == Token_Type_Keyword_As) {
+                        consume_token(parser);
+                        alias->alias = expect_token(parser, Token_Type_Symbol);
+                    } else {
+                        alias->alias = alias->token;
                     }
 
-                    consume_token(parser);
+                    bh_arr_push(upack->only, alias);
+
+                    if (parser->curr->type != '}')
+                        expect_token(parser, ',');
                 }
 
-                add_node_to_process(parser, (AstNode *) upack);
-                return NULL;
-
-            } else {
-                AstIncludeFile* include = make_node(AstIncludeFile, Ast_Kind_Include_File);
-                include->token = use_token;
-                include->filename = expect_token(parser, Token_Type_Literal_String);
-
-                return (AstNode *) include;
+                consume_token(parser);
             }
+
+            add_node_to_process(parser, (AstNode *) upack);
+            return NULL;
         }
 
         case Token_Type_Keyword_Proc:
@@ -1477,6 +1468,32 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
             }
         }
 
+        case '#': {
+            while (parser->curr->type == '#') {
+                OnyxToken* dir_token = parser->curr;
+
+                if (parse_possible_directive(parser, "include_file")) {
+                    AstInclude* include = make_node(AstInclude, Ast_Kind_Include_File);
+                    include->token = dir_token;
+                    include->name = expect_token(parser, Token_Type_Literal_String);
+
+                    return (AstNode *) include;
+                }
+                else if (parse_possible_directive(parser, "include_folder")) {
+                    AstInclude* include = make_node(AstInclude, Ast_Kind_Include_Folder);
+                    include->token = dir_token;
+                    include->name = expect_token(parser, Token_Type_Literal_String);
+
+                    return (AstNode *) include;
+                }
+                else {
+                    onyx_message_add(Msg_Type_Unknown_Directive,
+                            dir_token->pos, dir_token->text, dir_token->length);
+                    return NULL;
+                }
+            }
+        }
+
         default: break;
     }
 
@@ -1511,12 +1528,12 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Prog
     parser.results = (ParseResults) {
         .allocator = global_heap_allocator,
 
-        .files = NULL,
+        .includes = NULL,
         .nodes_to_process = NULL,
 
     };
 
-    bh_arr_new(parser.results.allocator, parser.results.files, 4);
+    bh_arr_new(parser.results.allocator, parser.results.includes, 4);
     bh_arr_new(parser.results.allocator, parser.results.nodes_to_process, 4);
 
     return parser;
@@ -1560,7 +1577,10 @@ ParseResults onyx_parse(OnyxParser *parser) {
             while (curr_stmt != NULL) {
 
                 switch (curr_stmt->kind) {
-                    case Ast_Kind_Include_File: bh_arr_push(parser->results.files, (AstIncludeFile *) curr_stmt); break;
+                    case Ast_Kind_Include_File:
+                    case Ast_Kind_Include_Folder:
+                        bh_arr_push(parser->results.includes, (AstInclude *) curr_stmt);
+                        break;
                     case Ast_Kind_Binding: {
                         if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_Package) {
                             symbol_introduce(parser->package->private_scope,

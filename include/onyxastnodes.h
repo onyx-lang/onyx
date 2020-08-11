@@ -47,7 +47,7 @@ typedef struct AstTypeAlias AstTypeAlias;
 
 typedef struct AstBinding AstBinding;
 typedef struct AstMemRes AstMemRes;
-typedef struct AstIncludeFile AstIncludeFile;
+typedef struct AstInclude AstInclude;
 typedef struct AstUsePackage AstUsePackage;
 typedef struct AstAlias AstAlias;
 typedef struct AstGlobal AstGlobal;
@@ -70,6 +70,7 @@ typedef enum AstKind {
     Ast_Kind_Program,
     Ast_Kind_Package,
     Ast_Kind_Include_File,
+    Ast_Kind_Include_Folder,
     Ast_Kind_Use_Package,
     Ast_Kind_Alias,
     Ast_Kind_Memres,
@@ -351,7 +352,7 @@ struct AstTypeAlias { AstType_base; AstType* to; };
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
 struct AstMemRes        { AstTyped_base; u64 addr; AstTyped *initial_value; }; // HACK: This has to be the same size or bigger as AstDereference
-struct AstIncludeFile   { AstNode_base; OnyxToken *filename; };
+struct AstInclude       { AstNode_base; OnyxToken *name; };
 struct AstUsePackage    {
     AstNode_base;
 
