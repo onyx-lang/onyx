@@ -20,7 +20,6 @@ typedef struct AstAddressOf AstAddressOf;
 typedef struct AstDereference AstDereference;
 typedef struct AstArrayAccess AstArrayAccess;
 typedef struct AstFieldAccess AstFieldAccess;
-typedef struct AstUfc AstUfc;
 typedef struct AstSizeOf AstSizeOf;
 typedef struct AstAlignOf AstAlignOf;
 typedef struct AstFileContents AstFileContents;
@@ -205,6 +204,8 @@ typedef enum BinaryOp {
     Binary_Op_Assign_Shr      = 30,
     Binary_Op_Assign_Sar      = 31,
     Binary_Op_Assign_End      = 32,
+
+    Binary_Op_Pipe            = 33,
 } BinaryOp;
 
 typedef enum OnyxIntrinsic {
@@ -278,7 +279,6 @@ struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
-struct AstUfc           { AstTyped_base; AstTyped *object; AstTyped *call; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
 struct AstFileContents  { AstTyped_base; OnyxToken *filename; };

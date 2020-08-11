@@ -415,26 +415,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
-            case Token_Type_Pipe: {
-                AstUfc* ufc_node = make_node(AstUfc, Ast_Kind_Ufc);
-                ufc_node->token = expect_token(parser, Token_Type_Pipe);
-                ufc_node->object = retval;
-
-                AstTyped* right = parse_factor(parser);
-
-                if (right->kind == Ast_Kind_Ufc) {
-                    ufc_node->call = ((AstUfc *) right)->object;
-                    ((AstUfc *) right)->object = (AstTyped *) ufc_node;
-                    retval = right;
-
-                } else {
-                    ufc_node->call = right;
-                    retval = (AstTyped *) ufc_node;
-                }
-
-                break;
-            }
-
             default: goto factor_parsed;
         }
     }
@@ -459,31 +439,33 @@ static inline i32 get_precedence(BinaryOp kind) {
         case Binary_Op_Assign_Shr:      return 1;
         case Binary_Op_Assign_Sar:      return 1;
 
-        case Binary_Op_Bool_And:        return 2;
-        case Binary_Op_Bool_Or:         return 2;
+        case Binary_Op_Pipe:            return 2;
 
-        case Binary_Op_Equal:           return 3;
-        case Binary_Op_Not_Equal:       return 3;
+        case Binary_Op_Bool_And:        return 3;
+        case Binary_Op_Bool_Or:         return 3;
 
-        case Binary_Op_Less_Equal:      return 4;
-        case Binary_Op_Less:            return 4;
-        case Binary_Op_Greater_Equal:   return 4;
-        case Binary_Op_Greater:         return 4;
+        case Binary_Op_Equal:           return 4;
+        case Binary_Op_Not_Equal:       return 4;
 
-        case Binary_Op_And:             return 5;
-        case Binary_Op_Or:              return 5;
-        case Binary_Op_Xor:             return 5;
-        case Binary_Op_Shl:             return 5;
-        case Binary_Op_Shr:             return 5;
-        case Binary_Op_Sar:             return 5;
+        case Binary_Op_Less_Equal:      return 5;
+        case Binary_Op_Less:            return 5;
+        case Binary_Op_Greater_Equal:   return 5;
+        case Binary_Op_Greater:         return 5;
 
-        case Binary_Op_Add:             return 6;
-        case Binary_Op_Minus:           return 6;
+        case Binary_Op_And:             return 6;
+        case Binary_Op_Or:              return 6;
+        case Binary_Op_Xor:             return 6;
+        case Binary_Op_Shl:             return 6;
+        case Binary_Op_Shr:             return 6;
+        case Binary_Op_Sar:             return 6;
 
-        case Binary_Op_Multiply:        return 7;
-        case Binary_Op_Divide:          return 7;
+        case Binary_Op_Add:             return 7;
+        case Binary_Op_Minus:           return 7;
 
-        case Binary_Op_Modulus:         return 8;
+        case Binary_Op_Multiply:        return 8;
+        case Binary_Op_Divide:          return 8;
+
+        case Binary_Op_Modulus:         return 9;
 
         default:                        return -1;
     }
@@ -560,6 +542,8 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             case Token_Type_Shl_Equal:         bin_op_kind = Binary_Op_Assign_Shl; break;
             case Token_Type_Shr_Equal:         bin_op_kind = Binary_Op_Assign_Shr; break;
             case Token_Type_Sar_Equal:         bin_op_kind = Binary_Op_Assign_Sar; break;
+
+            case Token_Type_Pipe:              bin_op_kind = Binary_Op_Pipe; break;
             default: goto expression_done;
         }
 
@@ -567,9 +551,16 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             bin_op_tok = parser->curr;
             consume_token(parser);
 
-            AstBinaryOp* bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
-            bin_op->operation = bin_op_kind;
-            bin_op->token = bin_op_tok;
+            AstBinaryOp* bin_op;
+            if (bin_op_kind != Binary_Op_Pipe) {
+                bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+                bin_op->operation = bin_op_kind;
+                bin_op->token = bin_op_tok;
+
+            } else {
+                bin_op = make_node(AstBinaryOp, Ast_Kind_Ufc);
+                bin_op->token = bin_op_tok;
+            }
 
             while ( !bh_arr_is_empty(tree_stack) &&
                     get_precedence(bh_arr_last(tree_stack)->operation) >= get_precedence(bin_op_kind))

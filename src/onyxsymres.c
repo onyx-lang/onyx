@@ -222,32 +222,32 @@ static void symres_field_access(AstFieldAccess** fa) {
     }
 }
 
-static void symres_ufc(AstUfc** ufc) {
-    AstCall* call_node = (AstCall *) (*ufc)->call;
+static void symres_ufc(AstBinaryOp** ufc) {
+    AstCall* call_node = (AstCall *) (*ufc)->right;
     symres_expression((AstTyped **) &call_node);
-    symres_expression(&(*ufc)->object);
+    symres_expression(&(*ufc)->left);
 
-    if ((*ufc)->call->kind != Ast_Kind_Call) {
+    if (call_node->kind != Ast_Kind_Call) {
         onyx_message_add(Msg_Type_Literal,
                 (*ufc)->token->pos,
                 "universal function call expected call on right side");
         return;
     }
 
-    if ((*ufc)->object == NULL) return;
+    if ((*ufc)->left == NULL) return;
 
     AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator,
             sizeof(AstArgument),
             Ast_Kind_Argument);
-    implicit_arg->value = (*ufc)->object;
+    implicit_arg->value = (*ufc)->left;
     implicit_arg->next = (AstNode *) call_node->arguments;
 
     call_node->arguments = implicit_arg;
     call_node->arg_count++;
     call_node->next = (*ufc)->next;
 
-    // NOTE: Not a UFC node
-    *ufc = (AstUfc *) call_node;
+    // NOTE: Not a BinaryOp node
+    *ufc = (AstBinaryOp *) call_node;
 }
 
 static void symres_unaryop(AstUnaryOp** unaryop) {
@@ -280,7 +280,7 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
         case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
         case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
-        case Ast_Kind_Ufc:          symres_ufc((AstUfc **) expr); break;
+        case Ast_Kind_Ufc:          symres_ufc((AstBinaryOp **) expr); break;
         case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
         case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
 

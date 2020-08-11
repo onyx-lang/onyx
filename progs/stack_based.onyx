@@ -137,7 +137,8 @@ start :: proc #export {
 
     val := something
             |> sort(proc (a: i32, b: i32) -> i32 { return a - b; })
-            |> sumN();
+            |> sumN()
+            |> clamp(30, 100);
     print(val);
 
     for i: 0, N do print(something[i] |> clamp(3, 6));
