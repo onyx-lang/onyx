@@ -32,6 +32,7 @@ static const char* token_type_names[] = {
     "->",
     "<-",
     "---",
+    "|>",
 
     ">=",
     "<=",
@@ -172,6 +173,7 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     LITERAL_TOKEN("->",         0, Token_Type_Right_Arrow);
     LITERAL_TOKEN("<-",         0, Token_Type_Right_Arrow);
     LITERAL_TOKEN("---",        0, Token_Type_Empty_Block);
+    LITERAL_TOKEN("|>",         0, Token_Type_Pipe);
     LITERAL_TOKEN("&&",         0, Token_Type_And_And);
     LITERAL_TOKEN("||",         0, Token_Type_Or_Or);
     LITERAL_TOKEN(">>>=",       0, Token_Type_Sar_Equal);

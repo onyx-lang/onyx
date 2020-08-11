@@ -415,13 +415,23 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
-            case '\'': {
+            case Token_Type_Pipe: {
                 AstUfc* ufc_node = make_node(AstUfc, Ast_Kind_Ufc);
-                ufc_node->token = expect_token(parser, '\'');
+                ufc_node->token = expect_token(parser, Token_Type_Pipe);
                 ufc_node->object = retval;
-                ufc_node->call = parse_factor(parser);
 
-                retval = (AstTyped *) ufc_node;
+                AstTyped* right = parse_factor(parser);
+
+                if (right->kind == Ast_Kind_Ufc) {
+                    ufc_node->call = ((AstUfc *) right)->object;
+                    ((AstUfc *) right)->object = (AstTyped *) ufc_node;
+                    retval = right;
+
+                } else {
+                    ufc_node->call = right;
+                    retval = (AstTyped *) ufc_node;
+                }
+
                 break;
             }
 

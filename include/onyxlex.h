@@ -34,6 +34,7 @@ typedef enum TokenType {
     Token_Type_Right_Arrow,
     Token_Type_Left_Arrow,
     Token_Type_Empty_Block,
+    Token_Type_Pipe,
 
     Token_Type_Greater_Equal,
     Token_Type_Less_Equal,

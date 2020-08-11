@@ -223,6 +223,10 @@ static void symres_field_access(AstFieldAccess** fa) {
 }
 
 static void symres_ufc(AstUfc** ufc) {
+    AstCall* call_node = (AstCall *) (*ufc)->call;
+    symres_expression((AstTyped **) &call_node);
+    symres_expression(&(*ufc)->object);
+
     if ((*ufc)->call->kind != Ast_Kind_Call) {
         onyx_message_add(Msg_Type_Literal,
                 (*ufc)->token->pos,
@@ -230,22 +234,17 @@ static void symres_ufc(AstUfc** ufc) {
         return;
     }
 
-    symres_expression(&(*ufc)->object);
     if ((*ufc)->object == NULL) return;
-
-    AstCall* call_node = (AstCall *) (*ufc)->call;
 
     AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator,
             sizeof(AstArgument),
             Ast_Kind_Argument);
     implicit_arg->value = (*ufc)->object;
     implicit_arg->next = (AstNode *) call_node->arguments;
-    
+
     call_node->arguments = implicit_arg;
     call_node->arg_count++;
     call_node->next = (*ufc)->next;
-
-    symres_expression((AstTyped **) &call_node);
 
     // NOTE: Not a UFC node
     *ufc = (AstUfc *) call_node;

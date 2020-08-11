@@ -8,7 +8,7 @@ package main
 use package printing
 use package memory
 
-sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) {
+sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) -> [N]i32 {
     for i: 0, N {
         smallest_idx := i;
 
@@ -18,6 +18,8 @@ sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) {
         arr[i] = arr[smallest_idx];
         arr[smallest_idx] = tmp;
     }
+
+    return arr;
 }
 
 ret_val :: proc (x: i32, y: i32) -> i32 {
@@ -58,6 +60,12 @@ vec_add :: proc (v: Vec3, u: Vec3, use out: ^Vec3) {
     z = v.z + u.z;
 }
 
+clamp :: proc (v: i32, lo: i32, hi: i32) -> i32 {
+    if v < lo do return lo;
+    if v > hi do return hi;
+    return v;
+}
+
 some_value := 20 + 30 * 4 + 15 / 5;
 
 start :: proc #export {
@@ -85,7 +93,7 @@ start :: proc #export {
     arr[1][3] = 40;
     arr[1][4] = 50;
     arr[1][9] = 123;
-    print(arr[1] 'sumN());
+    print(arr[1]|>sumN());
     print(summing(cast(^i32) arr[1]));
 
     v1: Vec3;
@@ -104,9 +112,9 @@ start :: proc #export {
     print(v3.y);
     print(v3.z);
 
-    print(v3'mag_squared());
+    print(v3|>mag_squared());
 
-    print(10'ret_val(4));
+    print(10 |> ret_val(4));
     
     for i: 0, N do print(arr[1][i]);
 
@@ -127,7 +135,10 @@ start :: proc #export {
     for i: 0, N do something[i] = N - i;
     for i: 0, N do print(something[i]);
 
-    something'sort(proc (a: i32, b: i32) -> i32 { return a - b; });
+    val := something
+            |> sort(proc (a: i32, b: i32) -> i32 { return a - b; })
+            |> sumN();
+    print(val);
 
-    for i: 0, N do print(something[i]);
+    for i: 0, N do print(something[i] |> clamp(3, 6));
 }
