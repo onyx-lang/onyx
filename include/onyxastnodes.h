@@ -20,6 +20,7 @@ typedef struct AstAddressOf AstAddressOf;
 typedef struct AstDereference AstDereference;
 typedef struct AstArrayAccess AstArrayAccess;
 typedef struct AstFieldAccess AstFieldAccess;
+typedef struct AstUfc AstUfc;
 typedef struct AstSizeOf AstSizeOf;
 typedef struct AstAlignOf AstAlignOf;
 typedef struct AstFileContents AstFileContents;
@@ -112,6 +113,7 @@ typedef enum AstKind {
     Ast_Kind_Dereference,
     Ast_Kind_Array_Access,
     Ast_Kind_Field_Access,
+    Ast_Kind_Ufc,
     Ast_Kind_Size_Of,
     Ast_Kind_Align_Of,
     Ast_Kind_File_Contents,
@@ -276,6 +278,7 @@ struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
+struct AstUfc           { AstTyped_base; AstTyped *object; AstTyped *call; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
 struct AstFileContents  { AstTyped_base; OnyxToken *filename; };

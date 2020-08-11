@@ -357,7 +357,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             return NULL;
     }
 
-    while (parser->curr->type == '[' || parser->curr->type == '.' || parser->curr->type == '(') {
+    while (1) {
         if (parser->hit_unexpected_token) return retval;
 
         switch ((u16) parser->curr->type) {
@@ -414,8 +414,22 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) call_node;
                 break;
             }
+
+            case '\'': {
+                AstUfc* ufc_node = make_node(AstUfc, Ast_Kind_Ufc);
+                ufc_node->token = expect_token(parser, '\'');
+                ufc_node->object = retval;
+                ufc_node->call = parse_factor(parser);
+
+                retval = (AstTyped *) ufc_node;
+                break;
+            }
+
+            default: goto factor_parsed;
         }
     }
+
+factor_parsed:
 
     return retval;
 }

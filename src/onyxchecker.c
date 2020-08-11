@@ -787,7 +787,7 @@ CHECK(expression, AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         onyx_message_add(Msg_Type_Literal,
-                (OnyxFilePos) { 0 },
+                expr->token->pos,
                 "type used as part of an expression");
         return 1;
     }

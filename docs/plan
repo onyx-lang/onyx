@@ -161,6 +161,12 @@ HOW:
 
         [X] Include other directories to search for files
 
+        [ ] Arrays need to be much better
+            - Currently, they are basically just a pointer.
+            - The length should be stored with the pointer
+            - Dynamic resizing?
+            - They are just very hard to use at the moment
+
         [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] Array literals

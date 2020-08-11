@@ -1,5 +1,6 @@
 package memory
 
+#include_file "memory"
 #include_file "intrinsics"
 
 use package intrinsics { memory_size, memory_grow }
@@ -22,6 +23,10 @@ Allocator :: struct {
 
 alloc :: proc (use a: ^Allocator, size: u32) -> rawptr {
     return func(data, AllocAction.Alloc, size, 16, null);
+}
+
+resize :: proc (use a: ^Allocator, ptr: rawptr, size: u32) -> rawptr {
+    return func(data, AllocAction.Resize, size, 16, ptr);
 }
 
 free :: proc (use a: ^Allocator, ptr: rawptr) {
@@ -121,8 +126,30 @@ heap_free :: proc (ptr: rawptr) {
 }
 
 #private
+heap_resize :: proc (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
+    hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
+
+    // If there is already enough space in the current allocated block,
+    // just return the block that already exists and has the memory in it.
+    if hb_ptr.size >= new_size do return ptr;
+
+    // If we are at the end of the allocation space, just extend it
+    if hb_ptr.size + cast(u32) ptr >= cast(u32) heap_state.next_alloc {
+        hb_ptr.size = new_size;
+        heap_state.next_alloc = cast(rawptr) (cast(u32) ptr + hb_ptr.size);
+        return ptr;
+    }
+
+    new_ptr := heap_alloc(new_size, align);
+    memory_copy(new_ptr, ptr, hb_ptr.size);
+    heap_free(ptr);
+    return new_ptr;
+}
+
+#private
 heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     if aa == AllocAction.Alloc do return heap_alloc(size, align);
+    if aa == AllocAction.Resize do return heap_resize(oldptr, size, align);
     if aa == AllocAction.Free {
         heap_free(oldptr);
         return null;
@@ -131,5 +158,6 @@ heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, o
     return null;
 }
 
-malloc :: proc (size: u32) -> rawptr do return alloc(^heap_allocator, size);
-mfree  :: proc (ptr: rawptr) do free(^heap_allocator, ptr);
+malloc  :: proc (size: u32) -> rawptr do return alloc(^heap_allocator, size);
+mfree   :: proc (ptr: rawptr) do free(^heap_allocator, ptr);
+mresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(^heap_allocator, ptr, size);

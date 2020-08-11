@@ -61,8 +61,8 @@ static void symres_return(AstReturn* ret);
 static void symres_if(AstIf* ifnode);
 static void symres_while(AstWhile* whilenode);
 static void symres_for(AstFor* fornode);
-static void symres_statement_chain(AstNode* walker, AstNode** trailer);
-static b32  symres_statement(AstNode* stmt);
+static void symres_statement_chain(AstNode** walker);
+static b32  symres_statement(AstNode** stmt);
 static void symres_block(AstBlock* block);
 static void symres_function(AstFunction* func);
 static void symres_global(AstGlobal* global);
@@ -183,7 +183,7 @@ static void symres_call(AstCall* call) {
     //     call->arg_count++;
     // }
 
-    symres_statement_chain((AstNode *) call->arguments, (AstNode **) &call->arguments);
+    symres_statement_chain((AstNode **) &call->arguments);
 }
 
 static void symres_size_of(AstSizeOf* so) {
@@ -222,6 +222,35 @@ static void symres_field_access(AstFieldAccess** fa) {
     }
 }
 
+static void symres_ufc(AstUfc** ufc) {
+    if ((*ufc)->call->kind != Ast_Kind_Call) {
+        onyx_message_add(Msg_Type_Literal,
+                (*ufc)->token->pos,
+                "universal function call expected call on right side");
+        return;
+    }
+
+    symres_expression(&(*ufc)->object);
+    if ((*ufc)->object == NULL) return;
+
+    AstCall* call_node = (AstCall *) (*ufc)->call;
+
+    AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator,
+            sizeof(AstArgument),
+            Ast_Kind_Argument);
+    implicit_arg->value = (*ufc)->object;
+    implicit_arg->next = (AstNode *) call_node->arguments;
+    
+    call_node->arguments = implicit_arg;
+    call_node->arg_count++;
+    call_node->next = (*ufc)->next;
+
+    symres_expression((AstTyped **) &call_node);
+
+    // NOTE: Not a UFC node
+    *ufc = (AstUfc *) call_node;
+}
+
 static void symres_unaryop(AstUnaryOp** unaryop) {
     if ((*unaryop)->operation == Unary_Op_Cast) {
         (*unaryop)->type_node = symres_type((*unaryop)->type_node);
@@ -252,6 +281,7 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
         case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
         case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
+        case Ast_Kind_Ufc:          symres_ufc((AstUfc **) expr); break;
         case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
         case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
 
@@ -284,8 +314,8 @@ static void symres_if(AstIf* ifnode) {
     //
     // The declaration will cause a problem but semantically the above
     // doesn't make sense.
-    if (ifnode->true_stmt != NULL)  symres_statement((AstNode *) ifnode->true_stmt);
-    if (ifnode->false_stmt != NULL) symres_statement((AstNode *) ifnode->false_stmt);
+    if (ifnode->true_stmt != NULL)  symres_statement((AstNode **) &ifnode->true_stmt);
+    if (ifnode->false_stmt != NULL) symres_statement((AstNode **) &ifnode->false_stmt);
 }
 
 static void symres_while(AstWhile* whilenode) {
@@ -310,36 +340,33 @@ static void symres_for(AstFor* fornode) {
 }
 
 // NOTE: Returns 1 if the statment should be removed
-static b32 symres_statement(AstNode* stmt) {
-    switch (stmt->kind) {
-        case Ast_Kind_Local:      symres_local((AstLocal **) &stmt);                return 1;
-        case Ast_Kind_Return:     symres_return((AstReturn *) stmt);                return 0;
-        case Ast_Kind_If:         symres_if((AstIf *) stmt);                        return 0;
-        case Ast_Kind_While:      symres_while((AstWhile *) stmt);                  return 0;
-        case Ast_Kind_For:        symres_for((AstFor *) stmt);                      return 0;
-        case Ast_Kind_Call:       symres_call((AstCall *) stmt);                    return 0;
-        case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *)stmt)->value); return 0;
-        case Ast_Kind_Block:      symres_block((AstBlock *) stmt);                  return 0;
-        case Ast_Kind_Defer:      symres_statement(((AstDefer *) stmt)->stmt);      return 0;
+static b32 symres_statement(AstNode** stmt) {
+    switch ((*stmt)->kind) {
+        case Ast_Kind_Local:      symres_local((AstLocal **) stmt);                  return 1;
+        case Ast_Kind_Return:     symres_return((AstReturn *) *stmt);                return 0;
+        case Ast_Kind_If:         symres_if((AstIf *) *stmt);                        return 0;
+        case Ast_Kind_While:      symres_while((AstWhile *) *stmt);                  return 0;
+        case Ast_Kind_For:        symres_for((AstFor *) *stmt);                      return 0;
+        case Ast_Kind_Call:       symres_call((AstCall *) *stmt);                    return 0;
+        case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *) *stmt)->value); return 0;
+        case Ast_Kind_Block:      symres_block((AstBlock *) *stmt);                  return 0;
+        case Ast_Kind_Defer:      symres_statement(&((AstDefer *) *stmt)->stmt);     return 0;
 
         case Ast_Kind_Break:      return 0;
         case Ast_Kind_Continue:   return 0;
 
-        default:                  symres_expression((AstTyped **) &stmt);           return 0;
+        default:                  symres_expression((AstTyped **) stmt);           return 0;
     }
 }
 
-static void symres_statement_chain(AstNode* walker, AstNode** trailer) {
-    while (walker) {
+static void symres_statement_chain(AstNode** walker) {
+    while (*walker) {
         if (symres_statement(walker)) {
-            *trailer = walker->next;
-
-            AstNode* tmp = walker->next;
-            walker->next = NULL;
-            walker = tmp;
+            AstNode* tmp = (*walker)->next;
+            (*walker)->next = NULL;
+            (*walker) = tmp;
         } else {
-            trailer = &walker->next;
-            walker = walker->next;
+            walker = &(*walker)->next;
         }
     }
 }
@@ -351,7 +378,7 @@ static void symres_block(AstBlock* block) {
     scope_enter(block->scope);
 
     if (block->body)
-        symres_statement_chain(block->body, &block->body);
+        symres_statement_chain(&block->body);
 
     scope_leave();
 }
