@@ -149,7 +149,6 @@ typedef enum AstFlags {
 
     // Expression flags
     Ast_Flag_Expr_Ignored      = BH_BIT(8),
-    Ast_Flag_Param_Splatted    = BH_BIT(9),
     Ast_Flag_Param_Use         = BH_BIT(10),
     Ast_Flag_Address_Taken     = BH_BIT(11),
 
@@ -485,7 +484,6 @@ extern AstBasicType basic_type_f64;
 extern AstBasicType basic_type_rawptr;
 
 extern AstNumLit builtin_heap_start;
-extern AstGlobal builtin_stack_base;
 extern AstGlobal builtin_stack_top;
 
 typedef struct BuiltinSymbol {
@@ -494,6 +492,8 @@ typedef struct BuiltinSymbol {
 } BuiltinSymbol;
 
 extern const BuiltinSymbol builtin_symbols[];
+
+void initialize_builtins();
 
 
 // NOTE: Useful not inlined functions

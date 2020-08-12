@@ -8,7 +8,7 @@ package main
 use package printing
 use package memory
 
-sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) -> [N]i32 {
+sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) -> [N] i32 {
     for i: 0, N {
         smallest_idx := i;
 
@@ -66,6 +66,20 @@ clamp :: proc (v: i32, lo: i32, hi: i32) -> i32 {
     return v;
 }
 
+// NOTE: Anonymous functions do NOT have closure,
+// so in either of these function scopes, the
+// parameter 'n' is not accessible.
+//
+// This is intended behavior since creating new
+// procs at runtime is very difficult with WASM
+stupid_idea :: proc (n: i32) -> proc () -> i32 {
+    if n == 1234 {
+        return proc -> i32 { return 5678; };
+    }
+
+    return proc -> i32 { return -1; };
+}
+
 some_value := 20 + 30 * 4 + 15 / 5;
 
 start :: proc #export {
@@ -75,7 +89,6 @@ start :: proc #export {
     print_hex(cast(u64) some_value);
     print("Hello, World!");
     print_ptr(__heap_start);
-    print_ptr(__stack_base);
     print_ptr(__stack_top);
     print_bin(42l);
     print_hex(42l);
@@ -96,25 +109,8 @@ start :: proc #export {
     print(arr[1]|>sumN());
     print(summing(cast(^i32) arr[1]));
 
-    v1: Vec3;
-    v1.x = 2;
-    v1.y = 4;
-    v1.z = 10;
-
-    v2: Vec3;
-    v2.x = 4;
-    v2.y = 2;
-    v2.z = 1;
-
-    v3: Vec3;
-    vec_add(v1, v2, ^v3);
-    print(v3.x);
-    print(v3.y);
-    print(v3.z);
-
-    print(v3|>mag_squared());
-
     print(10 |> ret_val(4));
+    print(11 |> ret_val(5));
     
     for i: 0, N do print(arr[1][i]);
 
@@ -141,5 +137,10 @@ start :: proc #export {
             |> clamp(30, 100);
     print(val);
 
-    for i: 0, N do print(something[i] |> clamp(3, 6));
+    for i: 0, N do
+        something[i]
+            |> clamp(3, 6)
+            |> print();
+
+    stupid_idea(1234)() |> print();
 }

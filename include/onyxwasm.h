@@ -334,7 +334,8 @@ typedef struct OnyxWasmModule {
     u32 next_datum_offset;
     u32 next_elem_idx;
 
-    u32 *stack_top_ptr, *stack_base_ptr;
+    i32 *stack_top_ptr;
+    u32 stack_base_idx;
 
     b32 has_stack_locals : 1;
 } OnyxWasmModule;

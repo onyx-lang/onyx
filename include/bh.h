@@ -545,6 +545,7 @@ typedef struct bh__arr {
 #define bh_arr_pop(arr)              ((arr)[--bh__arrhead(arr)->length])
 #define bh_arr_last(arr)             ((arr)[bh__arrhead(arr)->length - 1])
 #define bh_arr_end(arr, i)           ((i) >= &(arr)[bh_arr_length(arr)])
+#define bh_arr_start(arr, i)         ((i) < (arr))
 
 #define bh_arr_new(allocator_, arr, cap)    (bh__arr_grow((allocator_), (void**) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_free(arr)                    (bh__arr_free((void**) &(arr)))
@@ -573,6 +574,7 @@ typedef struct bh__arr {
 #define bh_arr_fastdelete(arr, i)     (arr[i] = arr[--bh__arrhead(arr)->length])
 
 #define bh_arr_each(T, var, arr)      for (T* var = (arr); !bh_arr_end((arr), var); var++)
+#define bh_arr_rev_each(T, var, arr)  for (T* var = &bh_arr_last((arr)); !bh_arr_start((arr), var); var--)
 
 b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap);

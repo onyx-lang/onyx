@@ -350,18 +350,12 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_arr_fastdelete(compiler_state->queued_files, 0);
     }
 
+    initialize_builtins();
+
     // Add builtin one-time entities
     bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
         .type = Entity_Type_Global_Header,
-        .global = &builtin_stack_base
-    }));
-    bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
-        .type = Entity_Type_Global_Header,
         .global = &builtin_stack_top
-    }));
-    bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
-        .type = Entity_Type_Global,
-        .global = &builtin_stack_base
     }));
     bh_arr_push(compiler_state->prog_info.entities, ((Entity) {
         .type = Entity_Type_Global,

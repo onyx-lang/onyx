@@ -192,7 +192,7 @@ CHECK(call, AstCall* call) {
 
     if (check_expression(&call->callee)) return 1;
 
-    // NOTE: Check arguments and splat structs
+    // NOTE: Check arguments
     AstNode** prev_param = (AstNode **) &call->arguments;
     AstArgument* actual_param = call->arguments;
     while (actual_param != NULL) {
@@ -205,43 +205,7 @@ CHECK(call, AstCall* call) {
             return 1;
         }
 
-        // NOTE: Splat structures into multiple arguments
-        if (actual_param->type->kind == Type_Kind_Struct) {
-            if (!type_struct_is_simple(actual_param->type)) {
-                onyx_message_add(Msg_Type_Literal,
-                    actual_param->token->pos,
-                    "can only splat simple structure. nested structures or struct of arrays is not allowed.");
-                return 1;
-            }
-
-            bh_arr_each(StructMember *, smem, actual_param->type->Struct.memarr) {
-                AstFieldAccess* field = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
-                field->expr = actual_param->value;
-
-                // HACK: Since dereferences are not used for struct types, we need a
-                // special case here.
-                if (field->expr->kind == Ast_Kind_Dereference) {
-                    field->expr = ((AstDereference *) field->expr)->expr;
-                }
-
-                field->offset = (*smem)->offset;
-                field->type = (*smem)->type;
-
-                AstArgument* arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
-                arg->value = (AstTyped *) field;
-                arg->type = field->type;
-                arg->token = actual_param->token;
-                arg->next = actual_param->next;
-
-                call->arg_count++;
-
-                *prev_param = (AstNode *) arg;
-                prev_param = (AstNode **) &arg->next;
-            }
-        } else {
-            prev_param = (AstNode **) &actual_param->next;
-        }
-
+        prev_param = (AstNode **) &actual_param->next;
         actual_param = (AstArgument *) actual_param->next;
     }
 
@@ -752,18 +716,6 @@ CHECK(field_access, AstFieldAccess** pfield) {
         return 1;
     }
 
-    if (field->expr->flags & Ast_Flag_Param_Splatted) {
-        AstLocal* param = (AstLocal *) field->expr;
-
-        u32 steps = smem.idx + 1;
-        while (steps--) param = (AstLocal *) param->next;
-
-        // NOTE: Not actually a field access
-        *pfield = (AstFieldAccess *) param;
-        token_toggle_end(field->token);
-        return 0;
-    }
-
     field->offset = smem.offset;
     field->type = smem.type;
 
@@ -1008,9 +960,6 @@ CHECK(struct, AstStructType* s_node) {
 }
 
 CHECK(function_header, AstFunction* func) {
-    i32 changed_params = 0;
-
-    AstLocal **prev_param = &func->params;
     AstLocal *param = func->params;
     while (param != NULL) {
         fill_in_type((AstTyped *) param);
@@ -1030,55 +979,10 @@ CHECK(function_header, AstFunction* func) {
             return 1;
         }
 
-        if (param->type->kind == Type_Kind_Struct) {
-            param->flags |= Ast_Flag_Param_Splatted;
-
-            if (!type_struct_is_simple(param->type)) {
-                onyx_message_add(Msg_Type_Literal,
-                    param->token->pos,
-                    "only simple structures can be passed by value");
-                return 1;
-            }
-
-            changed_params = 1;
-
-            AstLocal *first_new_param = NULL, *last_new_param = NULL;
-            AstLocal** insertion = prev_param;
-            bh_arr_each(StructMember *, smem, param->type->Struct.memarr) {
-                AstLocal* new_param = onyx_ast_node_new(semstate.node_allocator, sizeof(AstLocal), Ast_Kind_Param);
-                new_param->token = param->token;
-                new_param->type = (*smem)->type;
-                new_param->flags |= Ast_Flag_Const;
-
-                if (first_new_param == NULL) first_new_param = new_param;
-                last_new_param = new_param;
-
-                *insertion = new_param;
-                insertion = (AstLocal **) &new_param->next;
-            }
-
-            *prev_param = first_new_param;
-            last_new_param->next = param->next;
-            param->next = (AstNode *) first_new_param;
-
-            prev_param = (AstLocal **) &last_new_param->next;
-        } else {
-            prev_param = (AstLocal **) &param->next;
-        }
-
         param = (AstLocal *) param->next;
     }
 
-    if (changed_params) {
-        // NOTE: Need to rebuild the function parameters in a special way once the are modified.
-        // This may/will get cleaned up at a later point.
-
-        func->type = type_build_function_type(
-            semstate.node_allocator, func,
-            ((AstFunctionType *) func->type_node)->return_type);
-    } else {
-        fill_in_type((AstTyped *) func);
-    }
+    fill_in_type((AstTyped *) func);
 
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {

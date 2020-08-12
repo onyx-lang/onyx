@@ -95,9 +95,6 @@ HOW:
 
         [X] Output 'drop' instruction for functions whose return value isn't used
 
-        [ ] Devise and implement a simple set of implicit type casting rules.
-            - Numeric literals always type cast to whatever type is needed (very flexible).
-
         [X] Strings should work as pointers to data.
             - Literals should be placed in data section with pointers to the start.
             - Should strings be null-terminated or a length at the start of the string?
@@ -161,13 +158,43 @@ HOW:
 
         [X] Include other directories to search for files
 
+        [X] remove struct splatting at parameters
+            - structs can still be passed by value however
+            - removed the implicit splatting feature
+
+        [ ] package builtin
+            - Place to store builtin types and values
+                __heap_start
+                __stack_base
+                __stack_top
+                etc
+
+        [ ] multiple return values
+
+        [ ] multiple lvals and compound assignment
+            a := 2
+            b := 5
+            a, b = b, a;
+
+        [ ] 'use' enums and packages at an arbitrary scope
+
+        [ ] All code paths return correct value
+
+        [ ] Add slices
+            - Arrays without a size
+            - Converted to a struct that looks like:    
+                []T :: struct {
+                    count : u32;
+                    data  : ^T;
+                }
+
         [ ] Arrays need to be much better
             - Currently, they are basically just a pointer.
             - The length should be stored with the pointer
             - Dynamic resizing?
             - They are just very hard to use at the moment
 
-        [ ] 'use' enums and packages at an arbitrary scope
+        [ ] Type parameterized structs
 
         [ ] Array literals
 
@@ -176,16 +203,14 @@ HOW:
         [ ] Top level variable initialization
             - Works for numeric literals
 
-        [ ] Better checking for casts
-            - Checking which things are allowed to cast to/from should be checked in the checker,
-                not in the wasm generatation
-
         [X] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
-        [ ] All code paths return correct value
-
         [ ] #initialize structs
+
+        [ ] Better checking for casts
+            - Checking which things are allowed to cast to/from should be checked in the checker,
+                not in the wasm generatation
 
         [ ] Variadic arguments
 

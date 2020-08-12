@@ -939,6 +939,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
             bh_arr(AstType *) params = NULL;
             bh_arr_new(global_scratch_allocator, params, 4);
+            bh_arr_set_length(params, 0);
 
             expect_token(parser, '(');
             while (parser->curr->type != ')') {
@@ -966,7 +967,8 @@ static AstType* parse_type(OnyxParser* parser) {
             new->param_count = param_count;
             new->return_type = return_type;
 
-            fori (i, 0, param_count - 1) new->params[i] = params[i];
+            if (param_count > 0)
+                fori (i, 0, param_count - 1) new->params[i] = params[i];
 
             *next_insertion = (AstType *) new;
             next_insertion = NULL;

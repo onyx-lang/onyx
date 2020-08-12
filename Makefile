@@ -4,6 +4,7 @@ OBJ_FILES=\
 	build/onyxlex.o \
 	build/onyxparser.o \
 	build/onyxtypes.o \
+	build/onyxbuiltins.o \
 	build/onyxsempass.o \
 	build/onyxsymres.o \
 	build/onyxchecker.o \
