@@ -523,7 +523,18 @@ void onyx_resolve_symbols() {
     // NOTE: Add types to global scope
     BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
     while (bsym->sym != NULL) {
-        symbol_builtin_introduce(semstate.curr_scope, bsym->sym, bsym->node);
+        if (bsym->package == NULL)
+            symbol_builtin_introduce(semstate.curr_scope, bsym->sym, bsym->node);
+        else {
+            Package* p = program_info_package_lookup_or_create(
+                    semstate.program,
+                    bsym->package,
+                    semstate.curr_scope,
+                    semstate.node_allocator);
+            assert(p);
+
+            symbol_builtin_introduce(p->scope, bsym->sym, bsym->node);
+        }
         bsym++;
     }
 

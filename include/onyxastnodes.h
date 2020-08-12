@@ -487,6 +487,7 @@ extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 
 typedef struct BuiltinSymbol {
+    char*    package;
     char*    sym;
     AstNode* node;
 } BuiltinSymbol;

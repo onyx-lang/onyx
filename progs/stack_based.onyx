@@ -88,8 +88,6 @@ start :: proc #export {
     print("Hello, World!");
     print_hex(cast(u64) some_value);
     print("Hello, World!");
-    print_ptr(__heap_start);
-    print_ptr(__stack_top);
     print_bin(42l);
     print_hex(42l);
 
@@ -143,4 +141,10 @@ start :: proc #export {
             |> print();
 
     stupid_idea(1234)() |> print();
+
+    v : [5] Vec3;
+    v[2].x = 4;
+    v[2].y = 5;
+    v[2].z = 6;
+    mag_squared(v[2]) |> print();
 }

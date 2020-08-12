@@ -3,6 +3,7 @@ package memory
 #include_file "memory"
 #include_file "intrinsics"
 
+use package builtin { __heap_start }
 use package intrinsics { memory_size, memory_grow }
 
 // Need to define this somewhere

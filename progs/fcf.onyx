@@ -1,5 +1,7 @@
-use "progs/print_funcs"
-use "progs/intrinsics"
+#include_folder "./core"
+
+#include_file "printing"
+#include_file "intrinsics"
 
 use package printing
 
@@ -39,13 +41,13 @@ I32Array :: struct {
 }
 
 array_map :: proc (arr: I32Array, map: proc (i32) -> i32) {
-    for i: 0, arr.length arr.data[i] = map(arr.data[i]);
+    for i: 0, arr.length do arr.data[i] = map(arr.data[i]);
 }
 
 minus_one :: proc (n: i32) -> i32 { return n - 1; }
 double    :: proc (n: i32) -> i32 { return n << 1; }
 
-proc #export "main" {
+proc #export "start" {
     call_me(echo, 10);
 
     print(cast(my_int) add);
@@ -56,7 +58,7 @@ proc #export "main" {
     funcs[3] = div;
     funcs[4] = mod;
 
-    for i: 0, 5 print(funcs[i](10, 3));
+    for i: 0, 5 do print(funcs[i](10, 3));
 
     dc := cast(^DeferredCall) __heap_start;
     dc.func = add;
@@ -67,12 +69,15 @@ proc #export "main" {
 
     len :: 10;
     data := cast(^i32) (cast(i32) __heap_start + sizeof DeferredCall);
-    for i: 0, len data[i] = i;
+    for i: 0, len do data[i] = i;
     print(cast([] i32) data, len);
 
     add_one :: proc (n: i32) -> i32 { return n + 1; };
 
-    array_map(len, data, add_one);
+    arr : I32Array;
+    arr.length = len;
+    arr.data = data;
+    array_map(arr, add_one);
     print(cast([] i32) data, len);
 
     cheese := Cheeses.Cheddar;

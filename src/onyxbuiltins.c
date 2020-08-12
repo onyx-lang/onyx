@@ -21,24 +21,24 @@ AstNumLit builtin_heap_start = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_
 AstGlobal builtin_stack_top  = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token,  NULL, (AstType *) &basic_type_rawptr, NULL };
 
 const BuiltinSymbol builtin_symbols[] = {
-    { "void",       (AstNode *) &basic_type_void },
-    { "bool",       (AstNode *) &basic_type_bool },
-    { "i8",         (AstNode *) &basic_type_i8 },
-    { "u8",         (AstNode *) &basic_type_u8 },
-    { "i16",        (AstNode *) &basic_type_i16 },
-    { "u16",        (AstNode *) &basic_type_u16 },
-    { "i32",        (AstNode *) &basic_type_i32 },
-    { "u32",        (AstNode *) &basic_type_u32 },
-    { "i64",        (AstNode *) &basic_type_i64 },
-    { "u64",        (AstNode *) &basic_type_u64 },
-    { "f32",        (AstNode *) &basic_type_f32 },
-    { "f64",        (AstNode *) &basic_type_f64 },
-    { "rawptr",     (AstNode *) &basic_type_rawptr },
+    { NULL, "void",       (AstNode *) &basic_type_void },
+    { NULL, "bool",       (AstNode *) &basic_type_bool },
+    { NULL, "i8",         (AstNode *) &basic_type_i8 },
+    { NULL, "u8",         (AstNode *) &basic_type_u8 },
+    { NULL, "i16",        (AstNode *) &basic_type_i16 },
+    { NULL, "u16",        (AstNode *) &basic_type_u16 },
+    { NULL, "i32",        (AstNode *) &basic_type_i32 },
+    { NULL, "u32",        (AstNode *) &basic_type_u32 },
+    { NULL, "i64",        (AstNode *) &basic_type_i64 },
+    { NULL, "u64",        (AstNode *) &basic_type_u64 },
+    { NULL, "f32",        (AstNode *) &basic_type_f32 },
+    { NULL, "f64",        (AstNode *) &basic_type_f64 },
+    { NULL, "rawptr",     (AstNode *) &basic_type_rawptr },
 
-    { "__heap_start", (AstNode *) &builtin_heap_start },
-    { "__stack_top",  (AstNode *) &builtin_stack_top },
+    { "builtin", "__heap_start", (AstNode *) &builtin_heap_start },
+    { "builtin", "__stack_top",  (AstNode *) &builtin_stack_top },
 
-    { NULL, NULL },
+    { NULL, NULL, NULL },
 };
 
 void initialize_builtins() {

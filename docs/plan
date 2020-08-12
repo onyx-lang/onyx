@@ -162,10 +162,9 @@ HOW:
             - structs can still be passed by value however
             - removed the implicit splatting feature
 
-        [ ] package builtin
+        [X] package builtin
             - Place to store builtin types and values
                 __heap_start
-                __stack_base
                 __stack_top
                 etc
 
