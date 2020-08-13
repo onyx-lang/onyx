@@ -428,6 +428,20 @@ CHECK(binaryop_compare, AstBinaryOp** pbinop) {
         return 1;
     }
 
+    if (binop->left->type->kind == Type_Kind_Struct) {
+        onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "invalid type for left side of binary operator");
+        return 1;
+    }
+
+    if (binop->right->type->kind == Type_Kind_Struct) {
+        onyx_message_add(Msg_Type_Literal,
+                binop->token->pos,
+                "invalid type for right side of binary operator");
+        return 1;
+    }
+
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
         onyx_message_add(Msg_Type_Binop_Mismatch,
                 binop->token->pos,

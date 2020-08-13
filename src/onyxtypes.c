@@ -450,6 +450,10 @@ b32 type_is_pointer(Type* type) {
         || (type->kind == Type_Kind_Array);
 }
 
+b32 type_is_rawptr(Type* type) {
+    return type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Rawptr;
+}
+
 b32 type_is_array(Type* type) {
     return type->kind == Type_Kind_Array;
 }

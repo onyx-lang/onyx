@@ -277,6 +277,19 @@ static u64 local_raw_allocate(LocalAllocator* la, WasmType wt) {
     }
 }
 
+static void local_raw_free(LocalAllocator* la, WasmType wt) {
+    i32 idx = 0;
+
+    if (wt == WASM_TYPE_INT32)   idx = 0;
+    if (wt == WASM_TYPE_INT64)   idx = 1;
+    if (wt == WASM_TYPE_FLOAT32) idx = 2;
+    if (wt == WASM_TYPE_FLOAT64) idx = 3;
+
+    assert(la->allocated[idx] > 0 && la->freed[idx] < la->allocated[idx]);
+
+    la->freed[idx]++;
+}
+
 static u64 local_allocate(LocalAllocator* la, AstLocal* local) {
     if (local_is_wasm_local(local)) {
         WasmType wt = onyx_type_to_wasm_type(local->type);
@@ -301,17 +314,8 @@ static u64 local_allocate(LocalAllocator* la, AstLocal* local) {
 
 static void local_free(LocalAllocator* la, AstLocal* local) {
     if (local_is_wasm_local(local)) {
-        i32 idx = 0;
-
         WasmType wt = onyx_type_to_wasm_type(local->type);
-        if (wt == WASM_TYPE_INT32)   idx = 0;
-        if (wt == WASM_TYPE_INT64)   idx = 1;
-        if (wt == WASM_TYPE_FLOAT32) idx = 2;
-        if (wt == WASM_TYPE_FLOAT64) idx = 3;
-
-        assert(la->allocated[idx] > 0 && la->freed[idx] < la->allocated[idx]);
-
-        la->freed[idx]++;
+        local_raw_free(la, wt);
 
     } else {
         u32 size = type_size_of(local->type);
@@ -357,6 +361,8 @@ COMPILE_FUNC(intrinsic_call,        AstIntrinsicCall* call);
 COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return);
 COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return);
 COMPILE_FUNC(local_location,        AstLocal* local, u64* offset_return);
+COMPILE_FUNC(struct_load,           AstTyped* expr);
+COMPILE_FUNC(struct_store,          AstTyped* lval);
 COMPILE_FUNC(expression,            AstTyped* expr);
 COMPILE_FUNC(cast,                  AstUnaryOp* cast);
 COMPILE_FUNC(return,                AstReturn* ret);
@@ -457,6 +463,14 @@ COMPILE_FUNC(statement, AstNode* stmt) {
 COMPILE_FUNC(assignment, AstBinaryOp* assign) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    if (assign->right->type->kind == Type_Kind_Struct) {
+        compile_expression(mod, &code, assign->right);
+        compile_struct_store(mod, &code, assign->left);
+
+        *pcode = code;
+        return;
+    }
+
     AstTyped* lval = assign->left;
 
     if (lval->kind == Ast_Kind_Local) {
@@ -511,6 +525,8 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
 
 COMPILE_FUNC(store_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    assert(("Should use compile_struct_store instead", type->kind != Type_Kind_Struct));
 
     u32 alignment = type_get_alignment_log2(type);
 
@@ -1105,6 +1121,39 @@ COMPILE_FUNC(struct_load, AstTyped* expr) {
         }
 
         compile_load_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
+    }
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(struct_store, AstTyped* lval) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    assert(lval->type->kind == Type_Kind_Struct);
+
+    u64 offset = 0;
+
+    bh_arr_rev_each(StructMember *, smem, lval->type->Struct.memarr) {
+        offset = 0;
+
+        WasmType wt = onyx_type_to_wasm_type((*smem)->type);
+        u64 localidx = local_raw_allocate(mod->local_alloc, wt);
+
+        WIL(WI_LOCAL_SET, localidx);
+
+        switch (lval->kind) {
+            case Ast_Kind_Local: compile_local_location(mod, &code, (AstLocal *) lval, &offset); break;
+            case Ast_Kind_Dereference: compile_expression(mod, &code, ((AstDereference *) lval)->expr); break;
+            case Ast_Kind_Array_Access: compile_array_access_location(mod, &code, (AstArrayAccess *) lval, &offset); break;
+            case Ast_Kind_Field_Access: compile_field_access_location(mod, &code, (AstFieldAccess *) lval, &offset); break;
+
+            default: assert(0);
+        }
+        WIL(WI_LOCAL_GET, localidx);
+
+        compile_store_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
+
+        local_raw_free(mod->local_alloc, wt);
     }
 
     *pcode = code;

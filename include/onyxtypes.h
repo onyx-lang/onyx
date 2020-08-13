@@ -120,6 +120,7 @@ b32 type_struct_lookup_member(Type* type, char* member, StructMember* smem);
 b32 type_struct_is_simple(Type* type);
 
 b32 type_is_pointer(Type* type);
+b32 type_is_rawptr(Type* type);
 b32 type_is_array(Type* tyoe);
 b32 type_is_struct(Type* type);
 b32 type_is_bool(Type* type);

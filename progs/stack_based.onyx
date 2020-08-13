@@ -142,9 +142,22 @@ start :: proc #export {
 
     stupid_idea(1234)() |> print();
 
-    v : [5] Vec3;
-    v[2].x = 4;
-    v[2].y = 5;
-    v[2].z = 6;
-    mag_squared(v[2]) |> print();
+    varr : [5] Vec3;
+    varr[2].x = 4;
+    varr[2].y = 5;
+    varr[2].z = 6;
+    mag_squared(varr[2]) |> print();
+
+    v1 : Vec3;
+    v1.x = 1;
+    v1.y = 2;
+    v1.z = 4;
+
+    v2 := ^v1;
+
+    v3 : Vec3;
+    vec_add(v1, *v2, ^v3);
+    print(v3.x);
+    print(v3.y);
+    print(v3.z);
 }
