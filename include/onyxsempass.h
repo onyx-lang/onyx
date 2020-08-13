@@ -16,10 +16,11 @@ typedef struct SemState {
     ProgramInfo* program;
 
     // NOTE: Used in symbol resolution phase
-    Package*       curr_package;
-    Scope*         global_scope;
-    Scope*         curr_scope;
-    AstFunction*   curr_function;
+    Package*           curr_package;
+    Scope*             global_scope;
+    Scope*             curr_scope;
+    AstFunction*       curr_function;
+    bh_arr(AstBlock *) block_stack;
 
     // NOTE: Used in type checking phase
     Type* expected_return_type;

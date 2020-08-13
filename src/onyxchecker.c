@@ -882,6 +882,8 @@ CHECK(block, AstBlock* block) {
     if (check_statement_chain(block->body)) return 1;
 
     bh_table_each_start(AstTyped *, block->scope->symbols);
+        fill_in_type(value);
+
         if (value->type == NULL) {
             onyx_message_add(Msg_Type_Unresolved_Type,
                     value->token->pos,

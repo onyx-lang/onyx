@@ -168,14 +168,18 @@ HOW:
                 __stack_top
                 etc
 
-        [ ] multiple return values
+        [X] local variable allocator
+
+        [ ] Struct literals
+
+        [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] multiple lvals and compound assignment
             a := 2
             b := 5
             a, b = b, a;
 
-        [ ] 'use' enums and packages at an arbitrary scope
+        [ ] multiple return values
 
         [ ] All code paths return correct value
 
@@ -196,8 +200,6 @@ HOW:
         [ ] Type parameterized structs
 
         [ ] Array literals
-
-        [ ] Struct literals
 
         [ ] Top level variable initialization
             - Works for numeric literals

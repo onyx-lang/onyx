@@ -243,16 +243,20 @@ typedef struct WasmInstruction {
     WasmInstructionData data;
 } WasmInstruction;
 
-typedef struct WasmFuncLocals {
-    u8 i32_count;
-    u8 i64_count;
-    u8 f32_count;
-    u8 f64_count;
-} WasmFuncLocals;
+#define LOCAL_IS_WASM 0x8000000000000
+typedef struct LocalAllocator {
+    u32 param_count;
+
+    u32 allocated[4];
+    u32 freed[4];
+
+    i32 max_stack;
+    i32 curr_stack;
+} LocalAllocator;
 
 typedef struct WasmFunc {
     i32 type_idx;
-    WasmFuncLocals locals;
+    LocalAllocator locals;
     bh_arr(WasmInstruction) code;
 } WasmFunc;
 
@@ -290,8 +294,6 @@ typedef struct DeferredStmt {
     AstNode *stmt;
 } DeferredStmt;
 
-#define LOCAL_IS_WASM 0x8000000000000
-
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
 
@@ -300,6 +302,8 @@ typedef struct OnyxWasmModule {
 
     // NOTE: Mapping from local ast node ptrs to indicies or offsets, depending on the mode
     bh_imap local_map;
+
+    LocalAllocator* local_alloc;
 
     // NOTE: Mapping ptrs to elements
     bh_imap elem_map;
@@ -335,7 +339,7 @@ typedef struct OnyxWasmModule {
     u32 next_elem_idx;
 
     i32 *stack_top_ptr;
-    u32 stack_base_idx;
+    u64 stack_base_idx;
 
     b32 has_stack_locals : 1;
 } OnyxWasmModule;

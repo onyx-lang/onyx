@@ -288,7 +288,7 @@ struct AstBreak         { AstNode_base; u64 count; };
 struct AstContinue      { AstNode_base; u64 count; };
 
 // Structure Nodes
-struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; };
+struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; bh_arr(AstLocal *) locals; };
 struct AstWhile         { AstNode_base; AstTyped *cond; AstBlock *stmt; };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {

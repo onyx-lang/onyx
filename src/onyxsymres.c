@@ -114,32 +114,15 @@ static AstType* symres_type(AstType* type) {
 static void symres_local(AstLocal** local) {
     (*local)->type_node = symres_type((*local)->type_node);
 
+    bh_arr_push(bh_arr_last(semstate.block_stack)->locals, *local);
     bh_arr_push(semstate.curr_function->locals, *local);
-
+    
     symbol_introduce(semstate.curr_scope, (*local)->token, (AstNode *) *local);
 }
 
 static void symres_call(AstCall* call) {
     symres_expression((AstTyped **) &call->callee);
     if (call->callee == NULL) return;
-
-    // NOTE: Disabling UFC now. Causes too many problems.
-    // Especially since structs can have function pointers as members,
-    // so x.y(...) is ambiguous.
-    //
-    // if (call->callee->kind == Ast_Kind_Field_Access) {
-    //     AstFieldAccess* fa = (AstFieldAccess *) call->callee;
-    //     if (fa->expr == NULL) return;
-
-    //     AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
-    //     implicit_arg->value = fa->expr;
-    //     implicit_arg->token = fa->expr->token;
-    //     implicit_arg->next = (AstNode *) call->arguments;
-
-    //     call->callee = (AstTyped *) symbol_resolve(semstate.curr_scope, fa->token);
-    //     call->arguments = implicit_arg;
-    //     call->arg_count++;
-    // }
 
     symres_statement_chain((AstNode **) &call->arguments);
 }
@@ -285,7 +268,6 @@ static void symres_for(AstFor* fornode) {
     fornode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
     scope_enter(fornode->scope);
 
-    bh_arr_push(semstate.curr_function->locals, fornode->var);
     symbol_introduce(semstate.curr_scope, fornode->var->token, (AstNode *) fornode->var);
 
     symres_expression(&fornode->start);
@@ -334,10 +316,12 @@ static void symres_block(AstBlock* block) {
         block->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
 
     scope_enter(block->scope);
+    bh_arr_push(semstate.block_stack, block);
 
     if (block->body)
         symres_statement_chain(&block->body);
 
+    bh_arr_pop(semstate.block_stack);
     scope_leave();
 }
 

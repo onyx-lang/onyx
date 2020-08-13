@@ -26,6 +26,37 @@ proc #export "start" {
     v.x = 10;
     v.y = 100;
 
+    if false {
+        v : Vec2;
+        v2 : Vec2;
+
+        x := 1;
+        y := 1.0f;
+        z := 1.0;
+        w := 1.0f;
+    }
+    if false {
+        v : Vec2;
+
+        x := 1;
+        y := 1.0f;
+        z := 1.0;
+    }
+    if false {
+        v : Vec2;
+
+        x := 1;
+        y := 1.0f;
+        z := 1.0;
+    }
+    if false {
+        v : Vec2;
+
+        x := 1;
+        y := 1.0f;
+        z := 1.0;
+    }
+
     other(^v) |> print();
 }
 
