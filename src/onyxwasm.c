@@ -344,7 +344,7 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
 #define COMPILE_FUNC(kind, ...) static void compile_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
 
 COMPILE_FUNC(function_body,         AstFunction* fd);
-COMPILE_FUNC(block,                 AstBlock* block);
+COMPILE_FUNC(block,                 AstBlock* block, b32 generate_block_headers);
 COMPILE_FUNC(statement,             AstNode* stmt);
 COMPILE_FUNC(assignment,            AstBinaryOp* assign);
 COMPILE_FUNC(store_instruction,     Type* type, u32 offset);
@@ -361,7 +361,7 @@ COMPILE_FUNC(intrinsic_call,        AstIntrinsicCall* call);
 COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return);
 COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return);
 COMPILE_FUNC(local_location,        AstLocal* local, u64* offset_return);
-COMPILE_FUNC(struct_load,           AstTyped* expr);
+COMPILE_FUNC(struct_load,           Type* type, u64 offset);
 COMPILE_FUNC(struct_store,          AstTyped* lval);
 COMPILE_FUNC(expression,            AstTyped* expr);
 COMPILE_FUNC(cast,                  AstUnaryOp* cast);
@@ -372,31 +372,19 @@ COMPILE_FUNC(stack_leave,           u32 unused);
 COMPILE_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
 
-    bh_arr(WasmInstruction) code = *pcode;
-
-    bh_arr_each(AstLocal *, local, fd->body->locals)
-        bh_imap_put(&mod->local_map, (u64) *local, local_allocate(mod->local_alloc, *local));
-
-    forll (AstNode, stmt, fd->body->body, next) {
-        compile_statement(mod, &code, stmt);
-    }
-
-    compile_deferred_stmts(mod, &code, (AstNode *) fd);
-
-    bh_arr_each(AstLocal *, local, fd->body->locals)
-        local_free(mod->local_alloc, *local);
-
-    *pcode = code;
+    compile_block(mod, pcode, fd->body, 0);
 }
 
-COMPILE_FUNC(block, AstBlock* block) {
+COMPILE_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    if (generate_block_headers) {
+        bh_arr_push(mod->structured_jump_target, 1);
+        WID(WI_BLOCK_START, 0x40);
+    }
 
     bh_arr_each(AstLocal *, local, block->locals)
         bh_imap_put(&mod->local_map, (u64) *local, local_allocate(mod->local_alloc, *local));
-
-    bh_arr_push(mod->structured_jump_target, 1);
-    WID(WI_BLOCK_START, 0x40);
 
     forll (AstNode, stmt, block->body, next) {
         compile_statement(mod, &code, stmt);
@@ -404,11 +392,13 @@ COMPILE_FUNC(block, AstBlock* block) {
 
     compile_deferred_stmts(mod, &code, (AstNode *) block);
 
-    WI(WI_BLOCK_END);
-    bh_arr_pop(mod->structured_jump_target);
-
     bh_arr_each(AstLocal *, local, block->locals)
         local_free(mod->local_alloc, *local);
+
+    if (generate_block_headers) {
+        WI(WI_BLOCK_END);
+        bh_arr_pop(mod->structured_jump_target);
+    }
 
     *pcode = code;
 }
@@ -452,7 +442,7 @@ COMPILE_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_For:        compile_for(mod, &code, (AstFor *) stmt); break;
         case Ast_Kind_Break:      compile_structured_jump(mod, &code, ((AstBreak *) stmt)->count); break;
         case Ast_Kind_Continue:   compile_structured_jump(mod, &code, -((AstContinue *) stmt)->count); break;
-        case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt); break;
+        case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt, 1); break;
         case Ast_Kind_Defer:      compile_defer(mod, &code, (AstDefer *) stmt); break;
         default:                  compile_expression(mod, &code, (AstTyped *) stmt); break;
     }
@@ -566,7 +556,10 @@ COMPILE_FUNC(store_instruction, Type* type, u32 offset) {
 COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(("Should use compile_struct_load instead", type->kind != Type_Kind_Struct));
+    if (type->kind == Type_Kind_Struct) {
+        compile_struct_load(mod, pcode, type, offset);
+        return;
+    }
 
     if (type->kind == Type_Kind_Array) {
         if (offset != 0) {
@@ -574,6 +567,7 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
             WI(WI_I32_ADD);
         }
 
+        *pcode = code;
         return;
     }
 
@@ -630,17 +624,7 @@ COMPILE_FUNC(if, AstIf* if_node) {
 
     bh_arr_push(mod->structured_jump_target, 0);
 
-    if (if_node->true_stmt) {
-        bh_arr_each(AstLocal *, local, if_node->true_stmt->locals)
-            bh_imap_put(&mod->local_map, (u64) *local, local_allocate(mod->local_alloc, *local));
-
-        forll (AstNode, stmt, if_node->true_stmt->body, next) {
-            compile_statement(mod, &code, stmt);
-        }
-
-        bh_arr_each(AstLocal *, local, if_node->true_stmt->locals)
-            local_free(mod->local_alloc, *local);
-    }
+    if (if_node->true_stmt) compile_block(mod, &code, if_node->true_stmt, 0);
 
     if (if_node->false_stmt) {
         WI(WI_ELSE);
@@ -648,19 +632,9 @@ COMPILE_FUNC(if, AstIf* if_node) {
         if (if_node->false_stmt->kind == Ast_Kind_If) {
             compile_if(mod, &code, (AstIf *) if_node->false_stmt);
         } else {
-            bh_arr_each(AstLocal *, local, ((AstBlock *) if_node->false_stmt)->locals)
-                bh_imap_put(&mod->local_map, (u64) *local, local_allocate(mod->local_alloc, *local));
-
-            forll (AstNode, stmt, ((AstBlock *) if_node->false_stmt)->body, next) {
-                compile_statement(mod, &code, stmt);
-            }
-
-            bh_arr_each(AstLocal *, local, ((AstBlock *) if_node->false_stmt)->locals)
-                local_free(mod->local_alloc, *local);
+            compile_block(mod, &code, if_node->false_stmt, 0);
         }
     }
-
-    compile_deferred_stmts(mod, &code, (AstNode *) if_node);
 
     bh_arr_pop(mod->structured_jump_target);
 
@@ -682,17 +656,7 @@ COMPILE_FUNC(while, AstWhile* while_node) {
     bh_arr_push(mod->structured_jump_target, 1);
     bh_arr_push(mod->structured_jump_target, 2);
 
-    bh_arr_each(AstLocal *, local, while_node->stmt->locals)
-        bh_imap_put(&mod->local_map, (u64) *local, local_allocate(mod->local_alloc, *local));
-
-    forll (AstNode, stmt, while_node->stmt->body, next) {
-        compile_statement(mod, &code, stmt);
-    }
-
-    bh_arr_each(AstLocal *, local, while_node->stmt->locals)
-        local_free(mod->local_alloc, *local);
-
-    compile_deferred_stmts(mod, &code, (AstNode *) while_node);
+    compile_block(mod, &code, while_node->stmt, 0);
 
     bh_arr_pop(mod->structured_jump_target);
     bh_arr_pop(mod->structured_jump_target);
@@ -746,15 +710,7 @@ COMPILE_FUNC(for, AstFor* for_node) {
     WI(ge_instr);
     WID(WI_COND_JUMP, 0x01);
 
-    bh_arr_each(AstLocal *, local, for_node->stmt->locals)
-        bh_imap_put(&mod->local_map, (u64) *local, local_allocate(mod->local_alloc, *local));
-
-    forll (AstNode, stmt, for_node->stmt->body, next) {
-        compile_statement(mod, &code, stmt);
-    }
-
-    bh_arr_each(AstLocal *, local, for_node->stmt->locals)
-        local_free(mod->local_alloc, *local);
+    compile_block(mod, &code, for_node->stmt, 0);
 
     if (it_is_local) {
         WIL(WI_LOCAL_GET, tmp);
@@ -771,8 +727,6 @@ COMPILE_FUNC(for, AstFor* for_node) {
         WI(add_instr);
         compile_store_instruction(mod, &code, var->type, offset);
     }
-
-    compile_deferred_stmts(mod, &code, (AstNode *) for_node);
 
     bh_arr_pop(mod->structured_jump_target);
     bh_arr_pop(mod->structured_jump_target);
@@ -1101,60 +1055,72 @@ COMPILE_FUNC(local_location, AstLocal* local, u64* offset_return) {
     *pcode = code;
 }
 
-COMPILE_FUNC(struct_load, AstTyped* expr) {
+COMPILE_FUNC(struct_load, Type* type, u64 offset) {
+    // NOTE: Expects the stack to look like:
+    //      <location>
+
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(expr->type->kind == Type_Kind_Struct);
+    assert(type->kind == Type_Kind_Struct);
 
-    u64 offset = 0;
+    if (type->Struct.mem_count == 1) {
+        compile_load_instruction(mod, &code, type->Struct.memarr[0]->type, 0);
+        *pcode = code;
+        return;
+    }
 
-    bh_arr_each(StructMember *, smem, expr->type->Struct.memarr) {
-        offset = 0;
+    u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WIL(WI_LOCAL_SET, tmp_idx);
 
-        switch (expr->kind) {
-            case Ast_Kind_Local: compile_local_location(mod, &code, (AstLocal *) expr, &offset); break;
-            case Ast_Kind_Dereference: compile_expression(mod, &code, ((AstDereference *) expr)->expr); break;
-            case Ast_Kind_Array_Access: compile_array_access_location(mod, &code, (AstArrayAccess *) expr, &offset); break;
-            case Ast_Kind_Field_Access: compile_field_access_location(mod, &code, (AstFieldAccess *) expr, &offset); break;
-
-            default: assert(0);
-        }
-
+    bh_arr_each(StructMember *, smem, type->Struct.memarr) {
+        WIL(WI_LOCAL_GET, tmp_idx);
         compile_load_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
     }
+
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     *pcode = code;
 }
 
 COMPILE_FUNC(struct_store, AstTyped* lval) {
+    // NOTE: Expects the stack to look like:
+    //      mem_1
+    //      mem_2
+    //      ...
+    //      mem_n
+
     bh_arr(WasmInstruction) code = *pcode;
 
     assert(lval->type->kind == Type_Kind_Struct);
 
     u64 offset = 0;
 
+    switch (lval->kind) {
+        case Ast_Kind_Local:        compile_local_location(mod, &code, (AstLocal *) lval, &offset); break;
+        case Ast_Kind_Dereference:  compile_expression(mod, &code, ((AstDereference *) lval)->expr); break;
+        case Ast_Kind_Array_Access: compile_array_access_location(mod, &code, (AstArrayAccess *) lval, &offset); break;
+        case Ast_Kind_Field_Access: compile_field_access_location(mod, &code, (AstFieldAccess *) lval, &offset); break;
+
+        default: assert(0);
+    }
+
+    u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WIL(WI_LOCAL_SET, loc_idx);
+
     bh_arr_rev_each(StructMember *, smem, lval->type->Struct.memarr) {
-        offset = 0;
-
         WasmType wt = onyx_type_to_wasm_type((*smem)->type);
-        u64 localidx = local_raw_allocate(mod->local_alloc, wt);
+        u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
 
-        WIL(WI_LOCAL_SET, localidx);
-
-        switch (lval->kind) {
-            case Ast_Kind_Local: compile_local_location(mod, &code, (AstLocal *) lval, &offset); break;
-            case Ast_Kind_Dereference: compile_expression(mod, &code, ((AstDereference *) lval)->expr); break;
-            case Ast_Kind_Array_Access: compile_array_access_location(mod, &code, (AstArrayAccess *) lval, &offset); break;
-            case Ast_Kind_Field_Access: compile_field_access_location(mod, &code, (AstFieldAccess *) lval, &offset); break;
-
-            default: assert(0);
-        }
-        WIL(WI_LOCAL_GET, localidx);
+        WIL(WI_LOCAL_SET, tmp_idx);
+        WIL(WI_LOCAL_GET, loc_idx);
+        WIL(WI_LOCAL_GET, tmp_idx);
 
         compile_store_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
 
         local_raw_free(mod->local_alloc, wt);
     }
+
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     *pcode = code;
 }
@@ -1176,11 +1142,6 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                 WIL(WI_LOCAL_GET, tmp);
 
             } else {
-                if (expr->type->kind == Type_Kind_Struct) {
-                    compile_struct_load(mod, &code, expr);
-                    break;
-                }
-
                 u64 offset = 0;
                 compile_local_location(mod, &code, (AstLocal *) expr, &offset);
 
@@ -1236,7 +1197,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             break;
         }
 
-        case Ast_Kind_Block:          compile_block(mod, &code, (AstBlock *) expr); break;
+        case Ast_Kind_Block:          compile_block(mod, &code, (AstBlock *) expr, 1); break;
         case Ast_Kind_Call:           compile_call(mod, &code, (AstCall *) expr); break;
         case Ast_Kind_Intrinsic_Call: compile_intrinsic_call(mod, &code, (AstIntrinsicCall *) expr); break;
         case Ast_Kind_Binary_Op:      compile_binop(mod, &code, (AstBinaryOp *) expr); break;
@@ -1299,11 +1260,6 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Dereference: {
-            if (expr->type->kind == Type_Kind_Struct) {
-                compile_struct_load(mod, &code, expr);
-                break;
-            }
-
             AstDereference* deref = (AstDereference *) expr;
             compile_expression(mod, &code, deref->expr);
             compile_load_instruction(mod, &code, deref->type, 0);
@@ -1311,11 +1267,6 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Array_Access: {
-            if (expr->type->kind == Type_Kind_Struct) {
-                compile_struct_load(mod, &code, expr);
-                break;
-            }
-
             AstArrayAccess* aa = (AstArrayAccess *) expr;
             u64 offset = 0;
             compile_array_access_location(mod, &code, aa, &offset);
@@ -1324,11 +1275,6 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Field_Access: {
-            if (expr->type->kind == Type_Kind_Struct) {
-                compile_struct_load(mod, &code, expr);
-                break;
-            }
-
             AstFieldAccess* field = (AstFieldAccess* ) expr;
 
             if (field->expr->kind == Ast_Kind_Param && field->expr->type->kind == Type_Kind_Struct) {

@@ -162,3 +162,59 @@ heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, o
 malloc  :: proc (size: u32) -> rawptr do return alloc(^heap_allocator, size);
 mfree   :: proc (ptr: rawptr) do free(^heap_allocator, ptr);
 mresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(^heap_allocator, ptr, size);
+
+
+
+#private
+ScratchState :: struct {
+    base_ptr : rawptr;
+    size     : u32;
+    curr_ptr : rawptr;
+}
+
+#private
+scratch_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    ss := cast(^ScratchState) data;
+
+    if aa == AllocAction.Alloc {
+        retval := null;
+        rem := ss.size - cast(u32) ss.curr_ptr + cast(u32) ss.base_ptr;
+
+        if size >= rem {
+            retval = ss.curr_ptr;
+            ss.curr_ptr = cast(rawptr) (cast(u32) ss.curr_ptr + size);
+        } else {
+            ss.curr_ptr = ss.base_ptr;
+            retval = ss.base_ptr;
+        }
+
+        return retval;
+    }
+
+    return null;
+}
+
+scratch_state_init :: proc (use ss: ^ScratchState, buffer: rawptr, length: u32) {
+    base_ptr = buffer;
+    curr_ptr = buffer;
+    size     = length;
+}
+
+scratch_alloc_init :: proc (a: ^Allocator, ss: ^ScratchState) {
+    a.func = scratch_alloc_proc;
+    a.data = ss;
+}
+
+
+#private return_scratch_size :: 256
+#private return_scratch_buff :  [return_scratch_size] u8
+
+return_scratch_state : ScratchState;
+return_scratch_alloc : Allocator;
+
+memory_init :: proc {
+    heap_init();
+
+    scratch_state_init(^return_scratch_state, return_scratch_buff, return_scratch_size);
+    scratch_alloc_init(^return_scratch_alloc, ^return_scratch_state);
+}

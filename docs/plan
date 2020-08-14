@@ -179,8 +179,6 @@ HOW:
             b := 5
             a, b = b, a;
 
-        [ ] multiple return values
-
         [ ] All code paths return correct value
 
         [ ] Add slices
@@ -196,6 +194,16 @@ HOW:
             - The length should be stored with the pointer
             - Dynamic resizing?
             - They are just very hard to use at the moment
+
+        [ ] multiple return values
+            - THIS IS NOT GOING TO BE FUN. 
+            - Wasm multi-value proposal is not finalized and nothing has implemented it yet
+            - This means other methods of returning multiple things would be needed:    
+                - globals
+                - on the stack
+
+        [ ] returning structs
+            - This will put forward a lot of the work that will be done for multiple return values
 
         [ ] Type parameterized structs
 
