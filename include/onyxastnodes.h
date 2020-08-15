@@ -507,7 +507,8 @@ static inline b32 is_lval(AstNode* node) {
         || (node->kind == Ast_Kind_Global)
         || (node->kind == Ast_Kind_Dereference)
         || (node->kind == Ast_Kind_Array_Access)
-        || (node->kind == Ast_Kind_Field_Access);
+        || (node->kind == Ast_Kind_Field_Access)
+        || (node->kind == Ast_Kind_Memres);
 }
 
 static inline b32 binop_is_assignment(AstBinaryOp* binop) {

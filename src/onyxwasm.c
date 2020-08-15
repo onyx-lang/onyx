@@ -507,6 +507,14 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
         compile_expression(mod, &code, assign->right);
 
         compile_store_instruction(mod, &code, field->type, offset);
+
+    } else if (lval->kind == Ast_Kind_Memres) {
+        AstMemRes* memres = (AstMemRes *) lval;
+
+        compile_memory_reservation_location(mod, &code, memres);
+        compile_expression(mod, &code, assign->right);
+        compile_store_instruction(mod, &code, memres->type, 0);
+
     } else {
         assert(("Invalid lval", 0));
     }
