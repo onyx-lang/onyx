@@ -353,7 +353,7 @@ struct AstTypeAlias { AstType_base; AstType* to; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
-struct AstMemRes        { AstTyped_base; u64 addr; AstTyped *initial_value; }; // HACK: This has to be the same size or bigger as AstDereference
+struct AstMemRes        { AstTyped_base; u64 addr; AstTyped *initial_value; };
 struct AstInclude       { AstNode_base; OnyxToken *name; };
 struct AstUsePackage    {
     AstNode_base;

@@ -1048,7 +1048,6 @@ CHECK(memres, AstMemRes* memres) {
         }
 
         Type* memres_type = memres->type;
-        if (!type_is_compound(memres_type)) memres_type = memres_type->Pointer.elem;
 
         if (!types_are_compatible(memres_type, memres->initial_value->type)) {
             onyx_message_add(Msg_Type_Binop_Mismatch,

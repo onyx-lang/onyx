@@ -343,31 +343,32 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
 #define WIL(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } }))
 #define COMPILE_FUNC(kind, ...) static void compile_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
 
-COMPILE_FUNC(function_body,         AstFunction* fd);
-COMPILE_FUNC(block,                 AstBlock* block, b32 generate_block_headers);
-COMPILE_FUNC(statement,             AstNode* stmt);
-COMPILE_FUNC(assignment,            AstBinaryOp* assign);
-COMPILE_FUNC(store_instruction,     Type* type, u32 offset);
-COMPILE_FUNC(load_instruction,      Type* type, u32 offset);
-COMPILE_FUNC(if,                    AstIf* if_node);
-COMPILE_FUNC(while,                 AstWhile* while_node);
-COMPILE_FUNC(for,                   AstFor* for_node);
-COMPILE_FUNC(defer,                 AstDefer* defer);
-COMPILE_FUNC(deferred_stmts,        AstNode* node);
-COMPILE_FUNC(binop,                 AstBinaryOp* binop);
-COMPILE_FUNC(unaryop,               AstUnaryOp* unop);
-COMPILE_FUNC(call,                  AstCall* call);
-COMPILE_FUNC(intrinsic_call,        AstIntrinsicCall* call);
-COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return);
-COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return);
-COMPILE_FUNC(local_location,        AstLocal* local, u64* offset_return);
-COMPILE_FUNC(struct_load,           Type* type, u64 offset);
-COMPILE_FUNC(struct_store,          AstTyped* lval);
-COMPILE_FUNC(expression,            AstTyped* expr);
-COMPILE_FUNC(cast,                  AstUnaryOp* cast);
-COMPILE_FUNC(return,                AstReturn* ret);
-COMPILE_FUNC(stack_enter,           u64 stacksize);
-COMPILE_FUNC(stack_leave,           u32 unused);
+COMPILE_FUNC(function_body,                 AstFunction* fd);
+COMPILE_FUNC(block,                         AstBlock* block, b32 generate_block_headers);
+COMPILE_FUNC(statement,                     AstNode* stmt);
+COMPILE_FUNC(assignment,                    AstBinaryOp* assign);
+COMPILE_FUNC(store_instruction,             Type* type, u32 offset);
+COMPILE_FUNC(load_instruction,              Type* type, u32 offset);
+COMPILE_FUNC(if,                            AstIf* if_node);
+COMPILE_FUNC(while,                         AstWhile* while_node);
+COMPILE_FUNC(for,                           AstFor* for_node);
+COMPILE_FUNC(defer,                         AstDefer* defer);
+COMPILE_FUNC(deferred_stmts,                AstNode* node);
+COMPILE_FUNC(binop,                         AstBinaryOp* binop);
+COMPILE_FUNC(unaryop,                       AstUnaryOp* unop);
+COMPILE_FUNC(call,                          AstCall* call);
+COMPILE_FUNC(intrinsic_call,                AstIntrinsicCall* call);
+COMPILE_FUNC(array_access_location,         AstArrayAccess* aa, u64* offset_return);
+COMPILE_FUNC(field_access_location,         AstFieldAccess* field, u64* offset_return);
+COMPILE_FUNC(local_location,                AstLocal* local, u64* offset_return);
+COMPILE_FUNC(memory_reservation_location,   AstMemRes* memres);
+COMPILE_FUNC(struct_load,                   Type* type, u64 offset);
+COMPILE_FUNC(struct_store,                  AstTyped* lval);
+COMPILE_FUNC(expression,                    AstTyped* expr);
+COMPILE_FUNC(cast,                          AstUnaryOp* cast);
+COMPILE_FUNC(return,                        AstReturn* ret);
+COMPILE_FUNC(stack_enter,                   u64 stacksize);
+COMPILE_FUNC(stack_leave,                   u32 unused);
 
 COMPILE_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
@@ -1002,6 +1003,9 @@ COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
     } else if (aa->addr->kind == Ast_Kind_Local
         && aa->addr->type->kind == Type_Kind_Array) {
         compile_local_location(mod, &code, (AstLocal *) aa->addr, &offset);
+    } else if (aa->addr->kind == Ast_Kind_Memres
+        && aa->addr->type->kind != Type_Kind_Array) {
+        compile_memory_reservation_location(mod, &code, (AstMemRes *) aa->addr);
     } else {
         compile_expression(mod, &code, aa->addr);
     }
@@ -1033,11 +1037,22 @@ COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         u64 o2 = 0;
         compile_local_location(mod, &code, (AstLocal *) source_expr, &o2);
         offset += o2;
+    } else if (source_expr->kind == Ast_Kind_Memres
+        && source_expr->type->kind != Type_Kind_Pointer) {
+        compile_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
     } else {
         compile_expression(mod, &code, source_expr);
     }
 
     *offset_return = offset;
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(memory_reservation_location, AstMemRes* memres) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    WID(WI_I32_CONST, memres->addr);
 
     *pcode = code;
 }
@@ -1328,6 +1343,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Memres: {
             AstMemRes* memres = (AstMemRes *) expr;
             WID(WI_I32_CONST, memres->addr);
+            compile_load_instruction(mod, &code, memres->type, 0);
             break;
         }
 
@@ -1658,16 +1674,17 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
         mod->local_alloc = &wasm_func.locals;
         mod->local_alloc->param_count = localidx;
 
-        mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-
         mod->has_stack_locals = 0;
         bh_arr_each(AstLocal *, local, fd->locals)
             mod->has_stack_locals |= !local_is_wasm_local(*local);
 
-        if (mod->has_stack_locals)
+        if (mod->has_stack_locals) {
             // NOTE: '5' needs to match the number of instructions it takes
             // to setup a stack frame
             bh_arr_insert_end(wasm_func.code, 5);
+            mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        }
+
 
         // Generate code
         compile_function_body(mod, &wasm_func.code, fd);
@@ -1833,7 +1850,6 @@ static void compile_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
 static void compile_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     Type* effective_type = memres->type;
-    if (!type_is_compound(effective_type)) effective_type = effective_type->Pointer.elem;
 
     u64 alignment = type_alignment_of(effective_type);
     u64 size = type_size_of(effective_type);

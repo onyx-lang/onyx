@@ -338,12 +338,13 @@ static void symres_function(AstFunction* func) {
         symbol_introduce(semstate.curr_scope, param->token, (AstNode *) param);
 
         if (param->flags & Ast_Flag_Param_Use) {
-            if (param->type->kind != Type_Kind_Pointer || param->type->Pointer.elem->kind != Type_Kind_Struct) {
-                onyx_message_add(Msg_Type_Literal,
-                        param->token->pos,
-                        "can only 'use' pointers to structures.");
-            } else {
-                AstStructType* st = (AstStructType *) ((AstPointerType *) param->type_node)->elem;
+            if (type_is_struct(param->type)) {
+                AstStructType* st;
+                if (param->type->kind == Type_Kind_Struct) {
+                    st = (AstStructType *) param->type_node;
+                } else {
+                    st = (AstStructType *) ((AstPointerType *) param->type_node)->elem;
+                }
 
                 bh_arr_each(AstStructMember *, mem, st->members) {
                     AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
@@ -358,6 +359,11 @@ static void symres_function(AstFunction* func) {
                             (AstNode *) fa);
                     token_toggle_end((*mem)->token);
                 }
+
+            } else {
+                onyx_message_add(Msg_Type_Literal,
+                        param->token->pos,
+                        "can only 'use' structures or pointers to structures.");
             }
         }
     }
@@ -477,26 +483,6 @@ static void symres_memres(AstMemRes** memres) {
 
     } else {
         if ((*memres)->type_node == NULL) return;
-    }
-
-    (*memres)->type = type_build_from_ast(semstate.allocator, (*memres)->type_node);
-
-    if (!type_is_compound((*memres)->type)) {
-        Type* ptr_type = type_make_pointer(semstate.allocator, (*memres)->type);
-        (*memres)->type = ptr_type;
-
-        AstMemRes* new_memres = onyx_ast_node_new(semstate.node_allocator, sizeof(AstMemRes), Ast_Kind_Memres);
-        memcpy(new_memres, (*memres), sizeof(AstMemRes));
-
-        // BIG HACK: converting the (*memres) node to a dereference node to not break
-        // already resolved symbols
-        ((AstDereference *) (*memres))->kind = Ast_Kind_Dereference;
-        ((AstDereference *) (*memres))->type_node = (*memres)->type_node;
-        ((AstDereference *) (*memres))->type = (*memres)->type->Pointer.elem;
-        ((AstDereference *) (*memres))->expr = (AstTyped *) new_memres;
-
-        // BUT retain the 'old' memres in the entity list
-        *memres = new_memres;
     }
 }
 
