@@ -1117,6 +1117,7 @@ COMPILE_FUNC(struct_store, AstTyped* lval) {
         case Ast_Kind_Dereference:  compile_expression(mod, &code, ((AstDereference *) lval)->expr); break;
         case Ast_Kind_Array_Access: compile_array_access_location(mod, &code, (AstArrayAccess *) lval, &offset); break;
         case Ast_Kind_Field_Access: compile_field_access_location(mod, &code, (AstFieldAccess *) lval, &offset); break;
+        case Ast_Kind_Memres:       compile_memory_reservation_location(mod, &code, (AstMemRes *) lval); break;
 
         default: assert(0);
     }
