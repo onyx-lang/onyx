@@ -1085,10 +1085,12 @@ COMPILE_FUNC(struct_load, Type* type, u64 offset) {
     }
 
     u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    WIL(WI_LOCAL_SET, tmp_idx);
+    WIL(WI_LOCAL_TEE, tmp_idx);
 
+    b32 first = 1;
     bh_arr_each(StructMember *, smem, type->Struct.memarr) {
-        WIL(WI_LOCAL_GET, tmp_idx);
+        if (first) first = 0;
+        else       WIL(WI_LOCAL_GET, tmp_idx);
         compile_load_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
     }
 
@@ -1154,7 +1156,11 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Local: {
             u64 tmp = bh_imap_get(&mod->local_map, (u64) expr);
             if (tmp & LOCAL_IS_WASM) {
-                WIL(WI_LOCAL_GET, tmp);
+                if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == tmp) {
+                    bh_arr_last(code).type = WI_LOCAL_TEE;
+                } else {
+                    WIL(WI_LOCAL_GET, tmp);
+                }
 
             } else {
                 u64 offset = 0;
