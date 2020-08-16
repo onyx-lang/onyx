@@ -4,9 +4,11 @@ package main
 
 #include_file "printing"
 #include_file "alloc"
+#include_file "test"
 
 use package printing
 use package memory
+use package core as core
 
 sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) -> [N] i32 {
     for i: 0, N {
@@ -50,8 +52,8 @@ Vec3 :: struct {
     z: i32;
 }
 
-mag_squared :: proc (v: Vec3) -> i32 {
-    return v.x * v.x + v.y * v.y + v.z * v.z;
+mag_squared :: proc (use v: Vec3) -> i32 {
+    return x * x + y * y + z * z;
 }
 
 vec_add :: proc (v: Vec3, u: Vec3, use out: ^Vec3) {
@@ -72,12 +74,12 @@ clamp :: proc (v: i32, lo: i32, hi: i32) -> i32 {
 //
 // This is intended behavior since creating new
 // procs at runtime is very difficult with WASM
-stupid_idea :: proc (n: i32) -> proc () -> i32 {
+stupid_idea :: proc (n: i32) -> proc (i32) -> i32 {
     if n == 1234 {
-        return proc -> i32 { return 5678; };
+        return proc (a: i32) -> i32 { return 5678 + a; };
     }
 
-    return proc -> i32 { return -1; };
+    return proc (a: i32) -> i32 { return -1 + a; };
 }
 
 some_value := 20 + 30 * 4 + 15 / 5;
@@ -129,36 +131,32 @@ start :: proc #export {
     for i: 0, N do something[i] = N - i;
     for i: 0, N do print(something[i]);
 
-    val := something
+    something
             |> sort(proc (a: i32, b: i32) -> i32 { return a - b; })
             |> sumN()
-            |> clamp(30, 100);
-    print(val);
+            |> clamp(30, 100)
+            |> print();
 
     for i: 0, N do
         something[i]
             |> clamp(3, 6)
             |> print();
 
-    stupid_idea(1234)() |> print();
+    stupid_idea(1234)(1234) |> print();
 
     varr : [5] Vec3;
-    varr[2].x = 4;
-    varr[2].y = 5;
-    varr[2].z = 6;
+    varr[2] = Vec3 .{4, 5, 6};
+
     mag_squared(varr[2]) |> print();
 
-    v1 : Vec3;
-    v1.x = 1;
-    v1.y = 2;
-    v1.z = 4;
+    v1 := Vec3 .{ 1, 2, 4 };
+    v2 := *vadd(Vec3.{4, 3, 2}, Vec3.{1, 1, 1});
+  
+    print(v2.x);
+    print(v2.y);
+    print(v2.z);
 
-    v2 := v1;
-
-    v3 := *vadd(v1, v2);
-    print(v3.x);
-    print(v3.y);
-    print(v3.z);
+    buf := core.Buffer.{ 16, null };
 }
 
 vadd :: proc (v1: Vec3, v2: Vec3) -> ^Vec3 {

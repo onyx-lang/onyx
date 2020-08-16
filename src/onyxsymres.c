@@ -78,7 +78,7 @@ static AstType* symres_type(AstType* type) {
         ftype->return_type = symres_type(ftype->return_type);
 
         if (ftype->param_count > 0)
-            fori (i, 0, ftype->param_count - 1) {
+            fori (i, 0, ftype->param_count) {
                 ftype->params[i] = symres_type(ftype->params[i]);
             }
 
@@ -91,7 +91,7 @@ static AstType* symres_type(AstType* type) {
 
         s_node->flags |= Ast_Flag_Type_Is_Resolved;
 
-        bh_arr_each(AstStructMember *, member, s_node->members) {
+        bh_arr_each(AstTyped *, member, s_node->members) {
             (*member)->type_node = symres_type((*member)->type_node);
         }
 
@@ -203,6 +203,22 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
         (*unaryop)->type_node = ((AstUnaryOp *)(*unaryop))->expr->type_node;
 }
 
+static void symres_struct_literal(AstStructLiteral* sl) {
+    if (sl->stnode != NULL) symres_expression(&sl->stnode);
+    if (sl->stnode == NULL) return;
+
+    if (sl->stnode->kind != Ast_Kind_Struct_Type) {
+        onyx_message_add(Msg_Type_Literal,
+                sl->token->pos,
+                "type is not a struct type (BAD ERROR MESSAGE)");
+        return;
+    }
+
+    sl->type_node = (AstType *) sl->stnode;
+
+    bh_arr_each(AstTyped *, expr, sl->values) symres_expression(expr);
+}
+
 static void symres_expression(AstTyped** expr) {
     switch ((*expr)->kind) {
         case Ast_Kind_Symbol:
@@ -213,7 +229,8 @@ static void symres_expression(AstTyped** expr) {
             symres_expression(&((AstBinaryOp *)(*expr))->left);
             symres_expression(&((AstBinaryOp *)(*expr))->right);
 
-            (*expr)->type_node = ((AstBinaryOp *)(*expr))->left->type_node;
+            if (((AstBinaryOp *) (*expr))->left)
+                (*expr)->type_node = ((AstBinaryOp *)(*expr))->left->type_node;
             break;
 
         case Ast_Kind_Unary_Op:     symres_unaryop((AstUnaryOp **) expr); break;
@@ -235,6 +252,10 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Array_Access:
             symres_expression(&((AstArrayAccess *)(*expr))->addr);
             symres_expression(&((AstArrayAccess *)(*expr))->expr);
+            break;
+
+        case Ast_Kind_Struct_Literal:
+            symres_struct_literal((AstStructLiteral *)(*expr));
             break;
 
         default: break;
@@ -335,6 +356,8 @@ static void symres_function(AstFunction* func) {
         param->type_node = symres_type(param->type_node);
         param->type = type_build_from_ast(semstate.allocator, param->type_node);
 
+        if (param->type == NULL) break;
+
         symbol_introduce(semstate.curr_scope, param->token, (AstNode *) param);
 
         if (param->flags & Ast_Flag_Param_Use) {
@@ -346,7 +369,7 @@ static void symres_function(AstFunction* func) {
                     st = (AstStructType *) ((AstPointerType *) param->type_node)->elem;
                 }
 
-                bh_arr_each(AstStructMember *, mem, st->members) {
+                bh_arr_each(AstTyped *, mem, st->members) {
                     AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
                     fa->token = (*mem)->token;
                     fa->type_node = (*mem)->type_node;

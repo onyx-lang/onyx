@@ -6,6 +6,14 @@
 // NOTE: The one weird define you need to know before read the code below
 #define make_node(nclass, kind) onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
 
+#define STORE_PARSER_STATE \
+    OnyxToken* __parser_curr = parser->curr; \
+    OnyxToken* __parser_prev = parser->prev;
+
+#define RESTORE_PARSER_STATE \
+    parser->curr = __parser_curr; \
+    parser->prev = __parser_prev;
+
 static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 
 // NOTE: Forward declarations
@@ -16,12 +24,13 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type);
 
 static AstNumLit*     parse_int_literal(OnyxParser* parser);
 static AstNumLit*     parse_float_literal(OnyxParser* parser);
+static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_expression(OnyxParser* parser);
 static AstIf*         parse_if_stmt(OnyxParser* parser);
 static AstWhile*      parse_while_stmt(OnyxParser* parser);
 static AstFor*        parse_for_stmt(OnyxParser* parser);
-static b32            parse_symbol_declaration(OnyxParser* parser, AstNode** ret);
+static b32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*     parse_return_statement(OnyxParser* parser);
 static AstBlock*      parse_block(OnyxParser* parser);
 static AstNode*       parse_statement(OnyxParser* parser);
@@ -86,6 +95,19 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     return token;
 }
 
+static OnyxToken* soft_expect_token(OnyxParser* parser, TokenType token_type) {
+    if (parser->hit_unexpected_token) return NULL;
+
+    OnyxToken* token = parser->curr;
+
+    if (token->type == token_type) {
+        consume_token(parser);
+        return token;
+    }
+
+    return NULL;
+}
+
 static void add_node_to_process(OnyxParser* parser, AstNode* node) {
     bh_arr_push(parser->results.nodes_to_process, ((NodeToProcess) {
         .package = parser->package,
@@ -139,6 +161,70 @@ static AstNumLit* parse_float_literal(OnyxParser* parser) {
 
     token_toggle_end(float_node->token);
     return float_node;
+}
+
+static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
+    if (parser->curr->type != Token_Type_Symbol) return 0;
+
+    STORE_PARSER_STATE;
+
+    OnyxToken *symbol1 = NULL, *symbol2 = NULL;
+    symbol1 = expect_token(parser, Token_Type_Symbol);
+
+    if (!soft_expect_token(parser, '.')) {
+        RESTORE_PARSER_STATE;
+        return 0;
+    }
+
+    if (parser->curr->type == Token_Type_Symbol) {
+        symbol2 = soft_expect_token(parser, Token_Type_Symbol);
+
+        if (!soft_expect_token(parser, '.')) {
+            RESTORE_PARSER_STATE;
+            return 0;
+        }
+    }
+
+    if (parser->curr->type != '{') {
+        RESTORE_PARSER_STATE;
+        return 0;
+    }
+
+    AstStructLiteral* sl = make_node(AstStructLiteral, Ast_Kind_Struct_Literal);
+    sl->token = parser->curr;
+    bh_arr_new(global_heap_allocator, sl->values, 4);
+
+    if (symbol2 != NULL) {
+        AstTyped *package = make_node(AstTyped, Ast_Kind_Symbol);
+        package->token = symbol1;
+
+        AstFieldAccess *fa = make_node(AstFieldAccess, Ast_Kind_Field_Access);
+        fa->token = symbol2;
+        fa->expr = package;
+
+        sl->stnode = (AstTyped *) fa;
+
+    } else {
+        sl->stnode = make_node(AstTyped, Ast_Kind_Symbol);
+        sl->stnode->token = symbol1;
+    }
+
+    expect_token(parser, '{');
+    while (parser->curr->type != '}') {
+        if (parser->hit_unexpected_token) break;
+
+        AstTyped *expr = parse_expression(parser);
+        bh_arr_push(sl->values, expr);
+
+        if (parser->curr->type != '}')
+            expect_token(parser, ',');
+    }
+
+    expect_token(parser, '}');
+
+    *ret = (AstTyped *) sl;
+
+    return 1;
 }
 
 // ( <expr> )
@@ -235,6 +321,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case Token_Type_Symbol: {
+            if (parse_possible_struct_literal(parser, &retval)) return retval;
+
             OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
             AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);
             sym_node->token = sym_token;
@@ -678,7 +766,7 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
 // <symbol> : <type> : <expr>
 // <symbol> := <expr>
 // <symbol> :: <expr>
-static b32 parse_symbol_declaration(OnyxParser* parser, AstNode** ret) {
+static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) {
     if (parser->curr->type != Token_Type_Symbol) return 0;
     if ((parser->curr + 1)->type != ':')         return 0;
 
@@ -772,7 +860,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
 
         case Token_Type_Symbol:
-            if (parse_symbol_declaration(parser, &retval)) break;
+            if (parse_possible_symbol_declaration(parser, &retval)) break;
             // fallthrough
 
         case '(':
@@ -969,7 +1057,7 @@ static AstType* parse_type(OnyxParser* parser) {
             new->return_type = return_type;
 
             if (param_count > 0)
-                fori (i, 0, param_count - 1) new->params[i] = params[i];
+                fori (i, 0, param_count) new->params[i] = params[i];
 
             *next_insertion = (AstType *) new;
             next_insertion = NULL;
@@ -1026,8 +1114,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     while (parser->curr->type != '}') {
         if (parser->hit_unexpected_token) return s_node;
 
-        AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);
-        mem->offset = 0;
+        AstTyped* mem = make_node(AstTyped, Ast_Kind_Struct_Member);
 
         mem->token = expect_token(parser, Token_Type_Symbol);
         expect_token(parser, ':');

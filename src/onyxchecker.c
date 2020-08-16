@@ -15,6 +15,7 @@ CHECK(for, AstFor* fornode);
 CHECK(call, AstCall* call);
 CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok);
 CHECK(unaryop, AstUnaryOp** punop);
+CHECK(struct_literal, AstStructLiteral* sl);
 CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
@@ -630,6 +631,37 @@ CHECK(unaryop, AstUnaryOp** punop) {
     return 0;
 }
 
+CHECK(struct_literal, AstStructLiteral* sl) {
+    fill_in_type((AstTyped *) sl);
+
+    TypeStruct* st = &sl->type->Struct;
+    if (st->mem_count != bh_arr_length(sl->values)) {
+        onyx_message_add(Msg_Type_Literal,
+                sl->token->pos,
+                "incorrect number of initial values for this type");
+        return 1;
+    }
+
+    AstTyped** actual = sl->values;
+    StructMember** formal = st->memarr;
+
+    fori (i, 0, st->mem_count) {
+        if (check_expression(actual)) return 1;
+
+        if (!types_are_compatible((*formal)->type, (*actual)->type)) {
+            onyx_message_add(Msg_Type_Assignment_Mismatch,
+                    (*actual)->token->pos,
+                    type_get_name((*formal)->type),
+                    type_get_name((*actual)->type));
+            return 1;
+        }
+
+        actual++, formal++;
+    }
+
+    return 0;
+}
+
 CHECK(address_of, AstAddressOf* aof) {
     if (check_expression(&aof->expr)) return 1;
 
@@ -813,6 +845,10 @@ CHECK(expression, AstTyped** pexpr) {
             assert(expr->type != NULL);
             break;
 
+        case Ast_Kind_Struct_Literal:
+            retval = check_struct_literal((AstStructLiteral *) expr);
+            break;
+
         case Ast_Kind_Function:
             expr->flags |= Ast_Flag_Function_Used;
             break;
@@ -951,7 +987,7 @@ CHECK(struct, AstStructType* s_node) {
         return 1;
     }
 
-    bh_arr_each(AstStructMember *, member, s_node->members) {
+    bh_arr_each(AstTyped *, member, s_node->members) {
         token_toggle_end((*member)->token);
 
         if (bh_table_has(i32, mem_set, (*member)->token->text)) {

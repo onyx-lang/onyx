@@ -23,6 +23,7 @@ typedef struct AstFieldAccess AstFieldAccess;
 typedef struct AstSizeOf AstSizeOf;
 typedef struct AstAlignOf AstAlignOf;
 typedef struct AstFileContents AstFileContents;
+typedef struct AstStructLiteral AstStructLiteral;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstBreak AstBreak;
@@ -40,7 +41,6 @@ typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
 typedef struct AstArrayType AstArrayType;
 typedef struct AstStructType AstStructType;
-typedef struct AstStructMember AstStructMember;
 typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
 typedef struct AstTypeAlias AstTypeAlias;
@@ -116,6 +116,7 @@ typedef enum AstKind {
     Ast_Kind_Size_Of,
     Ast_Kind_Align_Of,
     Ast_Kind_File_Contents,
+    Ast_Kind_Struct_Literal,
 
     Ast_Kind_If,
     Ast_Kind_For,
@@ -281,6 +282,7 @@ struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
 struct AstFileContents  { AstTyped_base; OnyxToken *filename; };
+struct AstStructLiteral { AstTyped_base; AstTyped *stnode; bh_arr(AstTyped *) values; };
 
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
@@ -328,14 +330,13 @@ struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstStructType {
     AstType_base;
 
-    bh_arr(AstStructMember *) members;
+    bh_arr(AstTyped *) members;
 
     // NOTE: Used to cache the actual type, since building
     // a struct type is kind of complicated and should
     // only happen once.
     Type *stcache;
 };
-struct AstStructMember { AstTyped_base; u64 offset; };
 struct AstEnumType {
     AstType_base;
     Scope *scope;

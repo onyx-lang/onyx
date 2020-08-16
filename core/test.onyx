@@ -1,0 +1,6 @@
+package core
+
+Buffer :: struct {
+	length: u32;
+	data: rawptr;
+}

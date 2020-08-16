@@ -364,6 +364,7 @@ COMPILE_FUNC(local_location,                AstLocal* local, u64* offset_return)
 COMPILE_FUNC(memory_reservation_location,   AstMemRes* memres);
 COMPILE_FUNC(struct_load,                   Type* type, u64 offset);
 COMPILE_FUNC(struct_store,                  AstTyped* lval);
+COMPILE_FUNC(struct_literal,                AstStructLiteral* sl);
 COMPILE_FUNC(expression,                    AstTyped* expr);
 COMPILE_FUNC(cast,                          AstUnaryOp* cast);
 COMPILE_FUNC(return,                        AstReturn* ret);
@@ -1151,6 +1152,16 @@ COMPILE_FUNC(struct_store, AstTyped* lval) {
     *pcode = code;
 }
 
+COMPILE_FUNC(struct_literal, AstStructLiteral* sl) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    bh_arr_each(AstTyped *, val, sl->values) {
+        compile_expression(mod, &code, *val);
+    }
+
+    *pcode = code;
+}
+
 COMPILE_FUNC(expression, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -1218,6 +1229,11 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_StrLit: {
             WID(WI_I32_CONST, ((AstStrLit *) expr)->addr);
+            break;
+        }
+
+        case Ast_Kind_Struct_Literal: {
+            compile_struct_literal(mod, &code, (AstStructLiteral *) expr);
             break;
         }
 
@@ -2610,7 +2626,7 @@ static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
 
         leb = uint_to_uleb128((u64) datum->length, &leb_len);
         bh_buffer_append(&vec_buff, leb, leb_len);
-        fori (i, 0, datum->length - 1) bh_buffer_write_byte(&vec_buff, ((u8 *) datum->data)[i]);
+        fori (i, 0, datum->length) bh_buffer_write_byte(&vec_buff, ((u8 *) datum->data)[i]);
     }
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);

@@ -166,7 +166,7 @@ u8* double_to_ieee754(f64 f, b32 reverse);
 #define BH_BIT(x)                        (1 << (x))
 #define BH_MASK_SET(var, set, mask)     ((set) ? (var) |= (mask) : (var) &= ~(mask))
 
-#define fori(var, lo, hi)                for (i64 var = (lo); var <= (hi); var++)
+#define fori(var, lo, hi)                for (i64 var = (lo); var < (hi); var++)
 #define forll(T, var, start, step)        for (T* var = (start); var != NULL; var = var->step)
 
 #ifdef BH_DEBUG
@@ -2142,7 +2142,7 @@ void bh_imap_init(bh_imap* imap, bh_allocator alloc, i32 hash_count) {
     bh_arr_new(alloc, imap->hashes, hash_count);
     bh_arr_new(alloc, imap->entries, 4);
 
-    fori(count, 0, hash_count - 1) bh_arr_push(imap->hashes, -1);
+    fori(count, 0, hash_count) bh_arr_push(imap->hashes, -1);
 }
 
 void bh_imap_free(bh_imap* imap) {

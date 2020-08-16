@@ -138,8 +138,6 @@ b32 types_are_compatible(Type* t1, Type* t2) {
         case Type_Kind_Struct: {
             if (t2->kind != Type_Kind_Struct) return 0;
             if (t1->Struct.mem_count != t2->Struct.mem_count) return 0;
-            if (t1->Struct.name && t2->Struct.name)
-                if (strcmp(t1->Struct.name, t2->Struct.name) == 0) return 1;
 
             b32 works = 1;
             bh_table_each_start(StructMember, t1->Struct.members);
@@ -169,7 +167,7 @@ b32 types_are_compatible(Type* t1, Type* t2) {
             if (!types_are_compatible(t1->Function.return_type, t2->Function.return_type)) return 0;
 
             if (t1->Function.param_count > 0) {
-                fori (i, 0, t1->Function.param_count - 1) {
+                fori (i, 0, t1->Function.param_count) {
                     if (!types_are_compatible(t1->Function.params[i], t2->Function.params[i])) return 0;
                 }
             }
@@ -232,7 +230,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             func_type->Function.return_type = type_build_from_ast(alloc, ftype_node->return_type);
 
             if (param_count > 0)
-                fori (i, 0, param_count - 1) {
+                fori (i, 0, param_count) {
                     func_type->Function.params[i] = type_build_from_ast(alloc, ftype_node->params[i]);
                 }
 
@@ -283,7 +281,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             u32 offset = 0;
             u32 alignment = 1, mem_alignment;
             u32 idx = 0;
-            bh_arr_each(AstStructMember *, member, s_node->members) {
+            bh_arr_each(AstTyped *, member, s_node->members) {
                 (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 // TODO: Add alignment checking here
@@ -301,11 +299,19 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 token_toggle_end((*member)->token);
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
-                bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, (*member)->token->text));
                 token_toggle_end((*member)->token);
 
                 offset += type_size_of((*member)->type);
                 idx++;
+            }
+
+            // NOTE: Need to do a second pass because the references to the
+            // elements of the table may change if the internal arrays of the
+            // table need to be resized.
+            bh_arr_each(AstTyped *, member, s_node->members) {
+                token_toggle_end((*member)->token);
+                bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, (*member)->token->text));
+                token_toggle_end((*member)->token);
             }
 
             s_type->Struct.aligment = alignment;

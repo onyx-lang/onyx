@@ -172,14 +172,25 @@ HOW:
 
         [ ] Struct literals
 
+        [ ] #union on structs
+
+        [ ] #align on structs
+
         [ ] 'use' enums and packages at an arbitrary scope
+
+        [ ] Array literals
+
+        [ ] Top level variable initialization
+            - Works for numeric literals
 
         [ ] multiple lvals and compound assignment
             a := 2
             b := 5
             a, b = b, a;
-
+            
         [ ] All code paths return correct value
+
+        [ ] Type parameterized structs
 
         [ ] Add slices
             - Arrays without a size
@@ -204,13 +215,6 @@ HOW:
 
         [ ] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
-
-        [ ] Type parameterized structs
-
-        [ ] Array literals
-
-        [ ] Top level variable initialization
-            - Works for numeric literals
 
         [X] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
