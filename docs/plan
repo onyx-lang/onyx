@@ -175,11 +175,17 @@ HOW:
             X Named member initialization
             X Default values on structs so they don't have to be named
             
-        [ ] #union on structs
+        [X] #union on structs
 
-        [ ] #align on structs
+        [X] #align on structs
+
+        [X] #size on structs
 
         [ ] 'use' enums and packages at an arbitrary scope
+
+        [ ] 'when' statements
+            - Compile time conditions
+            - Only evalutate code blocks that evaluate to be true
 
         [ ] Array literals
 

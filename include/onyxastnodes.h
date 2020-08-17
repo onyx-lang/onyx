@@ -159,6 +159,9 @@ typedef enum AstFlags {
 
     // Enum flags
     Ast_Flag_Enum_Is_Flags     = BH_BIT(11),
+
+    // Struct flags
+    Ast_Flag_Struct_Is_Union   = BH_BIT(12),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -339,6 +342,8 @@ struct AstStructType {
     AstType_base;
 
     bh_arr(AstStructMember *) members;
+
+    u32 min_alignment, min_size;
 
     // NOTE: Used to cache the actual type, since building
     // a struct type is kind of complicated and should

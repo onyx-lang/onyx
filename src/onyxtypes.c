@@ -278,6 +278,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count);
             bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
 
+            b32 is_union = (s_node->flags & Ast_Flag_Struct_Is_Union) != 0;
+            u32 size = 0;
             u32 offset = 0;
             u32 alignment = 1, mem_alignment;
             u32 idx = 0;
@@ -301,7 +303,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
                 token_toggle_end((*member)->token);
 
-                offset += type_size_of((*member)->type);
+                u32 type_size = type_size_of((*member)->type);
+                if (!is_union) offset += type_size;
+                if (!is_union)   size += type_size;
+                else             size =  bh_max(size, type_size);
+
                 idx++;
             }
 
@@ -314,12 +320,15 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 token_toggle_end((*member)->token);
             }
 
+            alignment = bh_max(s_node->min_alignment, alignment);
             s_type->Struct.aligment = alignment;
 
-            if (offset % alignment != 0) {
-                offset += alignment - (offset % alignment);
+            if (size % alignment != 0) {
+                size += alignment - (size % alignment);
             }
-            s_type->Struct.size = offset;
+
+            size = bh_max(s_node->min_size, size);
+            s_type->Struct.size = size;
 
             return s_type;
         }

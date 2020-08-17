@@ -1131,6 +1131,37 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
     bh_arr_new(global_heap_allocator, s_node->members, 4);
 
+    while (parser->curr->type == '#') {
+        if (parser->hit_unexpected_token) return NULL;
+
+        if (parse_possible_directive(parser, "union")) {
+            s_node->flags |= Ast_Flag_Struct_Is_Union;
+        }
+
+        else if (parse_possible_directive(parser, "align")) {
+            AstNumLit* numlit = parse_int_literal(parser);
+            if (numlit == NULL) return NULL;
+
+            s_node->min_alignment = numlit->value.i;
+        }
+
+        else if (parse_possible_directive(parser, "size")) {
+            AstNumLit* numlit = parse_int_literal(parser);
+            if (numlit == NULL) return NULL;
+
+            s_node->min_size = numlit->value.i;
+        }
+
+        else {
+            OnyxToken* directive_token = expect_token(parser, '#');
+            OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
+
+            onyx_message_add(Msg_Type_Unknown_Directive,
+                    directive_token->pos,
+                    symbol_token->text, symbol_token->length);
+        }
+    }
+
     expect_token(parser, '{');
     while (parser->curr->type != '}') {
         if (parser->hit_unexpected_token) return s_node;
