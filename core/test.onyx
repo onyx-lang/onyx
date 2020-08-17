@@ -1,6 +1,8 @@
 package core
 
+use package memory { null }
+
 Buffer :: struct {
-	length: u32;
-	data: rawptr;
+	length : u32    = 0;
+	data   : rawptr = null;
 }

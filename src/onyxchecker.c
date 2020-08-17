@@ -987,7 +987,7 @@ CHECK(struct, AstStructType* s_node) {
         return 1;
     }
 
-    bh_arr_each(AstTyped *, member, s_node->members) {
+    bh_arr_each(AstStructMember *, member, s_node->members) {
         token_toggle_end((*member)->token);
 
         if (bh_table_has(i32, mem_set, (*member)->token->text)) {

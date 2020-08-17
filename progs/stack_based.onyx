@@ -150,13 +150,15 @@ start :: proc #export {
     mag_squared(varr[2]) |> print();
 
     v1 := Vec3 .{ 1, 2, 4 };
-    v2 := *vadd(Vec3.{4, 3, 2}, Vec3.{1, 1, 1});
+    v2 := *vadd(v1, Vec3.{ 1, 2, 4 });
   
     print(v2.x);
     print(v2.y);
     print(v2.z);
 
-    buf := core.Buffer.{ 16, null };
+    buf := core.Buffer.{
+        length = 16,
+    };
 }
 
 vadd :: proc (v1: Vec3, v2: Vec3) -> ^Vec3 {

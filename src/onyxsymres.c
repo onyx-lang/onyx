@@ -91,8 +91,11 @@ static AstType* symres_type(AstType* type) {
 
         s_node->flags |= Ast_Flag_Type_Is_Resolved;
 
-        bh_arr_each(AstTyped *, member, s_node->members) {
+        bh_arr_each(AstStructMember *, member, s_node->members) {
             (*member)->type_node = symres_type((*member)->type_node);
+            if ((*member)->initial_value != NULL) {
+                symres_expression(&(*member)->initial_value);
+            }
         }
 
         return type;
@@ -215,6 +218,49 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     }
 
     sl->type_node = (AstType *) sl->stnode;
+    sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
+
+    if (bh_arr_length(sl->named_values) > 0) {
+        bh_arr_set_length(sl->values, sl->type->Struct.mem_count);
+
+        StructMember s;
+        bh_arr_each(AstStructMember *, smem, sl->named_values) {
+            token_toggle_end((*smem)->token);
+            if (!type_struct_lookup_member(sl->type, (*smem)->token->text, &s)) {
+                onyx_message_add(Msg_Type_No_Field,
+                        (*smem)->token->pos,
+                        (*smem)->token->text, type_get_name(sl->type));
+                return;
+            }
+            token_toggle_end((*smem)->token);
+
+            if (sl->values[s.idx] != NULL) {
+                onyx_message_add(Msg_Type_Duplicate_Value,
+                        (*smem)->token->pos,
+                        (*smem)->token->text, (*smem)->token->length);
+                return;
+            }
+
+            sl->values[s.idx] = (*smem)->initial_value;
+        }
+
+        AstStructType* st = (AstStructType *) sl->type_node;
+        bh_arr_each(StructMember*, smem, sl->type->Struct.memarr) {
+            u32 idx = (*smem)->idx;
+
+            if (sl->values[idx] == NULL) {
+                if (st->members[idx]->initial_value == NULL) {
+                    onyx_message_add(Msg_Type_Field_No_Value,
+                            sl->token->pos,
+                            st->members[idx]->token->text,
+                            st->members[idx]->token->length);
+                    return;
+                }
+                
+                sl->values[idx] = st->members[idx]->initial_value;
+            }
+        }
+    }
 
     bh_arr_each(AstTyped *, expr, sl->values) symres_expression(expr);
 }
@@ -369,7 +415,7 @@ static void symres_function(AstFunction* func) {
                     st = (AstStructType *) ((AstPointerType *) param->type_node)->elem;
                 }
 
-                bh_arr_each(AstTyped *, mem, st->members) {
+                bh_arr_each(AstStructMember *, mem, st->members) {
                     AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
                     fa->token = (*mem)->token;
                     fa->type_node = (*mem)->type_node;

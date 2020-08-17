@@ -41,6 +41,7 @@ typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
 typedef struct AstArrayType AstArrayType;
 typedef struct AstStructType AstStructType;
+typedef struct AstStructMember AstStructMember;
 typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
 typedef struct AstTypeAlias AstTypeAlias;
@@ -282,7 +283,14 @@ struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
 struct AstFileContents  { AstTyped_base; OnyxToken *filename; };
-struct AstStructLiteral { AstTyped_base; AstTyped *stnode; bh_arr(AstTyped *) values; };
+struct AstStructLiteral {
+    AstTyped_base;
+
+    AstTyped *stnode;
+
+    bh_arr(AstStructMember *) named_values;
+    bh_arr(AstTyped *) values;
+};
 
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
@@ -330,12 +338,16 @@ struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstStructType {
     AstType_base;
 
-    bh_arr(AstTyped *) members;
+    bh_arr(AstStructMember *) members;
 
     // NOTE: Used to cache the actual type, since building
     // a struct type is kind of complicated and should
     // only happen once.
     Type *stcache;
+};
+struct AstStructMember {
+    AstTyped_base;
+    AstTyped* initial_value;
 };
 struct AstEnumType {
     AstType_base;

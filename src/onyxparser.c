@@ -193,6 +193,7 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
     AstStructLiteral* sl = make_node(AstStructLiteral, Ast_Kind_Struct_Literal);
     sl->token = parser->curr;
     bh_arr_new(global_heap_allocator, sl->values, 4);
+    bh_arr_new(global_heap_allocator, sl->named_values, 4);
 
     if (symbol2 != NULL) {
         AstTyped *package = make_node(AstTyped, Ast_Kind_Symbol);
@@ -210,11 +211,31 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
     }
 
     expect_token(parser, '{');
+    b32 is_named = ((parser->curr + 1)->type == '=');
+
+    OnyxToken* name = NULL;
     while (parser->curr->type != '}') {
         if (parser->hit_unexpected_token) break;
 
+        if (is_named) {
+            name = expect_token(parser, Token_Type_Symbol);
+            expect_token(parser, '=');
+        } else {
+            name = NULL;
+        }
+
         AstTyped *expr = parse_expression(parser);
-        bh_arr_push(sl->values, expr);
+
+        if (is_named) {
+            AstStructMember* sm = make_node(AstStructMember, Ast_Kind_Struct_Member);
+            sm->token = name;
+            sm->initial_value = expr;
+
+            bh_arr_push(sl->named_values, sm);
+            
+        } else {
+            bh_arr_push(sl->values, expr);
+        }
 
         if (parser->curr->type != '}')
             expect_token(parser, ',');
@@ -1114,11 +1135,17 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     while (parser->curr->type != '}') {
         if (parser->hit_unexpected_token) return s_node;
 
-        AstTyped* mem = make_node(AstTyped, Ast_Kind_Struct_Member);
+        AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);
 
         mem->token = expect_token(parser, Token_Type_Symbol);
         expect_token(parser, ':');
         mem->type_node = parse_type(parser);
+
+        if (parser->curr->type == '=') {
+            consume_token(parser);
+            mem->initial_value = parse_expression(parser);
+        }
+
         expect_token(parser, ';');
 
         bh_arr_push(s_node->members, mem);

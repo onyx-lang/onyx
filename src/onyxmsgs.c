@@ -28,6 +28,8 @@ static const char* msg_formats[] = {
 
     "duplicate declaration of struct member '%s'",
     "field '%s' does not exist on '%s'",
+    "duplicate value for struct member '%b'",
+    "no value provided for field '%b'",
 
     "unable to resolve type for symbol '%b'",
     "unable to resolve symbol '%b'",

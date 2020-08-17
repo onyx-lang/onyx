@@ -281,7 +281,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             u32 offset = 0;
             u32 alignment = 1, mem_alignment;
             u32 idx = 0;
-            bh_arr_each(AstTyped *, member, s_node->members) {
+            bh_arr_each(AstStructMember *, member, s_node->members) {
                 (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 // TODO: Add alignment checking here
@@ -308,7 +308,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             // NOTE: Need to do a second pass because the references to the
             // elements of the table may change if the internal arrays of the
             // table need to be resized.
-            bh_arr_each(AstTyped *, member, s_node->members) {
+            bh_arr_each(AstStructMember *, member, s_node->members) {
                 token_toggle_end((*member)->token);
                 bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, (*member)->token->text));
                 token_toggle_end((*member)->token);

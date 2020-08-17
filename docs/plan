@@ -170,8 +170,11 @@ HOW:
 
         [X] local variable allocator
 
-        [ ] Struct literals
-
+        [X] Struct literals
+            X All members specified means names not required
+            X Named member initialization
+            X Default values on structs so they don't have to be named
+            
         [ ] #union on structs
 
         [ ] #align on structs
@@ -187,7 +190,7 @@ HOW:
             a := 2
             b := 5
             a, b = b, a;
-            
+
         [ ] All code paths return correct value
 
         [ ] Type parameterized structs
