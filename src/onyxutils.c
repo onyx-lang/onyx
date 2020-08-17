@@ -10,6 +10,8 @@ bh_allocator global_scratch_allocator;
 bh_managed_heap global_heap;
 bh_allocator global_heap_allocator;
 
+static AstNode empty_node = { Ast_Kind_Error, 0, NULL, NULL };
+
 static const char* ast_node_names[] = {
     "ERROR",
     "PROGRAM",
@@ -171,7 +173,7 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
                 tkn->text);
 
         token_toggle_end(tkn);
-        return NULL;
+        return &empty_node;
     }
 
     if (res->kind == Ast_Kind_Symbol) {

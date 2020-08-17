@@ -46,10 +46,14 @@ summing :: proc (x: ^i32) -> i32 {
     return s;
 }
 
+get_value :: proc (x: i32, y: i32) -> i32 {
+    return x + 2 * y;
+}
+
 Vec3 :: struct {
-    x: i32;
-    y: i32;
-    z: i32;
+    x: i32 = get_value(10, 20);
+    y: i32 = 0;
+    z: i32 = 0;
 }
 
 mag_squared :: proc (use v: Vec3) -> i32 {
@@ -149,8 +153,8 @@ start :: proc #export {
 
     mag_squared(varr[2]) |> print();
 
-    v1 := Vec3 .{ 1, 2, 4 };
-    v2 := *vadd(v1, Vec3.{ 1, 2, 4 });
+    v1 := Vec3.{};
+    v2 := *vadd(v1, Vec3.{ 0, 0, 0 });
   
     print(v2.x);
     print(v2.y);

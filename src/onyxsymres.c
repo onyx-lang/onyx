@@ -220,7 +220,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     sl->type_node = (AstType *) sl->stnode;
     sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
 
-    if (bh_arr_length(sl->named_values) > 0) {
+    if (bh_arr_length(sl->values) == 0) {
         bh_arr_set_length(sl->values, sl->type->Struct.mem_count);
 
         StructMember s;
@@ -256,7 +256,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
                             st->members[idx]->token->length);
                     return;
                 }
-                
+
                 sl->values[idx] = st->members[idx]->initial_value;
             }
         }
