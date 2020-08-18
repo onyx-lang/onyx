@@ -1,0 +1,59 @@
+package core
+
+use package memory
+
+Buffer :: struct {
+    length : u32    = 0;
+    data   : rawptr = null;
+}
+
+string :: struct {
+    length : u32 = 0;
+    data   : ^u8 = null;
+}
+
+string_make :: proc #overloaded { string_make_from_u8 }
+
+#private
+string_make_from_u8 :: proc (s: ^u8) -> string {
+    len :: string_length(s);
+
+    return string.{ length = len, data = s };
+}
+
+
+string_length :: proc #overloaded {
+    proc (s: ^u8) -> u32 {
+        len := 0;
+        c := s;
+        while *c != #char "\0" {
+            len += 1;
+            c += 1;
+        }
+
+        return len;
+    },
+
+    proc (s: string) -> u32 {
+        return s.length;
+    },
+}
+
+#private
+string_length_string :: proc (s: string) -> u32 do return s.length;
+
+string_concat :: proc (a: Allocator, s1: string, s2: string) -> string {
+    len1 :: string_length(s1);
+    len2 :: string_length(s2);
+
+    data := cast(^u8) alloc(a, len1 + len2);
+    for i: 0, len1 do data[i]        = s1.data[i];
+    for i: 0, len2 do data[i + len1] = s2.data[i];
+
+    return string.{ len1 + len2, data };
+}
+
+string_free :: proc (a: Allocator, s: string) do free(a, s.data);
+
+#private print_str_with_len :: proc #foreign "host" "print_str_with_len" (s: ^u8, len: u32) ---
+string_print :: proc (s: string) do print_str_with_len(s.data, s.length);

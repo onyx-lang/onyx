@@ -4,11 +4,11 @@ package main
 
 #include_file "printing"
 #include_file "alloc"
-#include_file "test"
+#include_file "string"
 
 use package printing
 use package memory
-use package core as core
+use package core
 
 sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) -> [N] i32 {
     for i: 0, N {
@@ -154,23 +154,27 @@ start :: proc #export {
     print(v2.y);
     print(v2.z);
 
-    buf := core.Buffer.{ length = 16 };
-
     un : UnionTest;
     un.f = 1.25f;
     print_hex(cast(u64) un.i);
+
+    s1 :: string_make("Hello, ");
+    s2 :: string_make("World!");
+    s3 :: string_concat(heap_allocator, s1, s2);
+    defer string_free(heap_allocator, s3);
+    string_print(s3);
 }
 
 vadd :: proc (v1: Vec3, v2: Vec3) -> Vec3 {
     return Vec3.{
-        x = v1.x + v2.x,
-        y = v1.y + v2.y,
-        z = v1.z + v2.z,
+        v1.x + v2.x,
+        v1.y + v2.y,
+        v1.z + v2.z,
     };
 }
 
 vmul :: proc (use v: Vec3, s: i32) -> Vec3 {
-    return Vec3.{ x = x * s, y = y * s, z = z * s };
+    return Vec3.{ x * s, y * s, z * s };
 }
 
 UnionTest :: struct #union {

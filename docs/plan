@@ -186,6 +186,14 @@ HOW:
 
         [X] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
+            
+        [ ] Add slices
+            - Arrays without a size
+            - Converted to a struct that looks like:    
+                []T :: struct {
+                    count : u32;
+                    data  : ^T;
+                }
 
         [ ] 'use' enums and packages at an arbitrary scope
 
@@ -207,13 +215,6 @@ HOW:
 
         [ ] Type parameterized structs
 
-        [ ] Add slices
-            - Arrays without a size
-            - Converted to a struct that looks like:    
-                []T :: struct {
-                    count : u32;
-                    data  : ^T;
-                }
 
         [ ] Arrays need to be much better
             - Currently, they are basically just a pointer.

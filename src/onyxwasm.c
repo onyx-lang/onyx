@@ -1215,12 +1215,23 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Param: {
             u64 localidx = bh_imap_get(&mod->local_map, (u64) expr);
 
-            WIL(WI_LOCAL_GET, localidx);
+            if (expr->type->kind == Type_Kind_Struct) {
+                TypeStruct* st = &expr->type->Struct;
+                
+                fori (idx, 0, st->mem_count) {
+                    WIL(WI_LOCAL_GET, localidx + idx);
+                }
+                
+            } else {
+                WIL(WI_LOCAL_GET, localidx);
+            }
+
             break;
         }
 
         case Ast_Kind_Local: {
             u64 tmp = bh_imap_get(&mod->local_map, (u64) expr);
+
             if (tmp & LOCAL_IS_WASM) {
                 if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == tmp) {
                     bh_arr_last(code).type = WI_LOCAL_TEE;

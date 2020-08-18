@@ -961,8 +961,6 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 parser->curr->pos,
                 token_name(';'),
                 token_name(parser->curr->type));
-
-            find_token(parser, ';');
         }
         consume_token(parser);
     }
@@ -1275,10 +1273,9 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             while (parser->curr->type != '}') {
                 if (parser->hit_unexpected_token) return (AstFunction *) ofunc;
 
-                AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);
-                sym_node->token = expect_token(parser, Token_Type_Symbol);
+                AstTyped* o_node = parse_expression(parser);
 
-                bh_arr_push(ofunc->overloads, sym_node);
+                bh_arr_push(ofunc->overloads, o_node);
 
                 if (parser->curr->type != '}')
                     expect_token(parser, ',');

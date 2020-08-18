@@ -96,8 +96,9 @@ CHECK(for, AstFor* fornode) {
     if (check_expression(&fornode->end)) return 1;
     if (check_expression(&fornode->step)) return 1;
 
-    fornode->var->type_node = fornode->start->type_node;
-    if (check_expression((AstTyped **) &fornode->var)) return 1;
+    if (fornode->var->type_node == NULL)
+        fornode->var->type_node = fornode->start->type_node;
+    fill_in_type((AstTyped *) fornode->var);
 
     if (!type_is_integer(fornode->start->type)) {
         onyx_message_add(Msg_Type_Literal,
