@@ -192,8 +192,13 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
 
     AstStructLiteral* sl = make_node(AstStructLiteral, Ast_Kind_Struct_Literal);
     sl->token = parser->curr;
+
     bh_arr_new(global_heap_allocator, sl->values, 4);
     bh_arr_new(global_heap_allocator, sl->named_values, 4);
+    fori (i, 0, 4) {
+        sl->values[i] = NULL;
+        sl->named_values[i] = NULL;
+    }
 
     if (symbol2 != NULL) {
         AstTyped *package = make_node(AstTyped, Ast_Kind_Symbol);
