@@ -206,15 +206,6 @@ scratch_alloc_init :: proc (a: ^Allocator, ss: ^ScratchState) {
 }
 
 
-#private return_scratch_size  :: 256
-#private return_scratch_buff  :  [return_scratch_size] u8
-#private return_scratch_state :  ScratchState;
-
-return_scratch_alloc : Allocator;
-
 memory_init :: proc {
     heap_init();
-
-    scratch_state_init(^return_scratch_state, return_scratch_buff, return_scratch_size);
-    scratch_alloc_init(^return_scratch_alloc, ^return_scratch_state);
 }

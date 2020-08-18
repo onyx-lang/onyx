@@ -240,6 +240,12 @@ typedef enum OnyxIntrinsic {
     ONYX_INTRINSIC_F64_COPYSIGN,
 } OnyxIntrinsic;
 
+typedef enum CallingConvention {
+    CC_Undefined,
+    CC_Return_Wasm,
+    CC_Return_Stack
+} CallingConvention;
+
 
 // Base Nodes
 #define AstNode_members {     \
@@ -541,6 +547,13 @@ static inline b32 binop_is_compare(AstBinaryOp* binop) {
 
 static inline b32 node_is_type(AstNode* node) {
     return (node->kind > Ast_Kind_Type_Start) && (node->kind < Ast_Kind_Type_End);
+}
+
+static inline CallingConvention type_function_get_cc(Type* type) {
+    if (type == NULL) return CC_Undefined;
+    if (type->kind != Type_Kind_Function) return CC_Undefined;
+    if (type->Function.return_type->kind == Type_Kind_Struct) return CC_Return_Stack;
+    return CC_Return_Wasm;
 }
 
 #endif // #ifndef ONYXASTNODES_H

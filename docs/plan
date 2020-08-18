@@ -181,6 +181,12 @@ HOW:
 
         [X] #size on structs
 
+        [X] multiple return value
+            - Returning on the stack
+
+        [X] returning structs
+            - This will put forward a lot of the work that will be done for multiple return values
+
         [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] 'when' statements
@@ -214,16 +220,6 @@ HOW:
             - The length should be stored with the pointer
             - Dynamic resizing?
             - They are just very hard to use at the moment
-
-        [ ] multiple return values
-            - THIS IS NOT GOING TO BE FUN. 
-            - Wasm multi-value proposal is not finalized and nothing has implemented it yet
-            - This means other methods of returning multiple things would be needed:    
-                - globals
-                - on the stack
-
-        [ ] returning structs
-            - This will put forward a lot of the work that will be done for multiple return values
 
         [X] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.

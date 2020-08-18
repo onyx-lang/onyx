@@ -363,7 +363,8 @@ COMPILE_FUNC(field_access_location,         AstFieldAccess* field, u64* offset_r
 COMPILE_FUNC(local_location,                AstLocal* local, u64* offset_return);
 COMPILE_FUNC(memory_reservation_location,   AstMemRes* memres);
 COMPILE_FUNC(struct_load,                   Type* type, u64 offset);
-COMPILE_FUNC(struct_store,                  AstTyped* lval);
+COMPILE_FUNC(struct_lval,                   AstTyped* lval);
+COMPILE_FUNC(struct_store,                  Type* type, u64 offset);
 COMPILE_FUNC(struct_literal,                AstStructLiteral* sl);
 COMPILE_FUNC(expression,                    AstTyped* expr);
 COMPILE_FUNC(cast,                          AstUnaryOp* cast);
@@ -457,7 +458,7 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
 
     if (assign->right->type->kind == Type_Kind_Struct) {
         compile_expression(mod, &code, assign->right);
-        compile_struct_store(mod, &code, assign->left);
+        compile_struct_lval(mod, &code, assign->left);
 
         *pcode = code;
         return;
@@ -526,9 +527,10 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
 COMPILE_FUNC(store_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(("Should use compile_struct_store instead", type->kind != Type_Kind_Struct));
-
-    u32 alignment = type_get_alignment_log2(type);
+    if (type->kind == Type_Kind_Struct) {
+        compile_struct_store(mod, pcode, type, offset);
+        return;
+    }
 
     if (type->kind == Type_Kind_Enum) {
         type = type->Enum.backing;
@@ -537,6 +539,8 @@ COMPILE_FUNC(store_instruction, Type* type, u32 offset) {
     if (type->kind == Type_Kind_Function) {
         type = &basic_types[Basic_Kind_U32];
     }
+
+    u32 alignment = type_get_alignment_log2(type);
 
     i32 store_size  = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
@@ -909,14 +913,39 @@ COMPILE_FUNC(call, AstCall* call) {
         compile_expression(mod, &code, arg->value);
     }
 
+    CallingConvention cc = type_function_get_cc(call->callee->type);
+    assert(cc != CC_Undefined);
+
+    Type* return_type = call->callee->type->Function.return_type;
+    u32 return_size = type_size_of(return_type);
+    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+
+    if (cc == CC_Return_Stack) {
+        WID(WI_GLOBAL_GET, stack_top_idx);
+        WID(WI_I32_CONST, return_size);
+        WI(WI_I32_ADD);
+        WID(WI_GLOBAL_SET, stack_top_idx);
+    }
+
     if (call->callee->kind == Ast_Kind_Function) {
         i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) call->callee);
         bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
+
     } else {
         compile_expression(mod, &code, call->callee);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
         WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
+    }
+
+    if (cc == CC_Return_Stack) {
+        WID(WI_GLOBAL_GET, stack_top_idx);
+        WID(WI_I32_CONST, return_size);
+        WI(WI_I32_SUB);
+        WID(WI_GLOBAL_SET, stack_top_idx);
+
+        WID(WI_GLOBAL_GET, stack_top_idx);
+        compile_load_instruction(mod, &code, return_type, 0);
     }
 
     *pcode = code;
@@ -1108,7 +1137,7 @@ COMPILE_FUNC(struct_load, Type* type, u64 offset) {
     *pcode = code;
 }
 
-COMPILE_FUNC(struct_store, AstTyped* lval) {
+COMPILE_FUNC(struct_lval, AstTyped* lval) {
     // NOTE: Expects the stack to look like:
     //      mem_1
     //      mem_2
@@ -1131,10 +1160,27 @@ COMPILE_FUNC(struct_store, AstTyped* lval) {
         default: assert(0);
     }
 
+    compile_struct_store(mod, &code, lval->type, offset);
+
+    *pcode = code;
+}
+
+COMPILE_FUNC(struct_store, Type* type, u64 offset) {
+    // NOTE: Expects the stack to look like:
+    //      mem_1
+    //      mem_2
+    //      ...
+    //      mem_n
+    //      loc
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    assert(type->kind == Type_Kind_Struct);
+
     u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     WIL(WI_LOCAL_SET, loc_idx);
 
-    bh_arr_rev_each(StructMember *, smem, lval->type->Struct.memarr) {
+    bh_arr_rev_each(StructMember *, smem, type->Struct.memarr) {
         WasmType wt = onyx_type_to_wasm_type((*smem)->type);
         u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
 
@@ -1505,7 +1551,28 @@ COMPILE_FUNC(return, AstReturn* ret) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (ret->expr) {
-        compile_expression(mod, &code, ret->expr);
+        if (mod->curr_cc == CC_Return_Stack) {
+            if (ret->expr->type->kind == Type_Kind_Struct) {
+                compile_expression(mod, &code, ret->expr);
+
+                WIL(WI_LOCAL_GET, mod->stack_base_idx);
+                WID(WI_I32_CONST, type_size_of(ret->expr->type));
+                WI(WI_I32_SUB);
+
+                compile_store_instruction(mod, &code, ret->expr->type, 0);
+
+            } else {
+                WIL(WI_LOCAL_GET, mod->stack_base_idx);
+                WID(WI_I32_CONST, type_size_of(ret->expr->type));
+                WI(WI_I32_SUB);
+
+                compile_expression(mod, &code, ret->expr);
+                compile_store_instruction(mod, &code, ret->expr->type, 0);
+            }
+
+        } else {
+            compile_expression(mod, &code, ret->expr);
+        }
     }
 
     compile_deferred_stmts(mod, &code, (AstNode *) ret);
@@ -1544,7 +1611,7 @@ COMPILE_FUNC(stack_enter, u64 stacksize) {
 COMPILE_FUNC(stack_leave, u32 unused) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    u32 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
     WIL(WI_LOCAL_GET, mod->stack_base_idx);
     WID(WI_GLOBAL_SET, stack_top_idx);
@@ -1577,6 +1644,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     }
     *(t++) = ':';
 
+    // HACK: Slightly: the wasm type for structs has to be 0x00
     WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
     *(t++) = (char) return_type;
     *t = '\0';
@@ -1705,7 +1773,10 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
         mod->local_alloc = &wasm_func.locals;
         mod->local_alloc->param_count = localidx;
 
-        mod->has_stack_locals = 0;
+        mod->curr_cc = type_function_get_cc(fd->type);
+        assert(mod->curr_cc != CC_Undefined);
+
+        mod->has_stack_locals = (mod->curr_cc == CC_Return_Stack);
         bh_arr_each(AstLocal *, local, fd->locals)
             mod->has_stack_locals |= !local_is_wasm_local(*local);
 
@@ -1715,7 +1786,6 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
             bh_arr_insert_end(wasm_func.code, 5);
             mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
         }
-
 
         // Generate code
         compile_function_body(mod, &wasm_func.code, fd);

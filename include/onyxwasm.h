@@ -340,6 +340,7 @@ typedef struct OnyxWasmModule {
 
     i32 *stack_top_ptr;
     u64 stack_base_idx;
+    CallingConvention curr_cc;
 
     b32 has_stack_locals : 1;
 } OnyxWasmModule;

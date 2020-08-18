@@ -60,12 +60,6 @@ mag_squared :: proc (use v: Vec3) -> i32 {
     return x * x + y * y + z * z;
 }
 
-vec_add :: proc (v: Vec3, u: Vec3, use out: ^Vec3) {
-    x = v.x + u.x;
-    y = v.y + u.y;
-    z = v.z + u.z;
-}
-
 clamp :: proc (v: i32, lo: i32, hi: i32) -> i32 {
     if v < lo do return lo;
     if v > hi do return hi;
@@ -154,7 +148,7 @@ start :: proc #export {
     mag_squared(varr[2]) |> print();
 
     v1 := Vec3.{};
-    v2 := *vadd(v1, Vec3.{ 0, 0, 0 });
+    v2 := vmul(vadd(v1, Vec3.{ 1, 2, 3 }), 3);
   
     print(v2.x);
     print(v2.y);
@@ -167,15 +161,16 @@ start :: proc #export {
     print_hex(cast(u64) un.i);
 }
 
-vadd :: proc (v1: Vec3, v2: Vec3) -> ^Vec3 {
-    out := cast(^Vec3) alloc(return_scratch_alloc, sizeof Vec3);
-    *out = Vec3.{
+vadd :: proc (v1: Vec3, v2: Vec3) -> Vec3 {
+    return Vec3.{
         x = v1.x + v2.x,
         y = v1.y + v2.y,
         z = v1.z + v2.z,
     };
+}
 
-    return out;
+vmul :: proc (use v: Vec3, s: i32) -> Vec3 {
+    return Vec3.{ x = x * s, y = y * s, z = z * s };
 }
 
 UnionTest :: struct #union {
