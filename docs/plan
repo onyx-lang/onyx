@@ -186,7 +186,7 @@ HOW:
 
         [X] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
-            
+
         [ ] Add slices
             - Arrays without a size
             - Converted to a struct that looks like:    
@@ -213,8 +213,13 @@ HOW:
 
         [ ] All code paths return correct value
 
-        [ ] Type parameterized structs
+        [ ] Put type info in data section so it is runtime accessible
+            - size
+            - alignment
+            - struct member names
+            - array length
 
+        [ ] Type parameterized structs
 
         [ ] Arrays need to be much better
             - Currently, they are basically just a pointer.

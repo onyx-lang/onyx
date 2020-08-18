@@ -110,8 +110,10 @@ static AstType* symres_type(AstType* type) {
         return type;
     }
 
-    assert(("Bad type node", 0));
-    return NULL;
+    onyx_message_add(Msg_Type_Literal,
+            (OnyxFilePos) { 0 },
+            onyx_ast_node_kind_string(type->kind));
+    return type;
 }
 
 static void symres_local(AstLocal** local) {
@@ -230,6 +232,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
                 onyx_message_add(Msg_Type_No_Field,
                         (*smem)->token->pos,
                         (*smem)->token->text, type_get_name(sl->type));
+                token_toggle_end((*smem)->token);
                 return;
             }
             token_toggle_end((*smem)->token);

@@ -1,0 +1,8 @@
+package core
+
+#include_file "alloc"
+#include_file "intrinsics"
+#include_file "memory"
+#include_file "printing"
+#include_file "random"
+#include_file "string"

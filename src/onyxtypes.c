@@ -357,9 +357,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             assert(("symbol node in type expression", 0));
             return NULL;
 
-        default:
-            assert(("Node is not a type node", 0));
-            return NULL;
+        default: return NULL;
     }
 }
 
@@ -474,8 +472,10 @@ b32 type_is_array(Type* type) {
 }
 
 b32 type_is_struct(Type* type) {
+    if (type == NULL) return 0;
     if (type->kind == Type_Kind_Struct) return 1;
-    if (type->kind == Type_Kind_Pointer && type->Pointer.elem->kind == Type_Kind_Struct) return 1;
+    if (type->kind == Type_Kind_Pointer)
+        if (type->Pointer.elem != NULL && type->Pointer.elem->kind == Type_Kind_Struct) return 1;
     return 0;
 }
 

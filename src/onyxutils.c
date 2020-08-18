@@ -20,13 +20,13 @@ static const char* ast_node_names[] = {
     "INCLUDE FOLDER",
     "USE PACKAGE",
     "ALIAS",
-    "MEMORY RESERVATION"
+    "MEMORY RESERVATION",
 
     "BINDING",
     "FUNCTION",
     "OVERLOADED_FUNCTION",
     "BLOCK",
-    "SCOPE",
+    "LOCAL GROUP",
     "LOCAL",
     "GLOBAL",
     "SYMBOL",
@@ -52,14 +52,17 @@ static const char* ast_node_names[] = {
     "PARAM",
     "ARGUMENT",
     "CALL",
+    "INTRINSIC CALL",
     "RETURN",
     "ADDRESS OF",
     "DEREFERENCE",
     "ARRAY_ACCESS",
     "FIELD_ACCESS",
+    "UFC",
     "SIZE OF",
-    "ALIGN OF"
-    "FILE CONTENTS"
+    "ALIGN OF",
+    "FILE CONTENTS",
+    "STRUCT LITERAL",
 
     "IF",
     "FOR",

@@ -19,7 +19,7 @@ alloc_proc :: #type proc (rawptr, AllocAction, u32, u32, rawptr) -> rawptr;
 
 Allocator :: struct {
     data: rawptr;
-    func: alloc_proc; 
+    func: alloc_proc;
 }
 
 alloc :: proc (use a: Allocator, size: u32) -> rawptr {
@@ -100,7 +100,7 @@ heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
 
     new_pages :: ((size - heap_state.remaining_space) >> 16) + 1;
     if memory_grow(new_pages) == -1 {
-        // out of memory    
+        // out of memory
         return null;
     }
     heap_state.remaining_space += new_pages << 16;

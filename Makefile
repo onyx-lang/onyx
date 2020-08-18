@@ -1,4 +1,4 @@
-RELEASE=0
+RELEASE=1
 
 OBJ_FILES=\
 	build/onyxlex.o \
@@ -30,8 +30,9 @@ build/%.o: src/%.c include/bh.h
 $(TARGET): $(OBJ_FILES)
 	$(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
 
-install: $(TARGET)
+install: $(TARGET) core/*
 	cp $(TARGET) /usr/bin/
+	cp -r core/ /usr/share/onyx
 
 install_syntax: misc/onyx.vim misc/onyx.sublime-syntax
 	cp ./misc/onyx.vim /usr/share/vim/vim82/syntax/onyx.vim

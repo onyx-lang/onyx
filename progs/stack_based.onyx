@@ -1,6 +1,6 @@
 package main
 
-#include_folder "./core"
+#include_folder "/usr/share/onyx/core"
 
 #include_file "printing"
 #include_file "alloc"
@@ -109,7 +109,7 @@ start :: proc #export {
 
     print(10 |> ret_val(4));
     print(11 |> ret_val(5));
-    
+
     for i: 0, N do print(arr[1][i]);
 
     soa: struct { x: [5] i32; y: [5] i32; };
@@ -149,7 +149,7 @@ start :: proc #export {
 
     v1 := Vec3.{};
     v2 := vmul(vadd(v1, Vec3.{ 1, 2, 3 }), 3);
-  
+
     print(v2.x);
     print(v2.y);
     print(v2.z);

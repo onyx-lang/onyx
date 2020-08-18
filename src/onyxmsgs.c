@@ -2,7 +2,7 @@
 #include "onyxmsgs.h"
 #include "onyxutils.h"
 
-#define MAX_MSGS 10
+#define MAX_MSGS 100
 
 OnyxMessages msgs;
 
