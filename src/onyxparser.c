@@ -237,7 +237,7 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
             sm->initial_value = expr;
 
             bh_arr_push(sl->named_values, sm);
-            
+
         } else {
             bh_arr_push(sl->values, expr);
         }
@@ -522,7 +522,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     if (parser->curr->type != ')')
                         expect_token(parser, ',');
                 }
-                
+
                 consume_token(parser);
 
                 retval = (AstTyped *) call_node;

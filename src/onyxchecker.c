@@ -401,7 +401,7 @@ CHECK(binop_assignment, AstBinaryOp* binop, b32 assignment_is_ok) {
     }
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
-        onyx_message_add(Msg_Type_Binop_Mismatch,
+        onyx_message_add(Msg_Type_Assignment_Mismatch,
                 binop->token->pos,
                 type_get_name(binop->left->type),
                 type_get_name(binop->right->type));
@@ -651,7 +651,7 @@ CHECK(struct_literal, AstStructLiteral* sl) {
 
         if (!types_are_compatible((*formal)->type, (*actual)->type)) {
             onyx_message_add(Msg_Type_Assignment_Mismatch,
-                    (*actual)->token->pos,
+                    sl->token->pos,
                     type_get_name((*formal)->type),
                     type_get_name((*actual)->type));
             return 1;

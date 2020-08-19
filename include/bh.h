@@ -576,6 +576,8 @@ typedef struct bh__arr {
 #define bh_arr_each(T, var, arr)      for (T* var = (arr); !bh_arr_end((arr), var); var++)
 #define bh_arr_rev_each(T, var, arr)  for (T* var = &bh_arr_last((arr)); !bh_arr_start((arr), var); var--)
 
+#define bh_arr_zero(arr) memset(arr, 0, bh_arr_length(arr) * sizeof(*(arr)));
+
 b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_shrink(void** arr, i32 elemsize, i32 cap);
 b32 bh__arr_free(void **arr);

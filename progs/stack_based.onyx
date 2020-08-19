@@ -56,6 +56,11 @@ Vec3 :: struct {
     z: i32 = 0;
 }
 
+SomeBigThing :: struct {
+    name: string;
+    pos: Vec3;
+}
+
 mag_squared :: proc (use v: Vec3) -> i32 {
     return x * x + y * y + z * z;
 }
@@ -163,6 +168,16 @@ start :: proc #export {
     s3 :: string_concat(heap_allocator, s1, s2);
     defer string_free(heap_allocator, s3);
     string_print(s3);
+
+    sbt : SomeBigThing;
+    sbt.name = s3;
+    sbt.pos = Vec3.{ 2, 3, 4 };
+    string_print(sbt.name);
+
+    v := vmul(vadd(sbt.pos, Vec3.{ 1, 2, 3 }), 3);
+    print(v.x);
+    print(v.y);
+    print(v.z);
 }
 
 vadd :: proc (v1: Vec3, v2: Vec3) -> Vec3 {

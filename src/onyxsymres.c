@@ -224,6 +224,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
 
     if (bh_arr_length(sl->values) == 0) {
         bh_arr_set_length(sl->values, sl->type->Struct.mem_count);
+        bh_arr_zero(sl->values);
 
         StructMember s;
         bh_arr_each(AstStructMember *, smem, sl->named_values) {
