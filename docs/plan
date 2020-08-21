@@ -187,6 +187,23 @@ HOW:
         [X] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
 
+        [ ] Put type info in data section so it is runtime accessible
+            - type name
+            - size
+            - alignment
+            - struct member names
+            - array length
+
+        [ ] convert to using an 'atom' like table
+            - All identifier tokens are given a unique atom ptr, up to string equality.
+            - This means identifiers can be compared using ptr comparison, instead of string comparison
+            - This mean no more token_toggle_end!! Woo!!
+
+        [ ] Make the lexer much faster
+            - Technically it isn't slow right now
+            - But, profiling says we are spending 50% of the program execution time in the lexer
+            - That is awful
+
         [ ] Add slices
             - Arrays without a size
             - Converted to a struct that looks like:    
@@ -212,12 +229,6 @@ HOW:
             a, b = b, a;
 
         [ ] All code paths return correct value
-
-        [ ] Put type info in data section so it is runtime accessible
-            - size
-            - alignment
-            - struct member names
-            - array length
 
         [ ] Type parameterized structs
 

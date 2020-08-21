@@ -331,9 +331,9 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
     assert(value & LOCAL_IS_WASM);
 
     u32 idx = value & 0xFFFFFFFF;
-    if (value & 0x100000000) idx += la->allocated[0]; 
-    if (value & 0x200000000) idx += la->allocated[1]; 
-    if (value & 0x400000000) idx += la->allocated[2]; 
+    if (value & 0x100000000) idx += la->allocated[0];
+    if (value & 0x200000000) idx += la->allocated[1];
+    if (value & 0x400000000) idx += la->allocated[2];
 
     return (u64) idx;
 }
@@ -1217,11 +1217,11 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
             if (expr->type->kind == Type_Kind_Struct) {
                 TypeStruct* st = &expr->type->Struct;
-                
+
                 fori (idx, 0, st->mem_count) {
                     WIL(WI_LOCAL_GET, localidx + idx);
                 }
-                
+
             } else {
                 WIL(WI_LOCAL_GET, localidx);
             }
@@ -1593,7 +1593,7 @@ COMPILE_FUNC(return, AstReturn* ret) {
         while (i >= 0) {
             compile_statement(mod, &code, mod->deferred_stmts[i].stmt);
             i--;
-        } 
+        }
     }
 
     if (mod->has_stack_locals)
@@ -2005,7 +2005,7 @@ static void compile_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         onyx_message_add(Msg_Type_File_Not_Found,
                 fc->filename->pos,
                 fc->filename->text);
-        
+
         token_toggle_end(fc->filename);
         return;
     }

@@ -1,4 +1,4 @@
-RELEASE=1
+RELEASE=0
 
 OBJ_FILES=\
 	build/onyxlex.o \
@@ -21,7 +21,7 @@ TARGET=./onyx
 ifeq ($(RELEASE), 1)
 	FLAGS=-O2
 else
-	FLAGS=-g
+	FLAGS=-g -O2
 endif
 
 build/%.o: src/%.c include/bh.h

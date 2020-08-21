@@ -228,16 +228,6 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc);
 
 
 
-// MANAGED HEAP ALLOCATOR
-typedef struct bh_managed_heap {
-    ptr* pointers; // Actually a bh_arr
-} bh_managed_heap;
-
-void bh_managed_heap_init(bh_managed_heap* mh);
-void bh_managed_heap_free(bh_managed_heap* mh);
-bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh);
-BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc);
-
 
 
 // ARENA ALLOCATOR
@@ -734,6 +724,16 @@ void bh_imap_clear(bh_imap* imap);
 
 
 
+// MANAGED HEAP ALLOCATOR
+typedef struct bh_managed_heap {
+    bh_imap ptrs;
+} bh_managed_heap;
+
+void bh_managed_heap_init(bh_managed_heap* mh);
+void bh_managed_heap_free(bh_managed_heap* mh);
+bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh);
+BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc);
+
 
 
 
@@ -870,17 +870,15 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
 // MANAGED HEAP ALLOCATOR IMPLEMENTATION
 void bh_managed_heap_init(bh_managed_heap* mh) {
-    mh->pointers = NULL;
-
-    bh_arr_new(bh_heap_allocator(), mh->pointers, 4);
+    bh_imap_init(&mh->ptrs, bh_heap_allocator(), 512);
 }
 
 void bh_managed_heap_free(bh_managed_heap* mh) {
-    bh_arr_each(ptr, p, mh->pointers) {
-        free(*p);
+    bh_arr_each(bh__imap_entry, p, mh->ptrs.entries) {
+        free((void *) p->key);
     }
 
-    bh_arr_free(mh->pointers);
+    bh_imap_free(&mh->ptrs);
 }
 
 bh_allocator bh_managed_heap_allocator(bh_managed_heap* mh) {
@@ -903,40 +901,17 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
         }
 
         if (retval != NULL)
-            bh_arr_push(mh->pointers, retval);
+            bh_imap_put(&mh->ptrs, (u64) retval, 1);
     } break;
 
     case bh_allocator_action_resize: {
-        i32 replace_idx = 0;
-        b32 found = 0;
-
-        bh_arr_each(ptr, p, mh->pointers) {
-            if (*p == prev_memory) {
-                found = 1;
-                break;
-            }
-
-            replace_idx++;
-        }
-
+        bh_imap_delete(&mh->ptrs, (u64) prev_memory);
         retval = realloc(prev_memory, size);
-        mh->pointers[replace_idx] = retval;
+        bh_imap_put(&mh->ptrs, (u64) retval, 1);
     } break;
 
     case bh_allocator_action_free: {
-        i32 free_idx = 0;
-        b32 found = 0;
-
-        bh_arr_each(ptr, p, mh->pointers) {
-            if (*p == prev_memory) {
-                found = 1;
-                break;
-            }
-
-            free_idx++;
-        }
-
-        bh_arr_fastdelete(mh->pointers, free_idx);
+        bh_imap_delete(&mh->ptrs, (u64) prev_memory);
         free(prev_memory);
     } break;
     }
