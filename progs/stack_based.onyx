@@ -5,10 +5,12 @@ package main
 #include_file "printing"
 #include_file "alloc"
 #include_file "string"
+#include_file "wasi"
 
 use package printing
 use package memory
 use package core
+use package wasi
 
 sort :: proc (arr: [N]i32, cmp: proc (i32, i32) -> i32) -> [N] i32 {
     for i: 0, N {

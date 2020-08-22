@@ -187,17 +187,17 @@ HOW:
         [X] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
 
+        [ ] convert to using an 'atom' like table
+            - All identifier tokens are given a unique atom ptr, up to string equality.
+            - This means identifiers can be compared using ptr comparison, instead of string comparison
+            - This mean no more token_toggle_end!! Woo!!
+
         [ ] Put type info in data section so it is runtime accessible
             - type name
             - size
             - alignment
             - struct member names
             - array length
-
-        [ ] convert to using an 'atom' like table
-            - All identifier tokens are given a unique atom ptr, up to string equality.
-            - This means identifiers can be compared using ptr comparison, instead of string comparison
-            - This mean no more token_toggle_end!! Woo!!
 
         [ ] Make the lexer much faster
             - Technically it isn't slow right now
@@ -211,6 +211,8 @@ HOW:
                     count : u32;
                     data  : ^T;
                 }
+
+        [ ] Variadic arguments
 
         [ ] 'use' enums and packages at an arbitrary scope
 
@@ -241,13 +243,9 @@ HOW:
         [X] Start work on evaluating compile time known values.
             - An expression marked COMPTIME will be reduced to its value in the parse tree.
 
-        [ ] #initialize structs
-
         [ ] Better checking for casts
             - Checking which things are allowed to cast to/from should be checked in the checker,
                 not in the wasm generatation
-
-        [ ] Variadic arguments
 
         [ ] Switch statements
 

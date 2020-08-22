@@ -250,6 +250,7 @@ static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func);
 static b32 local_is_wasm_local(AstLocal* local) {
     if (local->flags & Ast_Flag_Address_Taken) return 0;
     if (local->type->kind == Type_Kind_Basic) return 1;
+    if (local->type->kind == Type_Kind_Enum && local->type->Enum.backing->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Pointer) return 1;
     return 0;
 }
@@ -298,6 +299,7 @@ static u64 local_allocate(LocalAllocator* la, AstLocal* local) {
     } else {
         u32 size = type_size_of(local->type);
         u32 alignment = type_alignment_of(local->type);
+
         if (size % alignment != 0)
             size += alignment - (size % alignment);
 
@@ -1499,6 +1501,9 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
         *pcode = code;
         return;
     }
+
+    if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
+    if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
 
     if (from->kind == Type_Kind_Basic && from->Basic.kind == Basic_Kind_Void) {
         onyx_message_add(Msg_Type_Literal,

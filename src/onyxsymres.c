@@ -110,6 +110,11 @@ static AstType* symres_type(AstType* type) {
         return type;
     }
 
+    if (type->kind == Ast_Kind_Enum_Type) {
+       // symres_enum((AstEnumType *) type);
+       return type;
+    }
+
     onyx_message_add(Msg_Type_Literal,
             (OnyxFilePos) { 0 },
             onyx_ast_node_kind_string(type->kind));
@@ -525,7 +530,7 @@ static void symres_enum(AstEnumType* enum_node) {
                 next_assign_value = (*value)->value->value.l;
             } else {
                 onyx_message_add(Msg_Type_Literal,
-                    (*value)->value->token->pos,
+                    (*value)->token->pos,
                     "expected numeric integer literal for enum initialization");
                 return;
             }

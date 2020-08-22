@@ -96,7 +96,7 @@ CHECK(for, AstFor* fornode) {
     if (check_expression(&fornode->end)) return 1;
     if (check_expression(&fornode->step)) return 1;
 
-    if (fornode->var->type_node == NULL)
+    if (fornode->var->type_node == NULL || fornode->var->type_node != fornode->start->type_node)
         fornode->var->type_node = fornode->start->type_node;
     fill_in_type((AstTyped *) fornode->var);
 

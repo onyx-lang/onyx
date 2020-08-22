@@ -55,5 +55,3 @@ string_concat :: proc (a: Allocator, s1: string, s2: string) -> string {
 
 string_free :: proc (a: Allocator, s: string) do free(a, s.data);
 
-#private print_str_with_len :: proc #foreign "host" "print_str_with_len" (s: ^u8, len: u32) ---
-string_print :: proc (s: string) do print_str_with_len(s.data, s.length);

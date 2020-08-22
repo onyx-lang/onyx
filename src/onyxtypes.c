@@ -496,6 +496,7 @@ b32 type_is_integer(Type* type) {
 }
 
 b32 type_is_numeric(Type* type) {
+    if (type->kind == Type_Kind_Enum) return 1;
     if (type->kind != Type_Kind_Basic) return 0;
 
     return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_F64;
