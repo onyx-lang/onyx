@@ -294,6 +294,11 @@ typedef struct DeferredStmt {
     AstNode *stmt;
 } DeferredStmt;
 
+typedef struct StrLitInfo {
+    u32 addr;
+    u32 len;
+} StrLitInfo;
+
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
 
@@ -316,7 +321,7 @@ typedef struct OnyxWasmModule {
     bh_table(i32) type_map;
 
     bh_table(u32) loaded_file_offsets;
-    bh_table(u32) string_literals;
+    bh_table(StrLitInfo) string_literals;
 
     bh_arr(u8) structured_jump_target;
 

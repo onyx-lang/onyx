@@ -300,8 +300,11 @@ static u64 local_allocate(LocalAllocator* la, AstLocal* local) {
         u32 size = type_size_of(local->type);
         u32 alignment = type_alignment_of(local->type);
 
-        if (size % alignment != 0)
-            size += alignment - (size % alignment);
+        if (la->curr_stack % alignment != 0)
+            la->curr_stack += alignment - (la->curr_stack % alignment);
+
+        if (la->max_stack < la->curr_stack)
+            la->max_stack = la->curr_stack;
 
         if (la->max_stack - la->curr_stack >= size) {
             la->curr_stack += size;
@@ -1288,6 +1291,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_StrLit: {
             WID(WI_I32_CONST, ((AstStrLit *) expr)->addr);
+            WID(WI_I32_CONST, ((AstStrLit *) expr)->length);
             break;
         }
 
@@ -1392,6 +1396,22 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                 u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + smem.idx;
 
                 WIL(WI_LOCAL_GET, localidx);
+                break;
+            }
+
+            if (field->expr->kind == Ast_Kind_StrLit) {
+                StructMember smem;
+
+                token_toggle_end(field->token);
+                type_struct_lookup_member(field->expr->type, field->token->text, &smem);
+                token_toggle_end(field->token);
+
+                if (smem.idx == 0)
+                    WID(WI_I32_CONST, ((AstStrLit *) field->expr)->addr);
+
+                if (smem.idx == 1)
+                    WID(WI_I32_CONST, ((AstStrLit *) field->expr)->length);
+                
                 break;
             }
 
@@ -1903,10 +1923,11 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
             *des++ = src[i];
         }
     }
-    *des++ = '\0';
 
-    if (bh_table_has(u32, mod->string_literals, (char *) strdata)) {
-        strlit->addr = bh_table_get(u32, mod->string_literals, (char *) strdata);
+    if (bh_table_has(StrLitInfo, mod->string_literals, (char *) strdata)) {
+        StrLitInfo sti = bh_table_get(StrLitInfo, mod->string_literals, (char *) strdata);
+        strlit->addr   = sti.addr;
+        strlit->length = sti.len;
         return;
     }
 
@@ -1919,9 +1940,10 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     };
 
     strlit->addr = (u32) mod->next_datum_offset,
+    strlit->length = length;
     mod->next_datum_offset += length;
 
-    bh_table_put(u32, mod->string_literals, (char *) strdata, strlit->addr);
+    bh_table_put(StrLitInfo, mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->addr, strlit->length }));
 
     bh_arr_push(mod->data, datum);
 }

@@ -349,65 +349,65 @@ IOVecArray :: struct {
 
 
 // FUNCTIONS
-args_get       :: proc #foreign "wasi_unstable" "args_get" (argv: ^^u8, argv_buf: ^u8) -> Errno ---
-args_sizes_get :: proc #foreign "wasi_unstable" "args_sizes_get" (argc: ^Size, argv_buf_size: ^Size) -> Errno ---
+args_get       :: proc #foreign "wasi_snapshot_preview1" "args_get" (argv: ^^u8, argv_buf: ^u8) -> Errno ---
+args_sizes_get :: proc #foreign "wasi_snapshot_preview1" "args_sizes_get" (argc: ^Size, argv_buf_size: ^Size) -> Errno ---
 
-environ_get       :: proc #foreign "wasi_unstable" "environ_get" (environ: ^^u8, environ_buf: ^u8) -> Errno ---
-environ_sizes_get :: proc #foreign "wasi_unstable" "environ_sizes_get" (environc: ^Size, environ_buf_size: ^Size) -> Errno ---
+environ_get       :: proc #foreign "wasi_snapshot_preview1" "environ_get" (environ: ^^u8, environ_buf: ^u8) -> Errno ---
+environ_sizes_get :: proc #foreign "wasi_snapshot_preview1" "environ_sizes_get" (environc: ^Size, environ_buf_size: ^Size) -> Errno ---
 
-clock_res_get  :: proc #foreign "wasi_unstable" "clock_res_get" (id: ClockID, resolution: ^Timestamp) -> Errno ---
-clock_time_get :: proc #foreign "wasi_unstable" "clock_time_get" (id: ClockID, precision: Timestamp, time: ^Timestamp) -> Errno ---
+clock_res_get  :: proc #foreign "wasi_snapshot_preview1" "clock_res_get" (id: ClockID, resolution: ^Timestamp) -> Errno ---
+clock_time_get :: proc #foreign "wasi_snapshot_preview1" "clock_time_get" (id: ClockID, precision: Timestamp, time: ^Timestamp) -> Errno ---
 
-fd_advise             :: proc #foreign "wasi_unstable" "fd_advise" (fd: FileDescriptor, offset: Filesize, len: Filesize, advice: Advice) -> Errno ---
-fd_allocate           :: proc #foreign "wasi_unstable" "fd_allocate" (fd: FileDescriptor, offset: Filesize, len: Filesize) -> Errno ---
-fd_close              :: proc #foreign "wasi_unstable" "fd_close" (fd: FileDescriptor) -> Errno ---
-fd_datasync           :: proc #foreign "wasi_unstable" "fd_datasync" (fd: FileDescriptor) -> Errno ---
-fd_fdstat_get         :: proc #foreign "wasi_unstable" "fd_fdstat_get" (fd: FileDescriptor, stat: ^FDStat) -> Errno ---
-fd_fdstat_set_flags   :: proc #foreign "wasi_unstable" "fd_fdstat_set_flags" (fd: FileDescriptor, flags: FDFlags) -> Errno ---
-fd_fdstat_set_rights  :: proc #foreign "wasi_unstable" "fd_fdstat_set_rights" (fd: FileDescriptor, rights_base: Rights, rights_inheriting: Rights) -> Errno ---
-fd_filestat_get       :: proc #foreign "wasi_unstable" "fd_filestat_get" (fd: FileDescriptor, buf: ^FileStat) -> Errno ---
-fd_filestat_set_size  :: proc #foreign "wasi_unstable" "fd_filestat_set_size" (fd: FileDescriptor, size: Filesize) -> Errno ---
-fd_filestat_set_times :: proc #foreign "wasi_unstable" "fd_filestat_set_times" (fd: FileDescriptor, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno ---
+fd_advise             :: proc #foreign "wasi_snapshot_preview1" "fd_advise" (fd: FileDescriptor, offset: Filesize, len: Filesize, advice: Advice) -> Errno ---
+fd_allocate           :: proc #foreign "wasi_snapshot_preview1" "fd_allocate" (fd: FileDescriptor, offset: Filesize, len: Filesize) -> Errno ---
+fd_close              :: proc #foreign "wasi_snapshot_preview1" "fd_close" (fd: FileDescriptor) -> Errno ---
+fd_datasync           :: proc #foreign "wasi_snapshot_preview1" "fd_datasync" (fd: FileDescriptor) -> Errno ---
+fd_fdstat_get         :: proc #foreign "wasi_snapshot_preview1" "fd_fdstat_get" (fd: FileDescriptor, stat: ^FDStat) -> Errno ---
+fd_fdstat_set_flags   :: proc #foreign "wasi_snapshot_preview1" "fd_fdstat_set_flags" (fd: FileDescriptor, flags: FDFlags) -> Errno ---
+fd_fdstat_set_rights  :: proc #foreign "wasi_snapshot_preview1" "fd_fdstat_set_rights" (fd: FileDescriptor, rights_base: Rights, rights_inheriting: Rights) -> Errno ---
+fd_filestat_get       :: proc #foreign "wasi_snapshot_preview1" "fd_filestat_get" (fd: FileDescriptor, buf: ^FileStat) -> Errno ---
+fd_filestat_set_size  :: proc #foreign "wasi_snapshot_preview1" "fd_filestat_set_size" (fd: FileDescriptor, size: Filesize) -> Errno ---
+fd_filestat_set_times :: proc #foreign "wasi_snapshot_preview1" "fd_filestat_set_times" (fd: FileDescriptor, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno ---
 fd_pread ::
-	proc #foreign "wasi_unstable" "fd_pread"
+	proc #foreign "wasi_snapshot_preview1" "fd_pread"
 	(fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nread: ^Size) -> Errno ---
-fd_prestat_get :: proc #foreign "wasi_unstable" "fd_prestat_get" (fd: FileDescriptor, buf: ^PrestatTagged) -> Errno ---
-fd_prestat_dir_name :: proc #foreign "wasi_unstable" "fd_prestat_dir_name" (fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
+fd_prestat_get :: proc #foreign "wasi_snapshot_preview1" "fd_prestat_get" (fd: FileDescriptor, buf: ^PrestatTagged) -> Errno ---
+fd_prestat_dir_name :: proc #foreign "wasi_snapshot_preview1" "fd_prestat_dir_name" (fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
 fd_pwrite ::
-	proc #foreign "wasi_unstable" "fd_pwrite"
+	proc #foreign "wasi_snapshot_preview1" "fd_pwrite"
 	(fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nwritten: ^Size) -> Errno ---
 fd_read ::
-	proc #foreign "wasi_unstable" "fd_read"
+	proc #foreign "wasi_snapshot_preview1" "fd_read"
 	(fd: FileDescriptor, iovs: IOVecArray, nread: ^Size) -> Errno ---
 fd_readdir ::
-	proc #foreign "wasi_unstable" "fd_readdir"
+	proc #foreign "wasi_snapshot_preview1" "fd_readdir"
 	(fd: FileDescriptor, buf: ^u8, buf_len: Size, cookie: DirCookie, bufused: ^Size) -> Errno ---
 fd_renumber ::
-	proc #foreign "wasi_unstable" "fd_renumber"
+	proc #foreign "wasi_snapshot_preview1" "fd_renumber"
 	(fd: FileDescriptor, to: FileDescriptor) -> Errno ---
 fd_seek ::
-	proc #foreign "wasi_unstable" "fd_seek"
+	proc #foreign "wasi_snapshot_preview1" "fd_seek"
 	(fd: FileDescriptor, offset: FileDelta, whence: Whence, newoffset: ^Filesize) -> Errno ---
-fd_sync :: proc #foreign "wasi_unstable" "fd_sync" (fd: FileDescriptor) -> Errno ---
-fd_tell :: proc #foreign "wasi_unstable" "fd_tell" (fd: FileDescriptor, offset: ^Filesize) -> Errno ---
+fd_sync :: proc #foreign "wasi_snapshot_preview1" "fd_sync" (fd: FileDescriptor) -> Errno ---
+fd_tell :: proc #foreign "wasi_snapshot_preview1" "fd_tell" (fd: FileDescriptor, offset: ^Filesize) -> Errno ---
 fd_write ::
-	proc #foreign "wasi_unstable" "fd_write"
+	proc #foreign "wasi_snapshot_preview1" "fd_write"
 	(fd: FileDescriptor, iovs: IOVecArray, nwritten: ^Size) -> Errno ---
 
 path_create_directory ::
-	proc #foreign "wasi_unstable" "path_create_directory"
+	proc #foreign "wasi_snapshot_preview1" "path_create_directory"
 	(fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
 path_filestat_get ::
-	proc #foreign "wasi_unstable" "path_filestat_get"
+	proc #foreign "wasi_snapshot_preview1" "path_filestat_get"
 	(fd: FileDescriptor, flags: LookupFlags, path: ^u8, path_len: Size, buf: ^FileStat) -> Errno ---
 path_filestat_set_times ::
-	proc #foreign "wasi_unstable" "path_filestat_set_times"
+	proc #foreign "wasi_snapshot_preview1" "path_filestat_set_times"
 	(fd: FileDescriptor, flags: LookupFlags, path: ^u8, path_len: Size, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno ---
 path_link ::
-	proc #foreign "wasi_unstable" "path_link"
+	proc #foreign "wasi_snapshot_preview1" "path_link"
 	(fd: FileDescriptor, old_flags: LookupFlags, old_path: ^u8, old_path_len: Size, new_fd: FileDescriptor, new_path: ^u8, new_path_len: Size) -> Errno ---	
 path_open ::
-	proc #foreign "wasi_unstable" "path_open"
+	proc #foreign "wasi_snapshot_preview1" "path_open"
 	( fd: FileDescriptor
 	, dirflags: LookupFlags
 	, path: ^u8
@@ -419,38 +419,38 @@ path_open ::
 	, opened_fd: ^FileDescriptor
 	) -> Errno ---
 path_readlink ::
-	proc #foreign "wasi_unstable" "path_readlink"
+	proc #foreign "wasi_snapshot_preview1" "path_readlink"
 	(fd: FileDescriptor, path: ^u8, path_len: Size, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno ---
 path_remove_directory ::
-	proc #foreign "wasi_unstable" "path_remove_directory"
+	proc #foreign "wasi_snapshot_preview1" "path_remove_directory"
 	(fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
 path_rename ::
-	proc #foreign "wasi_unstable" "path_rename"
+	proc #foreign "wasi_snapshot_preview1" "path_rename"
 	(fd: FileDescriptor, old_path: ^u8, old_path_len: Size, new_fd: FileDescriptor, new_path: ^u8, new_path_len: Size) -> Errno ---
 path_symlink ::
-	proc #foreign "wasi_unstable" "path_symlink"
+	proc #foreign "wasi_snapshot_preview1" "path_symlink"
 	(old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: ^u8, new_path_len: Size) -> Errno ---
 path_unlink_file ::
-	proc #foreign "wasi_unstable" "path_unlink_file"
+	proc #foreign "wasi_snapshot_preview1" "path_unlink_file"
 	(fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
 
 poll_oneoff ::
-	proc #foreign "wasi_unstable" "poll_oneoff"
+	proc #foreign "wasi_snapshot_preview1" "poll_oneoff"
 	(in: ^Subscription, out: ^Event, nsubscriptions: Size, nevents: ^Size) -> Errno ---
 
-proc_exit :: proc #foreign "wasi_unstable" "proc_exit" (rval: ExitCode) ---
-proc_raise :: proc #foreign "wasi_unstable" "proc_raise" (sig: Signal) -> Errno ---
+proc_exit  :: proc #foreign "wasi_snapshot_preview1" "proc_exit" (rval: ExitCode) ---
+proc_raise :: proc #foreign "wasi_snapshot_preview1" "proc_raise" (sig: Signal) -> Errno ---
 
-sched_yield :: proc #foreign "wasi_unstable" "sched_yield" -> Errno ---
+sched_yield :: proc #foreign "wasi_snapshot_preview1" "sched_yield" -> Errno ---
 
-random_get :: proc #foreign "wasi_unstable" "random_get" (buf: ^u8, buf_len: Size) -> Errno ---
+random_get :: proc #foreign "wasi_snapshot_preview1" "random_get" (buf: ^u8, buf_len: Size) -> Errno ---
 
 sock_recv ::
-	proc #foreign "wasi_unstable" "sock_recv"
+	proc #foreign "wasi_snapshot_preview1" "sock_recv"
 	(fd: FileDescriptor, ri_data: IOVecArray, ri_flags: RIFlags, ro_datalen: ^Size, ro_flags: ^ROFlags) -> Errno ---
 sock_send ::
-	proc #foreign "wasi_unstable" "sock_send"
+	proc #foreign "wasi_snapshot_preview1" "sock_send"
 	(fd: FileDescriptor, si_data: IOVecArray, si_flags: SIFlags, so_datalen: ^Size) -> Errno ---
 sock_shutdown ::
-	proc #foreign "wasi_unstable" "sock_shutdown"
+	proc #foreign "wasi_snapshot_preview1" "sock_shutdown"
 	(fd: FileDescriptor, how: SDFlags) -> Errno ---

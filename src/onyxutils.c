@@ -157,32 +157,34 @@ void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
     bh_table_put(AstNode *, scope->symbols, sym, node);
 }
 
-AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
-    token_toggle_end(tkn);
-
+AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
     AstNode* res = NULL;
     Scope* scope = start_scope;
 
     while (res == NULL && scope != NULL) {
-        if (bh_table_has(AstNode *, scope->symbols, tkn->text)) {
-            res = bh_table_get(AstNode *, scope->symbols, tkn->text);
+        if (bh_table_has(AstNode *, scope->symbols, sym)) {
+            res = bh_table_get(AstNode *, scope->symbols, sym);
         } else {
             scope = scope->parent;
         }
     }
 
-    if (res == NULL) {
-        onyx_message_add(Msg_Type_Unknown_Symbol,
-                tkn->pos,
-                tkn->text);
-
-        token_toggle_end(tkn);
-        return &empty_node;
-    }
+    if (res == NULL) return NULL;
 
     if (res->kind == Ast_Kind_Symbol) {
-        token_toggle_end(tkn);
         return symbol_resolve(start_scope, res->token);
+    }
+
+    return res;
+}
+
+AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
+    token_toggle_end(tkn);
+    AstNode* res = symbol_raw_resolve(start_scope, tkn->text);
+
+    if (res == NULL) {
+        onyx_message_add(Msg_Type_Unknown_Symbol, tkn->pos, tkn->text);
+        return &empty_node;
     }
 
     token_toggle_end(tkn);

@@ -1,5 +1,7 @@
 #include "onyxastnodes.h"
 #include "onyxtypes.h"
+#include "onyxmsgs.h"
+#include "onyxutils.h"
 
 AstBasicType basic_type_void   = { { Ast_Kind_Basic_Type, 0, NULL, "void"   }, &basic_types[Basic_Kind_Void]  };
 AstBasicType basic_type_bool   = { { Ast_Kind_Basic_Type, 0, NULL, "bool"   }, &basic_types[Basic_Kind_Bool]  };
@@ -17,8 +19,9 @@ AstBasicType basic_type_rawptr = { { Ast_Kind_Basic_Type, 0, NULL, "rawptr" }, &
 
 static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
 static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
-AstNumLit builtin_heap_start = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
-AstGlobal builtin_stack_top  = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token,  NULL, (AstType *) &basic_type_rawptr, NULL };
+AstNumLit builtin_heap_start  = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
+AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token,  NULL, (AstType *) &basic_type_rawptr, NULL };
+AstType  *builtin_string_type;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -41,5 +44,30 @@ const BuiltinSymbol builtin_symbols[] = {
     { NULL, NULL, NULL },
 };
 
-void initialize_builtins() {
+void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
+    BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
+    while (bsym->sym != NULL) {
+        if (bsym->package == NULL)
+            symbol_builtin_introduce(prog->global_scope, bsym->sym, bsym->node);
+        else {
+            Package* p = program_info_package_lookup_or_create(
+                    prog,
+                    bsym->package,
+                    prog->global_scope,
+                    a);
+            assert(p);
+
+            symbol_builtin_introduce(p->scope, bsym->sym, bsym->node);
+        }
+        bsym++;
+    }
+
+    Package* p = program_info_package_lookup_or_create(prog, "builtin", prog->global_scope, a);
+    builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "string");
+    if (builtin_string_type == NULL) {
+        onyx_message_add(Msg_Type_Literal,
+                (OnyxFilePos) { 0 },
+                "'string' struct not found in builtin package");
+        return;
+    }
 }

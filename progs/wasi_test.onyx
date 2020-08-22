@@ -1,11 +1,8 @@
 package main
 
-// WASI is still crap and I cannot get file opening to work.
-// Will try again in 5 years or so when they can finally make
-// that basic and necessary feature work.
-
 #include_folder "/usr/share/onyx/core"
 
+#include_file "builtin"
 #include_file "wasi"
 #include_file "alloc"
 #include_file "intrinsics"
@@ -16,6 +13,7 @@ use package builtin
 use package core
 use package memory
 use package wasi
+use package intrinsics
 
 print_u64_with_base :: proc (n_: u64, base: u64) {
     n := n_;
@@ -26,6 +24,8 @@ print_u64_with_base :: proc (n_: u64, base: u64) {
     *c = #char "\0";
     c -= 1;
 
+    s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
+
     if n == 0l {
         *c = #char "0";
         c -= 1;
@@ -33,27 +33,7 @@ print_u64_with_base :: proc (n_: u64, base: u64) {
         while n > 0l {
             m :: n % base;
 
-            ch := cast(u8) 0;
-
-            // TODO: Replace with array lookup when array literals are added
-            if     m == 0l  do ch = #char "0";
-            elseif m == 1l  do ch = #char "1";
-            elseif m == 2l  do ch = #char "2";
-            elseif m == 3l  do ch = #char "3";
-            elseif m == 4l  do ch = #char "4";
-            elseif m == 5l  do ch = #char "5";
-            elseif m == 6l  do ch = #char "6";
-            elseif m == 7l  do ch = #char "7";
-            elseif m == 8l  do ch = #char "8";
-            elseif m == 9l  do ch = #char "9";
-            elseif m == 10l do ch = #char "A";
-            elseif m == 11l do ch = #char "B";
-            elseif m == 12l do ch = #char "C";
-            elseif m == 13l do ch = #char "D";
-            elseif m == 14l do ch = #char "E";
-            elseif m == 15l do ch = #char "F";
-
-            *c = ch;
+            *c = s.data[cast(u32) m];
             c -= 1;
 
             n /= base;
@@ -78,13 +58,13 @@ print_u64_with_base :: proc (n_: u64, base: u64) {
 }
 
 print_string :: proc (s: string) {
-	vec := IOVec.{ buf = s.data, len = s.length };
+	vec := IOVec.{ buf = s.data, len = s.len };
 	tmp : Size;	
 	fd_write(1, IOVecArray.{ ^vec, 1 }, ^tmp);
 	fd_datasync(1);
 }
 
-print_u8 :: proc (s: ^u8) {
+print_u8 :: proc (s: cstring) {
 	string_make(s) |> print_string();
 }
 
@@ -92,6 +72,7 @@ print :: proc #overloaded { print_string, print_u8 }
 
 print_rights :: proc (rights: Rights) {
 	print_u64_with_base(cast(u64) rights, 2l);
+	print("\n");
 
 	if rights & Rights.DataSync != cast(Rights) 0 do print("DataSync\n");
 	if rights & Rights.Read != cast(Rights) 0 do print("Read\n");
@@ -132,8 +113,41 @@ readline :: proc (buf: ^u8, bufsize: u32) -> u32 {
 	return nread;
 }
 
+readdir :: proc (fd: FileDescriptor) {
+	buf : [1024] u8;
+	bufused : Size;
+
+	if fd_readdir(fd, cast(^u8) buf, 1024, cast(DirCookie) 0, ^bufused) != Errno.Success {
+		print("Failed to readdir\n");
+		return;
+	}
+
+	dirent := cast(^DirEnt) buf;
+	while true {
+		print(string.{ cast(^u8) (cast(u32) dirent + sizeof DirEnt), dirent.d_namlen });
+		print("\n");
+
+		print("\td_namlen: ");
+		print_u64_with_base(cast(u64) dirent.d_namlen, 16l);
+		print("\n");
+		print("\td_type: ");
+		print_u64_with_base(cast(u64) dirent.d_type, 16l);
+		print("\n");
+
+		bufused -= sizeof DirEnt + dirent.d_namlen;
+		dirent = cast(^DirEnt) (cast(u32) dirent + sizeof DirEnt + dirent.d_namlen);
+
+		if bufused <= 0 do break;
+	}
+}
+
 main :: proc #export "_start" {
 	memory_init();
+
+	curr_time: Timestamp;
+	clock_time_get(ClockID.Realtime, cast(Timestamp) 1, ^curr_time);
+	print_u64_with_base(cast(u64) curr_time, 10l);
+	print("\n");
 
 	print("Hello World!\n");
 	print_u64_with_base(cast(u64) 0x624abd, 16l);
@@ -145,90 +159,44 @@ main :: proc #export "_start" {
 
 	fd : FileDescriptor;
 	err := path_open(3,
-		cast(LookupFlags) 0,
-		"./foo.txt", 9,
-		OFlags.Creat,
-		Rights.DataSync | Rights.Write | Rights.Read | Rights.Seek | Rights.Tell | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile | Rights.Seek,
-		Rights.DataSync | Rights.Write | Rights.Read | Rights.Seek | Rights.Tell | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile | Rights.Seek,
-		FDFlags.Sync | FDFlags.Append,
+		LookupFlags.SymLinkFollow,
+		"./src/onyxmsgs.c".data, 16,
+		cast(OFlags) 0,
+		Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile,
+		Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile,
+		FDFlags.Sync,
 		^fd);
 
 	if err != Errno.Success {
 		print("Failed to open file\n");
-		proc_exit(cast(u32) err);
+		print("Error code: ");
+		print_u64_with_base(cast(u64) err, 16l);
+		proc_exit(1);
 	}
 
 	print_u64_with_base(cast(u64) fd, 16l);
 	print("\n");
 
-	hello_vec := IOVec.{ buf = "Hello World!\n", len = 13 };
-	nwritten : Size;
-	if fd_write(fd, IOVecArray.{ ^hello_vec, 1 }, ^nwritten) != Errno.Success {
-		print("Failed to write to file\n");
-		proc_exit(cast(u32) 123);
-		return;
+	filelen : Filesize;
+	if fd_seek(fd, 0l, Whence.End, ^filelen) != Errno.Success {
+		print("Failed to seek in file\n");
+		proc_exit(1);
 	}
+	print("the size is: ");
+	print_u64_with_base(cast(u64) filelen, 10l);
+
+	//buf : [128] u8;
+	//hello_vec := IOVec.{ buf = cast(^u8) buf, len = 128 };
+	//nread : Size;
+	//if fd_read(fd, IOVecArray.{ ^hello_vec, 1 }, ^nread) != Errno.Success {
+	//	print("Failed to read from file\n");
+	//	print("Error code: ");
+	//	print_u64_with_base(cast(u64) err, 10l);
+	//	proc_exit(1);
+	//	return;
+	//}
+//
+	//print(string.{ nread, cast(^u8) buf });
 
 	fd_close(fd);
-//
-//	if false {
-//		argc_size : Size;
-//		argv_size : Size;
-//		args_sizes_get(^argc_size, ^argv_size);
-//		print_u64_with_base(cast(u64) argc_size, 10l);
-//		print("\n");
-//		print_u64_with_base(cast(u64) argv_size, 10l);
-//		print("\n");
-//
-//		argv : ^u8;
-//		argv_buf := cast(^u8) malloc(argv_size);
-//		args_get(^argv, argv_buf);
-//		print(argv);
-//
-//		fs : FDStat;
-//		new_fd : FileDescriptor;
-//		print_u64_with_base(cast(u64) new_fd, 16l);
-//
-//		err := path_open(3,
-//				cast(LookupFlags) 0,
-//				"./Makefile", 10,
-//				cast(OFlags) 0,
-//				Rights.Read | Rights.Sync,
-//				Rights.Read | Rights.Sync,
-//				cast(FDFlags) 0,
-//				^new_fd);
-//
-//		print_u64_with_base(cast(u64) new_fd, 16l);
-//
-//		if err != Errno.Success {
-//			print("Failed to open file\n");
-//			proc_exit(cast(u32) err);
-//			return;
-//		}
-//
-//		fd_fdstat_get(new_fd, ^fs);
-//		print("Rights base:\n");
-//		print_rights(fs.fs_rights_base);
-//		print("Rights inheriting:\n");
-//		print_rights(fs.fs_rights_inheriting);
-//
-//		buf : [128] u8;
-//		read_iov := IOVec.{ cast(^u8) buf, 128 };
-//		nread : Size;
-//		fd_read(new_fd, IOVecArray.{ ^read_iov, 1 }, ^nread);
-//
-//		print(string.{nread, cast(^u8) buf});
-//
-//		//hello_vec := IOVec.{ buf = "Hello World!\n", len = 13 };
-//		//nwritten : Size;
-//		//if fd_write(new_fd, IOVecArray.{ ^hello_vec, 1 }, ^nwritten) != Errno.Success {
-//		//	print("Failed to write to file\n");
-//		//	proc_exit(cast(u32) 123);
-//		//	return;
-//		//}
-//		//print_u64_with_base(cast(u64) nwritten, 10l);
-//		//fd_datasync(1);
-//		//fd_datasync(new_fd);
-//		//fd_close(new_fd);
-//	}
 }

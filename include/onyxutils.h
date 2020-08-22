@@ -19,6 +19,7 @@ void scope_include(Scope* target, Scope* source);
 b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol);
 b32 symbol_raw_introduce(Scope* scope, char* tkn, OnyxFilePos pos, AstNode* symbol);
 void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node);
+AstNode* symbol_raw_resolve(Scope* start_scope, char* sym);
 AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn);
 
 void onyx_ast_print(AstNode* program, i32 indent);

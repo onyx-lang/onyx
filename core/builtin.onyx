@@ -1,0 +1,8 @@
+package builtin
+
+string :: struct {
+	data : ^u8;
+	len  : u32;	
+}
+
+cstring :: #type ^u8;

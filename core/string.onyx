@@ -1,15 +1,11 @@
 package core
 
+use package builtin { string }
 use package memory
 
 Buffer :: struct {
     data   : rawptr = null;
     length : u32    = 0;
-}
-
-string :: struct {
-    length : u32 = 0;
-    data   : ^u8 = null;
 }
 
 string_make :: proc #overloaded { string_make_from_u8 }
@@ -18,7 +14,7 @@ string_make :: proc #overloaded { string_make_from_u8 }
 string_make_from_u8 :: proc (s: ^u8) -> string {
     len :: string_length(s);
 
-    return string.{ length = len, data = s };
+    return string.{ len = len, data = s };
 }
 
 
@@ -35,12 +31,12 @@ string_length :: proc #overloaded {
     },
 
     proc (s: string) -> u32 {
-        return s.length;
+        return s.len;
     },
 }
 
 #private
-string_length_string :: proc (s: string) -> u32 do return s.length;
+string_length_string :: proc (s: string) -> u32 do return s.len;
 
 string_concat :: proc (a: Allocator, s1: string, s2: string) -> string {
     len1 :: string_length(s1);
@@ -50,7 +46,7 @@ string_concat :: proc (a: Allocator, s1: string, s2: string) -> string {
     for i: 0, len1 do data[i]        = s1.data[i];
     for i: 0, len2 do data[i + len1] = s2.data[i];
 
-    return string.{ len1 + len2, data };
+    return string.{ data, len1 + len2 };
 }
 
 string_free :: proc (a: Allocator, s: string) do free(a, s.data);

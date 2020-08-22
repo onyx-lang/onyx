@@ -350,7 +350,10 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_arr_fastdelete(compiler_state->queued_files, 0);
     }
 
-    initialize_builtins();
+    initialize_builtins(compiler_state->ast_alloc, &compiler_state->prog_info);
+    if (onyx_message_has_errors()) {
+        return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
+    }
 
     // Add builtin one-time entities
     bh_arr_push(compiler_state->prog_info.entities, ((Entity) {

@@ -21,7 +21,7 @@ TARGET=./onyx
 ifeq ($(RELEASE), 1)
 	FLAGS=-O2
 else
-	FLAGS=-g -O2
+	FLAGS=-g
 endif
 
 build/%.o: src/%.c include/bh.h

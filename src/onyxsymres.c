@@ -300,8 +300,11 @@ static void symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Function:
         case Ast_Kind_NumLit:
-        case Ast_Kind_StrLit:
             (*expr)->type_node = symres_type((*expr)->type_node);
+            break;
+            
+        case Ast_Kind_StrLit:
+            (*expr)->type_node = symres_type(builtin_string_type);
             break;
 
         case Ast_Kind_Array_Access:
@@ -567,24 +570,6 @@ static void symres_memres(AstMemRes** memres) {
 void onyx_resolve_symbols() {
 
     semstate.curr_scope = semstate.program->global_scope;
-
-    // NOTE: Add types to global scope
-    BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
-    while (bsym->sym != NULL) {
-        if (bsym->package == NULL)
-            symbol_builtin_introduce(semstate.curr_scope, bsym->sym, bsym->node);
-        else {
-            Package* p = program_info_package_lookup_or_create(
-                    semstate.program,
-                    bsym->package,
-                    semstate.curr_scope,
-                    semstate.node_allocator);
-            assert(p);
-
-            symbol_builtin_introduce(p->scope, bsym->sym, bsym->node);
-        }
-        bsym++;
-    }
 
     bh_arr_each(Entity, entity, semstate.program->entities) {
         if (entity->package) {

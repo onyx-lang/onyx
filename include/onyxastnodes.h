@@ -280,7 +280,7 @@ struct AstTyped AstTyped_members;
 struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
-struct AstStrLit        { AstTyped_base; u64 addr; };
+struct AstStrLit        { AstTyped_base; u64 addr; u64 length; };
 struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
 struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstTyped *callee; };
 struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
@@ -509,6 +509,7 @@ extern AstBasicType basic_type_rawptr;
 
 extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
+extern AstType  *builtin_string_type;
 
 typedef struct BuiltinSymbol {
     char*    package;
@@ -518,7 +519,7 @@ typedef struct BuiltinSymbol {
 
 extern const BuiltinSymbol builtin_symbols[];
 
-void initialize_builtins();
+void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 
 
 // NOTE: Useful not inlined functions

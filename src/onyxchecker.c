@@ -718,10 +718,10 @@ CHECK(array_access, AstArrayAccess* aa) {
     }
 
     if (aa->expr->type->kind != Type_Kind_Basic
-            || (aa->expr->type->Basic.flags & Basic_Flag_Integer) == 0) {
+            || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
         onyx_message_add(Msg_Type_Literal,
                 aa->token->pos,
-                "expected integer type for index");
+                "expected 32-bit integer type for index");
         return 1;
     }
 

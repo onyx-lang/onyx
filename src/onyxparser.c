@@ -366,13 +366,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
 
         case Token_Type_Literal_String: {
-            AstPointerType* str_type = make_node(AstPointerType, Ast_Kind_Pointer_Type);
-            str_type->flags |= Basic_Flag_Pointer;
-            str_type->elem = (AstType *) &basic_type_u8;
-
             AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
             str_node->token     = expect_token(parser, Token_Type_Literal_String);
-            str_node->type_node = (AstType *) str_type;
             str_node->addr      = 0;
 
             add_node_to_process(parser, (AstNode *) str_node);
