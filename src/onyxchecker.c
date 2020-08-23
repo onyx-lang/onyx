@@ -207,6 +207,15 @@ CHECK(call, AstCall* call) {
             return 1;
         }
 
+        if (actual_param->value->type->kind == Type_Kind_Struct) {
+            if (!type_struct_is_simple(actual_param->value->type)) {
+                onyx_message_add(Msg_Type_Literal,
+                        actual_param->token->pos,
+                        "can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
+                return 1;
+            }
+        }
+
         prev_param = (AstNode **) &actual_param->next;
         actual_param = (AstArgument *) actual_param->next;
     }

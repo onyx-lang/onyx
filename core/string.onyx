@@ -83,7 +83,7 @@ string_split :: proc (a: Allocator, str: string, delim: u8) -> StringSplitResult
 
 StringBuilder :: struct {
     // FIX(nested-structs): This should not be a pointer eventually.
-    // Currently nested structures cannot be passed as arguments or returned from procedures.
+    // Currently nested structures cannot be passed as arguments.
     // When this issue is fixed, change this to Allocator.
     alloc : ^Allocator;
 

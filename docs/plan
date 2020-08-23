@@ -187,8 +187,6 @@ HOW:
         [X] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
 
-        [ ] implicit overloading
-
         [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] convert to using an 'atom' like table

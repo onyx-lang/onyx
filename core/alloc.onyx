@@ -187,7 +187,7 @@ scratch_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32
             ss.curr_ptr = ss.base_ptr;
             retval = ss.base_ptr;
         }
-
+        
         return retval;
     }
 

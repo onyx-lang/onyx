@@ -61,15 +61,17 @@ print_u64_with_base :: proc (n_: u64, base: u64) {
     print(c + 1);
 }
 
-print_string :: proc (s: string) {
+print_string :: proc (s: string) -> u32 {
 	vec := IOVec.{ buf = s.data, len = s.len };
 	tmp : Size;
 	fd_write(1, IOVecArray.{ ^vec, 1 }, ^tmp);
 	fd_datasync(1);
+
+	return tmp;
 }
 
-print_u8 :: proc (s: cstring) {
-	string_make(s) |> print_string();
+print_u8 :: proc (s: cstring) -> u32 {
+	return string_make(s) |> print_string();
 }
 
 print :: proc #overloaded { print_string, print_u8 }
@@ -163,8 +165,33 @@ is_prime :: proc (n: u32) -> bool {
     return true;
 }
 
+Vec3 :: struct {
+	x: f32;
+	y: f32;
+	z: f32;
+}
+
+S :: struct {
+	name: string;
+	age:  u32;
+	pos:  Vec3;
+}
+
+output_s :: proc (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
+	sb  |> sba("Hello, I'm ")
+		|> sba(s.name)
+		|> sba(". I am ")
+		|> sba(cast(u64) s.age)
+		|> sba(" years old. I am at (")
+		|> sba(cast(u64) s.pos.x) |> sba(", ")
+		|> sba(cast(u64) s.pos.y) |> sba(", ")
+		|> sba(cast(u64) s.pos.z) |> sba(").\n");
+
+	return sb;
+}
+
 main :: proc (argc: u32, argv: ^cstring) {
-	sb := string_builder_make(^heap_allocator, 16);
+	sb := string_builder_make(^heap_allocator, 256);
 
 	timer := timer_start();
 	defer {
@@ -176,13 +203,9 @@ main :: proc (argc: u32, argv: ^cstring) {
 			|> print();
 	}
 
-	^sb |> sba("\x01\x02\x03There are ")
+	^sb |> sba("There are ")
 		|> sba(cast(u64) argc)
-		|> sba(" arguments.\n")
-		|> string_builder_to_string()
-		|> print();
-
-	string_builder_clear(^sb);
+		|> sba(" arguments.\n");
 
 	for i: 0, argc do ^sb |> sba(argv[i]) |> sba(" ");
 	^sb |> sba("\n")
@@ -257,4 +280,11 @@ main :: proc (argc: u32, argv: ^cstring) {
 	string_builder_clear(^sb);
 	^sb |> sba("The program evaluated to '") |> sba(cast(u64) acc) |> sba("'\n");
 	^sb |> string_builder_to_string() |> print();
+	^sb |> string_builder_clear();
+
+	person := S.{ name = "Tester", age = 45, pos = Vec3.{ 1.0f, 2.0f, 3.0f } };
+	^sb |> output_s(^person)
+		|> sba("Here is another message in the same string!\n")
+		|> string_builder_to_string()
+		|> print();
 }

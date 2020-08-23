@@ -1186,16 +1186,27 @@ COMPILE_FUNC(struct_store, Type* type, u64 offset) {
     WIL(WI_LOCAL_SET, loc_idx);
 
     bh_arr_rev_each(StructMember *, smem, type->Struct.memarr) {
-        WasmType wt = onyx_type_to_wasm_type((*smem)->type);
-        u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
+        if ((*smem)->type->kind == Type_Kind_Struct) {
+            if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == loc_idx) {
+                bh_arr_last(code).type = WI_LOCAL_TEE;
+            } else {
+                WIL(WI_LOCAL_GET, loc_idx);
+            }
 
-        WIL(WI_LOCAL_SET, tmp_idx);
-        WIL(WI_LOCAL_GET, loc_idx);
-        WIL(WI_LOCAL_GET, tmp_idx);
+            compile_struct_store(mod, &code, (*smem)->type, offset + (*smem)->offset);
 
-        compile_store_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
+        } else {
+            WasmType wt = onyx_type_to_wasm_type((*smem)->type);
+            u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
 
-        local_raw_free(mod->local_alloc, wt);
+            WIL(WI_LOCAL_SET, tmp_idx);
+            WIL(WI_LOCAL_GET, loc_idx);
+            WIL(WI_LOCAL_GET, tmp_idx);
+
+            compile_store_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
+
+            local_raw_free(mod->local_alloc, wt);
+        }
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
