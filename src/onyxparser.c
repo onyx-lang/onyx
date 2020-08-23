@@ -440,6 +440,15 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                         case 'r': char_lit->value.i = '\r'; break;
                         case 'v': char_lit->value.i = '\v'; break;
                         case 'e': char_lit->value.i = '\e'; break;
+                        case 'x': {
+                            // HACK: This whole way of doing this
+                            u8 buf[3];
+                            buf[0] = char_lit->token->text[2];
+                            buf[1] = char_lit->token->text[3];
+                            buf[2] = 0;
+                            char_lit->value.i = strtol((const char *) buf, NULL, 16);
+                            break;
+                        }
                         default: {
                             onyx_message_add(Msg_Type_Literal,
                                     char_lit->token->pos,
@@ -889,6 +898,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case '-':
         case '!':
         case '*':
+        case '^':
         case Token_Type_Literal_Integer:
         case Token_Type_Literal_Float:
         case Token_Type_Literal_String:

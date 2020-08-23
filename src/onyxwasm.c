@@ -1916,6 +1916,17 @@ static void compile_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
             case 'r': *des++ = '\r'; break;
             case 'v': *des++ = '\v'; break;
             case 'e': *des++ = '\e'; break;
+            case 'x': {
+                // HACK: This whole way of doing this
+                i++;
+                u8 buf[3];
+                buf[0] = src[i + 0];
+                buf[1] = src[i + 1];
+                buf[2] = 0;
+                *des++ = strtol((const char *) buf, NULL, 16);
+                i++;
+                break;
+            }
             default:  *des++ = '\\';
                       *des++ = src[i];
             }

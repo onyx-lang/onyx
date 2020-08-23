@@ -1,134 +1,138 @@
 package wasi
 
+use package main as main
+use package builtin { string }
+use package memory
+
 Size      :: #type u32;
 Filesize  :: #type u64;
 Timestamp :: #type u64;
 
 ClockID   :: enum (u32) {
-	Realtime         :: 0x00;
-	Monotonic        :: 0x01;
-	ProcessCPUTimeID :: 0x02;
-	ThreadCPUTimeID  :: 0x03;
+    Realtime         :: 0x00;
+    Monotonic        :: 0x01;
+    ProcessCPUTimeID :: 0x02;
+    ThreadCPUTimeID  :: 0x03;
 }
 
 Errno :: enum (u16) {
-	Success      :: 0x00;
-	TooBig       :: 0x01;
-	Access       :: 0x02;
-	AddrInUse    :: 0x03;
-	AddrNotAvail :: 0x04;
-	AFNoSupport  :: 0x05;
-	Again        :: 0x06;
-	Already      :: 0x07;
-	BadFile      :: 0x08;
-	BadMsg       :: 0x09;
-	Busy         :: 0x0a;
-	Canceled     :: 0x0b;
-	Child        :: 0x0c;
-	ConnAborted  :: 0x0d;
-	ConnRefused  :: 0x0e;
-	ConnReset    :: 0x0f;
-	DeadLock     :: 0x10;
-	DestAddrReq  :: 0x11;
-	Domain       :: 0x12;
-	DQUOT        :: 0x13;
-	Exist        :: 0x14;
-	Fault        :: 0x15;
-	FileTooBig   :: 0x16;
-	HostUnreach  :: 0x17;
-	IdentRemoved :: 0x18;
-	IllegalSeq   :: 0x19;
-	InProgress   :: 0x1a;
-	Interrupt    :: 0x1b;
-	Invalid      :: 0x1c;
-	IO           :: 0x1d;
-	IsConnection :: 0x1e;
-	IsDirectory  :: 0x1f;
-	Loop         :: 0x20;
-	MFile        :: 0x21;
-	MLink        :: 0x22;
-	MsgSize      :: 0x23;
-	MultiHop     :: 0x24;
-	NameTooLong  :: 0x25;
-	NetDown      :: 0x26;
-	NetReset     :: 0x27;
-	NetUnreach   :: 0x28;
-	NFile        :: 0x29;
-	NoBufs       :: 0x2a;	
-	NoDev        :: 0x2b;
-	NoEntry      :: 0x2c;
-	NoExec       :: 0x2d;
-	NoLock       :: 0x2e;
-	NoLink       :: 0x2f;
-	NoMemory     :: 0x30;
-	NoMsg        :: 0x31;
-	NoProtoOpt   :: 0x32;
-	NoSpace      :: 0x33;
-	NoSys        :: 0x34;
-	NotConn      :: 0x35;
-	NotDir       :: 0x36;
-	NotEmpty     :: 0x37;
-	NotRecover   :: 0x38;
-	NotSock      :: 0x39;
-	NotSupported :: 0x3a;
-	NoTTY        :: 0x3b;
-	NXIO         :: 0x3c;
-	Overflow     :: 0x3d;
-	OwnerDead    :: 0x3e;
-	Permission   :: 0x3f;
-	Pipe         :: 0x40;
-	Protocol     :: 0x41;
-	ProtoNoSup   :: 0x42;
-	Prototype    :: 0x43;
-	Range        :: 0x44;
-	ReadonlyFS   :: 0x45;
-	SeekPipe     :: 0x46;
-	Search       :: 0x47;
-	Stale        :: 0x48;
-	Timedout     :: 0x49;
-	TextBusy     :: 0x4a;
-	XDev         :: 0x4b;
+    Success      :: 0x00;
+    TooBig       :: 0x01;
+    Access       :: 0x02;
+    AddrInUse    :: 0x03;
+    AddrNotAvail :: 0x04;
+    AFNoSupport  :: 0x05;
+    Again        :: 0x06;
+    Already      :: 0x07;
+    BadFile      :: 0x08;
+    BadMsg       :: 0x09;
+    Busy         :: 0x0a;
+    Canceled     :: 0x0b;
+    Child        :: 0x0c;
+    ConnAborted  :: 0x0d;
+    ConnRefused  :: 0x0e;
+    ConnReset    :: 0x0f;
+    DeadLock     :: 0x10;
+    DestAddrReq  :: 0x11;
+    Domain       :: 0x12;
+    DQUOT        :: 0x13;
+    Exist        :: 0x14;
+    Fault        :: 0x15;
+    FileTooBig   :: 0x16;
+    HostUnreach  :: 0x17;
+    IdentRemoved :: 0x18;
+    IllegalSeq   :: 0x19;
+    InProgress   :: 0x1a;
+    Interrupt    :: 0x1b;
+    Invalid      :: 0x1c;
+    IO           :: 0x1d;
+    IsConnection :: 0x1e;
+    IsDirectory  :: 0x1f;
+    Loop         :: 0x20;
+    MFile        :: 0x21;
+    MLink        :: 0x22;
+    MsgSize      :: 0x23;
+    MultiHop     :: 0x24;
+    NameTooLong  :: 0x25;
+    NetDown      :: 0x26;
+    NetReset     :: 0x27;
+    NetUnreach   :: 0x28;
+    NFile        :: 0x29;
+    NoBufs       :: 0x2a;   
+    NoDev        :: 0x2b;
+    NoEntry      :: 0x2c;
+    NoExec       :: 0x2d;
+    NoLock       :: 0x2e;
+    NoLink       :: 0x2f;
+    NoMemory     :: 0x30;
+    NoMsg        :: 0x31;
+    NoProtoOpt   :: 0x32;
+    NoSpace      :: 0x33;
+    NoSys        :: 0x34;
+    NotConn      :: 0x35;
+    NotDir       :: 0x36;
+    NotEmpty     :: 0x37;
+    NotRecover   :: 0x38;
+    NotSock      :: 0x39;
+    NotSupported :: 0x3a;
+    NoTTY        :: 0x3b;
+    NXIO         :: 0x3c;
+    Overflow     :: 0x3d;
+    OwnerDead    :: 0x3e;
+    Permission   :: 0x3f;
+    Pipe         :: 0x40;
+    Protocol     :: 0x41;
+    ProtoNoSup   :: 0x42;
+    Prototype    :: 0x43;
+    Range        :: 0x44;
+    ReadonlyFS   :: 0x45;
+    SeekPipe     :: 0x46;
+    Search       :: 0x47;
+    Stale        :: 0x48;
+    Timedout     :: 0x49;
+    TextBusy     :: 0x4a;
+    XDev         :: 0x4b;
 
-	NotCapable   :: 0x4c;
+    NotCapable   :: 0x4c;
 }
 
 Rights :: enum #flags (u64) {
-	DataSync;
-	Read;
-	Seek;
-	FdStatSetFlags;
-	Sync;
-	Tell;
-	Write;
-	Advise;
-	Allocate;
-	PathCreateDirectory;
-	PathCreateFile;
-	PathLinkSource;
-	PathLinkTarget;
-	PathOpen;
-	ReadDir;
-	PathReadlink;
-	PathRenameSource;
-	PathRenameTarget;
-	PathFilestatGet;
-	PathFilestateSetSize;
-	PathFilestateSetTimes;
-	FilestatGet;
-	FilestatSetSize;
-	FilestatSetTimes;
-	PathSymlink;
-	PathRemoveDirectory;
-	PathUnlinkFile;
-	PollFDReadWrite;
-	SockShutdown;
+    DataSync;
+    Read;
+    Seek;
+    FdStatSetFlags;
+    Sync;
+    Tell;
+    Write;
+    Advise;
+    Allocate;
+    PathCreateDirectory;
+    PathCreateFile;
+    PathLinkSource;
+    PathLinkTarget;
+    PathOpen;
+    ReadDir;
+    PathReadlink;
+    PathRenameSource;
+    PathRenameTarget;
+    PathFilestatGet;
+    PathFilestateSetSize;
+    PathFilestateSetTimes;
+    FilestatGet;
+    FilestatSetSize;
+    FilestatSetTimes;
+    PathSymlink;
+    PathRemoveDirectory;
+    PathUnlinkFile;
+    PollFDReadWrite;
+    SockShutdown;
 }
 
 FileDescriptor :: #type i32;
 
 IOVec :: struct {
-	buf : ^u8;
-	len : u32;
+    buf : ^u8;
+    len : u32;
 }
 
 CIOVec :: #type IOVec; // Constant IOVec
@@ -136,9 +140,9 @@ CIOVec :: #type IOVec; // Constant IOVec
 FileDelta :: #type i64;
 
 Whence :: enum (u8) {
-	Set :: 0x00;
-	Cur :: 0x01;
-	End :: 0x02;
+    Set :: 0x00;
+    Cur :: 0x01;
+    End :: 0x02;
 }
 
 DirCookie  :: #type u64;
@@ -146,205 +150,205 @@ DirNameLen :: #type u32;
 INode      :: #type u64;
 
 Filetype :: enum (u8) {
-	Unknown      :: 0x00;
-	BlockDevice  :: 0x01;
-	CharDevice   :: 0x02;
-	Directory    :: 0x03;
-	RegularFile  :: 0x04;
-	SocketDgram  :: 0x05;
-	SocketStream :: 0x06;	
-	SymLink      :: 0x07;
+    Unknown      :: 0x00;
+    BlockDevice  :: 0x01;
+    CharDevice   :: 0x02;
+    Directory    :: 0x03;
+    RegularFile  :: 0x04;
+    SocketDgram  :: 0x05;
+    SocketStream :: 0x06;   
+    SymLink      :: 0x07;
 }
 
 DirEnt :: struct {
-	d_next   : DirCookie;
-	d_ino    : INode;
-	d_namlen : DirNameLen;
-	d_type   : Filetype;
+    d_next   : DirCookie;
+    d_ino    : INode;
+    d_namlen : DirNameLen;
+    d_type   : Filetype;
 }
 
 Advice :: enum (u8) {
-	Normal     :: 0x00;	
-	Sequential :: 0x01;
-	Random     :: 0x02;
-	WillNeed   :: 0x03;
-	DontNeed   :: 0x04;
-	NoReuse    :: 0x05;
+    Normal     :: 0x00; 
+    Sequential :: 0x01;
+    Random     :: 0x02;
+    WillNeed   :: 0x03;
+    DontNeed   :: 0x04;
+    NoReuse    :: 0x05;
 }
 
 FDFlags :: enum #flags (u16) {
-	Append;
-	DSync;
-	NonBlock;
-	RSync;
-	Sync;
+    Append;
+    DSync;
+    NonBlock;
+    RSync;
+    Sync;
 }
 
 FDStat :: struct {
-	fs_filetype          : Filetype;
-	fs_flags             : FDFlags;
-	fs_rights_base       : Rights;
-	fs_rights_inheriting : Rights;
+    fs_filetype          : Filetype;
+    fs_flags             : FDFlags;
+    fs_rights_base       : Rights;
+    fs_rights_inheriting : Rights;
 }
 
 Device :: #type u64;
 
 FSTFlags :: enum #flags (u16) {
-	ATIM;
-	ATIM_NOW;
-	MTIM;
-	MTIM_NOW;
+    ATIM;
+    ATIM_NOW;
+    MTIM;
+    MTIM_NOW;
 }
 
 LookupFlags :: enum #flags (u32) {
-	SymLinkFollow;
+    SymLinkFollow;
 }
 
 OFlags :: enum #flags (u16) {
-	Creat;
-	Directory;
-	FailIfExists;
-	Trunc;
+    Creat;
+    Directory;
+    FailIfExists;
+    Trunc;
 }
 
 LinkCount :: #type u64;
 
 FileStat :: struct {
-	dev      : Device;
-	ino      : INode;
-	filetype : Filetype;
-	nlink    : LinkCount;
-	size     : Filesize;
-	atim     : Timestamp;
-	mtim     : Timestamp;
-	ctim     : Timestamp;
+    dev      : Device;
+    ino      : INode;
+    filetype : Filetype;
+    nlink    : LinkCount;
+    size     : Filesize;
+    atim     : Timestamp;
+    mtim     : Timestamp;
+    ctim     : Timestamp;
 }
 
 Userdata :: #type u64;
 
 EventType :: enum (u8) {
-	Clock;
-	FDRead;
-	FDWrite;
+    Clock;
+    FDRead;
+    FDWrite;
 }
 
 EventRWFlags :: enum #flags (u16) {
-	ReadWriteHangUp;
+    ReadWriteHangUp;
 }
 
 EventFDReadWrite :: struct {
-	nbytes : Filesize;
-	flags  : EventRWFlags;
+    nbytes : Filesize;
+    flags  : EventRWFlags;
 }
 
 Event :: struct {
-	userdata     : Userdata;
-	error        : Errno;
-	type         : EventType;
-	fd_readwrite : EventFDReadWrite;
+    userdata     : Userdata;
+    error        : Errno;
+    type         : EventType;
+    fd_readwrite : EventFDReadWrite;
 }
 
 SubClockFlags :: enum #flags (u16) {
-	ClockAbsTime;
+    ClockAbsTime;
 }
 
 SubscriptionClock :: struct {
-	id        : ClockID;
-	timeout   : Timestamp;
-	precision : Timestamp;
-	flags     : SubClockFlags;
+    id        : ClockID;
+    timeout   : Timestamp;
+    precision : Timestamp;
+    flags     : SubClockFlags;
 }
 
 SubscriptionFDReadWrite :: struct {
-	file_descriptor : FileDescriptor;
+    file_descriptor : FileDescriptor;
 }
 
 SubscriptionTagged :: struct {
-	tag : EventType;
+    tag : EventType;
 
-	u : struct #union {
-		clock    : SubscriptionClock;
-		fd_read  : SubscriptionFDReadWrite;
-		fd_write : SubscriptionFDReadWrite;
-	};
+    u : struct #union {
+        clock    : SubscriptionClock;
+        fd_read  : SubscriptionFDReadWrite;
+        fd_write : SubscriptionFDReadWrite;
+    };
 }
 
 Subscription :: struct {
-	userdata : Userdata;
+    userdata : Userdata;
 
-	u : SubscriptionTagged;
+    u : SubscriptionTagged;
 }
 
 ExitCode :: #type u32;
 Signal :: enum (u8) {
-	None;
-	Hup;
-	Int;
-	Quit;
-	Ill;
-	Trap;
-	Abrt;
-	Bus;
-	Fpe;
-	Kill;
-	USR1;
-	Segv;
-	USR2;
-	Pipe;
-	Alrm;
-	Term;
-	Chld;
-	Stop;
-	Tstp;
-	Ttin;
-	Urg;
-	Xcpu;
-	Xfsz;
-	Vtalrm;
-	Prof;
-	Winch;
-	Poll;
-	Pwr;
-	Sys;
+    None;
+    Hup;
+    Int;
+    Quit;
+    Ill;
+    Trap;
+    Abrt;
+    Bus;
+    Fpe;
+    Kill;
+    USR1;
+    Segv;
+    USR2;
+    Pipe;
+    Alrm;
+    Term;
+    Chld;
+    Stop;
+    Tstp;
+    Ttin;
+    Urg;
+    Xcpu;
+    Xfsz;
+    Vtalrm;
+    Prof;
+    Winch;
+    Poll;
+    Pwr;
+    Sys;
 }
 
 RIFlags :: enum #flags (u16) {
-	RecvPeek;
-	RecvWaitAll;
+    RecvPeek;
+    RecvWaitAll;
 }
 
 ROFlags :: enum #flags (u16) {
-	RecvDataTruncated :: 1;
+    RecvDataTruncated :: 1;
 }
 
 SIFlags :: enum #flags (u16) {
-	None;
+    None;
 }
 
 SDFlags :: enum #flags (u16) {
-	RD;
-	WR;
+    RD;
+    WR;
 }
 
 PreopenType :: enum (u8) {
-	Dir :: 0x00;
+    Dir :: 0x00;
 }
 
 PrestatDir :: struct {
-	pr_name_len : Size;
+    pr_name_len : Size;
 }
 
 PrestatTagged :: struct {
-	tag : PreopenType;
+    tag : PreopenType;
 
-	u : struct #union {
-		dir : PrestatDir;
-	};
+    u : struct #union {
+        dir : PrestatDir;
+    };
 }
 
 IOVecArray :: struct {
-	iovs     : ^IOVec;
-	iovs_len : Size;
+    iovs     : ^IOVec;
+    iovs_len : Size;
 }
 
 
@@ -369,74 +373,73 @@ fd_filestat_get       :: proc #foreign "wasi_snapshot_preview1" "fd_filestat_get
 fd_filestat_set_size  :: proc #foreign "wasi_snapshot_preview1" "fd_filestat_set_size" (fd: FileDescriptor, size: Filesize) -> Errno ---
 fd_filestat_set_times :: proc #foreign "wasi_snapshot_preview1" "fd_filestat_set_times" (fd: FileDescriptor, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno ---
 fd_pread ::
-	proc #foreign "wasi_snapshot_preview1" "fd_pread"
-	(fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nread: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "fd_pread"
+    (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nread: ^Size) -> Errno ---
 fd_prestat_get :: proc #foreign "wasi_snapshot_preview1" "fd_prestat_get" (fd: FileDescriptor, buf: ^PrestatTagged) -> Errno ---
-fd_prestat_dir_name :: proc #foreign "wasi_snapshot_preview1" "fd_prestat_dir_name" (fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
+fd_prestat_dir_name :: proc #foreign "wasi_snapshot_preview1" "fd_prestat_dir_name" (fd: FileDescriptor, path: string) -> Errno ---
 fd_pwrite ::
-	proc #foreign "wasi_snapshot_preview1" "fd_pwrite"
-	(fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nwritten: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "fd_pwrite"
+    (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nwritten: ^Size) -> Errno ---
 fd_read ::
-	proc #foreign "wasi_snapshot_preview1" "fd_read"
-	(fd: FileDescriptor, iovs: IOVecArray, nread: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "fd_read"
+    (fd: FileDescriptor, iovs: IOVecArray, nread: ^Size) -> Errno ---
 fd_readdir ::
-	proc #foreign "wasi_snapshot_preview1" "fd_readdir"
-	(fd: FileDescriptor, buf: ^u8, buf_len: Size, cookie: DirCookie, bufused: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "fd_readdir"
+    (fd: FileDescriptor, buf: ^u8, buf_len: Size, cookie: DirCookie, bufused: ^Size) -> Errno ---
 fd_renumber ::
-	proc #foreign "wasi_snapshot_preview1" "fd_renumber"
-	(fd: FileDescriptor, to: FileDescriptor) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "fd_renumber"
+    (fd: FileDescriptor, to: FileDescriptor) -> Errno ---
 fd_seek ::
-	proc #foreign "wasi_snapshot_preview1" "fd_seek"
-	(fd: FileDescriptor, offset: FileDelta, whence: Whence, newoffset: ^Filesize) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "fd_seek"
+    (fd: FileDescriptor, offset: FileDelta, whence: Whence, newoffset: ^Filesize) -> Errno ---
 fd_sync :: proc #foreign "wasi_snapshot_preview1" "fd_sync" (fd: FileDescriptor) -> Errno ---
 fd_tell :: proc #foreign "wasi_snapshot_preview1" "fd_tell" (fd: FileDescriptor, offset: ^Filesize) -> Errno ---
 fd_write ::
-	proc #foreign "wasi_snapshot_preview1" "fd_write"
-	(fd: FileDescriptor, iovs: IOVecArray, nwritten: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "fd_write"
+    (fd: FileDescriptor, iovs: IOVecArray, nwritten: ^Size) -> Errno ---
 
 path_create_directory ::
-	proc #foreign "wasi_snapshot_preview1" "path_create_directory"
-	(fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_create_directory"
+    (fd: FileDescriptor, path: string) -> Errno ---
 path_filestat_get ::
-	proc #foreign "wasi_snapshot_preview1" "path_filestat_get"
-	(fd: FileDescriptor, flags: LookupFlags, path: ^u8, path_len: Size, buf: ^FileStat) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_filestat_get"
+    (fd: FileDescriptor, flags: LookupFlags, path: string, buf: ^FileStat) -> Errno ---
 path_filestat_set_times ::
-	proc #foreign "wasi_snapshot_preview1" "path_filestat_set_times"
-	(fd: FileDescriptor, flags: LookupFlags, path: ^u8, path_len: Size, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_filestat_set_times"
+    (fd: FileDescriptor, flags: LookupFlags, path: string, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno ---
 path_link ::
-	proc #foreign "wasi_snapshot_preview1" "path_link"
-	(fd: FileDescriptor, old_flags: LookupFlags, old_path: ^u8, old_path_len: Size, new_fd: FileDescriptor, new_path: ^u8, new_path_len: Size) -> Errno ---	
+    proc #foreign "wasi_snapshot_preview1" "path_link"
+    (fd: FileDescriptor, old_flags: LookupFlags, old_path: string, new_fd: FileDescriptor, new_path: string) -> Errno ---   
 path_open ::
-	proc #foreign "wasi_snapshot_preview1" "path_open"
-	( fd: FileDescriptor
-	, dirflags: LookupFlags
-	, path: ^u8
-	, path_len: Size
-	, oflags: OFlags
-	, fs_rights_base: Rights
-	, fs_rights_inherting: Rights
-	, fdflags: FDFlags
-	, opened_fd: ^FileDescriptor
-	) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_open"
+    ( fd: FileDescriptor
+    , dirflags: LookupFlags
+    , path: string
+    , oflags: OFlags
+    , fs_rights_base: Rights
+    , fs_rights_inherting: Rights
+    , fdflags: FDFlags
+    , opened_fd: ^FileDescriptor
+    ) -> Errno ---
 path_readlink ::
-	proc #foreign "wasi_snapshot_preview1" "path_readlink"
-	(fd: FileDescriptor, path: ^u8, path_len: Size, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_readlink"
+    (fd: FileDescriptor, path: string, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno ---
 path_remove_directory ::
-	proc #foreign "wasi_snapshot_preview1" "path_remove_directory"
-	(fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_remove_directory"
+    (fd: FileDescriptor, path: string) -> Errno ---
 path_rename ::
-	proc #foreign "wasi_snapshot_preview1" "path_rename"
-	(fd: FileDescriptor, old_path: ^u8, old_path_len: Size, new_fd: FileDescriptor, new_path: ^u8, new_path_len: Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_rename"
+    (fd: FileDescriptor, old_path: string, new_fd: FileDescriptor, new_path: string) -> Errno ---
 path_symlink ::
-	proc #foreign "wasi_snapshot_preview1" "path_symlink"
-	(old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: ^u8, new_path_len: Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_symlink"
+    (old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: string) -> Errno ---
 path_unlink_file ::
-	proc #foreign "wasi_snapshot_preview1" "path_unlink_file"
-	(fd: FileDescriptor, path: ^u8, path_len: Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "path_unlink_file"
+    (fd: FileDescriptor, path: string) -> Errno ---
 
 poll_oneoff ::
-	proc #foreign "wasi_snapshot_preview1" "poll_oneoff"
-	(in: ^Subscription, out: ^Event, nsubscriptions: Size, nevents: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "poll_oneoff"
+    (in: ^Subscription, out: ^Event, nsubscriptions: Size, nevents: ^Size) -> Errno ---
 
 proc_exit  :: proc #foreign "wasi_snapshot_preview1" "proc_exit" (rval: ExitCode) ---
 proc_raise :: proc #foreign "wasi_snapshot_preview1" "proc_raise" (sig: Signal) -> Errno ---
@@ -446,11 +449,31 @@ sched_yield :: proc #foreign "wasi_snapshot_preview1" "sched_yield" -> Errno ---
 random_get :: proc #foreign "wasi_snapshot_preview1" "random_get" (buf: ^u8, buf_len: Size) -> Errno ---
 
 sock_recv ::
-	proc #foreign "wasi_snapshot_preview1" "sock_recv"
-	(fd: FileDescriptor, ri_data: IOVecArray, ri_flags: RIFlags, ro_datalen: ^Size, ro_flags: ^ROFlags) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "sock_recv"
+    (fd: FileDescriptor, ri_data: IOVecArray, ri_flags: RIFlags, ro_datalen: ^Size, ro_flags: ^ROFlags) -> Errno ---
 sock_send ::
-	proc #foreign "wasi_snapshot_preview1" "sock_send"
-	(fd: FileDescriptor, si_data: IOVecArray, si_flags: SIFlags, so_datalen: ^Size) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "sock_send"
+    (fd: FileDescriptor, si_data: IOVecArray, si_flags: SIFlags, so_datalen: ^Size) -> Errno ---
 sock_shutdown ::
-	proc #foreign "wasi_snapshot_preview1" "sock_shutdown"
-	(fd: FileDescriptor, how: SDFlags) -> Errno ---
+    proc #foreign "wasi_snapshot_preview1" "sock_shutdown"
+    (fd: FileDescriptor, how: SDFlags) -> Errno ---
+
+
+
+// The builtin _start proc.
+// Sets up everything needed for execution.
+proc #export "_start" {
+	memory_init();
+
+	argc : Size;
+	argv_buf_size : Size;
+
+	args_sizes_get(^argc, ^argv_buf_size);
+
+	argv := cast(^^u8) malloc(sizeof ^u8 * argc);
+	argv_buf := cast(^u8) malloc(argv_buf_size);
+
+	args_get(argv, argv_buf);
+
+	main.main(argc, argv);
+}

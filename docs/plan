@@ -187,6 +187,10 @@ HOW:
         [X] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
 
+        [ ] implicit overloading
+
+        [ ] 'use' enums and packages at an arbitrary scope
+
         [ ] convert to using an 'atom' like table
             - All identifier tokens are given a unique atom ptr, up to string equality.
             - This means identifiers can be compared using ptr comparison, instead of string comparison
@@ -208,13 +212,11 @@ HOW:
             - Arrays without a size
             - Converted to a struct that looks like:    
                 []T :: struct {
-                    count : u32;
                     data  : ^T;
+                    count : u32;
                 }
 
         [ ] Variadic arguments
-
-        [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] 'when' statements
             - Compile time conditions

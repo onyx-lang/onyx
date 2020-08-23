@@ -1,17 +1,18 @@
 package core
 
-use package builtin { string }
+use package builtin { string, cstring }
 use package memory
+use package wasi
 
 Buffer :: struct {
     data   : rawptr = null;
-    length : u32    = 0;
+    len    : u32    = 0;
 }
 
-string_make :: proc #overloaded { string_make_from_u8 }
+string_make :: proc #overloaded { string_make_from_cstring }
 
 #private
-string_make_from_u8 :: proc (s: ^u8) -> string {
+string_make_from_cstring :: proc (s: cstring) -> string {
     len :: string_length(s);
 
     return string.{ len = len, data = s };
@@ -51,3 +52,158 @@ string_concat :: proc (a: Allocator, s1: string, s2: string) -> string {
 
 string_free :: proc (a: Allocator, s: string) do free(a, s.data);
 
+StringSplitResult :: struct {
+    tokens: ^string;
+    count: u32;
+}
+
+string_split :: proc (a: Allocator, str: string, delim: u8) -> StringSplitResult {
+    delim_count := 0;
+    for i: 0, str.len do if str.data[i] == delim do delim_count += 1;
+
+    strarr := cast(^string) alloc(a, sizeof string * (delim_count + 1));
+
+    curr_str := 0;
+    begin := str.data;
+
+    for i: 0, str.len {
+        if str.data[i] == delim {
+            strarr[curr_str] = string.{ begin, cast(u32) ^str.data[i] - cast(u32) begin };
+            begin = ^str.data[i + 1];
+            curr_str += 1;
+        }
+    }
+
+    strarr[curr_str] = string.{ begin, cast(u32) str.data + str.len - cast(u32) begin };
+
+    return StringSplitResult.{ strarr, delim_count + 1 };
+}
+
+
+
+StringBuilder :: struct {
+    // FIX(nested-structs): This should not be a pointer eventually.
+    // Currently nested structures cannot be passed as arguments or returned from procedures.
+    // When this issue is fixed, change this to Allocator.
+    alloc : ^Allocator;
+
+    data  : ^u8 = null;
+    len   : u32 = 0;
+    cap   : u32 = 0;
+}
+
+string_builder_make :: proc (a: ^Allocator, initial_cap: u32) -> StringBuilder {
+    data: ^u8 = null;
+
+    if initial_cap > 0 {
+        data = cast(^u8) alloc(*a, initial_cap);
+    }
+
+    return StringBuilder.{
+        alloc = a,
+        data  = data,
+        cap   = initial_cap,
+    };
+}
+
+string_builder_add_string :: proc (use sb: ^StringBuilder, str: string) -> ^StringBuilder {
+    len_total :: len + str.len;
+
+    if cap >= len_total {
+        for i: 0, str.len do data[len + i] = str.data[i];
+        len += str.len;
+        return sb;
+    }
+
+    new_cap := cap;
+    while new_cap < len_total do new_cap <<= 1;
+
+    new_data := cast(^u8) resize(*alloc, data, new_cap);
+    if new_data == null do return sb;
+
+    data = new_data;
+    cap = new_cap;
+
+    for i: 0, str.len do data[len + i] = str.data[i];
+    len += str.len;
+    return sb;
+}
+
+string_builder_add_cstring :: proc (use sb: ^StringBuilder, cstr: cstring) -> ^StringBuilder {
+    s := string_make(cstr);
+    return string_builder_add_string(sb, s);
+}
+
+u64_to_string :: proc (n_: u64, base: u64, buf: Buffer) -> string {
+    n := n_;
+
+    str :: cast(^u8) buf.data;
+    for i: 0, buf.len do str[i] = #char "\0";
+
+    c := cast(^u8) ^str[buf.len - 1];
+    len := 0;
+
+    s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
+
+    if n == 0l {
+        *c = #char "0";
+        len += 1;
+        c -= 1;
+    } else {
+        while n > 0l {
+            m :: n % base;
+
+            *c = s.data[cast(u32) m];
+            len += 1;
+            c -= 1;
+
+            n /= base;
+        }
+    }
+
+    if base == 16l {
+        *c = #char "x";
+        len += 1;
+        c -= 1;
+        *c = #char "0";
+        len += 1;
+        c -= 1;
+    }
+
+    if base == 2l {
+        *c = #char "b";
+        len += 1;
+        c -= 1;
+        *c = #char "0";
+        len += 1;
+        c -= 1;
+    }
+
+    return string.{ data = c + 1, len = len };
+}
+
+string_builder_add_u64 :: proc (use sb: ^StringBuilder, n: u64) -> ^StringBuilder {
+    return string_builder_add_u64_with_base(sb, n, 10l);
+}
+
+string_builder_add_u64_with_base :: proc (use sb: ^StringBuilder, n: u64, base: u64) -> ^StringBuilder {
+    buf : [256] u8;
+    s := u64_to_string(n, 10l, Buffer.{ cast(^u8) buf, 256 });
+    return string_builder_add_string(sb, s);
+}
+
+string_builder_append :: proc #overloaded {
+    string_builder_add_string,
+    string_builder_add_cstring,
+    string_builder_add_u64_with_base,
+    string_builder_add_u64,
+}
+
+string_builder_to_string :: proc (use sb: ^StringBuilder) -> string {
+    return string.{ data, len };
+}
+
+string_builder_clear :: proc (use sb: ^StringBuilder) -> ^StringBuilder {
+    len = 0;
+    return sb;
+}

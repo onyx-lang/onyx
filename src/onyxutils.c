@@ -184,6 +184,7 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
 
     if (res == NULL) {
         onyx_message_add(Msg_Type_Unknown_Symbol, tkn->pos, tkn->text);
+        token_toggle_end(tkn);
         return &empty_node;
     }
 
