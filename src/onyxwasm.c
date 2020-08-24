@@ -966,6 +966,9 @@ COMPILE_FUNC(call, AstCall* call) {
 
     Type* return_type = call->callee->type->Function.return_type;
     u32 return_size = type_size_of(return_type);
+    u32 return_align = type_alignment_of(return_type);
+    bh_align(return_size, return_align);
+
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
     if (cc == CC_Return_Stack) {
@@ -1685,6 +1688,8 @@ COMPILE_FUNC(return, AstReturn* ret) {
 
 COMPILE_FUNC(stack_enter, u64 stacksize) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    bh_align(stacksize, 16);
 
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 

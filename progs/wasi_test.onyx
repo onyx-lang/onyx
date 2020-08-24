@@ -301,8 +301,10 @@ main :: proc (argc: u32, argv: ^cstring) {
             |> print();
     }
 
-    while i := 0; i < 10 {
+    while i := 10; i < 10 {
         print("Looping\n");
         i += 1;
+    } else {
+        print("Never ran the loop\n");
     }
 }
