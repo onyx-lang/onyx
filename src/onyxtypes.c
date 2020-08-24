@@ -47,8 +47,12 @@ b32 types_are_surface_compatible(Type* t1, Type* t2) {
             break;
 
         case Type_Kind_Pointer:
-            if (t2->kind == Type_Kind_Pointer) return 1;
-            break;
+            if (t2->kind != Type_Kind_Pointer) return 0;
+
+            if (t1->Pointer.elem->kind == Type_Kind_Basic && t2->Pointer.elem->kind == Type_Kind_Basic)
+                return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
+
+            return 1;
 
         case Type_Kind_Array: {
             if (t2->kind != Type_Kind_Array) return 0;
@@ -205,7 +209,7 @@ u32 type_alignment_of(Type* type) {
         case Type_Kind_Pointer:  return 4;
         case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type_alignment_of(type->Array.elem);
-        case Type_Kind_Struct:   return type->Struct.aligment;
+        case Type_Kind_Struct:   return type->Struct.alignment;
         case Type_Kind_Enum:     return type_alignment_of(type->Enum.backing);
         default: return 1;
     }
@@ -321,7 +325,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             }
 
             alignment = bh_max(s_node->min_alignment, alignment);
-            s_type->Struct.aligment = alignment;
+            s_type->Struct.alignment = alignment;
 
             if (size % alignment != 0) {
                 size += alignment - (size % alignment);
@@ -345,6 +349,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             enum_type->Enum.name = enum_node->name;
 
             return enum_type;
+        }
+
+        case Ast_Kind_Slice_Type: {
+            return type_make_slice(alloc, type_build_from_ast(alloc, ((AstSliceType *) type_node)->elem));
         }
 
         case Ast_Kind_Basic_Type:
@@ -397,6 +405,31 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
     ptr_type->Pointer.elem = to;
 
     return ptr_type;
+}
+
+Type* type_make_slice(bh_allocator alloc, Type* of) {
+    Type* s_type = bh_alloc(alloc, sizeof(Type));
+    s_type->kind = Type_Kind_Struct;
+    s_type->Struct.name = bh_aprintf(global_heap_allocator, "[] %s", type_get_name(of));
+    s_type->Struct.mem_count = 2;
+    s_type->Struct.memarr = NULL;
+
+    bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count);
+    bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
+
+    StructMember smem;
+    smem = (StructMember) { .offset = 0, .type = type_make_pointer(alloc, of), .idx = 0, };
+    bh_table_put(StructMember, s_type->Struct.members, "data", smem);
+    smem = (StructMember) { .offset = 4, .type = &basic_types[Basic_Kind_U32], .idx = 1, };
+    bh_table_put(StructMember, s_type->Struct.members, "count", smem);
+
+    bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, "data"));
+    bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, "count"));
+
+    s_type->Struct.alignment = 4;
+    s_type->Struct.size = 8;
+
+    return s_type;
 }
 
 const char* type_get_name(Type* type) {

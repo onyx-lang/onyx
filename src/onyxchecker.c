@@ -20,6 +20,7 @@ CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
+CHECK(slice, AstSlice* sl);
 CHECK(field_access, AstFieldAccess** pfield);
 CHECK(size_of, AstSizeOf* so);
 CHECK(align_of, AstAlignOf* ao);
@@ -757,6 +758,52 @@ CHECK(array_access, AstArrayAccess* aa) {
     return 0;
 }
 
+CHECK(slice, AstSlice* sl) {
+    if (check_expression(&sl->addr)) return 1;
+    if (check_expression(&sl->lo)) return 1;
+    if (check_expression(&sl->hi)) return 1;
+
+    if (!type_is_pointer(sl->addr->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                sl->token->pos,
+                "expected pointer or array type for left of slice creation");
+        return 1;
+    }
+
+    if (sl->lo->type->kind != Type_Kind_Basic
+            || (sl->lo->type->Basic.kind != Basic_Kind_I32 && sl->lo->type->Basic.kind != Basic_Kind_U32)) {
+        onyx_message_add(Msg_Type_Literal,
+                sl->token->pos,
+                "expected 32-bit integer type for lower index");
+        return 1;
+    }
+
+    if (sl->hi->type->kind != Type_Kind_Basic
+            || (sl->hi->type->Basic.kind != Basic_Kind_I32 && sl->hi->type->Basic.kind != Basic_Kind_U32)) {
+        onyx_message_add(Msg_Type_Literal,
+                sl->token->pos,
+                "expected 32-bit integer type for upper index");
+        return 1;
+    }
+
+    Type *of = NULL;
+    if (sl->addr->type->kind == Type_Kind_Pointer)
+        of = sl->addr->type->Pointer.elem;
+    else if (sl->addr->type->kind == Type_Kind_Array)
+        of = sl->addr->type->Array.elem;
+    else {
+        onyx_message_add(Msg_Type_Literal,
+                sl->token->pos,
+                "invalid type for left of slice creation");
+        return 1;
+    }
+
+    sl->type = type_make_slice(semstate.node_allocator, of);
+    sl->elem_size = type_size_of(of);
+
+    return 0;
+}
+
 CHECK(field_access, AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     if (check_expression(&field->expr)) return 1;
@@ -838,6 +885,7 @@ CHECK(expression, AstTyped** pexpr) {
         case Ast_Kind_Address_Of:   retval = check_address_of((AstAddressOf *) expr); break;
         case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
+        case Ast_Kind_Slice:        retval = check_slice((AstSlice *) expr); break;
         case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
         case Ast_Kind_Align_Of:     retval = check_align_of((AstAlignOf *) expr); break;

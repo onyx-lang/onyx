@@ -19,6 +19,7 @@ typedef struct AstArgument AstArgument;
 typedef struct AstAddressOf AstAddressOf;
 typedef struct AstDereference AstDereference;
 typedef struct AstArrayAccess AstArrayAccess;
+typedef struct AstSlice AstSlice;
 typedef struct AstFieldAccess AstFieldAccess;
 typedef struct AstSizeOf AstSizeOf;
 typedef struct AstAlignOf AstAlignOf;
@@ -39,6 +40,7 @@ typedef struct AstBasicType AstBasicType;
 typedef struct AstPointerType AstPointerType;
 typedef struct AstFunctionType AstFunctionType;
 typedef struct AstArrayType AstArrayType;
+typedef struct AstSliceType AstSliceType;
 typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
 typedef struct AstEnumType AstEnumType;
@@ -93,6 +95,7 @@ typedef enum AstKind {
     Ast_Kind_Pointer_Type,
     Ast_Kind_Function_Type,
     Ast_Kind_Array_Type,
+    Ast_Kind_Slice_Type,
     Ast_Kind_Struct_Type,
     Ast_Kind_Enum_Type,
     Ast_Kind_Type_Alias,
@@ -111,6 +114,7 @@ typedef enum AstKind {
     Ast_Kind_Address_Of,
     Ast_Kind_Dereference,
     Ast_Kind_Array_Access,
+    Ast_Kind_Slice,
     Ast_Kind_Field_Access,
     Ast_Kind_Ufc,
     Ast_Kind_Size_Of,
@@ -283,6 +287,7 @@ struct AstArgument      { AstTyped_base; AstTyped *value; };
 struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
+struct AstSlice         { AstTyped_base; AstTyped *addr; AstTyped *lo, *hi; u64 elem_size; };
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
@@ -346,6 +351,7 @@ struct AstBasicType     { AstType_base; Type* type; };
 struct AstPointerType   { AstType_base; AstType* elem; };
 struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; AstType* params[]; };
 struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
+struct AstSliceType     { AstType_base; AstType* elem; };
 struct AstStructType {
     AstType_base;
 

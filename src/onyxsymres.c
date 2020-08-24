@@ -115,6 +115,13 @@ static AstType* symres_type(AstType* type) {
        return type;
     }
 
+    if (type->kind == Ast_Kind_Slice_Type) {
+        AstSliceType* s_node = (AstSliceType *) type;
+        s_node->elem = symres_type(s_node->elem);
+
+        return type;
+    }
+
     onyx_message_add(Msg_Type_Literal,
             (OnyxFilePos) { 0 },
             onyx_ast_node_kind_string(type->kind));
@@ -217,15 +224,15 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     if (sl->stnode != NULL) symres_expression(&sl->stnode);
     if (sl->stnode == NULL) return;
 
-    if (sl->stnode->kind != Ast_Kind_Struct_Type) {
+    sl->type_node = (AstType *) sl->stnode;
+    sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
+
+    if (sl->type->kind != Type_Kind_Struct) {
         onyx_message_add(Msg_Type_Literal,
                 sl->token->pos,
                 "type is not a struct type (BAD ERROR MESSAGE)");
         return;
     }
-
-    sl->type_node = (AstType *) sl->stnode;
-    sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
 
     if (bh_arr_length(sl->values) == 0) {
         bh_arr_set_length(sl->values, sl->type->Struct.mem_count);
@@ -310,6 +317,12 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Array_Access:
             symres_expression(&((AstArrayAccess *)(*expr))->addr);
             symres_expression(&((AstArrayAccess *)(*expr))->expr);
+            break;
+
+        case Ast_Kind_Slice:
+            symres_expression(&((AstSlice *)(*expr))->addr);
+            symres_expression(&((AstSlice *)(*expr))->lo);
+            symres_expression(&((AstSlice *)(*expr))->hi);
             break;
 
         case Ast_Kind_Struct_Literal:

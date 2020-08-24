@@ -480,14 +480,32 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         switch ((u16) parser->curr->type) {
             case '[': {
-                AstArrayAccess* aa_node = make_node(AstArrayAccess, Ast_Kind_Array_Access);
-                aa_node->token = expect_token(parser, '[');
-                aa_node->addr  = retval;
-                aa_node->expr  = parse_expression(parser);
+                OnyxToken *open_bracket = expect_token(parser, '[');
+                AstTyped *lo = parse_expression(parser);
 
-                expect_token(parser, ']');
+                if (parser->curr->type == ':') {
+                    consume_token(parser);
 
-                retval = (AstTyped *) aa_node;
+                    AstSlice *sl_node = make_node(AstSlice, Ast_Kind_Slice);
+                    sl_node->token = open_bracket;
+                    sl_node->addr  = retval;
+                    sl_node->lo    = lo;
+                    sl_node->hi    = parse_expression(parser);
+
+                    retval = (AstTyped *) sl_node;
+                    expect_token(parser, ']');
+                    goto factor_parsed;
+
+                } else {
+                    AstArrayAccess* aa_node = make_node(AstArrayAccess, Ast_Kind_Array_Access);
+                    aa_node->token = open_bracket;
+                    aa_node->addr  = retval;
+                    aa_node->expr  = lo;
+
+                    retval = (AstTyped *) aa_node;
+                    expect_token(parser, ']');
+                }
+
                 break;
             }
 
@@ -1075,15 +1093,21 @@ static AstType* parse_type(OnyxParser* parser) {
         }
 
         else if (parser->curr->type == '[') {
-           AstArrayType* new = make_node(AstArrayType, Ast_Kind_Array_Type);
-           new->token = expect_token(parser, '[');
+            AstSliceType *new;
+            OnyxToken *open_bracket = expect_token(parser, '[');
 
-           if (parser->curr->type != ']')
-               new->count_expr = parse_expression(parser);
+            if (parser->curr->type == ']') {
+                new = make_node(AstSliceType, Ast_Kind_Slice_Type);
+                new->token = open_bracket;
+            } else {
+                new = make_node(AstArrayType, Ast_Kind_Array_Type);
+                new->token = open_bracket;
+                ((AstArrayType *) new)->count_expr = parse_expression(parser);
+            }
 
-           expect_token(parser, ']');
-           *next_insertion = (AstType *) new;
-           next_insertion = &new->elem;
+            expect_token(parser, ']');
+            *next_insertion = (AstType *) new;
+            next_insertion = &new->elem;
         }
 
         else if (parser->curr->type == Token_Type_Keyword_Proc) {

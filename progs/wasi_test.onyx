@@ -62,7 +62,7 @@ print_u64_with_base :: proc (n_: u64, base: u64) {
 }
 
 print_string :: proc (s: string) -> u32 {
-    vec := IOVec.{ buf = s.data, len = s.len };
+    vec := IOVec.{ buf = s.data, len = s.count };
     tmp : Size;
     fd_write(1, IOVecArray.{ ^vec, 1 }, ^tmp);
     fd_datasync(1);
@@ -190,13 +190,25 @@ output_s :: proc (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
     return sb;
 }
 
+print_arr :: proc (sb: ^StringBuilder, arr: []i32) {
+    sb  |> string_builder_clear();
+
+    a := arr.data;
+
+    for i: 0, arr.count {
+        sb |> sba(cast(u64) a[i]) |> sba(" ");
+    }
+
+    sb |> sba("\n") |> string_builder_to_string() |> print();
+}
+
 main :: proc (argc: u32, argv: ^cstring) {
     sb := string_builder_make(heap_allocator, 256);
 
     timer := timer_start();
     defer {
         ^sb |> string_builder_clear()
-            |> sba("Time taken: ")
+            |> sba("\nTime taken: ")
             |> sba(cast(u64) timer_end(timer), 10l)
             |> sba("ms\n")
             |> string_builder_to_string()
@@ -213,15 +225,7 @@ main :: proc (argc: u32, argv: ^cstring) {
         |> print();
 
     fd: FileDescriptor = -1;
-    if err := path_open(3,
-        LookupFlags.SymLinkFollow,
-        string_make(argv[1]),
-        cast(OFlags) 0,
-        Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile,
-        Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile,
-        FDFlags.Sync,
-        ^fd);
-        err != Errno.Success {
+    if err := path_open(3, LookupFlags.SymLinkFollow, string_make(argv[1]), cast(OFlags) 0, Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile, Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile, FDFlags.Sync, ^fd); err != Errno.Success {
         print("Failed to open file\n");
         print("Error code: ");
         print_u64_with_base(cast(u64) err, 16l);
@@ -301,10 +305,27 @@ main :: proc (argc: u32, argv: ^cstring) {
             |> print();
     }
 
-    while i := 10; i < 10 {
-        print("Looping\n");
+    ^sb |> string_builder_clear();
+    while i := 0; i < 10 {
+        ^sb |> sba("Loop: ") |> sba(cast(u64) i) |> sba("\n");
+        
         i += 1;
     } else {
         print("Never ran the loop\n");
+    }
+
+    ^sb |> string_builder_to_string() |> print();
+
+
+    arr : [128] i32;
+    for i: 0, 128 do arr[i] = i * i;
+
+    slice := arr[14 : 20];
+
+    print_arr(^sb, slice);
+
+    ss := string_substr("Hello, WoWorld!", "World");
+    if ss.count > 0 {
+        print(ss);
     }
 }

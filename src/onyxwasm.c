@@ -370,6 +370,7 @@ COMPILE_FUNC(array_access_location,         AstArrayAccess* aa, u64* offset_retu
 COMPILE_FUNC(field_access_location,         AstFieldAccess* field, u64* offset_return);
 COMPILE_FUNC(local_location,                AstLocal* local, u64* offset_return);
 COMPILE_FUNC(memory_reservation_location,   AstMemRes* memres);
+COMPILE_FUNC(location,                      AstTyped* expr);
 COMPILE_FUNC(struct_load,                   Type* type, u64 offset);
 COMPILE_FUNC(struct_lval,                   AstTyped* lval);
 COMPILE_FUNC(struct_store,                  Type* type, u64 offset);
@@ -1150,11 +1151,19 @@ COMPILE_FUNC(local_location, AstLocal* local, u64* offset_return) {
     bh_arr(WasmInstruction) code = *pcode;
 
     u64 local_offset = (u64) bh_imap_get(&mod->local_map, (u64) local);
-    assert((local_offset & (LOCAL_IS_WASM | LOCAL_F64)) == 0);
 
-    WIL(WI_LOCAL_GET, mod->stack_base_idx);
+    if (local_offset & LOCAL_IS_WASM) {
+        // HACK: This case doesn't feel quite right. I think the
+        // only way to end up here is if you are taking the slice
+        // off a pointer that is a local. But this still feels
+        // like the wrong long term solution.
+        WIL(WI_LOCAL_GET, local_offset);
 
-    *offset_return += local_offset;
+    } else {
+        WIL(WI_LOCAL_GET, mod->stack_base_idx);
+
+        *offset_return += local_offset;
+    }
 
     *pcode = code;
 }
@@ -1270,6 +1279,78 @@ COMPILE_FUNC(struct_literal, AstStructLiteral* sl) {
     *pcode = code;
 }
 
+COMPILE_FUNC(location, AstTyped* expr) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (expr->kind) {
+        case Ast_Kind_Local: {
+            u64 offset = 0;
+            compile_local_location(mod, &code, (AstLocal *) expr, &offset);
+            if (offset != 0) {
+                WID(WI_I32_CONST, offset);
+                WI(WI_I32_ADD);
+            }
+            break;
+        }
+
+        case Ast_Kind_Dereference: {
+            compile_expression(mod, &code, ((AstDereference *) expr)->expr);
+            break;
+        }
+
+        case Ast_Kind_Array_Access: {
+            AstArrayAccess* aa = (AstArrayAccess *) expr;
+            u64 offset = 0;
+            compile_array_access_location(mod, &code, aa, &offset);
+            if (offset != 0) {
+                WID(WI_I32_CONST, offset);
+                WI(WI_I32_ADD);
+            }
+            break;
+        }
+
+        case Ast_Kind_Field_Access: {
+            AstFieldAccess* field = (AstFieldAccess *) expr;
+
+            if (field->expr->kind == Ast_Kind_Param && field->expr->type->kind == Type_Kind_Struct) {
+                StructMember smem;
+
+                token_toggle_end(field->token);
+                type_struct_lookup_member(field->expr->type, field->token->text, &smem);
+                token_toggle_end(field->token);
+
+                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + smem.idx;
+
+                WIL(WI_LOCAL_GET, localidx);
+                break;
+            }
+
+            u64 offset = 0;
+            compile_field_access_location(mod, &code, field, &offset);
+            if (offset != 0) {
+                WID(WI_I32_CONST, offset);
+                WI(WI_I32_ADD);
+            }
+            break;
+        }
+
+        case Ast_Kind_Memres: {
+            AstMemRes* memres = (AstMemRes *) expr;
+            WID(WI_I32_CONST, memres->addr);
+            break;
+        }
+
+        default: {
+            onyx_message_add(Msg_Type_Literal,
+                    (OnyxFilePos) { 0 },
+                    "location unknown");
+            break;
+        }
+    }
+
+    *pcode = code;
+}
+
 COMPILE_FUNC(expression, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -1371,57 +1452,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Address_Of: {
             AstAddressOf* aof = (AstAddressOf *) expr;
-
-            switch (aof->expr->kind) {
-                case Ast_Kind_Local: {
-                    u64 offset = 0;
-                    compile_local_location(mod, &code, (AstLocal *) aof->expr, &offset);
-                    if (offset != 0) {
-                        WID(WI_I32_CONST, offset);
-                        WI(WI_I32_ADD);
-                    }
-                    break;
-                }
-
-                case Ast_Kind_Dereference: {
-                    compile_expression(mod, &code, ((AstDereference *) aof->expr)->expr);
-                    break;
-                }
-
-                case Ast_Kind_Array_Access: {
-                    AstArrayAccess* aa = (AstArrayAccess *) aof->expr;
-                    u64 offset = 0;
-                    compile_array_access_location(mod, &code, aa, &offset);
-                    if (offset != 0) {
-                        WID(WI_I32_CONST, offset);
-                        WI(WI_I32_ADD);
-                    }
-                    break;
-                }
-
-                case Ast_Kind_Field_Access: {
-                    AstFieldAccess* field = (AstFieldAccess *) aof->expr;
-                    u64 offset = 0;
-                    compile_field_access_location(mod, &code, field, &offset);
-                    if (offset != 0) {
-                        WID(WI_I32_CONST, offset);
-                        WI(WI_I32_ADD);
-                    }
-                    break;
-                }
-
-                case Ast_Kind_Memres: {
-                    AstMemRes* memres = (AstMemRes *) aof->expr;
-                    WID(WI_I32_CONST, memres->addr);
-                    break;
-                }
-
-                default:
-                    onyx_message_add(Msg_Type_Literal,
-                            aof->token->pos,
-                            "unsupported address of");
-                }
-
+            compile_location(mod, &code, aof->expr);
             break;
         }
 
@@ -1475,6 +1506,25 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             u64 offset = 0;
             compile_field_access_location(mod, &code, field, &offset);
             compile_load_instruction(mod, &code, field->type, offset);
+            break;
+        }
+
+        case Ast_Kind_Slice: {
+            AstSlice* sl = (AstSlice *) expr;
+
+            u64 tmp_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+            compile_expression(mod, &code, sl->lo);
+            WIL(WI_LOCAL_TEE, tmp_local);
+            WID(WI_I32_CONST, sl->elem_size);
+            WI(WI_I32_MUL);
+            compile_location(mod, &code, sl->addr);
+            WI(WI_I32_ADD);
+            compile_expression(mod, &code, sl->hi);
+            WIL(WI_LOCAL_GET, tmp_local);
+            WI(WI_I32_SUB);
+
+            local_raw_free(mod->local_alloc, tmp_local);
             break;
         }
 

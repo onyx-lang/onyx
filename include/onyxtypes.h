@@ -62,7 +62,7 @@ typedef struct StructMember {
     TYPE_KIND(Struct, struct {                                    \
         char* name;                                               \
         u32 size;                                                 \
-        u16 aligment, mem_count;                                  \
+        u16 alignment, mem_count;                                 \
         bh_table(StructMember) members;                           \
         bh_arr(StructMember *) memarr;                            \
     })                                                            \
@@ -112,6 +112,7 @@ Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func, struct AstType* return_type);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
+Type* type_make_slice(bh_allocator alloc, Type* of);
 
 const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);

@@ -199,6 +199,14 @@ HOW:
                 // Loop never run
             }
 
+        [X] Add slices
+            - Arrays without a size
+            - Converted to a struct that looks like:    
+                []T :: struct {
+                    data  : ^T;
+                    count : u32;
+                }
+
         [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] convert to using an 'atom' like table
@@ -217,14 +225,6 @@ HOW:
             - Technically it isn't slow right now
             - But, profiling says we are spending 50% of the program execution time in the lexer
             - That is awful
-
-        [ ] Add slices
-            - Arrays without a size
-            - Converted to a struct that looks like:    
-                []T :: struct {
-                    data  : ^T;
-                    count : u32;
-                }
 
         [ ] Variadic arguments
 

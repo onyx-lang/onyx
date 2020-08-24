@@ -1,8 +1,4 @@
 package builtin
 
-string :: struct {
-	data : ^u8;
-	len  : u32;
-}
-
+string  :: #type []u8;
 cstring :: #type ^u8;
