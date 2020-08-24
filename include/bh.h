@@ -162,6 +162,8 @@ u8* double_to_ieee754(f64 f, b32 reverse);
 #define bh_align_of(Type)                bh_offset_of(struct { char c; Type member; }, member)
 #define bh_swap(Type, a, b)                do { Type tmp = (a); (a) = (b); (b) = tmp; } while(0)
 
+#define bh_align(x, a) if ((x) % (a) != 0) (x) += (a) - ((x) % (a));
+
 #define bh_pointer_add(ptr, amm)        ((void *)((u8 *) ptr + amm))
 #define BH_BIT(x)                        (1 << (x))
 #define BH_MASK_SET(var, set, mask)     ((set) ? (var) |= (mask) : (var) &= ~(mask))

@@ -9,8 +9,8 @@ CHECK(block, AstBlock* block);
 CHECK(statement_chain, AstNode* start);
 CHECK(statement, AstNode* stmt);
 CHECK(return, AstReturn* retnode);
-CHECK(if, AstIf* ifnode);
-CHECK(while, AstWhile* whilenode);
+CHECK(if, AstIfWhile* ifnode);
+CHECK(while, AstIfWhile* whilenode);
 CHECK(for, AstFor* fornode);
 CHECK(call, AstCall* call);
 CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok);
@@ -62,7 +62,9 @@ CHECK(return, AstReturn* retnode) {
     return 0;
 }
 
-CHECK(if, AstIf* ifnode) {
+CHECK(if, AstIfWhile* ifnode) {
+    if (ifnode->assignment != NULL) check_statement((AstNode *) ifnode->assignment);
+
     if (check_expression(&ifnode->cond)) return 1;
 
     if (!type_is_bool(ifnode->cond->type)) {
@@ -78,7 +80,9 @@ CHECK(if, AstIf* ifnode) {
     return 0;
 }
 
-CHECK(while, AstWhile* whilenode) {
+CHECK(while, AstIfWhile* whilenode) {
+    if (whilenode->assignment != NULL) check_statement((AstNode *) whilenode->assignment);
+
     if (check_expression(&whilenode->cond)) return 1;
 
     if (!type_is_bool(whilenode->cond->type)) {
@@ -88,7 +92,10 @@ CHECK(while, AstWhile* whilenode) {
         return 1;
     }
 
-    return check_block(whilenode->stmt);
+    if (whilenode->true_stmt)  if (check_block(whilenode->true_stmt))  return 1;
+    if (whilenode->false_stmt) if (check_block(whilenode->false_stmt)) return 1;
+
+    return 0;
 }
 
 CHECK(for, AstFor* fornode) {
@@ -900,8 +907,8 @@ CHECK(statement, AstNode* stmt) {
         case Ast_Kind_Continue:   return 0;
 
         case Ast_Kind_Return:     return check_return((AstReturn *) stmt);
-        case Ast_Kind_If:         return check_if((AstIf *) stmt);
-        case Ast_Kind_While:      return check_while((AstWhile *) stmt);
+        case Ast_Kind_If:         return check_if((AstIfWhile *) stmt);
+        case Ast_Kind_While:      return check_while((AstIfWhile *) stmt);
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
         case Ast_Kind_Defer: {
@@ -1113,8 +1120,8 @@ CHECK(node, AstNode* node) {
         case Ast_Kind_Overloaded_Function:  return check_overloaded_function((AstOverloadedFunction *) node);
         case Ast_Kind_Block:                return check_block((AstBlock *) node);
         case Ast_Kind_Return:               return check_return((AstReturn *) node);
-        case Ast_Kind_If:                   return check_if((AstIf *) node);
-        case Ast_Kind_While:                return check_while((AstWhile *) node);
+        case Ast_Kind_If:                   return check_if((AstIfWhile *) node);
+        case Ast_Kind_While:                return check_while((AstIfWhile *) node);
         case Ast_Kind_Call:                 return check_call((AstCall *) node);
         case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp **) &node, 1);
         default:                            return check_expression((AstTyped **) &node);

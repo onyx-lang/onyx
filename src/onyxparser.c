@@ -27,8 +27,8 @@ static AstNumLit*     parse_float_literal(OnyxParser* parser);
 static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_expression(OnyxParser* parser);
-static AstIf*         parse_if_stmt(OnyxParser* parser);
-static AstWhile*      parse_while_stmt(OnyxParser* parser);
+static AstIfWhile*    parse_if_stmt(OnyxParser* parser);
+static AstIfWhile*    parse_while_stmt(OnyxParser* parser);
 static AstFor*        parse_for_stmt(OnyxParser* parser);
 static b32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*     parse_return_statement(OnyxParser* parser);
@@ -705,14 +705,30 @@ expression_done:
 }
 
 // 'if' <expr> <stmt> ('elseif' <cond> <stmt>)* ('else' <block>)?
-static AstIf* parse_if_stmt(OnyxParser* parser) {
+static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
     expect_token(parser, Token_Type_Keyword_If);
+
+    AstIfWhile* if_node = make_node(AstIfWhile, Ast_Kind_If);
+    AstIfWhile* root_if = if_node;
+
+    if ((parser->curr + 1)->type == ':') {
+        if_node->local = make_node(AstLocal, Ast_Kind_Local);
+        if_node->local->token = expect_token(parser, Token_Type_Symbol);
+
+        expect_token(parser, ':');
+
+        AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+        assignment->operation = Binary_Op_Assign;
+        assignment->token = expect_token(parser, '=');
+        assignment->left = (AstTyped *) if_node->local;
+        assignment->right = parse_expression(parser);
+
+        if_node->assignment = assignment;
+        expect_token(parser, ';');
+    }
 
     AstTyped* cond = parse_expression(parser);
     AstBlock* true_stmt = parse_block(parser);
-
-    AstIf* if_node = make_node(AstIf, Ast_Kind_If);
-    AstIf* root_if = if_node;
 
     if_node->cond = cond;
     if (true_stmt != NULL)
@@ -722,7 +738,7 @@ static AstIf* parse_if_stmt(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return root_if;
 
         consume_token(parser);
-        AstIf* elseif_node = make_node(AstIf, Ast_Kind_If);
+        AstIfWhile* elseif_node = make_node(AstIfWhile, Ast_Kind_If);
 
         cond = parse_expression(parser);
         true_stmt = parse_block(parser);
@@ -747,16 +763,34 @@ static AstIf* parse_if_stmt(OnyxParser* parser) {
 }
 
 // 'while' <expr> <block>
-static AstWhile* parse_while_stmt(OnyxParser* parser) {
+static AstIfWhile* parse_while_stmt(OnyxParser* parser) {
     OnyxToken* while_token = expect_token(parser, Token_Type_Keyword_While);
-
-    AstTyped* cond = parse_expression(parser);
-    AstBlock* stmt = parse_block(parser);
-
-    AstWhile* while_node = make_node(AstWhile, Ast_Kind_While);
+    AstIfWhile* while_node = make_node(AstIfWhile, Ast_Kind_While);
     while_node->token = while_token;
-    while_node->cond = cond;
-    while_node->stmt = stmt;
+
+    if ((parser->curr + 1)->type == ':') {
+        while_node->local = make_node(AstLocal, Ast_Kind_Local);
+        while_node->local->token = expect_token(parser, Token_Type_Symbol);
+
+        expect_token(parser, ':');
+
+        AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+        assignment->operation = Binary_Op_Assign;
+        assignment->token = expect_token(parser, '=');
+        assignment->left = (AstTyped *) while_node->local;
+        assignment->right = parse_expression(parser);
+
+        while_node->assignment = assignment;
+        expect_token(parser, ';');
+    }
+
+    while_node->cond = parse_expression(parser);
+    while_node->true_stmt = parse_block(parser);
+
+    if (parser->curr->type == Token_Type_Keyword_Else) {
+        consume_token(parser);
+        while_node->false_stmt = parse_block(parser);
+    }
 
     return while_node;
 }

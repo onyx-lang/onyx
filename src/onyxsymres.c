@@ -16,8 +16,8 @@ static void symres_align_of(AstAlignOf* so);
 static void symres_field_access(AstFieldAccess** fa);
 static void symres_expression(AstTyped** expr);
 static void symres_return(AstReturn* ret);
-static void symres_if(AstIf* ifnode);
-static void symres_while(AstWhile* whilenode);
+static void symres_if(AstIfWhile* ifnode);
+static void symres_while(AstIfWhile* whilenode);
 static void symres_for(AstFor* fornode);
 static void symres_statement_chain(AstNode** walker);
 static b32  symres_statement(AstNode** stmt);
@@ -325,22 +325,40 @@ static void symres_return(AstReturn* ret) {
         symres_expression(&ret->expr);
 }
 
-static void symres_if(AstIf* ifnode) {
+static void symres_if(AstIfWhile* ifnode) {
+    if (ifnode->assignment != NULL) {
+        ifnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        scope_enter(ifnode->scope);
+
+        symbol_introduce(semstate.curr_scope, ifnode->local->token, (AstNode *) ifnode->local);
+
+        symres_statement((AstNode **) &ifnode->assignment);
+    }
+
     symres_expression(&ifnode->cond);
 
-    // BUG: This will not work for the following case:
-    //  if cond foo := 10
-    //  else foo := 20
-    //
-    // The declaration will cause a problem but semantically the above
-    // doesn't make sense.
     if (ifnode->true_stmt != NULL)  symres_statement((AstNode **) &ifnode->true_stmt);
     if (ifnode->false_stmt != NULL) symres_statement((AstNode **) &ifnode->false_stmt);
+
+    if (ifnode->assignment != NULL) scope_leave();
 }
 
-static void symres_while(AstWhile* whilenode) {
+static void symres_while(AstIfWhile* whilenode) {
+    if (whilenode->assignment != NULL) {
+        whilenode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        scope_enter(whilenode->scope);
+
+        symbol_introduce(semstate.curr_scope, whilenode->local->token, (AstNode *) whilenode->local);
+
+        symres_statement((AstNode **) &whilenode->assignment);
+    }
+
     symres_expression(&whilenode->cond);
-    symres_block(whilenode->stmt);
+
+    if (whilenode->true_stmt)  symres_block(whilenode->true_stmt);
+    if (whilenode->false_stmt) symres_block(whilenode->false_stmt);
+
+    if (whilenode->assignment != NULL) scope_leave();
 }
 
 static void symres_for(AstFor* fornode) {
@@ -363,8 +381,8 @@ static b32 symres_statement(AstNode** stmt) {
     switch ((*stmt)->kind) {
         case Ast_Kind_Local:      symres_local((AstLocal **) stmt);                  return 1;
         case Ast_Kind_Return:     symres_return((AstReturn *) *stmt);                return 0;
-        case Ast_Kind_If:         symres_if((AstIf *) *stmt);                        return 0;
-        case Ast_Kind_While:      symres_while((AstWhile *) *stmt);                  return 0;
+        case Ast_Kind_If:         symres_if((AstIfWhile *) *stmt);                   return 0;
+        case Ast_Kind_While:      symres_while((AstIfWhile *) *stmt);                return 0;
         case Ast_Kind_For:        symres_for((AstFor *) *stmt);                      return 0;
         case Ast_Kind_Call:       symres_call((AstCall *) *stmt);                    return 0;
         case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *) *stmt)->value); return 0;

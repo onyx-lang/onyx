@@ -306,6 +306,9 @@ static u64 local_allocate(LocalAllocator* la, AstLocal* local) {
         if (la->max_stack < la->curr_stack)
             la->max_stack = la->curr_stack;
 
+        if (size % alignment != 0)
+            size += alignment - (size % alignment);
+
         if (la->max_stack - la->curr_stack >= size) {
             la->curr_stack += size;
         } else {
@@ -354,8 +357,8 @@ COMPILE_FUNC(statement,                     AstNode* stmt);
 COMPILE_FUNC(assignment,                    AstBinaryOp* assign);
 COMPILE_FUNC(store_instruction,             Type* type, u32 offset);
 COMPILE_FUNC(load_instruction,              Type* type, u32 offset);
-COMPILE_FUNC(if,                            AstIf* if_node);
-COMPILE_FUNC(while,                         AstWhile* while_node);
+COMPILE_FUNC(if,                            AstIfWhile* if_node);
+COMPILE_FUNC(while,                         AstIfWhile* while_node);
 COMPILE_FUNC(for,                           AstFor* for_node);
 COMPILE_FUNC(defer,                         AstDefer* defer);
 COMPILE_FUNC(deferred_stmts,                AstNode* node);
@@ -445,8 +448,8 @@ COMPILE_FUNC(statement, AstNode* stmt) {
 
     switch (stmt->kind) {
         case Ast_Kind_Return:     compile_return(mod, &code, (AstReturn *) stmt); break;
-        case Ast_Kind_If:         compile_if(mod, &code, (AstIf *) stmt); break;
-        case Ast_Kind_While:      compile_while(mod, &code, (AstWhile *) stmt); break;
+        case Ast_Kind_If:         compile_if(mod, &code, (AstIfWhile *) stmt); break;
+        case Ast_Kind_While:      compile_while(mod, &code, (AstIfWhile *) stmt); break;
         case Ast_Kind_For:        compile_for(mod, &code, (AstFor *) stmt); break;
         case Ast_Kind_Break:      compile_structured_jump(mod, &code, ((AstBreak *) stmt)->count); break;
         case Ast_Kind_Continue:   compile_structured_jump(mod, &code, -((AstContinue *) stmt)->count); break;
@@ -635,21 +638,26 @@ COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     *pcode = code;
 }
 
-COMPILE_FUNC(if, AstIf* if_node) {
+COMPILE_FUNC(if, AstIfWhile* if_node) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    if (if_node->assignment != NULL) {
+        bh_imap_put(&mod->local_map, (u64) if_node->local, local_allocate(mod->local_alloc, if_node->local));
+
+        compile_assignment(mod, &code, if_node->assignment);
+    }
 
     compile_expression(mod, &code, if_node->cond);
     WID(WI_IF_START, 0x40);
 
     bh_arr_push(mod->structured_jump_target, 0);
-
     if (if_node->true_stmt) compile_block(mod, &code, if_node->true_stmt, 0);
 
     if (if_node->false_stmt) {
         WI(WI_ELSE);
 
         if (if_node->false_stmt->kind == Ast_Kind_If) {
-            compile_if(mod, &code, (AstIf *) if_node->false_stmt);
+            compile_if(mod, &code, (AstIfWhile *) if_node->false_stmt);
         } else {
             compile_block(mod, &code, if_node->false_stmt, 0);
         }
@@ -657,33 +665,68 @@ COMPILE_FUNC(if, AstIf* if_node) {
 
     bh_arr_pop(mod->structured_jump_target);
 
+    if (if_node->assignment != NULL) {
+        local_free(mod->local_alloc, if_node->local);
+    }
+
     WI(WI_IF_END);
 
     *pcode = code;
 }
 
-COMPILE_FUNC(while, AstWhile* while_node) {
+COMPILE_FUNC(while, AstIfWhile* while_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    WID(WI_BLOCK_START, 0x40);
-    WID(WI_LOOP_START, 0x40);
+    if (while_node->assignment != NULL) {
+        bh_imap_put(&mod->local_map, (u64) while_node->local, local_allocate(mod->local_alloc, while_node->local));
 
-    compile_expression(mod, &code, while_node->cond);
-    WI(WI_I32_EQZ);
-    WID(WI_COND_JUMP, 0x01);
+        compile_assignment(mod, &code, while_node->assignment);
+    }
 
-    bh_arr_push(mod->structured_jump_target, 1);
-    bh_arr_push(mod->structured_jump_target, 2);
+    if (while_node->false_stmt == NULL) {
+        WID(WI_BLOCK_START, 0x40);
+        WID(WI_LOOP_START, 0x40);
 
-    compile_block(mod, &code, while_node->stmt, 0);
+        compile_expression(mod, &code, while_node->cond);
+        WI(WI_I32_EQZ);
+        WID(WI_COND_JUMP, 0x01);
 
-    bh_arr_pop(mod->structured_jump_target);
-    bh_arr_pop(mod->structured_jump_target);
+        bh_arr_push(mod->structured_jump_target, 1);
+        bh_arr_push(mod->structured_jump_target, 2);
 
-    WID(WI_JUMP, 0x00);
+        compile_block(mod, &code, while_node->true_stmt, 0);
 
-    WI(WI_LOOP_END);
-    WI(WI_BLOCK_END);
+        bh_arr_pop(mod->structured_jump_target);
+        bh_arr_pop(mod->structured_jump_target);
+
+        WID(WI_JUMP, 0x00);
+
+        WI(WI_LOOP_END);
+        WI(WI_BLOCK_END);
+
+    } else {
+        compile_expression(mod, &code, while_node->cond);
+
+        bh_arr_push(mod->structured_jump_target, 1);
+        bh_arr_push(mod->structured_jump_target, 2);
+        WID(WI_IF_START, 0x40);
+
+        WID(WI_LOOP_START, 0x40);
+        compile_block(mod, &code, while_node->true_stmt, 0);
+        compile_expression(mod, &code, while_node->cond);
+        WID(WI_COND_JUMP, 0x00);
+        WI(WI_LOOP_END);
+
+        WI(WI_ELSE);
+        compile_block(mod, &code, while_node->false_stmt, 0);
+        WID(WI_IF_END, 0x40);
+
+        bh_arr_pop(mod->structured_jump_target);
+        bh_arr_pop(mod->structured_jump_target);
+    }
+
+    if (while_node->assignment != NULL)
+        local_free(mod->local_alloc, while_node->local);
 
     *pcode = code;
 }

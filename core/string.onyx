@@ -18,7 +18,6 @@ string_make_from_cstring :: proc (s: cstring) -> string {
     return string.{ len = len, data = s };
 }
 
-
 string_length :: proc #overloaded {
     proc (s: ^u8) -> u32 {
         len := 0;
@@ -82,21 +81,18 @@ string_split :: proc (a: Allocator, str: string, delim: u8) -> StringSplitResult
 
 
 StringBuilder :: struct {
-    // FIX(nested-structs): This should not be a pointer eventually.
-    // Currently nested structures cannot be passed as arguments.
-    // When this issue is fixed, change this to Allocator.
-    alloc : ^Allocator;
+    alloc : Allocator;
 
     data  : ^u8 = null;
     len   : u32 = 0;
     cap   : u32 = 0;
 }
 
-string_builder_make :: proc (a: ^Allocator, initial_cap: u32) -> StringBuilder {
+string_builder_make :: proc (a: Allocator, initial_cap: u32) -> StringBuilder {
     data: ^u8 = null;
 
     if initial_cap > 0 {
-        data = cast(^u8) alloc(*a, initial_cap);
+        data = cast(^u8) alloc(a, initial_cap);
     }
 
     return StringBuilder.{
@@ -118,7 +114,7 @@ string_builder_add_string :: proc (use sb: ^StringBuilder, str: string) -> ^Stri
     new_cap := cap;
     while new_cap < len_total do new_cap <<= 1;
 
-    new_data := cast(^u8) resize(*alloc, data, new_cap);
+    new_data := cast(^u8) resize(alloc, data, new_cap);
     if new_data == null do return sb;
 
     data = new_data;

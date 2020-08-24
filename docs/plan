@@ -187,6 +187,18 @@ HOW:
         [X] returning structs
             - This will put forward a lot of the work that will be done for multiple return values
 
+        [X] intializers in if / while
+            if err := some_function(...); err != 0 {
+                print(err);
+            }
+
+        [X] else on while
+            while ... {
+
+            } else {
+                // Loop never run
+            }
+
         [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] convert to using an 'atom' like table
@@ -201,7 +213,7 @@ HOW:
             - struct member names
             - array length
 
-        [ ] Make the lexer much faster
+        [X] Make the lexer much faster
             - Technically it isn't slow right now
             - But, profiling says we are spending 50% of the program execution time in the lexer
             - That is awful

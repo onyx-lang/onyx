@@ -30,9 +30,8 @@ typedef struct AstBreak AstBreak;
 typedef struct AstContinue AstContinue;
 
 typedef struct AstBlock AstBlock;
-typedef struct AstIf AstIf;
+typedef struct AstIfWhile AstIfWhile;
 typedef struct AstFor AstFor;
-typedef struct AstWhile AstWhile;
 typedef struct AstDefer AstDefer;
 
 typedef struct AstType AstType;
@@ -248,14 +247,12 @@ typedef enum CallingConvention {
 
 
 // Base Nodes
-#define AstNode_members {     \
+#define AstNode_base \
     AstKind kind;             \
     u32 flags;                \
     OnyxToken *token;         \
-    AstNode *next;            \
-};
-#define AstNode_base struct AstNode_members;
-struct AstNode AstNode_members;
+    AstNode *next;            
+struct AstNode { AstNode_base };
 
 // NOTE: 'type_node' is filled out by the parser.
 // For a type such as '^^i32', the tree would look something like
@@ -268,13 +265,11 @@ struct AstNode AstNode_members;
 //
 // 'type' is filled out afterwards. If it is NULL, the Type* is built
 // using the type_node. This can then be used to typecheck this node.
-#define AstTyped_members     { \
-    AstNode_base;              \
-    AstType *type_node;        \
-    Type *type;                \
-}
-#define AstTyped_base struct AstTyped_members;
-struct AstTyped AstTyped_members;
+#define AstTyped_base       \
+    AstNode_base;           \
+    AstType *type_node;     \
+    Type *type;                
+struct AstTyped { AstTyped_base };
 
 // Expression Nodes
 struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
@@ -308,7 +303,6 @@ struct AstContinue      { AstNode_base; u64 count; };
 
 // Structure Nodes
 struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; bh_arr(AstLocal *) locals; };
-struct AstWhile         { AstNode_base; AstTyped *cond; AstBlock *stmt; };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {
     AstNode_base;
@@ -323,8 +317,13 @@ struct AstFor           {
 
     AstBlock *stmt;
 };
-struct AstIf {
+struct AstIfWhile {
     AstNode_base;
+
+    Scope *scope;
+    AstLocal *local;
+    AstBinaryOp *assignment;
+
     AstTyped *cond;
 
     AstBlock *true_stmt;
@@ -336,9 +335,12 @@ struct AstIf {
 // without the 'next' member. This is because types
 // can't be in expressions so a 'next' thing
 // doesn't make sense.
-#define AstType_members { AstKind kind; u32 flags; OnyxToken* token; char* name; }
-#define AstType_base struct AstType_members;
-struct AstType AstType_members;
+#define AstType_base    \
+    AstKind kind;       \
+    u32 flags;          \
+    OnyxToken* token;   \
+    char* name;
+struct AstType { AstType_base };
 
 struct AstBasicType     { AstType_base; Type* type; };
 struct AstPointerType   { AstType_base; AstType* elem; };
