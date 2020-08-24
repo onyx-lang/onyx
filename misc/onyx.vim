@@ -29,9 +29,11 @@ syn keyword onyxConstant        true false null
 
 syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 
-syn region onyxComment start="//" end="$" keepend contains=onyxCommentStart
+syn region onyxComment          start="//" end="$" keepend contains=onyxCommentStart
 
-syn region onyxDirective start="#" end=" " keepend
+syn region onyxDirective        start="#" end=" " keepend
+
+syn region onyxString		    display start=+"+ skip=+\\\\\|\\"+ end=+"+ keepend
 
 hi def link onyxKeyword          Statement
 hi def link onyxType             Type
@@ -39,6 +41,7 @@ hi def link onyxComment          Comment
 hi def link onyxCommentStart     Todo
 hi def link onyxConstant         Constant
 hi def link onyxDirective        Constant
+hi def link onyxString           String
 
 let b:current_syntax = "onyx"
 let &cpo = s:cpo_save

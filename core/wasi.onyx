@@ -475,5 +475,5 @@ proc #export "_start" {
 
 	args_get(argv, argv_buf);
 
-	main.main(argc, argv);
+	main.main(argv[0 : argc]);
 }

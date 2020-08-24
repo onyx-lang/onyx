@@ -122,8 +122,22 @@ OnyxToken* onyx_get_token(OnyxTokenizer* tokenizer) {
     OnyxToken tk;
 
     // Skip whitespace
-    while (char_is_whitespace(*tokenizer->curr) && tokenizer->curr != tokenizer->end)
-        INCREMENT_CURR_TOKEN(tokenizer)
+    while (1) {
+        if (tokenizer->curr == tokenizer->end) break;
+
+        switch (*tokenizer->curr) {
+            case ' ':
+            case '\n':
+            case '\t':
+            case '\r':
+                INCREMENT_CURR_TOKEN(tokenizer);
+                break;
+            default:
+                goto whitespace_skipped;
+        }
+    }
+
+whitespace_skipped:
 
     tk.type = Token_Type_Unknown;
     tk.text = tokenizer->curr;
@@ -367,7 +381,7 @@ OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc
         .tokens         = NULL,
     };
 
-    bh_arr_new(allocator, tknizer.tokens, 512);
+    bh_arr_new(allocator, tknizer.tokens, 1 << 16);
     return tknizer;
 }
 

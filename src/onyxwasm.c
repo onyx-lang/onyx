@@ -1516,8 +1516,10 @@ COMPILE_FUNC(expression, AstTyped* expr) {
 
             compile_expression(mod, &code, sl->lo);
             WIL(WI_LOCAL_TEE, tmp_local);
-            WID(WI_I32_CONST, sl->elem_size);
-            WI(WI_I32_MUL);
+            if (sl->elem_size != 1) {
+                WID(WI_I32_CONST, sl->elem_size);
+                WI(WI_I32_MUL);
+            }
             compile_location(mod, &code, sl->addr);
             WI(WI_I32_ADD);
             compile_expression(mod, &code, sl->hi);
