@@ -211,19 +211,12 @@ HOW:
 
         [X] fallthrough on cases in switch statements
 
-        [ ] initializers on switch statements
+        [X] initializers on switch statements
 
         [ ] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is
 
         [ ] transmute
-
-        [ ] 'use' enums and packages at an arbitrary scope
-
-        [ ] convert to using an 'atom' like table
-            - All identifier tokens are given a unique atom ptr, up to string equality.
-            - This means identifiers can be compared using ptr comparison, instead of string comparison
-            - This mean no more token_toggle_end!! Woo!!
 
         [ ] Put type info in data section so it is runtime accessible
             - type name
@@ -231,6 +224,13 @@ HOW:
             - alignment
             - struct member names
             - array length
+
+        [ ] 'use' enums and packages at an arbitrary scope
+
+        [ ] convert to using an 'atom' like table
+            - All identifier tokens are given a unique atom ptr, up to string equality.
+            - This means identifiers can be compared using ptr comparison, instead of string comparison
+            - This mean no more token_toggle_end!! Woo!!
 
         [X] Make the lexer much faster
             - Technically it isn't slow right now
