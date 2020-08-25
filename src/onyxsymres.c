@@ -391,6 +391,15 @@ static void symres_for(AstFor* fornode) {
 }
 
 static void symres_switch(AstSwitch* switchnode) {
+    if (switchnode->assignment != NULL) {
+        switchnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        scope_enter(switchnode->scope);
+
+        symbol_introduce(semstate.curr_scope, switchnode->local->token, (AstNode *) switchnode->local);
+
+        symres_statement((AstNode **) &switchnode->assignment);
+    }
+
     symres_expression(&switchnode->expr);
 
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
@@ -400,6 +409,8 @@ static void symres_switch(AstSwitch* switchnode) {
 
     if (switchnode->default_case)
         symres_block(switchnode->default_case);
+
+    if (switchnode->assignment != NULL) scope_leave();
 }
 
 // NOTE: Returns 1 if the statment should be removed

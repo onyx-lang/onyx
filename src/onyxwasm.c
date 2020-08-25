@@ -437,7 +437,10 @@ COMPILE_FUNC(structured_jump, i32 jump_count, JumpType jump) {
     }
 
     if (success) {
-        WID(WI_JUMP, labelidx);
+        // NOTE: If the previous instruction was a non conditional jump,
+        // don't emit another jump since it will never be reached.
+        if (bh_arr_last(code).type != WI_JUMP)
+            WID(WI_JUMP, labelidx);
     } else {
         assert(("Invalid structured jump", 0));
     }
@@ -701,7 +704,8 @@ COMPILE_FUNC(while, AstIfWhile* while_node) {
         bh_arr_pop(mod->structured_jump_target);
         bh_arr_pop(mod->structured_jump_target);
 
-        WID(WI_JUMP, 0x00);
+        if (bh_arr_last(code).type != WI_JUMP)
+            WID(WI_JUMP, 0x00);
 
         WI(WI_LOOP_END);
         WI(WI_BLOCK_END);
@@ -795,7 +799,8 @@ COMPILE_FUNC(for, AstFor* for_node) {
     bh_arr_pop(mod->structured_jump_target);
     bh_arr_pop(mod->structured_jump_target);
 
-    WID(WI_JUMP, 0x00);
+    if (bh_arr_last(code).type != WI_JUMP)
+        WID(WI_JUMP, 0x00);
 
     WI(WI_LOOP_END);
     WI(WI_BLOCK_END);
@@ -811,21 +816,21 @@ COMPILE_FUNC(switch, AstSwitch* switch_node) {
     bh_imap block_map;
     bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
 
-    u32 jump_target = 1;
+    if (switch_node->assignment != NULL) {
+        bh_imap_put(&mod->local_map, (u64) switch_node->local, local_allocate(mod->local_alloc, switch_node->local));
 
-    if (switch_node->default_case != NULL) {
-        WID(WI_BLOCK_START, 0x40);
-
-        bh_arr_push(mod->structured_jump_target, jump_target);
-        jump_target = 3;
+        compile_assignment(mod, &code, switch_node->assignment);
     }
+
+    WID(WI_BLOCK_START, 0x40);
+    bh_arr_push(mod->structured_jump_target, 1);
 
     u64 block_num = 0;
     bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
         if (bh_imap_has(&block_map, (u64) sc->block)) continue;
 
         WID(WI_BLOCK_START, 0x40);
-        bh_arr_push(mod->structured_jump_target, jump_target);
+        bh_arr_push(mod->structured_jump_target, 3);
 
         bh_imap_put(&block_map, (u64) sc->block, block_num);
         block_num++;
@@ -856,7 +861,10 @@ COMPILE_FUNC(switch, AstSwitch* switch_node) {
         u64 bn = bh_imap_get(&block_map, (u64) sc->block);
 
         compile_block(mod, &code, sc->block, 0);
-        WID(WI_JUMP, block_num - bn);
+
+        if (bh_arr_last(code).type != WI_JUMP)
+            WID(WI_JUMP, block_num - bn);
+
         WI(WI_BLOCK_END);
         bh_arr_pop(mod->structured_jump_target);
 
@@ -865,9 +873,13 @@ COMPILE_FUNC(switch, AstSwitch* switch_node) {
 
     if (switch_node->default_case != NULL) {
         compile_block(mod, &code, switch_node->default_case, 0);
-        WI(WI_BLOCK_END);
-        bh_arr_pop(mod->structured_jump_target);
     }
+
+    WI(WI_BLOCK_END);
+    bh_arr_pop(mod->structured_jump_target);
+
+    if (switch_node->assignment != NULL)
+        local_free(mod->local_alloc, switch_node->local);
 
     bh_imap_free(&block_map);
     *pcode = code;

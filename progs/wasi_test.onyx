@@ -278,7 +278,6 @@ main :: proc (args: []cstring) {
             case #char "-" do acc -= 1;
             case #char "*" do acc *= 2;
             case #char "/" do acc /= 2;
-
             case #char "s" do acc *= acc;
 
             case #default {
@@ -334,22 +333,7 @@ main :: proc (args: []cstring) {
     print_arr(^sb, arr[5 : 10]);
 
     ss := string_substr("Hello, World!", "World");
-    if ss.count > 0 {
-        print(ss);
-    }
+    if ss.count > 0 do print(ss);
     print("\n");
-
-    num := 36;
-    switch num {
-        case 36 do print("6 squared\n");
-
-        case 42 {
-            print("The meaning of life\n");
-            fallthrough;
-        }
-
-        case #default {
-            print("Nothing was found");
-        }
-    }
 }
+

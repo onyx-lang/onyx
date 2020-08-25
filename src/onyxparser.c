@@ -849,6 +849,22 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
 
     bh_arr_new(global_heap_allocator, switch_node->cases, 4);
 
+    if ((parser->curr + 1)->type == ':') {
+        switch_node->local = make_node(AstLocal, Ast_Kind_Local);
+        switch_node->local->token = expect_token(parser, Token_Type_Symbol);
+
+        expect_token(parser, ':');
+
+        AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+        assignment->operation = Binary_Op_Assign;
+        assignment->token = expect_token(parser, '=');
+        assignment->left = (AstTyped *) switch_node->local;
+        assignment->right = parse_expression(parser);
+
+        switch_node->assignment = assignment;
+        expect_token(parser, ';');
+    }
+
     switch_node->expr = parse_expression(parser);
     expect_token(parser, '{');
 

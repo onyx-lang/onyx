@@ -158,11 +158,13 @@ CHECK(for, AstFor* fornode) {
 }
 
 CHECK(switch, AstSwitch* switchnode) {
+    if (switchnode->assignment != NULL) check_statement((AstNode *) switchnode->assignment);
+
     if (check_expression(&switchnode->expr)) return 1;
-    if (!type_is_integer(switchnode->expr->type)) {
+    if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
         onyx_message_add(Msg_Type_Literal,
                 switchnode->expr->token->pos,
-                "expected integer type for switch expression");
+                "expected integer or enum type for switch expression");
         return 1;
     }
 
@@ -173,6 +175,10 @@ CHECK(switch, AstSwitch* switchnode) {
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
         if (check_block(sc->block)) return 1;
         if (check_expression(&sc->value)) return 1;
+
+        if (sc->value->kind == Ast_Kind_Enum_Value) {
+            sc->value = (AstTyped *) ((AstEnumValue *) sc->value)->value;
+        }
 
         if (sc->value->kind != Ast_Kind_NumLit) {
             onyx_message_add(Msg_Type_Literal,
