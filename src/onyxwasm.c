@@ -360,6 +360,7 @@ COMPILE_FUNC(load_instruction,              Type* type, u32 offset);
 COMPILE_FUNC(if,                            AstIfWhile* if_node);
 COMPILE_FUNC(while,                         AstIfWhile* while_node);
 COMPILE_FUNC(for,                           AstFor* for_node);
+COMPILE_FUNC(switch,                        AstSwitch* switch_node);
 COMPILE_FUNC(defer,                         AstDefer* defer);
 COMPILE_FUNC(deferred_stmts,                AstNode* node);
 COMPILE_FUNC(binop,                         AstBinaryOp* binop);
@@ -452,6 +453,7 @@ COMPILE_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_If:         compile_if(mod, &code, (AstIfWhile *) stmt); break;
         case Ast_Kind_While:      compile_while(mod, &code, (AstIfWhile *) stmt); break;
         case Ast_Kind_For:        compile_for(mod, &code, (AstFor *) stmt); break;
+        case Ast_Kind_Switch:     compile_switch(mod, &code, (AstSwitch *) stmt); break;
         case Ast_Kind_Break:      compile_structured_jump(mod, &code, ((AstBreak *) stmt)->count); break;
         case Ast_Kind_Continue:   compile_structured_jump(mod, &code, -((AstContinue *) stmt)->count); break;
         case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt, 1); break;
@@ -801,6 +803,70 @@ COMPILE_FUNC(for, AstFor* for_node) {
 
     local_free(mod->local_alloc, var);
 
+    *pcode = code;
+}
+
+COMPILE_FUNC(switch, AstSwitch* switch_node) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    bh_imap block_map;
+    bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
+
+    if (switch_node->default_case != NULL) {
+        WID(WI_BLOCK_START, 0x40);
+        bh_arr_push(mod->structured_jump_target, 0);
+    }
+
+    u64 block_num = 0;
+    bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
+        if (bh_imap_has(&block_map, (u64) sc->block)) continue;
+
+        WID(WI_BLOCK_START, 0x40);
+        bh_arr_push(mod->structured_jump_target, 0);
+
+        bh_imap_put(&block_map, (u64) sc->block, block_num);
+        block_num++;
+    }
+
+    u64 count = switch_node->max_case + 1 - switch_node->min_case;
+    BranchTable* bt = bh_alloc(global_heap_allocator, sizeof(BranchTable) + sizeof(u32) * count);
+    bt->count = count;
+    bt->default_case = block_num;
+    fori (i, 0, bt->count) bt->cases[i] = bt->default_case;
+
+    bh_arr_each(bh__imap_entry, sc, switch_node->case_map.entries) {
+        bt->cases[sc->key - switch_node->min_case] = bh_imap_get(&block_map, (u64) sc->value);
+    }
+
+    WID(WI_BLOCK_START, 0x40);
+    compile_expression(mod, &code, switch_node->expr);
+    if (switch_node->min_case != 0) {
+        WID(WI_I32_CONST, switch_node->min_case);
+        WI(WI_I32_SUB);
+    }
+    WIL(WI_JUMP_TABLE, (u64) bt);
+    WI(WI_BLOCK_END);
+
+    bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
+        if (bh_imap_get(&block_map, (u64) sc->block) == 0xdeadbeef) continue;
+
+        u64 bn = bh_imap_get(&block_map, (u64) sc->block);
+
+        compile_block(mod, &code, sc->block, 0);
+        WID(WI_JUMP, block_num - bn);
+        WI(WI_BLOCK_END);
+        bh_arr_pop(mod->structured_jump_target);
+
+        bh_imap_put(&block_map, (u64) sc->block, 0xdeadbeef);
+    }
+
+    if (switch_node->default_case != NULL) {
+        compile_block(mod, &code, switch_node->default_case, 0);
+        WI(WI_BLOCK_END);
+        bh_arr_pop(mod->structured_jump_target);
+    }
+
+    bh_imap_free(&block_map);
     *pcode = code;
 }
 

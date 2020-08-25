@@ -28,6 +28,8 @@ static const char* token_type_names[] = {
     "alignof",
     "defer",
     "do",
+    "switch",
+    "case",
 
     "->",
     "<-",
@@ -258,6 +260,7 @@ whitespace_skipped:
         LITERAL_TOKEN("break",      1, Token_Type_Keyword_Break);
         break;
     case 'c':
+        LITERAL_TOKEN("case",       1, Token_Type_Keyword_Case);
         LITERAL_TOKEN("cast",       1, Token_Type_Keyword_Cast);
         LITERAL_TOKEN("continue",   1, Token_Type_Keyword_Continue);
         break;
@@ -290,6 +293,7 @@ whitespace_skipped:
     case 's':
         LITERAL_TOKEN("sizeof",     1, Token_Type_Keyword_Sizeof);
         LITERAL_TOKEN("struct",     1, Token_Type_Keyword_Struct);
+        LITERAL_TOKEN("switch",     1, Token_Type_Keyword_Switch);
         break;
     case 't':
         LITERAL_TOKEN("true",       1, Token_Type_Literal_True);

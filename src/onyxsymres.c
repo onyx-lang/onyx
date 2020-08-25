@@ -19,6 +19,7 @@ static void symres_return(AstReturn* ret);
 static void symres_if(AstIfWhile* ifnode);
 static void symres_while(AstIfWhile* whilenode);
 static void symres_for(AstFor* fornode);
+static void symres_switch(AstSwitch* switchnode);
 static void symres_statement_chain(AstNode** walker);
 static b32  symres_statement(AstNode** stmt);
 static void symres_block(AstBlock* block);
@@ -389,6 +390,18 @@ static void symres_for(AstFor* fornode) {
     scope_leave();
 }
 
+static void symres_switch(AstSwitch* switchnode) {
+    symres_expression(&switchnode->expr);
+
+    bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
+        symres_expression(&sc->value);
+        symres_block(sc->block);
+    }
+
+    if (switchnode->default_case)
+        symres_block(switchnode->default_case);
+}
+
 // NOTE: Returns 1 if the statment should be removed
 static b32 symres_statement(AstNode** stmt) {
     switch ((*stmt)->kind) {
@@ -397,6 +410,7 @@ static b32 symres_statement(AstNode** stmt) {
         case Ast_Kind_If:         symres_if((AstIfWhile *) *stmt);                   return 0;
         case Ast_Kind_While:      symres_while((AstIfWhile *) *stmt);                return 0;
         case Ast_Kind_For:        symres_for((AstFor *) *stmt);                      return 0;
+        case Ast_Kind_Switch:     symres_switch((AstSwitch *) *stmt);                return 0;
         case Ast_Kind_Call:       symres_call((AstCall *) *stmt);                    return 0;
         case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *) *stmt)->value); return 0;
         case Ast_Kind_Block:      symres_block((AstBlock *) *stmt);                  return 0;

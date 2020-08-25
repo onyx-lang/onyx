@@ -73,6 +73,8 @@ static const char* ast_node_names[] = {
     "BREAK",
     "CONTINUE",
     "DEFER",
+    "SWITCH",
+    "SWITCH CASE"
 
     "AST_NODE_KIND_COUNT",
 };

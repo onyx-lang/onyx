@@ -207,6 +207,15 @@ HOW:
                     count : u32;
                 }
 
+        [X] Switch statements
+
+        [ ] fallthrough on cases in switch statements
+
+        [ ] #file and #line directives
+            - string and u32 respectively that represent the current file and line number where the directive is
+
+        [ ] transmute
+
         [ ] 'use' enums and packages at an arbitrary scope
 
         [ ] convert to using an 'atom' like table
@@ -258,8 +267,6 @@ HOW:
         [ ] Better checking for casts
             - Checking which things are allowed to cast to/from should be checked in the checker,
                 not in the wasm generatation
-
-        [ ] Switch statements
 
 
 

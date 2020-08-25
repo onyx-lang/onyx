@@ -31,6 +31,8 @@ static const char* msg_formats[] = {
     "duplicate value for struct member '%b'",
     "no value provided for field '%b'",
 
+    "multiple cases for '%l'",
+
     "unable to resolve type for symbol '%b'",
     "unable to resolve symbol '%b'",
 

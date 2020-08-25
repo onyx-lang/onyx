@@ -30,6 +30,7 @@ static AstTyped*      parse_expression(OnyxParser* parser);
 static AstIfWhile*    parse_if_stmt(OnyxParser* parser);
 static AstIfWhile*    parse_while_stmt(OnyxParser* parser);
 static AstFor*        parse_for_stmt(OnyxParser* parser);
+static AstSwitch*     parse_switch_stmt(OnyxParser* parser);
 static b32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*     parse_return_statement(OnyxParser* parser);
 static AstBlock*      parse_block(OnyxParser* parser);
@@ -842,6 +843,54 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     return for_node;
 }
 
+static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
+    AstSwitch* switch_node = make_node(AstSwitch, Ast_Kind_Switch);
+    switch_node->token = expect_token(parser, Token_Type_Keyword_Switch);
+
+    bh_arr_new(global_heap_allocator, switch_node->cases, 4);
+
+    switch_node->expr = parse_expression(parser);
+    expect_token(parser, '{');
+
+    AstTyped** batch_cases = NULL;
+    bh_arr_new(global_scratch_allocator, batch_cases, 16);
+
+    while (parser->curr->type == Token_Type_Keyword_Case) {
+        expect_token(parser, Token_Type_Keyword_Case);
+        if (parser->hit_unexpected_token) return switch_node;
+
+        if (parse_possible_directive(parser, "default")) {
+            switch_node->default_case = parse_block(parser);
+            continue;
+        }
+
+        AstTyped* value = parse_expression(parser);
+        bh_arr_push(batch_cases, value);
+        while (parser->curr->type == ',') {
+            if (parser->hit_unexpected_token) return switch_node;
+
+            consume_token(parser);
+            value = parse_expression(parser);
+            bh_arr_push(batch_cases, value);
+        }
+
+        AstBlock* block = parse_block(parser);
+
+        AstSwitchCase sc_node;
+        sc_node.block = block;
+
+        bh_arr_each(AstTyped *, value, batch_cases) {
+            sc_node.value = *value;
+            bh_arr_push(switch_node->cases, sc_node);
+        }
+
+        bh_arr_clear(batch_cases);
+    }
+
+    expect_token(parser, '}');
+    return switch_node;
+}
+
 // Returns 1 if the symbol was consumed. Returns 0 otherwise
 // ret is set to the statement to insert
 // <symbol> : <type> = <expr>
@@ -970,6 +1019,11 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Keyword_For:
             needs_semicolon = 0;
             retval = (AstNode *) parse_for_stmt(parser);
+            break;
+
+        case Token_Type_Keyword_Switch:
+            needs_semicolon = 0;
+            retval = (AstNode *) parse_switch_stmt(parser);
             break;
 
         case Token_Type_Keyword_Break: {

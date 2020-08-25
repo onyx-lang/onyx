@@ -243,6 +243,12 @@ typedef struct WasmInstruction {
     WasmInstructionData data;
 } WasmInstruction;
 
+typedef struct BranchTable {
+    u32 count;
+    u32 default_case;
+    u32 cases[];    
+} BranchTable;
+
 #define LOCAL_IS_WASM 0x8000000000000
 typedef struct LocalAllocator {
     u32 param_count;

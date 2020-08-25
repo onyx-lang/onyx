@@ -34,6 +34,8 @@ typedef struct AstBlock AstBlock;
 typedef struct AstIfWhile AstIfWhile;
 typedef struct AstFor AstFor;
 typedef struct AstDefer AstDefer;
+typedef struct AstSwitchCase AstSwitchCase;
+typedef struct AstSwitch AstSwitch;
 
 typedef struct AstType AstType;
 typedef struct AstBasicType AstBasicType;
@@ -128,6 +130,8 @@ typedef enum AstKind {
     Ast_Kind_Break,
     Ast_Kind_Continue,
     Ast_Kind_Defer,
+    Ast_Kind_Switch,
+    Ast_Kind_Switch_Case,
 
     Ast_Kind_Count
 } AstKind;
@@ -255,7 +259,7 @@ typedef enum CallingConvention {
     AstKind kind;             \
     u32 flags;                \
     OnyxToken *token;         \
-    AstNode *next;            
+    AstNode *next;
 struct AstNode { AstNode_base };
 
 // NOTE: 'type_node' is filled out by the parser.
@@ -272,7 +276,7 @@ struct AstNode { AstNode_base };
 #define AstTyped_base       \
     AstNode_base;           \
     AstType *type_node;     \
-    Type *type;                
+    Type *type;
 struct AstTyped { AstTyped_base };
 
 // Expression Nodes
@@ -333,6 +337,25 @@ struct AstIfWhile {
 
     AstBlock *true_stmt;
     AstBlock *false_stmt;
+};
+struct AstSwitchCase { AstTyped *value; AstBlock *block; };
+struct AstSwitch {
+    AstNode_base;
+
+    // NOTE: These are not currently used;
+    Scope *scope;
+    AstLocal *local;
+    AstBinaryOp *assignment;
+
+    AstTyped *expr;
+
+    bh_arr(AstSwitchCase) cases;
+    AstBlock *default_case;
+
+    // NOTE: This is a mapping from the compile time known case value
+    // to a pointer to the block that it is associated with.
+    bh_imap case_map;
+    u64 min_case, max_case;
 };
 
 // Type Nodes

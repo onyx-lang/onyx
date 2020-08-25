@@ -13,6 +13,7 @@ set cpo&vim
 syn keyword onyxKeyword package struct proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
+syn keyword onyxKeyword switch case
 syn keyword onyxKeyword break continue return defer
 syn keyword onyxKeyword as cast sizeof alignof
 

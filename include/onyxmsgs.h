@@ -33,6 +33,8 @@ typedef enum MsgType {
     Msg_Type_Duplicate_Value,
     Msg_Type_Field_No_Value,
 
+    Msg_Type_Multiple_Cases,
+
     Msg_Type_Unresolved_Type,
     Msg_Type_Unresolved_Symbol,
 

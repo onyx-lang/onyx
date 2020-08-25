@@ -12,6 +12,7 @@ CHECK(return, AstReturn* retnode);
 CHECK(if, AstIfWhile* ifnode);
 CHECK(while, AstIfWhile* whilenode);
 CHECK(for, AstFor* fornode);
+CHECK(switch, AstSwitch* switchnode);
 CHECK(call, AstCall* call);
 CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok);
 CHECK(unaryop, AstUnaryOp** punop);
@@ -152,6 +153,52 @@ CHECK(for, AstFor* fornode) {
 
 
     if (check_block(fornode->stmt)) return 1;
+
+    return 0;
+}
+
+CHECK(switch, AstSwitch* switchnode) {
+    if (check_expression(&switchnode->expr)) return 1;
+    if (!type_is_integer(switchnode->expr->type)) {
+        onyx_message_add(Msg_Type_Literal,
+                switchnode->expr->token->pos,
+                "expected integer type for switch expression");
+        return 1;
+    }
+
+    bh_imap_init(&switchnode->case_map, global_heap_allocator, bh_arr_length(switchnode->cases) * 2);
+
+    switchnode->min_case = 0xffffffffffffffff;
+
+    bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
+        if (check_block(sc->block)) return 1;
+        if (check_expression(&sc->value)) return 1;
+
+        if (sc->value->kind != Ast_Kind_NumLit) {
+            onyx_message_add(Msg_Type_Literal,
+                    sc->value->token->pos,
+                    "case statement expected compile time known integer");
+            return 1;
+        }
+
+        promote_numlit_to_larger((AstNumLit *) sc->value);
+
+        u64 value = ((AstNumLit *) sc->value)->value.l;
+        switchnode->min_case = bh_min(switchnode->min_case, value);
+        switchnode->max_case = bh_max(switchnode->max_case, value);
+
+        if (bh_imap_has(&switchnode->case_map, value)) {
+            onyx_message_add(Msg_Type_Multiple_Cases,
+                    sc->value->token->pos,
+                    value);
+            return 1;
+        }
+
+        bh_imap_put(&switchnode->case_map, value, (u64) sc->block);
+    }
+
+    if (switchnode->default_case)
+        check_block(switchnode->default_case);
 
     return 0;
 }
@@ -958,6 +1005,7 @@ CHECK(statement, AstNode* stmt) {
         case Ast_Kind_If:         return check_if((AstIfWhile *) stmt);
         case Ast_Kind_While:      return check_while((AstIfWhile *) stmt);
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
+        case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
         case Ast_Kind_Defer: {
             if (!semstate.defer_allowed) {

@@ -273,13 +273,20 @@ main :: proc (args: []cstring) {
 
     acc := 0;
     for i: 0, tokens.count {
-        tok :: tokens.data[i].data[0];
+        switch tokens.data[i].data[0] {
+            case #char "+" do acc += 1;
+            case #char "-" do acc -= 1;
+            case #char "*" do acc *= 2;
+            case #char "/" do acc /= 2;
 
-        if     tok == #char "+" do acc += 1;
-        elseif tok == #char "-" do acc -= 1;
-        elseif tok == #char "*" do acc *= 2;
-        elseif tok == #char "/" do acc /= 2;
-        elseif tok == #char "s" do acc *= acc;
+            case #char "s" do acc *= acc;
+
+            case #default {
+                print("Unexpected token: ");
+                print_u64_with_base(cast(u64) tokens.data[i].data[0], 16l);
+                print("\n");
+            }
+        }
     }
 
     string_builder_clear(^sb);

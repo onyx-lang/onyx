@@ -4,10 +4,7 @@ use package builtin { string, cstring }
 use package memory
 use package wasi
 
-Buffer :: struct {
-    data   : rawptr = null;
-    len    : u32    = 0;
-}
+Buffer :: #type []void;
 
 string_make :: proc #overloaded { string_make_from_cstring }
 
@@ -139,9 +136,9 @@ u64_to_string :: proc (n_: u64, base: u64, buf: Buffer) -> string {
     n := n_;
 
     str :: cast(^u8) buf.data;
-    for i: 0, buf.len do str[i] = #char "\0";
+    for i: 0, buf.count do str[i] = #char "\0";
 
-    c := cast(^u8) ^str[buf.len - 1];
+    c := cast(^u8) ^str[buf.count - 1];
     len := 0;
 
     s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
@@ -188,7 +185,7 @@ string_builder_add_u64 :: proc (use sb: ^StringBuilder, n: u64) -> ^StringBuilde
 
 string_builder_add_u64_with_base :: proc (use sb: ^StringBuilder, n: u64, base: u64) -> ^StringBuilder {
     buf : [256] u8;
-    s := u64_to_string(n, base, Buffer.{ cast(^u8) buf, 256 });
+    s := u64_to_string(n, base, Buffer.{ cast(rawptr) buf, 256 });
     return string_builder_add_string(sb, s);
 }
 
