@@ -209,7 +209,9 @@ HOW:
 
         [X] Switch statements
 
-        [ ] fallthrough on cases in switch statements
+        [X] fallthrough on cases in switch statements
+
+        [ ] initializers on switch statements
 
         [ ] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is

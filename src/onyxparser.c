@@ -1027,8 +1027,9 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
 
         case Token_Type_Keyword_Break: {
-            AstBreak* bnode = make_node(AstBreak, Ast_Kind_Break);
+            AstJump* bnode = make_node(AstJump, Ast_Kind_Jump);
             bnode->token = expect_token(parser, Token_Type_Keyword_Break);
+            bnode->jump  = Jump_Type_Break;
 
             u64 count = 1;
             while (parser->curr->type == Token_Type_Keyword_Break) {
@@ -1042,11 +1043,28 @@ static AstNode* parse_statement(OnyxParser* parser) {
         }
 
         case Token_Type_Keyword_Continue: {
-            AstContinue* cnode = make_node(AstBreak, Ast_Kind_Continue);
+            AstJump* cnode = make_node(AstJump, Ast_Kind_Jump);
             cnode->token = expect_token(parser, Token_Type_Keyword_Continue);
+            cnode->jump  = Jump_Type_Continue;
 
             u64 count = 1;
             while (parser->curr->type == Token_Type_Keyword_Continue) {
+                consume_token(parser);
+                count++;
+            }
+            cnode->count = count;
+
+            retval = (AstNode *) cnode;
+            break;
+        }
+
+        case Token_Type_Keyword_Fallthrough: {
+            AstJump* cnode = make_node(AstJump, Ast_Kind_Jump);
+            cnode->token = expect_token(parser, Token_Type_Keyword_Fallthrough);
+            cnode->jump  = Jump_Type_Fallthrough;
+
+            u64 count = 1;
+            while (parser->curr->type == Token_Type_Keyword_Fallthrough) {
                 consume_token(parser);
                 count++;
             }

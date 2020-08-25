@@ -998,8 +998,7 @@ CHECK(global, AstGlobal* global) {
 
 CHECK(statement, AstNode* stmt) {
     switch (stmt->kind) {
-        case Ast_Kind_Break:      return 0;
-        case Ast_Kind_Continue:   return 0;
+        case Ast_Kind_Jump:      return 0;
 
         case Ast_Kind_Return:     return check_return((AstReturn *) stmt);
         case Ast_Kind_If:         return check_if((AstIfWhile *) stmt);

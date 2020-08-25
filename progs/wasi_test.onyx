@@ -337,4 +337,19 @@ main :: proc (args: []cstring) {
     if ss.count > 0 {
         print(ss);
     }
+    print("\n");
+
+    num := 36;
+    switch num {
+        case 36 do print("6 squared\n");
+
+        case 42 {
+            print("The meaning of life\n");
+            fallthrough;
+        }
+
+        case #default {
+            print("Nothing was found");
+        }
+    }
 }

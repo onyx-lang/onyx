@@ -416,8 +416,7 @@ static b32 symres_statement(AstNode** stmt) {
         case Ast_Kind_Block:      symres_block((AstBlock *) *stmt);                  return 0;
         case Ast_Kind_Defer:      symres_statement(&((AstDefer *) *stmt)->stmt);     return 0;
 
-        case Ast_Kind_Break:      return 0;
-        case Ast_Kind_Continue:   return 0;
+        case Ast_Kind_Jump:      return 0;
 
         default:                  symres_expression((AstTyped **) stmt);           return 0;
     }

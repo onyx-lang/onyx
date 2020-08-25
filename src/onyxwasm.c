@@ -416,14 +416,14 @@ COMPILE_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     *pcode = code;
 }
 
-COMPILE_FUNC(structured_jump, i32 jump_count) {
+COMPILE_FUNC(structured_jump, i32 jump_count, JumpType jump) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    i32 labelidx = 0;
-    u8 wanted = (jump_count < 0) ? 2 : 1;
-    b32 success = 0;
+    static const u8 wants[Jump_Type_Count] = { 1, 2, 3 };
 
-    if (jump_count < 0) jump_count = -jump_count;
+    i32 labelidx = 0;
+    u8 wanted = wants[jump];
+    b32 success = 0;
 
     i32 len = bh_arr_length(mod->structured_jump_target) - 1;
     for (u8* t = &bh_arr_last(mod->structured_jump_target); len >= 0; len--, t--) {
@@ -454,8 +454,7 @@ COMPILE_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_While:      compile_while(mod, &code, (AstIfWhile *) stmt); break;
         case Ast_Kind_For:        compile_for(mod, &code, (AstFor *) stmt); break;
         case Ast_Kind_Switch:     compile_switch(mod, &code, (AstSwitch *) stmt); break;
-        case Ast_Kind_Break:      compile_structured_jump(mod, &code, ((AstBreak *) stmt)->count); break;
-        case Ast_Kind_Continue:   compile_structured_jump(mod, &code, -((AstContinue *) stmt)->count); break;
+        case Ast_Kind_Jump:       compile_structured_jump(mod, &code, ((AstJump *) stmt)->count, ((AstJump *) stmt)->jump); break;
         case Ast_Kind_Block:      compile_block(mod, &code, (AstBlock *) stmt, 1); break;
         case Ast_Kind_Defer:      compile_defer(mod, &code, (AstDefer *) stmt); break;
         default:                  compile_expression(mod, &code, (AstTyped *) stmt); break;
@@ -812,9 +811,13 @@ COMPILE_FUNC(switch, AstSwitch* switch_node) {
     bh_imap block_map;
     bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
 
+    u32 jump_target = 1;
+
     if (switch_node->default_case != NULL) {
         WID(WI_BLOCK_START, 0x40);
-        bh_arr_push(mod->structured_jump_target, 0);
+
+        bh_arr_push(mod->structured_jump_target, jump_target);
+        jump_target = 3;
     }
 
     u64 block_num = 0;
@@ -822,7 +825,7 @@ COMPILE_FUNC(switch, AstSwitch* switch_node) {
         if (bh_imap_has(&block_map, (u64) sc->block)) continue;
 
         WID(WI_BLOCK_START, 0x40);
-        bh_arr_push(mod->structured_jump_target, 0);
+        bh_arr_push(mod->structured_jump_target, jump_target);
 
         bh_imap_put(&block_map, (u64) sc->block, block_num);
         block_num++;
@@ -2799,6 +2802,23 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
             leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
             bh_buffer_append(buff, leb, leb_len);
             break;
+
+        case WI_JUMP_TABLE: {
+            BranchTable* bt = (BranchTable *) instr->data.p; 
+
+            leb = uint_to_uleb128((u64) bt->count, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+
+            fori (i, 0, bt->count) {
+                leb = uint_to_uleb128((u64) bt->cases[i], &leb_len);
+                bh_buffer_append(buff, leb, leb_len);
+            }
+
+            leb = uint_to_uleb128((u64) bt->default_case, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+            break;
+        }
+
 
         case WI_CALL_INDIRECT:
         case WI_I32_STORE:

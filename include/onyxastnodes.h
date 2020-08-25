@@ -27,8 +27,7 @@ typedef struct AstFileContents AstFileContents;
 typedef struct AstStructLiteral AstStructLiteral;
 
 typedef struct AstReturn AstReturn;
-typedef struct AstBreak AstBreak;
-typedef struct AstContinue AstContinue;
+typedef struct AstJump AstJump;
 
 typedef struct AstBlock AstBlock;
 typedef struct AstIfWhile AstIfWhile;
@@ -127,8 +126,7 @@ typedef enum AstKind {
     Ast_Kind_If,
     Ast_Kind_For,
     Ast_Kind_While,
-    Ast_Kind_Break,
-    Ast_Kind_Continue,
+    Ast_Kind_Jump,
     Ast_Kind_Defer,
     Ast_Kind_Switch,
     Ast_Kind_Switch_Case,
@@ -253,6 +251,14 @@ typedef enum CallingConvention {
     CC_Return_Stack
 } CallingConvention;
 
+typedef enum JumpType {
+    Jump_Type_Break,
+    Jump_Type_Continue,
+    Jump_Type_Fallthrough,
+
+    Jump_Type_Count,
+} JumpType;
+
 
 // Base Nodes
 #define AstNode_base \
@@ -307,8 +313,7 @@ struct AstStructLiteral {
 
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
-struct AstBreak         { AstNode_base; u64 count; };
-struct AstContinue      { AstNode_base; u64 count; };
+struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
 // Structure Nodes
 struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; bh_arr(AstLocal *) locals; };
