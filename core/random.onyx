@@ -4,9 +4,9 @@ package random
 seed := 8675309
 
 random_seed :: proc (s: u32) do seed = s;
-random :: proc -> u32 {
-	seed = seed * 5831 + 102847;
-	return seed;
+random :: proc (s := ^seed) -> u32 {
+	*s = *s * 5831 + 102847;
+	return *s;
 }
 
 random_between :: proc (lo: i32, hi: i32) -> i32 do return random() % (hi + 1 - lo) + lo;

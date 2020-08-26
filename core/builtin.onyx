@@ -34,5 +34,5 @@ free :: proc (use a: Allocator, ptr: rawptr) {
 
 context : struct {
 	allocator      : Allocator;
-	temp_allocator : Allocator;	
+	temp_allocator : Allocator;
 }

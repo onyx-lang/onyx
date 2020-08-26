@@ -8,6 +8,7 @@
 #include "onyxsempass.h"
 #include "onyxutils.h"
 #include "onyxwasm.h"
+#include "onyxdoc.h"
 
 #define VERSION "0.1"
 
@@ -16,7 +17,8 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "The compiler for the Onyx programming language.\n"
     "\n"
     "Usage:\n"
-    "\tonyx [-o <target file>] [-ast] [-verbose] <input files>\n"
+    "\tonyx [-o <target file>] [-verbose] <input files>\n"
+    "\tonyx doc <input files>\n"
     "\tonyx -help\n"
     "\nFlags:\n"
     "\t-o <target_file>        Specify the target file (default: out.wasm)\n"
@@ -26,7 +28,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
 
 typedef enum CompileAction {
     ONYX_COMPILE_ACTION_COMPILE,
-    ONYX_COMPILE_ACTION_CHECK_ERRORS,
+    ONYX_COMPILE_ACTION_DOCUMENT,
     ONYX_COMPILE_ACTION_PRINT_HELP,
 } CompileAction;
 
@@ -35,7 +37,6 @@ typedef struct OnyxCompileOptions {
     CompileAction action;
 
     u32 verbose_output : 1;
-    u32 print_ast : 1;
 
     bh_arr(const char *) included_folders;
     bh_arr(const char *) files;
@@ -48,7 +49,6 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
         .action = ONYX_COMPILE_ACTION_PRINT_HELP,
 
         .verbose_output = 0,
-        .print_ast = 0,
 
         .files = NULL,
         .target_file = "out.wasm",
@@ -61,26 +61,26 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
     bh_arr_push(options.included_folders, ".");
 
     fori(i, 1, argc) {
-        if (!strcmp(argv[i], "-help")) {
+        if (!strcmp(argv[i], "doc") && i == 1) {
+            options.action = ONYX_COMPILE_ACTION_DOCUMENT;
+        }
+        else if (!strcmp(argv[i], "-help")) {
             options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
             break;
         }
         else if (!strcmp(argv[i], "-o")) {
-            options.action = ONYX_COMPILE_ACTION_COMPILE;
             options.target_file = argv[++i];
-        }
-        else if (!strcmp(argv[i], "-ast")) {
-            options.print_ast = 1;
         }
         else if (!strcmp(argv[i], "-verbose")) {
             options.verbose_output = 1;
         }
         else if (!strcmp(argv[i], "-I")) {
-            options.action = ONYX_COMPILE_ACTION_COMPILE;
             bh_arr_push(options.included_folders, argv[++i]);
         }
         else {
-            options.action = ONYX_COMPILE_ACTION_COMPILE;
+            if (options.action == ONYX_COMPILE_ACTION_PRINT_HELP)
+                options.action = ONYX_COMPILE_ACTION_COMPILE;
+
             bh_arr_push(options.files, argv[i]);
         }
     }
@@ -381,6 +381,12 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
     }
 
+    if (compiler_state->options->action == ONYX_COMPILE_ACTION_DOCUMENT) {
+        OnyxDocumentation docs = onyx_docs_generate(&compiler_state->prog_info);
+        onyx_docs_write(&docs);
+        
+        return ONYX_COMPILER_PROGRESS_SUCCESS;
+    }
 
     // NOTE: Generate WASM instructions
     if (compiler_state->options->verbose_output)
@@ -430,6 +436,7 @@ int main(int argc, char *argv[]) {
             return 1;
 
         case ONYX_COMPILE_ACTION_COMPILE:
+        case ONYX_COMPILE_ACTION_DOCUMENT:
             compiler_progress = onyx_compile(&compile_state);
             break;
 

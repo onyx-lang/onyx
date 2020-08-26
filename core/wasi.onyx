@@ -1,7 +1,7 @@
 package wasi
 
 use package main as main
-use package builtin { string }
+use package builtin
 use package memory
 
 Size      :: #type u32;
@@ -464,6 +464,9 @@ sock_shutdown ::
 // Sets up everything needed for execution.
 proc #export "_start" {
 	memory_init();
+
+    context.allocator = heap_allocator;
+    context.temp_allocator = heap_allocator;
 
 	argc : Size;
 	argv_buf_size : Size;

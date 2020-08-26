@@ -568,7 +568,7 @@ static void symres_use_package(AstUsePackage* package) {
         pac_node->package = p;
         pac_node->token = package->alias;
 
-        symbol_introduce(semstate.curr_package->scope, package->alias, (AstNode *) pac_node);
+        symbol_introduce(semstate.curr_package->include_scope, package->alias, (AstNode *) pac_node);
     }
 
     if (package->only != NULL) {
@@ -582,7 +582,7 @@ static void symres_use_package(AstUsePackage* package) {
                 return;
             }
 
-            symbol_introduce(semstate.curr_package->scope, (*alias)->alias, thing);
+            symbol_introduce(semstate.curr_package->include_scope, (*alias)->alias, thing);
         }
     }
 

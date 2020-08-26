@@ -18,8 +18,9 @@ use package core
 use package memory
 use package wasi
 use package intrinsics
+use package random
 
-print_u64_with_base :: proc (n_: u64, base := 10l) {
+print_u64 :: proc (n_: u64, base := 10l) {
     n := n_;
     str: [256] u8;
     for i: 0, 256 do str[i] = #char "\0";
@@ -77,7 +78,7 @@ print_u8 :: proc (s: cstring) -> u32 {
 print :: proc #overloaded { print_string, print_u8 }
 
 print_rights :: proc (rights: Rights) {
-    print_u64_with_base(cast(u64) rights, 2l);
+    print_u64(cast(u64) rights, 2l);
     print("\n");
 
     if rights & Rights.DataSync != cast(Rights) 0 do print("DataSync\n");
@@ -134,10 +135,10 @@ readdir :: proc (fd: FileDescriptor) {
         print("\n");
 
         print("\td_namlen: ");
-        print_u64_with_base(cast(u64) dirent.d_namlen, 16l);
+        print_u64(cast(u64) dirent.d_namlen, 16l);
         print("\n");
         print("\td_type: ");
-        print_u64_with_base(cast(u64) dirent.d_type, 16l);
+        print_u64(cast(u64) dirent.d_type, 16l);
         print("\n");
 
         bufused -= sizeof DirEnt + dirent.d_namlen;
@@ -208,6 +209,11 @@ make_i32_arr :: proc (a := heap_allocator, len := 10) -> [] i32 {
 }
 
 main :: proc (args: []cstring) {
+    now : Timestamp;
+    clock_time_get(ClockID.Realtime, cast(Timestamp) 1, ^now);
+
+    random_seed(cast(u32) now);
+
     sb := string_builder_make(heap_allocator, 256);
 
     timer := timer_start();
@@ -233,12 +239,12 @@ main :: proc (args: []cstring) {
     if err := path_open(3, LookupFlags.SymLinkFollow, string_make(args.data[1]), cast(OFlags) 0, Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile, Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile, FDFlags.Sync, ^fd); err != Errno.Success {
         print("Failed to open file\n");
         print("Error code: ");
-        print_u64_with_base(cast(u64) err, 16l);
+        print_u64(cast(u64) err, 16l);
         proc_exit(1);
     }
     defer fd_close(fd);
 
-    print_u64_with_base(cast(u64) fd, 16l);
+    print_u64(cast(u64) fd, 16l);
     print("\n");
 
     filelen : Filesize;
@@ -247,13 +253,13 @@ main :: proc (args: []cstring) {
         proc_exit(1);
     }
     print("the size is: ");
-    print_u64_with_base(cast(u64) filelen);
+    print_u64(cast(u64) filelen);
     print("\n");
 
     sum := 0l;
     for i: 0, 20000 do if is_prime(i) do sum += cast(u64) i;
     print("Sum of primes less than 20000 is: ");
-    print_u64_with_base(sum);
+    print_u64(sum);
     print("\n");
 
     matches := string_split(heap_allocator, "This is a test string to test splitting. It surprisingly works very well.", #char " ");
@@ -282,7 +288,7 @@ main :: proc (args: []cstring) {
 
             case #default {
                 print("Unexpected token: ");
-                print_u64_with_base(cast(u64) tokens.data[i].data[0], 16l);
+                print_u64(cast(u64) tokens.data[i].data[0], 16l);
                 print("\n");
 
                 // This breaks out of the for loop
@@ -342,14 +348,14 @@ main :: proc (args: []cstring) {
     foobar(10, 1230);
 
     sl := make_i32_arr();
-    print_u64_with_base(cast(u64) sl.count);
+    print_u64(cast(u64) sl.count);
 }
 
 foobar :: proc (a: i32, b := 1, c := 5l) {
-    print_u64_with_base(cast(u64) a);
+    print_u64(cast(u64) a);
     print("\n");
-    print_u64_with_base(cast(u64) b, 16l);
+    print_u64(cast(u64) b, 16l);
     print("\n");
-    print_u64_with_base(c);
+    print_u64(c);
     print("\n");
 }

@@ -46,6 +46,9 @@ string_concat :: proc (a: Allocator, s1: string, s2: string) -> string {
 
 string_free :: proc (a: Allocator, s: string) do free(a, s.data);
 
+// This is an example doc string
+// You can have as many comments as you want
+// It documents the string_split function
 string_split :: proc (a: Allocator, str: string, delim: u8) -> []string {
     delim_count := 0;
     for i: 0, str.count do if str.data[i] == delim do delim_count += 1;

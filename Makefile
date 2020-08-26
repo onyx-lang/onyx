@@ -11,6 +11,7 @@ OBJ_FILES=\
 	build/onyxmsgs.o \
 	build/onyxutils.o \
 	build/onyxwasm.o \
+	build/onyxdoc.o \
 	build/onyx.o
 
 CC=gcc
