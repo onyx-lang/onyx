@@ -202,7 +202,7 @@ print_arr :: proc (sb: ^StringBuilder, arr: []i32) {
     sb |> sba("\n") |> string_builder_to_string() |> print();
 }
 
-make_i32_arr :: proc (a: Allocator, len: u32) -> [] i32 {
+make_i32_arr :: proc (a := heap_allocator, len := 10) -> [] i32 {
     arr := cast(^i32) alloc(a, sizeof i32 * len);
     return arr[0 : len];
 }
@@ -247,13 +247,13 @@ main :: proc (args: []cstring) {
         proc_exit(1);
     }
     print("the size is: ");
-    print_u64_with_base(cast(u64) filelen, 10l);
+    print_u64_with_base(cast(u64) filelen);
     print("\n");
 
     sum := 0l;
     for i: 0, 20000 do if is_prime(i) do sum += cast(u64) i;
     print("Sum of primes less than 20000 is: ");
-    print_u64_with_base(sum, 10l);
+    print_u64_with_base(sum);
     print("\n");
 
     matches := string_split(heap_allocator, "This is a test string to test splitting. It surprisingly works very well.", #char " ");
@@ -340,6 +340,9 @@ main :: proc (args: []cstring) {
     print("\n");
 
     foobar(10, 1230);
+
+    sl := make_i32_arr();
+    print_u64_with_base(cast(u64) sl.count);
 }
 
 foobar :: proc (a: i32, b := 1, c := 5l) {

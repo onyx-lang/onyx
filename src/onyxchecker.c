@@ -301,7 +301,7 @@ b32 check_call(AstCall* call) {
     if (callee->kind == Ast_Kind_Function) {
         if (call->arg_count < bh_arr_length(callee->params)) {
             AstArgument** last_arg = &call->arguments;
-            while (*last_arg && (*last_arg)->next != NULL)
+            while (*last_arg != NULL)
                 last_arg = (AstArgument **) &(*last_arg)->next;
 
             while (call->arg_count < bh_arr_length(callee->params)
@@ -314,7 +314,7 @@ b32 check_call(AstCall* call) {
                 new_arg->type = dv->type;
                 new_arg->next = NULL;
 
-                (*last_arg)->next = (AstNode *) new_arg;
+                *last_arg = new_arg;
                 last_arg = (AstArgument **) &(*last_arg)->next;
 
                 call->arg_count++;
