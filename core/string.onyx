@@ -1,10 +1,8 @@
 package core
 
-use package builtin { string, cstring }
+use package builtin
 use package memory
 use package wasi
-
-Buffer :: #type []void;
 
 string_make :: proc #overloaded { string_make_from_cstring }
 
@@ -179,11 +177,7 @@ u64_to_string :: proc (n_: u64, base: u64, buf: Buffer) -> string {
     return string.{ data = c + 1, count = len };
 }
 
-string_builder_add_u64 :: proc (use sb: ^StringBuilder, n: u64) -> ^StringBuilder {
-    return string_builder_add_u64_with_base(sb, n, 10l);
-}
-
-string_builder_add_u64_with_base :: proc (use sb: ^StringBuilder, n: u64, base: u64) -> ^StringBuilder {
+string_builder_add_u64 :: proc (use sb: ^StringBuilder, n: u64, base := 10l) -> ^StringBuilder {
     buf : [256] u8;
     s := u64_to_string(n, base, Buffer.{ cast(rawptr) buf, 256 });
     return string_builder_add_string(sb, s);
@@ -192,7 +186,6 @@ string_builder_add_u64_with_base :: proc (use sb: ^StringBuilder, n: u64, base: 
 string_builder_append :: proc #overloaded {
     string_builder_add_string,
     string_builder_add_cstring,
-    string_builder_add_u64_with_base,
     string_builder_add_u64,
 }
 

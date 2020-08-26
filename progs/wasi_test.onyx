@@ -19,7 +19,7 @@ use package memory
 use package wasi
 use package intrinsics
 
-print_u64_with_base :: proc (n_: u64, base: u64) {
+print_u64_with_base :: proc (n_: u64, base := 10l) {
     n := n_;
     str: [256] u8;
     for i: 0, 256 do str[i] = #char "\0";
@@ -159,7 +159,7 @@ timer_end :: proc (start_time: Timestamp) -> Timestamp {
     return (curr_time - start_time) / 1000000l;
 }
 
-is_prime :: proc (n: u32) -> bool {
+is_prime :: proc (n := 0) -> bool {
     sqrt :: cast(i32) (sqrt_f32(cast(f32) n));
     for i: 2, sqrt + 1 do if n % i == 0 do return false;
     return true;
@@ -284,6 +284,9 @@ main :: proc (args: []cstring) {
                 print("Unexpected token: ");
                 print_u64_with_base(cast(u64) tokens.data[i].data[0], 16l);
                 print("\n");
+
+                // This breaks out of the for loop
+                break break;
             }
         }
     }
@@ -335,5 +338,15 @@ main :: proc (args: []cstring) {
     ss := string_substr("Hello, World!", "World");
     if ss.count > 0 do print(ss);
     print("\n");
+
+    foobar(10, 1230);
 }
 
+foobar :: proc (a: i32, b := 1, c := 5l) {
+    print_u64_with_base(cast(u64) a);
+    print("\n");
+    print_u64_with_base(cast(u64) b, 16l);
+    print("\n");
+    print_u64_with_base(c);
+    print("\n");
+}

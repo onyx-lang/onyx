@@ -54,6 +54,7 @@ typedef struct AstInclude AstInclude;
 typedef struct AstUsePackage AstUsePackage;
 typedef struct AstAlias AstAlias;
 typedef struct AstGlobal AstGlobal;
+typedef struct AstParam AstParam;
 typedef struct AstFunction AstFunction;
 typedef struct AstOverloadedFunction AstOverloadedFunction;
 
@@ -440,12 +441,16 @@ struct AstGlobal        {
         };
     };
 };
+struct AstParam         { AstLocal *local; AstTyped *default_value; };
 struct AstFunction      {
     AstTyped_base;
 
     Scope *scope;
+
+    bh_arr(AstParam) params;
+    AstType* return_type;
+
     AstBlock *body;
-    AstLocal *params;
     bh_arr(AstLocal *) locals;
 
     union {

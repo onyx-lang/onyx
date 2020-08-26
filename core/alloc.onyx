@@ -3,42 +3,8 @@ package memory
 #include_file "memory"
 #include_file "intrinsics"
 
-use package builtin { __heap_start }
+use package builtin
 use package intrinsics { memory_size, memory_grow }
-
-// Need to define this somewhere
-null :: cast(rawptr) 0;
-
-AllocAction :: enum {
-    Alloc;
-    Free;
-    Resize;
-}
-
-alloc_proc :: #type proc (rawptr, AllocAction, u32, u32, rawptr) -> rawptr;
-
-Allocator :: struct {
-    data: rawptr;
-    func: alloc_proc;
-}
-
-alloc :: proc (use a: Allocator, size: u32) -> rawptr {
-    return func(data, AllocAction.Alloc, size, 16, null);
-}
-
-resize :: proc (use a: Allocator, ptr: rawptr, size: u32) -> rawptr {
-    return func(data, AllocAction.Resize, size, 16, ptr);
-}
-
-free :: proc (use a: Allocator, ptr: rawptr) {
-    func(data, AllocAction.Free, 0, 0, ptr);
-}
-
-
-
-
-
-
 
 heap_allocator : Allocator;
 

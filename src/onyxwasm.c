@@ -1988,13 +1988,13 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (fd->body != NULL) {
         // NOTE: Generate the local map
         u64 localidx = 0;
-        for (AstLocal *param = fd->params; param != NULL; param = (AstLocal *) param->next) {
-            if (param->type->kind == Type_Kind_Struct) {
-                bh_imap_put(&mod->local_map, (u64) param, localidx | LOCAL_IS_WASM);
-                localidx += param->type->Struct.mem_count;
+        bh_arr_each(AstParam, param, fd->params) {
+            if (param->local->type->kind == Type_Kind_Struct) {
+                bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
+                localidx += param->local->type->Struct.mem_count;
 
             } else {
-                bh_imap_put(&mod->local_map, (u64) param, localidx++ | LOCAL_IS_WASM);
+                bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);
             }
         }
 

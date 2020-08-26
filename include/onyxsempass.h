@@ -36,6 +36,8 @@ void onyx_resolve_symbols();
 // NOTE: Inferring and checking types in the tree
 void onyx_type_check();
 
+b32 check_expression(AstTyped** expr);
+
 // NOTE: Full semantic pass
 void onyx_sempass_init(bh_allocator alloc, bh_allocator node_alloc);
 void onyx_sempass(ProgramInfo* program);

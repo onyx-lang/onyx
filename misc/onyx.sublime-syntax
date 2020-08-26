@@ -30,7 +30,7 @@ contexts:
       scope: constant.type.onyx
 
     - match: '\b(true|false|null)\b'
-      scope: constant.boolean.onyx
+      scope: constant.numeric.onyx
 
     # Numbers
     - match: '\b(-)?[0-9.]+(f|l)?\b'

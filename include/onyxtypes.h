@@ -56,7 +56,8 @@ typedef struct StructMember {
     TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })    \
     TYPE_KIND(Function, struct {                                  \
         Type *return_type;                                        \
-        u64 param_count;                                          \
+        u32 param_count;                                          \
+        u32 needed_param_count;                                   \
         Type* params[];                                           \
     })                                                            \
     TYPE_KIND(Struct, struct {                                    \
@@ -109,7 +110,7 @@ u32 type_size_of(Type* type);
 u32 type_alignment_of(Type* type);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 
-Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func, struct AstType* return_type);
+Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
 Type* type_make_slice(bh_allocator alloc, Type* of);

@@ -369,27 +369,22 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
     }
 }
 
-// NOTE: Kinda hacky way of building the functions type
-Type* type_build_function_type(bh_allocator alloc, AstFunction* func, AstType* return_type) {
-    u64 param_count = 0;
-    for (AstLocal* param = func->params;
-            param != NULL;
-            param = (AstLocal *) param->next)
-        param_count++;
+Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
+    u64 param_count = bh_arr_length(func->params);
 
-    AstFunctionType* old_ftype = (AstFunctionType *) func->type_node;
     Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
 
     func_type->kind = Type_Kind_Function;
     func_type->Function.param_count = param_count;
-    func_type->Function.return_type = type_build_from_ast(alloc, return_type);
+    func_type->Function.needed_param_count = 0;
+    func_type->Function.return_type = type_build_from_ast(alloc, func->return_type);
 
     if (param_count > 0) {
         i32 i = 0;
-        for (AstLocal* param = func->params;
-                param != NULL;
-                param = (AstLocal *) param->next) {
-            func_type->Function.params[i++] = param->type;
+        bh_arr_each(AstParam, param, func->params) {
+            if (param->default_value == NULL)
+                func_type->Function.needed_param_count++;
+            func_type->Function.params[i++] = param->local->type;
         }
     }
 

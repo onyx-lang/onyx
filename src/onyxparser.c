@@ -37,7 +37,7 @@ static AstBlock*      parse_block(OnyxParser* parser);
 static AstNode*       parse_statement(OnyxParser* parser);
 static AstType*       parse_type(OnyxParser* parser);
 static AstStructType* parse_struct(OnyxParser* parser);
-static AstLocal*      parse_function_params(OnyxParser* parser);
+static void           parse_function_params(OnyxParser* parser, AstFunction* func);
 static b32            parse_possible_directive(OnyxParser* parser, const char* dir);
 static AstFunction*   parse_function_definition(OnyxParser* parser);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
@@ -1343,25 +1343,23 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
 // e
 // '(' (<symbol>: <type>,?)* ')'
-static AstLocal* parse_function_params(OnyxParser* parser) {
+static void parse_function_params(OnyxParser* parser, AstFunction* func) {
     if (parser->curr->type != '(')
-        return NULL;
+        return;
 
     expect_token(parser, '(');
 
     if (parser->curr->type == ')') {
         consume_token(parser);
-        return NULL;
+        return;
     }
 
-    AstLocal* first_param = NULL;
-    AstLocal* curr_param = NULL;
-    AstLocal* trailer = NULL;
+    AstParam curr_param = { 0 };
 
     b32 param_use = 0;
     OnyxToken* symbol;
     while (parser->curr->type != ')') {
-        if (parser->hit_unexpected_token) return first_param;
+        if (parser->hit_unexpected_token) return;
 
         if (parser->curr->type == Token_Type_Keyword_Use) {
             consume_token(parser);
@@ -1371,29 +1369,35 @@ static AstLocal* parse_function_params(OnyxParser* parser) {
         symbol = expect_token(parser, Token_Type_Symbol);
         expect_token(parser, ':');
 
-        curr_param = make_node(AstLocal, Ast_Kind_Param);
-        curr_param->token = symbol;
-        curr_param->flags |= Ast_Flag_Const;
-        curr_param->type_node = parse_type(parser);
+        curr_param.local = make_node(AstLocal, Ast_Kind_Param);
+        curr_param.local->token = symbol;
+        curr_param.local->flags |= Ast_Flag_Const;
 
         if (param_use) {
-            curr_param->flags |= Ast_Flag_Param_Use;
+            curr_param.local->flags |= Ast_Flag_Param_Use;
             param_use = 0;
         }
 
-        if (first_param == NULL) first_param = curr_param;
+        if (parser->curr->type != '=') {
+            curr_param.local->type_node = parse_type(parser);
+        }
 
-        curr_param->next = NULL;
-        if (trailer) trailer->next = (AstNode *) curr_param;
+        if (parser->curr->type == '=') {
+            consume_token(parser);
 
-        trailer = curr_param;
+            curr_param.default_value = parse_expression(parser);
+        }
+
+        bh_arr_push(func->params, curr_param);
+
+        curr_param.default_value = NULL;
 
         if (parser->curr->type != ')')
             expect_token(parser, ',');
     }
 
     consume_token(parser); // Skip the )
-    return first_param;
+    return;
 }
 
 // e
@@ -1415,8 +1419,10 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
 // 'proc' <directive>* <func_params> ('->' <type>)? <block>
 static AstFunction* parse_function_definition(OnyxParser* parser) {
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
-    bh_arr_new(global_heap_allocator, func_def->locals, 4);
     func_def->token = expect_token(parser, Token_Type_Keyword_Proc);
+
+    bh_arr_new(global_heap_allocator, func_def->locals, 4);
+    bh_arr_new(global_heap_allocator, func_def->params, 4);
 
     while (parser->curr->type == '#') {
         if (parse_possible_directive(parser, "overloaded")) {
@@ -1484,8 +1490,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
         }
     }
 
-    AstLocal* params = parse_function_params(parser);
-    func_def->params = params;
+    parse_function_params(parser, func_def);
 
     AstType* return_type = (AstType *) &basic_type_void;
     if (parser->curr->type == Token_Type_Right_Arrow) {
@@ -1493,27 +1498,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
 
         return_type = parse_type(parser);
     }
-
-    u64 param_count = 0;
-    for (AstLocal* param = params;
-            param != NULL;
-            param = (AstLocal *) param->next)
-        param_count++;
-
-    AstFunctionType* type_node = bh_alloc(parser->allocator, sizeof(AstFunctionType) + param_count * sizeof(AstType *));
-    type_node->kind = Ast_Kind_Function_Type;
-    type_node->param_count = param_count;
-    type_node->return_type = return_type;
-
-    u32 i = 0;
-    for (AstLocal* param = params;
-            param != NULL;
-            param = (AstLocal *) param->next) {
-        type_node->params[i] = param->type_node;
-        i++;
-    }
-
-    func_def->type_node = (AstType *) type_node;
+    func_def->return_type = return_type;
 
     func_def->body = parse_block(parser);
 

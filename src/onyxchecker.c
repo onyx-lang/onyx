@@ -3,7 +3,7 @@
 #include "onyxparser.h"
 #include "onyxutils.h"
 
-#define CHECK(kind, ...) static b32 check_ ## kind (__VA_ARGS__)
+#define CHECK(kind, ...) b32 check_ ## kind (__VA_ARGS__)
 
 CHECK(block, AstBlock* block);
 CHECK(statement_chain, AstNode* start);
@@ -41,7 +41,7 @@ static inline void fill_in_type(AstTyped* node) {
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
 }
 
-CHECK(return, AstReturn* retnode) {
+b32 check_return(AstReturn* retnode) {
     if (retnode->expr) {
         if (check_expression(&retnode->expr)) return 1;
 
@@ -64,7 +64,7 @@ CHECK(return, AstReturn* retnode) {
     return 0;
 }
 
-CHECK(if, AstIfWhile* ifnode) {
+b32 check_if(AstIfWhile* ifnode) {
     if (ifnode->assignment != NULL) check_statement((AstNode *) ifnode->assignment);
 
     if (check_expression(&ifnode->cond)) return 1;
@@ -82,7 +82,7 @@ CHECK(if, AstIfWhile* ifnode) {
     return 0;
 }
 
-CHECK(while, AstIfWhile* whilenode) {
+b32 check_while(AstIfWhile* whilenode) {
     if (whilenode->assignment != NULL) check_statement((AstNode *) whilenode->assignment);
 
     if (check_expression(&whilenode->cond)) return 1;
@@ -100,7 +100,7 @@ CHECK(while, AstIfWhile* whilenode) {
     return 0;
 }
 
-CHECK(for, AstFor* fornode) {
+b32 check_for(AstFor* fornode) {
     if (check_expression(&fornode->start)) return 1;
     if (check_expression(&fornode->end)) return 1;
     if (check_expression(&fornode->step)) return 1;
@@ -157,7 +157,7 @@ CHECK(for, AstFor* fornode) {
     return 0;
 }
 
-CHECK(switch, AstSwitch* switchnode) {
+b32 check_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) check_statement((AstNode *) switchnode->assignment);
 
     if (check_expression(&switchnode->expr)) return 1;
@@ -217,7 +217,7 @@ static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction*
 
         TypeFunction* ol_type = &overload->type->Function;
 
-        if (ol_type->param_count != call->arg_count) continue;
+        if (call->arg_count < ol_type->needed_param_count) continue;
 
         AstArgument* arg = call->arguments;
         Type** param_type = ol_type->params;
@@ -243,7 +243,7 @@ no_match:
     return NULL;
 }
 
-CHECK(call, AstCall* call) {
+b32 check_call(AstCall* call) {
     AstFunction* callee = (AstFunction *) call->callee;
 
     if (callee->kind == Ast_Kind_Symbol) {
@@ -296,6 +296,30 @@ CHECK(call, AstCall* call) {
                 call->token->pos,
                 callee->token->text, callee->token->length);
         return 1;
+    }
+
+    if (callee->kind == Ast_Kind_Function) {
+        if (call->arg_count < bh_arr_length(callee->params)) {
+            AstArgument** last_arg = &call->arguments;
+            while (*last_arg && (*last_arg)->next != NULL)
+                last_arg = (AstArgument **) &(*last_arg)->next;
+
+            while (call->arg_count < bh_arr_length(callee->params)
+                && callee->params[call->arg_count].default_value != NULL) {
+                AstTyped* dv = callee->params[call->arg_count].default_value;
+
+                AstArgument* new_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
+                new_arg->token = dv->token;
+                new_arg->value = dv;
+                new_arg->type = dv->type;
+                new_arg->next = NULL;
+
+                (*last_arg)->next = (AstNode *) new_arg;
+                last_arg = (AstArgument **) &(*last_arg)->next;
+
+                call->arg_count++;
+            }
+        }
     }
 
     // NOTE: If we calling an intrinsic function, translate the
@@ -363,23 +387,22 @@ CHECK(call, AstCall* call) {
 
     call->type = callee->type->Function.return_type;
 
-    Type** formal_param = &callee->type->Function.params[0];
+    Type **formal_params = callee->type->Function.params;
     actual_param = call->arguments;
 
     i32 arg_pos = 0;
-    while (formal_param != NULL && actual_param != NULL) {
-        if (!types_are_compatible(*formal_param, actual_param->type)) {
+    while (arg_pos < callee->type->Function.param_count && actual_param != NULL) {
+        if (!types_are_compatible(formal_params[arg_pos], actual_param->type)) {
             onyx_message_add(Msg_Type_Function_Param_Mismatch,
                     actual_param->token->pos,
                     callee->token->text, callee->token->length,
-                    type_get_name(*formal_param),
+                    type_get_name(formal_params[arg_pos]),
                     arg_pos,
                     type_get_name(actual_param->type));
             return 1;
         }
 
         arg_pos++;
-        formal_param++;
         actual_param = (AstArgument *) actual_param->next;
     }
 
@@ -390,7 +413,7 @@ CHECK(call, AstCall* call) {
         return 1;
     }
 
-    if (arg_pos > callee->type->Function.param_count) {
+    if (actual_param != NULL) {
         onyx_message_add(Msg_Type_Literal,
                 call->token->pos,
                 "too many arguments to function call");
@@ -402,7 +425,7 @@ CHECK(call, AstCall* call) {
     return 0;
 }
 
-CHECK(binop_assignment, AstBinaryOp* binop, b32 assignment_is_ok) {
+b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     if (!assignment_is_ok) {
         onyx_message_add(Msg_Type_Literal,
             binop->token->pos,
@@ -483,7 +506,7 @@ CHECK(binop_assignment, AstBinaryOp* binop, b32 assignment_is_ok) {
     return 0;
 }
 
-CHECK(binaryop_compare, AstBinaryOp** pbinop) {
+b32 check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
     if (binop->left->type == NULL) {
@@ -531,7 +554,7 @@ CHECK(binaryop_compare, AstBinaryOp** pbinop) {
     return 0;
 }
 
-CHECK(binaryop_bool, AstBinaryOp** pbinop) {
+b32 check_binaryop_bool(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
     if (binop->left->type == NULL) {
@@ -564,7 +587,7 @@ CHECK(binaryop_bool, AstBinaryOp** pbinop) {
     return 0;
 }
 
-CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok) {
+b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     AstBinaryOp* binop = *pbinop;
 
     if (check_expression(&binop->left)) return 1;
@@ -684,7 +707,7 @@ CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok) {
     return 0;
 }
 
-CHECK(unaryop, AstUnaryOp** punop) {
+b32 check_unaryop(AstUnaryOp** punop) {
     AstUnaryOp* unaryop = *punop;
 
     if (check_expression(&unaryop->expr)) return 1;
@@ -702,7 +725,7 @@ CHECK(unaryop, AstUnaryOp** punop) {
     return 0;
 }
 
-CHECK(struct_literal, AstStructLiteral* sl) {
+b32 check_struct_literal(AstStructLiteral* sl) {
     fill_in_type((AstTyped *) sl);
 
     TypeStruct* st = &sl->type->Struct;
@@ -733,7 +756,7 @@ CHECK(struct_literal, AstStructLiteral* sl) {
     return 0;
 }
 
-CHECK(address_of, AstAddressOf* aof) {
+b32 check_address_of(AstAddressOf* aof) {
     if (check_expression(&aof->expr)) return 1;
 
     if (aof->expr->kind != Ast_Kind_Array_Access
@@ -754,7 +777,7 @@ CHECK(address_of, AstAddressOf* aof) {
     return 0;
 }
 
-CHECK(dereference, AstDereference* deref) {
+b32 check_dereference(AstDereference* deref) {
     if (check_expression(&deref->expr)) return 1;
 
     if (!type_is_pointer(deref->expr->type)) {
@@ -776,7 +799,7 @@ CHECK(dereference, AstDereference* deref) {
     return 0;
 }
 
-CHECK(array_access, AstArrayAccess* aa) {
+b32 check_array_access(AstArrayAccess* aa) {
     if (check_expression(&aa->addr)) return 1;
     if (check_expression(&aa->expr)) return 1;
 
@@ -811,7 +834,7 @@ CHECK(array_access, AstArrayAccess* aa) {
     return 0;
 }
 
-CHECK(slice, AstSlice* sl) {
+b32 check_slice(AstSlice* sl) {
     if (check_expression(&sl->addr)) return 1;
     if (check_expression(&sl->lo)) return 1;
     if (check_expression(&sl->hi)) return 1;
@@ -857,7 +880,7 @@ CHECK(slice, AstSlice* sl) {
     return 0;
 }
 
-CHECK(field_access, AstFieldAccess** pfield) {
+b32 check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     if (check_expression(&field->expr)) return 1;
 
@@ -886,19 +909,19 @@ CHECK(field_access, AstFieldAccess** pfield) {
     return 0;
 }
 
-CHECK(size_of, AstSizeOf* so) {
+b32 check_size_of(AstSizeOf* so) {
     so->size = type_size_of(type_build_from_ast(semstate.allocator, so->so_type));
 
     return 0;
 }
 
-CHECK(align_of, AstAlignOf* ao) {
+b32 check_align_of(AstAlignOf* ao) {
     ao->alignment = type_alignment_of(type_build_from_ast(semstate.allocator, ao->ao_type));
 
     return 0;
 }
 
-CHECK(expression, AstTyped** pexpr) {
+b32 check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         onyx_message_add(Msg_Type_Literal,
@@ -968,6 +991,18 @@ CHECK(expression, AstTyped** pexpr) {
             break;
 
         case Ast_Kind_Function:
+            // NOTE: Will need something like this at some point
+            // AstFunction* func = (AstFunction *) expr;
+            // bh_arr_each(AstParam, param, func->params) {
+            //     if (param->default_value != NULL) {
+            //         onyx_message_add(Msg_Type_Literal,
+            //                 func->token->pos,
+            //                 "cannot use functions with default parameters in this way");
+            //         retval = 1;
+            //         break;
+            //     }
+            // }
+
             expr->flags |= Ast_Flag_Function_Used;
             break;
 
@@ -987,7 +1022,7 @@ CHECK(expression, AstTyped** pexpr) {
     return retval;
 }
 
-CHECK(global, AstGlobal* global) {
+b32 check_global(AstGlobal* global) {
     fill_in_type((AstTyped *) global);
 
     if (global->type == NULL) {
@@ -1002,7 +1037,7 @@ CHECK(global, AstGlobal* global) {
     return 0;
 }
 
-CHECK(statement, AstNode* stmt) {
+b32 check_statement(AstNode* stmt) {
     switch (stmt->kind) {
         case Ast_Kind_Jump:      return 0;
 
@@ -1037,7 +1072,7 @@ CHECK(statement, AstNode* stmt) {
     }
 }
 
-CHECK(statement_chain, AstNode* start) {
+b32 check_statement_chain(AstNode* start) {
     while (start) {
         if (check_statement(start)) return 1;
         start = start->next;
@@ -1046,7 +1081,7 @@ CHECK(statement_chain, AstNode* start) {
     return 0;
 }
 
-CHECK(block, AstBlock* block) {
+b32 check_block(AstBlock* block) {
     if (check_statement_chain(block->body)) return 1;
 
     bh_table_each_start(AstTyped *, block->scope->symbols);
@@ -1063,7 +1098,7 @@ CHECK(block, AstBlock* block) {
     return 0;
 }
 
-CHECK(function, AstFunction* func) {
+b32 check_function(AstFunction* func) {
     semstate.expected_return_type = func->type->Function.return_type;
     if (func->body) {
         return check_block(func->body);
@@ -1072,7 +1107,7 @@ CHECK(function, AstFunction* func) {
     return 0;
 }
 
-CHECK(overloaded_function, AstOverloadedFunction* func) {
+b32 check_overloaded_function(AstOverloadedFunction* func) {
     bh_arr_each(AstTyped *, node, func->overloads) {
         if ((*node)->kind == Ast_Kind_Overloaded_Function) {
             onyx_message_add(Msg_Type_Literal,
@@ -1094,7 +1129,7 @@ CHECK(overloaded_function, AstOverloadedFunction* func) {
     return 0;
 }
 
-CHECK(struct, AstStructType* s_node) {
+b32 check_struct(AstStructType* s_node) {
     bh_table(i32) mem_set;
     bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
 
@@ -1129,30 +1164,40 @@ CHECK(struct, AstStructType* s_node) {
     return 0;
 }
 
-CHECK(function_header, AstFunction* func) {
-    AstLocal *param = func->params;
-    while (param != NULL) {
-        fill_in_type((AstTyped *) param);
+b32 check_function_header(AstFunction* func) {
+    b32 expect_default_param = 0;    
 
-        if (param->type == NULL) {
+    bh_arr_each(AstParam, param, func->params) {
+        AstLocal* local = param->local;
+
+        if (expect_default_param && param->default_value == NULL) {
             onyx_message_add(Msg_Type_Literal,
-                    param->token->pos,
+                    local->token->pos,
+                    "all parameters must have default values after the first default valued parameter.");
+            return 1;
+        }
+
+        if (param->default_value != NULL) expect_default_param = 1;
+
+        fill_in_type((AstTyped *) local);
+
+        if (local->type == NULL) {
+            onyx_message_add(Msg_Type_Literal,
+                    local->token->pos,
                     "function parameter types must be known");
             return 1;
         }
 
-        if (param->type->kind != Type_Kind_Array
-            && type_size_of(param->type) == 0) {
+        if (local->type->kind != Type_Kind_Array
+            && type_size_of(local->type) == 0) {
             onyx_message_add(Msg_Type_Literal,
-                    param->token->pos,
+                    local->token->pos,
                     "function parameters must have non-void types");
             return 1;
         }
-
-        param = (AstLocal *) param->next;
     }
 
-    fill_in_type((AstTyped *) func);
+    func->type = type_build_function_type(semstate.node_allocator, func);
 
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {
@@ -1187,7 +1232,7 @@ CHECK(function_header, AstFunction* func) {
     return 0;
 }
 
-CHECK(memres, AstMemRes* memres) {
+b32 check_memres(AstMemRes* memres) {
     fill_in_type((AstTyped *) memres);
 
     if (memres->initial_value != NULL) {
@@ -1215,7 +1260,7 @@ CHECK(memres, AstMemRes* memres) {
     return 0;
 }
 
-CHECK(node, AstNode* node) {
+b32 check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
         case Ast_Kind_Overloaded_Function:  return check_overloaded_function((AstOverloadedFunction *) node);

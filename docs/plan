@@ -213,6 +213,9 @@ HOW:
 
         [X] initializers on switch statements
 
+        [X] default parameters
+            - Must be the last parameters
+
         [ ] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is
 

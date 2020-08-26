@@ -463,42 +463,65 @@ static void symres_function(AstFunction* func) {
     if (func->scope == NULL)
         func->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
 
+    bh_arr_each(AstParam, param, func->params) {
+        if (param->default_value != NULL) {
+            symres_expression(&param->default_value);
+            if (check_expression(&param->default_value)) return;
+        }
+    }
+
+    func->return_type = symres_type(func->return_type);
+
     scope_enter(func->scope);
 
-    for (AstLocal *param = func->params; param != NULL; param = (AstLocal *) param->next) {
-        param->type_node = symres_type(param->type_node);
-        param->type = type_build_from_ast(semstate.allocator, param->type_node);
+    bh_arr_each(AstParam, param, func->params) {
+        if (param->local->type_node != NULL) {
+            param->local->type_node = symres_type(param->local->type_node);
+            param->local->type = type_build_from_ast(semstate.allocator, param->local->type_node);
 
-        if (param->type == NULL) break;
+            if (param->default_value != NULL) {
+                if (!types_are_compatible(param->local->type, param->default_value->type)) {
+                    onyx_message_add(Msg_Type_Assignment_Mismatch,
+                            param->local->token->pos,
+                            type_get_name(param->local->type),
+                            type_get_name(param->default_value->type));
+                    return;
+                }
+            }
+        } else {
+            param->local->type = param->default_value->type;
+        }
 
-        symbol_introduce(semstate.curr_scope, param->token, (AstNode *) param);
+        if (param->local->type == NULL) break;
 
-        if (param->flags & Ast_Flag_Param_Use) {
-            if (type_is_struct(param->type)) {
+        symbol_introduce(semstate.curr_scope, param->local->token, (AstNode *) param->local);
+
+        if (param->local->flags & Ast_Flag_Param_Use) {
+            if (type_is_struct(param->local->type)) {
                 AstStructType* st;
-                if (param->type->kind == Type_Kind_Struct) {
-                    st = (AstStructType *) param->type_node;
+                if (param->local->type->kind == Type_Kind_Struct) {
+                    st = (AstStructType *) param->local->type_node;
                 } else {
-                    st = (AstStructType *) ((AstPointerType *) param->type_node)->elem;
+                    st = (AstStructType *) ((AstPointerType *) param->local->type_node)->elem;
                 }
 
                 bh_arr_each(AstStructMember *, mem, st->members) {
                     AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
                     fa->token = (*mem)->token;
                     fa->type_node = (*mem)->type_node;
-                    fa->expr = (AstTyped *) param;
+                    fa->expr = (AstTyped *) param->local;
 
                     token_toggle_end((*mem)->token);
                     symbol_raw_introduce(semstate.curr_scope,
                             (*mem)->token->text,
-                            param->token->pos,
+                            param->local->token->pos,
                             (AstNode *) fa);
                     token_toggle_end((*mem)->token);
                 }
 
             } else {
                 onyx_message_add(Msg_Type_Literal,
-                        param->token->pos,
+                        param->local->token->pos,
                         "can only 'use' structures or pointers to structures.");
             }
         }
