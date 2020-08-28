@@ -1258,7 +1258,7 @@ COMPILE_FUNC(struct_load, Type* type, u64 offset) {
     assert(type->kind == Type_Kind_Struct);
 
     if (type->Struct.mem_count == 1) {
-        compile_load_instruction(mod, &code, type->Struct.memarr[0]->type, 0);
+        compile_load_instruction(mod, &code, type->Struct.memarr[0]->type, offset);
         *pcode = code;
         return;
     }

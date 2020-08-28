@@ -275,12 +275,13 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case '-': {
-            consume_token(parser);
+            OnyxToken* negate_token = expect_token(parser, '-');
             AstTyped* factor = parse_factor(parser);
 
             AstUnaryOp* negate_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
             negate_node->operation = Unary_Op_Negate;
             negate_node->expr = factor;
+            negate_node->token = negate_token;
 
             retval = (AstTyped *) negate_node;
             break;
