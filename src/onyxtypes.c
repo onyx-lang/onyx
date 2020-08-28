@@ -373,6 +373,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Type_Alias:
             return type_build_from_ast(alloc, ((AstTypeAlias *) type_node)->to);
 
+        case Ast_Kind_Type_Raw_Alias:
+            return ((AstTypeRawAlias *) type_node)->to;
+
         case Ast_Kind_Symbol:
             assert(("symbol node in type expression", 0));
             return NULL;

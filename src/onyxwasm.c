@@ -1376,6 +1376,7 @@ COMPILE_FUNC(location, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (expr->kind) {
+        case Ast_Kind_Param:
         case Ast_Kind_Local: {
             u64 offset = 0;
             compile_local_location(mod, &code, (AstLocal *) expr, &offset);
@@ -1428,6 +1429,7 @@ COMPILE_FUNC(location, AstTyped* expr) {
         }
 
         default: {
+            DEBUG_HERE;
             onyx_message_add(Msg_Type_Literal,
                     (OnyxFilePos) { 0 },
                     "location unknown");

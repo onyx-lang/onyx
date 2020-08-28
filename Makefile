@@ -3,6 +3,7 @@ RELEASE=0
 OBJ_FILES=\
 	build/onyxlex.o \
 	build/onyxparser.o \
+	build/onyxclone.o \
 	build/onyxtypes.o \
 	build/onyxbuiltins.o \
 	build/onyxsempass.o \
@@ -22,7 +23,7 @@ TARGET=./onyx
 ifeq ($(RELEASE), 1)
 	FLAGS=-O3
 else
-	FLAGS=-g3 -Og
+	FLAGS=-g3
 endif
 
 build/%.o: src/%.c include/bh.h

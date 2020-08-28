@@ -14,6 +14,7 @@ typedef struct SemState {
 
     // NOTE: Used wherever
     ProgramInfo* program;
+    bh_arr(Entity) other_entities;
 
     // NOTE: Used in symbol resolution phase
     Package*           curr_package;
@@ -33,10 +34,14 @@ extern SemState semstate;
 // NOTE: Resolving all symbols in the tree
 void onyx_resolve_symbols();
 
+void symres_function(AstFunction* func);
+
 // NOTE: Inferring and checking types in the tree
 void onyx_type_check();
 
 b32 check_expression(AstTyped** expr);
+b32 check_function_header(AstFunction* func);
+b32 check_function(AstFunction* func);
 
 // NOTE: Full semantic pass
 void onyx_sempass_init(bh_allocator alloc, bh_allocator node_alloc);

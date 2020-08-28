@@ -23,7 +23,7 @@ static void symres_switch(AstSwitch* switchnode);
 static void symres_statement_chain(AstNode** walker);
 static b32  symres_statement(AstNode** stmt);
 static void symres_block(AstBlock* block);
-static void symres_function(AstFunction* func);
+void symres_function(AstFunction* func);
 static void symres_global(AstGlobal* global);
 static void symres_overloaded_function(AstOverloadedFunction* ofunc);
 static void symres_use_package(AstUsePackage* package);
@@ -461,7 +461,7 @@ static void symres_block(AstBlock* block) {
     scope_leave();
 }
 
-static void symres_function(AstFunction* func) {
+void symres_function(AstFunction* func) {
     if (func->scope == NULL)
         func->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
 
@@ -647,6 +647,10 @@ static void symres_memres(AstMemRes** memres) {
     }
 }
 
+static void symres_polyproc(AstPolyProc* pp) {
+    pp->poly_scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+}
+
 void onyx_resolve_symbols() {
 
     semstate.curr_scope = semstate.program->global_scope;
@@ -666,6 +670,7 @@ void onyx_resolve_symbols() {
             case Entity_Type_Type_Alias:          entity->type_alias = symres_type(entity->type_alias); break;
             case Entity_Type_Enum:                symres_enum(entity->enum_type); break;
             case Entity_Type_Memory_Reservation:  symres_memres(&entity->mem_res); break;
+            case Entity_Type_Polymorphic_Proc:    symres_polyproc(entity->poly_proc); break;
 
             default: break;
         }

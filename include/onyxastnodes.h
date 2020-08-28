@@ -4,7 +4,6 @@
 #include "onyxlex.h"
 #include "onyxtypes.h"
 
-
 typedef struct AstNode AstNode;
 typedef struct AstTyped AstTyped;
 
@@ -47,6 +46,7 @@ typedef struct AstStructMember AstStructMember;
 typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
 typedef struct AstTypeAlias AstTypeAlias;
+typedef struct AstTypeRawAlias AstTypeRawAlias;
 
 typedef struct AstBinding AstBinding;
 typedef struct AstMemRes AstMemRes;
@@ -57,6 +57,9 @@ typedef struct AstGlobal AstGlobal;
 typedef struct AstParam AstParam;
 typedef struct AstFunction AstFunction;
 typedef struct AstOverloadedFunction AstOverloadedFunction;
+
+typedef struct AstPolyParam AstPolyParam;
+typedef struct AstPolyProc AstPolyProc;
 
 typedef struct AstPackage AstPackage;
 typedef struct Package Package;
@@ -82,6 +85,7 @@ typedef enum AstKind {
     Ast_Kind_Binding,
     Ast_Kind_Function,
     Ast_Kind_Overloaded_Function,
+    Ast_Kind_Polymorphic_Proc,
     Ast_Kind_Block,
     Ast_Kind_Local_Group,
     Ast_Kind_Local,
@@ -101,6 +105,7 @@ typedef enum AstKind {
     Ast_Kind_Struct_Type,
     Ast_Kind_Enum_Type,
     Ast_Kind_Type_Alias,
+    Ast_Kind_Type_Raw_Alias,
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
@@ -168,6 +173,8 @@ typedef enum AstFlags {
 
     // Struct flags
     Ast_Flag_Struct_Is_Union   = BH_BIT(17),
+
+    Ast_Flag_No_Clone          = BH_BIT(18),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -409,8 +416,9 @@ struct AstEnumType {
     // NOTE: Used to cache the actual type for the same reason as above.
     Type *etcache;
 };
-struct AstEnumValue { AstTyped_base; AstNumLit* value; };
-struct AstTypeAlias { AstType_base; AstType* to; };
+struct AstEnumValue    { AstTyped_base; AstNumLit* value; };
+struct AstTypeAlias    { AstType_base; AstType* to; };
+struct AstTypeRawAlias { AstType_base; Type* to; };
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
@@ -465,12 +473,15 @@ struct AstFunction      {
         };
     };
 };
+struct AstPolyParam { AstNode* poly_sym; AstType* type_expr; u64 idx; };
 struct AstPolyProc {
     AstNode_base;
 
     Scope *poly_scope;
+    bh_arr(AstPolyParam) poly_params;
 
-    AstFunction* func;
+    AstFunction* base_func;
+    bh_table(AstFunction *) concrete_funcs;
 };
 struct AstOverloadedFunction {
     AstTyped_base;
@@ -493,6 +504,7 @@ typedef enum EntityType {
     Entity_Type_Enum,
     Entity_Type_Type_Alias,
     Entity_Type_Memory_Reservation,
+    Entity_Type_Polymorphic_Proc,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
     Entity_Type_Expression,
@@ -516,6 +528,7 @@ typedef struct Entity {
         AstType               *type_alias;
         AstEnumType           *enum_type;
         AstMemRes             *mem_res;
+        AstPolyProc           *poly_proc;
     };
 } Entity;
 
@@ -538,7 +551,7 @@ typedef struct ProgramInfo {
     u32 foreign_global_count;
 } ProgramInfo;
 
-
+i32 sort_entities(const void* e1, const void* e2);
 
 // NOTE: Basic internal types constructed in the parser
 extern AstBasicType basic_type_void;
@@ -572,7 +585,9 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 
 // NOTE: Useful not inlined functions
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
+AstNode* ast_clone(bh_allocator a, void* n);
 void promote_numlit_to_larger(AstNumLit* num);
+AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

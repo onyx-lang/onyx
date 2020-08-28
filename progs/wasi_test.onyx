@@ -23,40 +23,40 @@ use package random
 use package file
 use package stdio
 
-print_rights :: proc (rights: Rights) {
-    print(cast(u32) rights, 2);
-    print("\n");
-
-    if rights & Rights.DataSync != cast(Rights) 0 do print("DataSync\n");
-    if rights & Rights.Read != cast(Rights) 0 do print("Read\n");
-    if rights & Rights.Seek != cast(Rights) 0 do print("Seek\n");
-    if rights & Rights.FdStatSetFlags != cast(Rights) 0 do print("FdStatSetFlags\n");
-    if rights & Rights.Sync != cast(Rights) 0 do print("Sync\n");
-    if rights & Rights.Tell != cast(Rights) 0 do print("Tell\n");
-    if rights & Rights.Write != cast(Rights) 0 do print("Write\n");
-    if rights & Rights.Advise != cast(Rights) 0 do print("Advise\n");
-    if rights & Rights.Allocate != cast(Rights) 0 do print("Allocate\n");
-    if rights & Rights.PathCreateDirectory != cast(Rights) 0 do print("PathCreateDirectory\n");
-    if rights & Rights.PathCreateFile != cast(Rights) 0 do print("PathCreateFile\n");
-    if rights & Rights.PathLinkSource != cast(Rights) 0 do print("PathLinkSource\n");
-    if rights & Rights.PathLinkTarget != cast(Rights) 0 do print("PathLinkTarget\n");
-    if rights & Rights.PathOpen != cast(Rights) 0 do print("PathOpen\n");
-    if rights & Rights.ReadDir != cast(Rights) 0 do print("ReadDir\n");
-    if rights & Rights.PathReadlink != cast(Rights) 0 do print("PathReadlink\n");
-    if rights & Rights.PathRenameSource != cast(Rights) 0 do print("PathRenameSource\n");
-    if rights & Rights.PathRenameTarget != cast(Rights) 0 do print("PathRenameTarget\n");
-    if rights & Rights.PathFilestatGet != cast(Rights) 0 do print("PathFilestatGet\n");
-    if rights & Rights.PathFilestateSetSize != cast(Rights) 0 do print("PathFilestateSetSize\n");
-    if rights & Rights.PathFilestateSetTimes != cast(Rights) 0 do print("PathFilestateSetTimes\n");
-    if rights & Rights.FilestatGet != cast(Rights) 0 do print("FilestatGet\n");
-    if rights & Rights.FilestatSetSize != cast(Rights) 0 do print("FilestatSetSize\n");
-    if rights & Rights.FilestatSetTimes != cast(Rights) 0 do print("FilestatSetTimes\n");
-    if rights & Rights.PathSymlink != cast(Rights) 0 do print("PathSymlink\n");
-    if rights & Rights.PathRemoveDirectory != cast(Rights) 0 do print("PathRemoveDirectory\n");
-    if rights & Rights.PathUnlinkFile != cast(Rights) 0 do print("PathUnlinkFile\n");
-    if rights & Rights.PollFDReadWrite != cast(Rights) 0 do print("PollFDReadWrite\n");
-    if rights & Rights.SockShutdown != cast(Rights) 0 do print("SockShutdown\n");
-}
+// print_rights :: proc (rights: Rights) {
+//     print(cast(u32) rights, 2);
+//     print("\n");
+// 
+//     if rights & Rights.DataSync != cast(Rights) 0 do print("DataSync\n");
+//     if rights & Rights.Read != cast(Rights) 0 do print("Read\n");
+//     if rights & Rights.Seek != cast(Rights) 0 do print("Seek\n");
+//     if rights & Rights.FdStatSetFlags != cast(Rights) 0 do print("FdStatSetFlags\n");
+//     if rights & Rights.Sync != cast(Rights) 0 do print("Sync\n");
+//     if rights & Rights.Tell != cast(Rights) 0 do print("Tell\n");
+//     if rights & Rights.Write != cast(Rights) 0 do print("Write\n");
+//     if rights & Rights.Advise != cast(Rights) 0 do print("Advise\n");
+//     if rights & Rights.Allocate != cast(Rights) 0 do print("Allocate\n");
+//     if rights & Rights.PathCreateDirectory != cast(Rights) 0 do print("PathCreateDirectory\n");
+//     if rights & Rights.PathCreateFile != cast(Rights) 0 do print("PathCreateFile\n");
+//     if rights & Rights.PathLinkSource != cast(Rights) 0 do print("PathLinkSource\n");
+//     if rights & Rights.PathLinkTarget != cast(Rights) 0 do print("PathLinkTarget\n");
+//     if rights & Rights.PathOpen != cast(Rights) 0 do print("PathOpen\n");
+//     if rights & Rights.ReadDir != cast(Rights) 0 do print("ReadDir\n");
+//     if rights & Rights.PathReadlink != cast(Rights) 0 do print("PathReadlink\n");
+//     if rights & Rights.PathRenameSource != cast(Rights) 0 do print("PathRenameSource\n");
+//     if rights & Rights.PathRenameTarget != cast(Rights) 0 do print("PathRenameTarget\n");
+//     if rights & Rights.PathFilestatGet != cast(Rights) 0 do print("PathFilestatGet\n");
+//     if rights & Rights.PathFilestateSetSize != cast(Rights) 0 do print("PathFilestateSetSize\n");
+//     if rights & Rights.PathFilestateSetTimes != cast(Rights) 0 do print("PathFilestateSetTimes\n");
+//     if rights & Rights.FilestatGet != cast(Rights) 0 do print("FilestatGet\n");
+//     if rights & Rights.FilestatSetSize != cast(Rights) 0 do print("FilestatSetSize\n");
+//     if rights & Rights.FilestatSetTimes != cast(Rights) 0 do print("FilestatSetTimes\n");
+//     if rights & Rights.PathSymlink != cast(Rights) 0 do print("PathSymlink\n");
+//     if rights & Rights.PathRemoveDirectory != cast(Rights) 0 do print("PathRemoveDirectory\n");
+//     if rights & Rights.PathUnlinkFile != cast(Rights) 0 do print("PathUnlinkFile\n");
+//     if rights & Rights.PollFDReadWrite != cast(Rights) 0 do print("PollFDReadWrite\n");
+//     if rights & Rights.SockShutdown != cast(Rights) 0 do print("SockShutdown\n");
+// }
 
 readline :: proc (buf: ^u8, bufsize: u32) -> u32 {
     iov := IOVec.{ buf, bufsize };
@@ -137,8 +137,8 @@ output_s :: proc (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
     return sb;
 }
 
-print_arr :: proc (sb: ^StringBuilder, arr: []i32) {
-    sb  |> string_builder_clear();
+print_arr :: proc (sb: ^StringBuilder, arr: [] $T) {
+    sb |> string_builder_clear();
 
     for i: 0, arr.count {
         sb |> sba(cast(u64) arr[i]) |> sba(" ");
@@ -278,6 +278,21 @@ main :: proc (args: []cstring) {
     print_u64(cast(u64) sl.count);
 
     print_u64(cast(u64) fib(20));
+    print("\n");
+
+    print(add(20l, 5l));
+    print("\n");
+    print(cast(u64) add(20.0f, 5.0f));
+    print("\n");
+
+    slice := make_slice(cast(^u32) 1234, 5678);
+    print(cast(u64) slice.data);
+    print("\n");
+    print(cast(u64) get_slice_length(^slice));
+    print("\n");
+
+    print(multi_poly(5.4f, 10l));
+    print("\n");
 }
 
 foobar :: proc (a: i32, b := 1, c := 5l) {
@@ -301,6 +316,16 @@ fib :: proc (n: i32) -> i32 {
     return 0;
 }
 
-// make_slice :: proc (ptr: ^$T, count: u32) -> [] T {
-//     return ptr[0 : count];
-// }
+add :: proc (a: $T, b: T) -> T {
+    return a + b;
+}
+
+multi_poly :: proc (a: $T, b: $R) -> R {
+    return cast(R) (a + cast(T) b);
+}
+
+make_slice :: proc (ptr: ^$T, count: u32) -> [] T {
+    return ptr[4 : count];
+}
+
+get_slice_length :: proc (s: ^[] $T) -> u32 do return s.count;

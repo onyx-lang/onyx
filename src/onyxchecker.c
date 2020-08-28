@@ -288,6 +288,13 @@ b32 check_call(AstCall* call) {
         if (callee == NULL) return 1;
     }
 
+    if (callee->kind == Ast_Kind_Polymorphic_Proc) {
+        call->callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, call);
+        if (call->callee == NULL) return 1;
+
+        callee = (AstFunction *) call->callee;
+    }
+
     // NOTE: Build callee's type
     fill_in_type((AstTyped *) callee);
 
@@ -1037,6 +1044,10 @@ b32 check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Memres: break;
 
+        case Ast_Kind_Polymorphic_Proc: break;
+
+        case Ast_Kind_Error: break;
+
         default:
             retval = 1;
             DEBUG_HERE;
@@ -1189,7 +1200,7 @@ b32 check_struct(AstStructType* s_node) {
 }
 
 b32 check_function_header(AstFunction* func) {
-    b32 expect_default_param = 0;    
+    b32 expect_default_param = 0;
 
     bh_arr_each(AstParam, param, func->params) {
         AstLocal* local = param->local;
@@ -1345,6 +1356,8 @@ void onyx_type_check() {
             case Entity_Type_Global_Header: break;
 
             case Entity_Type_Use_Package: break;
+
+            case Entity_Type_Polymorphic_Proc: break;
 
             default: DEBUG_HERE; break;
         }

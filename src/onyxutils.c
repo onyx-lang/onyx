@@ -1,8 +1,13 @@
+#define BH_DEBUG
+
 #include "onyxutils.h"
 #include "onyxlex.h"
 #include "onyxastnodes.h"
 #include "onyxmsgs.h"
 #include "onyxparser.h"
+#include "onyxastnodes.h"
+#include "onyxsempass.h"
+
 
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
@@ -25,6 +30,7 @@ static const char* ast_node_names[] = {
     "BINDING",
     "FUNCTION",
     "OVERLOADED_FUNCTION",
+    "POLYMORPHIC PROC",
     "BLOCK",
     "LOCAL GROUP",
     "LOCAL",
@@ -44,6 +50,7 @@ static const char* ast_node_names[] = {
     "STRUCT TYPE",
     "ENUM TYPE",
     "TYPE_ALIAS",
+    "TYPE RAW ALIAS"
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",
@@ -70,8 +77,7 @@ static const char* ast_node_names[] = {
     "IF",
     "FOR",
     "WHILE",
-    "BREAK",
-    "CONTINUE",
+    "JUMP",
     "DEFER",
     "SWITCH",
     "SWITCH CASE"
@@ -194,6 +200,10 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
 
     token_toggle_end(tkn);
     return res;
+}
+
+void scope_clear(Scope* scope) {
+    bh_table_clear(scope->symbols);
 }
 
 #define REDUCE_BINOP_ALL(op) \
@@ -329,4 +339,90 @@ void promote_numlit_to_larger(AstNumLit* num) {
         f64 val = (f64) num->value.f;
         num->value.d = val;
     }
+}
+
+static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) {
+    while (1) {
+        if (type_expr == (AstType *) target) return actual;
+
+        switch (type_expr->kind) {
+            case Ast_Kind_Pointer_Type: {
+                type_expr = ((AstPointerType *) type_expr)->elem;
+                actual = actual->Pointer.elem;
+                break;
+            }
+
+            case Ast_Kind_Slice_Type: {
+                type_expr = ((AstSliceType *) type_expr)->elem;
+                actual = actual->Slice.ptr_to_data->Pointer.elem;
+                break;
+            }
+
+            default:
+                return NULL;
+        }
+    }
+
+    return NULL;
+}
+
+AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
+    if (pp->concrete_funcs == NULL) {
+        bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
+    }
+
+    scope_clear(pp->poly_scope);
+
+    // Currently, not going to do any cacheing
+
+    bh_arr_each(AstPolyParam, param, pp->poly_params) {
+        AstArgument* arg = call->arguments;
+        if (param->idx >= call->arg_count) {
+            onyx_message_add(Msg_Type_Literal,
+                    call->token->pos,
+                    "not enough arguments to polymorphic procedure.");
+            return NULL;
+        }
+
+        fori (i, 0, param->idx) arg = (AstArgument *) arg->next;
+        Type* arg_type = arg->type;
+
+        Type* resolved_type = solve_poly_type(param->poly_sym, param->type_expr, arg_type);
+
+        if (resolved_type == NULL) {
+            onyx_message_add(Msg_Type_Literal,
+                    call->token->pos,
+                    "unable to match polymorphic procedure type.");
+            return NULL;
+        }
+
+        AstTypeRawAlias* raw = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+        raw->to = resolved_type;
+
+        symbol_introduce(pp->poly_scope, param->poly_sym->token, (AstNode *) raw);
+    }
+
+    semstate.curr_scope = pp->poly_scope;
+
+    AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
+    symres_function(func);
+    if (check_function_header(func)) return NULL;
+    if (check_function(func)) return NULL;
+
+    bh_arr_push(semstate.other_entities, ((Entity) {
+        .type = Entity_Type_Function_Header,
+        .function = func,
+        .package = NULL,
+    }));
+    bh_arr_push(semstate.other_entities, ((Entity) {
+        .type = Entity_Type_Function,
+        .function = func,
+        .package = NULL,
+    }));
+
+    return func;
+}
+
+i32 sort_entities(const void* e1, const void* e2) {
+    return ((Entity *)e1)->type - ((Entity *)e2)->type;
 }

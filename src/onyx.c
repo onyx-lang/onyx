@@ -199,10 +199,6 @@ static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_con
     return onyx_parse(&parser);
 }
 
-static i32 sort_entities(const void* e1, const void* e2) {
-    return ((Entity *)e1)->type - ((Entity *)e2)->type;
-}
-
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
     bh_arr_each(AstInclude *, include, results->includes) {
         if ((*include)->kind == Ast_Kind_Include_File) {
@@ -292,6 +288,13 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
             case Ast_Kind_Memres: {
                 ent.type = Entity_Type_Memory_Reservation;
                 ent.mem_res = (AstMemRes *) node;
+                bh_arr_push(compiler_state->prog_info.entities, ent);
+                break;
+            }
+
+            case Ast_Kind_Polymorphic_Proc: {
+                ent.type = Entity_Type_Polymorphic_Proc;
+                ent.poly_proc = (AstPolyProc *) node;
                 bh_arr_push(compiler_state->prog_info.entities, ent);
                 break;
             }
