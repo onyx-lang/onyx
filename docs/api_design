@@ -23,11 +23,3 @@ The standard high level topics to cover are:
 
 
 
-
-Package main:
-	main :: proc (args: [] cstring) -> i32	
-
-Package string:
-	string_split :: proc (a: Allocator, s: string, delim: u8) -> [] string
-		at /usr/share/onyx/core/string.onyx:50,0
-		Auto documentation for string_split

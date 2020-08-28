@@ -205,6 +205,10 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
         return WASM_TYPE_VOID;
     }
 
+    if (type->kind == Type_Kind_Slice) {
+        return WASM_TYPE_VOID;
+    }
+
     if (type->kind == Type_Kind_Enum) {
         return onyx_type_to_wasm_type(type->Enum.backing);
     }
@@ -469,7 +473,7 @@ COMPILE_FUNC(statement, AstNode* stmt) {
 COMPILE_FUNC(assignment, AstBinaryOp* assign) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (assign->right->type->kind == Type_Kind_Struct) {
+    if (type_is_structlike_strict(assign->right->type)) {
         compile_expression(mod, &code, assign->right);
         compile_struct_lval(mod, &code, assign->left);
 
@@ -540,7 +544,7 @@ COMPILE_FUNC(assignment, AstBinaryOp* assign) {
 COMPILE_FUNC(store_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (type->kind == Type_Kind_Struct) {
+    if (type_is_structlike_strict(type)) {
         compile_struct_store(mod, pcode, type, offset);
         return;
     }
@@ -583,7 +587,7 @@ COMPILE_FUNC(store_instruction, Type* type, u32 offset) {
 COMPILE_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (type->kind == Type_Kind_Struct) {
+    if (type_is_structlike_strict(type)) {
         compile_struct_load(mod, pcode, type, offset);
         return;
     }
@@ -1193,7 +1197,7 @@ COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
     u64 offset = field->offset;
     AstTyped* source_expr = field->expr;
     while (source_expr->kind == Ast_Kind_Field_Access
-            && (source_expr->type->kind == Type_Kind_Struct)) {
+            && type_is_structlike_strict(source_expr->type)) {
         offset += ((AstFieldAccess *) source_expr)->offset;
         source_expr = (AstTyped *) ((AstFieldAccess *) source_expr)->expr;
     }
@@ -1255,10 +1259,14 @@ COMPILE_FUNC(struct_load, Type* type, u64 offset) {
 
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(type->kind == Type_Kind_Struct);
+    assert(type_is_structlike_strict(type));
 
-    if (type->Struct.mem_count == 1) {
-        compile_load_instruction(mod, &code, type->Struct.memarr[0]->type, offset);
+    u32 mem_count = type_structlike_mem_count(type);
+    StructMember smem;
+
+    if (mem_count == 1) {
+        type_lookup_member_by_idx(type, 0, &smem);
+        compile_load_instruction(mod, &code, smem.type, offset);
         *pcode = code;
         return;
     }
@@ -1266,11 +1274,10 @@ COMPILE_FUNC(struct_load, Type* type, u64 offset) {
     u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     WIL(WI_LOCAL_TEE, tmp_idx);
 
-    b32 first = 1;
-    bh_arr_each(StructMember *, smem, type->Struct.memarr) {
-        if (first) first = 0;
-        else       WIL(WI_LOCAL_GET, tmp_idx);
-        compile_load_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
+    fori (i, 0, mem_count) {
+        type_lookup_member_by_idx(type, i, &smem);
+        if (i != 0) WIL(WI_LOCAL_GET, tmp_idx);
+        compile_load_instruction(mod, &code, smem.type, offset + smem.offset);
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
@@ -1287,7 +1294,7 @@ COMPILE_FUNC(struct_lval, AstTyped* lval) {
 
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(lval->type->kind == Type_Kind_Struct);
+    assert(type_is_structlike_strict(lval->type));
 
     u64 offset = 0;
 
@@ -1316,30 +1323,35 @@ COMPILE_FUNC(struct_store, Type* type, u64 offset) {
 
     bh_arr(WasmInstruction) code = *pcode;
 
-    assert(type->kind == Type_Kind_Struct);
+    assert(type_is_structlike_strict(type));
 
     u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     WIL(WI_LOCAL_SET, loc_idx);
 
-    bh_arr_rev_each(StructMember *, smem, type->Struct.memarr) {
-        if ((*smem)->type->kind == Type_Kind_Struct) {
+    StructMember smem;
+
+    u32 mem_count = type_structlike_mem_count(type);
+    forir (i, mem_count - 1, 0) {
+        type_lookup_member_by_idx(type, i, &smem);
+
+        if (type_is_structlike_strict(smem.type)) {
             if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == loc_idx) {
                 bh_arr_last(code).type = WI_LOCAL_TEE;
             } else {
                 WIL(WI_LOCAL_GET, loc_idx);
             }
 
-            compile_struct_store(mod, &code, (*smem)->type, offset + (*smem)->offset);
+            compile_struct_store(mod, &code, smem.type, offset + smem.offset);
 
         } else {
-            WasmType wt = onyx_type_to_wasm_type((*smem)->type);
+            WasmType wt = onyx_type_to_wasm_type(smem.type);
             u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
 
             WIL(WI_LOCAL_SET, tmp_idx);
             WIL(WI_LOCAL_GET, loc_idx);
             WIL(WI_LOCAL_GET, tmp_idx);
 
-            compile_store_instruction(mod, &code, (*smem)->type, offset + (*smem)->offset);
+            compile_store_instruction(mod, &code, smem.type, offset + smem.offset);
 
             local_raw_free(mod->local_alloc, wt);
         }
@@ -1393,11 +1405,11 @@ COMPILE_FUNC(location, AstTyped* expr) {
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess *) expr;
 
-            if (field->expr->kind == Ast_Kind_Param && field->expr->type->kind == Type_Kind_Struct) {
+            if (field->expr->kind == Ast_Kind_Param && type_is_structlike_strict(field->expr->type)) {
                 StructMember smem;
 
                 token_toggle_end(field->token);
-                type_struct_lookup_member(field->expr->type, field->token->text, &smem);
+                type_lookup_member(field->expr->type, field->token->text, &smem);
                 token_toggle_end(field->token);
 
                 u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + smem.idx;
@@ -1439,10 +1451,10 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Param: {
             u64 localidx = bh_imap_get(&mod->local_map, (u64) expr);
 
-            if (expr->type->kind == Type_Kind_Struct) {
-                TypeStruct* st = &expr->type->Struct;
+            if (type_is_structlike_strict(expr->type)) {
+                u32 mem_count = type_structlike_mem_count(expr->type);
 
-                fori (idx, 0, st->mem_count) {
+                fori (idx, 0, mem_count) {
                     WIL(WI_LOCAL_GET, localidx + idx);
                 }
 
@@ -1555,11 +1567,11 @@ COMPILE_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess* ) expr;
 
-            if (field->expr->kind == Ast_Kind_Param && field->expr->type->kind == Type_Kind_Struct) {
+            if (field->expr->kind == Ast_Kind_Param && type_is_structlike_strict(field->expr->type)) {
                 StructMember smem;
 
                 token_toggle_end(field->token);
-                type_struct_lookup_member(field->expr->type, field->token->text, &smem);
+                type_lookup_member(field->expr->type, field->token->text, &smem);
                 token_toggle_end(field->token);
 
                 u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + smem.idx;
@@ -1572,7 +1584,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                 StructMember smem;
 
                 token_toggle_end(field->token);
-                type_struct_lookup_member(field->expr->type, field->token->text, &smem);
+                type_lookup_member(field->expr->type, field->token->text, &smem);
                 token_toggle_end(field->token);
 
                 if (smem.idx == 0)
@@ -1703,6 +1715,15 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (from->kind == Type_Kind_Slice || to->kind == Type_Kind_Slice) {
+        onyx_message_add(Msg_Type_Literal,
+                cast->token->pos,
+                "cannot cast to or from a slice");
+        WI(WI_DROP);
+        *pcode = code;
+        return;
+    }
+
     if (to->kind == Type_Kind_Function) {
         onyx_message_add(Msg_Type_Literal,
                 cast->token->pos,
@@ -1778,7 +1799,7 @@ COMPILE_FUNC(return, AstReturn* ret) {
 
     if (ret->expr) {
         if (mod->curr_cc == CC_Return_Stack) {
-            if (ret->expr->type->kind == Type_Kind_Struct) {
+            if (type_is_structlike_strict(ret->expr->type)) {
                 compile_expression(mod, &code, ret->expr);
 
                 WIL(WI_LOCAL_GET, mod->stack_base_idx);
@@ -1857,13 +1878,16 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     i32 param_count = ft->Function.param_count;
     i32 params_left = param_count;
     while (params_left-- > 0) {
-        if ((*param_type)->kind == Type_Kind_Struct) {
-            bh_arr_each(StructMember *, smem, (*param_type)->Struct.memarr) {
-                *(t++) = (char) onyx_type_to_wasm_type((*smem)->type);
+        if (type_is_structlike_strict(*param_type)) {
+            u32 mem_count = type_structlike_mem_count(*param_type);
+            StructMember smem;
+
+            fori (i, 0, mem_count) {
+                type_lookup_member_by_idx(*param_type, i, &smem);
+                *(t++) = (char) onyx_type_to_wasm_type(smem.type);
             }
 
-            param_count += (*param_type)->Struct.mem_count - 1;
-
+            param_count += mem_count - 1;
         } else {
             *(t++) = (char) onyx_type_to_wasm_type(*param_type);
         }
@@ -1989,9 +2013,9 @@ static void compile_function(OnyxWasmModule* mod, AstFunction* fd) {
         // NOTE: Generate the local map
         u64 localidx = 0;
         bh_arr_each(AstParam, param, fd->params) {
-            if (param->local->type->kind == Type_Kind_Struct) {
+            if (type_is_structlike_strict(param->local->type)) {
                 bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
-                localidx += param->local->type->Struct.mem_count;
+                localidx += type_structlike_mem_count(param->local->type);
 
             } else {
                 bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);

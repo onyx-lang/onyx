@@ -1,0 +1,121 @@
+package file
+
+// Many of these functions will be improved when
+// multiple return values are implemented.
+
+use package builtin
+use package wasi
+
+OpenMode :: enum {
+    Read;
+    Write;
+    Append; 
+}
+
+File :: struct {
+    fd : FileDescriptor;
+}
+
+file_open :: proc (file: ^File, path: string, mode := OpenMode.Read, flags := FDFlags.Sync) -> bool {
+    // Currently the directory's file descriptor appears to always be 3
+    DIR_FD :: 3;
+
+    open_flags := cast(OFlags) 0;
+    rights := Rights.DataSync
+            | Rights.Sync
+            | Rights.FilestatGet
+            | Rights.FilestatSetSize
+            | Rights.FilestatSetTimes
+            | Rights.Advise
+            | Rights.Allocate
+            | Rights.PathOpen
+            | Rights.PathCreateFile;
+    fdflags := flags;
+
+    switch mode {
+        case OpenMode.Write {
+            open_flags |= OFlags.Creat | OFlags.Trunc;
+            rights     |= Rights.Write;
+        }
+
+        case OpenMode.Append {
+            open_flags |= OFlags.Creat;
+            rights     |= Rights.Write;
+            fdflags    |= FDFlags.Append;
+        }
+
+        case OpenMode.Read {
+            rights |= Rights.Read | Rights.Seek | Rights.Tell;
+        }
+    }
+
+    if err := path_open(
+        DIR_FD,
+        LookupFlags.SymLinkFollow,
+        path,
+        open_flags,
+        rights,
+        rights,
+        fdflags,
+        ^file.fd);
+        err != Errno.Success {
+        return false;
+    }
+
+    return true;
+}
+
+file_close :: proc (file: File) -> bool {
+    if fd_close(file.fd) != Errno.Success {
+        return false;
+    }
+
+    return true;
+}
+
+file_get_size :: proc (file: File) -> i64 {
+    //size: i64 = 0l;
+    //prev: i64;
+
+    //if fd_seek(file.fd, 0l,   Whence.Cur, ^prev) != Errno.Success do return -1l;
+    //if fd_seek(file.fd, 0l,   Whence.End, ^size) != Errno.Success do return -1l;
+    //if fd_seek(file.fd, prev, Whence.Set, ^prev) != Errno.Success do return -1l;
+
+    fs: FileStat;
+    if fd_filestat_get(file.fd, ^fs) != Errno.Success do return -1l;
+
+    return fs.size;
+}
+
+file_get_contents_from_file :: proc (file: File) -> string {
+    size := cast(u32) file_get_size(file);
+
+    data := cast(^u8) alloc(context.allocator, size);
+
+    prev_loc: i64;
+    fd_tell(file.fd, ^prev_loc);
+
+    dummy: i64;
+    fd_seek(file.fd, 0l, Whence.Set, ^dummy);
+
+    dummy2: u32; 
+    buf := IOVec.{ cast(rawptr) data, size };
+    fd_pread(file.fd, IOVecArray.{ ^buf, 1 }, 0l, ^dummy2);
+
+    fd_seek(file.fd, prev_loc, Whence.Set, ^dummy);
+
+    return data[0 : size];
+}
+
+file_get_contents :: proc #overloaded {
+    file_get_contents_from_file,
+
+    proc (path: string) -> string {
+        tmp_file: File;
+
+        if !file_open(^tmp_file, path, OpenMode.Read) do return "";
+        defer file_close(tmp_file);
+
+        return file_get_contents(tmp_file);
+    }
+}

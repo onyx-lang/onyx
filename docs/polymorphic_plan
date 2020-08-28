@@ -1,0 +1,41 @@
+Current basic plan for polymorphic procedures
+
+0. Cleanup some of the aspects of the type system and make slices their own special type.
+
+1. Detect polymorphic parameters
+	Polymorphic parameters will have a $ in from a symbol in their type
+
+2. Polymorphic procedures (polyproc) will have a seperate entity type
+	Most of the stages will ignore them however
+
+3. Polyprocs will store a tabel on them mapping from specific, filled in types to the corresponding function.
+	"T=u32;R=[] u8" -> <function>
+
+4. When a polyproc is called, the polymoprhic parameters are parallel-recursived to find the type matching the polyparam.
+	For example:
+
+		foo :: proc (a: ^[] $T, b: u32) -> T {
+			return a.data[b];
+		}
+
+		arr : [128] []u8;
+		// init arr
+		a := arr[4 : 10];
+		foo(^a, 2);
+
+	When foo is called, we look at the polymorphic parameters, a in this example, are do the following recursion:
+
+		(^[] $T, ^[] []u8)      Both are pointers, so remove ^
+		([] $T, [] []u8)        Both are slices, so remove []
+		($T, []u8)              T is resolved to be []u8 in this case
+
+	If at any point, both sides cannot be removed, it is an invalid parameter.
+
+5. When the specific types of the polyproc are resolved, if no matching function already exists, a copy is made.
+	Copies are made from an un-symbol-resolved version of the procedure.
+	Some nodes can be marked as NO_COPY which signals that a copy should not be made.
+
+6. After a copy is made, it is fed through symbol resolution using the correct scope, and then type checking, and then function header and function entities are added to the entity list in the correct position.
+
+
+Ideally, nothing should change with the WASM output.

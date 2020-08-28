@@ -89,6 +89,11 @@ b32 types_are_surface_compatible(Type* t1, Type* t2) {
             return t1 == t2;
         }
 
+        case Type_Kind_Slice: {
+            if (t2->kind != Type_Kind_Slice) return 0;
+            return types_are_compatible(t1->Slice.ptr_to_data->Pointer.elem, t2->Slice.ptr_to_data->Pointer.elem);
+        }
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -179,6 +184,11 @@ b32 types_are_compatible(Type* t1, Type* t2) {
             return 1;
         }
 
+        case Type_Kind_Slice: {
+            if (t2->kind != Type_Kind_Slice) return 0;
+            return types_are_compatible(t1->Slice.ptr_to_data->Pointer.elem, t2->Slice.ptr_to_data->Pointer.elem);
+        }
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -197,6 +207,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
+        case Type_Kind_Slice:    return 8;
         default:                 return 0;
     }
 }
@@ -211,6 +222,7 @@ u32 type_alignment_of(Type* type) {
         case Type_Kind_Array:    return type_alignment_of(type->Array.elem);
         case Type_Kind_Struct:   return type->Struct.alignment;
         case Type_Kind_Enum:     return type_alignment_of(type->Enum.backing);
+        case Type_Kind_Slice:    return 4;
         default: return 1;
     }
 }
@@ -403,28 +415,11 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
 }
 
 Type* type_make_slice(bh_allocator alloc, Type* of) {
-    Type* s_type = bh_alloc(alloc, sizeof(Type));
-    s_type->kind = Type_Kind_Struct;
-    s_type->Struct.name = bh_aprintf(global_heap_allocator, "[] %s", type_get_name(of));
-    s_type->Struct.mem_count = 2;
-    s_type->Struct.memarr = NULL;
+    Type* slice_type = bh_alloc(alloc, sizeof(Type));
+    slice_type->kind = Type_Kind_Slice;
+    slice_type->Slice.ptr_to_data = type_make_pointer(alloc, of);
 
-    bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count);
-    bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
-
-    StructMember smem;
-    smem = (StructMember) { .offset = 0, .type = type_make_pointer(alloc, of), .idx = 0, };
-    bh_table_put(StructMember, s_type->Struct.members, "data", smem);
-    smem = (StructMember) { .offset = 4, .type = &basic_types[Basic_Kind_U32], .idx = 1, };
-    bh_table_put(StructMember, s_type->Struct.members, "count", smem);
-
-    bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, "data"));
-    bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, "count"));
-
-    s_type->Struct.alignment = 4;
-    s_type->Struct.size = 8;
-
-    return s_type;
+    return slice_type;
 }
 
 const char* type_get_name(Type* type) {
@@ -460,15 +455,70 @@ u32 type_get_alignment_log2(Type* type) {
     return 2;
 }
 
-b32 type_struct_lookup_member(Type* type, char* member, StructMember* smem) {
-    if (!type_is_struct(type)) return 0;
+b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
     if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
 
-    TypeStruct* stype = &type->Struct;
+    switch (type->kind) {
+        case Type_Kind_Struct: {
+            TypeStruct* stype = &type->Struct;
 
-    if (!bh_table_has(StructMember, stype->members, member)) return 0;
-    *smem = bh_table_get(StructMember, stype->members, member);
-    return 1;
+            if (!bh_table_has(StructMember, stype->members, member)) return 0;
+            *smem = bh_table_get(StructMember, stype->members, member);
+            return 1;
+        }
+
+        case Type_Kind_Slice: {
+            if (strcmp(member, "data") == 0) {
+                smem->idx = 0;
+                smem->offset = 0;
+                smem->type = type->Slice.ptr_to_data;
+                return 1;
+            }
+            if (strcmp(member, "count") == 0) {
+                smem->idx = 1;
+                smem->offset = 4;
+                smem->type = &basic_types[Basic_Kind_U32];
+                return 1;
+            }
+
+            return 0;
+        }
+
+        default: return 0;
+    }
+}
+
+b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+
+    switch (type->kind) {
+        case Type_Kind_Struct: {
+            TypeStruct* stype = &type->Struct;
+
+            if (idx > stype->mem_count) return 0;
+            *smem = *stype->memarr[idx];
+            return 1;
+        }
+
+        case Type_Kind_Slice: {
+            if (idx == 0) {
+                smem->idx = 0;
+                smem->offset = 0;
+                smem->type = type->Slice.ptr_to_data;
+                return 1;
+            }
+            if (idx == 1) {
+                smem->idx = 1;
+                smem->offset = 4;
+                smem->type = &basic_types[Basic_Kind_U32];
+                return 1;
+            }
+
+            return 0;
+        }
+
+        default: return 0;
+    }
 }
 
 b32 type_struct_is_simple(Type* type) {
@@ -541,4 +591,36 @@ b32 type_results_in_void(Type* type) {
         || (   (type->kind == Type_Kind_Function)
             && (type->Function.return_type->kind == Type_Kind_Basic)
             && (type->Function.return_type->Basic.kind == Basic_Kind_Void));
+}
+
+b32 type_is_structlike(Type* type) {
+    if (type->kind == Type_Kind_Struct) return 1;
+    if (type->kind == Type_Kind_Slice)  return 1;
+    if (type->kind == Type_Kind_Pointer) {
+        if (type->Pointer.elem->kind == Type_Kind_Struct) return 1;
+        if (type->Pointer.elem->kind == Type_Kind_Slice)  return 1;
+    }
+    return 0;
+}
+
+b32 type_is_structlike_strict(Type* type) {
+    if (type->kind == Type_Kind_Struct) return 1;
+    if (type->kind == Type_Kind_Slice)  return 1;
+    return 0;
+}
+
+u32 type_structlike_mem_count(Type* type) {
+    switch (type->kind) {
+        case Type_Kind_Struct: return type->Struct.mem_count;
+        case Type_Kind_Slice:  return 2;
+        default: return 0;
+    }
+}
+
+u32 type_structlike_is_simple(Type* type) {
+    switch (type->kind) {
+        case Type_Kind_Struct: return type_struct_is_simple(type);
+        case Type_Kind_Slice:  return 1;
+        default: return 0;
+    }
 }

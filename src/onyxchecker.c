@@ -268,8 +268,8 @@ b32 check_call(AstCall* call) {
             return 1;
         }
 
-        if (actual_param->value->type->kind == Type_Kind_Struct) {
-            if (!type_struct_is_simple(actual_param->value->type)) {
+        if (type_is_structlike_strict(actual_param->value->type)) {
+            if (!type_structlike_is_simple(actual_param->value->type)) {
                 onyx_message_add(Msg_Type_Literal,
                         actual_param->token->pos,
                         "can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
@@ -523,14 +523,14 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
         return 1;
     }
 
-    if (binop->left->type->kind == Type_Kind_Struct) {
+    if (type_is_structlike_strict(binop->left->type)) {
         onyx_message_add(Msg_Type_Literal,
                 binop->token->pos,
                 "invalid type for left side of binary operator");
         return 1;
     }
 
-    if (binop->right->type->kind == Type_Kind_Struct) {
+    if (type_is_structlike_strict(binop->right->type)) {
         onyx_message_add(Msg_Type_Literal,
                 binop->token->pos,
                 "invalid type for right side of binary operator");
@@ -728,8 +728,9 @@ b32 check_unaryop(AstUnaryOp** punop) {
 b32 check_struct_literal(AstStructLiteral* sl) {
     fill_in_type((AstTyped *) sl);
 
-    TypeStruct* st = &sl->type->Struct;
-    if (st->mem_count != bh_arr_length(sl->values)) {
+    u32 mem_count = type_structlike_mem_count(sl->type);
+
+    if (mem_count != bh_arr_length(sl->values)) {
         onyx_message_add(Msg_Type_Literal,
                 sl->token->pos,
                 "incorrect number of initial values for this type");
@@ -737,20 +738,26 @@ b32 check_struct_literal(AstStructLiteral* sl) {
     }
 
     AstTyped** actual = sl->values;
-    StructMember** formal = st->memarr;
+    StructMember smem;
 
-    fori (i, 0, st->mem_count) {
+    fori (i, 0, mem_count) {
         if (check_expression(actual)) return 1;
 
-        if (!types_are_compatible((*formal)->type, (*actual)->type)) {
+        // NOTE: Not checking the return on this function because
+        // this for loop is bounded by the number of members in the
+        // type.
+        type_lookup_member_by_idx(sl->type, i, &smem);
+        Type* formal = smem.type;
+
+        if (!types_are_compatible(formal, (*actual)->type)) {
             onyx_message_add(Msg_Type_Assignment_Mismatch,
                     sl->token->pos,
-                    type_get_name((*formal)->type),
+                    type_get_name(formal),
                     type_get_name((*actual)->type));
             return 1;
         }
 
-        actual++, formal++;
+        actual++;
     }
 
     return 0;
@@ -884,16 +891,16 @@ b32 check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     if (check_expression(&field->expr)) return 1;
 
-    if (!type_is_struct(field->expr->type)) {
+    if (!type_is_structlike(field->expr->type)) {
         onyx_message_add(Msg_Type_Literal,
             field->token->pos,
-            "expected expression of kind struct or pointer to struct");
+            "cannot access field on non structures");
         return 1;
     }
 
     token_toggle_end(field->token);
     StructMember smem;
-    if (!type_struct_lookup_member(field->expr->type, field->token->text, &smem)) {
+    if (!type_lookup_member(field->expr->type, field->token->text, &smem)) {
         onyx_message_add(Msg_Type_No_Field,
             field->token->pos,
             field->token->text,

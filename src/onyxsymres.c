@@ -228,21 +228,21 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     sl->type_node = (AstType *) sl->stnode;
     sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
 
-    if (sl->type->kind != Type_Kind_Struct) {
+    if (!type_is_structlike_strict(sl->type)) {
         onyx_message_add(Msg_Type_Literal,
                 sl->token->pos,
-                "type is not a struct type (BAD ERROR MESSAGE)");
+                "type is not a constructable using a struct literal");
         return;
     }
 
     if (bh_arr_length(sl->values) == 0) {
-        bh_arr_set_length(sl->values, sl->type->Struct.mem_count);
+        bh_arr_set_length(sl->values, type_structlike_mem_count(sl->type));
         bh_arr_zero(sl->values);
 
         StructMember s;
         bh_arr_each(AstStructMember *, smem, sl->named_values) {
             token_toggle_end((*smem)->token);
-            if (!type_struct_lookup_member(sl->type, (*smem)->token->text, &s)) {
+            if (!type_lookup_member(sl->type, (*smem)->token->text, &s)) {
                 onyx_message_add(Msg_Type_No_Field,
                         (*smem)->token->pos,
                         (*smem)->token->text, type_get_name(sl->type));
@@ -261,20 +261,22 @@ static void symres_struct_literal(AstStructLiteral* sl) {
             sl->values[s.idx] = (*smem)->initial_value;
         }
 
-        AstStructType* st = (AstStructType *) sl->type_node;
-        bh_arr_each(StructMember*, smem, sl->type->Struct.memarr) {
-            u32 idx = (*smem)->idx;
+        if (sl->type->kind == Type_Kind_Struct) {
+            AstStructType* st = (AstStructType *) sl->type_node;
+            bh_arr_each(StructMember*, smem, sl->type->Struct.memarr) {
+                u32 idx = (*smem)->idx;
 
-            if (sl->values[idx] == NULL) {
-                if (st->members[idx]->initial_value == NULL) {
-                    onyx_message_add(Msg_Type_Field_No_Value,
-                            sl->token->pos,
-                            st->members[idx]->token->text,
-                            st->members[idx]->token->length);
-                    return;
+                if (sl->values[idx] == NULL) {
+                    if (st->members[idx]->initial_value == NULL) {
+                        onyx_message_add(Msg_Type_Field_No_Value,
+                                sl->token->pos,
+                                st->members[idx]->token->text,
+                                st->members[idx]->token->length);
+                        return;
+                    }
+
+                    sl->values[idx] = st->members[idx]->initial_value;
                 }
-
-                sl->values[idx] = st->members[idx]->initial_value;
             }
         }
     }

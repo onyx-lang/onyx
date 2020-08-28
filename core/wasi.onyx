@@ -1,8 +1,11 @@
 package wasi
 
+#include_file "stdio"
+
 use package main as main
 use package builtin
 use package memory
+use package stdio as io
 
 Size      :: #type u32;
 Filesize  :: #type u64;
@@ -478,5 +481,9 @@ proc #export "_start" {
 
 	args_get(argv, argv_buf);
 
+    io.stdio_init();
+
 	main.main(argv[0 : argc]);
+
+    io.print_flush();
 }

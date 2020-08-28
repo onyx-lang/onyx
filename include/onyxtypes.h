@@ -68,6 +68,7 @@ typedef struct StructMember {
         bh_arr(StructMember *) memarr;                            \
     })                                                            \
     TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
+    TYPE_KIND(Slice, struct { Type *ptr_to_data; })               \
     TYPE_KIND(Enum, struct { char* name; Type* backing; }) 
 
 typedef enum TypeKind {
@@ -118,7 +119,9 @@ Type* type_make_slice(bh_allocator alloc, Type* of);
 const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);
 
-b32 type_struct_lookup_member(Type* type, char* member, StructMember* smem);
+b32 type_lookup_member(Type* type, char* member, StructMember* smem);
+b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem);
+
 b32 type_struct_is_simple(Type* type);
 
 b32 type_is_pointer(Type* type);
@@ -131,5 +134,9 @@ b32 type_is_integer(Type* type);
 b32 type_is_numeric(Type* type);
 b32 type_is_compound(Type* type);
 b32 type_results_in_void(Type* type);
+b32 type_is_structlike(Type* type);
+b32 type_is_structlike_strict(Type* type);
+u32 type_structlike_mem_count(Type* type);
+u32 type_structlike_is_simple(Type* type);
 
 #endif // #ifndef ONYX_TYPES

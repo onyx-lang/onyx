@@ -1,0 +1,5 @@
+Onyx
+    filter remove_inline //.*$
+    filter call_regexp_common C++
+    extension onyx
+    3rd_gen_scale 2.30

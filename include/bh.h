@@ -168,7 +168,8 @@ u8* double_to_ieee754(f64 f, b32 reverse);
 #define BH_BIT(x)                        (1 << (x))
 #define BH_MASK_SET(var, set, mask)     ((set) ? (var) |= (mask) : (var) &= ~(mask))
 
-#define fori(var, lo, hi)                for (i64 var = (lo); var < (hi); var++)
+#define fori(var, lo, hi)                 for (i64 var = (lo); var < (hi); var++)
+#define forir(var, hi, lo)                for (i64 var = (hi); var >= (lo); var--)
 #define forll(T, var, start, step)        for (T* var = (start); var != NULL; var = var->step)
 
 #ifdef BH_DEBUG

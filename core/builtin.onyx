@@ -32,6 +32,10 @@ free :: proc (use a: Allocator, ptr: rawptr) {
     func(data, AllocAction.Free, 0, 0, ptr);
 }
 
+calloc  :: proc (size: u32) -> rawptr do return alloc(context.allocator, size);
+cresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(context.allocator, ptr, size);
+cfree   :: proc (ptr: rawptr) do free(context.allocator, ptr);
+
 context : struct {
 	allocator      : Allocator;
 	temp_allocator : Allocator;

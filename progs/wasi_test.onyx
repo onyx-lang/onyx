@@ -8,6 +8,7 @@ package main
 #include_file "intrinsics"
 #include_file "random"
 #include_file "string"
+#include_file "file"
 
 use package builtin
 
@@ -19,66 +20,11 @@ use package memory
 use package wasi
 use package intrinsics
 use package random
-
-print_u64 :: proc (n_: u64, base := 10l) {
-    n := n_;
-    str: [256] u8;
-    for i: 0, 256 do str[i] = #char "\0";
-
-    c := cast(^u8) ^str[255];
-    *c = #char "\0";
-    c -= 1;
-
-    s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
-
-    if n == 0l {
-        *c = #char "0";
-        c -= 1;
-    } else {
-        while n > 0l {
-            m :: n % base;
-
-            *c = s.data[cast(u32) m];
-            c -= 1;
-
-            n /= base;
-        }
-    }
-
-    if base == 16l {
-        *c = #char "x";
-        c -= 1;
-        *c = #char "0";
-        c -= 1;
-    }
-
-    if base == 2l {
-        *c = #char "b";
-        c -= 1;
-        *c = #char "0";
-        c -= 1;
-    }
-
-    print(c + 1);
-}
-
-print_string :: proc (s: string) -> u32 {
-    vec := IOVec.{ buf = s.data, len = s.count };
-    tmp : Size;
-    fd_write(1, IOVecArray.{ ^vec, 1 }, ^tmp);
-    fd_datasync(1);
-
-    return tmp;
-}
-
-print_u8 :: proc (s: cstring) -> u32 {
-    return string_make(s) |> print_string();
-}
-
-print :: proc #overloaded { print_string, print_u8 }
+use package file
+use package stdio
 
 print_rights :: proc (rights: Rights) {
-    print_u64(cast(u64) rights, 2l);
+    print(cast(u32) rights, 2);
     print("\n");
 
     if rights & Rights.DataSync != cast(Rights) 0 do print("DataSync\n");
@@ -214,7 +160,7 @@ main :: proc (args: []cstring) {
 
     random_seed(cast(u32) now);
 
-    sb := string_builder_make(heap_allocator, 256);
+    sb := string_builder_make(256);
 
     timer := timer_start();
     defer {
@@ -235,26 +181,9 @@ main :: proc (args: []cstring) {
         |> string_builder_to_string()
         |> print();
 
-    fd: FileDescriptor = -1;
-    if err := path_open(3, LookupFlags.SymLinkFollow, string_make(args.data[1]), cast(OFlags) 0, Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile, Rights.DataSync | Rights.Write | Rights.Read | Rights.Tell | Rights.Seek | Rights.Advise | Rights.PathOpen | Rights.PathCreateFile, FDFlags.Sync, ^fd); err != Errno.Success {
-        print("Failed to open file\n");
-        print("Error code: ");
-        print_u64(cast(u64) err, 16l);
-        proc_exit(1);
-    }
-    defer fd_close(fd);
-
-    print_u64(cast(u64) fd, 16l);
-    print("\n");
-
-    filelen : Filesize;
-    if fd_seek(fd, 0l, Whence.End, ^filelen) != Errno.Success {
-        print("Failed to seek in file\n");
-        proc_exit(1);
-    }
-    print("the size is: ");
-    print_u64(cast(u64) filelen);
-    print("\n");
+    cont := file_get_contents(string_make(args.data[1]));
+    defer cfree(cont.data);
+    print(cont);
 
     sum := 0l;
     for i: 0, 20000 do if is_prime(i) do sum += cast(u64) i;
@@ -262,8 +191,8 @@ main :: proc (args: []cstring) {
     print_u64(sum);
     print("\n");
 
-    matches := string_split(heap_allocator, "This is a test string to test splitting. It surprisingly works very well.", #char " ");
-    defer free(heap_allocator, matches.data);
+    matches := string_split("This is a test string to test splitting. It surprisingly works very well.", #char " ");
+    defer cfree(matches.data);
 
     string_builder_clear(^sb);
     for i: 0, matches.count {
@@ -274,8 +203,8 @@ main :: proc (args: []cstring) {
     ^sb |> string_builder_to_string() |> print();
 
     program := "+ + * s - /";
-    tokens := string_split(heap_allocator, program, #char " ");
-    defer free(heap_allocator, tokens.data);
+    tokens := string_split(program, #char " ");
+    defer cfree(tokens.data);
 
     acc := 0;
     for i: 0, tokens.count {
@@ -349,6 +278,8 @@ main :: proc (args: []cstring) {
 
     sl := make_i32_arr();
     print_u64(cast(u64) sl.count);
+
+    print_u64(cast(u64) fib(20));
 }
 
 foobar :: proc (a: i32, b := 1, c := 5l) {
@@ -359,3 +290,19 @@ foobar :: proc (a: i32, b := 1, c := 5l) {
     print_u64(c);
     print("\n");
 }
+
+fib :: proc (n: i32) -> i32 {
+    switch n {
+        case 0 do return 1;
+        case 1 do return 1;
+        case #default {
+            return fib(n - 1) + fib(n - 2);
+        }
+    }
+
+    return 0;
+}
+
+//make_slice :: proc (ptr: ^$T, count: u32) -> [] T {
+//    return ptr[0 : count];
+//}

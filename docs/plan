@@ -223,6 +223,8 @@ HOW:
 
         [ ] transmute
 
+        [ ] explicit memory controls at top level
+
         [ ] Put type info in data section so it is runtime accessible
             - type name
             - size

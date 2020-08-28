@@ -33,27 +33,27 @@ string_length :: proc #overloaded {
 #private
 string_length_string :: proc (s: string) -> u32 do return s.count;
 
-string_concat :: proc (a: Allocator, s1: string, s2: string) -> string {
+string_concat :: proc (s1: string, s2: string) -> string {
     len1 :: string_length(s1);
     len2 :: string_length(s2);
 
-    data := cast(^u8) alloc(a, len1 + len2);
+    data := cast(^u8) calloc(len1 + len2);
     for i: 0, len1 do data[i]        = s1.data[i];
     for i: 0, len2 do data[i + len1] = s2.data[i];
 
     return string.{ data, len1 + len2 };
 }
 
-string_free :: proc (a: Allocator, s: string) do free(a, s.data);
+string_free :: proc (s: string) do cfree(s.data);
 
 // This is an example doc string
 // You can have as many comments as you want
 // It documents the string_split function
-string_split :: proc (a: Allocator, str: string, delim: u8) -> []string {
+string_split :: proc (str: string, delim: u8) -> []string {
     delim_count := 0;
     for i: 0, str.count do if str.data[i] == delim do delim_count += 1;
 
-    strarr := cast(^string) alloc(a, sizeof string * (delim_count + 1));
+    strarr := cast(^string) calloc(sizeof string * (delim_count + 1));
 
     curr_str := 0;
     begin := 0;
@@ -83,6 +83,11 @@ string_substr :: proc (str: string, sub: string) -> string {
     return str.data[0:0];
 }
 
+string_contains :: proc (str: string, c: u8) -> bool {
+    for i: 0, str.count do if str.data[i] == c do return true;
+    return false;
+}
+
 StringBuilder :: struct {
     alloc : Allocator;
 
@@ -91,15 +96,15 @@ StringBuilder :: struct {
     cap   : u32 = 0;
 }
 
-string_builder_make :: proc (a: Allocator, initial_cap: u32) -> StringBuilder {
+string_builder_make :: proc (initial_cap: u32) -> StringBuilder {
     data: ^u8 = null;
 
     if initial_cap > 0 {
-        data = cast(^u8) alloc(a, initial_cap);
+        data = cast(^u8) calloc(initial_cap);
     }
 
     return StringBuilder.{
-        alloc = a,
+        alloc = context.allocator,
         data  = data,
         cap   = initial_cap,
     };
