@@ -373,8 +373,6 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
 
     scope_clear(pp->poly_scope);
 
-    // Currently, not going to do any cacheing
-
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
         AstArgument* arg = call->arguments;
         if (param->idx >= call->arg_count) {
@@ -402,9 +400,23 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
         symbol_introduce(pp->poly_scope, param->poly_sym->token, (AstNode *) raw);
     }
 
+    static char key_buf[1024];
+    fori (i, 0, 1024) key_buf[i] = 0;
+    bh_table_each_start(AstNode *, pp->poly_scope->symbols);
+        strncat(key_buf, bh_bprintf("%s=", key), 1023);
+        strncat(key_buf, type_get_name(((AstTypeRawAlias *) value)->to), 1023);
+        strncat(key_buf, ";", 1023);
+    bh_table_each_end;
+
+    if (bh_table_has(AstFunction *, pp->concrete_funcs, key_buf)) {
+        return bh_table_get(AstFunction *, pp->concrete_funcs, key_buf);
+    }
+
     semstate.curr_scope = pp->poly_scope;
 
     AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
+    bh_table_put(AstFunction *, pp->concrete_funcs, key_buf, func);
+
     symres_function(func);
     if (check_function_header(func)) return NULL;
     if (check_function(func)) return NULL;

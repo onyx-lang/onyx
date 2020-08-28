@@ -281,6 +281,9 @@ main :: proc (args: []cstring) {
     print("\n");
 
     print(add(20l, 5l));
+    print(add(20l, 5l));
+    print(add(20l, 5l));
+    print(add(20l, 5l));
     print("\n");
     print(cast(u64) add(20.0f, 5.0f));
     print("\n");
