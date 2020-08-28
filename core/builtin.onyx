@@ -7,6 +7,8 @@ Buffer :: #type []void;
 
 null :: cast(rawptr) 0;
 
+DEFAULT_ALLOCATION_ALIGNMENT :: 16
+
 AllocAction :: enum {
     Alloc;
     Free;
@@ -21,11 +23,11 @@ Allocator :: struct {
 }
 
 alloc :: proc (use a: Allocator, size: u32) -> rawptr {
-    return func(data, AllocAction.Alloc, size, 16, null);
+    return func(data, AllocAction.Alloc, size, DEFAULT_ALLOCATION_ALIGNMENT, null);
 }
 
 resize :: proc (use a: Allocator, ptr: rawptr, size: u32) -> rawptr {
-    return func(data, AllocAction.Resize, size, 16, ptr);
+    return func(data, AllocAction.Resize, size, DEFAULT_ALLOCATION_ALIGNMENT, ptr);
 }
 
 free :: proc (use a: Allocator, ptr: rawptr) {

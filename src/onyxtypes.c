@@ -441,6 +441,7 @@ const char* type_get_name(Type* type) {
                 return "<anonymous enum>";
 
         case Type_Kind_Function: return bh_aprintf(global_scratch_allocator, "proc (...) -> %s", type_get_name(type->Function.return_type));
+        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_name(type->Slice.ptr_to_data->Pointer.elem));
 
         default: return "unknown";
     }
@@ -591,6 +592,12 @@ b32 type_results_in_void(Type* type) {
         || (   (type->kind == Type_Kind_Function)
             && (type->Function.return_type->kind == Type_Kind_Basic)
             && (type->Function.return_type->Basic.kind == Basic_Kind_Void));
+}
+
+b32 type_is_array_accessible(Type* type) {
+    if (type_is_pointer(type)) return 1;
+    if (type->kind == Type_Kind_Slice) return 1;
+    return 0;
 }
 
 b32 type_is_structlike(Type* type) {

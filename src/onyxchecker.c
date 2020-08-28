@@ -810,7 +810,7 @@ b32 check_array_access(AstArrayAccess* aa) {
     if (check_expression(&aa->addr)) return 1;
     if (check_expression(&aa->expr)) return 1;
 
-    if (!type_is_pointer(aa->addr->type)) {
+    if (!type_is_array_accessible(aa->addr->type)) {
         onyx_message_add(Msg_Type_Literal,
                 aa->token->pos,
                 "expected pointer or array type for left of array access");
@@ -829,6 +829,22 @@ b32 check_array_access(AstArrayAccess* aa) {
         aa->type = aa->addr->type->Pointer.elem;
     else if (aa->addr->type->kind == Type_Kind_Array)
         aa->type = aa->addr->type->Array.elem;
+    else if (aa->addr->type->kind == Type_Kind_Slice) {
+        // If we are accessing on a slice, implicitly add a field access for the data member
+
+        StructMember smem;
+        type_lookup_member(aa->addr->type, "data", &smem);
+
+        AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
+        fa->token = aa->addr->token;
+        fa->type = smem.type;
+        fa->offset = smem.offset;
+        fa->idx = smem.idx;
+        fa->expr = aa->addr;
+
+        aa->addr = (AstTyped *) fa;
+        aa->type = aa->addr->type->Pointer.elem;
+    }
     else {
         onyx_message_add(Msg_Type_Literal,
                 aa->token->pos,
@@ -910,6 +926,7 @@ b32 check_field_access(AstFieldAccess** pfield) {
     }
 
     field->offset = smem.offset;
+    field->idx = smem.idx;
     field->type = smem.type;
 
     token_toggle_end(field->token);

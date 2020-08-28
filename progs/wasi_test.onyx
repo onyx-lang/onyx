@@ -140,16 +140,14 @@ output_s :: proc (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
 print_arr :: proc (sb: ^StringBuilder, arr: []i32) {
     sb  |> string_builder_clear();
 
-    a := arr.data;
-
     for i: 0, arr.count {
-        sb |> sba(cast(u64) a[i]) |> sba(" ");
+        sb |> sba(cast(u64) arr[i]) |> sba(" ");
     }
 
     sb |> sba("\n") |> string_builder_to_string() |> print();
 }
 
-make_i32_arr :: proc (a := heap_allocator, len := 10) -> [] i32 {
+make_i32_arr :: proc (a := context.allocator, len := 10) -> [] i32 {
     arr := cast(^i32) alloc(a, sizeof i32 * len);
     return arr[0 : len];
 }
@@ -176,12 +174,12 @@ main :: proc (args: []cstring) {
         |> sba(cast(u64) args.count)
         |> sba(" arguments.\n");
 
-    for i: 0, args.count do ^sb |> sba(args.data[i]) |> sba(" ");
+    for i: 0, args.count do ^sb |> sba(args[i]) |> sba(" ");
     ^sb |> sba("\n")
         |> string_builder_to_string()
         |> print();
 
-    cont := file_get_contents(string_make(args.data[1]));
+    cont := file_get_contents(string_make(args[1]));
     defer cfree(cont.data);
     print(cont);
 
@@ -196,7 +194,7 @@ main :: proc (args: []cstring) {
 
     string_builder_clear(^sb);
     for i: 0, matches.count {
-        ^sb |> sba(matches.data[i])
+        ^sb |> sba(matches[i])
             |> sba("\n");
     }
 
@@ -208,7 +206,7 @@ main :: proc (args: []cstring) {
 
     acc := 0;
     for i: 0, tokens.count {
-        switch tokens.data[i].data[0] {
+        switch tokens[i][0] {
             case #char "+" do acc += 1;
             case #char "-" do acc -= 1;
             case #char "*" do acc *= 2;
@@ -217,7 +215,7 @@ main :: proc (args: []cstring) {
 
             case #default {
                 print("Unexpected token: ");
-                print_u64(cast(u64) tokens.data[i].data[0], 16l);
+                print_u64(cast(u64) tokens[i][0], 16l);
                 print("\n");
 
                 // This breaks out of the for loop
@@ -303,6 +301,6 @@ fib :: proc (n: i32) -> i32 {
     return 0;
 }
 
-//make_slice :: proc (ptr: ^$T, count: u32) -> [] T {
-//    return ptr[0 : count];
-//}
+// make_slice :: proc (ptr: ^$T, count: u32) -> [] T {
+//     return ptr[0 : count];
+// }

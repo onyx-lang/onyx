@@ -476,8 +476,8 @@ proc #export "_start" {
 
 	args_sizes_get(^argc, ^argv_buf_size);
 
-	argv := cast(^^u8) malloc(sizeof ^u8 * argc);
-	argv_buf := cast(^u8) malloc(argv_buf_size);
+	argv := cast(^^u8) calloc(sizeof ^u8 * argc);
+	argv_buf := cast(^u8) calloc(argv_buf_size);
 
 	args_get(argv, argv_buf);
 

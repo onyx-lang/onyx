@@ -299,7 +299,7 @@ struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
 struct AstSlice         { AstTyped_base; AstTyped *addr; AstTyped *lo, *hi; u64 elem_size; };
-struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u64 offset; };
+struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u32 offset; u32 idx; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
 struct AstFileContents  { AstTyped_base; OnyxToken *filename; };
@@ -464,6 +464,13 @@ struct AstFunction      {
             OnyxToken* foreign_name;
         };
     };
+};
+struct AstPolyProc {
+    AstNode_base;
+
+    Scope *poly_scope;
+
+    AstFunction* func;
 };
 struct AstOverloadedFunction {
     AstTyped_base;

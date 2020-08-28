@@ -134,6 +134,7 @@ b32 type_is_integer(Type* type);
 b32 type_is_numeric(Type* type);
 b32 type_is_compound(Type* type);
 b32 type_results_in_void(Type* type);
+b32 type_is_array_accessible(Type* type);
 b32 type_is_structlike(Type* type);
 b32 type_is_structlike_strict(Type* type);
 u32 type_structlike_mem_count(Type* type);

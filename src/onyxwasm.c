@@ -1406,13 +1406,7 @@ COMPILE_FUNC(location, AstTyped* expr) {
             AstFieldAccess* field = (AstFieldAccess *) expr;
 
             if (field->expr->kind == Ast_Kind_Param && type_is_structlike_strict(field->expr->type)) {
-                StructMember smem;
-
-                token_toggle_end(field->token);
-                type_lookup_member(field->expr->type, field->token->text, &smem);
-                token_toggle_end(field->token);
-
-                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + smem.idx;
+                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
 
                 WIL(WI_LOCAL_GET, localidx);
                 break;
@@ -1568,13 +1562,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
             AstFieldAccess* field = (AstFieldAccess* ) expr;
 
             if (field->expr->kind == Ast_Kind_Param && type_is_structlike_strict(field->expr->type)) {
-                StructMember smem;
-
-                token_toggle_end(field->token);
-                type_lookup_member(field->expr->type, field->token->text, &smem);
-                token_toggle_end(field->token);
-
-                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + smem.idx;
+                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
 
                 WIL(WI_LOCAL_GET, localidx);
                 break;

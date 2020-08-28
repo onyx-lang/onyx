@@ -125,11 +125,6 @@ heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, o
     return null;
 }
 
-malloc  :: proc (size: u32) -> rawptr do return alloc(heap_allocator, size);
-mfree   :: proc (ptr: rawptr) do free(heap_allocator, ptr);
-mresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(heap_allocator, ptr, size);
-
-
 
 #private
 ScratchState :: struct {
