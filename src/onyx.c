@@ -387,7 +387,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     if (compiler_state->options->action == ONYX_COMPILE_ACTION_DOCUMENT) {
         OnyxDocumentation docs = onyx_docs_generate(&compiler_state->prog_info);
         onyx_docs_write(&docs);
-        
+
         return ONYX_COMPILER_PROGRESS_SUCCESS;
     }
 
@@ -462,7 +462,7 @@ int main(int argc, char *argv[]) {
             break;
 
         case ONYX_COMPILER_PROGRESS_SUCCESS:
-            if (compile_opts.verbose_output) bh_printf("Successfully compiled to '%s'\n", compile_opts.target_file);
+            bh_printf("Successfully compiled to '%s'\n", compile_opts.target_file);
             break;
     }
 

@@ -1175,7 +1175,7 @@ COMPILE_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
     } else if (aa->addr->kind == Ast_Kind_Field_Access
         && aa->addr->type->kind == Type_Kind_Array) {
         compile_field_access_location(mod, &code, (AstFieldAccess *) aa->addr, &offset);
-    } else if (aa->addr->kind == Ast_Kind_Local
+    } else if ((aa->addr->kind == Ast_Kind_Local || aa->addr->kind == Ast_Kind_Param)
         && aa->addr->type->kind == Type_Kind_Array) {
         compile_local_location(mod, &code, (AstLocal *) aa->addr, &offset);
     } else if (aa->addr->kind == Ast_Kind_Memres
@@ -1207,7 +1207,7 @@ COMPILE_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         u64 o2 = 0;
         compile_array_access_location(mod, &code, (AstArrayAccess *) source_expr, &o2);
         offset += o2;
-    } else if (source_expr->kind == Ast_Kind_Local
+    } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
         && source_expr->type->kind != Type_Kind_Pointer) {
         u64 o2 = 0;
         compile_local_location(mod, &code, (AstLocal *) source_expr, &o2);
@@ -1603,7 +1603,7 @@ COMPILE_FUNC(expression, AstTyped* expr) {
                 WID(WI_I32_CONST, sl->elem_size);
                 WI(WI_I32_MUL);
             }
-            compile_location(mod, &code, sl->addr);
+            compile_expression(mod, &code, sl->addr);
             WI(WI_I32_ADD);
             compile_expression(mod, &code, sl->hi);
             WIL(WI_LOCAL_GET, tmp_local);

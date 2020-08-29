@@ -37,8 +37,10 @@ install: $(TARGET) core/*
 	cp -r core/ /usr/share/onyx
 
 install_syntax: misc/onyx.vim misc/onyx.sublime-syntax
+	cp ./misc/onyx_compiler.vim /usr/share/vim/vim82/compiler/onyx.vim
 	cp ./misc/onyx.vim /usr/share/vim/vim82/syntax/onyx.vim
 	cp ./misc/onyx.sublime-syntax /home/brendan/.config/sublime-text-3/Packages/User/onyx.sublime-syntax
+	cp ./misc/onyx.sublime-build /home/brendan/.config/sublime-text-3/Packages/User/Onyx.sublime-build
 
 clean:
 	rm -f $(OBJ_FILES) 2>&1 >/dev/null

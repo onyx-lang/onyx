@@ -1129,12 +1129,12 @@ static AstBlock* parse_block(OnyxParser* parser) {
 
     // NOTE: --- is for an empty block
     if (parser->curr->type == Token_Type_Empty_Block) {
-        expect_token(parser, Token_Type_Empty_Block);
+        block->token = expect_token(parser, Token_Type_Empty_Block);
         return block;
     }
 
     if (parser->curr->type == Token_Type_Keyword_Do) {
-        consume_token(parser);
+        block->token = expect_token(parser, Token_Type_Keyword_Do);
         block->body = parse_statement(parser);
         return block;
     }
@@ -1144,7 +1144,7 @@ static AstBlock* parse_block(OnyxParser* parser) {
         find_token(parser, '}');
         return block;
     }
-    expect_token(parser, '{');
+    block->token = expect_token(parser, '{');
 
     AstNode** next = &block->body;
     AstNode* stmt = NULL;

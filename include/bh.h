@@ -1,6 +1,9 @@
 #ifndef BH_H
 #define BH_H
 
+// NOTE: For lseek64
+#define _LARGEFILE64_SOURCE
+
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -1255,9 +1258,9 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
     i32 os_mode = 0;
 
     switch (mode & BH_FILE_MODE_MODES) {
-    case BH_FILE_MODE_READ:                         os_mode = O_RDONLY; break;
-    case BH_FILE_MODE_WRITE:                        os_mode = O_WRONLY | O_CREAT | O_TRUNC; break;
-    case BH_FILE_MODE_APPEND:                       os_mode = O_RDONLY | O_APPEND | O_CREAT; break;
+    case BH_FILE_MODE_READ:                       os_mode = O_RDONLY; break;
+    case BH_FILE_MODE_WRITE:                      os_mode = O_WRONLY | O_CREAT | O_TRUNC; break;
+    case BH_FILE_MODE_APPEND:                     os_mode = O_RDONLY | O_APPEND | O_CREAT; break;
     case BH_FILE_MODE_READ   | BH_FILE_MODE_RW:   os_mode = O_RDWR; break;
     case BH_FILE_MODE_WRITE  | BH_FILE_MODE_RW:   os_mode = O_RDWR | O_CREAT | O_TRUNC; break;
     case BH_FILE_MODE_APPEND | BH_FILE_MODE_RW:   os_mode = O_RDWR | O_APPEND | O_CREAT; break;
@@ -1293,8 +1296,8 @@ b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, is
 b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote) {
     isize res;
     i64 current_offset = 0;
-    bh__file_seek_wrapper(file->fd, offset, BH_FILE_WHENCE_CURRENT, &current_offset);
-    if (current_offset == offset) {
+    bh__file_seek_wrapper(file->fd, 0, BH_FILE_WHENCE_CURRENT, &current_offset);
+    if (current_offset == offset || file->fd == 1 || file->fd == 2) {
         // Standard in and out do like pwrite()
         res = write(file->fd, buffer, buff_size);
     } else {
@@ -1307,7 +1310,7 @@ b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_s
 }
 
 static b32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset) {
-    i64 res = lseek(fd, offset, whence);
+    i64 res = lseek64(fd, offset, whence);
     if (res < 0) return 0;
     if (new_offset) *new_offset = res;
     return 1;

@@ -7,6 +7,9 @@ Buffer :: #type []void;
 
 null :: cast(rawptr) 0;
 
+// ---------------------------------
+//           Allocation
+// ---------------------------------
 DEFAULT_ALLOCATION_ALIGNMENT :: 16
 
 AllocAction :: enum {
@@ -38,6 +41,11 @@ calloc  :: proc (size: u32) -> rawptr do return alloc(context.allocator, size);
 cresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(context.allocator, ptr, size);
 cfree   :: proc (ptr: rawptr) do free(context.allocator, ptr);
 
+
+
+// ---------------------------------
+//           Dynamic Arrays
+// ---------------------------------
 array_init :: proc (arr: ^[..] $T, initial_cap := 4) {
     arr.count = 0;
     arr.capacity = initial_cap;
@@ -78,7 +86,7 @@ array_add_at :: proc (arr: ^[..] $T, x: T, idx: u32) {
 }
 
 array_remove :: proc (arr: ^[..] $T, elem: T) {
-    move  := 0;
+    move := 0;
 
     for i: 0, arr.count - move {
         if arr.data[i + move] == elem do move += 1;
@@ -115,6 +123,10 @@ array_average :: proc (arr: ^[..] $T) -> T {
     }
 
     return sum / cast(T) arr.count;
+}
+
+array_to_slice :: proc (arr: ^[..] $T) -> [] T {
+    return arr.data[0 : arr.count];
 }
 
 

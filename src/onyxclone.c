@@ -201,6 +201,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 		case Ast_Kind_Block:
 			((AstBlock *) nn)->body = ast_clone_list(a, ((AstBlock *) node)->body);
 			((AstBlock *) nn)->locals = NULL;
+			bh_arr_new(global_heap_allocator, ((AstBlock *) nn)->locals, 4);
 			break;
 
 		case Ast_Kind_Defer:
@@ -287,6 +288,9 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 			df->return_type = (AstType *) ast_clone(a, sf->return_type);
 			df->body = (AstBlock *) ast_clone(a, sf->body);
+
+			df->locals = NULL;
+		    bh_arr_new(global_heap_allocator, df->locals, 4);
 
 			df->params = NULL;
 			bh_arr_new(global_heap_allocator, df->params, bh_arr_length(sf->params));

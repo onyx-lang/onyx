@@ -11,11 +11,7 @@ package main
 #include_file "file"
 
 use package builtin
-
-// NOTE: Didn't realize this would work so easily
-use package core { string_builder_append as sba }
 use package core
-
 use package memory
 use package wasi
 use package intrinsics
@@ -30,10 +26,15 @@ print_arr_details :: proc (arr: ^[..] $T) {
     print(arr.capacity);
     print("\n\tData ptr: ");
     print(cast(u32) arr.data, 16);
+    print("\n\tSize of elements: ");
+    print(sizeof T);
+    print("\n\tAlignment of elements: ");
+    print(alignof T);
     print("\n\n");
 }
 
-print_arr :: proc (arr: ^[..] $T) {
+// This works on both slices and arrays
+print_arr :: proc (arr: $T) {
     for i: 0, arr.count {
         print(arr.data[i]);
         print(" ");
@@ -42,26 +43,61 @@ print_arr :: proc (arr: ^[..] $T) {
     print("\n");
 }
 
-print_vec_arr :: proc (arr: ^[..] Vec3) {
+print_vec_arr :: proc (arr: [..] Vec3) {
     for i: 0, arr.count {
         print("Vec3(");
-        print(arr.data[i].x);
+        print(arr[i].x);
         print(", ");
-        print(arr.data[i].y);
+        print(arr[i].y);
         print(", ");
-        print(arr.data[i].z);
+        print(arr[i].z);
         print(")\n");
     }
 
     print("\n");
 }
 
+// This demonstrates that we have something similar to static 'duck' typing.
+get_count :: proc (x: $T) -> u32 do return x.count;
+
+
+
+SOA :: struct {
+    a  : [..] i32;
+    b  : [..] i64;
+}
+
 main :: proc (args: [] cstring) {
+    s : SOA;
+    array_init(^s.a, 10);
+    array_init(^s.b, 10);
+    defer array_free(^s.a);
+    defer array_free(^s.b);
+
+    print_arr_details(^s.a);
+    print_arr_details(^s.b);
+
+    for i: 0, 100 {
+        array_add(^s.a, 5 * i);
+        array_add(^s.b, 3l * cast(i64) i);
+    }
+
+    print_arr(^s.a);
+    print_arr(array_to_slice(^s.a));
+
+    print("After adding...\n");
+    print_arr_details(^s.a);
+    print_arr_details(^s.b);
+}
+
+main2 :: proc (args: [] cstring) {
     print(cast(u32) __heap_start, 16);
 
+    iarr_backing : [32] i32;
     iarr : [..] i32;
-    array_init(^iarr, 24);
-    defer array_free(^iarr);
+    iarr.data = cast(^i32) iarr_backing;
+    iarr.count = 0;
+    iarr.capacity = 32;
 
     print_arr_details(^iarr);
 
@@ -116,11 +152,24 @@ main :: proc (args: [] cstring) {
     defer array_free(^varr);
 
     for i: 0, 20 {
-        array_add(^varr, Vec3.{ i, i * i, i * i * i });
+        array_add(^varr, Vec3.{
+            x = i,
+            y = i * i,
+            z = i * i * i,
+        });
     }
 
+    array_add(^varr, Vec3.{ 4, 2, 3 });
+
     print_arr_details(^varr);
-    print_vec_arr(^varr);
+    print_vec_arr(varr);
+
+    print(get_count(iarr));
+    print("\n");
+    print(get_count(barr));
+    print("\n");
+    print(get_count(varr));
+    print("\n");
 }
 
 Vec3 :: struct {

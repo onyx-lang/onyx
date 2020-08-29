@@ -1,0 +1,7 @@
+{
+	"target": "exec",
+	"shell_cmd": "/usr/bin/onyx -o \"${folder}/${file_base_name}.wasm\" \"$file\"",
+	"working_dir": "${folder}",
+	"selector": "source.onyx",
+	"file_regex": "^\\(([^:]+):([0-9]+),([0-9]+)\\) (.*)",
+}

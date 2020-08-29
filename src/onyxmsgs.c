@@ -59,6 +59,7 @@ void onyx_message_add(MsgType type, OnyxFilePos pos, ...) {
     va_end(arg_list);
 
     Message** walker = &msgs.first;
+    while (*walker && strcmp((*walker)->pos.filename, pos.filename) < 0) walker = &(*walker)->next;
     while (*walker && (*walker)->pos.line < pos.line) walker = &(*walker)->next;
     while (*walker && (*walker)->pos.line == pos.line && (*walker)->pos.column < pos.column) walker = &(*walker)->next;
 
