@@ -138,8 +138,14 @@ string_builder_add_cstring :: proc (use sb: ^StringBuilder, cstr: cstring) -> ^S
     return string_builder_add_string(sb, s);
 }
 
-u64_to_string :: proc (n_: u64, base: u64, buf: Buffer) -> string {
-    n := n_;
+i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
+    n := cast(u64) n_;
+
+    is_neg := false;
+    if n_ < 0l && base == 10l {
+        is_neg = true;
+        n = cast(u64) -n_;
+    }
 
     str :: cast(^u8) buf.data;
     for i: 0, buf.count do str[i] = #char "\0";
@@ -182,19 +188,36 @@ u64_to_string :: proc (n_: u64, base: u64, buf: Buffer) -> string {
         c -= 1;
     }
 
+    if is_neg {
+        *c = #char "-";
+        len += 1;
+        c -= 1;
+    }
+
     return string.{ data = c + 1, count = len };
 }
 
 string_builder_add_u64 :: proc (use sb: ^StringBuilder, n: u64, base := 10l) -> ^StringBuilder {
     buf : [256] u8;
-    s := u64_to_string(n, base, Buffer.{ cast(rawptr) buf, 256 });
+    s := i64_to_string(n, base, Buffer.{ cast(rawptr) buf, 256 });
     return string_builder_add_string(sb, s);
+}
+
+string_builder_add_bool :: proc (use sb: ^StringBuilder, b: bool) -> ^StringBuilder {
+    if b {
+        return string_builder_add_string(sb, "true");
+    } else {
+        return string_builder_add_string(sb, "false");
+    }
+
+    return null;
 }
 
 string_builder_append :: proc #overloaded {
     string_builder_add_string,
     string_builder_add_cstring,
     string_builder_add_u64,
+    string_builder_add_bool,
 }
 
 string_builder_to_string :: proc (use sb: ^StringBuilder) -> string {

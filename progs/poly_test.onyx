@@ -24,11 +24,11 @@ use package file
 use package stdio
 
 print_arr_details :: proc (arr: ^[..] $T) {
-    print("\nArray details:\n");
+    print("\nArray details:\n\tSize: ");
     print(arr.count);
-    print("\n");
+    print("\n\tCapacity: ");
     print(arr.capacity);
-    print("\n");
+    print("\n\tData ptr: ");
     print(cast(u32) arr.data, 16);
     print("\n\n");
 }
@@ -43,26 +43,49 @@ print_arr :: proc (arr: ^[..] $T) {
 }
 
 main :: proc (args: [] cstring) {
-    arr : [..] i32;
-    array_init(^arr, 24);
+    iarr : [..] i32;
+    array_init(^iarr, 24);
+    defer array_free(^iarr);
 
-    print_arr_details(^arr);
+    print_arr_details(^iarr);
 
-    array_add(^arr, 1234);
+    array_add(^iarr, 1234);
 
-    for i: 0, 12 do array_add(^arr, i % 5);
+    for i: 0, 12 do array_add(^iarr, i % 5);
 
-    print_arr_details(^arr);
-    print_arr(^arr);
+    print_arr_details(^iarr);
+    print_arr(^iarr);
 
-    array_remove_at(^arr, 4);
+    array_remove_at(^iarr, 4);
 
-    print_arr_details(^arr);
-    print_arr(^arr);
+    print_arr_details(^iarr);
+    print_arr(^iarr);
 
-    array_remove(^arr, 1);
-    array_remove(^arr, 4);
+    array_remove(^iarr, 1);
+    array_remove(^iarr, 4);
 
-    print_arr_details(^arr);
-    print_arr(^arr);
+    print_arr_details(^iarr);
+    print_arr(^iarr);
+
+    array_add_at(^iarr, 5678, 2);
+
+    print_arr_details(^iarr);
+    print_arr(^iarr);
+
+
+
+    barr : [..] i64;
+    array_init(^barr, 10);
+    defer array_free(^barr);
+
+    for i: 0, 1000 {
+        array_add(^barr, cast(u64) (3 * i * i + 4 * i - 2));
+    }
+
+    print_arr_details(^barr);
+    print_arr(^barr);
+
+    print("Does the array contain 2638? ");
+    print(array_contains(^barr, 2638l));
+    print("\n");
 }
