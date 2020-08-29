@@ -630,7 +630,7 @@ static inline i32 get_precedence(BinaryOp kind) {
 // With expected precedence rules
 static AstTyped* parse_expression(OnyxParser* parser) {
     bh_arr(AstBinaryOp*) tree_stack = NULL;
-    bh_arr_new(global_scratch_allocator, tree_stack, 4);
+    bh_arr_new(global_heap_allocator, tree_stack, 4);
     bh_arr_set_length(tree_stack, 0);
 
     AstTyped* left = parse_factor(parser);
@@ -719,6 +719,8 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             bin_op->right = right;
         }
     }
+
+    bh_arr_free(tree_stack);
 
 expression_done:
     return root;

@@ -42,7 +42,23 @@ print_arr :: proc (arr: ^[..] $T) {
     print("\n");
 }
 
+print_vec_arr :: proc (arr: ^[..] Vec3) {
+    for i: 0, arr.count {
+        print("Vec3(");
+        print(arr.data[i].x);
+        print(", ");
+        print(arr.data[i].y);
+        print(", ");
+        print(arr.data[i].z);
+        print(")\n");
+    }
+
+    print("\n");
+}
+
 main :: proc (args: [] cstring) {
+    print(cast(u32) __heap_start, 16);
+
     iarr : [..] i32;
     array_init(^iarr, 24);
     defer array_free(^iarr);
@@ -71,6 +87,8 @@ main :: proc (args: [] cstring) {
 
     print_arr_details(^iarr);
     print_arr(^iarr);
+    print(array_average(^iarr));
+    print("\n");
 
 
 
@@ -78,14 +96,35 @@ main :: proc (args: [] cstring) {
     array_init(^barr, 10);
     defer array_free(^barr);
 
-    for i: 0, 1000 {
+    for i: 0, 500 {
         array_add(^barr, cast(u64) (3 * i * i + 4 * i - 2));
     }
 
     print_arr_details(^barr);
     print_arr(^barr);
-
-    print("Does the array contain 2638? ");
-    print(array_contains(^barr, 2638l));
+    print(array_average(^barr));
     print("\n");
+
+    print("Does the array contain 2637? ");
+    print(array_contains(^barr, 2637l));
+    print("\n");
+
+
+
+    varr : [..] Vec3;
+    array_init(^varr);
+    defer array_free(^varr);
+
+    for i: 0, 20 {
+        array_add(^varr, Vec3.{ i, i * i, i * i * i });
+    }
+
+    print_arr_details(^varr);
+    print_vec_arr(^varr);
+}
+
+Vec3 :: struct {
+    x: i32;
+    y: i32;
+    z: i32;
 }
