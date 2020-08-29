@@ -1,6 +1,6 @@
 package main
 
-#include_folder "/usr/share/onyx/core"
+#include_folder "./core"
 
 #include_file "builtin"
 #include_file "wasi"
@@ -33,9 +33,9 @@ print_arr_details :: proc (arr: ^[..] $T) {
     print("\n\n");
 }
 
-print_arr :: proc (arr: [..] $T) {
+print_arr :: proc (arr: ^[..] $T) {
     for i: 0, arr.count {
-        print(arr[i]);
+        print(arr.data[i]);
         print(" ");
     }
 
@@ -44,15 +44,25 @@ print_arr :: proc (arr: [..] $T) {
 
 main :: proc (args: [] cstring) {
     arr : [..] i32;
-    array_init(^arr);
+    array_init(^arr, 24);
 
     print_arr_details(^arr);
 
     array_add(^arr, 1234);
 
-    for i: 0, 12 do array_add(^arr, i * 2 + 2);
+    for i: 0, 12 do array_add(^arr, i % 5);
 
     print_arr_details(^arr);
+    print_arr(^arr);
 
-    print_arr(arr);
+    array_remove_at(^arr, 4);
+
+    print_arr_details(^arr);
+    print_arr(^arr);
+
+    array_remove(^arr, 1);
+    array_remove(^arr, 4);
+
+    print_arr_details(^arr);
+    print_arr(^arr);
 }

@@ -431,8 +431,10 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
     bh_table_put(AstFunction *, pp->concrete_funcs, key_buf, func);
 
     symres_function(func);
+    if (onyx_message_has_errors()) return NULL;
     if (check_function_header(func)) return NULL;
     if (check_function(func)) return NULL;
+    if (onyx_message_has_errors()) return NULL;
 
     bh_arr_push(semstate.other_entities, ((Entity) {
         .type = Entity_Type_Function_Header,

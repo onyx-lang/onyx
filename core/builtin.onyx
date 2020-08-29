@@ -38,9 +38,9 @@ calloc  :: proc (size: u32) -> rawptr do return alloc(context.allocator, size);
 cresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(context.allocator, ptr, size);
 cfree   :: proc (ptr: rawptr) do free(context.allocator, ptr);
 
-array_init :: proc(arr: ^[..] $T) {
+array_init :: proc(arr: ^[..] $T, initial_cap := 4) {
     arr.count = 0;
-    arr.capacity = 4;
+    arr.capacity = initial_cap;
     arr.data = calloc(sizeof T * arr.capacity);
 }
 
@@ -52,6 +52,27 @@ array_add :: proc (arr: ^[..] $T, x: T) {
 
     arr.data[arr.count] = x;
     arr.count += 1;
+}
+
+array_remove_at :: proc (arr: ^[..] $T, idx: u32) {
+    if idx >= arr.count do return;
+
+    for i: idx, arr.count - 1 {
+        arr.data[i] = arr.data[i + 1];
+    }
+
+    arr.count -= 1;
+}
+
+array_remove :: proc (arr: ^[..] $T, elem: T) {
+    move  := 0;
+
+    for i: 0, arr.count - move {
+        if arr.data[i + move] == elem do move += 1;
+        if move != 0 do arr.data[i] = arr.data[i + move];
+    } 
+
+    arr.count -= move;
 }
 
 context : struct {
