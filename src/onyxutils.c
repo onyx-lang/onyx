@@ -47,6 +47,7 @@ static const char* ast_node_names[] = {
     "FUNCTION_TYPE",
     "ARRAY TYPE",
     "SLICE TYPE",
+    "DYNARR TYPE",
     "STRUCT TYPE",
     "ENUM TYPE",
     "TYPE_ALIAS",
@@ -347,14 +348,26 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
 
         switch (type_expr->kind) {
             case Ast_Kind_Pointer_Type: {
+                if (actual->kind != Type_Kind_Pointer) return NULL;
+
                 type_expr = ((AstPointerType *) type_expr)->elem;
                 actual = actual->Pointer.elem;
                 break;
             }
 
             case Ast_Kind_Slice_Type: {
+                if (actual->kind != Type_Kind_Slice) return NULL;
+
                 type_expr = ((AstSliceType *) type_expr)->elem;
                 actual = actual->Slice.ptr_to_data->Pointer.elem;
+                break;
+            }
+
+            case Ast_Kind_DynArr_Type: {
+                if (actual->kind != Type_Kind_DynArray) return NULL;
+
+                type_expr = ((AstDynArrType *) type_expr)->elem;
+                actual = actual->DynArray.ptr_to_data->Pointer.elem;
                 break;
             }
 

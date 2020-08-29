@@ -1714,6 +1714,15 @@ COMPILE_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (from->kind == Type_Kind_DynArray || to->kind == Type_Kind_DynArray) {
+        onyx_message_add(Msg_Type_Literal,
+                cast->token->pos,
+                "cannot cast to or from a dynamic array");
+        WI(WI_DROP);
+        *pcode = code;
+        return;
+    }
+
     if (to->kind == Type_Kind_Function) {
         onyx_message_add(Msg_Type_Literal,
                 cast->token->pos,

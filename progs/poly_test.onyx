@@ -1,0 +1,58 @@
+package main
+
+#include_folder "/usr/share/onyx/core"
+
+#include_file "builtin"
+#include_file "wasi"
+#include_file "alloc"
+#include_file "intrinsics"
+#include_file "random"
+#include_file "string"
+#include_file "file"
+
+use package builtin
+
+// NOTE: Didn't realize this would work so easily
+use package core { string_builder_append as sba }
+use package core
+
+use package memory
+use package wasi
+use package intrinsics
+use package random
+use package file
+use package stdio
+
+print_arr_details :: proc (arr: ^[..] $T) {
+    print("\nArray details:\n");
+    print(arr.count);
+    print("\n");
+    print(arr.capacity);
+    print("\n");
+    print(cast(u32) arr.data, 16);
+    print("\n\n");
+}
+
+print_arr :: proc (arr: [..] $T) {
+    for i: 0, arr.count {
+        print(arr[i]);
+        print(" ");
+    }
+
+    print("\n");
+}
+
+main :: proc (args: [] cstring) {
+    arr : [..] i32;
+    array_init(^arr);
+
+    print_arr_details(^arr);
+
+    array_add(^arr, 1234);
+
+    for i: 0, 12 do array_add(^arr, i * 2 + 2);
+
+    print_arr_details(^arr);
+
+    print_arr(arr);
+}

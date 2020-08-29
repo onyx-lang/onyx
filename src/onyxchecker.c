@@ -836,8 +836,9 @@ b32 check_array_access(AstArrayAccess* aa) {
         aa->type = aa->addr->type->Pointer.elem;
     else if (aa->addr->type->kind == Type_Kind_Array)
         aa->type = aa->addr->type->Array.elem;
-    else if (aa->addr->type->kind == Type_Kind_Slice) {
-        // If we are accessing on a slice, implicitly add a field access for the data member
+    else if (aa->addr->type->kind == Type_Kind_Slice
+            || aa->addr->type->kind == Type_Kind_DynArray) {
+        // If we are accessing on a slice or a dynamic array, implicitly add a field access for the data member
 
         StructMember smem;
         type_lookup_member(aa->addr->type, "data", &smem);

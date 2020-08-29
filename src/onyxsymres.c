@@ -123,6 +123,13 @@ static AstType* symres_type(AstType* type) {
         return type;
     }
 
+    if (type->kind == Ast_Kind_DynArr_Type) {
+        AstDynArrType* da_node = (AstDynArrType *) type;
+        da_node->elem = symres_type(da_node->elem);
+
+        return type;
+    }
+
     onyx_message_add(Msg_Type_Literal,
             (OnyxFilePos) { 0 },
             onyx_ast_node_kind_string(type->kind));

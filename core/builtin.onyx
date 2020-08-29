@@ -38,6 +38,22 @@ calloc  :: proc (size: u32) -> rawptr do return alloc(context.allocator, size);
 cresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(context.allocator, ptr, size);
 cfree   :: proc (ptr: rawptr) do free(context.allocator, ptr);
 
+array_init :: proc(arr: ^[..] $T) {
+    arr.count = 0;
+    arr.capacity = 4;
+    arr.data = calloc(sizeof T * arr.capacity);
+}
+
+array_add :: proc (arr: ^[..] $T, x: T) {
+    if arr.count + 1 > arr.capacity {
+        arr.capacity <<= 1;
+        arr.data = cresize(arr.data, sizeof T * arr.capacity);
+    }
+
+    arr.data[arr.count] = x;
+    arr.count += 1;
+}
+
 context : struct {
 	allocator      : Allocator;
 	temp_allocator : Allocator;

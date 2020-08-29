@@ -1188,6 +1188,13 @@ static AstType* parse_type(OnyxParser* parser, bh_arr(AstPolyParam)* poly_vars) 
             if (parser->curr->type == ']') {
                 new = make_node(AstSliceType, Ast_Kind_Slice_Type);
                 new->token = open_bracket;
+                
+            } else if (parser->curr->type == '.') {
+                new = make_node(AstDynArrType, Ast_Kind_DynArr_Type);
+                new->token = open_bracket;
+                consume_token(parser);
+                expect_token(parser, '.');
+
             } else {
                 new = make_node(AstArrayType, Ast_Kind_Array_Type);
                 new->token = open_bracket;

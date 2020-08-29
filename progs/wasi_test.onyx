@@ -296,6 +296,20 @@ main :: proc (args: []cstring) {
 
     print(multi_poly(5.4f, 10l));
     print("\n");
+
+    dynarr : [..] Vec3;
+    array_init(^dynarr);
+    for i: 0, 16 do array_add(^dynarr, Vec3.{ cast(f32) i, cast(f32) (i * i), cast(f32) (i * i * i) });
+    for i: 0, 16 {
+        print(cast(u32) dynarr.data[i].x);
+        print(" ");
+        print(cast(u32) dynarr.data[i].y);
+        print(" ");
+        print(cast(u32) dynarr.data[i].z);
+        print("\n");
+    }
+
+    print(dynarr.count, 10);
 }
 
 foobar :: proc (a: i32, b := 1, c := 5l) {

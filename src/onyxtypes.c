@@ -94,6 +94,11 @@ b32 types_are_surface_compatible(Type* t1, Type* t2) {
             return types_are_compatible(t1->Slice.ptr_to_data->Pointer.elem, t2->Slice.ptr_to_data->Pointer.elem);
         }
 
+        case Type_Kind_DynArray: {
+            if (t2->kind != Type_Kind_DynArray) return 0;
+            return types_are_compatible(t1->DynArray.ptr_to_data->Pointer.elem, t2->DynArray.ptr_to_data->Pointer.elem);
+        }
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -189,6 +194,11 @@ b32 types_are_compatible(Type* t1, Type* t2) {
             return types_are_compatible(t1->Slice.ptr_to_data->Pointer.elem, t2->Slice.ptr_to_data->Pointer.elem);
         }
 
+        case Type_Kind_DynArray: {
+            if (t2->kind != Type_Kind_DynArray) return 0;
+            return types_are_compatible(t1->DynArray.ptr_to_data->Pointer.elem, t2->DynArray.ptr_to_data->Pointer.elem);
+        }
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -208,6 +218,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Struct:   return type->Struct.size;
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
         case Type_Kind_Slice:    return 8;
+        case Type_Kind_DynArray: return 12;
         default:                 return 0;
     }
 }
@@ -223,6 +234,7 @@ u32 type_alignment_of(Type* type) {
         case Type_Kind_Struct:   return type->Struct.alignment;
         case Type_Kind_Enum:     return type_alignment_of(type->Enum.backing);
         case Type_Kind_Slice:    return 4;
+        case Type_Kind_DynArray: return 4;
         default: return 1;
     }
 }
@@ -367,6 +379,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return type_make_slice(alloc, type_build_from_ast(alloc, ((AstSliceType *) type_node)->elem));
         }
 
+        case Ast_Kind_DynArr_Type: {
+            return type_make_dynarray(alloc, type_build_from_ast(alloc, ((AstDynArrType *) type_node)->elem));
+        }
+
         case Ast_Kind_Basic_Type:
             return ((AstBasicType *) type_node)->type;
 
@@ -425,6 +441,14 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
     return slice_type;
 }
 
+Type* type_make_dynarray(bh_allocator alloc, Type* of) {
+    Type* dynarr = bh_alloc(alloc, sizeof(Type));
+    dynarr->kind = Type_Kind_DynArray;
+    dynarr->DynArray.ptr_to_data = type_make_pointer(alloc, of);
+
+    return dynarr;
+}
+
 const char* type_get_name(Type* type) {
     if (type == NULL) return "unknown";
 
@@ -445,6 +469,7 @@ const char* type_get_name(Type* type) {
 
         case Type_Kind_Function: return bh_aprintf(global_scratch_allocator, "proc (...) -> %s", type_get_name(type->Function.return_type));
         case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_name(type->Slice.ptr_to_data->Pointer.elem));
+        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_name(type->DynArray.ptr_to_data->Pointer.elem));
 
         default: return "unknown";
     }
@@ -488,6 +513,27 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             return 0;
         }
 
+        case Type_Kind_DynArray: {
+            if (strcmp(member, "data") == 0) {
+                smem->idx = 0;
+                smem->offset = 0;
+                smem->type = type->DynArray.ptr_to_data;
+                return 1;
+            }
+            if (strcmp(member, "count") == 0) {
+                smem->idx = 1;
+                smem->offset = 4;
+                smem->type = &basic_types[Basic_Kind_U32];
+                return 1;
+            }
+            if (strcmp(member, "capacity") == 0) {
+                smem->idx = 2;
+                smem->offset = 8;
+                smem->type = &basic_types[Basic_Kind_U32];
+                return 1;
+            }
+        }
+
         default: return 0;
     }
 }
@@ -519,6 +565,27 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             }
 
             return 0;
+        }
+
+        case Type_Kind_DynArray: {
+            if (idx == 0) {
+                smem->idx = 0;
+                smem->offset = 0;
+                smem->type = type->DynArray.ptr_to_data;
+                return 1;
+            }
+            if (idx == 1) {
+                smem->idx = 1;
+                smem->offset = 4;
+                smem->type = &basic_types[Basic_Kind_U32];
+                return 1;
+            }
+            if (idx == 2) {
+                smem->idx = 2;
+                smem->offset = 8;
+                smem->type = &basic_types[Basic_Kind_U32];
+                return 1;
+            }
         }
 
         default: return 0;
@@ -600,37 +667,43 @@ b32 type_results_in_void(Type* type) {
 b32 type_is_array_accessible(Type* type) {
     if (type_is_pointer(type)) return 1;
     if (type->kind == Type_Kind_Slice) return 1;
+    if (type->kind == Type_Kind_DynArray) return 1;
     return 0;
 }
 
 b32 type_is_structlike(Type* type) {
     if (type->kind == Type_Kind_Struct) return 1;
     if (type->kind == Type_Kind_Slice)  return 1;
+    if (type->kind == Type_Kind_DynArray) return 1;
     if (type->kind == Type_Kind_Pointer) {
         if (type->Pointer.elem->kind == Type_Kind_Struct) return 1;
         if (type->Pointer.elem->kind == Type_Kind_Slice)  return 1;
+        if (type->Pointer.elem->kind == Type_Kind_DynArray) return 1;
     }
     return 0;
 }
 
 b32 type_is_structlike_strict(Type* type) {
-    if (type->kind == Type_Kind_Struct) return 1;
-    if (type->kind == Type_Kind_Slice)  return 1;
+    if (type->kind == Type_Kind_Struct)   return 1;
+    if (type->kind == Type_Kind_Slice)    return 1;
+    if (type->kind == Type_Kind_DynArray) return 1;
     return 0;
 }
 
 u32 type_structlike_mem_count(Type* type) {
     switch (type->kind) {
-        case Type_Kind_Struct: return type->Struct.mem_count;
-        case Type_Kind_Slice:  return 2;
+        case Type_Kind_Struct:   return type->Struct.mem_count;
+        case Type_Kind_Slice:    return 2;
+        case Type_Kind_DynArray: return 3;
         default: return 0;
     }
 }
 
 u32 type_structlike_is_simple(Type* type) {
     switch (type->kind) {
-        case Type_Kind_Struct: return type_struct_is_simple(type);
-        case Type_Kind_Slice:  return 1;
+        case Type_Kind_Struct:   return type_struct_is_simple(type);
+        case Type_Kind_Slice:    return 1;
+        case Type_Kind_DynArray: return 1;
         default: return 0;
     }
 }

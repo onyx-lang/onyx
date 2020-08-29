@@ -18,7 +18,7 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_Enum_Value:
 		case Ast_Kind_Overloaded_Function:
 		case Ast_Kind_Polymorphic_Proc:
-		return 0;
+			return 0;
 
 		default: return 1;
 	}
@@ -52,9 +52,11 @@ static inline i32 ast_kind_to_size(AstKind kind) {
         case Ast_Kind_Function_Type: return sizeof(AstFunctionType);
         case Ast_Kind_Array_Type: return sizeof(AstArrayType);
         case Ast_Kind_Slice_Type: return sizeof(AstSliceType);
+        case Ast_Kind_DynArr_Type: return sizeof(AstDynArrType);
         case Ast_Kind_Struct_Type: return sizeof(AstStructType);
         case Ast_Kind_Enum_Type: return sizeof(AstEnumType);
         case Ast_Kind_Type_Alias: return sizeof(AstTypeAlias);
+        case Ast_Kind_Type_Raw_Alias: return sizeof(AstTypeRawAlias);
         case Ast_Kind_Type_End: return 0;
         case Ast_Kind_Struct_Member: return sizeof(AstStructMember);
         case Ast_Kind_Enum_Value: return sizeof(AstEnumValue);
@@ -128,6 +130,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			((AstUnaryOp *) nn)->type_node = (AstType *) ast_clone(a, ((AstUnaryOp *) node)->type_node);
 			break;
 
+		case Ast_Kind_Param:
 		case Ast_Kind_Local:
 			((AstLocal *) nn)->type_node = (AstType *) ast_clone(a, ((AstLocal *) node)->type_node);
 			break;
@@ -254,6 +257,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 		case Ast_Kind_Slice_Type:
 			((AstSliceType *) nn)->elem = (AstType *) ast_clone(a, ((AstSliceType *) node)->elem);
+			break;
+
+		case Ast_Kind_DynArr_Type:
+			((AstDynArrType *) nn)->elem = (AstType *) ast_clone(a, ((AstDynArrType *) node)->elem);
 			break;
 
 		case Ast_Kind_Type_Alias:

@@ -69,6 +69,7 @@ typedef struct StructMember {
     })                                                            \
     TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
     TYPE_KIND(Slice, struct { Type *ptr_to_data; })               \
+    TYPE_KIND(DynArray, struct { Type *ptr_to_data; })            \
     TYPE_KIND(Enum, struct { char* name; Type* backing; }) 
 
 typedef enum TypeKind {
@@ -115,6 +116,7 @@ Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
 Type* type_make_slice(bh_allocator alloc, Type* of);
+Type* type_make_dynarray(bh_allocator alloc, Type* of);
 
 const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);
