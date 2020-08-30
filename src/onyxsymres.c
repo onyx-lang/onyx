@@ -56,11 +56,8 @@ static AstType* symres_type(AstType* type) {
         AstFieldAccess* field = (AstFieldAccess *) type;
         symres_field_access(&field);
 
-        if (!node_is_type((AstNode *) field)) {
-            onyx_message_add(Msg_Type_Literal,
-                    type->token->pos,
-                    "field access did not result in a type");
-        }
+        if (!node_is_type((AstNode *) field))
+            onyx_report_error(type->token->pos, "field access did not result in a type");
 
         return (AstType *) field;
     }
@@ -130,9 +127,6 @@ static AstType* symres_type(AstType* type) {
         return type;
     }
 
-    onyx_message_add(Msg_Type_Literal,
-            (OnyxFilePos) { 0 },
-            onyx_ast_node_kind_string(type->kind));
     return type;
 }
 
@@ -194,9 +188,7 @@ static void symres_ufc(AstBinaryOp** ufc) {
     symres_expression(&(*ufc)->left);
 
     if (call_node->kind != Ast_Kind_Call) {
-        onyx_message_add(Msg_Type_Literal,
-                (*ufc)->token->pos,
-                "universal function call expected call on right side");
+        onyx_report_error((*ufc)->token->pos, "universal function call expected call on right side");
         return;
     }
 
@@ -236,9 +228,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
 
     if (!type_is_structlike_strict(sl->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                sl->token->pos,
-                "type is not a constructable using a struct literal");
+        onyx_report_error(sl->token->pos, "Type is not a constructable using a struct literal.");
         return;
     }
 
@@ -250,18 +240,15 @@ static void symres_struct_literal(AstStructLiteral* sl) {
         bh_arr_each(AstStructMember *, smem, sl->named_values) {
             token_toggle_end((*smem)->token);
             if (!type_lookup_member(sl->type, (*smem)->token->text, &s)) {
-                onyx_message_add(Msg_Type_No_Field,
-                        (*smem)->token->pos,
-                        (*smem)->token->text, type_get_name(sl->type));
+                onyx_report_error((*smem)->token->pos,
+                    "The field '%s' does not exist on type '%s'.", (*smem)->token->text, type_get_name(sl->type));
                 token_toggle_end((*smem)->token);
                 return;
             }
             token_toggle_end((*smem)->token);
 
             if (sl->values[s.idx] != NULL) {
-                onyx_message_add(Msg_Type_Duplicate_Value,
-                        (*smem)->token->pos,
-                        (*smem)->token->text, (*smem)->token->length);
+                onyx_report_error((*smem)->token->pos, "Multiple values given for '%b'.", (*smem)->token->text, (*smem)->token->length);
                 return;
             }
 
@@ -275,8 +262,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
 
                 if (sl->values[idx] == NULL) {
                     if (st->members[idx]->initial_value == NULL) {
-                        onyx_message_add(Msg_Type_Field_No_Value,
-                                sl->token->pos,
+                        onyx_report_error(sl->token->pos, "No value was given for the field '%b'.",
                                 st->members[idx]->token->text,
                                 st->members[idx]->token->length);
                         return;
@@ -490,8 +476,8 @@ void symres_function(AstFunction* func) {
 
             if (param->default_value != NULL) {
                 if (!types_are_compatible(param->local->type, param->default_value->type)) {
-                    onyx_message_add(Msg_Type_Assignment_Mismatch,
-                            param->local->token->pos,
+                    onyx_report_error(param->local->token->pos,
+                            "Expected default value of type '%s', was of type '%s'.",
                             type_get_name(param->local->type),
                             type_get_name(param->default_value->type));
                     return;
@@ -529,9 +515,7 @@ void symres_function(AstFunction* func) {
                 }
 
             } else {
-                onyx_message_add(Msg_Type_Literal,
-                        param->local->token->pos,
-                        "can only 'use' structures or pointers to structures.");
+                onyx_report_error(param->local->token->pos, "can only 'use' structures or pointers to structures.");
             }
         }
     }
@@ -564,9 +548,7 @@ static void symres_use_package(AstUsePackage* package) {
     token_toggle_end(package->package->token);
 
     if (p == NULL) {
-        onyx_message_add(Msg_Type_Literal,
-            package->token->pos,
-            "package not found in included source files");
+        onyx_report_error(package->token->pos, "package not found in included source files");
         return;
     }
 
@@ -585,9 +567,7 @@ static void symres_use_package(AstUsePackage* package) {
 
             AstNode* thing = symbol_resolve(p->scope, (*alias)->token);
             if (thing == NULL) {
-                onyx_message_add(Msg_Type_Literal,
-                    (*alias)->token->pos,
-                    "not found in package");
+                onyx_report_error((*alias)->token->pos, "not found in package");
                 return;
             }
 
@@ -619,9 +599,7 @@ static void symres_enum(AstEnumType* enum_node) {
             } else if ((*value)->value->type_node == (AstType *) &basic_type_i64) {
                 next_assign_value = (*value)->value->value.l;
             } else {
-                onyx_message_add(Msg_Type_Literal,
-                    (*value)->token->pos,
-                    "expected numeric integer literal for enum initialization");
+                onyx_report_error((*value)->token->pos, "expected numeric integer literal for enum initialization");
                 return;
             }
 

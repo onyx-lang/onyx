@@ -4,7 +4,7 @@
 #include "bh.h"
 
 #include "onyxlex.h"
-#include "onyxmsgs.h"
+#include "onyxerrors.h"
 #include "onyxastnodes.h"
 
 typedef struct NodeToProcess {

@@ -4,7 +4,7 @@
 #include "bh.h"
 
 #include "onyxastnodes.h"
-#include "onyxmsgs.h"
+#include "onyxerrors.h"
 
 typedef u8 WasmType;
 

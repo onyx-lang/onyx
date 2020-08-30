@@ -1,6 +1,6 @@
 #include "onyxastnodes.h"
 #include "onyxtypes.h"
-#include "onyxmsgs.h"
+#include "onyxerrors.h"
 #include "onyxutils.h"
 
 AstBasicType basic_type_void   = { Ast_Kind_Basic_Type, 0, NULL, "void"  , &basic_types[Basic_Kind_Void]  };
@@ -65,9 +65,7 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
     Package* p = program_info_package_lookup_or_create(prog, "builtin", prog->global_scope, a);
     builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "string");
     if (builtin_string_type == NULL) {
-        onyx_message_add(Msg_Type_Literal,
-                (OnyxFilePos) { 0 },
-                "'string' struct not found in builtin package");
+        onyx_report_error((OnyxFilePos) { 0 }, "'string' struct not found in builtin package.");
         return;
     }
 }

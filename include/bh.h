@@ -143,6 +143,26 @@ static inline u64 log2_dumb(u64 n) {
 
 
 
+static inline const char* bh_num_suffix(u64 i) {
+    if (i == 11 || i == 12 || i == 13) return "th";
+
+    switch (i % 10) {
+        case 0: return "th";
+        case 1: return "st";
+        case 2: return "nd";
+        case 3: return "rd";
+        case 4: return "th";
+        case 5: return "th";
+        case 6: return "th";
+        case 7: return "th";
+        case 8: return "th";
+        case 9: return "th";
+
+        default: return "";
+    }
+}
+
+
 
 
 //-------------------------------------------------------------------------------------

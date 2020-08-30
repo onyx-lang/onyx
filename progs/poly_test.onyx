@@ -67,12 +67,20 @@ SOA :: struct {
     b  : [..] i64;
 }
 
+soa_init :: proc (s: ^SOA) {
+    array_init(^s.a);
+    array_init(^s.b);
+}
+
+soa_deinit :: proc (s: ^SOA) {
+    array_free(^s.a);
+    array_free(^s.b);
+}
+
 main :: proc (args: [] cstring) {
     s : SOA;
-    array_init(^s.a, 10);
-    array_init(^s.b, 10);
-    defer array_free(^s.a);
-    defer array_free(^s.b);
+    soa_init(^s);
+    defer soa_deinit(^s);
 
     print_arr_details(^s.a);
     print_arr_details(^s.b);
@@ -83,7 +91,8 @@ main :: proc (args: [] cstring) {
     }
 
     print_arr(^s.a);
-    print_arr(array_to_slice(^s.a));
+    array_to_slice(^s.a) |> print_arr();
+    array_to_slice(^s.b) |> print_arr();
 
     print("After adding...\n");
     print_arr_details(^s.a);
@@ -138,7 +147,7 @@ main2 :: proc (args: [] cstring) {
 
     print_arr_details(^barr);
     print_arr(^barr);
-    print(array_average(^barr));
+    array_average(^barr) |> print();
     print("\n");
 
     print("Does the array contain 2637? ");

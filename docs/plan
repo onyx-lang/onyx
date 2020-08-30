@@ -218,6 +218,11 @@ HOW:
 
         [X] Basic documentation outputter
 
+        [X] Rewrite error reporting system
+            - don't sort errors
+            - add infos to warnings
+            - no more preformatted strings, just write them inline ffs
+
         [ ] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is
 
@@ -231,9 +236,6 @@ HOW:
             - alignment
             - struct member names
             - array length
-
-        [ ] Clean up error messages
-            - Stop using Msg_Type_Literal everywhere and be more specific
 
         [ ] 'use' enums and packages at an arbitrary scope
 

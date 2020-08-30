@@ -3,7 +3,7 @@
 #include "bh.h"
 
 #include "onyxlex.h"
-#include "onyxmsgs.h"
+#include "onyxerrors.h"
 #include "onyxparser.h"
 #include "onyxsempass.h"
 #include "onyxutils.h"
@@ -109,8 +109,8 @@ typedef enum CompilerProgress {
 typedef struct CompilerState {
     OnyxCompileOptions* options;
 
-    bh_arena                  ast_arena, msg_arena, sp_arena;
-    bh_allocator token_alloc, ast_alloc, msg_alloc, sp_alloc;
+    bh_arena                  ast_arena, sp_arena;
+    bh_allocator token_alloc, ast_alloc, sp_alloc;
 
     bh_table(bh_file_contents) loaded_files;
     bh_arr(const char *) queued_files;
@@ -124,12 +124,8 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
 
     program_info_init(&compiler_state->prog_info, global_heap_allocator);
 
-    bh_arena_init(&compiler_state->msg_arena, opts->allocator, 4096);
-    compiler_state->msg_alloc = bh_arena_allocator(&compiler_state->msg_arena);
-
     bh_table_init(opts->allocator, compiler_state->loaded_files, 15);
-
-    onyx_message_init(compiler_state->msg_alloc, &compiler_state->loaded_files);
+    onyx_errors_init(&compiler_state->loaded_files);
 
     compiler_state->token_alloc = opts->allocator;
 
@@ -150,7 +146,6 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
 
 static void compiler_state_free(CompilerState* cs) {
     bh_arena_free(&cs->ast_arena);
-    bh_arena_free(&cs->msg_arena);
     bh_arena_free(&cs->sp_arena);
     bh_table_free(cs->loaded_files);
     onyx_wasm_module_free(&cs->wasm_mod);
@@ -333,7 +328,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     ParseResults results = parse_source_file(compiler_state, &fc);
     merge_parse_results(compiler_state, &results);
 
-    if (onyx_message_has_errors()) {
+    if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
     } else {
         return ONYX_COMPILER_PROGRESS_SUCCESS;
@@ -354,7 +349,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     }
 
     initialize_builtins(compiler_state->ast_alloc, &compiler_state->prog_info);
-    if (onyx_message_has_errors()) {
+    if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
     }
 
@@ -380,7 +375,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     onyx_sempass_init(compiler_state->sp_alloc, compiler_state->ast_alloc);
     onyx_sempass(&compiler_state->prog_info);
 
-    if (onyx_message_has_errors()) {
+    if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
     }
 
@@ -398,7 +393,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     compiler_state->wasm_mod = onyx_wasm_module_create(compiler_state->options->allocator);
     onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->prog_info);
 
-    if (onyx_message_has_errors()) {
+    if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
     }
 
@@ -454,7 +449,7 @@ int main(int argc, char *argv[]) {
         case ONYX_COMPILER_PROGRESS_FAILED_PARSE:
         case ONYX_COMPILER_PROGRESS_FAILED_SEMPASS:
         case ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN:
-            onyx_message_print();
+            onyx_errors_print();
             break;
 
         case ONYX_COMPILER_PROGRESS_FAILED_OUTPUT:

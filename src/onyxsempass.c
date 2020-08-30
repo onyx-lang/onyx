@@ -26,7 +26,7 @@ void onyx_sempass(ProgramInfo* program) {
     semstate.program = program;
 
     onyx_resolve_symbols(program);
-    if (onyx_message_has_errors()) return;
+    if (onyx_has_errors()) return;
 
     onyx_type_check(program);
 
@@ -38,5 +38,5 @@ void onyx_sempass(ProgramInfo* program) {
         bh_arr_clear(semstate.other_entities);
     }
     
-    if (onyx_message_has_errors()) return;
+    if (onyx_has_errors()) return;
 }

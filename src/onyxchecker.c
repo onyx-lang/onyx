@@ -46,17 +46,15 @@ b32 check_return(AstReturn* retnode) {
         if (check_expression(&retnode->expr)) return 1;
 
         if (!types_are_compatible(retnode->expr->type, semstate.expected_return_type)) {
-            onyx_message_add(Msg_Type_Function_Return_Mismatch,
-                    retnode->expr->token->pos,
+            onyx_report_error(retnode->expr->token->pos,
+                    "Expected to return a value of type '%s', returning value of type '%s'.",
                     type_get_name(retnode->expr->type),
                     type_get_name(semstate.expected_return_type));
             return 1;
         }
     } else {
         if (semstate.expected_return_type->Basic.size > 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    retnode->token->pos,
-                    "returning from non-void function without value");
+            onyx_report_error(retnode->token->pos, "returning from non-void function without value");
             return 1;
         }
     }
@@ -70,9 +68,7 @@ b32 check_if(AstIfWhile* ifnode) {
     if (check_expression(&ifnode->cond)) return 1;
 
     if (!type_is_bool(ifnode->cond->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                ifnode->cond->token->pos,
-                "expected boolean type for condition");
+        onyx_report_error(ifnode->cond->token->pos, "expected boolean type for condition");
         return 1;
     }
 
@@ -88,9 +84,7 @@ b32 check_while(AstIfWhile* whilenode) {
     if (check_expression(&whilenode->cond)) return 1;
 
     if (!type_is_bool(whilenode->cond->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                whilenode->cond->token->pos,
-                "expected boolean type for condition");
+        onyx_report_error(whilenode->cond->token->pos, "expected boolean type for condition");
         return 1;
     }
 
@@ -110,23 +104,17 @@ b32 check_for(AstFor* fornode) {
     fill_in_type((AstTyped *) fornode->var);
 
     if (!type_is_integer(fornode->start->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                fornode->start->token->pos,
-                "expected expression of integer type for start");
+        onyx_report_error(fornode->start->token->pos, "expected expression of integer type for start");
         return 1;
     }
 
     if (!type_is_integer(fornode->end->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                fornode->end->token->pos,
-                "expected expression of integer type for end");
+        onyx_report_error(fornode->end->token->pos, "expected expression of integer type for end");
         return 1;
     }
 
     if (!type_is_integer(fornode->step->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                fornode->step->token->pos,
-                "expected expression of integer type for step");
+        onyx_report_error(fornode->step->token->pos, "expected expression of integer type for step");
         return 1;
     }
 
@@ -138,16 +126,12 @@ b32 check_for(AstFor* fornode) {
     }
 
     if (!types_are_compatible(fornode->end->type, fornode->start->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                fornode->end->token->pos,
-                "type of end does not match type of start");
+        onyx_report_error(fornode->end->token->pos, "type of end does not match type of start");
         return 1;
     }
 
     if (!types_are_compatible(fornode->step->type, fornode->start->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                fornode->start->token->pos,
-                "type of step does not match type of start");
+        onyx_report_error(fornode->start->token->pos, "type of step does not match type of start");
         return 1;
     }
 
@@ -162,9 +146,7 @@ b32 check_switch(AstSwitch* switchnode) {
 
     if (check_expression(&switchnode->expr)) return 1;
     if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
-        onyx_message_add(Msg_Type_Literal,
-                switchnode->expr->token->pos,
-                "expected integer or enum type for switch expression");
+        onyx_report_error(switchnode->expr->token->pos, "expected integer or enum type for switch expression");
         return 1;
     }
 
@@ -181,9 +163,7 @@ b32 check_switch(AstSwitch* switchnode) {
         }
 
         if (sc->value->kind != Ast_Kind_NumLit) {
-            onyx_message_add(Msg_Type_Literal,
-                    sc->value->token->pos,
-                    "case statement expected compile time known integer");
+            onyx_report_error(sc->value->token->pos, "case statement expected compile time known integer");
             return 1;
         }
 
@@ -194,9 +174,7 @@ b32 check_switch(AstSwitch* switchnode) {
         switchnode->max_case = bh_max(switchnode->max_case, value);
 
         if (bh_imap_has(&switchnode->case_map, value)) {
-            onyx_message_add(Msg_Type_Multiple_Cases,
-                    sc->value->token->pos,
-                    value);
+            onyx_report_error(sc->value->token->pos, "Multiple cases for values '%d'.", value);
             return 1;
         }
 
@@ -236,9 +214,7 @@ no_match:
         continue;
     }
 
-    onyx_message_add(Msg_Type_Literal,
-            call->token->pos,
-            "unable to match overloaded function");
+    onyx_report_error(call->token->pos, "unable to match overloaded function");
 
     return NULL;
 }
@@ -247,9 +223,7 @@ b32 check_call(AstCall* call) {
     AstFunction* callee = (AstFunction *) call->callee;
 
     if (callee->kind == Ast_Kind_Symbol) {
-        onyx_message_add(Msg_Type_Unresolved_Symbol,
-                callee->token->pos,
-                callee->token->text, callee->token->length);
+        onyx_report_error(callee->token->pos, "Unresolved symbol '%b'.", callee->token->text, callee->token->length);
         return 1;
     }
 
@@ -262,17 +236,14 @@ b32 check_call(AstCall* call) {
         if (check_expression((AstTyped **) &actual_param)) return 1;
 
         if (actual_param->value->kind == Ast_Kind_Overloaded_Function) {
-            onyx_message_add(Msg_Type_Literal,
-                    actual_param->token->pos,
-                    "cannot pass overloaded functions as parameters.");
+            onyx_report_error(actual_param->token->pos, "Cannot pass overloaded functions as parameters.");
             return 1;
         }
 
         if (type_is_structlike_strict(actual_param->value->type)) {
             if (!type_structlike_is_simple(actual_param->value->type)) {
-                onyx_message_add(Msg_Type_Literal,
-                        actual_param->token->pos,
-                        "can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
+                onyx_report_error(actual_param->token->pos,
+                    "Can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
                 return 1;
             }
         }
@@ -299,8 +270,8 @@ b32 check_call(AstCall* call) {
     fill_in_type((AstTyped *) callee);
 
     if (callee->type->kind != Type_Kind_Function) {
-        onyx_message_add(Msg_Type_Call_Non_Function,
-                call->token->pos,
+        onyx_report_error(call->token->pos,
+                "Attempting to call something that is not a function, '%b'.",
                 callee->token->text, callee->token->length);
         return 1;
     }
@@ -400,8 +371,8 @@ b32 check_call(AstCall* call) {
     i32 arg_pos = 0;
     while (arg_pos < callee->type->Function.param_count && actual_param != NULL) {
         if (!types_are_compatible(formal_params[arg_pos], actual_param->type)) {
-            onyx_message_add(Msg_Type_Function_Param_Mismatch,
-                    actual_param->token->pos,
+            onyx_report_error(actual_param->token->pos,
+                    "The function '%b' expects a value of type '%s' for parameter '%d', got '%s'.",
                     callee->token->text, callee->token->length,
                     type_get_name(formal_params[arg_pos]),
                     arg_pos,
@@ -414,16 +385,12 @@ b32 check_call(AstCall* call) {
     }
 
     if (arg_pos < callee->type->Function.param_count) {
-        onyx_message_add(Msg_Type_Literal,
-                call->token->pos,
-                "too few arguments to function call");
+        onyx_report_error(call->token->pos, "Too few arguments to function call.");
         return 1;
     }
 
     if (actual_param != NULL) {
-        onyx_message_add(Msg_Type_Literal,
-                call->token->pos,
-                "too many arguments to function call");
+        onyx_report_error(call->token->pos, "Too many arguments to function call.");
         return 1;
     }
 
@@ -434,29 +401,27 @@ b32 check_call(AstCall* call) {
 
 b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     if (!assignment_is_ok) {
-        onyx_message_add(Msg_Type_Literal,
-            binop->token->pos,
-            "assignment not valid in expression");
+        onyx_report_error(binop->token->pos, "Assignment not valid in expression.");
         return 1;
     }
 
     if (!is_lval((AstNode *) binop->left)) {
-        onyx_message_add(Msg_Type_Not_Lval,
-                binop->left->token->pos,
+        onyx_report_error(binop->left->token->pos,
+                "Cannot assign to '%b'.",
                 binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
     if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL) {
-        onyx_message_add(Msg_Type_Assign_Const,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Cannot assign to constant '%b.'.",
                 binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
     if (binop->right->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
         return 1;
     }
@@ -501,8 +466,8 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     }
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
-        onyx_message_add(Msg_Type_Assignment_Mismatch,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Cannot assign value of type '%s' to a '%s'.",
                 type_get_name(binop->left->type),
                 type_get_name(binop->right->type));
         return 1;
@@ -517,36 +482,32 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
     if (binop->left->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Unable to resolve type for symbol '%b'.",
                 binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
     if (binop->right->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
         return 1;
     }
 
     if (type_is_structlike_strict(binop->left->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "invalid type for left side of binary operator");
+        onyx_report_error(binop->token->pos, "Invalid type for left side of comparison operator.");
         return 1;
     }
 
     if (type_is_structlike_strict(binop->right->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "invalid type for right side of binary operator");
+        onyx_report_error(binop->token->pos, "Invalid type for right side of comparison operator.");
         return 1;
     }
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
-        onyx_message_add(Msg_Type_Binop_Mismatch,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Cannot compare '%s' to '%s'.",
                 type_get_name(binop->left->type),
                 type_get_name(binop->right->type));
         return 1;
@@ -565,23 +526,21 @@ b32 check_binaryop_bool(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
     if (binop->left->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Unable to resolve type for symbol '%b'.",
                 binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
     if (binop->right->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
         return 1;
     }
 
     if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "boolean operator expects boolean types for both operands");
+        onyx_report_error(binop->token->pos, "Boolean operator expects boolean types for both operands.");
         return 1;
     }
 
@@ -611,62 +570,50 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         return check_binaryop_bool(pbinop);
 
     if (binop->left->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Unable to resolve type for symbol '%b'.",
                 binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
     if (binop->right->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
         return 1;
     }
 
     if (!type_is_numeric(binop->left->type) && !type_is_pointer(binop->left->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "expected numeric or pointer type for left side of binary operator");
+        onyx_report_error(binop->token->pos, "Expected numeric or pointer type for left side of binary operator.");
         return 1;
     }
 
     if (!type_is_numeric(binop->right->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "expected numeric type for right side of binary operator");
+        onyx_report_error(binop->token->pos, "Expected numeric type for right side of binary operator.");
         return 1;
     }
 
     if (type_is_pointer(binop->right->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "right side of binary operator is a pointer");
+        onyx_report_error(binop->token->pos, "Right side of binary operator is a pointer.");
         return 1;
     }
 
     if (binop->left->type->kind == Type_Kind_Basic
         && binop->left->type->Basic.kind == Basic_Kind_Rawptr
         && !binop_is_compare(binop)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "cannot operate on a rawptr");
+        onyx_report_error(binop->token->pos, "Cannot operate on a 'rawptr'. Cast it to a another pointer type first.");
         return 1;
     }
 
     b32 lptr = type_is_pointer(binop->left->type);
     if (lptr && (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus)) {
-        onyx_message_add(Msg_Type_Literal,
-                binop->token->pos,
-                "this operator is not supported for these operands");
+        onyx_report_error(binop->token->pos, "This operator is not supported for these operands.");
         return 1;
     }
 
     if (lptr) {
         if (!type_is_integer(binop->right->type)) {
-            onyx_message_add(Msg_Type_Literal,
-                    binop->right->token->pos,
-                    "expected integer type");
+            onyx_report_error(binop->right->token->pos, "Expected integer type.");
             return 1;
         }
 
@@ -698,8 +645,8 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
-        onyx_message_add(Msg_Type_Binop_Mismatch,
-                binop->token->pos,
+        onyx_report_error(binop->token->pos,
+                "Mismatched types for binary operation. left: '%s', right: '%s'.",
                 type_get_name(binop->left->type),
                 type_get_name(binop->right->type));
         return 1;
@@ -738,9 +685,11 @@ b32 check_struct_literal(AstStructLiteral* sl) {
     u32 mem_count = type_structlike_mem_count(sl->type);
 
     if (mem_count != bh_arr_length(sl->values)) {
-        onyx_message_add(Msg_Type_Literal,
-                sl->token->pos,
-                "incorrect number of initial values for this type");
+        onyx_report_error(sl->token->pos,
+                "'%s' expects %d values, given %d.",
+                type_get_name(sl->type),
+                bh_arr_length(sl->values),
+                mem_count);
         return 1;
     }
 
@@ -757,8 +706,9 @@ b32 check_struct_literal(AstStructLiteral* sl) {
         Type* formal = smem.type;
 
         if (!types_are_compatible(formal, (*actual)->type)) {
-            onyx_message_add(Msg_Type_Assignment_Mismatch,
-                    sl->token->pos,
+            onyx_report_error(sl->token->pos,
+                    "Mismatched types for %d%s member, expected '%s, got '%s'.",
+                    i, bh_num_suffix(i),
                     type_get_name(formal),
                     type_get_name((*actual)->type));
             return 1;
@@ -778,9 +728,7 @@ b32 check_address_of(AstAddressOf* aof) {
             && aof->expr->kind != Ast_Kind_Field_Access
             && aof->expr->kind != Ast_Kind_Memres
             && aof->expr->kind != Ast_Kind_Local) {
-        onyx_message_add(Msg_Type_Literal,
-                aof->token->pos,
-                "cannot take the address of this");
+        onyx_report_error(aof->token->pos, "Cannot take the address of value.");
         return 1;
     }
 
@@ -795,16 +743,12 @@ b32 check_dereference(AstDereference* deref) {
     if (check_expression(&deref->expr)) return 1;
 
     if (!type_is_pointer(deref->expr->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                deref->token->pos,
-                "cannot dereference non-pointer");
+        onyx_report_error(deref->token->pos, "Cannot dereference non-pointer value.");
         return 1;
     }
 
     if (deref->expr->type == basic_type_rawptr.type) {
-        onyx_message_add(Msg_Type_Literal,
-                deref->token->pos,
-                "cannot dereference rawptr");
+        onyx_report_error(deref->token->pos, "Cannot dereference 'rawptr'. Cast to another pointer type first.");
         return 1;
     }
 
@@ -818,17 +762,13 @@ b32 check_array_access(AstArrayAccess* aa) {
     if (check_expression(&aa->expr)) return 1;
 
     if (!type_is_array_accessible(aa->addr->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                aa->token->pos,
-                "expected pointer or array type for left of array access");
+        onyx_report_error(aa->token->pos, "Expected pointer or array type for left of array access.");
         return 1;
     }
 
     if (aa->expr->type->kind != Type_Kind_Basic
             || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_message_add(Msg_Type_Literal,
-                aa->token->pos,
-                "expected 32-bit integer type for index");
+        onyx_report_error(aa->token->pos, "Expected type u32 or i32 for index.");
         return 1;
     }
 
@@ -854,9 +794,7 @@ b32 check_array_access(AstArrayAccess* aa) {
         aa->type = aa->addr->type->Pointer.elem;
     }
     else {
-        onyx_message_add(Msg_Type_Literal,
-                aa->token->pos,
-                "invalid type for left of array access");
+        onyx_report_error(aa->token->pos, "Invalid type for left of array access.");
         return 1;
     }
 
@@ -871,25 +809,19 @@ b32 check_slice(AstSlice* sl) {
     if (check_expression(&sl->hi)) return 1;
 
     if (!type_is_pointer(sl->addr->type)) {
-        onyx_message_add(Msg_Type_Literal,
-                sl->token->pos,
-                "expected pointer or array type for left of slice creation");
+        onyx_report_error(sl->token->pos, "Expected pointer or array type for left of slice creation.");
         return 1;
     }
 
     if (sl->lo->type->kind != Type_Kind_Basic
             || (sl->lo->type->Basic.kind != Basic_Kind_I32 && sl->lo->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_message_add(Msg_Type_Literal,
-                sl->token->pos,
-                "expected 32-bit integer type for lower index");
+        onyx_report_error(sl->lo->token->pos, "Expected type u32 or i32 for lower index.");
         return 1;
     }
 
     if (sl->hi->type->kind != Type_Kind_Basic
             || (sl->hi->type->Basic.kind != Basic_Kind_I32 && sl->hi->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_message_add(Msg_Type_Literal,
-                sl->token->pos,
-                "expected 32-bit integer type for upper index");
+        onyx_report_error(sl->hi->token->pos, "Expected type u32 or i32 for upper index.");
         return 1;
     }
 
@@ -899,9 +831,7 @@ b32 check_slice(AstSlice* sl) {
     else if (sl->addr->type->kind == Type_Kind_Array)
         of = sl->addr->type->Array.elem;
     else {
-        onyx_message_add(Msg_Type_Literal,
-                sl->token->pos,
-                "invalid type for left of slice creation");
+        onyx_report_error(sl->token->pos, "Invalid type for left of slice creation.");
         return 1;
     }
 
@@ -916,17 +846,19 @@ b32 check_field_access(AstFieldAccess** pfield) {
     if (check_expression(&field->expr)) return 1;
 
     if (!type_is_structlike(field->expr->type)) {
-        onyx_message_add(Msg_Type_Literal,
-            field->token->pos,
-            "cannot access field on non structures");
+        onyx_report_error(field->token->pos,
+            "Cannot access field '%b' on '%s'. Type is not a struct.",
+            field->token->text,
+            field->token->length,
+            type_get_name(field->expr->type));
         return 1;
     }
 
     token_toggle_end(field->token);
     StructMember smem;
     if (!type_lookup_member(field->expr->type, field->token->text, &smem)) {
-        onyx_message_add(Msg_Type_No_Field,
-            field->token->pos,
+        onyx_report_error(field->token->pos,
+            "Field '%s' does not exists on '%s'.",
             field->token->text,
             type_get_name(field->expr->type));
         token_toggle_end(field->token);
@@ -956,9 +888,7 @@ b32 check_align_of(AstAlignOf* ao) {
 b32 check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
-        onyx_message_add(Msg_Type_Literal,
-                expr->token->pos,
-                "type used as part of an expression");
+        onyx_report_error(expr->token->pos, "Type used as part of an expression.");
         return 1;
     }
 
@@ -973,17 +903,15 @@ b32 check_expression(AstTyped** pexpr) {
         case Ast_Kind_Block: retval = check_block((AstBlock *) expr); break;
 
         case Ast_Kind_Symbol:
-            onyx_message_add(Msg_Type_Unresolved_Symbol,
-                    expr->token->pos,
+            onyx_report_error(expr->token->pos,
+                    "Unable to resolve symbol '%b'.",
                     expr->token->text, expr->token->length);
             retval = 1;
             break;
 
         case Ast_Kind_Param:
             if (expr->type == NULL) {
-                onyx_message_add(Msg_Type_Literal,
-                        expr->token->pos,
-                        "local variable with unknown type");
+                onyx_report_error(expr->token->pos, "Parameter with unknown type. You should hopefully never see this.");
                 retval = 1;
             }
             break;
@@ -1000,9 +928,7 @@ b32 check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {
-                onyx_message_add(Msg_Type_Literal,
-                        expr->token->pos,
-                        "global with unknown type");
+                onyx_report_error(expr->token->pos, "Global with unknown type.");
                 retval = 1;
             }
             break;
@@ -1062,8 +988,8 @@ b32 check_global(AstGlobal* global) {
     fill_in_type((AstTyped *) global);
 
     if (global->type == NULL) {
-        onyx_message_add(Msg_Type_Unresolved_Type,
-                global->token->pos,
+        onyx_report_error(global->token->pos,
+                "Unable to resolve type for global '%b'.",
                 global->exported_name->text,
                 global->exported_name->length);
 
@@ -1083,20 +1009,7 @@ b32 check_statement(AstNode* stmt) {
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
         case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
-        case Ast_Kind_Defer: {
-            if (!semstate.defer_allowed) {
-                onyx_message_add(Msg_Type_Literal,
-                    stmt->token->pos,
-                    "deferred statement not allowed in deferred block");
-                return 1;
-            }
-
-            semstate.defer_allowed = 0;
-            b32 state = check_statement(((AstDefer *) stmt)->stmt);
-            semstate.defer_allowed = 1;
-
-            return state;
-        }
+        case Ast_Kind_Defer:      return check_statement(((AstDefer *) stmt)->stmt);
 
         case Ast_Kind_Binary_Op:
             stmt->flags |= Ast_Flag_Expr_Ignored;
@@ -1124,8 +1037,8 @@ b32 check_block(AstBlock* block) {
         fill_in_type(value);
 
         if (value->type == NULL) {
-            onyx_message_add(Msg_Type_Unresolved_Type,
-                    value->token->pos,
+            onyx_report_error(value->token->pos,
+                    "Unable to resolve type for local '%b'.",
                     value->token->text, value->token->length);
             return 1;
         }
@@ -1146,17 +1059,13 @@ b32 check_function(AstFunction* func) {
 b32 check_overloaded_function(AstOverloadedFunction* func) {
     bh_arr_each(AstTyped *, node, func->overloads) {
         if ((*node)->kind == Ast_Kind_Overloaded_Function) {
-            onyx_message_add(Msg_Type_Literal,
-                    (*node)->token->pos,
-                    "overload option can not be another overloaded function (yet)");
+            onyx_report_error((*node)->token->pos, "Overload option can not be another overloaded function.");
 
             return 1;
         }
 
         if ((*node)->kind != Ast_Kind_Function) {
-            onyx_message_add(Msg_Type_Literal,
-                    (*node)->token->pos,
-                    "overload option not function");
+            onyx_report_error((*node)->token->pos, "Overload option not function.");
 
             return 1;
         }
@@ -1169,19 +1078,12 @@ b32 check_struct(AstStructType* s_node) {
     bh_table(i32) mem_set;
     bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
 
-    if (bh_arr_length(s_node->members) == 0) {
-        onyx_message_add(Msg_Type_Literal,
-                s_node->token->pos,
-                "empty structure");
-        return 1;
-    }
-
     bh_arr_each(AstStructMember *, member, s_node->members) {
         token_toggle_end((*member)->token);
 
         if (bh_table_has(i32, mem_set, (*member)->token->text)) {
-            onyx_message_add(Msg_Type_Duplicate_Member,
-                    (*member)->token->pos,
+            onyx_report_error((*member)->token->pos,
+                    "Duplicate struct member '%s'.",
                     (*member)->token->text);
 
             token_toggle_end((*member)->token);
@@ -1207,9 +1109,8 @@ b32 check_function_header(AstFunction* func) {
         AstLocal* local = param->local;
 
         if (expect_default_param && param->default_value == NULL) {
-            onyx_message_add(Msg_Type_Literal,
-                    local->token->pos,
-                    "all parameters must have default values after the first default valued parameter.");
+            onyx_report_error(local->token->pos,
+                    "All parameters must have default values after the first default valued parameter.");
             return 1;
         }
 
@@ -1218,17 +1119,13 @@ b32 check_function_header(AstFunction* func) {
         fill_in_type((AstTyped *) local);
 
         if (local->type == NULL) {
-            onyx_message_add(Msg_Type_Literal,
-                    local->token->pos,
-                    "function parameter types must be known");
+            onyx_report_error(local->token->pos, "Function parameter types must be known.");
             return 1;
         }
 
         if (local->type->kind != Type_Kind_Array
             && type_size_of(local->type) == 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    local->token->pos,
-                    "function parameters must have non-void types");
+            onyx_report_error(local->token->pos, "Function parameters cannot have zero-width types.");
             return 1;
         }
     }
@@ -1237,30 +1134,22 @@ b32 check_function_header(AstFunction* func) {
 
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting a foreign function");
+            onyx_report_error(func->token->pos, "exporting a foreign function");
             return 1;
         }
 
         if ((func->flags & Ast_Flag_Intrinsic) != 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting a intrinsic function");
+            onyx_report_error(func->token->pos, "exporting a intrinsic function");
             return 1;
         }
 
         if ((func->flags & Ast_Flag_Inline) != 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting a inlined function");
+            onyx_report_error(func->token->pos, "exporting a inlined function");
             return 1;
         }
 
         if (func->exported_name == NULL) {
-            onyx_message_add(Msg_Type_Literal,
-                    func->token->pos,
-                    "exporting function without a name");
+            onyx_report_error(func->token->pos, "exporting function without a name");
             return 1;
         }
     }
@@ -1276,17 +1165,15 @@ b32 check_memres(AstMemRes* memres) {
         check_expression(&memres->initial_value);
 
         if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
-            onyx_message_add(Msg_Type_Literal,
-                    memres->initial_value->token->pos,
-                    "top level expressions must be compile time known");
+            onyx_report_error(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
             return 1;
         }
 
         Type* memres_type = memres->type;
 
         if (!types_are_compatible(memres_type, memres->initial_value->type)) {
-            onyx_message_add(Msg_Type_Binop_Mismatch,
-                    memres->token->pos,
+            onyx_report_error(memres->token->pos,
+                    "Cannot assign value of type '%s' to a '%s'.",
                     type_get_name(memres_type),
                     type_get_name(memres->initial_value->type));
             return 1;

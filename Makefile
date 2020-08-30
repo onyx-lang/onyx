@@ -9,7 +9,7 @@ OBJ_FILES=\
 	build/onyxsempass.o \
 	build/onyxsymres.o \
 	build/onyxchecker.o \
-	build/onyxmsgs.o \
+	build/onyxerrors.o \
 	build/onyxutils.o \
 	build/onyxwasm.o \
 	build/onyxdoc.o \

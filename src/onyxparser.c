@@ -1,5 +1,5 @@
 #include "onyxlex.h"
-#include "onyxmsgs.h"
+#include "onyxerrors.h"
 #include "onyxparser.h"
 #include "onyxutils.h"
 
@@ -85,9 +85,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     consume_token(parser);
 
     if (token->type != token_type) {
-        onyx_message_add(Msg_Type_Expected_Token,
-                         token->pos,
-                         token_name(token_type), token_name(token->type));
+        onyx_report_error(token->pos, "expected token '%s', got '%s'.", token_name(token_type), token_name(token->type));
         parser->hit_unexpected_token = 1;
         parser->curr = &parser->tokenizer->tokens[bh_arr_length(parser->tokenizer->tokens) - 1];
         return NULL;
@@ -452,9 +450,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                             break;
                         }
                         default: {
-                            onyx_message_add(Msg_Type_Literal,
-                                    char_lit->token->pos,
-                                    "invalid escaped character");
+                            onyx_report_error(char_lit->token->pos, "invalid escaped character");
                             break;
                         }
                     }
@@ -464,16 +460,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
-            onyx_message_add(Msg_Type_Literal,
-                    parser->curr->pos,
-                    "invalid directive in expression.");
+            onyx_report_error(parser->curr->pos, "invalid directive in expression.");
             return NULL;
         }
 
         default:
-            onyx_message_add(Msg_Type_Unexpected_Token,
-                    parser->curr->pos,
-                    token_name(parser->curr->type));
+            onyx_report_error(parser->curr->pos, "unexpected token '%s'.", token_name(parser->curr->type));
             return NULL;
     }
 
@@ -947,14 +939,7 @@ static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
         consume_token(parser);
 
         AstTyped* expr = parse_expression(parser);
-        if (expr == NULL) {
-            token_toggle_end(parser->curr);
-            onyx_message_add(Msg_Type_Expected_Expression,
-                    assignment->token->pos,
-                    parser->curr->text);
-            token_toggle_end(parser->curr);
-            return 1;
-        }
+        if (expr == NULL) return 1;
         assignment->right = expr;
 
         AstNode* left_symbol = make_node(AstNode, Ast_Kind_Symbol);
@@ -1108,15 +1093,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
     }
 
-    if (needs_semicolon) {
-        if (parser->curr->type != ';') {
-            onyx_message_add(Msg_Type_Expected_Token,
-                parser->curr->pos,
-                token_name(';'),
-                token_name(parser->curr->type));
-        }
-        consume_token(parser);
-    }
+    if (needs_semicolon) expect_token(parser, ';');
 
     return retval;
 }
@@ -1249,11 +1226,9 @@ static AstType* parse_type(OnyxParser* parser, bh_arr(AstPolyParam)* poly_vars) 
         }
 
         else if (parser->curr->type == '$') {
-            if (poly_vars == NULL) {
-                onyx_message_add(Msg_Type_Literal,
-                        parser->curr->pos,
-                        "polymorphic variable not valid here.");
-            }
+            if (poly_vars == NULL)
+                onyx_report_error(parser->curr->pos, "polymorphic variable not valid here.");
+
             bh_arr(AstPolyParam) pv = *poly_vars;
             consume_token(parser);
 
@@ -1299,12 +1274,7 @@ static AstType* parse_type(OnyxParser* parser, bh_arr(AstPolyParam)* poly_vars) 
         }
 
         else {
-            token_toggle_end(parser->curr);
-            onyx_message_add(Msg_Type_Unexpected_Token,
-                    parser->curr->pos,
-                    parser->curr->text);
-            token_toggle_end(parser->curr);
-
+            onyx_report_error(parser->curr->pos, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
             consume_token(parser);
             break;
         }
@@ -1346,9 +1316,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_message_add(Msg_Type_Unknown_Directive,
-                    directive_token->pos,
-                    symbol_token->text, symbol_token->length);
+            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -1535,9 +1503,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_message_add(Msg_Type_Unknown_Directive,
-                    directive_token->pos,
-                    symbol_token->text, symbol_token->length);
+            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -1592,9 +1558,7 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_message_add(Msg_Type_Unknown_Directive,
-                    directive_token->pos,
-                    symbol_token->text, symbol_token->length);
+            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -1618,9 +1582,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_message_add(Msg_Type_Unknown_Directive,
-                    directive_token->pos,
-                    symbol_token->text, symbol_token->length);
+            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -1849,8 +1811,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     return (AstNode *) include;
                 }
                 else {
-                    onyx_message_add(Msg_Type_Unknown_Directive,
-                            dir_token->pos, dir_token->text, dir_token->length);
+                    onyx_report_error(dir_token->pos, "unknown directive '#%b'.", dir_token->text, dir_token->length);
                     return NULL;
                 }
             }

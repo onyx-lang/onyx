@@ -5,7 +5,7 @@
 
 #include "onyxlex.h"
 #include "onyxastnodes.h"
-#include "onyxmsgs.h"
+#include "onyxerrors.h"
 
 typedef struct SemState {
     // NOTE: Adding node_allocator in case we need

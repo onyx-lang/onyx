@@ -3,7 +3,7 @@
 #include "onyxutils.h"
 #include "onyxlex.h"
 #include "onyxastnodes.h"
-#include "onyxmsgs.h"
+#include "onyxerrors.h"
 #include "onyxparser.h"
 #include "onyxastnodes.h"
 #include "onyxsempass.h"
@@ -156,7 +156,7 @@ b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
 
 b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
     if (bh_table_has(AstNode *, scope->symbols, name)) {
-        onyx_message_add(Msg_Type_Redeclare_Symbol, pos, name);
+        onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
         return 0;
     }
 
@@ -194,7 +194,7 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     AstNode* res = symbol_raw_resolve(start_scope, tkn->text);
 
     if (res == NULL) {
-        onyx_message_add(Msg_Type_Unknown_Symbol, tkn->pos, tkn->text);
+        onyx_report_error(tkn->pos, "Unable to resolve symbol '%s'", tkn->text);
         token_toggle_end(tkn);
         return &empty_node;
     }
@@ -389,9 +389,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
         AstArgument* arg = call->arguments;
         if (param->idx >= call->arg_count) {
-            onyx_message_add(Msg_Type_Literal,
-                    call->token->pos,
-                    "not enough arguments to polymorphic procedure.");
+            onyx_report_error(call->token->pos, "Not enough arguments to polymorphic procedure.");
             return NULL;
         }
 
@@ -401,9 +399,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
         Type* resolved_type = solve_poly_type(param->poly_sym, param->type_expr, arg_type);
 
         if (resolved_type == NULL) {
-            onyx_message_add(Msg_Type_Literal,
-                    call->token->pos,
-                    "unable to match polymorphic procedure type.");
+            onyx_report_error(call->token->pos, "Unable to match polymorphic procedure type.");
             return NULL;
         }
 
@@ -431,16 +427,14 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
     bh_table_put(AstFunction *, pp->concrete_funcs, key_buf, func);
 
     symres_function(func);
-    if (onyx_message_has_errors()) goto has_error;
+    if (onyx_has_errors()) goto has_error;
     if (check_function_header(func)) goto has_error;
     if (check_function(func)) goto has_error;
-    if (onyx_message_has_errors()) goto has_error;
+    if (onyx_has_errors()) goto has_error;
     goto no_errors;
 
 has_error:
-    onyx_message_add(Msg_Type_Literal,
-            call->token->pos,
-            "error in polymorphic procedure generated from this call site.");
+    onyx_report_error(call->token->pos, "Error in polymorphic procedure generated from this call site.");
     return NULL;
 
 no_errors:
