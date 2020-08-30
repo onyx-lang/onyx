@@ -1432,7 +1432,7 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
     return match;
 }
 
-// 'proc' <directive>* <func_params> ('->' <type>)? <block>
+// 'proc' <func_params> ('->' <type>)? <directive>* <block>
 static AstFunction* parse_function_definition(OnyxParser* parser) {
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = expect_token(parser, Token_Type_Keyword_Proc);
@@ -1442,6 +1442,16 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
 
     bh_arr(AstPolyParam) polymorphic_vars = NULL;
     bh_arr_new(global_heap_allocator, polymorphic_vars, 4);
+
+    parse_function_params(parser, func_def, &polymorphic_vars);
+
+    AstType* return_type = (AstType *) &basic_type_void;
+    if (parser->curr->type == Token_Type_Right_Arrow) {
+        expect_token(parser, Token_Type_Right_Arrow);
+
+        return_type = parse_type(parser, NULL);
+    }
+    func_def->return_type = return_type;
 
     while (parser->curr->type == '#') {
         if (parse_possible_directive(parser, "overloaded")) {
@@ -1469,6 +1479,8 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
         if (parse_possible_directive(parser, "add_overload")) {
             if (func_def->overloaded_function != NULL) {
                 onyx_report_error(parser->curr->pos, "cannot have multiple #add_overload directives on a single procedure.");
+                expect_token(parser, Token_Type_Symbol);
+                
             } else {
                 AstNode* sym_node = make_node(AstNode, Ast_Kind_Symbol);
                 sym_node->token = expect_token(parser, Token_Type_Symbol);
@@ -1516,16 +1528,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
-
-    parse_function_params(parser, func_def, &polymorphic_vars);
-
-    AstType* return_type = (AstType *) &basic_type_void;
-    if (parser->curr->type == Token_Type_Right_Arrow) {
-        expect_token(parser, Token_Type_Right_Arrow);
-
-        return_type = parse_type(parser, NULL);
-    }
-    func_def->return_type = return_type;
 
     func_def->body = parse_block(parser);
 

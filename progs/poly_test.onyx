@@ -43,7 +43,7 @@ print_arr :: proc (arr: $T) {
     print("\n");
 }
 
-print_vec :: proc #add_overload print (v: Vec3) {
+print_vec :: proc (v: Vec3) #add_overload print {
     print("Vec3(");
     print(v.x);
     print(", ");

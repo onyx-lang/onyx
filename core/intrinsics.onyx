@@ -1,48 +1,48 @@
 package intrinsics
 
-memory_size  :: proc #intrinsic -> i32 ---
-memory_grow  :: proc #intrinsic (val: i32) -> i32 ---
+memory_size  :: proc -> i32 #intrinsic ---
+memory_grow  :: proc (val: i32) -> i32 #intrinsic ---
 
-clz_i32      :: proc #intrinsic (val: i32) -> i32 ---
-ctz_i32      :: proc #intrinsic (val: i32) -> i32 ---
-popcnt_i32   :: proc #intrinsic (val: i32) -> i32 ---
-and_i32      :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
-or_i32       :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
-xor_i32      :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
-shl_i32      :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
-slr_i32      :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
-sar_i32      :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
-rotl_i32     :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
-rotr_i32     :: proc #intrinsic (lhs: i32, rhs: i32) -> i32 ---
+clz_i32      :: proc (val: i32) -> i32 #intrinsic ---
+ctz_i32      :: proc (val: i32) -> i32 #intrinsic ---
+popcnt_i32   :: proc (val: i32) -> i32 #intrinsic ---
+and_i32      :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
+or_i32       :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
+xor_i32      :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
+shl_i32      :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
+slr_i32      :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
+sar_i32      :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
+rotl_i32     :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
+rotr_i32     :: proc (lhs: i32, rhs: i32) -> i32 #intrinsic ---
 
-clz_i64      :: proc #intrinsic (val: i64) -> i64 ---
-ctz_i64      :: proc #intrinsic (val: i64) -> i64 ---
-popcnt_i64   :: proc #intrinsic (val: i64) -> i64 ---
-and_i64      :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
-or_i64       :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
-xor_i64      :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
-shl_i64      :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
-slr_i64      :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
-sar_i64      :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
-rotl_i64     :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
-rotr_i64     :: proc #intrinsic (lhs: i64, rhs: i64) -> i64 ---
+clz_i64      :: proc (val: i64) -> i64 #intrinsic ---
+ctz_i64      :: proc (val: i64) -> i64 #intrinsic ---
+popcnt_i64   :: proc (val: i64) -> i64 #intrinsic ---
+and_i64      :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
+or_i64       :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
+xor_i64      :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
+shl_i64      :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
+slr_i64      :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
+sar_i64      :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
+rotl_i64     :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
+rotr_i64     :: proc (lhs: i64, rhs: i64) -> i64 #intrinsic ---
 
-abs_f32      :: proc #intrinsic (val: f32) -> f32 ---
-ceil_f32     :: proc #intrinsic (val: f32) -> f32 ---
-floor_f32    :: proc #intrinsic (val: f32) -> f32 ---
-trunc_f32    :: proc #intrinsic (val: f32) -> f32 ---
-nearest_f32  :: proc #intrinsic (val: f32) -> f32 ---
-sqrt_f32     :: proc #intrinsic (val: f32) -> f32 ---
-min_f32      :: proc #intrinsic (lhs: f32, rhs: f32) -> f32 ---
-max_f32      :: proc #intrinsic (lhs: f32, rhs: f32) -> f32 ---
-copysign_f32 :: proc #intrinsic (lhs: f32, rhs: f32) -> f32 ---
+abs_f32      :: proc (val: f32) -> f32 #intrinsic ---
+ceil_f32     :: proc (val: f32) -> f32 #intrinsic ---
+floor_f32    :: proc (val: f32) -> f32 #intrinsic ---
+trunc_f32    :: proc (val: f32) -> f32 #intrinsic ---
+nearest_f32  :: proc (val: f32) -> f32 #intrinsic ---
+sqrt_f32     :: proc (val: f32) -> f32 #intrinsic ---
+min_f32      :: proc (lhs: f32, rhs: f32) -> f32 #intrinsic ---
+max_f32      :: proc (lhs: f32, rhs: f32) -> f32 #intrinsic ---
+copysign_f32 :: proc (lhs: f32, rhs: f32) -> f32 #intrinsic ---
 
-abs_f64      :: proc #intrinsic (val: f64) -> f64 ---
-ceil_f64     :: proc #intrinsic (val: f64) -> f64 ---
-floor_f64    :: proc #intrinsic (val: f64) -> f64 ---
-trunc_f64    :: proc #intrinsic (val: f64) -> f64 ---
-nearest_f64  :: proc #intrinsic (val: f64) -> f64 ---
-sqrt_f64     :: proc #intrinsic (val: f64) -> f64 ---
-min_f64      :: proc #intrinsic (lhs: f64, rhs: f64) -> f64 ---
-max_f64      :: proc #intrinsic (lhs: f64, rhs: f64) -> f64 ---
-copysign_f64 :: proc #intrinsic (lhs: f64, rhs: f64) -> f64 ---
+abs_f64      :: proc (val: f64) -> f64 #intrinsic ---
+ceil_f64     :: proc (val: f64) -> f64 #intrinsic ---
+floor_f64    :: proc (val: f64) -> f64 #intrinsic ---
+trunc_f64    :: proc (val: f64) -> f64 #intrinsic ---
+nearest_f64  :: proc (val: f64) -> f64 #intrinsic ---
+sqrt_f64     :: proc (val: f64) -> f64 #intrinsic ---
+min_f64      :: proc (lhs: f64, rhs: f64) -> f64 #intrinsic ---
+max_f64      :: proc (lhs: f64, rhs: f64) -> f64 #intrinsic ---
+copysign_f64 :: proc (lhs: f64, rhs: f64) -> f64 #intrinsic ---

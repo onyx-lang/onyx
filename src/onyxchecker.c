@@ -214,8 +214,21 @@ no_match:
         continue;
     }
 
-    onyx_report_error(call->token->pos, "unable to match overloaded function");
+    char* arg_str = bh_alloc(global_scratch_allocator, 1024);
 
+    AstArgument* arg = call->arguments;
+    while (arg != NULL) {
+        strncat(arg_str, type_get_name(arg->type), 1023);
+
+        if (arg->next != NULL)
+            strncat(arg_str, ", ", 1023);
+
+        arg = (AstArgument *) arg->next;
+    }
+
+    onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
+
+    bh_free(global_scratch_allocator, arg_str);
     return NULL;
 }
 

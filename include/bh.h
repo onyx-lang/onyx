@@ -1503,7 +1503,8 @@ char* bh_bprintf(char const *fmt, ...) {
 
 char* bh_bprintf_va(char const *fmt, va_list va) {
     static char buffer[4096];
-    bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
+    isize len = bh_snprintf_va(buffer, sizeof(buffer), fmt, va);
+    buffer[len - 1] = 0;
     return buffer;
 }
 

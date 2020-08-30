@@ -1,10 +1,10 @@
 package printing
 
-print_bool :: proc #foreign "host" "print" (value: bool) ---
-print_i32  :: proc #foreign "host" "print" (value: i32) ---
-print_f32  :: proc #foreign "host" "print" (value: f32) ---
-print_i64  :: proc #foreign "host" "print" (value: i64) ---
-print_f64  :: proc #foreign "host" "print" (value: f64) ---
+print_bool :: proc (value: bool) #foreign "host" "print" ---
+print_i32  :: proc (value: i32)  #foreign "host" "print" ---
+print_f32  :: proc (value: f32)  #foreign "host" "print" ---
+print_i64  :: proc (value: i64)  #foreign "host" "print" ---
+print_f64  :: proc (value: f64)  #foreign "host" "print" ---
 
 PrintableArray :: struct {
     data: ^u8;
@@ -36,7 +36,7 @@ print_str_by_byte :: proc (str: ^u8) {
     }
 }
 
-print_str :: proc #foreign "host" "print_str" (str: ^u8) ---
+print_str :: proc (str: ^u8) #foreign "host" "print_str" ---
 
 print_str_len :: proc (str: [] u8, len: i32) {
     for i: 0, len do print(cast(i32) str[i]);
