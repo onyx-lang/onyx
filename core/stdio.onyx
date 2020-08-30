@@ -13,6 +13,7 @@ print_cstring :: proc (s: cstring) do string_builder_append(^cout_state.sb, s);
 print_i64     :: proc (n: i64, base := 10l) do string_builder_append(^cout_state.sb, n, base);
 print_i32     :: proc (n: i32, base := 10)  do string_builder_append(^cout_state.sb, cast(i64) n, cast(u64) base);
 print_bool    :: proc (b: bool) do string_builder_append(^cout_state.sb, b);
+print_ptr     :: proc (p: rawptr) do string_builder_append(^cout_state.sb, cast(i64) p, 16l);
 
 print :: proc #overloaded {
 	print_string,
@@ -20,6 +21,7 @@ print :: proc #overloaded {
 	print_i64,
 	print_i32,
 	print_bool,
+	print_ptr,
 }
 
 print_flush :: proc {

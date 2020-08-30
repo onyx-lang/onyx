@@ -464,6 +464,10 @@ struct AstFunction      {
     AstBlock *body;
     bh_arr(AstLocal *) locals;
 
+    // NOTE: used by the #add_overload directive. Initially set to a symbol,
+    // then resolved to an overloaded function.
+    AstNode *overloaded_function;
+
     union {
         // NOTE: Used when a function is exported with a specific name
         OnyxToken* exported_name;

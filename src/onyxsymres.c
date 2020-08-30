@@ -465,6 +465,20 @@ void symres_function(AstFunction* func) {
         }
     }
 
+    if (func->overloaded_function != NULL) {
+        symres_expression((AstTyped **) &func->overloaded_function);
+        if (func->overloaded_function == NULL) return; // NOTE: Error message will already be generated
+
+        if (func->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
+            onyx_report_error(func->token->pos, "#add_overload directive did not resolve to an overloaded function.");
+            return;
+
+        } else {
+            AstOverloadedFunction* ofunc = (AstOverloadedFunction *) func->overloaded_function;
+            bh_arr_push(ofunc->overloads, (AstTyped *) func);
+        }
+    }
+
     func->return_type = symres_type(func->return_type);
 
     scope_enter(func->scope);

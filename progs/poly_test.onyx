@@ -43,23 +43,18 @@ print_arr :: proc (arr: $T) {
     print("\n");
 }
 
-print_vec_arr :: proc (arr: [..] Vec3) {
-    for i: 0, arr.count {
-        print("Vec3(");
-        print(arr[i].x);
-        print(", ");
-        print(arr[i].y);
-        print(", ");
-        print(arr[i].z);
-        print(")\n");
-    }
-
-    print("\n");
+print_vec :: proc #add_overload print (v: Vec3) {
+    print("Vec3(");
+    print(v.x);
+    print(", ");
+    print(v.y);
+    print(", ");
+    print(v.z);
+    print(")");
 }
 
 // This demonstrates that we have something similar to static 'duck' typing.
 get_count :: proc (x: $T) -> u32 do return x.count;
-
 
 
 SOA :: struct {
@@ -86,8 +81,8 @@ main :: proc (args: [] cstring) {
     print_arr_details(^s.b);
 
     for i: 0, 100 {
-        array_add(^s.a, 5 * i);
-        array_add(^s.b, 3l * cast(i64) i);
+        array_push(^s.a, 5 * i);
+        array_push(^s.b, 3l * cast(i64) i);
     }
 
     print_arr(^s.a);
@@ -110,14 +105,14 @@ main2 :: proc (args: [] cstring) {
 
     print_arr_details(^iarr);
 
-    array_add(^iarr, 1234);
+    array_push(^iarr, 1234);
 
-    for i: 0, 12 do array_add(^iarr, i % 5);
+    for i: 0, 12 do array_push(^iarr, i % 5);
 
     print_arr_details(^iarr);
     print_arr(^iarr);
 
-    array_remove_at(^iarr, 4);
+    array_delete(^iarr, 4);
 
     print_arr_details(^iarr);
     print_arr(^iarr);
@@ -128,7 +123,7 @@ main2 :: proc (args: [] cstring) {
     print_arr_details(^iarr);
     print_arr(^iarr);
 
-    array_add_at(^iarr, 5678, 2);
+    array_insert(^iarr, 2, 5678);
 
     print_arr_details(^iarr);
     print_arr(^iarr);
@@ -142,7 +137,7 @@ main2 :: proc (args: [] cstring) {
     defer array_free(^barr);
 
     for i: 0, 500 {
-        array_add(^barr, cast(u64) (3 * i * i + 4 * i - 2));
+        array_push(^barr, cast(u64) (3 * i * i + 4 * i - 2));
     }
 
     print_arr_details(^barr);
@@ -161,17 +156,17 @@ main2 :: proc (args: [] cstring) {
     defer array_free(^varr);
 
     for i: 0, 20 {
-        array_add(^varr, Vec3.{
+        array_push(^varr, Vec3.{
             x = i,
             y = i * i,
             z = i * i * i,
         });
     }
 
-    array_add(^varr, Vec3.{ 4, 2, 3 });
+    array_push(^varr, Vec3.{ 4, 2, 3 });
 
     print_arr_details(^varr);
-    print_vec_arr(varr);
+    print_arr(varr);
 
     print(get_count(iarr));
     print("\n");

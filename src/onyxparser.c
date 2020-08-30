@@ -1466,7 +1466,17 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             return (AstFunction *) ofunc;
         }
 
-        if (parse_possible_directive(parser, "intrinsic")) {
+        if (parse_possible_directive(parser, "add_overload")) {
+            if (func_def->overloaded_function != NULL) {
+                onyx_report_error(parser->curr->pos, "cannot have multiple #add_overload directives on a single procedure.");
+            } else {
+                AstNode* sym_node = make_node(AstNode, Ast_Kind_Symbol);
+                sym_node->token = expect_token(parser, Token_Type_Symbol);
+                func_def->overloaded_function = sym_node;
+            }
+        }
+
+        else if (parse_possible_directive(parser, "intrinsic")) {
             func_def->flags |= Ast_Flag_Intrinsic;
 
             if (parser->curr->type == Token_Type_Literal_String) {
