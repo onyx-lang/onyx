@@ -133,6 +133,26 @@ array_to_slice :: proc (arr: ^[..] $T) -> [] T {
     return arr.data[0 : arr.count];
 }
 
+//
+// Simple insertion sort
+//    cmp should return >0 if left > right
+//
+array_sort :: proc (arr: ^[..] $T, cmp: proc (T, T) -> i32) {
+    for i: 1, arr.count {
+        x := arr.data[i];
+        j := i - 1; 
+
+        while j >= 0 && cmp(arr.data[j], x) > 0 {
+            arr.data[j + 1] = arr.data[j];
+            j -= 1;
+        }
+
+        arr.data[j + 1] = x;
+    }
+}
+
+cmp_asc :: proc (a: $T, b: T) -> i32 do return cast(i32) (a - b);
+cmp_dec :: proc (a: $T, b: T) -> i32 do return cast(i32) (b - a);
 
 context : struct {
 	allocator      : Allocator;

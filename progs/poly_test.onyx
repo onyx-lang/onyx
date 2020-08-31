@@ -30,16 +30,6 @@ print_arr_details :: proc (arr: ^[..] $T) {
     print("\n\n");
 }
 
-// This works on both slices and arrays
-print_arr :: proc (arr: $T, sep := " ") {
-    for i: 0, arr.count {
-        print(arr.data[i]);
-        if i != arr.count - 1 do print(sep);
-    }
-
-    print("\n");
-}
-
 print_vec :: proc (v: Vec3) #add_overload print {
     print("Vec3(");
     print(v.x);
@@ -64,8 +54,8 @@ Dummy :: struct {
 
 
 SOA :: struct {
-    a  : [..] i32;
     b  : [..] i64;
+    a  : [..] i32;
 }
 
 soa_init :: proc (s: ^SOA) {
@@ -78,7 +68,7 @@ soa_deinit :: proc (s: ^SOA) {
     array_free(^s.b);
 }
 
-main :: proc (args: [] cstring) {
+main2 :: proc (args: [] cstring) {
     s : SOA;
     soa_init(^s);
     defer soa_deinit(^s);
@@ -91,16 +81,18 @@ main :: proc (args: [] cstring) {
         array_push(^s.b, 3l * cast(i64) i);
     }
 
-    print_arr(^s.a);
-    array_to_slice(^s.a) |> print_arr();
-    array_to_slice(^s.b) |> print_arr();
+    array_sort(^s.a, cmp_dec);
+    array_sort(^s.b, cmp_asc);
+
+    print_array(^s.a);
+    print_array(^s.b);
 
     print("After adding...\n");
     print_arr_details(^s.a);
     print_arr_details(^s.b);
 }
 
-main2 :: proc (args: [] cstring) {
+main :: proc (args: [] cstring) {
     print(cast(u32) __heap_start, 16);
 
     iarr_backing : [32] i32;
@@ -116,23 +108,23 @@ main2 :: proc (args: [] cstring) {
     for i: 0, 12 do array_push(^iarr, i % 5);
 
     print_arr_details(^iarr);
-    print_arr(^iarr);
+    print_array(^iarr);
 
     array_delete(^iarr, 4);
 
     print_arr_details(^iarr);
-    print_arr(^iarr);
+    print_array(^iarr);
 
     array_remove(^iarr, 1);
     array_remove(^iarr, 4);
 
     print_arr_details(^iarr);
-    print_arr(^iarr);
+    print_array(^iarr);
 
     array_insert(^iarr, 2, 5678);
 
     print_arr_details(^iarr);
-    print_arr(^iarr);
+    print_array(^iarr);
     print(array_average(^iarr));
     print("\n");
 
@@ -147,7 +139,7 @@ main2 :: proc (args: [] cstring) {
     }
 
     print_arr_details(^barr);
-    print_arr(^barr);
+    print_array(^barr);
     array_average(^barr) |> print();
     print("\n");
 
@@ -170,15 +162,16 @@ main2 :: proc (args: [] cstring) {
     }
 
     array_push(^varr, Vec3.{ 4, 2, 3 });
+    array_sort(^varr, cmp_vec3);
 
     print_arr_details(^varr);
-    print_arr(varr, "\n");
+    print_array(varr, "\n");
 
 
     dummy := Dummy.{ data = calloc(sizeof [5] i32) };
     for i: 0, dummy.count do dummy.data[i] = i * 5;
 
-    print_arr(dummy);
+    print_array(dummy);
 
     print(get_count(iarr));
     print("\n");
@@ -194,4 +187,10 @@ Vec3 :: struct {
     x: i32;
     y: i32;
     z: i32;
+}
+
+cmp_vec3 :: proc (v1: Vec3, v2: Vec3) -> i32 {
+    if v1.x != v2.x do return v1.x - v2.x;
+    if v1.y != v2.y do return v1.y - v2.y;
+    return v1.z - v2.z;
 }

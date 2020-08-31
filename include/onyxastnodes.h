@@ -594,7 +594,12 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 AstNode* ast_clone(bh_allocator a, void* n);
 void promote_numlit_to_larger(AstNumLit* num);
-AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call);
+
+typedef enum PolyProcLookupMethod {
+    PPLM_By_Call,
+    PPLM_By_Function_Type,
+} PolyProcLookupMethod;
+AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

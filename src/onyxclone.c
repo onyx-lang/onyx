@@ -12,7 +12,6 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_NumLit:
 		case Ast_Kind_StrLit:
 		case Ast_Kind_Package:
-		case Ast_Kind_Function_Type:
 		case Ast_Kind_Struct_Type:
 		case Ast_Kind_Enum_Type:
 		case Ast_Kind_Enum_Value:
@@ -24,8 +23,8 @@ static inline b32 should_clone(AstNode* node) {
 	}
 }
 
-static inline i32 ast_kind_to_size(AstKind kind) {
-	switch (kind) {
+static inline i32 ast_kind_to_size(AstNode* node) {
+	switch (node->kind) {
         case Ast_Kind_Error: return sizeof(AstNode);
         case Ast_Kind_Program: return sizeof(AstNode);
         case Ast_Kind_Package: return sizeof(AstPackage);
@@ -49,7 +48,7 @@ static inline i32 ast_kind_to_size(AstKind kind) {
         case Ast_Kind_Type: return sizeof(AstType);
         case Ast_Kind_Basic_Type: return sizeof(AstBasicType);
         case Ast_Kind_Pointer_Type: return sizeof(AstPointerType);
-        case Ast_Kind_Function_Type: return sizeof(AstFunctionType);
+        case Ast_Kind_Function_Type: return sizeof(AstFunctionType) + ((AstFunctionType *) node)->param_count * sizeof(AstType *);
         case Ast_Kind_Array_Type: return sizeof(AstArrayType);
         case Ast_Kind_Slice_Type: return sizeof(AstSliceType);
         case Ast_Kind_DynArr_Type: return sizeof(AstDynArrType);
@@ -113,13 +112,13 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 	if (node == NULL) return NULL;
 	if (!should_clone(node)) return node;
 
-	i32 node_size = ast_kind_to_size(node->kind);
+	i32 node_size = ast_kind_to_size(node);
 	// bh_printf("Cloning %s with size %d\n", onyx_ast_node_kind_string(node->kind), node_size);
 
 	AstNode* nn = onyx_ast_node_new(a, node_size, node->kind);
 	memmove(nn, node, node_size);
 
-	switch (node->kind) {
+	switch ((u16) node->kind) {
 		case Ast_Kind_Binary_Op:
 			((AstBinaryOp *) nn)->left  = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->left);
 			((AstBinaryOp *) nn)->right = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->right);
@@ -274,6 +273,14 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			((AstTypeAlias *) nn)->to = (AstType *) ast_clone(a, ((AstTypeAlias *) node)->to);
 			break;
 
+		case Ast_Kind_Function_Type:
+			((AstFunctionType *) nn)->return_type = (AstType *) ast_clone(a, ((AstFunctionType *) node)->return_type);
+			((AstFunctionType *) nn)->param_count = ((AstFunctionType *) node)->param_count;
+			fori (i, 0, ((AstFunctionType *) nn)->param_count) {
+				((AstFunctionType *) nn)->params[i] = (AstType *) ast_clone(a, ((AstFunctionType *) node)->params[i]);
+			}
+			break;
+
 		case Ast_Kind_Binding:
 			bh_printf("Cloning binding: %b\n", node->token->text, node->token->length);
 			((AstTyped *) nn)->type_node = (AstType *) ast_clone(a, ((AstTyped *) node)->type_node);
@@ -304,22 +311,6 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 			break;
 		}
-
-		case Ast_Kind_NumLit:
-		case Ast_Kind_StrLit:
-		case Ast_Kind_File_Contents:
-		case Ast_Kind_Jump:
-		case Ast_Kind_Type:
-		case Ast_Kind_Basic_Type:
-		case Ast_Kind_Struct_Member:
-			return nn;
-
-		//default: {
-		//	AstNode* new_node = make_node(a, AstNode, node->kind);
-		//	new_node->token = node->token;
-		//	new_node->flags = node->flags;
-		//	new_node->next = ast_clone(a, node->next);
-		//}
 	}
 
 	return nn;

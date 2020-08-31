@@ -1,19 +1,7 @@
 package memory
 
 memory_copy :: proc (dst_: rawptr, src_: rawptr, len: u32) {
-	if len % 8 == 0 {
-		dst := cast(^u64) dst_;
-		src := cast(^u64) src_;
-		for i: 0, len >> 3 do dst[i] = src[i];
-		
-	} elseif len % 4 == 0 {
-		dst := cast(^u32) dst_;
-		src := cast(^u32) src_;
-		for i: 0, len >> 2 do dst[i] = src[i];
-
-	} else {
-		dst := cast(^u8) dst_;
-		src := cast(^u8) src_;
-		for i: 0, len do dst[i] = src[i];
-	}
+	dst := cast(^u8) dst_;
+	src := cast(^u8) src_;
+	for i: 0, len do dst[i] = src[i];
 }

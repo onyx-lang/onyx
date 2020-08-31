@@ -233,6 +233,21 @@ no_match:
 }
 
 b32 check_call(AstCall* call) {
+    // All the things that need to be done when checking a call node.
+    //      1. Ensure the callee is not a symbol
+    //      2. Check the callee expression (since it could be a variable or a field access, etc)
+    //      3. Check all arguments
+    //          * Cannot pass overloaded functions
+    //          * Cannot pass a non-simple struct
+    //      4. If callee is an overloaded function, use the argument types to determine which overload is used.
+    //      5. If callee is polymorphic, use the arguments type to generate a polymorphic function.
+    //      6. If an argument is polymorphic, generate the correct polymorphic function.
+    //      7. Fill in default arguments
+    //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
+    //      9. Check types of formal and actual params against each other
+
+
+
     AstFunction* callee = (AstFunction *) call->callee;
 
     if (callee->kind == Ast_Kind_Symbol) {
@@ -242,27 +257,30 @@ b32 check_call(AstCall* call) {
 
     if (check_expression(&call->callee)) return 1;
 
-    // NOTE: Check arguments
-    AstNode** prev_param = (AstNode **) &call->arguments;
-    AstArgument* actual_param = call->arguments;
-    while (actual_param != NULL) {
-        if (check_expression((AstTyped **) &actual_param)) return 1;
+    b32 has_polymorphic_args = 0;
 
-        if (actual_param->value->kind == Ast_Kind_Overloaded_Function) {
-            onyx_report_error(actual_param->token->pos, "Cannot pass overloaded functions as parameters.");
+    // NOTE: Check arguments
+    AstArgument* actual = call->arguments;
+    while (actual != NULL) {
+        if (check_expression((AstTyped **) &actual)) return 1;
+
+        if (actual->value->kind == Ast_Kind_Overloaded_Function) {
+            onyx_report_error(actual->token->pos, "Cannot pass overloaded functions as parameters.");
             return 1;
         }
 
-        if (type_is_structlike_strict(actual_param->value->type)) {
-            if (!type_structlike_is_simple(actual_param->value->type)) {
-                onyx_report_error(actual_param->token->pos,
+        if (type_is_structlike_strict(actual->value->type)) {
+            if (!type_structlike_is_simple(actual->value->type)) {
+                onyx_report_error(actual->token->pos,
                     "Can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
                 return 1;
             }
         }
 
-        prev_param = (AstNode **) &actual_param->next;
-        actual_param = (AstArgument *) actual_param->next;
+        if (actual->value->kind == Ast_Kind_Polymorphic_Proc)
+            has_polymorphic_args = 1;
+
+        actual = (AstArgument *) actual->next;
     }
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
@@ -273,7 +291,12 @@ b32 check_call(AstCall* call) {
     }
 
     if (callee->kind == Ast_Kind_Polymorphic_Proc) {
-        call->callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, call);
+        call->callee = (AstTyped *) polymorphic_proc_lookup(
+                (AstPolyProc *) call->callee,
+                PPLM_By_Call,
+                call,
+                call->token->pos);
+
         if (call->callee == NULL) return 1;
 
         callee = (AstFunction *) call->callee;
@@ -287,6 +310,29 @@ b32 check_call(AstCall* call) {
                 "Attempting to call something that is not a function, '%b'.",
                 callee->token->text, callee->token->length);
         return 1;
+    }
+
+    if (has_polymorphic_args) {
+        actual = call->arguments;
+        u32 arg_idx = 0;
+
+        while (actual != NULL) {
+            if (actual->value->kind == Ast_Kind_Polymorphic_Proc) {
+                actual->value = (AstTyped *) polymorphic_proc_lookup(
+                    (AstPolyProc *) actual->value,
+                    PPLM_By_Function_Type,
+                    callee->type->Function.params[arg_idx],
+                    actual->token->pos);
+
+                if (actual->value == NULL) return 1;
+
+                actual->type = actual->value->type;
+                actual->value->flags |= Ast_Flag_Function_Used;
+            }
+                    
+            actual = (AstArgument *) actual->next;
+            arg_idx++;
+        }
     }
 
     if (callee->kind == Ast_Kind_Function) {
@@ -379,22 +425,22 @@ b32 check_call(AstCall* call) {
     call->type = callee->type->Function.return_type;
 
     Type **formal_params = callee->type->Function.params;
-    actual_param = call->arguments;
+    actual = call->arguments;
 
     i32 arg_pos = 0;
-    while (arg_pos < callee->type->Function.param_count && actual_param != NULL) {
-        if (!types_are_compatible(formal_params[arg_pos], actual_param->type)) {
-            onyx_report_error(actual_param->token->pos,
+    while (arg_pos < callee->type->Function.param_count && actual != NULL) {
+        if (!types_are_compatible(formal_params[arg_pos], actual->type)) {
+            onyx_report_error(actual->token->pos,
                     "The function '%b' expects a value of type '%s' for parameter '%d', got '%s'.",
                     callee->token->text, callee->token->length,
                     type_get_name(formal_params[arg_pos]),
                     arg_pos,
-                    type_get_name(actual_param->type));
+                    type_get_name(actual->type));
             return 1;
         }
 
         arg_pos++;
-        actual_param = (AstArgument *) actual_param->next;
+        actual = (AstArgument *) actual->next;
     }
 
     if (arg_pos < callee->type->Function.param_count) {
@@ -402,7 +448,7 @@ b32 check_call(AstCall* call) {
         return 1;
     }
 
-    if (actual_param != NULL) {
+    if (actual != NULL) {
         onyx_report_error(call->token->pos, "Too many arguments to function call.");
         return 1;
     }
@@ -597,12 +643,16 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if (!type_is_numeric(binop->left->type) && !type_is_pointer(binop->left->type)) {
-        onyx_report_error(binop->token->pos, "Expected numeric or pointer type for left side of binary operator.");
+        onyx_report_error(binop->token->pos,
+                "Expected numeric or pointer type for left side of binary operator, got '%s'.",
+                type_get_name(binop->left->type));
         return 1;
     }
 
     if (!type_is_numeric(binop->right->type)) {
-        onyx_report_error(binop->token->pos, "Expected numeric type for right side of binary operator.");
+        onyx_report_error(binop->token->pos,
+                "Expected numeric type for right side of binary operator, got '%s'.",
+                type_get_name(binop->right->type));
         return 1;
     }
 

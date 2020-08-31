@@ -223,7 +223,7 @@ HOW:
             - add infos to warnings
             - no more preformatted strings, just write them inline ffs
 
-        [ ] #file and #line directives
+        [X] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is
 
         [ ] transmute

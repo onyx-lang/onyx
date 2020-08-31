@@ -1927,7 +1927,7 @@ static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
     }
 }
 
-static inline b32 should_EMIT_FUNCtion(AstFunction* fd) {
+static inline b32 should_emit_function(AstFunction* fd) {
     // NOTE: Don't output intrinsic functions
     if (fd->flags & Ast_Flag_Intrinsic) return 0;
 
@@ -1947,8 +1947,8 @@ static inline b32 should_EMIT_FUNCtion(AstFunction* fd) {
 }
 
 
-static void EMIT_FUNCtion(OnyxWasmModule* mod, AstFunction* fd) {
-    if (!should_EMIT_FUNCtion(fd)) return;
+static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
+    if (!should_emit_function(fd)) return;
 
     i32 type_idx = generate_type_idx(mod, fd->type);
 
@@ -2357,7 +2357,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
 
         switch (entity->type) {
             case Entity_Type_Function_Header: {
-                if (!should_EMIT_FUNCtion(entity->function)) break;
+                if (!should_emit_function(entity->function)) break;
 
                 u64 func_idx;
                 if ((entity->function->flags & Ast_Flag_Foreign) != 0)
@@ -2395,7 +2395,7 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
                 break;
             }
 
-            case Entity_Type_Function: EMIT_FUNCtion(module, entity->function); break;
+            case Entity_Type_Function: emit_function(module, entity->function); break;
             case Entity_Type_Global:   emit_global(module,   entity->global); break;
 
             default: break;

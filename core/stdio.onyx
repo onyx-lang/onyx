@@ -15,6 +15,16 @@ print_i32     :: proc (n: i32, base := 10)  do string_builder_append(^cout_state
 print_bool    :: proc (b: bool) do string_builder_append(^cout_state.sb, b);
 print_ptr     :: proc (p: rawptr) do string_builder_append(^cout_state.sb, cast(i64) p, 16l);
 
+// This works on both slices and arrays
+print_array :: proc (arr: $T, sep := " ") {
+    for i: 0, arr.count {
+        print(arr.data[i]);
+        if i != arr.count - 1 do print(sep);
+    }
+
+    print("\n");
+}
+
 print :: proc #overloaded {
 	print_string,
 	print_cstring,

@@ -379,7 +379,7 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
     return NULL;
 }
 
-AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
+AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos) {
     if (pp->concrete_funcs == NULL) {
         bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
     }
@@ -387,19 +387,42 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
     scope_clear(pp->poly_scope);
 
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
-        AstArgument* arg = call->arguments;
-        if (param->idx >= call->arg_count) {
-            onyx_report_error(call->token->pos, "Not enough arguments to polymorphic procedure.");
+        Type* actual_type;
+        if (pp_lookup == PPLM_By_Call) {
+            AstArgument* arg = ((AstCall *) actual)->arguments;
+            if (param->idx >= ((AstCall *) actual)->arg_count) {
+                onyx_report_error(pos, "Not enough arguments to polymorphic procedure.");
+                return NULL;
+            }
+
+            fori (i, 0, param->idx) arg = (AstArgument *) arg->next;
+            actual_type = arg->type;
+        }
+
+        else if (pp_lookup == PPLM_By_Function_Type) {
+            Type* ft = (Type*) actual;
+            if (param->idx >= ft->Function.param_count) {
+                onyx_report_error(pos, "Incompatible polymorphic argument to function paramter.");
+                return NULL;
+            }
+
+            actual_type = ft->Function.params[param->idx];
+        }
+
+        else {
+            onyx_report_error(pos, "Cannot resolve polymorphic function type.");
             return NULL;
         }
 
-        fori (i, 0, param->idx) arg = (AstArgument *) arg->next;
-        Type* arg_type = arg->type;
-
-        Type* resolved_type = solve_poly_type(param->poly_sym, param->type_expr, arg_type);
+        Type* resolved_type = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
 
         if (resolved_type == NULL) {
-            onyx_report_error(call->token->pos, "Unable to match polymorphic procedure type.");
+            if (pp_lookup == PPLM_By_Call) {
+                onyx_report_error(pos, "Unable to match polymorphic procedure type.");
+            }
+            else if (pp_lookup == PPLM_By_Function_Type) {
+                onyx_report_error(pos, "Unable to match polymorphic procedure type.");
+            }
             return NULL;
         }
 
@@ -412,7 +435,8 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
     static char key_buf[1024];
     fori (i, 0, 1024) key_buf[i] = 0;
     bh_table_each_start(AstNode *, pp->poly_scope->symbols);
-        strncat(key_buf, bh_bprintf("%s=", key), 1023);
+        strncat(key_buf, key, 1023);
+        strncat(key_buf, "=", 1023);
         strncat(key_buf, type_get_name(((AstTypeRawAlias *) value)->to), 1023);
         strncat(key_buf, ";", 1023);
     bh_table_each_end;
@@ -434,7 +458,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, AstCall* call) {
     goto no_errors;
 
 has_error:
-    onyx_report_error(call->token->pos, "Error in polymorphic procedure generated from this call site.");
+    onyx_report_error(pos, "Error in polymorphic procedure generated from this call site.");
     return NULL;
 
 no_errors:
