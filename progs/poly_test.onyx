@@ -1,8 +1,5 @@
 package main
 
-#include_folder "./core"
-
-#include_file "builtin"
 #include_file "wasi"
 #include_file "alloc"
 #include_file "intrinsics"
@@ -25,7 +22,7 @@ print_arr_details :: proc (arr: ^[..] $T) {
     print("\n\tCapacity: ");
     print(arr.capacity);
     print("\n\tData ptr: ");
-    print(cast(u32) arr.data, 16);
+    print(arr.data);
     print("\n\tSize of elements: ");
     print(sizeof T);
     print("\n\tAlignment of elements: ");
@@ -34,10 +31,10 @@ print_arr_details :: proc (arr: ^[..] $T) {
 }
 
 // This works on both slices and arrays
-print_arr :: proc (arr: $T) {
+print_arr :: proc (arr: $T, sep := " ") {
     for i: 0, arr.count {
         print(arr.data[i]);
-        print(" ");
+        if i != arr.count - 1 do print(sep);
     }
 
     print("\n");
@@ -55,6 +52,15 @@ print_vec :: proc (v: Vec3) #add_overload print {
 
 // This demonstrates that we have something similar to static 'duck' typing.
 get_count :: proc (x: $T) -> u32 do return x.count;
+
+
+// Because of the static duck typing, this will pass as an
+// array/slice in most places.
+Dummy :: struct {
+    count : u32 = 5;
+    data  : ^u32;
+}
+
 
 
 SOA :: struct {
@@ -166,13 +172,21 @@ main2 :: proc (args: [] cstring) {
     array_push(^varr, Vec3.{ 4, 2, 3 });
 
     print_arr_details(^varr);
-    print_arr(varr);
+    print_arr(varr, "\n");
+
+
+    dummy := Dummy.{ data = calloc(sizeof [5] i32) };
+    for i: 0, dummy.count do dummy.data[i] = i * 5;
+
+    print_arr(dummy);
 
     print(get_count(iarr));
     print("\n");
     print(get_count(barr));
     print("\n");
     print(get_count(varr));
+    print("\n");
+    print(get_count(dummy));
     print("\n");
 }
 

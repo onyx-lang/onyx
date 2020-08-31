@@ -12,6 +12,14 @@
 
 #define VERSION "0.1"
 
+
+#ifndef CORE_INSTALLATION
+    #ifdef __unix__
+    #define CORE_INSTALLATION "/usr/share/onyx/core"
+    #endif
+#endif
+
+
 static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
     "The compiler for the Onyx programming language.\n"
@@ -54,10 +62,11 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
         .target_file = "out.wasm",
     };
 
-    bh_arr_new(alloc, options.files, 1);
-    bh_arr_new(alloc, options.included_folders, 1);
+    bh_arr_new(alloc, options.files, 2);
+    bh_arr_new(alloc, options.included_folders, 2);
 
     // NOTE: Add the current folder
+    bh_arr_push(options.included_folders, CORE_INSTALLATION);
     bh_arr_push(options.included_folders, ".");
 
     fori(i, 1, argc) {
@@ -119,6 +128,8 @@ typedef struct CompilerState {
     OnyxWasmModule wasm_mod;
 } CompilerState;
 
+static char* lookup_included_file(CompilerState* cs, char* filename);
+
 static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOptions* opts) {
     compiler_state->options = opts;
 
@@ -139,6 +150,8 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
 
     bh_arr_new(opts->allocator, compiler_state->queued_files, 4);
 
+    bh_arr_push(compiler_state->queued_files, lookup_included_file(compiler_state, "builtin"));
+
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files)
         bh_arr_push(compiler_state->queued_files, (char *) *filename);
@@ -153,19 +166,17 @@ static void compiler_state_free(CompilerState* cs) {
 
 
 
-static char* lookup_included_file(CompilerState* cs, OnyxToken* filename) {
+static char* lookup_included_file(CompilerState* cs, char* filename) {
     static char path[256];
     fori (i, 0, 256) path[i] = 0;
 
     static char fn[128];
     fori (i, 0, 128) fn[i] = 0;
-    token_toggle_end(filename);
-    if (!bh_str_ends_with(filename->text, ".onyx")) {
-        bh_snprintf(fn, 128, "%s.onyx", filename->text);
+    if (!bh_str_ends_with(filename, ".onyx")) {
+        bh_snprintf(fn, 128, "%s.onyx", filename);
     } else {
-        bh_snprintf(fn, 128, "%s", filename->text);
+        bh_snprintf(fn, 128, "%s", filename);
     }
-    token_toggle_end(filename);
 
     bh_arr_each(const char *, folder, cs->options->included_folders) {
         if ((*folder)[strlen(*folder) - 1] != '/')
@@ -197,9 +208,11 @@ static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_con
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
     bh_arr_each(AstInclude *, include, results->includes) {
         if ((*include)->kind == Ast_Kind_Include_File) {
-            char* filename = lookup_included_file(compiler_state, (*include)->name);
-            char* formatted_name = bh_strdup(global_heap_allocator, filename);
+            token_toggle_end((*include)->name);
+            char* filename = lookup_included_file(compiler_state, (*include)->name->text);
+            token_toggle_end((*include)->name);
 
+            char* formatted_name = bh_strdup(global_heap_allocator, filename);
             bh_arr_push(compiler_state->queued_files, formatted_name);
         } else if ((*include)->kind == Ast_Kind_Include_Folder) {
             const char* folder = bh_aprintf(global_heap_allocator, "%b", (*include)->name->text, (*include)->name->length);

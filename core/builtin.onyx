@@ -60,6 +60,10 @@ array_free :: proc (arr: ^[..] $T) {
     arr.data = null;
 }
 
+array_clear :: proc (arr: ^[..] $T) {
+    arr.count = 0;
+}
+
 array_ensure_capacity :: proc (arr: ^[..] $T, cap: u32) {
     if arr.capacity >= cap do return;
 

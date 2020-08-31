@@ -767,8 +767,10 @@ EMIT_FUNC(for, AstFor* for_node) {
 
     WID(WI_BLOCK_START, 0x40);
     WID(WI_LOOP_START, 0x40);
+    WID(WI_BLOCK_START, 0x40);
 
     bh_arr_push(mod->structured_jump_target, 1);
+    bh_arr_push(mod->structured_jump_target, 0);
     bh_arr_push(mod->structured_jump_target, 2);
 
     if (it_is_local) {
@@ -780,9 +782,12 @@ EMIT_FUNC(for, AstFor* for_node) {
     }
     emit_expression(mod, &code, for_node->end);
     WI(ge_instr);
-    WID(WI_COND_JUMP, 0x01);
+    WID(WI_COND_JUMP, 0x02);
 
     emit_block(mod, &code, for_node->stmt, 0);
+
+    bh_arr_pop(mod->structured_jump_target);
+    WI(WI_BLOCK_END);
 
     if (it_is_local) {
         WIL(WI_LOCAL_GET, tmp);

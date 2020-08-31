@@ -116,6 +116,17 @@ static void add_node_to_process(OnyxParser* parser, AstNode* node) {
 }
 
 
+static AstNumLit* make_int_literal(bh_allocator a, i64 i) {
+    AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    if (bh_abs(i) >= ((u64) 1 << 32))
+        num->type_node = (AstType *) &basic_type_i64;
+    else
+        num->type_node = (AstType *) &basic_type_i32;
+
+    num->value.l = i;
+    return num;
+}
+
 
 static AstNumLit* parse_int_literal(OnyxParser* parser) {
     AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
@@ -418,6 +429,37 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 add_node_to_process(parser, (AstNode *) fc);
 
                 retval = (AstTyped *) fc;
+                break;
+            }
+            else if (parse_possible_directive(parser, "file")) {
+                OnyxToken* dir_token = parser->curr - 2;
+
+                OnyxToken* str_token = bh_alloc(parser->allocator, sizeof(OnyxToken));
+                str_token->text  = bh_strdup(global_heap_allocator, (char *) dir_token->pos.filename);
+                str_token->length = strlen(dir_token->pos.filename);
+                str_token->pos = dir_token->pos;
+                str_token->type = Token_Type_Literal_String;
+
+                AstStrLit* filename = make_node(AstStrLit, Ast_Kind_StrLit);
+                filename->token = str_token;
+                filename->addr      = 0;
+
+                add_node_to_process(parser, (AstNode *) filename);
+                retval = (AstTyped *) filename;
+                break;
+            }
+            else if (parse_possible_directive(parser, "line")) {
+                OnyxToken* dir_token = parser->curr - 2;
+
+                AstNumLit* line_num = make_int_literal(parser->allocator, dir_token->pos.line);
+                retval = (AstTyped *) line_num;
+                break;
+            }
+            else if (parse_possible_directive(parser, "column")) {
+                OnyxToken* dir_token = parser->curr - 2;
+
+                AstNumLit* col_num = make_int_literal(parser->allocator, dir_token->pos.column);
+                retval = (AstTyped *) col_num;
                 break;
             }
             else if (parse_possible_directive(parser, "char")) {
