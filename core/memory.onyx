@@ -1,4 +1,4 @@
-package memory
+package core
 
 memory_copy :: proc (dst_: rawptr, src_: rawptr, len: u32) {
 	dst := cast(^u8) dst_;

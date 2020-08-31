@@ -461,6 +461,8 @@ void symres_function(AstFunction* func) {
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
             symres_expression(&param->default_value);
+            if (onyx_has_errors()) return;
+            
             if (check_expression(&param->default_value)) return;
         }
     }

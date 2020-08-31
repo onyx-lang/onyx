@@ -1,4 +1,4 @@
-package math
+package core
 
 PI  :: 3.14159265f;
 TAU :: 6.28318330f;

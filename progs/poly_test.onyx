@@ -1,20 +1,9 @@
 package main
 
-#include_file "wasi"
-#include_file "alloc"
-#include_file "intrinsics"
-#include_file "random"
-#include_file "string"
-#include_file "file"
+#include_file "core/std/wasi"
 
 use package builtin
 use package core
-use package memory
-use package wasi
-use package intrinsics
-use package random
-use package file
-use package stdio
 
 print_arr_details :: proc (arr: ^[..] $T) {
     print("\nArray details:\n\tSize: ");

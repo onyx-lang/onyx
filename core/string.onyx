@@ -1,9 +1,5 @@
 package core
 
-use package builtin
-use package memory
-use package wasi
-
 string_make :: proc #overloaded { string_make_from_cstring }
 
 #private

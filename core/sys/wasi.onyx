@@ -1,0 +1,43 @@
+package system
+
+#include_file "core/wasi"
+
+use package builtin
+use package wasi
+use package core
+use package main as main
+
+STDOUT_FILENO :: 1
+
+output_string :: proc (s: string) -> u32 {
+    vec := IOVec.{ buf = s.data, len = s.count };
+    tmp : Size;
+    fd_write(STDOUT_FILENO, IOVecArray.{ ^vec, 1 }, ^tmp);
+    fd_datasync(STDOUT_FILENO);
+    return tmp;
+}
+
+// The builtin _start proc.
+// Sets up everything needed for execution.
+proc #export "_start" {
+    memory_init();
+
+    context.allocator = heap_allocator;
+    context.temp_allocator = heap_allocator;
+
+    argc : Size;
+    argv_buf_size : Size;
+
+    args_sizes_get(^argc, ^argv_buf_size);
+
+    argv := cast(^cstring) calloc(sizeof cstring * argc);
+    argv_buf := cast(cstring) calloc(argv_buf_size);
+
+    args_get(argv, argv_buf);
+
+    stdio_init();
+
+    main.main(argv[0 : argc]);
+
+    print_buffer_flush();
+}

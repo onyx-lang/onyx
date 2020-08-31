@@ -1,11 +1,14 @@
 package wasi
 
-#include_file "stdio"
-
-use package main as main
 use package builtin
-use package memory
-use package stdio as io
+use package core {
+    memory_init,
+    stdio_init,
+    print_buffer_flush,
+
+    heap_allocator
+}
+use package main as main
 
 Size      :: #type u32;
 Filesize  :: #type u64;
@@ -425,27 +428,3 @@ sock_shutdown :: proc (fd: FileDescriptor, how: SDFlags) -> Errno #foreign "wasi
 
 
 
-// The builtin _start proc.
-// Sets up everything needed for execution.
-proc #export "_start" {
-	memory_init();
-
-    context.allocator = heap_allocator;
-    context.temp_allocator = heap_allocator;
-
-	argc : Size;
-	argv_buf_size : Size;
-
-	args_sizes_get(^argc, ^argv_buf_size);
-
-	argv := cast(^cstring) calloc(sizeof cstring * argc);
-	argv_buf := cast(cstring) calloc(argv_buf_size);
-
-	args_get(argv, argv_buf);
-
-    io.stdio_init();
-
-	main.main(argv[0 : argc]);
-
-    io.print_flush();
-}

@@ -1,0 +1,15 @@
+package core
+
+use package builtin
+
+#include_file "core/alloc"
+#include_file "core/intrinsics"
+#include_file "core/math"
+#include_file "core/memory"
+#include_file "core/random"
+#include_file "core/stdio"
+#include_file "core/string"
+
+#include_file "core/sys/js"
+
+

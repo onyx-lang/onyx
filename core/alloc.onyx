@@ -1,10 +1,7 @@
-package memory
+package core
 
-#include_file "memory"
-#include_file "intrinsics"
-
-use package builtin
-use package intrinsics { memory_size, memory_grow }
+#include_file "core/memory"
+#include_file "core/intrinsics"
 
 heap_allocator : Allocator;
 

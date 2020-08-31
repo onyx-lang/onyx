@@ -1,4 +1,4 @@
-package random
+package core
 
 #private
 seed := 8675309

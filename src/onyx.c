@@ -15,7 +15,7 @@
 
 #ifndef CORE_INSTALLATION
     #ifdef __unix__
-    #define CORE_INSTALLATION "/usr/share/onyx/core"
+    #define CORE_INSTALLATION "/usr/share/onyx"
     #endif
 #endif
 
@@ -150,7 +150,7 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
 
     bh_arr_new(opts->allocator, compiler_state->queued_files, 4);
 
-    bh_arr_push(compiler_state->queued_files, lookup_included_file(compiler_state, "builtin"));
+    bh_arr_push(compiler_state->queued_files, lookup_included_file(compiler_state, "core/builtin"));
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files)

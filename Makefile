@@ -21,7 +21,7 @@ LIBS=
 TARGET=./onyx
 
 # These aren't working yet
-INSTALL_FOLDER=/usr/share/onyx/core
+INSTALL_FOLDER=/usr/share/onyx
 DEFINES=-DCORE_INSTALLATION=$(INSTALL_FOLDER)
 
 ifeq ($(RELEASE), 1)
@@ -38,7 +38,7 @@ $(TARGET): $(OBJ_FILES)
 
 install: $(TARGET) core/*
 	cp $(TARGET) /usr/bin/
-	cp -r core/* $(INSTALL_FOLDER)
+	cp -r core/ $(INSTALL_FOLDER)/
 
 install_syntax: misc/onyx.vim misc/onyx.sublime-syntax
 	cp ./misc/onyx_compiler.vim /usr/share/vim/vim82/compiler/onyx.vim
