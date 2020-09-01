@@ -226,18 +226,26 @@ HOW:
         [X] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is
 
-        [ ] transmute
-
-        [ ] explicit memory controls at top level
-
-        [ ] Put type info in data section so it is runtime accessible
+        [ ] ** Put type info in data section so it is runtime accessible
             - type name
             - size
             - alignment
             - struct member names
             - array length
 
+        [ ] Type parameterized structs
+
+        [ ] Array literals
+
+        [ ] transmute
+
+        [ ] explicit memory controls at top level
+
         [ ] 'use' enums and packages at an arbitrary scope
+
+        [ ] look into creating a source map
+            - first-look looks really gross
+            - whoever came up with the source map spec should be fired... why are people so afraid of binary files??
 
         [ ] convert to using an 'atom' like table
             - All identifier tokens are given a unique atom ptr, up to string equality.
@@ -255,8 +263,6 @@ HOW:
             - Compile time conditions
             - Only evalutate code blocks that evaluate to be true
 
-        [ ] Array literals
-
         [ ] Top level variable initialization
             - Works for numeric literals
 
@@ -266,8 +272,6 @@ HOW:
             a, b = b, a;
 
         [ ] All code paths return correct value
-
-        [ ] Type parameterized structs
 
         [ ] Arrays need to be much better
             - Currently, they are basically just a pointer.

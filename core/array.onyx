@@ -1,0 +1,109 @@
+package core
+
+// ---------------------------------
+//           Dynamic Arrays
+// ---------------------------------
+array_init :: proc (arr: ^[..] $T, initial_cap := 4) {
+    arr.count = 0;
+    arr.capacity = initial_cap;
+    arr.data = calloc(sizeof T * arr.capacity);
+}
+
+array_free :: proc (arr: ^[..] $T) {
+    arr.count = 0;
+    arr.capacity = 0;
+
+    cfree(arr.data);
+    arr.data = null;
+}
+
+array_clear :: proc (arr: ^[..] $T) {
+    arr.count = 0;
+}
+
+array_ensure_capacity :: proc (arr: ^[..] $T, cap: u32) {
+    if arr.capacity >= cap do return;
+
+    while cap > arr.capacity do arr.capacity <<= 1;
+    arr.data = cresize(arr.data, sizeof T * arr.capacity);
+}
+
+array_push :: proc (arr: ^[..] $T, x: T) {
+    array_ensure_capacity(arr, arr.count + 1);
+    arr.data[arr.count] = x;
+    arr.count += 1;
+}
+
+array_insert :: proc (arr: ^[..] $T, idx: u32, x: T) {
+    array_ensure_capacity(arr, arr.count + 1);
+
+    arr.count += 1;
+    while i := arr.count; i > idx {
+        arr.data[i] = arr.data[i - 1];
+        i -= 1;
+    }
+
+    arr.data[idx] = x;
+}
+
+array_remove :: proc (arr: ^[..] $T, elem: T) {
+    move := 0;
+
+    for i: 0, arr.count - move {
+        if arr.data[i + move] == elem do move += 1;
+        if move != 0 do arr.data[i] = arr.data[i + move];
+    } 
+
+    arr.count -= move;
+}
+
+array_delete :: proc (arr: ^[..] $T, idx: u32) {
+    if idx >= arr.count do return;
+
+    for i: idx, arr.count - 1 {
+        arr.data[i] = arr.data[i + 1];
+    }
+
+    arr.count -= 1;
+}
+
+array_contains :: proc (arr: ^[..] $T, x: T) -> bool {
+    for i: 0, arr.count do if arr.data[i] == x do return true;
+    return false;
+}
+
+array_pop :: proc (arr: ^[..] $T) -> T {
+    arr.count -= 1;
+    return arr.data[arr.count];
+}
+
+array_average :: proc (arr: ^[..] $T) -> T {
+    sum := cast(T) 0;
+    for i: 0, arr.count {
+        sum += arr.data[i];
+    }
+
+    return sum / cast(T) arr.count;
+}
+
+array_to_slice :: proc (arr: ^[..] $T) -> [] T {
+    return arr.data[0 : arr.count];
+}
+
+/*
+** Simple insertion sort
+**    cmp should return >0 if left > right
+*/
+array_sort :: proc (arr: ^[..] $T, cmp: proc (T, T) -> i32) {
+    for i: 1, arr.count {
+        x := arr.data[i];
+        j := i - 1; 
+
+        while j >= 0 && cmp(arr.data[j], x) > 0 {
+            arr.data[j + 1] = arr.data[j];
+            j -= 1;
+        }
+
+        arr.data[j + 1] = x;
+    }
+}

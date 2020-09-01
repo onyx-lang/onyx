@@ -42,11 +42,10 @@ Dummy :: struct {
 
 
 /* TODO: Make this work at some point
-   compose :: proc (a: $A, f: proc (A) -> $B, g: proc (B) -> $C) -> C {
-      return a |> f() |> g();
-   }
+compose :: proc (a: $A, f: proc (A) -> $B, g: proc (B) -> $C) -> C {
+    return a |> f() |> g();
+}
 */
-
 
 
 SOA :: struct {

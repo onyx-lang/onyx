@@ -1238,7 +1238,7 @@ static AstType* parse_type(OnyxParser* parser, bh_arr(AstPolyParam)* poly_vars) 
             while (parser->curr->type != ')') {
                 if (parser->hit_unexpected_token) return root;
 
-                AstType* param_type = parse_type(parser, NULL);
+                AstType* param_type = parse_type(parser, poly_vars);
                 bh_arr_push(params, param_type);
 
                 if (parser->curr->type != ')')
@@ -1249,7 +1249,7 @@ static AstType* parse_type(OnyxParser* parser, bh_arr(AstPolyParam)* poly_vars) 
             AstType* return_type = (AstType *) &basic_type_void;
             if (parser->curr->type == Token_Type_Right_Arrow) {
                 consume_token(parser);
-                return_type = parse_type(parser, NULL);
+                return_type = parse_type(parser, poly_vars);
             }
 
             u64 param_count = bh_arr_length(params);
