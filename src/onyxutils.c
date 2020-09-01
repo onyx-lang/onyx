@@ -342,41 +342,90 @@ void promote_numlit_to_larger(AstNumLit* num) {
     }
 }
 
+typedef struct PolySolveElem {
+    AstType* type_expr;
+    Type*    actual;
+} PolySolveElem;
+
 static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) {
-    while (1) {
-        if (type_expr == (AstType *) target) return actual;
+    bh_arr(PolySolveElem) elem_queue = NULL;
+    bh_arr_new(global_heap_allocator, elem_queue, 4);
 
-        switch (type_expr->kind) {
+    Type* result = NULL;
+
+    bh_arr_push(elem_queue, ((PolySolveElem) {
+        .type_expr = type_expr,
+        .actual    = actual
+    }));
+
+    while (!bh_arr_is_empty(elem_queue)) {
+        PolySolveElem elem = elem_queue[0];
+        bh_arr_deleten(elem_queue, 0, 1);
+
+        if (elem.type_expr == (AstType *) target) {
+            result = elem.actual;
+            break;
+        }
+
+        switch (elem.type_expr->kind) {
             case Ast_Kind_Pointer_Type: {
-                if (actual->kind != Type_Kind_Pointer) return NULL;
+                if (elem.actual->kind != Type_Kind_Pointer) break;
 
-                type_expr = ((AstPointerType *) type_expr)->elem;
-                actual = actual->Pointer.elem;
+                bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = ((AstPointerType *) elem.type_expr)->elem,
+                    .actual = elem.actual->Pointer.elem,
+                }));
                 break;
             }
 
             case Ast_Kind_Slice_Type: {
-                if (actual->kind != Type_Kind_Slice) return NULL;
+                if (elem.actual->kind != Type_Kind_Slice) break;
 
-                type_expr = ((AstSliceType *) type_expr)->elem;
-                actual = actual->Slice.ptr_to_data->Pointer.elem;
+                bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = ((AstSliceType *) elem.type_expr)->elem,
+                    .actual = elem.actual->Slice.ptr_to_data->Pointer.elem,
+                }));
                 break;
             }
 
             case Ast_Kind_DynArr_Type: {
-                if (actual->kind != Type_Kind_DynArray) return NULL;
+                if (elem.actual->kind != Type_Kind_DynArray) break;
 
-                type_expr = ((AstDynArrType *) type_expr)->elem;
-                actual = actual->DynArray.ptr_to_data->Pointer.elem;
+                bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = ((AstDynArrType *) elem.type_expr)->elem,
+                    .actual = elem.actual->DynArray.ptr_to_data->Pointer.elem,
+                }));
                 break;
             }
 
-            default:
-                return NULL;
+            case Ast_Kind_Function_Type: {
+                if (elem.actual->kind != Type_Kind_Function) break;
+
+                AstFunctionType* ft = (AstFunctionType *) elem.type_expr;
+
+                fori (i, 0, ft->param_count) {
+                    bh_arr_push(elem_queue, ((PolySolveElem) {
+                        .type_expr = ft->params[i],
+                        .actual = elem.actual->Function.params[i],
+                    }));
+                }
+
+                bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = ft->return_type,
+                    .actual = elem.actual->Function.return_type,
+                }));
+
+                break;
+            }
+
+            default: break;
         }
     }
 
-    return NULL;
+solving_done:
+    bh_arr_free(elem_queue);
+
+    return result;
 }
 
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos) {
@@ -417,12 +466,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
         Type* resolved_type = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
 
         if (resolved_type == NULL) {
-            if (pp_lookup == PPLM_By_Call) {
-                onyx_report_error(pos, "Unable to match polymorphic procedure type.");
-            }
-            else if (pp_lookup == PPLM_By_Function_Type) {
-                onyx_report_error(pos, "Unable to match polymorphic procedure type.");
-            }
+            onyx_report_error(pos, "Unable to match polymorphic procedure type with actual type, '%s'.", type_get_name(actual_type));
             return NULL;
         }
 

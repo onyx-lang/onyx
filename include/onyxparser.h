@@ -23,6 +23,11 @@ typedef struct ParseResults {
     bh_arr(NodeToProcess) nodes_to_process;
 } ParseResults;
 
+typedef struct PolymorphicContext {
+    AstType* root_node;
+    bh_arr(AstPolyParam)* poly_params;
+} PolymorphicContext;
+
 typedef struct OnyxParser {
     bh_allocator allocator;
 
@@ -35,6 +40,8 @@ typedef struct OnyxParser {
     OnyxToken *curr;
 
     ParseResults results;
+
+    PolymorphicContext polymorph_context;
 
     b32 hit_unexpected_token : 1;
 } OnyxParser;

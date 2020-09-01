@@ -37,15 +37,14 @@ get_count :: proc (x: $T) -> u32 do return x.count;
 // array/slice in most places.
 Dummy :: struct {
     count : u32 = 5;
-    data  : ^u32;
+    data  : [5] u32;
 }
 
 
-/* TODO: Make this work at some point
-compose :: proc (a: $A, f: proc (A) -> $B, g: proc (B) -> $C) -> C {
+/* This demos some of the power you have with the polymorphic types */
+compose :: proc (a: A, f: proc ($A) -> $B, g: proc (B) -> $C) -> C {
     return a |> f() |> g();
 }
-*/
 
 
 SOA :: struct {
@@ -64,6 +63,10 @@ soa_deinit :: proc (s: ^SOA) {
 }
 
 main :: proc (args: [] cstring) {
+    res := compose(5, proc (x: i32) -> i32 do return x * 3;,
+                      proc (x: i32) -> i32 do return x + 5;);
+    print(res);
+
     s : SOA;
     soa_init(^s);
     defer soa_deinit(^s);
@@ -109,7 +112,7 @@ main :: proc (args: [] cstring) {
 
     print("Deleteing ^a[20]\n");
     ptrmap_delete(^map, ^s.a[20]);
-    
+
     print("Has ^a[20]? ");
     print(ptrmap_has(^map, ^s.a[20]));
     print("\n");
@@ -191,7 +194,9 @@ main2 :: proc (args: [] cstring) {
     print_array(varr, "\n");
 
 
-    dummy := Dummy.{ data = cast(^u32) calloc(sizeof [5] i32) };
+    dummy := cast(^Dummy) calloc(sizeof Dummy);
+    defer cfree(dummy);
+    dummy.count = 5;
     for i: 0, dummy.count do dummy.data[i] = i * 5;
 
     print_array(dummy);

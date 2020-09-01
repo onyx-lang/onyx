@@ -464,9 +464,25 @@ const char* type_get_name(Type* type) {
             else
                 return "<anonymous enum>";
 
-        case Type_Kind_Function: return bh_aprintf(global_scratch_allocator, "proc (...) -> %s", type_get_name(type->Function.return_type));
         case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_name(type->Slice.ptr_to_data->Pointer.elem));
         case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_name(type->DynArray.ptr_to_data->Pointer.elem));
+
+        case Type_Kind_Function: {
+            char buf[512];
+            fori (i, 0, 512) buf[i] = 0;
+
+            strncat(buf, "proc (", 511);
+            fori (i, 0, type->Function.param_count) {
+                strncat(buf, type_get_name(type->Function.params[i]), 511);
+                if (i != type->Function.param_count - 1)
+                    strncat(buf, ", ", 511);
+            }
+
+            strncat(buf, ") -> ", 511);
+            strncat(buf, type_get_name(type->Function.return_type), 511);
+
+            return bh_aprintf(global_scratch_allocator, "%s", buf);
+        }
 
         default: return "unknown";
     }
