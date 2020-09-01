@@ -17,6 +17,9 @@ contexts:
     - match: '//'
       scope: punctuation.definition.comment.onyx
       push: line_comment
+    - match: '/\*'
+      scope: punctuation.definition.comment.onyx
+      push: block_comment
 
     # Keywords are if, else for and while.
     # Note that blackslashes don't need to be escaped within single quoted
@@ -54,3 +57,10 @@ contexts:
     - meta_scope: comment.line.onyx
     - match: $
       pop: true
+
+  block_comment:
+    - meta_scope: comment.block.onyx
+    - match: '\*/'
+      pop: true
+    - match: '/\*'
+      push: block_comment

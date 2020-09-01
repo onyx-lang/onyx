@@ -169,6 +169,32 @@ whitespace_skipped:
         goto token_parsed;
     }
 
+    if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '*') {
+        tokenizer->curr += 2;
+        tk.type = Token_Type_Comment;
+        tk.text = tokenizer->curr;
+
+        i32 comment_depth = 1;
+
+        while (comment_depth > 0 && tokenizer->curr != tokenizer->end) {
+            if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '*') {
+                tokenizer->curr += 2;
+                comment_depth += 1;
+            }
+
+            else if (*tokenizer->curr == '*' && *(tokenizer->curr + 1) == '/') {
+                tokenizer->curr += 2;
+                comment_depth -= 1;
+            }
+
+            else {
+                INCREMENT_CURR_TOKEN(tokenizer);
+            }
+        }
+
+        goto token_parsed;
+    }
+
     // String literal
     if (*tk.text == '"') {
         u64 len = 0;

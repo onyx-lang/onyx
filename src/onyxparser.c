@@ -1268,10 +1268,13 @@ static AstType* parse_type(OnyxParser* parser, bh_arr(AstPolyParam)* poly_vars) 
         }
 
         else if (parser->curr->type == '$') {
+            bh_arr(AstPolyParam) pv = NULL;
+
             if (poly_vars == NULL)
                 onyx_report_error(parser->curr->pos, "polymorphic variable not valid here.");
+            else
+                pv = *poly_vars;
 
-            bh_arr(AstPolyParam) pv = *poly_vars;
             consume_token(parser);
 
             AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
