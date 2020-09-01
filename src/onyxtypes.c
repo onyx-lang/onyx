@@ -134,9 +134,6 @@ b32 types_are_compatible(Type* t1, Type* t2) {
                 return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
             }
 
-            if (t2->kind == Type_Kind_Basic && t2->Basic.kind == Basic_Kind_Rawptr)
-                return 1;
-
             break;
         }
 

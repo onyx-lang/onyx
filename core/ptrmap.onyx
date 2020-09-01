@@ -1,0 +1,111 @@
+package core
+
+
+PtrMap :: struct {
+    hashes  : [..] i32;
+    entries : [..] PtrMapEntry;
+}
+
+PtrMapEntry :: struct {
+    key   : rawptr;
+    value : rawptr;
+
+    next  : i32;    
+}
+
+ptrmap_init :: proc (use pmap: ^PtrMap, hash_count: i32 = 16) {
+    array_init(^hashes, hash_count);
+    array_init(^entries, 4);
+
+    for i: 0, hash_count do array_push(^hashes, -1);
+}
+
+ptrmap_free :: proc (use pmap: ^PtrMap) {
+    array_free(^hashes);
+    array_free(^entries);
+}
+
+
+ptrmap_put :: proc (use pmap: ^PtrMap, key: rawptr, value: rawptr) {
+    lr := ptrmap_lookup(pmap, key);
+
+    if lr.entry_index >= 0 {
+        entries[lr.entry_index].value = value;
+        return;
+    }
+
+    array_push(^entries, PtrMapEntry.{
+        key = key,
+        value = value,
+        next = hashes[lr.hash_index],
+    });
+
+    hashes[lr.hash_index] = entries.count - 1;
+}
+
+ptrmap_has :: proc (use pmap: ^PtrMap, key: rawptr) -> bool {
+    lr := ptrmap_lookup(pmap, key);
+    return lr.entry_index >= 0;
+}
+
+ptrmap_get :: proc (use pmap: ^PtrMap, key: rawptr) -> rawptr {
+    lr := ptrmap_lookup(pmap, key);
+    if lr.entry_index >= 0 do return entries[lr.entry_index].value;
+
+    return null;
+}
+
+ptrmap_delete :: proc (use pmap: ^PtrMap, key: rawptr) {
+    lr := ptrmap_lookup(pmap, key);
+    if lr.entry_index < 0 do return;    
+
+    if lr.entry_prev < 0   do hashes[lr.hash_index] = entries[lr.entry_index].next;
+    else                   do hashes[lr.entry_prev] = entries[lr.entry_index].next;
+
+    if lr.entry_index == entries.count - 1 {
+        array_pop(^entries);
+        return;
+    }
+
+    array_fast_delete(^entries, lr.entry_index);
+    last := ptrmap_lookup(pmap, entries[lr.entry_index].key);
+    if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
+    else                       do hashes[last.hash_index] = lr.entry_index;
+}
+
+ptrmap_clear :: proc (use pmap: ^PtrMap) {
+    for i: 0, hashes.count do hashes.data[i] = -1;
+    entries.count = 0;
+}
+
+
+
+//
+// Private symbols
+//
+
+#private
+PtrMapLookupResult :: struct {
+    hash_index  : i32 = -1;
+    entry_index : i32 = -1;
+    entry_prev  : i32 = -1;
+}
+
+#private
+ptrmap_lookup :: proc (use pmap: ^PtrMap, key: rawptr) -> PtrMapLookupResult {
+    lr := PtrMapLookupResult.{};
+
+    hash := cast(u32) 0xcbf29ce4 ^ cast(u32) key;
+
+    lr.hash_index = hash % hashes.count;
+    lr.entry_index = hashes[lr.hash_index];
+
+    while lr.entry_index >= 0 {
+        if entries[lr.entry_index].key == key do return lr;
+
+        lr.entry_prev = lr.entry_index;
+        lr.entry_index = entries[lr.entry_index].next;
+    }
+
+    return lr;
+}

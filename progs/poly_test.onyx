@@ -63,7 +63,7 @@ soa_deinit :: proc (s: ^SOA) {
     array_free(^s.b);
 }
 
-main2 :: proc (args: [] cstring) {
+main :: proc (args: [] cstring) {
     s : SOA;
     soa_init(^s);
     defer soa_deinit(^s);
@@ -85,9 +85,37 @@ main2 :: proc (args: [] cstring) {
     print("After adding...\n");
     print_arr_details(^s.a);
     print_arr_details(^s.b);
-}
 
-main :: proc (args: [] cstring) {
+
+    map : PtrMap;
+    ptrmap_init(^map);
+    defer ptrmap_free(^map);
+
+    for i: 0, 100 do ptrmap_put(^map, ^s.a[i], ^s.b[i]);
+
+    print("Has ^a[20]? ");
+    print(ptrmap_has(^map, ^s.a[20]));
+    print("\n");
+
+    print("Has null? ");
+    print(ptrmap_has(^map, null));
+    print("\n");
+
+    print("Value at ^a[50]: ");
+    print(ptrmap_get(^map, ^s.a[50]));
+    print(" == ");
+    print(^s.b[50]);
+    print("\n");
+
+    print("Deleteing ^a[20]\n");
+    ptrmap_delete(^map, ^s.a[20]);
+    
+    print("Has ^a[20]? ");
+    print(ptrmap_has(^map, ^s.a[20]));
+    print("\n");
+}
+    
+main2 :: proc (args: [] cstring) {
     print(cast(u32) __heap_start, 16);
 
     iarr_backing : [32] i32;
@@ -163,7 +191,7 @@ main :: proc (args: [] cstring) {
     print_array(varr, "\n");
 
 
-    dummy := Dummy.{ data = calloc(sizeof [5] i32) };
+    dummy := Dummy.{ data = cast(^u32) calloc(sizeof [5] i32) };
     for i: 0, dummy.count do dummy.data[i] = i * 5;
 
     print_array(dummy);

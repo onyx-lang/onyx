@@ -222,7 +222,7 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
 
 string_builder_add_i64 :: proc (use sb: ^StringBuilder, n: i64, base := 10l) -> ^StringBuilder {
     buf : [256] u8;
-    s := i64_to_string(n, base, Buffer.{ cast(rawptr) buf, 256 });
+    s := i64_to_string(n, base, Buffer.{ cast(^void) buf, 256 });
     return string_builder_add_string(sb, s);
 }
 

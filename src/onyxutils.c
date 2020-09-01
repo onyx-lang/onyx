@@ -445,6 +445,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
         return bh_table_get(AstFunction *, pp->concrete_funcs, key_buf);
     }
 
+    Type* old_return_type = semstate.expected_return_type;
     semstate.curr_scope = pp->poly_scope;
 
     AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
@@ -459,9 +460,11 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
 
 has_error:
     onyx_report_error(pos, "Error in polymorphic procedure generated from this call site.");
+    semstate.expected_return_type = old_return_type;
     return NULL;
 
 no_errors:
+    semstate.expected_return_type = old_return_type;
 
     bh_arr_push(semstate.other_entities, ((Entity) {
         .type = Entity_Type_Function_Header,

@@ -48,13 +48,15 @@ b32 check_return(AstReturn* retnode) {
         if (!types_are_compatible(retnode->expr->type, semstate.expected_return_type)) {
             onyx_report_error(retnode->expr->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
-                    type_get_name(retnode->expr->type),
-                    type_get_name(semstate.expected_return_type));
+                    type_get_name(semstate.expected_return_type),
+                    type_get_name(retnode->expr->type));
             return 1;
         }
     } else {
         if (semstate.expected_return_type->Basic.size > 0) {
-            onyx_report_error(retnode->token->pos, "returning from non-void function without value");
+            onyx_report_error(retnode->token->pos,
+                "Returning from non-void function without value. Expected a value of type '%s'.",
+                type_get_name(semstate.expected_return_type));
             return 1;
         }
     }
@@ -524,11 +526,11 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         if (check_binaryop(&binop_node, 0)) return 1;
     }
 
-    if (!types_are_compatible(binop->left->type, binop->right->type)) {
+    if (!types_are_compatible(binop->right->type, binop->right->type)) {
         onyx_report_error(binop->token->pos,
                 "Cannot assign value of type '%s' to a '%s'.",
-                type_get_name(binop->left->type),
-                type_get_name(binop->right->type));
+                type_get_name(binop->right->type),
+                type_get_name(binop->left->type));
         return 1;
     }
 
@@ -564,11 +566,19 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
         return 1;
     }
 
-    if (!types_are_compatible(binop->left->type, binop->right->type)) {
+    // HACK: Since ^... to rawptr is a one way conversion, strip any pointers
+    // away so they can be compared as expected
+    Type* ltype = binop->left->type;
+    Type* rtype = binop->right->type;
+
+    if (ltype->kind == Type_Kind_Pointer) ltype = &basic_types[Basic_Kind_Rawptr];
+    if (rtype->kind == Type_Kind_Pointer) rtype = &basic_types[Basic_Kind_Rawptr];
+
+    if (!types_are_compatible(ltype, rtype)) {
         onyx_report_error(binop->token->pos,
                 "Cannot compare '%s' to '%s'.",
-                type_get_name(binop->left->type),
-                type_get_name(binop->right->type));
+                type_get_name(ltype),
+                type_get_name(rtype));
         return 1;
     }
 
@@ -770,7 +780,7 @@ b32 check_struct_literal(AstStructLiteral* sl) {
 
         if (!types_are_compatible(formal, (*actual)->type)) {
             onyx_report_error(sl->token->pos,
-                    "Mismatched types for %d%s member, expected '%s, got '%s'.",
+                    "Mismatched types for %d%s member, expected '%s', got '%s'.",
                     i, bh_num_suffix(i),
                     type_get_name(formal),
                     type_get_name((*actual)->type));

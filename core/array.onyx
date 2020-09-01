@@ -67,6 +67,13 @@ array_delete :: proc (arr: ^[..] $T, idx: u32) {
     arr.count -= 1;
 }
 
+array_fast_delete :: proc (arr: ^[..] $T, idx: u32) {
+    if idx >= arr.count do return;
+
+    arr.data[idx] = arr.data[arr.count - 1];
+    arr.count -= 1;
+}
+
 array_contains :: proc (arr: ^[..] $T, x: T) -> bool {
     for i: 0, arr.count do if arr.data[i] == x do return true;
     return false;
