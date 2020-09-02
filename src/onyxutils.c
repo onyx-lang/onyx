@@ -122,6 +122,8 @@ Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_
         package->include_scope = scope_create(alloc, parent_scope);
         package->scope = scope_create(alloc, package->include_scope);
         package->private_scope = scope_create(alloc, package->scope);
+        package->unqualified_uses = NULL;
+        bh_arr_new(global_heap_allocator, package->unqualified_uses, 4);
 
         bh_table_put(Package *, prog->packages, pac_name, package);
 

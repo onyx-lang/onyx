@@ -2,7 +2,7 @@ package system
 
 #include_file "core/wasi"
 
-use package builtin
+
 use package wasi
 use package core
 use package main as main

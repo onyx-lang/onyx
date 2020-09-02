@@ -1,6 +1,6 @@
 package system
 
-use package builtin
+
 use package core
 use package main as main
 

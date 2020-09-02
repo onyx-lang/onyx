@@ -10,7 +10,7 @@ PtrMapEntry :: struct {
     key   : rawptr;
     value : rawptr;
 
-    next  : i32;    
+    next  : i32;
 }
 
 ptrmap_init :: proc (use pmap: ^PtrMap, hash_count: i32 = 16) {
@@ -95,7 +95,7 @@ PtrMapLookupResult :: struct {
 ptrmap_lookup :: proc (use pmap: ^PtrMap, key: rawptr) -> PtrMapLookupResult {
     lr := PtrMapLookupResult.{};
 
-    hash := cast(u32) 0xcbf29ce4 ^ cast(u32) key;
+    hash := cast(u32) 0xcbf29ce7 ^ cast(u32) key;
 
     lr.hash_index = hash % hashes.count;
     lr.entry_index = hashes[lr.hash_index];

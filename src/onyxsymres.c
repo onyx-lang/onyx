@@ -503,7 +503,13 @@ void symres_function(AstFunction* func) {
             param->local->type = param->default_value->type;
         }
 
-        if (param->local->type == NULL) break;
+        if (param->local->type == NULL) {
+            onyx_report_error(param->local->token->pos,
+                    "Unable to resolve type for parameter, '%b'.\n",
+                    param->local->token->text,
+                    param->local->token->length);
+            return;
+        }
 
         symbol_introduce(semstate.curr_scope, param->local->token, (AstNode *) param->local);
 
@@ -591,8 +597,21 @@ static void symres_use_package(AstUsePackage* package) {
         }
     }
 
-    if (package->alias == NULL && package->only == NULL)
+    if (package->alias == NULL && package->only == NULL) {
+        b32 already_included = 0;
+        bh_arr_each(Package *, included_package, semstate.curr_package->unqualified_uses) {
+            if (*included_package == p) {
+                already_included = 1;
+                break;
+            }
+        }
+
+        if (already_included) return;
+
         scope_include(semstate.curr_package->include_scope, p->scope);
+
+        bh_arr_push(semstate.curr_package->unqualified_uses, p);
+    }
 }
 
 static void symres_enum(AstEnumType* enum_node) {

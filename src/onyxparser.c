@@ -1959,6 +1959,10 @@ ParseResults onyx_parse(OnyxParser *parser) {
         parser->package = package;
     }
 
+    AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);
+    implicit_use_builtin->package = (AstPackage *) &builtin_package_node;
+    add_node_to_process(parser, (AstNode *) implicit_use_builtin);
+
     while (parser->curr->type != Token_Type_End_Stream) {
         if (parser->hit_unexpected_token) return parser->results;
 

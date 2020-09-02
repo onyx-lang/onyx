@@ -17,6 +17,9 @@ AstBasicType basic_type_f32    = { Ast_Kind_Basic_Type, 0, NULL, "f32"   , &basi
 AstBasicType basic_type_f64    = { Ast_Kind_Basic_Type, 0, NULL, "f64"   , &basic_types[Basic_Kind_F64]   };
 AstBasicType basic_type_rawptr = { Ast_Kind_Basic_Type, 0, NULL, "rawptr", &basic_types[Basic_Kind_Rawptr] };
 
+static OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
+AstNode   builtin_package_node  = { Ast_Kind_Symbol, Ast_Flag_No_Clone, &builtin_package_token, NULL };
+
 static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
 static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
 AstNumLit builtin_heap_start  = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
@@ -45,6 +48,9 @@ const BuiltinSymbol builtin_symbols[] = {
 };
 
 void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
+    // HACK
+    builtin_package_token.text = bh_strdup(global_heap_allocator, builtin_package_token.text);
+
     BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
     while (bsym->sym != NULL) {
         if (bsym->package == NULL)

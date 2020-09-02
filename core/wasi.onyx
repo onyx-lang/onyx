@@ -1,6 +1,6 @@
 package wasi
 
-use package builtin
+
 use package core {
     memory_init,
     stdio_init,

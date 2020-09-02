@@ -2,7 +2,6 @@ package main
 
 #include_file "core/std/wasi"
 
-use package builtin
 use package core
 
 print_arr_details :: proc (arr: ^[..] $T) {
@@ -75,7 +74,7 @@ main :: proc (args: [] cstring) {
     print_arr_details(^s.b);
 
     for i: 0, 100 {
-        array_push(^s.a, 5 * i);
+        array_push(^s.a, (5 * i) % 21);
         array_push(^s.b, 3l * cast(i64) i);
     }
 
@@ -94,7 +93,7 @@ main :: proc (args: [] cstring) {
     print("\n\n");
 
     map : PtrMap;
-    ptrmap_init(^map);
+    ptrmap_init(^map, 50);
     defer ptrmap_free(^map);
 
     for i: 0, 100 do ptrmap_put(^map, ^s.a[i], ^s.b[i]);

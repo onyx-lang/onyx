@@ -542,6 +542,8 @@ typedef struct Entity {
 struct Package {
     char *name;
 
+    bh_arr(Package *) unqualified_uses;
+
     Scope *scope;
     Scope *include_scope;
     Scope *private_scope;
@@ -575,6 +577,7 @@ extern AstBasicType basic_type_f32;
 extern AstBasicType basic_type_f64;
 extern AstBasicType basic_type_rawptr;
 
+extern AstNode   builtin_package_node;
 extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstType  *builtin_string_type;

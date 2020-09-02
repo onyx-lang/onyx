@@ -3,7 +3,7 @@ package core_file
 // Many of these functions will be improved when
 // multiple return values are implemented.
 
-use package builtin
+
 use package core
 use package wasi
 

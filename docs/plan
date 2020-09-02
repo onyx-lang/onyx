@@ -226,7 +226,9 @@ HOW:
         [X] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is
 
-        [ ] ** Put type info in data section so it is runtime accessible
+        [ ] data structure based iteration
+
+        [ ] Put type info in data section so it is runtime accessible
             - type name
             - size
             - alignment

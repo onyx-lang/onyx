@@ -1,6 +1,6 @@
 package core
 
-use package builtin
+
 
 #include_file "core/alloc"
 #include_file "core/array"
