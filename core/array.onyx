@@ -114,3 +114,13 @@ array_sort :: proc (arr: ^[..] $T, cmp: proc (T, T) -> i32) {
         arr.data[j + 1] = x;
     }
 }
+
+array_fold :: proc (arr: ^[..] $T, init: $R, f: proc (T, R) -> R) -> R {
+    val := init;
+    for i: 0, arr.count do val = f(arr.data[i], val);
+    return val;
+}
+
+array_map :: proc (arr: ^[..] $T, f: proc (T) -> T) {
+    for i: 0, arr.count do arr.data[i] = f(arr.data[i]);
+}

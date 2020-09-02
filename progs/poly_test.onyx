@@ -89,6 +89,9 @@ main :: proc (args: [] cstring) {
     print_arr_details(^s.a);
     print_arr_details(^s.b);
 
+    print("Array A sum: ");
+    print(array_fold(^s.a, 0, proc (x: i32, acc: i32) -> i32 do return x + acc;));
+    print("\n\n");
 
     map : PtrMap;
     ptrmap_init(^map);

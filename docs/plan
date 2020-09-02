@@ -273,7 +273,7 @@ HOW:
 
         [ ] All code paths return correct value
 
-        [ ] Arrays need to be much better
+        [X] Arrays need to be much better
             - Currently, they are basically just a pointer.
             - The length should be stored with the pointer
             - Dynamic resizing?
