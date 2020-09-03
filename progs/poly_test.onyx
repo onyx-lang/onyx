@@ -119,7 +119,7 @@ main :: proc (args: [] cstring) {
     print(ptrmap_has(^map, ^s.a[20]));
     print("\n");
 }
-    
+
 main2 :: proc (args: [] cstring) {
     print(cast(u32) __heap_start, 16);
 

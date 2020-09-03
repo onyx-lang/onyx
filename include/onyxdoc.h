@@ -4,8 +4,15 @@
 #include "bh.h"
 #include "onyxastnodes.h"
 
+typedef enum DocFormat {
+    Doc_Format_Human,
+    Doc_Format_Tags,
+    Doc_Format_Html,
+} DocFormat;
+
 typedef struct DocEntry {
 	OnyxFilePos pos;
+    char* sym; // Unused by doc generator
 	char* def;
 	char* additional;
 } DocEntry;
@@ -20,10 +27,12 @@ typedef struct DocPackage {
 typedef struct OnyxDocumentation {
 	bh_arena doc_arena;
 
+    DocFormat format;
+
 	bh_arr(DocPackage) package_docs;
 } OnyxDocumentation;
 
 OnyxDocumentation onyx_docs_generate(ProgramInfo* prog);
-void onyx_docs_write(OnyxDocumentation* doc);
+void onyx_docs_emit(OnyxDocumentation* doc);
 
 #endif

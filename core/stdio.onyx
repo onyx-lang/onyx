@@ -39,6 +39,8 @@ print_array :: proc (arr: $T, sep := " ") {
 }
 
 print_buffer_flush :: proc {
+    if print_buffer.len == 0 do return;
+
 	^print_buffer
 		|> string_builder_to_string()
 		|> system.output_string();

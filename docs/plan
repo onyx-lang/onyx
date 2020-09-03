@@ -174,7 +174,7 @@ HOW:
             X All members specified means names not required
             X Named member initialization
             X Default values on structs so they don't have to be named
-            
+
         [X] #union on structs
 
         [X] #align on structs
@@ -201,7 +201,7 @@ HOW:
 
         [X] Add slices
             - Arrays without a size
-            - Converted to a struct that looks like:    
+            - Converted to a struct that looks like:
                 []T :: struct {
                     data  : ^T;
                     count : u32;
@@ -226,7 +226,16 @@ HOW:
         [X] #file and #line directives
             - string and u32 respectively that represent the current file and line number where the directive is
 
+        [X] Generate a tags file
+            - This looks very simple
+            - I think all the infrastructure is there for this
+
         [ ] data structure based iteration
+
+        [ ] baked parameters
+            - Compile time known parameters
+            - Removes the argument from the list and replaces the function with the
+                baked function
 
         [ ] Put type info in data section so it is runtime accessible
             - type name

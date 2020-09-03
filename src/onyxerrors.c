@@ -50,6 +50,13 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
 }
 
 void onyx_errors_print() {
+    // NOTE: If the format of the error messages is ever changed,
+    // update onyx_compile.vim and onyx.sublime-build to match
+    // the new format. This was editor error highlighting is still
+    // supported.
+    //
+    //                                      - brendanfh   2020/09/03
+
     bh_arr_each(OnyxError, err, errors.errors) {
         if (err->pos.filename) {
             bh_file_contents* fc = &bh_table_get(bh_file_contents, *errors.file_contents, (char *) err->pos.filename);

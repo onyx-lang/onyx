@@ -11,6 +11,7 @@ WebGl_Wasm = {
         this.renderbuffers = [];
         this.textures = [];
         this.uniformlocs = [];
+        this.vertexArrays = [];
 
         this.canvas = document.getElementById(canvasname);
         if (this.canvas == null) return 0;
@@ -34,6 +35,8 @@ WebGl_Wasm = {
     bindFramebuffer(target, framebuffer) { this.gl.bindFramebuffer(target, this.framebuffers[framebuffer]); },
     bindRenderbuffer(target, renderbuffer) { this.gl.bindRenderbuffer(target, this.renderbuffers[renderbuffer]); },
     bindTexture(target, texture) { this.gl.bindTexture(target, this.textures[texture]); },
+    bindVertexArray(vertexArray) { this.gl.bindVertexArray(this.vertexArrays[vertexArray]); },
+
     blendColor(red, green, blue, alpha) { this.gl.blendColor(red, green, blue, alpha); },
     blendEquation(mode) { this.gl.blendEquation(mode); },
     blendEquationSeparate(modeRGB, modeAlpha) { this.gl.blendEquationSeparate(modeRGB, modeAlpha); },
@@ -118,6 +121,13 @@ WebGl_Wasm = {
         this.textures.push(texture);
         return this.textures.length - 1;
     },
+    createVertexArray() {
+        const vao = this.gl.createVertexArray();
+        if (vao == null) return -1;
+
+        this.vertexArrays.push(vao);
+        return this.vertexArrays.length - 1;
+    },
     cullFace(mode) { this.gl.cullFace(mode); },
     deleteBuffer(buffer) { this.gl.deleteBuffer(this.buffers[buffer]); },
     deleteFramebuffer(framebuffer) { this.gl.deleteFramebuffer(this.framebuffers[framebuffer]); },
@@ -125,6 +135,7 @@ WebGl_Wasm = {
     deleteRenderbuffer(renderbuffer) { this.gl.deleteRenderbuffer(this.renderbuffers[renderbuffer]); },
     deleteShader(shader) { this.gl.deleteShader(this.shaders[shader]); },
     deleteTexture(texture) { this.gl.deleteTexture(this.textures[texture]); },
+    deleteVertexArray(vertexArray) { this.gl.deleteVertexArray(this.vertexArrays[vertexArray]); },
     depthFunc(func) { this.gl.depthFunc(func); },
     depthMask(flag) { this.gl.depthMask(flag); },
     depthRange(znear, zfar) { this.gl.depthRange(znear, zfar); },
@@ -132,7 +143,9 @@ WebGl_Wasm = {
     disable(cap) { this.gl.disable(cap); },
     disableVertexAttribArray(index) { this.gl.disableVertexAttribArray(index); },
     drawArrays(mode, first, count) { this.gl.drawArrays(mode, first, count); },
+    drawArraysInstanced(mode, first, count, instanceCount) { this.gl.drawArraysInstanced(mode, first, count, instanceCount); },
     drawElements(mode, count, type, offset) { this.gl.drawElements(mode, count, type, offset); },
+    drawElementsInstanced(mode, count, type, offset, instanceCount) { this.gl.drawElementsInstanced(mode, count, type, offset, instanceCount); },
     enable(cap) { this.gl.enable(cap); },
     enableVertexAttribArray(index) { this.gl.enableVertexAttribArray(index); },
     finish() { this.gl.finish(); },
@@ -261,6 +274,7 @@ WebGl_Wasm = {
     vertexAttrib3f(idx, x, y, z) { this.gl.vertexAttrib3f(idx, x, y, z); },
     vertexAttrib4f(idx, x, y, z, w) { this.gl.vertexAttrib4f(idx, x, y, z, w); },
     vertexAttribPointer(idx, size, type, normalized, stride, offset) { this.gl.vertexAttribPointer(idx, size, type, normalized, stride, offset); },
+    vertexAttribDivisor(idx, divisor) { this.gl.vertexAttribDivisor(idx, divisor); },
     viewport(x, y, width, height) { this.gl.viewport(x, y, width, height); },
 
 };

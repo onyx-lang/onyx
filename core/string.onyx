@@ -26,9 +26,6 @@ string_length :: proc #overloaded {
     },
 }
 
-#private
-string_length_string :: proc (s: string) -> u32 do return s.count;
-
 string_concat :: proc (s1: string, s2: string) -> string {
     len1 :: string_length(s1);
     len2 :: string_length(s2);

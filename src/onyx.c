@@ -334,6 +334,16 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
     bh_file_close(&file);
 
+    // POTENTIAL BUG: If there are too many files and too many collisions in the table,
+    // there is a chance that the inner arrays of the table will be repositioned. That
+    // would completely break the pointer taken here, which would break all references
+    // to file contents anywhere else in the program.
+    //
+    // A good solution would be to not use a table and just use a array of char* and
+    // ensure that the filename is not in that list.
+    //                                                      - brendanfh 2020/09/03
+
+
     // NOTE: Need to reget the value out of the table so token references work
     bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
@@ -394,7 +404,8 @@ static i32 onyx_compile(CompilerState* compiler_state) {
 
     if (compiler_state->options->action == ONYX_COMPILE_ACTION_DOCUMENT) {
         OnyxDocumentation docs = onyx_docs_generate(&compiler_state->prog_info);
-        onyx_docs_write(&docs);
+        docs.format = Doc_Format_Tags;
+        onyx_docs_emit(&docs);
 
         return ONYX_COMPILER_PROGRESS_SUCCESS;
     }
