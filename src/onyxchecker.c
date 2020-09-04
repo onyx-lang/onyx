@@ -21,7 +21,6 @@ CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
-CHECK(slice, AstArrayAccess* sl);
 CHECK(field_access, AstFieldAccess** pfield);
 CHECK(range_literal, AstBinaryOp** range);
 CHECK(size_of, AstSizeOf* so);
@@ -840,6 +839,24 @@ b32 check_array_access(AstArrayAccess* aa) {
         return 1;
     }
 
+    if (types_are_compatible(aa->expr->type, type_build_from_ast(semstate.node_allocator, builtin_range_type))) {
+        Type *of = NULL;
+        if (aa->addr->type->kind == Type_Kind_Pointer)
+            of = aa->addr->type->Pointer.elem;
+        else if (aa->addr->type->kind == Type_Kind_Array)
+            of = aa->addr->type->Array.elem;
+        else {
+            onyx_report_error(aa->token->pos, "Invalid type for left of slice creation.");
+            return 1;
+        }
+
+        aa->kind = Ast_Kind_Slice;
+        aa->type = type_make_slice(semstate.node_allocator, of);
+        aa->elem_size = type_size_of(of);
+
+        return 0;
+    }
+
     if (aa->expr->type->kind != Type_Kind_Basic
             || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
         onyx_report_error(aa->token->pos, "Expected type u32 or i32 for index.");
@@ -873,31 +890,6 @@ b32 check_array_access(AstArrayAccess* aa) {
     }
 
     aa->elem_size = type_size_of(aa->type);
-
-    return 0;
-}
-
-b32 check_slice(AstArrayAccess* sl) {
-    if (check_expression(&sl->addr)) return 1;
-    if (check_expression(&sl->expr)) return 1;
-
-    if (!type_is_pointer(sl->addr->type)) {
-        onyx_report_error(sl->token->pos, "Expected pointer or array type for left of slice creation.");
-        return 1;
-    }
-
-    Type *of = NULL;
-    if (sl->addr->type->kind == Type_Kind_Pointer)
-        of = sl->addr->type->Pointer.elem;
-    else if (sl->addr->type->kind == Type_Kind_Array)
-        of = sl->addr->type->Array.elem;
-    else {
-        onyx_report_error(sl->token->pos, "Invalid type for left of slice creation.");
-        return 1;
-    }
-
-    sl->type = type_make_slice(semstate.node_allocator, of);
-    sl->elem_size = type_size_of(of);
 
     return 0;
 }
@@ -962,8 +954,11 @@ b32 check_range_literal(AstBinaryOp** prange) {
     AstStructLiteral* rsl = onyx_ast_node_new(semstate.node_allocator, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
     bh_arr_new(global_heap_allocator, rsl->values, 3);
 
-    bh_arr_push(rsl->values, range->left);
-    bh_arr_push(rsl->values, range->right);
+    bh_arr_insert_end(rsl->values, 2);
+    type_lookup_member(expected_range_type, "low", &smem);
+    rsl->values[smem.idx] = range->left;
+    type_lookup_member(expected_range_type, "high", &smem);
+    rsl->values[smem.idx] = range->right;
 
     // HACK: This relies on the third member of the 'range' struct to exist, be the step,
     // and have an intial_value.
@@ -1027,8 +1022,8 @@ b32 check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Address_Of:   retval = check_address_of((AstAddressOf *) expr); break;
         case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
+        case Ast_Kind_Slice:
         case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
-        case Ast_Kind_Slice:        retval = check_slice((AstArrayAccess *) expr); break;
         case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
         case Ast_Kind_Align_Of:     retval = check_align_of((AstAlignOf *) expr); break;

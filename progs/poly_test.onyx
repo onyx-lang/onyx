@@ -62,7 +62,7 @@ soa_deinit :: proc (s: ^SOA) {
 }
 
 get_range :: proc (arr: ^[..] $T) -> range {
-    return 0 .. arr.count;
+    return 20 .. 26;
 }
 
 print_range :: proc (r: range) #add_overload print {
@@ -101,6 +101,7 @@ main :: proc (args: [] cstring) {
     array_sort(^s.a, cmp_dec);
     array_sort(^s.b, cmp_asc);
 
+    print_array(s.a.data[r]);
     print_array(s.a.data[21 .. 27]);
     print_array(^s.b);
 

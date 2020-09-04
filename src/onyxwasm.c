@@ -1597,33 +1597,26 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Slice: {
             AstArrayAccess* sl = (AstArrayAccess *) expr;
 
-            AstTyped *lo, *hi;
+            emit_expression(mod, &code, sl->expr);
 
-            // NOTE: Since all ranges are converted to struct literals,
-            // we need to extract the expressions from the struct literal
-            // data. Doing it in this verbose way for robustness sake.
-            AstStructLiteral *range_literal = (AstStructLiteral *) sl->expr;
-            StructMember smem;
-            type_lookup_member(range_literal->type, "low", &smem);
-            lo = range_literal->values[smem.idx];
-            type_lookup_member(range_literal->type, "high", &smem);
-            hi = range_literal->values[smem.idx];
+            u64 lo_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+            u64 hi_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
 
-            u64 tmp_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-
-            emit_expression(mod, &code, lo);
-            WIL(WI_LOCAL_TEE, tmp_local);
+            WI(WI_DROP);
+            WIL(WI_LOCAL_SET, hi_local);
+            WIL(WI_LOCAL_TEE, lo_local);
             if (sl->elem_size != 1) {
                 WID(WI_I32_CONST, sl->elem_size);
                 WI(WI_I32_MUL);
             }
             emit_expression(mod, &code, sl->addr);
             WI(WI_I32_ADD);
-            emit_expression(mod, &code, hi);
-            WIL(WI_LOCAL_GET, tmp_local);
+            WIL(WI_LOCAL_GET, hi_local);
+            WIL(WI_LOCAL_GET, lo_local);
             WI(WI_I32_SUB);
 
-            local_raw_free(mod->local_alloc, tmp_local);
+            local_raw_free(mod->local_alloc, lo_local);
+            local_raw_free(mod->local_alloc, hi_local);
             break;
         }
 

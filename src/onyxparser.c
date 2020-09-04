@@ -520,8 +520,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstTyped *expr = parse_expression(parser);
 
                 AstKind kind = Ast_Kind_Array_Access;
-                if (expr->kind == Ast_Kind_Range)
-                    kind = Ast_Kind_Slice;
 
                 AstArrayAccess *aa_node = make_node(AstArrayAccess, kind);
                 aa_node->token = open_bracket;
