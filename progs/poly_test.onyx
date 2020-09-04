@@ -47,8 +47,8 @@ compose :: proc (a: A, f: proc ($A) -> $B, g: proc (B) -> $C) -> C {
 
 
 SOA :: struct {
-    b  : [..] i64;
     a  : [..] i32;
+    b  : [..] i64;
 }
 
 soa_init :: proc (s: ^SOA) {
@@ -62,7 +62,7 @@ soa_deinit :: proc (s: ^SOA) {
 }
 
 get_range :: proc (arr: ^[..] $T) -> range {
-    return 20 .. 26;
+    return 0 .. arr.count;
 }
 
 print_range :: proc (r: range) #add_overload print {
@@ -72,6 +72,14 @@ print_range :: proc (r: range) #add_overload print {
     print(" by ");
     print(r.step);
     print("\n");
+}
+
+// NOTE: This function will be very useful for for loops. i.e.
+//        for i: 0 .. 100 |> by(2) {
+//            ...
+//        }
+by :: proc (r: range, s: u32) -> range {
+    return range.{ low = r.low, high = r.high, step = s };
 }
 
 main :: proc (args: [] cstring) {
@@ -87,22 +95,29 @@ main :: proc (args: [] cstring) {
         soa_deinit(^s);
     }
 
+    print("Evens from 6 to 34:\n");
+    for i: 6 .. 34 |> by(2) {
+        print(i);
+        print(" ");
+    }
+    print("\n");
+
     print_arr_details(^s.a);
     print_arr_details(^s.b);
 
-    for i: 0, 100 {
+    for i: 0 .. 100 {
         array_push(^s.a, (5 * i) % 21);
         array_push(^s.b, 3l * cast(i64) i);
     }
 
-    r := ^s.a |> get_range();
+    r := ^s.a |> get_range() |> by(3);
     print(r);
+    print_array(^s.a);
 
     array_sort(^s.a, cmp_dec);
-    array_sort(^s.b, cmp_asc);
+    array_sort(^s.b, cmp_dec);
 
-    print_array(s.a.data[r]);
-    print_array(s.a.data[21 .. 27]);
+    print_array(^s.a);
     print_array(^s.b);
 
     print("After adding...\n");
@@ -117,7 +132,7 @@ main :: proc (args: [] cstring) {
     ptrmap_init(^map, 50);
     defer ptrmap_free(^map);
 
-    for i: 0, 100 do ptrmap_put(^map, ^s.a[i], ^s.b[i]);
+    for i: 0 .. 100 do ptrmap_put(^map, ^s.a[i], ^s.b[i]);
 
     print("Has ^a[20]? ");
     print(ptrmap_has(^map, ^s.a[20]));
@@ -154,7 +169,7 @@ main2 :: proc (args: [] cstring) {
 
     array_push(^iarr, 1234);
 
-    for i: 0, 12 do array_push(^iarr, i % 5);
+    for i: 0 .. 12 do array_push(^iarr, i % 5);
 
     print_arr_details(^iarr);
     print_array(^iarr);
@@ -183,7 +198,7 @@ main2 :: proc (args: [] cstring) {
     array_init(^barr, 10);
     defer array_free(^barr);
 
-    for i: 0, 500 {
+    for i: 0 .. 500 {
         array_push(^barr, cast(u64) (3 * i * i + 4 * i - 2));
     }
 
@@ -202,7 +217,7 @@ main2 :: proc (args: [] cstring) {
     array_init(^varr);
     defer array_free(^varr);
 
-    for i: 0, 20 {
+    for i: 0 .. 20 {
         array_push(^varr, Vec3.{
             x = i,
             y = i * i,
@@ -220,7 +235,7 @@ main2 :: proc (args: [] cstring) {
     dummy := cast(^Dummy) calloc(sizeof Dummy);
     defer cfree(dummy);
     dummy.count = 5;
-    for i: 0, dummy.count do dummy.data[i] = i * 5;
+    for i: 0 .. dummy.count do dummy.data[i] = i * 5;
 
     print_array(dummy);
 

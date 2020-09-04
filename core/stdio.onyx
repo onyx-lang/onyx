@@ -30,7 +30,7 @@ print :: proc #overloaded {
 
 // This works on both slices and arrays
 print_array :: proc (arr: $T, sep := " ") {
-    for i: 0, arr.count {
+    for i: 0 .. arr.count {
         print(arr.data[i]);
         if i != arr.count - 1 do print(sep);
     }

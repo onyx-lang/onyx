@@ -270,6 +270,13 @@ typedef enum JumpType {
     Jump_Type_Count,
 } JumpType;
 
+typedef enum ForLoopType {
+    For_Loop_Invalid,
+    For_Loop_Range,
+    For_Loop_Array,
+    For_Loop_Slice,
+    For_Loop_DynArr,
+} ForLoopType;
 
 // Base Nodes
 #define AstNode_base \
@@ -337,7 +344,10 @@ struct AstFor           {
     // NOTE: Local defining the iteration variable
     AstLocal* var;
 
-    AstTyped *start, *end, *step;
+    // NOTE: This can be any expression, but it is checked that
+    // it is of a type that we know how to iterate over.
+    AstTyped* iter;
+    ForLoopType loop_type;
 
     AstBlock *stmt;
 };
@@ -582,6 +592,7 @@ extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstType  *builtin_string_type;
 extern AstType  *builtin_range_type;
+extern Type     *builtin_range_type_type;
 
 typedef struct BuiltinSymbol {
     char*    package;

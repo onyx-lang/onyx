@@ -853,19 +853,7 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     for_node->var = var_node;
 
     expect_token(parser, ':');
-    for_node->start = parse_expression(parser);
-    expect_token(parser, ',');
-    for_node->end = parse_expression(parser);
-
-    if (parser->curr->type == ',') {
-        consume_token(parser);
-        for_node->step = parse_expression(parser);
-    } else {
-        for_node->step = make_node(AstNumLit, Ast_Kind_NumLit);
-        for_node->step->type_node = (AstType *) &basic_type_i32;
-        ((AstNumLit *) for_node->step)->value.i = 1;
-    }
-
+    for_node->iter = parse_expression(parser);
     for_node->stmt = parse_block(parser);
 
     return for_node;

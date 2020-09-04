@@ -17,7 +17,7 @@ ptrmap_init :: proc (use pmap: ^PtrMap, hash_count: i32 = 16) {
     array_init(^hashes, hash_count);
     array_init(^entries, 4);
 
-    for i: 0, hash_count do array_push(^hashes, -1);
+    for i: 0 .. hash_count do array_push(^hashes, -1);
 }
 
 ptrmap_free :: proc (use pmap: ^PtrMap) {
@@ -57,7 +57,7 @@ ptrmap_get :: proc (use pmap: ^PtrMap, key: rawptr) -> rawptr {
 
 ptrmap_delete :: proc (use pmap: ^PtrMap, key: rawptr) {
     lr := ptrmap_lookup(pmap, key);
-    if lr.entry_index < 0 do return;    
+    if lr.entry_index < 0 do return;
 
     if lr.entry_prev < 0   do hashes[lr.hash_index] = entries[lr.entry_index].next;
     else                   do hashes[lr.entry_prev] = entries[lr.entry_index].next;
@@ -74,7 +74,7 @@ ptrmap_delete :: proc (use pmap: ^PtrMap, key: rawptr) {
 }
 
 ptrmap_clear :: proc (use pmap: ^PtrMap) {
-    for i: 0, hashes.count do hashes.data[i] = -1;
+    for i: 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;
 }
 

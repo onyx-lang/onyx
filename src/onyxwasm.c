@@ -741,27 +741,36 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     *pcode = code;
 }
 
-EMIT_FUNC(for, AstFor* for_node) {
+EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    AstLocal* var = for_node->var;
-    u64 tmp = local_allocate(mod->local_alloc, var);
-    bh_imap_put(&mod->local_map, (u64) var, tmp);
+    // NOTE: There are some aspects of the code below that rely on the
+    // low, high, and step members to be i32's. This restriction can be lifted,
+    // but it is important to change the code here.
+    //                                              -brendanfh   2020/09/04
 
-    b32 it_is_local = (b32) ((tmp & LOCAL_IS_WASM) != 0);
+    AstLocal* var = for_node->var;
+    b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
     u64 offset = 0;
 
-    WasmType var_type = onyx_type_to_wasm_type(for_node->var->type);
-    assert(var_type == WASM_TYPE_INT32 || var_type == WASM_TYPE_INT64);
-    WasmInstructionType add_instr = var_type == WASM_TYPE_INT32 ? WI_I32_ADD  : WI_I64_ADD;
-    WasmInstructionType ge_instr  = var_type == WASM_TYPE_INT32 ? WI_I32_GE_S : WI_I64_GE_S;
+    StructMember smem;
+    type_lookup_member(builtin_range_type_type, "low", &smem);
+    u64 low_local  = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+    type_lookup_member(builtin_range_type_type, "high", &smem);
+    u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+    type_lookup_member(builtin_range_type_type, "step", &smem);
+    u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+
+    WIL(WI_LOCAL_SET, step_local);
+    WIL(WI_LOCAL_SET, high_local);
+    WIL(WI_LOCAL_SET, low_local);
 
     if (it_is_local) {
-        emit_expression(mod, &code, for_node->start);
-        WIL(WI_LOCAL_SET, tmp);
+        WIL(WI_LOCAL_GET, low_local);
+        WIL(WI_LOCAL_SET, iter_local);
     } else {
         emit_local_location(mod, &code, var, &offset);
-        emit_expression(mod, &code, for_node->start);
+        WIL(WI_LOCAL_GET, low_local);
         emit_store_instruction(mod, &code, var->type, offset);
     }
 
@@ -774,14 +783,14 @@ EMIT_FUNC(for, AstFor* for_node) {
     bh_arr_push(mod->structured_jump_target, 2);
 
     if (it_is_local) {
-        WIL(WI_LOCAL_GET, tmp);
+        WIL(WI_LOCAL_GET, iter_local);
     } else {
         offset = 0;
         emit_local_location(mod, &code, var, &offset);
         emit_load_instruction(mod, &code, var->type, offset);
     }
-    emit_expression(mod, &code, for_node->end);
-    WI(ge_instr);
+    WIL(WI_LOCAL_GET, high_local);
+    WI(WI_I32_GE_S);
     WID(WI_COND_JUMP, 0x02);
 
     emit_block(mod, &code, for_node->stmt, 0);
@@ -790,18 +799,18 @@ EMIT_FUNC(for, AstFor* for_node) {
     WI(WI_BLOCK_END);
 
     if (it_is_local) {
-        WIL(WI_LOCAL_GET, tmp);
-        emit_expression(mod, &code, for_node->step);
-        WI(add_instr);
-        WIL(WI_LOCAL_SET, tmp);
+        WIL(WI_LOCAL_GET, iter_local);
+        WIL(WI_LOCAL_GET, step_local);
+        WI(WI_I32_ADD);
+        WIL(WI_LOCAL_SET, iter_local);
     } else {
         offset = 0;
         emit_local_location(mod, &code, var, &offset);
         offset = 0;
         emit_local_location(mod, &code, var, &offset);
         emit_load_instruction(mod, &code, var->type, offset);
-        emit_expression(mod, &code, for_node->step);
-        WI(add_instr);
+        WIL(WI_LOCAL_GET, step_local);
+        WI(WI_I32_ADD);
         emit_store_instruction(mod, &code, var->type, offset);
     }
 
@@ -813,6 +822,31 @@ EMIT_FUNC(for, AstFor* for_node) {
 
     WI(WI_LOOP_END);
     WI(WI_BLOCK_END);
+
+    type_lookup_member(builtin_range_type_type, "low", &smem);
+    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+    type_lookup_member(builtin_range_type_type, "high", &smem);
+    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+    type_lookup_member(builtin_range_type_type, "step", &smem);
+    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+
+    *pcode = code;
+}
+
+EMIT_FUNC(for, AstFor* for_node) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    AstLocal* var = for_node->var;
+    u64 iter_local = local_allocate(mod->local_alloc, var);
+    bh_imap_put(&mod->local_map, (u64) var, iter_local);
+
+    emit_expression(mod, &code, for_node->iter);
+
+    if (for_node->loop_type == For_Loop_Range) {
+        emit_for_range(mod, &code, for_node, iter_local);
+    } else {
+        onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
+    }
 
     local_free(mod->local_alloc, var);
 

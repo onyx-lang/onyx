@@ -27,6 +27,7 @@ AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Glo
 
 AstType  *builtin_string_type;
 AstType  *builtin_range_type;
+Type     *builtin_range_type_type;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },

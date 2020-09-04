@@ -306,6 +306,10 @@ static void symres_expression(AstTyped** expr) {
             symres_expression(&((AstBinaryOp *)(*expr))->right);
 
             (*expr)->type_node = symres_type(builtin_range_type);
+
+            // NOTE: This is a weird place to put this so maybe put it somewhere else eventually
+            //                                                  - brendanfh   2020/09/04
+            builtin_range_type_type = type_build_from_ast(semstate.node_allocator, builtin_range_type);
             break;
 
         case Ast_Kind_Function:
@@ -376,11 +380,9 @@ static void symres_for(AstFor* fornode) {
     fornode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
     scope_enter(fornode->scope);
 
-    symbol_introduce(semstate.curr_scope, fornode->var->token, (AstNode *) fornode->var);
+    symres_expression(&fornode->iter);
 
-    symres_expression(&fornode->start);
-    symres_expression(&fornode->end);
-    symres_expression(&fornode->step);
+    symbol_introduce(semstate.curr_scope, fornode->var->token, (AstNode *) fornode->var);
 
     symres_block(fornode->stmt);
 

@@ -3,5 +3,5 @@ package core
 memory_copy :: proc (dst_: rawptr, src_: rawptr, len: u32) {
 	dst := cast(^u8) dst_;
 	src := cast(^u8) src_;
-	for i: 0, len do dst[i] = src[i];
+	for i: 0 .. len do dst[i] = src[i];
 }

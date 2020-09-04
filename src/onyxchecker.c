@@ -97,46 +97,27 @@ b32 check_while(AstIfWhile* whilenode) {
 }
 
 b32 check_for(AstFor* fornode) {
-    if (check_expression(&fornode->start)) return 1;
-    if (check_expression(&fornode->end)) return 1;
-    if (check_expression(&fornode->step)) return 1;
+    if (check_expression(&fornode->iter)) return 1;
+    fornode->loop_type = For_Loop_Invalid;
 
-    if (fornode->var->type_node == NULL || fornode->var->type_node != fornode->start->type_node)
-        fornode->var->type_node = fornode->start->type_node;
-    fill_in_type((AstTyped *) fornode->var);
+    Type* iter_type = fornode->iter->type;
+    b32 can_iterate = 0;
+    if (types_are_compatible(iter_type, builtin_range_type_type)) {
+        can_iterate = 1;
 
-    if (!type_is_integer(fornode->start->type)) {
-        onyx_report_error(fornode->start->token->pos, "expected expression of integer type for start");
+        // NOTE: Blindly copy the first range member's type which will
+        // be the low value.                - brendanfh 2020/09/04
+        fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
+
+        fornode->loop_type = For_Loop_Range;
+    }
+
+    if (!can_iterate) {
+        onyx_report_error(fornode->iter->token->pos,
+                "Cannot iterate over a '%s'.",
+                type_get_name(iter_type));
         return 1;
     }
-
-    if (!type_is_integer(fornode->end->type)) {
-        onyx_report_error(fornode->end->token->pos, "expected expression of integer type for end");
-        return 1;
-    }
-
-    if (!type_is_integer(fornode->step->type)) {
-        onyx_report_error(fornode->step->token->pos, "expected expression of integer type for step");
-        return 1;
-    }
-
-    // NOTE: Auto promote implicit step to the type of start
-    if (fornode->step->kind == Ast_Kind_NumLit) {
-        fornode->step->type_node = fornode->start->type_node;
-        fornode->step->type = fornode->start->type;
-        promote_numlit_to_larger((AstNumLit *) fornode->step);
-    }
-
-    if (!types_are_compatible(fornode->end->type, fornode->start->type)) {
-        onyx_report_error(fornode->end->token->pos, "type of end does not match type of start");
-        return 1;
-    }
-
-    if (!types_are_compatible(fornode->step->type, fornode->start->type)) {
-        onyx_report_error(fornode->start->token->pos, "type of step does not match type of start");
-        return 1;
-    }
-
 
     if (check_block(fornode->stmt)) return 1;
 
@@ -839,7 +820,7 @@ b32 check_array_access(AstArrayAccess* aa) {
         return 1;
     }
 
-    if (types_are_compatible(aa->expr->type, type_build_from_ast(semstate.node_allocator, builtin_range_type))) {
+    if (types_are_compatible(aa->expr->type, builtin_range_type_type)) {
         Type *of = NULL;
         if (aa->addr->type->kind == Type_Kind_Pointer)
             of = aa->addr->type->Pointer.elem;
@@ -931,7 +912,7 @@ b32 check_range_literal(AstBinaryOp** prange) {
     if (check_expression(&range->left))  return 1;
     if (check_expression(&range->right)) return 1;
 
-    Type* expected_range_type = type_build_from_ast(semstate.node_allocator, builtin_range_type);
+    Type* expected_range_type = builtin_range_type_type;
     StructMember smem;
 
     type_lookup_member(expected_range_type, "low", &smem);

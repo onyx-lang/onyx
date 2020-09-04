@@ -206,9 +206,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 		case Ast_Kind_For:
 			((AstFor *) nn)->var = (AstLocal *) ast_clone(a, ((AstFor *) node)->var);
-			((AstFor *) nn)->start = (AstTyped *) ast_clone(a, ((AstFor *) node)->start);
-			((AstFor *) nn)->end = (AstTyped *) ast_clone(a, ((AstFor *) node)->end);
-			((AstFor *) nn)->step = (AstTyped *) ast_clone(a, ((AstFor *) node)->step);
+			((AstFor *) nn)->iter = (AstTyped *) ast_clone(a, ((AstFor *) node)->iter);
 			((AstFor *) nn)->stmt = (AstBlock *) ast_clone(a, ((AstFor *) node)->stmt);
 			break;
 
