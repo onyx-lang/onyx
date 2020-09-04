@@ -53,15 +53,15 @@ string_split :: proc (str: string, delim: u8) -> []string {
 
     for i: 0, str.count {
         if str[i] == delim {
-            strarr[curr_str] = str.data[begin : i];
+            strarr[curr_str] = str.data[begin .. i];
             begin = i + 1;
             curr_str += 1;
         }
     }
 
-    strarr[curr_str] = str.data[begin : str.count];
+    strarr[curr_str] = str.data[begin .. str.count];
 
-    return strarr[0 : delim_count + 1];
+    return strarr[0 .. delim_count + 1];
 }
 
 string_substr :: proc (str: string, sub: string) -> string {
@@ -69,11 +69,11 @@ string_substr :: proc (str: string, sub: string) -> string {
         while j := 0; j < sub.count && str[i + j] == sub[j] {
             j += 1;
 
-            if j == sub.count do return str.data[i : i + j];
+            if j == sub.count do return str.data[i .. i + j];
         }
     }
 
-    return str.data[0:0];
+    return str.data[0 .. 0];
 }
 
 string_contains :: proc (str: string, c: u8) -> bool {
@@ -183,7 +183,7 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
         c -= 1;
 
         n /= base;
-        
+
     } else {
         *c = #char "0";
         len += 1;

@@ -94,7 +94,7 @@ array_average :: proc (arr: ^[..] $T) -> T {
 }
 
 array_to_slice :: proc (arr: ^[..] $T) -> [] T {
-    return arr.data[0 : arr.count];
+    return arr.data[0 .. arr.count];
 }
 
 /*

@@ -1584,7 +1584,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                 if (smem.idx == 1)
                     WID(WI_I32_CONST, ((AstStrLit *) field->expr)->length);
-                
+
                 break;
             }
 
@@ -1595,11 +1595,23 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Slice: {
-            AstSlice* sl = (AstSlice *) expr;
+            AstArrayAccess* sl = (AstArrayAccess *) expr;
+
+            AstTyped *lo, *hi;
+
+            // NOTE: Since all ranges are converted to struct literals,
+            // we need to extract the expressions from the struct literal
+            // data. Doing it in this verbose way for robustness sake.
+            AstStructLiteral *range_literal = (AstStructLiteral *) sl->expr;
+            StructMember smem;
+            type_lookup_member(range_literal->type, "low", &smem);
+            lo = range_literal->values[smem.idx];
+            type_lookup_member(range_literal->type, "high", &smem);
+            hi = range_literal->values[smem.idx];
 
             u64 tmp_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
 
-            emit_expression(mod, &code, sl->lo);
+            emit_expression(mod, &code, lo);
             WIL(WI_LOCAL_TEE, tmp_local);
             if (sl->elem_size != 1) {
                 WID(WI_I32_CONST, sl->elem_size);
@@ -1607,7 +1619,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             }
             emit_expression(mod, &code, sl->addr);
             WI(WI_I32_ADD);
-            emit_expression(mod, &code, sl->hi);
+            emit_expression(mod, &code, hi);
             WIL(WI_LOCAL_GET, tmp_local);
             WI(WI_I32_SUB);
 
@@ -2827,7 +2839,7 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
             break;
 
         case WI_JUMP_TABLE: {
-            BranchTable* bt = (BranchTable *) instr->data.p; 
+            BranchTable* bt = (BranchTable *) instr->data.p;
 
             leb = uint_to_uleb128((u64) bt->count, &leb_len);
             bh_buffer_append(buff, leb, leb_len);

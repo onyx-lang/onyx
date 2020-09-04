@@ -37,7 +37,7 @@ proc #export "_start" {
 
     stdio_init();
 
-    main.main(argv[0 : argc]);
+    main.main(argv[0 .. argc]);
 
     print_buffer_flush();
 }

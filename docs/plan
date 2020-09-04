@@ -231,6 +231,15 @@ HOW:
             - I think all the infrastructure is there for this
 
         [ ] data structure based iteration
+            - Currently, I do not plan on having custom iterators. This may very well change in the near future.
+            - For now, a for loop will be reimagined to look like:
+                for val: iterable ...
+
+            - 'iterable' will be something of a type that the compiler knows how to iterate over:
+                * range
+                * array
+                * slice
+                * dynamic array
 
         [ ] baked parameters
             - Compile time known parameters

@@ -517,31 +517,19 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         switch ((u16) parser->curr->type) {
             case '[': {
                 OnyxToken *open_bracket = expect_token(parser, '[');
-                AstTyped *lo = parse_expression(parser);
+                AstTyped *expr = parse_expression(parser);
 
-                if (parser->curr->type == ':') {
-                    consume_token(parser);
+                AstKind kind = Ast_Kind_Array_Access;
+                if (expr->kind == Ast_Kind_Range)
+                    kind = Ast_Kind_Slice;
 
-                    AstSlice *sl_node = make_node(AstSlice, Ast_Kind_Slice);
-                    sl_node->token = open_bracket;
-                    sl_node->addr  = retval;
-                    sl_node->lo    = lo;
-                    sl_node->hi    = parse_expression(parser);
+                AstArrayAccess *aa_node = make_node(AstArrayAccess, kind);
+                aa_node->token = open_bracket;
+                aa_node->addr = retval;
+                aa_node->expr = expr;
 
-                    retval = (AstTyped *) sl_node;
-                    expect_token(parser, ']');
-                    goto factor_parsed;
-
-                } else {
-                    AstArrayAccess* aa_node = make_node(AstArrayAccess, Ast_Kind_Array_Access);
-                    aa_node->token = open_bracket;
-                    aa_node->addr  = retval;
-                    aa_node->expr  = lo;
-
-                    retval = (AstTyped *) aa_node;
-                    expect_token(parser, ']');
-                }
-
+                retval = (AstTyped *) aa_node;
+                expect_token(parser, ']');
                 break;
             }
 

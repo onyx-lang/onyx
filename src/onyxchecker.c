@@ -21,7 +21,7 @@ CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
-CHECK(slice, AstSlice* sl);
+CHECK(slice, AstArrayAccess* sl);
 CHECK(field_access, AstFieldAccess** pfield);
 CHECK(range_literal, AstBinaryOp** range);
 CHECK(size_of, AstSizeOf* so);
@@ -877,25 +877,12 @@ b32 check_array_access(AstArrayAccess* aa) {
     return 0;
 }
 
-b32 check_slice(AstSlice* sl) {
+b32 check_slice(AstArrayAccess* sl) {
     if (check_expression(&sl->addr)) return 1;
-    if (check_expression(&sl->lo)) return 1;
-    if (check_expression(&sl->hi)) return 1;
+    if (check_expression(&sl->expr)) return 1;
 
     if (!type_is_pointer(sl->addr->type)) {
         onyx_report_error(sl->token->pos, "Expected pointer or array type for left of slice creation.");
-        return 1;
-    }
-
-    if (sl->lo->type->kind != Type_Kind_Basic
-            || (sl->lo->type->Basic.kind != Basic_Kind_I32 && sl->lo->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_report_error(sl->lo->token->pos, "Expected type u32 or i32 for lower index.");
-        return 1;
-    }
-
-    if (sl->hi->type->kind != Type_Kind_Basic
-            || (sl->hi->type->Basic.kind != Basic_Kind_I32 && sl->hi->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_report_error(sl->hi->token->pos, "Expected type u32 or i32 for upper index.");
         return 1;
     }
 
@@ -1041,7 +1028,7 @@ b32 check_expression(AstTyped** pexpr) {
         case Ast_Kind_Address_Of:   retval = check_address_of((AstAddressOf *) expr); break;
         case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
-        case Ast_Kind_Slice:        retval = check_slice((AstSlice *) expr); break;
+        case Ast_Kind_Slice:        retval = check_slice((AstArrayAccess *) expr); break;
         case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
         case Ast_Kind_Align_Of:     retval = check_align_of((AstAlignOf *) expr); break;

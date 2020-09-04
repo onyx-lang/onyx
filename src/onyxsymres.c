@@ -317,15 +317,10 @@ static void symres_expression(AstTyped** expr) {
             (*expr)->type_node = symres_type(builtin_string_type);
             break;
 
+        case Ast_Kind_Slice:
         case Ast_Kind_Array_Access:
             symres_expression(&((AstArrayAccess *)(*expr))->addr);
             symres_expression(&((AstArrayAccess *)(*expr))->expr);
-            break;
-
-        case Ast_Kind_Slice:
-            symres_expression(&((AstSlice *)(*expr))->addr);
-            symres_expression(&((AstSlice *)(*expr))->lo);
-            symres_expression(&((AstSlice *)(*expr))->hi);
             break;
 
         case Ast_Kind_Struct_Literal:

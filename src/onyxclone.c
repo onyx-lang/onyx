@@ -69,7 +69,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Address_Of: return sizeof(AstAddressOf);
         case Ast_Kind_Dereference: return sizeof(AstDereference);
         case Ast_Kind_Array_Access: return sizeof(AstArrayAccess);
-        case Ast_Kind_Slice: return sizeof(AstSlice);
+        case Ast_Kind_Slice: return sizeof(AstArrayAccess);
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
         case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
         case Ast_Kind_Range: return sizeof(AstBinaryOp);
@@ -121,6 +121,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 	switch ((u16) node->kind) {
 		case Ast_Kind_Binary_Op:
+        case Ast_Kind_Range:
 			((AstBinaryOp *) nn)->left  = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->left);
 			((AstBinaryOp *) nn)->right = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->right);
 			break;
@@ -151,15 +152,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			((AstDereference *) nn)->expr = (AstTyped *) ast_clone(a, ((AstDereference *) node)->expr);
 			break;
 
+		case Ast_Kind_Slice:
 		case Ast_Kind_Array_Access:
 			((AstArrayAccess *) nn)->addr = (AstTyped *) ast_clone(a, ((AstArrayAccess *) node)->addr);
 			((AstArrayAccess *) nn)->expr = (AstTyped *) ast_clone(a, ((AstArrayAccess *) node)->expr);
-			break;
-
-		case Ast_Kind_Slice:
-			((AstSlice *) nn)->lo = (AstTyped *) ast_clone(a, ((AstSlice *) node)->lo);
-			((AstSlice *) nn)->hi = (AstTyped *) ast_clone(a, ((AstSlice *) node)->hi);
-			((AstSlice *) nn)->addr = (AstTyped *) ast_clone(a, ((AstSlice *) node)->addr);
 			break;
 
 		case Ast_Kind_Field_Access:
