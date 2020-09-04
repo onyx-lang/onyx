@@ -237,6 +237,9 @@ HOW:
             - Removes the argument from the list and replaces the function with the
                 baked function
 
+        [ ] Add SIMD intrinsics
+            - This also requires adding the v128 SIMD type
+
         [ ] Put type info in data section so it is runtime accessible
             - type name
             - size

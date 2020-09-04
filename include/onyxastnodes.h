@@ -125,7 +125,8 @@ typedef enum AstKind {
     Ast_Kind_Array_Access,
     Ast_Kind_Slice,
     Ast_Kind_Field_Access,
-    Ast_Kind_Ufc,
+    Ast_Kind_Pipe,
+    Ast_Kind_Range,
     Ast_Kind_Size_Of,
     Ast_Kind_Align_Of,
     Ast_Kind_File_Contents,
@@ -225,6 +226,7 @@ typedef enum BinaryOp {
     Binary_Op_Assign_End      = 32,
 
     Binary_Op_Pipe            = 33,
+    Binary_Op_Range           = 34,
 } BinaryOp;
 
 typedef enum OnyxIntrinsic {
@@ -581,6 +583,7 @@ extern AstNode   builtin_package_node;
 extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstType  *builtin_string_type;
+extern AstType  *builtin_range_type;
 
 typedef struct BuiltinSymbol {
     char*    package;

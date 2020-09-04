@@ -5,6 +5,12 @@ cstring :: #type ^u8;
 
 Buffer :: #type []void;
 
+range :: struct {
+    low  : i32;
+    high : i32;
+    step : i32 = 1;
+}
+
 null :: cast(rawptr) 0;
 
 // ---------------------------------

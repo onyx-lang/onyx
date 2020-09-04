@@ -57,6 +57,7 @@ static const char* token_type_names[] = {
     "<<=",
     ">>=",
     ">>>=",
+    "..",
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
@@ -366,13 +367,14 @@ whitespace_skipped:
         break;
 
     default:
-        LITERAL_TOKEN("^=",          0, Token_Type_Xor_Equal);
         LITERAL_TOKEN("==",          0, Token_Type_Equal_Equal);
         LITERAL_TOKEN("!=",          0, Token_Type_Not_Equal);
         LITERAL_TOKEN("+=",          0, Token_Type_Plus_Equal);
         LITERAL_TOKEN("*=",          0, Token_Type_Star_Equal);
+        LITERAL_TOKEN("^=",          0, Token_Type_Xor_Equal);
         LITERAL_TOKEN("/=",          0, Token_Type_Fslash_Equal);
         LITERAL_TOKEN("%=",          0, Token_Type_Percent_Equal);
+        LITERAL_TOKEN("..",          0, Token_Type_Dot_Dot);
         break;
     }
 

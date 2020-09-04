@@ -69,7 +69,8 @@ static const char* ast_node_names[] = {
     "ARRAY_ACCESS",
     "SLICE",
     "FIELD_ACCESS",
-    "UFC",
+    "PIPE",
+    "RANGE",
     "SIZE OF",
     "ALIGN OF",
     "FILE CONTENTS",
@@ -326,7 +327,7 @@ AstTyped* ast_reduce(bh_allocator a, AstTyped* node) {
         case Ast_Kind_Binary_Op: return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
         case Ast_Kind_Unary_Op:  return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
         case Ast_Kind_NumLit:    return node;
-        default:                 return NULL; 
+        default:                 return NULL;
     }
 }
 

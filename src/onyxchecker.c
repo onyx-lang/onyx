@@ -23,6 +23,7 @@ CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
 CHECK(slice, AstSlice* sl);
 CHECK(field_access, AstFieldAccess** pfield);
+CHECK(range_literal, AstBinaryOp** range);
 CHECK(size_of, AstSizeOf* so);
 CHECK(align_of, AstAlignOf* ao);
 CHECK(global, AstGlobal* global);
@@ -331,7 +332,7 @@ b32 check_call(AstCall* call) {
                 actual->type = actual->value->type;
                 actual->value->flags |= Ast_Flag_Function_Used;
             }
-                    
+
             actual = (AstArgument *) actual->next;
             arg_idx++;
         }
@@ -587,7 +588,7 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
         // NOTE: Not a binary op
         *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
     }
-    
+
     return 0;
 }
 
@@ -946,6 +947,52 @@ b32 check_field_access(AstFieldAccess** pfield) {
     return 0;
 }
 
+b32 check_range_literal(AstBinaryOp** prange) {
+    AstBinaryOp* range = *prange;
+    if (check_expression(&range->left))  return 1;
+    if (check_expression(&range->right)) return 1;
+
+    Type* expected_range_type = type_build_from_ast(semstate.node_allocator, builtin_range_type);
+    StructMember smem;
+
+    type_lookup_member(expected_range_type, "low", &smem);
+    if (!types_are_compatible(range->left->type, smem.type)) {
+        onyx_report_error(range->token->pos, "Expected left side of range to be a 32-bit integer.");
+        return 1;
+    }
+
+    type_lookup_member(expected_range_type, "high", &smem);
+    if (!types_are_compatible(range->right->type, smem.type)) {
+        onyx_report_error(range->token->pos, "Expected right side of range to be a 32-bit integer.");
+        return 1;
+    }
+
+    // NOTE: Implicitly converting this to a struct literal because that makes the
+    // WASM generation easier and more robust for return a range from a procedure
+    // and the like. This could be improved as struct literals are made more throughout
+    // the code base.
+    //                                                          - brendanfh, 2020/09/03
+    AstStructLiteral* rsl = onyx_ast_node_new(semstate.node_allocator, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
+    bh_arr_new(global_heap_allocator, rsl->values, 3);
+
+    bh_arr_push(rsl->values, range->left);
+    bh_arr_push(rsl->values, range->right);
+
+    // HACK: This relies on the third member of the 'range' struct to exist, be the step,
+    // and have an intial_value.
+    AstStructMember* step_member = ((AstStructType *) builtin_range_type)->members[2];
+    if (check_expression(&step_member->initial_value)) return 1;
+    bh_arr_push(rsl->values, step_member->initial_value);
+
+    rsl->token = range->token;
+    rsl->type = expected_range_type;
+
+    // NOTE: Not a binary op
+    *prange = (AstBinaryOp *) rsl;
+
+    return 0;
+}
+
 b32 check_size_of(AstSizeOf* so) {
     so->size = type_size_of(type_build_from_ast(semstate.allocator, so->so_type));
 
@@ -998,6 +1045,7 @@ b32 check_expression(AstTyped** pexpr) {
         case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
         case Ast_Kind_Align_Of:     retval = check_align_of((AstAlignOf *) expr); break;
+        case Ast_Kind_Range:        retval = check_range_literal((AstBinaryOp **) pexpr); break;
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {
@@ -1252,7 +1300,7 @@ b32 check_memres(AstMemRes* memres) {
             return 1;
         }
     }
-    
+
     return 0;
 }
 

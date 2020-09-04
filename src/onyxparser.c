@@ -612,6 +612,7 @@ static inline i32 get_precedence(BinaryOp kind) {
         case Binary_Op_Assign_Sar:      return 1;
 
         case Binary_Op_Pipe:            return 2;
+        case Binary_Op_Range:           return 2;
 
         case Binary_Op_Bool_And:        return 3;
         case Binary_Op_Bool_Or:         return 3;
@@ -716,6 +717,7 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             case Token_Type_Sar_Equal:         bin_op_kind = Binary_Op_Assign_Sar; break;
 
             case Token_Type_Pipe:              bin_op_kind = Binary_Op_Pipe; break;
+            case Token_Type_Dot_Dot:           bin_op_kind = Binary_Op_Range; break;
             default: goto expression_done;
         }
 
@@ -724,15 +726,18 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             consume_token(parser);
 
             AstBinaryOp* bin_op;
-            if (bin_op_kind != Binary_Op_Pipe) {
-                bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
-                bin_op->operation = bin_op_kind;
-                bin_op->token = bin_op_tok;
+            if (bin_op_kind == Binary_Op_Pipe) {
+                bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
+
+            } else if (bin_op_kind == Binary_Op_Range) {
+                bin_op = make_node(AstBinaryOp, Ast_Kind_Range);
 
             } else {
-                bin_op = make_node(AstBinaryOp, Ast_Kind_Ufc);
-                bin_op->token = bin_op_tok;
+                bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
             }
+
+            bin_op->token = bin_op_tok;
+            bin_op->operation = bin_op_kind;
 
             while ( !bh_arr_is_empty(tree_stack) &&
                     get_precedence(bh_arr_last(tree_stack)->operation) >= get_precedence(bin_op_kind))
@@ -1209,12 +1214,11 @@ static AstType* parse_type(OnyxParser* parser) {
             if (parser->curr->type == ']') {
                 new = make_node(AstSliceType, Ast_Kind_Slice_Type);
                 new->token = open_bracket;
-                
-            } else if (parser->curr->type == '.') {
+
+            } else if (parser->curr->type == Token_Type_Dot_Dot) {
                 new = make_node(AstDynArrType, Ast_Kind_DynArr_Type);
                 new->token = open_bracket;
                 consume_token(parser);
-                expect_token(parser, '.');
 
             } else {
                 new = make_node(AstArrayType, Ast_Kind_Array_Type);
@@ -1531,7 +1535,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             if (func_def->overloaded_function != NULL) {
                 onyx_report_error(parser->curr->pos, "cannot have multiple #add_overload directives on a single procedure.");
                 expect_token(parser, Token_Type_Symbol);
-                
+
             } else {
                 AstNode* sym_node = make_node(AstNode, Ast_Kind_Symbol);
                 sym_node->token = expect_token(parser, Token_Type_Symbol);

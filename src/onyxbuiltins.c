@@ -24,7 +24,9 @@ static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_sta
 static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
 AstNumLit builtin_heap_start  = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
 AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token,  NULL, (AstType *) &basic_type_rawptr, NULL };
+
 AstType  *builtin_string_type;
+AstType  *builtin_range_type;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -69,9 +71,16 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
     }
 
     Package* p = program_info_package_lookup_or_create(prog, "builtin", prog->global_scope, a);
+
     builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "string");
     if (builtin_string_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, "'string' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_range_type = (AstType *) symbol_raw_resolve(p->scope, "range");
+    if (builtin_range_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'range' struct not found in builtin package.");
         return;
     }
 }

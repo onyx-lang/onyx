@@ -71,7 +71,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Array_Access: return sizeof(AstArrayAccess);
         case Ast_Kind_Slice: return sizeof(AstSlice);
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
-        case Ast_Kind_Ufc: return sizeof(AstBinaryOp);
+        case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
+        case Ast_Kind_Range: return sizeof(AstBinaryOp);
         case Ast_Kind_Size_Of: return sizeof(AstSizeOf);
         case Ast_Kind_Align_Of: return sizeof(AstAlignOf);
         case Ast_Kind_File_Contents: return sizeof(AstFileContents);
@@ -223,7 +224,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			if (((AstIfWhile *) nn)->assignment)
 				((AstIfWhile *) nn)->assignment->left = (AstTyped *) ((AstIfWhile *) nn)->local;
 
-			((AstIfWhile *) nn)->cond = (AstTyped *) ast_clone(a, ((AstIfWhile *) node)->cond);			
+			((AstIfWhile *) nn)->cond = (AstTyped *) ast_clone(a, ((AstIfWhile *) node)->cond);
 			((AstIfWhile *) nn)->true_stmt = (AstBlock *) ast_clone(a, ((AstIfWhile *) node)->true_stmt);
 			((AstIfWhile *) nn)->false_stmt = (AstBlock *) ast_clone(a, ((AstIfWhile *) node)->false_stmt);
 			break;
@@ -239,7 +240,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			dw->expr = (AstTyped *) ast_clone(a, sw->expr);
 
 			dw->default_case = (AstBlock *) ast_clone(a, sw->default_case);
-			
+
 			dw->cases = NULL;
 			bh_arr_new(global_heap_allocator, dw->cases, bh_arr_length(sw->cases));
 

@@ -61,14 +61,31 @@ soa_deinit :: proc (s: ^SOA) {
     array_free(^s.b);
 }
 
+get_range :: proc (arr: ^[..] $T) -> range {
+    return 0 .. arr.count;
+}
+
+print_range :: proc (r: range) #add_overload print {
+    print(r.low);
+    print(" to ");
+    print(r.high);
+    print(" by ");
+    print(r.step);
+    print("\n");
+}
+
 main :: proc (args: [] cstring) {
     res := compose(5, proc (x: i32) -> i32 do return x * 3;,
                       proc (x: i32) -> i32 do return x + 5;);
     print(res);
+    print("\n");
 
     s : SOA;
     soa_init(^s);
-    defer soa_deinit(^s);
+    defer {
+        print("Clearing SOA...\n");
+        soa_deinit(^s);
+    }
 
     print_arr_details(^s.a);
     print_arr_details(^s.b);
@@ -77,6 +94,9 @@ main :: proc (args: [] cstring) {
         array_push(^s.a, (5 * i) % 21);
         array_push(^s.b, 3l * cast(i64) i);
     }
+
+    r := ^s.a |> get_range();
+    print(r);
 
     array_sort(^s.a, cmp_dec);
     array_sort(^s.b, cmp_asc);
