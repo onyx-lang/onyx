@@ -113,6 +113,7 @@ b32 check_for(AstFor* fornode) {
         // NOTE: Blindly copy the first range member's type which will
         // be the low value.                - brendanfh 2020/09/04
         fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
+        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
         fornode->loop_type = For_Loop_Range;
 
     }
@@ -141,6 +142,9 @@ b32 check_for(AstFor* fornode) {
 
         fornode->loop_type = For_Loop_DynArr;
     }
+
+    if (fornode->by_pointer)
+        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
 
     if (!can_iterate) {
         onyx_report_error(fornode->iter->token->pos,
@@ -807,11 +811,12 @@ b32 check_struct_literal(AstStructLiteral* sl) {
 b32 check_address_of(AstAddressOf* aof) {
     if (check_expression(&aof->expr)) return 1;
 
-    if (aof->expr->kind != Ast_Kind_Array_Access
+    if ((aof->expr->kind != Ast_Kind_Array_Access
             && aof->expr->kind != Ast_Kind_Dereference
             && aof->expr->kind != Ast_Kind_Field_Access
             && aof->expr->kind != Ast_Kind_Memres
-            && aof->expr->kind != Ast_Kind_Local) {
+            && aof->expr->kind != Ast_Kind_Local)
+            || (aof->expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
         onyx_report_error(aof->token->pos, "Cannot take the address of value.");
         return 1;
     }

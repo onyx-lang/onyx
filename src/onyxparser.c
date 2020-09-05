@@ -897,7 +897,11 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
 
         if (parse_possible_directive(parser, "default")) {
             switch_node->default_case = parse_block(parser);
-            continue;
+
+            if (parser->curr->type != '}') {
+                onyx_report_error(parser->curr->pos, "The #default case must be the last case in a switch statement.\n");
+            }
+            break;
         }
 
         AstTyped* value = parse_expression(parser);

@@ -420,14 +420,16 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     *pcode = code;
 }
 
-EMIT_FUNC(structured_jump, i32 jump_count, JumpType jump) {
+EMIT_FUNC(structured_jump, AstJump* jump) {
     bh_arr(WasmInstruction) code = *pcode;
 
     static const u8 wants[Jump_Type_Count] = { 1, 2, 3 };
 
     i32 labelidx = 0;
-    u8 wanted = wants[jump];
+    u8 wanted = wants[jump->jump];
     b32 success = 0;
+
+    u32 jump_count = jump->count;
 
     i32 len = bh_arr_length(mod->structured_jump_target) - 1;
     for (u8* t = &bh_arr_last(mod->structured_jump_target); len >= 0; len--, t--) {
@@ -446,7 +448,7 @@ EMIT_FUNC(structured_jump, i32 jump_count, JumpType jump) {
         if (bh_arr_last(code).type != WI_JUMP)
             WID(WI_JUMP, labelidx);
     } else {
-        assert(("Invalid structured jump", 0));
+        onyx_report_error(jump->token->pos, "Invalid structured jump.");
     }
 
     *pcode = code;
@@ -461,7 +463,7 @@ EMIT_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_While:      emit_while(mod, &code, (AstIfWhile *) stmt); break;
         case Ast_Kind_For:        emit_for(mod, &code, (AstFor *) stmt); break;
         case Ast_Kind_Switch:     emit_switch(mod, &code, (AstSwitch *) stmt); break;
-        case Ast_Kind_Jump:       emit_structured_jump(mod, &code, ((AstJump *) stmt)->count, ((AstJump *) stmt)->jump); break;
+        case Ast_Kind_Jump:       emit_structured_jump(mod, &code, (AstJump *) stmt); break;
         case Ast_Kind_Block:      emit_block(mod, &code, (AstBlock *) stmt, 1); break;
         case Ast_Kind_Defer:      emit_defer(mod, &code, (AstDefer *) stmt); break;
         default:                  emit_expression(mod, &code, (AstTyped *) stmt); break;

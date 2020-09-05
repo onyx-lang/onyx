@@ -230,7 +230,7 @@ HOW:
             - This looks very simple
             - I think all the infrastructure is there for this
 
-        [ ] data structure based iteration
+        [X] data structure based iteration
             - Currently, I do not plan on having custom iterators. This may very well change in the near future.
             - For now, a for loop will be reimagined to look like:
                 for val: iterable ...

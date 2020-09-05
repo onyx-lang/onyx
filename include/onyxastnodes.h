@@ -177,6 +177,8 @@ typedef enum AstFlags {
     Ast_Flag_Struct_Is_Union   = BH_BIT(17),
 
     Ast_Flag_No_Clone          = BH_BIT(18),
+
+    Ast_Flag_Cannot_Take_Addr  = BH_BIT(19),
 } AstFlags;
 
 typedef enum UnaryOp {

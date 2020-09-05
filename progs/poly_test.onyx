@@ -94,7 +94,24 @@ print_v2 :: proc (v: V2) #add_overload print {
     print(")");
 }
 
+switch_demo :: proc {
+    switch a := 4; a {
+        case 4, 5, 6 {
+            print("a was 4, 5, or 6\n");
+            fallthrough fallthrough;
+        }
+
+        case 10 do print("a was 10\n");
+
+        case #default {
+            print("a was something else.\n");
+        }
+    }
+}
+
 main :: proc (args: [] cstring) {
+    switch_demo();
+
     res := compose(5, proc (x: i32) -> i32 do return x * 3;,
                       proc (x: i32) -> i32 do return x + 5;);
     print(res);
