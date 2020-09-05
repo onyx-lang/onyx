@@ -86,9 +86,7 @@ array_pop :: proc (arr: ^[..] $T) -> T {
 
 array_average :: proc (arr: ^[..] $T) -> T {
     sum := cast(T) 0;
-    for i: 0 .. arr.count {
-        sum += arr.data[i];
-    }
+    for it: *arr do sum += it;
 
     return sum / cast(T) arr.count;
 }
@@ -117,7 +115,7 @@ array_sort :: proc (arr: ^[..] $T, cmp: proc (T, T) -> i32) {
 
 array_fold :: proc (arr: ^[..] $T, init: $R, f: proc (T, R) -> R) -> R {
     val := init;
-    for i: 0 .. arr.count do val = f(arr.data[i], val);
+    for it: *arr do val = f(it, val);
     return val;
 }
 

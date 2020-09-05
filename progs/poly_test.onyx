@@ -133,6 +133,12 @@ main :: proc (args: [] cstring) {
     }
     print("\n");
 
+    for ^vec: s.c {
+        print(vec);
+        print(" ");
+    }
+    print("\n");
+
 
     array_sort(^s.a, cmp_dec);
     array_sort(^s.b, cmp_dec);

@@ -846,9 +846,13 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     AstFor* for_node = make_node(AstFor, Ast_Kind_For);
     for_node->token = expect_token(parser, Token_Type_Keyword_For);
 
+    if (parser->curr->type == '^') {
+        consume_token(parser);
+        for_node->by_pointer = 1;
+    }
+
     AstLocal* var_node = make_node(AstLocal, Ast_Kind_Local);
     var_node->token = expect_token(parser, Token_Type_Symbol);
-    var_node->type_node = (AstType *) &basic_type_i32;
 
     for_node->var = var_node;
 

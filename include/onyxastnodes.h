@@ -350,6 +350,10 @@ struct AstFor           {
     ForLoopType loop_type;
 
     AstBlock *stmt;
+
+    // ROBUSTNESS: This should be able to be set by a compile time variable at some point.
+    // But for now, this will do.
+    b32 by_pointer : 1;
 };
 struct AstIfWhile {
     AstNode_base;

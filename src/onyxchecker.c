@@ -103,6 +103,11 @@ b32 check_for(AstFor* fornode) {
     Type* iter_type = fornode->iter->type;
     b32 can_iterate = 0;
     if (types_are_compatible(iter_type, builtin_range_type_type)) {
+        if (fornode->by_pointer) {
+            onyx_report_error(fornode->var->token->pos, "Cannot iterate by pointer over a range.");
+            return 1;
+        }
+
         can_iterate = 1;
 
         // NOTE: Blindly copy the first range member's type which will
@@ -114,14 +119,18 @@ b32 check_for(AstFor* fornode) {
     else if (iter_type->kind == Type_Kind_Slice) {
         can_iterate = 1;
 
-        fornode->var->type = iter_type->Slice.ptr_to_data->Pointer.elem;
+        if (fornode->by_pointer) fornode->var->type = iter_type->Slice.ptr_to_data;
+        else                     fornode->var->type = iter_type->Slice.ptr_to_data->Pointer.elem;
+
         fornode->loop_type = For_Loop_Slice;
 
     }
     else if (iter_type->kind == Type_Kind_DynArray) {
         can_iterate = 1;
 
-        fornode->var->type = iter_type->DynArray.ptr_to_data->Pointer.elem;
+        if (fornode->by_pointer) fornode->var->type = iter_type->DynArray.ptr_to_data;
+        else                     fornode->var->type = iter_type->DynArray.ptr_to_data->Pointer.elem;
+
         fornode->loop_type = For_Loop_DynArr;
     }
 

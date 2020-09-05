@@ -848,13 +848,22 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     //      start_ptr
     //
 
-    u64 end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    u64 ptr_local     = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 end_ptr_local, ptr_local;
+    end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+    if (for_node->by_pointer) {
+        ptr_local = iter_local;
+    } else {
+        ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    }
 
     AstLocal* var = for_node->var;
-    u64 elem_size = type_size_of(var->type);
     b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
     u64 offset = 0;
+
+    u64 elem_size;
+    if (for_node->by_pointer) elem_size = type_size_of(var->type->Pointer.elem);
+    else                      elem_size = type_size_of(var->type);
 
     WIL(WI_LOCAL_SET, end_ptr_local);
     WIL(WI_LOCAL_TEE, ptr_local);
@@ -879,23 +888,25 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(WI_I32_GE_S);
     WID(WI_COND_JUMP, 0x02);
 
-    // NOTE: Storing structs requires that the location to store it is,
-    // the top most thing on the stack. Everything requires it to be
-    // 'under' the other element being stored.  -brendanfh 2020/09/04
-    if (!it_is_local && var->type->kind != Type_Kind_Struct) {
-        emit_local_location(mod, &code, var, &offset);
-    }
-
-    WIL(WI_LOCAL_GET, ptr_local);
-    emit_load_instruction(mod, &code, var->type, 0);
-    if (it_is_local) {
-        WIL(WI_LOCAL_SET, iter_local);
-    } else {
-        if (var->type->kind != Type_Kind_Struct) {
-            emit_store_instruction(mod, &code, var->type, offset);
-        } else {
+    if (!for_node->by_pointer) {
+        // NOTE: Storing structs requires that the location to store it is,
+        // the top most thing on the stack. Everything requires it to be
+        // 'under' the other element being stored.  -brendanfh 2020/09/04
+        if (!it_is_local && var->type->kind != Type_Kind_Struct) {
             emit_local_location(mod, &code, var, &offset);
-            emit_store_instruction(mod, &code, var->type, offset);
+        }
+
+        WIL(WI_LOCAL_GET, ptr_local);
+        emit_load_instruction(mod, &code, var->type, 0);
+        if (it_is_local) {
+            WIL(WI_LOCAL_SET, iter_local);
+        } else {
+            if (var->type->kind != Type_Kind_Struct) {
+                emit_store_instruction(mod, &code, var->type, offset);
+            } else {
+                emit_local_location(mod, &code, var, &offset);
+                emit_store_instruction(mod, &code, var->type, offset);
+            }
         }
     }
 
