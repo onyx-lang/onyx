@@ -6,7 +6,7 @@
                 "type": "cppdbg",
                 "request": "launch",
                 "program": "${workspaceFolder}/onyx",
-                "args": ["-verbose", "progs/poly_test.onyx"],
+                "args": ["-verbose", "examples/02_variables.onyx"],
                 "stopAtEntry": true,
                 "cwd": "${workspaceFolder}",
                 "environment": [],

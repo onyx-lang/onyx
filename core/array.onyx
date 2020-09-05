@@ -75,7 +75,7 @@ array_fast_delete :: proc (arr: ^[..] $T, idx: u32) {
 }
 
 array_contains :: proc (arr: ^[..] $T, x: T) -> bool {
-    for i: 0 .. arr.count do if arr.data[i] == x do return true;
+    for it: *arr do if it == x do return true;
     return false;
 }
 
@@ -120,5 +120,5 @@ array_fold :: proc (arr: ^[..] $T, init: $R, f: proc (T, R) -> R) -> R {
 }
 
 array_map :: proc (arr: ^[..] $T, f: proc (T) -> T) {
-    for i: 0 .. arr.count do arr.data[i] = f(arr.data[i]);
+    for ^it: *arr do *it = f(*it);
 }

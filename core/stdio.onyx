@@ -22,10 +22,19 @@ print_i32     :: proc (n: i32, base := 10)  do string_builder_append(^print_buff
 print_bool    :: proc (b: bool) do string_builder_append(^print_buffer, b);
 print_ptr     :: proc (p: rawptr) do string_builder_append(^print_buffer, cast(i64) p, 16l);
 
+print_range :: proc (r: range, sep := " ") {
+    for i: r {
+        print(i);
+        if i + r.step < r.high do print(sep);
+    }
+    print("\n");
+}
+
 print :: proc #overloaded {
 	print_string, print_cstring,
 	print_i64,    print_i32,
 	print_bool,   print_ptr,
+    print_range,
 }
 
 // This works on both slices and arrays
@@ -44,7 +53,7 @@ print_buffer_flush :: proc {
 	^print_buffer
 		|> string_builder_to_string()
 		|> system.output_string();
-		
+
 	^print_buffer |> string_builder_clear();
 }
 

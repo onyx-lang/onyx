@@ -1,0 +1,178 @@
+// Now, lets go over the basic types and control flow mechanisms in Onyx.
+
+#include_file "core/std/wasi"
+
+use package core
+
+main :: proc (args: [] cstring) {
+    // Here is a list of all the builtin types:
+    //       void
+    //       bool
+    //         i8  u8     (signed vs unsigned variants)
+    //        i16  u16
+    //        i32  u32
+    //        i64  u64
+    //        f32  f64
+    //     rawptr
+    //     string
+    //    cstring
+    //      range
+    //
+    // If you look in core/builtin.onyx, you can see the definition for some
+    // of these types in terms of other types. Let's look at some of those types.
+
+    // A pointer in Onyx is written as ^<type>. This is read as 'a pointer to a <type>'.
+    // I will not type to explain what a pointer is here, but it is something to note
+    // that pointers in Onyx are only 4-bytes instead of 8-bytes, since Onyx's compile
+    // target is WASM32.
+    //
+    // Here foo is an i32. The unary prefix ^ operator takes the address of a value.
+    // The type of foo_ptr is ^i32, or a pointer to an i32. Another example of a pointer
+    // is the cstring builtin. It is ^u8, which is what C would call a char*.
+    foo     := 10;
+    foo_ptr := ^foo;
+
+    print("foo is ");
+    print(foo);
+    print("\n");
+    print("foo_ptr is ");
+    print(foo_ptr);
+    print("\n");
+
+
+    // An important type to know before proceeding is the range type. When designing
+    // the language, there were a couple places where the idea of a range as very
+    // natural, such as for loop iteration, and making slices. The range type in
+    // Onyx is simply defined as a structure with 3 members: low, high, and step.
+    // A range represents values between low and high, including low but not including
+    // high, with a certain step between them. For example a range with values 5, 25, 2,
+    // represents the numbers 5, 7, 9, .. 21, 23. While you can use the range structure,
+    // it is more common to use a range literal, which is written below. 'rng' represents
+    // a range with a low of 5, a high of 25, and a step of 1. Currently there is no way
+    // to specify the step in a range literal.
+    rng := 5 .. 25;
+    print("rng is ");
+    print(rng);
+
+    // Onyx has 3 different array-like types:
+    //  * Fixed-size arrays, written [N] <type>, where N is a compile time know integer.
+    //  * Slices, written [] <type>.
+    //  * Dynamic arrays, written [..] <type>.
+    //
+    // Fixed size arrays are not commonly used because of their limited flexibility.
+    // They are commonly seen as struct members or local variables. Here is an example
+    // of creating and using a fixed size array. This uses a for-loop which we have not
+    // looked at yet, but the example should be self-explanitory.
+    fixed_arr : [10] i32;
+    for i: 0 .. 10 {
+        fixed_arr[i] = i * i;
+    }
+    print("fixed_arr[3] is ");
+    print(fixed_arr[3]);
+    print("\n");
+
+
+    // Slices are a concept not unique to Onyx. They represent a pointer and a count,
+    // which allows them to be passed around conveying multiple pieces of information.
+    // To create a slice, you either need a pointer or a fixed size array. Simply, do
+    // an array access with the type of the index being a range. This creates a slice.
+    //
+    // Think of this example as letting slice_arr be a sub-array of fixed_arr. When
+    // the 3rd element of slice_arr is accessed, it corresponds to the 6th element
+    // of fixed_arr. It is important to know that this does NOT make a copy of the
+    // data. It simply points into the same memory as fixed_arr.
+    slice_arr := fixed_arr[3 .. 9];
+    print("slice_arr[3] is ");
+    print(slice_arr[3]);
+    print("\n");
+
+
+    // Dynamic arrays are the most common arrays used in practice. They represent a
+    // pointer, a count, and a capacity. The extra capacity field allows implementations
+    // to know how many elements can fit into the space allocated for the array, and not
+    // just how many elements are currently in the array. To facilitate using dynamic
+    // arrays, there are many array_ procedures in the core package. Take this example.
+    dyn_arr : [..] i32;
+    array_init(^dyn_arr);
+    defer array_free(^dyn_arr);
+
+    for i: 0 .. 100 {
+        array_push(^dyn_arr, i * i * i);
+    }
+
+    print("dyn_arr is ");
+    print_array(dyn_arr);
+
+
+
+    // I think that's enough about types for now. Lets look at the ways to manage control
+    // flow in an Onyx program.
+
+    // An important things to know before looking at control flow are the different ways
+    // Onyx allows you to create a block. Blocks are used by all methods of control flow
+    // and can be declared in one of three ways:
+    //      * { ... } - Curly braces surrounding a set of semi-colon delimited statements.
+    //      * do ...  - The do keyword followed by one statement.
+    //      * ---     - The empty block which has no statements, equivalent to {}.
+
+    // Onyx has standard if statement semantics. Each if statement contains a condition,
+    // followed by a block. For this reason if-elseif chains have to be written with an
+    // elseif keyword. Otherwise, you would have to write 'else do if', which I find to
+    // be very ugly to read and is technically different, more on that later.
+
+    if_var := 5 * 2 + 3;
+    if if_var == 13 {
+        print("if_var was 13\n");
+        print("another statement here!\n");
+    }
+    elseif if_var == 14 do print("if_var was actually 14\n");
+    else do print("if_var wasn't 13 or 14\n");
+
+    // Ifs, as well as whiles and switch statements, can have a single initialized variable
+    // that is scoped to the blocks of the if statement and all else statements.
+
+    if hidden_if_var := 6; hidden_if_var > 5 {
+        print("hidden_if_var was greater than 5!\n");
+    }
+
+    // If you uncomment this line, you will get an error, since hidden_if_var is only accessible
+    // inside the if's block.
+    // print(hidden_if_var);
+
+
+    // Onyx has the standard top-test while loop, whose syntax is very similar to an if
+    // statement. The only unique thing about Onyx's while loops, is that they can have
+    // a 'else' clause. If the body of the loop is never run, i.e. the condition was
+    // false originally, then the else clause is used. Try changing the initial value
+    // for i to be 11.
+
+    while i := 0; i < 10 {
+        print(i);
+        print(" ");
+        i += 1;
+    } else {
+        print("The while loop never ran...");
+    }
+
+    print("\n");
+
+
+    // Onyx also has the standard 'break' and 'continue' statement found in many other
+    // imperative programming languages, but with a slight twist. It is not uncommon to
+    // be in a nested loop and want to either completely break out of all of the loops,
+    // or to skip to the next iteration of an outer loop. For this reason, Onyx allows
+    // you to place as many 'break' or 'continue' statements in a row as you need to
+    // break or continue the loop that you want to. Take this example.
+    while i := 0; i < 10 {
+        while j := 0; j < 10 {
+            print(i);
+            print(" ");
+            print(j);
+            print("\n");
+
+            if i == 1 && j == 2 do break break;
+            j += 1;
+        }
+        i += 1;
+    }
+}

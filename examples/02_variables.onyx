@@ -1,0 +1,30 @@
+// This time, we are not adding, 'package main' to the top of the file, since
+// every file is automatically part of the main package unless specified otherwise.
+
+#include_file "core/std/wasi"
+
+use package core
+
+main :: proc (args: [] cstring) {
+
+    // This is the syntax for declaring a local variable in a procedure.
+    foo: i32;
+    foo = 10;
+
+    // You don't have to put the declaration and assignment on different lines.
+    footwo: i32 = 10;
+
+    // If you leave the type out between the : and the =, the type is automatically
+    // inferred from the right hand side of the equals.
+    bar := 15;
+
+    print("foo is ");
+    print(foo);
+    print("\n");
+    print("footwo is ");
+    print(footwo);
+    print("\n");
+    print("bar is ");
+    print(bar);
+    print("\n");
+}

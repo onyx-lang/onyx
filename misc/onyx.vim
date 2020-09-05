@@ -10,7 +10,7 @@ endif
 let s:cpo_save = &cpo
 set cpo&vim
 
-syn keyword onyxKeyword package struct proc use global
+syn keyword onyxKeyword package struct enum proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword switch case
@@ -32,7 +32,7 @@ syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 
 syn region onyxComment          start="//" end="$" keepend contains=onyxCommentStart
 
-syn region onyxDirective        start="#" end=" " keepend
+syn region onyxDirective        start="#" end=" "
 
 syn region onyxString		    display start=+"+ skip=+\\\\\|\\"+ end=+"+ keepend
 

@@ -564,7 +564,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 store_size  = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
     i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
-    i32 is_integer  = is_basic && (type->Basic.flags & Basic_Flag_Integer);
+    i32 is_integer  = is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean));
     i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
 
     if (is_pointer) {
@@ -615,7 +615,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     i32 load_size   = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
     i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
-    i32 is_integer  = is_basic && (type->Basic.flags & Basic_Flag_Integer);
+    i32 is_integer  = is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean));
     i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
     i32 is_unsigned = is_basic && (type->Basic.flags & Basic_Flag_Unsigned);
 

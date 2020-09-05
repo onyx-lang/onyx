@@ -143,6 +143,9 @@ main :: proc (args: [] cstring) {
     r := ^s.a |> get_range() |> by(3);
     print(r);
     print_array(^s.a);
+    print("A has 22? ");
+    print(array_contains(^s.a, 22));
+    print("\n");
 
     // NOTE: Iterating by value
     for vec: s.c {
