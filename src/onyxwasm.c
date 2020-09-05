@@ -834,6 +834,96 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     *pcode = code;
 }
 
+EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    // NOTE: This implementation is only for loops by value, not by pointer.
+
+    // At this point the stack will look like:
+    //      data
+
+    u64 end_ptr_local, ptr_local;
+    end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+    if (for_node->by_pointer) {
+        ptr_local = iter_local;
+    } else {
+        ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    }
+
+    AstLocal* var = for_node->var;
+    b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
+    u64 offset = 0;
+
+    u64 elem_size;
+    if (for_node->by_pointer) elem_size = type_size_of(var->type->Pointer.elem);
+    else                      elem_size = type_size_of(var->type);
+
+    WIL(WI_LOCAL_TEE, ptr_local);
+    WIL(WI_I32_CONST, for_node->iter->type->Array.count * elem_size);
+    WI(WI_I32_ADD);
+    WIL(WI_LOCAL_SET, end_ptr_local);
+
+    WID(WI_BLOCK_START, 0x40);
+    WID(WI_LOOP_START, 0x40);
+    WID(WI_BLOCK_START, 0x40);
+
+    bh_arr_push(mod->structured_jump_target, 1);
+    bh_arr_push(mod->structured_jump_target, 0);
+    bh_arr_push(mod->structured_jump_target, 2);
+
+    WIL(WI_LOCAL_GET, ptr_local);
+    WIL(WI_LOCAL_GET, end_ptr_local);
+    WI(WI_I32_GE_S);
+    WID(WI_COND_JUMP, 0x02);
+
+    if (!for_node->by_pointer) {
+        // NOTE: Storing structs requires that the location to store it is,
+        // the top most thing on the stack. Everything requires it to be
+        // 'under' the other element being stored.  -brendanfh 2020/09/04
+        if (!it_is_local && var->type->kind != Type_Kind_Struct) {
+            emit_local_location(mod, &code, var, &offset);
+        }
+
+        WIL(WI_LOCAL_GET, ptr_local);
+        emit_load_instruction(mod, &code, var->type, 0);
+        if (it_is_local) {
+            WIL(WI_LOCAL_SET, iter_local);
+        } else {
+            if (var->type->kind != Type_Kind_Struct) {
+                emit_store_instruction(mod, &code, var->type, offset);
+            } else {
+                emit_local_location(mod, &code, var, &offset);
+                emit_store_instruction(mod, &code, var->type, offset);
+            }
+        }
+    }
+
+    emit_block(mod, &code, for_node->stmt, 0);
+
+    bh_arr_pop(mod->structured_jump_target);
+    WI(WI_BLOCK_END);
+
+    WIL(WI_LOCAL_GET, ptr_local);
+    WIL(WI_I32_CONST, elem_size);
+    WI(WI_I32_ADD);
+    WIL(WI_LOCAL_SET, ptr_local);
+
+    bh_arr_pop(mod->structured_jump_target);
+    bh_arr_pop(mod->structured_jump_target);
+
+    if (bh_arr_last(code).type != WI_JUMP)
+        WID(WI_JUMP, 0x00);
+
+    WI(WI_LOOP_END);
+    WI(WI_BLOCK_END);
+
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
+    *pcode = code;
+}
+
 EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -842,11 +932,6 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     // At this point the stack will look like:
     //      data
     //      count
-    //
-    // The locals we need to have:
-    //      end_ptr
-    //      start_ptr
-    //
 
     u64 end_ptr_local, ptr_local;
     end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
@@ -930,7 +1015,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(WI_BLOCK_END);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     *pcode = code;
 }
@@ -946,6 +1031,8 @@ EMIT_FUNC(for, AstFor* for_node) {
 
     if (for_node->loop_type == For_Loop_Range) {
         emit_for_range(mod, &code, for_node, iter_local);
+    } else if (for_node->loop_type == For_Loop_Array) {
+        emit_for_array(mod, &code, for_node, iter_local);
     } else if (for_node->loop_type == For_Loop_Slice) {
         emit_for_slice(mod, &code, for_node, iter_local);
     } else if (for_node->loop_type == For_Loop_DynArr) {

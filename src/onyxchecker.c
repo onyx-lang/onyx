@@ -116,6 +116,14 @@ b32 check_for(AstFor* fornode) {
         fornode->loop_type = For_Loop_Range;
 
     }
+    else if (iter_type->kind == Type_Kind_Array) {
+        can_iterate = 1;
+
+        if (fornode->by_pointer) fornode->var->type = type_make_pointer(semstate.node_allocator, iter_type->Array.elem);
+        else                     fornode->var->type = iter_type->Array.elem;
+
+        fornode->loop_type = For_Loop_Array;
+    }
     else if (iter_type->kind == Type_Kind_Slice) {
         can_iterate = 1;
 

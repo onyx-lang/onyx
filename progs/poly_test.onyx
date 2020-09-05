@@ -127,14 +127,25 @@ main :: proc (args: [] cstring) {
     print(r);
     print_array(^s.a);
 
+    // NOTE: Iterating by value
     for vec: s.c {
         print(vec);
         print(" ");
     }
     print("\n");
 
+    // NOTE: Iterating by pointer
     for ^vec: s.c {
         print(vec);
+        print(" ");
+    }
+    print("\n");
+
+    small : [12] i32;
+    for ^it: small do *it = 1234 + cast(u32) it;
+
+    for it: small {
+        print(it);
         print(" ");
     }
     print("\n");
