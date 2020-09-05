@@ -108,8 +108,21 @@ b32 check_for(AstFor* fornode) {
         // NOTE: Blindly copy the first range member's type which will
         // be the low value.                - brendanfh 2020/09/04
         fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
-
         fornode->loop_type = For_Loop_Range;
+
+    }
+    else if (iter_type->kind == Type_Kind_Slice) {
+        can_iterate = 1;
+
+        fornode->var->type = iter_type->Slice.ptr_to_data->Pointer.elem;
+        fornode->loop_type = For_Loop_Slice;
+
+    }
+    else if (iter_type->kind == Type_Kind_DynArray) {
+        can_iterate = 1;
+
+        fornode->var->type = iter_type->DynArray.ptr_to_data->Pointer.elem;
+        fornode->loop_type = For_Loop_DynArr;
     }
 
     if (!can_iterate) {

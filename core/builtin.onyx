@@ -5,6 +5,8 @@ cstring :: #type ^u8;
 
 Buffer :: #type []void;
 
+// NOTE: Because of many implementation details, all fields of this
+// struct are required to be i32's.
 range :: struct {
     low  : i32;
     high : i32;

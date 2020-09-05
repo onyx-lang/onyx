@@ -49,16 +49,19 @@ compose :: proc (a: A, f: proc ($A) -> $B, g: proc (B) -> $C) -> C {
 SOA :: struct {
     a  : [..] i32;
     b  : [..] i64;
+    c  : [..] V2;
 }
 
 soa_init :: proc (s: ^SOA) {
     array_init(^s.a);
     array_init(^s.b);
+    array_init(^s.c);
 }
 
 soa_deinit :: proc (s: ^SOA) {
     array_free(^s.a);
     array_free(^s.b);
+    array_free(^s.c);
 }
 
 get_range :: proc (arr: ^[..] $T) -> range {
@@ -80,6 +83,15 @@ print_range :: proc (r: range) #add_overload print {
 //        }
 by :: proc (r: range, s: u32) -> range {
     return range.{ low = r.low, high = r.high, step = s };
+}
+
+V2 :: struct { x: i32; y: i32; }
+print_v2 :: proc (v: V2) #add_overload print {
+    print("V2(");
+    print(v.x);
+    print(", ");
+    print(v.y);
+    print(")");
 }
 
 main :: proc (args: [] cstring) {
@@ -108,11 +120,19 @@ main :: proc (args: [] cstring) {
     for i: 0 .. 100 {
         array_push(^s.a, (5 * i) % 21);
         array_push(^s.b, 3l * cast(i64) i);
+        array_push(^s.c, V2.{ i, i * i });
     }
 
     r := ^s.a |> get_range() |> by(3);
     print(r);
     print_array(^s.a);
+
+    for vec: s.c {
+        print(vec);
+        print(" ");
+    }
+    print("\n");
+
 
     array_sort(^s.a, cmp_dec);
     array_sort(^s.b, cmp_dec);
