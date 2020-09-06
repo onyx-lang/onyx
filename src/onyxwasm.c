@@ -2169,8 +2169,6 @@ static inline b32 should_emit_function(AstFunction* fd) {
     // NOTE: Don't output intrinsic functions
     if (fd->flags & Ast_Flag_Intrinsic) return 0;
 
-    if (fd->flags & Ast_Flag_Foreign) return 1;
-
     // NOTE: Don't output functions that are not used, only if
     // they are also not exported.
     if ((fd->flags & Ast_Flag_Function_Used) == 0) {
@@ -2189,18 +2187,6 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (!should_emit_function(fd)) return;
 
     i32 type_idx = generate_type_idx(mod, fd->type);
-
-    if (fd->flags & Ast_Flag_Foreign) {
-        WasmImport import = {
-            .kind = WASM_FOREIGN_FUNCTION,
-            .idx  = type_idx,
-            .mod  = fd->foreign_module,
-            .name = fd->foreign_name,
-        };
-
-        bh_arr_push(mod->imports, import);
-        return;
-    }
 
     WasmFunc wasm_func = {
         .type_idx = type_idx,
@@ -2279,6 +2265,22 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     // NOTE: Clear the local map on exit of generating this function
     bh_imap_clear(&mod->local_map);
+}
+
+static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
+    if (!should_emit_function(fd)) return;
+
+    i32 type_idx = generate_type_idx(mod, fd->type);
+
+    WasmImport import = {
+        .kind = WASM_FOREIGN_FUNCTION,
+        .idx  = type_idx,
+        .mod  = fd->foreign_module,
+        .name = fd->foreign_name,
+    };
+
+    bh_arr_push(mod->imports, import);
+    return;
 }
 
 static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
@@ -2519,7 +2521,6 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .funcs = NULL,
         .next_func_idx = 0,
-        .next_foreign_func_idx = 0,
 
         .exports = NULL,
         .export_count = 0,
@@ -2568,7 +2569,6 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 }
 
 void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
-    module->next_func_idx   = program->foreign_func_count;
     module->next_global_idx = program->foreign_global_count;
 
     WasmExport mem_export = {
@@ -2594,18 +2594,15 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
         }
 
         switch (entity->type) {
-            case Entity_Type_Function_Header: {
+            case Entity_Type_Foreign_Function_Header:
+                emit_foreign_function(module, entity->function);
+                // fallthrough
+
+            case Entity_Type_Function_Header:
                 if (!should_emit_function(entity->function)) break;
 
-                u64 func_idx;
-                if ((entity->function->flags & Ast_Flag_Foreign) != 0)
-                    func_idx = module->next_foreign_func_idx++;
-                else
-                    func_idx = module->next_func_idx++;
-
-                bh_imap_put(&module->index_map, (u64) entity->function, func_idx);
+                bh_imap_put(&module->index_map, (u64) entity->function, module->next_func_idx++);
                 break;
-            }
 
             case Entity_Type_Global_Header: {
                 u64 global_idx;

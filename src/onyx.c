@@ -229,13 +229,20 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
 
         switch (nkind) {
             case Ast_Kind_Function: {
-                ent.type     = Entity_Type_Function_Header;
-                ent.function = (AstFunction *) node;
-                bh_arr_push(compiler_state->prog_info.entities, ent);
+                if ((node->flags & Ast_Flag_Foreign) != 0) {
+                    ent.type     = Entity_Type_Foreign_Function_Header;
+                    ent.function = (AstFunction *) node;
+                    bh_arr_push(compiler_state->prog_info.entities, ent);
 
-                ent.type     = Entity_Type_Function;
-                ent.function = (AstFunction *) node;
-                bh_arr_push(compiler_state->prog_info.entities, ent);
+                } else {
+                    ent.type     = Entity_Type_Function_Header;
+                    ent.function = (AstFunction *) node;
+                    bh_arr_push(compiler_state->prog_info.entities, ent);
+
+                    ent.type     = Entity_Type_Function;
+                    ent.function = (AstFunction *) node;
+                    bh_arr_push(compiler_state->prog_info.entities, ent);
+                }
                 break;
             }
 

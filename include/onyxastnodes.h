@@ -528,6 +528,7 @@ typedef enum EntityType {
     Entity_Type_Type_Alias,
     Entity_Type_Memory_Reservation,
     Entity_Type_Polymorphic_Proc,
+    Entity_Type_Foreign_Function_Header,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
     Entity_Type_Expression,
@@ -572,7 +573,6 @@ typedef struct ProgramInfo {
     bh_table(Package *)   packages;
     bh_arr(Entity)        entities;
 
-    u32 foreign_func_count;
     u32 foreign_global_count;
 } ProgramInfo;
 

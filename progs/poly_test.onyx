@@ -68,15 +68,6 @@ get_range :: proc (arr: ^[..] $T) -> range {
     return 0 .. arr.count;
 }
 
-print_range :: proc (r: range) #add_overload print {
-    print(r.low);
-    print(" to ");
-    print(r.high);
-    print(" by ");
-    print(r.step);
-    print("\n");
-}
-
 // NOTE: This function will be very useful for for loops. i.e.
 //        for i: 0 .. 100 |> by(2) {
 //            ...

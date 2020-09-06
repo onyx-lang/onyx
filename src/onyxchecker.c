@@ -1319,10 +1319,8 @@ b32 check_node(AstNode* node) {
 void onyx_type_check() {
     bh_arr_each(Entity, entity, semstate.program->entities) {
         switch (entity->type) {
+            case Entity_Type_Foreign_Function_Header:
             case Entity_Type_Function_Header:
-                if (entity->function->flags & Ast_Flag_Foreign)
-                    semstate.program->foreign_func_count++;
-
                 if (check_function_header(entity->function)) return;
                 break;
 

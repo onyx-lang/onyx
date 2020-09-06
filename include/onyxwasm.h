@@ -343,7 +343,6 @@ typedef struct OnyxWasmModule {
     u32 export_count;
     u32 next_type_idx;
     u32 next_func_idx;
-    u32 next_foreign_func_idx;
     u32 next_global_idx;
     u32 next_foreign_global_idx;
     u32 next_datum_offset;

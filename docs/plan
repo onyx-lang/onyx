@@ -241,7 +241,7 @@ HOW:
                 * slice
                 * dynamic array
 
-        [ ] Don't include foreign functions unless they're used
+        [X] Don't include foreign functions unless they're used
             - Do multiple passes if needed
             - Some APIs like WebGL have a ton of foreigns, and most of them aren't even used
 

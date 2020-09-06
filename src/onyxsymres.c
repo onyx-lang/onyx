@@ -686,8 +686,10 @@ void onyx_resolve_symbols() {
         }
 
         switch (entity->type) {
-            case Entity_Type_Use_Package:         symres_use_package(entity->use_package); break;
+            case Entity_Type_Foreign_Function_Header:
             case Entity_Type_Function:            symres_function(entity->function); break;
+
+            case Entity_Type_Use_Package:         symres_use_package(entity->use_package); break;
             case Entity_Type_Overloaded_Function: symres_overloaded_function(entity->overloaded_function); break;
             case Entity_Type_Global:              symres_global(entity->global); break;
             case Entity_Type_Expression:          symres_expression(&entity->expr); break;
