@@ -462,6 +462,7 @@ b32 check_call(AstCall* call) {
     actual = call->arguments;
 
     Type* variadic_type = NULL;
+    AstParam* variadic_param = NULL;
 
     i32 arg_pos = 0;
     while (1) {
@@ -470,6 +471,7 @@ b32 check_call(AstCall* call) {
 
         if (variadic_type == NULL && formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
             variadic_type = formal_params[arg_pos]->VarArgs.ptr_to_data->Pointer.elem;
+            variadic_param = &callee->params[arg_pos];
         }
 
         if (variadic_type != NULL) {
@@ -477,9 +479,9 @@ b32 check_call(AstCall* call) {
                 onyx_report_error(actual->token->pos,
                         "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
                         callee->token->text, callee->token->length,
-                        type_get_name(formal_params[arg_pos]),
-                        callee->params[arg_pos].local->token->text,
-                        callee->params[arg_pos].local->token->length,
+                        type_get_name(variadic_type),
+                        variadic_param->local->token->text,
+                        variadic_param->local->token->length,
                         type_get_name(actual->type));
                 return 1;
             }
