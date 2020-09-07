@@ -100,8 +100,61 @@ switch_demo :: proc {
     }
 }
 
+vararg_test :: proc (prefix: string, nums: ..i32) {
+    print(prefix);
+    for num: nums {
+        print(num);
+        print(" ");
+    }
+}
+
+NumInfo :: struct {
+    min : i32;
+    max : i32;
+    sum : i32;
+}
+
+get_num_info :: proc (nums: ..i32) -> NumInfo {
+    ni : NumInfo;
+
+    ni.min = nums[0];
+    for num: nums do if num < ni.min do ni.min = num;
+
+    ni.max = nums[0];
+    for num: nums do if num > ni.max do ni.max = num;
+
+    ni.sum = 0;
+    for num: nums do ni.sum += num;
+
+    return ni;
+}
+
+print_strings :: proc (ss: ..string) {
+    for s: ss do print_string(s);
+}
+
+// At some point, it would be nice to have the ability to say something like:
+// complex_varargs :: proc (nums: ..i32, names: ..string) {
+//     ...
+// }
+
 main :: proc (args: [] cstring) {
     switch_demo();
+
+    print_strings("This ", "is ", "a ", "test.\n");
+
+    vararg_test("Here are some numbers:\n", 1, 2, 3, 4, 5);
+    print("\n\n");
+
+    ni := get_num_info(1, 2, 3, 4, 5);
+    print("Some information about those numbers:\n");
+    print("Min: ");
+    print(ni.min);
+    print("\nMax: ");
+    print(ni.max);
+    print("\nSum: ");
+    print(ni.sum);
+    print("\n\n");
 
     res := compose(5, proc (x: i32) -> i32 do return x * 3;,
                       proc (x: i32) -> i32 do return x + 5;);

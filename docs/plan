@@ -245,13 +245,7 @@ HOW:
             - Do multiple passes if needed
             - Some APIs like WebGL have a ton of foreigns, and most of them aren't even used
 
-        [ ] baked parameters
-            - Compile time known parameters
-            - Removes the argument from the list and replaces the function with the
-                baked function
-
-        [ ] Add SIMD intrinsics
-            - This also requires adding the v128 SIMD type
+        [X] Variadic arguments
 
         [ ] Put type info in data section so it is runtime accessible
             - type name
@@ -259,6 +253,14 @@ HOW:
             - alignment
             - struct member names
             - array length
+
+        [ ] baked parameters
+            - Compile time known parameters
+            - Removes the argument from the list and replaces the function with the
+                baked function
+
+        [ ] Add SIMD intrinsics
+            - This also requires adding the v128 SIMD type
 
         [ ] Type parameterized structs
 
@@ -283,8 +285,6 @@ HOW:
             - Technically it isn't slow right now
             - But, profiling says we are spending 50% of the program execution time in the lexer
             - That is awful
-
-        [ ] Variadic arguments
 
         [ ] 'when' statements
             - Compile time conditions

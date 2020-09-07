@@ -883,7 +883,7 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
         // NOTE: Storing structs requires that the location to store it is,
         // the top most thing on the stack. Everything requires it to be
         // 'under' the other element being stored.  -brendanfh 2020/09/04
-        if (!it_is_local && var->type->kind != Type_Kind_Struct) {
+        if (!it_is_local && !type_is_structlike(var->type)) {
             emit_local_location(mod, &code, var, &offset);
         }
 
@@ -892,7 +892,7 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
         if (it_is_local) {
             WIL(WI_LOCAL_SET, iter_local);
         } else {
-            if (var->type->kind != Type_Kind_Struct) {
+            if (!type_is_structlike(var->type)) {
                 emit_store_instruction(mod, &code, var->type, offset);
             } else {
                 emit_local_location(mod, &code, var, &offset);
@@ -979,7 +979,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
         // NOTE: Storing structs requires that the location to store it is,
         // the top most thing on the stack. Everything requires it to be
         // 'under' the other element being stored.  -brendanfh 2020/09/04
-        if (!it_is_local && var->type->kind != Type_Kind_Struct) {
+        if (!it_is_local && !type_is_structlike(var->type)) {
             emit_local_location(mod, &code, var, &offset);
         }
 
@@ -988,7 +988,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
         if (it_is_local) {
             WIL(WI_LOCAL_SET, iter_local);
         } else {
-            if (var->type->kind != Type_Kind_Struct) {
+            if (!type_is_structlike(var->type)) {
                 emit_store_instruction(mod, &code, var->type, offset);
             } else {
                 emit_local_location(mod, &code, var, &offset);
@@ -1279,10 +1279,33 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 EMIT_FUNC(call, AstCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    u32 stack_grow_amm = 0;
+    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+
+    u32 vararg_count = 0;
+
     for (AstArgument *arg = call->arguments;
             arg != NULL;
             arg = (AstArgument *) arg->next) {
+        if ((arg->flags & Ast_Flag_Arg_Is_VarArg) && !type_is_structlike(arg->type)) {
+            WID(WI_GLOBAL_GET, stack_top_idx);
+        }
+
         emit_expression(mod, &code, arg->value);
+
+        if (arg->flags & Ast_Flag_Arg_Is_VarArg) {
+            if (type_is_structlike(arg->type)) WID(WI_GLOBAL_GET, stack_top_idx);
+
+            emit_store_instruction(mod, &code, arg->type, stack_grow_amm);
+
+            stack_grow_amm += type_size_of(arg->type);
+            vararg_count += 1;
+        }
+    }
+
+    if (vararg_count > 0) {
+        WID(WI_GLOBAL_GET, stack_top_idx);
+        WID(WI_I32_CONST, vararg_count);
     }
 
     CallingConvention cc = type_function_get_cc(call->callee->type);
@@ -1293,11 +1316,13 @@ EMIT_FUNC(call, AstCall* call) {
     u32 return_align = type_alignment_of(return_type);
     bh_align(return_size, return_align);
 
-    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    stack_grow_amm += return_size;
 
-    if (cc == CC_Return_Stack) {
+    b32 needs_stack = (cc == CC_Return_Stack) || (vararg_count > 0);
+
+    if (needs_stack) {
         WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_I32_CONST, return_size);
+        WID(WI_I32_CONST, stack_grow_amm);
         WI(WI_I32_ADD);
         WID(WI_GLOBAL_SET, stack_top_idx);
     }
@@ -1313,14 +1338,16 @@ EMIT_FUNC(call, AstCall* call) {
         WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
     }
 
-    if (cc == CC_Return_Stack) {
+    if (needs_stack) {
         WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_I32_CONST, return_size);
+        WID(WI_I32_CONST, stack_grow_amm);
         WI(WI_I32_SUB);
         WID(WI_GLOBAL_SET, stack_top_idx);
+    }
 
+    if (cc == CC_Return_Stack) {
         WID(WI_GLOBAL_GET, stack_top_idx);
-        emit_load_instruction(mod, &code, return_type, 0);
+        emit_load_instruction(mod, &code, return_type, stack_grow_amm - return_size);
     }
 
     *pcode = code;
@@ -2359,6 +2386,8 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
             case 'r': *des++ = '\r'; break;
             case 'v': *des++ = '\v'; break;
             case 'e': *des++ = '\e'; break;
+            case '"': *des++ = '"';  break;
+            case '\\': *des++ = '\\'; break;
             case 'x': {
                 // HACK: This whole way of doing this
                 i++;

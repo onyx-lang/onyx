@@ -179,6 +179,8 @@ typedef enum AstFlags {
     Ast_Flag_No_Clone          = BH_BIT(18),
 
     Ast_Flag_Cannot_Take_Addr  = BH_BIT(19),
+    
+    Ast_Flag_Arg_Is_VarArg     = BH_BIT(20),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -468,8 +470,13 @@ struct AstGlobal        {
         };
     };
 };
-struct AstParam         { AstLocal *local; AstTyped *default_value; };
-struct AstFunction      {
+struct AstParam {
+    AstLocal *local;
+    AstTyped *default_value;
+
+    b32 is_vararg : 1;
+};
+struct AstFunction {
     AstTyped_base;
 
     Scope *scope;

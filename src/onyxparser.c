@@ -1419,6 +1419,11 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
         }
 
         if (parser->curr->type != '=') {
+            if (parser->curr->type == Token_Type_Dot_Dot) {
+                consume_token(parser);
+                curr_param.is_vararg = 1;
+            }
+
             i32 old_len = bh_arr_length(*parser->polymorph_context.poly_params);
             curr_param.local->type_node = parse_type(parser);
 

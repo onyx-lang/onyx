@@ -12,8 +12,8 @@ stdio_init :: proc {
 }
 
 print_string  :: proc (s: string) {
-	string_builder_append(^print_buffer, s);
-	if s.data[s.count - 1] == #char "\n" do print_buffer_flush();
+    string_builder_append(^print_buffer, s);
+    if s.data[s.count - 1] == #char "\n" do print_buffer_flush();
 }
 
 print_cstring :: proc (s: cstring) do string_builder_append(^print_buffer, s);

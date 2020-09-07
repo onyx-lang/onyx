@@ -1,0 +1,25 @@
+#include_file "core/std/wasi"
+
+use package core
+
+main :: proc (args: [] cstring) {
+    program := "+ + * s - /";
+    accumulator := 0;
+
+    for token: program {
+        switch token {
+            case #char "+" do accumulator += 1;
+            case #char "-" do accumulator -= 1;
+            case #char "*" do accumulator *= 2;
+            case #char "/" do accumulator /= 2;
+            case #char "s" do accumulator *= accumulator;
+            case #default ---
+        }
+    }
+
+    print("The program \"");
+    print(program);
+    print("\" calculates the value ");
+    print(accumulator);
+    print("\n");
+}

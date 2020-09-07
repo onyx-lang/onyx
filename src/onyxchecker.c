@@ -134,6 +134,19 @@ b32 check_for(AstFor* fornode) {
         fornode->loop_type = For_Loop_Slice;
 
     }
+    else if (iter_type->kind == Type_Kind_VarArgs) {
+        if (fornode->by_pointer) {
+            onyx_report_error(fornode->var->token->pos, "Cannot iterate by pointer over '%s'.", type_get_name(iter_type));
+            return 1;
+        }
+
+        can_iterate = 1;
+
+        fornode->var->type = iter_type->VarArgs.ptr_to_data->Pointer.elem;
+
+        // NOTE: Slices are VarArgs are being treated the same here.
+        fornode->loop_type = For_Loop_Slice;
+    }
     else if (iter_type->kind == Type_Kind_DynArray) {
         can_iterate = 1;
 
@@ -219,7 +232,11 @@ static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction*
         while (arg != NULL) {
             fill_in_type((AstTyped *) arg);
 
-            if (!types_are_compatible(*param_type, arg->type)) goto no_match;
+            if ((*param_type)->kind == Type_Kind_VarArgs) {
+                if (!types_are_compatible((*param_type)->VarArgs.ptr_to_data->Pointer.elem, arg->type))
+                    goto no_match;
+            }
+            else if (!types_are_compatible(*param_type, arg->type)) goto no_match;
 
             param_type++;
             arg = (AstArgument *) arg->next;
@@ -376,7 +393,7 @@ b32 check_call(AstCall* call) {
         }
     }
 
-    // NOTE: If we calling an intrinsic function, translate the
+    // NOTE: If we are calling an intrinsic function, translate the
     // call into an intrinsic call node.
     if (callee->flags & Ast_Flag_Intrinsic) {
         call->kind = Ast_Kind_Intrinsic_Call;
@@ -444,14 +461,38 @@ b32 check_call(AstCall* call) {
     Type **formal_params = callee->type->Function.params;
     actual = call->arguments;
 
+    Type* variadic_type = NULL;
+
     i32 arg_pos = 0;
-    while (arg_pos < callee->type->Function.param_count && actual != NULL) {
-        if (!types_are_compatible(formal_params[arg_pos], actual->type)) {
+    while (1) {
+        if (actual == NULL) break;
+        if (arg_pos >= callee->type->Function.param_count && variadic_type == NULL) break;
+
+        if (variadic_type == NULL && formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
+            variadic_type = formal_params[arg_pos]->VarArgs.ptr_to_data->Pointer.elem;
+        }
+
+        if (variadic_type != NULL) {
+            if (!types_are_compatible(variadic_type, actual->type)) {
+                onyx_report_error(actual->token->pos,
+                        "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
+                        callee->token->text, callee->token->length,
+                        type_get_name(formal_params[arg_pos]),
+                        callee->params[arg_pos].local->token->text,
+                        callee->params[arg_pos].local->token->length,
+                        type_get_name(actual->type));
+                return 1;
+            }
+
+            actual->flags |= Ast_Flag_Arg_Is_VarArg;
+
+        } else if (!types_are_compatible(formal_params[arg_pos], actual->type)) {
             onyx_report_error(actual->token->pos,
-                    "The function '%b' expects a value of type '%s' for parameter '%d', got '%s'.",
+                    "The function '%b' expects a value of type '%s' for %d%s parameter, got '%s'.",
                     callee->token->text, callee->token->length,
                     type_get_name(formal_params[arg_pos]),
-                    arg_pos,
+                    arg_pos + 1,
+                    bh_num_suffix(arg_pos + 1),
                     type_get_name(actual->type));
             return 1;
         }
@@ -884,7 +925,8 @@ b32 check_array_access(AstArrayAccess* aa) {
     else if (aa->addr->type->kind == Type_Kind_Array)
         aa->type = aa->addr->type->Array.elem;
     else if (aa->addr->type->kind == Type_Kind_Slice
-            || aa->addr->type->kind == Type_Kind_DynArray) {
+            || aa->addr->type->kind == Type_Kind_DynArray
+            || aa->addr->type->kind == Type_Kind_VarArgs) {
         // If we are accessing on a slice or a dynamic array, implicitly add a field access for the data member
 
         StructMember smem;
@@ -1223,6 +1265,7 @@ b32 check_struct(AstStructType* s_node) {
 
 b32 check_function_header(AstFunction* func) {
     b32 expect_default_param = 0;
+    b32 has_had_varargs = 0;
 
     bh_arr_each(AstParam, param, func->params) {
         AstLocal* local = param->local;
@@ -1233,6 +1276,18 @@ b32 check_function_header(AstFunction* func) {
             return 1;
         }
 
+        if (has_had_varargs && param->is_vararg) {
+            onyx_report_error(local->token->pos,
+                    "Can only have one param that is of variable argument type.");
+            return 1;
+        }
+
+        if (has_had_varargs && !param->is_vararg) {
+            onyx_report_error(local->token->pos,
+                    "Variable arguments must be last in parameter list");
+            return 1;
+        }
+
         if (param->default_value != NULL) expect_default_param = 1;
 
         fill_in_type((AstTyped *) local);
@@ -1240,6 +1295,12 @@ b32 check_function_header(AstFunction* func) {
         if (local->type == NULL) {
             onyx_report_error(local->token->pos, "Function parameter types must be known.");
             return 1;
+        }
+
+        if (param->is_vararg) {
+            has_had_varargs = 1;
+
+            local->type = type_make_varargs(semstate.node_allocator, local->type);
         }
 
         if (local->type->kind != Type_Kind_Array
