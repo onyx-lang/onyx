@@ -20,7 +20,7 @@ print_cstring :: proc (s: cstring) do string_builder_append(^print_buffer, s);
 print_i64     :: proc (n: i64, base := 10l) do string_builder_append(^print_buffer, n, base);
 print_i32     :: proc (n: i32, base := 10)  do string_builder_append(^print_buffer, cast(i64) n, cast(u64) base);
 print_bool    :: proc (b: bool) do string_builder_append(^print_buffer, b);
-print_ptr     :: proc (p: rawptr) do string_builder_append(^print_buffer, cast(i64) p, 16l);
+print_ptr     :: proc (p: ^void) do string_builder_append(^print_buffer, cast(i64) p, 16l);
 
 print_range :: proc (r: range, sep := " ") {
     for i: r {

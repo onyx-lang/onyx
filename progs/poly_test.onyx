@@ -134,6 +134,10 @@ print_strings :: proc (ss: ..string) {
 }
 
 multi_max :: proc (nums: ..$T) -> T {
+    print("Got this many args: ");
+    print(nums.count);
+    print("\n");
+
     max := nums[0];
     for num: nums do if num > max do max = num;
     return max;

@@ -1359,6 +1359,11 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
         AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);
 
+        if (parser->curr->type == Token_Type_Keyword_Use) {
+            consume_token(parser);
+            mem->flags |= Ast_Flag_Struct_Mem_Used;
+        }
+
         mem->token = expect_token(parser, Token_Type_Symbol);
         expect_token(parser, ':');
         mem->type_node = parse_type(parser);

@@ -139,6 +139,8 @@ b32 types_are_compatible(Type* t1, Type* t2) {
                 return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
             }
 
+            if (t2->kind == Type_Kind_Basic && t2->Basic.kind == Basic_Kind_Rawptr) return 1;
+
             break;
         }
 
@@ -341,17 +343,24 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 token_toggle_end((*member)->token);
 
                 u32 type_size = type_size_of((*member)->type);
-                if (!is_union) offset += type_size;
-                if (!is_union)   size += type_size;
-                else             size =  bh_max(size, type_size);
+                if (((*member)->flags & Ast_Flag_Struct_Mem_Used) == 0) {
+                    if (!is_union) offset += type_size;
+                    if (!is_union) size += type_size;
+                    else           size =  bh_max(size, type_size);
 
-                idx++;
+                    idx++;
+                }
             }
 
             // NOTE: Need to do a second pass because the references to the
             // elements of the table may change if the internal arrays of the
             // table need to be resized.
+            s_type->Struct.mem_count = 0;
             bh_arr_each(AstStructMember *, member, s_node->members) {
+                if ((*member)->flags & Ast_Flag_Struct_Mem_Used) continue;
+
+                s_type->Struct.mem_count++;
+
                 token_toggle_end((*member)->token);
                 bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, (*member)->token->text));
                 token_toggle_end((*member)->token);
@@ -637,13 +646,15 @@ b32 type_struct_is_simple(Type* type) {
     if (type->kind != Type_Kind_Struct) return 0;
 
     b32 is_simple = 1;
-    bh_table_each_start(StructMember, type->Struct.members);
-        if (value.type->kind == Type_Kind_Struct
-            || value.type->kind == Type_Kind_Array) {
+    bh_arr_each(StructMember *, mem, type->Struct.memarr) {
+        if ((*mem)->type->kind == Type_Kind_Struct
+            || (*mem)->type->kind == Type_Kind_Array
+            || (*mem)->type->kind == Type_Kind_Slice
+            || (*mem)->type->kind == Type_Kind_DynArray) {
             is_simple = 0;
             break;
         }
-    bh_table_each_end;
+    }
 
     return is_simple;
 }

@@ -77,7 +77,7 @@ string_substr :: proc (str: string, sub: string) -> string {
 }
 
 string_contains :: proc (str: string, c: u8) -> bool {
-    for i: 0 .. str.count do if str[i] == c do return true;
+    for ch: str do if ch == c do return true;
     return false;
 }
 

@@ -183,6 +183,8 @@ typedef enum AstFlags {
     Ast_Flag_Cannot_Take_Addr  = BH_BIT(19),
 
     Ast_Flag_Arg_Is_VarArg     = BH_BIT(20),
+
+    Ast_Flag_Struct_Mem_Used   = BH_BIT(21),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -666,6 +668,7 @@ static inline CallingConvention type_function_get_cc(Type* type) {
     if (type->kind != Type_Kind_Function) return CC_Undefined;
     if (type->Function.return_type->kind == Type_Kind_Struct) return CC_Return_Stack;
     if (type->Function.return_type->kind == Type_Kind_Slice) return CC_Return_Stack;
+    if (type->Function.return_type->kind == Type_Kind_DynArray) return CC_Return_Stack;
     return CC_Return_Wasm;
 }
 

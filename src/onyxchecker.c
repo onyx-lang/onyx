@@ -584,7 +584,7 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         if (check_binaryop(&binop_node, 0)) return 1;
     }
 
-    if (!types_are_compatible(binop->right->type, binop->right->type)) {
+    if (!types_are_compatible(binop->right->type, binop->left->type)) {
         onyx_report_error(binop->token->pos,
                 "Cannot assign value of type '%s' to a '%s'.",
                 type_get_name(binop->right->type),
@@ -819,8 +819,8 @@ b32 check_struct_literal(AstStructLiteral* sl) {
         onyx_report_error(sl->token->pos,
                 "'%s' expects %d values, given %d.",
                 type_get_name(sl->type),
-                bh_arr_length(sl->values),
-                mem_count);
+                mem_count,
+                bh_arr_length(sl->values));
         return 1;
     }
 

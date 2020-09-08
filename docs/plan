@@ -275,6 +275,7 @@ HOW:
         [ ] look into creating a source map
             - first-look looks really gross
             - whoever came up with the source map spec should be fired... why are people so afraid of binary files??
+            - DWARF looks like it might be easier, but it still doesn't look fun.
 
         [ ] convert to using an 'atom' like table
             - All identifier tokens are given a unique atom ptr, up to string equality.

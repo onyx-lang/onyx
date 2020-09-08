@@ -2,7 +2,68 @@
 
 use package core
 
+
+Foo :: struct {
+    data1 : i32;
+    data2 : f32;
+}
+
+Bar :: struct {
+    use foo : Foo;
+    bar_data : string;
+    // bar_data2 : cstring;
+}
+
+// BUG: This should cause some kind of error since this should be
+// infinite in size, but it doesn't so... fix that.
+//                                      - brendanfh   2020/09/08
+// Link :: struct {
+//     data : i32;
+//     next : Link;
+// }
+
+
+// bar : Bar;
+// bar.data1 = 123;
+// bar.data2 = 524782.1f;
+
+// asdf :: proc (f: Foo) -> ...
+// asdf(bar.foo);
+
+print_foo :: proc (f: ^Foo) {
+    print("Foo: \n");
+    print(f.data1);
+    print("\n");
+    print(cast(i32) f.data2);
+    print("\n");
+}
+
+print_bar :: proc (bar: ^Bar) {
+    print(bar.data1);
+    print("\n");
+    print(cast(i32) bar.data2);
+    print("\n");
+    print(bar.bar_data);
+    print("\n");
+}
+
+make_bar :: proc -> Bar {
+    bar : Bar;
+    bar.data1 = 1234;
+    bar.data2 = 12.34f;
+    bar.bar_data = "This is a test";
+
+    return bar;
+}
+
 main :: proc (args: [] cstring) {
+    bar := make_bar();
+
+    print(sizeof Bar);
+    print("\n");
+    print_bar(^bar);
+    print_foo(^bar.foo);
+
     program := "+ + * s - /";
     accumulator := 0;
 
