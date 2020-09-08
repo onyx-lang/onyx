@@ -1430,6 +1430,13 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
             i32 new_len = bh_arr_length(*parser->polymorph_context.poly_params);
             i32 new_poly_params = new_len - old_len;
 
+            if (curr_param.is_vararg) {
+                AstVarArgType* va_type = make_node(AstVarArgType, Ast_Kind_VarArg_Type);
+                va_type->elem = curr_param.local->type_node;
+                va_type->token = curr_param.local->type_node->token;
+                curr_param.local->type_node = (AstType *) va_type;
+            }
+
             fori (i, 0, new_poly_params) {
                 (*parser->polymorph_context.poly_params)[old_len + i].type_expr = curr_param.local->type_node;
                 (*parser->polymorph_context.poly_params)[old_len + i].idx = param_idx;

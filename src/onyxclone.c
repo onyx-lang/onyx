@@ -52,6 +52,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Array_Type: return sizeof(AstArrayType);
         case Ast_Kind_Slice_Type: return sizeof(AstSliceType);
         case Ast_Kind_DynArr_Type: return sizeof(AstDynArrType);
+        case Ast_Kind_VarArg_Type: return sizeof(AstVarArgType);
         case Ast_Kind_Struct_Type: return sizeof(AstStructType);
         case Ast_Kind_Enum_Type: return sizeof(AstEnumType);
         case Ast_Kind_Type_Alias: return sizeof(AstTypeAlias);
@@ -264,6 +265,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			((AstDynArrType *) nn)->elem = (AstType *) ast_clone(a, ((AstDynArrType *) node)->elem);
 			break;
 
+		case Ast_Kind_VarArg_Type:
+			((AstVarArgType *) nn)->elem = (AstType *) ast_clone(a, ((AstVarArgType *) node)->elem);
+			break;
+
 		case Ast_Kind_Type_Alias:
 			((AstTypeAlias *) nn)->to = (AstType *) ast_clone(a, ((AstTypeAlias *) node)->to);
 			break;
@@ -301,6 +306,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 				AstParam new_param;
 				new_param.local = (AstLocal *) ast_clone(a, param->local);
 				new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
+                new_param.is_vararg = param->is_vararg;
 				bh_arr_push(df->params, new_param);
 			}
 

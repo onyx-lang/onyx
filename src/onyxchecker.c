@@ -894,7 +894,9 @@ b32 check_array_access(AstArrayAccess* aa) {
     if (check_expression(&aa->expr)) return 1;
 
     if (!type_is_array_accessible(aa->addr->type)) {
-        onyx_report_error(aa->token->pos, "Expected pointer or array type for left of array access.");
+        onyx_report_error(aa->token->pos,
+                "Expected pointer or array type for left of array access, got '%s'.",
+                type_get_name(aa->addr->type));
         return 1;
     }
 
@@ -1299,11 +1301,7 @@ b32 check_function_header(AstFunction* func) {
             return 1;
         }
 
-        if (param->is_vararg) {
-            has_had_varargs = 1;
-
-            local->type = type_make_varargs(semstate.node_allocator, local->type);
-        }
+        if (param->is_vararg) has_had_varargs = 1;
 
         if (local->type->kind != Type_Kind_Array
             && type_size_of(local->type) == 0) {

@@ -401,6 +401,13 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
                 break;
             }
 
+            case Ast_Kind_VarArg_Type:
+                bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = ((AstVarArgType *) elem.type_expr)->elem,
+                    .actual = actual,
+                }));
+                break;
+
             case Ast_Kind_Function_Type: {
                 if (elem.actual->kind != Type_Kind_Function) break;
 

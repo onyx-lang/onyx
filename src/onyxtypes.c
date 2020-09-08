@@ -392,6 +392,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return type_make_dynarray(alloc, type_build_from_ast(alloc, ((AstDynArrType *) type_node)->elem));
         }
 
+        case Ast_Kind_VarArg_Type:
+            return type_make_varargs(alloc, type_build_from_ast(alloc, ((AstVarArgType *) type_node)->elem));
+
         case Ast_Kind_Basic_Type:
             return ((AstBasicType *) type_node)->type;
 

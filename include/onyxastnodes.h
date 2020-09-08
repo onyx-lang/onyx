@@ -41,6 +41,7 @@ typedef struct AstFunctionType AstFunctionType;
 typedef struct AstArrayType AstArrayType;
 typedef struct AstSliceType AstSliceType;
 typedef struct AstDynArrType AstDynArrType;
+typedef struct AstVarArgType AstVarArgType;
 typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
 typedef struct AstEnumType AstEnumType;
@@ -103,6 +104,7 @@ typedef enum AstKind {
     Ast_Kind_Array_Type,
     Ast_Kind_Slice_Type,
     Ast_Kind_DynArr_Type,
+    Ast_Kind_VarArg_Type,
     Ast_Kind_Struct_Type,
     Ast_Kind_Enum_Type,
     Ast_Kind_Type_Alias,
@@ -179,7 +181,7 @@ typedef enum AstFlags {
     Ast_Flag_No_Clone          = BH_BIT(18),
 
     Ast_Flag_Cannot_Take_Addr  = BH_BIT(19),
-    
+
     Ast_Flag_Arg_Is_VarArg     = BH_BIT(20),
 } AstFlags;
 
@@ -409,6 +411,7 @@ struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; A
 struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstSliceType     { AstType_base; AstType* elem; };
 struct AstDynArrType    { AstType_base; AstType* elem; };
+struct AstVarArgType    { AstType_base; AstType* elem; };
 struct AstStructType {
     AstType_base;
 
@@ -473,6 +476,11 @@ struct AstGlobal        {
 struct AstParam {
     AstLocal *local;
     AstTyped *default_value;
+
+    // HACK: There is a little too much complexity here. If a parameter is
+    // a vararg, not only is the flag below set, but the type_node of the
+    // local is also a AstVarArgType. I think this redudancy should be able
+    // to be cleaned up.                        -brendanfh   2020/09/07
 
     b32 is_vararg : 1;
 };

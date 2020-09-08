@@ -127,6 +127,13 @@ static AstType* symres_type(AstType* type) {
         return type;
     }
 
+    if (type->kind == Ast_Kind_VarArg_Type) {
+        AstVarArgType* va_node = (AstVarArgType *) type;
+        va_node->elem = symres_type(va_node->elem);
+
+        return type;
+    }
+
     return type;
 }
 
