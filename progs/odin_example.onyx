@@ -63,6 +63,8 @@ main :: proc (args: [] cstring) {
     print("\n");
     print_bar(^bar);
     print_foo(^bar.foo);
+    print(bar.foo.data1);
+    print("\n");
 
     program := "+ + * s - /";
     accumulator := 0;

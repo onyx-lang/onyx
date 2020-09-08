@@ -666,6 +666,8 @@ static void symres_enum(AstEnumType* enum_node) {
                 return;
             }
 
+            (*value)->value->type = enum_node->backing_type;
+
         } else {
             AstNumLit* num = onyx_ast_node_new(semstate.node_allocator, sizeof(AstNumLit), Ast_Kind_NumLit);
             num->value.l = next_assign_value;

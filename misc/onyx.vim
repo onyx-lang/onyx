@@ -31,6 +31,7 @@ syn keyword onyxConstant        true false null
 syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 
 syn region onyxComment          start="//" end="$" keepend contains=onyxCommentStart
+syn region onyxComment          start="/\*" end="\*/" contains=onyxCommentStart
 
 syn region onyxDirective        start="#" end=" "
 

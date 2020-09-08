@@ -262,6 +262,10 @@ HOW:
         [ ] Add SIMD intrinsics
             - This also requires adding the v128 SIMD type
 
+        [ ] Add threading intrinsics
+            - This will actually be fairly easy since I think all that is needed is
+                to implement the intrinsics.
+
         [ ] Type parameterized structs
 
         [ ] Array literals

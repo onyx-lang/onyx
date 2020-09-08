@@ -740,6 +740,7 @@ bufferDataWithData             :: proc (target: GLenum, buffer: Buffer, usage: G
 bufferDataNoData               :: proc (target: GLenum, size: GLsizeiptr, usage: GLenum) #foreign "gl" "bufferDataNoData" ---
 bufferData                     :: proc #overloaded { bufferDataWithData, bufferDataNoData }
 bufferSubData                  :: proc (target: GLenum, offset: GLsizei, data: Buffer) #foreign "gl" "bufferSubData" ---
+canvasSize                     :: proc (width: GLsizei, height: GLsizei) #foreign "gl" "canvasSize" ---
 checkFrameBufferStatus         :: proc (target: GLenum) -> GLenum #foreign "gl" "checkFrameBufferStatus" ---
 clear                          :: proc (mask: GLbitfield) #foreign "gl" "clear" ---
 clearColor                     :: proc (red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) #foreign "gl" "clearColor" ---

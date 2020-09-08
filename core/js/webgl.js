@@ -57,6 +57,10 @@ WebGl_Wasm = {
         const data = new DataView(WASM_MEMORY.buffer, bufferdata, bufferlen);
         this.gl.bufferSubData(target, offset, data);
     },
+    canvasSize(width, height) {
+        this.canvas.width = width;
+        this.canvas.height = height;
+    },
     checkFrameBufferStatus(target) { return this.gl.checkFrameBufferStatus(target); },
     clear(bit) { this.gl.clear(bit); },
     clearColor(r, g, b, a) { this.gl.clearColor(r, g, b, a); },

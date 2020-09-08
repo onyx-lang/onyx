@@ -1138,6 +1138,8 @@ b32 check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Polymorphic_Proc: break;
 
+        case Ast_Kind_Package: break;
+
         case Ast_Kind_Error: break;
 
         default:
