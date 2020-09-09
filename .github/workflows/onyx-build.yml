@@ -1,0 +1,21 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: make
+      run: make
+    - name: make install
+      run: make install
+    - name: onyx progs/odin_example.onyx
+      run: onyx progs/odin_example.onyx
