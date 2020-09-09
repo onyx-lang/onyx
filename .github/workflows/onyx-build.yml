@@ -17,7 +17,5 @@ jobs:
       run: mkdir build
     - name: make
       run: make
-    - name: make install
-      run: make install
-    - name: onyx progs/odin_example.onyx
-      run: onyx progs/odin_example.onyx
+    - name: ./onyx progs/odin_example.onyx
+      run: ./onyx progs/odin_example.onyx
