@@ -8,11 +8,6 @@
 
 typedef u8 WasmType;
 
-extern const WasmType WASM_TYPE_INT32;
-extern const WasmType WASM_TYPE_INT64;
-extern const WasmType WASM_TYPE_FLOAT32;
-extern const WasmType WASM_TYPE_FLOAT64;
-
 typedef struct WasmFuncType {
     // NOTE: For now, WASM only allows for 1 return value.
     // This may be lifted in the future.
@@ -246,15 +241,15 @@ typedef struct WasmInstruction {
 typedef struct BranchTable {
     u32 count;
     u32 default_case;
-    u32 cases[];    
+    u32 cases[];
 } BranchTable;
 
 #define LOCAL_IS_WASM 0x8000000000000
 typedef struct LocalAllocator {
     u32 param_count;
 
-    u32 allocated[4];
-    u32 freed[4];
+    u32 allocated[5];
+    u32 freed[5];
 
     i32 max_stack;
     i32 curr_stack;

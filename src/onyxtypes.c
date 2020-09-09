@@ -5,23 +5,30 @@
 
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
-    { Type_Kind_Basic, 0, { Basic_Kind_Void,                    0,                       0, 1, "void"   } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Void,                    0,                       0,  1, "void"   } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1, 1, "bool"   } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1,  1, "bool"   } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_I8,     Basic_Flag_Integer,                       1, 1, "i8"     } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1, 1, "u8"     } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I16,    Basic_Flag_Integer,                       2, 2, "i16"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2, 2, "u16"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I32,    Basic_Flag_Integer,                       4, 4, "i32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4, 4, "u32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I64,    Basic_Flag_Integer,                       8, 8, "i64"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8, 8, "u64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I8,     Basic_Flag_Integer,                       1,  1, "i8"     } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1,  1, "u8"     } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I16,    Basic_Flag_Integer,                       2,  2, "i16"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2,  2, "u16"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I32,    Basic_Flag_Integer,                       4,  4, "i32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4,  4, "u32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I64,    Basic_Flag_Integer,                       8,  8, "i64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8,  8, "u64"    } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4, 4, "f32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8, 4, "f64"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4, 4, "rawptr" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4,  4, "rawptr" } },
+
+    { Type_Kind_Basic, 0, { Basic_Kind_I8X16,  Basic_Flag_SIMD,                          16, 16, "i8x16" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I16X8,  Basic_Flag_SIMD,                          16, 16, "i16x8" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I32X4,  Basic_Flag_SIMD,                          16, 16, "i32x4" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_I64X2,  Basic_Flag_SIMD,                          16, 16, "i64x2" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F32X4,  Basic_Flag_SIMD,                          16, 16, "f32x4" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                          16, 16, "f64x2" } },
 };
 
 b32 types_are_surface_compatible(Type* t1, Type* t2) {

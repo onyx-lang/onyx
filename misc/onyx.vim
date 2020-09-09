@@ -25,6 +25,12 @@ syn keyword onyxType i64 u64
 syn keyword onyxType f32
 syn keyword onyxType f64
 syn keyword onyxType rawptr
+syn keyword onyxType i8x16
+syn keyword onyxType i16x8
+syn keyword onyxType i32x4
+syn keyword onyxType i64x2
+syn keyword onyxType f32x4
+syn keyword onyxType f64x2
 
 syn keyword onyxConstant        true false null
 

@@ -21,6 +21,13 @@ enum BasicKind {
     Basic_Kind_F64,
 
     Basic_Kind_Rawptr,
+
+    Basic_Kind_I8X16,
+    Basic_Kind_I16X8,
+    Basic_Kind_I32X4,
+    Basic_Kind_I64X2,
+    Basic_Kind_F32X4,
+    Basic_Kind_F64X2,
 };
 
 enum BasicFlag {
@@ -29,6 +36,8 @@ enum BasicFlag {
     Basic_Flag_Unsigned         = BH_BIT(2),
     Basic_Flag_Float            = BH_BIT(3),
     Basic_Flag_Pointer          = BH_BIT(4),
+
+    Basic_Flag_SIMD             = BH_BIT(5),
 
     Basic_Flag_Numeric          = Basic_Flag_Integer | Basic_Flag_Float,
     Basic_Flag_Ordered          = Basic_Flag_Integer | Basic_Flag_Float | Basic_Flag_Pointer,

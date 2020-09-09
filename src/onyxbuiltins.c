@@ -17,6 +17,14 @@ AstBasicType basic_type_f32    = { Ast_Kind_Basic_Type, 0, NULL, "f32"   , &basi
 AstBasicType basic_type_f64    = { Ast_Kind_Basic_Type, 0, NULL, "f64"   , &basic_types[Basic_Kind_F64]   };
 AstBasicType basic_type_rawptr = { Ast_Kind_Basic_Type, 0, NULL, "rawptr", &basic_types[Basic_Kind_Rawptr] };
 
+static OnyxToken simd_token = { Token_Type_Symbol, 14, "simd intrinsic", { 0 } };
+AstBasicType basic_type_i8x16 = { Ast_Kind_Basic_Type, 0, &simd_token, "i8x16", &basic_types[Basic_Kind_I8X16] };
+AstBasicType basic_type_i16x8 = { Ast_Kind_Basic_Type, 0, &simd_token, "i16x8", &basic_types[Basic_Kind_I16X8] };
+AstBasicType basic_type_i32x4 = { Ast_Kind_Basic_Type, 0, &simd_token, "i32x4", &basic_types[Basic_Kind_I32X4] };
+AstBasicType basic_type_i64x2 = { Ast_Kind_Basic_Type, 0, &simd_token, "i64x2", &basic_types[Basic_Kind_I64X2] };
+AstBasicType basic_type_f32x4 = { Ast_Kind_Basic_Type, 0, &simd_token, "f32x4", &basic_types[Basic_Kind_F32X4] };
+AstBasicType basic_type_f64x2 = { Ast_Kind_Basic_Type, 0, &simd_token, "f64x2", &basic_types[Basic_Kind_F64X2] };
+
 static OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
 AstNode   builtin_package_node  = { Ast_Kind_Symbol, Ast_Flag_No_Clone, &builtin_package_token, NULL };
 
@@ -43,6 +51,13 @@ const BuiltinSymbol builtin_symbols[] = {
     { NULL, "f32",        (AstNode *) &basic_type_f32 },
     { NULL, "f64",        (AstNode *) &basic_type_f64 },
     { NULL, "rawptr",     (AstNode *) &basic_type_rawptr },
+
+    { "simd", "i8x16",    (AstNode *) &basic_type_i8x16 },
+    { "simd", "i16x8",    (AstNode *) &basic_type_i16x8 },
+    { "simd", "i32x4",    (AstNode *) &basic_type_i32x4 },
+    { "simd", "i64x2",    (AstNode *) &basic_type_i64x2 },
+    { "simd", "f32x4",    (AstNode *) &basic_type_f32x4 },
+    { "simd", "f64x2",    (AstNode *) &basic_type_f64x2 },
 
     { "builtin", "__heap_start", (AstNode *) &builtin_heap_start },
     { "builtin", "__stack_top",  (AstNode *) &builtin_stack_top },

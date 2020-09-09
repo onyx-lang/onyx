@@ -9,6 +9,7 @@
 #define WASM_TYPE_INT64   0x7E
 #define WASM_TYPE_FLOAT32 0x7D
 #define WASM_TYPE_FLOAT64 0x7C
+#define WASM_TYPE_VAR128  0x7B
 #define WASM_TYPE_VOID    0x00
 #else
 #define WASM_TYPE_INT32   'A'
@@ -237,6 +238,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
             if (basic->size <= 4) return WASM_TYPE_FLOAT32;
             if (basic->size == 8) return WASM_TYPE_FLOAT64;
         }
+        if (basic->flags & Basic_Flag_SIMD) return WASM_TYPE_VAR128;
         if (basic->size == 0) return WASM_TYPE_VOID;
     }
 
@@ -246,10 +248,11 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
 static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft);
 static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func);
 
-#define LOCAL_I32 0x000000000
-#define LOCAL_I64 0x100000000
-#define LOCAL_F32 0x300000000
-#define LOCAL_F64 0x700000000
+#define LOCAL_I32  0x000000000
+#define LOCAL_I64  0x100000000
+#define LOCAL_F32  0x300000000
+#define LOCAL_F64  0x700000000
+#define LOCAL_V128 0xf00000000
 
 static b32 local_is_wasm_local(AstLocal* local) {
     if (local->flags & Ast_Flag_Address_Taken) return 0;
@@ -265,12 +268,14 @@ static u64 local_raw_allocate(LocalAllocator* la, WasmType wt) {
     if (wt == WASM_TYPE_INT64)   idx = 1;
     if (wt == WASM_TYPE_FLOAT32) idx = 2;
     if (wt == WASM_TYPE_FLOAT64) idx = 3;
+    if (wt == WASM_TYPE_VAR128)  idx = 4;
 
     u64 flag_bits = LOCAL_IS_WASM;
     if (wt == WASM_TYPE_INT32)   flag_bits |= LOCAL_I32;
     if (wt == WASM_TYPE_INT64)   flag_bits |= LOCAL_I64;
     if (wt == WASM_TYPE_FLOAT32) flag_bits |= LOCAL_F32;
     if (wt == WASM_TYPE_FLOAT64) flag_bits |= LOCAL_F64;
+    if (wt == WASM_TYPE_VAR128)  flag_bits |= LOCAL_V128;
 
     if (la->freed[idx] > 0) {
         la->freed[idx]--;
@@ -289,6 +294,7 @@ static void local_raw_free(LocalAllocator* la, WasmType wt) {
     if (wt == WASM_TYPE_INT64)   idx = 1;
     if (wt == WASM_TYPE_FLOAT32) idx = 2;
     if (wt == WASM_TYPE_FLOAT64) idx = 3;
+    if (wt == WASM_TYPE_VAR128)  idx = 4;
 
     assert(la->allocated[idx] > 0 && la->freed[idx] < la->allocated[idx]);
 
@@ -346,6 +352,7 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
     if (value & 0x100000000) idx += la->allocated[0];
     if (value & 0x200000000) idx += la->allocated[1];
     if (value & 0x400000000) idx += la->allocated[2];
+    if (value & 0x800000000) idx += la->allocated[3];
 
     return (u64) idx;
 }
@@ -3030,7 +3037,8 @@ static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
         (i32) (func->locals.allocated[0] != 0) +
         (i32) (func->locals.allocated[1] != 0) +
         (i32) (func->locals.allocated[2] != 0) +
-        (i32) (func->locals.allocated[3] != 0);
+        (i32) (func->locals.allocated[3] != 0) +
+        (i32) (func->locals.allocated[4] != 0);
 
     i32 leb_len;
     u8* leb = uint_to_uleb128((u64) total_locals, &leb_len);
@@ -3055,6 +3063,11 @@ static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
         leb = uint_to_uleb128((u64) func->locals.allocated[3], &leb_len);
         bh_buffer_append(buff, leb, leb_len);
         bh_buffer_write_byte(buff, WASM_TYPE_FLOAT64);
+    }
+    if (func->locals.allocated[4] != 0) {
+        leb = uint_to_uleb128((u64) func->locals.allocated[4], &leb_len);
+        bh_buffer_append(buff, leb, leb_len);
+        bh_buffer_write_byte(buff, WASM_TYPE_VAR128);
     }
 
     return buff->length - prev_len;
