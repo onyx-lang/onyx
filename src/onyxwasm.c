@@ -1387,7 +1387,7 @@ EMIT_FUNC(call, AstCall* call) {
         WIP(WI_V128_CONST, byte_buffer); \
     }
 
-#define SIMD_LANE_INSTR(instr, arg) \
+#define SIMD_EXTRACT_LANE_INSTR(instr, arg) \
     emit_expression(mod, &code, arg->value);\
     arg = (AstArgument *) arg->next; \
     if (arg->value->kind != Ast_Kind_NumLit) { \
@@ -1396,6 +1396,20 @@ EMIT_FUNC(call, AstCall* call) {
         return; \
     } \
     WID(instr, (u8) ((AstNumLit *) arg->value)->value.i);
+
+#define SIMD_REPLACE_LANE_INSTR(instr, arg) { \
+        emit_expression(mod, &code, arg->value);\
+        arg = (AstArgument *) arg->next; \
+        if (arg->value->kind != Ast_Kind_NumLit) { \
+            onyx_report_error(arg->token->pos, "SIMD lane instructions expect a compile time lane number."); \
+            *pcode = code; \
+            return; \
+        } \
+        u8 lane = (u8) ((AstNumLit *) arg->value)->value.i; \
+        arg = (AstArgument *) arg->next; \
+        emit_expression(mod, &code, arg->value); \
+        WID(instr, lane); \
+    }
 
 
 EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
@@ -1544,20 +1558,20 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
             break;
         }
 
-        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: SIMD_LANE_INSTR(WI_I8X16_EXTRACT_LANE_S, call->arguments); break;
-        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U: SIMD_LANE_INSTR(WI_I8X16_EXTRACT_LANE_U, call->arguments); break;
-        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I8X16_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: SIMD_LANE_INSTR(WI_I16X8_EXTRACT_LANE_S, call->arguments); break;
-        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U: SIMD_LANE_INSTR(WI_I16X8_EXTRACT_LANE_U, call->arguments); break;
-        case ONYX_INTRINSIC_I16X8_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I16X8_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_I32X4_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I32X4_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_I64X2_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I64X2_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I64X2_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_F32X4_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   SIMD_LANE_INSTR(WI_F32X4_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_F64X2_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_LANE_INSTR(WI_F64X2_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_S, call->arguments); break;
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_U, call->arguments); break;
+        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I8X16_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_S, call->arguments); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_U, call->arguments); break;
+        case ONYX_INTRINSIC_I16X8_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I16X8_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I32X4_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I32X4_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I64X2_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I64X2_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F32X4_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F32X4_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F64X2_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F64X2_REPLACE_LANE, call->arguments); break;
 
         case ONYX_INTRINSIC_I8X16_SWIZZLE: WI(WI_I8X16_SWIZZLE); break;
         case ONYX_INTRINSIC_I8X16_SPLAT:   WI(WI_I8X16_SPLAT); break;

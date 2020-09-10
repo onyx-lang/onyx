@@ -1,0 +1,75 @@
+package main
+
+#include_file "core/std/wasi"
+#include_file "core/simd_intrinsics"
+
+use package core
+use package simd
+
+main :: proc (args: [] cstring) {
+    init_positions();
+    init_velocities();
+
+    print("Beginning simulation.\n");
+
+    for i: 0 .. 20 {
+        update();
+        print(cast(i64) (avg_motion() * 100000000000000000.0f));
+        print("\n");
+    }
+}
+
+OBJECT_COUNT :: 10000
+
+positions  : [OBJECT_COUNT] f32x4
+velocities : [OBJECT_COUNT] f32x4
+
+init_positions :: proc () {
+    for ^p: positions {
+        *p = f32x4_replace_lane(*p, 0, random_float(-127.0f, 127.0f));
+        *p = f32x4_replace_lane(*p, 1, random_float(-127.0f, 127.0f));
+        *p = f32x4_replace_lane(*p, 2, random_float(-127.0f, 127.0f));
+        *p = f32x4_replace_lane(*p, 3, random_float(-127.0f, 127.0f));
+    }
+}
+
+init_velocities :: proc () {
+    for ^v: velocities do *v = f32x4_const(0.0f, 0.0f, 0.0f, 0.0f);
+}
+
+horizontal_add :: proc (f: f32x4) -> f32 {
+    return f32x4_extract_lane(f, 0)
+         + f32x4_extract_lane(f, 1)
+         + f32x4_extract_lane(f, 2)
+         + f32x4_extract_lane(f, 3);
+}
+
+distance :: proc (x: f32x4, y: f32x4) -> f32 {
+    d := f32x4_sub(x, y);
+    return horizontal_add(f32x4_mul(d, d));
+}
+
+update :: proc () {
+    for i: 0 .. OBJECT_COUNT {
+        for j: 0 .. OBJECT_COUNT {
+            dist := distance(positions[i], positions[j]);
+            if dist == 0.0f do continue;
+
+            velocities[i] = f32x4_add(velocities[i], f32x4_div(f32x4_sub(positions[j], positions[i]), f32x4_splat(dist)));
+        }
+    }
+
+    for i: 0 .. OBJECT_COUNT {
+        positions[i] = f32x4_add(positions[i], velocities[i]);
+    }
+}
+
+avg_motion :: proc () -> f32 {
+    avg_motion := f32x4_splat(0.0f);
+    obj_vec := f32x4_splat(cast(f32) OBJECT_COUNT);
+    for v: velocities {
+        avg_motion = f32x4_add(avg_motion, f32x4_div(v, obj_vec));
+    }
+
+    return distance(f32x4_splat(0.0f), avg_motion);
+}
