@@ -18,28 +18,28 @@ f32x4_const :: proc (b1: f32,  b2: f32,  b3: f32,  b4: f32) -> f32x4 #intrinsic 
 f64x2_const :: proc (b1: f64,  b2: f64)                     -> f64x2 #intrinsic ---
 
 // NOTE: These u8 values must be compile time known values.
-i8x16_shuffle :: proc (v: v128,
+i8x16_shuffle :: proc (a: v128, b: v128,
                        b1: u8,  b2: u8,  b3: u8,  b4: u8,
                        b5: u8,  b6: u8,  b7: u8,  b8: u8,
                        b9: u8,  b10: u8, b11: u8, b12: u8,
                        b13: u8, b14: u8, b15: u8, b16: u8) -> v128 #intrinsic ---
 
-i8x16_extract_lane_s :: proc (v: i8x16, l: u8)           -> i8    #intrinsic ---
-i8x16_extract_lane_u :: proc (v: i8x16, l: u8)           -> u8    #intrinsic ---
-i8x16_replace_lane   :: proc (v: i8x16, l: u8, val: i8)  -> i8x16 #intrinsic ---
-i16x8_extract_lane_s :: proc (v: i16x8, l: u8)           -> i16   #intrinsic ---
-i16x8_extract_lane_u :: proc (v: i16x8, l: u8)           -> u16   #intrinsic ---
-i16x8_replace_lane   :: proc (v: i16x8, l: u8, val: i16) -> i16x8 #intrinsic ---
-i32x4_extract_lane   :: proc (v: i32x4, l: u8)           -> i32   #intrinsic ---
-i32x4_replace_lane   :: proc (v: i32x4, l: u8, val: i32) -> i32x4 #intrinsic ---
-i64x2_extract_lane   :: proc (v: i64x2, l: u8)           -> i64   #intrinsic ---
-i64x2_replace_lane   :: proc (v: i64x2, l: u8, val: i64) -> i64x2 #intrinsic ---
-f32x4_extract_lane   :: proc (v: f32x4, l: u8)           -> f32   #intrinsic ---
-f32x4_replace_lane   :: proc (v: f32x4, l: u8, val: f32) -> f32x4 #intrinsic ---
-f64x2_extract_lane   :: proc (v: f64x2, l: u8)           -> f64   #intrinsic ---
-f64x2_replace_lane   :: proc (v: f64x2, l: u8, val: f64) -> f64x2 #intrinsic ---
+i8x16_extract_lane_s :: proc (v: i8x16, l: u32)           -> i8    #intrinsic ---
+i8x16_extract_lane_u :: proc (v: i8x16, l: u32)           -> u8    #intrinsic ---
+i8x16_replace_lane   :: proc (v: i8x16, l: u32, val: i8)  -> i8x16 #intrinsic ---
+i16x8_extract_lane_s :: proc (v: i16x8, l: u32)           -> i16   #intrinsic ---
+i16x8_extract_lane_u :: proc (v: i16x8, l: u32)           -> u16   #intrinsic ---
+i16x8_replace_lane   :: proc (v: i16x8, l: u32, val: i16) -> i16x8 #intrinsic ---
+i32x4_extract_lane   :: proc (v: i32x4, l: u32)           -> i32   #intrinsic ---
+i32x4_replace_lane   :: proc (v: i32x4, l: u32, val: i32) -> i32x4 #intrinsic ---
+i64x2_extract_lane   :: proc (v: i64x2, l: u32)           -> i64   #intrinsic ---
+i64x2_replace_lane   :: proc (v: i64x2, l: u32, val: i64) -> i64x2 #intrinsic ---
+f32x4_extract_lane   :: proc (v: f32x4, l: u32)           -> f32   #intrinsic ---
+f32x4_replace_lane   :: proc (v: f32x4, l: u32, val: f32) -> f32x4 #intrinsic ---
+f64x2_extract_lane   :: proc (v: f64x2, l: u32)           -> f64   #intrinsic ---
+f64x2_replace_lane   :: proc (v: f64x2, l: u32, val: f64) -> f64x2 #intrinsic ---
 
-i8x16_swizzle :: proc (v: v128)  -> v128  #intrinsic ---
+i8x16_swizzle :: proc (v: v128, s: v128)  -> v128  #intrinsic ---
 i8x16_splat   :: proc (val: i8)  -> i8x16 #intrinsic ---
 i16x8_splat   :: proc (val: i16) -> i16x8 #intrinsic ---
 i32x4_splat   :: proc (val: i32) -> i32x4 #intrinsic ---

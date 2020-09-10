@@ -135,6 +135,8 @@ b32 types_are_compatible(Type* t1, Type* t2) {
                 if ((t1->Basic.flags & Basic_Flag_Integer) && (t2->Basic.flags & Basic_Flag_Integer)) {
                     return t1->Basic.size == t2->Basic.size;
                 }
+
+                if (t1->Basic.kind == Basic_Kind_V128 || t2->Basic.kind == Basic_Kind_V128) return 1;
             }
 
             if (t1->Basic.kind == Basic_Kind_Rawptr && type_is_pointer(t2)) {

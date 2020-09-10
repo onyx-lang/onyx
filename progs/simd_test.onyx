@@ -6,15 +6,18 @@ package main
 use package core
 use package simd
 
-dummy :: proc (p: ^i32x4) {
-    v := cast(^i32x4) calloc(sizeof i32x4);
-    y := *p;
-
-    *v = *p;
-}
-
 main :: proc (args: [] cstring) {
-    x := i32x4_splat(10);
-    d : i8x16;
-    dummy(^x);
+    x := f32x4_const(10.0f, 20.0f, 30.0f, 40.0f);
+    y := f32x4_splat(100.0f);
+
+    z := f32x4_add(x, y);
+
+    print(cast(i32) f32x4_extract_lane(z, 0));
+    print("\n");
+    print(cast(i32) f32x4_extract_lane(z, 1));
+    print("\n");
+    print(cast(i32) f32x4_extract_lane(z, 2));
+    print("\n");
+    print(cast(i32) f32x4_extract_lane(z, 3));
+    print("\n");
 }

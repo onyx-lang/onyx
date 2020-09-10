@@ -10,7 +10,7 @@ print_arr_details :: proc (arr: ^[..] $T) {
     print("\n\tCapacity: ");
     print(arr.capacity);
     print("\n\tData ptr: ");
-    print(arr.data);
+    print(cast(^void) arr.data);
     print("\n\tSize of elements: ");
     print(sizeof T);
     print("\n\tAlignment of elements: ");
@@ -224,7 +224,7 @@ main :: proc (args: [] cstring) {
 
     // NOTE: Iterating by pointer
     for ^vec: s.c {
-        print(vec);
+        print(cast(^void) vec);
         print(" ");
     }
     print("\n");
@@ -268,9 +268,9 @@ main :: proc (args: [] cstring) {
     print("\n");
 
     print("Value at ^a[50]: ");
-    print(ptrmap_get(^map, ^s.a[50]));
+    print(cast(^void) ptrmap_get(^map, ^s.a[50]));
     print(" == ");
-    print(^s.b[50]);
+    print(cast(^void) (^s.b[50]));
     print("\n");
 
     print("Deleteing ^a[20]\n");

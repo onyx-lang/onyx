@@ -360,6 +360,7 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
 #define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }))
 #define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }))
 #define WIL(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } }))
+#define WIP(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } }))
 #define EMIT_FUNC(kind, ...) static void emit_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
 
 EMIT_FUNC(function_body,                 AstFunction* fd);
@@ -1093,7 +1094,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     }
 
     u64 count = switch_node->max_case + 1 - switch_node->min_case;
-    BranchTable* bt = bh_alloc(global_heap_allocator, sizeof(BranchTable) + sizeof(u32) * count);
+    BranchTable* bt = bh_alloc(mod->extended_instr_alloc, sizeof(BranchTable) + sizeof(u32) * count);
     bt->count = count;
     bt->default_case = block_num;
     fori (i, 0, bt->count) bt->cases[i] = bt->default_case;
@@ -1367,14 +1368,58 @@ EMIT_FUNC(call, AstCall* call) {
     *pcode = code;
 }
 
+// BUG: This implementation assumes that the host system C's implementation is using
+// little endian integers.
+#define SIMD_INT_CONST_INTRINSIC(type, count) { \
+        type* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16); \
+        AstArgument* arg = call->arguments; \
+        fori (i, 0, count) { \
+            if (arg->value->kind != Ast_Kind_NumLit) { \
+                onyx_report_error(arg->token->pos, \
+                        "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.", \
+                        i, bh_num_suffix(i)); \
+                *pcode = code; \
+                return; \
+            } \
+            byte_buffer[i] = (type) ((AstNumLit *) arg->value)->value.l; \
+            arg = (AstArgument *) arg->next; \
+        } \
+        WIP(WI_V128_CONST, byte_buffer); \
+    }
+
+#define SIMD_LANE_INSTR(instr, arg) \
+    emit_expression(mod, &code, arg->value);\
+    arg = (AstArgument *) arg->next; \
+    if (arg->value->kind != Ast_Kind_NumLit) { \
+        onyx_report_error(arg->token->pos, "SIMD lane instructions expect a compile time lane number."); \
+        *pcode = code; \
+        return; \
+    } \
+    WID(instr, (u8) ((AstNumLit *) arg->value)->value.i);
+
+
 EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    i32 place_arguments_normally = 1;
+    b32 place_arguments_normally = 1;
 
-    // NOTE: Doing this in case there becomes intrinsics that the arguments
-    // are not placed as they normally would be
-    if (0) place_arguments_normally = 0;
+    switch (call->intrinsic) {
+        case ONYX_INTRINSIC_V128_CONST:
+        case ONYX_INTRINSIC_I8X16_CONST: case ONYX_INTRINSIC_I16X8_CONST:
+        case ONYX_INTRINSIC_I32X4_CONST: case ONYX_INTRINSIC_I64X2_CONST:
+        case ONYX_INTRINSIC_F32X4_CONST: case ONYX_INTRINSIC_F64X2_CONST:
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U:
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U:
+        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:
+        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:
+        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   case ONYX_INTRINSIC_I16X8_REPLACE_LANE:
+        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   case ONYX_INTRINSIC_I64X2_REPLACE_LANE:
+        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   case ONYX_INTRINSIC_F64X2_REPLACE_LANE:
+        case ONYX_INTRINSIC_I8X16_SHUFFLE:
+            place_arguments_normally = 0;
+
+        default: break;
+    }
 
     if (place_arguments_normally) {
         for (AstArgument *arg = call->arguments;
@@ -1431,6 +1476,252 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
         case ONYX_INTRINSIC_F64_MIN:      WI(WI_F64_MIN); break;
         case ONYX_INTRINSIC_F64_MAX:      WI(WI_F64_MAX); break;
         case ONYX_INTRINSIC_F64_COPYSIGN: WI(WI_F64_COPYSIGN); break;
+
+        case ONYX_INTRINSIC_I8X16_CONST:
+        case ONYX_INTRINSIC_V128_CONST:   SIMD_INT_CONST_INTRINSIC(u8, 16);   break;
+        case ONYX_INTRINSIC_I16X8_CONST:  SIMD_INT_CONST_INTRINSIC(u16, 8);   break;
+        case ONYX_INTRINSIC_I32X4_CONST:  SIMD_INT_CONST_INTRINSIC(u32, 4);   break;
+        case ONYX_INTRINSIC_I64X2_CONST:  SIMD_INT_CONST_INTRINSIC(u64, 2);   break;
+        case ONYX_INTRINSIC_F32X4_CONST: {
+            f32* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
+            AstArgument* arg = call->arguments;
+            fori (i, 0, 4) {
+                if (arg->value->kind != Ast_Kind_NumLit) {
+                    onyx_report_error(arg->token->pos,
+                            "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
+                            i, bh_num_suffix(i));
+                    *pcode = code;
+                    return;
+                }
+                byte_buffer[i] = (f32) ((AstNumLit *) arg->value)->value.f;
+                arg = (AstArgument *) arg->next;
+            }
+            WIP(WI_V128_CONST, byte_buffer);
+            break;
+        }
+
+        case ONYX_INTRINSIC_F64X2_CONST: {
+            f64* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
+            AstArgument* arg = call->arguments;
+            fori (i, 0, 2) {
+                if (arg->value->kind != Ast_Kind_NumLit) {
+                    onyx_report_error(arg->token->pos,
+                            "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
+                            i, bh_num_suffix(i));
+                    *pcode = code;
+                    return;
+                }
+                byte_buffer[i] = (f64) ((AstNumLit *) arg->value)->value.d;
+                arg = (AstArgument *) arg->next;
+            }
+            WIP(WI_V128_CONST, byte_buffer);
+            break;
+        }
+
+        case ONYX_INTRINSIC_I8X16_SHUFFLE: {
+            u8* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
+            AstArgument* arg = call->arguments;
+
+            // NOTE: There are two parameters that have to be outputted before
+            // the immediate bytes
+            emit_expression(mod, &code, arg->value);
+            arg = (AstArgument *) arg->next;
+            emit_expression(mod, &code, arg->value);
+            arg = (AstArgument *) arg->next;
+
+            fori (i, 0, 16) {
+                if (arg->value->kind != Ast_Kind_NumLit) {
+                    onyx_report_error(arg->token->pos,
+                            "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
+                            i, bh_num_suffix(i));
+                    *pcode = code;
+                    return;
+                }
+                byte_buffer[i] = (u8) ((AstNumLit *) arg->value)->value.i;
+                arg = (AstArgument *) arg->next;
+            }
+            WIP(WI_I8X16_SHUFFLE, byte_buffer);
+            break;
+        }
+
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: SIMD_LANE_INSTR(WI_I8X16_EXTRACT_LANE_S, call->arguments); break;
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U: SIMD_LANE_INSTR(WI_I8X16_EXTRACT_LANE_U, call->arguments); break;
+        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I8X16_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: SIMD_LANE_INSTR(WI_I16X8_EXTRACT_LANE_S, call->arguments); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U: SIMD_LANE_INSTR(WI_I16X8_EXTRACT_LANE_U, call->arguments); break;
+        case ONYX_INTRINSIC_I16X8_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I16X8_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_I32X4_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I32X4_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_I64X2_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I64X2_REPLACE_LANE:   SIMD_LANE_INSTR(WI_I64X2_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_F32X4_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   SIMD_LANE_INSTR(WI_F32X4_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_LANE_INSTR(WI_F64X2_EXTRACT_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_LANE_INSTR(WI_F64X2_REPLACE_LANE, call->arguments); break;
+
+        case ONYX_INTRINSIC_I8X16_SWIZZLE: WI(WI_I8X16_SWIZZLE); break;
+        case ONYX_INTRINSIC_I8X16_SPLAT:   WI(WI_I8X16_SPLAT); break;
+        case ONYX_INTRINSIC_I16X8_SPLAT:   WI(WI_I16X8_SPLAT); break;
+        case ONYX_INTRINSIC_I32X4_SPLAT:   WI(WI_I32X4_SPLAT); break;
+        case ONYX_INTRINSIC_I64X2_SPLAT:   WI(WI_I64X2_SPLAT); break;
+        case ONYX_INTRINSIC_F32X4_SPLAT:   WI(WI_F32X4_SPLAT); break;
+        case ONYX_INTRINSIC_F64X2_SPLAT:   WI(WI_F64X2_SPLAT); break;
+
+        case ONYX_INTRINSIC_I8X16_EQ:   WI(WI_I8X16_EQ); break;
+        case ONYX_INTRINSIC_I8X16_NEQ:  WI(WI_I8X16_NEQ); break;
+        case ONYX_INTRINSIC_I8X16_LT_S: WI(WI_I8X16_LT_S); break;
+        case ONYX_INTRINSIC_I8X16_LT_U: WI(WI_I8X16_LT_U); break;
+        case ONYX_INTRINSIC_I8X16_GT_S: WI(WI_I8X16_GT_S); break;
+        case ONYX_INTRINSIC_I8X16_GT_U: WI(WI_I8X16_GT_U); break;
+        case ONYX_INTRINSIC_I8X16_LE_S: WI(WI_I8X16_LE_S); break;
+        case ONYX_INTRINSIC_I8X16_LE_U: WI(WI_I8X16_LE_U); break;
+        case ONYX_INTRINSIC_I8X16_GE_S: WI(WI_I8X16_GE_S); break;
+        case ONYX_INTRINSIC_I8X16_GE_U: WI(WI_I8X16_GE_U); break;
+
+        case ONYX_INTRINSIC_I16X8_EQ:   WI(WI_I16X8_EQ); break;
+        case ONYX_INTRINSIC_I16X8_NEQ:  WI(WI_I16X8_NEQ); break;
+        case ONYX_INTRINSIC_I16X8_LT_S: WI(WI_I16X8_LT_S); break;
+        case ONYX_INTRINSIC_I16X8_LT_U: WI(WI_I16X8_LT_U); break;
+        case ONYX_INTRINSIC_I16X8_GT_S: WI(WI_I16X8_GT_S); break;
+        case ONYX_INTRINSIC_I16X8_GT_U: WI(WI_I16X8_GT_U); break;
+        case ONYX_INTRINSIC_I16X8_LE_S: WI(WI_I16X8_LE_S); break;
+        case ONYX_INTRINSIC_I16X8_LE_U: WI(WI_I16X8_LE_U); break;
+        case ONYX_INTRINSIC_I16X8_GE_S: WI(WI_I16X8_GE_S); break;
+        case ONYX_INTRINSIC_I16X8_GE_U: WI(WI_I16X8_GE_U); break;
+
+        case ONYX_INTRINSIC_I32X4_EQ:   WI(WI_I32X4_EQ); break;
+        case ONYX_INTRINSIC_I32X4_NEQ:  WI(WI_I32X4_NEQ); break;
+        case ONYX_INTRINSIC_I32X4_LT_S: WI(WI_I32X4_LT_S); break;
+        case ONYX_INTRINSIC_I32X4_LT_U: WI(WI_I32X4_LT_U); break;
+        case ONYX_INTRINSIC_I32X4_GT_S: WI(WI_I32X4_GT_S); break;
+        case ONYX_INTRINSIC_I32X4_GT_U: WI(WI_I32X4_GT_U); break;
+        case ONYX_INTRINSIC_I32X4_LE_S: WI(WI_I32X4_LE_S); break;
+        case ONYX_INTRINSIC_I32X4_LE_U: WI(WI_I32X4_LE_U); break;
+        case ONYX_INTRINSIC_I32X4_GE_S: WI(WI_I32X4_GE_S); break;
+        case ONYX_INTRINSIC_I32X4_GE_U: WI(WI_I32X4_GE_U); break;
+
+        case ONYX_INTRINSIC_F32X4_EQ:  WI(WI_F32X4_EQ); break;
+        case ONYX_INTRINSIC_F32X4_NEQ: WI(WI_F32X4_NEQ); break;
+        case ONYX_INTRINSIC_F32X4_LT:  WI(WI_F32X4_LT); break;
+        case ONYX_INTRINSIC_F32X4_GT:  WI(WI_F32X4_GT); break;
+        case ONYX_INTRINSIC_F32X4_LE:  WI(WI_F32X4_LE); break;
+        case ONYX_INTRINSIC_F32X4_GE:  WI(WI_F32X4_GE); break;
+
+        case ONYX_INTRINSIC_F64X2_EQ:  WI(WI_F64X2_EQ); break;
+        case ONYX_INTRINSIC_F64X2_NEQ: WI(WI_F64X2_NEQ); break;
+        case ONYX_INTRINSIC_F64X2_LT:  WI(WI_F64X2_LT); break;
+        case ONYX_INTRINSIC_F64X2_GT:  WI(WI_F64X2_GT); break;
+        case ONYX_INTRINSIC_F64X2_LE:  WI(WI_F64X2_LE); break;
+        case ONYX_INTRINSIC_F64X2_GE:  WI(WI_F64X2_GE); break;
+
+        case ONYX_INTRINSIC_V128_NOT:       WI(WI_V128_NOT); break;
+        case ONYX_INTRINSIC_V128_AND:       WI(WI_V128_AND); break;
+        case ONYX_INTRINSIC_V128_ANDNOT:    WI(WI_V128_ANDNOT); break;
+        case ONYX_INTRINSIC_V128_OR:        WI(WI_V128_OR); break;
+        case ONYX_INTRINSIC_V128_XOR:       WI(WI_V128_XOR); break;
+        case ONYX_INTRINSIC_V128_BITSELECT: WI(WI_V128_BITSELECT); break;
+
+        case ONYX_INTRINSIC_I8X16_ABS:            WI(WI_I8X16_ABS); break;
+        case ONYX_INTRINSIC_I8X16_NEG:            WI(WI_I8X16_NEG); break;
+        case ONYX_INTRINSIC_I8X16_ANY_TRUE:       WI(WI_I8X16_ANY_TRUE); break;
+        case ONYX_INTRINSIC_I8X16_ALL_TRUE:       WI(WI_I8X16_ALL_TRUE); break;
+        case ONYX_INTRINSIC_I8X16_BITMASK:        WI(WI_I8X16_BITMASK); break;
+        case ONYX_INTRINSIC_I8X16_NARROW_I16X8_S: WI(WI_I8X16_NARROW_I16X8_S); break;
+        case ONYX_INTRINSIC_I8X16_NARROW_I16X8_U: WI(WI_I8X16_NARROW_I16X8_U); break;
+        case ONYX_INTRINSIC_I8X16_SHL:            WI(WI_I8X16_SHL); break;
+        case ONYX_INTRINSIC_I8X16_SHR_S:          WI(WI_I8X16_SHR_S); break;
+        case ONYX_INTRINSIC_I8X16_SHR_U:          WI(WI_I8X16_SHR_U); break;
+        case ONYX_INTRINSIC_I8X16_ADD:            WI(WI_I8X16_ADD); break;
+        case ONYX_INTRINSIC_I8X16_ADD_SAT_S:      WI(WI_I8X16_ADD_SAT_S); break;
+        case ONYX_INTRINSIC_I8X16_ADD_SAT_U:      WI(WI_I8X16_ADD_SAT_U); break;
+        case ONYX_INTRINSIC_I8X16_SUB:            WI(WI_I8X16_SUB); break;
+        case ONYX_INTRINSIC_I8X16_SUB_SAT_S:      WI(WI_I8X16_SUB_SAT_S); break;
+        case ONYX_INTRINSIC_I8X16_SUB_SAT_U:      WI(WI_I8X16_SUB_SAT_U); break;
+        case ONYX_INTRINSIC_I8X16_MIN_S:          WI(WI_I8X16_MIN_S); break;
+        case ONYX_INTRINSIC_I8X16_MIN_U:          WI(WI_I8X16_MIN_U); break;
+        case ONYX_INTRINSIC_I8X16_MAX_S:          WI(WI_I8X16_MAX_S); break;
+        case ONYX_INTRINSIC_I8X16_MAX_U:          WI(WI_I8X16_MAX_U); break;
+        case ONYX_INTRINSIC_I8X16_AVGR_U:         WI(WI_I8X16_AVGR_U); break;
+
+        case ONYX_INTRINSIC_I16X8_ABS:                WI(WI_I16X8_ABS); break;
+        case ONYX_INTRINSIC_I16X8_NEG:                WI(WI_I16X8_NEG); break;
+        case ONYX_INTRINSIC_I16X8_ANY_TRUE:           WI(WI_I16X8_ANY_TRUE); break;
+        case ONYX_INTRINSIC_I16X8_ALL_TRUE:           WI(WI_I16X8_ALL_TRUE); break;
+        case ONYX_INTRINSIC_I16X8_BITMASK:            WI(WI_I16X8_BITMASK); break;
+        case ONYX_INTRINSIC_I16X8_NARROW_I32X4_S:     WI(WI_I16X8_NARROW_I32X4_S); break;
+        case ONYX_INTRINSIC_I16X8_NARROW_I32X4_U:     WI(WI_I16X8_NARROW_I32X4_U); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_LOW_I8X16_S:  WI(WI_I16X8_WIDEN_LOW_I8X16_S); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_HIGH_I8X16_S: WI(WI_I16X8_WIDEN_HIGH_I8X16_S); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_LOW_I8X16_U:  WI(WI_I16X8_WIDEN_LOW_I8X16_U); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_HIGH_I8X16_U: WI(WI_I16X8_WIDEN_HIGH_I8X16_U); break;
+        case ONYX_INTRINSIC_I16X8_SHL:                WI(WI_I16X8_SHL); break;
+        case ONYX_INTRINSIC_I16X8_SHR_S:              WI(WI_I16X8_SHR_S); break;
+        case ONYX_INTRINSIC_I16X8_SHR_U:              WI(WI_I16X8_SHR_U); break;
+        case ONYX_INTRINSIC_I16X8_ADD:                WI(WI_I16X8_ADD); break;
+        case ONYX_INTRINSIC_I16X8_ADD_SAT_S:          WI(WI_I16X8_ADD_SAT_S); break;
+        case ONYX_INTRINSIC_I16X8_ADD_SAT_U:          WI(WI_I16X8_ADD_SAT_U); break;
+        case ONYX_INTRINSIC_I16X8_SUB:                WI(WI_I16X8_SUB); break;
+        case ONYX_INTRINSIC_I16X8_SUB_SAT_S:          WI(WI_I16X8_SUB_SAT_S); break;
+        case ONYX_INTRINSIC_I16X8_SUB_SAT_U:          WI(WI_I16X8_SUB_SAT_U); break;
+        case ONYX_INTRINSIC_I16X8_MUL:                WI(WI_I16X8_MUL); break;
+        case ONYX_INTRINSIC_I16X8_MIN_S:              WI(WI_I16X8_MIN_S); break;
+        case ONYX_INTRINSIC_I16X8_MIN_U:              WI(WI_I16X8_MIN_U); break;
+        case ONYX_INTRINSIC_I16X8_MAX_S:              WI(WI_I16X8_MAX_S); break;
+        case ONYX_INTRINSIC_I16X8_MAX_U:              WI(WI_I16X8_MAX_U); break;
+        case ONYX_INTRINSIC_I16X8_AVGR_U:             WI(WI_I16X8_AVGR_U); break;
+
+        case ONYX_INTRINSIC_I32X4_ABS:                WI(WI_I32X4_ABS); break;
+        case ONYX_INTRINSIC_I32X4_NEG:                WI(WI_I32X4_NEG); break;
+        case ONYX_INTRINSIC_I32X4_ANY_TRUE:           WI(WI_I32X4_ANY_TRUE); break;
+        case ONYX_INTRINSIC_I32X4_ALL_TRUE:           WI(WI_I32X4_ALL_TRUE); break;
+        case ONYX_INTRINSIC_I32X4_BITMASK:            WI(WI_I32X4_BITMASK); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_LOW_I16X8_S:  WI(WI_I32X4_WIDEN_LOW_I16X8_S); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_HIGH_I16X8_S: WI(WI_I32X4_WIDEN_HIGH_I16X8_S); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_LOW_I16X8_U:  WI(WI_I32X4_WIDEN_LOW_I16X8_U); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_HIGH_I16X8_U: WI(WI_I32X4_WIDEN_HIGH_I16X8_U); break;
+        case ONYX_INTRINSIC_I32X4_SHL:                WI(WI_I32X4_SHL); break;
+        case ONYX_INTRINSIC_I32X4_SHR_S:              WI(WI_I32X4_SHR_S); break;
+        case ONYX_INTRINSIC_I32X4_SHR_U:              WI(WI_I32X4_SHR_U); break;
+        case ONYX_INTRINSIC_I32X4_ADD:                WI(WI_I32X4_ADD); break;
+        case ONYX_INTRINSIC_I32X4_SUB:                WI(WI_I32X4_SUB); break;
+        case ONYX_INTRINSIC_I32X4_MUL:                WI(WI_I32X4_MUL); break;
+        case ONYX_INTRINSIC_I32X4_MIN_S:              WI(WI_I32X4_MIN_S); break;
+        case ONYX_INTRINSIC_I32X4_MIN_U:              WI(WI_I32X4_MIN_U); break;
+        case ONYX_INTRINSIC_I32X4_MAX_S:              WI(WI_I32X4_MAX_S); break;
+        case ONYX_INTRINSIC_I32X4_MAX_U:              WI(WI_I32X4_MAX_U); break;
+
+        case ONYX_INTRINSIC_I64X2_NEG:   WI(WI_I64X2_NEG); break;
+        case ONYX_INTRINSIC_I64X2_SHL:   WI(WI_I64X2_SHL); break;
+        case ONYX_INTRINSIC_I64X2_SHR_S: WI(WI_I64X2_SHR_S); break;
+        case ONYX_INTRINSIC_I64X2_SHR_U: WI(WI_I64X2_SHR_U); break;
+        case ONYX_INTRINSIC_I64X2_ADD:   WI(WI_I64X2_ADD); break;
+        case ONYX_INTRINSIC_I64X2_SUB:   WI(WI_I64X2_SUB); break;
+        case ONYX_INTRINSIC_I64X2_MUL:   WI(WI_I64X2_MUL); break;
+
+        case ONYX_INTRINSIC_F32X4_ABS:  WI(WI_F32X4_ABS); break;
+        case ONYX_INTRINSIC_F32X4_NEG:  WI(WI_F32X4_NEG); break;
+        case ONYX_INTRINSIC_F32X4_SQRT: WI(WI_F32X4_SQRT); break;
+        case ONYX_INTRINSIC_F32X4_ADD:  WI(WI_F32X4_ADD); break;
+        case ONYX_INTRINSIC_F32X4_SUB:  WI(WI_F32X4_SUB); break;
+        case ONYX_INTRINSIC_F32X4_MUL:  WI(WI_F32X4_MUL); break;
+        case ONYX_INTRINSIC_F32X4_DIV:  WI(WI_F32X4_DIV); break;
+        case ONYX_INTRINSIC_F32X4_MIN:  WI(WI_F32X4_MIN); break;
+        case ONYX_INTRINSIC_F32X4_MAX:  WI(WI_F32X4_MAX); break;
+
+        case ONYX_INTRINSIC_F64X2_ABS:  WI(WI_F64X2_ABS); break;
+        case ONYX_INTRINSIC_F64X2_NEG:  WI(WI_F64X2_NEG); break;
+        case ONYX_INTRINSIC_F64X2_SQRT: WI(WI_F64X2_SQRT); break;
+        case ONYX_INTRINSIC_F64X2_ADD:  WI(WI_F64X2_ADD); break;
+        case ONYX_INTRINSIC_F64X2_SUB:  WI(WI_F64X2_SUB); break;
+        case ONYX_INTRINSIC_F64X2_MUL:  WI(WI_F64X2_MUL); break;
+        case ONYX_INTRINSIC_F64X2_DIV:  WI(WI_F64X2_DIV); break;
+        case ONYX_INTRINSIC_F64X2_MIN:  WI(WI_F64X2_MIN); break;
+        case ONYX_INTRINSIC_F64X2_MAX:  WI(WI_F64X2_MAX); break;
+
+        case ONYX_INTRINSIC_I32X4_TRUNC_SAT_F32X4_S: WI(WI_I32X4_TRUNC_SAT_F32X4_S); break;
+        case ONYX_INTRINSIC_I32X4_TRUNC_SAT_F32X4_U: WI(WI_I32X4_TRUNC_SAT_F32X4_U); break;
+        case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_S:   WI(WI_F32X4_CONVERT_I32X4_S); break;
+        case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_U:   WI(WI_F32X4_CONVERT_I32X4_U); break;
 
         default: assert(("Unsupported intrinsic", 0));
     }
@@ -2601,6 +2892,11 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .stack_base_idx = 0,
     };
 
+    bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
+    bh_arena_init(eid, global_heap_allocator, 8196);
+    module.extended_instr_data = eid;
+    module.extended_instr_alloc = bh_arena_allocator(eid);
+
     bh_arr_new(alloc, module.types, 4);
     bh_arr_new(alloc, module.funcs, 4);
     bh_arr_new(alloc, module.imports, 4);
@@ -2697,6 +2993,8 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {
+    bh_arena_free(module->extended_instr_data);
+
     bh_arr_free(module->types);
     bh_arr_free(module->funcs);
     bh_imap_free(&module->local_map);
@@ -3184,6 +3482,20 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
         case WI_F64_CONST:
             leb = double_to_ieee754(instr->data.d, 0);
             bh_buffer_append(buff, leb, 8);
+            break;
+
+        case WI_V128_CONST:
+        case WI_I8X16_SHUFFLE:
+            fori (i, 0, 16) bh_buffer_write_byte(buff, ((u8*) instr->data.p)[i]);
+            break;
+
+        case WI_I8X16_EXTRACT_LANE_S: case WI_I8X16_EXTRACT_LANE_U: case WI_I8X16_REPLACE_LANE:
+        case WI_I16X8_EXTRACT_LANE_S: case WI_I16X8_EXTRACT_LANE_U: case WI_I16X8_REPLACE_LANE:
+        case WI_I32X4_EXTRACT_LANE: case WI_I32X4_REPLACE_LANE:
+        case WI_I64X2_EXTRACT_LANE: case WI_I64X2_REPLACE_LANE:
+        case WI_F32X4_EXTRACT_LANE: case WI_F32X4_REPLACE_LANE:
+        case WI_F64X2_EXTRACT_LANE: case WI_F64X2_REPLACE_LANE:
+            bh_buffer_write_byte(buff, (u8) instr->data.i1);
             break;
 
         default: break;

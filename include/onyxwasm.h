@@ -492,6 +492,9 @@ typedef struct StrLitInfo {
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
 
+    bh_arena    *extended_instr_data;
+    bh_allocator extended_instr_alloc;
+
     // NOTE: Mapping ptrs to function / global indicies
     bh_imap index_map;
 
