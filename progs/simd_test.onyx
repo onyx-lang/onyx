@@ -1,10 +1,20 @@
 package main
 
 #include_file "core/std/wasi"
+#include_file "core/simd_intrinsics"
 
 use package core
 use package simd
 
+dummy :: proc (p: ^i32x4) {
+    v := cast(^i32x4) calloc(sizeof i32x4);
+    y := *p;
+
+    *v = *p;
+}
+
 main :: proc (args: [] cstring) {
-    x : i32x4;
+    x := i32x4_splat(10);
+    d : i8x16;
+    dummy(^x);
 }

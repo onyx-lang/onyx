@@ -28,6 +28,7 @@ enum BasicKind {
     Basic_Kind_I64X2,
     Basic_Kind_F32X4,
     Basic_Kind_F64X2,
+    Basic_Kind_V128,
 };
 
 enum BasicFlag {
@@ -146,6 +147,7 @@ b32 type_is_small_integer(Type* type);
 b32 type_is_integer(Type* type);
 b32 type_is_numeric(Type* type);
 b32 type_is_compound(Type* type);
+b32 type_is_simd(Type* type);
 b32 type_results_in_void(Type* type);
 b32 type_is_array_accessible(Type* type);
 b32 type_is_structlike(Type* type);

@@ -29,6 +29,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, { Basic_Kind_I64X2,  Basic_Flag_SIMD,                          16, 16, "i64x2" } },
     { Type_Kind_Basic, 0, { Basic_Kind_F32X4,  Basic_Flag_SIMD,                          16, 16, "f32x4" } },
     { Type_Kind_Basic, 0, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                          16, 16, "f64x2" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_V128,   Basic_Flag_SIMD,                          16, 16, "v128"  } },
 };
 
 b32 types_are_surface_compatible(Type* t1, Type* t2) {
@@ -534,6 +535,7 @@ u32 type_get_alignment_log2(Type* type) {
     else if (store_size == 2) return 1;
     else if (store_size == 4) return 2;
     else if (store_size == 8) return 3;
+    else if (store_size == 16) return 4;
     return 2;
 }
 
@@ -713,6 +715,11 @@ b32 type_is_numeric(Type* type) {
 b32 type_is_compound(Type* type) {
     return type->kind == Type_Kind_Array
         || type->kind == Type_Kind_Struct;
+}
+
+b32 type_is_simd(Type* type) {
+    if (type->kind != Type_Kind_Basic) return 0;
+    return type->Basic.flags & Basic_Flag_SIMD;
 }
 
 b32 type_results_in_void(Type* type) {

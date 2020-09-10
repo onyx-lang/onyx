@@ -573,6 +573,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
     i32 is_integer  = is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean));
     i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
+    i32 is_simd     = is_basic && (type->Basic.flags & Basic_Flag_SIMD);
 
     if (is_pointer) {
         WID(WI_I32_STORE, ((WasmInstructionData) { alignment, offset }));
@@ -584,6 +585,8 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     } else if (is_float) {
         if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
+    } else if (is_simd) {
+        WID(WI_V128_STORE, ((WasmInstructionData) { alignment, offset }));
     } else {
         onyx_report_error((OnyxFilePos) { 0 },
             "Failed to generate store instruction for type '%s'.",
@@ -625,6 +628,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     i32 is_integer  = is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean));
     i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
     i32 is_unsigned = is_basic && (type->Basic.flags & Basic_Flag_Unsigned);
+    i32 is_simd     = is_basic && (type->Basic.flags & Basic_Flag_SIMD);
 
     WasmInstructionType instr = WI_NOP;
     i32 alignment = type_get_alignment_log2(type);
@@ -643,6 +647,9 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     else if (is_float) {
         if      (load_size == 4) instr = WI_F32_LOAD;
         else if (load_size == 8) instr = WI_F64_LOAD;
+    }
+    else if (is_simd) {
+        instr = WI_V128_LOAD;
     }
 
     WID(instr, ((WasmInstructionData) { alignment, offset }));
@@ -1996,6 +2003,21 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (type_is_simd(to) && !type_is_simd(from)) {
+        onyx_report_error(cast->token->pos, "Can only perform a SIMD cast between SIMD types.");
+        return;
+    }
+
+    if (type_is_simd(from) && !type_is_simd(to)) {
+        onyx_report_error(cast->token->pos, "Can only perform a SIMD cast between SIMD types.");
+        return;
+    }
+
+    if (type_is_simd(from) && type_is_simd(to)) {
+        *pcode = code;
+        return;
+    }
+
     if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
     if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
 
@@ -3077,7 +3099,14 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
     i32 leb_len;
     u8* leb;
 
-    bh_buffer_write_byte(buff, (u8) instr->type);
+    if (instr->type & SIMD_INSTR_MASK) {
+        bh_buffer_write_byte(buff, 0xFD);
+        leb = uint_to_uleb128((u64) (instr->type &~ SIMD_INSTR_MASK), &leb_len);
+        bh_buffer_append(buff, leb, leb_len);
+
+    } else {
+        bh_buffer_write_byte(buff, (u8) instr->type);
+    }
 
     switch (instr->type) {
         case WI_LOCAL_GET:
@@ -3121,29 +3150,19 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
 
 
         case WI_CALL_INDIRECT:
-        case WI_I32_STORE:
-        case WI_I32_STORE_8:
-        case WI_I32_STORE_16:
-        case WI_I64_STORE:
-        case WI_I64_STORE_8:
-        case WI_I64_STORE_16:
-        case WI_I64_STORE_32:
-        case WI_F32_STORE:
-        case WI_F64_STORE:
+        case WI_I32_STORE: case WI_I32_STORE_8: case WI_I32_STORE_16:
+        case WI_I64_STORE: case WI_I64_STORE_8: case WI_I64_STORE_16: case WI_I64_STORE_32:
+        case WI_F32_STORE: case WI_F64_STORE:
+        case WI_V128_STORE:
         case WI_I32_LOAD:
-        case WI_I32_LOAD_8_S:
-        case WI_I32_LOAD_8_U:
-        case WI_I32_LOAD_16_S:
-        case WI_I32_LOAD_16_U:
+        case WI_I32_LOAD_8_S: case WI_I32_LOAD_8_U:
+        case WI_I32_LOAD_16_S: case WI_I32_LOAD_16_U:
         case WI_I64_LOAD:
-        case WI_I64_LOAD_8_S:
-        case WI_I64_LOAD_8_U:
-        case WI_I64_LOAD_16_S:
-        case WI_I64_LOAD_16_U:
-        case WI_I64_LOAD_32_S:
-        case WI_I64_LOAD_32_U:
-        case WI_F32_LOAD:
-        case WI_F64_LOAD:
+        case WI_I64_LOAD_8_S: case WI_I64_LOAD_8_U:
+        case WI_I64_LOAD_16_S: case WI_I64_LOAD_16_U:
+        case WI_I64_LOAD_32_S: case WI_I64_LOAD_32_U:
+        case WI_F32_LOAD: case WI_F64_LOAD:
+        case WI_V128_LOAD:
             leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
             bh_buffer_append(buff, leb, leb_len);
             leb = uint_to_uleb128((u64) instr->data.i2, &leb_len);
