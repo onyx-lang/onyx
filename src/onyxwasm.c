@@ -3007,7 +3007,8 @@ void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program) {
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {
-    bh_arena_free(module->extended_instr_data);
+    if (module->extended_instr_data != NULL)
+        bh_arena_free(module->extended_instr_data);
 
     bh_arr_free(module->types);
     bh_arr_free(module->funcs);

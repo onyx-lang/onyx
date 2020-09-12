@@ -34,7 +34,7 @@ init_positions :: proc () {
 }
 
 init_velocities :: proc () {
-    for ^v: velocities do *v = f32x4_const(0.0f, 0.0f, 0.0f, 0.0f);
+    for ^v: velocities do *v = f32x4_splat(0.0f);
 }
 
 horizontal_add :: proc (f: f32x4) -> f32 {

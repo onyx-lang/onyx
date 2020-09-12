@@ -798,7 +798,7 @@ b32 check_struct_literal(AstStructLiteral* sl) {
         if (!types_are_compatible(formal, (*actual)->type)) {
             onyx_report_error(sl->token->pos,
                     "Mismatched types for %d%s member, expected '%s', got '%s'.",
-                    i, bh_num_suffix(i),
+                    i + 1, bh_num_suffix(i + 1),
                     type_get_name(formal),
                     type_get_name((*actual)->type));
             return 1;
