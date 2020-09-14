@@ -1297,6 +1297,30 @@ static AstType* parse_type(OnyxParser* parser) {
                 *next_insertion = (AstType *) symbol_node;
             }
 
+            if (parser->curr->type == '(') {
+                consume_token(parser);
+
+                bh_arr(AstType *) params = NULL;
+                bh_arr_new(global_heap_allocator, params, 2);
+
+                while (parser->curr->type != ')') {
+                    if (parser->hit_unexpected_token) break;
+
+                    AstType* t = parse_type(parser);
+                    bh_arr_push(params, t);
+
+                    if (parser->curr->type != ')')
+                        expect_token(parser, ',');
+                }
+                expect_token(parser, ')');
+
+                AstPolyCallType* pc_type = make_node(AstPolyCallType, Ast_Kind_Poly_Call_Type);
+                pc_type->callee = *next_insertion;
+                pc_type->params = params;
+
+                *next_insertion = (AstType *) pc_type;
+            }
+
             next_insertion = NULL;
         }
 
@@ -1319,8 +1343,37 @@ static AstType* parse_type(OnyxParser* parser) {
 }
 
 static AstStructType* parse_struct(OnyxParser* parser) {
-    AstStructType* s_node = make_node(AstStructType, Ast_Kind_Struct_Type);
-    s_node->token = expect_token(parser, Token_Type_Keyword_Struct);
+    OnyxToken *s_token = expect_token(parser, Token_Type_Keyword_Struct);
+
+    AstStructType* s_node;
+    AstPolyStructType* poly_struct = NULL;
+
+    s_node = make_node(AstStructType, Ast_Kind_Struct_Type);
+    s_node->token = s_token;
+
+    if (parser->curr->type == '(') {
+        consume_token(parser);
+
+        bh_arr(OnyxToken *) poly_params = NULL;
+        bh_arr_new(global_heap_allocator, poly_params, 1);
+
+        while (parser->curr->type == '$') {
+            consume_token(parser);
+            if (parser->hit_unexpected_token) return NULL;
+
+            OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
+            bh_arr_push(poly_params, sym_token);
+
+            if (parser->curr->type != ')')
+                expect_token(parser, ',');
+        }
+        expect_token(parser, ')');
+
+        poly_struct = make_node(AstPolyStructType, Ast_Kind_Poly_Struct_Type);
+        poly_struct->token = s_token;
+        poly_struct->poly_params = poly_params;
+        poly_struct->base_struct = s_node;
+    }
 
     bh_arr_new(global_heap_allocator, s_node->members, 4);
 
@@ -1380,7 +1433,13 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
     expect_token(parser, '}');
 
-    return s_node;
+    if (poly_struct != NULL) {
+        // NOTE: Not a StructType
+        return (AstStructType *) poly_struct;
+
+    } else {
+        return s_node;
+    }
 }
 
 // e
@@ -1810,7 +1869,9 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 } else if (node->kind != Ast_Kind_Overloaded_Function
                         && node->kind != Ast_Kind_StrLit) {
 
-                    if (node->kind == Ast_Kind_Struct_Type || node->kind == Ast_Kind_Enum_Type) {
+                    if (node->kind == Ast_Kind_Struct_Type
+                            || node->kind == Ast_Kind_Enum_Type
+                            || node->kind == Ast_Kind_Poly_Struct_Type) {
                         ((AstStructType *)node)->name = bh_aprintf(global_heap_allocator,
                             "%b", symbol->text, symbol->length);
                     }

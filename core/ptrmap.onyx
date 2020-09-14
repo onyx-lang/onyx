@@ -25,7 +25,6 @@ ptrmap_free :: proc (use pmap: ^PtrMap) {
     array_free(^entries);
 }
 
-
 ptrmap_put :: proc (use pmap: ^PtrMap, key: rawptr, value: rawptr) {
     lr := ptrmap_lookup(pmap, key);
 

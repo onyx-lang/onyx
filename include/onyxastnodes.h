@@ -44,6 +44,8 @@ typedef struct AstDynArrType AstDynArrType;
 typedef struct AstVarArgType AstVarArgType;
 typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
+typedef struct AstPolyStructType AstPolyStructType;
+typedef struct AstPolyCallType AstPolyCallType;
 typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
 typedef struct AstTypeAlias AstTypeAlias;
@@ -106,6 +108,8 @@ typedef enum AstKind {
     Ast_Kind_DynArr_Type,
     Ast_Kind_VarArg_Type,
     Ast_Kind_Struct_Type,
+    Ast_Kind_Poly_Struct_Type,
+    Ast_Kind_Poly_Call_Type,
     Ast_Kind_Enum_Type,
     Ast_Kind_Type_Alias,
     Ast_Kind_Type_Raw_Alias,
@@ -533,6 +537,21 @@ struct AstStructMember {
     AstTyped_base;
     AstTyped* initial_value;
 };
+struct AstPolyStructType {
+    AstType_base;
+
+    Scope *scope;
+    bh_arr(OnyxToken *) poly_params;
+    bh_table(AstStructType *) concrete_structs;
+
+    AstStructType* base_struct;
+};
+struct AstPolyCallType {
+    AstType_base;
+
+    AstType* callee;
+    bh_arr(AstType *) params;
+};
 struct AstEnumType {
     AstType_base;
     Scope *scope;
@@ -748,6 +767,8 @@ typedef enum PolyProcLookupMethod {
     PPLM_By_Function_Type,
 } PolyProcLookupMethod;
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos);
+
+AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

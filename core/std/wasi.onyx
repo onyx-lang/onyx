@@ -5,6 +5,7 @@ package core
 #include_file "core/alloc"
 #include_file "core/array"
 #include_file "core/file"
+#include_file "core/i32map"
 #include_file "core/intrinsics"
 #include_file "core/math"
 #include_file "core/memory"

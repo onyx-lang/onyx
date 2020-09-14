@@ -34,6 +34,7 @@ extern SemState semstate;
 // NOTE: Resolving all symbols in the tree
 void onyx_resolve_symbols();
 
+AstType* symres_type(AstType* type);
 void symres_function(AstFunction* func);
 
 // NOTE: Inferring and checking types in the tree

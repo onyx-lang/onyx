@@ -12,7 +12,6 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_NumLit:
 		case Ast_Kind_StrLit:
 		case Ast_Kind_Package:
-		case Ast_Kind_Struct_Type:
 		case Ast_Kind_Enum_Type:
 		case Ast_Kind_Enum_Value:
 		case Ast_Kind_Overloaded_Function:
@@ -54,6 +53,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_DynArr_Type: return sizeof(AstDynArrType);
         case Ast_Kind_VarArg_Type: return sizeof(AstVarArgType);
         case Ast_Kind_Struct_Type: return sizeof(AstStructType);
+        case Ast_Kind_Poly_Struct_Type: return sizeof(AstPolyStructType);
+        case Ast_Kind_Poly_Call_Type: return sizeof(AstPolyCallType);
         case Ast_Kind_Enum_Type: return sizeof(AstEnumType);
         case Ast_Kind_Type_Alias: return sizeof(AstTypeAlias);
         case Ast_Kind_Type_Raw_Alias: return sizeof(AstTypeRawAlias);
@@ -272,6 +273,25 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 		case Ast_Kind_Type_Alias:
 			((AstTypeAlias *) nn)->to = (AstType *) ast_clone(a, ((AstTypeAlias *) node)->to);
 			break;
+
+        case Ast_Kind_Struct_Type: {
+            AstStructType* ds = (AstStructType *) nn;
+            AstStructType* ss = (AstStructType *) node;
+
+            ds->members = NULL;
+            bh_arr_new(global_heap_allocator, ds->members, bh_arr_length(ss->members));
+
+            bh_arr_each(AstStructMember *, smem, ss->members) {
+                bh_arr_push(ds->members, (AstStructMember *) ast_clone(a, *smem));
+            }
+
+            ds->stcache = NULL;
+            break;
+        }
+
+        case Ast_Kind_Struct_Member:
+            ((AstStructMember *) nn)->initial_value = (AstTyped *) ast_clone(a, ((AstStructMember *) node)->initial_value);
+            break;
 
 		case Ast_Kind_Function_Type:
 			((AstFunctionType *) nn)->return_type = (AstType *) ast_clone(a, ((AstFunctionType *) node)->return_type);

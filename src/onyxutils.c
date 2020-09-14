@@ -49,6 +49,8 @@ static const char* ast_node_names[] = {
     "SLICE TYPE",
     "DYNARR TYPE",
     "STRUCT TYPE",
+    "POLYMORPHIC STRUCT TYPE",
+    "POLYMORPHIC STRUCT CALL TYPE",
     "ENUM TYPE",
     "TYPE_ALIAS",
     "TYPE RAW ALIAS"
@@ -428,6 +430,22 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
                 break;
             }
 
+            case Ast_Kind_Poly_Call_Type: {
+                if (elem.actual->kind != Type_Kind_Struct) break;
+                if (bh_arr_length(elem.actual->Struct.poly_args) != bh_arr_length(((AstPolyCallType *) elem.type_expr)->params)) break;
+
+                AstPolyCallType* pt = (AstPolyCallType *) elem.type_expr;
+
+                fori (i, 0, bh_arr_length(pt->params)) {
+                    bh_arr_push(elem_queue, ((PolySolveElem) {
+                        .type_expr = pt->params[i],
+                        .actual = elem.actual->Struct.poly_args[i],
+                    }));
+                }
+
+                break;
+            }
+
             default: break;
         }
     }
@@ -532,6 +550,68 @@ no_errors:
     }));
 
     return func;
+}
+
+
+
+AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params) {
+    // @Cleanup
+    assert(bh_arr_length(ps_type->poly_params) == bh_arr_length(params));
+    assert(ps_type->scope != NULL);
+
+    if (ps_type->concrete_structs == NULL) {
+        bh_table_init(global_heap_allocator, ps_type->concrete_structs, 16);
+    }
+
+    scope_clear(ps_type->scope);
+
+    fori (i, 0, bh_arr_length(ps_type->poly_params)) {
+        if (params[i] == NULL) {
+            onyx_report_error((OnyxFilePos) { 0 }, "Type parameter is not a type.");
+            return NULL;
+        }
+
+        AstTypeRawAlias* raw = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+        raw->to = params[i];
+
+        symbol_introduce(ps_type->scope, ps_type->poly_params[i], (AstNode *) raw);
+    }
+
+    static char key_buf[1024];
+    fori (i, 0, 1024) key_buf[i] = 0;
+    bh_table_each_start(AstNode *, ps_type->scope->symbols);
+        strncat(key_buf, key, 1023);
+        strncat(key_buf, "=", 1023);
+        strncat(key_buf, type_get_name(((AstTypeRawAlias *) value)->to), 1023);
+        strncat(key_buf, ";", 1023);
+    bh_table_each_end;
+
+    if (bh_table_has(AstStructType *, ps_type->concrete_structs, key_buf)) {
+        return bh_table_get(AstStructType *, ps_type->concrete_structs, key_buf);
+    }
+
+    AstStructType* concrete_struct = (AstStructType *) ast_clone(semstate.node_allocator, ps_type->base_struct);
+
+    semstate.curr_scope = ps_type->scope;
+    concrete_struct = (AstStructType *) symres_type((AstType *) concrete_struct);
+    if (onyx_has_errors()) goto has_error;
+    goto no_errors;
+
+has_error:
+    // onyx_report_error((OnyxFilePos) { 0 }, "Error in polymorphic struct generated from this call site.");
+    return NULL;
+
+no_errors:
+    bh_table_put(AstStructType *, ps_type->concrete_structs, key_buf, concrete_struct);
+
+    Type* cs_type = type_build_from_ast(semstate.node_allocator, (AstType *) concrete_struct);
+
+    cs_type->Struct.poly_args = NULL;
+    bh_arr_new(global_heap_allocator, cs_type->Struct.poly_args, bh_arr_length(params));
+
+    fori (i, 0, bh_arr_length(params)) bh_arr_push(cs_type->Struct.poly_args, params[i]);
+
+    return concrete_struct;
 }
 
 i32 sort_entities(const void* e1, const void* e2) {

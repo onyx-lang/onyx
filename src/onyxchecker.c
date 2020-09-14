@@ -795,6 +795,8 @@ b32 check_struct_literal(AstStructLiteral* sl) {
         type_lookup_member_by_idx(sl->type, i, &smem);
         Type* formal = smem.type;
 
+        // NOTE: We may want to report a different error if the struct member was named,
+        // since those names may not be in the correct order. - brendanfh   2020/09/12
         if (!types_are_compatible(formal, (*actual)->type)) {
             onyx_report_error(sl->token->pos,
                     "Mismatched types for %d%s member, expected '%s', got '%s'.",
@@ -918,6 +920,7 @@ b32 check_array_access(AstArrayAccess* aa) {
 b32 check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     if (check_expression(&field->expr)) return 1;
+    if (field->expr->type == NULL) return 1;
 
     if (!type_is_structlike(field->expr->type)) {
         onyx_report_error(field->token->pos,

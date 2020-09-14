@@ -423,6 +423,32 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Type_Raw_Alias:
             return ((AstTypeRawAlias *) type_node)->to;
 
+        case Ast_Kind_Poly_Struct_Type:
+            // @Cleanup: Replace this with a proper onyx_report_error. - brendanfh 2020/09/14
+            assert(("Polymorphic struct used without instantiation.", 0));
+            break;
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType* pc_type = (AstPolyCallType *) type_node;
+
+            // @Cleanup: make this a proper error message.  -brendanfh 2020/09/14
+            assert(pc_type->callee && pc_type->callee->kind == Ast_Kind_Poly_Struct_Type);
+
+            AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
+
+            bh_arr(Type *) param_types = NULL;
+            bh_arr_new(global_heap_allocator, param_types, bh_arr_length(pc_type->params));
+            bh_arr_each(AstType *, ptype, pc_type->params) {
+                bh_arr_push(param_types, type_build_from_ast(alloc, *ptype));
+            }
+
+            AstStructType* concrete = polymorphic_struct_lookup(ps_type, param_types);
+
+            bh_arr_free(param_types);
+
+            return type_build_from_ast(alloc, (AstType *) concrete);
+        }
+
         case Ast_Kind_Symbol:
             assert(("symbol node in type expression", 0));
             return NULL;

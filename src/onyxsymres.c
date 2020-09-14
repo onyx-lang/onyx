@@ -8,7 +8,7 @@
 static void scope_enter(Scope* new_scope);
 static void scope_leave();
 
-static AstType* symres_type(AstType* type);
+AstType* symres_type(AstType* type);
 static void symres_local(AstLocal** local);
 static void symres_call(AstCall* call);
 static void symres_size_of(AstSizeOf* so);
@@ -40,7 +40,7 @@ static void scope_leave() {
     semstate.curr_scope = semstate.curr_scope->parent;
 }
 
-static AstType* symres_type(AstType* type) {
+AstType* symres_type(AstType* type) {
     if (type == NULL) return NULL;
 
     if (type->kind == Ast_Kind_Type_Alias) {
@@ -147,6 +147,25 @@ static AstType* symres_type(AstType* type) {
     if (type->kind == Ast_Kind_VarArg_Type) {
         AstVarArgType* va_node = (AstVarArgType *) type;
         va_node->elem = symres_type(va_node->elem);
+
+        return type;
+    }
+
+    if (type->kind == Ast_Kind_Poly_Struct_Type) {
+        AstPolyStructType* pst_node = (AstPolyStructType *) type;
+        pst_node->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+
+        return type;
+    }
+
+    if (type->kind == Ast_Kind_Poly_Call_Type) {
+        AstPolyCallType* pc_node = (AstPolyCallType *) type;
+
+        pc_node->callee = symres_type(pc_node->callee);
+
+        bh_arr_each(AstType *, param, pc_node->params) {
+            *param = symres_type(*param);
+        }
 
         return type;
     }
