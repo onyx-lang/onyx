@@ -290,8 +290,24 @@ AstNode* ast_clone(bh_allocator a, void* n) {
         }
 
         case Ast_Kind_Struct_Member:
+			((AstStructMember *) nn)->type_node = (AstType *) ast_clone(a, ((AstStructMember *) node)->type_node);
             ((AstStructMember *) nn)->initial_value = (AstTyped *) ast_clone(a, ((AstStructMember *) node)->initial_value);
             break;
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType* pcd = (AstPolyCallType *) nn;
+            AstPolyCallType* pcs = (AstPolyCallType *) node;
+
+            pcd->callee = (AstType *) ast_clone(a, pcs->callee);
+            pcd->params = NULL;
+            bh_arr_new(global_heap_allocator, pcd->params, bh_arr_length(pcs->params));
+
+            bh_arr_each(AstType *, param, pcs->params) {
+                bh_arr_push(pcd->params, (AstType *) ast_clone(a, *param));
+            }
+
+            break;
+        }
 
 		case Ast_Kind_Function_Type:
 			((AstFunctionType *) nn)->return_type = (AstType *) ast_clone(a, ((AstFunctionType *) node)->return_type);

@@ -6,12 +6,11 @@ use package core
 
 
 main :: proc (args: [] cstring) {
-
-    imap : I32Map(string);
+    imap : I32Map(i32);
     i32map_init(^imap);
 
-    i32map_put(^imap, 50, "Hello ");
-    i32map_put(^imap, 1234, "World!");
+    i32map_put(^imap, 50, 1234);
+    i32map_put(^imap, 1234, 5678);
 
     print(i32map_get(^imap, 50));
     print(i32map_get(^imap, 1234));

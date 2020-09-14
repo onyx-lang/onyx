@@ -46,11 +46,11 @@ i32map_has :: proc (imap: ^I32Map($T), key: i32) -> bool {
     return lr.entry_index >= 0;
 }
 
-i32map_get :: proc (imap: ^I32Map($T), key: i32) -> i32 {
+i32map_get :: proc (imap: ^I32Map($T), key: i32, default := cast(T) 0) -> T {
     lr := i32map_lookup(imap, key);
     if lr.entry_index >= 0 do return imap.entries[lr.entry_index].value;
 
-    return null;
+    return default;
 }
 
 i32map_delete :: proc (imap: ^I32Map($T), key: i32) {
