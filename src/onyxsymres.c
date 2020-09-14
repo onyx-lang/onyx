@@ -569,6 +569,11 @@ void symres_function(AstFunction* func) {
                     st = (AstStructType *) ((AstPointerType *) param->local->type_node)->elem;
                 }
 
+                if (st->kind == Ast_Kind_Poly_Call_Type) {
+                    onyx_report_error(param->local->token->pos, "Currently, cannot 'use' a polymorphic struct type. This will be added in the future.");
+                    return;
+                }
+
                 bh_arr_each(AstStructMember *, mem, st->members) {
                     AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
                     fa->token = (*mem)->token;
