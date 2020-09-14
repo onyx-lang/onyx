@@ -11,69 +11,69 @@ I32MapEntry :: struct ($T) {
     value : T;
 }
 
-i32map_init :: proc (imap: ^I32Map($T), hash_count: i32 = 16) {
-    array_init(^imap.hashes, hash_count);
-    array_init(^imap.entries, 4);
+i32map_init :: proc (use imap: ^I32Map($T), hash_count: i32 = 16) {
+    array_init(^hashes, hash_count);
+    array_init(^entries, 4);
 
-    for i: 0 .. hash_count do array_push(^imap.hashes, -1);
+    for i: 0 .. hash_count do array_push(^hashes, -1);
 }
 
-i32map_free :: proc (imap: ^I32Map($T)) {
-    array_free(^imap.hashes);
-    array_free(^imap.entries);
+i32map_free :: proc (use imap: ^I32Map($T)) {
+    array_free(^hashes);
+    array_free(^entries);
 }
 
-i32map_put :: proc (imap: ^I32Map($T), key: i32, value: T) {
+i32map_put :: proc (use imap: ^I32Map($T), key: i32, value: T) {
     lr := i32map_lookup(imap, key);
 
     if lr.entry_index >= 0 {
-        imap.entries[lr.entry_index].value = value;
+        entries[lr.entry_index].value = value;
         return;
     }
 
     entry : I32MapEntry(T);
     entry.key = key;
     entry.value = value;
-    entry.next = imap.hashes[lr.hash_index];
+    entry.next = hashes[lr.hash_index];
 
-    array_push(^imap.entries, entry);
+    array_push(^entries, entry);
 
-    imap.hashes[lr.hash_index] = imap.entries.count - 1;
+    hashes[lr.hash_index] = entries.count - 1;
 }
 
-i32map_has :: proc (imap: ^I32Map($T), key: i32) -> bool {
+i32map_has :: proc (use imap: ^I32Map($T), key: i32) -> bool {
     lr := i32map_lookup(imap, key);
     return lr.entry_index >= 0;
 }
 
-i32map_get :: proc (imap: ^I32Map($T), key: i32, default := cast(T) 0) -> T {
+i32map_get :: proc (use imap: ^I32Map($T), key: i32, default := cast(T) 0) -> T {
     lr := i32map_lookup(imap, key);
-    if lr.entry_index >= 0 do return imap.entries[lr.entry_index].value;
+    if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
     return default;
 }
 
-i32map_delete :: proc (imap: ^I32Map($T), key: i32) {
+i32map_delete :: proc (use imap: ^I32Map($T), key: i32) {
     lr := i32map_lookup(imap, key);
     if lr.entry_index < 0 do return;
 
-    if lr.entry_prev < 0   do imap.hashes[lr.hash_index] = imap.entries[lr.entry_index].next;
-    else                   do imap.hashes[lr.entry_prev] = imap.entries[lr.entry_index].next;
+    if lr.entry_prev < 0   do hashes[lr.hash_index] = entries[lr.entry_index].next;
+    else                   do hashes[lr.entry_prev] = entries[lr.entry_index].next;
 
-    if lr.entry_index == imap.entries.count - 1 {
-        array_pop(^imap.entries);
+    if lr.entry_index == entries.count - 1 {
+        array_pop(^entries);
         return;
     }
 
-    array_fast_delete(^imap.entries, lr.entry_index);
-    last := i32map_lookup(imap, imap.entries[lr.entry_index].key);
-    if last.entry_prev >= 0    do imap.entries[last.entry_prev].next = lr.entry_index;
-    else                       do imap.hashes[last.hash_index] = lr.entry_index;
+    array_fast_delete(^entries, lr.entry_index);
+    last := i32map_lookup(imap, entries[lr.entry_index].key);
+    if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
+    else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-i32map_clear :: proc (imap: ^I32Map($T)) {
-    for i: 0 .. imap.hashes.count do imap.hashes.data[i] = -1;
-    imap.entries.count = 0;
+i32map_clear :: proc (use imap: ^I32Map($T)) {
+    for i: 0 .. hashes.count do hashes.data[i] = -1;
+    entries.count = 0;
 }
 
 
@@ -90,19 +90,19 @@ I32MapLookupResult :: struct {
 }
 
 #private
-i32map_lookup :: proc (imap: ^I32Map($T), key: i32) -> I32MapLookupResult {
+i32map_lookup :: proc (use imap: ^I32Map($T), key: i32) -> I32MapLookupResult {
     lr := I32MapLookupResult.{};
 
     hash := cast(u32) 0xcbf29ce7 ^ cast(u32) key;
 
-    lr.hash_index = hash % imap.hashes.count;
-    lr.entry_index = imap.hashes[lr.hash_index];
+    lr.hash_index = hash % hashes.count;
+    lr.entry_index = hashes[lr.hash_index];
 
     while lr.entry_index >= 0 {
-        if imap.entries[lr.entry_index].key == key do return lr;
+        if entries[lr.entry_index].key == key do return lr;
 
         lr.entry_prev = lr.entry_index;
-        lr.entry_index = imap.entries[lr.entry_index].next;
+        lr.entry_index = entries[lr.entry_index].next;
     }
 
     return lr;
