@@ -259,14 +259,14 @@ HOW:
             - Removes the argument from the list and replaces the function with the
                 baked function
 
-        [ ] Add SIMD intrinsics
+        [X] Add SIMD intrinsics
             - This also requires adding the v128 SIMD type
 
         [ ] Add threading intrinsics
             - This will actually be fairly easy since I think all that is needed is
                 to implement the intrinsics.
 
-        [ ] Type parameterized structs
+        [X] Type parameterized structs
 
         [ ] Array literals
 

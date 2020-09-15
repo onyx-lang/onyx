@@ -611,6 +611,20 @@ no_errors:
 
     fori (i, 0, bh_arr_length(params)) bh_arr_push(cs_type->Struct.poly_args, params[i]);
 
+    char name_buf[256];
+    fori (i, 0, 256) name_buf[i] = 0;
+
+    strncat(name_buf, ps_type->name, 255);
+    strncat(name_buf, "(", 255);
+    bh_arr_each(Type *, ptype, cs_type->Struct.poly_args) {
+        if (ptype != cs_type->Struct.poly_args)
+            strncat(name_buf, ", ", 255);
+
+        strncat(name_buf, type_get_name(*ptype), 255);
+    }
+    strncat(name_buf, ")", 255);
+    cs_type->Struct.name = bh_aprintf(semstate.node_allocator, "%s", name_buf);
+
     return concrete_struct;
 }
 
