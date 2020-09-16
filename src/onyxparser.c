@@ -442,7 +442,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 AstStrLit* filename = make_node(AstStrLit, Ast_Kind_StrLit);
                 filename->token = str_token;
-                filename->addr      = 0;
+                filename->addr  = 0;
 
                 add_node_to_process(parser, (AstNode *) filename);
                 retval = (AstTyped *) filename;

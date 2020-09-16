@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <malloc.h>
 
 #include <stdlib.h>
 #include <stdarg.h>
@@ -54,41 +55,13 @@ typedef double f64;
 //-------------------------------------------------------------------------------------
 // Better character functions
 //-------------------------------------------------------------------------------------
-inline b32 char_is_alpha(const char a) {
-    return ('a' <= a && a <= 'z') || ('A' <= a && a <= 'Z');
-}
-
-inline char charset_contains(const char* charset, char ch) {
-    while (*charset) {
-        if (*charset == ch) return ch;
-        charset++;
-    }
-
-    return 0;
-}
-
-inline b32 char_is_num(const char a) {
-    return ('0' <= a && a <= '9');
-}
-
-inline b32 char_is_alphanum(const char a) {
-    return char_is_alpha(a) || char_is_num(a);
-}
-
-inline b32 char_is_whitespace(const char a) {
-    return charset_contains(" \t\r\n", a);
-}
-
-inline b32 char_in_range(const char lo, const char hi, const char a) {
-    return lo <= a <= hi;
-}
-
-inline i64 chars_match(char* ptr1, char* ptr2) {
-    i64 len = 0;
-    while (*ptr2 != '\0' && *ptr1 == *ptr2) ptr1++, ptr2++, len++;
-    return *ptr2 == '\0' ? len : 0;
-}
-
+b32 char_is_alpha(const char a);
+b32 char_is_num(const char a);
+b32 char_is_alphanum(const char a);
+char charset_contains(const char* charset, char ch);
+b32 char_is_whitespace(const char a);
+b32 char_in_range(const char lo, const char hi, const char a);
+i64 chars_match(char* ptr1, char* ptr2);
 
 
 
@@ -447,7 +420,7 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va);
 #ifdef BH_DEBUG
 
 void* bh__debug_malloc(size_t size, const char* file, u64 line);
-void* bh__debug_aligned_alloc(size_t alignment, size_t size, const char* file, u64 line);
+void* bh__debug_memalign(size_t alignment, size_t size, const char* file, u64 line);
 void  bh__debug_free(void* ptr, const char* file, u64 line);
 void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
 
@@ -459,9 +432,9 @@ void* bh__debug_malloc(size_t size, const char* file, u64 line) {
     return p;
 }
 
-void* bh__debug_aligned_alloc(size_t alignment, size_t size, const char* file, u64 line) {
-    void* p = aligned_alloc(alignment, size);
-    bh_printf("[DEBUG] %p = aligned_alloc(%d, %d) at %s:%d\n", p, alignment, size, file, line);
+void* bh__debug_memalign(size_t alignment, size_t size, const char* file, u64 line) {
+    void* p = memalign(alignment, size);
+    bh_printf("[DEBUG] %p = memalign(%d, %d) at %s:%d\n", p, alignment, size, file, line);
     return p;
 }
 
@@ -479,7 +452,7 @@ void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
 #endif
 
 #define malloc(size)                    (bh__debug_malloc(size, __FILE__, __LINE__))
-#define aligned_alloc(alignment, size)    (bh__debug_aligned_alloc(alignment, size, __FILE__, __LINE__))
+#define memalign(alignment, size)    (bh__debug_memalign(alignment, size, __FILE__, __LINE__))
 #define free(ptr)                        (bh__debug_free(ptr, __FILE__, __LINE__))
 #define realloc(ptr, size)                (bh__debug_realloc(ptr, size, __FILE__, __LINE__))
 
@@ -815,14 +788,41 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc);
 //-------------------------------------------------------------------------------------
 // CHAR FUNCTIONS
 //-------------------------------------------------------------------------------------
-extern inline b32 char_is_alpha(const char a);
-extern inline b32 char_is_num(const char a);
-extern inline b32 char_is_alphanum(const char a);
-extern inline char charset_contains(const char* charset, char ch);
-extern inline b32 char_is_whitespace(const char a);
-extern inline b32 char_in_range(const char lo, const char hi, const char a);
-extern inline i64 chars_match(char* ptr1, char* ptr2);
 
+b32 char_is_alpha(const char a) {
+    return ('a' <= a && a <= 'z') || ('A' <= a && a <= 'Z');
+}
+
+char charset_contains(const char* charset, char ch) {
+    while (*charset) {
+        if (*charset == ch) return ch;
+        charset++;
+    }
+
+    return 0;
+}
+
+b32 char_is_num(const char a) {
+    return ('0' <= a && a <= '9');
+}
+
+b32 char_is_alphanum(const char a) {
+    return char_is_alpha(a) || char_is_num(a);
+}
+
+b32 char_is_whitespace(const char a) {
+    return charset_contains(" \t\r\n", a);
+}
+
+b32 char_in_range(const char lo, const char hi, const char a) {
+    return lo <= a <= hi;
+}
+
+i64 chars_match(char* ptr1, char* ptr2) {
+    i64 len = 0;
+    while (*ptr2 != '\0' && *ptr1 == *ptr2) ptr1++, ptr2++, len++;
+    return *ptr2 == '\0' ? len : 0;
+}
 
 
 
@@ -869,7 +869,7 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
-        retval = aligned_alloc(alignment, size);
+        retval = memalign(alignment, size);
 
         if (flags & bh_allocator_flag_clear && retval != NULL) {
             memset(retval, 0, size);
@@ -920,7 +920,7 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
-        retval = aligned_alloc(alignment, size);
+        retval = memalign(alignment, size);
 
         if (flags & bh_allocator_flag_clear && retval != NULL) {
             memset(retval, 0, size);

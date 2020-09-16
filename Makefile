@@ -1,4 +1,4 @@
-RELEASE=0
+RELEASE=1
 
 OBJ_FILES=\
 	build/onyxlex.o \
@@ -15,7 +15,7 @@ OBJ_FILES=\
 	build/onyxdoc.o \
 	build/onyx.o
 
-CC=gcc
+CC=tcc
 INCLUDES=-I./include
 LIBS=
 TARGET=./onyx
