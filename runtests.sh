@@ -21,9 +21,12 @@ for test_file in ./tests/*.onyx ; do
 
 	if ! diff ./tmpoutput "./tests/$name" >/dev/null; then
 		echo "❌ Test output did not match."
+		diff ./tmpoutput "./tests/$name"
 		success=0
 		continue
 	fi
+
+	rm "./tests/$name.wasm"
 done
 rm ./tmpoutput
 

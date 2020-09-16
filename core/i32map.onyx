@@ -57,8 +57,8 @@ i32map_delete :: proc (use imap: ^I32Map($T), key: i32) {
     lr := i32map_lookup(imap, key);
     if lr.entry_index < 0 do return;
 
-    if lr.entry_prev < 0   do hashes[lr.hash_index] = entries[lr.entry_index].next;
-    else                   do hashes[lr.entry_prev] = entries[lr.entry_index].next;
+    if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next;
+    else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
 
     if lr.entry_index == entries.count - 1 {
         array_pop(^entries);

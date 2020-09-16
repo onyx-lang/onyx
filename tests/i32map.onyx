@@ -1,0 +1,37 @@
+package main
+
+#include_file "core/std/js"
+
+use package core
+
+main :: proc (args: [] cstring) {
+    imap : I32Map(^string);
+    i32map_init(^imap);
+    defer {
+        print("Freeing map\n");
+        i32map_free(^imap);
+    }
+
+    hello := "Hello ";
+    world := "World!";
+
+    i32map_put(^imap, 50, ^hello);
+    i32map_put(^imap, 1234, ^world);
+
+    print(i32map_has(^imap, 50));
+    print("\n");
+    print(i32map_has(^imap, 51));
+    print("\n");
+
+    print(*i32map_get(^imap, 50));
+    print(*i32map_get(^imap, 1234));
+    print("\n");
+
+    i32map_delete(^imap, 50);
+    print(i32map_has(^imap, 50));
+    print("\n");
+
+    i32map_clear(^imap);
+    print(i32map_has(^imap, 1234));
+    print("\n");
+}

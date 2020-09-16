@@ -1,0 +1,282 @@
+package main
+
+#include_file "core/std/js"
+
+use package core
+
+print_arr_details :: proc (arr: ^[..] $T) {
+    print("\nArray details:\n\tSize: ");
+    print(arr.count);
+    print("\n\tCapacity: ");
+    print(arr.capacity);
+    print("\n\tData ptr: ");
+    print(cast(^void) arr.data);
+    print("\n\tSize of elements: ");
+    print(sizeof T);
+    print("\n\tAlignment of elements: ");
+    print(alignof T);
+    print("\n\n");
+}
+
+print_vec :: proc (v: Vec3) #add_overload print {
+    print("Vec3(");
+    print(v.x);
+    print(", ");
+    print(v.y);
+    print(", ");
+    print(v.z);
+    print(")");
+}
+
+// This demonstrates that we have something similar to static 'duck' typing.
+get_count :: proc (x: $T) -> u32 do return x.count;
+
+
+// Because of the static duck typing, this will pass as an
+// array/slice in most places.
+Dummy :: struct {
+    count : u32 = 5;
+    data  : [5] u32;
+}
+
+
+/* This demos some of the power you have with the polymorphic types */
+compose :: proc (a: A, f: proc ($A) -> $B, g: proc (B) -> $C) -> C {
+    return a |> f() |> g();
+}
+
+
+SOA :: struct {
+    a  : [..] i32;
+    b  : [..] i64;
+    c  : [..] Vec3;
+}
+
+soa_init :: proc (s: ^SOA) {
+    array_init(^s.a);
+    array_init(^s.b);
+    array_init(^s.c);
+}
+
+soa_deinit :: proc (s: ^SOA) {
+    array_free(^s.a);
+    array_free(^s.b);
+    array_free(^s.c);
+}
+
+get_range :: proc (arr: ^[..] $T) -> range {
+    return 0 .. arr.count;
+}
+
+// NOTE: This function will be very useful for for loops. i.e.
+//        for i: 0 .. 100 |> by(2) {
+//            ...
+//        }
+by :: proc (r: range, s: u32) -> range {
+    return range.{ low = r.low, high = r.high, step = s };
+}
+
+switch_demo :: proc {
+    switch a := 4; a {
+        case 4, 5, 6 {
+            print("a was 4, 5, or 6\n");
+            fallthrough fallthrough;
+        }
+
+        case 10 do print("a was 10\n");
+
+        case #default {
+            print("a was something else.\n");
+        }
+    }
+}
+
+vararg_test :: proc (prefix: string, nums: ..i32) {
+    print(prefix);
+    for num: nums {
+        print(num);
+        print(" ");
+    }
+}
+
+NumInfo :: struct {
+    min : i32;
+    max : i32;
+    sum : i32;
+}
+
+get_num_info :: proc (nums: ..i32) -> NumInfo {
+    ni : NumInfo;
+
+    ni.min = nums[0];
+    for num: nums do if num < ni.min do ni.min = num;
+
+    ni.max = nums[0];
+    for num: nums do if num > ni.max do ni.max = num;
+
+    ni.sum = 0;
+    for num: nums do ni.sum += num;
+
+    return ni;
+}
+
+print_strings :: proc (ss: ..string) {
+    for s: ss do print_string(s);
+}
+
+multi_max :: proc (nums: ..$T) -> T {
+    print("Got this many args: ");
+    print(nums.count);
+    print("\n");
+
+    max := nums[0];
+    for num: nums do if num > max do max = num;
+    return max;
+}
+
+weird_sum :: proc (n1: $T, others: ..T) -> T {
+    s := n1;
+    for n: others do s += n;
+    return s;
+}
+
+main :: proc (args: [] cstring) {
+    switch_demo();
+
+    print_strings("This ", "is ", "a ", "test.\n");
+
+    vararg_test("Here are some numbers:\n", 1, 2, 3, 4, 5);
+    print("\n\n");
+
+    multi_max(4, 2, 76, 3, 1203, 2, 4) |> print();
+    print("\n");
+
+    multi_max(4l, 2l, 76l, 3l, 1203l, 2l, 4l) |> print();
+    print("\n");
+
+    weird_sum(4, 1) |> print();
+    print("\n");
+
+    ni := get_num_info(1, 2, 3, 4, 5);
+    print("Some information about those numbers:\n");
+    print("Min: ");
+    print(ni.min);
+    print("\nMax: ");
+    print(ni.max);
+    print("\nSum: ");
+    print(ni.sum);
+    print("\n\n");
+
+    res := compose(5, proc (x: i32) -> i32 do return x * 3;,
+                      proc (x: i32) -> i32 do return x + 5;);
+    print(res);
+    print("\n");
+
+    s : SOA;
+    soa_init(^s);
+    defer {
+        print("Clearing SOA...\n");
+        soa_deinit(^s);
+    }
+
+    print("Evens from 6 to 34:\n");
+    for i: 6 .. 34 |> by(2) {
+        print(i);
+        print(" ");
+    }
+    print("\n");
+
+    print_arr_details(^s.a);
+    print_arr_details(^s.b);
+
+    for i: 0 .. 100 {
+        array_push(^s.a, (5 * i) % 21);
+        array_push(^s.b, 3l * cast(i64) i);
+        array_push(^s.c, Vec3.{ i, i * i, i * i * i });
+    }
+
+    r := ^s.a |> get_range() |> by(3);
+    print(r);
+    print_array(^s.a);
+    print("A has 22? ");
+    print(array_contains(^s.a, 22));
+    print("\n");
+
+    // NOTE: Iterating by value
+    for vec: s.c {
+        print(vec);
+        print(" ");
+    }
+    print("\n");
+
+    // NOTE: Iterating by pointer
+    for ^vec: s.c {
+        print(cast(^void) vec);
+        print(" ");
+    }
+    print("\n");
+
+    small : [12] i32;
+    for ^it: small do *it = 1234 + cast(u32) it;
+
+    for it: small {
+        print(it);
+        print(" ");
+    }
+    print("\n");
+
+
+    array_sort(^s.a, cmp_dec);
+    array_sort(^s.b, cmp_dec);
+
+    print_array(^s.a);
+    print_array(^s.b);
+
+    print("After adding...\n");
+    print_arr_details(^s.a);
+    print_arr_details(^s.b);
+
+    print("Array A sum: ");
+    print(array_fold(^s.a, 0, proc (x: i32, acc: i32) -> i32 do return x + acc;));
+    print("\n\n");
+
+    map : PtrMap;
+    ptrmap_init(^map, 50);
+    defer ptrmap_free(^map);
+
+    for i: 0 .. 100 do ptrmap_put(^map, ^s.a[i], ^s.b[i]);
+
+    print("Has ^a[20]? ");
+    print(ptrmap_has(^map, ^s.a[20]));
+    print("\n");
+
+    print("Has null? ");
+    print(ptrmap_has(^map, null));
+    print("\n");
+
+    print("Value at ^a[50]: ");
+    print(cast(^void) ptrmap_get(^map, ^s.a[50]));
+    print(" == ");
+    print(cast(^void) (^s.b[50]));
+    print("\n");
+
+    print("Deleteing ^a[20]\n");
+    ptrmap_delete(^map, ^s.a[20]);
+
+    print("Has ^a[20]? ");
+    print(ptrmap_has(^map, ^s.a[20]));
+    print("\n");
+}
+
+
+Vec3 :: struct {
+    x: i32;
+    y: i32;
+    z: i32;
+}
+
+cmp_vec3 :: proc (v1: Vec3, v2: Vec3) -> i32 {
+    if v1.x != v2.x do return v1.x - v2.x;
+    if v1.y != v2.y do return v1.y - v2.y;
+    return v1.z - v2.z;
+}

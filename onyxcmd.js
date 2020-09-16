@@ -8,7 +8,7 @@ const ENV = {
         print_str(ptr, len) {
             const data = new Uint8Array(wasm_memory, ptr, len);
             const str  = new TextDecoder().decode(data);
-            console.log(str);
+            process.stdout.write(str);
         }
     }   
 }
