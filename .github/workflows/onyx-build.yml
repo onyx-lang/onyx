@@ -13,11 +13,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: install tcc
-      run: apt install tcc
     - name: add build folder
       run: mkdir build
     - name: make
       run: make
-    - name: ./onyx progs/odin_example.onyx
-      run: ./onyx progs/odin_example.onyx
+    - name: run tests
+      run: ./runtests.sh

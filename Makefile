@@ -15,7 +15,12 @@ OBJ_FILES=\
 	build/onyxdoc.o \
 	build/onyx.o
 
-CC=tcc
+ifeq (, $(shell which tcc))
+	CC=gcc
+else
+	CC=tcc
+endif
+
 INCLUDES=-I./include
 LIBS=
 TARGET=./onyx
