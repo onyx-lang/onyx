@@ -5,5 +5,5 @@ package main
 use package core
 
 main :: proc (args: [] cstring) {
-	print("Hello, World!");
+	println("Hello, World!");
 }

@@ -37,6 +37,11 @@ print :: proc #overloaded {
     print_range,
 }
 
+println :: proc (x: $T) {
+    print(x);
+    print("\n");
+}
+
 // This works on both slices and arrays
 print_array :: proc (arr: $T, sep := " ") {
     for i: 0 .. arr.count {
