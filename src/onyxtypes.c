@@ -335,11 +335,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_arr_each(AstStructMember *, member, s_node->members) {
                 (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
-                // TODO: Add alignment checking here
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment > alignment) alignment = mem_alignment;
-                if (offset % alignment != 0) {
-                    offset += alignment - (offset % alignment);
+                if (offset % mem_alignment != 0) {
+                    offset += mem_alignment - (offset % mem_alignment);
                 }
 
                 StructMember smem = {
@@ -558,7 +557,7 @@ const char* type_get_name(Type* type) {
 }
 
 u32 type_get_alignment_log2(Type* type) {
-    i32 store_size = type_size_of(type);
+    i32 store_size = type_alignment_of(type);
     if      (store_size == 1) return 0;
     else if (store_size == 2) return 1;
     else if (store_size == 4) return 2;
