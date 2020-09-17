@@ -146,7 +146,7 @@ scratch_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32
             ss.curr_ptr = ss.base_ptr;
             retval = ss.base_ptr;
         }
-        
+
         return retval;
     }
 
@@ -163,6 +163,14 @@ scratch_alloc_init :: proc (a: ^Allocator, ss: ^ScratchState) {
     a.func = scratch_alloc_proc;
     a.data = ss;
 }
+
+
+
+alloc_slice :: proc (sl: ^[] $T, count: i32) {
+    sl.data  = calloc(sizeof T * count);
+    sl.count = count;
+}
+
 
 
 memory_init :: proc {

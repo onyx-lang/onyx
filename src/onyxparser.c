@@ -392,6 +392,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             bool_node->type_node = (AstType *) &basic_type_bool;
             bool_node->token = expect_token(parser, Token_Type_Literal_True);
             bool_node->value.i = 1;
+            bool_node->flags |= Ast_Flag_Comptime;
             retval = (AstTyped *) bool_node;
             break;
         }
@@ -401,6 +402,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             bool_node->type_node = (AstType *) &basic_type_bool;
             bool_node->token = expect_token(parser, Token_Type_Literal_False);
             bool_node->value.i = 0;
+            bool_node->flags |= Ast_Flag_Comptime;
             retval = (AstTyped *) bool_node;
             break;
         }

@@ -15,14 +15,11 @@ main :: proc (args: [] cstring) {
     i32map_put(^imap, 50, ^hello);
     i32map_put(^imap, 1234, ^world);
 
-    print(i32map_has(^imap, 50));
-    print("\n");
-    print(i32map_has(^imap, 51));
-    print("\n");
+    println(i32map_has(^imap, 50));
+    println(i32map_has(^imap, 51));
 
     // i32map_delete(^imap, 50);
 
-    print(*i32map_get(^imap, 50));
-    print(*i32map_get(^imap, 1234));
-    print("\n");
+    print(  *i32map_get(^imap, 50));
+    println(*i32map_get(^imap, 1234));
 }
