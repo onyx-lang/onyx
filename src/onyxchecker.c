@@ -1268,14 +1268,6 @@ b32 check_function_header(AstFunction* func) {
             return 1;
         }
 
-        local->ppt = Param_Pass_By_Value;
-
-        if (type_is_structlike_strict(local->type)
-                && !type_structlike_is_simple(local->type)) {
-            // local->type = type_make_pointer(semstate.node_allocator, local->type);
-            local->ppt = Param_Pass_By_Implicit_Pointer;
-        }
-
         if (param->is_vararg) has_had_varargs = 1;
 
         if (local->type->kind != Type_Kind_Array

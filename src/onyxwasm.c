@@ -1306,29 +1306,27 @@ EMIT_FUNC(call, AstCall* call) {
     for (AstArgument *arg = call->arguments;
             arg != NULL;
             arg = (AstArgument *) arg->next) {
-        if ((arg->flags & Ast_Flag_Arg_Is_VarArg) && !type_is_structlike(arg->type)) {
-            WID(WI_GLOBAL_GET, stack_top_idx);
-        }
+
+        b32 place_on_stack = 0;
+        b32 arg_is_struct  = type_is_structlike(arg->type);
+
+        if (arg->flags & Ast_Flag_Arg_Is_VarArg) place_on_stack = 1;
+        if (type_get_param_pass(arg->type) == Param_Pass_By_Implicit_Pointer) place_on_stack = 1;
+
+        if (place_on_stack && !arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
 
         emit_expression(mod, &code, arg->value);
 
-        if (arg->flags & Ast_Flag_Arg_Is_VarArg) {
-            if (type_is_structlike(arg->type)) WID(WI_GLOBAL_GET, stack_top_idx);
-
+        if (place_on_stack) {
+            if (arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
             emit_store_instruction(mod, &code, arg->type, stack_grow_amm);
 
-            stack_grow_amm += type_size_of(arg->type);
-            vararg_count += 1;
-        }
-
-        // CLEANUP structs-by-value
-        else if (type_is_structlike_strict(arg->type) && !type_structlike_is_simple(arg->type)) {
-            WID(WI_GLOBAL_GET, stack_top_idx);
-            emit_store_instruction(mod, &code, arg->type, stack_grow_amm);
-
-            WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_I32_CONST, stack_grow_amm);
-            WI(WI_I32_ADD);
+            if (arg->flags & Ast_Flag_Arg_Is_VarArg) vararg_count += 1;
+            else {
+                WID(WI_GLOBAL_GET, stack_top_idx);
+                WID(WI_I32_CONST, stack_grow_amm);
+                WI(WI_I32_ADD);
+            }
 
             stack_grow_amm += type_size_of(arg->type);
         }
@@ -2040,7 +2038,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             AstLocal* param = (AstLocal *) expr;
             u64 localidx = bh_imap_get(&mod->local_map, (u64) param);
 
-            switch (param->ppt) {
+            switch (type_get_param_pass(param->type)) {
                 case Param_Pass_By_Value: {
                     if (type_is_structlike_strict(expr->type)) {
                         u32 mem_count = type_structlike_mem_count(expr->type);
@@ -2170,7 +2168,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             if (field->expr->kind == Ast_Kind_Param) {
                 AstLocal* param = (AstLocal *) field->expr;
 
-                if (param->ppt == Param_Pass_By_Value && !type_is_pointer(param->type)) {
+                if (type_get_param_pass(param->type) == Param_Pass_By_Value && !type_is_pointer(param->type)) {
                     u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
                     WIL(WI_LOCAL_GET, localidx);
                     break;
@@ -2483,19 +2481,18 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     if (ft->kind != Type_Kind_Function) return -1;
 
     static char type_repr_buf[128];
-
     char* t = type_repr_buf;
+
     Type** param_type = ft->Function.params;
     i32 param_count = ft->Function.param_count;
     i32 params_left = param_count;
-    while (params_left-- > 0) {
-        if (type_is_structlike_strict(*param_type)) {
-            if (!type_structlike_is_simple(*param_type)) {
-                // HACK!!
-                // CLEANUP structs-by-value
-                *(t++) = WASM_TYPE_INT32;
 
-            } else {
+    while (params_left-- > 0) {
+        if (type_get_param_pass(*param_type) == Param_Pass_By_Implicit_Pointer) {
+            *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]);
+
+        } else {
+            if (type_is_structlike_strict(*param_type)) {
                 u32 mem_count = type_structlike_mem_count(*param_type);
                 StructMember smem;
 
@@ -2505,10 +2502,10 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
                 }
 
                 param_count += mem_count - 1;
-            }
 
-        } else {
-            *(t++) = (char) onyx_type_to_wasm_type(*param_type);
+            } else {
+                *(t++) = (char) onyx_type_to_wasm_type(*param_type);
+            }
         }
 
         param_type++;
@@ -2618,7 +2615,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         // NOTE: Generate the local map
         u64 localidx = 0;
         bh_arr_each(AstParam, param, fd->params) {
-            switch (param->local->ppt) {
+            switch (type_get_param_pass(param->local->type)) {
                 case Param_Pass_By_Value: {
                     if (type_is_structlike_strict(param->local->type)) {
                         bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);

@@ -429,7 +429,7 @@ struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *ri
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 addr; u64 length; };
-struct AstLocal         { AstTyped_base; ParamPassType ppt; };
+struct AstLocal         { AstTyped_base; };
 struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstTyped *callee; };
 struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
 struct AstArgument      { AstTyped_base; AstTyped *value; };
@@ -808,6 +808,11 @@ static inline CallingConvention type_function_get_cc(Type* type) {
     if (type->Function.return_type->kind == Type_Kind_Slice) return CC_Return_Stack;
     if (type->Function.return_type->kind == Type_Kind_DynArray) return CC_Return_Stack;
     return CC_Return_Wasm;
+}
+
+static inline ParamPassType type_get_param_pass(Type* type) {
+    if (type_is_structlike_strict(type) && !type_structlike_is_simple(type)) return Param_Pass_By_Implicit_Pointer;
+    return Param_Pass_By_Value;
 }
 
 #endif // #ifndef ONYXASTNODES_H
