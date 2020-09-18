@@ -922,7 +922,7 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     WI(WI_BLOCK_END);
 
     WIL(WI_LOCAL_GET, ptr_local);
-    if (elem_size != 1) {
+    if (elem_size != 0) {
         WIL(WI_I32_CONST, elem_size);
         WI(WI_I32_ADD);
     }
@@ -1020,7 +1020,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(WI_BLOCK_END);
 
     WIL(WI_LOCAL_GET, ptr_local);
-    if (elem_size != 1) {
+    if (elem_size != 0) {
         WIL(WI_I32_CONST, elem_size);
         WI(WI_I32_ADD);
     }
