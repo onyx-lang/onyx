@@ -1612,10 +1612,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             }
         }
 
-        else if (parse_possible_directive(parser, "inline")) {
-            func_def->flags |= Ast_Flag_Inline;
-        }
-
         else if (parse_possible_directive(parser, "foreign")) {
             func_def->foreign_module = expect_token(parser, Token_Type_Literal_String);
             func_def->foreign_name   = expect_token(parser, Token_Type_Literal_String);
@@ -1630,10 +1626,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
                 OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
                 func_def->exported_name = str_token;
             }
-        }
-
-        else if (parse_possible_directive(parser, "nostack")) {
-            func_def->flags |= Ast_Flag_No_Stack;
         }
 
         else {
@@ -2048,21 +2040,16 @@ ParseResults onyx_parse(OnyxParser *parser) {
                         break;
 
                     case Ast_Kind_Binding: {
-                        if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_Package) {
-                            symbol_introduce(parser->package->private_scope,
-                                ((AstBinding *) curr_stmt)->token,
-                                ((AstBinding *) curr_stmt)->node);
+                        Scope* target_scope = parser->package->scope;
 
-                        } else if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_File) {
-                            symbol_introduce(parser->file_scope,
-                                ((AstBinding *) curr_stmt)->token,
-                                ((AstBinding *) curr_stmt)->node);
+                        if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_Package)
+                            target_scope = parser->package->private_scope;
+                        if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_File)
+                            target_scope = parser->file_scope;
 
-                        } else {
-                            symbol_introduce(parser->package->scope,
-                                ((AstBinding *) curr_stmt)->token,
-                                ((AstBinding *) curr_stmt)->node);
-                        }
+                        symbol_introduce(target_scope,
+                            ((AstBinding *) curr_stmt)->token,
+                            ((AstBinding *) curr_stmt)->node);
                         break;
                     }
 

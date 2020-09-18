@@ -231,7 +231,7 @@ static void symres_pipe(AstBinaryOp** pipe) {
     symres_expression(&(*pipe)->left);
 
     if (call_node->kind != Ast_Kind_Call) {
-        onyx_report_error((*pipe)->token->pos, "universal function call expected call on right side");
+        onyx_report_error((*pipe)->token->pos, "Pipe operator expected call on right side.");
         return;
     }
 

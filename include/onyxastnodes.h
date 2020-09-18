@@ -164,10 +164,8 @@ typedef enum AstFlags {
     Ast_Flag_Global_Stack_Base = BH_BIT(8),
 
     // Function flags
-    Ast_Flag_Inline            = BH_BIT(9),
     Ast_Flag_Intrinsic         = BH_BIT(10),
     Ast_Flag_Function_Used     = BH_BIT(11),
-    Ast_Flag_No_Stack          = BH_BIT(12),
 
     // Expression flags
     Ast_Flag_Expr_Ignored      = BH_BIT(13),

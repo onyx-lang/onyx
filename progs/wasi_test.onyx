@@ -1,32 +1,17 @@
 package main
 
-#include_folder "/usr/share/onyx/core"
-
-#include_file "builtin"
-#include_file "wasi"
-#include_file "alloc"
-#include_file "intrinsics"
-#include_file "random"
-#include_file "string"
-#include_file "file"
-
-
+#include_file "core/std/wasi"
 
 // NOTE: Didn't realize this would work so easily
 use package core { string_builder_append as sba }
 use package core
-
-use package memory
+use package core_file
 use package wasi
-use package intrinsics
-use package random
-use package file
-use package stdio
 
 // print_rights :: proc (rights: Rights) {
 //     print(cast(u32) rights, 2);
 //     print("\n");
-// 
+//
 //     if rights & Rights.DataSync != cast(Rights) 0 do print("DataSync\n");
 //     if rights & Rights.Read != cast(Rights) 0 do print("Read\n");
 //     if rights & Rights.Seek != cast(Rights) 0 do print("Seek\n");
@@ -108,7 +93,7 @@ timer_end :: proc (start_time: Timestamp) -> Timestamp {
 
 is_prime :: proc (n := 0) -> bool {
     sqrt :: cast(i32) (sqrt_f32(cast(f32) n));
-    for i: 2, sqrt + 1 do if n % i == 0 do return false;
+    for i: 2 .. sqrt + 1 do if n % i == 0 do return false;
     return true;
 }
 
@@ -140,7 +125,7 @@ output_s :: proc (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
 print_arr :: proc (sb: ^StringBuilder, arr: [] $T) {
     sb |> string_builder_clear();
 
-    for i: 0, arr.count {
+    for i: 0 .. arr.count {
         sb |> sba(cast(u64) arr[i]) |> sba(" ");
     }
 
@@ -149,7 +134,7 @@ print_arr :: proc (sb: ^StringBuilder, arr: [] $T) {
 
 make_i32_arr :: proc (a := context.allocator, len := 10) -> [] i32 {
     arr := cast(^i32) alloc(a, sizeof i32 * len);
-    return arr[0 : len];
+    return arr[0 .. len];
 }
 
 main :: proc (args: []cstring) {
@@ -174,7 +159,7 @@ main :: proc (args: []cstring) {
         |> sba(cast(u64) args.count)
         |> sba(" arguments.\n");
 
-    for i: 0, args.count do ^sb |> sba(args[i]) |> sba(" ");
+    for i: 0 .. args.count do ^sb |> sba(args[i]) |> sba(" ");
     ^sb |> sba("\n")
         |> string_builder_to_string()
         |> print();
@@ -184,7 +169,7 @@ main :: proc (args: []cstring) {
     print(cont);
 
     sum := 0l;
-    for i: 0, 20000 do if is_prime(i) do sum += cast(u64) i;
+    for i: 0 .. 20000 do if is_prime(i) do sum += cast(u64) i;
     print("Sum of primes less than 20000 is: ");
     print_i64(sum);
     print("\n");
@@ -193,7 +178,7 @@ main :: proc (args: []cstring) {
     defer cfree(matches.data);
 
     string_builder_clear(^sb);
-    for i: 0, matches.count {
+    for i: 0 .. matches.count {
         ^sb |> sba(matches[i])
             |> sba("\n");
     }
@@ -205,7 +190,7 @@ main :: proc (args: []cstring) {
     defer cfree(tokens.data);
 
     acc := 0;
-    for i: 0, tokens.count {
+    for i: 0 .. tokens.count {
         switch tokens[i][0] {
             case #char "+" do acc += 1;
             case #char "-" do acc -= 1;
@@ -264,9 +249,9 @@ main :: proc (args: []cstring) {
 
 
     arr : [128] i32;
-    for i: 0, 128 do arr[i] = i * i;
+    for i: 0 .. 128 do arr[i] = i * i;
 
-    print_arr(^sb, arr[5 : 10]);
+    print_arr(^sb, arr[5 .. 10]);
 
     ss := string_substr("Hello, World!", "World");
     if ss.count > 0 do print(ss);
@@ -299,8 +284,8 @@ main :: proc (args: []cstring) {
 
     dynarr : [..] Vec3;
     array_init(^dynarr);
-    for i: 0, 16 do array_add(^dynarr, Vec3.{ cast(f32) i, cast(f32) (i * i), cast(f32) (i * i * i) });
-    for i: 0, 16 {
+    for i: 0 .. 16 do array_push(^dynarr, Vec3.{ cast(f32) i, cast(f32) (i * i), cast(f32) (i * i * i) });
+    for i: 0 .. 16 {
         print(cast(u32) dynarr.data[i].x);
         print(" ");
         print(cast(u32) dynarr.data[i].y);
@@ -342,7 +327,7 @@ multi_poly :: proc (a: $T, b: $R) -> R {
 }
 
 make_slice :: proc (ptr: ^$T, count: u32) -> [] T {
-    return ptr[4 : count];
+    return ptr[4 .. count];
 }
 
 get_slice_length :: proc (s: ^[] $T) -> u32 do return s.count;

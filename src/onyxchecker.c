@@ -1287,11 +1287,6 @@ b32 check_function_header(AstFunction* func) {
             return 1;
         }
 
-        if ((func->flags & Ast_Flag_Inline) != 0) {
-            onyx_report_error(func->token->pos, "exporting a inlined function");
-            return 1;
-        }
-
         if (func->exported_name == NULL) {
             onyx_report_error(func->token->pos, "exporting function without a name");
             return 1;

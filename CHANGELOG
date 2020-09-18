@@ -7,7 +7,7 @@ Additions:
 * Added println to core library; print followed by a newline.
 * Added tests/ folder and runtests.sh which will compile and execute the programs in the
     folder and test against their expected output.
-* #private_file for specifying symbols at the file scope
+* #private_file for specifying symbols at the file scope.
 
 Removals:
 
@@ -19,4 +19,4 @@ Changes:
 Bug fixes:
 * Fixed error message index for struct literal member type mismatch.
 * Fixed freeing non-allocated memory when generating documentation.
-* Fixed alignment issue with struct members
+* Fixed alignment issue with struct members.
