@@ -419,14 +419,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         case '#': {
             if (parse_possible_directive(parser, "file_contents")) {
-                AstPointerType* fc_type = make_node(AstPointerType, Ast_Kind_Pointer_Type);
-                fc_type->flags |= Basic_Flag_Pointer;
-                fc_type->elem = (AstType *) &basic_type_u8;
-
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
                 fc->token = parser->prev - 1;
                 fc->filename = expect_token(parser, Token_Type_Literal_String);
-                fc->type_node = (AstType *) fc_type;
+                fc->type = type_make_slice(parser->allocator, &basic_types[Basic_Kind_U8]);
 
                 add_node_to_process(parser, (AstNode *) fc);
 

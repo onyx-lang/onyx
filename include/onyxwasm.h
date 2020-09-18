@@ -513,7 +513,7 @@ typedef struct OnyxWasmModule {
     // to the function type index if it has been created.
     bh_table(i32) type_map;
 
-    bh_table(u32) loaded_file_offsets;
+    bh_table(StrLitInfo) loaded_file_info;
     bh_table(StrLitInfo) string_literals;
 
     bh_arr(u8) structured_jump_target;

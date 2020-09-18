@@ -2235,12 +2235,9 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_File_Contents: {
             AstFileContents* fc = (AstFileContents *) expr;
-            token_toggle_end(fc->filename);
 
-            u32 offset = bh_table_get(u32, mod->loaded_file_offsets, fc->filename->text);
-            WID(WI_I32_CONST, offset);
-
-            token_toggle_end(fc->filename);
+            WID(WI_I32_CONST, fc->addr);
+            WID(WI_I32_CONST, fc->size);
             break;
         }
 
@@ -2835,7 +2832,11 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
 static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     token_toggle_end(fc->filename);
 
-    if (bh_table_has(u32, mod->loaded_file_offsets, fc->filename->text)) {
+    if (bh_table_has(StrLitInfo, mod->loaded_file_info, fc->filename->text)) {
+        StrLitInfo info = bh_table_get(StrLitInfo, mod->loaded_file_info, fc->filename->text);
+        fc->addr = info.addr;
+        fc->size = info.len;
+
         token_toggle_end(fc->filename);
         return;
     }
@@ -2843,7 +2844,6 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     u32 offset = mod->next_datum_offset;
     if (offset % 16 != 0)
         offset += 16 - (offset % 16);
-    bh_table_put(u32, mod->loaded_file_offsets, fc->filename->text, offset);
 
     if (!bh_file_exists(fc->filename->text)) {
         onyx_report_error(fc->filename->pos,
@@ -2860,6 +2860,14 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     memcpy(actual_data, contents.data, contents.length);
     actual_data[contents.length] = 0;
     bh_file_contents_free(&contents);
+
+    bh_table_put(StrLitInfo, mod->loaded_file_info, fc->filename->text, ((StrLitInfo) {
+        .addr = offset,
+        .len  = length - 1,
+    }));
+
+    fc->addr = offset;
+    fc->size = length - 1;
 
     WasmDatum datum = {
         .offset = offset,
@@ -2924,7 +2932,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
     bh_table_init(global_heap_allocator, module.type_map, 61);
     bh_table_init(global_heap_allocator, module.exports, 61);
-    bh_table_init(global_heap_allocator, module.loaded_file_offsets, 7);
+    bh_table_init(global_heap_allocator, module.loaded_file_info, 7);
     bh_table_init(global_heap_allocator, module.string_literals, 16);
 
     bh_imap_init(&module.index_map, global_heap_allocator, 128);

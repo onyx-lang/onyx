@@ -432,7 +432,7 @@ struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 ele
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u32 offset; u32 idx; };
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
-struct AstFileContents  { AstTyped_base; OnyxToken *filename; };
+struct AstFileContents  { AstTyped_base; OnyxToken *filename; u32 addr, size; };
 struct AstStructLiteral {
     AstTyped_base;
 
