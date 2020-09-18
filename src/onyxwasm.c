@@ -922,8 +922,10 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     WI(WI_BLOCK_END);
 
     WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_I32_CONST, elem_size);
-    WI(WI_I32_ADD);
+    if (elem_size != 1) {
+        WIL(WI_I32_CONST, elem_size);
+        WI(WI_I32_ADD);
+    }
     WIL(WI_LOCAL_SET, ptr_local);
 
     bh_arr_pop(mod->structured_jump_target);
@@ -1018,8 +1020,10 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(WI_BLOCK_END);
 
     WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_I32_CONST, elem_size);
-    WI(WI_I32_ADD);
+    if (elem_size != 1) {
+        WIL(WI_I32_CONST, elem_size);
+        WI(WI_I32_ADD);
+    }
     WIL(WI_LOCAL_SET, ptr_local);
 
     bh_arr_pop(mod->structured_jump_target);
@@ -1316,6 +1320,18 @@ EMIT_FUNC(call, AstCall* call) {
             stack_grow_amm += type_size_of(arg->type);
             vararg_count += 1;
         }
+
+        // CLEANUP structs-by-value
+        else if (type_is_structlike_strict(arg->type) && !type_structlike_is_simple(arg->type)) {
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            emit_store_instruction(mod, &code, arg->type, stack_grow_amm);
+
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WID(WI_I32_CONST, stack_grow_amm);
+            WI(WI_I32_ADD);
+
+            stack_grow_amm += type_size_of(arg->type);
+        }
     }
 
     if (vararg_count > 0) {
@@ -1333,7 +1349,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     stack_grow_amm += return_size;
 
-    b32 needs_stack = (cc == CC_Return_Stack) || (vararg_count > 0);
+    b32 needs_stack = (cc == CC_Return_Stack) || (stack_grow_amm > 0);
 
     if (needs_stack) {
         WID(WI_GLOBAL_GET, stack_top_idx);
@@ -1791,14 +1807,17 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         u64 o2 = 0;
         emit_array_access_location(mod, &code, (AstArrayAccess *) source_expr, &o2);
         offset += o2;
+
     } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
         && source_expr->type->kind != Type_Kind_Pointer) {
         u64 o2 = 0;
         emit_local_location(mod, &code, (AstLocal *) source_expr, &o2);
         offset += o2;
+
     } else if (source_expr->kind == Ast_Kind_Memres
         && source_expr->type->kind != Type_Kind_Pointer) {
         emit_memory_reservation_location(mod, &code, (AstMemRes *) source_expr);
+
     } else {
         emit_expression(mod, &code, source_expr);
     }
@@ -1822,10 +1841,9 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
     u64 local_offset = (u64) bh_imap_get(&mod->local_map, (u64) local);
 
     if (local_offset & LOCAL_IS_WASM) {
-        // HACK: This case doesn't feel quite right. I think the
-        // only way to end up here is if you are taking the slice
-        // off a pointer that is a local. But this still feels
-        // like the wrong long term solution.
+        // CLEANUP structs-by-value
+        // This is a weird condition but it is relied on in a couple places including
+        // passing non-simple structs by value.             -brendanfh 2020/09/18
         WIL(WI_LOCAL_GET, local_offset);
 
     } else {
@@ -1990,13 +2008,6 @@ EMIT_FUNC(location, AstTyped* expr) {
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess *) expr;
 
-            if (field->expr->kind == Ast_Kind_Param && type_is_structlike_strict(field->expr->type)) {
-                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
-
-                WIL(WI_LOCAL_GET, localidx);
-                break;
-            }
-
             u64 offset = 0;
             emit_field_access_location(mod, &code, field, &offset);
             if (offset != 0) {
@@ -2026,17 +2037,28 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
     switch (expr->kind) {
         case Ast_Kind_Param: {
-            u64 localidx = bh_imap_get(&mod->local_map, (u64) expr);
+            AstLocal* param = (AstLocal *) expr;
+            u64 localidx = bh_imap_get(&mod->local_map, (u64) param);
 
-            if (type_is_structlike_strict(expr->type)) {
-                u32 mem_count = type_structlike_mem_count(expr->type);
+            switch (param->ppt) {
+                case Param_Pass_By_Value: {
+                    if (type_is_structlike_strict(expr->type)) {
+                        u32 mem_count = type_structlike_mem_count(expr->type);
+                        fori (idx, 0, mem_count) WIL(WI_LOCAL_GET, localidx + idx);
 
-                fori (idx, 0, mem_count) {
-                    WIL(WI_LOCAL_GET, localidx + idx);
+                    } else {
+                        WIL(WI_LOCAL_GET, localidx);
+                    }
+                    break;
                 }
 
-            } else {
-                WIL(WI_LOCAL_GET, localidx);
+                case Param_Pass_By_Implicit_Pointer: {
+                    WIL(WI_LOCAL_GET, localidx);
+                    emit_load_instruction(mod, &code, expr->type, 0);
+                    break;
+                }
+
+                default: assert(0);
             }
 
             break;
@@ -2144,14 +2166,20 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess* ) expr;
 
-            if (field->expr->kind == Ast_Kind_Param && type_is_structlike_strict(field->expr->type)) {
-                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
+            // CLEANUP structs-by-value
+            if (field->expr->kind == Ast_Kind_Param) {
+                AstLocal* param = (AstLocal *) field->expr;
 
-                WIL(WI_LOCAL_GET, localidx);
-                break;
+                if (param->ppt == Param_Pass_By_Value && !type_is_pointer(param->type)) {
+                    u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
+                    WIL(WI_LOCAL_GET, localidx);
+                    break;
+                }
             }
 
-            if (field->expr->kind == Ast_Kind_StrLit) {
+
+            // HACK
+            else if (field->expr->kind == Ast_Kind_StrLit) {
                 StructMember smem;
 
                 token_toggle_end(field->token);
@@ -2462,15 +2490,23 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     i32 params_left = param_count;
     while (params_left-- > 0) {
         if (type_is_structlike_strict(*param_type)) {
-            u32 mem_count = type_structlike_mem_count(*param_type);
-            StructMember smem;
+            if (!type_structlike_is_simple(*param_type)) {
+                // HACK!!
+                // CLEANUP structs-by-value
+                *(t++) = WASM_TYPE_INT32;
 
-            fori (i, 0, mem_count) {
-                type_lookup_member_by_idx(*param_type, i, &smem);
-                *(t++) = (char) onyx_type_to_wasm_type(smem.type);
+            } else {
+                u32 mem_count = type_structlike_mem_count(*param_type);
+                StructMember smem;
+
+                fori (i, 0, mem_count) {
+                    type_lookup_member_by_idx(*param_type, i, &smem);
+                    *(t++) = (char) onyx_type_to_wasm_type(smem.type);
+                }
+
+                param_count += mem_count - 1;
             }
 
-            param_count += mem_count - 1;
         } else {
             *(t++) = (char) onyx_type_to_wasm_type(*param_type);
         }
@@ -2582,12 +2618,23 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         // NOTE: Generate the local map
         u64 localidx = 0;
         bh_arr_each(AstParam, param, fd->params) {
-            if (type_is_structlike_strict(param->local->type)) {
-                bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
-                localidx += type_structlike_mem_count(param->local->type);
+            switch (param->local->ppt) {
+                case Param_Pass_By_Value: {
+                    if (type_is_structlike_strict(param->local->type)) {
+                        bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
+                        localidx += type_structlike_mem_count(param->local->type);
 
-            } else {
-                bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);
+                        break;
+                    }
+                    // fallthrough
+                }
+
+                case Param_Pass_By_Implicit_Pointer: {
+                    bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);
+                    break;
+                }
+
+                default: assert(0);
             }
         }
 

@@ -5,21 +5,18 @@ package main
 use package core
 
 main :: proc (args: [] cstring) {
-    imap : I32Map(^string);
+    imap : I32Map(string);
     i32map_init(^imap);
     defer i32map_free(^imap);
 
-    hello := "Hello ";
-    world := "World!";
-
-    i32map_put(^imap, 50, ^hello);
-    i32map_put(^imap, 1234, ^world);
+    i32map_put(^imap, 50,   "Hello ");
+    i32map_put(^imap, 1234, "World!");
 
     println(i32map_has(^imap, 50));
     println(i32map_has(^imap, 51));
 
     // i32map_delete(^imap, 50);
 
-    print(  *i32map_get(^imap, 50));
-    println(*i32map_get(^imap, 1234));
+    print(  i32map_get(^imap, 50, ""));
+    println(i32map_get(^imap, 1234, ""));
 }

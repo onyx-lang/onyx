@@ -303,13 +303,15 @@ b32 check_call(AstCall* call) {
             return 1;
         }
 
-        if (type_is_structlike_strict(actual->value->type)) {
-            if (!type_structlike_is_simple(actual->value->type)) {
-                onyx_report_error(actual->token->pos,
-                    "Can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
-                return 1;
-            }
-        }
+        // NOTE: This restricts you to only passing simple structures as parameters.
+        // At one point in time it was okay, but there are some necessary complexities.
+        // if (type_is_structlike_strict(actual->value->type)) {
+        //     if (!type_structlike_is_simple(actual->value->type)) {
+        //         onyx_report_error(actual->token->pos,
+        //             "Can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
+        //         return 1;
+        //     }
+        // }
 
         if (actual->value->kind == Ast_Kind_Polymorphic_Proc)
             has_polymorphic_args = 1;
@@ -1264,6 +1266,14 @@ b32 check_function_header(AstFunction* func) {
         if (local->type == NULL) {
             onyx_report_error(local->token->pos, "Function parameter types must be known.");
             return 1;
+        }
+
+        local->ppt = Param_Pass_By_Value;
+
+        if (type_is_structlike_strict(local->type)
+                && !type_structlike_is_simple(local->type)) {
+            // local->type = type_make_pointer(semstate.node_allocator, local->type);
+            local->ppt = Param_Pass_By_Implicit_Pointer;
         }
 
         if (param->is_vararg) has_had_varargs = 1;

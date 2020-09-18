@@ -392,6 +392,13 @@ typedef enum ForLoopType {
     For_Loop_DynArr,
 } ForLoopType;
 
+typedef enum ParamPassType {
+    Param_Pass_Invalid,
+    Param_Pass_By_Value,
+    Param_Pass_By_VarArg,
+    Param_Pass_By_Implicit_Pointer,
+} ParamPassType;
+
 // Base Nodes
 #define AstNode_base \
     AstKind kind;             \
@@ -422,7 +429,7 @@ struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *ri
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 addr; u64 length; };
-struct AstLocal         { AstTyped_base; AstLocal *prev_local; };
+struct AstLocal         { AstTyped_base; ParamPassType ppt; };
 struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstTyped *callee; };
 struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
 struct AstArgument      { AstTyped_base; AstTyped *value; };
@@ -597,6 +604,9 @@ struct AstGlobal        {
     };
 };
 struct AstParam {
+    // HACK CLEANUP: This does not need to have a local buried inside of it.
+    // Convert this to be AstTyped_base and pull the ParamPassType from AstLocal
+    // to here.                                        - brendanfh 2020/09/18
     AstLocal *local;
     AstTyped *default_value;
 

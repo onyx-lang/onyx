@@ -1,3 +1,16 @@
+Release v0.0.4
+--------------
+Additions:
+* Ability to pass complicated structs by value. Very useful in polymorphic data types.
+
+Removals:
+
+Changes:
+
+Bug fixes:
+
+
+
 Release v0.0.3
 --------------
 Additions:
