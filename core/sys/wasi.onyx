@@ -19,7 +19,7 @@ output_string :: proc (s: string) -> u32 {
 
 // The builtin _start proc.
 // Sets up everything needed for execution.
-proc #export "_start" {
+proc () #export "_start" {
     memory_init();
 
     context.allocator = heap_allocator;

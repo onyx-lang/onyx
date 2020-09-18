@@ -76,7 +76,7 @@ by :: proc (r: range, s: u32) -> range {
     return range.{ low = r.low, high = r.high, step = s };
 }
 
-switch_demo :: proc {
+switch_demo :: proc () {
     switch a := 4; a {
         case 4, 5, 6 {
             println("a was 4, 5, or 6");

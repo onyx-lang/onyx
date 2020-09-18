@@ -47,7 +47,7 @@ print_bar :: proc (bar: ^Bar) {
     print("\n");
 }
 
-make_bar :: proc -> Bar {
+make_bar :: proc () -> Bar {
     bar : Bar;
     bar.data1 = 1234;
     bar.data2 = 12.34f;

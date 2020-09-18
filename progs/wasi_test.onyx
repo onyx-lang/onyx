@@ -79,7 +79,7 @@ readdir :: proc (fd: FileDescriptor) {
     }
 }
 
-timer_start :: proc -> Timestamp {
+timer_start :: proc () -> Timestamp {
     curr_time: Timestamp;
     clock_time_get(ClockID.Realtime, cast(Timestamp) 1, ^curr_time);
     return curr_time;

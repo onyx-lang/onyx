@@ -1,15 +1,12 @@
 package core
 
-string_make :: proc #overloaded { string_make_from_cstring }
-
-#private
-string_make_from_cstring :: proc (s: cstring) -> string {
+string_make :: proc (s: cstring) -> string {
     len :: string_length(s);
 
     return string.{ count = len, data = s };
 }
 
-string_length :: proc #overloaded {
+string_length :: proc {
     proc (s: ^u8) -> u32 {
         len := 0;
         c := s;
@@ -233,7 +230,7 @@ string_builder_add_bool :: proc (use sb: ^StringBuilder, b: bool) -> ^StringBuil
     return null;
 }
 
-string_builder_append :: proc #overloaded {
+string_builder_append :: proc {
     string_builder_add_string,
     string_builder_add_cstring,
     string_builder_add_i64,
@@ -292,6 +289,6 @@ string_advance_line :: proc (str: ^string) {
     str.count -= adv;
 }
 
-string_read :: proc #overloaded {
+string_read :: proc {
     string_read_u32, string_read_char
 }

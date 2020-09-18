@@ -10,7 +10,7 @@ use package wasi
 OpenMode :: enum {
     Read;
     Write;
-    Append; 
+    Append;
 }
 
 File :: struct {
@@ -99,7 +99,7 @@ file_get_contents_from_file :: proc (file: File) -> string {
     dummy: i64;
     fd_seek(file.fd, 0l, Whence.Set, ^dummy);
 
-    dummy2: u32; 
+    dummy2: u32;
     buf := IOVec.{ data, size };
     fd_pread(file.fd, IOVecArray.{ ^buf, 1 }, 0l, ^dummy2);
 
@@ -108,7 +108,7 @@ file_get_contents_from_file :: proc (file: File) -> string {
     return data[0 .. size];
 }
 
-file_get_contents :: proc #overloaded {
+file_get_contents :: proc {
     file_get_contents_from_file,
 
     proc (path: string) -> string {

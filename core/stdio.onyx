@@ -7,7 +7,7 @@ use package system as system
 #private
 print_buffer : StringBuilder;
 
-stdio_init :: proc {
+stdio_init :: proc () {
 	print_buffer = string_builder_make(2048);
 }
 
@@ -30,7 +30,7 @@ print_range :: proc (r: range, sep := " ") {
     print("\n");
 }
 
-print :: proc #overloaded {
+print :: proc {
 	print_string, print_cstring,
 	print_i64,    print_i32,
 	print_bool,   print_ptr,
@@ -52,7 +52,7 @@ print_array :: proc (arr: $T, sep := " ") {
     print("\n");
 }
 
-print_buffer_flush :: proc {
+print_buffer_flush :: proc () {
     if print_buffer.len == 0 do return;
 
 	^print_buffer

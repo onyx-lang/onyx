@@ -418,7 +418,7 @@ poll_oneoff :: proc (in: ^Subscription, out: ^Event, nsubscriptions: Size, neven
 proc_exit  :: proc (rval: ExitCode) #foreign "wasi_unstable" "proc_exit" ---
 proc_raise :: proc (sig: Signal) -> Errno #foreign "wasi_unstable" "proc_raise" ---
 
-sched_yield :: proc -> Errno #foreign "wasi_unstable" "sched_yield" ---
+sched_yield :: proc () -> Errno #foreign "wasi_unstable" "sched_yield" ---
 
 random_get :: proc (buf: ^u8, buf_len: Size) -> Errno #foreign "wasi_unstable" "random_get" ---
 

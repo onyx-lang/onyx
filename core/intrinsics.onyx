@@ -1,6 +1,6 @@
 package core
 
-memory_size  :: proc -> i32 #intrinsic ---
+memory_size  :: proc () -> i32 #intrinsic ---
 memory_grow  :: proc (val: i32) -> i32 #intrinsic ---
 
 clz_i32      :: proc (val: i32) -> i32 #intrinsic ---

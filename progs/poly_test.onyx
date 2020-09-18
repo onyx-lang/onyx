@@ -85,7 +85,7 @@ print_v2 :: proc (v: V2) #add_overload print {
     print(")");
 }
 
-switch_demo :: proc {
+switch_demo :: proc () {
     switch a := 4; a {
         case 4, 5, 6 {
             print("a was 4, 5, or 6\n");

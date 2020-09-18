@@ -18,7 +18,7 @@ heap_block :: struct {
     next : ^heap_block;
 }
 
-heap_init :: proc {
+heap_init :: proc () {
     heap_state.free_list = null;
     heap_state.next_alloc = __heap_start;
     heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
@@ -173,6 +173,6 @@ alloc_slice :: proc (sl: ^[] $T, count: i32) {
 
 
 
-memory_init :: proc {
+memory_init :: proc () {
     heap_init();
 }

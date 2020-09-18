@@ -1443,9 +1443,6 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 // e
 // '(' (<symbol>: <type>,?)* ')'
 static void parse_function_params(OnyxParser* parser, AstFunction* func) {
-    if (parser->curr->type != '(')
-        return;
-
     expect_token(parser, '(');
 
     if (parser->curr->type == ')') {
@@ -1543,8 +1540,32 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
 
 // 'proc' <func_params> ('->' <type>)? <directive>* <block>
 static AstFunction* parse_function_definition(OnyxParser* parser) {
+    OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
+
+    if (parser->curr->type == '{') {
+        AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
+        ofunc->token = proc_token;
+
+        bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
+
+        expect_token(parser, '{');
+        while (parser->curr->type != '}') {
+            if (parser->hit_unexpected_token) return (AstFunction *) ofunc;
+
+            AstTyped* o_node = parse_expression(parser);
+
+            bh_arr_push(ofunc->overloads, o_node);
+
+            if (parser->curr->type != '}')
+                expect_token(parser, ',');
+        }
+
+        consume_token(parser);
+        return (AstFunction *) ofunc;
+    }
+
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
-    func_def->token = expect_token(parser, Token_Type_Keyword_Proc);
+    func_def->token = proc_token;
 
     bh_arr_new(global_heap_allocator, func_def->locals, 4);
     bh_arr_new(global_heap_allocator, func_def->params, 4);
@@ -1565,28 +1586,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
     func_def->return_type = return_type;
 
     while (parser->curr->type == '#') {
-        if (parse_possible_directive(parser, "overloaded")) {
-            AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
-            ofunc->token = func_def->token;
-
-            bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
-
-            expect_token(parser, '{');
-            while (parser->curr->type != '}') {
-                if (parser->hit_unexpected_token) return (AstFunction *) ofunc;
-
-                AstTyped* o_node = parse_expression(parser);
-
-                bh_arr_push(ofunc->overloads, o_node);
-
-                if (parser->curr->type != '}')
-                    expect_token(parser, ',');
-            }
-
-            consume_token(parser);
-            return (AstFunction *) ofunc;
-        }
-
         if (parse_possible_directive(parser, "add_overload")) {
             if (func_def->overloaded_function != NULL) {
                 onyx_report_error(parser->curr->pos, "cannot have multiple #add_overload directives on a single procedure.");
