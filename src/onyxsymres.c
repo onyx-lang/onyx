@@ -631,7 +631,7 @@ static void symres_use_package(AstUsePackage* package) {
         pac_node->package = p;
         pac_node->token = package->alias;
 
-        symbol_introduce(semstate.curr_package->include_scope, package->alias, (AstNode *) pac_node);
+        symbol_introduce(semstate.curr_scope, package->alias, (AstNode *) pac_node);
     }
 
     if (package->only != NULL) {
@@ -643,24 +643,12 @@ static void symres_use_package(AstUsePackage* package) {
                 return;
             }
 
-            symbol_introduce(semstate.curr_package->include_scope, (*alias)->alias, thing);
+            symbol_introduce(semstate.curr_scope, (*alias)->alias, thing);
         }
     }
 
     if (package->alias == NULL && package->only == NULL) {
-        b32 already_included = 0;
-        bh_arr_each(Package *, included_package, semstate.curr_package->unqualified_uses) {
-            if (*included_package == p) {
-                already_included = 1;
-                break;
-            }
-        }
-
-        if (already_included) return;
-
-        scope_include(semstate.curr_package->include_scope, p->scope);
-
-        bh_arr_push(semstate.curr_package->unqualified_uses, p);
+        scope_include(semstate.curr_scope, p->scope);
     }
 }
 
@@ -729,7 +717,7 @@ void onyx_resolve_symbols() {
 
     bh_arr_each(Entity, entity, semstate.program->entities) {
         if (entity->package) {
-            scope_enter(entity->package->private_scope);
+            scope_enter(entity->scope);
             semstate.curr_package = entity->package;
         }
 

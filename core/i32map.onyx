@@ -82,14 +82,14 @@ i32map_clear :: proc (use imap: ^I32Map($T)) {
 // Private symbols
 //
 
-#private
+#private_file
 I32MapLookupResult :: struct {
     hash_index  : i32 = -1;
     entry_index : i32 = -1;
     entry_prev  : i32 = -1;
 }
 
-#private
+#private_file
 i32map_lookup :: proc (use imap: ^I32Map($T), key: i32) -> I32MapLookupResult {
     lr := I32MapLookupResult.{};
 

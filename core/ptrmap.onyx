@@ -83,14 +83,14 @@ ptrmap_clear :: proc (use pmap: ^PtrMap) {
 // Private symbols
 //
 
-#private
+#private_file
 PtrMapLookupResult :: struct {
     hash_index  : i32 = -1;
     entry_index : i32 = -1;
     entry_prev  : i32 = -1;
 }
 
-#private
+#private_file
 ptrmap_lookup :: proc (use pmap: ^PtrMap, key: rawptr) -> PtrMapLookupResult {
     lr := PtrMapLookupResult.{};
 

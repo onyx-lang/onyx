@@ -33,6 +33,7 @@ typedef struct OnyxParser {
 
     ProgramInfo *program;
     Package *package;
+    Scope *file_scope;
 
     // NOTE: not used since all tokens are lexed before parsing starts
     OnyxTokenizer *tokenizer;

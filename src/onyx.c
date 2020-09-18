@@ -226,6 +226,7 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
         AstKind nkind = node->kind;
 
         ent.package = n->package;
+        ent.scope   = n->scope;
 
         switch (nkind) {
             case Ast_Kind_Function: {

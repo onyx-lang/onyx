@@ -7,10 +7,12 @@ Additions:
 * Added println to core library; print followed by a newline.
 * Added tests/ folder and runtests.sh which will compile and execute the programs in the
     folder and test against their expected output.
+* #private_file for specifying symbols at the file scope
 
 Removals:
 
 Changes:
+* BREAKING: 'use package' now places included symbols at the file scope, not package scope.
 * Switched to using TCC as the primary compiler, while maintaining support for GCC.
 * boolean literals are compile time known so they can be used at top level.
 

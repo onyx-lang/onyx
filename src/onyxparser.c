@@ -110,7 +110,7 @@ static OnyxToken* soft_expect_token(OnyxParser* parser, TokenType token_type) {
 static void add_node_to_process(OnyxParser* parser, AstNode* node) {
     bh_arr_push(parser->results.nodes_to_process, ((NodeToProcess) {
         .package = parser->package,
-        .scope = parser->package->scope,
+        .scope = parser->file_scope,
         .node = node,
     }));
 }
@@ -1784,9 +1784,13 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
 // 'use' <string>
 // <symbol> :: <expr>
 static AstNode* parse_top_level_statement(OnyxParser* parser) {
-    b32 is_private = 0;
+    AstFlags private_kind = 0;
     if (parse_possible_directive(parser, "private")) {
-        is_private = 1;
+        private_kind = Ast_Flag_Private_Package;
+    }
+
+    else if (parse_possible_directive(parser, "private_file")) {
+        private_kind = Ast_Flag_Private_File;
     }
 
     switch ((u16) parser->curr->type) {
@@ -1853,8 +1857,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                 AstTyped* node = parse_top_level_expression(parser);
 
-                if (is_private)
-                    node->flags |= Ast_Flag_Private_Package;
+                node->flags |= private_kind;
 
                 if (node->kind == Ast_Kind_Function) {
                     AstFunction* func = (AstFunction *) node;
@@ -1908,8 +1911,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     }
                 }
 
-                if (is_private)
-                    memres->flags |= Ast_Flag_Private_Package;
+                memres->flags |= private_kind;
 
                 add_node_to_process(parser, (AstNode *) memres);
 
@@ -2025,6 +2027,8 @@ ParseResults onyx_parse(OnyxParser *parser) {
         parser->package = package;
     }
 
+    parser->file_scope = scope_create(parser->allocator, parser->package->private_scope);
+
     AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);
     implicit_use_builtin->package = (AstPackage *) &builtin_package_node;
     add_node_to_process(parser, (AstNode *) implicit_use_builtin);
@@ -2042,11 +2046,18 @@ ParseResults onyx_parse(OnyxParser *parser) {
                     case Ast_Kind_Include_Folder:
                         bh_arr_push(parser->results.includes, (AstInclude *) curr_stmt);
                         break;
+
                     case Ast_Kind_Binding: {
                         if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_Package) {
                             symbol_introduce(parser->package->private_scope,
                                 ((AstBinding *) curr_stmt)->token,
                                 ((AstBinding *) curr_stmt)->node);
+
+                        } else if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_File) {
+                            symbol_introduce(parser->file_scope,
+                                ((AstBinding *) curr_stmt)->token,
+                                ((AstBinding *) curr_stmt)->node);
+
                         } else {
                             symbol_introduce(parser->package->scope,
                                 ((AstBinding *) curr_stmt)->token,
