@@ -799,8 +799,9 @@ b32 check_struct_literal(AstStructLiteral* sl) {
         // since those names may not be in the correct order. - brendanfh   2020/09/12
         if (!types_are_compatible(formal, (*actual)->type)) {
             onyx_report_error(sl->token->pos,
-                    "Mismatched types for %d%s member, expected '%s', got '%s'.",
+                    "Mismatched types for %d%s member named '%s', expected '%s', got '%s'.",
                     i + 1, bh_num_suffix(i + 1),
+                    smem.name,
                     type_get_name(formal),
                     type_get_name((*actual)->type));
             return 1;

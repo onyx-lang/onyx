@@ -59,6 +59,12 @@ typedef struct Type Type;
 typedef struct StructMember {
     u32 offset, idx;
     Type *type;
+
+    // NOTE: Since the name is stored here, it may not be necessary to,
+    // store a hash table of struct members. There realistically will not
+    // be many struct members, and iterating through an array would be
+    // easier and less costly.                  - brendanfh 2020/09/17
+    char *name;
 } StructMember;
 
 #define TYPE_KINDS \

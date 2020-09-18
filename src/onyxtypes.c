@@ -341,13 +341,14 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     offset += mem_alignment - (offset % mem_alignment);
                 }
 
+                token_toggle_end((*member)->token);
                 StructMember smem = {
                     .offset = offset,
                     .type = (*member)->type,
                     .idx = idx,
+                    .name = bh_strdup(alloc, (*member)->token->text),
                 };
 
-                token_toggle_end((*member)->token);
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
                 token_toggle_end((*member)->token);
 
