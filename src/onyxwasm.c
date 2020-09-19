@@ -1289,6 +1289,26 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
             WI(WI_I32_EQZ);
             break;
 
+        case Unary_Op_Bitwise_Not: {
+            emit_expression(mod, &code, unop->expr);
+
+            TypeBasic* type = &unop->type->Basic;
+
+            if (type->kind == Basic_Kind_I32
+                    || type->kind == Basic_Kind_I16
+                    || type->kind == Basic_Kind_I8) {
+                WID(WI_I32_CONST, 0xffffffff);
+                WI(WI_I32_XOR);
+
+            }
+            else if (type->kind == Basic_Kind_I64) {
+                WIL(WI_I64_CONST, 0xffffffffffffffff);
+                WI(WI_I64_XOR);
+            }
+
+            break;
+        }
+
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
     }
 

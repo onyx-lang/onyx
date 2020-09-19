@@ -306,6 +306,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '~': {
+            AstUnaryOp* not_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+            not_node->operation = Unary_Op_Bitwise_Not;
+            not_node->token = expect_token(parser, '~');
+            not_node->expr = parse_factor(parser);
+
+            retval = (AstTyped *) not_node;
+            break;
+        }
+
         case '*': {
             AstDereference* deref_node = make_node(AstDereference, Ast_Kind_Dereference);
             deref_node->token = expect_token(parser, '*');

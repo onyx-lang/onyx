@@ -293,6 +293,13 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
     } \
     break;
 
+#define REDUCE_UNOP_INT(op) \
+    if (type_is_small_integer(unop->type) || type_is_bool(unop->type)) { \
+        res->value.i = op ((AstNumLit *) unop->expr)->value.i; \
+    } else if (type_is_integer(unop->type)) { \
+        res->value.l = op ((AstNumLit *) unop->expr)->value.l; \
+    }
+
 AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
     unop->expr = ast_reduce(a, unop->expr);
 
@@ -312,6 +319,7 @@ AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
             if (type_is_bool(res->type)) res->value.i = ! ((AstNumLit *) unop->expr)->value.i;
             break;
         }
+        case Unary_Op_Bitwise_Not: REDUCE_UNOP_INT(~);
 
         default: return (AstTyped *) unop;
     }

@@ -762,6 +762,15 @@ b32 check_unaryop(AstUnaryOp** punop) {
         unaryop->type = unaryop->expr->type;
     }
 
+    if (unaryop->operation == Unary_Op_Bitwise_Not) {
+        if (!type_is_integer(unaryop->expr->type)) {
+            onyx_report_error(unaryop->token->pos,
+                    "Bitwise operator expected integer type, got '%s'.",
+                    type_get_name(unaryop->expr->type));
+            return 1;
+        }
+    }
+
     if (unaryop->expr->flags & Ast_Flag_Comptime) {
         unaryop->flags |= Ast_Flag_Comptime;
         // NOTE: Not a unary op

@@ -2,10 +2,13 @@ Release v0.0.4
 --------------
 Additions:
 * Ability to pass complicated structs by value. Very useful in polymorphic data types.
+* bitwise not operator, ~
 
 Removals:
 
 Changes:
+* Procedure definitions now require parentheses, even if there are no arguments. This was
+    done to allow for `proc { foo, bar }` to be the overload syntax.
 
 Bug fixes:
 

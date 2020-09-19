@@ -193,6 +193,7 @@ typedef enum AstFlags {
 typedef enum UnaryOp {
     Unary_Op_Negate,
     Unary_Op_Not,
+    Unary_Op_Bitwise_Not,
     Unary_Op_Cast,
 } UnaryOp;
 
