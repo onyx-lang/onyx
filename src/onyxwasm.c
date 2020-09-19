@@ -1310,6 +1310,9 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         }
 
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
+
+        // NOTE: Any remaining auto casts can be ignored since it means that a cast was not necessary. - brendanfh 2020/09/19
+        case Unary_Op_Auto_Cast: emit_expression(mod, &code, unop->expr); break;
     }
 
     *pcode = code;
@@ -1328,10 +1331,10 @@ EMIT_FUNC(call, AstCall* call) {
             arg = (AstArgument *) arg->next) {
 
         b32 place_on_stack = 0;
-        b32 arg_is_struct  = type_is_structlike(arg->type);
+        b32 arg_is_struct  = type_is_structlike(arg->value->type);
 
         if (arg->flags & Ast_Flag_Arg_Is_VarArg) place_on_stack = 1;
-        if (type_get_param_pass(arg->type) == Param_Pass_By_Implicit_Pointer) place_on_stack = 1;
+        if (type_get_param_pass(arg->value->type) == Param_Pass_By_Implicit_Pointer) place_on_stack = 1;
 
         if (place_on_stack && !arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
 
@@ -1339,7 +1342,7 @@ EMIT_FUNC(call, AstCall* call) {
 
         if (place_on_stack) {
             if (arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
-            emit_store_instruction(mod, &code, arg->type, stack_grow_amm);
+            emit_store_instruction(mod, &code, arg->value->type, stack_grow_amm);
 
             if (arg->flags & Ast_Flag_Arg_Is_VarArg) vararg_count += 1;
             else {
@@ -1348,7 +1351,7 @@ EMIT_FUNC(call, AstCall* call) {
                 WI(WI_I32_ADD);
             }
 
-            stack_grow_amm += type_size_of(arg->type);
+            stack_grow_amm += type_size_of(arg->value->type);
         }
     }
 

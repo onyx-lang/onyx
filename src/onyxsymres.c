@@ -258,9 +258,6 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
     }
 
     symres_expression(&(*unaryop)->expr);
-
-    if ((*unaryop)->type_node == NULL)
-        (*unaryop)->type_node = ((AstUnaryOp *)(*unaryop))->expr->type_node;
 }
 
 static void symres_struct_literal(AstStructLiteral* sl) {

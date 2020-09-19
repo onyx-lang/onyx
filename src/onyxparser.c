@@ -334,6 +334,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Tilde_Tilde: {
+            AstUnaryOp* ac_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
+            ac_node->operation = Unary_Op_Auto_Cast;
+            ac_node->token = expect_token(parser, Token_Type_Tilde_Tilde);
+            ac_node->expr = parse_factor(parser);
+
+            retval = (AstTyped *) ac_node;
+            break;
+        }
+
         case Token_Type_Keyword_Cast: {
             AstUnaryOp* cast_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
             cast_node->token = expect_token(parser, Token_Type_Keyword_Cast);

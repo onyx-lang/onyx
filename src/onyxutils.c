@@ -478,7 +478,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
             }
 
             fori (i, 0, param->idx) arg = (AstArgument *) arg->next;
-            actual_type = arg->type;
+            actual_type = arg->value->type;
         }
 
         else if (pp_lookup == PPLM_By_Function_Type) {

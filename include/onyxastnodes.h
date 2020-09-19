@@ -195,6 +195,7 @@ typedef enum UnaryOp {
     Unary_Op_Not,
     Unary_Op_Bitwise_Not,
     Unary_Op_Cast,
+    Unary_Op_Auto_Cast,
 } UnaryOp;
 
 typedef enum BinaryOp {
@@ -800,6 +801,10 @@ static inline b32 binop_is_compare(AstBinaryOp* binop) {
 
 static inline b32 node_is_type(AstNode* node) {
     return (node->kind > Ast_Kind_Type_Start) && (node->kind < Ast_Kind_Type_End);
+}
+
+static inline b32 node_is_auto_cast(AstNode* node) {
+    return (node->kind == Ast_Kind_Unary_Op) && (((AstUnaryOp *) node)->operation == Unary_Op_Auto_Cast);
 }
 
 static inline CallingConvention type_function_get_cc(Type* type) {

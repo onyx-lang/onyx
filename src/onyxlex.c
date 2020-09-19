@@ -58,6 +58,7 @@ static const char* token_type_names[] = {
     ">>=",
     ">>>=",
     "..",
+    "~~",
 
     "TOKEN_TYPE_SYMBOL",
     "TOKEN_TYPE_LITERAL_STRING",
@@ -375,6 +376,7 @@ whitespace_skipped:
         LITERAL_TOKEN("/=",          0, Token_Type_Fslash_Equal);
         LITERAL_TOKEN("%=",          0, Token_Type_Percent_Equal);
         LITERAL_TOKEN("..",          0, Token_Type_Dot_Dot);
+        LITERAL_TOKEN("~~",          0, Token_Type_Tilde_Tilde);
         break;
     }
 

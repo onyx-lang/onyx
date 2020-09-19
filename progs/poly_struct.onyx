@@ -5,6 +5,13 @@ package main
 use package core
 
 main :: proc (args: [] cstring) {
+
+    x := 2.4f;
+    y := 1;
+    y += ~~x;
+    println(y);
+
+
     imap : I32Map(string);
     i32map_init(^imap);
     defer i32map_free(^imap);

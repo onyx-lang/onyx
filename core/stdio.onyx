@@ -4,11 +4,10 @@ package core
 // of the system package
 use package system as system
 
-#private
-print_buffer : StringBuilder;
+#private_file print_buffer : StringBuilder;
 
 stdio_init :: proc () {
-	print_buffer = string_builder_make(2048);
+    print_buffer = string_builder_make(2048);
 }
 
 print_string  :: proc (s: string) {
@@ -31,9 +30,9 @@ print_range :: proc (r: range, sep := " ") {
 }
 
 print :: proc {
-	print_string, print_cstring,
-	print_i64,    print_i32,
-	print_bool,   print_ptr,
+    print_string, print_cstring,
+    print_i64,    print_i32,
+    print_bool,   print_ptr,
     print_range,
 }
 
@@ -55,10 +54,10 @@ print_array :: proc (arr: $T, sep := " ") {
 print_buffer_flush :: proc () {
     if print_buffer.len == 0 do return;
 
-	^print_buffer
-		|> string_builder_to_string()
-		|> system.output_string();
+    ^print_buffer
+        |> string_builder_to_string()
+        |> system.output_string();
 
-	^print_buffer |> string_builder_clear();
+    ^print_buffer |> string_builder_clear();
 }
 

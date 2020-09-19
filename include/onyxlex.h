@@ -61,6 +61,7 @@ typedef enum TokenType {
     Token_Type_Sar_Equal,
 
     Token_Type_Dot_Dot,
+    Token_Type_Tilde_Tilde,
 
     Token_Type_Symbol,
     Token_Type_Literal_String,
