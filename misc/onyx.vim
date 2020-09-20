@@ -14,9 +14,7 @@ syn keyword onyxKeyword package struct enum proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword switch case
-syn keyword onyxKeyword break continue return defer fallthrough
-syn keyword onyxKeyword as cast sizeof alignof
-
+syn keyword onyxKeyword break continue return defer fallthrough syn keyword onyxKeyword as cast sizeof alignof
 syn keyword onyxType bool void
 syn keyword onyxType i8 u8
 syn keyword onyxType i16 u16
@@ -28,6 +26,11 @@ syn keyword onyxType rawptr
 syn keyword onyxType i8x16 i16x8 i32x4 i64x2 f32x4 f64x2 v128
 
 syn keyword onyxConstant        true false null
+
+syn match onyxNumber            "\<0x[a-fA-F0-9]\+\>"
+syn match onyxNumber            "\<\d\+[lf]\=\>"
+syn match onyxNumber            "\<\d\+\.\d*f\=\>"
+syn match onyxNumber            "\.\d\+f\=\>"
 
 syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 
@@ -45,6 +48,7 @@ hi def link onyxCommentStart     Todo
 hi def link onyxConstant         Constant
 hi def link onyxDirective        Constant
 hi def link onyxString           String
+hi def link onyxNumber           Number
 
 let b:current_syntax = "onyx"
 let &cpo = s:cpo_save
