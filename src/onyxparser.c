@@ -127,6 +127,14 @@ static AstNumLit* make_int_literal(bh_allocator a, i64 i) {
     return num;
 }
 
+static AstUnaryOp* wrap_in_auto_cast(bh_allocator a, AstTyped* expr) {
+    AstUnaryOp* ac = onyx_ast_node_new(a, sizeof(AstUnaryOp), Ast_Kind_Unary_Op);
+    ac->operation = Unary_Op_Auto_Cast;
+    ac->token = expr->token;
+    ac->expr = expr;
+    return ac;
+}
+
 
 static AstNumLit* parse_int_literal(OnyxParser* parser) {
     AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
@@ -1316,7 +1324,7 @@ static AstType* parse_type(OnyxParser* parser) {
             }
 
             if (parser->curr->type == '(') {
-                consume_token(parser);
+                OnyxToken* paren_token = expect_token(parser, '(');
 
                 bh_arr(AstType *) params = NULL;
                 bh_arr_new(global_heap_allocator, params, 2);
@@ -1333,6 +1341,7 @@ static AstType* parse_type(OnyxParser* parser) {
                 expect_token(parser, ')');
 
                 AstPolyCallType* pc_type = make_node(AstPolyCallType, Ast_Kind_Poly_Call_Type);
+                pc_type->token = paren_token;
                 pc_type->callee = *next_insertion;
                 pc_type->params = params;
 
@@ -2034,7 +2043,7 @@ ParseResults onyx_parse(OnyxParser *parser) {
         parser->package = package;
     }
 
-    parser->file_scope = scope_create(parser->allocator, parser->package->private_scope);
+    parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
 
     AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);
     implicit_use_builtin->package = (AstPackage *) &builtin_package_node;

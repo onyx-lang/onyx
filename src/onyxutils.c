@@ -95,7 +95,7 @@ const char* onyx_ast_node_kind_string(AstKind kind) {
 
 
 void program_info_init(ProgramInfo* prog, bh_allocator alloc) {
-    prog->global_scope = scope_create(alloc, NULL);
+    prog->global_scope = scope_create(alloc, NULL, (OnyxFilePos) { 0 });
 
     bh_table_init(alloc, prog->packages, 16);
 
@@ -122,8 +122,8 @@ Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_
         memcpy(pac_name, package_name, strlen(package_name) + 1);
 
         package->name = pac_name;
-        package->scope = scope_create(alloc, parent_scope);
-        package->private_scope = scope_create(alloc, package->scope);
+        package->scope = scope_create(alloc, parent_scope, (OnyxFilePos) { 0 });
+        package->private_scope = scope_create(alloc, package->scope, (OnyxFilePos) { 0 });
 
         bh_table_put(Package *, prog->packages, pac_name, package);
 
@@ -131,9 +131,10 @@ Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_
     }
 }
 
-Scope* scope_create(bh_allocator a, Scope* parent) {
+Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     Scope* scope = bh_alloc_item(a, Scope);
     scope->parent = parent;
+    scope->created_at = created_at;
     scope->symbols = NULL;
 
     bh_table_init(global_heap_allocator, scope->symbols, 64);
@@ -196,7 +197,7 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     AstNode* res = symbol_raw_resolve(start_scope, tkn->text);
 
     if (res == NULL) {
-        onyx_report_error(tkn->pos, "Unable to resolve symbol '%s'", tkn->text);
+        onyx_report_error(tkn->pos, "Unable to resolve symbol '%s'.", tkn->text);
         token_toggle_end(tkn);
         return &empty_node;
     }
@@ -523,12 +524,15 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
     }
 
     Type* old_return_type = semstate.expected_return_type;
+    Scope* old_scope = semstate.curr_scope;
     semstate.curr_scope = pp->poly_scope;
 
     AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
     bh_table_put(AstFunction *, pp->concrete_funcs, key_buf, func);
 
     symres_function(func);
+    semstate.curr_scope = old_scope;
+
     if (onyx_has_errors()) goto has_error;
     if (check_function_header(func)) goto has_error;
     if (check_function(func)) goto has_error;
@@ -559,7 +563,7 @@ no_errors:
 
 
 
-AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params) {
+AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params, OnyxFilePos pos) {
     // @Cleanup
     assert(bh_arr_length(ps_type->poly_params) == bh_arr_length(params));
     assert(ps_type->scope != NULL);
@@ -597,13 +601,16 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(semstate.node_allocator, ps_type->base_struct);
 
+    Scope* old_scope = semstate.curr_scope;
     semstate.curr_scope = ps_type->scope;
     concrete_struct = (AstStructType *) symres_type((AstType *) concrete_struct);
+    semstate.curr_scope = old_scope;
+
     if (onyx_has_errors()) goto has_error;
     goto no_errors;
 
 has_error:
-    // onyx_report_error((OnyxFilePos) { 0 }, "Error in polymorphic struct generated from this call site.");
+    // onyx_report_error(pos, "Error in polymorphic struct generated from this call site.");
     return NULL;
 
 no_errors:

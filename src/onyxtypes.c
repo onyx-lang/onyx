@@ -297,6 +297,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             if (a_node->count_expr) {
                 a_node->count_expr->type = type_build_from_ast(alloc, a_node->count_expr->type_node);
 
+                if (node_is_auto_cast((AstNode *) a_node->count_expr)) {
+                    a_node->count_expr = ((AstUnaryOp *) a_node)->expr;
+                }
+
                 // NOTE: Currently, the count_expr has to be an I32 literal
                 if (a_node->count_expr->kind != Ast_Kind_NumLit
                     || a_node->count_expr->type->kind != Type_Kind_Basic
@@ -442,7 +446,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 bh_arr_push(param_types, type_build_from_ast(alloc, *ptype));
             }
 
-            AstStructType* concrete = polymorphic_struct_lookup(ps_type, param_types);
+            AstStructType* concrete = polymorphic_struct_lookup(ps_type, param_types, pc_type->token->pos);
 
             bh_arr_free(param_types);
 

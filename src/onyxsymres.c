@@ -31,8 +31,8 @@ static void symres_enum(AstEnumType* enum_node);
 static void symres_memres(AstMemRes** memres);
 
 static void scope_enter(Scope* new_scope) {
-    if (new_scope->parent == NULL)
-        new_scope->parent = semstate.curr_scope;
+    // if (new_scope->parent == NULL)
+    //     new_scope->parent = semstate.curr_scope;
     semstate.curr_scope = new_scope;
 }
 
@@ -153,7 +153,7 @@ AstType* symres_type(AstType* type) {
 
     if (type->kind == Ast_Kind_Poly_Struct_Type) {
         AstPolyStructType* pst_node = (AstPolyStructType *) type;
-        pst_node->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        pst_node->scope = scope_create(semstate.node_allocator, semstate.curr_scope, pst_node->token->pos);
 
         return type;
     }
@@ -261,11 +261,18 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
 }
 
 static void symres_struct_literal(AstStructLiteral* sl) {
+    // @CLEANUP
     if (sl->stnode != NULL) symres_expression(&sl->stnode);
+    sl->stnode = (AstTyped *) symres_type((AstType *) sl->stnode);
     if (sl->stnode == NULL || sl->stnode->kind == Ast_Kind_Error || sl->stnode->kind == Ast_Kind_Symbol) return;
 
-    sl->type_node = symres_type((AstType *) sl->stnode);
+    sl->type_node = (AstType *) sl->stnode;
+    while (sl->type_node->kind == Ast_Kind_Type_Alias)
+        sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
+
     sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
+
+    if (sl->type == NULL) return;
 
     if (!type_is_structlike_strict(sl->type)) {
         onyx_report_error(sl->token->pos, "Type is not a constructable using a struct literal.");
@@ -301,10 +308,8 @@ static void symres_struct_literal(AstStructLiteral* sl) {
                 u32 idx = (*smem)->idx;
 
                 if (sl->values[idx] == NULL) {
-                    if (st->members[idx]->initial_value == NULL) {
-                        onyx_report_error(sl->token->pos, "No value was given for the field '%b'.",
-                                st->members[idx]->token->text,
-                                st->members[idx]->token->length);
+                    if (st->kind != Ast_Kind_Struct_Type || st->members[idx]->initial_value == NULL) {
+                        onyx_report_error(sl->token->pos, "No value was given for the field '%s'.", (*smem)->name);
                         return;
                     }
 
@@ -382,7 +387,7 @@ static void symres_return(AstReturn* ret) {
 
 static void symres_if(AstIfWhile* ifnode) {
     if (ifnode->assignment != NULL) {
-        ifnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        ifnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, ifnode->token->pos);
         scope_enter(ifnode->scope);
 
         symbol_introduce(semstate.curr_scope, ifnode->local->token, (AstNode *) ifnode->local);
@@ -400,7 +405,7 @@ static void symres_if(AstIfWhile* ifnode) {
 
 static void symres_while(AstIfWhile* whilenode) {
     if (whilenode->assignment != NULL) {
-        whilenode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        whilenode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
         symbol_introduce(semstate.curr_scope, whilenode->local->token, (AstNode *) whilenode->local);
@@ -417,7 +422,7 @@ static void symres_while(AstIfWhile* whilenode) {
 }
 
 static void symres_for(AstFor* fornode) {
-    fornode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+    fornode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, fornode->token->pos);
     scope_enter(fornode->scope);
 
     symres_expression(&fornode->iter);
@@ -431,7 +436,7 @@ static void symres_for(AstFor* fornode) {
 
 static void symres_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) {
-        switchnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        switchnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, switchnode->token->pos);
         scope_enter(switchnode->scope);
 
         symbol_introduce(semstate.curr_scope, switchnode->local->token, (AstNode *) switchnode->local);
@@ -486,7 +491,7 @@ static void symres_statement_chain(AstNode** walker) {
 
 static void symres_block(AstBlock* block) {
     if (block->scope == NULL)
-        block->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        block->scope = scope_create(semstate.node_allocator, semstate.curr_scope, block->token->pos);
 
     scope_enter(block->scope);
     bh_arr_push(semstate.block_stack, block);
@@ -500,7 +505,7 @@ static void symres_block(AstBlock* block) {
 
 void symres_function(AstFunction* func) {
     if (func->scope == NULL)
-        func->scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+        func->scope = scope_create(semstate.node_allocator, semstate.curr_scope, func->token->pos);
 
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
@@ -656,7 +661,7 @@ static void symres_enum(AstEnumType* enum_node) {
     if (enum_node->backing == NULL) return;
 
     enum_node->backing_type = type_build_from_ast(semstate.allocator, enum_node->backing);
-    enum_node->scope = scope_create(semstate.node_allocator, NULL);
+    enum_node->scope = scope_create(semstate.node_allocator, NULL, enum_node->token->pos);
 
     u64 next_assign_value = (enum_node->flags & Ast_Flag_Enum_Is_Flags) ? 1 : 0;
     bh_arr_each(AstEnumValue *, value, enum_node->values) {
@@ -705,7 +710,7 @@ static void symres_memres(AstMemRes** memres) {
 }
 
 static void symres_polyproc(AstPolyProc* pp) {
-    pp->poly_scope = scope_create(semstate.node_allocator, semstate.curr_scope);
+    pp->poly_scope = scope_create(semstate.node_allocator, semstate.curr_scope, pp->token->pos);
 }
 
 void onyx_resolve_symbols() {

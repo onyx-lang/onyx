@@ -40,7 +40,7 @@ syn region onyxComment          start="/\*" end="\*/" contains=onyxCommentStart
 syn match onyxDefinitionGroup   "\<[a-zA-Z_][a-zA-Z0-9_]*\> *::" contains=onyxDefinition
 syn match onyxDefinition        "\<[a-zA-Z_][a-zA-Z0-9_]*\>" contained
 
-syn region onyxDirective        start="#" end=" "
+syn match onyxDirective         "\#[a-zA-Z_]\+"
 
 syn region onyxString		    display start=+"+ skip=+\\\\\|\\"+ end=+"+ keepend
 

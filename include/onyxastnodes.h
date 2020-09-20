@@ -69,10 +69,11 @@ typedef struct Package Package;
 
 typedef struct Scope {
     struct Scope *parent;
+    OnyxFilePos created_at;
     bh_table(AstNode *) symbols;
 } Scope;
 
-extern Scope* scope_create(bh_allocator a, Scope* parent);
+extern Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at);
 
 
 typedef enum AstKind {
@@ -777,7 +778,7 @@ typedef enum PolyProcLookupMethod {
 } PolyProcLookupMethod;
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos);
 
-AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params);
+AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params, OnyxFilePos pos);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {
