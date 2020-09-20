@@ -37,6 +37,9 @@ syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 syn region onyxComment          start="//" end="$" keepend contains=onyxCommentStart
 syn region onyxComment          start="/\*" end="\*/" contains=onyxCommentStart
 
+syn match onyxDefinitionGroup   "\<[a-zA-Z_][a-zA-Z0-9_]*\> *::" contains=onyxDefinition
+syn match onyxDefinition        "\<[a-zA-Z_][a-zA-Z0-9_]*\>" contained
+
 syn region onyxDirective        start="#" end=" "
 
 syn region onyxString		    display start=+"+ skip=+\\\\\|\\"+ end=+"+ keepend
@@ -49,6 +52,7 @@ hi def link onyxConstant         Constant
 hi def link onyxDirective        Constant
 hi def link onyxString           String
 hi def link onyxNumber           Number
+hi def link onyxDefinition       Identifier
 
 let b:current_syntax = "onyx"
 let &cpo = s:cpo_save
