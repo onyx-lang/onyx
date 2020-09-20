@@ -1,0 +1,80 @@
+
+                                        Onyx Language Specification
+
+                                               Brendan Hansen
+
+        This is the most formal specification of the Onyx programming language. At the time of writing, most
+    of the design and functionality of Onyx is entirely in my head and I am already beginning to forget some
+    of the features of the language.
+
+        Some common abbrevations used in this paper:
+                                            LHS for "Left Hand Side"
+                                            RHS for "Right Hand Side"
+
+                                              Language Features
+                Grammar.................................................................Line xxx
+                Operator Precedence.....................................................[op-pred]
+                Operators...............................................................Line xxx
+                    Arithmetic Operators................................................Line xxx
+                    Logical Operators...................................................[log-ops]
+                    Bitwise Operators...................................................Line xxx
+                    Miscellaneous Operators.............................................Line xxx
+                Packages................................................................Line xxx
+
+
+
+                                              Operator Precendence
+                                                    [op-pred]
+
+        The following are all the binary operators in Onyx in their precedence from highest to lowest:
+
+                                  +---+-------------------------------------------+
+                                  | 9 |                  %                        |
+                                  | 8 |                 * /                       |
+                                  | 7 |                 + -                       |
+                                  | 6 |            & | ^ << >> >>>                |
+                                  | 5 |               <= < >= >                   |
+                                  | 4 |                 == !=                     |
+                                  | 3 |               && || ^^                    |
+                                  | 2 |                |> ..                      |
+                                  | 1 |   = += -= *= /= %= &= |= ^= <<= >>= >>>   |
+                                  +---+-------------------------------------------+
+
+
+        The following are all the unary operators. Prefix unary operators are right associative and all
+    of equal precedence. Postfix unary operators are left associative and also all of equal precedence.
+
+                                  Prefix unary operators:
+                                  !                             Boolean NOT
+                                  -                             Arithmetic negative
+                                  ~                             Bitwise NOT
+                                  ^                             Address of
+                                  *                             Dereference
+                                  cast(X)                       Cast to X
+                                  ~~                            Auto cast
+
+                                  Postfix unary operators:
+                                  [N]                           Array subscript
+                                  .foo                          Field access
+                                  (..)                          Function call
+
+
+
+
+
+                                                Logical Operators
+                                                    [log-ops]
+
+        There is only one unary logical operator, !. It negates the boolean value given to it.
+
+        Binary logical operators expect both the LHS and RHS to be of boolean type. The following are the logical
+    operators in Onyx:
+
+                                                &&       Logical AND
+                                                ||       Logical OR
+                                                ^^       Logical XOR
+
+        All logical operators are of equal precedence. && and || are standard operators in many C-style languages.
+    ^^ is not found in any of the languages I know about, but I don't see a reason not to have it. There are a few
+    places in the compiler that could utilize the ^^ operator.
+

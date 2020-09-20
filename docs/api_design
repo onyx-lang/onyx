@@ -16,6 +16,9 @@ The standard high level topics to cover are:
 	- utility functions
 		* random
 		* clock
+    - arrays
+    - maps
+    - common conversions
 
 
 
