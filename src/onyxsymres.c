@@ -262,9 +262,9 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
 
 static void symres_struct_literal(AstStructLiteral* sl) {
     if (sl->stnode != NULL) symres_expression(&sl->stnode);
-    if (sl->stnode == NULL || sl->stnode->kind == Ast_Kind_Error) return;
+    if (sl->stnode == NULL || sl->stnode->kind == Ast_Kind_Error || sl->stnode->kind == Ast_Kind_Symbol) return;
 
-    sl->type_node = (AstType *) sl->stnode;
+    sl->type_node = symres_type((AstType *) sl->stnode);
     sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
 
     if (!type_is_structlike_strict(sl->type)) {
