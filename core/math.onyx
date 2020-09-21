@@ -47,3 +47,13 @@ cos :: proc (t_: f32) -> f32 {
 	res += 1.0f;
 	return res;
 }
+
+max_poly :: proc (a: $T, b: T) -> T {
+    if a >= b do return a;
+    return b;
+}
+
+min_poly :: proc (a: $T, b: T) -> T {
+    if a <= b do return a;
+    return b;
+}
