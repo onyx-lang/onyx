@@ -119,6 +119,6 @@ array_fold :: proc (arr: ^[..] $T, init: $R, f: proc (T, R) -> R) -> R {
     return val;
 }
 
-array_map :: proc (arr: ^[..] $T, f: proc (T) -> T) {
-    for ^it: *arr do *it = f(*it);
+array_map :: proc (arr: ^[..] $T, data: $R, f: proc (T, R) -> T) {
+    for ^it: *arr do *it = f(*it, data);
 }
