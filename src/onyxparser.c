@@ -508,6 +508,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                         case 'r': char_lit->value.i = '\r'; break;
                         case 'v': char_lit->value.i = '\v'; break;
                         case 'e': char_lit->value.i = '\e'; break;
+                        case '"': char_lit->value.i = '"'; break;
                         case 'x': {
                             // HACK: This whole way of doing this
                             u8 buf[3];

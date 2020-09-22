@@ -57,3 +57,7 @@ min_poly :: proc (a: $T, b: T) -> T {
     if a <= b do return a;
     return b;
 }
+
+sqrt_i32 :: proc (x: i32) -> i32 {
+    return ~~sqrt_f32(~~x);
+}
