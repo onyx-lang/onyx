@@ -1618,6 +1618,23 @@ isize bh__printi64(char* str, isize n, bh__print_format format, i64 value) {
     return bh__print_string(str, n, walker);
 }
 
+isize bh__printf64(char* str, isize n, f64 value) {
+    fori (i, 0, 6) value *= 10.0;
+    i64 v = (i64) value;
+
+    isize l1 = bh__printi64(str, n, ((bh__print_format) { .base = 10 }), v / 1000000);
+    str += l1;
+    n -= l1;
+
+    *str = '.';
+    str += 1;
+    n -= 1;
+
+    isize l2 = bh__printi64(str, n, ((bh__print_format) { .base = 10 }), bh_abs(v) % 1000000);
+
+    return l1 + l2 + 1;
+}
+
 // TODO: This is very hacked together but for now it will work.
 isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
     char const *text_start = str;
@@ -1672,6 +1689,11 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va) {
             char* s = va_arg(va, char *);
             i32 l = va_arg(va, int);
             len = bh__print_string(str, bh_min(l, n), s);
+        } break;
+
+        case 'f': {
+            f64 f = va_arg(va, f64);
+            len = bh__printf64(str, n, f);
         } break;
 
         default: fmt--;

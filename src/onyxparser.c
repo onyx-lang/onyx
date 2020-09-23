@@ -780,9 +780,9 @@ expression_done:
 
 // 'if' <expr> <stmt> ('elseif' <cond> <stmt>)* ('else' <block>)?
 static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
-    expect_token(parser, Token_Type_Keyword_If);
-
     AstIfWhile* if_node = make_node(AstIfWhile, Ast_Kind_If);
+    if_node->token = expect_token(parser, Token_Type_Keyword_If);
+
     AstIfWhile* root_if = if_node;
 
     if ((parser->curr + 1)->type == ':') {
