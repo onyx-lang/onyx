@@ -978,14 +978,19 @@ b32 check_field_access(AstFieldAccess** pfield) {
         return 1;
     }
 
-    token_toggle_end(field->token);
     StructMember smem;
-    if (!type_lookup_member(field->expr->type, field->token->text, &smem)) {
+    if (field->token != NULL) {
+        token_toggle_end(field->token);
+        field->field = field->token->text;
+    }
+
+    if (!type_lookup_member(field->expr->type, field->field, &smem)) {
         onyx_report_error(field->token->pos,
             "Field '%s' does not exists on '%s'.",
-            field->token->text,
+            field->field,
             type_get_name(field->expr->type));
-        token_toggle_end(field->token);
+
+        if (field->token != NULL) token_toggle_end(field->token);
         return 1;
     }
 
@@ -993,7 +998,7 @@ b32 check_field_access(AstFieldAccess** pfield) {
     field->idx = smem.idx;
     field->type = smem.type;
 
-    token_toggle_end(field->token);
+    if (field->token != NULL) token_toggle_end(field->token);
     return 0;
 }
 

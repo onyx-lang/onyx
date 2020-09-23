@@ -18,7 +18,11 @@ OBJ_FILES=\
 ifeq (, $(shell which tcc))
 	CC=gcc
 else
+ifeq ($(RELEASE), 0)
+	CC=gcc
+else
 	CC=tcc
+endif
 endif
 
 INCLUDES=-I./include

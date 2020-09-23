@@ -20,6 +20,7 @@ static void symres_if(AstIfWhile* ifnode);
 static void symres_while(AstIfWhile* whilenode);
 static void symres_for(AstFor* fornode);
 static void symres_switch(AstSwitch* switchnode);
+static void symres_use(AstUse* use);
 static void symres_statement_chain(AstNode** walker);
 static b32  symres_statement(AstNode** stmt);
 static void symres_block(AstBlock* block);
@@ -29,6 +30,14 @@ static void symres_overloaded_function(AstOverloadedFunction* ofunc);
 static void symres_use_package(AstUsePackage* package);
 static void symres_enum(AstEnumType* enum_node);
 static void symres_memres(AstMemRes** memres);
+
+static AstFieldAccess* make_field_access(AstTyped* node, char* field) {
+    AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
+    fa->field = field;
+    fa->expr = node;
+
+    return fa;
+}
 
 static void scope_enter(Scope* new_scope) {
     // if (new_scope->parent == NULL)
@@ -457,6 +466,41 @@ static void symres_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) scope_leave();
 }
 
+static void symres_use(AstUse* use) {
+    symres_expression(&use->expr);
+    if (use->expr == NULL) return;
+
+    if (use->expr->kind == Ast_Kind_Enum_Type) {
+        AstEnumType* et = (AstEnumType *) use->expr;
+
+        bh_arr_each(AstEnumValue *, ev, et->values)
+            symbol_introduce(semstate.curr_scope, (*ev)->token, (AstNode *) *ev);
+
+        return;
+    }
+
+    if (use->expr->type_node == NULL) goto cannot_use;
+
+    if (use->expr->type_node->kind == Ast_Kind_Struct_Type ||
+            use->expr->type_node->kind == Ast_Kind_Poly_Call_Type) {
+
+        if (use->expr->type == NULL)
+            use->expr->type = type_build_from_ast(semstate.node_allocator, use->expr->type_node);
+        if (use->expr->type == NULL) goto cannot_use;
+
+        Type* st = use->expr->type;
+        bh_arr_each(StructMember *, smem, st->Struct.memarr) {
+            AstFieldAccess* fa = make_field_access(use->expr, (*smem)->name);
+            symbol_raw_introduce(semstate.curr_scope, (*smem)->name, use->token->pos, (AstNode *) fa);
+        }
+
+        return;
+    }
+
+cannot_use:
+    onyx_report_error(use->token->pos, "Cannot use this.");
+}
+
 // NOTE: Returns 1 if the statment should be removed
 static b32 symres_statement(AstNode** stmt) {
     switch ((*stmt)->kind) {
@@ -470,6 +514,7 @@ static b32 symres_statement(AstNode** stmt) {
         case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *) *stmt)->value); return 0;
         case Ast_Kind_Block:      symres_block((AstBlock *) *stmt);                  return 0;
         case Ast_Kind_Defer:      symres_statement(&((AstDefer *) *stmt)->stmt);     return 0;
+        case Ast_Kind_Use:        symres_use((AstUse *) *stmt);                       return 1;
 
         case Ast_Kind_Jump:      return 0;
 

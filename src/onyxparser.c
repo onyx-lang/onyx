@@ -1145,6 +1145,15 @@ static AstNode* parse_statement(OnyxParser* parser) {
             break;
         }
 
+        case Token_Type_Keyword_Use: {
+            AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
+            use_node->token = expect_token(parser, Token_Type_Keyword_Use);
+            use_node->expr = parse_expression(parser);
+
+            retval = (AstNode *) use_node;
+            break;
+        }
+
         default:
             break;
     }
