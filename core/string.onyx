@@ -80,10 +80,10 @@ string_contains :: proc (str: string, c: u8) -> bool {
 
 // string_compare :: proc (str1: string, str2: string) -> i32 {
 //     if str1.count != str2.count do return str1.count - str2.count;
-// 
+//
 //     i := 0;
 //     while i < str1.count && str1[i] == str2[i] do i += 1;
-// 
+//
 //     if i == str1.count do return 0;
 //     return ~~(str1[i] - str2[i]);
 // }
@@ -183,10 +183,7 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
         n = cast(u64) -n_;
     }
 
-    str :: cast(^u8) buf.data;
-    for i: 0 .. buf.count do str[i] = #char "\0";
-
-    c := cast(^u8) ^str[buf.count - 1];
+    c := ^(cast(^u8) buf.data)[buf.count - 1];
     len := 0;
 
     s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
@@ -233,9 +230,37 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
     return string.{ data = c + 1, count = len };
 }
 
+// NOTE: This is a big hack but it will work for now
+f64_to_string :: proc (f: f64, buf: [] u8) -> string {
+    a := f;
+    a *= 10000.0;
+    v := cast(i64) a;
+
+    b := Buffer.{ cast(^void) buf.data, buf.count };
+    len := 0;
+
+    s1 := i64_to_string(v / 10000l, 10l, b);
+    for i: 0 .. s1.count do buf.data[i] = s1.data[i];
+    buf.data[s1.count] = #char ".";
+    len = s1.count + 1;
+
+    if v < ~~0 do v = -v;
+    s2 := i64_to_string(v % 10000l, 10l, b);
+    for i: 0 .. s2.count do buf.data[s1.count + 1 + i] = s2.data[i];
+    len += s2.count;
+
+    return string.{ buf.data, len };
+}
+
 string_builder_add_i64 :: proc (use sb: ^StringBuilder, n: i64, base := 10l) -> ^StringBuilder {
     buf : [256] u8;
     s := i64_to_string(n, base, Buffer.{ cast(^void) buf, 256 });
+    return string_builder_add_string(sb, s);
+}
+
+string_builder_add_f64 :: proc (use sb: ^StringBuilder, f: f64) -> ^StringBuilder {
+    buf : [256] u8;
+    s := f64_to_string(f, buf[0 .. 256]);
     return string_builder_add_string(sb, s);
 }
 
@@ -253,6 +278,7 @@ string_builder_append :: proc {
     string_builder_add_string,
     string_builder_add_cstring,
     string_builder_add_i64,
+    string_builder_add_f64,
     string_builder_add_bool,
 }
 

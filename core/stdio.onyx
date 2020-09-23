@@ -18,6 +18,8 @@ print_string  :: proc (s: string) {
 print_cstring :: proc (s: cstring) do string_builder_append(^print_buffer, s);
 print_i64     :: proc (n: i64, base := 10l) do string_builder_append(^print_buffer, n, base);
 print_i32     :: proc (n: i32, base := 10)  do string_builder_append(^print_buffer, cast(i64) n, cast(u64) base);
+print_f64     :: proc (n: f64) do string_builder_append(^print_buffer, n);
+print_f32     :: proc (n: f32)  do string_builder_append(^print_buffer, cast(f64) n);
 print_bool    :: proc (b: bool) do string_builder_append(^print_buffer, b);
 print_ptr     :: proc (p: ^void) do string_builder_append(^print_buffer, cast(i64) p, 16l);
 
@@ -32,6 +34,7 @@ print_range :: proc (r: range, sep := " ") {
 print :: proc {
     print_string, print_cstring,
     print_i64,    print_i32,
+    print_f64,    print_f32,
     print_bool,   print_ptr,
     print_range,
 }

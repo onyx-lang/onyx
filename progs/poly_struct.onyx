@@ -7,7 +7,7 @@ use package core
 main :: proc (args: [] cstring) {
 
     x := 2.4f;
-    y := 1;
+    y := 1.2f;
     y += ~~x;
     println(y);
 
