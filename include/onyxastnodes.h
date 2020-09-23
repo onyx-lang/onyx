@@ -26,6 +26,7 @@ typedef struct AstStructLiteral AstStructLiteral;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstJump AstJump;
+typedef struct AstUse AstUse;
 
 typedef struct AstBlock AstBlock;
 typedef struct AstIfWhile AstIfWhile;
@@ -142,6 +143,7 @@ typedef enum AstKind {
     Ast_Kind_For,
     Ast_Kind_While,
     Ast_Kind_Jump,
+    Ast_Kind_Use,
     Ast_Kind_Defer,
     Ast_Kind_Switch,
     Ast_Kind_Switch_Case,
@@ -439,7 +441,7 @@ struct AstArgument      { AstTyped_base; AstTyped *value; };
 struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
-struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u32 offset; u32 idx; };
+struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u32 offset; u32 idx; char* field; }; // If token is null, defer to field
 struct AstSizeOf        { AstTyped_base; AstType *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_type; u64 alignment; };
 struct AstFileContents  { AstTyped_base; OnyxToken *filename; u32 addr, size; };
@@ -455,6 +457,7 @@ struct AstStructLiteral {
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
+struct AstUse           { AstNode_base; AstTyped* expr; };
 
 // Structure Nodes
 struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; bh_arr(AstLocal *) locals; };
