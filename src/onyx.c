@@ -20,6 +20,38 @@
 #endif
 
 
+
+
+#ifdef REPORT_TIMES
+// CLEANUP: Move this to another file
+typedef struct TimerStackElem {
+    char* label;
+    u64   time;
+} TimerStackElem;
+
+static bh_arr(TimerStackElem) global_timer_stack;
+
+void timer_stack_init() {
+    global_timer_stack = NULL;
+    bh_arr_new(global_heap_allocator, global_timer_stack, 4);
+}
+
+void timer_stack_push(char* label) {
+    TimerStackElem elem;
+    elem.label = label;
+    elem.time  = bh_time_curr();
+    bh_arr_push(global_timer_stack, elem);
+}
+
+void timer_stack_pop() {
+    TimerStackElem elem = bh_arr_pop(global_timer_stack);
+    u64 duration = bh_time_duration(elem.time);
+    bh_printf("[Time] %s took %lms.\n", elem.label, duration);
+}
+#endif
+
+
+
 static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
     "The compiler for the Onyx programming language.\n"
@@ -329,6 +361,10 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
 static CompilerProgress process_source_file(CompilerState* compiler_state, char* filename) {
     if (bh_table_has(bh_file_contents, compiler_state->loaded_files, filename)) return ONYX_COMPILER_PROGRESS_SUCCESS;
 
+#ifdef REPORT_TIMES
+    timer_stack_push(bh_aprintf(global_heap_allocator, "Parsing '%s'", filename));
+#endif
+
     bh_file file;
 
     bh_file_error err = bh_file_open(&file, filename);
@@ -360,6 +396,10 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     ParseResults results = parse_source_file(compiler_state, &fc);
     merge_parse_results(compiler_state, &results);
 
+#ifdef REPORT_TIMES
+    timer_stack_pop();
+#endif
+
     if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
     } else {
@@ -370,6 +410,10 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
 
 static i32 onyx_compile(CompilerState* compiler_state) {
 
+#ifdef REPORT_TIMES
+    timer_stack_push("Parsing");
+#endif
+
     // NOTE: While the queue is not empty, process the next file
     while (!bh_arr_is_empty(compiler_state->queued_files)) {
         CompilerProgress result = process_source_file(compiler_state, (char *) compiler_state->queued_files[0]);
@@ -379,6 +423,13 @@ static i32 onyx_compile(CompilerState* compiler_state) {
 
         bh_arr_fastdelete(compiler_state->queued_files, 0);
     }
+
+#ifdef REPORT_TIMES
+    timer_stack_pop();
+    
+    timer_stack_push("Checking semantics");
+    timer_stack_push("Initializing builtins");
+#endif
 
     initialize_builtins(compiler_state->ast_alloc, &compiler_state->prog_info);
     if (onyx_has_errors()) {
@@ -400,12 +451,20 @@ static i32 onyx_compile(CompilerState* compiler_state) {
             sizeof(Entity),
             sort_entities);
 
+#ifdef REPORT_TIMES
+    timer_stack_pop();
+#endif
+
     // NOTE: Check types and semantic rules
     if (compiler_state->options->verbose_output)
         bh_printf("[Checking semantics]\n");
 
     onyx_sempass_init(compiler_state->sp_alloc, compiler_state->ast_alloc);
     onyx_sempass(&compiler_state->prog_info);
+
+#ifdef REPORT_TIMES
+    timer_stack_pop();
+#endif
 
     if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_SEMPASS;
@@ -423,6 +482,11 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     if (compiler_state->options->verbose_output)
         bh_printf("[Generating WASM]\n");
 
+#ifdef REPORT_TIMES
+    timer_stack_push("Code generation");
+    timer_stack_push("Generating WASM");
+#endif
+
     compiler_state->wasm_mod = onyx_wasm_module_create(compiler_state->options->allocator);
     onyx_wasm_module_compile(&compiler_state->wasm_mod, &compiler_state->prog_info);
 
@@ -430,6 +494,10 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         return ONYX_COMPILER_PROGRESS_FAILED_BINARY_GEN;
     }
 
+#ifdef REPORT_TIMES
+    timer_stack_pop();
+    timer_stack_push("Write to file");
+#endif
 
     // NOTE: Output to file
     bh_file output_file;
@@ -441,6 +509,11 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         bh_printf("[Writing WASM] %s\n", output_file.filename);
 
     onyx_wasm_module_write_to_file(&compiler_state->wasm_mod, output_file);
+
+#ifdef REPORT_TIMES
+    timer_stack_pop();
+    timer_stack_pop();
+#endif
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }

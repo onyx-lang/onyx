@@ -37,7 +37,7 @@ syn keyword onyxCommentStart    contained TODO NOTE BUG HACK
 syn region onyxComment          start="//" end="$" keepend contains=onyxCommentStart
 syn region onyxComment          start="/\*" end="\*/" contains=onyxCommentStart
 
-syn match onyxDefinitionGroup   "\<[a-zA-Z_][a-zA-Z0-9_]*\> *::" contains=onyxDefinition
+syn match onyxDefinitionGroup   "\<[a-zA-Z_][a-zA-Z0-9_]*\> *:" contains=onyxDefinition
 syn match onyxDefinition        "\<[a-zA-Z_][a-zA-Z0-9_]*\>" contained
 
 syn match onyxDirective         "\#[a-zA-Z_]\+"

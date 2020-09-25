@@ -1,4 +1,5 @@
 RELEASE=1
+TIME=0
 
 OBJ_FILES=\
 	build/onyxlex.o \
@@ -25,6 +26,10 @@ else
 endif
 endif
 
+ifeq ($(TIME), 1)
+	TIMEFLAG=-DREPORT_TIMES=1
+endif
+
 INCLUDES=-I./include
 LIBS=
 TARGET=./onyx
@@ -40,10 +45,10 @@ else
 endif
 
 build/%.o: src/%.c include/bh.h
-	$(CC) $(FLAGS) -c $< -o $@ $(INCLUDES)
+	$(CC) $(TIMEFLAG) $(FLAGS) -c $< -o $@ $(INCLUDES)
 
 $(TARGET): $(OBJ_FILES)
-	$(CC) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
+	$(CC) $(TIMEFLAG) $(FLAGS) $(OBJ_FILES) -o $@ $(LIBS)
 
 install: $(TARGET) core/*
 	cp $(TARGET) /usr/bin/

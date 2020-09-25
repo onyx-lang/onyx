@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <malloc.h>
+#include <time.h>
 
 #include <stdlib.h>
 #include <stdarg.h>
@@ -768,6 +769,12 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc);
 
 
 
+
+//------------------------------------------------------------------------------
+// TIME / DURATION
+//------------------------------------------------------------------------------
+u64 bh_time_curr();
+u64 bh_time_duration(u64 old);
 
 
 
@@ -2262,6 +2269,31 @@ void bh_imap_clear(bh_imap* imap) {
 }
 
 #endif // ifndef BH_NO_IMAP
+
+
+
+
+
+
+
+u64 bh_time_curr() {
+    struct timespec spec;
+    clock_gettime(CLOCK_MONOTONIC, &spec);
+
+    time_t sec = spec.tv_sec;
+    u64 ms  = spec.tv_nsec / 1000000;
+    if (ms > 999) {
+        sec++;
+        ms = 0;
+    }
+
+    return sec * 1000 + ms;
+}
+
+u64 bh_time_duration(u64 old) {
+    u64 curr = bh_time_curr();
+    return curr - old;
+}
 
 #endif // ifdef BH_DEFINE
 
