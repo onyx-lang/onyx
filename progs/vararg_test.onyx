@@ -1,0 +1,36 @@
+package main
+
+#include_file "core/std/wasi"
+
+use package core;
+
+old_va_test :: proc (prefix: string, va: ..i32) {
+    for v: va do println(v);
+}
+
+vararg_get :: proc (va: ^rawptr, ret: ^$T) {
+    *ret = *cast(^T) *va;
+    *va = cast(rawptr) (cast(^u8) *va + sizeof T);
+}
+
+// va is just a rawptr with no bounds checking
+new_va_test :: proc (prefix: string, va: ...) {
+    println(string);
+
+    x : i32;
+    vararg_get(^va, ^x);
+
+    println(x);
+}
+
+main :: proc (args: [] cstring) {
+    va_test("foo", 1, 2, 3, 4);
+}
+
+// Things needed to make the above work"
+/*
+    1. A RawVarArg type in the type system
+    2. Parsing '...' as a rawvararg
+    3. Typechecking is disabled for arguments in a rawvararg
+    4. RawVarArg is treated as a pointer
+*/
