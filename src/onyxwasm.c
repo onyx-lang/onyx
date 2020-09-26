@@ -1360,7 +1360,9 @@ EMIT_FUNC(call, AstCall* call) {
 
     switch (call->va_kind) {
         case VA_Kind_Typed: {
-            WID(WI_GLOBAL_GET, vararg_offset);
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WID(WI_I32_CONST, vararg_offset);
+            WI(WI_I32_ADD);
             WID(WI_I32_CONST, vararg_count);
             break;
         }

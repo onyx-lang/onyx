@@ -5,6 +5,7 @@ package main
 use package core;
 
 old_va_test :: proc (prefix: string, va: ..i32) {
+    println(prefix);
     for v: va do println(v);
 }
 
@@ -20,14 +21,8 @@ vararg_get :: proc (va: vararg, ret: ^$T) -> bool {
 new_va_test :: proc (prefix: string, va: ...) {
     println(prefix);
 
-    for i: 0 .. 2 {
+    for i: 0 .. va.count {
         x : i32;
-        vararg_get(va, ^x);
-        println(x);
-    }
-
-    for i: 0 .. 2 {
-        x : f32;
         vararg_get(va, ^x);
         println(x);
     }
@@ -35,12 +30,5 @@ new_va_test :: proc (prefix: string, va: ...) {
 
 main :: proc (args: [] cstring) {
     new_va_test("foo", 1, 2, 3.0f, 5.0f);
+    old_va_test("bar", 1);
 }
-
-// Things needed to make the above work"
-/*
-    1. A RawVarArg type in the type system
-    2. Parsing '...' as a rawvararg
-    3. Typechecking is disabled for arguments in a rawvararg
-    4. RawVarArg is treated as a pointer
-*/

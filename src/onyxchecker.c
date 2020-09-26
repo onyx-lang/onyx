@@ -430,7 +430,7 @@ b32 check_call(AstCall* call) {
 
     ArgState arg_state = AS_Expecting_Exact;
     i32 arg_pos = 0;
-    while (arg_pos < bh_arr_length(arg_arr)) {
+    while (1) { 
         switch (arg_state) {
             case AS_Expecting_Exact: {
                 if (arg_pos >= callee->type->Function.param_count) goto type_checking_done;
@@ -448,6 +448,7 @@ b32 check_call(AstCall* call) {
                     continue;
                 }
 
+                if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(arg_arr[arg_pos]->value, formal_params[arg_pos])) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The function '%b' expects a value of type '%s' for %d%s parameter, got '%s'.",
@@ -464,6 +465,9 @@ b32 check_call(AstCall* call) {
             }
 
             case AS_Expecting_Typed_VA: {
+                call->va_kind = VA_Kind_Typed;
+                
+                if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(arg_arr[arg_pos]->value, variadic_type)) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
@@ -476,13 +480,14 @@ b32 check_call(AstCall* call) {
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Typed;
-                call->va_kind = VA_Kind_Typed;
                 break;
             }
 
             case AS_Expecting_Untyped_VA: {
-                arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
                 call->va_kind = VA_Kind_Untyped;
+
+                if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
+                arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
                 break;
             }
         }
@@ -492,7 +497,7 @@ b32 check_call(AstCall* call) {
 
 type_checking_done:
 
-    if (arg_pos < callee->type->Function.param_count) {
+    if (arg_pos < callee->type->Function.needed_param_count) {
         onyx_report_error(call->token->pos, "Too few arguments to function call.");
         return 1;
     }
