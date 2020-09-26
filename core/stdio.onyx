@@ -44,6 +44,95 @@ println :: proc (x: $T) {
     print("\n");
 }
 
+printf :: proc (format: string, va: ...) {
+    buffer: [2048] u8;
+    len := 0;
+
+    state := 0;
+
+    for ch: format do switch (state) {
+        case 0 {
+            if ch == #char "%" do state = 1;
+            else {
+                buffer[len] = ch;
+                len += 1;
+            }
+        }
+
+        case 1 {
+            switch (ch) {
+                case #char "%" { buffer[len] = ch; len += 1; }
+
+                case #char "i" {
+                    n : i32;
+                    if !vararg_get(va, ^n) do return;
+
+                    ibuf : [128] u8;
+                    istr := i64_to_string(~~n, 10l, Buffer.{ ~~ibuf, 128 });
+
+                    for a: istr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "l" {
+                    n : i64;
+                    if !vararg_get(va, ^n) do return;
+
+                    ibuf : [128] u8;
+                    istr := i64_to_string(n, 10l, Buffer.{ ~~ibuf, 128 });
+
+                    for a: istr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "f" {
+                    n : f32;
+                    if !vararg_get(va, ^n) do return;
+
+                    fbuf : [128] u8;
+                    fstr := f64_to_string(~~n, fbuf[0 .. 128]);
+
+                    for a: fstr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "d" {
+                    n : f64;
+                    if !vararg_get(va, ^n) do return;
+
+                    fbuf : [128] u8;
+                    fstr := f64_to_string(n, fbuf[0 .. 128]);
+
+                    for a: fstr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "s" {
+                    str : string;
+                    if !vararg_get(va, ^str) do return;
+
+                    for a: str {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+            }
+
+            state = 0;
+        }
+    }
+
+    print(string.{ ~~buffer, len });
+}
+
 // This works on both slices and arrays
 print_array :: proc (arr: $T, sep := " ") {
     for i: 0 .. arr.count {

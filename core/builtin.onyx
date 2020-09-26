@@ -18,6 +18,14 @@ vararg :: #type ^struct {
     count: i32;
 }
 
+vararg_get :: proc (va: vararg, ret: ^$T) -> bool {
+    if va.count <= 0 do return false;
+    *ret = *cast(^T) va.data;
+    va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
+    va.count -= 1;
+    return true;
+}
+
 null :: cast(rawptr) 0;
 
 // ---------------------------------

@@ -589,12 +589,14 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
                 smem->idx = 0;
                 smem->offset = 0;
                 smem->type = type->Slice.ptr_to_data;
+                smem->name = "data";
                 return 1;
             }
             if (strcmp(member, "count") == 0) {
                 smem->idx = 1;
                 smem->offset = 4;
                 smem->type = &basic_types[Basic_Kind_U32];
+                smem->name = "count";
                 return 1;
             }
 
@@ -606,18 +608,21 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
                 smem->idx = 0;
                 smem->offset = 0;
                 smem->type = type->DynArray.ptr_to_data;
+                smem->name = "data";
                 return 1;
             }
             if (strcmp(member, "count") == 0) {
                 smem->idx = 1;
                 smem->offset = 4;
                 smem->type = &basic_types[Basic_Kind_U32];
+                smem->name = "count";
                 return 1;
             }
             if (strcmp(member, "capacity") == 0) {
                 smem->idx = 2;
                 smem->offset = 8;
                 smem->type = &basic_types[Basic_Kind_U32];
+                smem->name = "capacity";
                 return 1;
             }
         }
@@ -646,12 +651,14 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
                 smem->idx = 0;
                 smem->offset = 0;
                 smem->type = type->Slice.ptr_to_data;
+                smem->name = "data";
                 return 1;
             }
             if (idx == 1) {
                 smem->idx = 1;
                 smem->offset = 4;
                 smem->type = &basic_types[Basic_Kind_U32];
+                smem->name = "count";
                 return 1;
             }
 
@@ -663,18 +670,21 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
                 smem->idx = 0;
                 smem->offset = 0;
                 smem->type = type->DynArray.ptr_to_data;
+                smem->name = "data";
                 return 1;
             }
             if (idx == 1) {
                 smem->idx = 1;
                 smem->offset = 4;
                 smem->type = &basic_types[Basic_Kind_U32];
+                smem->name = "count";
                 return 1;
             }
             if (idx == 2) {
                 smem->idx = 2;
                 smem->offset = 8;
                 smem->type = &basic_types[Basic_Kind_U32];
+                smem->name = "capacity";
                 return 1;
             }
         }
