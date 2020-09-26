@@ -1326,22 +1326,14 @@ EMIT_FUNC(call, AstCall* call) {
 
     u32 vararg_count = 0;
     u32 vararg_offset = -1;
-    VarArgKind vararg_type = VA_Kind_Not_VA;
 
-    for (AstArgument *arg = call->arguments;
-            arg != NULL;
-            arg = (AstArgument *) arg->next) {
+    bh_arr_each(AstArgument *, parg, call->arg_arr) {
+        AstArgument* arg = *parg;
 
         b32 place_on_stack = 0;
         b32 arg_is_struct  = type_is_structlike(arg->value->type);
 
-        if (arg->flags & Ast_Flag_Arg_Is_VarArg) {
-            vararg_type = VA_Kind_Typed;
-            if (vararg_offset == -1) vararg_offset = stack_grow_amm;
-            place_on_stack = 1;
-        }
-        if (arg->flags & Ast_Flag_Arg_Is_Untyped_VarArg) {
-            vararg_type = VA_Kind_Untyped;
+        if (arg->va_kind != VA_Kind_Not_VA) {
             if (vararg_offset == -1) vararg_offset = stack_grow_amm;
             place_on_stack = 1;
         }
@@ -1355,7 +1347,7 @@ EMIT_FUNC(call, AstCall* call) {
             if (arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
             emit_store_instruction(mod, &code, arg->value->type, stack_grow_amm);
 
-            if (vararg_type != VA_Kind_Not_VA) vararg_count += 1;
+            if (arg->va_kind != VA_Kind_Not_VA) vararg_count += 1;
             else {
                 WID(WI_GLOBAL_GET, stack_top_idx);
                 WID(WI_I32_CONST, stack_grow_amm);
@@ -1366,35 +1358,33 @@ EMIT_FUNC(call, AstCall* call) {
         }
     }
 
-    if (vararg_type != VA_Kind_Not_VA) {
-        switch (vararg_type) {
-            case VA_Kind_Typed: {
-                WID(WI_GLOBAL_GET, vararg_offset);
-                WID(WI_I32_CONST, vararg_count);
-                break;
-            }
-
-            case VA_Kind_Untyped: {
-                WID(WI_GLOBAL_GET, stack_top_idx);
-                WID(WI_GLOBAL_GET, stack_top_idx);
-                WID(WI_I32_CONST, vararg_offset);
-                WI(WI_I32_ADD);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm);
-
-                WID(WI_GLOBAL_GET, stack_top_idx);
-                WID(WI_I32_CONST, vararg_count);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm + 4);
-
-                WID(WI_GLOBAL_GET, stack_top_idx);
-                WID(WI_I32_CONST, stack_grow_amm);
-                WI(WI_I32_ADD);
-
-                stack_grow_amm += 8;
-                break;
-            }
-
-            default: break;
+    switch (call->va_kind) {
+        case VA_Kind_Typed: {
+            WID(WI_GLOBAL_GET, vararg_offset);
+            WID(WI_I32_CONST, vararg_count);
+            break;
         }
+
+        case VA_Kind_Untyped: {
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WID(WI_I32_CONST, vararg_offset);
+            WI(WI_I32_ADD);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm);
+
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WID(WI_I32_CONST, vararg_count);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm + 4);
+
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WID(WI_I32_CONST, stack_grow_amm);
+            WI(WI_I32_ADD);
+
+            stack_grow_amm += 8;
+            break;
+        }
+
+        default: break;
     }
 
     CallingConvention cc = type_function_get_cc(call->callee->type);

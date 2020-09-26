@@ -188,11 +188,7 @@ typedef enum AstFlags {
 
     Ast_Flag_Cannot_Take_Addr      = BH_BIT(20),
 
-    Ast_Flag_Arg_Is_VarArg         = BH_BIT(21),
-
-    Ast_Flag_Arg_Is_Untyped_VarArg = BH_BIT(22),
-
-    Ast_Flag_Struct_Mem_Used       = BH_BIT(23),
+    Ast_Flag_Struct_Mem_Used       = BH_BIT(21),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -443,9 +439,7 @@ struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 addr; u64 length; };
 struct AstLocal         { AstTyped_base; };
-struct AstCall          { AstTyped_base; AstArgument *arguments; u64 arg_count; AstTyped *callee; };
-struct AstIntrinsicCall { AstTyped_base; AstArgument *arguments; u64 arg_count; OnyxIntrinsic intrinsic; };
-struct AstArgument      { AstTyped_base; AstTyped *value; };
+struct AstArgument      { AstTyped_base; AstTyped *value; VarArgKind va_kind; };
 struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
@@ -460,6 +454,29 @@ struct AstStructLiteral {
 
     bh_arr(AstStructMember *) named_values;
     bh_arr(AstTyped *) values;
+};
+struct AstCall {
+    AstTyped_base;
+
+    AstArgument *arguments;
+    u64 arg_count;
+
+    bh_arr(AstArgument *) arg_arr;
+    AstTyped *callee;
+
+    VarArgKind va_kind;
+};
+struct AstIntrinsicCall {
+    AstTyped_base;
+
+    AstArgument *arguments;
+    u64 arg_count;
+
+    bh_arr(AstArgument *) arg_arr;
+
+    OnyxIntrinsic intrinsic;
+
+    VarArgKind va_kind;
 };
 
 // Intruction Node

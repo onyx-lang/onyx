@@ -8,10 +8,12 @@ old_va_test :: proc (prefix: string, va: ..i32) {
     for v: va do println(v);
 }
 
-vararg_get :: proc (va: vararg, ret: ^$T) {
+vararg_get :: proc (va: vararg, ret: ^$T) -> bool {
+    if va.count <= 0 do return false;
     *ret = *cast(^T) va.data;
     va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
-    // *va = cast(rawptr) (cast(^u8) *va + sizeof T);
+    va.count -= 1;
+    return true;
 }
 
 // va is just a rawptr with no bounds checking

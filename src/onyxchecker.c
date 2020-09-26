@@ -283,6 +283,17 @@ no_match:
     return NULL;
 }
 
+typedef struct PolyArg {
+    AstArgument* arg;
+    u64          pos;
+} PolyArg;
+
+typedef enum ArgState {
+    AS_Expecting_Exact,
+    AS_Expecting_Typed_VA,
+    AS_Expecting_Untyped_VA,
+} ArgState;
+
 b32 check_call(AstCall* call) {
     // All the things that need to be done when checking a call node.
     //      1. Ensure the callee is not a symbol
@@ -295,20 +306,18 @@ b32 check_call(AstCall* call) {
     //      6. If an argument is polymorphic, generate the correct polymorphic function.
     //      7. Fill in default arguments
     //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
-    //      9. Check types of formal and actual params against each other
+    //      9. Check types of formal and actual params against each other, handling varargs
 
 
-
-    AstFunction* callee = (AstFunction *) call->callee;
-
-    if (callee->kind == Ast_Kind_Symbol) {
-        onyx_report_error(callee->token->pos, "Unresolved symbol '%b'.", callee->token->text, callee->token->length);
-        return 1;
-    }
 
     if (check_expression(&call->callee)) return 1;
+    AstFunction* callee = (AstFunction *) call->callee;
 
-    b32 has_polymorphic_args = 0;
+    bh_arr(AstArgument *) arg_arr = NULL;
+    bh_arr_new(global_heap_allocator, arg_arr, call->arg_count);
+
+    bh_arr(PolyArg) poly_args = NULL;
+    bh_arr_new(global_heap_allocator, arg_arr, 1);
 
     // NOTE: Check arguments
     AstArgument* actual = call->arguments;
@@ -316,13 +325,20 @@ b32 check_call(AstCall* call) {
         if (check_expression((AstTyped **) &actual)) return 1;
 
         if (actual->value->kind == Ast_Kind_Overloaded_Function) {
-            onyx_report_error(actual->token->pos, "Cannot pass overloaded functions as parameters.");
+            onyx_report_error(actual->token->pos,
+                "Cannot pass overloaded function '%b' as argument.",
+                actual->value->token->text, actual->value->token->length);
             return 1;
         }
 
-        if (actual->value->kind == Ast_Kind_Polymorphic_Proc)
-            has_polymorphic_args = 1;
+        if (actual->value->kind == Ast_Kind_Polymorphic_Proc) {
+            bh_arr_push(poly_args, ((PolyArg) {
+                .arg = actual,
+                .pos = bh_arr_length(arg_arr),
+            }));
+        }
 
+        bh_arr_push(arg_arr, actual);
         actual = (AstArgument *) actual->next;
     }
 
@@ -355,35 +371,21 @@ b32 check_call(AstCall* call) {
         return 1;
     }
 
-    if (has_polymorphic_args) {
-        actual = call->arguments;
-        u32 arg_idx = 0;
+    bh_arr_each(PolyArg, pa, poly_args) {
+        pa->arg->value = (AstTyped *) polymorphic_proc_lookup(
+            (AstPolyProc *) pa->arg->value,
+            PPLM_By_Function_Type,
+            callee->type->Function.params[pa->pos],
+            pa->arg->token->pos);
 
-        while (actual != NULL) {
-            if (actual->value->kind == Ast_Kind_Polymorphic_Proc) {
-                actual->value = (AstTyped *) polymorphic_proc_lookup(
-                    (AstPolyProc *) actual->value,
-                    PPLM_By_Function_Type,
-                    callee->type->Function.params[arg_idx],
-                    actual->token->pos);
+        if (pa->arg->value == NULL) return 1;
 
-                if (actual->value == NULL) return 1;
-
-                actual->value->flags |= Ast_Flag_Function_Used;
-            }
-
-            actual = (AstArgument *) actual->next;
-            arg_idx++;
-        }
+        pa->arg->value->flags |= Ast_Flag_Function_Used;
     }
 
     if (callee->kind == Ast_Kind_Function) {
-        if (call->arg_count < bh_arr_length(callee->params)) {
-            AstArgument** last_arg = &call->arguments;
-            while (*last_arg != NULL)
-                last_arg = (AstArgument **) &(*last_arg)->next;
-
-            while (call->arg_count < bh_arr_length(callee->params)
+        if (bh_arr_length(arg_arr) < bh_arr_length(callee->params)) {
+            while (bh_arr_length(arg_arr) < bh_arr_length(callee->params)
                 && callee->params[call->arg_count].default_value != NULL) {
                 AstTyped* dv = callee->params[call->arg_count].default_value;
 
@@ -392,10 +394,7 @@ b32 check_call(AstCall* call) {
                 new_arg->value = dv;
                 new_arg->next = NULL;
 
-                *last_arg = new_arg;
-                last_arg = (AstArgument **) &(*last_arg)->next;
-
-                call->arg_count++;
+                bh_arr_push(arg_arr, new_arg);
             }
         }
     }
@@ -407,7 +406,6 @@ b32 check_call(AstCall* call) {
         call->callee = NULL;
 
         token_toggle_end(callee->intrinsic_name);
-
         char* intr_name = callee->intrinsic_name->text;
 
         if (bh_table_has(OnyxIntrinsic, intrinsic_table, intr_name)) {
@@ -423,74 +421,73 @@ b32 check_call(AstCall* call) {
     }
 
     call->type = callee->type->Function.return_type;
+    call->va_kind = VA_Kind_Not_VA;
 
     Type **formal_params = callee->type->Function.params;
-    actual = call->arguments;
 
     Type* variadic_type = NULL;
     AstParam* variadic_param = NULL;
 
-    i32 arg_state = 0;
-
+    ArgState arg_state = AS_Expecting_Exact;
     i32 arg_pos = 0;
-    while (1) {
-        if (actual == NULL) break;
-
+    while (arg_pos < bh_arr_length(arg_arr)) {
         switch (arg_state) {
-            case 0: {
+            case AS_Expecting_Exact: {
                 if (arg_pos >= callee->type->Function.param_count) goto type_checking_done;
 
                 if (formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
                     variadic_type = formal_params[arg_pos]->VarArgs.ptr_to_data->Pointer.elem;
                     variadic_param = &callee->params[arg_pos];
-                    arg_state = 1;
+                    arg_state = AS_Expecting_Typed_VA;
                     continue;
                 }
 
+                // CLEANUP POTENTIAL BUG if the builtin_vararg_type_type is ever rebuilt
                 if (formal_params[arg_pos] == builtin_vararg_type_type) {
-                    arg_state = 2; 
+                    arg_state = AS_Expecting_Untyped_VA; 
                     continue;
                 }
 
-                if (!type_check_or_auto_cast(actual->value, formal_params[arg_pos])) {
-                    onyx_report_error(actual->token->pos,
+                if (!type_check_or_auto_cast(arg_arr[arg_pos]->value, formal_params[arg_pos])) {
+                    onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The function '%b' expects a value of type '%s' for %d%s parameter, got '%s'.",
                             callee->token->text, callee->token->length,
                             type_get_name(formal_params[arg_pos]),
                             arg_pos + 1,
                             bh_num_suffix(arg_pos + 1),
-                            type_get_name(actual->value->type));
+                            type_get_name(arg_arr[arg_pos]->value->type));
                     return 1;
                 }
 
+                arg_arr[arg_pos]->va_kind = VA_Kind_Not_VA;
                 break;
             }
 
-            case 1: {
-                if (!type_check_or_auto_cast(actual->value, variadic_type)) {
-                    onyx_report_error(actual->token->pos,
+            case AS_Expecting_Typed_VA: {
+                if (!type_check_or_auto_cast(arg_arr[arg_pos]->value, variadic_type)) {
+                    onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
                             callee->token->text, callee->token->length,
                             type_get_name(variadic_type),
                             variadic_param->local->token->text,
                             variadic_param->local->token->length,
-                            type_get_name(actual->value->type));
+                            type_get_name(arg_arr[arg_pos]->value->type));
                     return 1;
                 }
 
-                actual->flags |= Ast_Flag_Arg_Is_VarArg;
+                arg_arr[arg_pos]->va_kind = VA_Kind_Typed;
+                call->va_kind = VA_Kind_Typed;
                 break;
             }
 
-            case 2: {
-                // Untyped varargs
-                actual->flags |= Ast_Flag_Arg_Is_Untyped_VarArg;
+            case AS_Expecting_Untyped_VA: {
+                arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
+                call->va_kind = VA_Kind_Untyped;
                 break;
             }
         }
 
         arg_pos++;
-        actual = (AstArgument *) actual->next;
     }
 
 type_checking_done:
@@ -500,12 +497,15 @@ type_checking_done:
         return 1;
     }
 
-    if (actual != NULL) {
+    if (arg_pos < bh_arr_length(arg_arr)) {
         onyx_report_error(call->token->pos, "Too many arguments to function call.");
         return 1;
     }
 
     callee->flags |= Ast_Flag_Function_Used;
+    call->arg_arr = arg_arr;
+
+    bh_arr_free(poly_args);
 
     return 0;
 }

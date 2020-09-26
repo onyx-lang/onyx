@@ -599,7 +599,8 @@ void symres_function(AstFunction* func) {
 
         } else if (param->vararg_kind == VA_Kind_Untyped) {
             // HACK
-            builtin_vararg_type_type = type_build_from_ast(semstate.node_allocator, builtin_vararg_type);
+            if (builtin_vararg_type_type == NULL)
+                builtin_vararg_type_type = type_build_from_ast(semstate.node_allocator, builtin_vararg_type);
 
             param->local->type = builtin_vararg_type_type;
         }
