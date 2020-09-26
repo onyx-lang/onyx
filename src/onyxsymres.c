@@ -582,7 +582,7 @@ void symres_function(AstFunction* func) {
     bh_arr_each(AstParam, param, func->params) {
         if (param->local->type_node != NULL) {
             param->local->type_node = symres_type(param->local->type_node);
-            param->local->type = type_build_from_ast(semstate.allocator, param->local->type_node);
+            param->local->type = type_build_from_ast(semstate.node_allocator, param->local->type_node);
 
             if (param->default_value != NULL) {
                 if (!types_are_compatible(param->local->type, param->default_value->type)) {
@@ -593,8 +593,15 @@ void symres_function(AstFunction* func) {
                     return;
                 }
             }
-        } else {
+
+        } else if (param->default_value != NULL) {
             param->local->type = param->default_value->type;
+
+        } else if (param->vararg_kind == VA_Kind_Untyped) {
+            // HACK
+            builtin_vararg_type_type = type_build_from_ast(semstate.node_allocator, builtin_vararg_type);
+
+            param->local->type = builtin_vararg_type_type;
         }
 
         if (param->local->type == NULL) {

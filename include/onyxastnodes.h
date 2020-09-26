@@ -155,42 +155,44 @@ typedef enum AstKind {
 // only 32-bits of flags to play with
 typedef enum AstFlags {
     // Top-level flags
-    Ast_Flag_Exported          = BH_BIT(1),
-    Ast_Flag_Foreign           = BH_BIT(2),
-    Ast_Flag_Const             = BH_BIT(3),
-    Ast_Flag_Comptime          = BH_BIT(4),
-    Ast_Flag_Private_Package   = BH_BIT(5),
-    Ast_Flag_Private_File      = BH_BIT(6),
+    Ast_Flag_Exported              = BH_BIT(1),
+    Ast_Flag_Foreign               = BH_BIT(2),
+    Ast_Flag_Const                 = BH_BIT(3),
+    Ast_Flag_Comptime              = BH_BIT(4),
+    Ast_Flag_Private_Package       = BH_BIT(5),
+    Ast_Flag_Private_File          = BH_BIT(6),
 
     // Global flags
-    Ast_Flag_Global_Stack_Top  = BH_BIT(7),
-    Ast_Flag_Global_Stack_Base = BH_BIT(8),
+    Ast_Flag_Global_Stack_Top      = BH_BIT(7),
+    Ast_Flag_Global_Stack_Base     = BH_BIT(8),
 
     // Function flags
-    Ast_Flag_Intrinsic         = BH_BIT(10),
-    Ast_Flag_Function_Used     = BH_BIT(11),
+    Ast_Flag_Intrinsic             = BH_BIT(10),
+    Ast_Flag_Function_Used         = BH_BIT(11),
 
     // Expression flags
-    Ast_Flag_Expr_Ignored      = BH_BIT(13),
-    Ast_Flag_Param_Use         = BH_BIT(14),
-    Ast_Flag_Address_Taken     = BH_BIT(15),
+    Ast_Flag_Expr_Ignored          = BH_BIT(13),
+    Ast_Flag_Param_Use             = BH_BIT(14),
+    Ast_Flag_Address_Taken         = BH_BIT(15),
 
     // Type flags
-    Ast_Flag_Type_Is_Resolved  = BH_BIT(16),
+    Ast_Flag_Type_Is_Resolved      = BH_BIT(16),
 
     // Enum flags
-    Ast_Flag_Enum_Is_Flags     = BH_BIT(17),
+    Ast_Flag_Enum_Is_Flags         = BH_BIT(17),
 
     // Struct flags
-    Ast_Flag_Struct_Is_Union   = BH_BIT(18),
+    Ast_Flag_Struct_Is_Union       = BH_BIT(18),
 
-    Ast_Flag_No_Clone          = BH_BIT(19),
+    Ast_Flag_No_Clone              = BH_BIT(19),
 
-    Ast_Flag_Cannot_Take_Addr  = BH_BIT(20),
+    Ast_Flag_Cannot_Take_Addr      = BH_BIT(20),
 
-    Ast_Flag_Arg_Is_VarArg     = BH_BIT(21),
+    Ast_Flag_Arg_Is_VarArg         = BH_BIT(21),
 
-    Ast_Flag_Struct_Mem_Used   = BH_BIT(22),
+    Ast_Flag_Arg_Is_Untyped_VarArg = BH_BIT(22),
+
+    Ast_Flag_Struct_Mem_Used       = BH_BIT(23),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -404,6 +406,12 @@ typedef enum ParamPassType {
     Param_Pass_By_Implicit_Pointer,
 } ParamPassType;
 
+typedef enum VarArgKind {
+    VA_Kind_Not_VA,
+    VA_Kind_Typed,
+    VA_Kind_Untyped,
+} VarArgKind;
+
 // Base Nodes
 #define AstNode_base \
     AstKind kind;             \
@@ -616,12 +624,7 @@ struct AstParam {
     AstLocal *local;
     AstTyped *default_value;
 
-    // HACK: There is a little too much complexity here. If a parameter is
-    // a vararg, not only is the flag below set, but the type_node of the
-    // local is also a AstVarArgType. I think this redudancy should be able
-    // to be cleaned up.                        -brendanfh   2020/09/07
-
-    b32 is_vararg : 1;
+    VarArgKind vararg_kind;
 };
 struct AstFunction {
     AstTyped_base;
@@ -751,6 +754,8 @@ extern AstGlobal builtin_stack_top;
 extern AstType  *builtin_string_type;
 extern AstType  *builtin_range_type;
 extern Type     *builtin_range_type_type;
+extern AstType  *builtin_vararg_type;
+extern Type     *builtin_vararg_type_type;
 
 typedef struct BuiltinSymbol {
     char*    package;

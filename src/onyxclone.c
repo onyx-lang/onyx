@@ -342,7 +342,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 				AstParam new_param;
 				new_param.local = (AstLocal *) ast_clone(a, param->local);
 				new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
-                new_param.is_vararg = param->is_vararg;
+                new_param.vararg_kind = param->vararg_kind;
 				bh_arr_push(df->params, new_param);
 			}
 

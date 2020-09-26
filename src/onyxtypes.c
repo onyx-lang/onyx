@@ -474,7 +474,7 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
     if (param_count > 0) {
         i32 i = 0;
         bh_arr_each(AstParam, param, func->params) {
-            if (param->default_value == NULL && !param->is_vararg)
+            if (param->default_value == NULL && param->vararg_kind == VA_Kind_Not_VA)
                 func_type->Function.needed_param_count++;
             func_type->Function.params[i++] = param->local->type;
         }

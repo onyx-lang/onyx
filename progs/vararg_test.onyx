@@ -8,23 +8,31 @@ old_va_test :: proc (prefix: string, va: ..i32) {
     for v: va do println(v);
 }
 
-vararg_get :: proc (va: ^rawptr, ret: ^$T) {
-    *ret = *cast(^T) *va;
-    *va = cast(rawptr) (cast(^u8) *va + sizeof T);
+vararg_get :: proc (va: vararg, ret: ^$T) {
+    *ret = *cast(^T) va.data;
+    va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
+    // *va = cast(rawptr) (cast(^u8) *va + sizeof T);
 }
 
 // va is just a rawptr with no bounds checking
 new_va_test :: proc (prefix: string, va: ...) {
-    println(string);
+    println(prefix);
 
-    x : i32;
-    vararg_get(^va, ^x);
+    for i: 0 .. 2 {
+        x : i32;
+        vararg_get(va, ^x);
+        println(x);
+    }
 
-    println(x);
+    for i: 0 .. 2 {
+        x : f32;
+        vararg_get(va, ^x);
+        println(x);
+    }
 }
 
 main :: proc (args: [] cstring) {
-    va_test("foo", 1, 2, 3, 4);
+    new_va_test("foo", 1, 2, 3.0f, 5.0f);
 }
 
 // Things needed to make the above work"

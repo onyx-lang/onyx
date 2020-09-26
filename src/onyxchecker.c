@@ -320,16 +320,6 @@ b32 check_call(AstCall* call) {
             return 1;
         }
 
-        // NOTE: This restricts you to only passing simple structures as parameters.
-        // At one point in time it was okay, but there are some necessary complexities.
-        // if (type_is_structlike_strict(actual->value->type)) {
-        //     if (!type_structlike_is_simple(actual->value->type)) {
-        //         onyx_report_error(actual->token->pos,
-        //             "Can only pass simple structs as parameters (no nested structures). passing by pointer is the only way for now.");
-        //         return 1;
-        //     }
-        // }
-
         if (actual->value->kind == Ast_Kind_Polymorphic_Proc)
             has_polymorphic_args = 1;
 
@@ -440,44 +430,70 @@ b32 check_call(AstCall* call) {
     Type* variadic_type = NULL;
     AstParam* variadic_param = NULL;
 
+    i32 arg_state = 0;
+
     i32 arg_pos = 0;
     while (1) {
         if (actual == NULL) break;
-        if (arg_pos >= callee->type->Function.param_count && variadic_type == NULL) break;
 
-        if (variadic_type == NULL && formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
-            variadic_type = formal_params[arg_pos]->VarArgs.ptr_to_data->Pointer.elem;
-            variadic_param = &callee->params[arg_pos];
-        }
+        switch (arg_state) {
+            case 0: {
+                if (arg_pos >= callee->type->Function.param_count) goto type_checking_done;
 
-        if (variadic_type != NULL) {
-            if (!type_check_or_auto_cast(actual->value, variadic_type)) {
-                onyx_report_error(actual->token->pos,
-                        "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
-                        callee->token->text, callee->token->length,
-                        type_get_name(variadic_type),
-                        variadic_param->local->token->text,
-                        variadic_param->local->token->length,
-                        type_get_name(actual->value->type));
-                return 1;
+                if (formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
+                    variadic_type = formal_params[arg_pos]->VarArgs.ptr_to_data->Pointer.elem;
+                    variadic_param = &callee->params[arg_pos];
+                    arg_state = 1;
+                    continue;
+                }
+
+                if (formal_params[arg_pos] == builtin_vararg_type_type) {
+                    arg_state = 2; 
+                    continue;
+                }
+
+                if (!type_check_or_auto_cast(actual->value, formal_params[arg_pos])) {
+                    onyx_report_error(actual->token->pos,
+                            "The function '%b' expects a value of type '%s' for %d%s parameter, got '%s'.",
+                            callee->token->text, callee->token->length,
+                            type_get_name(formal_params[arg_pos]),
+                            arg_pos + 1,
+                            bh_num_suffix(arg_pos + 1),
+                            type_get_name(actual->value->type));
+                    return 1;
+                }
+
+                break;
             }
 
-            actual->flags |= Ast_Flag_Arg_Is_VarArg;
+            case 1: {
+                if (!type_check_or_auto_cast(actual->value, variadic_type)) {
+                    onyx_report_error(actual->token->pos,
+                            "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
+                            callee->token->text, callee->token->length,
+                            type_get_name(variadic_type),
+                            variadic_param->local->token->text,
+                            variadic_param->local->token->length,
+                            type_get_name(actual->value->type));
+                    return 1;
+                }
 
-        } else if (!type_check_or_auto_cast(actual->value, formal_params[arg_pos])) {
-            onyx_report_error(actual->token->pos,
-                    "The function '%b' expects a value of type '%s' for %d%s parameter, got '%s'.",
-                    callee->token->text, callee->token->length,
-                    type_get_name(formal_params[arg_pos]),
-                    arg_pos + 1,
-                    bh_num_suffix(arg_pos + 1),
-                    type_get_name(actual->value->type));
-            return 1;
+                actual->flags |= Ast_Flag_Arg_Is_VarArg;
+                break;
+            }
+
+            case 2: {
+                // Untyped varargs
+                actual->flags |= Ast_Flag_Arg_Is_Untyped_VarArg;
+                break;
+            }
         }
 
         arg_pos++;
         actual = (AstArgument *) actual->next;
     }
+
+type_checking_done:
 
     if (arg_pos < callee->type->Function.param_count) {
         onyx_report_error(call->token->pos, "Too few arguments to function call.");
@@ -1295,13 +1311,13 @@ b32 check_function_header(AstFunction* func) {
             return 1;
         }
 
-        if (has_had_varargs && param->is_vararg) {
+        if (has_had_varargs && param->vararg_kind != VA_Kind_Not_VA) {
             onyx_report_error(local->token->pos,
                     "Can only have one param that is of variable argument type.");
             return 1;
         }
 
-        if (has_had_varargs && !param->is_vararg) {
+        if (has_had_varargs && param->vararg_kind != VA_Kind_Not_VA) {
             onyx_report_error(local->token->pos,
                     "Variable arguments must be last in parameter list");
             return 1;
@@ -1316,7 +1332,7 @@ b32 check_function_header(AstFunction* func) {
             return 1;
         }
 
-        if (param->is_vararg) has_had_varargs = 1;
+        if (param->vararg_kind != VA_Kind_Not_VA) has_had_varargs = 1;
 
         if (local->type->kind != Type_Kind_Array
             && type_size_of(local->type) == 0) {

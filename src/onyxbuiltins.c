@@ -37,6 +37,8 @@ AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Glo
 AstType  *builtin_string_type;
 AstType  *builtin_range_type;
 Type     *builtin_range_type_type;
+AstType  *builtin_vararg_type;
+Type     *builtin_vararg_type_type;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -342,6 +344,12 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
     builtin_range_type = (AstType *) symbol_raw_resolve(p->scope, "range");
     if (builtin_range_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, "'range' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_vararg_type = (AstType *) symbol_raw_resolve(p->scope, "vararg");
+    if (builtin_range_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'vararg' struct not found in builtin package.");
         return;
     }
 

@@ -13,6 +13,11 @@ range :: struct {
     step : i32 = 1;
 }
 
+vararg :: #type ^struct {
+    data:  rawptr;
+    count: i32;
+}
+
 null :: cast(rawptr) 0;
 
 // ---------------------------------
