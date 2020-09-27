@@ -1,0 +1,27 @@
+package main
+
+#include_file "core/std/js"
+
+use package core;
+
+old_va_test :: proc (prefix: string, va: ..i32) {
+    println(prefix);
+    for v: va do println(v);
+}
+
+new_va_test :: proc (prefix: string, va: ...) {
+    println(prefix);
+
+    for i: 0 .. va.count {
+        x : i32;
+        vararg_get(va, ^x);
+        println(x);
+    }
+}
+
+main :: proc (args: [] cstring) {
+    new_va_test("foo", 1, 2, 3.0f, 5.0f);
+    old_va_test("bar", 1);
+
+    printf("Hello, %i, %s!\n", 1234, "World");
+}
