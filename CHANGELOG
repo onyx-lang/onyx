@@ -5,14 +5,28 @@ Additions:
 * bitwise not operator, ~
 * auto cast operator, ~~. In many circumstances, will automatically determine what to cast to.
     - Will also report errors in the cast is not possible.
+* Arbitrarily typed varargs. They behave similar to C-style varargs.
+* vararg_get builtin procedure to retrieve a value from a ... vararg.
+* #private_file directive for placing a symbol at file scope.
+* a basic implentation of printf in the standard library.
+* use statements at the function level.
 
 Removals:
 
 Changes:
 * Procedure definitions now require parentheses, even if there are no arguments. This was
     done to allow for `proc { foo, bar }` to be the overload syntax.
+* array_map takes an arbitrary parameter of polymorphic type to make up for the fact that
+    anonymous procs do not have closure. New type signature is:
+        array_map :: proc (arr: ^[..] $T, data: $R, f: proc (T, R) -> T)
+* better syntax highlighting for VIM.
 
 Bug fixes:
+* many bugs related to var args and procedure calls in general.
+* polymorphic structs caused segmentation fault when trying to produce an error message.
+* polymorhpic structs caused scope to change when using a struct literal of a polymoprhic type.
+* #char "\"" did not work.
+* nested function calls returning non-basic types would simply be wrong.
 
 
 

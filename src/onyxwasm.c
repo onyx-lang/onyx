@@ -1326,6 +1326,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     u32 vararg_count = 0;
     u32 vararg_offset = -1;
+    u64 stack_top_store_local;;
 
     bh_arr_each(AstArgument *, parg, call->arg_arr) {
         AstArgument* arg = *parg;
@@ -1341,7 +1342,25 @@ EMIT_FUNC(call, AstCall* call) {
 
         if (place_on_stack && !arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
 
+        if (stack_grow_amm != 0) {
+            stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WIL(WI_LOCAL_SET, stack_top_store_local);
+
+            WID(WI_GLOBAL_GET, stack_top_idx);
+            WID(WI_I32_CONST, stack_grow_amm);
+            WI(WI_I32_ADD);
+            WID(WI_GLOBAL_SET, stack_top_idx);
+        }
+
         emit_expression(mod, &code, arg->value);
+
+        if (stack_grow_amm != 0) {
+            WIL(WI_LOCAL_GET, stack_top_store_local);
+            WID(WI_GLOBAL_SET, stack_top_idx);
+
+            local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        }
 
         if (place_on_stack) {
             if (arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
