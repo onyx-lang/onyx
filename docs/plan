@@ -274,7 +274,7 @@ HOW:
 
         [ ] explicit memory controls at top level
 
-        [ ] 'use' enums and packages at an arbitrary scope
+        [X] 'use' enums and packages at an arbitrary scope
 
         [ ] look into creating a source map
             - first-look looks really gross
@@ -295,7 +295,7 @@ HOW:
             - Compile time conditions
             - Only evalutate code blocks that evaluate to be true
 
-        [ ] Top level variable initialization
+        [X] Top level variable initialization
             - Works for numeric literals
 
         [ ] multiple lvals and compound assignment

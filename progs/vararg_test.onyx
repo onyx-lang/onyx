@@ -4,24 +4,29 @@ package main
 
 use package core;
 
-old_va_test :: proc (prefix: string, va: ..i32) {
-    println(prefix);
+old_va_test :: proc (fix: Fixes, va: ..i32) {
+    println(fix.prefix);
     for v: va do println(v);
+    println(fix.suffix);
 }
 
-new_va_test :: proc (prefix: string, va: ...) {
-    println(prefix);
+Fixes :: struct { prefix: string; suffix: string; }
+
+new_va_test :: proc (fix: Fixes, va: ...) {
+    println(fix.prefix);
 
     for i: 0 .. va.count {
         x : i32;
         vararg_get(va, ^x);
         println(x);
     }
+
+    println(fix.suffix);
 }
 
 main :: proc (args: [] cstring) {
-    new_va_test("foo", 1, 2, 3.0f, 5.0f);
-    old_va_test("bar", 1);
+    new_va_test(Fixes.{ "foo", "foozle" }, 1, 2, 3.0f, 5.0f);
+    old_va_test(Fixes.{ "bar", "barzle" }, 1);
 
-    printf("Hello, %i, %s!\n", 1234, "World");
+    printf("Hello, %%%i, %s!\n", 1234, "World");
 }

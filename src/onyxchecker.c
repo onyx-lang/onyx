@@ -1237,12 +1237,12 @@ b32 check_block(AstBlock* block) {
     bh_table_each_start(AstTyped *, block->scope->symbols);
         fill_in_type(value);
 
-        if (value->type == NULL) {
-            onyx_report_error(value->token->pos,
-                    "Unable to resolve type for local '%b'.",
-                    value->token->text, value->token->length);
-            return 1;
-        }
+        // if (value->type == NULL) {
+        //     onyx_report_error(value->token->pos,
+        //             "Unable to resolve type for local '%b'.",
+        //             value->token->text, value->token->length);
+        //     return 1;
+        // }
     bh_table_each_end;
 
     return 0;

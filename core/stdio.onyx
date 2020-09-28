@@ -49,7 +49,6 @@ printf :: proc (format: string, va: ...) {
     len := 0;
 
     state := 0;
-
     for ch: format do switch (state) {
         case 0 {
             if ch == #char "%" do state = 1;
@@ -59,7 +58,7 @@ printf :: proc (format: string, va: ...) {
             }
         }
 
-        case 1 {
+        case #default {
             switch (ch) {
                 case #char "%" { buffer[len] = ch; len += 1; }
 
