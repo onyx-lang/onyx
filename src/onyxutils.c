@@ -48,12 +48,13 @@ static const char* ast_node_names[] = {
     "ARRAY TYPE",
     "SLICE TYPE",
     "DYNARR TYPE",
+    "VARARG TYPE",
     "STRUCT TYPE",
     "POLYMORPHIC STRUCT TYPE",
     "POLYMORPHIC STRUCT CALL TYPE",
     "ENUM TYPE",
     "TYPE_ALIAS",
-    "TYPE RAW ALIAS"
+    "TYPE RAW ALIAS",
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",
@@ -587,7 +588,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type
         symbol_introduce(ps_type->scope, ps_type->poly_params[i], (AstNode *) raw);
     }
 
-    static char key_buf[1024];
+    char key_buf[1024];
     fori (i, 0, 1024) key_buf[i] = 0;
     bh_table_each_start(AstNode *, ps_type->scope->symbols);
         strncat(key_buf, key, 1023);

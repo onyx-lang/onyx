@@ -124,7 +124,6 @@ heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, o
 }
 
 
-#private
 ScratchState :: struct {
     base_ptr : rawptr;
     size     : u32;
@@ -139,7 +138,7 @@ scratch_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32
         retval := null;
         rem := ss.size - cast(u32) ss.curr_ptr + cast(u32) ss.base_ptr;
 
-        if size >= rem {
+        if size <= rem {
             retval = ss.curr_ptr;
             ss.curr_ptr = cast(rawptr) (cast(u32) ss.curr_ptr + size);
         } else {

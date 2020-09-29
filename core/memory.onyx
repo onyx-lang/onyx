@@ -5,3 +5,8 @@ memory_copy :: proc (dst_: rawptr, src_: rawptr, len: u32) {
 	src := cast(^u8) src_;
 	for i: 0 .. len do dst[i] = src[i];
 }
+
+memory_set :: proc (start: rawptr, length: u32, value: u8) {
+    s := cast(^u8) start;
+    for i: 0 .. length do s[i] = value;
+}

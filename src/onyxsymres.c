@@ -103,12 +103,20 @@ AstType* symres_type(AstType* type) {
             member->type_node = symres_type(member->type_node);
 
             if (member->flags & Ast_Flag_Struct_Mem_Used) {
-                if (member->type_node->kind != Ast_Kind_Struct_Type) {
-                    onyx_report_error(member->token->pos,
-                            "Can only 'use' members of struct type.");
+                AstStructType *used = (AstStructType *) member->type_node;
+
+                while (used->kind == Ast_Kind_Type_Alias) {
+                    // NOTE: Maybe not a struct type.
+                    used = (AstStructType *) ((AstTypeAlias *) used)->to;
                 }
 
-                AstStructType *used = (AstStructType *) member->type_node;
+                if (used->kind != Ast_Kind_Struct_Type) {
+                    onyx_report_error(member->token->pos,
+                            "Can only 'use' members of struct type, got '%s'.",
+                            onyx_ast_node_kind_string(used->kind));
+
+                    return type;
+                }
 
                 bh_arr_insertn(s_node->members, i, bh_arr_length(used->members));
 

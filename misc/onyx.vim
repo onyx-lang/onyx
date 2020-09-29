@@ -40,6 +40,9 @@ syn region onyxComment          start="/\*" end="\*/" contains=onyxCommentStart
 syn match onyxDefinitionGroup   "\<[a-zA-Z_][a-zA-Z0-9_]*\> *:" contains=onyxDefinition
 syn match onyxDefinition        "\<[a-zA-Z_][a-zA-Z0-9_]*\>" contained
 
+syn match onyxCallGroup         "\<[a-zA-Z_][a-zA-Z0-9_\.]*\> *(" contains=onyxCall
+syn match onyxCall              "\<[a-zA-Z_][a-zA-Z0-9_\.]*\>" contained
+
 syn match onyxDirective         "\#[a-zA-Z_]\+"
 
 syn region onyxString		    display start=+"+ skip=+\\\\\|\\"+ end=+"+ keepend
@@ -53,6 +56,8 @@ hi def link onyxDirective        Constant
 hi def link onyxString           String
 hi def link onyxNumber           Number
 hi def link onyxDefinition       Identifier
+hi def link onyxCall             Function
+hi def link onyxOperator         Operator
 
 let b:current_syntax = "onyx"
 let &cpo = s:cpo_save
