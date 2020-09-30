@@ -430,7 +430,7 @@ b32 check_call(AstCall* call) {
 
     ArgState arg_state = AS_Expecting_Exact;
     i32 arg_pos = 0;
-    while (1) { 
+    while (1) {
         switch (arg_state) {
             case AS_Expecting_Exact: {
                 if (arg_pos >= callee->type->Function.param_count) goto type_checking_done;
@@ -444,7 +444,7 @@ b32 check_call(AstCall* call) {
 
                 // CLEANUP POTENTIAL BUG if the builtin_vararg_type_type is ever rebuilt
                 if (formal_params[arg_pos] == builtin_vararg_type_type) {
-                    arg_state = AS_Expecting_Untyped_VA; 
+                    arg_state = AS_Expecting_Untyped_VA;
                     continue;
                 }
 
@@ -466,7 +466,7 @@ b32 check_call(AstCall* call) {
 
             case AS_Expecting_Typed_VA: {
                 call->va_kind = VA_Kind_Typed;
-                
+
                 if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(arg_arr[arg_pos]->value, variadic_type)) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
@@ -581,7 +581,7 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         if (check_binaryop(&binop_node, 0)) return 1;
     }
 
-    if (!types_are_compatible(binop->right->type, binop->left->type)) {
+    if (!type_check_or_auto_cast(binop->right, binop->left->type)) {
         onyx_report_error(binop->token->pos,
                 "Cannot assign value of type '%s' to a '%s'.",
                 type_get_name(binop->right->type),
@@ -818,6 +818,15 @@ b32 check_unaryop(AstUnaryOp** punop) {
 
     if (unaryop->operation != Unary_Op_Cast) {
         unaryop->type = unaryop->expr->type;
+    }
+
+    if (unaryop->operation == Unary_Op_Not) {
+        if (!type_is_bool(unaryop->expr->type)) {
+            onyx_report_error(unaryop->token->pos,
+                    "Bool negation operator expected bool type, got '%s'.",
+                    type_get_name(unaryop->expr->type));
+            return 1;
+        }
     }
 
     if (unaryop->operation == Unary_Op_Bitwise_Not) {
