@@ -7,16 +7,21 @@
     of the design and functionality of Onyx is entirely in my head and I am already beginning to forget some
     of the features of the language.
 
-        Some common abbrevations used in this paper:
+                                            How to read this document
+
+        To easily navigate this document, tags have been placed for your editor to easily find. If you see
+    #foo somewhere, you can search for [foo] which will be the place where foo is explained.
+
+                                  Some common abbrevations used in this paper
                                             LHS for "Left Hand Side"
                                             RHS for "Right Hand Side"
 
                                               Language Features
                 Grammar.................................................................Line xxx
-                Operator Precedence.....................................................[op-pred]
+                Operator Precedence.....................................................#op-pred
                 Operators...............................................................Line xxx
                     Arithmetic Operators................................................Line xxx
-                    Logical Operators...................................................[log-ops]
+                    Logical Operators...................................................#log-ops
                     Bitwise Operators...................................................Line xxx
                     Miscellaneous Operators.............................................Line xxx
                 Packages................................................................Line xxx
@@ -37,7 +42,7 @@
                                   | 4 |                 == !=                     |
                                   | 3 |               && || ^^                    |
                                   | 2 |                |> ..                      |
-                                  | 1 |   = += -= *= /= %= &= |= ^= <<= >>= >>>   |
+                                  | 1 |  = += -= *= /= %= &= |= ^= <<= >>= >>>=   |
                                   +---+-------------------------------------------+
 
 
@@ -75,6 +80,6 @@
                                                 ^^       Logical XOR
 
         All logical operators are of equal precedence. && and || are standard operators in many C-style languages.
-    ^^ is not found in any of the languages I know about, but I don't see a reason not to have it. There are a few
-    places in the compiler that could utilize the ^^ operator.
+    ^^ is a boolean XOR operation and is not found in any of the languages I know about, but I don't see a reason
+    not to have it. There are a few places in the compiler that could utilize the ^^ operator.
 
