@@ -41,20 +41,71 @@ static inline void fill_in_type(AstTyped* node) {
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
 }
 
+/*
+// NOTE: Returns 1 if the conversion was successful.
+static b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
+    fill_in_type((AstTyped *) num);
+    assert(num->type);
+
+    if (types_are_compatible(num->type, type)) return 1;
+
+    if (!type_is_numeric(type)) return 0;
+
+    if (num->type->Basic.flags & Basic_Flag_Integer) {
+
+        //
+        //  Integer literal auto cast rules:
+        //      - Up in size always works
+        //      - Down in size only works if value is in range of smaller type.
+        //      - Cast to float only works if value is less than the maximum precise value for float size.
+        //
+
+        if (type->Basic.flags & Basic_Flag_Integer) {
+            if (num->type->Basic.size < type->Basic.size) {
+                num->value.l = (i64) num->value.i;
+                num->type = type;
+                return 1;
+            }
+        }
+
+        if (type->Basic.flags & Basic_Flag_Float) {
+
+        }
+
+    }
+    else if (num->type->Basic.flags & Basic_Flag_Float) {
+        // NOTE: Floats don't cast to integers implicitly.
+        if ((type->Basic.flags & Basic_Flag_Float) == 0) return 0;
+
+        if (num->type->Basic.kind == Basic_Kind_F32 && type->Basic.kind == Basic_Kind_F64) num->value.d = (f64) num->value.f;
+        else return 0;
+
+        num->type = type;
+
+        return 1;
+    }
+
+    return 0;
+} */
+
 // NOTE: Returns 0 if it was not possible to make the types compatible.
 static b32 type_check_or_auto_cast(AstTyped* node, Type* type) {
     assert(type != NULL);
     assert(node != NULL);
 
     if (types_are_compatible(node->type, type)) return 1;
-    if (!node_is_auto_cast((AstNode *) node))   return 0;
+    if (node_is_auto_cast((AstNode *) node)) {
+        // If the node is an auto cast, we convert it to a cast node which will reports errors if
+        // the cast is illegal in the code generation.
+        ((AstUnaryOp *) node)->type = type;
+        ((AstUnaryOp *) node)->operation = Unary_Op_Cast;
+        return 1;
+    }
+    else if (node->kind == Ast_Kind_NumLit) {
+        // if (convert_numlit_to_type((AstNumLit *) node, type)) return 1;
+    }
 
-    // If the node is an auto cast, we convert it to a cast node which will reports errors if
-    // the cast is illegal in the code generation.
-    ((AstUnaryOp *) node)->type = type;
-    ((AstUnaryOp *) node)->operation = Unary_Op_Cast;
-
-    return 1;
+    return 0;
 }
 
 b32 check_return(AstReturn* retnode) {

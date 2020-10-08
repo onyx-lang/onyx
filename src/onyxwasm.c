@@ -2879,6 +2879,16 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
 
 static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     switch (node->kind) {
+    case Ast_Kind_StrLit: {
+        AstStrLit* sl = (AstStrLit *) node;
+
+        // NOTE: This assumes the address and the length fields have been filled out
+        // by emit_string_literal.
+        u32* sdata = (u32 *) data;
+        sdata[0] = sl->addr;
+        sdata[1] = sl->length;
+        break;
+    }
     case Ast_Kind_NumLit: {
         switch (node->type->Basic.kind) {
         case Basic_Kind_Bool:

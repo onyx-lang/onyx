@@ -408,6 +408,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
             str_node->token     = expect_token(parser, Token_Type_Literal_String);
             str_node->addr      = 0;
+            str_node->flags    |= Ast_Flag_Comptime;
 
             add_node_to_process(parser, (AstNode *) str_node);
 

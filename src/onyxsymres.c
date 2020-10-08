@@ -796,6 +796,7 @@ void onyx_resolve_symbols() {
             case Entity_Type_Enum:                symres_enum(entity->enum_type); break;
             case Entity_Type_Memory_Reservation:  symres_memres(&entity->mem_res); break;
             case Entity_Type_Polymorphic_Proc:    symres_polyproc(entity->poly_proc); break;
+            case Entity_Type_String_Literal:      symres_expression(&entity->expr); break;
 
             default: break;
         }
