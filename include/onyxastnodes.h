@@ -704,6 +704,8 @@ typedef enum EntityState {
     Entity_State_Count,
 } EntityState;
 
+extern const char* entity_state_strings[Entity_State_Count];
+
 // NOTE: An Entity represents something will need to be
 // processed later down the pipeline.
 typedef enum EntityType {
@@ -729,6 +731,8 @@ typedef enum EntityType {
 
     Entity_Type_Count,
 } EntityType;
+
+extern const char* entity_type_strings[Entity_Type_Count];
 
 typedef struct Entity {
     EntityType type;

@@ -29,13 +29,13 @@ static void eh_shift_down(EntityHeap* entities, i32 index) {
 
 	i32 l = eh_lchild(index);	
 	if (l < bh_arr_length(entities->entities)
-		&& entity_compare(&entities->entities[l], &entities->entities[min_index]) <= 0) {
+		&& entity_compare(&entities->entities[l], &entities->entities[min_index]) < 0) {
 		min_index = l;
 	}
 
 	i32 r = eh_rchild(index);	
 	if (r < bh_arr_length(entities->entities)
-		&& entity_compare(&entities->entities[r], &entities->entities[min_index]) <= 0) {
+		&& entity_compare(&entities->entities[r], &entities->entities[min_index]) < 0) {
 		min_index = r;
 	}
 

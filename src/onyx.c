@@ -218,8 +218,7 @@ static void compiler_state_free(CompilerState* cs) {
 // another time.                                        -brendanfh 2020/10/09
 static char* lookup_included_file(CompilerState* cs, char* filename) {
     static char path[256];
-    fori (i, 0, 256)
-        path[i] = 0;
+    fori (i, 0, 256) path[i] = 0;
 
     static char fn[128];
     fori (i, 0, 128) fn[i] = 0;
@@ -260,8 +259,8 @@ static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_con
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
     bh_arr_each(AstInclude *, include, results->includes) {
         EntityType et = Entity_Type_Include_File;
-        if ((*include)->kind == Ast_Kind_Include_Folder)
-            et = Entity_Type_Include_Folder;
+
+        if ((*include)->kind == Ast_Kind_Include_Folder) et = Entity_Type_Include_Folder;
 
         entity_heap_insert(&compiler_state->prog_info.entities, (Entity) {
             .state = Entity_State_Parse,
@@ -388,10 +387,6 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
 static CompilerProgress process_source_file(CompilerState* compiler_state, char* filename) {
     if (bh_table_has(bh_file_contents, compiler_state->loaded_files, filename)) return ONYX_COMPILER_PROGRESS_SUCCESS;
 
-#ifdef REPORT_TIMES
-    timer_stack_push(bh_aprintf(global_heap_allocator, "Parsing '%s'", filename));
-#endif
-
     bh_file file;
 
     bh_file_error err = bh_file_open(&file, filename);
@@ -424,10 +419,6 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     ParseResults results = parse_source_file(compiler_state, &fc);
     merge_parse_results(compiler_state, &results);
 
-#ifdef REPORT_TIMES
-    timer_stack_pop();
-#endif
-
     if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
     } else {
@@ -441,8 +432,8 @@ static b32 process_include_entity(CompilerState* compiler_state, Entity* ent) {
 
     if (include->kind == Ast_Kind_Include_File) {
         char* filename = lookup_included_file(compiler_state, include->name);
-
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
+
         process_source_file(compiler_state, formatted_name);
 
     } else if (include->kind == Ast_Kind_Include_Folder) {
@@ -453,6 +444,10 @@ static b32 process_include_entity(CompilerState* compiler_state, Entity* ent) {
 }
 
 static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
+    // bh_printf("Processing entity: %s %s\n",
+    //         entity_state_strings[ent->state],
+    //         entity_type_strings[ent->type]);
+
     i32 changed = 1;
 
     switch (ent->state) {
@@ -489,33 +484,25 @@ static i32 onyx_compile(CompilerState* compiler_state) {
 
         Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
         assert(ent.state == Entity_State_Parse_Builtin);
-        DEBUG_HERE;
 
         process_entity(compiler_state, &ent);
-
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
         entity_heap_remove_top(&compiler_state->prog_info.entities);
 
         initialize_builtins(compiler_state->ast_alloc, &compiler_state->prog_info);
-
         semstate.program = &compiler_state->prog_info;
     }
 
     while (!bh_arr_is_empty(compiler_state->prog_info.entities.entities)) {
         Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
+        entity_heap_remove_top(&compiler_state->prog_info.entities);
         b32 changed = process_entity(compiler_state, &ent);
 
-        if (onyx_has_errors()) {
-            return ONYX_COMPILER_PROGRESS_ERROR;
-        }
+        if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
-        if (changed) {
-            if (ent.state == Entity_State_Finalized) {
-                entity_heap_remove_top(&compiler_state->prog_info.entities);
-            } else {
-                entity_heap_change_top(&compiler_state->prog_info.entities, ent);
-            }
+        if (changed && ent.state != Entity_State_Finalized) {
+            entity_heap_insert(&compiler_state->prog_info.entities, ent);
         }
     }
 

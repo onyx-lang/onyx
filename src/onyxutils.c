@@ -95,6 +95,37 @@ const char* onyx_ast_node_kind_string(AstKind kind) {
     return ast_node_names[kind];
 }
 
+const char* entity_state_strings[Entity_State_Count] = {
+    "Error",
+    "Parse Builtin",
+    "Parse",
+    "Resolve_Symbols",
+    "Check_Types",
+    "Code_Gen",
+    "Finalized",
+};
+
+const char* entity_type_strings[Entity_Type_Count] = {
+    "Unknown",
+    "Include Folder",
+    "Include File",
+    "Use Package",
+    "String Literal",
+    "File Contents",
+    "Enum",
+    "Type Alias",
+    "Memory Reservation",
+    "Polymorphic Proc",
+    "Foreign_Function Header",
+    "Foreign_Global Header",
+    "Function Header",
+    "Global Header",
+    "Expression",
+    "Global",
+    "Overloaded_Function",
+    "Function",
+};
+
 
 void program_info_init(ProgramInfo* prog, bh_allocator alloc) {
     prog->global_scope = scope_create(alloc, NULL, (OnyxFilePos) { 0 });
