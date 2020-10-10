@@ -7,6 +7,7 @@ OBJ_FILES=\
 	build/onyxclone.o \
 	build/onyxtypes.o \
 	build/onyxbuiltins.o \
+	build/onyxentities.o \
 	build/onyxsempass.o \
 	build/onyxsymres.o \
 	build/onyxchecker.o \

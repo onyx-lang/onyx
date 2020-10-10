@@ -1468,55 +1468,44 @@ b32 check_node(AstNode* node) {
     }
 }
 
-void onyx_type_check() {
-    bh_arr_each(Entity, entity, semstate.program->entities) {
-        switch (entity->type) {
-            case Entity_Type_Foreign_Function_Header:
-            case Entity_Type_Function_Header:
-                if (check_function_header(entity->function)) return;
-                break;
+void check_entity(Entity* ent) {
+    switch (ent->type) {
+        case Entity_Type_Foreign_Function_Header:
+        case Entity_Type_Function_Header:
+            if (check_function_header(ent->function)) return;
+            break;
 
-            case Entity_Type_Function:
-                if (check_function(entity->function)) return;
-                break;
+        case Entity_Type_Function:
+            if (check_function(ent->function)) return;
+            break;
 
-            case Entity_Type_Overloaded_Function:
-                if (check_overloaded_function(entity->overloaded_function)) return;
-                break;
+        case Entity_Type_Overloaded_Function:
+            if (check_overloaded_function(ent->overloaded_function)) return;
+            break;
 
-            case Entity_Type_Global:
-                if (entity->global->flags & Ast_Flag_Foreign)
-                    semstate.program->foreign_global_count++;
+        case Entity_Type_Foreign_Global_Header:
+            semstate.program->foreign_global_count++;
+            // fallthrough
 
-                if (check_global(entity->global)) return;
-                break;
+        case Entity_Type_Global:
+            if (check_global(ent->global)) return;
+            break;
 
-            case Entity_Type_Expression:
-                if (check_expression(&entity->expr)) return;
-                break;
+        case Entity_Type_Expression:
+            if (check_expression(&ent->expr)) return;
+            break;
 
-            case Entity_Type_Type_Alias:
-                if (entity->type_alias->kind == Ast_Kind_Struct_Type)
-                    if (check_struct((AstStructType *) entity->type_alias)) return;
-                break;
+        case Entity_Type_Type_Alias:
+            if (ent->type_alias->kind == Ast_Kind_Struct_Type)
+                if (check_struct((AstStructType *) ent->type_alias)) return;
+            break;
 
-            case Entity_Type_Memory_Reservation:
-                if (check_memres(entity->mem_res)) return;
-                break;
+        case Entity_Type_Memory_Reservation:
+            if (check_memres(ent->mem_res)) return;
+            break;
 
-            case Entity_Type_Enum: break;
-
-            case Entity_Type_String_Literal: break;
-
-            case Entity_Type_File_Contents: break;
-
-            case Entity_Type_Global_Header: break;
-
-            case Entity_Type_Use_Package: break;
-
-            case Entity_Type_Polymorphic_Proc: break;
-
-            default: DEBUG_HERE; break;
-        }
+        default: break;
     }
+
+    ent->state = Entity_State_Code_Gen;
 }

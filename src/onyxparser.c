@@ -1965,14 +1965,26 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 if (parse_possible_directive(parser, "include_file")) {
                     AstInclude* include = make_node(AstInclude, Ast_Kind_Include_File);
                     include->token = dir_token;
-                    include->name = expect_token(parser, Token_Type_Literal_String);
+
+                    OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
+                    if (str_token != NULL) {
+                        token_toggle_end(str_token);
+                        include->name = bh_strdup(parser->allocator, str_token->text);
+                        token_toggle_end(str_token);
+                    }
 
                     return (AstNode *) include;
                 }
                 else if (parse_possible_directive(parser, "include_folder")) {
                     AstInclude* include = make_node(AstInclude, Ast_Kind_Include_Folder);
                     include->token = dir_token;
-                    include->name = expect_token(parser, Token_Type_Literal_String);
+                    
+                    OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
+                    if (str_token != NULL) {
+                        token_toggle_end(str_token);
+                        include->name = bh_strdup(parser->allocator, str_token->text);
+                        token_toggle_end(str_token);
+                    }
 
                     return (AstNode *) include;
                 }

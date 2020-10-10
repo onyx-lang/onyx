@@ -531,9 +531,10 @@ typedef struct OnyxWasmModule {
     u32 next_type_idx;
     u32 next_func_idx;
     u32 next_global_idx;
-    u32 next_foreign_global_idx;
     u32 next_datum_offset;
     u32 next_elem_idx;
+    u32 foreign_function_count;
+    u32 foreign_global_count;
 
     i32 *stack_top_ptr;
     u64 stack_base_idx;
@@ -541,6 +542,8 @@ typedef struct OnyxWasmModule {
 
     b32 has_stack_locals : 1;
 } OnyxWasmModule;
+
+extern OnyxWasmModule global_wasm_module;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
 void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program);

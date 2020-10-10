@@ -101,8 +101,8 @@ void program_info_init(ProgramInfo* prog, bh_allocator alloc) {
 
     bh_table_init(alloc, prog->packages, 16);
 
-    prog->entities = NULL;
-    bh_arr_new(alloc, prog->entities, 4);
+    // NOTE: This will be initialized upon the first call to entity_heap_insert.
+    prog->entities.entities = NULL;
 }
 
 Package* program_info_package_lookup(ProgramInfo* prog, char* package_name) {
@@ -537,8 +537,6 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
 
     if (onyx_has_errors()) goto has_error;
     if (check_function_header(func)) goto has_error;
-    if (check_function(func)) goto has_error;
-    if (onyx_has_errors()) goto has_error;
     goto no_errors;
 
 has_error:
@@ -549,16 +547,19 @@ has_error:
 no_errors:
     semstate.expected_return_type = old_return_type;
 
-    bh_arr_push(semstate.other_entities, ((Entity) {
+    entity_heap_insert(&semstate.program->entities, (Entity) {
+        .state = Entity_State_Code_Gen,
         .type = Entity_Type_Function_Header,
         .function = func,
         .package = NULL,
-    }));
-    bh_arr_push(semstate.other_entities, ((Entity) {
+    });
+
+    entity_heap_insert(&semstate.program->entities, (Entity) {
+        .state = Entity_State_Check_Types,
         .type = Entity_Type_Function,
         .function = func,
         .package = NULL,
-    }));
+    });
 
     return func;
 }
@@ -640,8 +641,4 @@ no_errors:
     cs_type->Struct.name = bh_aprintf(semstate.node_allocator, "%s", name_buf);
 
     return concrete_struct;
-}
-
-i32 sort_entities(const void* e1, const void* e2) {
-    return ((Entity *)e1)->type - ((Entity *)e2)->type;
 }

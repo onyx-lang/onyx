@@ -608,7 +608,7 @@ struct AstTypeRawAlias { AstType_base; Type* to; };
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
 struct AstMemRes        { AstTyped_base; u64 addr; AstTyped *initial_value; };
-struct AstInclude       { AstNode_base; OnyxToken *name; };
+struct AstInclude       { AstNode_base; char* name; };
 struct AstUsePackage    {
     AstNode_base;
 
@@ -691,10 +691,26 @@ struct AstPackage {
     Package* package;
 };
 
+typedef enum EntityState {
+    Entity_State_Error,
+    
+    Entity_State_Parse_Builtin,
+    Entity_State_Parse,
+    Entity_State_Resolve_Symbols,
+    Entity_State_Check_Types,
+    Entity_State_Code_Gen,
+    Entity_State_Finalized,
+
+    Entity_State_Count,
+} EntityState;
+
 // NOTE: An Entity represents something will need to be
 // processed later down the pipeline.
 typedef enum EntityType {
     Entity_Type_Unknown,
+
+    Entity_Type_Include_Folder,
+    Entity_Type_Include_File,
     Entity_Type_Use_Package,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
@@ -703,20 +719,25 @@ typedef enum EntityType {
     Entity_Type_Memory_Reservation,
     Entity_Type_Polymorphic_Proc,
     Entity_Type_Foreign_Function_Header,
+    Entity_Type_Foreign_Global_Header,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
     Entity_Type_Expression,
     Entity_Type_Global,
     Entity_Type_Overloaded_Function,
     Entity_Type_Function,
+
+    Entity_Type_Count,
 } EntityType;
 
 typedef struct Entity {
     EntityType type;
+    EntityState state;
     Package *package;
     Scope *scope;
 
     union {
+        AstInclude            *include;
         AstUsePackage         *use_package;
         AstFunction           *function;
         AstOverloadedFunction *overloaded_function;
@@ -731,6 +752,21 @@ typedef struct Entity {
     };
 } Entity;
 
+typedef struct EntityHeap {
+    bh_arr(Entity) entities;
+
+    i32 state_count[Entity_State_Count];
+} EntityHeap;
+
+void entity_heap_insert(EntityHeap* entities, Entity e);
+Entity entity_heap_top(EntityHeap* entities);
+void entity_heap_change_top(EntityHeap* entities, Entity new_top);
+void entity_heap_remove_top(EntityHeap* entities);
+
+void symres_entity(Entity* ent);
+void check_entity(Entity* ent);
+void emit_entity(Entity* ent);
+
 struct Package {
     char *name;
 
@@ -743,12 +779,10 @@ typedef struct ProgramInfo {
     Scope *global_scope;
 
     bh_table(Package *)   packages;
-    bh_arr(Entity)        entities;
+    EntityHeap            entities;
 
     u32 foreign_global_count;
 } ProgramInfo;
-
-i32 sort_entities(const void* e1, const void* e2);
 
 // NOTE: Basic internal types constructed in the parser
 extern AstBasicType basic_type_void;

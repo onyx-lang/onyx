@@ -774,33 +774,30 @@ static void symres_polyproc(AstPolyProc* pp) {
     pp->poly_scope = scope_create(semstate.node_allocator, semstate.curr_scope, pp->token->pos);
 }
 
-void onyx_resolve_symbols() {
-
-    semstate.curr_scope = semstate.program->global_scope;
-
-    bh_arr_each(Entity, entity, semstate.program->entities) {
-        if (entity->package) {
-            scope_enter(entity->scope);
-            semstate.curr_package = entity->package;
-        }
-
-        switch (entity->type) {
-            case Entity_Type_Foreign_Function_Header:
-            case Entity_Type_Function:            symres_function(entity->function); break;
-
-            case Entity_Type_Use_Package:         symres_use_package(entity->use_package); break;
-            case Entity_Type_Overloaded_Function: symres_overloaded_function(entity->overloaded_function); break;
-            case Entity_Type_Global:              symres_global(entity->global); break;
-            case Entity_Type_Expression:          symres_expression(&entity->expr); break;
-            case Entity_Type_Type_Alias:          entity->type_alias = symres_type(entity->type_alias); break;
-            case Entity_Type_Enum:                symres_enum(entity->enum_type); break;
-            case Entity_Type_Memory_Reservation:  symres_memres(&entity->mem_res); break;
-            case Entity_Type_Polymorphic_Proc:    symres_polyproc(entity->poly_proc); break;
-            case Entity_Type_String_Literal:      symres_expression(&entity->expr); break;
-
-            default: break;
-        }
-
-        if (entity->package) scope_leave();
+void symres_entity(Entity* ent) {
+    if (ent->package) {
+        scope_enter(ent->scope);
+        semstate.curr_package = ent->package;
     }
+
+    switch (ent->type) {
+        case Entity_Type_Foreign_Function_Header:
+        case Entity_Type_Function:            symres_function(ent->function); break;
+
+        case Entity_Type_Use_Package:         symres_use_package(ent->use_package); break;
+        case Entity_Type_Overloaded_Function: symres_overloaded_function(ent->overloaded_function); break;
+        case Entity_Type_Global:              symres_global(ent->global); break;
+        case Entity_Type_Expression:          symres_expression(&ent->expr); break;
+        case Entity_Type_Type_Alias:          ent->type_alias = symres_type(ent->type_alias); break;
+        case Entity_Type_Enum:                symres_enum(ent->enum_type); break;
+        case Entity_Type_Memory_Reservation:  symres_memres(&ent->mem_res); break;
+        case Entity_Type_Polymorphic_Proc:    symres_polyproc(ent->poly_proc); break;
+        case Entity_Type_String_Literal:      symres_expression(&ent->expr); break;
+
+        default: break;
+    }
+
+    ent->state = Entity_State_Check_Types;
+
+    if (ent->package) scope_leave();
 }
