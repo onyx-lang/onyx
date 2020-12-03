@@ -2,6 +2,7 @@
 #include "onyxtypes.h"
 #include "onyxastnodes.h"
 #include "onyxutils.h"
+#include "onyxerrors.h"
 
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
@@ -340,6 +341,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 mem_alignment = type_alignment_of((*member)->type);
+                if (mem_alignment <= 0) {
+                    onyx_report_error((*member)->token->pos, "Invalid member type: %s", type_get_name((*member)->type)); 
+                    return s_type;
+                }
+
                 if (mem_alignment > alignment) alignment = mem_alignment;
                 if (offset % mem_alignment != 0) {
                     offset += mem_alignment - (offset % mem_alignment);
