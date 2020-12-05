@@ -123,6 +123,19 @@ printf :: proc (format: string, va: ...) {
                         len += 1;
                     }
                 }
+
+                case #char "p" {
+                    n : rawptr;
+                    if !vararg_get(va, ^n) do return;
+
+                    ibuf : [128] u8;
+                    istr := i64_to_string(~~n, 16l, Buffer.{ ~~ibuf, 128 });
+
+                    for a: istr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
             }
 
             state = 0;

@@ -312,13 +312,18 @@ string_read_char :: proc (str: ^string, out: ^u8) {
     str.count -= 1;
 }
 
+string_discard_chars :: proc (str: ^string, char_count := 1) {
+    str.data += char_count;
+    str.count -= char_count;
+}
+
 // Goes up to but not including the closest newline or EOF
 string_read_line :: proc (str: ^string, out: ^string) {
     out.data = str.data;
     out.count = 0;
 
-    for i: 0 .. str.count {
-        if str.data[i] == #char "\n" do break;
+    for ch: *str {
+        if ch == #char "\n" do break;
         out.count += 1;
     }
 

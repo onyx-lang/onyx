@@ -74,16 +74,9 @@ file_close :: proc (file: File) -> bool {
     return true;
 }
 
-file_get_size :: proc (file: File) -> i64 {
-    //size: i64 = 0l;
-    //prev: i64;
-
-    //if fd_seek(file.fd, 0l,   Whence.Cur, ^prev) != Errno.Success do return -1l;
-    //if fd_seek(file.fd, 0l,   Whence.End, ^size) != Errno.Success do return -1l;
-    //if fd_seek(file.fd, prev, Whence.Set, ^prev) != Errno.Success do return -1l;
-
+file_get_size :: proc (file: File) -> u64 {
     fs: FileStat;
-    if fd_filestat_get(file.fd, ^fs) != Errno.Success do return -1l;
+    if fd_filestat_get(file.fd, ^fs) != Errno.Success do return 0l;
 
     return fs.size;
 }

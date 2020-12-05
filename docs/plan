@@ -265,6 +265,9 @@ HOW:
         [ ] Add threading intrinsics
             - This will actually be fairly easy since I think all that is needed is
                 to implement the intrinsics.
+            - ^^^ This is a false statement. I also need to have 'thread local variables' for
+                stack pointers and separate stack allocation in the linear memory for each
+                of the threads.
 
         [X] Type parameterized structs
 

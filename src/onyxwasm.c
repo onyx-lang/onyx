@@ -893,7 +893,7 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
 
     WIL(WI_LOCAL_GET, ptr_local);
     WIL(WI_LOCAL_GET, end_ptr_local);
-    WI(WI_I32_GE_S);
+    WI(WI_I32_GE_U);
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
@@ -991,7 +991,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
 
     WIL(WI_LOCAL_GET, ptr_local);
     WIL(WI_LOCAL_GET, end_ptr_local);
-    WI(WI_I32_GE_S);
+    WI(WI_I32_GE_U);
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
