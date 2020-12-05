@@ -329,6 +329,11 @@ string_read_line :: proc (str: ^string, out: ^string) {
 
     str.data += out.count;
     str.count -= out.count;
+
+    if str.count > 0 {
+        str.data += 1;
+        str.count -= 1;
+    }
 }
 
 string_advance_line :: proc (str: ^string) {

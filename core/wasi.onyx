@@ -223,7 +223,15 @@ FileStat :: struct {
     dev      : Device;
     ino      : INode;
     filetype : Filetype;
-    nlink    : LinkCount;
+
+    // ANGER(Brendan Hansen): I give the worst documentation in
+    // the entire world award to WASI, whose best documentation
+    // is a C header file, that is itself incorrect. nlink does
+    // not exist in the current version of wasmtime, and should
+    // not be here, but maybe in the future? Ugh.
+    //                                   - brendanfh 2020/12/05
+    // nlink    : LinkCount;
+
     size     : Filesize;
     atim     : Timestamp;
     mtim     : Timestamp;
