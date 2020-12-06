@@ -10,6 +10,8 @@ Additions:
 * #private_file directive for placing a symbol at file scope.
 * a basic implentation of printf in the standard library.
 * use statements at the function level.
+* nested packages, i.e. 'core.array'
+    - Still testing it out; could change at in the future
 
 Removals:
 
