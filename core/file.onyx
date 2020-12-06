@@ -1,4 +1,4 @@
-package core_file
+package core.file
 
 // Many of these functions will be improved when
 // multiple return values are implemented.
@@ -17,7 +17,7 @@ File :: struct {
     fd : FileDescriptor;
 }
 
-file_open :: proc (file: ^File, path: string, mode := OpenMode.Read, flags := FDFlags.Sync) -> bool {
+open :: proc (file: ^File, path: string, mode := OpenMode.Read, flags := FDFlags.Sync) -> bool {
     // Currently the directory's file descriptor appears to always be 3
     DIR_FD :: 3;
 
@@ -66,7 +66,7 @@ file_open :: proc (file: ^File, path: string, mode := OpenMode.Read, flags := FD
     return true;
 }
 
-file_close :: proc (file: File) -> bool {
+close :: proc (file: File) -> bool {
     if fd_close(file.fd) != Errno.Success {
         return false;
     }
@@ -74,15 +74,15 @@ file_close :: proc (file: File) -> bool {
     return true;
 }
 
-file_get_size :: proc (file: File) -> u64 {
+get_size :: proc (file: File) -> u64 {
     fs: FileStat;
     if fd_filestat_get(file.fd, ^fs) != Errno.Success do return 0l;
 
     return fs.size;
 }
 
-file_get_contents_from_file :: proc (file: File) -> string {
-    size := cast(u32) file_get_size(file);
+get_contents_from_file :: proc (file: File) -> string {
+    size := cast(u32) get_size(file);
 
     data := cast(^u8) alloc(context.allocator, size);
 
@@ -101,15 +101,15 @@ file_get_contents_from_file :: proc (file: File) -> string {
     return data[0 .. size];
 }
 
-file_get_contents :: proc {
-    file_get_contents_from_file,
+get_contents :: proc {
+    get_contents_from_file,
 
     proc (path: string) -> string {
         tmp_file: File;
 
-        if !file_open(^tmp_file, path, OpenMode.Read) do return "";
-        defer file_close(tmp_file);
+        if !open(^tmp_file, path, OpenMode.Read) do return "";
+        defer close(tmp_file);
 
-        return file_get_contents(tmp_file);
+        return get_contents(tmp_file);
     }
 }

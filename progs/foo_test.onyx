@@ -1,0 +1,5 @@
+package test.foo
+
+use package core
+
+print_foo :: proc () do println("Foo!");

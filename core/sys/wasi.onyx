@@ -2,7 +2,6 @@ package system
 
 #include_file "core/wasi"
 
-
 use package wasi
 use package core
 use package main as main
@@ -20,10 +19,10 @@ output_string :: proc (s: string) -> u32 {
 // The builtin _start proc.
 // Sets up everything needed for execution.
 proc () #export "_start" {
-    memory_init();
+    allocator.heap_init();
 
-    context.allocator = heap_allocator;
-    context.temp_allocator = heap_allocator;
+    context.allocator = allocator.heap_allocator;
+    context.temp_allocator = allocator.heap_allocator;
 
     argc : Size;
     argv_buf_size : Size;

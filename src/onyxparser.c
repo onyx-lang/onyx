@@ -44,6 +44,7 @@ static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstNode*       parse_top_level_statement(OnyxParser* parser);
+static AstPackage*    parse_package_name(OnyxParser* parser);
 
 static void consume_token(OnyxParser* parser) {
     if (parser->hit_unexpected_token) return;
@@ -1839,6 +1840,27 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
             AstNode* pack_symbol = make_node(AstNode, Ast_Kind_Symbol);
             pack_symbol->token = expect_token(parser, Token_Type_Symbol);
+
+            // CLEANUP: This is just gross.
+            if (parser->curr->type == '.') {
+                consume_token(parser);
+                pack_symbol->token->length += 1;
+
+                while (1) {
+                    if (parser->hit_unexpected_token) break;
+
+                    OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+                    pack_symbol->token->length += symbol->length;
+
+                    if (parser->curr->type == '.') {
+                        pack_symbol->token->length += 1;
+                        consume_token(parser);
+                    } else {
+                        break;
+                    }
+                }
+            }
+
             upack->package = (AstPackage *) pack_symbol;
 
             if (parser->curr->type == Token_Type_Keyword_As) {
@@ -2002,6 +2024,65 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
     return NULL;
 }
 
+static AstPackage* parse_package_name(OnyxParser* parser) {
+    AstPackage* package_node = make_node(AstPackage, Ast_Kind_Package);
+
+    if (parser->curr->type != Token_Type_Keyword_Package) {
+        Package *package = program_info_package_lookup_or_create(
+            parser->program,
+            "main",
+            parser->program->global_scope,
+            parser->allocator);
+
+        package_node->token = NULL;
+        package_node->package = package;
+        return package_node;
+    }
+
+    char package_name[1024]; // CLEANUP: This could overflow, if someone decides to be dumb
+                             // with their package names  - brendanfh   2020/12/06
+    package_name[0] = 0;
+    package_node->token = expect_token(parser, Token_Type_Keyword_Package);
+
+    Package *package = NULL;
+
+    while (1) {
+        if (parser->hit_unexpected_token) return package_node;
+
+        OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+
+        // This logic will need to accessible elsewhere
+        token_toggle_end(symbol);
+        strncat(package_name, symbol->text, 1023);
+        token_toggle_end(symbol);
+
+        Package *newpackage = program_info_package_lookup_or_create(
+            parser->program,
+            package_name,
+            parser->program->global_scope,
+            parser->allocator);
+
+        if (package != NULL) {
+            AstPackage* pnode = make_node(AstPackage, Ast_Kind_Package);
+            pnode->token = symbol;
+            pnode->package = newpackage;
+
+            symbol_introduce(package->scope, symbol, pnode);
+        }
+
+        package = newpackage;
+
+        if (parser->curr->type == '.') {
+            strncat(package_name, ".", 1023);
+            consume_token(parser);
+        } else {
+            break;
+        }
+    }
+
+    package_node->package = package;
+    return package_node;
+}
 
 
 
@@ -2049,31 +2130,32 @@ void onyx_parser_free(OnyxParser* parser) {
 }
 
 ParseResults onyx_parse(OnyxParser *parser) {
-    if (parser->curr->type == Token_Type_Keyword_Package) {
-        consume_token(parser);
+    // if (parser->curr->type == Token_Type_Keyword_Package) {
+    //     consume_token(parser);
 
-        OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+    //     OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
 
-        token_toggle_end(symbol);
-        Package *package = program_info_package_lookup_or_create(
-            parser->program,
-            symbol->text,
-            parser->program->global_scope,
-            parser->allocator);
-        token_toggle_end(symbol);
+    //     token_toggle_end(symbol);
+    //     Package *package = program_info_package_lookup_or_create(
+    //         parser->program,
+    //         symbol->text,
+    //         parser->program->global_scope,
+    //         parser->allocator);
+    //     token_toggle_end(symbol);
 
-        parser->package = package;
+    //     parser->package = package;
 
-    } else {
-        Package *package = program_info_package_lookup_or_create(
-            parser->program,
-            "main",
-            parser->program->global_scope,
-            parser->allocator);
+    // } else {
+    //     Package *package = program_info_package_lookup_or_create(
+    //         parser->program,
+    //         "main",
+    //         parser->program->global_scope,
+    //         parser->allocator);
 
-        parser->package = package;
-    }
+    //     parser->package = package;
+    // }
 
+    parser->package = parse_package_name(parser)->package;
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
 
     AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);

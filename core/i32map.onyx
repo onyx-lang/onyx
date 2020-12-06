@@ -1,4 +1,6 @@
-package core
+package core.i32map
+
+use package core.array as array
 
 I32Map :: struct ($T) {
     hashes  : [..] i32;
@@ -11,20 +13,20 @@ I32MapEntry :: struct ($T) {
     value : T;
 }
 
-i32map_init :: proc (use imap: ^I32Map($T), hash_count: i32 = 16) {
-    array_init(^hashes, hash_count);
-    array_init(^entries, 4);
+init :: proc (use imap: ^I32Map($T), hash_count: i32 = 16) {
+    array.init(^hashes, hash_count);
+    array.init(^entries, 4);
 
-    for i: 0 .. hash_count do array_push(^hashes, -1);
+    for i: 0 .. hash_count do array.push(^hashes, -1);
 }
 
-i32map_free :: proc (use imap: ^I32Map($T)) {
-    array_free(^hashes);
-    array_free(^entries);
+free :: proc (use imap: ^I32Map($T)) {
+    array.free(^hashes);
+    array.free(^entries);
 }
 
-i32map_put :: proc (use imap: ^I32Map($T), key: i32, value: T) {
-    lr := i32map_lookup(imap, key);
+put :: proc (use imap: ^I32Map($T), key: i32, value: T) {
+    lr := lookup(imap, key);
 
     if lr.entry_index >= 0 {
         entries[lr.entry_index].value = value;
@@ -36,42 +38,42 @@ i32map_put :: proc (use imap: ^I32Map($T), key: i32, value: T) {
     entry.value = value;
     entry.next = hashes[lr.hash_index];
 
-    array_push(^entries, entry);
+    array.push(^entries, entry);
 
     hashes[lr.hash_index] = entries.count - 1;
 }
 
-i32map_has :: proc (use imap: ^I32Map($T), key: i32) -> bool {
-    lr := i32map_lookup(imap, key);
+has :: proc (use imap: ^I32Map($T), key: i32) -> bool {
+    lr := lookup(imap, key);
     return lr.entry_index >= 0;
 }
 
-i32map_get :: proc (use imap: ^I32Map($T), key: i32, default := cast(T) 0) -> T {
-    lr := i32map_lookup(imap, key);
+get :: proc (use imap: ^I32Map($T), key: i32, default := cast(T) 0) -> T {
+    lr := lookup(imap, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
     return default;
 }
 
-i32map_delete :: proc (use imap: ^I32Map($T), key: i32) {
-    lr := i32map_lookup(imap, key);
+delete :: proc (use imap: ^I32Map($T), key: i32) {
+    lr := lookup(imap, key);
     if lr.entry_index < 0 do return;
 
     if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next;
     else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
 
     if lr.entry_index == entries.count - 1 {
-        array_pop(^entries);
+        array.pop(^entries);
         return;
     }
 
-    array_fast_delete(^entries, lr.entry_index);
-    last := i32map_lookup(imap, entries[lr.entry_index].key);
+    array.fast_delete(^entries, lr.entry_index);
+    last := lookup(imap, entries[lr.entry_index].key);
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-i32map_clear :: proc (use imap: ^I32Map($T)) {
+clear :: proc (use imap: ^I32Map($T)) {
     for i: 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;
 }
@@ -90,7 +92,7 @@ I32MapLookupResult :: struct {
 }
 
 #private_file
-i32map_lookup :: proc (use imap: ^I32Map($T), key: i32) -> I32MapLookupResult {
+lookup :: proc (use imap: ^I32Map($T), key: i32) -> I32MapLookupResult {
     lr := I32MapLookupResult.{};
 
     hash := cast(u32) 0xcbf29ce7 ^ cast(u32) key;

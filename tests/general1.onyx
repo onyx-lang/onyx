@@ -53,15 +53,15 @@ SOA :: struct {
 }
 
 soa_init :: proc (s: ^SOA) {
-    array_init(^s.a);
-    array_init(^s.b);
-    array_init(^s.c);
+    array.init(^s.a);
+    array.init(^s.b);
+    array.init(^s.c);
 }
 
 soa_deinit :: proc (s: ^SOA) {
-    array_free(^s.a);
-    array_free(^s.b);
-    array_free(^s.c);
+    array.free(^s.a);
+    array.free(^s.b);
+    array.free(^s.c);
 }
 
 get_range :: proc (arr: ^[..] $T) -> range {
@@ -184,16 +184,16 @@ main :: proc (args: [] cstring) {
     print_arr_details(^s.b);
 
     for i: 0 .. 100 {
-        array_push(^s.a, (5 * i) % 21);
-        array_push(^s.b, 3l * cast(i64) i);
-        array_push(^s.c, Vec3.{ i, i * i, i * i * i });
+        array.push(^s.a, (5 * i) % 21);
+        array.push(^s.b, 3l * cast(i64) i);
+        array.push(^s.c, Vec3.{ i, i * i, i * i * i });
     }
 
     r := ^s.a |> get_range() |> by(3);
     print(r);
     print_array(^s.a);
     print("A has 22? ");
-    println(array_contains(^s.a, 22));
+    println(array.contains(^s.a, 22));
 
     // NOTE: Iterating by value
     for vec: s.c {
@@ -219,8 +219,8 @@ main :: proc (args: [] cstring) {
     print("\n");
 
 
-    array_sort(^s.a, cmp_dec);
-    array_sort(^s.b, cmp_dec);
+    array.sort(^s.a, cmp_dec);
+    array.sort(^s.b, cmp_dec);
 
     print_array(^s.a);
     print_array(^s.b);
@@ -230,31 +230,31 @@ main :: proc (args: [] cstring) {
     print_arr_details(^s.b);
 
     print("Array A sum: ");
-    println(array_fold(^s.a, 0, proc (x: i32, acc: i32) -> i32 do return x + acc;));
+    println(array.fold(^s.a, 0, proc (x: i32, acc: i32) -> i32 do return x + acc;));
     print("\n");
 
-    map : PtrMap;
-    ptrmap_init(^map, 50);
-    defer ptrmap_free(^map);
+    map : ptrmap.PtrMap;
+    ptrmap.init(^map, 50);
+    defer ptrmap.free(^map);
 
-    for i: 0 .. 100 do ptrmap_put(^map, ^s.a[i], ^s.b[i]);
+    for i: 0 .. 100 do ptrmap.put(^map, ^s.a[i], ^s.b[i]);
 
     print("Has ^a[20]? ");
-    println(ptrmap_has(^map, ^s.a[20]));
+    println(ptrmap.has(^map, ^s.a[20]));
 
     print("Has null? ");
-    println(ptrmap_has(^map, null));
+    println(ptrmap.has(^map, null));
 
     print("Value at ^a[50]: ");
-    print(cast(^void) ptrmap_get(^map, ^s.a[50]));
+    print(cast(^void) ptrmap.get(^map, ^s.a[50]));
     print(" == ");
     println(cast(^void) (^s.b[50]));
 
     println("Deleteing ^a[20]");
-    ptrmap_delete(^map, ^s.a[20]);
+    ptrmap.delete(^map, ^s.a[20]);
 
     print("Has ^a[20]? ");
-    println(ptrmap_has(^map, ^s.a[20]));
+    println(ptrmap.has(^map, ^s.a[20]));
 }
 
 

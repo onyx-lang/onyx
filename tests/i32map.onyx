@@ -5,23 +5,23 @@ package main
 use package core
 
 main :: proc (args: [] cstring) {
-    imap : I32Map(string);
-    i32map_init(^imap);
+    imap : i32map.I32Map(string);
+    i32map.init(^imap);
     defer {
         print("Freeing map\n");
-        i32map_free(^imap);
+        i32map.free(^imap);
     }
-    i32map_put(^imap, 50, "Hello ");
-    i32map_put(^imap, 1234, "World!");
+    i32map.put(^imap, 50, "Hello ");
+    i32map.put(^imap, 1234, "World!");
 
-    println(i32map_has(^imap, 50));
-    println(i32map_has(^imap, 51));
+    println(i32map.has(^imap, 50));
+    println(i32map.has(^imap, 51));
 
-    printf("%s%s\n", i32map_get(^imap, 50, ""), i32map_get(^imap, 1234, ""));
+    printf("%s%s\n", i32map.get(^imap, 50, ""), i32map.get(^imap, 1234, ""));
 
-    i32map_delete(^imap, 50);
-    println(i32map_has(^imap, 50));
+    i32map.delete(^imap, 50);
+    println(i32map.has(^imap, 50));
 
-    i32map_clear(^imap);
-    println(i32map_has(^imap, 1234));
+    i32map.clear(^imap);
+    println(i32map.has(^imap, 1234));
 }

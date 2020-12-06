@@ -1,4 +1,8 @@
-package core
+package core.math
+
+use package core {
+    sqrt_f32, sqrt_f64
+}
 
 PI  :: 3.14159265f;
 TAU :: 6.28318330f;
@@ -48,16 +52,16 @@ cos :: proc (t_: f32) -> f32 {
 	return res;
 }
 
-max_poly :: proc (a: $T, b: T) -> T {
+max :: proc (a: $T, b: T) -> T {
     if a >= b do return a;
     return b;
 }
 
-min_poly :: proc (a: $T, b: T) -> T {
+min :: proc (a: $T, b: T) -> T {
     if a <= b do return a;
     return b;
 }
 
-sqrt_i32 :: proc (x: i32) -> i32 {
-    return ~~sqrt_f32(~~x);
-}
+sqrt_i32 :: proc (x: i32) -> i32 do return ~~sqrt_f32(~~x);
+sqrt_i64 :: proc (x: i64) -> i64 do return ~~sqrt_f64(~~x);
+sqrt :: proc { sqrt_f32, sqrt_f64, sqrt_i32, sqrt_i64 }

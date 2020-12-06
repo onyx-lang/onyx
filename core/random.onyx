@@ -1,4 +1,4 @@
-package core
+package core.random
 
 #private_file seed := 8675309
 
@@ -6,14 +6,15 @@ package core
 #private_file RANDOM_INCREMENT  :: 1013904223
 // #private_file RANDOM_MODULUS    :: 1 << 32
 
-random_seed :: proc (s: u32) do seed = s;
-random :: proc (s := ^seed) -> u32 {
+set_seed :: proc (s: u32) do seed = s;
+
+int :: proc (s := ^seed) -> u32 {
 	*s = *s * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
 	return *s;
 }
 
-random_between :: proc (lo: i32, hi: i32) -> i32 do return random() % (hi + 1 - lo) + lo;
+between :: proc (lo: i32, hi: i32) -> i32 do return int () % (hi + 1 - lo) + lo;
 
-random_float :: proc (lo := 0.0f, hi := 1.0f) -> f32 {
-    return (cast(f32) (random() % (1 << 20)) / cast(f32) (1 << 20)) * (hi - lo) + lo;
+float :: proc (lo := 0.0f, hi := 1.0f) -> f32 {
+    return (cast(f32) (int() % (1 << 20)) / cast(f32) (1 << 20)) * (hi - lo) + lo;
 }

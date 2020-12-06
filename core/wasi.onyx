@@ -1,15 +1,5 @@
 package wasi
 
-
-use package core {
-    memory_init,
-    stdio_init,
-    print_buffer_flush,
-
-    heap_allocator
-}
-use package main as main
-
 Size      :: #type u32;
 Filesize  :: #type u64;
 Timestamp :: #type u64;
