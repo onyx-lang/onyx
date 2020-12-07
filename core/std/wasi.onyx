@@ -13,6 +13,7 @@ package core
 #include_file "core/random"
 #include_file "core/stdio"
 #include_file "core/string"
+#include_file "core/strmap"
 #include_file "core/wasi"
 
 #include_file "core/sys/wasi"

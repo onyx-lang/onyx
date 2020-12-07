@@ -7,7 +7,7 @@ make :: proc (s: cstring) -> string {
 }
 
 length :: proc {
-    proc (s: ^u8) -> u32 {
+    proc (s: cstring) -> u32 {
         len := 0;
         c := s;
         while *c != #char "\0" {
@@ -21,6 +21,21 @@ length :: proc {
     proc (s: string) -> u32 {
         return s.count;
     },
+}
+
+alloc_copy :: proc (orig: string) -> string {
+    new_str : string;
+    new_str.data = calloc(sizeof u8 * orig.count);
+    new_str.count = orig.count;
+    copy(orig, new_str);
+    return new_str;
+}
+
+copy :: proc (orig: string, dest: string) {
+    len := orig.count;
+    if dest.count < len do len = dest.count;
+
+    for i: 0 .. len do dest.data[i] = orig.data[i];
 }
 
 concat :: proc (s1: string, s2: string) -> string {
@@ -343,6 +358,54 @@ read_line :: proc (str: ^string, out: ^string) {
         str.data += 1;
         str.count -= 1;
     }
+}
+
+read_until :: proc (str: ^string, upto: u8, skip := 0) -> string {
+    if str.count == 0 do return "";
+
+    out : string;
+    out.data = str.data;
+    out.count = 0;
+
+    s := skip;
+    for ch: *str {
+        if ch == upto {
+            if s <= 0 do break;
+            else do s -= 1;
+        }
+
+        out.count += 1;
+    }
+
+    str.data += out.count;
+    str.count -= out.count;
+
+    return out;
+}
+
+read_until_either :: proc (str: ^string, skip: u32, uptos: ..u8) -> string {
+    if str.count == 0 do return "";
+
+    out : string;
+    out.data = str.data;
+    out.count = 0;
+
+    s := skip;
+    for ch: *str {
+        for upto: uptos {
+            if ch == upto {
+                if s <= 0 do break break;
+                else do s -= 1;
+            }
+        }
+
+        out.count += 1;
+    }
+
+    str.data += out.count;
+    str.count -= out.count;
+
+    return out;
 }
 
 advance_line :: proc (str: ^string) {
