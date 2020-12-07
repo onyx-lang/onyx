@@ -8,6 +8,7 @@ enum BasicKind {
 
     Basic_Kind_Bool,
 
+    Basic_Kind_Int_Unsized,
     Basic_Kind_I8,
     Basic_Kind_U8,
     Basic_Kind_I16,
@@ -17,6 +18,7 @@ enum BasicKind {
     Basic_Kind_I64,
     Basic_Kind_U64,
 
+    Basic_Kind_Float_Unsized,
     Basic_Kind_F32,
     Basic_Kind_F64,
 

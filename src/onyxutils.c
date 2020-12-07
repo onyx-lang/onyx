@@ -379,10 +379,12 @@ void promote_numlit_to_larger(AstNumLit* num) {
         // NOTE: Int32, Int16, Int8
         i64 val = (i64) num->value.i;
         num->value.l = val;
+        num->type = &basic_types[Basic_Kind_I64];
     } else if (num->type->Basic.size <= 4) {
         // NOTE: Float32
         f64 val = (f64) num->value.f;
         num->value.d = val;
+        num->type = &basic_types[Basic_Kind_F64];
     }
 }
 
@@ -512,7 +514,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
             }
 
             fori (i, 0, param->idx) arg = (AstArgument *) arg->next;
-            actual_type = arg->value->type;
+            actual_type = resolve_expression_type(arg->value);
         }
 
         else if (pp_lookup == PPLM_By_Function_Type) {
@@ -673,3 +675,145 @@ no_errors:
 
     return concrete_struct;
 }
+
+// NOTE: Returns 1 if the conversion was successful.
+b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
+    if (num->type == NULL)
+        num->type = type_build_from_ast(semstate.allocator, num->type_node);
+    assert(num->type);
+
+    if (types_are_compatible(num->type, type)) return 1;
+    if (!type_is_numeric(type)) return 0;
+
+    if (num->type->Basic.kind == Basic_Kind_Int_Unsized) {
+
+        //
+        //  Integer literal auto cast rules:
+        //      - Up in size always works
+        //      - Down in size only works if value is in range of smaller type.
+        //      - Cast to float only works if value is less than the maximum precise value for float size.
+        //
+
+        if (type->Basic.flags & Basic_Flag_Integer) {
+            if (type->Basic.flags & Basic_Flag_Unsigned) {
+                u64 value = (u64) num->value.l;
+                if (type->Basic.size == 8) {
+                    num->type = type;
+                    return 1;
+                }
+                if (value <= ((u64) 1 << (type->Basic.size * 8)) - 1) {
+                    num->type = type;
+                    return 1;
+                }
+
+            } else {
+                i64 value = (i64) num->value.l;
+                switch (type->Basic.size) {
+                    case 1: if (-128 <= value && value <= 127) {
+                                num->value.i = (i8) value;
+                                num->type = type;
+                                return 1;
+                            }
+                    case 2: if (-32768 <= value && value <= 32767) {
+                                num->value.i = (i16) value;
+                                num->type = type;
+                                return 1;
+                            }
+                    case 4: if (-247483648 <= value && value <= 2147483647) {
+                                num->value.i = (i32) value;
+                                num->type = type;
+                                return 1;
+                            }
+                    case 8: {   num->type = type;
+                                return 1;
+                            }
+                }
+            }
+        }
+
+        else if (type->Basic.flags & Basic_Flag_Float) {
+            if (type->Basic.size == 4) {
+                // TODO(Brendan): Check these boundary conditions
+                if (bh_abs(num->value.l) >= (1 << 23)) {
+                    onyx_report_error(num->token->pos, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
+                    return 0;
+                }
+
+                num->type = type;
+                num->value.f = (f32) num->value.l;
+                return 1;
+            }
+            if (type->Basic.size == 8) {
+                // TODO(Brendan): Check these boundary conditions
+                if (bh_abs(num->value.l) >= (1ull << 52)) {
+                    onyx_report_error(num->token->pos, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
+                    return 0;
+                }
+
+                num->type = type;
+                num->value.d = (f64) num->value.l;
+                return 1;
+            }
+        }
+    }
+    else if (num->type->Basic.kind == Basic_Kind_Float_Unsized) {
+        // NOTE: Floats don't cast to integers implicitly.
+        if ((type->Basic.flags & Basic_Flag_Float) == 0) return 0;
+
+        if (type->Basic.kind == Basic_Kind_F32) {
+            num->value.f = (f32) num->value.d;
+        }
+
+        num->type = type;
+        return 1;
+    }
+    else if (num->type->Basic.kind == Basic_Kind_F32) {
+        // NOTE: Floats don't cast to integers implicitly.
+        if ((type->Basic.flags & Basic_Flag_Float) == 0) return 0;
+
+        if (type->Basic.kind == Basic_Kind_F64) {
+            num->value.d = (f64) num->value.f;
+            num->type = type;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// NOTE: Returns 0 if it was not possible to make the types compatible.
+b32 type_check_or_auto_cast(AstTyped* node, Type* type) {
+    assert(type != NULL);
+    assert(node != NULL);
+
+    if (types_are_compatible(node->type, type)) return 1;
+    if (node_is_auto_cast((AstNode *) node)) {
+        // If the node is an auto cast, we convert it to a cast node which will reports errors if
+        // the cast is illegal in the code generation.
+        ((AstUnaryOp *) node)->type = type;
+        ((AstUnaryOp *) node)->operation = Unary_Op_Cast;
+        return 1;
+    }
+    else if (node->kind == Ast_Kind_NumLit) {
+        if (convert_numlit_to_type((AstNumLit *) node, type)) return 1;
+    }
+
+    return 0;
+}
+
+Type* resolve_expression_type(AstTyped* node) {
+    if (node->type == NULL)
+        node->type = type_build_from_ast(semstate.allocator, node->type_node);
+
+    if (node->kind == Ast_Kind_NumLit) {
+        if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
+            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
+        }
+        else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
+            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F32]);
+        }
+    }
+
+    return node->type;
+}
+

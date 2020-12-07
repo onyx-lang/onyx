@@ -143,17 +143,13 @@ static AstNumLit* parse_int_literal(OnyxParser* parser) {
     int_node->flags |= Ast_Flag_Comptime;
     int_node->value.l = 0ll;
 
-    AstType* type = (AstType *) &basic_type_i32;
     token_toggle_end(int_node->token);
 
     char* first_invalid = NULL;
     i64 value = strtoll(int_node->token->text, &first_invalid, 0);
-    if (bh_abs(value) > ((u64) 1 << 32) || *first_invalid == 'l') {
-        type = (AstType *) &basic_type_i64;
-    }
 
     int_node->value.l = value;
-    int_node->type_node = type;
+    int_node->type_node = (AstType *) &basic_type_int_unsized;
 
     token_toggle_end(int_node->token);
     return int_node;
@@ -165,14 +161,13 @@ static AstNumLit* parse_float_literal(OnyxParser* parser) {
     float_node->flags |= Ast_Flag_Comptime;
     float_node->value.d = 0.0;
 
-    AstType* type = (AstType *) &basic_type_f64;
+    AstType* type = (AstType *) &basic_type_float_unsized;
     token_toggle_end(float_node->token);
 
     if (float_node->token->text[float_node->token->length - 1] == 'f') {
         type = (AstType *) &basic_type_f32;
         float_node->value.f = strtof(float_node->token->text, NULL);
     } else {
-        type = (AstType *) &basic_type_f64;
         float_node->value.d = strtod(float_node->token->text, NULL);
     }
 
@@ -2067,7 +2062,7 @@ static AstPackage* parse_package_name(OnyxParser* parser) {
             pnode->token = symbol;
             pnode->package = newpackage;
 
-            symbol_introduce(package->scope, symbol, pnode);
+            symbol_introduce(package->scope, symbol, (AstNode *) pnode);
         }
 
         package = newpackage;

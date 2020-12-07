@@ -34,78 +34,14 @@ CHECK(memres, AstMemRes* memres);
 
 static inline void fill_in_type(AstTyped* node) {
     if (node->type_node && node->type_node->kind == Ast_Kind_Array_Type) {
-        if (((AstArrayType *) node->type_node)->count_expr) check_expression(&((AstArrayType *) node->type_node)->count_expr);
+        if (((AstArrayType *) node->type_node)->count_expr) {
+            check_expression(&((AstArrayType *) node->type_node)->count_expr);
+            resolve_expression_type(((AstArrayType *) node->type_node)->count_expr);
+        }
     }
 
     if (node->type == NULL)
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
-}
-
-/*
-// NOTE: Returns 1 if the conversion was successful.
-static b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
-    fill_in_type((AstTyped *) num);
-    assert(num->type);
-
-    if (types_are_compatible(num->type, type)) return 1;
-
-    if (!type_is_numeric(type)) return 0;
-
-    if (num->type->Basic.flags & Basic_Flag_Integer) {
-
-        //
-        //  Integer literal auto cast rules:
-        //      - Up in size always works
-        //      - Down in size only works if value is in range of smaller type.
-        //      - Cast to float only works if value is less than the maximum precise value for float size.
-        //
-
-        if (type->Basic.flags & Basic_Flag_Integer) {
-            if (num->type->Basic.size < type->Basic.size) {
-                num->value.l = (i64) num->value.i;
-                num->type = type;
-                return 1;
-            }
-        }
-
-        if (type->Basic.flags & Basic_Flag_Float) {
-
-        }
-
-    }
-    else if (num->type->Basic.flags & Basic_Flag_Float) {
-        // NOTE: Floats don't cast to integers implicitly.
-        if ((type->Basic.flags & Basic_Flag_Float) == 0) return 0;
-
-        if (num->type->Basic.kind == Basic_Kind_F32 && type->Basic.kind == Basic_Kind_F64) num->value.d = (f64) num->value.f;
-        else return 0;
-
-        num->type = type;
-
-        return 1;
-    }
-
-    return 0;
-} */
-
-// NOTE: Returns 0 if it was not possible to make the types compatible.
-static b32 type_check_or_auto_cast(AstTyped* node, Type* type) {
-    assert(type != NULL);
-    assert(node != NULL);
-
-    if (types_are_compatible(node->type, type)) return 1;
-    if (node_is_auto_cast((AstNode *) node)) {
-        // If the node is an auto cast, we convert it to a cast node which will reports errors if
-        // the cast is illegal in the code generation.
-        ((AstUnaryOp *) node)->type = type;
-        ((AstUnaryOp *) node)->operation = Unary_Op_Cast;
-        return 1;
-    }
-    else if (node->kind == Ast_Kind_NumLit) {
-        // if (convert_numlit_to_type((AstNumLit *) node, type)) return 1;
-    }
-
-    return 0;
 }
 
 b32 check_return(AstReturn* retnode) {
@@ -265,6 +201,7 @@ b32 check_switch(AstSwitch* switchnode) {
             return 1;
         }
 
+        resolve_expression_type(sc->value);
         promote_numlit_to_larger((AstNumLit *) sc->value);
 
         u64 value = ((AstNumLit *) sc->value)->value.l;
@@ -538,6 +475,8 @@ b32 check_call(AstCall* call) {
                 call->va_kind = VA_Kind_Untyped;
 
                 if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
+
+                resolve_expression_type(arg_arr[arg_pos]->value);
                 arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
                 break;
             }
@@ -599,7 +538,7 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         // NOTE: This is the 'type inference' system. Very stupid, but very easy.
         // If a left operand has an unknown type, fill it in with the type of
         // the right hand side.
-        if (binop->left->type == NULL) binop->left->type = binop->right->type;
+        if (binop->left->type == NULL) binop->left->type = resolve_expression_type(binop->right);
 
     } else {
         // NOTE: +=, -=, ...
@@ -680,6 +619,7 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
     if (ltype->kind == Type_Kind_Pointer) ltype = &basic_types[Basic_Kind_Rawptr];
     if (rtype->kind == Type_Kind_Pointer) rtype = &basic_types[Basic_Kind_Rawptr];
 
+
     if (!types_are_compatible(ltype, rtype)) {
         b32 left_ac  = node_is_auto_cast((AstNode *) binop->left);
         b32 right_ac = node_is_auto_cast((AstNode *) binop->right);
@@ -688,8 +628,8 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
             onyx_report_error(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
             return 1;
         }
-        else if (left_ac  && type_check_or_auto_cast(binop->left, rtype));
-        else if (right_ac && type_check_or_auto_cast(binop->right, ltype));
+        else if (type_check_or_auto_cast(binop->left, rtype));
+        else if (type_check_or_auto_cast(binop->right, ltype));
         else {
             onyx_report_error(binop->token->pos,
                     "Cannot compare '%s' to '%s'.",
@@ -744,6 +684,8 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
 
     if (check_expression(&binop->left)) return 1;
     if (check_expression(&binop->right)) return 1;
+    // resolve_expression_type(binop->left);
+    // resolve_expression_type(binop->right);
 
     if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
         binop->flags |= Ast_Flag_Comptime;
@@ -756,14 +698,14 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         return check_binaryop_bool(pbinop);
 
     if (binop->left->type == NULL) {
-        onyx_report_error(binop->token->pos,
+        onyx_report_error(binop->left->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->left->token->text, binop->left->token->length);
         return 1;
     }
 
     if (binop->right->type == NULL) {
-        onyx_report_error(binop->token->pos,
+        onyx_report_error(binop->right->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
         return 1;
@@ -802,6 +744,7 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if (lptr) {
+        resolve_expression_type(binop->right);
         if (!type_is_integer(binop->right->type)) {
             onyx_report_error(binop->right->token->pos, "Expected integer type.");
             return 1;
@@ -866,6 +809,7 @@ b32 check_unaryop(AstUnaryOp** punop) {
     AstUnaryOp* unaryop = *punop;
 
     if (check_expression(&unaryop->expr)) return 1;
+    resolve_expression_type(unaryop->expr);
 
     if (unaryop->operation != Unary_Op_Cast) {
         unaryop->type = unaryop->expr->type;
@@ -1007,6 +951,7 @@ b32 check_array_access(AstArrayAccess* aa) {
         return 0;
     }
 
+    resolve_expression_type(aa->expr);
     if (aa->expr->type->kind != Type_Kind_Basic
             || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
         onyx_report_error(aa->token->pos, "Expected type u32 or i32 for index.");
@@ -1433,6 +1378,7 @@ b32 check_memres(AstMemRes* memres) {
 
     if (memres->initial_value != NULL) {
         fill_in_type(memres->initial_value);
+        resolve_expression_type(memres->initial_value);
         check_expression(&memres->initial_value);
 
         if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
@@ -1440,14 +1386,19 @@ b32 check_memres(AstMemRes* memres) {
             return 1;
         }
 
-        Type* memres_type = memres->type;
+        if (memres->type != NULL) {
+            Type* memres_type = memres->type;
+            if (!type_check_or_auto_cast(memres->initial_value, memres_type)) {
+                onyx_report_error(memres->token->pos,
+                        "Cannot assign value of type '%s' to a '%s'.",
+                        type_get_name(memres_type),
+                        type_get_name(memres->initial_value->type));
+                return 1;
+            }
 
-        if (!type_check_or_auto_cast(memres->initial_value, memres_type)) {
-            onyx_report_error(memres->token->pos,
-                    "Cannot assign value of type '%s' to a '%s'.",
-                    type_get_name(memres_type),
-                    type_get_name(memres->initial_value->type));
-            return 1;
+        } else {
+            memres->type = memres->initial_value->type;
+            bh_printf("Memres type: %s\n", type_get_name(memres->type));
         }
     }
 
@@ -1493,6 +1444,7 @@ void check_entity(Entity* ent) {
 
         case Entity_Type_Expression:
             if (check_expression(&ent->expr)) return;
+            resolve_expression_type(ent->expr);
             break;
 
         case Entity_Type_Type_Alias:

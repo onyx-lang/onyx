@@ -10,6 +10,7 @@ Type basic_types[] = {
 
     { Type_Kind_Basic, 0, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1,  1, "bool"   } },
 
+    { Type_Kind_Basic, 0, { Basic_Kind_Int_Unsized, Basic_Flag_Integer,                  0,  0, "unsized int" } },
     { Type_Kind_Basic, 0, { Basic_Kind_I8,     Basic_Flag_Integer,                       1,  1, "i8"     } },
     { Type_Kind_Basic, 0, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1,  1, "u8"     } },
     { Type_Kind_Basic, 0, { Basic_Kind_I16,    Basic_Flag_Integer,                       2,  2, "i16"    } },
@@ -19,6 +20,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, { Basic_Kind_I64,    Basic_Flag_Integer,                       8,  8, "i64"    } },
     { Type_Kind_Basic, 0, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8,  8, "u64"    } },
 
+    { Type_Kind_Basic, 0, { Basic_Kind_Float_Unsized, Basic_Flag_Float,                  0,  0, "unsized float" } },
     { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } },
     { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } },
 
@@ -296,7 +298,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             u32 count = 0;
             if (a_node->count_expr) {
-                a_node->count_expr->type = type_build_from_ast(alloc, a_node->count_expr->type_node);
+                if (a_node->count_expr->type == NULL)
+                    a_node->count_expr->type = type_build_from_ast(alloc, a_node->count_expr->type_node);
 
                 if (node_is_auto_cast((AstNode *) a_node->count_expr)) {
                     a_node->count_expr = ((AstUnaryOp *) a_node)->expr;
@@ -441,8 +444,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_type = (AstPolyCallType *) type_node;
 
-            // @Cleanup: make this a proper error message.  -brendanfh 2020/09/14
-            assert(pc_type->callee && pc_type->callee->kind == Ast_Kind_Poly_Struct_Type);
+            if (!(pc_type->callee && pc_type->callee->kind == Ast_Kind_Poly_Struct_Type)) {
+                onyx_report_error(pc_type->token->pos, "Cannot instantiate a concrete type off of a non-polymorphic type.");
+                return NULL;
+            }
 
             AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
 
@@ -757,7 +762,7 @@ b32 type_is_numeric(Type* type) {
     if (type->kind == Type_Kind_Enum) return 1;
     if (type->kind != Type_Kind_Basic) return 0;
 
-    return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_F64;
+    return type->Basic.kind >= Basic_Kind_Int_Unsized && type->Basic.kind <= Basic_Kind_F64;
 }
 
 b32 type_is_compound(Type* type) {

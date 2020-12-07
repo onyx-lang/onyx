@@ -2,7 +2,7 @@
 #include "onyxsempass.h"
 #include "onyxparser.h"
 #include "onyxutils.h"
-
+#include "onyxastnodes.h"
 
 
 static void scope_enter(Scope* new_scope);
@@ -593,7 +593,7 @@ void symres_function(AstFunction* func) {
             param->local->type = type_build_from_ast(semstate.node_allocator, param->local->type_node);
 
             if (param->default_value != NULL) {
-                if (!types_are_compatible(param->local->type, param->default_value->type)) {
+                if (!type_check_or_auto_cast(param->default_value, param->local->type)) {
                     onyx_report_error(param->local->token->pos,
                             "Expected default value of type '%s', was of type '%s'.",
                             type_get_name(param->local->type),
@@ -603,7 +603,7 @@ void symres_function(AstFunction* func) {
             }
 
         } else if (param->default_value != NULL) {
-            param->local->type = param->default_value->type;
+            param->local->type = resolve_expression_type(param->default_value);
 
         } else if (param->vararg_kind == VA_Kind_Untyped) {
             // HACK
@@ -730,9 +730,10 @@ static void symres_enum(AstEnumType* enum_node) {
 
         if ((*value)->value != NULL) {
             // HACK
-            if ((*value)->value->type_node == (AstType *) &basic_type_i32) {
+            resolve_expression_type((AstTyped *) (*value)->value);
+            if (type_is_small_integer((*value)->value->type)) {
                 next_assign_value = (*value)->value->value.i;
-            } else if ((*value)->value->type_node == (AstType *) &basic_type_i64) {
+            } else if (type_is_integer((*value)->value->type)) {
                 next_assign_value = (*value)->value->value.l;
             } else {
                 onyx_report_error((*value)->token->pos, "expected numeric integer literal for enum initialization");
@@ -759,14 +760,12 @@ static void symres_enum(AstEnumType* enum_node) {
 
 static void symres_memres(AstMemRes** memres) {
     (*memres)->type_node = symres_type((*memres)->type_node);
+
     if ((*memres)->initial_value != NULL) {
         symres_expression(&(*memres)->initial_value);
 
-        if ((*memres)->type_node == NULL)
-            (*memres)->type_node = (*memres)->initial_value->type_node;
-
-    } else {
-        if ((*memres)->type_node == NULL) return;
+        // if ((*memres)->type_node == NULL)
+        //     (*memres)->type_node = (*memres)->initial_value->type_node;
     }
 }
 

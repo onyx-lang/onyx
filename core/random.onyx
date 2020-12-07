@@ -1,6 +1,6 @@
 package core.random
 
-#private_file seed := 8675309
+#private_file seed : i32 = 8675309
 
 #private_file RANDOM_MULTIPLIER :: 1664525
 #private_file RANDOM_INCREMENT  :: 1013904223
@@ -9,7 +9,7 @@ package core.random
 set_seed :: proc (s: u32) do seed = s;
 
 int :: proc (s := ^seed) -> u32 {
-	*s = *s * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
+    *s = *s * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
 	return *s;
 }
 

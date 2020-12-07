@@ -164,7 +164,7 @@ main :: proc (args: [] cstring) {
     multi_max(4, 2, 76, 3, 1203, 2, 4) |> print();
     print("\n");
 
-    multi_max(4l, 2l, 76l, 3l, 1203l, 2l, 4l) |> print();
+    multi_max(cast(u64) 4, cast(u64) 2, cast(u64) 76, cast(u64) 3, cast(u64) 1203, cast(u64) 2, cast(u64) 4) |> print();
     print("\n");
 
     weird_sum(4, 1) |> print();
@@ -204,7 +204,7 @@ main :: proc (args: [] cstring) {
 
     for i: 0 .. 100 {
         array_push(^s.a, (5 * i) % 21);
-        array_push(^s.b, 3l * cast(i64) i);
+        array_push(^s.b, 3 * cast(i64) i);
         array_push(^s.c, V2.{ i, i * i });
     }
 
@@ -333,7 +333,7 @@ main2 :: proc (args: [] cstring) {
     print("\n");
 
     print("Does the array contain 2637? ");
-    print(array_contains(^barr, 2637l));
+    print(array_contains(^barr, 2637));
     print("\n");
 
 

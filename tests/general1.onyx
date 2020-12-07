@@ -147,8 +147,8 @@ main :: proc (args: [] cstring) {
     vararg_test("Here are some numbers:\n", 1, 2, 3, 4, 5);
     print("\n\n");
 
-    multi_max(4, 2, 76, 3, 1203, 2, 4)        |> println();
-    multi_max(4l, 2l, 76l, 3l, 1203l, 2l, 4l) |> println();
+    multi_max(4, 2, 76, 3, 1203, 2, 4) |> println();
+    multi_max(4, 2, 76, 3, 1203, 2, 4) |> println();
 
     weird_sum(4, 1) |> println();
 
@@ -185,7 +185,7 @@ main :: proc (args: [] cstring) {
 
     for i: 0 .. 100 {
         array.push(^s.a, (5 * i) % 21);
-        array.push(^s.b, 3l * cast(i64) i);
+        array.push(^s.b, 3 * cast(i64) i);
         array.push(^s.c, Vec3.{ i, i * i, i * i * i });
     }
 

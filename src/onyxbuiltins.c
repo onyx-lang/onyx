@@ -17,6 +17,10 @@ AstBasicType basic_type_f32    = { Ast_Kind_Basic_Type, 0, NULL, "f32"   , &basi
 AstBasicType basic_type_f64    = { Ast_Kind_Basic_Type, 0, NULL, "f64"   , &basic_types[Basic_Kind_F64]   };
 AstBasicType basic_type_rawptr = { Ast_Kind_Basic_Type, 0, NULL, "rawptr", &basic_types[Basic_Kind_Rawptr] };
 
+// NOTE: Types used for numeric literals
+AstBasicType basic_type_int_unsized   = { Ast_Kind_Basic_Type, 0, NULL, "unsized_int",   &basic_types[Basic_Kind_Int_Unsized] };
+AstBasicType basic_type_float_unsized = { Ast_Kind_Basic_Type, 0, NULL, "unsized_float", &basic_types[Basic_Kind_Float_Unsized] };
+
 static OnyxToken simd_token = { Token_Type_Symbol, 0, "", { 0 } };
 AstBasicType basic_type_i8x16 = { Ast_Kind_Basic_Type, 0, &simd_token, "i8x16", &basic_types[Basic_Kind_I8X16] };
 AstBasicType basic_type_i16x8 = { Ast_Kind_Basic_Type, 0, &simd_token, "i16x8", &basic_types[Basic_Kind_I16X8] };

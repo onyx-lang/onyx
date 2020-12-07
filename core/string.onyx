@@ -202,7 +202,7 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
     n := cast(u64) n_;
 
     is_neg := false;
-    if n_ < 0l && base == 10l {
+    if n_ < 0 && base == 10 {
         is_neg = true;
         n = cast(u64) -n_;
     }
@@ -212,7 +212,7 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
 
     s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
 
-    while n > 0l {
+    while n > 0 {
         m :: n % base;
 
         *c = s[cast(u32) m];
@@ -227,7 +227,7 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
         c -= 1;
     }
 
-    if base == 16l {
+    if base == 16 {
         *c = #char "x";
         len += 1;
         c -= 1;
@@ -236,7 +236,7 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
         c -= 1;
     }
 
-    if base == 2l {
+    if base == 2 {
         *c = #char "b";
         len += 1;
         c -= 1;
@@ -263,20 +263,20 @@ f64_to_string :: proc (f: f64, buf: [] u8) -> string {
     b := Buffer.{ cast(^void) buf.data, buf.count };
     len := 0;
 
-    s1 := i64_to_string(v / 10000l, 10l, b);
+    s1 := i64_to_string(v / 10000, 10, b);
     for i: 0 .. s1.count do buf.data[i] = s1.data[i];
     buf.data[s1.count] = #char ".";
     len = s1.count + 1;
 
     if v < ~~0 do v = -v;
-    s2 := i64_to_string(v % 10000l, 10l, b);
+    s2 := i64_to_string(v % 10000, 10, b);
     for i: 0 .. s2.count do buf.data[s1.count + 1 + i] = s2.data[i];
     len += s2.count;
 
     return string.{ buf.data, len };
 }
 
-builder_add_i64 :: proc (use sb: ^StringBuilder, n: i64, base := 10l) -> ^StringBuilder {
+builder_add_i64 :: proc (use sb: ^StringBuilder, n: i64, base: u64 = 10) -> ^StringBuilder {
     buf : [256] u8;
     s := i64_to_string(n, base, Buffer.{ cast(^void) buf, 256 });
     return builder_add_string(sb, s);

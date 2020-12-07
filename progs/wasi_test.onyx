@@ -46,7 +46,7 @@ use package wasi
 readline :: proc (buf: ^u8, bufsize: u32) -> u32 {
     iov := IOVec.{ buf, bufsize };
     nread : Size;
-    fd_pread(0, IOVecArray.{ ^iov, 1 }, 0l, ^nread);
+    fd_pread(0, IOVecArray.{ ^iov, 1 }, 0, ^nread);
 
     return nread;
 }
@@ -66,10 +66,10 @@ readdir :: proc (fd: FileDescriptor) {
         print("\n");
 
         print("\td_namlen: ");
-        print_i64(cast(u64) dirent.d_namlen, 16l);
+        print_i64(cast(u64) dirent.d_namlen, 16);
         print("\n");
         print("\td_type: ");
-        print_i64(cast(u64) dirent.d_type, 16l);
+        print_i64(cast(u64) dirent.d_type, 16);
         print("\n");
 
         bufused -= sizeof DirEnt + dirent.d_namlen;
@@ -88,7 +88,7 @@ timer_start :: proc () -> Timestamp {
 timer_end :: proc (start_time: Timestamp) -> Timestamp {
     curr_time: Timestamp;
     clock_time_get(ClockID.Realtime, cast(Timestamp) 1, ^curr_time);
-    return (curr_time - start_time) / 1000000l;
+    return (curr_time - start_time) / 1000000;
 }
 
 is_prime :: proc (n := 0) -> bool {
@@ -149,7 +149,7 @@ main :: proc (args: []cstring) {
     defer {
         ^sb |> string_builder_clear()
             |> sba("\nTime taken: ")
-            |> sba(cast(u64) timer_end(timer), 10l)
+            |> sba(cast(u64) timer_end(timer), 10)
             |> sba("ms\n")
             |> string_builder_to_string()
             |> print();
@@ -168,7 +168,7 @@ main :: proc (args: []cstring) {
     defer cfree(cont.data);
     print(cont);
 
-    sum := 0l;
+    sum: u64 = 0;
     for i: 0 .. 20000 do if is_prime(i) do sum += cast(u64) i;
     print("Sum of primes less than 20000 is: ");
     print_i64(sum);
@@ -200,7 +200,7 @@ main :: proc (args: []cstring) {
 
             case #default {
                 print("Unexpected token: ");
-                print_i64(cast(u64) tokens[i][0], 16l);
+                print_i64(cast(u64) tokens[i][0], 16);
                 print("\n");
 
                 // This breaks out of the for loop
@@ -265,10 +265,10 @@ main :: proc (args: []cstring) {
     print_i64(cast(u64) fib(20));
     print("\n");
 
-    print(add(20l, 5l));
-    print(add(20l, 5l));
-    print(add(20l, 5l));
-    print(add(20l, 5l));
+    print(add(cast(u64) 20, cast(u64) 5));
+    print(add(cast(u64) 20, cast(u64) 5));
+    print(add(cast(u64) 20, cast(u64) 5));
+    print(add(cast(u64) 20, cast(u64) 5));
     print("\n");
     print(cast(u64) add(20.0f, 5.0f));
     print("\n");
@@ -279,7 +279,7 @@ main :: proc (args: []cstring) {
     print(cast(u64) get_slice_length(^slice));
     print("\n");
 
-    print(multi_poly(5.4f, 10l));
+    print(multi_poly(5.4f, 10));
     print("\n");
 
     dynarr : [..] Vec3;
@@ -297,10 +297,10 @@ main :: proc (args: []cstring) {
     print(dynarr.count, 10);
 }
 
-foobar :: proc (a: i32, b := 1, c := 5l) {
+foobar :: proc (a: i32, b := 1, c: i64 = 5) {
     print_i64(cast(u64) a);
     print("\n");
-    print_i64(cast(u64) b, 16l);
+    print_i64(cast(u64) b, 16);
     print("\n");
     print_i64(c);
     print("\n");

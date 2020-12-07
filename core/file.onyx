@@ -76,7 +76,7 @@ close :: proc (file: File) -> bool {
 
 get_size :: proc (file: File) -> u64 {
     fs: FileStat;
-    if fd_filestat_get(file.fd, ^fs) != Errno.Success do return 0l;
+    if fd_filestat_get(file.fd, ^fs) != Errno.Success do return 0;
 
     return fs.size;
 }
@@ -90,11 +90,11 @@ get_contents_from_file :: proc (file: File) -> string {
     fd_tell(file.fd, ^prev_loc);
 
     dummy: i64;
-    fd_seek(file.fd, 0l, Whence.Set, ^dummy);
+    fd_seek(file.fd, 0, Whence.Set, ^dummy);
 
     dummy2: u32;
     buf := IOVec.{ data, size };
-    fd_pread(file.fd, IOVecArray.{ ^buf, 1 }, 0l, ^dummy2);
+    fd_pread(file.fd, IOVecArray.{ ^buf, 1 }, 0, ^dummy2);
 
     fd_seek(file.fd, prev_loc, Whence.Set, ^dummy);
 

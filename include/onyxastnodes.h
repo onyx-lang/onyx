@@ -803,6 +803,9 @@ extern AstBasicType basic_type_f32;
 extern AstBasicType basic_type_f64;
 extern AstBasicType basic_type_rawptr;
 
+extern AstBasicType basic_type_int_unsized;
+extern AstBasicType basic_type_float_unsized;
+
 extern AstNode   builtin_package_node;
 extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
@@ -834,6 +837,9 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 AstNode* ast_clone(bh_allocator a, void* n);
 void promote_numlit_to_larger(AstNumLit* num);
+b32 convert_numlit_to_type(AstNumLit* num, Type* type);
+b32 type_check_or_auto_cast(AstTyped* node, Type* type);
+Type* resolve_expression_type(AstTyped* node);
 
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,

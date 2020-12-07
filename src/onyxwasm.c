@@ -1328,7 +1328,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     u32 vararg_count = 0;
     u32 vararg_offset = -1;
-    u64 stack_top_store_local;;
+    u64 stack_top_store_local;
 
     bh_arr_each(AstArgument *, parg, call->arg_arr) {
         AstArgument* arg = *parg;
