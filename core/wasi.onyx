@@ -207,7 +207,7 @@ OFlags :: enum #flags (u16) {
     Trunc;
 }
 
-LinkCount :: #type u64;
+LinkCount :: #type u32;
 
 FileStat :: struct {
     dev      : Device;
@@ -219,8 +219,15 @@ FileStat :: struct {
     // is a C header file, that is itself incorrect. nlink does
     // not exist in the current version of wasmtime, and should
     // not be here, but maybe in the future? Ugh.
+    //
+    // STILL ANGERY(Brendan Hansen): Actually, nlink does exist
+    // in the current version of wasmtime; however its actually
+    // a 32-bit value, not 64-bit, which means the offsets were
+    // incorrect. I fixed it for now, but when wasmtime updates
+    // the size of 'LinkCount' needs to be changed.
     //                                   - brendanfh 2020/12/05
-    // nlink    : LinkCount;
+    //                                   - brendanfh 2020/12/07
+    nlink    : LinkCount;
 
     size     : Filesize;
     atim     : Timestamp;
