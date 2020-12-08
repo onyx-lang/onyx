@@ -305,6 +305,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     a_node->count_expr = ((AstUnaryOp *) a_node)->expr;
                 }
 
+                resolve_expression_type((AstTyped *) a_node->count_expr);
+
                 // NOTE: Currently, the count_expr has to be an I32 literal
                 if (a_node->count_expr->kind != Ast_Kind_NumLit
                     || a_node->count_expr->type->kind != Type_Kind_Basic

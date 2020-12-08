@@ -1378,8 +1378,8 @@ b32 check_memres(AstMemRes* memres) {
 
     if (memres->initial_value != NULL) {
         fill_in_type(memres->initial_value);
-        resolve_expression_type(memres->initial_value);
         check_expression(&memres->initial_value);
+        resolve_expression_type(memres->initial_value);
 
         if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
             onyx_report_error(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
@@ -1398,7 +1398,6 @@ b32 check_memres(AstMemRes* memres) {
 
         } else {
             memres->type = memres->initial_value->type;
-            bh_printf("Memres type: %s\n", type_get_name(memres->type));
         }
     }
 

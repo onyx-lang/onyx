@@ -246,11 +246,11 @@ void scope_clear(Scope* scope) {
 #define REDUCE_BINOP_ALL(op) \
     if (type_is_small_integer(res->type) || type_is_bool(res->type)) { \
         res->value.i = left->value.i op right->value.i; \
-    } else if (type_is_integer(res->type)) { \
+    } else if (type_is_integer(res->type) || res->type->Basic.kind == Basic_Kind_Int_Unsized) { \
         res->value.l = left->value.l op right->value.l; \
     } else if (res->type->Basic.kind == Basic_Kind_F32) { \
         res->value.f = left->value.f op right->value.f; \
-    } else if (res->type->Basic.kind == Basic_Kind_F64) { \
+    } else if (res->type->Basic.kind == Basic_Kind_F64 || res->type->Basic.kind == Basic_Kind_Float_Unsized) { \
         res->value.d = left->value.d op right->value.d; \
     } \
     break;
@@ -258,7 +258,7 @@ void scope_clear(Scope* scope) {
 #define REDUCE_BINOP_INT(op) \
     if (type_is_small_integer(res->type) || type_is_bool(res->type)) { \
         res->value.i = left->value.i op right->value.i; \
-    } else if (type_is_integer(res->type)) { \
+    } else if (type_is_integer(res->type) || res->type->Basic.kind == Basic_Kind_Int_Unsized) { \
         res->value.l = left->value.l op right->value.l; \
     } \
     break;
@@ -318,11 +318,11 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
 #define REDUCE_UNOP(op) \
     if (type_is_small_integer(unop->type) || type_is_bool(unop->type)) { \
         res->value.i = op ((AstNumLit *) unop->expr)->value.i; \
-    } else if (type_is_integer(unop->type)) { \
+    } else if (type_is_integer(unop->type) || unop->type->Basic.kind == Basic_Kind_Int_Unsized) { \
         res->value.l = op ((AstNumLit *) unop->expr)->value.l; \
     } else if (unop->type->Basic.kind == Basic_Kind_F32) { \
         res->value.f = op ((AstNumLit *) unop->expr)->value.f; \
-    } else if (unop->type->Basic.kind == Basic_Kind_F64) { \
+    } else if (unop->type->Basic.kind == Basic_Kind_F64 || unop->type->Basic.kind == Basic_Kind_Float_Unsized) { \
         res->value.d = op ((AstNumLit *) unop->expr)->value.d; \
     } \
     break;
@@ -714,12 +714,12 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
                 i64 value = (i64) num->value.l;
                 switch (type->Basic.size) {
                     case 1: if (-128 <= value && value <= 127) {
-                                num->value.i = (i8) value;
+                                num->value.i = (i32) value;
                                 num->type = type;
                                 return 1;
                             } break;
                     case 2: if (-32768 <= value && value <= 32767) {
-                                num->value.i = (i16) value;
+                                num->value.i = (i32) value;
                                 num->type = type;
                                 return 1;
                             } break;
