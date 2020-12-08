@@ -705,6 +705,10 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
                     num->type = type;
                     return 1;
                 }
+                
+                onyx_report_error(num->token->pos, "Integer constant with value '%l' does not fit into %d-bits.",
+                        num->value.l,
+                        type->Basic.size * 8);
 
             } else {
                 i64 value = (i64) num->value.l;
@@ -713,21 +717,25 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
                                 num->value.i = (i8) value;
                                 num->type = type;
                                 return 1;
-                            }
+                            } break;
                     case 2: if (-32768 <= value && value <= 32767) {
                                 num->value.i = (i16) value;
                                 num->type = type;
                                 return 1;
-                            }
-                    case 4: if (-247483648 <= value && value <= 2147483647) {
+                            } break;
+                    case 4: if (-2147483648 <= value && value <= 2147483647) {
                                 num->value.i = (i32) value;
                                 num->type = type;
                                 return 1;
-                            }
+                            } break;
                     case 8: {   num->type = type;
                                 return 1;
-                            }
+                            } break;
                 }
+
+                onyx_report_error(num->token->pos, "Integer constant with value '%l' does not fit into %d-bits.",
+                        num->value.l,
+                        type->Basic.size * 8);
             }
         }
 
@@ -807,10 +815,13 @@ Type* resolve_expression_type(AstTyped* node) {
 
     if (node->kind == Ast_Kind_NumLit) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
-            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
+            if ((((u64) ((AstNumLit *) node)->value.l) >> 32) > 0)
+                convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);
+            else
+                convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
         }
         else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
-            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F32]);
+            convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F64]);
         }
     }
 
