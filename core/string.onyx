@@ -336,6 +336,13 @@ read_char :: proc (str: ^string, out: ^u8) {
     str.count -= 1;
 }
 
+read_chars :: proc (str: ^string, out: ^string, char_count := 1) {
+    out.data = str.data;
+    out.count = char_count;
+    str.data += char_count;
+    str.count -= char_count;
+}
+
 discard_chars :: proc (str: ^string, char_count := 1) {
     str.data += char_count;
     str.count -= char_count;
