@@ -13,11 +13,11 @@ proc () #export "_start" {
     context.allocator = allocator.heap_allocator;
     context.temp_allocator = allocator.heap_allocator;
 
-    stdio_init();
-
     args : [] cstring;
     args.data  = null;
     args.count = 0;
+
+    stdio_init();
 
     main.main(args);
 

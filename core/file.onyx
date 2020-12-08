@@ -107,7 +107,7 @@ get_contents :: proc {
     proc (path: string) -> string {
         tmp_file: File;
 
-        if !open(^tmp_file, path, OpenMode.Read) do return "";
+        if !open(^tmp_file, path, OpenMode.Read) do return string.{ null, 0 };
         defer close(tmp_file);
 
         return get_contents(tmp_file);

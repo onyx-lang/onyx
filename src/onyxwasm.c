@@ -1413,14 +1413,15 @@ EMIT_FUNC(call, AstCall* call) {
     CallingConvention cc = type_function_get_cc(call->callee->type);
     assert(cc != CC_Undefined);
 
+    b32 needs_stack = (cc == CC_Return_Stack) || (stack_grow_amm > 0);
+
     Type* return_type = call->callee->type->Function.return_type;
     u32 return_size = type_size_of(return_type);
     u32 return_align = type_alignment_of(return_type);
     bh_align(return_size, return_align);
 
-    stack_grow_amm += return_size;
-
-    b32 needs_stack = (cc == CC_Return_Stack) || (stack_grow_amm > 0);
+    if (cc == CC_Return_Stack)
+        stack_grow_amm += return_size;
 
     if (needs_stack) {
         WID(WI_GLOBAL_GET, stack_top_idx);
