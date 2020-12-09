@@ -1328,15 +1328,15 @@ static AstType* parse_type(OnyxParser* parser) {
             AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
             symbol_node->token = expect_token(parser, Token_Type_Symbol);
 
-            if (parser->curr->type == '.') {
+            *next_insertion = (AstType *) symbol_node;
+
+            while (parser->curr->type == '.') {
                 consume_token(parser);
                 AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
                 field->token = expect_token(parser, Token_Type_Symbol);
-                field->expr  = (AstTyped *) symbol_node;
+                field->expr  = (AstTyped *) *next_insertion;
 
                 *next_insertion = (AstType *) field;
-            } else {
-                *next_insertion = (AstType *) symbol_node;
             }
 
             if (parser->curr->type == '(') {

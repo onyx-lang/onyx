@@ -12,16 +12,24 @@ Additions:
 * use statements at the function level.
 * nested packages, i.e. 'core.array'
     - Still testing it out; could change at in the future
+* basic printf implementation
+* core.str.reader library
 
 Removals:
 
 Changes:
+* Massive renaming of packages, since nested packages are now allowed.
+    - Most collections of function simply were put into a package, instead of being prefixed,
+        i.e. array_map -> array.map
+* Numeric literals now no longer have a concrete type; they become whatever type is needed,
+    reporting an error if that is not possible.
 * Procedure definitions now require parentheses, even if there are no arguments. This was
     done to allow for `proc { foo, bar }` to be the overload syntax.
-* array_map takes an arbitrary parameter of polymorphic type to make up for the fact that
+* array.map takes an arbitrary parameter of polymorphic type to make up for the fact that
     anonymous procs do not have closure. New type signature is:
         array_map :: proc (arr: ^[..] $T, data: $R, f: proc (T, R) -> T)
 * better syntax highlighting for VIM.
+* Compiler internals changed to make it easier to do advanced things in the future. 
 
 Bug fixes:
 * many bugs related to var args and procedure calls in general.
@@ -29,6 +37,8 @@ Bug fixes:
 * polymorhpic structs caused scope to change when using a struct literal of a polymoprhic type.
 * #char "\"" did not work.
 * nested function calls returning non-basic types would simply be wrong.
+* Recursive structs are no longer possible.
+* For loop array/slice/dynarray used to use signed indicies, which was wrong.
 
 
 

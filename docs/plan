@@ -24,45 +24,70 @@ FEATURES:
     - inferred typing
     - Smart package loading
     - defer
-    ? polymorphic functions
+    - polymorphic functions
 
 HOW:
     Currently there is a multi-phase development process since implementing everything
     at once would be overwhelming and unsatisfying. The current progress of each stage:
 
-    Stage 1 (MVP):
-        [X] Can declare procedures
-        [X] Procedures have params and returns of the following types:
-            - i32, u32
-            - i64, u64
-            - f32, f64
-        [X] Procedures have locals of the same set of types
-        [X] Locals are declared in the following way
-            local : (type) ((= or :) initial value);
+    Stage 3:
+        I have a working compiler with many features, but here are some additional features
+        I would like to consider adding in the future.
 
-            if : is used, the value is unmodifiable
-            if type is specified, that is assumed to be the correct type
-            if type is not specified, the type of initial value is used as the type
+        [ ] Put type info in data section so it is runtime accessible
+            - type name
+            - size
+            - alignment
+            - struct member names
+            - array length
 
-        [X] Five basic math operations are legal:
-            + - * / %
-        [X] Math operations are sign aware and only operate on operands of the same type
-        [X] All casts are explicit using this syntax:
-            X as T
+        [ ] baked parameters
+            - Compile time known parameters
+            - Removes the argument from the list and replaces the function with the
+                baked function
 
-            casts X to type T
+        [ ] Add threading intrinsics
+            - This will actually be fairly easy since I think all that is needed is
+                to implement the intrinsics.
+            - ^^^ This is a false statement. I also need to have 'thread local variables' for
+                stack pointers and separate stack allocation in the linear memory for each
+                of the threads.
 
-        [X] Curly braces are required for all bodies of blocks
-        [X] Numeric literals are parsed
-        [X] Numeric literals have the minimum type detected
-        [X] Foreign imports (functions only)
-        [X] Comparison operators
-        [X] Proper boolean type
-        [X] Conditional branching works as expected
-        [X] Simple while loop is functioning as expected
-        [X] break and continue semantics
-        [X] Function calling works for the builtin types
-        [X] Function return values are type checked
+        [ ] Array literals
+
+        [ ] transmute
+
+        [ ] explicit memory controls at top level
+
+        [ ] look into creating a source map
+            - first-look looks really gross
+            - whoever came up with the source map spec should be fired... why are people so afraid of binary files??
+            - DWARF looks like it might be easier, but it still doesn't look fun.
+
+        [ ] convert to using an 'atom' like table
+            - All identifier tokens are given a unique atom ptr, up to string equality.
+            - This means identifiers can be compared using ptr comparison, instead of string comparison
+            - This mean no more token_toggle_end!! Woo!!
+
+        [ ] 'when' statements
+            - Compile time conditions
+            - Only evalutate code blocks that evaluate to be true
+
+        [ ] multiple lvals and compound assignment
+            a := 2
+            b := 5
+            a, b = b, a;
+
+        [ ] All code paths return correct value
+
+        [ ] Better checking for casts
+            - Checking which things are allowed to cast to/from should be checked in the checker,
+                not in the wasm generatation
+
+        [ ] Interop with C
+            - Difficult feature
+            - Would be nice to use existing C code (such as stb headers)
+            - Some way to make this happen without needing a full C compiler would be nice
 
     Stage 2:
         [X] Order of symbol declaration is irrelevant
@@ -247,80 +272,55 @@ HOW:
 
         [X] Variadic arguments
 
-        [ ] Put type info in data section so it is runtime accessible
-            - type name
-            - size
-            - alignment
-            - struct member names
-            - array length
-
-        [ ] baked parameters
-            - Compile time known parameters
-            - Removes the argument from the list and replaces the function with the
-                baked function
+        [X] Type parameterized structs
 
         [X] Add SIMD intrinsics
             - This also requires adding the v128 SIMD type
 
-        [ ] Add threading intrinsics
-            - This will actually be fairly easy since I think all that is needed is
-                to implement the intrinsics.
-            - ^^^ This is a false statement. I also need to have 'thread local variables' for
-                stack pointers and separate stack allocation in the linear memory for each
-                of the threads.
-
-        [X] Type parameterized structs
-
-        [ ] Array literals
-
-        [ ] transmute
-
-        [ ] explicit memory controls at top level
-
         [X] 'use' enums and packages at an arbitrary scope
-
-        [ ] look into creating a source map
-            - first-look looks really gross
-            - whoever came up with the source map spec should be fired... why are people so afraid of binary files??
-            - DWARF looks like it might be easier, but it still doesn't look fun.
-
-        [ ] convert to using an 'atom' like table
-            - All identifier tokens are given a unique atom ptr, up to string equality.
-            - This means identifiers can be compared using ptr comparison, instead of string comparison
-            - This mean no more token_toggle_end!! Woo!!
 
         [X] Make the lexer much faster
             - Technically it isn't slow right now
             - But, profiling says we are spending 50% of the program execution time in the lexer
             - That is awful
 
-        [ ] 'when' statements
-            - Compile time conditions
-            - Only evalutate code blocks that evaluate to be true
-
         [X] Top level variable initialization
             - Works for numeric literals
 
-        [ ] multiple lvals and compound assignment
-            a := 2
-            b := 5
-            a, b = b, a;
 
-        [ ] All code paths return correct value
+    Stage 1 (MVP):
+        [X] Can declare procedures
+        [X] Procedures have params and returns of the following types:
+            - i32, u32
+            - i64, u64
+            - f32, f64
+        [X] Procedures have locals of the same set of types
+        [X] Locals are declared in the following way
+            local : (type) ((= or :) initial value);
 
-        [X] Arrays need to be much better
-            - Currently, they are basically just a pointer.
-            - The length should be stored with the pointer
-            - Dynamic resizing?
-            - They are just very hard to use at the moment
+            if : is used, the value is unmodifiable
+            if type is specified, that is assumed to be the correct type
+            if type is not specified, the type of initial value is used as the type
 
-        [X] Start work on evaluating compile time known values.
-            - An expression marked COMPTIME will be reduced to its value in the parse tree.
+        [X] Five basic math operations are legal:
+            + - * / %
+        [X] Math operations are sign aware and only operate on operands of the same type
+        [X] All casts are explicit using this syntax:
+            X as T
 
-        [ ] Better checking for casts
-            - Checking which things are allowed to cast to/from should be checked in the checker,
-                not in the wasm generatation
+            casts X to type T
 
+        [X] Curly braces are required for all bodies of blocks
+        [X] Numeric literals are parsed
+        [X] Numeric literals have the minimum type detected
+        [X] Foreign imports (functions only)
+        [X] Comparison operators
+        [X] Proper boolean type
+        [X] Conditional branching works as expected
+        [X] Simple while loop is functioning as expected
+        [X] break and continue semantics
+        [X] Function calling works for the builtin types
+        [X] Function return values are type checked
 
 
 
