@@ -2071,7 +2071,7 @@ static AstPackage* parse_package_name(OnyxParser* parser) {
             pnode->token = symbol;
             pnode->package = newpackage;
 
-            symbol_introduce(package->scope, symbol, (AstNode *) pnode);
+            symbol_subpackage_introduce(package->scope, symbol, pnode);
         }
 
         package = newpackage;

@@ -1,0 +1,144 @@
+package core.str.reader
+
+StringReader :: struct {
+    data : ^u8;
+    count : u32;
+
+    // The original string.
+    original_str : string;
+}
+
+make :: proc (str: string) -> StringReader {
+    reader : StringReader;
+    init(^reader, str);
+    return reader;
+}
+
+init :: proc (use reader: ^StringReader, str: string) {
+    original_str = str;
+    data  = original_str.data;
+    count = original_str.count;
+}
+
+reset :: proc (use reader: ^StringReader) {
+    data  = original_str.data;
+    count = original_str.count;
+}
+
+empty :: proc (use reader: ^StringReader) -> bool do return count == 0;
+
+read_u32 :: proc (use reader: ^StringReader) -> u32 {
+    n: u32 = 0;
+
+    skip_whitespace(reader);
+
+    while count > 0 && data[0] >= #char "0" && data[0] <= #char "9" {
+        n *= 10;
+        n += cast(u32) (data[0] - #char "0");
+
+        data += 1;
+        count -= 1;
+    }
+
+    return n;
+}
+
+read_byte :: proc (use reader: ^StringReader) -> u8 {
+    if count == 0 do return #char "\0";
+
+    defer {
+        data += 1;
+        count -= 1;
+    }
+
+    return data[0];
+}
+
+read_bytes :: proc (use reader: ^StringReader, byte_count := 1) -> string {
+    bc := byte_count;
+    if count < bc do bc = count;
+
+    defer {
+        data += bc;
+        count -= bc;
+    }
+
+    return string.{ data, bc };
+}
+
+read_line :: proc (use reader: ^StringReader) -> string {
+    out : string;
+    out.data = data;
+    out.count = 0;
+
+    // HACK(Brendan): I want to use a for loop, but I don't know why.
+    for ch: *(cast(^string) reader) {
+        if ch == #char "\n" do break;
+        out.count += 1;
+    }
+
+    data += out.count;
+    count -= out.count;
+
+    if count > 0 {
+        data += 1;
+        count -= 1;
+    }
+
+    return out;
+}
+
+read_until :: proc (use reader: ^StringReader, skip: u32, uptos: ..u8) -> string {
+    if count == 0 do return string.{ null, 0 };
+
+    out : string;
+    out.data = data;
+    out.count = 0;
+
+    s := skip;
+    
+    // HACK(Brendan): See above.
+    for ch: *(cast(^string) reader) {
+        for upto: uptos do if ch == upto {
+            if s <= 0 do break;
+            else do s -= 1;
+        }
+
+        out.count += 1;
+    }
+
+    data += out.count;
+    count -= out.count;
+
+    return out;
+}
+
+advance_line :: proc (use reader: ^StringReader) {
+    if count == 0 do return;
+
+    adv := 0;
+    while data[adv] != #char "\n" do adv += 1;
+
+    data += adv + 1;
+    count -= adv + 1;
+}
+
+
+skip_whitespace :: proc (use reader: ^StringReader) {
+    while count > 0 do switch *data {
+        case #char " ", #char "\t", #char "\n", #char "\r" {
+            data += 1;
+            count -= 1;
+        }
+
+        case #default do return;
+    }
+}
+
+skip_bytes :: proc (use reader: ^StringReader, byte_count := 1) {
+    bc := byte_count;
+    if count < bc do bc = count;
+
+    data += bc;
+    count -= bc;
+}
