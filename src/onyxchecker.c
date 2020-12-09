@@ -976,6 +976,7 @@ b32 check_array_access(AstArrayAccess* aa) {
         fa->offset = smem.offset;
         fa->idx = smem.idx;
         fa->expr = aa->addr;
+        fa->field = "data";
 
         aa->addr = (AstTyped *) fa;
         aa->type = aa->addr->type->Pointer.elem;
@@ -1005,9 +1006,13 @@ b32 check_field_access(AstFieldAccess** pfield) {
     }
 
     StructMember smem;
-    if (field->token != NULL) {
+    if (field->token != NULL && field->field == NULL) {
         token_toggle_end(field->token);
-        field->field = field->token->text;
+        // CLEANUP: Duplicating the string here isn't the best for effiency,
+        // but it fixes a lot of bugs, so here we are.
+        //                                      - brendanfh  2020/12/08
+        field->field = bh_strdup(semstate.allocator, field->token->text);
+        token_toggle_end(field->token);
     }
 
     if (!type_lookup_member(field->expr->type, field->field, &smem)) {
@@ -1016,7 +1021,6 @@ b32 check_field_access(AstFieldAccess** pfield) {
             field->field,
             type_get_name(field->expr->type));
 
-        if (field->token != NULL) token_toggle_end(field->token);
         return 1;
     }
 
@@ -1024,7 +1028,6 @@ b32 check_field_access(AstFieldAccess** pfield) {
     field->idx = smem.idx;
     field->type = smem.type;
 
-    if (field->token != NULL) token_toggle_end(field->token);
     return 0;
 }
 
