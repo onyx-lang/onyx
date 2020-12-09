@@ -43,6 +43,22 @@ read_u32 :: proc (use reader: ^StringReader) -> u32 {
     return n;
 }
 
+read_u64 :: proc (use reader: ^StringReader) -> u64 {
+    n: u64 = 0;
+
+    skip_whitespace(reader);
+
+    while count > 0 && data[0] >= #char "0" && data[0] <= #char "9" {
+        n *= 10;
+        n += cast(u64) (data[0] - #char "0");
+
+        data += 1;
+        count -= 1;
+    }
+
+    return n;
+}
+
 read_byte :: proc (use reader: ^StringReader) -> u8 {
     if count == 0 do return #char "\0";
 
