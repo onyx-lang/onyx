@@ -1,0 +1,56 @@
+Macro level tasks that need to be worked on:
+
+Command Line Interface:
+    Currently, the command line interface is trash. Pretty much the only thing
+    you can do is compile a binary file from a set of files. There are many
+    more things I would like to do with the CLI, including:
+        - Documentation generation in text, HTML, or man pages
+        - Add statistic printing (time taken, SLOC, etc)
+        - Abstract syntax tree printing
+        - Running the binary right away using Wasmtime, Wasmer or NodeJS
+
+    [ ] Remove old code from CLI logic
+    [ ] Fix documentation generation (broken since compiler architecture change) 
+    [ ] Add statistic printing
+    [ ] Fix AST printing (broken for a long time)
+    [ ] Add automated running component
+        - Store to temporary file (OS independent)
+        - Detect / choose WASM backend
+        - Run it
+        - Clean up
+
+Language Cohesion:
+    There are a couple areas of the language that have little gotchas because
+    of technical laziness. Cleaning up these areas will help the language feel
+    more cohesive and put together.
+
+    [ ] Struct literals can only have 1 level of package before the struct
+        name. This is because packages were not able to be nested, so having
+        arbitrary package levels before a struct literal was not necessary.
+        The following should work when this is patched:
+
+            var := some.packages.nested.here.StructName.{ value1, value2, ... };
+        
+    [ ] Rearrange APIs. There is a lot of functionality in the standard libraries,
+        but it isn't organized in a usable way.
+        - 'core.array' contains a lot of functionality that would also apply to
+          slices. 'core.slice' should contain this functionality and 'core.array'
+          can provide wrappers that convert the array to a slice.
+        - 'core.str' is a bad name, it should be 'core.string'. The issue is that
+          it conflicts with 'builtin.string'. These two should be switched. Type
+          name should be 'str' and package name should be 'string'
+
+    [ ] :: should not declare a local variable, just bind a name to an expression.
+        They can still be lexically scoped.
+
+    [ ] Currently accessing a field directly on a function call produces invalid
+        WASM code; i.e.  foo().bar; This should at least produce an error until
+        the underlying issue is fixed.
+
+Usability:
+    Currently, the compiler can only work on Linux. This is an arbitrary
+    restriction due completely to my laziness and lack of access to a
+    Windows / MacOS computer.
+
+    [ ] Make compiler work on Windows
+    [ ] Make compiler work on MacOS
