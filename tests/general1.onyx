@@ -91,7 +91,7 @@ switch_demo :: proc () {
     }
 }
 
-vararg_test :: proc (prefix: string, nums: ..i32) {
+vararg_test :: proc (prefix: str, nums: ..i32) {
     print(prefix);
     for num: nums {
         print(num);
@@ -120,8 +120,8 @@ get_num_info :: proc (nums: ..i32) -> NumInfo {
     return ni;
 }
 
-print_strings :: proc (ss: ..string) {
-    for s: ss do print_string(s);
+print_strings :: proc (ss: ..str) {
+    for s: ss do print_str(s);
 }
 
 multi_max :: proc (nums: ..$T) -> T {
@@ -139,7 +139,7 @@ weird_sum :: proc (n1: $T, others: ..T) -> T {
     return s;
 }
 
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
     switch_demo();
 
     print_strings("This ", "is ", "a ", "test.\n");

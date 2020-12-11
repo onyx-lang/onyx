@@ -17,7 +17,7 @@ File :: struct {
     fd : FileDescriptor;
 }
 
-open :: proc (file: ^File, path: string, mode := OpenMode.Read, flags := FDFlags.Sync) -> bool {
+open :: proc (file: ^File, path: str, mode := OpenMode.Read, flags := FDFlags.Sync) -> bool {
     // Currently the directory's file descriptor appears to always be 3
     DIR_FD :: 3;
 
@@ -105,7 +105,7 @@ close :: proc (file: File) -> bool {
     return true;
 }
 
-write :: proc (file: File, data: string) {
+write :: proc (file: File, data: str) {
     vec := IOVec.{ buf = data.data, len = data.count };
     tmp : Size;
     fd_write(file.fd, IOVecArray.{ ^vec, 1 }, ^tmp);
@@ -119,7 +119,7 @@ get_size :: proc (file: File) -> u64 {
     return fs.size;
 }
 
-get_contents_from_file :: proc (file: File) -> string {
+get_contents_from_file :: proc (file: File) -> str {
     size := cast(u32) get_size(file);
 
     data := cast(^u8) alloc(context.allocator, size);
@@ -142,10 +142,10 @@ get_contents_from_file :: proc (file: File) -> string {
 get_contents :: proc {
     get_contents_from_file,
 
-    proc (path: string) -> string {
+    proc (path: str) -> str {
         tmp_file: File;
 
-        if !open(^tmp_file, path, OpenMode.Read) do return string.{ null, 0 };
+        if !open(^tmp_file, path, OpenMode.Read) do return str.{ null, 0 };
         defer close(tmp_file);
 
         return get_contents(tmp_file);

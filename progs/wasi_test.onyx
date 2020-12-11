@@ -62,7 +62,7 @@ readdir :: proc (fd: FileDescriptor) {
 
     dirent := cast(^DirEnt) buf;
     while true {
-        print(string.{ cast(^u8) (cast(u32) dirent + sizeof DirEnt), dirent.d_namlen });
+        print(str.{ cast(^u8) (cast(u32) dirent + sizeof DirEnt), dirent.d_namlen });
         print("\n");
 
         print("\td_namlen: ");

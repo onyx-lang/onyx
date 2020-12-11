@@ -724,7 +724,7 @@ GLMat4 :: #type [16] GLfloat
 
 activeTexture                  :: proc (texture: GLenum) #foreign "gl" "activeTexture" ---
 attachShader                   :: proc (program: GLProgram, shader: GLShader) -> GLProgram #foreign "gl" "attachShader" ---
-bindAttribLocation             :: proc (program: GLProgram, index: GLuint, name: string) #foreign "gl" "bindAttribLocation" ---
+bindAttribLocation             :: proc (program: GLProgram, index: GLuint, name: str) #foreign "gl" "bindAttribLocation" ---
 bindBuffer                     :: proc (target: GLenum, buffer: GLBuffer) #foreign "gl" "bindBuffer" ---
 bindFramebuffer                :: proc (target: GLenum, framebuffer: GLFramebuffer) #foreign "gl" "bindFramebuffer" ---
 bindRenderbuffer               :: proc (target: GLenum, renderbuffer: GLRenderbuffer) #foreign "gl" "bindRenderbuffer" ---
@@ -748,8 +748,8 @@ clearDepth                     :: proc (depth: GLclampf) #foreign "gl" "clearDep
 clearStencil                   :: proc (s: GLint) #foreign "gl" "clearStencil" ---
 colorMask                      :: proc (red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean) #foreign "gl" "colorMask" ---
 compileShader                  :: proc (shader: GLShader) #foreign "gl" "compileShader" ---
-compressedTexImage2D           :: proc (target: GLenum, level: GLint, internalformat: GLenum, width: GLsizei, height: GLsizei, border: GLint, data: string) #foreign "gl" "compressedTexImage2D" ---
-compressedTexSubImage2D        :: proc (target: GLenum, level: GLint, internalformat: GLenum, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, data: string) #foreign "gl" "compressedTexSubImage2D" ---
+compressedTexImage2D           :: proc (target: GLenum, level: GLint, internalformat: GLenum, width: GLsizei, height: GLsizei, border: GLint, data: str) #foreign "gl" "compressedTexImage2D" ---
+compressedTexSubImage2D        :: proc (target: GLenum, level: GLint, internalformat: GLenum, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, data: str) #foreign "gl" "compressedTexSubImage2D" ---
 copyBufferSubData              :: proc (readTarget: GLenum, writeTarget: GLenum, readOffset: GLintptr, writeOffset: GLintptr, size: GLsizeiptr) #foreign "gl" "copyBufferSubData" ---
 copyTexImage2D                 :: proc (target: GLenum, level: GLint, internalformat: GLenum, x: GLint, y: GLint, width: GLsizei, height: GLsizei, border: GLint) #foreign "gl" "copyTexImage2D" ---
 copyTexSubImage2D              :: proc (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "copyTexSubImage2D" ---
@@ -790,20 +790,20 @@ generateMipmap                 :: proc (target: GLenum) #foreign "gl" "generateM
 getActiveAttrib                :: proc (program: GLProgram, index: GLuint, out: ^GLActiveInfo) #foreign "gl" "getActiveAttrib" ---
 getActiveUniform               :: proc (program: GLProgram, index: GLuint, out: ^GLActiveInfo) #foreign "gl" "getActiveUniform" ---
 // getAttachedShaders does not work yet because we can't return a list of things
-getAttribLocation              :: proc (program: GLProgram, name: string) -> GLint #foreign "gl" "getAttribLocation" ---
-getBufferSubData               :: proc (target: GLenum, srcByteOffset: GLintptr, dstBuffer: string, dstOffset: GLuint, length: GLuint) #foreign "gl" "getBufferSubData" ---
+getAttribLocation              :: proc (program: GLProgram, name: str) -> GLint #foreign "gl" "getAttribLocation" ---
+getBufferSubData               :: proc (target: GLenum, srcByteOffset: GLintptr, dstBuffer: str, dstOffset: GLuint, length: GLuint) #foreign "gl" "getBufferSubData" ---
 // getBufferParameter and getParameter do not work
 getError                       :: proc () -> GLenum #foreign "gl" "getError" ---
 getInternalformatParameter     :: proc (target: GLenum, internalFormat: GLenum, pname: GLenum) -> GLenum #foreign "gl" "getInternalformatParameter" ---
 // many of the 'gets' don't work yet because they return very javascripty things
 getProgramParameter            :: proc (program: GLProgram, pname: GLenum) -> GLenum #foreign "gl" "getProgramParameter" ---
 getShaderParameter             :: proc (shader: GLShader, pname: GLenum) -> GLenum #foreign "gl" "getShaderParameter" ---
-getUniformLocation             :: proc (program: GLProgram, name: string) -> GLUniformLocation #foreign "gl" "getUniformLocation" ---
+getUniformLocation             :: proc (program: GLProgram, name: str) -> GLUniformLocation #foreign "gl" "getUniformLocation" ---
 getVertexAttribOffset          :: proc (index: GLuint, pname: GLenum) #foreign "gl" "getVertexAttribOffset" ---
 hint                           :: proc (target: GLenum, mode: GLenum) #foreign "gl" "hint" ---
-init                           :: proc (canvasname: string) -> GLboolean #foreign "gl" "init" ---
-invalidateFramebuffer          :: proc (target: GLenum, attachments: string) #foreign "gl" "invalidateFramebuffer" ---
-invalidateSubFramebuffer       :: proc (target: GLenum, attachments: string, x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "invalidateSubFramebuffer" ---
+init                           :: proc (canvasname: str) -> GLboolean #foreign "gl" "init" ---
+invalidateFramebuffer          :: proc (target: GLenum, attachments: str) #foreign "gl" "invalidateFramebuffer" ---
+invalidateSubFramebuffer       :: proc (target: GLenum, attachments: str, x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "invalidateSubFramebuffer" ---
 isEnabled                      :: proc (cap: GLenum) -> GLboolean #foreign "gl" "isEnabled" ---
 lineWidth                      :: proc (width: GLfloat) #foreign "gl" "lineWidth" ---
 linkProgram                    :: proc (program: GLProgram) #foreign "gl" "linkProgram" ---
@@ -812,21 +812,21 @@ polygonOffset                  :: proc (factor: GLfloat, units: GLfloat) #foreig
 printProgramInfoLog            :: proc (program: GLProgram) #foreign "gl" "printProgramInfoLog" ---
 printShaderInfoLog             :: proc (shader: GLShader) #foreign "gl" "printShaderInfoLog" ---
 readBuffer                     :: proc (src: GLenum) #foreign "gl" "readBuffer" ---
-readPixels                     :: proc (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: string) #foreign "gl" "readPixels" ---
+readPixels                     :: proc (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) #foreign "gl" "readPixels" ---
 renderbufferStorageMultisample :: proc (target: GLenum, samples: GLsizei, internalforamt: GLenum, width: GLsizei, height: GLsizei) #foreign "gl" "renderbufferStorageMultisample" ---
 sampleCoverage                 :: proc (value: GLclampf, invert: GLboolean) #foreign "gl" "sampleCoverage" ---
 scissor                        :: proc (x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "scissor" ---
-shaderSource                   :: proc (shader: GLShader, source: string) #foreign "gl" "shaderSource" ---
+shaderSource                   :: proc (shader: GLShader, source: str) #foreign "gl" "shaderSource" ---
 stencilFunc                    :: proc (func: GLenum, ref: GLint, mask: GLuint) #foreign "gl" "stencilFunc" ---
 stencilFuncSeparate            :: proc (face: GLenum, func: GLenum, ref: GLint, mask: GLuint) #foreign "gl" "stencilFuncSeparate" ---
 stencilMask                    :: proc (mask: GLuint) #foreign "gl" "stencilMask" ---
 stencilMaskSeparate            :: proc (face: GLenum, mask: GLenum) #foreign "gl" "stencilMaskSeparate" ---
 stencilOp                      :: proc (fail: GLenum, zfail: GLenum, zpass: GLenum) #foreign "gl" "stencilOp" ---
 stencilOpSeparate              :: proc (face: GLenum, fail: GLenum, zfail: GLenum, zpass: GLenum) #foreign "gl" "stencilOpSeparate" ---
-texImage2D                     :: proc (target: GLenum, level: GLint, internalFormat: GLenum, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, type: GLenum, pixels: string) #foreign "gl" "texImage2D" ---
+texImage2D                     :: proc (target: GLenum, level: GLint, internalFormat: GLenum, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, type: GLenum, pixels: str) #foreign "gl" "texImage2D" ---
 texParameterf                  :: proc (target: GLenum, pname: GLenum, param: GLfloat) #foreign "gl" "texParameterf" ---
 texParameteri                  :: proc (target: GLenum, pname: GLenum, param: GLint) #foreign "gl" "texParameteri" ---
-texSubImage2D                  :: proc (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: string) #foreign "gl" "texSubImage2D" ---
+texSubImage2D                  :: proc (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) #foreign "gl" "texSubImage2D" ---
 uniform1f                      :: proc (loc: GLUniformLocation, x: GLfloat) #foreign "gl" "uniform1f" ---
 uniform1i                      :: proc (loc: GLUniformLocation, x: GLint) #foreign "gl" "uniform1i" ---
 uniform2f                      :: proc (loc: GLUniformLocation, x: GLfloat, y: GLfloat) #foreign "gl" "uniform2f" ---

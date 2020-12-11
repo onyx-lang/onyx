@@ -4,6 +4,6 @@ package main
 
 use package core
 
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
 	println("Hello, World!");
 }

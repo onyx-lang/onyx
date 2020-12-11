@@ -8,7 +8,7 @@ use package main as main
 
 STDOUT_FILENO :: 1
 
-output_string :: proc (s: string) -> u32 {
+output_str :: proc (s: str) -> u32 {
     vec := IOVec.{ buf = s.data, len = s.count };
     tmp : Size;
     fd_write(STDOUT_FILENO, IOVecArray.{ ^vec, 1 }, ^tmp);
@@ -29,8 +29,8 @@ proc () #export "_start" {
 
     args_sizes_get(^argc, ^argv_buf_size);
 
-    argv := cast(^cstring) calloc(sizeof cstring * argc);
-    argv_buf := cast(cstring) calloc(argv_buf_size);
+    argv := cast(^cstr) calloc(sizeof cstr * argc);
+    argv_buf := cast(cstr) calloc(argv_buf_size);
 
     args_get(argv, argv_buf);
 

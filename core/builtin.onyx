@@ -1,8 +1,9 @@
 package builtin
 
-string  :: #type []u8;
-cstring :: #type ^u8;
+str  :: #type []u8;
+cstr :: #type ^u8;
 
+// CLEANUP: Remove the buffer type from builtin
 Buffer :: #type []void;
 
 // NOTE: Because of many implementation details, all fields of this

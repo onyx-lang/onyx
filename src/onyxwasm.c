@@ -1420,8 +1420,12 @@ EMIT_FUNC(call, AstCall* call) {
     u32 return_align = type_alignment_of(return_type);
     bh_align(return_size, return_align);
 
-    if (cc == CC_Return_Stack)
+    if (cc == CC_Return_Stack) {
+        bh_align(stack_grow_amm, return_align);
         stack_grow_amm += return_size;
+    }
+
+    bh_align(stack_grow_amm, 16);
 
     if (needs_stack) {
         WID(WI_GLOBAL_GET, stack_top_idx);

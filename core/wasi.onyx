@@ -385,7 +385,7 @@ fd_filestat_set_size  :: proc (fd: FileDescriptor, size: Filesize) -> Errno #for
 fd_filestat_set_times :: proc (fd: FileDescriptor, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_unstable" "fd_filestat_set_times" ---
 fd_pread              :: proc (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nread: ^Size) -> Errno #foreign "wasi_unstable" "fd_pread" ---
 fd_prestat_get        :: proc (fd: FileDescriptor, buf: ^PrestatTagged) -> Errno #foreign "wasi_unstable" "fd_prestat_get" ---
-fd_prestat_dir_name   :: proc (fd: FileDescriptor, path: string) -> Errno #foreign "wasi_unstable" "fd_prestat_dir_name" ---
+fd_prestat_dir_name   :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "fd_prestat_dir_name" ---
 fd_pwrite             :: proc (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nwritten: ^Size) -> Errno #foreign "wasi_unstable" "fd_pwrite" ---
 fd_read               :: proc (fd: FileDescriptor, iovs: IOVecArray, nread: ^Size) -> Errno #foreign "wasi_unstable" "fd_read" ---
 fd_readdir            :: proc (fd: FileDescriptor, buf: ^u8, buf_len: Size, cookie: DirCookie, bufused: ^Size) -> Errno #foreign "wasi_unstable" "fd_readdir" ---
@@ -395,15 +395,15 @@ fd_sync               :: proc (fd: FileDescriptor) -> Errno #foreign "wasi_unsta
 fd_tell               :: proc (fd: FileDescriptor, offset: ^Filesize) -> Errno #foreign "wasi_unstable" "fd_tell" ---
 fd_write              :: proc (fd: FileDescriptor, iovs: IOVecArray, nwritten: ^Size) -> Errno #foreign "wasi_unstable" "fd_write" ---
 
-path_create_directory   :: proc (fd: FileDescriptor, path: string) -> Errno #foreign "wasi_unstable" "path_create_directory" ---
-path_filestat_get       :: proc (fd: FileDescriptor, flags: LookupFlags, path: string, buf: ^FileStat) -> Errno #foreign "wasi_unstable" "path_filestat_get" ---
-path_filestat_set_times :: proc (fd: FileDescriptor, flags: LookupFlags, path: string, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_unstable" "path_filestat_set_times" ---
+path_create_directory   :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_create_directory" ---
+path_filestat_get       :: proc (fd: FileDescriptor, flags: LookupFlags, path: str, buf: ^FileStat) -> Errno #foreign "wasi_unstable" "path_filestat_get" ---
+path_filestat_set_times :: proc (fd: FileDescriptor, flags: LookupFlags, path: str, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_unstable" "path_filestat_set_times" ---
 
-path_link :: proc (fd: FileDescriptor, old_flags: LookupFlags, old_path: string, new_fd: FileDescriptor, new_path: string) -> Errno #foreign "wasi_unstable" "path_link" ---
+path_link :: proc (fd: FileDescriptor, old_flags: LookupFlags, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_link" ---
 path_open :: proc
     ( fd: FileDescriptor
     , dirflags: LookupFlags
-    , path: string
+    , path: str
     , oflags: OFlags
     , fs_rights_base: Rights
     , fs_rights_inherting: Rights
@@ -412,11 +412,11 @@ path_open :: proc
     ) -> Errno
      #foreign "wasi_unstable" "path_open" ---
 
-path_readlink :: proc (fd: FileDescriptor, path: string, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno #foreign "wasi_unstable" "path_readlink" ---
-path_remove_directory :: proc (fd: FileDescriptor, path: string) -> Errno #foreign "wasi_unstable" "path_remove_directory" ---
-path_rename  :: proc (fd: FileDescriptor, old_path: string, new_fd: FileDescriptor, new_path: string) -> Errno #foreign "wasi_unstable" "path_rename" ---
-path_symlink :: proc (old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: string) -> Errno #foreign "wasi_unstable" "path_symlink" ---
-path_unlink_file :: proc (fd: FileDescriptor, path: string) -> Errno #foreign "wasi_unstable" "path_unlink_file" ---
+path_readlink :: proc (fd: FileDescriptor, path: str, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno #foreign "wasi_unstable" "path_readlink" ---
+path_remove_directory :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_remove_directory" ---
+path_rename  :: proc (fd: FileDescriptor, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_rename" ---
+path_symlink :: proc (old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_symlink" ---
+path_unlink_file :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_unlink_file" ---
 
 poll_oneoff :: proc (in: ^Subscription, out: ^Event, nsubscriptions: Size, nevents: ^Size) -> Errno #foreign "wasi_unstable" "poll_oneoff" ---
 

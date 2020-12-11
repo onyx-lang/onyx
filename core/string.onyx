@@ -1,13 +1,13 @@
-package core.str
+package core.string
 
-make :: proc (s: cstring) -> string {
+make :: proc (s: cstr) -> str {
     len :: length(s);
 
-    return string.{ count = len, data = s };
+    return str.{ count = len, data = s };
 }
 
 length :: proc {
-    proc (s: cstring) -> u32 {
+    proc (s: cstr) -> u32 {
         len := 0;
         c := s;
         while *c != #char "\0" {
@@ -18,27 +18,27 @@ length :: proc {
         return len;
     },
 
-    proc (s: string) -> u32 {
+    proc (s: str) -> u32 {
         return s.count;
     },
 }
 
-alloc_copy :: proc (orig: string) -> string {
-    new_str : string;
+alloc_copy :: proc (orig: str) -> str {
+    new_str : str;
     new_str.data = calloc(sizeof u8 * orig.count);
     new_str.count = orig.count;
     copy(orig, new_str);
     return new_str;
 }
 
-copy :: proc (orig: string, dest: string) {
+copy :: proc (orig: str, dest: str) {
     len := orig.count;
     if dest.count < len do len = dest.count;
 
     for i: 0 .. len do dest.data[i] = orig.data[i];
 }
 
-concat :: proc (s1: string, s2: string) -> string {
+concat :: proc (s1: str, s2: str) -> str {
     len1 :: length(s1);
     len2 :: length(s2);
 
@@ -46,54 +46,54 @@ concat :: proc (s1: string, s2: string) -> string {
     for i: 0 .. len1 do data[i]        = s1[i];
     for i: 0 .. len2 do data[i + len1] = s2[i];
 
-    return string.{ data, len1 + len2 };
+    return str.{ data, len1 + len2 };
 }
 
-free :: proc (s: string) do cfree(s.data);
+free :: proc (s: str) do cfree(s.data);
 
-// This is an example doc string
+// This is an example doc str
 // You can have as many comments as you want
 // It documents the split function
-split :: proc (str: string, delim: u8) -> []string {
+split :: proc (s: str, delim: u8) -> []str {
     delim_count := 0;
-    for i: 0 .. str.count do if str[i] == delim do delim_count += 1;
+    for i: 0 .. s.count do if s[i] == delim do delim_count += 1;
 
-    strarr := cast(^string) calloc(sizeof string * (delim_count + 1));
+    strarr := cast(^str) calloc(sizeof str * (delim_count + 1));
 
     curr_str := 0;
     begin := 0;
 
-    for i: 0 .. str.count {
-        if str[i] == delim {
-            strarr[curr_str] = str.data[begin .. i];
+    for i: 0 .. s.count {
+        if s[i] == delim {
+            strarr[curr_str] = s.data[begin .. i];
             begin = i + 1;
             curr_str += 1;
         }
     }
 
-    strarr[curr_str] = str.data[begin .. str.count];
+    strarr[curr_str] = s.data[begin .. s.count];
 
     return strarr[0 .. delim_count + 1];
 }
 
-substr :: proc (str: string, sub: string) -> string {
-    for i: 0 .. str.count {
-        while j := 0; j < sub.count && str[i + j] == sub[j] {
-            j += 1;
+// substr :: proc (s: str, sub: str) -> str {
+//     for i: 0 .. str.count {
+//         while j := 0; j < sub.count && str[i + j] == sub[j] {
+//             j += 1;
+// 
+//             if j == sub.count do return str.data[i .. i + j];
+//         }
+//     }
+// 
+//     return str.data[0 .. 0];
+// }
 
-            if j == sub.count do return str.data[i .. i + j];
-        }
-    }
-
-    return str.data[0 .. 0];
-}
-
-contains :: proc (str: string, c: u8) -> bool {
-    for ch: str do if ch == c do return true;
+contains :: proc (s: str, c: u8) -> bool {
+    for ch: s do if ch == c do return true;
     return false;
 }
 
-// compare :: proc (str1: string, str2: string) -> i32 {
+// compare :: proc (str1: str, str2: str) -> i32 {
 //     if str1.count != str2.count do return str1.count - str2.count;
 //
 //     i := 0;
@@ -103,7 +103,7 @@ contains :: proc (str: string, c: u8) -> bool {
 //     return ~~(str1[i] - str2[i]);
 // }
 
-equal :: proc (str1: string, str2: string) -> bool {
+equal :: proc (str1: str, str2: str) -> bool {
     if str1.count != str2.count do return false;
     while i := 0; i < str1.count {
         if str1[i] != str2[i] do return false;
@@ -112,7 +112,7 @@ equal :: proc (str1: string, str2: string) -> bool {
     return true;
 }
 
-starts_with :: proc (str1: string, str2: string) -> bool {
+starts_with :: proc (str1: str, str2: str) -> bool {
     if str1.count < str2.count do return false;
     while i := 0; i < str2.count {
         if str1[i] != str2[i] do return false;
@@ -121,21 +121,21 @@ starts_with :: proc (str1: string, str2: string) -> bool {
     return true;
 }
 
-strip_leading_whitespace :: proc (str: ^string) {
-    while true do switch str.data[0] {
+strip_leading_whitespace :: proc (s: ^str) {
+    while true do switch s.data[0] {
         case #char " ", #char "\t", #char "\n", #char "\r" {
-            str.data += 1;
-            str.count -= 1;
+            s.data += 1;
+            s.count -= 1;
         }
 
         case #default do return;
     }
 }
 
-strip_trailing_whitespace :: proc (str: ^string) {
-    while true do switch str.data[str.count - 1] {
+strip_trailing_whitespace :: proc (s: ^str) {
+    while true do switch s.data[s.count - 1] {
         case #char " ", #char "\t", #char "\n", #char "\r" {
-            str.count -= 1;
+            s.count -= 1;
         }
 
         case #default do return;
@@ -170,12 +170,12 @@ builder_make :: proc (initial_cap: u32) -> StringBuilder {
     };
 }
 
-builder_add_string :: proc (use sb: ^StringBuilder, str: string) -> ^StringBuilder {
-    len_total :: len + str.count;
+builder_add_str :: proc (use sb: ^StringBuilder, s: str) -> ^StringBuilder {
+    len_total :: len + s.count;
 
     if cap >= len_total {
-        for i: 0 .. str.count do data[len + i] = str[i];
-        len += str.count;
+        for i: 0 .. s.count do data[len + i] = s[i];
+        len += s.count;
         return sb;
     }
 
@@ -188,17 +188,17 @@ builder_add_string :: proc (use sb: ^StringBuilder, str: string) -> ^StringBuild
     data = new_data;
     cap = new_cap;
 
-    for i: 0 .. str.count do data[len + i] = str[i];
-    len += str.count;
+    for i: 0 .. s.count do data[len + i] = s[i];
+    len += s.count;
     return sb;
 }
 
-builder_add_cstring :: proc (use sb: ^StringBuilder, cstr: cstring) -> ^StringBuilder {
-    s := make(cstr);
-    return builder_add_string(sb, s);
+builder_add_cstr :: proc (use sb: ^StringBuilder, cstring: cstr) -> ^StringBuilder {
+    s := make(cstring);
+    return builder_add_str(sb, s);
 }
 
-i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
+i64_to_str :: proc (n_: i64, base: u64, buf: Buffer) -> str {
     n := cast(u64) n_;
 
     is_neg := false;
@@ -251,11 +251,11 @@ i64_to_string :: proc (n_: i64, base: u64, buf: Buffer) -> string {
         c -= 1;
     }
 
-    return string.{ data = c + 1, count = len };
+    return str.{ data = c + 1, count = len };
 }
 
 // NOTE: This is a big hack but it will work for now
-f64_to_string :: proc (f: f64, buf: [] u8) -> string {
+f64_to_str :: proc (f: f64, buf: [] u8) -> str {
     a := f;
     a *= 10000.0;
     v := cast(i64) a;
@@ -263,51 +263,51 @@ f64_to_string :: proc (f: f64, buf: [] u8) -> string {
     b := Buffer.{ cast(^void) buf.data, buf.count };
     len := 0;
 
-    s1 := i64_to_string(v / 10000, 10, b);
+    s1 := i64_to_str(v / 10000, 10, b);
     for i: 0 .. s1.count do buf.data[i] = s1.data[i];
     buf.data[s1.count] = #char ".";
     len = s1.count + 1;
 
     if v < ~~0 do v = -v;
-    s2 := i64_to_string(v % 10000, 10, b);
+    s2 := i64_to_str(v % 10000, 10, b);
     for i: 0 .. s2.count do buf.data[s1.count + 1 + i] = s2.data[i];
     len += s2.count;
 
-    return string.{ buf.data, len };
+    return str.{ buf.data, len };
 }
 
 builder_add_i64 :: proc (use sb: ^StringBuilder, n: i64, base: u64 = 10) -> ^StringBuilder {
     buf : [256] u8;
-    s := i64_to_string(n, base, Buffer.{ cast(^void) buf, 256 });
-    return builder_add_string(sb, s);
+    s := i64_to_str(n, base, Buffer.{ cast(^void) buf, 256 });
+    return builder_add_str(sb, s);
 }
 
 builder_add_f64 :: proc (use sb: ^StringBuilder, f: f64) -> ^StringBuilder {
     buf : [256] u8;
-    s := f64_to_string(f, buf[0 .. 256]);
-    return builder_add_string(sb, s);
+    s := f64_to_str(f, buf[0 .. 256]);
+    return builder_add_str(sb, s);
 }
 
 builder_add_bool :: proc (use sb: ^StringBuilder, b: bool) -> ^StringBuilder {
     if b {
-        return builder_add_string(sb, "true");
+        return builder_add_str(sb, "true");
     } else {
-        return builder_add_string(sb, "false");
+        return builder_add_str(sb, "false");
     }
 
     return null;
 }
 
 builder_append :: proc {
-    builder_add_string,
-    builder_add_cstring,
+    builder_add_str,
+    builder_add_cstr,
     builder_add_i64,
     builder_add_f64,
     builder_add_bool,
 }
 
-builder_to_string :: proc (use sb: ^StringBuilder) -> string {
-    return string.{ data, len };
+builder_to_str :: proc (use sb: ^StringBuilder) -> str {
+    return str.{ data, len };
 }
 
 builder_clear :: proc (use sb: ^StringBuilder) -> ^StringBuilder {
@@ -315,114 +315,114 @@ builder_clear :: proc (use sb: ^StringBuilder) -> ^StringBuilder {
     return sb;
 }
 
-read_u32 :: proc (str: ^string, out: ^u32) {
+read_u32 :: proc (s: ^str, out: ^u32) {
     n := 0;
 
-    strip_leading_whitespace(str);
-    while str.data[0] >= #char "0" && str.data[0] <= #char "9" {
+    strip_leading_whitespace(s);
+    while s.data[0] >= #char "0" && s.data[0] <= #char "9" {
         n *= 10;
-        n += cast(u32) (str.data[0] - #char "0");
+        n += cast(u32) (s.data[0] - #char "0");
 
-        str.data += 1;
-        str.count -= 1;
+        s.data += 1;
+        s.count -= 1;
     }
 
     *out = n;
 }
 
-read_char :: proc (str: ^string, out: ^u8) {
-    *out = str.data[0];
-    str.data += 1;
-    str.count -= 1;
+read_char :: proc (s: ^str, out: ^u8) {
+    *out = s.data[0];
+    s.data += 1;
+    s.count -= 1;
 }
 
-read_chars :: proc (str: ^string, out: ^string, char_count := 1) {
-    out.data = str.data;
+read_chars :: proc (s: ^str, out: ^str, char_count := 1) {
+    out.data = s.data;
     out.count = char_count;
-    str.data += char_count;
-    str.count -= char_count;
+    s.data += char_count;
+    s.count -= char_count;
 }
 
-discard_chars :: proc (str: ^string, char_count := 1) {
-    str.data += char_count;
-    str.count -= char_count;
+discard_chars :: proc (s: ^str, char_count := 1) {
+    s.data += char_count;
+    s.count -= char_count;
 }
 
 // Goes up to but not including the closest newline or EOF
-read_line :: proc (str: ^string, out: ^string) {
-    out.data = str.data;
+read_line :: proc (s: ^str, out: ^str) {
+    out.data = s.data;
     out.count = 0;
 
-    for ch: *str {
+    for ch: *s {
         if ch == #char "\n" do break;
         out.count += 1;
     }
 
-    str.data += out.count;
-    str.count -= out.count;
+    s.data += out.count;
+    s.count -= out.count;
 
-    if str.count > 0 {
-        str.data += 1;
-        str.count -= 1;
+    if s.count > 0 {
+        s.data += 1;
+        s.count -= 1;
     }
 }
 
-read_until :: proc (str: ^string, upto: u8, skip := 0) -> string {
-    if str.count == 0 do return "";
+read_until :: proc (s: ^str, upto: u8, skip := 0) -> str {
+    if s.count == 0 do return "";
 
-    out : string;
-    out.data = str.data;
+    out : str;
+    out.data = s.data;
     out.count = 0;
 
-    s := skip;
-    for ch: *str {
+    rem := skip;
+    for ch: *s {
         if ch == upto {
-            if s <= 0 do break;
-            else do s -= 1;
+            if rem <= 0 do break;
+            else do rem -= 1;
         }
 
         out.count += 1;
     }
 
-    str.data += out.count;
-    str.count -= out.count;
+    s.data += out.count;
+    s.count -= out.count;
 
     return out;
 }
 
-read_until_either :: proc (str: ^string, skip: u32, uptos: ..u8) -> string {
-    if str.count == 0 do return "";
+read_until_either :: proc (s: ^str, skip: u32, uptos: ..u8) -> str {
+    if s.count == 0 do return "";
 
-    out : string;
-    out.data = str.data;
+    out : str;
+    out.data = s.data;
     out.count = 0;
 
-    s := skip;
-    for ch: *str {
+    rem := skip;
+    for ch: *s {
         for upto: uptos {
             if ch == upto {
-                if s <= 0 do break break;
-                else do s -= 1;
+                if rem <= 0 do break break;
+                else do rem -= 1;
             }
         }
 
         out.count += 1;
     }
 
-    str.data += out.count;
-    str.count -= out.count;
+    s.data += out.count;
+    s.count -= out.count;
 
     return out;
 }
 
-advance_line :: proc (str: ^string) {
-    if str.count == 0 do return;
+advance_line :: proc (s: ^str) {
+    if s.count == 0 do return;
 
     adv := 0;
-    while str.data[adv] != #char "\n" do adv += 1;
+    while s.data[adv] != #char "\n" do adv += 1;
 
-    str.data += adv + 1;
-    str.count -= adv + 1;
+    s.data += adv + 1;
+    s.count -= adv + 1;
 }
 
 read :: proc {

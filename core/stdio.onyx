@@ -4,24 +4,24 @@ package core
 // of the system package
 use package system as system
 
-#private_file print_buffer : str.StringBuilder;
+#private_file print_buffer : string.StringBuilder;
 
 stdio_init :: proc () {
-    print_buffer = str.builder_make(2048);
+    print_buffer = string.builder_make(2048);
 }
 
-print_string  :: proc (s: string) {
-    str.builder_append(^print_buffer, s);
+print_str  :: proc (s: str) {
+    string.builder_append(^print_buffer, s);
     if s.data[s.count - 1] == #char "\n" do print_buffer_flush();
 }
 
-print_cstring :: proc (s: cstring)             do str.builder_append(^print_buffer, s);
-print_i64     :: proc (n: i64, base: u64 = 10) do str.builder_append(^print_buffer, n, base);
-print_i32     :: proc (n: i32, base: u32 = 10) do str.builder_append(^print_buffer, cast(i64) n, cast(u64) base);
-print_f64     :: proc (n: f64)                 do str.builder_append(^print_buffer, n);
-print_f32     :: proc (n: f32)                 do str.builder_append(^print_buffer, cast(f64) n);
-print_bool    :: proc (b: bool)                do str.builder_append(^print_buffer, b);
-print_ptr     :: proc (p: ^void)               do str.builder_append(^print_buffer, cast(i64) p, cast(u64) 16);
+print_cstr :: proc (s: cstr)                do string.builder_append(^print_buffer, s);
+print_i64  :: proc (n: i64, base: u64 = 10) do string.builder_append(^print_buffer, n, base);
+print_i32  :: proc (n: i32, base: u32 = 10) do string.builder_append(^print_buffer, cast(i64) n, cast(u64) base);
+print_f64  :: proc (n: f64)                 do string.builder_append(^print_buffer, n);
+print_f32  :: proc (n: f32)                 do string.builder_append(^print_buffer, cast(f64) n);
+print_bool :: proc (b: bool)                do string.builder_append(^print_buffer, b);
+print_ptr  :: proc (p: ^void)               do string.builder_append(^print_buffer, cast(i64) p, cast(u64) 16);
 
 print_range :: proc (r: range, sep := " ") {
     for i: r {
@@ -32,7 +32,7 @@ print_range :: proc (r: range, sep := " ") {
 }
 
 print :: proc {
-    print_string, print_cstring,
+    print_str,    print_cstr,
     print_i64,    print_i32,
     print_f64,    print_f32,
     print_bool,   print_ptr,
@@ -44,7 +44,7 @@ println :: proc (x: $T) {
     print("\n");
 }
 
-printf :: proc (format: string, va: ...) {
+printf :: proc (format: str, va: ...) {
     buffer: [2048] u8;
     len := 0;
 
@@ -67,7 +67,7 @@ printf :: proc (format: string, va: ...) {
                     if !vararg_get(va, ^n) do return;
 
                     ibuf : [128] u8;
-                    istr := str.i64_to_string(~~n, 10, Buffer.{ ~~ibuf, 128 });
+                    istr := string.i64_to_str(~~n, 10, Buffer.{ ~~ibuf, 128 });
 
                     for a: istr {
                         buffer[len] = a;
@@ -80,7 +80,7 @@ printf :: proc (format: string, va: ...) {
                     if !vararg_get(va, ^n) do return;
 
                     ibuf : [128] u8;
-                    istr := str.i64_to_string(n, 10, Buffer.{ ~~ibuf, 128 });
+                    istr := string.i64_to_str(n, 10, Buffer.{ ~~ibuf, 128 });
 
                     for a: istr {
                         buffer[len] = a;
@@ -93,7 +93,7 @@ printf :: proc (format: string, va: ...) {
                     if !vararg_get(va, ^n) do return;
 
                     fbuf : [128] u8;
-                    fstr := str.f64_to_string(~~n, fbuf[0 .. 128]);
+                    fstr := string.f64_to_str(~~n, fbuf[0 .. 128]);
 
                     for a: fstr {
                         buffer[len] = a;
@@ -106,7 +106,7 @@ printf :: proc (format: string, va: ...) {
                     if !vararg_get(va, ^n) do return;
 
                     fbuf : [128] u8;
-                    fstr := str.f64_to_string(n, fbuf[0 .. 128]);
+                    fstr := string.f64_to_str(n, fbuf[0 .. 128]);
 
                     for a: fstr {
                         buffer[len] = a;
@@ -115,10 +115,10 @@ printf :: proc (format: string, va: ...) {
                 }
 
                 case #char "s" {
-                    str : string;
-                    if !vararg_get(va, ^str) do return;
+                    s : str;
+                    if !vararg_get(va, ^s) do return;
 
-                    for a: str {
+                    for a: s {
                         buffer[len] = a;
                         len += 1;
                     }
@@ -129,12 +129,20 @@ printf :: proc (format: string, va: ...) {
                     if !vararg_get(va, ^n) do return;
 
                     ibuf : [128] u8;
-                    istr := str.i64_to_string(~~n, 16, Buffer.{ ~~ibuf, 128 });
+                    istr := string.i64_to_str(~~n, 16, Buffer.{ ~~ibuf, 128 });
 
                     for a: istr {
                         buffer[len] = a;
                         len += 1;
                     }
+                }
+                
+                case #char "c" {
+                    c : u8;
+                    if !vararg_get(va, ^c) do return;
+
+                    buffer[len] = c;
+                    len += 1;
                 }
             }
 
@@ -142,7 +150,7 @@ printf :: proc (format: string, va: ...) {
         }
     }
 
-    print(string.{ ~~buffer, len });
+    print(str.{ ~~buffer, len });
 }
 
 // This works on both slices and arrays
@@ -159,9 +167,9 @@ print_buffer_flush :: proc () {
     if print_buffer.len == 0 do return;
 
     ^print_buffer
-        |> str.builder_to_string()
-        |> system.output_string();
+        |> string.builder_to_str()
+        |> system.output_str();
 
-    ^print_buffer |> str.builder_clear();
+    ^print_buffer |> string.builder_clear();
 }
 

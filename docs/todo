@@ -50,16 +50,13 @@ Language Cohesion:
         The following should work when this is patched:
 
             var := some.packages.nested.here.StructName.{ value1, value2, ... };
-        
-    [ ] Rearrange APIs. There is a lot of functionality in the standard libraries,
-        but it isn't organized in a usable way.
-        - 'core.array' contains a lot of functionality that would also apply to
-          slices. 'core.slice' should contain this functionality and 'core.array'
-          can provide wrappers that convert the array to a slice.
-        - 'core.str' is a bad name, it should be 'core.string'. The issue is that
-          it conflicts with 'builtin.string'. These two should be switched. Type
-          name should be 'str' and package name should be 'string'
 
+    [ ] 'use' statements have two different variations and should be unified.
+        They can be used to include a package, 'use package', and they can
+        be used to add names from a namespace to the current scope. The problem
+        is that 'use package' can only be at the top level, and 'use' can only
+        be used at the block level.
+        
     [ ] :: should not declare a local variable, just bind a name to an expression.
         They can still be lexically scoped.
 
@@ -70,6 +67,15 @@ Language Cohesion:
 API Expansion:
     There are many differeny places where the standard API for WASI and JS
     backends could be improved. Here are some of the target areas.
+
+    [ ] Rearrange APIs. There is a lot of functionality in the standard libraries,
+        but it isn't organized in a usable way.
+        - 'core.array' contains a lot of functionality that would also apply to
+          slices. 'core.slice' should contain this functionality and 'core.array'
+          can provide wrappers that convert the array to a slice.
+        - 'core.str' is a bad name, it should be 'core.string'. The issue is that
+          it conflicts with 'builtin.string'. These two should be switched. Type
+          name should be 'str' and package name should be 'string'
 
     [ ] Expand capabilities of file api on WASI.
     [ ] Add clock / time api for both backends

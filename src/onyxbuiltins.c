@@ -339,9 +339,9 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
 
     Package* p = program_info_package_lookup_or_create(prog, "builtin", prog->global_scope, a);
 
-    builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "string");
+    builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
     if (builtin_string_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'string' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, "'str' struct not found in builtin package.");
         return;
     }
 

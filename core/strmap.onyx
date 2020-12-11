@@ -1,7 +1,7 @@
 package core.strmap
 
 use package core.array as array
-use package core.str as str
+use package core.string as string
 use package core { print }
 
 StrMap :: struct ($T) {
@@ -13,7 +13,7 @@ StrMap :: struct ($T) {
 
 StrMapEntry :: struct ($T) {
     next  : i32;
-    key   : string;
+    key   : str;
     value : T;
 }
 
@@ -31,7 +31,7 @@ free :: proc (use smap: ^StrMap($T)) {
     array.free(^key_store);
 }
 
-put :: proc (use smap: ^StrMap($T), key: string, value: T, copy_key := false) {
+put :: proc (use smap: ^StrMap($T), key: str, value: T, copy_key := false) {
     lr := lookup(smap, key);
 
     if lr.entry_index >= 0 {
@@ -49,7 +49,7 @@ put :: proc (use smap: ^StrMap($T), key: string, value: T, copy_key := false) {
     //     array.ensure_capacity(^key_store, key_store.count + key.count);
     //     key_store.count += key.count;
 
-    //     str.copy(key, new_key);
+    //     string.copy(key, new_key);
     // }
 
     entry : StrMapEntry(T);
@@ -62,19 +62,19 @@ put :: proc (use smap: ^StrMap($T), key: string, value: T, copy_key := false) {
     hashes[lr.hash_index] = entries.count - 1;
 }
 
-has :: proc (use smap: ^StrMap($T), key: string) -> bool {
+has :: proc (use smap: ^StrMap($T), key: str) -> bool {
     lr := lookup(smap, key);
     return lr.entry_index >= 0;
 }
 
-get :: proc (use smap: ^StrMap($T), key: string, default := cast(T) 0) -> T {
+get :: proc (use smap: ^StrMap($T), key: str, default := cast(T) 0) -> T {
     lr := lookup(smap, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
     return default;
 }
 
-delete :: proc (use smap: ^StrMap($T), key: string) {
+delete :: proc (use smap: ^StrMap($T), key: str) {
     lr := lookup(smap, key);
     if lr.entry_index < 0 do return;
 
@@ -111,7 +111,7 @@ StrMapLookupResult :: struct {
 }
 
 #private_file
-lookup :: proc (use smap: ^StrMap($T), key: string) -> StrMapLookupResult {
+lookup :: proc (use smap: ^StrMap($T), key: str) -> StrMapLookupResult {
     lr := StrMapLookupResult.{};
 
     hash: u32 = 5381;
@@ -121,7 +121,7 @@ lookup :: proc (use smap: ^StrMap($T), key: string) -> StrMapLookupResult {
     lr.entry_index = hashes[lr.hash_index];
 
     while lr.entry_index >= 0 {
-        if str.equal(entries[lr.entry_index].key, key) do return lr;
+        if string.equal(entries[lr.entry_index].key, key) do return lr;
 
         lr.entry_prev = lr.entry_index;
         lr.entry_index = entries[lr.entry_index].next;

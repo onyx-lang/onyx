@@ -102,6 +102,11 @@ AstType* symres_type(AstType* type) {
             AstStructMember *member = s_node->members[i];
             member->type_node = symres_type(member->type_node);
 
+            if (!node_is_type(member->type_node)) {
+                onyx_report_error(member->token->pos, "Member type is not a type.");
+                return type;
+            }
+
             if (member->flags & Ast_Flag_Struct_Mem_Used) {
                 AstStructType *used = (AstStructType *) member->type_node;
 
@@ -584,6 +589,9 @@ void symres_function(AstFunction* func) {
     }
 
     func->return_type = symres_type(func->return_type);
+    if (!node_is_type((AstNode *) func->return_type)) {
+        onyx_report_error(func->token->pos, "Return type is not a type.");
+    }
 
     scope_enter(func->scope);
 

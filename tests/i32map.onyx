@@ -4,8 +4,8 @@ package main
 
 use package core
 
-main :: proc (args: [] cstring) {
-    imap : i32map.I32Map(string);
+main :: proc (args: [] cstr) {
+    imap : i32map.I32Map(str);
     i32map.init(^imap);
     defer {
         print("Freeing map\n");
