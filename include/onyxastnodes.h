@@ -719,6 +719,7 @@ typedef enum EntityType {
     Entity_Type_Enum,
     Entity_Type_Type_Alias,
     Entity_Type_Memory_Reservation,
+    Entity_Type_Use,
     Entity_Type_Polymorphic_Proc,
     Entity_Type_Foreign_Function_Header,
     Entity_Type_Foreign_Global_Header,

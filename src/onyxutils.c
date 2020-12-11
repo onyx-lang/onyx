@@ -115,6 +115,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Enum",
     "Type Alias",
     "Memory Reservation",
+    "Use",
     "Polymorphic Proc",
     "Foreign_Function Header",
     "Foreign_Global Header",

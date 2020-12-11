@@ -65,7 +65,7 @@ Language Cohesion:
         the underlying issue is fixed.
 
 API Expansion:
-    There are many differeny places where the standard API for WASI and JS
+    There are many different places where the standard API for WASI and JS
     backends could be improved. Here are some of the target areas.
 
     [ ] Rearrange APIs. There is a lot of functionality in the standard libraries,

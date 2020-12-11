@@ -191,24 +191,26 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
 
     STORE_PARSER_STATE;
 
-    OnyxToken *symbol1 = NULL, *symbol2 = NULL;
-    symbol1 = expect_token(parser, Token_Type_Symbol);
+    bh_arr(OnyxToken *) syms = NULL;
+    bh_arr_new(global_heap_allocator, syms, 4);
 
-    if (!soft_expect_token(parser, '.')) {
-        RESTORE_PARSER_STATE;
-        return 0;
-    }
+    b32 success = 1;
+    while (parser->curr->type == Token_Type_Symbol) {
+        if (parser->hit_unexpected_token) break;
 
-    if (parser->curr->type == Token_Type_Symbol) {
-        symbol2 = soft_expect_token(parser, Token_Type_Symbol);
+        OnyxToken* symbol = soft_expect_token(parser, Token_Type_Symbol);
+        bh_arr_push(syms, symbol);
 
         if (!soft_expect_token(parser, '.')) {
-            RESTORE_PARSER_STATE;
-            return 0;
+            success = 0;
+            break;
         }
     }
 
-    if (parser->curr->type != '{') {
+    if (parser->curr->type != '{') success = 0;
+
+    if (!success) {
+        bh_arr_free(syms);
         RESTORE_PARSER_STATE;
         return 0;
     }
@@ -216,26 +218,22 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
     AstStructLiteral* sl = make_node(AstStructLiteral, Ast_Kind_Struct_Literal);
     sl->token = parser->curr;
 
+    sl->stnode = make_node(AstTyped, Ast_Kind_Symbol);
+    sl->stnode->token = syms[0];
+
+    for (i32 i = 1; i < bh_arr_length(syms); i++) {
+        AstFieldAccess* fa = make_node(AstFieldAccess, Ast_Kind_Field_Access);
+        fa->token = syms[i];
+        fa->expr = sl->stnode;
+        sl->stnode = (AstTyped *) fa;
+    }
+    bh_arr_free(syms);
+
     bh_arr_new(global_heap_allocator, sl->values, 4);
     bh_arr_new(global_heap_allocator, sl->named_values, 4);
     fori (i, 0, 4) {
         sl->values[i] = NULL;
         sl->named_values[i] = NULL;
-    }
-
-    if (symbol2 != NULL) {
-        AstTyped *package = make_node(AstTyped, Ast_Kind_Symbol);
-        package->token = symbol1;
-
-        AstFieldAccess *fa = make_node(AstFieldAccess, Ast_Kind_Field_Access);
-        fa->token = symbol2;
-        fa->expr = package;
-
-        sl->stnode = (AstTyped *) fa;
-
-    } else {
-        sl->stnode = make_node(AstTyped, Ast_Kind_Symbol);
-        sl->stnode->token = symbol1;
     }
 
     expect_token(parser, '{');
@@ -272,7 +270,6 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
     expect_token(parser, '}');
 
     *ret = (AstTyped *) sl;
-
     return 1;
 }
 
@@ -922,7 +919,8 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
     expect_token(parser, '{');
 
     AstTyped** batch_cases = NULL;
-    bh_arr_new(global_scratch_allocator, batch_cases, 16);
+    // NOTE: Look into bugs relating to switching this to the scratch allocator
+    bh_arr_new(global_heap_allocator, batch_cases, 16);
 
     while (parser->curr->type == Token_Type_Keyword_Case) {
         expect_token(parser, Token_Type_Keyword_Case);
@@ -959,6 +957,8 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
 
         bh_arr_clear(batch_cases);
     }
+
+    bh_arr_free(batch_cases);
 
     expect_token(parser, '}');
     return switch_node;
@@ -1282,7 +1282,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
             u64 param_count = bh_arr_length(params);
             AstFunctionType* new = onyx_ast_node_new(parser->allocator,
-                    sizeof(AstFunctionType) + sizeof(AstType) * param_count,
+                    sizeof(AstFunctionType) + sizeof(AstType*) * param_count,
                     Ast_Kind_Function_Type);
             new->token = proc_token;
             new->param_count = param_count;
