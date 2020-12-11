@@ -6,7 +6,7 @@
                 "type": "cppdbg",
                 "request": "launch",
                 "program": "${workspaceFolder}/onyx",
-                "args": ["-verbose", "tests/i32map.onyx"],
+                "args": ["-verbose", "tests/hello_world.onyx"],
                 "stopAtEntry": true,
                 "cwd": "~/dev/c/onyx",
                 "environment": [],

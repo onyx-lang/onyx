@@ -2,4 +2,6 @@ package test.foo
 
 use package core
 
+TestFoo :: struct { a: i32; }
+
 print_foo :: proc () do println("Foo!");

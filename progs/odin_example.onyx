@@ -3,6 +3,7 @@
 
 use package core
 use package test { foo as foo_pkg }
+use package test as test
 
 Foo :: struct {
     data1 : i32;
@@ -11,7 +12,7 @@ Foo :: struct {
 
 Bar :: struct {
     use foo : Foo;
-    bar_data : string;
+    bar_data : str;
     // bar_data2 : cstring;
 }
 
@@ -57,8 +58,10 @@ make_bar :: proc () -> Bar {
     return bar;
 }
 
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
     foo_pkg.print_foo();
+    foo := test.foo.TestFoo.{ a = 1234 };
+    printf("foo.a: %i\n", foo.a);
 
     bar := make_bar();
 

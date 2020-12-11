@@ -44,7 +44,7 @@ Language Cohesion:
     of technical laziness. Cleaning up these areas will help the language feel
     more cohesive and put together.
 
-    [ ] Struct literals can only have 1 level of package before the struct
+    [X] Struct literals can only have 1 level of package before the struct
         name. This is because packages were not able to be nested, so having
         arbitrary package levels before a struct literal was not necessary.
         The following should work when this is patched:

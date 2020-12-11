@@ -5,8 +5,11 @@ Additions:
 Removals:
 
 Changes:
+* struct literals can now have arbitrary package prefixes on them, i.e.
+    some.deeply.nested.packages.Struct.{ ... };
 
 Bug fixes:
+* globals that were #foreign caused several bugs, which have been squashed.
 
 
 
