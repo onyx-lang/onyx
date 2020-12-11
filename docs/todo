@@ -19,6 +19,26 @@ Command Line Interface:
         - Run it
         - Clean up
 
+    Another throught would be an extensible command line interface, like what
+    Zig has I believe. The idea is there are a couple fixed commands, such as
+    'compile', 'help', etc. But in a folder such as ~/.local/share/onyx/cmd
+    or /usr/share/onyx/cmd, there can be other executables that are invoked if
+    their name is used after the 'onyx' command. For example,
+
+        $ onyx compile foo.onyx
+        This would be a built in command.
+
+        $ onyx run foo.onyx
+        This would try to execute an executable named 'run' either:
+            - ./.onyx/cmd
+            - ~/.local/share/onyx/cmd/
+            - /usr/share/onyx/cmd/
+
+    There would be some kind of precedence to finding the executable, but
+    this level of control allows for extensible commands to be run based
+    on the project. My only problem with this idea is that it does not port
+    well to Windows, but it would be worth considering for sure.
+
 Language Cohesion:
     There are a couple areas of the language that have little gotchas because
     of technical laziness. Cleaning up these areas will help the language feel
@@ -46,6 +66,15 @@ Language Cohesion:
     [ ] Currently accessing a field directly on a function call produces invalid
         WASM code; i.e.  foo().bar; This should at least produce an error until
         the underlying issue is fixed.
+
+API Expansion:
+    There are many differeny places where the standard API for WASI and JS
+    backends could be improved. Here are some of the target areas.
+
+    [ ] Expand capabilities of file api on WASI.
+    [ ] Add clock / time api for both backends
+    [ ] Better random number api
+    [ ] Better string formatting and parsing api
 
 Usability:
     Currently, the compiler can only work on Linux. This is an arbitrary
