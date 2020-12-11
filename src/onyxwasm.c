@@ -2801,16 +2801,12 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         default: assert(("Invalid global type", 0)); break;
     }
 
-    bh_arr_grow(module->globals, global_idx + 1);
-    module->globals[global_idx] = glob;
-    bh_arr_set_length(module->globals, bh_max(bh_arr_length(module->globals), global_idx + 1));
-
     bh_arr_grow(module->globals, global_idx - module->foreign_global_count + 1);
     module->globals[global_idx - module->foreign_global_count] = glob;
     bh_arr_set_length(module->globals, bh_max(bh_arr_length(module->globals), global_idx - module->foreign_global_count + 1));
 
     if (global->flags & Ast_Flag_Global_Stack_Top)
-        module->stack_top_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+        module->stack_top_ptr = &module->globals[global_idx - module->foreign_global_count].initial_value[0].data.i1;
 }
 
 static void emit_foreign_global(OnyxWasmModule* module, AstGlobal* global) {

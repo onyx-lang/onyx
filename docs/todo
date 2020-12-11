@@ -73,7 +73,7 @@ API Expansion:
         - 'core.array' contains a lot of functionality that would also apply to
           slices. 'core.slice' should contain this functionality and 'core.array'
           can provide wrappers that convert the array to a slice.
-        - 'core.str' is a bad name, it should be 'core.string'. The issue is that
+        ✔ 'core.str' is a bad name, it should be 'core.string'. The issue is that
           it conflicts with 'builtin.string'. These two should be switched. Type
           name should be 'str' and package name should be 'string'
 

@@ -2015,7 +2015,10 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     return (AstNode *) include;
                 }
                 else {
-                    onyx_report_error(dir_token->pos, "unknown directive '#%b'.", dir_token->text, dir_token->length);
+                    OnyxToken* directive_token = expect_token(parser, '#');
+                    OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
+
+                    onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
                     return NULL;
                 }
             }

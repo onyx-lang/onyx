@@ -102,7 +102,7 @@ AstType* symres_type(AstType* type) {
             AstStructMember *member = s_node->members[i];
             member->type_node = symres_type(member->type_node);
 
-            if (!node_is_type(member->type_node)) {
+            if (!node_is_type((AstNode *) member->type_node)) {
                 onyx_report_error(member->token->pos, "Member type is not a type.");
                 return type;
             }
@@ -791,9 +791,11 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function:            symres_function(ent->function); break;
 
+        case Entity_Type_Foreign_Global_Header:
+        case Entity_Type_Global_Header:       symres_global(ent->global); break;
+
         case Entity_Type_Use_Package:         symres_use_package(ent->use_package); break;
         case Entity_Type_Overloaded_Function: symres_overloaded_function(ent->overloaded_function); break;
-        case Entity_Type_Global:              symres_global(ent->global); break;
         case Entity_Type_Expression:          symres_expression(&ent->expr); break;
         case Entity_Type_Type_Alias:          ent->type_alias = symres_type(ent->type_alias); break;
         case Entity_Type_Enum:                symres_enum(ent->enum_type); break;
