@@ -517,17 +517,18 @@ cannot_use:
 // NOTE: Returns 1 if the statment should be removed
 static b32 symres_statement(AstNode** stmt) {
     switch ((*stmt)->kind) {
-        case Ast_Kind_Local:      symres_local((AstLocal **) stmt);                  return 1;
-        case Ast_Kind_Return:     symres_return((AstReturn *) *stmt);                return 0;
-        case Ast_Kind_If:         symres_if((AstIfWhile *) *stmt);                   return 0;
-        case Ast_Kind_While:      symres_while((AstIfWhile *) *stmt);                return 0;
-        case Ast_Kind_For:        symres_for((AstFor *) *stmt);                      return 0;
-        case Ast_Kind_Switch:     symres_switch((AstSwitch *) *stmt);                return 0;
-        case Ast_Kind_Call:       symres_call((AstCall *) *stmt);                    return 0;
-        case Ast_Kind_Argument:   symres_expression((AstTyped **) &((AstArgument *) *stmt)->value); return 0;
-        case Ast_Kind_Block:      symres_block((AstBlock *) *stmt);                  return 0;
-        case Ast_Kind_Defer:      symres_statement(&((AstDefer *) *stmt)->stmt);     return 0;
-        case Ast_Kind_Use:        symres_use((AstUse *) *stmt);                       return 1;
+        case Ast_Kind_Local:       symres_local((AstLocal **) stmt);                  return 1;
+        case Ast_Kind_Return:      symres_return((AstReturn *) *stmt);                return 0;
+        case Ast_Kind_If:          symres_if((AstIfWhile *) *stmt);                   return 0;
+        case Ast_Kind_While:       symres_while((AstIfWhile *) *stmt);                return 0;
+        case Ast_Kind_For:         symres_for((AstFor *) *stmt);                      return 0;
+        case Ast_Kind_Switch:      symres_switch((AstSwitch *) *stmt);                return 0;
+        case Ast_Kind_Call:        symres_call((AstCall *) *stmt);                    return 0;
+        case Ast_Kind_Argument:    symres_expression((AstTyped **) &((AstArgument *) *stmt)->value); return 0;
+        case Ast_Kind_Block:       symres_block((AstBlock *) *stmt);                  return 0;
+        case Ast_Kind_Defer:       symres_statement(&((AstDefer *) *stmt)->stmt);     return 0;
+        case Ast_Kind_Use:         symres_use((AstUse *) *stmt);                      return 1;
+        case Ast_Kind_Use_Package: symres_use_package((AstUsePackage *) *stmt);       return 1;
 
         case Ast_Kind_Jump:      return 0;
 
@@ -787,6 +788,8 @@ void symres_entity(Entity* ent) {
         semstate.curr_package = ent->package;
     }
 
+    EntityState next_state = Entity_State_Check_Types;
+
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function:            symres_function(ent->function); break;
@@ -795,6 +798,10 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Global_Header:       symres_global(ent->global); break;
 
         case Entity_Type_Use_Package:         symres_use_package(ent->use_package); break;
+        case Entity_Type_Use:                 symres_use(ent->use);
+                                              next_state = Entity_State_Finalized;
+                                              break;
+
         case Entity_Type_Overloaded_Function: symres_overloaded_function(ent->overloaded_function); break;
         case Entity_Type_Expression:          symres_expression(&ent->expr); break;
         case Entity_Type_Type_Alias:          ent->type_alias = symres_type(ent->type_alias); break;
@@ -806,7 +813,7 @@ void symres_entity(Entity* ent) {
         default: break;
     }
 
-    ent->state = Entity_State_Check_Types;
+    ent->state = next_state;
 
     if (ent->package) scope_leave();
 }

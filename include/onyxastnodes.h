@@ -754,6 +754,7 @@ typedef struct Entity {
         AstEnumType           *enum_type;
         AstMemRes             *mem_res;
         AstPolyProc           *poly_proc;
+        AstUse                *use;
     };
 } Entity;
 

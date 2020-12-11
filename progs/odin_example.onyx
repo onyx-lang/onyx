@@ -2,8 +2,6 @@
 #include_file "progs/foo_test"
 
 use package core
-use package test { foo as foo_pkg }
-use package test as test
 
 Foo :: struct {
     data1 : i32;
@@ -59,6 +57,13 @@ make_bar :: proc () -> Bar {
 }
 
 main :: proc (args: [] cstr) {
+    use package test { foo as foo_pkg }
+    use package test as test
+    use test.foo.SomeEnum
+
+    printf("Val2: %i\n", cast(i32) Val2);
+    printf("Val3: %i\n", cast(i32) Val3);
+
     foo_pkg.print_foo();
     foo := test.foo.TestFoo.{ a = 1234 };
     printf("foo.a: %i\n", foo.a);

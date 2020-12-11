@@ -51,7 +51,7 @@ Language Cohesion:
 
             var := some.packages.nested.here.StructName.{ value1, value2, ... };
 
-    [ ] 'use' statements have two different variations and should be unified.
+    [X] 'use' statements have two different variations and should be unified.
         They can be used to include a package, 'use package', and they can
         be used to add names from a namespace to the current scope. The problem
         is that 'use package' can only be at the top level, and 'use' can only

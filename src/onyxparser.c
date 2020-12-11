@@ -32,7 +32,8 @@ static AstIfWhile*    parse_while_stmt(OnyxParser* parser);
 static AstFor*        parse_for_stmt(OnyxParser* parser);
 static AstSwitch*     parse_switch_stmt(OnyxParser* parser);
 static b32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
-static AstReturn*     parse_return_statement(OnyxParser* parser);
+static AstReturn*     parse_return_stmt(OnyxParser* parser);
+static AstNode*       parse_use_stmt(OnyxParser* parser);
 static AstBlock*      parse_block(OnyxParser* parser);
 static AstNode*       parse_statement(OnyxParser* parser);
 static AstType*       parse_type(OnyxParser* parser);
@@ -1013,7 +1014,7 @@ static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 }
 
 // 'return' <expr>?
-static AstReturn* parse_return_statement(OnyxParser* parser) {
+static AstReturn* parse_return_stmt(OnyxParser* parser) {
     AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
     return_node->token = expect_token(parser, Token_Type_Keyword_Return);
 
@@ -1032,6 +1033,82 @@ static AstReturn* parse_return_statement(OnyxParser* parser) {
     return return_node;
 }
 
+static AstNode* parse_use_stmt(OnyxParser* parser) {
+    OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
+
+    if (parser->curr->type == Token_Type_Keyword_Package) {
+        expect_token(parser, Token_Type_Keyword_Package);
+
+        AstUsePackage* upack = make_node(AstUsePackage, Ast_Kind_Use_Package);
+        upack->token = use_token;
+
+        AstNode* pack_symbol = make_node(AstNode, Ast_Kind_Symbol);
+        pack_symbol->token = expect_token(parser, Token_Type_Symbol);
+
+        // CLEANUP: This is just gross.
+        if (parser->curr->type == '.') {
+            consume_token(parser);
+            pack_symbol->token->length += 1;
+
+            while (1) {
+                if (parser->hit_unexpected_token) break;
+
+                OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+                pack_symbol->token->length += symbol->length;
+
+                if (parser->curr->type == '.') {
+                    pack_symbol->token->length += 1;
+                    consume_token(parser);
+                } else {
+                    break;
+                }
+            }
+        }
+
+        upack->package = (AstPackage *) pack_symbol;
+
+        if (parser->curr->type == Token_Type_Keyword_As) {
+            consume_token(parser);
+            upack->alias = expect_token(parser, Token_Type_Symbol);
+        }
+
+        if (parser->curr->type == '{') {
+            consume_token(parser);
+
+            bh_arr_new(global_heap_allocator, upack->only, 4);
+
+            while (parser->curr->type != '}') {
+                if (parser->hit_unexpected_token) return NULL;
+
+                AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
+                alias->token = expect_token(parser, Token_Type_Symbol);
+
+                if (parser->curr->type == Token_Type_Keyword_As) {
+                    consume_token(parser);
+                    alias->alias = expect_token(parser, Token_Type_Symbol);
+                } else {
+                    alias->alias = alias->token;
+                }
+
+                bh_arr_push(upack->only, alias);
+
+                if (parser->curr->type != '}')
+                    expect_token(parser, ',');
+            }
+
+            consume_token(parser);
+        }
+
+        return (AstNode *) upack;
+
+    } else {
+        AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
+        use_node->token = use_token;
+        use_node->expr = parse_expression(parser);
+        return (AstNode *) use_node;
+    }
+}
+
 // <return> ;
 // <block>
 // <symbol_statement> ;
@@ -1046,7 +1123,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Return:
-            retval = (AstNode *) parse_return_statement(parser);
+            retval = (AstNode *) parse_return_stmt(parser);
             break;
 
         case '{':
@@ -1152,11 +1229,12 @@ static AstNode* parse_statement(OnyxParser* parser) {
         }
 
         case Token_Type_Keyword_Use: {
-            AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
-            use_node->token = expect_token(parser, Token_Type_Keyword_Use);
-            use_node->expr = parse_expression(parser);
+            // AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
+            // use_node->token = expect_token(parser, Token_Type_Keyword_Use);
+            // use_node->expr = parse_expression(parser);
 
-            retval = (AstNode *) use_node;
+            needs_semicolon = 0;
+            retval = (AstNode *) parse_use_stmt(parser);
             break;
         }
 
@@ -1835,71 +1913,8 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
-            OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
-
-            expect_token(parser, Token_Type_Keyword_Package);
-
-            AstUsePackage* upack = make_node(AstUsePackage, Ast_Kind_Use_Package);
-            upack->token = use_token;
-
-            AstNode* pack_symbol = make_node(AstNode, Ast_Kind_Symbol);
-            pack_symbol->token = expect_token(parser, Token_Type_Symbol);
-
-            // CLEANUP: This is just gross.
-            if (parser->curr->type == '.') {
-                consume_token(parser);
-                pack_symbol->token->length += 1;
-
-                while (1) {
-                    if (parser->hit_unexpected_token) break;
-
-                    OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-                    pack_symbol->token->length += symbol->length;
-
-                    if (parser->curr->type == '.') {
-                        pack_symbol->token->length += 1;
-                        consume_token(parser);
-                    } else {
-                        break;
-                    }
-                }
-            }
-
-            upack->package = (AstPackage *) pack_symbol;
-
-            if (parser->curr->type == Token_Type_Keyword_As) {
-                consume_token(parser);
-                upack->alias = expect_token(parser, Token_Type_Symbol);
-            }
-
-            if (parser->curr->type == '{') {
-                consume_token(parser);
-
-                bh_arr_new(global_heap_allocator, upack->only, 4);
-
-                while (parser->curr->type != '}') {
-                    if (parser->hit_unexpected_token) return NULL;
-
-                    AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
-                    alias->token = expect_token(parser, Token_Type_Symbol);
-
-                    if (parser->curr->type == Token_Type_Keyword_As) {
-                        consume_token(parser);
-                        alias->alias = expect_token(parser, Token_Type_Symbol);
-                    } else {
-                        alias->alias = alias->token;
-                    }
-
-                    bh_arr_push(upack->only, alias);
-
-                    if (parser->curr->type != '}')
-                        expect_token(parser, ',');
-                }
-
-                consume_token(parser);
-            }
-
-            add_node_to_process(parser, (AstNode *) upack);
+            AstNode* use_node = parse_use_stmt(parser);
+            add_node_to_process(parser, use_node);
             return NULL;
         }
 
