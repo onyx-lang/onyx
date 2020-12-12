@@ -2132,7 +2132,6 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Prog
     parser.results = (ParseResults) {
         .allocator = global_heap_allocator,
 
-        .includes = NULL,
         .nodes_to_process = NULL,
 
     };
@@ -2142,7 +2141,6 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Prog
         .poly_params = NULL,
     };
 
-    bh_arr_new(parser.results.allocator, parser.results.includes, 4);
     bh_arr_new(parser.results.allocator, parser.results.nodes_to_process, 4);
 
     return parser;
@@ -2195,7 +2193,7 @@ ParseResults onyx_parse(OnyxParser *parser) {
                 switch (curr_stmt->kind) {
                     case Ast_Kind_Include_File:
                     case Ast_Kind_Include_Folder:
-                        bh_arr_push(parser->results.includes, (AstInclude *) curr_stmt);
+                        add_node_to_process(parser, curr_stmt);
                         break;
 
                     case Ast_Kind_Binding: {

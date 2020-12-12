@@ -10,7 +10,7 @@
 #include "onyxwasm.h"
 #include "onyxdoc.h"
 
-#define VERSION "0.1"
+#define VERSION "v0.0.5"
 
 
 #ifndef CORE_INSTALLATION
@@ -22,49 +22,20 @@
 
 
 
-#ifdef REPORT_TIMES
-// CLEANUP: Move this to another file
-typedef struct TimerStackElem {
-    char* label;
-    u64   time;
-} TimerStackElem;
-
-static bh_arr(TimerStackElem) global_timer_stack;
-
-void timer_stack_init() {
-    global_timer_stack = NULL;
-    bh_arr_new(global_heap_allocator, global_timer_stack, 4);
-}
-
-void timer_stack_push(char* label) {
-    TimerStackElem elem;
-    elem.label = label;
-    elem.time  = bh_time_curr();
-    bh_arr_push(global_timer_stack, elem);
-}
-
-void timer_stack_pop() {
-    TimerStackElem elem = bh_arr_pop(global_timer_stack);
-    u64 duration = bh_time_duration(elem.time);
-    bh_printf("[Time] %s took %lms.\n", elem.label, duration);
-}
-#endif
-
-
 
 static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
-    "The compiler for the Onyx programming language.\n"
+    "The compiler for the Onyx programming language, created by Brendan Hansen.\n"
     "\n"
     "Usage:\n"
-    "\tonyx [-o <target file>] [-verbose] <input files>\n"
+    "\tonyx [-o <target file>] [--verbose] <input files>\n"
     "\tonyx doc <input files>\n"
-    "\tonyx -help\n"
-    "\nFlags:\n"
+    "\tonyx help\n"
+    "\n"
+    "Flags:\n"
+    "\t<input files>           List of initial files\n"
     "\t-o <target_file>        Specify the target file (default: out.wasm)\n"
-    "\t-ast                    Print the abstract syntax tree after parsing\n"
-    "\t-verbose                Verbose output\n"
-    "\t-help                   Print this help message\n";
+    "\t--verbose               Verbose output\n";
 
 typedef enum CompileAction {
     ONYX_COMPILE_ACTION_COMPILE,
@@ -101,28 +72,32 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
     bh_arr_push(options.included_folders, CORE_INSTALLATION);
     bh_arr_push(options.included_folders, ".");
 
-    fori(i, 1, argc) {
-        if (!strcmp(argv[i], "doc") && i == 1) {
-            options.action = ONYX_COMPILE_ACTION_DOCUMENT;
-        }
-        else if (!strcmp(argv[i], "-help")) {
-            options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
-            break;
-        }
-        else if (!strcmp(argv[i], "-o")) {
-            options.target_file = argv[++i];
-        }
-        else if (!strcmp(argv[i], "-verbose")) {
-            options.verbose_output = 1;
-        }
-        else if (!strcmp(argv[i], "-I")) {
-            bh_arr_push(options.included_folders, argv[++i]);
-        }
-        else {
-            if (options.action == ONYX_COMPILE_ACTION_PRINT_HELP)
-                options.action = ONYX_COMPILE_ACTION_COMPILE;
+    if (argc == 1) return options;
 
-            bh_arr_push(options.files, argv[i]);
+    if (!strcmp(argv[1], "doc")) {
+        options.action = ONYX_COMPILE_ACTION_DOCUMENT;
+    }
+    else if (!strcmp(argv[1], "help")) {
+        options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+    }
+    else {
+        options.action = ONYX_COMPILE_ACTION_COMPILE;
+    }
+
+    if (options.action == ONYX_COMPILE_ACTION_COMPILE) {
+        fori(i, 1, argc) {
+            if (!strcmp(argv[i], "-o")) {
+                options.target_file = argv[++i];
+            }
+            else if (!strcmp(argv[i], "-verbose")) {
+                options.verbose_output = 1;
+            }
+            else if (!strcmp(argv[i], "-I")) {
+                bh_arr_push(options.included_folders, argv[++i]);
+            }
+            else {
+                bh_arr_push(options.files, argv[i]);
+            }
         }
     }
 
@@ -257,19 +232,6 @@ static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_con
 }
 
 static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
-    bh_arr_each(AstInclude *, include, results->includes) {
-        EntityType et = Entity_Type_Include_File;
-
-        if ((*include)->kind == Ast_Kind_Include_Folder) et = Entity_Type_Include_Folder;
-
-        entity_heap_insert(&compiler_state->prog_info.entities, (Entity) {
-            .state = Entity_State_Parse,
-            .type = et,
-            .scope = NULL,
-            .include = *include,
-        });
-    }
-
     Entity ent;
     bh_arr_each(NodeToProcess, n, results->nodes_to_process) {
         AstNode* node = n->node;
@@ -280,6 +242,22 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
         ent.scope   = n->scope;
 
         switch (nkind) {
+            case Ast_Kind_Include_File: {
+                ent.state = Entity_State_Parse;
+                ent.type = Entity_Type_Include_File;
+                ent.include = (AstInclude *) node;
+                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                break;
+            }
+                                   
+            case Ast_Kind_Include_Folder: {
+                ent.state = Entity_State_Parse;
+                ent.type = Entity_Type_Include_Folder;
+                ent.include = (AstInclude *) node;
+                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                break;
+            }
+
             case Ast_Kind_Function: {
                 if ((node->flags & Ast_Flag_Foreign) != 0) {
                     ent.type     = Entity_Type_Foreign_Function_Header;
@@ -451,10 +429,6 @@ static b32 process_include_entity(CompilerState* compiler_state, Entity* ent) {
 }
 
 static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
-    // bh_printf("Processing entity: %s %s\n",
-    //         entity_state_strings[ent->state],
-    //         entity_type_strings[ent->type]);
-
     i32 changed = 1;
 
     switch (ent->state) {
@@ -549,8 +523,12 @@ int main(int argc, char *argv[]) {
             return 1;
 
         case ONYX_COMPILE_ACTION_COMPILE:
-        case ONYX_COMPILE_ACTION_DOCUMENT:
             compiler_progress = onyx_compile(&compile_state);
+            break;
+
+        case ONYX_COMPILE_ACTION_DOCUMENT:
+            bh_printf("Documentation has not been fully implemented yet.\n");
+            exit(EXIT_FAILURE);
             break;
 
         default: break;
@@ -571,7 +549,8 @@ int main(int argc, char *argv[]) {
             break;
 
         case ONYX_COMPILER_PROGRESS_SUCCESS:
-            bh_printf("Successfully compiled to '%s'\n", compile_opts.target_file);
+            if (compile_opts.verbose_output)
+                bh_printf("Successfully compiled to '%s'\n", compile_opts.target_file);
             break;
     }
 

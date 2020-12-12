@@ -9,7 +9,7 @@ Command Line Interface:
         - Abstract syntax tree printing
         - Running the binary right away using Wasmtime, Wasmer or NodeJS
 
-    [ ] Remove old code from CLI logic
+    [X] Remove old code from CLI logic
     [ ] Fix documentation generation (broken since compiler architecture change) 
     [ ] Add statistic printing
     [ ] Fix AST printing (broken for a long time)
