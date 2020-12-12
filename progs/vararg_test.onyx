@@ -10,7 +10,7 @@ old_va_test :: proc (fix: Fixes, va: ..i32) {
     println(fix.suffix);
 }
 
-Fixes :: struct { prefix: string; suffix: string; }
+Fixes :: struct { prefix: str; suffix: str; }
 
 new_va_test :: proc (fix: Fixes, va: ...) {
     println(fix.prefix);
@@ -24,7 +24,7 @@ new_va_test :: proc (fix: Fixes, va: ...) {
     println(fix.suffix);
 }
 
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
     new_va_test(Fixes.{ "foo", "foozle" }, 1, 2, 3.0f, 5.0f);
     old_va_test(Fixes.{ "bar", "barzle" }, 1);
 

@@ -6,7 +6,7 @@ package main
 use package core
 use package simd
 
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
     init_positions();
     init_velocities();
 
@@ -26,10 +26,10 @@ velocities : [OBJECT_COUNT] f32x4
 
 init_positions :: proc () {
     for ^p: positions {
-        *p = f32x4_replace_lane(*p, 0, random_float(-127.0f, 127.0f));
-        *p = f32x4_replace_lane(*p, 1, random_float(-127.0f, 127.0f));
-        *p = f32x4_replace_lane(*p, 2, random_float(-127.0f, 127.0f));
-        *p = f32x4_replace_lane(*p, 3, random_float(-127.0f, 127.0f));
+        *p = f32x4_replace_lane(*p, 0, random.float(-127.0f, 127.0f));
+        *p = f32x4_replace_lane(*p, 1, random.float(-127.0f, 127.0f));
+        *p = f32x4_replace_lane(*p, 2, random.float(-127.0f, 127.0f));
+        *p = f32x4_replace_lane(*p, 3, random.float(-127.0f, 127.0f));
     }
 }
 
