@@ -60,7 +60,7 @@ Language Cohesion:
     [ ] :: should not declare a local variable, just bind a name to an expression.
         They can still be lexically scoped.
 
-    [ ] Currently accessing a field directly on a function call produces invalid
+    [X] Currently accessing a field directly on a function call produces invalid
         WASM code; i.e.  foo().bar; This should at least produce an error until
         the underlying issue is fixed.
 

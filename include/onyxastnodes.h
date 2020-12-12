@@ -854,6 +854,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {
     return (node->kind == Ast_Kind_Local)
+        || (node->kind == Ast_Kind_Param)
         || (node->kind == Ast_Kind_Global)
         || (node->kind == Ast_Kind_Dereference)
         || (node->kind == Ast_Kind_Array_Access)

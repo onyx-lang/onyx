@@ -1005,6 +1005,14 @@ b32 check_field_access(AstFieldAccess** pfield) {
         return 1;
     }
 
+    if (!is_lval((AstNode *) field->expr)) {
+        onyx_report_error(field->token->pos,
+            "Cannot access field '%b'. Expression is not an lval.",
+            field->token->text,
+            field->token->length);
+        return 1;
+    }
+
     StructMember smem;
     if (field->token != NULL && field->field == NULL) {
         token_toggle_end(field->token);
