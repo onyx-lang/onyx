@@ -1,7 +1,8 @@
 package core.math
 
 use package core {
-    sqrt_f32, sqrt_f64
+    sqrt_f32, sqrt_f64,
+    abs_f32,  abs_f64
 }
 
 PI  :: 3.14159265f;
@@ -65,3 +66,13 @@ min :: proc (a: $T, b: T) -> T {
 sqrt_i32 :: proc (x: i32) -> i32 do return ~~sqrt_f32(~~x);
 sqrt_i64 :: proc (x: i64) -> i64 do return ~~sqrt_f64(~~x);
 sqrt :: proc { sqrt_f32, sqrt_f64, sqrt_i32, sqrt_i64 }
+
+abs_i32 :: proc (x: i32) -> i32 {
+    if x >= 0 do return x;
+    return -x;
+}
+abs_i64 :: proc (x: i64) -> i64 {
+    if x >= 0 do return x;
+    return -x;
+}
+abs :: proc { abs_i32, abs_i64, abs_f32, abs_f64 }
