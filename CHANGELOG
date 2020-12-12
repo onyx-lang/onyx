@@ -1,16 +1,23 @@
 Release v0.0.5
 --------------
 Additions:
+* 'abs' function in core/math.onyx.
 
 Removals:
+* field accesses on things that are not lvals. This was a bug anyway, so it
+    should not require any code changes, but the feature is gone.
 
 Changes:
+* BREAKING: The type name 'string', and the package name 'str', have been swapped.
+* 'use' statements are more powerful. 'use package' can occur at any scope level,
+    and 'use <value>' can occur at file scope.
 * struct literals can now have arbitrary package prefixes on them, i.e.
     some.deeply.nested.packages.Struct.{ ... };
+* cleaned up CLI
 
 Bug fixes:
 * globals that were #foreign caused several bugs, which have been squashed.
-
+* field accesses can only happen on lvals.
 
 
 Release v0.0.4
