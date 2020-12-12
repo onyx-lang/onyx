@@ -89,7 +89,7 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
             if (!strcmp(argv[i], "-o")) {
                 options.target_file = argv[++i];
             }
-            else if (!strcmp(argv[i], "-verbose")) {
+            else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-V")) {
                 options.verbose_output = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
