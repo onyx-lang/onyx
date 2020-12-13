@@ -217,15 +217,8 @@ static char* lookup_included_file(CompilerState* cs, char* filename) {
 }
 
 static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
-    // NOTE: Maybe don't want to recreate the tokenizer and parser for every file
-    if (compiler_state->options->verbose_output)
-        bh_printf("[Lexing]       %s\n", file_contents->filename);
-
     OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
     onyx_lex_tokens(&tokenizer);
-
-    if (compiler_state->options->verbose_output)
-        bh_printf("[Parsing]      %s\n", file_contents->filename);
 
     OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->prog_info);
     return onyx_parse(&parser);
@@ -381,9 +374,6 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         return ONYX_COMPILER_PROGRESS_FAILED_READ;
     }
 
-    if (compiler_state->options->verbose_output)
-        bh_printf("[Reading]      %s\n", file.filename);
-
     bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
     bh_file_close(&file);
 
@@ -400,6 +390,9 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     // NOTE: Need to reget the value out of the table so token references work
     bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
+
+    if (compiler_state->options->verbose_output)
+        bh_printf("Processing source file:    %s\n", file.filename);
 
     ParseResults results = parse_source_file(compiler_state, &fc);
     merge_parse_results(compiler_state, &results);
@@ -451,6 +444,8 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
 
 
 static i32 onyx_compile(CompilerState* compiler_state) {
+    u64 start_time = bh_time_curr();
+
     {
         entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
             .state = Entity_State_Resolve_Symbols,
@@ -494,9 +489,24 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     }
 
     if (compiler_state->options->verbose_output)
-        bh_printf("[Writing WASM] %s\n", output_file.filename);
+        bh_printf("Outputting to WASM file:   %s\n", output_file.filename);
 
     onyx_wasm_module_write_to_file(&global_wasm_module, output_file);
+
+    u64 duration = bh_time_duration(start_time);
+    
+    if (compiler_state->options->verbose_output) {
+        bh_printf("\nStatistics:\n");
+        bh_printf("    Time taken: %l.%l seconds\n",
+                duration / 1000, duration % 1000);
+        bh_printf("    Processed %l lines (%f lines/second).\n",
+                lexer_lines_processed,
+                ((f32) 1000 * lexer_lines_processed) / (duration));
+        bh_printf("    Processed %l tokens (%f tokens/second).\n",
+                lexer_tokens_processed,
+                ((f32) 1000 * lexer_tokens_processed) / (duration));
+        bh_printf("\n");
+    }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
@@ -549,8 +559,6 @@ int main(int argc, char *argv[]) {
             break;
 
         case ONYX_COMPILER_PROGRESS_SUCCESS:
-            if (compile_opts.verbose_output)
-                bh_printf("Successfully compiled to '%s'\n", compile_opts.target_file);
             break;
     }
 

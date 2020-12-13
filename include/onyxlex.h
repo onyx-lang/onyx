@@ -3,6 +3,10 @@
 
 #include "bh.h"
 
+// NOTE: Used for global statistics
+extern u64 lexer_lines_processed;
+extern u64 lexer_tokens_processed;
+
 typedef enum TokenType {
     Token_Type_Ascii_End            = 256,
     Token_Type_Unknown              = 256,

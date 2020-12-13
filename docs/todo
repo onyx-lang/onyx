@@ -10,8 +10,8 @@ Command Line Interface:
         - Running the binary right away using Wasmtime, Wasmer or NodeJS
 
     [X] Remove old code from CLI logic
+    [X] Add statistic printing
     [ ] Fix documentation generation (broken since compiler architecture change) 
-    [ ] Add statistic printing
     [ ] Fix AST printing (broken for a long time)
     [ ] Add automated running component
         - Store to temporary file (OS independent)
