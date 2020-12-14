@@ -114,7 +114,7 @@ MapLookupResult :: struct {
 lookup :: proc (use map: ^Map($K, $V), key: K) -> MapLookupResult {
     lr := MapLookupResult.{};
 
-    hash := hash_function(key);
+    hash := hash_function(key); // You cannot use this type for the key, unless you add an overload.
 
     lr.hash_index = hash % hashes.count;
     lr.entry_index = hashes[lr.hash_index];
