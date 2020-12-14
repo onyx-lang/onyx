@@ -233,28 +233,28 @@ main :: proc (args: [] cstr) {
     println(array.fold(^s.a, 0, proc (x: i32, acc: i32) -> i32 do return x + acc;));
     print("\n");
 
-    map : ptrmap.PtrMap;
-    ptrmap.init(^map, 50);
-    defer ptrmap.free(^map);
+    pmap : map.Map(rawptr, rawptr);
+    map.init(^pmap, 50);
+    defer map.free(^pmap);
 
-    for i: 0 .. 100 do ptrmap.put(^map, ^s.a[i], ^s.b[i]);
+    for i: 0 .. 100 do map.put(^pmap, ^s.a[i], ^s.b[i]);
 
     print("Has ^a[20]? ");
-    println(ptrmap.has(^map, ^s.a[20]));
+    println(map.has(^pmap, ^s.a[20]));
 
     print("Has null? ");
-    println(ptrmap.has(^map, null));
+    println(map.has(^pmap, null));
 
     print("Value at ^a[50]: ");
-    print(cast(^void) ptrmap.get(^map, ^s.a[50]));
+    print(cast(^void) map.get(^pmap, ^s.a[50]));
     print(" == ");
     println(cast(^void) (^s.b[50]));
 
     println("Deleteing ^a[20]");
-    ptrmap.delete(^map, ^s.a[20]);
+    map.delete(^pmap, ^s.a[20]);
 
     print("Has ^a[20]? ");
-    println(ptrmap.has(^map, ^s.a[20]));
+    println(map.has(^pmap, ^s.a[20]));
 }
 
 
