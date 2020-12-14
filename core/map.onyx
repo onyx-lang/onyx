@@ -1,41 +1,40 @@
-package core.i32map
-
-// THIS PACKAGE IS DEPRECATED IN FAVOR OF USING 'Map(i32, ...)' from map.onyx.
+package core.map
 
 use package core.array as array
+use package core.string as string
 
-I32Map :: struct ($T) {
+Map :: struct ($K, $V) {
     hashes  : [..] i32;
-    entries : [..] I32MapEntry(T);
+    entries : [..] MapEntry(K, V);
 }
 
-I32MapEntry :: struct ($T) {
-    key   : i32;
+MapEntry :: struct ($K, $T) {
     next  : i32;
+    key   : K;
     value : T;
 }
 
-init :: proc (use imap: ^I32Map($T), hash_count: i32 = 16) {
+init :: proc (use map: ^Map($K, $V), hash_count: i32 = 16) {
     array.init(^hashes, hash_count);
     array.init(^entries, 4);
 
     for i: 0 .. hash_count do array.push(^hashes, -1);
 }
 
-free :: proc (use imap: ^I32Map($T)) {
+free :: proc (use map: ^Map($K, $V)) {
     array.free(^hashes);
     array.free(^entries);
 }
 
-put :: proc (use imap: ^I32Map($T), key: i32, value: T) {
-    lr := lookup(imap, key);
+put :: proc (use map: ^Map($K, $V), key: K, value: V) {
+    lr := lookup(map, key);
 
     if lr.entry_index >= 0 {
         entries[lr.entry_index].value = value;
         return;
     }
 
-    entry : I32MapEntry(T);
+    entry : MapEntry(K, V);
     entry.key = key;
     entry.value = value;
     entry.next = hashes[lr.hash_index];
@@ -45,20 +44,20 @@ put :: proc (use imap: ^I32Map($T), key: i32, value: T) {
     hashes[lr.hash_index] = entries.count - 1;
 }
 
-has :: proc (use imap: ^I32Map($T), key: i32) -> bool {
-    lr := lookup(imap, key);
+has :: proc (use map: ^Map($K, $V), key: K) -> bool {
+    lr := lookup(map, key);
     return lr.entry_index >= 0;
 }
 
-get :: proc (use imap: ^I32Map($T), key: i32, default := cast(T) 0) -> T {
-    lr := lookup(imap, key);
+get :: proc (use map: ^Map($K, $V), key: K, default := cast(V) 0) -> V {
+    lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
     return default;
 }
 
-delete :: proc (use imap: ^I32Map($T), key: i32) {
-    lr := lookup(imap, key);
+delete :: proc (use map: ^Map($K, $V), key: K) {
+    lr := lookup(map, key);
     if lr.entry_index < 0 do return;
 
     if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next;
@@ -70,40 +69,58 @@ delete :: proc (use imap: ^I32Map($T), key: i32) {
     }
 
     array.fast_delete(^entries, lr.entry_index);
-    last := lookup(imap, entries[lr.entry_index].key);
+    last := lookup(map, entries[lr.entry_index].key);
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-clear :: proc (use imap: ^I32Map($T)) {
+clear :: proc (use map: ^Map($K, $V)) {
     for i: 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;
 }
 
+hash_function :: proc {
+	proc (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+	proc (key: i32) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+	proc (key: i64) -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
 
+	proc (key: str) -> u32 {
+	    hash: u32 = 5381;
+	    for ch: key do hash += (hash << 5) + ~~ch;
+	    return hash;
+	},
+}
+
+cmp_function :: proc {
+	proc (a: rawptr, b: rawptr) -> bool { return a == b; },
+	proc (a: i32, b: i32) -> bool       { return a == b; },
+	proc (a: i64, b: i64) -> bool       { return a == b; },
+
+	string.equal,
+}
 
 //
 // Private symbols
 //
 
 #private_file
-I32MapLookupResult :: struct {
+MapLookupResult :: struct {
     hash_index  : i32 = -1;
     entry_index : i32 = -1;
     entry_prev  : i32 = -1;
 }
 
 #private_file
-lookup :: proc (use imap: ^I32Map($T), key: i32) -> I32MapLookupResult {
-    lr := I32MapLookupResult.{};
+lookup :: proc (use map: ^Map($K, $V), key: K) -> MapLookupResult {
+    lr := MapLookupResult.{};
 
-    hash := cast(u32) 0xcbf29ce7 ^ cast(u32) key;
+    hash := hash_function(key);
 
     lr.hash_index = hash % hashes.count;
     lr.entry_index = hashes[lr.hash_index];
 
     while lr.entry_index >= 0 {
-        if entries[lr.entry_index].key == key do return lr;
+        if cmp_function(entries[lr.entry_index].key, key) do return lr;
 
         lr.entry_prev = lr.entry_index;
         lr.entry_index = entries[lr.entry_index].next;

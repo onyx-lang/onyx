@@ -6,6 +6,7 @@ package core
 #include_file "core/array"
 #include_file "core/i32map"
 #include_file "core/intrinsics"
+#include_file "core/map"
 #include_file "core/math"
 #include_file "core/memory"
 #include_file "core/ptrmap"

@@ -1,5 +1,7 @@
 package core.ptrmap
 
+// THIS PACKAGE IS DEPRECATED IN FAVOR OF USING 'Map(rawptr, ...)' from map.onyx.
+
 use package core.array as array
 
 PtrMap :: struct {

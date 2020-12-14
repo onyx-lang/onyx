@@ -1,5 +1,7 @@
 package core.strmap
 
+// THIS PACKAGE IS DEPRECATED IN FAVOR OF USING 'Map(str, ...)' from map.onyx.
+
 use package core.array as array
 use package core.string as string
 use package core { print }
