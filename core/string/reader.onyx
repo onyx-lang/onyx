@@ -133,6 +133,26 @@ read_until :: proc (use reader: ^StringReader, skip: u32, uptos: ..u8) -> str {
     return out;
 }
 
+// Reads a continuous string of alphabetic chars along with underscores '_'
+read_word :: proc (use reader: ^StringReader) -> str {
+    if count == 0 do return str.{ null, 0 };
+
+    out := str.{ data, 0 };
+    for ch: *(cast(^str) reader) {
+        if     (ch >= #char "a" && ch <= #char "z")
+            || (ch >= #char "A" && ch <= #char "Z")
+            || ch == #char "_" {
+            out.count += 1;            
+        }
+        else do break;
+    }
+
+    data += out.count;
+    count -= out.count;
+
+    return out;
+}
+
 advance_line :: proc (use reader: ^StringReader) {
     if count == 0 do return;
 
