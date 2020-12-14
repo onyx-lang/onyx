@@ -87,5 +87,6 @@ Usability:
     restriction due completely to my laziness and lack of access to a
     Windows / MacOS computer.
 
+    [ ] Make README on GitHub better, and actually describe what to do
     [ ] Make compiler work on Windows
     [ ] Make compiler work on MacOS

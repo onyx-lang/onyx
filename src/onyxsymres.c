@@ -680,9 +680,7 @@ static void symres_global(AstGlobal* global) {
 
 static void symres_overloaded_function(AstOverloadedFunction* ofunc) {
     bh_arr_each(AstTyped *, node, ofunc->overloads) {
-        if ((*node)->kind == Ast_Kind_Symbol) {
-            *node = (AstTyped *) symbol_resolve(semstate.curr_scope, (*node)->token);
-        }
+        symres_expression(node);
     }
 }
 

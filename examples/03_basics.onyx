@@ -4,7 +4,7 @@
 
 use package core
 
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
     // Here is a list of all the builtin types:
     //       void
     //       bool
@@ -14,8 +14,8 @@ main :: proc (args: [] cstring) {
     //        i64  u64
     //        f32  f64
     //     rawptr
-    //     string
-    //    cstring
+    //        str
+    //       cstr
     //      range
     //
     // If you look in core/builtin.onyx, you can see the definition for some
@@ -28,7 +28,7 @@ main :: proc (args: [] cstring) {
     //
     // Here foo is an i32. The unary prefix ^ operator takes the address of a value.
     // The type of foo_ptr is ^i32, or a pointer to an i32. Another example of a pointer
-    // is the cstring builtin. It is ^u8, which is what C would call a char*.
+    // is the cstr builtin. It is ^u8, which is what C would call a char*.
     foo     := 10;
     foo_ptr := ^foo;
 
@@ -36,7 +36,7 @@ main :: proc (args: [] cstring) {
     print(foo);
     print("\n");
     print("foo_ptr is ");
-    print(foo_ptr);
+    printf("%p", foo_ptr);
     print("\n");
 
 
@@ -91,13 +91,13 @@ main :: proc (args: [] cstring) {
     // pointer, a count, and a capacity. The extra capacity field allows implementations
     // to know how many elements can fit into the space allocated for the array, and not
     // just how many elements are currently in the array. To facilitate using dynamic
-    // arrays, there are many array_ procedures in the core package. Take this example.
+    // arrays, there are many procedures in the core.array package. Take this example.
     dyn_arr : [..] i32;
-    array_init(^dyn_arr);
-    defer array_free(^dyn_arr);
+    array.init(^dyn_arr);
+    defer array.free(^dyn_arr);
 
-    for i: 0 .. 100 {
-        array_push(^dyn_arr, i * i * i);
+    for i: 0 .. 10 {
+        array.push(^dyn_arr, i * i * i);
     }
 
     print("dyn_arr is ");

@@ -5,7 +5,7 @@
 
 use package core
 
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
 
     // This is the syntax for declaring a local variable in a procedure.
     foo: i32;

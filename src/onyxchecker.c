@@ -1282,7 +1282,8 @@ b32 check_overloaded_function(AstOverloadedFunction* func) {
         }
 
         if ((*node)->kind != Ast_Kind_Function) {
-            onyx_report_error((*node)->token->pos, "Overload option not function.");
+            onyx_report_error((*node)->token->pos, "Overload option not function. Got '%s'",
+                onyx_ast_node_kind_string((*node)->kind));
 
             return 1;
         }

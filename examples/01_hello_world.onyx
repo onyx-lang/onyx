@@ -22,7 +22,7 @@ package main
 // prevents a cluttered global namespace.
 //
 // In Onyx, there are a couple way to control the 'use package' statement. The example below
-// brings in ALL symbols from the 'core' package to the current package scope. This is handy,
+// brings in ALL symbols from the 'core' package to the current file scope. This is handy,
 // but if there are symbols with the same name in multiple packages, there will be conflicts.
 // To address this, Onyx has two ways of controlling which symbols are included.
 //
@@ -34,10 +34,10 @@ package main
 //
 //      use package core { some_symbol, some_other_symbol as sos }
 //
-// This next exmaple makes the symbol, 'some_symbol', accessible in the current package scope.
+// This next exmaple makes the symbol, 'some_symbol', accessible in the current file scope.
 // This is useful if there is only one thing you need from a package and you do not want to
 // worry about conflicting symbol names in the future. This example also makes the symbol,
-// 'some_other_symbol', accessible in the current package scope under the name, 'sos'. This
+// 'some_other_symbol', accessible in the current file scope under the name, 'sos'. This
 // is useful if a symbol name is long and you use it a lot in a package.
 //
 // As you may expect, you can also combine both of these features into one statement, such as,
@@ -49,9 +49,9 @@ use package core
 // procedure is called when the program starts. There is nothing really special going on here;
 // you can go look in core/sys/wasi.onyx to see how the actual _start procedure works. At the
 // end it simply calls main.main, which is this procedure. By convention, main takes a slice
-// of cstrings, which were the arguments passed from the command line. We will talk about
+// of cstr's, which were the arguments passed from the command line. We will talk about
 // slices later.
-main :: proc (args: [] cstring) {
+main :: proc (args: [] cstr) {
 
     // This is the actual call to print, which will print the message 'Hello World!\n' onto the screen.
     // It is not too important to know how this works, but if you are interested you can find the
