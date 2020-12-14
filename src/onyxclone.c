@@ -16,6 +16,7 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_Enum_Value:
 		case Ast_Kind_Overloaded_Function:
 		case Ast_Kind_Polymorphic_Proc:
+		case Ast_Kind_Use_Package:
 			return 0;
 
 		default: return 1;
@@ -83,6 +84,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_For: return sizeof(AstFor);
         case Ast_Kind_While: return sizeof(AstIfWhile);
         case Ast_Kind_Jump: return sizeof(AstJump);
+        case Ast_Kind_Use: return sizeof(AstUse);
         case Ast_Kind_Defer: return sizeof(AstDefer);
         case Ast_Kind_Switch: return sizeof(AstSwitch);
         case Ast_Kind_Switch_Case: return sizeof(AstSwitchCase);
@@ -346,6 +348,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 				bh_arr_push(df->params, new_param);
 			}
 
+			break;
+		}
+
+		case Ast_Kind_Use: {
+			((AstUse *) nn)->expr = (AstTyped *) ast_clone(a, ((AstUse *) node)->expr);
 			break;
 		}
 	}
