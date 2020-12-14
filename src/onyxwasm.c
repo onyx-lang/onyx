@@ -1296,14 +1296,14 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 
             TypeBasic* type = &unop->type->Basic;
 
-            if (type->kind == Basic_Kind_I32
-                    || type->kind == Basic_Kind_I16
-                    || type->kind == Basic_Kind_I8) {
+            if (type->kind == Basic_Kind_I32 || type->kind == Basic_Kind_U32
+                    || type->kind == Basic_Kind_I16 || type->kind == Basic_Kind_U16
+                    || type->kind == Basic_Kind_I8 || type->kind == Basic_Kind_U8) {
                 WID(WI_I32_CONST, 0xffffffff);
                 WI(WI_I32_XOR);
 
             }
-            else if (type->kind == Basic_Kind_I64) {
+            else if (type->kind == Basic_Kind_I64 || type->kind == Basic_Kind_U64) {
                 WIL(WI_I64_CONST, 0xffffffffffffffff);
                 WI(WI_I64_XOR);
             }

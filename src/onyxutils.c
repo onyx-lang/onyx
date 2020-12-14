@@ -559,6 +559,9 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
         symbol_introduce(pp->poly_scope, param->poly_sym->token, (AstNode *) raw);
     }
 
+    // HACK(Brendan): Maybe each type should be given a unique id upon creation?
+    // Then that could be used to uniquely identify the type, instead of relying
+    // on the name being unique.                     - brendanfh 2020/12/14
     static char key_buf[1024];
     fori (i, 0, 1024) key_buf[i] = 0;
     bh_table_each_start(AstNode *, pp->poly_scope->symbols);
