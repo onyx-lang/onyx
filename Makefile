@@ -1,5 +1,4 @@
 RELEASE=1
-TIME=0
 
 OBJ_FILES=\
 	build/onyxlex.o \
@@ -25,10 +24,6 @@ ifeq ($(RELEASE), 0)
 else
 	CC=tcc
 endif
-endif
-
-ifeq ($(TIME), 1)
-	TIMEFLAG=-DREPORT_TIMES=1
 endif
 
 INCLUDES=-I./include

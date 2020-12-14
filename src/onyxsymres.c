@@ -494,14 +494,21 @@ static void symres_use(AstUse* use) {
 
     if (use->expr->type_node == NULL) goto cannot_use;
 
-    if (use->expr->type_node->kind == Ast_Kind_Struct_Type ||
-            use->expr->type_node->kind == Ast_Kind_Poly_Call_Type) {
+    AstType* effective_type = use->expr->type_node;
+    if (effective_type->kind == Ast_Kind_Pointer_Type)
+        effective_type = ((AstPointerType *) effective_type)->elem;
+
+    if (effective_type->kind == Ast_Kind_Struct_Type ||
+            effective_type->kind == Ast_Kind_Poly_Call_Type) {
 
         if (use->expr->type == NULL)
             use->expr->type = type_build_from_ast(semstate.node_allocator, use->expr->type_node);
         if (use->expr->type == NULL) goto cannot_use;
 
         Type* st = use->expr->type;
+        if (st->kind == Type_Kind_Pointer)
+            st = st->Pointer.elem;
+
         bh_arr_each(StructMember *, smem, st->Struct.memarr) {
             AstFieldAccess* fa = make_field_access(use->expr, (*smem)->name);
             symbol_raw_introduce(semstate.curr_scope, (*smem)->name, use->token->pos, (AstNode *) fa);

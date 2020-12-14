@@ -1723,9 +1723,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
                 expect_token(parser, Token_Type_Symbol);
 
             } else {
-                AstNode* sym_node = make_node(AstNode, Ast_Kind_Symbol);
-                sym_node->token = expect_token(parser, Token_Type_Symbol);
-                func_def->overloaded_function = sym_node;
+                func_def->overloaded_function = (AstNode *) parse_expression(parser);
             }
         }
 
