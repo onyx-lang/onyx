@@ -23,6 +23,7 @@ typedef struct AstSizeOf AstSizeOf;
 typedef struct AstAlignOf AstAlignOf;
 typedef struct AstFileContents AstFileContents;
 typedef struct AstStructLiteral AstStructLiteral;
+typedef struct AstArrayLiteral AstArrayLiteral;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstJump AstJump;
@@ -138,6 +139,7 @@ typedef enum AstKind {
     Ast_Kind_Align_Of,
     Ast_Kind_File_Contents,
     Ast_Kind_Struct_Literal,
+    Ast_Kind_Array_Literal,
 
     Ast_Kind_If,
     Ast_Kind_For,
@@ -455,6 +457,13 @@ struct AstStructLiteral {
     AstTyped *stnode;
 
     bh_arr(AstStructMember *) named_values;
+    bh_arr(AstTyped *) values;
+};
+struct AstArrayLiteral {
+    AstTyped_base;
+
+    AstTyped *atnode;
+
     bh_arr(AstTyped *) values;
 };
 struct AstCall {

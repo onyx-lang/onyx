@@ -135,6 +135,7 @@ Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
+Type* type_make_array(bh_allocator alloc, Type* to, u32 count);
 Type* type_make_slice(bh_allocator alloc, Type* of);
 Type* type_make_dynarray(bh_allocator alloc, Type* of);
 Type* type_make_varargs(bh_allocator alloc, Type* of);

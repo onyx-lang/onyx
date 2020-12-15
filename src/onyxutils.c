@@ -78,6 +78,7 @@ static const char* ast_node_names[] = {
     "ALIGN OF",
     "FILE CONTENTS",
     "STRUCT LITERAL",
+    "ARRAY LITERAL",
 
     "IF",
     "FOR",

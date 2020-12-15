@@ -2204,6 +2204,11 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Array_Literal: {
+            assert(("Array literals are not allowed as expressions currently. This will be added in a future update.", 0));
+            break;
+        }
+
         case Ast_Kind_Function: {
             i32 elemidx = get_element_idx(mod, (AstFunction *) expr);
             WID(WI_I32_CONST, elemidx);
@@ -2891,6 +2896,20 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
 
 static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     switch (node->kind) {
+    case Ast_Kind_Array_Literal: {
+        AstArrayLiteral* al = (AstArrayLiteral *) node;
+
+        i32 i = 0;
+        i32 elem_size = type_size_of(al->type->Array.elem);
+
+        bh_arr_each(AstTyped *, expr, al->values) {
+            emit_raw_data(mod, bh_pointer_add(data, i * elem_size), *expr);
+            i++;
+        }
+
+        break;    
+    }
+
     case Ast_Kind_StrLit: {
         AstStrLit* sl = (AstStrLit *) node;
 

@@ -25,6 +25,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type);
 static AstNumLit*     parse_int_literal(OnyxParser* parser);
 static AstNumLit*     parse_float_literal(OnyxParser* parser);
 static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
+static b32            parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_expression(OnyxParser* parser);
 static AstIfWhile*    parse_if_stmt(OnyxParser* parser);
@@ -237,6 +238,34 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, Ast
     expect_token(parser, '}');
 
     *ret = (AstTyped *) sl;
+    return 1;
+}
+
+static b32 parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret) {
+    if (parser->curr->type != '.'
+        || (parser->curr + 1)->type != '[') return 0;
+    
+    AstArrayLiteral* al = make_node(AstArrayLiteral, Ast_Kind_Array_Literal);
+    al->token = parser->curr;
+    al->atnode = left;
+
+    bh_arr_new(global_heap_allocator, al->values, 4);
+    fori (i, 0, 4) al->values[i] = NULL;
+
+    expect_token(parser, '.');
+    expect_token(parser, '[');
+    while (parser->curr->type != ']') {
+        AstTyped* value = parse_expression(parser);
+        bh_arr_push(al->values, value);
+
+        if (parser->curr->type != ']')
+            expect_token(parser, ',');
+    }
+
+    expect_token(parser, ']');
+
+    *ret = (AstTyped *) al;
+
     return 1;
 }
 
@@ -534,6 +563,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             case '.': {
                 if (parse_possible_struct_literal(parser, retval, &retval)) return retval;
+                if (parse_possible_array_literal(parser, retval, &retval))  return retval;
                 
                 consume_token(parser);
                 AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);

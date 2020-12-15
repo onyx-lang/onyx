@@ -507,6 +507,17 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
     return ptr_type;
 }
 
+Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
+    Type* arr_type = bh_alloc_item(alloc, Type);
+
+    arr_type->kind = Type_Kind_Array;
+    arr_type->Array.count = count;
+    arr_type->Array.elem = to;
+    arr_type->Array.size = count * type_size_of(to);
+
+    return arr_type;
+}
+
 Type* type_make_slice(bh_allocator alloc, Type* of) {
     Type* slice_type = bh_alloc(alloc, sizeof(Type));
     slice_type->kind = Type_Kind_Slice;

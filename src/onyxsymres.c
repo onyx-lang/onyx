@@ -350,6 +350,30 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     bh_arr_each(AstTyped *, expr, sl->values) symres_expression(expr);
 }
 
+static void symres_array_literal(AstArrayLiteral* al) {
+    if (al->atnode != NULL) symres_expression(&al->atnode);
+    if (!node_is_type((AstNode *) al->atnode)) {
+        onyx_report_error(al->token->pos, "Array type is not a type.");
+        return;
+    }
+
+    al->atnode = (AstTyped *) symres_type((AstType *) al->atnode);
+    if (al->atnode == NULL || al->atnode->kind == Ast_Kind_Error || al->atnode->kind == Ast_Kind_Symbol) return;
+
+    al->type_node = (AstType *) al->atnode;
+    while (al->type_node->kind == Ast_Kind_Type_Alias)
+        al->type_node = ((AstTypeAlias *) al->type_node)->to;
+
+    al->type = type_build_from_ast(semstate.allocator, al->type_node);
+    if (al->type == NULL) return;
+
+    al->type = type_make_array(semstate.allocator, al->type, bh_arr_length(al->values));
+    if (al->type == NULL) return;
+
+    bh_arr_each(AstTyped *, expr, al->values)
+        symres_expression(expr);
+}
+
 static void symres_expression(AstTyped** expr) {
     switch ((*expr)->kind) {
         case Ast_Kind_Symbol:
@@ -402,6 +426,10 @@ static void symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Struct_Literal:
             symres_struct_literal((AstStructLiteral *)(*expr));
+            break;
+
+        case Ast_Kind_Array_Literal:
+            symres_array_literal((AstArrayLiteral *)(*expr));
             break;
 
         default: break;

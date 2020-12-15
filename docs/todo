@@ -44,6 +44,13 @@ Language Cohesion:
     of technical laziness. Cleaning up these areas will help the language feel
     more cohesive and put together.
 
+    [X] Add array literals; The semantics of how array literals will work in
+        terms of being an value that can be passed around have not been solidified,
+        but there are many circumstances where having array literals for static
+        constant data (such as MD5 hash vectors) would be useful.
+
+        Array literals work only for static constant data outside of procedures.
+
     [X] Struct literals can only have 1 level of package before the struct
         name. This is because packages were not able to be nested, so having
         arbitrary package levels before a struct literal was not necessary.

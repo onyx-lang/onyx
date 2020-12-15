@@ -17,6 +17,7 @@ CHECK(call, AstCall* call);
 CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok);
 CHECK(unaryop, AstUnaryOp** punop);
 CHECK(struct_literal, AstStructLiteral* sl);
+CHECK(array_literal, AstArrayLiteral* al);
 CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
@@ -909,6 +910,39 @@ b32 check_struct_literal(AstStructLiteral* sl) {
     return 0;
 }
 
+b32 check_array_literal(AstArrayLiteral* al) {
+    fill_in_type((AstTyped *) al);
+
+    assert(al->type->kind == Type_Kind_Array);
+
+    if (al->type->Array.count != bh_arr_length(al->values)) {
+        onyx_report_error(al->token->pos, "Wrong array size (%d) for number of values (%d).",
+            al->type->Array.count, bh_arr_length(al->values));
+        return 1;
+    }
+
+    b32 all_comptime = 1;
+
+    Type* elem_type = al->type->Array.elem;
+    bh_arr_each(AstTyped *, expr, al->values) {
+        if (check_expression(expr)) return 1;
+        if (((*expr)->flags & Ast_Flag_Comptime) == 0)
+            all_comptime = 0;
+
+        if (!type_check_or_auto_cast(expr, elem_type)) {
+            onyx_report_error((*expr)->token->pos, "Mismatched types for value of in array, expected '%s', got '%s'.",
+                type_get_name(elem_type),
+                type_get_name((*expr)->type));
+            return 1;
+        }
+    }
+    
+    if (all_comptime)
+        al->flags |= Ast_Flag_Comptime;
+
+    return 0;
+}
+
 b32 check_address_of(AstAddressOf* aof) {
     if (check_expression(&aof->expr)) return 1;
 
@@ -1186,6 +1220,10 @@ b32 check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Struct_Literal:
             retval = check_struct_literal((AstStructLiteral *) expr);
+            break;
+
+        case Ast_Kind_Array_Literal:
+            retval = check_array_literal((AstArrayLiteral *) expr);
             break;
 
         case Ast_Kind_Function:
