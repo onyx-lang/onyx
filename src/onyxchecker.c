@@ -726,17 +726,17 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if (type_is_pointer(binop->right->type)) {
-        onyx_report_error(binop->token->pos, "Right side of binary operator is a pointer.");
+        onyx_report_error(binop->token->pos, "Right side of a binary operator cannot be a pointer.");
         return 1;
     }
 
     if (binop->left->type->kind == Type_Kind_Basic
-        && binop->left->type->Basic.kind == Basic_Kind_Rawptr
-        && !binop_is_compare(binop)) {
+        && binop->left->type->Basic.kind == Basic_Kind_Rawptr) {
         onyx_report_error(binop->token->pos, "Cannot operate on a 'rawptr'. Cast it to a another pointer type first.");
         return 1;
     }
-
+    
+    // CLEANUP: Remove this check since it is kind of redundant with the code below.
     b32 lptr = type_is_pointer(binop->left->type);
     if (lptr && (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus)) {
         onyx_report_error(binop->token->pos, "This operator is not supported for these operands.");
