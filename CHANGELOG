@@ -2,10 +2,19 @@ Release v0.0.5
 --------------
 Additions:
 * 'abs' function in core/math.onyx.
+* --verbose prints statistics about the compilation including time taken, lines
+    processed and token processed.
+* 'read_word' in core.string.reader.
+* 'use' statements work on pointers to structures.
+* Better error reporting for invaild binary operators.
+* '--fun' flag displays a bar graph of where each of the entities in the compilation
+    pipeline are. Compiles the program slower purely to make it look better.
+* polymorphic procedures can be instantiated in many more places now due to clean up.
 
 Removals:
 * field accesses on things that are not lvals. This was a bug anyway, so it
     should not require any code changes, but the feature is gone.
+* i32map, strmap, ptrmap modules. Use generic map in map.onyx instead.
 
 Changes:
 * BREAKING: The type name 'string', and the package name 'str', have been swapped.
@@ -18,6 +27,9 @@ Changes:
 Bug fixes:
 * globals that were #foreign caused several bugs, which have been squashed.
 * field accesses can only happen on lvals.
+* Bitwise NOT on unsigned integers did not work.
+* 'use' statements now work in polymorphic procedures
+* resizing heap allocated memory at the end of memory would not grow underlying memory.
 
 
 Release v0.0.4
