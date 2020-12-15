@@ -450,18 +450,12 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
 static void output_dummy_progress_bar(CompilerState* compiler_state) {
     EntityHeap* eh = &compiler_state->prog_info.entities;
 
-    const i32 WIDTH = 80;
-
     printf("\e[2;1H");
     for (i32 i = 0; i < Entity_State_Count - 1; i++) {
         printf("%20s (%4d) | ", entity_state_strings[i], eh->state_count[i]);
         
-        for (i32 c = 0; c < WIDTH; c++) {
-            if (c < eh->state_count[i] * 5 / WIDTH)
-                printf("\xe2\x96\x88");
-            else
-                printf(" ");
-        }
+        printf("\e[0K");
+        for (i32 c = 0; c < eh->state_count[i] / 10; c++) printf("\xe2\x96\x88");
         printf("\n");
     }
 }
@@ -497,14 +491,20 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         printf("\e[2J");
 
     while (!bh_arr_is_empty(compiler_state->prog_info.entities.entities)) {
+        Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
+
         if (compiler_state->options->fun_output) {
             output_dummy_progress_bar(compiler_state);
 
             // Slowing things down for the effect
-            usleep(500);
+            usleep(2000);
+
+            if (ent.expr->token) {
+                OnyxFilePos pos = ent.expr->token->pos;
+                printf("\e[0K%s on %s:%d:%d\n", entity_state_strings[ent.state], pos.filename, pos.line, pos.column);
+            }
         }
 
-        Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
         entity_heap_remove_top(&compiler_state->prog_info.entities);
         b32 changed = process_entity(compiler_state, &ent);
 

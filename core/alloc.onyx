@@ -103,8 +103,18 @@ heap_resize :: proc (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
 
     // If we are at the end of the allocation space, just extend it
     if hb_ptr.size + cast(u32) ptr >= cast(u32) heap_state.next_alloc {
+        if new_size >= heap_state.remaining_space {
+            new_pages :: ((new_size - heap_state.remaining_space) >> 16) + 1;
+            if memory_grow(new_pages) == -1 {
+                // out of memory
+                return null;
+            }
+            heap_state.remaining_space += new_pages << 16;
+        }
+
         hb_ptr.size = new_size + sizeof heap_block;
         heap_state.next_alloc = cast(rawptr) (cast(u32) ptr + hb_ptr.size);
+        heap_state.remaining_space -= new_size - old_size;
         return ptr;
     }
 
