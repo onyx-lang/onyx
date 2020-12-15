@@ -609,7 +609,7 @@ void symres_function(AstFunction* func) {
             param->local->type = type_build_from_ast(semstate.node_allocator, param->local->type_node);
 
             if (param->default_value != NULL) {
-                if (!type_check_or_auto_cast(param->default_value, param->local->type)) {
+                if (!type_check_or_auto_cast(&param->default_value, param->local->type)) {
                     onyx_report_error(param->local->token->pos,
                             "Expected default value of type '%s', was of type '%s'.",
                             type_get_name(param->local->type),

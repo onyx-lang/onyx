@@ -48,7 +48,7 @@ b32 check_return(AstReturn* retnode) {
     if (retnode->expr) {
         if (check_expression(&retnode->expr)) return 1;
 
-        if (!type_check_or_auto_cast(retnode->expr, semstate.expected_return_type)) {
+        if (!type_check_or_auto_cast(&retnode->expr, semstate.expected_return_type)) {
             onyx_report_error(retnode->expr->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
                     type_get_name(semstate.expected_return_type),
@@ -238,10 +238,10 @@ static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction*
             fill_in_type((AstTyped *) arg);
 
             if ((*param_type)->kind == Type_Kind_VarArgs) {
-                if (!type_check_or_auto_cast(arg->value, (*param_type)->VarArgs.ptr_to_data->Pointer.elem))
+                if (!type_check_or_auto_cast(&arg->value, (*param_type)->VarArgs.ptr_to_data->Pointer.elem))
                     goto no_match;
             }
-            else if (!type_check_or_auto_cast(arg->value, *param_type)) goto no_match;
+            else if (!type_check_or_auto_cast(&arg->value, *param_type)) goto no_match;
 
             param_type++;
             arg = (AstArgument *) arg->next;
@@ -271,11 +271,6 @@ no_match:
     return NULL;
 }
 
-typedef struct PolyArg {
-    AstArgument* arg;
-    u64          pos;
-} PolyArg;
-
 typedef enum ArgState {
     AS_Expecting_Exact,
     AS_Expecting_Typed_VA,
@@ -296,16 +291,11 @@ b32 check_call(AstCall* call) {
     //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
     //      9. Check types of formal and actual params against each other, handling varargs
 
-
-
     if (check_expression(&call->callee)) return 1;
     AstFunction* callee = (AstFunction *) call->callee;
 
     bh_arr(AstArgument *) arg_arr = NULL;
     bh_arr_new(global_heap_allocator, arg_arr, call->arg_count);
-
-    bh_arr(PolyArg) poly_args = NULL;
-    bh_arr_new(global_heap_allocator, arg_arr, 1);
 
     // NOTE: Check arguments
     AstArgument* actual = call->arguments;
@@ -317,13 +307,6 @@ b32 check_call(AstCall* call) {
                 "Cannot pass overloaded function '%b' as argument.",
                 actual->value->token->text, actual->value->token->length);
             return 1;
-        }
-
-        if (actual->value->kind == Ast_Kind_Polymorphic_Proc) {
-            bh_arr_push(poly_args, ((PolyArg) {
-                .arg = actual,
-                .pos = bh_arr_length(arg_arr),
-            }));
         }
 
         bh_arr_push(arg_arr, actual);
@@ -357,18 +340,6 @@ b32 check_call(AstCall* call) {
                 "Attempting to call something that is not a function, '%b'.",
                 callee->token->text, callee->token->length);
         return 1;
-    }
-
-    bh_arr_each(PolyArg, pa, poly_args) {
-        pa->arg->value = (AstTyped *) polymorphic_proc_lookup(
-            (AstPolyProc *) pa->arg->value,
-            PPLM_By_Function_Type,
-            callee->type->Function.params[pa->pos],
-            pa->arg->token->pos);
-
-        if (pa->arg->value == NULL) return 1;
-
-        pa->arg->value->flags |= Ast_Flag_Function_Used;
     }
 
     if (callee->kind == Ast_Kind_Function) {
@@ -437,7 +408,7 @@ b32 check_call(AstCall* call) {
                 }
 
                 if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
-                if (!type_check_or_auto_cast(arg_arr[arg_pos]->value, formal_params[arg_pos])) {
+                if (!type_check_or_auto_cast(&arg_arr[arg_pos]->value, formal_params[arg_pos])) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The function '%b' expects a value of type '%s' for %d%s parameter, got '%s'.",
                             callee->token->text, callee->token->length,
@@ -456,7 +427,7 @@ b32 check_call(AstCall* call) {
                 call->va_kind = VA_Kind_Typed;
 
                 if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
-                if (!type_check_or_auto_cast(arg_arr[arg_pos]->value, variadic_type)) {
+                if (!type_check_or_auto_cast(&arg_arr[arg_pos]->value, variadic_type)) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
                             callee->token->text, callee->token->length,
@@ -499,8 +470,6 @@ type_checking_done:
 
     callee->flags |= Ast_Flag_Function_Used;
     call->arg_arr = arg_arr;
-
-    bh_arr_free(poly_args);
 
     return 0;
 }
@@ -571,7 +540,7 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         if (check_binaryop(&binop_node, 0)) return 1;
     }
 
-    if (!type_check_or_auto_cast(binop->right, binop->left->type)) {
+    if (!type_check_or_auto_cast(&binop->right, binop->left->type)) {
         onyx_report_error(binop->token->pos,
                 "Cannot assign value of type '%s' to a '%s'.",
                 type_get_name(binop->right->type),
@@ -628,8 +597,8 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
             onyx_report_error(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
             return 1;
         }
-        else if (type_check_or_auto_cast(binop->left, rtype));
-        else if (type_check_or_auto_cast(binop->right, ltype));
+        else if (type_check_or_auto_cast(&binop->left, rtype));
+        else if (type_check_or_auto_cast(&binop->right, ltype));
         else {
             onyx_report_error(binop->token->pos,
                     "Cannot compare '%s' to '%s'.",
@@ -785,8 +754,8 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
             onyx_report_error(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
             return 1;
         }
-        else if (type_check_or_auto_cast(binop->left, binop->right->type));
-        else if (type_check_or_auto_cast(binop->right, binop->left->type));
+        else if (type_check_or_auto_cast(&binop->left, binop->right->type));
+        else if (type_check_or_auto_cast(&binop->right, binop->left->type));
         else {
             onyx_report_error(binop->token->pos,
                     "Mismatched types for binary operation. left: '%s', right: '%s'.",
@@ -924,7 +893,7 @@ b32 check_struct_literal(AstStructLiteral* sl) {
         type_lookup_member_by_idx(sl->type, i, &smem);
         Type* formal = smem.type;
 
-        if (!type_check_or_auto_cast((*actual), formal)) {
+        if (!type_check_or_auto_cast(actual, formal)) {
             onyx_report_error(sl->token->pos,
                     "Mismatched types for %d%s member named '%s', expected '%s', got '%s'.",
                     i + 1, bh_num_suffix(i + 1),
@@ -1104,13 +1073,13 @@ b32 check_range_literal(AstBinaryOp** prange) {
     StructMember smem;
 
     type_lookup_member(expected_range_type, "low", &smem);
-    if (!type_check_or_auto_cast(range->left, smem.type)) {
+    if (!type_check_or_auto_cast(&range->left, smem.type)) {
         onyx_report_error(range->token->pos, "Expected left side of range to be a 32-bit integer.");
         return 1;
     }
 
     type_lookup_member(expected_range_type, "high", &smem);
-    if (!type_check_or_auto_cast(range->right, smem.type)) {
+    if (!type_check_or_auto_cast(&range->right, smem.type)) {
         onyx_report_error(range->token->pos, "Expected right side of range to be a 32-bit integer.");
         return 1;
     }
@@ -1456,7 +1425,7 @@ b32 check_memres(AstMemRes* memres) {
 
         if (memres->type != NULL) {
             Type* memres_type = memres->type;
-            if (!type_check_or_auto_cast(memres->initial_value, memres_type)) {
+            if (!type_check_or_auto_cast(&memres->initial_value, memres_type)) {
                 onyx_report_error(memres->token->pos,
                         "Cannot assign value of type '%s' to a '%s'.",
                         type_get_name(memres_type),

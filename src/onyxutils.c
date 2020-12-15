@@ -611,6 +611,8 @@ no_errors:
         .package = NULL,
     });
 
+    func->flags |= Ast_Flag_Function_Used;
+
     return func;
 }
 
@@ -807,9 +809,18 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
 }
 
 // NOTE: Returns 0 if it was not possible to make the types compatible.
-b32 type_check_or_auto_cast(AstTyped* node, Type* type) {
+b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
+    AstTyped* node = *pnode;
     assert(type != NULL);
     assert(node != NULL);
+
+    if (node->kind == Ast_Kind_Polymorphic_Proc) {
+        AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token->pos);
+        if (func == NULL) return 0;
+
+        *pnode = (AstTyped *) func;
+        return 1;
+    }
 
     if (types_are_compatible(node->type, type)) return 1;
     if (node_is_auto_cast((AstNode *) node)) {
