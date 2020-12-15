@@ -286,6 +286,11 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
 static void symres_struct_literal(AstStructLiteral* sl) {
     // @CLEANUP
     if (sl->stnode != NULL) symres_expression(&sl->stnode);
+    if (!node_is_type((AstNode *) sl->stnode)) {
+        onyx_report_error(sl->token->pos, "Struct type is not a type.");
+        return;
+    }
+
     sl->stnode = (AstTyped *) symres_type((AstType *) sl->stnode);
     if (sl->stnode == NULL || sl->stnode->kind == Ast_Kind_Error || sl->stnode->kind == Ast_Kind_Symbol) return;
 

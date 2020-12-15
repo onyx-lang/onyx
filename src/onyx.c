@@ -455,7 +455,7 @@ static void output_dummy_progress_bar(CompilerState* compiler_state) {
         printf("%20s (%4d) | ", entity_state_strings[i], eh->state_count[i]);
         
         printf("\e[0K");
-        for (i32 c = 0; c < eh->state_count[i] / 10; c++) printf("\xe2\x96\x88");
+        for (i32 c = 0; c < eh->state_count[i] * 50 / bh_arr_length(eh->entities); c++) printf("\xe2\x96\x88");
         printf("\n");
     }
 }
@@ -497,7 +497,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
             output_dummy_progress_bar(compiler_state);
 
             // Slowing things down for the effect
-            usleep(2000);
+            usleep(1000);
 
             if (ent.expr->token) {
                 OnyxFilePos pos = ent.expr->token->pos;
