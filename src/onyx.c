@@ -48,6 +48,7 @@ typedef struct OnyxCompileOptions {
     CompileAction action;
 
     u32 verbose_output : 1;
+    u32 fun_output     : 1;
 
     bh_arr(const char *) included_folders;
     bh_arr(const char *) files;
@@ -91,6 +92,9 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
             }
             else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-V")) {
                 options.verbose_output = 1;
+            }
+            else if (!strcmp(argv[i], "--fun") || !strcmp(argv[i], "-F")) {
+                options.fun_output = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
@@ -442,6 +446,25 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
     return changed;
 }
 
+// Just having fun with some visual output - brendanfh 2020/12/14
+static void output_dummy_progress_bar(CompilerState* compiler_state) {
+    EntityHeap* eh = &compiler_state->prog_info.entities;
+
+    const i32 WIDTH = 80;
+
+    printf("\e[2;1H");
+    for (i32 i = 0; i < Entity_State_Count - 1; i++) {
+        printf("%20s (%4d) | ", entity_state_strings[i], eh->state_count[i]);
+        
+        for (i32 c = 0; c < WIDTH; c++) {
+            if (c < eh->state_count[i] * 5 / WIDTH)
+                printf("\xe2\x96\x88");
+            else
+                printf(" ");
+        }
+        printf("\n");
+    }
+}
 
 static i32 onyx_compile(CompilerState* compiler_state) {
     u64 start_time = bh_time_curr();
@@ -470,7 +493,17 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         semstate.program = &compiler_state->prog_info;
     }
 
+    if (compiler_state->options->fun_output)
+        printf("\e[2J");
+
     while (!bh_arr_is_empty(compiler_state->prog_info.entities.entities)) {
+        if (compiler_state->options->fun_output) {
+            output_dummy_progress_bar(compiler_state);
+
+            // Slowing things down for the effect
+            usleep(500);
+        }
+
         Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
         entity_heap_remove_top(&compiler_state->prog_info.entities);
         b32 changed = process_entity(compiler_state, &ent);

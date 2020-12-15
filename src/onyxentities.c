@@ -72,6 +72,8 @@ void entity_heap_change_top(EntityHeap* entities, Entity new_top) {
 }
 
 void entity_heap_remove_top(EntityHeap* entities) {
+    entities->state_count[entities->entities[0].state]--;
+
 	entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
 	bh_arr_pop(entities->entities);
 	eh_shift_down(entities, 0);
