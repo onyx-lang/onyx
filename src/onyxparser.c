@@ -24,7 +24,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type);
 
 static AstNumLit*     parse_int_literal(OnyxParser* parser);
 static AstNumLit*     parse_float_literal(OnyxParser* parser);
-static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret);
+static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_expression(OnyxParser* parser);
 static AstIfWhile*    parse_if_stmt(OnyxParser* parser);
@@ -187,48 +187,13 @@ static AstNumLit* parse_float_literal(OnyxParser* parser) {
     return float_node;
 }
 
-static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
-    if (parser->curr->type != Token_Type_Symbol) return 0;
-
-    STORE_PARSER_STATE;
-
-    bh_arr(OnyxToken *) syms = NULL;
-    bh_arr_new(global_heap_allocator, syms, 4);
-
-    b32 success = 1;
-    while (parser->curr->type == Token_Type_Symbol) {
-        if (parser->hit_unexpected_token) break;
-
-        OnyxToken* symbol = soft_expect_token(parser, Token_Type_Symbol);
-        bh_arr_push(syms, symbol);
-
-        if (!soft_expect_token(parser, '.')) {
-            success = 0;
-            break;
-        }
-    }
-
-    if (parser->curr->type != '{') success = 0;
-
-    if (!success) {
-        bh_arr_free(syms);
-        RESTORE_PARSER_STATE;
-        return 0;
-    }
+static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret) {
+    if (parser->curr->type != '.'
+        || (parser->curr + 1)->type != '{') return 0;
 
     AstStructLiteral* sl = make_node(AstStructLiteral, Ast_Kind_Struct_Literal);
     sl->token = parser->curr;
-
-    sl->stnode = make_node(AstTyped, Ast_Kind_Symbol);
-    sl->stnode->token = syms[0];
-
-    for (i32 i = 1; i < bh_arr_length(syms); i++) {
-        AstFieldAccess* fa = make_node(AstFieldAccess, Ast_Kind_Field_Access);
-        fa->token = syms[i];
-        fa->expr = sl->stnode;
-        sl->stnode = (AstTyped *) fa;
-    }
-    bh_arr_free(syms);
+    sl->stnode = left;
 
     bh_arr_new(global_heap_allocator, sl->values, 4);
     bh_arr_new(global_heap_allocator, sl->named_values, 4);
@@ -237,6 +202,7 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped** ret) {
         sl->named_values[i] = NULL;
     }
 
+    expect_token(parser, '.');
     expect_token(parser, '{');
     b32 is_named = ((parser->curr + 1)->type == '=');
 
@@ -389,8 +355,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case Token_Type_Symbol: {
-            if (parse_possible_struct_literal(parser, &retval)) return retval;
-
             OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
             AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);
             sym_node->token = sym_token;
@@ -532,6 +496,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) char_lit;
                 break;
             }
+            else if (parse_possible_directive(parser, "type")) {
+                AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
+                alias->to = parse_type(parser);
+                retval = (AstTyped *) alias;
+                break;
+            }
 
             onyx_report_error(parser->curr->pos, "invalid directive in expression.");
             return NULL;
@@ -563,6 +533,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
 
             case '.': {
+                if (parse_possible_struct_literal(parser, retval, &retval)) return retval;
+                
                 consume_token(parser);
                 AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
                 field->token = expect_token(parser, Token_Type_Symbol);
@@ -1236,6 +1208,32 @@ static AstNode* parse_statement(OnyxParser* parser) {
             needs_semicolon = 0;
             retval = (AstNode *) parse_use_stmt(parser);
             break;
+        }
+
+        case '#': {
+            if (parse_possible_directive(parser, "context_scope")) {
+                AstLocal* context_tmp = make_node(AstLocal, Ast_Kind_Local);
+                context_tmp->type_node = builtin_context_variable->type_node;
+
+                AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+                assignment->operation = Binary_Op_Assign;
+                assignment->left = (AstTyped *) context_tmp;
+                assignment->right = builtin_context_variable;
+                context_tmp->next = (AstNode *) assignment;
+
+                AstBlock* context_block = parse_block(parser);
+                needs_semicolon = 0;
+                assignment->next = (AstNode *) context_block;
+
+                AstBinaryOp* assignment2 = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+                assignment2->operation = Binary_Op_Assign;
+                assignment2->left = builtin_context_variable;
+                assignment2->right = (AstTyped *) context_tmp;
+                context_block->next = (AstNode *) assignment2;
+
+                retval = (AstNode *) context_tmp;
+                break;
+            }
         }
 
         default:

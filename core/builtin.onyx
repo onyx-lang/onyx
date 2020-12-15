@@ -3,9 +3,6 @@ package builtin
 str  :: #type []u8;
 cstr :: #type ^u8;
 
-// CLEANUP: Remove the buffer type from builtin
-Buffer :: #type []void;
-
 // NOTE: Because of many implementation details, all fields of this
 // struct are required to be i32's.
 range :: struct {
@@ -68,6 +65,6 @@ cmp_asc :: proc (a: $T, b: T) -> i32 do return cast(i32) (a - b);
 cmp_dec :: proc (a: $T, b: T) -> i32 do return cast(i32) (b - a);
 
 context : struct {
-	allocator      : Allocator;
-	temp_allocator : Allocator;
+    allocator      : Allocator;
+    temp_allocator : Allocator;
 }

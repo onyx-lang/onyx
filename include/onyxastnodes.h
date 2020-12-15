@@ -818,6 +818,7 @@ extern AstType  *builtin_range_type;
 extern Type     *builtin_range_type_type;
 extern AstType  *builtin_vararg_type;
 extern Type     *builtin_vararg_type_type;
+extern AstTyped *builtin_context_variable;
 
 typedef struct BuiltinSymbol {
     char*    package;

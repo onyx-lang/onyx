@@ -1,0 +1,77 @@
+package core.string.builder
+
+use package core.array as array
+use package core.string as string
+use package core.conv as conv
+
+Builder :: struct {
+    alloc : Allocator;
+    data  : [..] u8;
+}
+
+make :: proc (initial_cap := 4, alloc := context.allocator) -> Builder {
+    builder : Builder;
+    builder.alloc = alloc;
+
+    #context_scope {
+        context.allocator = alloc;
+        array.init(^builder.data, initial_cap);
+    }
+
+    return builder;
+}
+
+clear :: proc (use sb: ^Builder) -> ^Builder {
+    data.count = 0;
+    return sb;
+}
+
+add_str :: proc (use sb: ^Builder, s: str) -> ^Builder {
+    len_total :: data.count + s.count;
+
+    if data.capacity < len_total do #context_scope {
+        context.allocator = alloc;
+        array.ensure_capacity(^data, len_total);
+    }
+
+    for i: 0 .. s.count do data[data.count + i] = s[i];
+    data.count += s.count;
+    return sb;
+}
+
+add_cstr :: proc (use sb: ^Builder, cstring: cstr) -> ^Builder {
+    s := string.make(cstring);
+    return add_str(sb, s);
+}
+
+add_i64 :: proc (use sb: ^Builder, n: i64, base: u64 = 10) -> ^Builder {
+    buf : [256] u8;
+    s := conv.i64_to_str(n, base, buf[0 .. 256]);
+    return add_str(sb, s);
+}
+
+add_f64 :: proc (use sb: ^Builder, f: f64) -> ^Builder {
+    buf : [256] u8;
+    s := conv.f64_to_str(f, buf[0 .. 256]);
+    return add_str(sb, s);
+}
+
+add_bool :: proc (use sb: ^Builder, b: bool) -> ^Builder {
+    if b do return add_str(sb, "true");
+    else do return add_str(sb, "false");
+
+    return sb;
+}
+
+append :: proc {
+    add_str,
+    add_cstr,
+    add_i64,
+    add_f64,
+    add_bool,
+}
+
+to_str :: proc (use sb: ^Builder) -> str {
+    return str.{ data.data, data.count };
+}
+

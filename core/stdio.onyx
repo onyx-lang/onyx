@@ -4,24 +4,24 @@ package core
 // of the system package
 use package system as system
 
-#private_file print_buffer : string.StringBuilder;
+#private_file print_buffer : string.builder.Builder;
 
 stdio_init :: proc () {
-    print_buffer = string.builder_make(2048);
+    print_buffer = string.builder.make(2048);
 }
 
 print_str  :: proc (s: str) {
-    string.builder_append(^print_buffer, s);
+    string.builder.append(^print_buffer, s);
     if s.data[s.count - 1] == #char "\n" do print_buffer_flush();
 }
 
-print_cstr :: proc (s: cstr)                do string.builder_append(^print_buffer, s);
-print_i64  :: proc (n: i64, base: u64 = 10) do string.builder_append(^print_buffer, n, base);
-print_i32  :: proc (n: i32, base: u32 = 10) do string.builder_append(^print_buffer, cast(i64) n, cast(u64) base);
-print_f64  :: proc (n: f64)                 do string.builder_append(^print_buffer, n);
-print_f32  :: proc (n: f32)                 do string.builder_append(^print_buffer, cast(f64) n);
-print_bool :: proc (b: bool)                do string.builder_append(^print_buffer, b);
-print_ptr  :: proc (p: ^void)               do string.builder_append(^print_buffer, cast(i64) p, cast(u64) 16);
+print_cstr :: proc (s: cstr)                do string.builder.append(^print_buffer, s);
+print_i64  :: proc (n: i64, base: u64 = 10) do string.builder.append(^print_buffer, n, base);
+print_i32  :: proc (n: i32, base: u32 = 10) do string.builder.append(^print_buffer, cast(i64) n, cast(u64) base);
+print_f64  :: proc (n: f64)                 do string.builder.append(^print_buffer, n);
+print_f32  :: proc (n: f32)                 do string.builder.append(^print_buffer, cast(f64) n);
+print_bool :: proc (b: bool)                do string.builder.append(^print_buffer, b);
+print_ptr  :: proc (p: ^void)               do string.builder.append(^print_buffer, cast(i64) p, cast(u64) 16);
 
 print_range :: proc (r: range, sep := " ") {
     for i: r {
@@ -46,111 +46,7 @@ println :: proc (x: $T) {
 
 printf :: proc (format: str, va: ...) {
     buffer: [2048] u8;
-    len := 0;
-
-    state := 0;
-    for ch: format do switch (state) {
-        case 0 {
-            if ch == #char "%" do state = 1;
-            else {
-                buffer[len] = ch;
-                len += 1;
-            }
-        }
-
-        case #default {
-            switch (ch) {
-                case #char "%" { buffer[len] = ch; len += 1; }
-
-                case #char "i" {
-                    n : i32;
-                    if !vararg_get(va, ^n) do return;
-
-                    ibuf : [128] u8;
-                    istr := string.i64_to_str(~~n, 10, Buffer.{ ~~ibuf, 128 });
-
-                    for a: istr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "l" {
-                    n : i64;
-                    if !vararg_get(va, ^n) do return;
-
-                    ibuf : [128] u8;
-                    istr := string.i64_to_str(n, 10, Buffer.{ ~~ibuf, 128 });
-
-                    for a: istr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "f" {
-                    n : f32;
-                    if !vararg_get(va, ^n) do return;
-
-                    fbuf : [128] u8;
-                    fstr := string.f64_to_str(~~n, fbuf[0 .. 128]);
-
-                    for a: fstr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "d" {
-                    n : f64;
-                    if !vararg_get(va, ^n) do return;
-
-                    fbuf : [128] u8;
-                    fstr := string.f64_to_str(n, fbuf[0 .. 128]);
-
-                    for a: fstr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "s" {
-                    s : str;
-                    if !vararg_get(va, ^s) do return;
-
-                    for a: s {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "p" {
-                    n : rawptr;
-                    if !vararg_get(va, ^n) do return;
-
-                    ibuf : [128] u8;
-                    istr := string.i64_to_str(~~n, 16, Buffer.{ ~~ibuf, 128 });
-
-                    for a: istr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-                
-                case #char "c" {
-                    c : u8;
-                    if !vararg_get(va, ^c) do return;
-
-                    buffer[len] = c;
-                    len += 1;
-                }
-            }
-
-            state = 0;
-        }
-    }
-
-    print(str.{ ~~buffer, len });
+    print(conv.str_format_va(format, buffer[0 .. 2048], va));
 }
 
 // This works on both slices and arrays
@@ -164,12 +60,12 @@ print_array :: proc (arr: $T, sep := " ") {
 }
 
 print_buffer_flush :: proc () {
-    if print_buffer.len == 0 do return;
+    if print_buffer.data.count == 0 do return;
 
     ^print_buffer
-        |> string.builder_to_str()
+        |> string.builder.to_str()
         |> system.output_str();
 
-    ^print_buffer |> string.builder_clear();
+    ^print_buffer |> string.builder.clear();
 }
 

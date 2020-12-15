@@ -201,7 +201,8 @@ static void symres_local(AstLocal** local) {
     bh_arr_push(bh_arr_last(semstate.block_stack)->locals, *local);
     bh_arr_push(semstate.curr_function->locals, *local);
 
-    symbol_introduce(semstate.curr_scope, (*local)->token, (AstNode *) *local);
+    if ((*local)->token != NULL)
+        symbol_introduce(semstate.curr_scope, (*local)->token, (AstNode *) *local);
 }
 
 static void symres_call(AstCall* call) {

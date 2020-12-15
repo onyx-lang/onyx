@@ -43,6 +43,7 @@ AstType  *builtin_range_type;
 Type     *builtin_range_type_type;
 AstType  *builtin_vararg_type;
 Type     *builtin_vararg_type_type;
+AstTyped *builtin_context_variable;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -357,6 +358,11 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
         return;
     }
 
+    builtin_context_variable = (AstTyped *) symbol_raw_resolve(p->scope, "context");
+    if (builtin_context_variable == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'context' variable not found in builtin package.");
+        return;
+    }
 
 
     bh_table_init(global_heap_allocator, intrinsic_table, 128);

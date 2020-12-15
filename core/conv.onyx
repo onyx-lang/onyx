@@ -1,0 +1,190 @@
+package core.conv
+
+i64_to_str :: proc (n_: i64, base: u64, buf: [] u8) -> str {
+    n := cast(u64) n_;
+
+    is_neg := false;
+    if n_ < 0 && base == 10 {
+        is_neg = true;
+        n = cast(u64) -n_;
+    }
+
+    c := ^buf[buf.count - 1];
+    len := 0;
+
+    s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
+
+    while n > 0 {
+        m :: n % base;
+
+        *c = s[cast(u32) m];
+        len += 1;
+        c -= 1;
+
+        n /= base;
+
+    } else {
+        *c = #char "0";
+        len += 1;
+        c -= 1;
+    }
+
+    if base == 16 {
+        *c = #char "x";
+        len += 1;
+        c -= 1;
+        *c = #char "0";
+        len += 1;
+        c -= 1;
+    }
+
+    if base == 2 {
+        *c = #char "b";
+        len += 1;
+        c -= 1;
+        *c = #char "0";
+        len += 1;
+        c -= 1;
+    }
+
+    if is_neg {
+        *c = #char "-";
+        len += 1;
+        c -= 1;
+    }
+
+    return str.{ data = c + 1, count = len };
+}
+
+// NOTE: This is a big hack but it will work for now
+f64_to_str :: proc (f: f64, buf: [] u8) -> str {
+    a := f;
+    a *= 10000.0;
+    v := cast(i64) a;
+
+    len := 0;
+
+    s1 := i64_to_str(v / 10000, 10, buf);
+    for i: 0 .. s1.count do buf.data[i] = s1.data[i];
+    buf.data[s1.count] = #char ".";
+    len = s1.count + 1;
+
+    if v < ~~0 do v = -v;
+    s2 := i64_to_str(v % 10000, 10, buf);
+    for i: 0 .. s2.count do buf.data[s1.count + 1 + i] = s2.data[i];
+    len += s2.count;
+
+    return str.{ buf.data, len };
+}
+
+str_format :: proc (format: str, buffer: [] u8, va: ...) -> str {
+	return str_format_va(format, buffer, va);
+}
+
+str_format_va :: proc (format: str, buffer: [] u8, va: vararg) -> str {
+    len := 0;
+    state := 0;
+
+    for ch: format do switch (state) {
+        case 0 {
+            if ch == #char "%" do state = 1;
+            else {
+                buffer[len] = ch;
+                len += 1;
+            }
+        }
+
+        case #default {
+            switch (ch) {
+                case #char "%" { buffer[len] = ch; len += 1; }
+
+                case #char "i" {
+                    n : i32;
+                    if !vararg_get(va, ^n) do return;
+
+                    ibuf : [128] u8;
+                    istr := i64_to_str(~~n, 10, ibuf[0 .. 128]);
+
+                    for a: istr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "l" {
+                    n : i64;
+                    if !vararg_get(va, ^n) do return;
+
+                    ibuf : [128] u8;
+                    istr := i64_to_str(n, 10, ibuf[0 .. 128]);
+
+                    for a: istr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "f" {
+                    n : f32;
+                    if !vararg_get(va, ^n) do return;
+
+                    fbuf : [128] u8;
+                    fstr := f64_to_str(~~n, fbuf[0 .. 128]);
+
+                    for a: fstr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "d" {
+                    n : f64;
+                    if !vararg_get(va, ^n) do return;
+
+                    fbuf : [128] u8;
+                    fstr := f64_to_str(n, fbuf[0 .. 128]);
+
+                    for a: fstr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "s" {
+                    s : str;
+                    if !vararg_get(va, ^s) do return;
+
+                    for a: s {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+
+                case #char "p" {
+                    n : rawptr;
+                    if !vararg_get(va, ^n) do return;
+
+                    ibuf : [128] u8;
+                    istr := i64_to_str(~~n, 16, ibuf[0 .. 128]);
+
+                    for a: istr {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
+                
+                case #char "c" {
+                    c : u8;
+                    if !vararg_get(va, ^c) do return;
+
+                    buffer[len] = c;
+                    len += 1;
+                }
+            }
+
+            state = 0;
+        }
+    }
+
+    return str.{ ~~buffer.data, len };
+}

@@ -736,10 +736,10 @@ blendEquationSeparate          :: proc (modeRGB: GLenum, modeAlpha: GLenum) #for
 blendFunc                      :: proc (sfactor: GLenum, dfactor: GLenum) #foreign "gl" "blendFunc" ---
 blendFuncSeparate              :: proc (srcRGB: GLenum, dstRGB: GLenum, srcAlpha: GLenum, dstAlpha: GLenum) #foreign "gl" "blendFuncSeparate" ---
 blitFramebuffer                :: proc (sx0: GLint, sy0: GLint, sx1: GLint, sy1: GLint, dx0: GLint, dy0: GLint, dx1: GLint, dy1: GLint, mask: GLbitfield, filter: GLenum) #foreign "gl" "blitFramebuffer" ---
-bufferDataWithData             :: proc (target: GLenum, buffer: Buffer, usage: GLenum) #foreign "gl" "bufferDataWithData" ---
+bufferDataWithData             :: proc (target: GLenum, buffer: [] void, usage: GLenum) #foreign "gl" "bufferDataWithData" ---
 bufferDataNoData               :: proc (target: GLenum, size: GLsizeiptr, usage: GLenum) #foreign "gl" "bufferDataNoData" ---
 bufferData                     :: proc { bufferDataWithData, bufferDataNoData }
-bufferSubData                  :: proc (target: GLenum, offset: GLsizei, data: Buffer) #foreign "gl" "bufferSubData" ---
+bufferSubData                  :: proc (target: GLenum, offset: GLsizei, data: [] void) #foreign "gl" "bufferSubData" ---
 canvasSize                     :: proc (width: GLsizei, height: GLsizei) #foreign "gl" "canvasSize" ---
 checkFrameBufferStatus         :: proc (target: GLenum) -> GLenum #foreign "gl" "checkFrameBufferStatus" ---
 clear                          :: proc (mask: GLbitfield) #foreign "gl" "clear" ---
