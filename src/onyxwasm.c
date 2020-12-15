@@ -1230,9 +1230,7 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
 
     WasmInstructionType binop_instr = binop_map[(i32) binop->operation][optype];
 
-    if (binop_instr == WI_NOP) {
-        assert(("Invalid type and operation", 0));
-    }
+    assert(binop_instr != WI_NOP);
 
     // NOTE: Use unsigned variant if needed
     // Unsigned instructions are always right after

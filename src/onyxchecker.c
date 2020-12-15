@@ -796,7 +796,63 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         }
     }
 
+    static const u8 binop_allowed[Binary_Op_Count] = {
+        /* Add */             Basic_Flag_Numeric | Basic_Flag_Pointer,
+        /* Minus */           Basic_Flag_Numeric | Basic_Flag_Pointer,
+        /* Multiply */        Basic_Flag_Numeric,
+        /* Divide */          Basic_Flag_Numeric,
+        /* Modulus */         Basic_Flag_Integer,
+
+        /* Equal */           Basic_Flag_Ordered,
+        /* Not_Equal */       Basic_Flag_Ordered,
+        /* Less */            Basic_Flag_Ordered,
+        /* Less_Equal */      Basic_Flag_Ordered,
+        /* Greater */         Basic_Flag_Ordered,
+        /* Greater_Equal */   Basic_Flag_Ordered,
+
+        /* And */             Basic_Flag_Integer,
+        /* Or */              Basic_Flag_Integer,
+        /* Xor */             Basic_Flag_Integer,
+        /* Shl */             Basic_Flag_Integer,
+        /* Shr */             Basic_Flag_Integer,
+        /* Sar */             Basic_Flag_Integer,
+
+        /* Bool_And */        Basic_Flag_Boolean,
+        /* Bool_Or */         Basic_Flag_Boolean,
+
+        /* Assign_Start */    0,
+        /* Assign */          0,
+        /* Assign_Add */      0,
+        /* Assign_Minus */    0,
+        /* Assign_Multiply */ 0,
+        /* Assign_Divide */   0,
+        /* Assign_Modulus */  0,
+        /* Assign_And */      0,
+        /* Assign_Or */       0,
+        /* Assign_Xor */      0,
+        /* Assign_Shl */      0,
+        /* Assign_Shr */      0,
+        /* Assign_Sar */      0,
+        /* Assign_End */      0,
+
+        /* Pipe */            0,
+        /* Range */           0,
+    };
+
     binop->type = binop->left->type;
+
+    enum BasicFlag effective_flags = 0;
+    switch (binop->type->kind) {
+        case Type_Kind_Basic:   effective_flags = binop->type->Basic.flags; break;
+        case Type_Kind_Pointer: effective_flags = Basic_Flag_Pointer;       break;
+        case Type_Kind_Enum:    effective_flags = Basic_Flag_Integer;       break;
+    }
+
+    if ((binop_allowed[binop->operation] & effective_flags) == 0) {
+        onyx_report_error(binop->token->pos, "Binary operator not allowed for arguments of type '%s'.",
+                type_get_name(binop->type));
+        return 1;
+    }
 
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op

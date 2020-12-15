@@ -240,6 +240,8 @@ typedef enum BinaryOp {
 
     Binary_Op_Pipe            = 33,
     Binary_Op_Range           = 34,
+
+    Binary_Op_Count
 } BinaryOp;
 
 typedef enum OnyxIntrinsic {
