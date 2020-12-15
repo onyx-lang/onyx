@@ -168,11 +168,24 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
     // HACK
     global_wasm_module = onyx_wasm_module_create(compiler_state->options->allocator);
 
+    // NOTE: Add builtin entities to pipeline.
     entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Include_File,
         .package = NULL,
         .include = create_include_file(compiler_state->sp_alloc, "core/builtin"),
+    }));
+
+    entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
+        .state = Entity_State_Resolve_Symbols,
+        .type = Entity_Type_Global_Header,
+        .global = &builtin_stack_top
+    }));
+    
+    entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
+        .state = Entity_State_Resolve_Symbols,
+        .type = Entity_Type_Global,
+        .global = &builtin_stack_top
     }));
 
     // NOTE: Add all files passed by command line to the queue
@@ -430,6 +443,15 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
 
     switch (ent->state) {
         case Entity_State_Parse_Builtin:
+            process_include_entity(compiler_state, ent);
+            ent->state = Entity_State_Finalized;
+
+            if (onyx_has_errors()) return 0;
+
+            initialize_builtins(compiler_state->ast_alloc, &compiler_state->prog_info);
+            semstate.program = &compiler_state->prog_info;
+            break;
+
         case Entity_State_Parse:
             process_include_entity(compiler_state, ent);
             ent->state = Entity_State_Finalized;
@@ -463,35 +485,13 @@ static void output_dummy_progress_bar(CompilerState* compiler_state) {
 static i32 onyx_compile(CompilerState* compiler_state) {
     u64 start_time = bh_time_curr();
 
-    {
-        entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
-            .state = Entity_State_Resolve_Symbols,
-            .type = Entity_Type_Global_Header,
-            .global = &builtin_stack_top
-        }));
-        entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
-            .state = Entity_State_Resolve_Symbols,
-            .type = Entity_Type_Global,
-            .global = &builtin_stack_top
-        }));
-
-        Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
-        assert(ent.state == Entity_State_Parse_Builtin);
-
-        process_entity(compiler_state, &ent);
-        if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
-
-        entity_heap_remove_top(&compiler_state->prog_info.entities);
-
-        initialize_builtins(compiler_state->ast_alloc, &compiler_state->prog_info);
-        semstate.program = &compiler_state->prog_info;
-    }
-
     if (compiler_state->options->fun_output)
         printf("\e[2J");
 
     while (!bh_arr_is_empty(compiler_state->prog_info.entities.entities)) {
         Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
+        entity_heap_remove_top(&compiler_state->prog_info.entities);
+        if (ent.state == Entity_State_Finalized) continue;
 
         if (compiler_state->options->fun_output) {
             output_dummy_progress_bar(compiler_state);
@@ -505,14 +505,16 @@ static i32 onyx_compile(CompilerState* compiler_state) {
             }
         }
 
-        entity_heap_remove_top(&compiler_state->prog_info.entities);
         b32 changed = process_entity(compiler_state, &ent);
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
-        if (changed && ent.state != Entity_State_Finalized) {
-            entity_heap_insert(&compiler_state->prog_info.entities, ent);
-        }
+        // SPEED: Not checking if the entity is already finalized does diminish speeds
+        // a little bit, but it makes the fun visualization look better... so... I'm
+        // gonna keep this how it is for now.                - brendanfh 2020/12/15
+
+        // if (changed && ent.state != Entity_State_Finalized)
+        entity_heap_insert(&compiler_state->prog_info.entities, ent);
     }
 
     // NOTE: Output to file
