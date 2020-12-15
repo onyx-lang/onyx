@@ -819,7 +819,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
         if (func == NULL) return 0;
 
         *pnode = (AstTyped *) func;
-        return 1;
+        node = *pnode;
     }
 
     if (types_are_compatible(node->type, type)) return 1;
