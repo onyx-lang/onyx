@@ -446,7 +446,7 @@ static void symres_if(AstIfWhile* ifnode) {
         ifnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, ifnode->token->pos);
         scope_enter(ifnode->scope);
 
-        symbol_introduce(semstate.curr_scope, ifnode->local->token, (AstNode *) ifnode->local);
+        symres_local(&ifnode->local);
 
         symres_statement((AstNode **) &ifnode->assignment);
     }
@@ -464,7 +464,7 @@ static void symres_while(AstIfWhile* whilenode) {
         whilenode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
-        symbol_introduce(semstate.curr_scope, whilenode->local->token, (AstNode *) whilenode->local);
+        symres_local(&whilenode->local);
 
         symres_statement((AstNode **) &whilenode->assignment);
     }
@@ -483,7 +483,7 @@ static void symres_for(AstFor* fornode) {
 
     symres_expression(&fornode->iter);
 
-    symbol_introduce(semstate.curr_scope, fornode->var->token, (AstNode *) fornode->var);
+    symres_local(&fornode->var);
 
     symres_block(fornode->stmt);
 

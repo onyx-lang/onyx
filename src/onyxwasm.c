@@ -1010,6 +1010,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
             if (!type_is_structlike(var->type)) {
                 emit_store_instruction(mod, &code, var->type, offset);
             } else {
+                offset = 0;
                 emit_local_location(mod, &code, var, &offset);
                 emit_store_instruction(mod, &code, var->type, offset);
             }
@@ -3071,7 +3072,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .next_global_idx = 0,
 
         .data = NULL,
-        .next_datum_offset = 0,
+        .next_datum_offset = 32, // Starting offset so null pointers don't immediately
+                                 // break constant data.       - brendanfh 2020/12/16
 
         .elems = NULL,
         .next_elem_idx = 0,
