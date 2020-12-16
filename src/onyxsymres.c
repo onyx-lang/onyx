@@ -9,7 +9,7 @@ static void scope_enter(Scope* new_scope);
 static void scope_leave();
 
 AstType* symres_type(AstType* type);
-static void symres_local(AstLocal** local);
+static void symres_local(AstLocal** local, b32 add_to_block_locals);
 static void symres_call(AstCall* call);
 static void symres_size_of(AstSizeOf* so);
 static void symres_align_of(AstAlignOf* so);
@@ -195,10 +195,16 @@ AstType* symres_type(AstType* type) {
     return type;
 }
 
-static void symres_local(AstLocal** local) {
+static void symres_local(AstLocal** local, b32 add_to_block_locals) {
     (*local)->type_node = symres_type((*local)->type_node);
 
-    bh_arr_push(bh_arr_last(semstate.block_stack)->locals, *local);
+    // NOTE: This is a little gross, but it is allows for finer control
+    // over when locals are in scope in a block, which reduces the number
+    // of unique WASM locals and stack space needed.
+    //                                            - brendanfh 2020/12/16
+    if (add_to_block_locals)
+        bh_arr_push(bh_arr_last(semstate.block_stack)->locals, *local);
+
     bh_arr_push(semstate.curr_function->locals, *local);
 
     if ((*local)->token != NULL)
@@ -446,7 +452,7 @@ static void symres_if(AstIfWhile* ifnode) {
         ifnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, ifnode->token->pos);
         scope_enter(ifnode->scope);
 
-        symres_local(&ifnode->local);
+        symres_local(&ifnode->local, 0);
 
         symres_statement((AstNode **) &ifnode->assignment);
     }
@@ -464,7 +470,7 @@ static void symres_while(AstIfWhile* whilenode) {
         whilenode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
-        symres_local(&whilenode->local);
+        symres_local(&whilenode->local, 0);
 
         symres_statement((AstNode **) &whilenode->assignment);
     }
@@ -483,7 +489,7 @@ static void symres_for(AstFor* fornode) {
 
     symres_expression(&fornode->iter);
 
-    symres_local(&fornode->var);
+    symres_local(&fornode->var, 0);
 
     symres_block(fornode->stmt);
 
@@ -558,7 +564,7 @@ cannot_use:
 // NOTE: Returns 1 if the statment should be removed
 static b32 symres_statement(AstNode** stmt) {
     switch ((*stmt)->kind) {
-        case Ast_Kind_Local:       symres_local((AstLocal **) stmt);                  return 1;
+        case Ast_Kind_Local:       symres_local((AstLocal **) stmt, 1);               return 1;
         case Ast_Kind_Return:      symres_return((AstReturn *) *stmt);                return 0;
         case Ast_Kind_If:          symres_if((AstIfWhile *) *stmt);                   return 0;
         case Ast_Kind_While:       symres_while((AstIfWhile *) *stmt);                return 0;
