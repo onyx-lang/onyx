@@ -91,9 +91,5 @@ main :: proc (args: [] cstr) {
         }
     }
 
-    print("The program \"");
-    print(program);
-    print("\" calculates the value ");
-    print(accumulator);
-    print("\n");
+    printf("The program \"%s\" calculates the value %i\n", program, accumulator);
 }

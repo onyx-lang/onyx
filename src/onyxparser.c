@@ -1251,15 +1251,18 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 assignment->right = builtin_context_variable;
                 context_tmp->next = (AstNode *) assignment;
 
-                AstBlock* context_block = parse_block(parser);
-                needs_semicolon = 0;
-                assignment->next = (AstNode *) context_block;
-
                 AstBinaryOp* assignment2 = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
                 assignment2->operation = Binary_Op_Assign;
                 assignment2->left = builtin_context_variable;
                 assignment2->right = (AstTyped *) context_tmp;
-                context_block->next = (AstNode *) assignment2;
+
+                AstDefer* defer_node = make_node(AstDefer, Ast_Kind_Defer);
+                defer_node->stmt = (AstNode *) assignment2;
+                assignment->next = (AstNode *) defer_node;
+
+                AstBlock* context_block = parse_block(parser);
+                needs_semicolon = 0;
+                defer_node->next = (AstNode *) context_block;
 
                 retval = (AstNode *) context_tmp;
                 break;

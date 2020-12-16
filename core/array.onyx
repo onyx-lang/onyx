@@ -21,21 +21,25 @@ clear :: proc (arr: ^[..] $T) {
     arr.count = 0;
 }
 
-ensure_capacity :: proc (arr: ^[..] $T, cap: u32) {
-    if arr.capacity >= cap do return;
+ensure_capacity :: proc (arr: ^[..] $T, cap: u32) -> bool {
+    if arr.capacity >= cap do return true;
 
     while cap > arr.capacity do arr.capacity <<= 1;
-    arr.data = cresize(arr.data, sizeof T * arr.capacity);
+    new_data := cresize(arr.data, sizeof T * arr.capacity);
+    if new_data == null do return false;
+    arr.data = new_data;
+    return true;
 }
 
-push :: proc (arr: ^[..] $T, x: T) {
-    ensure_capacity(arr, arr.count + 1);
+push :: proc (arr: ^[..] $T, x: T) -> bool {
+    if !ensure_capacity(arr, arr.count + 1) do return false;
     arr.data[arr.count] = x;
     arr.count += 1;
+    return true;
 }
 
-insert :: proc (arr: ^[..] $T, idx: u32, x: T) {
-    ensure_capacity(arr, arr.count + 1);
+insert :: proc (arr: ^[..] $T, idx: u32, x: T) -> bool {
+    if !ensure_capacity(arr, arr.count + 1) do return false;
 
     arr.count += 1;
     while i := arr.count; i > idx {
@@ -44,6 +48,7 @@ insert :: proc (arr: ^[..] $T, idx: u32, x: T) {
     }
 
     arr.data[idx] = x;
+    return true;
 }
 
 remove :: proc (arr: ^[..] $T, elem: T) {

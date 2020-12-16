@@ -157,7 +157,7 @@ advance_line :: proc (use reader: ^StringReader) {
     if count == 0 do return;
 
     adv := 0;
-    while data[adv] != #char "\n" do adv += 1;
+    while data[adv] != #char "\n" && adv <= count - 1 do adv += 1;
 
     data += adv + 1;
     count -= adv + 1;
