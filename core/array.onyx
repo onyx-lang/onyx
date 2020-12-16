@@ -54,7 +54,9 @@ insert :: proc (arr: ^[..] $T, idx: u32, x: T) -> bool {
 remove :: proc (arr: ^[..] $T, elem: T) {
     move := 0;
 
-    for i: 0 .. arr.count - move {
+    while i := 0; i < arr.count - move {
+        defer i += 1;
+        
         if arr.data[i + move] == elem do move += 1;
         if move != 0 do arr.data[i] = arr.data[i + move];
     }
