@@ -1,9 +1,9 @@
 package core.allocator
 
 #include_file "core/memory"
-#include_file "core/intrinsics"
+#include_file "core/intrinsics/wasm"
 
-use package core { memory_size, memory_grow }
+use package core.intrinsics.wasm { memory_size, memory_grow }
 use package core.memory as memory
 
 heap_allocator : Allocator;

@@ -2920,13 +2920,26 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         sdata[1] = sl->length;
         break;
     }
+
     case Ast_Kind_NumLit: {
+        // NOTE: This makes a big assumption that we are running on a
+        // little endian machine, since WebAssembly is little endian
+        // by specification. This is probably a safe assumption, but
+        // should probably be fixed at some point.
+        //                                - brendanfh  2020/12/15
+        
         switch (node->type->Basic.kind) {
         case Basic_Kind_Bool:
         case Basic_Kind_I8:
         case Basic_Kind_U8:
+            *((i8 *) data) = (i8) ((AstNumLit *) node)->value.i;
+            return;
+
         case Basic_Kind_I16:
         case Basic_Kind_U16:
+            *((i16 *) data) = (i16) ((AstNumLit *) node)->value.i;
+            return;
+
         case Basic_Kind_I32:
         case Basic_Kind_U32:
         case Basic_Kind_Rawptr:

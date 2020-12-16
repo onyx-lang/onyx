@@ -1,4 +1,4 @@
-package simd
+package core.intrinsics.simd
 
 // NOTE: These u8 values must be compile time known values.
 v128_const :: proc (b1: u8,  b2: u8,  b3: u8,  b4: u8,

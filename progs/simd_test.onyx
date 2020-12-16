@@ -1,10 +1,10 @@
 package main
 
 #include_file "core/std/wasi"
-#include_file "core/simd_intrinsics"
+#include_file "core/intrinsics/simd"
 
 use package core
-use package simd
+use package core.intrinsics.simd
 
 main :: proc (args: [] cstr) {
     x := f32x4_const(10.0f, 20.0f, 30.0f, 40.0f);

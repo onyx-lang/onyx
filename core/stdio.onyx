@@ -1,4 +1,11 @@
 package core
+// Currently, these symbols are dumped in the 'core' namespace, which means
+// most programs that just 'use package core' can access all of them, which
+// is convenient; However, it doesn't hurt to wonder if they should be the
+// 'core.io' package so these would become like 'io.printf(...)'. Of course,
+// you could always still do 'use package core.io', which would bring these
+// in anyway.
+
 
 // It is expected that a file will be included that will be part
 // of the system package

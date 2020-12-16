@@ -1,6 +1,6 @@
 package core.math
 
-use package core {
+use package core.intrinsics.wasm {
     sqrt_f32, sqrt_f64,
     abs_f32,  abs_f64
 }
