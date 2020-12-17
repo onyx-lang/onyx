@@ -203,9 +203,9 @@ static void symres_local(AstLocal** local, b32 add_to_block_locals) {
     // of unique WASM locals and stack space needed.
     //                                            - brendanfh 2020/12/16
     if (add_to_block_locals)
-        bh_arr_push(bh_arr_last(semstate.block_stack)->locals, *local);
+        bh_arr_push(bh_arr_last(semstate.block_stack)->allocate_exprs, (AstTyped *) *local);
 
-    bh_arr_push(semstate.curr_function->locals, *local);
+    bh_arr_push(semstate.curr_function->allocate_exprs, (AstTyped *) *local);
 
     if ((*local)->token != NULL)
         symbol_introduce(semstate.curr_scope, (*local)->token, (AstNode *) *local);
@@ -378,6 +378,9 @@ static void symres_array_literal(AstArrayLiteral* al) {
 
     bh_arr_each(AstTyped *, expr, al->values)
         symres_expression(expr);
+
+    bh_arr_push(bh_arr_last(semstate.block_stack)->allocate_exprs, (AstTyped *) al);
+    bh_arr_push(semstate.curr_function->allocate_exprs, (AstTyped *) al);
 }
 
 static void symres_expression(AstTyped** expr) {

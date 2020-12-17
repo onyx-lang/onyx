@@ -735,8 +735,7 @@ b32 type_struct_is_simple(Type* type) {
 }
 
 b32 type_is_pointer(Type* type) {
-    return (type->kind == Type_Kind_Pointer)
-        || (type->kind == Type_Kind_Array);
+    return type->kind == Type_Kind_Pointer;
 }
 
 b32 type_is_rawptr(Type* type) {
@@ -798,6 +797,7 @@ b32 type_results_in_void(Type* type) {
 
 b32 type_is_array_accessible(Type* type) {
     if (type_is_pointer(type)) return 1;
+    if (type->kind == Type_Kind_Array) return 1;
     if (type->kind == Type_Kind_Slice) return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
     if (type->kind == Type_Kind_VarArgs) return 1;

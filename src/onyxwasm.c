@@ -256,8 +256,8 @@ static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func);
 #define LOCAL_F64  0x700000000
 #define LOCAL_V128 0xf00000000
 
-static b32 local_is_wasm_local(AstLocal* local) {
-    if (local->flags & Ast_Flag_Address_Taken) return 0;
+static b32 local_is_wasm_local(AstTyped* local) {
+    if (local->kind == Ast_Kind_Local && local->flags & Ast_Flag_Address_Taken) return 0;
     if (local->type->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Enum && local->type->Enum.backing->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Pointer) return 1;
@@ -303,7 +303,7 @@ static void local_raw_free(LocalAllocator* la, WasmType wt) {
     la->freed[idx]++;
 }
 
-static u64 local_allocate(LocalAllocator* la, AstLocal* local) {
+static u64 local_allocate(LocalAllocator* la, AstTyped* local) {
     if (local_is_wasm_local(local)) {
         WasmType wt = onyx_type_to_wasm_type(local->type);
         return local_raw_allocate(la, wt);
@@ -332,7 +332,7 @@ static u64 local_allocate(LocalAllocator* la, AstLocal* local) {
     }
 }
 
-static void local_free(LocalAllocator* la, AstLocal* local) {
+static void local_free(LocalAllocator* la, AstTyped* local) {
     if (local_is_wasm_local(local)) {
         WasmType wt = onyx_type_to_wasm_type(local->type);
         local_raw_free(la, wt);
@@ -390,6 +390,7 @@ EMIT_FUNC(struct_load,                   Type* type, u64 offset);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
 EMIT_FUNC(struct_store,                  Type* type, u64 offset);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
+EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
 EMIT_FUNC(expression,                    AstTyped* expr);
 EMIT_FUNC(cast,                          AstUnaryOp* cast);
 EMIT_FUNC(return,                        AstReturn* ret);
@@ -410,8 +411,8 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
         WID(WI_BLOCK_START, 0x40);
     }
 
-    bh_arr_each(AstLocal *, local, block->locals)
-        bh_imap_put(&mod->local_map, (u64) *local, local_allocate(mod->local_alloc, *local));
+    bh_arr_each(AstTyped *, expr, block->allocate_exprs)
+        bh_imap_put(&mod->local_map, (u64) *expr, local_allocate(mod->local_alloc, *expr));
 
     forll (AstNode, stmt, block->body, next) {
         emit_statement(mod, &code, stmt);
@@ -419,8 +420,8 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
 
     emit_deferred_stmts(mod, &code, (AstNode *) block);
 
-    bh_arr_each(AstLocal *, local, block->locals)
-        local_free(mod->local_alloc, *local);
+    bh_arr_each(AstTyped *, expr, block->allocate_exprs)
+        local_free(mod->local_alloc, *expr);
 
     if (generate_block_headers) {
         WI(WI_BLOCK_END);
@@ -488,6 +489,51 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
     if (type_is_structlike_strict(assign->right->type)) {
         emit_expression(mod, &code, assign->right);
         emit_struct_lval(mod, &code, assign->left);
+
+        *pcode = code;
+        return;
+    }
+
+    if (assign->right->type->kind == Type_Kind_Array) {
+        Type* rtype = assign->right->type;
+
+        Type* elem_type = rtype;
+        u32 elem_count = 1;
+        while (elem_type->kind == Type_Kind_Array) {
+            elem_count *= elem_type->Array.count;
+            elem_type = elem_type->Array.elem;
+        }
+        u32 elem_size = type_size_of(elem_type);
+
+        u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+        emit_location(mod, &code, assign->left);
+        WIL(WI_LOCAL_SET, lptr_local);
+
+        emit_expression(mod, &code, assign->right);
+        WIL(WI_LOCAL_SET, rptr_local);
+
+        fori (i, 0, elem_count) {
+            if (!type_is_structlike(rtype))
+                WIL(WI_LOCAL_GET, lptr_local);
+
+            if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == rptr_local)
+                bh_arr_last(code).type = WI_LOCAL_TEE;
+            else
+                WIL(WI_LOCAL_GET, rptr_local);
+            emit_load_instruction(mod, &code, elem_type, i * elem_size);
+
+            if (!type_is_structlike(rtype)) {
+                emit_store_instruction(mod, &code, elem_type, i * elem_size);
+            } else {
+                WIL(WI_LOCAL_GET, lptr_local);
+                emit_store_instruction(mod, &code, elem_type, i * elem_size);
+            }
+        }
+
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
         *pcode = code;
         return;
@@ -670,7 +716,7 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (if_node->assignment != NULL) {
-        bh_imap_put(&mod->local_map, (u64) if_node->local, local_allocate(mod->local_alloc, if_node->local));
+        bh_imap_put(&mod->local_map, (u64) if_node->local, local_allocate(mod->local_alloc, (AstTyped *) if_node->local));
 
         emit_assignment(mod, &code, if_node->assignment);
     }
@@ -694,7 +740,7 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
     bh_arr_pop(mod->structured_jump_target);
 
     if (if_node->assignment != NULL) {
-        local_free(mod->local_alloc, if_node->local);
+        local_free(mod->local_alloc, (AstTyped *) if_node->local);
     }
 
     WI(WI_IF_END);
@@ -706,7 +752,7 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (while_node->assignment != NULL) {
-        bh_imap_put(&mod->local_map, (u64) while_node->local, local_allocate(mod->local_alloc, while_node->local));
+        bh_imap_put(&mod->local_map, (u64) while_node->local, local_allocate(mod->local_alloc, (AstTyped *) while_node->local));
 
         emit_assignment(mod, &code, while_node->assignment);
     }
@@ -755,7 +801,7 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     }
 
     if (while_node->assignment != NULL)
-        local_free(mod->local_alloc, while_node->local);
+        local_free(mod->local_alloc, (AstTyped *) while_node->local);
 
     *pcode = code;
 }
@@ -1048,7 +1094,7 @@ EMIT_FUNC(for, AstFor* for_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     AstLocal* var = for_node->var;
-    u64 iter_local = local_allocate(mod->local_alloc, var);
+    u64 iter_local = local_allocate(mod->local_alloc, (AstTyped *) var);
     bh_imap_put(&mod->local_map, (u64) var, iter_local);
 
     emit_expression(mod, &code, for_node->iter);
@@ -1069,7 +1115,7 @@ EMIT_FUNC(for, AstFor* for_node) {
         onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
     }
 
-    local_free(mod->local_alloc, var);
+    local_free(mod->local_alloc, (AstTyped *) var);
 
     *pcode = code;
 }
@@ -1081,7 +1127,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
 
     if (switch_node->assignment != NULL) {
-        bh_imap_put(&mod->local_map, (u64) switch_node->local, local_allocate(mod->local_alloc, switch_node->local));
+        bh_imap_put(&mod->local_map, (u64) switch_node->local, local_allocate(mod->local_alloc, (AstTyped *) switch_node->local));
 
         emit_assignment(mod, &code, switch_node->assignment);
     }
@@ -1143,7 +1189,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     bh_arr_pop(mod->structured_jump_target);
 
     if (switch_node->assignment != NULL)
-        local_free(mod->local_alloc, switch_node->local);
+        local_free(mod->local_alloc, (AstTyped *) switch_node->local);
 
     bh_imap_free(&block_map);
     *pcode = code;
@@ -2049,6 +2095,37 @@ EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
     *pcode = code;
 }
 
+EMIT_FUNC(array_literal, AstArrayLiteral* al) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 local_offset = (u64) bh_imap_get(&mod->local_map, (u64) al);
+    assert((local_offset & LOCAL_IS_WASM) == 0);
+
+    assert(al->type->kind == Type_Kind_Array);
+
+    u32 elem_size = type_size_of(al->type->Array.elem);
+
+    fori (i, 0, al->type->Array.count) {
+        if (!type_is_structlike(al->type->Array.elem))
+            WIL(WI_LOCAL_GET, mod->stack_base_idx);
+
+        emit_expression(mod, &code, al->values[i]);
+
+        if (!type_is_structlike(al->type->Array.elem)) {
+            emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
+        } else {
+            WIL(WI_LOCAL_GET, mod->stack_base_idx);
+            emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
+        }
+    }
+
+    WIL(WI_LOCAL_GET, mod->stack_base_idx);
+    WIL(WI_I32_CONST, local_offset);
+    WI(WI_I32_ADD);
+
+    *pcode = code;
+}
+
 EMIT_FUNC(location, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -2206,7 +2283,8 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Array_Literal: {
-            assert(("Array literals are not allowed as expressions currently. This will be added in a future update.", 0));
+            // assert(("Array literals are not allowed as expressions currently. This will be added in a future update.", 0));
+            emit_array_literal(mod, &code, (AstArrayLiteral *) expr);
             break;
         }
 
@@ -2724,8 +2802,8 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         assert(mod->curr_cc != CC_Undefined);
 
         mod->has_stack_locals = (mod->curr_cc == CC_Return_Stack);
-        bh_arr_each(AstLocal *, local, fd->locals)
-            mod->has_stack_locals |= !local_is_wasm_local(*local);
+        bh_arr_each(AstTyped *, expr, fd->allocate_exprs)
+            mod->has_stack_locals |= !local_is_wasm_local(*expr);
 
         if (mod->has_stack_locals) {
             // NOTE: '5' needs to match the number of instructions it takes

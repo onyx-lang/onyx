@@ -1282,7 +1282,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
 // '{' <stmtlist> '}'
 static AstBlock* parse_block(OnyxParser* parser) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
-    bh_arr_new(global_heap_allocator, block->locals, 4);
+    bh_arr_new(global_heap_allocator, block->allocate_exprs, 4);
 
     // NOTE: --- is for an empty block
     if (parser->curr->type == Token_Type_Empty_Block) {
@@ -1729,7 +1729,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = proc_token;
 
-    bh_arr_new(global_heap_allocator, func_def->locals, 4);
+    bh_arr_new(global_heap_allocator, func_def->allocate_exprs, 4);
     bh_arr_new(global_heap_allocator, func_def->params, 4);
 
     bh_arr(AstPolyParam) polymorphic_vars = NULL;

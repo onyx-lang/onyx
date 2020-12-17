@@ -56,7 +56,40 @@ make_bar :: proc () -> Bar {
     return bar;
 }
 
+f :: proc () -> [5] [2] u32 #export "IAMTHEFUNCTION" {
+    mem := cast(^u32) calloc(sizeof [5] [2] u32);
+    for i: 0 .. 10 do mem[i] = 1234 + i;
+    return ~~mem;
+
+
+    // This is safe ONLY when the value is used without calling another function.
+    // mem : [5] u32;
+    // for ^m: mem do *m = 4567;
+    // return mem;
+}
+
+compress :: proc (arr: [5] $T, f : proc (T, T) -> T) -> T {
+    val := arr[0];
+    for i: 1 .. 5 do val = f(val, arr[i]);
+    return val;
+}
+
 main :: proc (args: [] cstr) {
+    {
+        foo : [5] [2] u32;
+        foo = f();
+
+        printf("%p == %p\n", cast(^u32) foo, ^foo);
+        for ^thing: foo do for t: *thing do printf("%p %i\n", thing, t);
+
+        // This needs to be optimized
+        bar := u32.[ 1, 2, 3, 4, 5 ];
+        bar[2] = 1234;
+        for b: bar do printf("b: %i\n", b);
+
+        println(compress(f32.[ 1, 2, 3, 4, 5 ], proc (a: $T, b: T) -> T { return a + b; }));
+    }
+
     use package test { foo as foo_pkg }
     use package test as test
     use test.foo.SomeEnum

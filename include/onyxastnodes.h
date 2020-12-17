@@ -496,7 +496,13 @@ struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 struct AstUse           { AstNode_base; AstTyped* expr; };
 
 // Structure Nodes
-struct AstBlock         { AstNode_base; AstNode *body; Scope *scope; bh_arr(AstLocal *) locals; };
+struct AstBlock         {
+    AstNode_base;
+    AstNode *body;
+    Scope *scope;
+
+    bh_arr(AstTyped *) allocate_exprs;
+};
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {
     AstNode_base;
@@ -663,7 +669,7 @@ struct AstFunction {
     AstType* return_type;
 
     AstBlock *body;
-    bh_arr(AstLocal *) locals;
+    bh_arr(AstTyped *) allocate_exprs;
 
     // NOTE: used by the #add_overload directive. Initially set to a symbol,
     // then resolved to an overloaded function.
