@@ -1,15 +1,19 @@
 Release v0.0.5
 --------------
 Additions:
-* 'abs' function in core/math.onyx.
-* --verbose prints statistics about the compilation including time taken, lines
-    processed and token processed.
-* 'read_word' in core.string.reader.
+* array literals; use (type).[ (vals) ] as the syntax; They work as global variables, and
+    local variables, and as intermediates (such as function arguments).
+* polymorphic procedures can be instantiated in many more places now due to clean up.
+* added #context_scope block. It automatically stores and restores the context at the beginning
+    and the end of the block respectively.
 * 'use' statements work on pointers to structures.
-* Better error reporting for invaild binary operators.
 * '--fun' flag displays a bar graph of where each of the entities in the compilation
     pipeline are. Compiles the program slower purely to make it look better.
-* polymorphic procedures can be instantiated in many more places now due to clean up.
+* --verbose prints statistics about the compilation including time taken, lines
+    processed and token processed.
+* 'abs' function in core/math.onyx.
+* 'read_word' in core.string.reader.
+* Better error reporting for invaild binary operators.
 
 Removals:
 * field accesses on things that are not lvals. This was a bug anyway, so it
@@ -22,7 +26,10 @@ Changes:
     and 'use <value>' can occur at file scope.
 * struct literals can now have arbitrary package prefixes on them, i.e.
     some.deeply.nested.packages.Struct.{ ... };
+* struct literals can have arbitrary expressions as their type, i.e.
+    (#type [] void).{ ... };
 * cleaned up CLI
+* assignment over an array type copies the array instead of just the pointer.
 
 Bug fixes:
 * globals that were #foreign caused several bugs, which have been squashed.
@@ -30,6 +37,9 @@ Bug fixes:
 * Bitwise NOT on unsigned integers did not work.
 * 'use' statements now work in polymorphic procedures
 * resizing heap allocated memory at the end of memory would not grow underlying memory.
+* stack position variables introduced from for loops, ifs, whiles, or switchs would produce
+    very bad side effects if they were not in a stack based function.
+* array.remove was broken when the semantics of `for: lo .. hi` changed.
 
 
 Release v0.0.4
