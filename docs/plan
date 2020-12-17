@@ -53,7 +53,7 @@ HOW:
                 stack pointers and separate stack allocation in the linear memory for each
                 of the threads.
 
-        [ ] Array literals
+        [X] Array literals
 
         [ ] transmute
 

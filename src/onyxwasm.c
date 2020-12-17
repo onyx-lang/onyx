@@ -514,6 +514,10 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
         emit_expression(mod, &code, assign->right);
         WIL(WI_LOCAL_SET, rptr_local);
 
+        // NOTE: Currently, we inline the copying of the array; But if the array has
+        // many elements, this could result in a LOT of instructions. Maybe for lengths
+        // greater than like 16 we output a loop that copies them?
+        //                                               - brendanfh 2020/12/16
         fori (i, 0, elem_count) {
             if (!type_is_structlike(rtype))
                 WIL(WI_LOCAL_GET, lptr_local);

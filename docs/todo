@@ -50,6 +50,10 @@ Language Cohesion:
         constant data (such as MD5 hash vectors) would be useful.
 
         Array literals work only for static constant data outside of procedures.
+        Array literals also now work in expressions.
+        I changed the semantics of assignment for array types. Instead of just
+        copying the pointer to the array, ALL elements of the source array are
+        copied into the destination array.
 
     [X] Struct literals can only have 1 level of package before the struct
         name. This is because packages were not able to be nested, so having

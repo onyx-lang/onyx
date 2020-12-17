@@ -57,15 +57,16 @@ make_bar :: proc () -> Bar {
 }
 
 f :: proc () -> [5] [2] u32 #export "IAMTHEFUNCTION" {
-    mem := cast(^u32) calloc(sizeof [5] [2] u32);
-    for i: 0 .. 10 do mem[i] = 1234 + i;
-    return ~~mem;
+    // This method of returning an array will leak memory, since this is never freed.
+    // mem := cast(^u32) calloc(sizeof [5] [2] u32);
+    // for i: 0 .. 10 do mem[i] = 1234 + i;
+    // return ~~mem;
 
 
     // This is safe ONLY when the value is used without calling another function.
-    // mem : [5] u32;
-    // for ^m: mem do *m = 4567;
-    // return mem;
+    mem : [5] [2] u32;
+    for ^m2: mem do for ^m: *m2 do *m = 4567;
+    return mem;
 }
 
 compress :: proc (arr: [5] $T, f : proc (T, T) -> T) -> T {
