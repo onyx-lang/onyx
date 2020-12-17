@@ -519,7 +519,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
         // greater than like 16 we output a loop that copies them?
         //                                               - brendanfh 2020/12/16
         fori (i, 0, elem_count) {
-            if (!type_is_structlike(rtype))
+            if (!type_is_structlike(elem_type))
                 WIL(WI_LOCAL_GET, lptr_local);
 
             if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == rptr_local)
@@ -528,7 +528,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
                 WIL(WI_LOCAL_GET, rptr_local);
             emit_load_instruction(mod, &code, elem_type, i * elem_size);
 
-            if (!type_is_structlike(rtype)) {
+            if (!type_is_structlike(elem_type)) {
                 emit_store_instruction(mod, &code, elem_type, i * elem_size);
             } else {
                 WIL(WI_LOCAL_GET, lptr_local);

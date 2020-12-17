@@ -1,0 +1,15 @@
+Array of structs on the stack.
+Vec2(4039, 7782)
+Array of structs from function call.
+Vec2(0, 0)
+Vec2(1, 1)
+Vec2(4, 8)
+Vec2(9, 27)
+Array of structs on a struct.
+Vec2(3, 9)
+Vec2(3, 27)
+Array of structs on a struct from function call.
+Vec2(25, 125)
+Vec2(100, 1000)
+Array of u32.
+63001

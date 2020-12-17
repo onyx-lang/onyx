@@ -1,0 +1,98 @@
+#include_file "core/std/js"
+
+use package core
+
+Vec2 :: struct { x: i32; y: i32; }
+
+// Overload print() to print Vec2's.
+proc (use v: Vec2) #add_overload print {
+    printf("Vec2(%i, %i)", x, y);
+}
+
+EntityStore :: struct {
+    positions  : [4] Vec2;
+    velocities : [4] Vec2;
+}
+
+calc_vecs :: proc (n := 0) -> [4] Vec2 {
+    vecs : [4] Vec2;
+
+    i := n;
+    for ^v: vecs {
+        v.x = i * i;
+        v.y = i * i * i;
+        i += 1;
+    }
+
+    return vecs;
+}
+
+main :: proc (args: [] cstr) #export "MAIN" {
+    // Array of structs on stack
+    {
+        println("Array of structs on the stack.");
+        vecs : [8] Vec2;
+        for ^v: vecs {
+            v.x = 4039;
+            v.y = 7782;
+        }
+        
+        println(vecs[3]);
+    }
+
+    // Array of structs from function call
+    {
+        println("Array of structs from function call.");
+        vecs := calc_vecs();
+        for ^v: vecs do println(*v);
+    }
+
+    // Array of structs on a struct
+    {
+        println("Array of structs on a struct.");
+
+        es : EntityStore;
+        es.positions = Vec2.[
+            Vec2.{ 0, 0 },
+            Vec2.{ 1, 1 },
+            Vec2.{ 2, 4 },
+            Vec2.{ 3, 9 },
+        ];
+
+        es.velocities = Vec2.[
+            Vec2.{ 0, 0 },
+            Vec2.{ 1, 1 },
+            Vec2.{ 2, 8 },
+            Vec2.{ 3, 27 },
+        ];
+
+        println(es.positions[3]);
+        println(es.velocities[3]);
+    }
+
+    // Array of structs on a struct from function call
+    {
+        println("Array of structs on a struct from function call.");
+
+        es : EntityStore;
+        es.positions = calc_vecs(5);
+        es.velocities = calc_vecs(10);
+
+        println(es.positions[0]);
+        println(es.velocities[0]);
+    }
+
+    // Array of u32
+    {
+        println("Array of u32.");
+
+        nums : [100] u32;
+        i := 1;
+        for ^n: nums {
+            *n = i * i;
+            i += 5;
+        }
+
+        println(nums[50]);
+    }
+}
