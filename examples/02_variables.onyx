@@ -18,13 +18,7 @@ main :: proc (args: [] cstr) {
     // inferred from the right hand side of the equals.
     bar := 15;
 
-    print("foo is ");
-    print(foo);
-    print("\n");
-    print("footwo is ");
-    print(footwo);
-    print("\n");
-    print("bar is ");
-    print(bar);
-    print("\n");
+    print("foo is %i\n", foo);
+    print("footwo is %i\n", footwo);
+    print("bar is %i\n", bar);
 }

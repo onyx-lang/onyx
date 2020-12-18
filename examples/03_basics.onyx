@@ -29,15 +29,14 @@ main :: proc (args: [] cstr) {
     // Here foo is an i32. The unary prefix ^ operator takes the address of a value.
     // The type of foo_ptr is ^i32, or a pointer to an i32. Another example of a pointer
     // is the cstr builtin. It is ^u8, which is what C would call a char*.
+    //
+    // Also, this example uses printf which will be talked about later. If you are familar
+    // with the C printf, it is very similar, except %d in C is %i in this language.
     foo     := 10;
     foo_ptr := ^foo;
 
-    print("foo is ");
-    print(foo);
-    print("\n");
-    print("foo_ptr is ");
-    printf("%p", foo_ptr);
-    print("\n");
+    printf("foo is %i\n", foo);
+    printf("foo_ptr is %p\n", foo_ptr);
 
 
     // An important type to know before proceeding is the range type. When designing
@@ -62,14 +61,24 @@ main :: proc (args: [] cstr) {
     // Fixed size arrays are not commonly used because of their limited flexibility.
     // They are commonly seen as struct members or local variables. Here is an example
     // of creating and using a fixed size array. This uses a for-loop which we have not
-    // looked at yet, but the example should be self-explanitory.
+    // looked at yet, but the example should be self-explanatory.
     fixed_arr : [10] i32;
     for i: 0 .. 10 {
         fixed_arr[i] = i * i;
     }
-    print("fixed_arr[3] is ");
-    print(fixed_arr[3]);
-    print("\n");
+    print("fixed_arr[3] is %i\n", fixed_arr[3]);
+
+    // A quick thing to note about fixed size arrays is that they copy their contents
+    // on assignment. In this example, another_arr declares space on the stack for 10
+    // i32s just like fixed_arr did; However, unlike in C, when another_arr is assigned
+    // to fixed_arr, the contents of fixed_arr are copied into another_arr by value. So,
+    // even when fixed_arr[3] is changed, another_arr[3] is the same.
+    another_arr : [10] i32;
+    another_arr = fixed_arr;
+
+    fixed_arr[3] = 1234;
+
+    printf("another_arr[3] is %i\n", another_arr[3]);
 
 
     // Slices are a concept not unique to Onyx. They represent a pointer and a count,
@@ -82,9 +91,7 @@ main :: proc (args: [] cstr) {
     // of fixed_arr. It is important to know that this does NOT make a copy of the
     // data. It simply points into the same memory as fixed_arr.
     slice_arr := fixed_arr[3 .. 9];
-    print("slice_arr[3] is ");
-    print(slice_arr[3]);
-    print("\n");
+    print("slice_arr[3] is %i\n", slice_arr[3]);
 
 
     // Dynamic arrays are the most common arrays used in practice. They represent a
@@ -142,13 +149,12 @@ main :: proc (args: [] cstr) {
 
     // Onyx has the standard top-test while loop, whose syntax is very similar to an if
     // statement. The only unique thing about Onyx's while loops, is that they can have
-    // a 'else' clause. If the body of the loop is never run, i.e. the condition was
+    // an 'else' clause. If the body of the loop is never run, i.e. the condition was
     // false originally, then the else clause is used. Try changing the initial value
     // for i to be 11.
 
     while i := 0; i < 10 {
-        print(i);
-        print(" ");
+        printf("%i ", i);
         i += 1;
     } else {
         print("The while loop never ran...");
@@ -165,10 +171,7 @@ main :: proc (args: [] cstr) {
     // break or continue the loop that you want to. Take this example.
     while i := 0; i < 10 {
         while j := 0; j < 10 {
-            print(i);
-            print(" ");
-            print(j);
-            print("\n");
+            printf("%i %j\n", i, j);
 
             if i == 1 && j == 2 do break break;
             j += 1;
