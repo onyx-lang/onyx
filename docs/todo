@@ -79,6 +79,22 @@ Language Cohesion:
         easier to talk about types in a concrete way (for polymorphism and such),
         and would prepare the compiler to output type information into data section.
 
+    [ ] Switches should have range based statements, i.e.
+            switch expr {
+                case 10 .. 14 do ...
+            }
+
+        The only reason I have not implemented this feature is because it would
+        introduce a slight inconsistency in the language design. Generally, the
+        range (..) operator talks about ranges as inclusive low and exclusive
+        high, which makes sense for for-loops and the like. However, for the switch
+        statement, I think that would be very confusing. In the example above,
+        I would expect the case to trip when `expr` is 14. This isn't a techinal
+        problem; implementing this feature will be fairly straight forward. It
+        is just a language design problems, because it requires a bit of extra
+        thought to remember that ranges in for-loops and slices are NOT inclusive
+        on the upper end.
+
 API Expansion:
     There are many different places where the standard API for WASI and JS
     backends could be improved. Here are some of the target areas.

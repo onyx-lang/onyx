@@ -4,6 +4,8 @@
 #include "onyxutils.h"
 #include "onyxerrors.h"
 
+static u32 next_unique_id = 1;
+
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
     { Type_Kind_Basic, 0, { Basic_Kind_Void,                    0,                       0,  1, "void"   } },
@@ -331,6 +333,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             s_node->stcache = s_type;
             s_type->kind = Type_Kind_Struct;
 
+            s_type->Struct.unique_id = next_unique_id++;
             s_type->Struct.name = s_node->name;
             s_type->Struct.mem_count = bh_arr_length(s_node->members);
             s_type->Struct.memarr = NULL;
@@ -412,6 +415,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             enum_node->etcache = enum_type;
 
             enum_type->kind = Type_Kind_Enum;
+            enum_type->Enum.unique_id = next_unique_id++;
             enum_type->Enum.backing = enum_node->backing_type;
             enum_type->Enum.name = enum_node->name;
 
@@ -540,6 +544,49 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
     va_type->VarArgs.ptr_to_data = type_make_pointer(alloc, of);
 
     return va_type;
+}
+
+const char* type_get_unique_name(Type* type) {
+    if (type == NULL) return "unknown";
+
+    switch (type->kind) {
+        case Type_Kind_Basic: return type->Basic.name;
+        case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "^%s", type_get_unique_name(type->Pointer.elem));
+        case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_unique_name(type->Array.elem));
+        case Type_Kind_Struct:
+            if (type->Struct.name)
+                return bh_aprintf(global_scratch_allocator, "%s@%l", type->Struct.name, type->Struct.unique_id);
+            else
+                return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous struct>", type->Struct.unique_id);
+        case Type_Kind_Enum:
+            if (type->Enum.name)
+                return bh_aprintf(global_scratch_allocator, "%s@%l", type->Enum.name, type->Enum.unique_id);
+            else
+                return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous enum>", type->Enum.unique_id);
+
+        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_unique_name(type->Slice.ptr_to_data->Pointer.elem));
+        case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_unique_name(type->VarArgs.ptr_to_data->Pointer.elem));
+        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_unique_name(type->DynArray.ptr_to_data->Pointer.elem));
+
+        case Type_Kind_Function: {
+            char buf[512];
+            fori (i, 0, 512) buf[i] = 0;
+
+            strncat(buf, "proc (", 511);
+            fori (i, 0, type->Function.param_count) {
+                strncat(buf, type_get_unique_name(type->Function.params[i]), 511);
+                if (i != type->Function.param_count - 1)
+                    strncat(buf, ", ", 511);
+            }
+
+            strncat(buf, ") -> ", 511);
+            strncat(buf, type_get_unique_name(type->Function.return_type), 511);
+
+            return bh_aprintf(global_scratch_allocator, "%s", buf);
+        }
+
+        default: return "unknown";
+    }
 }
 
 const char* type_get_name(Type* type) {

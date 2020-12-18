@@ -79,6 +79,7 @@ typedef struct StructMember {
         Type* params[];                                           \
     })                                                            \
     TYPE_KIND(Struct, struct {                                    \
+        u64 unique_id;                                            \
         char* name;                                               \
         u32 size;                                                 \
         u16 alignment, mem_count;                                 \
@@ -90,7 +91,11 @@ typedef struct StructMember {
     TYPE_KIND(Slice, struct { Type *ptr_to_data; })               \
     TYPE_KIND(DynArray, struct { Type *ptr_to_data; })            \
     TYPE_KIND(VarArgs, struct { Type *ptr_to_data; })             \
-    TYPE_KIND(Enum, struct { char* name; Type* backing; })
+    TYPE_KIND(Enum, struct {                                      \
+        u64 unique_id;                                            \
+        char* name;                                               \
+        Type* backing;                                            \
+    })
 
 typedef enum TypeKind {
     Type_Kind_Invalid,
@@ -140,6 +145,7 @@ Type* type_make_slice(bh_allocator alloc, Type* of);
 Type* type_make_dynarray(bh_allocator alloc, Type* of);
 Type* type_make_varargs(bh_allocator alloc, Type* of);
 
+const char* type_get_unique_name(Type* type);
 const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);
 

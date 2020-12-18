@@ -579,7 +579,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
     bh_table_each_start(AstNode *, pp->poly_scope->symbols);
         strncat(key_buf, key, 1023);
         strncat(key_buf, "=", 1023);
-        strncat(key_buf, type_get_name(((AstTypeRawAlias *) value)->to), 1023);
+        strncat(key_buf, type_get_unique_name(((AstTypeRawAlias *) value)->to), 1023);
         strncat(key_buf, ";", 1023);
     bh_table_each_end;
 
@@ -658,7 +658,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type
     bh_table_each_start(AstNode *, ps_type->scope->symbols);
         strncat(key_buf, key, 1023);
         strncat(key_buf, "=", 1023);
-        strncat(key_buf, type_get_name(((AstTypeRawAlias *) value)->to), 1023);
+        strncat(key_buf, type_get_unique_name(((AstTypeRawAlias *) value)->to), 1023);
         strncat(key_buf, ";", 1023);
     bh_table_each_end;
 
