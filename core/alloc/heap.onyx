@@ -1,0 +1,143 @@
+package core.alloc.heap
+
+// This is the implementation for the general purpose heap allocator.
+// It is a simple bump allocator, with a free list. It is not very good
+// but it suffices for the kinds of things being done in the early days
+// of the language. You will not make your own instance of the heap
+// allocator, since it controls WASM intrinsics such as memory_grow.
+
+#include_file "core/memory"
+#include_file "core/intrinsics/wasm"
+
+use package core.intrinsics.wasm { memory_size, memory_grow }
+use package core.memory as memory
+
+// The global heap state
+#private_file
+heap_state : struct {
+    free_list       : ^heap_block;
+    next_alloc      : rawptr;
+    remaining_space : u32;
+}
+
+#private_file
+heap_block :: struct {
+    size : u32;
+    next : ^heap_block;
+}
+
+#private_file
+heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
+    if size_ == 0 do return null;
+
+    size := size_ + sizeof heap_block;
+    if size % align != 0 {
+        size += align - (size % align);
+    }
+
+    prev := ^heap_state.free_list;
+    hb := heap_state.free_list;
+    while hb != null {
+        if hb.size >= size {
+            *prev = hb.next;
+            hb.next = null;
+
+            return cast(rawptr) (cast(u32) hb + sizeof heap_block);
+        }
+
+        prev = ^hb.next;
+        hb = hb.next;
+    }
+
+    if size < heap_state.remaining_space {
+        ret := cast(^heap_block) heap_state.next_alloc;
+        ret.size = size;
+        ret.next = null;
+
+        heap_state.next_alloc = cast(rawptr) (cast(u32) heap_state.next_alloc + size);
+        heap_state.remaining_space -= size;
+
+        return cast(rawptr) (cast(u32) ret + sizeof heap_block);
+    }
+
+    new_pages :: ((size - heap_state.remaining_space) >> 16) + 1;
+    if memory_grow(new_pages) == -1 {
+        // out of memory
+        return null;
+    }
+    heap_state.remaining_space += new_pages << 16;
+
+    ret := cast(^heap_block) heap_state.next_alloc;
+    ret.size = size;
+    ret.next = null;
+
+    heap_state.next_alloc = cast(rawptr) (cast(u32) heap_state.next_alloc + size);
+    heap_state.remaining_space -= size;
+
+    return cast(rawptr) (cast(u32) ret + sizeof heap_block);
+}
+
+#private_file
+heap_free :: proc (ptr: rawptr) {
+    hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
+
+    // DEBUGGING: Fills freed memory with 0's
+    // for i: 0, hb_ptr.size do (cast(^u8) ptr)[i] = cast(u8) 0;
+
+    hb_ptr.next = heap_state.free_list;
+    heap_state.free_list = hb_ptr;
+}
+
+#private_file
+heap_resize :: proc (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
+    hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
+    old_size := hb_ptr.size - sizeof heap_block;
+
+    // If there is already enough space in the current allocated block,
+    // just return the block that already exists and has the memory in it.
+    if old_size >= new_size do return ptr;
+
+    // If we are at the end of the allocation space, just extend it
+    if hb_ptr.size + cast(u32) ptr >= cast(u32) heap_state.next_alloc {
+        if new_size - old_size >= heap_state.remaining_space {
+            new_pages :: ((new_size - old_size - heap_state.remaining_space) >> 16) + 1;
+            if memory_grow(new_pages) == -1 {
+                // out of memory
+                return null;
+            }
+            heap_state.remaining_space += new_pages << 16;
+        }
+
+        hb_ptr.size = new_size + sizeof heap_block;
+        heap_state.next_alloc = cast(rawptr) (cast(u32) ptr + hb_ptr.size);
+        heap_state.remaining_space -= new_size - old_size;
+        return ptr;
+    }
+
+    new_ptr := heap_alloc(new_size, align);
+    memory.copy(new_ptr, ptr, old_size);
+    heap_free(ptr);
+    return new_ptr;
+}
+
+#private_file
+heap_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    if aa == AllocationAction.Alloc do return heap_alloc(size, align);
+    if aa == AllocationAction.Resize do return heap_resize(oldptr, size, align);
+    if aa == AllocationAction.Free {
+        heap_free(oldptr);
+        return null;
+    }
+
+    return null;
+}
+
+init :: proc () {
+    heap_state.free_list = null;
+    heap_state.next_alloc = __heap_start;
+    heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
+
+    use package core.alloc { heap_allocator }
+    heap_allocator.data = ^heap_state;
+    heap_allocator.func = heap_alloc_proc;
+}

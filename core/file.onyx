@@ -122,7 +122,7 @@ get_size :: proc (file: File) -> u64 {
 get_contents_from_file :: proc (file: File) -> str {
     size := cast(u32) get_size(file);
 
-    data := cast(^u8) alloc(context.allocator, size);
+    data := cast(^u8) raw_alloc(context.allocator, size);
 
     prev_loc: i64;
     fd_tell(file.fd, ^prev_loc);

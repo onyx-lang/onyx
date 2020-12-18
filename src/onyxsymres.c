@@ -379,8 +379,10 @@ static void symres_array_literal(AstArrayLiteral* al) {
     bh_arr_each(AstTyped *, expr, al->values)
         symres_expression(expr);
 
-    bh_arr_push(bh_arr_last(semstate.block_stack)->allocate_exprs, (AstTyped *) al);
-    bh_arr_push(semstate.curr_function->allocate_exprs, (AstTyped *) al);
+    if (bh_arr_length(semstate.block_stack) > 0) {
+        bh_arr_push(bh_arr_last(semstate.block_stack)->allocate_exprs, (AstTyped *) al);
+        bh_arr_push(semstate.curr_function->allocate_exprs, (AstTyped *) al);
+    }
 }
 
 static void symres_expression(AstTyped** expr) {

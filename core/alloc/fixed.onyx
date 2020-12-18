@@ -1,0 +1,40 @@
+package core.alloc.fixed
+
+// This allocator is very simple and always returns the same pointer,
+// unless too much memory is asked for, in which case it returns null.
+//
+// This kind of allocator is useful for temporary string building or
+// similar circumstances, where you know that the needed memory size
+// will not be exceeded, but you don't what to deal with potential
+// slowness of a general heap allocator. By using this allocator, you
+// can continue to use the same code that does allocations like normal,
+// but can get the speed increase of a simple allocation strategy.
+
+FixedAllocatorData :: struct {
+	ptr  : rawptr;
+	size : u32;
+}
+
+#private_file
+fixed_allocator_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+	fa_data := cast(^FixedAllocatorData) data;	
+
+	if aa != AllocationAction.Alloc do return null;
+	if size > fa_data.size do return null;
+	
+	return fa_data.ptr;
+}
+
+make :: proc (ptr: rawptr, size: u32) -> FixedAllocatorData {
+	return FixedAllocatorData.{
+		ptr  = ptr,
+		size = size,
+	};
+}
+
+make_allocator :: proc (fa_data: ^FixedAllocatorData) -> Allocator {
+	return Allocator.{
+		func = fixed_allocator_proc,
+		data = fa_data,
+	};
+}

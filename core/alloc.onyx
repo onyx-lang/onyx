@@ -1,181 +1,19 @@
-package core.allocator
+package core.alloc
 
-#include_file "core/memory"
-#include_file "core/intrinsics/wasm"
+#include_file "core/alloc/arena"
+#include_file "core/alloc/fixed"
+#include_file "core/alloc/heap"
+#include_file "core/alloc/ring"
 
-use package core.intrinsics.wasm { memory_size, memory_grow }
-use package core.memory as memory
+TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 16Kb
 
+// The global heap allocator, set up upon program intialization.
 heap_allocator : Allocator;
 
-#private
-heap_state : struct {
-    free_list       : ^heap_block;
-    next_alloc      : rawptr;
-    remaining_space : u32;
-}
-
-#private
-heap_block :: struct {
-    size : u32;
-    next : ^heap_block;
-}
-
-heap_init :: proc () {
-    heap_state.free_list = null;
-    heap_state.next_alloc = __heap_start;
-    heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
-
-    heap_allocator.data = ^heap_state;
-    heap_allocator.func = heap_alloc_proc;
-}
-
-#private
-heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
-    if size_ == 0 do return null;
-
-    size := size_ + sizeof heap_block;
-    if size % align != 0 {
-        size += align - (size % align);
-    }
-
-    prev := ^heap_state.free_list;
-    hb := heap_state.free_list;
-    while hb != null {
-        if hb.size >= size {
-            *prev = hb.next;
-            hb.next = null;
-
-            return cast(rawptr) (cast(u32) hb + sizeof heap_block);
-        }
-
-        prev = ^hb.next;
-        hb = hb.next;
-    }
-
-    if size < heap_state.remaining_space {
-        ret := cast(^heap_block) heap_state.next_alloc;
-        ret.size = size;
-        ret.next = null;
-
-        heap_state.next_alloc = cast(rawptr) (cast(u32) heap_state.next_alloc + size);
-        heap_state.remaining_space -= size;
-
-        return cast(rawptr) (cast(u32) ret + sizeof heap_block);
-    }
-
-    new_pages :: ((size - heap_state.remaining_space) >> 16) + 1;
-    if memory_grow(new_pages) == -1 {
-        // out of memory
-        return null;
-    }
-    heap_state.remaining_space += new_pages << 16;
-
-    ret := cast(^heap_block) heap_state.next_alloc;
-    ret.size = size;
-    ret.next = null;
-
-    heap_state.next_alloc = cast(rawptr) (cast(u32) heap_state.next_alloc + size);
-    heap_state.remaining_space -= size;
-
-    return cast(rawptr) (cast(u32) ret + sizeof heap_block);
-}
-
-#private
-heap_free :: proc (ptr: rawptr) {
-    hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
-
-    // DEBUGGING: Fills freed memory with 0's
-    // for i: 0, hb_ptr.size do (cast(^u8) ptr)[i] = cast(u8) 0;
-
-    hb_ptr.next = heap_state.free_list;
-    heap_state.free_list = hb_ptr;
-}
-
-#private
-heap_resize :: proc (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
-    hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
-    old_size := hb_ptr.size - sizeof heap_block;
-
-    // If there is already enough space in the current allocated block,
-    // just return the block that already exists and has the memory in it.
-    if old_size >= new_size do return ptr;
-
-    // If we are at the end of the allocation space, just extend it
-    if hb_ptr.size + cast(u32) ptr >= cast(u32) heap_state.next_alloc {
-        if new_size - old_size >= heap_state.remaining_space {
-            new_pages :: ((new_size - old_size - heap_state.remaining_space) >> 16) + 1;
-            if memory_grow(new_pages) == -1 {
-                // out of memory
-                return null;
-            }
-            heap_state.remaining_space += new_pages << 16;
-        }
-
-        hb_ptr.size = new_size + sizeof heap_block;
-        heap_state.next_alloc = cast(rawptr) (cast(u32) ptr + hb_ptr.size);
-        heap_state.remaining_space -= new_size - old_size;
-        return ptr;
-    }
-
-    new_ptr := heap_alloc(new_size, align);
-    memory.copy(new_ptr, ptr, old_size);
-    heap_free(ptr);
-    return new_ptr;
-}
-
-#private
-heap_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    if aa == AllocAction.Alloc do return heap_alloc(size, align);
-    if aa == AllocAction.Resize do return heap_resize(oldptr, size, align);
-    if aa == AllocAction.Free {
-        heap_free(oldptr);
-        return null;
-    }
-
-    return null;
-}
-
-
-ScratchState :: struct {
-    base_ptr : rawptr;
-    size     : u32;
-    curr_ptr : rawptr;
-}
-
-#private
-scratch_alloc_proc :: proc (data: rawptr, aa: AllocAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    ss := cast(^ScratchState) data;
-
-    if aa == AllocAction.Alloc {
-        retval := null;
-        rem := ss.size - cast(u32) ss.curr_ptr + cast(u32) ss.base_ptr;
-
-        if size <= rem {
-            retval = ss.curr_ptr;
-            ss.curr_ptr = cast(rawptr) (cast(u32) ss.curr_ptr + size);
-        } else {
-            ss.curr_ptr = ss.base_ptr;
-            retval = ss.base_ptr;
-        }
-
-        return retval;
-    }
-
-    return null;
-}
-
-scratch_state_init :: proc (use ss: ^ScratchState, buffer: rawptr, length: u32) {
-    base_ptr = buffer;
-    curr_ptr = buffer;
-    size     = length;
-}
-
-scratch_alloc_init :: proc (a: ^Allocator, ss: ^ScratchState) {
-    a.func = scratch_alloc_proc;
-    a.data = ss;
-}
-
+// The global temp allocator, set up upon program intialization.
+#private_file
+temp_state     : ring.RingState;
+temp_allocator : Allocator;
 
 
 alloc_slice :: proc (sl: ^[] $T, count: i32) {
@@ -183,4 +21,10 @@ alloc_slice :: proc (sl: ^[] $T, count: i32) {
     sl.count = count;
 }
 
+init :: proc () {
+    heap.init();
 
+    temp_buffer := raw_alloc(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
+    temp_state = ring.make(temp_buffer, TEMPORARY_ALLOCATOR_SIZE);
+    temp_allocator = ring.make_allocator(^temp_state);
+}

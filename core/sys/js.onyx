@@ -8,10 +8,10 @@ output_str :: proc (s: str) -> u32 #foreign "host" "print_str" ---
 // The builtin _start proc.
 // Sets up everything needed for execution.
 proc () #export "_start" {
-    allocator.heap_init();
+    alloc.init();
 
-    context.allocator = allocator.heap_allocator;
-    context.temp_allocator = allocator.heap_allocator;
+    context.allocator = alloc.heap_allocator;
+    context.temp_allocator = alloc.temp_allocator;
 
     args : [] cstr;
     args.data  = null;

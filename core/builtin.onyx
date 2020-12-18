@@ -26,45 +26,53 @@ vararg_get :: proc (va: vararg, ret: ^$T) -> bool {
 
 null :: cast(rawptr) 0;
 
-// ---------------------------------
-//           Allocation
-// ---------------------------------
-DEFAULT_ALLOCATION_ALIGNMENT :: 16
+OnyxContext :: struct {
+    allocator      : Allocator;
+    temp_allocator : Allocator;
+}
 
-AllocAction :: enum {
+context : OnyxContext;
+
+
+//
+// Basic allocation structures.
+// The implementations of all of the allocators can be found in core/alloc/.
+// These need to be here so the context structure has the types and enum values.
+//
+__DEFAULT_ALLOCATION_ALIGNMENT :: 16
+
+AllocationAction :: enum {
     Alloc;
     Free;
     Resize;
 }
 
-allocator_proc :: #type proc (rawptr, AllocAction, u32, u32, rawptr) -> rawptr;
+allocator_proc :: #type proc (rawptr, AllocationAction, u32, u32, rawptr) -> rawptr;
 
 Allocator :: struct {
     data: rawptr;
     func: allocator_proc;
 }
 
-alloc :: proc (use a: Allocator, size: u32) -> rawptr {
-    return func(data, AllocAction.Alloc, size, DEFAULT_ALLOCATION_ALIGNMENT, null);
+raw_alloc :: proc (use a: Allocator, size: u32) -> rawptr {
+    return func(data, AllocationAction.Alloc, size, __DEFAULT_ALLOCATION_ALIGNMENT, null);
 }
 
-resize :: proc (use a: Allocator, ptr: rawptr, size: u32) -> rawptr {
-    return func(data, AllocAction.Resize, size, DEFAULT_ALLOCATION_ALIGNMENT, ptr);
+raw_resize :: proc (use a: Allocator, ptr: rawptr, size: u32) -> rawptr {
+    return func(data, AllocationAction.Resize, size, __DEFAULT_ALLOCATION_ALIGNMENT, ptr);
 }
 
-free :: proc (use a: Allocator, ptr: rawptr) {
-    func(data, AllocAction.Free, 0, 0, ptr);
+raw_free :: proc (use a: Allocator, ptr: rawptr) {
+    func(data, AllocationAction.Free, 0, 0, ptr);
 }
 
-calloc  :: proc (size: u32) -> rawptr do return alloc(context.allocator, size);
-cresize :: proc (ptr: rawptr, size: u32) -> rawptr do return resize(context.allocator, ptr, size);
-cfree   :: proc (ptr: rawptr) do free(context.allocator, ptr);
+// Allocators using the context structure.
+calloc  :: proc (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
+cresize :: proc (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
+cfree   :: proc (ptr: rawptr) do raw_free(context.allocator, ptr);
+
 
 // @CLEANUP: These need to move to somewhere else eventually
 cmp_asc :: proc (a: $T, b: T) -> i32 do return cast(i32) (a - b);
 cmp_dec :: proc (a: $T, b: T) -> i32 do return cast(i32) (b - a);
 
-context : struct {
-    allocator      : Allocator;
-    temp_allocator : Allocator;
-}
