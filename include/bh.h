@@ -1625,6 +1625,7 @@ isize bh__printi64(char* str, isize n, bh__print_format format, i64 value) {
     return bh__print_string(str, n, walker);
 }
 
+// TODO: This implementation is VERY VERY BAD AND WRONG. Fix it.
 isize bh__printf64(char* str, isize n, f64 value) {
     fori (i, 0, 6) value *= 10.0;
     i64 v = (i64) value;
@@ -2269,8 +2270,6 @@ void bh_imap_clear(bh_imap* imap) {
 }
 
 #endif // ifndef BH_NO_IMAP
-
-
 
 
 

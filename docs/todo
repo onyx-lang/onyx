@@ -75,9 +75,13 @@ Language Cohesion:
         WASM code; i.e.  foo().bar; This should at least produce an error until
         the underlying issue is fixed.
 
-    [ ] Every type should have a unique id assigned to it. This would make it
+    [X] Every type should have a unique id assigned to it. This would make it
         easier to talk about types in a concrete way (for polymorphism and such),
         and would prepare the compiler to output type information into data section.
+
+        This has been implemented for structs and enums, since those are the two
+        types that you can control the name and inadvertently give the same name
+        to two different structs / enums.
 
     [ ] Switches should have range based statements, i.e.
             switch expr {

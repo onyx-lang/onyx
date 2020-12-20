@@ -531,16 +531,12 @@ static i32 onyx_compile(CompilerState* compiler_state) {
     u64 duration = bh_time_duration(start_time);
     
     if (compiler_state->options->verbose_output) {
-        bh_printf("\nStatistics:\n");
-        bh_printf("    Time taken: %l.%l seconds\n",
-                duration / 1000, duration % 1000);
-        bh_printf("    Processed %l lines (%f lines/second).\n",
-                lexer_lines_processed,
-                ((f32) 1000 * lexer_lines_processed) / (duration));
-        bh_printf("    Processed %l tokens (%f tokens/second).\n",
-                lexer_tokens_processed,
-                ((f32) 1000 * lexer_tokens_processed) / (duration));
-        bh_printf("\n");
+        // TODO: Replace these with bh_printf when padded formatting is added.
+        printf("\nStatistics:\n");
+        printf("    Time taken: %lf seconds\n", (double) duration / 1000);
+        printf("    Processed %ld lines (%f lines/second).\n", lexer_lines_processed, ((f32) 1000 * lexer_lines_processed) / (duration));
+        printf("    Processed %ld tokens (%f tokens/second).\n", lexer_tokens_processed, ((f32) 1000 * lexer_tokens_processed) / (duration));
+        printf("\n");
     }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
