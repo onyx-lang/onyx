@@ -1,0 +1,26 @@
+List of known bugs:
+
+[ ] Using an auto-cast on an argument when calling an overloaded proc leads
+	to an unexpected error. Take the following example:
+	```
+	overloaded :: proc {
+		proc (x: f32, y: str) ---,
+		proc (x: i32, y: i32) ---,
+	}
+
+	foo :: proc () {
+		x: i32 = 1234;
+		overloaded(~~x, 4);
+	}
+	```
+	Compiles with the following error:
+	```
+	(/home/brendan/dev/c/onyx/a.onyx:8,15) unable to match overloaded function with provided argument types: (f32, unsized int)
+ 	8 |     overloaded(~~x, 4);
+ 	```
+
+ 	This is because in trying the first overload, the auto-cast is consumed
+ 	and converted to a cast(f32). Then, when it doesn't match the first one
+ 	and it tries the second, the parameter types are f32 and unsized int,
+ 	which is doesn't match the second one, when the original parameters would
+ 	have matched correctly.

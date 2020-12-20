@@ -25,8 +25,8 @@ arena_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: 
             retval = ss.curr_ptr;
             ss.curr_ptr = cast(rawptr) (cast(u32) ss.curr_ptr + size);
         } else {
-        	// Not enough space for the allocation
-        	retval = null;
+            // Not enough space for the allocation
+            retval = null;
         }
 
         return retval;
@@ -36,20 +36,20 @@ arena_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: 
 }
 
 make :: proc (buffer: rawptr, length: u32) -> ArenaState {
-	return ArenaState.{
-	    base_ptr = buffer,
-	    curr_ptr = buffer,
-	    size     = length,
-	};
+    return ArenaState.{
+        base_ptr = buffer,
+        curr_ptr = buffer,
+        size     = length,
+    };
 }
 
 make_allocator :: proc (rs: ^ArenaState) -> Allocator {
-	return Allocator.{
-		func = ring_alloc_proc,
-		data = rs,
-	};
+    return Allocator.{
+        func = arena_alloc_proc,
+        data = rs,
+    };
 }
 
 reset :: proc (arena: ^ArenaState) {
-	arena.curr_ptr = arena.base_ptr;
+    arena.curr_ptr = arena.base_ptr;
 }
