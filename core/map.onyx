@@ -1,5 +1,6 @@
 package core.map
 
+use package core { printf }
 use package core.array as array
 use package core.string as string
 

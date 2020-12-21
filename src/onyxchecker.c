@@ -33,13 +33,23 @@ CHECK(struct, AstStructType* s_node);
 CHECK(function_header, AstFunction* func);
 CHECK(memres, AstMemRes* memres);
 
-static inline void fill_in_type(AstTyped* node) {
-    if (node->type_node && node->type_node->kind == Ast_Kind_Array_Type) {
-        if (((AstArrayType *) node->type_node)->count_expr) {
-            check_expression(&((AstArrayType *) node->type_node)->count_expr);
-            resolve_expression_type(((AstArrayType *) node->type_node)->count_expr);
+static inline void fill_in_array_count(AstType* type_node) {
+    if (type_node == NULL) return;
+
+    if (type_node->kind == Ast_Kind_Type_Alias) {
+        fill_in_array_count(((AstTypeAlias *) type_node)->to);
+    }
+
+    if (type_node->kind == Ast_Kind_Array_Type) {
+        if (((AstArrayType *) type_node)->count_expr) {
+            check_expression(&((AstArrayType *) type_node)->count_expr);
+            resolve_expression_type(((AstArrayType *) type_node)->count_expr);
         }
     }
+}
+
+static inline void fill_in_type(AstTyped* node) {
+    fill_in_array_count(node->type_node);
 
     if (node->type == NULL)
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
@@ -1148,13 +1158,27 @@ b32 check_range_literal(AstBinaryOp** prange) {
 }
 
 b32 check_size_of(AstSizeOf* so) {
-    so->size = type_size_of(type_build_from_ast(semstate.allocator, so->so_type));
+    fill_in_array_count(so->so_ast_type);
+
+    so->so_type = type_build_from_ast(semstate.allocator, so->so_ast_type);
+    if (so->so_type == NULL) {
+        onyx_report_error(so->token->pos, "Error with type used here.");
+        return 1;
+    }
+    so->size = type_size_of(so->so_type);
 
     return 0;
 }
 
 b32 check_align_of(AstAlignOf* ao) {
-    ao->alignment = type_alignment_of(type_build_from_ast(semstate.allocator, ao->ao_type));
+    fill_in_array_count(ao->ao_ast_type);
+
+    ao->ao_type = type_build_from_ast(semstate.allocator, ao->ao_ast_type);
+    if (ao->ao_type == NULL) {
+        onyx_report_error(ao->token->pos, "Error with type used here.");
+        return 1;
+    }
+    ao->alignment = type_alignment_of(ao->ao_type);
 
     return 0;
 }
@@ -1356,27 +1380,6 @@ b32 check_overloaded_function(AstOverloadedFunction* func) {
 }
 
 b32 check_struct(AstStructType* s_node) {
-    bh_table(i32) mem_set;
-    bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
-
-    bh_arr_each(AstStructMember *, member, s_node->members) {
-        token_toggle_end((*member)->token);
-
-        if (bh_table_has(i32, mem_set, (*member)->token->text)) {
-            onyx_report_error((*member)->token->pos,
-                    "Duplicate struct member '%s'.",
-                    (*member)->token->text);
-
-            token_toggle_end((*member)->token);
-            return 1;
-        }
-
-        bh_table_put(i32, mem_set, (*member)->token->text, 1);
-        token_toggle_end((*member)->token);
-    }
-
-    bh_table_free(mem_set);
-
     // NOTE: fills in the stcache
     type_build_from_ast(semstate.allocator, (AstType *) s_node);
 

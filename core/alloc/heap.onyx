@@ -90,6 +90,8 @@ heap_free :: proc (ptr: rawptr) {
 
 #private_file
 heap_resize :: proc (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
+    if ptr == null do return null;
+    
     hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
     old_size := hb_ptr.size - sizeof heap_block;
 

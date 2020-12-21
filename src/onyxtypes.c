@@ -313,6 +313,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 if (a_node->count_expr->kind != Ast_Kind_NumLit
                     || a_node->count_expr->type->kind != Type_Kind_Basic
                     || a_node->count_expr->type->Basic.kind != Basic_Kind_I32) {
+                    onyx_report_error(type_node->token->pos, "Array type expects type 'i32' for size, got '%s'.",
+                        type_get_name(a_node->count_expr->type));
                     return NULL;
                 }
 

@@ -1,4 +1,5 @@
 RELEASE=1
+USE_GCC=1
 
 OBJ_FILES=\
 	build/onyxlex.o \
@@ -22,7 +23,11 @@ else
 ifeq ($(RELEASE), 0)
 	CC=gcc
 else
-	CC=tcc
+	ifeq ($(USE_GCC),1)
+		CC=gcc
+	else
+		CC=tcc
+	endif
 endif
 endif
 

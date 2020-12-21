@@ -24,3 +24,34 @@ List of known bugs:
  	and it tries the second, the parameter types are f32 and unsized int,
  	which is doesn't match the second one, when the original parameters would
  	have matched correctly.
+
+[ ] `TileData :: [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;` results in a
+    segfault because it is an invalid top level node, but that is not checked
+    before it is tried to be used.
+ 
+[X] `TileData :: #type [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;` produces the
+	following error:
+	```
+	(/home/brendan/dev/onyx/aoc/day20.onyx:25,19) Array type expects type 'i32' for size, got 'unsized int'.
+	 25 | TileData :: #type [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;
+	```
+
+	This because the expression for the array size is not reducing and getting
+	converted to the fixed size integer. I suspect this is because for sizeof
+	and alignof expression, `fill_in_type` is not used, and that function has
+	the logic to handle the array subscript reduction and type resolution.
+
+[X] The following struct is causing a seg fault in the compiler. I believe it
+	is because of the duplicate struct member names and failing to get the position
+	in the file to report the error.
+	```
+	Tile :: struct {
+		id          : u32;
+		orientation : TileOrientation;
+		data        : [] bool;
+		edges       : [] u32;
+
+		pos_x       : u32 = 0;
+		pos_x       : u32 = 0;
+	}
+	```

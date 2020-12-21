@@ -366,7 +366,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case Token_Type_Keyword_Sizeof: {
             AstSizeOf* so_node = make_node(AstSizeOf, Ast_Kind_Size_Of);
             so_node->token = expect_token(parser, Token_Type_Keyword_Sizeof);
-            so_node->so_type = (AstType *) parse_type(parser);
+            so_node->so_ast_type = (AstType *) parse_type(parser);
             so_node->type_node = (AstType *) &basic_type_i32;
 
             retval = (AstTyped *) so_node;
@@ -376,7 +376,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case Token_Type_Keyword_Alignof: {
             AstAlignOf* ao_node = make_node(AstAlignOf, Ast_Kind_Align_Of);
             ao_node->token = expect_token(parser, Token_Type_Keyword_Alignof);
-            ao_node->ao_type = (AstType *) parse_type(parser);
+            ao_node->ao_ast_type = (AstType *) parse_type(parser);
             ao_node->type_node = (AstType *) &basic_type_i32;
 
             retval = (AstTyped *) ao_node;

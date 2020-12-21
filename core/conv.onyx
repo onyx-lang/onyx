@@ -180,6 +180,19 @@ str_format_va :: proc (format: str, buffer: [] u8, va: vararg) -> str {
                     buffer[len] = c;
                     len += 1;
                 }
+
+                case #char "b" {
+                    b : bool;
+                    if !vararg_get(va, ^b) do return;
+
+                    s := "false";
+                    if b do s = "true";
+
+                    for a: s {
+                        buffer[len] = a;
+                        len += 1;
+                    }
+                }
             }
 
             state = 0;

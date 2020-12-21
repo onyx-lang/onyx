@@ -167,11 +167,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			break;
 
 		case Ast_Kind_Size_Of:
-			((AstSizeOf *) nn)->so_type = (AstType *) ast_clone(a, ((AstSizeOf *) node)->so_type);
+			((AstSizeOf *) nn)->so_ast_type = (AstType *) ast_clone(a, ((AstSizeOf *) node)->so_ast_type);
 			break;
 
 		case Ast_Kind_Align_Of:
-			((AstAlignOf *) nn)->ao_type = (AstType *) ast_clone(a, ((AstAlignOf *) node)->ao_type);
+			((AstAlignOf *) nn)->ao_ast_type = (AstType *) ast_clone(a, ((AstAlignOf *) node)->ao_ast_type);
 			break;
 
 		case Ast_Kind_Struct_Literal: {
