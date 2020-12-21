@@ -80,6 +80,10 @@ clear :: proc (use map: ^Map($K, $V)) {
     entries.count = 0;
 }
 
+empty :: proc (use map: ^Map($K, $V)) -> bool {
+    return entries.count == 0;
+}
+
 hash_function :: proc {
 	proc (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
 	proc (key: i32) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
