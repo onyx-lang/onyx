@@ -1961,6 +1961,8 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 expect_token(parser, ':');
 
                 AstTyped* node = parse_top_level_expression(parser);
+                if (parser->hit_unexpected_token || node == NULL)
+                    return NULL;
 
                 node->flags |= private_kind;
 

@@ -5,7 +5,7 @@ package core.alloc
 #include_file "core/alloc/heap"
 #include_file "core/alloc/ring"
 
-TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 16Kb
+TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
 
 // The global heap allocator, set up upon program intialization.
 heap_allocator : Allocator;

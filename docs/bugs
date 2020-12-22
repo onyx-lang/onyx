@@ -25,13 +25,23 @@ List of known bugs:
  	which is doesn't match the second one, when the original parameters would
  	have matched correctly.
 
-[ ] `TileData :: [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;` results in a
+[ ] `defer` statements are not executed at the end of a loop if the loop is
+    exited using a `break` statement, or a `continue` statement. The semantics
+    of this need to change because it is not expected behaviour. Also it would
+    prevent the usefulness of this pattern:
+    ```
+    while i := 0; i < 10 {
+        defer i += 1;
+        ...
+    }
+    ```
+    Since `continue`ing or `break`ing would skip the deferred statement, causing
+    an infinite loop.
+
+[X] `TileData :: [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;` results in a
     segfault because it is an invalid top level node, but that is not checked
     before it is tried to be used.
 
-[ ] `defer` statements are not executed at the end of a loop if the loop is
-    exited using a `break` statement, or a `continue` statement.
- 
 [X] `TileData :: #type [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;` produces the
 	following error:
 	```
