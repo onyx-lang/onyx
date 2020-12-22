@@ -3222,7 +3222,7 @@ void emit_entity(Entity* ent) {
             *module->stack_top_ptr += 16 - (*module->stack_top_ptr % 16);
         }
 
-        builtin_heap_start.value.i = *module->stack_top_ptr + (1 << 16);
+        builtin_heap_start.value.i = *module->stack_top_ptr + (1 << 20);
         if (builtin_heap_start.value.i % 16 != 0) {
             builtin_heap_start.value.i += 16 - (builtin_heap_start.value.i % 16);
         }

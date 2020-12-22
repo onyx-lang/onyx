@@ -1,33 +1,53 @@
 package core.alloc.arena
 
-// This allocator is great for when you need to do bunch of
-// allocations is a small amount of time. Much like the Ring
-// allocator, it simply bumps up a pointer as you allocate
-// memory. Unlike the Ring allocator, it does not wrap around,
-// meaning you can run of out of memory, so make sure the buffer
-// provided has enough space for what you are going to do.
+// This allocator is mostly used for making many fixed-size
+// allocation (i.e. allocations that will not need to change
+// in size, such as game entities or position structs). The
+// power of this allocator over the heap allocator for this
+// purpose is that it is much faster, since the logic is
+// simpler. Another power of this allocator over something
+// such as a dynamic array is that the dynamic array could
+// relocate and cause any pointers to the data inside to
+// become invalidated; this is definitely not behaviour you
+// want. This arena allocator can grow as large as needed,
+// while guaranteeing that the memory inside of it will
+// never move.
 
 ArenaState :: struct {
-    base_ptr : rawptr;
-    size     : u32;
-    curr_ptr : rawptr;
+    backing_allocator : Allocator;
+
+    first_arena   : ^Arena;
+    current_arena : ^Arena;
+    
+    size       : u32;
+    arena_size : u32;
 }
+
+Arena :: struct { next : ^Arena; }
 
 #private_file
 arena_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    ss := cast(^ArenaState) data;
+    alloc_arena := cast(^ArenaState) data;
 
     if aa == AllocationAction.Alloc {
-        retval := null;
-        rem := ss.size - cast(u32) ss.curr_ptr + cast(u32) ss.base_ptr;
-
-        if size <= rem {
-            retval = ss.curr_ptr;
-            ss.curr_ptr = cast(rawptr) (cast(u32) ss.curr_ptr + size);
-        } else {
-            // Not enough space for the allocation
-            retval = null;
+        // NOTE: An allocation of this size does not fit into a single arena.
+        if size > alloc_arena.arena_size - sizeof rawptr {
+            return null;
         }
+
+        if alloc_arena.size + size >= alloc_arena.arena_size {
+            new_arena := cast(^Arena) raw_alloc(alloc_arena.backing_allocator, alloc_arena.arena_size);
+            if new_arena == null do return null;
+
+            alloc_arena.size = sizeof rawptr;
+
+            new_arena.next = null;
+            alloc_arena.current_arena.next = new_arena;
+            alloc_arena.current_arena = new_arena;
+        }
+
+        retval := cast(rawptr) (cast(^u8) alloc_arena.current_arena + alloc_arena.size);
+        alloc_arena.size += size;
 
         return retval;
     }
@@ -35,11 +55,18 @@ arena_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: 
     return null;
 }
 
-make :: proc (buffer: rawptr, length: u32) -> ArenaState {
+// NOTE: `arena_size` must be at least 4
+make :: proc (backing: Allocator, arena_size: u32) -> ArenaState {
+    initial_arena := cast(^Arena) raw_alloc(backing, arena_size);
+    initial_arena.next = null;
+
     return ArenaState.{
-        base_ptr = buffer,
-        curr_ptr = buffer,
-        size     = length,
+        backing_allocator = backing,
+        first_arena       = initial_arena,
+        current_arena     = initial_arena,
+
+        size              = sizeof rawptr,
+        arena_size        = arena_size,
     };
 }
 
@@ -50,6 +77,16 @@ make_allocator :: proc (rs: ^ArenaState) -> Allocator {
     };
 }
 
-reset :: proc (arena: ^ArenaState) {
-    arena.curr_ptr = arena.base_ptr;
+free :: proc (arena: ^ArenaState) {
+    walker := arena.first_arena;
+    trailer := walker;
+    while walker != null {
+        walker = walker.next;
+        raw_free(arena.backing_allocator, trailer);
+        trailer = walker;
+    }
+
+    arena.first_arena   = null;
+    arena.current_arena = null;
+    arena.size          = 0;
 }

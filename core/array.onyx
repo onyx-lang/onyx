@@ -17,6 +17,24 @@ free :: proc (arr: ^[..] $T) {
     arr.data = null;
 }
 
+copy :: proc (arr: ^[..] $T) -> [..] T {
+    new_arr : [..] T;
+    init(^new_arr, arr.count);
+    new_arr.count = arr.count;
+
+    for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
+    return new_arr;
+}
+
+copy_range :: proc (arr: ^[..] $T, r: range) -> [..] T {
+    new_arr : [..] T;
+    init(^new_arr, r.high - r.low);
+    new_arr.count = r.high - r.low;
+
+    for i: r do new_arr.data[i] = arr.data[i];
+    return new_arr;
+}
+
 clear :: proc (arr: ^[..] $T) {
     arr.count = 0;
 }
