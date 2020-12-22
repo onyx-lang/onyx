@@ -832,8 +832,11 @@ static void symres_enum(AstEnumType* enum_node) {
             num->value.l = next_assign_value;
             num->type_node = enum_node->backing;
             num->type = enum_node->backing_type;
+            num->flags |= Ast_Flag_Comptime;
             (*value)->value = num;
         }
+
+        (*value)->flags |= Ast_Flag_Comptime;
 
         if (enum_node->flags & Ast_Flag_Enum_Is_Flags) {
             next_assign_value <<= 1;

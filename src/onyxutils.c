@@ -380,10 +380,11 @@ AstTyped* ast_reduce(bh_allocator a, AstTyped* node) {
     assert(node->flags & Ast_Flag_Comptime);
 
     switch (node->kind) {
-        case Ast_Kind_Binary_Op: return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
-        case Ast_Kind_Unary_Op:  return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
-        case Ast_Kind_NumLit:    return node;
-        default:                 return NULL;
+        case Ast_Kind_Binary_Op:  return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
+        case Ast_Kind_Unary_Op:   return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
+        case Ast_Kind_NumLit:     return node;
+        case Ast_Kind_Enum_Value: return (AstTyped *) ast_reduce(a, (AstTyped *) ((AstEnumValue *) node)->value);
+        default:                  return NULL;
     }
 }
 
