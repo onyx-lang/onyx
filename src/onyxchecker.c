@@ -421,8 +421,8 @@ b32 check_call(AstCall* call) {
                 if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(&arg_arr[arg_pos]->value, formal_params[arg_pos])) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
-                            "The function '%b' expects a value of type '%s' for %d%s parameter, got '%s'.",
-                            callee->token->text, callee->token->length,
+                            "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
+                            get_function_name(callee),
                             type_get_name(formal_params[arg_pos]),
                             arg_pos + 1,
                             bh_num_suffix(arg_pos + 1),
@@ -440,8 +440,8 @@ b32 check_call(AstCall* call) {
                 if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(&arg_arr[arg_pos]->value, variadic_type)) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
-                            "The function '%b' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
-                            callee->token->text, callee->token->length,
+                            "The procedure '%s' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
+                            get_function_name(callee),
                             type_get_name(variadic_type),
                             variadic_param->local->token->text,
                             variadic_param->local->token->length,

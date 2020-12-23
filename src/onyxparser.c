@@ -1972,11 +1972,23 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     if (func->exported_name == NULL)
                         func->exported_name = symbol;
 
+                    func->name = symbol;
+
+                } else if (node->kind == Ast_Kind_Polymorphic_Proc) {
+                    AstPolyProc* proc = (AstPolyProc *) node;
+
+                    if (proc->base_func->exported_name == NULL)
+                        proc->base_func->exported_name = symbol;
+
+                    proc->base_func->name = symbol;
+
                 } else if (node->kind == Ast_Kind_Global) {
                     AstGlobal* global = (AstGlobal *) node;
 
                     if (global->exported_name == NULL)
                         global->exported_name = symbol;
+
+                    global->name = symbol;
 
                 } else if (node->kind != Ast_Kind_Overloaded_Function
                         && node->kind != Ast_Kind_StrLit) {

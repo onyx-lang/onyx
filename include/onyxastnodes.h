@@ -640,6 +640,8 @@ struct AstAlias         {
 struct AstGlobal        {
     AstTyped_base;
 
+    OnyxToken* name;
+
     union {
         // NOTE: Used when a global is exported with a specific name
         OnyxToken* exported_name;
@@ -674,6 +676,8 @@ struct AstFunction {
     // NOTE: used by the #add_overload directive. Initially set to a symbol,
     // then resolved to an overloaded function.
     AstNode *overloaded_function;
+
+    OnyxToken* name;
 
     union {
         // NOTE: Used when a function is exported with a specific name
@@ -860,6 +864,7 @@ void promote_numlit_to_larger(AstNumLit* num);
 b32 convert_numlit_to_type(AstNumLit* num, Type* type);
 b32 type_check_or_auto_cast(AstTyped** pnode, Type* type);
 Type* resolve_expression_type(AstTyped* node);
+char* get_function_name(AstFunction* func);
 
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,

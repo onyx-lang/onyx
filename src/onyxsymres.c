@@ -796,7 +796,11 @@ static void symres_use_package(AstUsePackage* package) {
     }
 
     if (package->alias == NULL && package->only == NULL) {
-        scope_include(semstate.curr_scope, p->scope);
+        OnyxFilePos pos = { 0 };
+        if (package->token != NULL)
+            pos = package->token->pos;
+
+        scope_include(semstate.curr_scope, p->scope, pos);
     }
 }
 

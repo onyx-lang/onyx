@@ -14,7 +14,7 @@ void program_info_init(ProgramInfo* prog, bh_allocator alloc);
 Package* program_info_package_lookup(ProgramInfo* prog, char* package_name);
 Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_name, Scope* parent_scope, bh_allocator alloc);
 
-void scope_include(Scope* target, Scope* source);
+void scope_include(Scope* target, Scope* source, OnyxFilePos pos);
 b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol);
 b32 symbol_raw_introduce(Scope* scope, char* tkn, OnyxFilePos pos, AstNode* symbol);
 void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node);

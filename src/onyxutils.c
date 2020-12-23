@@ -177,9 +177,9 @@ Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     return scope;
 }
 
-void scope_include(Scope* target, Scope* source) {
+void scope_include(Scope* target, Scope* source, OnyxFilePos pos) {
     bh_table_each_start(AstNode *, source->symbols);
-        symbol_raw_introduce(target, (char *) key, value->token->pos, value);
+        symbol_raw_introduce(target, (char *) key, pos, value);
     bh_table_each_end;
 }
 
@@ -194,8 +194,12 @@ b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
 
 b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
     if (bh_table_has(AstNode *, scope->symbols, name)) {
-        onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
-        return 0;
+        if (bh_table_get(AstNode *, scope->symbols, name) != symbol) {
+            onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
+            return 0;
+        }
+
+        return 1;
     }
 
     bh_table_put(AstNode *, scope->symbols, name, symbol);
@@ -869,3 +873,17 @@ Type* resolve_expression_type(AstTyped* node) {
     return node->type;
 }
 
+char* get_function_name(AstFunction* func) {
+    if (func->name != NULL) {
+        return bh_aprintf(global_scratch_allocator, "%b", func->name->text, func->name->length);
+    }
+
+    if (func->exported_name != NULL) {
+        return bh_aprintf(global_scratch_allocator,
+                "EXPORTED:%b",
+                func->exported_name->text,
+                func->exported_name->length);
+    }
+
+    return "<anonymous procedure>";
+}
