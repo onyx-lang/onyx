@@ -1477,8 +1477,8 @@ b32 check_memres(AstMemRes* memres) {
             if (!type_check_or_auto_cast(&memres->initial_value, memres_type)) {
                 onyx_report_error(memres->token->pos,
                         "Cannot assign value of type '%s' to a '%s'.",
-                        type_get_name(memres_type),
-                        type_get_name(memres->initial_value->type));
+                        type_get_name(memres->initial_value->type),
+                        type_get_name(memres_type));
                 return 1;
             }
 

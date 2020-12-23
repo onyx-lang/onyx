@@ -2073,7 +2073,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
         default: break;
     }
 
-    consume_token(parser);
+    expect_token(parser, ';');
     return NULL;
 }
 
@@ -2220,6 +2220,7 @@ ParseResults onyx_parse(OnyxParser *parser) {
 
         if (curr_stmt != NULL && curr_stmt != &error_node) {
             while (curr_stmt != NULL) {
+                if (parser->hit_unexpected_token) return parser->results;
 
                 switch (curr_stmt->kind) {
                     case Ast_Kind_Include_File:
