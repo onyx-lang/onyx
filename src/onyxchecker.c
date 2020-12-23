@@ -186,6 +186,19 @@ b32 check_for(AstFor* fornode) {
     return 0;
 }
 
+static b32 add_case_to_switch_statement(AstSwitch* switchnode, i64 case_value, AstBlock* block, OnyxFilePos pos) {
+    switchnode->min_case = bh_min(switchnode->min_case, case_value);
+    switchnode->max_case = bh_max(switchnode->max_case, case_value);
+
+    if (bh_imap_has(&switchnode->case_map, case_value)) {
+        onyx_report_error(pos, "Multiple cases for values '%d'.", case_value);
+        return 1;
+    }
+
+    bh_imap_put(&switchnode->case_map, case_value, (u64) block);
+    return 0;
+}
+
 b32 check_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) check_statement((AstNode *) switchnode->assignment);
 
@@ -201,30 +214,43 @@ b32 check_switch(AstSwitch* switchnode) {
 
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
         if (check_block(sc->block)) return 1;
-        if (check_expression(&sc->value)) return 1;
 
-        if (sc->value->kind == Ast_Kind_Enum_Value) {
-            sc->value = (AstTyped *) ((AstEnumValue *) sc->value)->value;
+        bh_arr_each(AstTyped *, value, sc->values) {
+            if (check_expression(value)) return 1;
+
+            if ((*value)->kind == Ast_Kind_Range_Literal) {
+                AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
+                resolve_expression_type(rl->low);
+                resolve_expression_type(rl->high);
+                assert(rl->low->kind == Ast_Kind_NumLit && rl->high->kind == Ast_Kind_NumLit);
+
+                promote_numlit_to_larger((AstNumLit *) rl->low);
+                promote_numlit_to_larger((AstNumLit *) rl->high);
+
+                i64 lower = ((AstNumLit *) rl->low)->value.l;
+                i64 upper = ((AstNumLit *) rl->high)->value.l;
+
+                // NOTE: This is inclusive!!!!
+                fori (case_value, lower, upper + 1)
+                    add_case_to_switch_statement(switchnode, case_value, sc->block, rl->token->pos);
+
+                continue;
+            }
+
+            if ((*value)->kind == Ast_Kind_Enum_Value) {
+                (*value) = (AstTyped *) ((AstEnumValue *) (*value))->value;
+            }
+
+            if ((*value)->kind != Ast_Kind_NumLit) {
+                onyx_report_error((*value)->token->pos, "case statement expected compile time known integer");
+                return 1;
+            }
+
+            resolve_expression_type((*value));
+            promote_numlit_to_larger((AstNumLit *) (*value));
+
+            add_case_to_switch_statement(switchnode, ((AstNumLit *) (*value))->value.l, sc->block, sc->block->token->pos);
         }
-
-        if (sc->value->kind != Ast_Kind_NumLit) {
-            onyx_report_error(sc->value->token->pos, "case statement expected compile time known integer");
-            return 1;
-        }
-
-        resolve_expression_type(sc->value);
-        promote_numlit_to_larger((AstNumLit *) sc->value);
-
-        u64 value = ((AstNumLit *) sc->value)->value.l;
-        switchnode->min_case = bh_min(switchnode->min_case, value);
-        switchnode->max_case = bh_max(switchnode->max_case, value);
-
-        if (bh_imap_has(&switchnode->case_map, value)) {
-            onyx_report_error(sc->value->token->pos, "Multiple cases for values '%d'.", value);
-            return 1;
-        }
-
-        bh_imap_put(&switchnode->case_map, value, (u64) sc->block);
     }
 
     if (switchnode->default_case)

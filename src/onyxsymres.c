@@ -540,7 +540,9 @@ static void symres_switch(AstSwitch* switchnode) {
     symres_expression(&switchnode->expr);
 
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
-        symres_expression(&sc->value);
+        bh_arr_each(AstTyped *, value, sc->values)
+            symres_expression(value);
+            
         symres_block(sc->block);
     }
 

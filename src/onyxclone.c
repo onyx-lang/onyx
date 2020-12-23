@@ -262,8 +262,13 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			bh_arr_new(global_heap_allocator, dw->cases, bh_arr_length(sw->cases));
 
 			bh_arr_each(AstSwitchCase, c, sw->cases) {
+				bh_arr(AstTyped *) new_values = NULL;
+				bh_arr_new(global_heap_allocator, new_values, bh_arr_length(c->values));
+				bh_arr_each(AstTyped *, value, c->values)
+					bh_arr_push(new_values, (AstTyped *) ast_clone(a, *value));
+
 				AstSwitchCase sc;
-				sc.value = (AstTyped *) ast_clone(a, c->value);
+				sc.values = new_values;	
 				sc.block = (AstBlock *) ast_clone(a, c->block);
 				bh_arr_push(dw->cases, sc);
 			}

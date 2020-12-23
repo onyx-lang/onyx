@@ -488,7 +488,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             else if (parse_possible_directive(parser, "char")) {
                 AstNumLit* char_lit = make_node(AstNumLit, Ast_Kind_NumLit);
                 char_lit->flags |= Ast_Flag_Comptime;
-                char_lit->type_node = (AstType *) &basic_type_u8;
+                char_lit->type_node = (AstType *) &basic_type_int_unsized;
 
                 char_lit->token = expect_token(parser, Token_Type_Literal_String);
 
@@ -921,11 +921,10 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
     switch_node->expr = parse_expression(parser);
     expect_token(parser, '{');
 
-    AstTyped** batch_cases = NULL;
-    // NOTE: Look into bugs relating to switching this to the scratch allocator
-    bh_arr_new(global_heap_allocator, batch_cases, 16);
-
     while (parser->curr->type == Token_Type_Keyword_Case) {
+        bh_arr(AstTyped *) case_values = NULL;
+        bh_arr_new(global_heap_allocator, case_values, 1);
+
         expect_token(parser, Token_Type_Keyword_Case);
         if (parser->hit_unexpected_token) return switch_node;
 
@@ -939,29 +938,23 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
         }
 
         AstTyped* value = parse_expression(parser);
-        bh_arr_push(batch_cases, value);
+        bh_arr_push(case_values, value);
         while (parser->curr->type == ',') {
             if (parser->hit_unexpected_token) return switch_node;
 
             consume_token(parser);
             value = parse_expression(parser);
-            bh_arr_push(batch_cases, value);
+            bh_arr_push(case_values, value);
         }
 
         AstBlock* block = parse_block(parser);
 
         AstSwitchCase sc_node;
-        sc_node.block = block;
+        sc_node.block  = block;
+        sc_node.values = case_values;
 
-        bh_arr_each(AstTyped *, value, batch_cases) {
-            sc_node.value = *value;
-            bh_arr_push(switch_node->cases, sc_node);
-        }
-
-        bh_arr_clear(batch_cases);
+        bh_arr_push(switch_node->cases, sc_node);
     }
-
-    bh_arr_free(batch_cases);
 
     expect_token(parser, '}');
     return switch_node;

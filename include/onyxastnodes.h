@@ -553,11 +553,15 @@ struct AstIfWhile {
     AstBlock *true_stmt;
     AstBlock *false_stmt;
 };
-struct AstSwitchCase { AstTyped *value; AstBlock *block; };
+struct AstSwitchCase {
+    // NOTE: All expressions that end up in this block
+    bh_arr(AstTyped *) values;
+    
+    AstBlock *block;
+};
 struct AstSwitch {
     AstNode_base;
 
-    // NOTE: These are not currently used;
     Scope *scope;
     AstLocal *local;
     AstBinaryOp *assignment;
