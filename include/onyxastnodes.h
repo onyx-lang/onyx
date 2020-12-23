@@ -7,7 +7,7 @@
 typedef struct AstNode AstNode;
 typedef struct AstTyped AstTyped;
 
-typedef struct AstBinOp AstBinaryOp;
+typedef struct AstBinaryOp AstBinaryOp;
 typedef struct AstUnaryOp AstUnaryOp;
 typedef struct AstNumLit AstNumLit;
 typedef struct AstStrLit AstStrLit;
@@ -24,6 +24,7 @@ typedef struct AstAlignOf AstAlignOf;
 typedef struct AstFileContents AstFileContents;
 typedef struct AstStructLiteral AstStructLiteral;
 typedef struct AstArrayLiteral AstArrayLiteral;
+typedef struct AstRangeLiteral AstRangeLiteral;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstJump AstJump;
@@ -134,7 +135,7 @@ typedef enum AstKind {
     Ast_Kind_Slice,
     Ast_Kind_Field_Access,
     Ast_Kind_Pipe,
-    Ast_Kind_Range,
+    Ast_Kind_Range_Literal,
     Ast_Kind_Size_Of,
     Ast_Kind_Align_Of,
     Ast_Kind_File_Contents,
@@ -438,7 +439,7 @@ struct AstNode { AstNode_base };
 struct AstTyped { AstTyped_base };
 
 // Expression Nodes
-struct AstBinOp         { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
+struct AstBinaryOp      { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 addr; u64 length; };
@@ -465,6 +466,22 @@ struct AstArrayLiteral {
     AstTyped *atnode;
 
     bh_arr(AstTyped *) values;
+};
+struct AstRangeLiteral {
+    AstTyped_base; 
+
+    // HACK: Currently, range literals are parsed as binary operators, which means
+    // the first sizeof(AstBinaryOp) bytes of this structure must match that of
+    // AstBinaryOp, which means I need this dummy field here.
+    //                                              - brendanfh 2020/12/23
+    BinaryOp __unused_operation;
+    AstTyped *low, *high;
+
+    // Currently, there is no way to specify this in the grammar, but it is set
+    // to be the initial value of the `step` member of the range structure in
+    // core/builtin.onyx.
+    //                                              - brendanfh 2020/12/23
+    AstTyped *step;
 };
 struct AstCall {
     AstTyped_base;

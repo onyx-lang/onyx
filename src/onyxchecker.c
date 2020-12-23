@@ -18,12 +18,12 @@ CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok);
 CHECK(unaryop, AstUnaryOp** punop);
 CHECK(struct_literal, AstStructLiteral* sl);
 CHECK(array_literal, AstArrayLiteral* al);
+CHECK(range_literal, AstRangeLiteral** range);
 CHECK(expression, AstTyped** expr);
 CHECK(address_of, AstAddressOf* aof);
 CHECK(dereference, AstDereference* deref);
 CHECK(array_access, AstArrayAccess* expr);
 CHECK(field_access, AstFieldAccess** pfield);
-CHECK(range_literal, AstBinaryOp** range);
 CHECK(size_of, AstSizeOf* so);
 CHECK(align_of, AstAlignOf* ao);
 CHECK(global, AstGlobal* global);
@@ -961,6 +961,38 @@ b32 check_array_literal(AstArrayLiteral* al) {
     return 0;
 }
 
+b32 check_range_literal(AstRangeLiteral** prange) {
+    AstRangeLiteral* range = *prange;
+    if (check_expression(&range->low))  return 1;
+    if (check_expression(&range->high)) return 1;
+
+    Type* expected_range_type = builtin_range_type_type;
+    StructMember smem;
+
+    type_lookup_member(expected_range_type, "low", &smem);
+    if (!type_check_or_auto_cast(&range->low, smem.type)) {
+        onyx_report_error(range->token->pos, "Expected left side of range to be a 32-bit integer.");
+        return 1;
+    }
+
+    type_lookup_member(expected_range_type, "high", &smem);
+    if (!type_check_or_auto_cast(&range->high, smem.type)) {
+        onyx_report_error(range->token->pos, "Expected right side of range to be a 32-bit integer.");
+        return 1;
+    }
+
+    if (range->step == NULL) {
+        // HACK: This relies on the third member of the 'range' struct to exist, be the step,
+        // and have an initial_value.
+        AstStructMember* step_member = ((AstStructType *) builtin_range_type)->members[2];
+        if (check_expression(&step_member->initial_value)) return 1;
+
+        range->step = step_member->initial_value;
+    }
+
+    return 0;
+}
+
 b32 check_address_of(AstAddressOf* aof) {
     if (check_expression(&aof->expr)) return 1;
 
@@ -1116,55 +1148,6 @@ b32 check_field_access(AstFieldAccess** pfield) {
     return 0;
 }
 
-b32 check_range_literal(AstBinaryOp** prange) {
-    AstBinaryOp* range = *prange;
-    if (check_expression(&range->left))  return 1;
-    if (check_expression(&range->right)) return 1;
-
-    Type* expected_range_type = builtin_range_type_type;
-    StructMember smem;
-
-    type_lookup_member(expected_range_type, "low", &smem);
-    if (!type_check_or_auto_cast(&range->left, smem.type)) {
-        onyx_report_error(range->token->pos, "Expected left side of range to be a 32-bit integer.");
-        return 1;
-    }
-
-    type_lookup_member(expected_range_type, "high", &smem);
-    if (!type_check_or_auto_cast(&range->right, smem.type)) {
-        onyx_report_error(range->token->pos, "Expected right side of range to be a 32-bit integer.");
-        return 1;
-    }
-
-    // NOTE: Implicitly converting this to a struct literal because that makes the
-    // WASM generation easier and more robust for return a range from a procedure
-    // and the like. This could be improved as struct literals are made more throughout
-    // the code base.
-    //                                                          - brendanfh, 2020/09/03
-    AstStructLiteral* rsl = onyx_ast_node_new(semstate.node_allocator, sizeof(AstStructLiteral), Ast_Kind_Struct_Literal);
-    bh_arr_new(global_heap_allocator, rsl->values, 3);
-
-    bh_arr_insert_end(rsl->values, 2);
-    type_lookup_member(expected_range_type, "low", &smem);
-    rsl->values[smem.idx] = range->left;
-    type_lookup_member(expected_range_type, "high", &smem);
-    rsl->values[smem.idx] = range->right;
-
-    // HACK: This relies on the third member of the 'range' struct to exist, be the step,
-    // and have an intial_value.
-    AstStructMember* step_member = ((AstStructType *) builtin_range_type)->members[2];
-    if (check_expression(&step_member->initial_value)) return 1;
-    bh_arr_push(rsl->values, step_member->initial_value);
-
-    rsl->token = range->token;
-    rsl->type = expected_range_type;
-
-    // NOTE: Not a binary op
-    *prange = (AstBinaryOp *) rsl;
-
-    return 0;
-}
-
 b32 check_size_of(AstSizeOf* so) {
     fill_in_array_count(so->so_ast_type);
 
@@ -1224,14 +1207,14 @@ b32 check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Local: break;
 
-        case Ast_Kind_Address_Of:   retval = check_address_of((AstAddressOf *) expr); break;
-        case Ast_Kind_Dereference:  retval = check_dereference((AstDereference *) expr); break;
+        case Ast_Kind_Address_Of:    retval = check_address_of((AstAddressOf *) expr); break;
+        case Ast_Kind_Dereference:   retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Slice:
-        case Ast_Kind_Array_Access: retval = check_array_access((AstArrayAccess *) expr); break;
-        case Ast_Kind_Field_Access: retval = check_field_access((AstFieldAccess **) pexpr); break;
-        case Ast_Kind_Size_Of:      retval = check_size_of((AstSizeOf *) expr); break;
-        case Ast_Kind_Align_Of:     retval = check_align_of((AstAlignOf *) expr); break;
-        case Ast_Kind_Range:        retval = check_range_literal((AstBinaryOp **) pexpr); break;
+        case Ast_Kind_Array_Access:  retval = check_array_access((AstArrayAccess *) expr); break;
+        case Ast_Kind_Field_Access:  retval = check_field_access((AstFieldAccess **) pexpr); break;
+        case Ast_Kind_Size_Of:       retval = check_size_of((AstSizeOf *) expr); break;
+        case Ast_Kind_Align_Of:      retval = check_align_of((AstAlignOf *) expr); break;
+        case Ast_Kind_Range_Literal: retval = check_range_literal((AstRangeLiteral **) pexpr); break;
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {

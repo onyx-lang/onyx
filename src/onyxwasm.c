@@ -391,6 +391,7 @@ EMIT_FUNC(struct_lval,                   AstTyped* lval);
 EMIT_FUNC(struct_store,                  Type* type, u64 offset);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
+EMIT_FUNC(range_literal,                 AstRangeLiteral* range);
 EMIT_FUNC(expression,                    AstTyped* expr);
 EMIT_FUNC(cast,                          AstUnaryOp* cast);
 EMIT_FUNC(return,                        AstReturn* ret);
@@ -2130,6 +2131,16 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     *pcode = code;
 }
 
+EMIT_FUNC(range_literal, AstRangeLiteral* range) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    emit_expression(mod, &code, range->low);
+    emit_expression(mod, &code, range->high);
+    emit_expression(mod, &code, range->step);
+
+    *pcode = code;
+}
+
 EMIT_FUNC(location, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -2289,6 +2300,11 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Array_Literal: {
             // assert(("Array literals are not allowed as expressions currently. This will be added in a future update.", 0));
             emit_array_literal(mod, &code, (AstArrayLiteral *) expr);
+            break;
+        }
+
+        case Ast_Kind_Range_Literal: {
+            emit_range_literal(mod, &code, (AstRangeLiteral *) expr);
             break;
         }
 

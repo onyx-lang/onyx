@@ -435,9 +435,9 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
         case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
 
-        case Ast_Kind_Range:
-            symres_expression(&((AstBinaryOp *)(*expr))->left);
-            symres_expression(&((AstBinaryOp *)(*expr))->right);
+        case Ast_Kind_Range_Literal:
+            symres_expression(&((AstRangeLiteral *)(*expr))->low);
+            symres_expression(&((AstRangeLiteral *)(*expr))->high);
 
             (*expr)->type_node = symres_type(builtin_range_type);
 

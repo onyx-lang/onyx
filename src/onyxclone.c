@@ -74,11 +74,12 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Slice: return sizeof(AstArrayAccess);
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
         case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
-        case Ast_Kind_Range: return sizeof(AstBinaryOp);
+        case Ast_Kind_Range_Literal: return sizeof(AstRangeLiteral);
         case Ast_Kind_Size_Of: return sizeof(AstSizeOf);
         case Ast_Kind_Align_Of: return sizeof(AstAlignOf);
         case Ast_Kind_File_Contents: return sizeof(AstFileContents);
         case Ast_Kind_Struct_Literal: return sizeof(AstStructLiteral);
+        case Ast_Kind_Array_Literal: return sizeof(AstArrayLiteral);
         case Ast_Kind_If: return sizeof(AstIfWhile);
         case Ast_Kind_For: return sizeof(AstFor);
         case Ast_Kind_While: return sizeof(AstIfWhile);
@@ -124,7 +125,6 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 	switch ((u16) node->kind) {
 		case Ast_Kind_Binary_Op:
-        case Ast_Kind_Range:
 			((AstBinaryOp *) nn)->left  = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->left);
 			((AstBinaryOp *) nn)->right = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->right);
 			break;
@@ -192,6 +192,26 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 			break;
 		}
+
+		case Ast_Kind_Array_Literal: {
+			AstArrayLiteral* st = (AstArrayLiteral *) node;
+			AstArrayLiteral* dt = (AstArrayLiteral *) nn;
+
+			dt->atnode = (AstTyped *) ast_clone(a, st->atnode);
+
+			dt->values = NULL;
+			bh_arr_new(global_heap_allocator, dt->values, bh_arr_length(st->values));
+			bh_arr_each(AstTyped *, val, st->values)
+				bh_arr_push(dt->values, (AstTyped *) ast_clone(a, *val));
+
+			break;
+		}
+
+        case Ast_Kind_Range_Literal:
+       		((AstRangeLiteral *) nn)->low  = (AstTyped *) ast_clone(a, ((AstRangeLiteral *) node)->low); 
+       		((AstRangeLiteral *) nn)->high = (AstTyped *) ast_clone(a, ((AstRangeLiteral *) node)->high); 
+       		((AstRangeLiteral *) nn)->step = (AstTyped *) ast_clone(a, ((AstRangeLiteral *) node)->step); 
+        	break;
 
 		case Ast_Kind_Return:
 			((AstReturn *) nn)->expr = (AstTyped *) ast_clone(a, ((AstReturn *) node)->expr);

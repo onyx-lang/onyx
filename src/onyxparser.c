@@ -749,7 +749,7 @@ static AstTyped* parse_expression(OnyxParser* parser) {
                 bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
 
             } else if (bin_op_kind == Binary_Op_Range) {
-                bin_op = make_node(AstBinaryOp, Ast_Kind_Range);
+                bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
 
             } else {
                 bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
