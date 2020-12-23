@@ -9,7 +9,6 @@ static inline b32 should_clone(AstNode* node) {
 		// List of nodes that should not be copied
 		case Ast_Kind_Global:
 		case Ast_Kind_Memres:
-		case Ast_Kind_NumLit:
 		case Ast_Kind_StrLit:
 		case Ast_Kind_Package:
 		case Ast_Kind_Enum_Type:
