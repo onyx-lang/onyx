@@ -895,6 +895,8 @@ b32 check_struct_literal(AstStructLiteral* sl) {
     AstTyped** actual = sl->values;
     StructMember smem;
 
+    b32 all_comptime = 1;
+
     fori (i, 0, mem_count) {
         if (check_expression(actual)) return 1;
 
@@ -914,8 +916,14 @@ b32 check_struct_literal(AstStructLiteral* sl) {
             return 1;
         }
 
+        if (((*actual)->flags & Ast_Flag_Comptime) == 0)
+            all_comptime = 0;
+
         actual++;
     }
+
+    if (all_comptime)
+        sl->flags |= Ast_Flag_Comptime;
 
     return 0;
 }

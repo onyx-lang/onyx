@@ -2993,6 +2993,21 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         break;    
     }
 
+    case Ast_Kind_Struct_Literal: {
+        AstStructLiteral* sl = (AstStructLiteral *) node;
+
+        Type* sl_type = sl->type;
+        assert(sl_type->kind == Type_Kind_Struct);
+
+        i32 i = 0;
+        bh_arr_each(AstTyped *, expr, sl->values) {
+            emit_raw_data(mod, bh_pointer_add(data, sl_type->Struct.memarr[i]->offset), *expr);
+            i++;
+        }
+
+        break;
+    }
+
     case Ast_Kind_StrLit: {
         AstStrLit* sl = (AstStrLit *) node;
 
