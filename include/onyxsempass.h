@@ -31,11 +31,8 @@ typedef struct SemState {
 extern SemState semstate;
 
 AstType* symres_type(AstType* type);
-void symres_function(AstFunction* func);
 
 b32 check_expression(AstTyped** expr);
-b32 check_function_header(AstFunction* func);
-b32 check_function(AstFunction* func);
 
 // TODO: This should be moved elsewhere.
 void onyx_sempass_init(bh_allocator alloc, bh_allocator node_alloc);

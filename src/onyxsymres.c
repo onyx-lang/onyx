@@ -24,6 +24,7 @@ static void symres_use(AstUse* use);
 static void symres_statement_chain(AstNode** walker);
 static b32  symres_statement(AstNode** stmt);
 static void symres_block(AstBlock* block);
+void symres_function_header(AstFunction* func);
 void symres_function(AstFunction* func);
 static void symres_global(AstGlobal* global);
 static void symres_overloaded_function(AstOverloadedFunction* ofunc);
@@ -40,8 +41,6 @@ static AstFieldAccess* make_field_access(AstTyped* node, char* field) {
 }
 
 static void scope_enter(Scope* new_scope) {
-    // if (new_scope->parent == NULL)
-    //     new_scope->parent = semstate.curr_scope;
     semstate.curr_scope = new_scope;
 }
 
@@ -642,12 +641,19 @@ static void symres_block(AstBlock* block) {
     scope_leave();
 }
 
-void symres_function(AstFunction* func) {
+void symres_function_header(AstFunction* func) {
     if (func->scope == NULL)
         func->scope = scope_create(semstate.node_allocator, semstate.curr_scope, func->token->pos);
 
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
+            symres_expression(&param->default_value);
+            if (onyx_has_errors()) return;
+
+            // HACK: It shouldn't be necessary to do this twice, but right now
+            // if `null` is the default parameter and it hasn't been used anywhere in
+            // code yet, it doesn't resolve properly. So for now I am just checking symbols twice.
+            //                                                      -brendanfh 2020/12/24
             symres_expression(&param->default_value);
             if (onyx_has_errors()) return;
 
@@ -744,9 +750,11 @@ void symres_function(AstFunction* func) {
         }
     }
 
-    if (func->type_node != NULL) {
-        func->type_node = symres_type(func->type_node);
-    }
+    scope_leave();
+}
+
+void symres_function(AstFunction* func) {
+    scope_enter(func->scope);
 
     semstate.curr_function = func;
     symres_block(func->body);
@@ -864,20 +872,24 @@ static void symres_memres(AstMemRes** memres) {
 }
 
 static void symres_polyproc(AstPolyProc* pp) {
-    pp->poly_scope = scope_create(semstate.node_allocator, semstate.curr_scope, pp->token->pos);
+    pp->poly_scope = semstate.curr_scope;
 }
 
 void symres_entity(Entity* ent) {
-    if (ent->package) {
+    if (ent->package) semstate.curr_package = ent->package;
+
+    Scope* old_scope;
+    if (ent->scope) {
+        old_scope = semstate.curr_scope;
         scope_enter(ent->scope);
-        semstate.curr_package = ent->package;
     }
 
     EntityState next_state = Entity_State_Check_Types;
 
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
-        case Entity_Type_Function:            symres_function(ent->function); break;
+        case Entity_Type_Function_Header:         symres_function_header(ent->function); break;
+        case Entity_Type_Function:                symres_function(ent->function);        break;
 
         case Entity_Type_Foreign_Global_Header:
         case Entity_Type_Global_Header:       symres_global(ent->global); break;
@@ -900,5 +912,7 @@ void symres_entity(Entity* ent) {
 
     ent->state = next_state;
 
-    if (ent->package) scope_leave();
+    if (ent->scope) {
+        semstate.curr_scope = old_scope;
+    }
 }

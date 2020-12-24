@@ -533,10 +533,12 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
         bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
     }
 
-    scope_clear(pp->poly_scope);
+    bh_arr(AstPolySolution) slns = NULL;
+    bh_arr_new(global_heap_allocator, slns, bh_arr_length(pp->poly_params));
 
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
         Type* actual_type;
+
         if (pp_lookup == PPLM_By_Call) {
             AstArgument* arg = ((AstCall *) actual)->arguments;
             if (param->idx >= ((AstCall *) actual)->arg_count) {
@@ -570,69 +572,87 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
             return NULL;
         }
 
-        AstTypeRawAlias* raw = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-        raw->to = resolved_type;
-
-        symbol_introduce(pp->poly_scope, param->poly_sym->token, (AstNode *) raw);
+        bh_arr_push(slns, ((AstPolySolution) {
+            .poly_sym = param->poly_sym,
+            .type     = resolved_type
+        }));
     }
 
-    // HACK(Brendan): Maybe each type should be given a unique id upon creation?
-    // Then that could be used to uniquely identify the type, instead of relying
-    // on the name being unique.                     - brendanfh 2020/12/14
+    AstFunction* result = polymorphic_proc_solidify(pp, slns, pos);
+    
+    bh_arr_free(slns);
+    return result;
+}
+
+// NOTE: This returns a volatile string. Do not store it without copying it.
+static char* build_polyproc_unique_key(bh_arr(AstPolySolution) slns) {
     static char key_buf[1024];
     fori (i, 0, 1024) key_buf[i] = 0;
-    bh_table_each_start(AstNode *, pp->poly_scope->symbols);
-        strncat(key_buf, key, 1023);
-        strncat(key_buf, "=", 1023);
-        strncat(key_buf, type_get_unique_name(((AstTypeRawAlias *) value)->to), 1023);
-        strncat(key_buf, ";", 1023);
-    bh_table_each_end;
 
-    if (bh_table_has(AstFunction *, pp->concrete_funcs, key_buf)) {
-        return bh_table_get(AstFunction *, pp->concrete_funcs, key_buf);
+    bh_arr_each(AstPolySolution, sln, slns) {
+        token_toggle_end(sln->poly_sym->token);
+
+        strncat(key_buf, sln->poly_sym->token->text, 1023);
+        strncat(key_buf, "=", 1023);
+        strncat(key_buf, type_get_unique_name(sln->type), 1023);
+        strncat(key_buf, ";", 1023);
+
+        token_toggle_end(sln->poly_sym->token);
     }
 
-    Type* old_return_type = semstate.expected_return_type;
-    Scope* old_scope = semstate.curr_scope;
-    semstate.curr_scope = pp->poly_scope;
+    return key_buf;
+}
+
+AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
+    if (pp->concrete_funcs == NULL) {
+        bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
+    }
+
+    // NOTE: Check if a version of this polyproc has already been created.
+    char* unique_key = build_polyproc_unique_key(slns);
+    if (bh_table_has(AstFunction *, pp->concrete_funcs, unique_key)) {
+        return bh_table_get(AstFunction *, pp->concrete_funcs, unique_key);
+    }
+
+    Scope* poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, pos);
+    bh_arr_each(AstPolySolution, sln, slns) {
+        AstTypeRawAlias* raw = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+        raw->to = sln->type;
+
+        symbol_introduce(poly_scope, sln->poly_sym->token, (AstNode *) raw);
+    }
 
     AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
-    bh_table_put(AstFunction *, pp->concrete_funcs, key_buf, func);
-
-    symres_function(func);
-    semstate.curr_scope = old_scope;
-
-    if (onyx_has_errors()) goto has_error;
-    if (check_function_header(func)) goto has_error;
-    goto no_errors;
-
-has_error:
-    onyx_report_error(pos, "Error in polymorphic procedure generated from this call site.");
-    semstate.expected_return_type = old_return_type;
-    return NULL;
-
-no_errors:
-    semstate.expected_return_type = old_return_type;
-
-    entity_heap_insert(&semstate.program->entities, (Entity) {
-        .state = Entity_State_Code_Gen,
-        .type = Entity_Type_Function_Header,
-        .function = func,
-        .package = NULL,
-    });
-
-    entity_heap_insert(&semstate.program->entities, (Entity) {
-        .state = Entity_State_Check_Types,
-        .type = Entity_Type_Function,
-        .function = func,
-        .package = NULL,
-    });
+    bh_table_put(AstFunction *, pp->concrete_funcs, unique_key, func);
 
     func->flags |= Ast_Flag_Function_Used;
 
+    Entity func_header_entity = {
+        .state = Entity_State_Resolve_Symbols,
+        .type = Entity_Type_Function_Header,
+        .function = func,
+        .package = NULL,
+        .scope = poly_scope,
+    };
+
+    entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
+    if (onyx_has_errors()) {
+        onyx_report_error(pos, "Error in polymorphic procedure header generated from this call site.");
+        return NULL;
+    }
+
+    Entity func_entity = {
+        .state = Entity_State_Resolve_Symbols,
+        .type = Entity_Type_Function,
+        .function = func,
+        .package = NULL,
+        .scope = poly_scope,
+    };
+
+    entity_heap_insert(&semstate.program->entities, func_header_entity);
+    entity_heap_insert(&semstate.program->entities, func_entity);
     return func;
 }
-
 
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params, OnyxFilePos pos) {
@@ -886,4 +906,18 @@ char* get_function_name(AstFunction* func) {
     }
 
     return "<anonymous procedure>";
+}
+
+void entity_bring_to_state(Entity* ent, EntityState state) {
+    while (ent->state != state) {
+        switch (ent->state) {
+            case Entity_State_Resolve_Symbols: symres_entity(ent); break;
+            case Entity_State_Check_Types:     check_entity(ent);  break;
+            case Entity_State_Code_Gen:        emit_entity(ent);   break;
+
+            default: return;
+        }
+
+        if (onyx_has_errors()) return;
+    }
 }

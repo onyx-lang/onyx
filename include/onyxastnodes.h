@@ -65,6 +65,7 @@ typedef struct AstFunction AstFunction;
 typedef struct AstOverloadedFunction AstOverloadedFunction;
 
 typedef struct AstPolyParam AstPolyParam;
+typedef struct AstPolySolution AstPolySolution;
 typedef struct AstPolyProc AstPolyProc;
 
 typedef struct AstPackage AstPackage;
@@ -712,7 +713,23 @@ struct AstFunction {
         };
     };
 };
-struct AstPolyParam { AstNode* poly_sym; AstType* type_expr; u64 idx; };
+struct AstPolyParam {
+    // The symbol node that represents the polymorphic variable.
+    AstNode* poly_sym;
+
+    // The type expression that contains `poly_sym` in it somewhere.
+    // Matching polymorphic variables does a parallel tree traversal
+    // to find the pairing of the actual type and polymorphic variable
+    // symbol.
+    AstType* type_expr;
+
+    // The parameter index where the polymorphic variable occurs.
+    u64 idx;
+};
+struct AstPolySolution {
+    AstNode* poly_sym;
+    Type*    type;
+};
 struct AstPolyProc {
     AstNode_base;
 
@@ -811,6 +828,7 @@ Entity entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity new_top);
 void entity_heap_remove_top(EntityHeap* entities);
 
+void entity_bring_to_state(Entity* ent, EntityState state);
 void symres_entity(Entity* ent);
 void check_entity(Entity* ent);
 void emit_entity(Entity* ent);
@@ -892,6 +910,7 @@ typedef enum PolyProcLookupMethod {
     PPLM_By_Function_Type,
 } PolyProcLookupMethod;
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos);
+AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params, OnyxFilePos pos);
 
