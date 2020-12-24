@@ -38,6 +38,21 @@ List of known bugs:
     Since `continue`ing or `break`ing would skip the deferred statement, causing
     an infinite loop.
 
+[ ] The following code causes an infinite loop somewhere.
+	```	
+	get_neighbor_count :: proc (grid: ^map.Map(Vec2, Cell), pos: Vec2) -> u32 {
+		count := 0;
+
+		for ^dir: Hex_Directions {
+			pos  := Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y };
+			cell := map.get(grid, pos, Cell.{});
+			if cell.alive do count += 1;
+		}
+
+		return count;
+	}
+	```
+
 [X] `TileData :: [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;` results in a
     segfault because it is an invalid top level node, but that is not checked
     before it is tried to be used.

@@ -75,6 +75,13 @@ delete :: proc (use map: ^Map($K, $V), key: K) {
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
+update :: proc (use map: ^Map($K, $V), key: K, f: proc (^V)) {
+    lr := lookup(map, key);
+    if lr.entry_index < 0 do return;
+
+    f(^entries[lr.entry_index].value);
+}
+
 clear :: proc (use map: ^Map($K, $V)) {
     for i: 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;

@@ -83,7 +83,7 @@ Language Cohesion:
         types that you can control the name and inadvertently give the same name
         to two different structs / enums.
 
-    [ ] Switches should have range based statements, i.e.
+    [X] Switches should have range based statements, i.e.
             switch expr {
                 case 10 .. 14 do ...
             }
@@ -107,6 +107,10 @@ Language Cohesion:
             array_to_slice :: proc (arr: [$N] $T) -> [] T {
                 return arr[0 .. N];
             }
+
+    [ ] Functions should return the correct value in all branches.
+
+    [ ] Add macros.
 
 API Expansion:
     There are many different places where the standard API for WASI and JS
