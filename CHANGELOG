@@ -1,12 +1,25 @@
 Release v0.0.6
 --------------
 Additions:
+* properly different kinds of allocators in core/alloc/.
+* `map.empty`
+* `string.compare`
+* `array.copy`
+* ranges on switch cases, i.e. `case 4 .. 10`. Note, this is inclusive on the upper end,
+    unlike most other uses of the range literal.
+* `map.update`
 
 Removals:
 
 Changes:
+* enum values are compile time known.
+* struct literals are compile time known can be used at top level scope.
+* range literals are proper things in the compiler code now.
+* polymorphic procedure generation code is much cleaner now, making new polymorphic features easier.
 
 Bug fixes:
+* polymorphic procedures would get 'confused' when two structs in the program had the same name.
+* function argument type mismatch would give wrong function name.
 
 
 Release v0.0.5
