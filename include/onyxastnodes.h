@@ -26,6 +26,8 @@ typedef struct AstStructLiteral AstStructLiteral;
 typedef struct AstArrayLiteral AstArrayLiteral;
 typedef struct AstRangeLiteral AstRangeLiteral;
 
+typedef struct AstDirectiveSolidify AstDirectiveSolidify;
+
 typedef struct AstReturn AstReturn;
 typedef struct AstJump AstJump;
 typedef struct AstUse AstUse;
@@ -151,6 +153,8 @@ typedef enum AstKind {
     Ast_Kind_Defer,
     Ast_Kind_Switch,
     Ast_Kind_Switch_Case,
+
+    Ast_Kind_Directive_Solidify,
 
     Ast_Kind_Count
 } AstKind;
@@ -508,6 +512,15 @@ struct AstIntrinsicCall {
     VarArgKind va_kind;
 };
 
+struct AstDirectiveSolidify {
+    AstTyped_base;
+
+    AstPolyProc* poly_proc;
+    bh_arr(AstPolySolution) known_polyvars;
+
+    AstNode* resolved_proc;
+};
+
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
@@ -729,12 +742,17 @@ struct AstPolyParam {
 struct AstPolySolution {
     AstNode* poly_sym;
     Type*    type;
+
+    // If `type` is null, it is filled in with this type.
+    AstType* ast_type;
 };
 struct AstPolyProc {
     AstNode_base;
 
     Scope *poly_scope;
     bh_arr(AstPolyParam) poly_params;
+
+    bh_arr(AstPolySolution) known_slns;
 
     AstFunction* base_func;
     bh_table(AstFunction *) concrete_funcs;
@@ -911,6 +929,8 @@ typedef enum PolyProcLookupMethod {
 } PolyProcLookupMethod;
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos);
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
+AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
+
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params, OnyxFilePos pos);
 

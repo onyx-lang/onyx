@@ -437,3 +437,10 @@ void onyx_lex_tokens(OnyxTokenizer* tokenizer) {
     lexer_lines_processed += tokenizer->line_number - 1;
     lexer_tokens_processed += bh_arr_length(tokenizer->tokens);
 }
+
+b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2) {
+    if (tkn1->length != tkn2->length) return 0;
+    fori (i, 0, tkn1->length)
+        if (tkn1->text[i] != tkn2->text[i]) return 0;
+    return 1;
+}

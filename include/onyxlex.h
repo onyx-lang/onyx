@@ -111,4 +111,6 @@ OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc
 void onyx_tokenizer_free(OnyxTokenizer* tokenizer);
 void onyx_lex_tokens(OnyxTokenizer* tokenizer);
 
+b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2);
+
 #endif

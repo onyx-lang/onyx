@@ -6,7 +6,7 @@
                 "type": "cppdbg",
                 "request": "launch",
                 "program": "${workspaceFolder}/onyx",
-                "args": ["--verbose", "progs/odin_example.onyx"],
+                "args": ["--verbose", "progs/poly_solidify.onyx"],
                 "stopAtEntry": true,
                 "cwd": "~/dev/c/onyx",
                 "environment": [],

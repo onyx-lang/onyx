@@ -531,6 +531,39 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) alias;
                 break;
             }
+            else if (parse_possible_directive(parser, "solidify")) {
+                AstDirectiveSolidify* solid = make_node(AstDirectiveSolidify, Ast_Kind_Directive_Solidify);
+                solid->token = parser->curr - 1;
+
+                solid->poly_proc = (AstPolyProc *) parse_factor(parser);
+
+                solid->known_polyvars = NULL;
+                bh_arr_new(global_heap_allocator, solid->known_polyvars, 2);
+
+                expect_token(parser, '{');
+                while (parser->curr->type != '}') {
+                    if (parser->hit_unexpected_token) break;
+
+                    AstNode* poly_var = make_node(AstNode, Ast_Kind_Symbol);
+                    poly_var->token = expect_token(parser, Token_Type_Symbol);
+
+                    expect_token(parser, '=');
+                    AstType* poly_type = parse_type(parser);
+
+                    bh_arr_push(solid->known_polyvars, ((AstPolySolution) {
+                        .poly_sym = poly_var,
+                        .ast_type = poly_type,
+                        .type     = NULL
+                    }));
+
+                    if (parser->curr->type != '}')
+                        expect_token(parser, ',');
+                }
+                expect_token(parser, '}');
+
+                retval = (AstTyped *) solid;
+                break;
+            }
 
             onyx_report_error(parser->curr->pos, "invalid directive in expression.");
             return NULL;

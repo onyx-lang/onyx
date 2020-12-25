@@ -3,7 +3,7 @@
 #include "onyxparser.h"
 #include "onyxutils.h"
 #include "onyxastnodes.h"
-
+#include "onyxerrors.h"
 
 static void scope_enter(Scope* new_scope);
 static void scope_leave();
@@ -21,6 +21,7 @@ static void symres_while(AstIfWhile* whilenode);
 static void symres_for(AstFor* fornode);
 static void symres_switch(AstSwitch* switchnode);
 static void symres_use(AstUse* use);
+static void symres_directive_solidify(AstDirectiveSolidify** psolid);
 static void symres_statement_chain(AstNode** walker);
 static b32  symres_statement(AstNode** stmt);
 static void symres_block(AstBlock* block);
@@ -468,6 +469,10 @@ static void symres_expression(AstTyped** expr) {
             symres_array_literal((AstArrayLiteral *)(*expr));
             break;
 
+        case Ast_Kind_Directive_Solidify:
+            symres_directive_solidify((AstDirectiveSolidify **) expr);
+            break;
+
         default: break;
     }
 }
@@ -591,6 +596,30 @@ static void symres_use(AstUse* use) {
 
 cannot_use:
     onyx_report_error(use->token->pos, "Cannot use this.");
+}
+
+static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
+    AstDirectiveSolidify* solid = *psolid;
+    if (solid->resolved_proc != NULL)
+        *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
+
+    symres_expression((AstTyped **) &solid->poly_proc);
+    if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
+        onyx_report_error(solid->token->pos, "Expected polymorphic procedure in #solidify directive.");
+        return;
+    }
+
+    bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
+        sln->ast_type = symres_type(sln->ast_type);
+        sln->type = type_build_from_ast(semstate.node_allocator, sln->ast_type);
+        if (onyx_has_errors()) return;
+    }
+
+    solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token->pos);
+
+    // NOTE: Not a DirectiveSolidify.
+    *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
+    return;
 }
 
 // NOTE: Returns 1 if the statment should be removed

@@ -1283,6 +1283,10 @@ b32 check_expression(AstTyped** pexpr) {
             expr->flags |= Ast_Flag_Function_Used;
             break;
 
+        case Ast_Kind_Directive_Solidify:
+            *pexpr = (AstTyped *) ((AstDirectiveSolidify *) expr)->resolved_proc;
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;

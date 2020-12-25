@@ -536,7 +536,18 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
     bh_arr(AstPolySolution) slns = NULL;
     bh_arr_new(global_heap_allocator, slns, bh_arr_length(pp->poly_params));
 
+    bh_arr_each(AstPolySolution, known_sln, pp->known_slns) bh_arr_push(slns, *known_sln);
+
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
+        b32 already_solved = 0;
+        bh_arr_each(AstPolySolution, known_sln, pp->known_slns) {
+            if (token_equals(param->poly_sym->token, known_sln->poly_sym->token)) {
+                already_solved = 1;
+                break;
+            }
+        }
+        if (already_solved) continue;
+
         Type* actual_type;
 
         if (pp_lookup == PPLM_By_Call) {
@@ -652,6 +663,55 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     entity_heap_insert(&semstate.program->entities, func_header_entity);
     entity_heap_insert(&semstate.program->entities, func_entity);
     return func;
+}
+
+// NOTE: This can return either a AstFunction or an AstPolyProc, depending if enough parameters were
+// supplied to remove all the polymorphic variables from the function.
+AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
+    i32 valid_argument_count = 0;
+
+    bh_arr_each(AstPolySolution, sln, slns) {
+        b32 found_match = 0;
+
+        bh_arr_each(AstPolyParam, param, pp->poly_params) {
+            if (token_equals(sln->poly_sym->token, param->poly_sym->token)) {
+                found_match = 1;
+                break;
+            }
+        }
+
+        if (found_match) {
+            valid_argument_count++;
+        } else {
+            onyx_report_error(pos, "'%b' is not a type variable of '%b'.",
+                sln->poly_sym->token->text, sln->poly_sym->token->length,
+                pp->token->text, pp->token->length);
+            return (AstNode *) pp;
+        }
+    }
+
+    if (valid_argument_count == bh_arr_length(pp->poly_params)) {
+        return (AstNode *) polymorphic_proc_solidify(pp, slns, pos);
+
+    } else {
+        // HACK: Some of these initializations assume that the entity for this polyproc has
+        // made it through the symbol resolution phase.
+        //                                                    - brendanfh 2020/12/25
+        AstPolyProc* new_pp = onyx_ast_node_new(semstate.node_allocator, sizeof(AstPolyProc), Ast_Kind_Polymorphic_Proc);
+        new_pp->token = pp->token;                            // TODO: Change this to be the solidify->token
+        new_pp->base_func = pp->base_func;
+        new_pp->poly_scope = new_pp->poly_scope;
+        new_pp->flags = pp->flags;
+        new_pp->poly_params = pp->poly_params;
+
+        new_pp->known_slns = NULL;
+        bh_arr_new(global_heap_allocator, new_pp->known_slns, bh_arr_length(pp->known_slns) + bh_arr_length(slns));
+
+        bh_arr_each(AstPolySolution, sln, pp->known_slns) bh_arr_push(new_pp->known_slns, *sln);
+        bh_arr_each(AstPolySolution, sln, slns)           bh_arr_push(new_pp->known_slns, *sln);
+
+        return (AstNode *) new_pp;
+    }
 }
 
 
