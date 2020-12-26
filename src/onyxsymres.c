@@ -604,6 +604,10 @@ static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
         *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
 
     symres_expression((AstTyped **) &solid->poly_proc);
+    if (solid->poly_proc && solid->poly_proc->kind == Ast_Kind_Directive_Solidify) {
+        solid->poly_proc = (AstPolyProc *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
+    }
+    
     if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
         onyx_report_error(solid->token->pos, "Expected polymorphic procedure in #solidify directive.");
         return;

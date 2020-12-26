@@ -6,7 +6,8 @@ max_f32 :: #solidify math.max { T = f32 };
 
 compose :: proc (a: $A, f: proc (A) -> $B, g: proc (B) -> $C) -> C do return g(f(a));
 
-specific_compose :: #solidify compose { A = f32, B = f32, C = u32 };
+specific_compose_0 :: #solidify compose { B = u32 };
+specific_compose_1 :: #solidify specific_compose_0 { A = f32 };
 
 main :: proc (args: [] cstr) {
 	printf("max(1, 2) = %i\n", math.max(1, 2));
@@ -14,5 +15,8 @@ main :: proc (args: [] cstr) {
 
 	// printf("max_f32(1, 2) = %i\n", max_f32(cast(u32) 1, cast(u32) 2));
 
-
+	println(specific_compose_1(
+		2,
+		proc (a: f32) -> i32 { return ~~(a * 2); },
+		proc (b: i32) -> i32 { return ~~(b + 6); }));
 }

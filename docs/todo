@@ -112,7 +112,7 @@ Language Cohesion:
 
     [ ] Add macros.
 
-    [ ] #solidify polymoprhic procedures.
+    [X] #solidify polymoprhic procedures.
 
 API Expansion:
     There are many different places where the standard API for WASI and JS
