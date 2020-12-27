@@ -265,7 +265,9 @@ void scope_clear(Scope* scope) {
 #define REDUCE_BINOP_ALL(op) \
     if (type_is_small_integer(res->type) || type_is_bool(res->type)) { \
         res->value.i = left->value.i op right->value.i; \
-    } else if (type_is_integer(res->type) || res->type->Basic.kind == Basic_Kind_Int_Unsized) { \
+    } else if (type_is_integer(res->type) \
+        || res->type->Basic.kind == Basic_Kind_Int_Unsized \
+        || res->type->kind == Type_Kind_Enum) { \
         res->value.l = left->value.l op right->value.l; \
     } else if (res->type->Basic.kind == Basic_Kind_F32) { \
         res->value.f = left->value.f op right->value.f; \
@@ -277,7 +279,9 @@ void scope_clear(Scope* scope) {
 #define REDUCE_BINOP_INT(op) \
     if (type_is_small_integer(res->type) || type_is_bool(res->type)) { \
         res->value.i = left->value.i op right->value.i; \
-    } else if (type_is_integer(res->type) || res->type->Basic.kind == Basic_Kind_Int_Unsized) { \
+    } else if (type_is_integer(res->type) \
+        || res->type->Basic.kind == Basic_Kind_Int_Unsized \
+        || res->type->kind == Type_Kind_Enum) { \
         res->value.l = left->value.l op right->value.l; \
     } \
     break;
@@ -387,7 +391,7 @@ AstTyped* ast_reduce(bh_allocator a, AstTyped* node) {
         case Ast_Kind_Binary_Op:  return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
         case Ast_Kind_Unary_Op:   return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
         case Ast_Kind_NumLit:     return node;
-        case Ast_Kind_Enum_Value: return (AstTyped *) ast_reduce(a, (AstTyped *) ((AstEnumValue *) node)->value);
+        case Ast_Kind_Enum_Value: return (AstTyped *) ((AstEnumValue *) node)->value;
         default:                  return NULL;
     }
 }
