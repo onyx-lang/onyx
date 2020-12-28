@@ -2219,30 +2219,9 @@ void onyx_parser_free(OnyxParser* parser) {
 }
 
 ParseResults onyx_parse(OnyxParser *parser) {
-    // if (parser->curr->type == Token_Type_Keyword_Package) {
-    //     consume_token(parser);
-
-    //     OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-
-    //     token_toggle_end(symbol);
-    //     Package *package = program_info_package_lookup_or_create(
-    //         parser->program,
-    //         symbol->text,
-    //         parser->program->global_scope,
-    //         parser->allocator);
-    //     token_toggle_end(symbol);
-
-    //     parser->package = package;
-
-    // } else {
-    //     Package *package = program_info_package_lookup_or_create(
-    //         parser->program,
-    //         "main",
-    //         parser->program->global_scope,
-    //         parser->allocator);
-
-    //     parser->package = package;
-    // }
+    // NOTE: Skip comments at the beginning of the file
+    if (parser->curr->type == Token_Type_Comment)
+        consume_token(parser);
 
     parser->package = parse_package_name(parser)->package;
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
