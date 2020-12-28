@@ -1,0 +1,95 @@
+// Fixed-size arrays are a common feature amongst almost all procedural programming
+// languages, so there shouldn't be anything fundamental I need to discuss here. I
+// will make some notes about how fixed-size arrays work in Onyx.
+
+// Firstly, fixed size arrays types can be a little confusing, because they represent
+// different things in different contexts. As local variables or struct members, they
+// represent a value. So for example, `[4] i32` as a local variable would create enough
+// space for 4 i32's on the stack. However, if a parameter has `[4] i32` as a type, it
+// is passed by reference (through a pointer to the start of the array).
+
+// Another wrinkle to note is that assignment statements over an array type *copy* the
+// contents of the array, not just the pointer to it. This is different than how C and
+// C++ operate.
+
+// This file will give examples of all of these things, as well as some of the gotchas
+// you need to be aware of.
+
+#include_file "core/std/wasi"
+
+use package core
+
+main :: proc (args: [] cstr) {
+    // The following declares a fixed-size array of 10 i32s on the stack. Currently,
+    // it is not guaranteed that `arr` will be zero initialized, so we will do that
+    // with a for loop. Note, the `^` after the for keyword means we are iterating by
+    // pointer.
+    arr : [10] i32;
+    for ^elem: arr do *elem = 0;
+
+    // To access certain elements of the array, simply use the array access operator,
+    // [...], as so. This sets the fourth element of the array to be 1234.
+    arr[3] = 1234;
+    printf("arr[3] is %i\n", arr[3]);
+
+    // Fixed-size arrays can be iterated over using a `for` loop as so.
+    for element: arr {
+        printf("%i ", element);
+    }
+    printf("\n");
+
+
+    // Fixed-size arrays are passed to procedures by reference. In the following example,
+    // the array `arr` is passed by reference so when the for loop changes the
+    // contents of `array_param`, the contents of `arr` are changed as well.
+    array_proc :: proc (array_param: [10] i32) {
+        for i: 0 .. 10 {
+            array_param[i] = 1000 + i;
+        }
+    };
+
+    array_proc(arr);
+    for element: arr {
+        printf("%i ", element);
+    }
+
+
+    // One important thing to note about fixed-size arrays is that the assignment
+    // operator will *copy* the contents of the array to the destination
+    // array. Slices and dynamic arrays do not operate this way.
+    other_arr : [10] i32;
+    other_arr = arr;
+    for other_element: other_arr do printf("%i ", other_element);
+    printf("\n");
+
+    // This does mean that the following pattern of double buffering arrays (which
+    // is used widely in many C programs), will work in Onyx, but it will be much
+    // slower than in C.
+    //
+    //      buffer1 : [128] i32;
+    //      buffer2 : [128] i32;
+    //      ...
+    //      tmp := buffer1;
+    //      buffer1 = buffer2;
+    //      buffer2 = tmp;
+    //
+    // In this circumstance, I would recommend just using pointers. So [128] i32 in
+    // the previous example would just become ^i32.
+
+
+
+    // One final thing to talk about is array literals, a quick way of defining
+    // all the elements of a fixed-size array. In Onyx, array literals look like:
+    //     arr_lit : [5] i32 = i32.[ 2, 3, 5, 7, 11 ];
+    // OR
+    arr_lit := i32.[ 2, 3, 5, 7, 11 ];
+    
+    for elem: arr_lit do printf("%i ", elem);
+    printf("\n");
+
+    // The type of the elements of the array is given right before the `.`. The
+    // expression `u32.[ 1, 2, 3, 4, 5 ]` has the type `[5] u32`. The elements
+    // given between the square brackets are expected to be of the type before
+    // the `.`. The length of this array is given by how many elements are between
+    // the square brackets.
+}
