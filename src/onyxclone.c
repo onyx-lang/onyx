@@ -380,6 +380,26 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			((AstUse *) nn)->expr = (AstTyped *) ast_clone(a, ((AstUse *) node)->expr);
 			break;
 		}
+
+		case Ast_Kind_Directive_Solidify: {
+			AstDirectiveSolidify* dd = (AstDirectiveSolidify *) nn;
+			AstDirectiveSolidify* sd = (AstDirectiveSolidify *) node;
+
+			dd->poly_proc = (AstPolyProc *) ast_clone(a, (AstNode *) sd->poly_proc);
+			dd->resolved_proc = NULL;
+
+			dd->known_polyvars = NULL;
+			bh_arr_new(global_heap_allocator, dd->known_polyvars, bh_arr_length(sd->known_polyvars));
+
+			bh_arr_each(AstPolySolution, sln, sd->known_polyvars) {
+				AstPolySolution new_sln;
+				new_sln.poly_sym = (AstNode *) ast_clone(a, (AstNode *) sln->poly_sym);
+				new_sln.ast_type = (AstType *) ast_clone(a, (AstNode *) sln->ast_type);
+				bh_arr_push(dd->known_polyvars, new_sln);
+			}
+
+			break;
+		}
 	}
 
 	return nn;

@@ -22,16 +22,30 @@ main :: proc (args: [] cstr) {
 		proc (b: f32) -> f64 { return ~~(b + 6); }));
 
 
-    arr : [..] f32;
-    array.init(^arr);
-    defer array.free(^arr);
+    arr1 : [..] f32;
+    arr2 : [..] i32;
+    array.init(^arr1);
+    array.init(^arr2);
+    defer array.free(^arr1);
+    defer array.free(^arr2);
 
+    for i: 0 .. 10 {
+        array.push(^arr1, ~~i);
+        array.push(^arr2, ~~i);
+    }
+    print_arrays(arr1, arr2);
 
-    for i: 0 .. 10 do array.push(^arr, ~~i);
-    print_array(arr);
+    array_map(arr1, double);
+    array_map(arr2, double);
 
-    array_map(arr, double);
-    print_array(arr);
+    print_arrays(arr1, arr2);
+
+    print_arrays :: proc (arr1: [..] $T, arr2: [..] $R) {
+        println("==================================================");
+        print_array(arr1);
+        print_array(arr2);
+        println("==================================================");
+    }
 }
 
 array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
@@ -43,12 +57,18 @@ array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
 
     for ^v: arr do *v = f(*v);
 
-    test2 :: proc () { test(); println("WORLD!!!!"); };
-    test :: proc () { println("HELLO!!!"); };
+    test2 :: proc () {
+        test();
+        println("WORLD!!!!");
+    }
+
+    test  :: proc () {
+        println("HELLO!!!");
+    }
 
     InternalStruct :: struct ($SOMETHING) {
         foo : SOMETHING;
-    };
+    }
 }
 
 double :: proc (v: $V) -> V do return v * 2;

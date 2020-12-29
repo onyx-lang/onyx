@@ -32,7 +32,7 @@ static AstIfWhile*    parse_if_stmt(OnyxParser* parser);
 static AstIfWhile*    parse_while_stmt(OnyxParser* parser);
 static AstFor*        parse_for_stmt(OnyxParser* parser);
 static AstSwitch*     parse_switch_stmt(OnyxParser* parser);
-static b32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
+static i32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*     parse_return_stmt(OnyxParser* parser);
 static AstNode*       parse_use_stmt(OnyxParser* parser);
 static AstBlock*      parse_block(OnyxParser* parser);
@@ -116,7 +116,7 @@ static void add_node_to_process(OnyxParser* parser, AstNode* node) {
 
     if (!bh_arr_is_empty(parser->block_stack)) {
         Scope* binding_scope = parser->block_stack[bh_arr_length(parser->block_stack) - 1]->binding_scope;
-        
+
         if (binding_scope != NULL)
             scope = binding_scope;
     }
@@ -1003,13 +1003,16 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
     return switch_node;
 }
 
-// Returns 1 if the symbol was consumed. Returns 0 otherwise
+// Returns:
+//     0 - if this was not a symbol declaration.
+//     1 - if this was a local declaration.
+//     2 - if this was binding declaration.
 // ret is set to the statement to insert
 // <symbol> : <type> = <expr>
 // <symbol> : <type> : <expr>
 // <symbol> := <expr>
 // <symbol> :: <expr>
-static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) {
+static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) {
     if (parser->curr->type != Token_Type_Symbol) return 0;
     if ((parser->curr + 1)->type != ':')         return 0;
 
@@ -1032,7 +1035,7 @@ static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 
         AstBinding* binding = parse_top_level_binding(parser, symbol);
         symbol_introduce(current_block->binding_scope, symbol, binding->node);
-        return 1;
+        return 2;
     }
 
     // NOTE: var: type
@@ -1185,9 +1188,13 @@ static AstNode* parse_statement(OnyxParser* parser) {
             retval = (AstNode *) parse_block(parser);
             break;
 
-        case Token_Type_Symbol:
-            if (parse_possible_symbol_declaration(parser, &retval)) break;
+        case Token_Type_Symbol: {
+            i32 symbol_res = parse_possible_symbol_declaration(parser, &retval);
+            if (symbol_res == 2) needs_semicolon = 0;
+            if (symbol_res != 0) break;
+            
             // fallthrough
+        }
 
         case '(':
         case '+':
