@@ -112,9 +112,18 @@ static OnyxToken* soft_expect_token(OnyxParser* parser, TokenType token_type) {
 }
 
 static void add_node_to_process(OnyxParser* parser, AstNode* node) {
+    Scope* scope = parser->file_scope;
+
+    if (!bh_arr_is_empty(parser->block_stack)) {
+        Scope* binding_scope = parser->block_stack[bh_arr_length(parser->block_stack) - 1]->binding_scope;
+        
+        if (binding_scope != NULL)
+            scope = binding_scope;
+    }
+
     bh_arr_push(parser->results.nodes_to_process, ((NodeToProcess) {
         .package = parser->package,
-        .scope = parser->file_scope,
+        .scope = scope,
         .node = node,
     }));
 }
@@ -1008,9 +1017,21 @@ static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
     expect_token(parser, ':');
 
     if (parser->curr->type == ':') {
-        AstBinding* binding = parse_top_level_binding(parser, symbol);
+        AstBlock* current_block = parser->block_stack[bh_arr_length(parser->block_stack) - 1];
+        if (current_block->binding_scope == NULL) {
+            // TODO: Check this is right. I suspect it may allow more things to be
+            // valid than I want it to.
 
-        bh_arr_push(parser->block_stack[0]->bindings, binding);
+            Scope* parent_scope = parser->file_scope;
+            if (bh_arr_length(parser->block_stack) > 1) {
+                parent_scope = parser->block_stack[bh_arr_length(parser->block_stack) - 2]->binding_scope;
+            }
+
+            current_block->binding_scope = scope_create(parser->allocator, parent_scope, current_block->token->pos);
+        }
+
+        AstBinding* binding = parse_top_level_binding(parser, symbol);
+        symbol_introduce(current_block->binding_scope, symbol, binding->node);
         return 1;
     }
 
@@ -1340,7 +1361,10 @@ static AstBlock* parse_block(OnyxParser* parser) {
     AstNode** next = &block->body;
     AstNode* stmt = NULL;
     while (parser->curr->type != '}') {
-        if (parser->hit_unexpected_token) return block;
+        if (parser->hit_unexpected_token) {
+            bh_arr_pop(parser->block_stack);
+            return block;
+        }
 
         stmt = parse_statement(parser);
 
