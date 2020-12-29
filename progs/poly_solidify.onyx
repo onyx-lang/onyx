@@ -49,21 +49,26 @@ main :: proc (args: [] cstr) {
 }
 
 array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
-    test2();
-
     foo := #solidify math.max { T = T };
     is := (#type InternalStruct(T)).{ foo = foo(6, 2) };
     printf("%i\n", is.foo);
 
     for ^v: arr do *v = f(*v);
 
-    test2 :: proc () {
-        test();
-        println("WORLD!!!!");
-    }
+    {
+        test2();
 
-    test  :: proc () {
-        println("HELLO!!!");
+        test2 :: proc () {
+            test();
+
+            is : InternalStruct([] u32);
+
+            println("WORLD!!!!");
+        }
+
+        test  :: proc () {
+            println("HELLO!!!");
+        }
     }
 
     InternalStruct :: struct ($SOMETHING) {

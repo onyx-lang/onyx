@@ -115,10 +115,8 @@ static void add_node_to_process(OnyxParser* parser, AstNode* node) {
     Scope* scope = parser->file_scope;
 
     if (!bh_arr_is_empty(parser->block_stack)) {
-        Scope* binding_scope = parser->block_stack[bh_arr_length(parser->block_stack) - 1]->binding_scope;
-
-        if (binding_scope != NULL)
-            scope = binding_scope;
+        scope = parser->block_stack[bh_arr_length(parser->block_stack) - 1]->binding_scope;
+        assert(scope != NULL);
     }
 
     bh_arr_push(parser->results.nodes_to_process, ((NodeToProcess) {
@@ -1021,17 +1019,7 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 
     if (parser->curr->type == ':') {
         AstBlock* current_block = parser->block_stack[bh_arr_length(parser->block_stack) - 1];
-        if (current_block->binding_scope == NULL) {
-            // TODO: Check this is right. I suspect it may allow more things to be
-            // valid than I want it to.
-
-            Scope* parent_scope = parser->file_scope;
-            if (bh_arr_length(parser->block_stack) > 1) {
-                parent_scope = parser->block_stack[bh_arr_length(parser->block_stack) - 2]->binding_scope;
-            }
-
-            current_block->binding_scope = scope_create(parser->allocator, parent_scope, current_block->token->pos);
-        }
+        assert(current_block->binding_scope != NULL);
 
         AstBinding* binding = parse_top_level_binding(parser, symbol);
         symbol_introduce(current_block->binding_scope, symbol, binding->node);
@@ -1340,6 +1328,13 @@ static AstNode* parse_statement(OnyxParser* parser) {
 static AstBlock* parse_block(OnyxParser* parser) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
     bh_arr_new(global_heap_allocator, block->allocate_exprs, 4);
+
+    {
+        Scope* parent_scope = parser->file_scope;
+        if (!bh_arr_is_empty(parser->block_stack))
+            parent_scope = bh_arr_last(parser->block_stack)->binding_scope;
+        block->binding_scope = scope_create(parser->allocator, parent_scope, parser->curr->pos);
+    }
 
     bh_arr_push(parser->block_stack, block);
 
