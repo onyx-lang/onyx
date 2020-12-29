@@ -532,7 +532,8 @@ struct AstBlock         {
     AstNode *body;
     Scope *scope;
 
-    bh_arr(AstTyped *) allocate_exprs;
+    bh_arr(AstTyped *)   allocate_exprs;
+    bh_arr(AstBinding *) bindings;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {

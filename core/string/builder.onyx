@@ -27,7 +27,7 @@ clear :: proc (use sb: ^Builder) -> ^Builder {
 }
 
 add_str :: proc (use sb: ^Builder, s: str) -> ^Builder {
-    len_total :: data.count + s.count;
+    len_total := data.count + s.count;
 
     if data.capacity < len_total do #context_scope {
         context.allocator = alloc;

@@ -75,7 +75,26 @@ compress :: proc (arr: [5] $T, f : proc (T, T) -> T) -> T {
     return val;
 }
 
+BadUnion :: struct {
+    use container : struct #union {
+        int: i32;
+        float: f32;
+    };
+}
+
+Vec2   :: struct { x: i32; y: i32; }
+Entity :: struct { use pos: Vec2; }
+
 main :: proc (args: [] cstr) {
+    a : BadUnion;
+    a.int = 1234;
+    a.float = 0.5;
+    printf("%i == 4\n", sizeof BadUnion);
+    printf("%p\n", a.int);
+    printf("%f\n", a.float);
+
+    e := Entity.{ pos = Vec2.{ 1, 2 } };
+
     {
         foo : [5] [2] u32;
         foo = f();

@@ -88,6 +88,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Defer: return sizeof(AstDefer);
         case Ast_Kind_Switch: return sizeof(AstSwitch);
         case Ast_Kind_Switch_Case: return sizeof(AstSwitchCase);
+        case Ast_Kind_Directive_Solidify: return sizeof(AstDirectiveSolidify);
         case Ast_Kind_Count: return 0;
 	}
 }

@@ -112,6 +112,24 @@ Language Cohesion:
 
     [ ] Add macros.
 
+    [ ] enum #flags should be able to be used as so:
+        ```
+        SomeEnum :: enum #flags {
+            Property1; 
+            Property2; 
+            Property3; 
+        }
+
+        val : SomeEnum = ~~0;
+        val.Property1 = true;
+        val.Property3 = true;
+
+        // This should also be allowed.
+        val |= SomeEnum.Property2;
+
+        if val.Property2 { ... }
+        ```
+
     [X] #solidify polymoprhic procedures.
 
 API Expansion:
@@ -140,3 +158,19 @@ Usability:
     [ ] Make README on GitHub better, and actually describe what to do
     [ ] Make compiler work on Windows
     [ ] Make compiler work on MacOS
+    [ ] Add examples for the following language features:
+        - Slices
+        - Dynamic Arrays
+        - Structs and unions
+        - Enums
+        - switch statements
+        - for loops
+        - Maps
+        - varargs
+        - `use` keyword
+        - pipe operator
+        - Overloaded procedures
+        - Polymorphic procedures
+        - WASM directives (#export, #foreign)
+        - #solidify directive
+        - SIMD

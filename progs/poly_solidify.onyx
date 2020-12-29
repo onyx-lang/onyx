@@ -27,7 +27,7 @@ main :: proc (args: [] cstr) {
     defer array.free(^arr);
 
 
-    for i: 0 .. 10 do array.push(^arr, i);
+    for i: 0 .. 10 do array.push(^arr, ~~i);
     print_array(arr);
 
     array_map(arr, double);

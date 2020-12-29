@@ -12,12 +12,13 @@ i64_to_str :: proc (n_: i64, base: u64, buf: [] u8) -> str {
     c := ^buf[buf.count - 1];
     len := 0;
 
-    s :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
+    // BUGFIX: Make this work with '::';
+    BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
 
     while n > 0 {
-        m :: n % base;
+        m := n % base;
 
-        *c = s[cast(u32) m];
+        *c = BASE64_MAP[cast(u32) m];
         len += 1;
         c -= 1;
 

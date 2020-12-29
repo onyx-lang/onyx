@@ -667,6 +667,9 @@ static void symres_block(AstBlock* block) {
     scope_enter(block->scope);
     bh_arr_push(semstate.block_stack, block);
 
+    bh_arr_each(AstBinding *, binding, block->bindings)
+        symbol_introduce(semstate.curr_scope, (*binding)->token, (*binding)->node);
+
     if (block->body)
         symres_statement_chain(&block->body);
 

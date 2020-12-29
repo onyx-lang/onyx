@@ -1,7 +1,7 @@
 package core.string
 
 make :: proc (s: cstr) -> str {
-    len :: length(s);
+    len := length(s);
 
     return str.{ count = len, data = s };
 }
@@ -39,8 +39,8 @@ copy :: proc (orig: str, dest: str) {
 }
 
 concat :: proc (s1: str, s2: str) -> str {
-    len1 :: length(s1);
-    len2 :: length(s2);
+    len1 := length(s1);
+    len2 := length(s2);
 
     data := cast(^u8) calloc(len1 + len2);
     for i: 0 .. len1 do data[i]        = s1[i];

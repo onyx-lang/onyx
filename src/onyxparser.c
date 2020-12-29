@@ -45,6 +45,7 @@ static AstFunction*   parse_function_definition(OnyxParser* parser);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
+static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
 static AstNode*       parse_top_level_statement(OnyxParser* parser);
 static AstPackage*    parse_package_name(OnyxParser* parser);
 
@@ -1004,12 +1005,18 @@ static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
     if ((parser->curr + 1)->type != ':')         return 0;
 
     OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-    consume_token(parser);
-    AstType* type_node = NULL;
+    expect_token(parser, ':');
+
+    if (parser->curr->type == ':') {
+        AstBinding* binding = parse_top_level_binding(parser, symbol);
+
+        bh_arr_push(parser->block_stack[0]->bindings, binding);
+        return 1;
+    }
 
     // NOTE: var: type
-    if (parser->curr->type != ':'
-            && parser->curr->type != '=') {
+    AstType* type_node = NULL;
+    if (parser->curr->type != '=') {
         type_node = parse_type(parser);
     }
 
@@ -1018,11 +1025,7 @@ static b32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
     local->type_node = type_node;
     *ret = (AstNode *) local;
 
-    if (parser->curr->type == '=' || parser->curr->type == ':') {
-        if (parser->curr->type == ':') {
-            local->flags |= Ast_Flag_Const;
-        }
-
+    if (parser->curr->type == '=') {
         AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
         assignment->operation = Binary_Op_Assign;
         local->next = (AstNode *) assignment;
@@ -1310,21 +1313,26 @@ static AstBlock* parse_block(OnyxParser* parser) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
     bh_arr_new(global_heap_allocator, block->allocate_exprs, 4);
 
+    bh_arr_push(parser->block_stack, block);
+
     // NOTE: --- is for an empty block
     if (parser->curr->type == Token_Type_Empty_Block) {
         block->token = expect_token(parser, Token_Type_Empty_Block);
+        bh_arr_pop(parser->block_stack);
         return block;
     }
 
     if (parser->curr->type == Token_Type_Keyword_Do) {
         block->token = expect_token(parser, Token_Type_Keyword_Do);
         block->body = parse_statement(parser);
+        bh_arr_pop(parser->block_stack);
         return block;
     }
 
     if (parser->curr->type != '{') {
         expect_token(parser, '{');
         find_token(parser, '}');
+        bh_arr_pop(parser->block_stack);
         return block;
     }
     block->token = expect_token(parser, '{');
@@ -1346,6 +1354,7 @@ static AstBlock* parse_block(OnyxParser* parser) {
 
     expect_token(parser, '}');
 
+    bh_arr_pop(parser->block_stack);
     return block;
 }
 
@@ -1954,6 +1963,62 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     }
 }
 
+static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol) {
+    expect_token(parser, ':');
+
+    AstTyped* node = parse_top_level_expression(parser);
+    if (parser->hit_unexpected_token || node == NULL)
+        return NULL;
+
+    if (node->kind == Ast_Kind_Function) {
+        AstFunction* func = (AstFunction *) node;
+
+        if (func->exported_name == NULL)
+            func->exported_name = symbol;
+
+        func->name = symbol;
+
+    } else if (node->kind == Ast_Kind_Polymorphic_Proc) {
+        AstPolyProc* proc = (AstPolyProc *) node;
+
+        if (proc->base_func->exported_name == NULL)
+            proc->base_func->exported_name = symbol;
+
+        proc->base_func->name = symbol;
+
+    } else if (node->kind == Ast_Kind_Global) {
+        AstGlobal* global = (AstGlobal *) node;
+
+        if (global->exported_name == NULL)
+            global->exported_name = symbol;
+
+        global->name = symbol;
+
+    } else if (node->kind != Ast_Kind_Overloaded_Function
+            && node->kind != Ast_Kind_StrLit) {
+
+        if (node->kind == Ast_Kind_Struct_Type
+                || node->kind == Ast_Kind_Enum_Type
+                || node->kind == Ast_Kind_Poly_Struct_Type) {
+            ((AstStructType *)node)->name = bh_aprintf(global_heap_allocator,
+                "%b", symbol->text, symbol->length);
+        }
+
+        if (node->kind == Ast_Kind_Type_Alias) {
+            node->token = symbol;
+        }
+
+        // HACK
+        add_node_to_process(parser, (AstNode *) node);
+    }
+
+    AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+    binding->token = symbol;
+    binding->node = (AstNode *) node;
+
+    return binding;
+}
+
 // 'use' <string>
 // <symbol> :: <expr>
 static AstNode* parse_top_level_statement(OnyxParser* parser) {
@@ -1984,61 +2049,11 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
             expect_token(parser, ':');
 
             if (parser->curr->type == ':') {
-                expect_token(parser, ':');
-
-                AstTyped* node = parse_top_level_expression(parser);
-                if (parser->hit_unexpected_token || node == NULL)
-                    return NULL;
-
-                node->flags |= private_kind;
-
-                if (node->kind == Ast_Kind_Function) {
-                    AstFunction* func = (AstFunction *) node;
-
-                    if (func->exported_name == NULL)
-                        func->exported_name = symbol;
-
-                    func->name = symbol;
-
-                } else if (node->kind == Ast_Kind_Polymorphic_Proc) {
-                    AstPolyProc* proc = (AstPolyProc *) node;
-
-                    if (proc->base_func->exported_name == NULL)
-                        proc->base_func->exported_name = symbol;
-
-                    proc->base_func->name = symbol;
-
-                } else if (node->kind == Ast_Kind_Global) {
-                    AstGlobal* global = (AstGlobal *) node;
-
-                    if (global->exported_name == NULL)
-                        global->exported_name = symbol;
-
-                    global->name = symbol;
-
-                } else if (node->kind != Ast_Kind_Overloaded_Function
-                        && node->kind != Ast_Kind_StrLit) {
-
-                    if (node->kind == Ast_Kind_Struct_Type
-                            || node->kind == Ast_Kind_Enum_Type
-                            || node->kind == Ast_Kind_Poly_Struct_Type) {
-                        ((AstStructType *)node)->name = bh_aprintf(global_heap_allocator,
-                            "%b", symbol->text, symbol->length);
-                    }
-
-                    if (node->kind == Ast_Kind_Type_Alias) {
-                        node->token = symbol;
-                    }
-
-                    // HACK
-                    add_node_to_process(parser, (AstNode *) node);
-                }
-
-                AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
-                binding->token = symbol;
-                binding->node = (AstNode *) node;
+                AstBinding* binding = parse_top_level_binding(parser, symbol);
+                binding->node->flags |= private_kind;
 
                 return (AstNode *) binding;
+
             } else {
                 AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
                 memres->token = symbol;
@@ -2197,12 +2212,12 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Prog
     parser.prev = NULL;
     parser.program = program;
     parser.hit_unexpected_token = 0;
+    parser.block_stack = NULL;
 
     parser.results = (ParseResults) {
         .allocator = global_heap_allocator,
 
         .nodes_to_process = NULL,
-
     };
 
     parser.polymorph_context = (PolymorphicContext) {
@@ -2210,12 +2225,14 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, Prog
         .poly_params = NULL,
     };
 
+    bh_arr_new(global_heap_allocator, parser.block_stack, 4);
     bh_arr_new(parser.results.allocator, parser.results.nodes_to_process, 4);
 
     return parser;
 }
 
 void onyx_parser_free(OnyxParser* parser) {
+    bh_arr_free(parser->block_stack);
 }
 
 ParseResults onyx_parse(OnyxParser *parser) {
