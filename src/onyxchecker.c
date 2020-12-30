@@ -1128,7 +1128,10 @@ b32 check_array_access(AstArrayAccess* aa) {
 b32 check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     if (check_expression(&field->expr)) return 1;
-    if (field->expr->type == NULL) return 1;
+    if (field->expr->type == NULL) {
+        onyx_report_error(field->token->pos, "Unable able to deduce type of expression for accessing field.");
+        return 1;
+    }
 
     if (!type_is_structlike(field->expr->type)) {
         onyx_report_error(field->token->pos,

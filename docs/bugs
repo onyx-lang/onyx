@@ -38,7 +38,7 @@ List of known bugs:
     Since `continue`ing or `break`ing would skip the deferred statement, causing
     an infinite loop.
 
-[ ] The following code causes an infinite loop somewhere.
+[X] The following code causes an infinite loop somewhere.
     ``` 
     get_neighbor_count :: proc (grid: ^map.Map(Vec2, Cell), pos: Vec2) -> u32 {
         count := 0;
