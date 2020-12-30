@@ -346,7 +346,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
             token_toggle_end((*smem)->token);
 
             if (s.included_through_use) {
-                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%b', whic was included through a 'use' statement.", s.name);
+                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%s', whic was included through a 'use' statement.", s.name);
                 return;
             }
 
