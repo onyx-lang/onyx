@@ -356,21 +356,24 @@ static void symres_struct_literal(AstStructLiteral* sl) {
                 return;
             }
 
+            if (s.member_was_used) {
+                (*smem)->flags |= Ast_Flag_Struct_Mem_Used;
+            }
+
             sl->values[s.idx] = (*smem)->initial_value;
         }
 
         if (sl->type->kind == Type_Kind_Struct) {
-            AstStructType* st = (AstStructType *) sl->type_node;
             bh_arr_each(StructMember*, smem, sl->type->Struct.memarr) {
                 u32 idx = (*smem)->idx;
 
                 if (sl->values[idx] == NULL) {
-                    if (st->kind != Ast_Kind_Struct_Type || st->members[idx]->initial_value == NULL) {
+                    if ((*smem)->initial_value == NULL) {
                         onyx_report_error(sl->token->pos, "No value was given for the field '%s'.", (*smem)->name);
                         return;
                     }
 
-                    sl->values[idx] = st->members[idx]->initial_value;
+                    sl->values[idx] = (*smem)->initial_value;
                 }
             }
         }

@@ -93,7 +93,7 @@ main :: proc (args: [] cstr) {
     printf("%p\n", a.int);
     printf("%f\n", a.float);
 
-    e := Entity.{ pos = Vec2.{ 1, 2 } };
+    e := Entity.{ Vec2.{ 1, 2 } };
 
     {
         foo : [5] [2] u32;

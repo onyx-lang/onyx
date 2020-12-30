@@ -1,0 +1,145 @@
+use package core
+
+main :: proc (args: [] cstr) {
+
+	test_simple_struct();
+	test_simple_union();
+	test_default_values();
+	test_simple_use();
+	test_polymorphic();
+	test_polymorphic_with_defaults();
+
+	test_simple_struct :: proc () {
+		println("Testing a simple structure.");
+		
+		SimpleStruct :: struct {
+			age    : u16;
+			height : u32;
+
+			name : str;
+		}
+
+		ss := SimpleStruct.{ 41, 67, "Steve" };
+
+		printf("SimpleStruct<%i, %i>(%i, %i, %s)\n",
+			sizeof SimpleStruct,
+			alignof SimpleStruct,
+			cast(u32) ss.age, ss.height, ss.name);
+	}
+
+	test_simple_union :: proc () {
+		println("\n\nTesting a simple union.");
+
+		SimpleUnion :: struct #union {
+			int_val   : i32;
+			float_val : f32;
+		}
+
+		u : SimpleUnion;
+		u.float_val = 0.5;
+
+		printf("%p == 0x3F000000\n", u.int_val);
+	}
+
+	test_default_values :: proc () {
+		println("\n\nTesting a struct with default values.");
+
+		DefaultedStruct :: struct {
+			i : i32 = 0;
+			f : f32 = 1;
+			l : i64 = 2;
+			d : f64 = 3;
+		}
+
+		ds1 := DefaultedStruct.{};
+		print_defaulted(ds1);
+
+		ds2 := DefaultedStruct.{ i = 3, d = 0 };
+		print_defaulted(ds2);
+
+		print_defaulted :: proc (use ds: DefaultedStruct) {
+			printf("DefaultedStruct(%i, %f, %l, %d)\n", i, f, l, d);
+		}
+	}
+
+	test_simple_use :: proc () {
+		println("\n\nTesting a struct with `use`.");
+
+		StructWithUse :: struct {
+			first_member : i32;
+
+			use used_member : UsedMember;
+
+			last_member : i32;
+		}
+
+		UsedMember :: struct {
+			x : f32;
+			y : f32;	
+		}
+
+		// This does not work, but it should.
+		// swu := StructWithUse.{ 1234, UsedMember.{ 1, 2 }, 5678 };
+
+		// Neither does this, but it also should.
+		// swu := StructWithUse.{
+		// 	first_member = 1234,
+		// 	used_member  = UsedMember.{ 1, 2 },
+		// 	last_member  = 5678,
+		// };
+
+		// This does, when all non-used members are listed out.
+		swu := StructWithUse.{ 1234, 1, 2, 5678 };
+
+		// This also does.
+		swu2 := StructWithUse.{
+			first_member = 1234,
+			x            = 1,
+			y            = 2,
+			last_member  = 5678,
+		};
+
+		print_swu :: proc (use swu: StructWithUse) {
+			printf("StructWithUse(%i, (%f, %f), %i)\n",
+				first_member, x, y, last_member);
+		}
+
+		print_swu(swu);
+		print_swu(swu2);
+	}
+
+	test_polymorphic :: proc () {
+		println("\n\nTesting a polymorphic struct.");
+
+		PolyStruct :: struct ($T, $R) {
+			t_data : T;
+			r_data : R;
+		}
+
+		ps1 : PolyStruct(i32, f32);
+		ps1.t_data = 1234;
+		ps1.r_data = 5678;
+
+		printf("PolyStruct<i32, f32>(%i, %f)\n", ps1.t_data, ps1.r_data);
+
+		// Currently, this is how you have to do this.
+		ps2 := (#type PolyStruct(f32, i32)).{ 1234, 5678 };
+		printf("PolyStruct<f32, i32>(%f, %i)\n", ps2.t_data, ps2.r_data);
+	}
+
+	test_polymorphic_with_defaults :: proc () {
+		println("\n\nTesting a polymorphic struct with default values.");
+
+		PolyStruct :: struct ($T, $R) {
+			t_data : T = 1234;
+			r_data : R = 5678;
+		}
+
+		PolyStructTyped :: #type PolyStruct(i32, f32);
+
+		ps := PolyStructTyped.{};
+		printf("PolyStruct<i32, f32>(%i, %f)\n", ps.t_data, ps.r_data);
+	}
+}
+
+#include_file "core/std/js"

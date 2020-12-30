@@ -67,6 +67,10 @@ typedef struct StructMember {
     // be many struct members, and iterating through an array would be
     // easier and less costly.                  - brendanfh 2020/09/17
     char *name;
+
+    struct AstTyped* initial_value;
+
+    b32 member_was_used : 1;
 } StructMember;
 
 #define TYPE_KINDS \

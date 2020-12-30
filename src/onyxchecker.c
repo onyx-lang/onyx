@@ -1008,12 +1008,11 @@ b32 check_range_literal(AstRangeLiteral** prange) {
     }
 
     if (range->step == NULL) {
-        // HACK: This relies on the third member of the 'range' struct to exist, be the step,
-        // and have an initial_value.
-        AstStructMember* step_member = ((AstStructType *) builtin_range_type)->members[2];
-        if (check_expression(&step_member->initial_value)) return 1;
+        type_lookup_member(expected_range_type, "step", &smem);
+        assert(smem.initial_value != NULL);
+        if (check_expression(&smem.initial_value)) return 1;
 
-        range->step = step_member->initial_value;
+        range->step = smem.initial_value;
     }
 
     return 0;

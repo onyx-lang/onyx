@@ -1,0 +1,25 @@
+Testing a simple structure.
+SimpleStruct<16, 4>(41, 67, Steve)
+
+
+Testing a simple union.
+0x3F000000 == 0x3F000000
+
+
+Testing a struct with default values.
+DefaultedStruct(0, 1.0, 2, 3.0)
+DefaultedStruct(3, 1.0, 2, 0.0)
+
+
+Testing a struct with `use`.
+StructWithUse(1234, (1.0, 2.0), 5678)
+StructWithUse(1234, (1.0, 2.0), 5678)
+
+
+Testing a polymorphic struct.
+PolyStruct<i32, f32>(1234, 5678.0)
+PolyStruct<f32, i32>(1234.0, 5678)
+
+
+Testing a polymorphic struct with default values.
+PolyStruct<i32, f32>(1234, 5678.0)

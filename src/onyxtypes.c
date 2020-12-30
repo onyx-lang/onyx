@@ -367,6 +367,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .type = (*member)->type,
                     .idx = idx,
                     .name = bh_strdup(alloc, (*member)->token->text),
+                    .member_was_used = ((*member)->flags & Ast_Flag_Struct_Mem_Used) != 0,
+                    .initial_value = (*member)->initial_value,
                 };
 
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
@@ -646,6 +648,9 @@ u32 type_get_alignment_log2(Type* type) {
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
     if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+
+    smem->member_was_used = 0;
+    smem->initial_value = NULL;
 
     switch (type->kind) {
         case Type_Kind_Struct: {
