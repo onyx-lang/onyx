@@ -6,7 +6,7 @@
                 "type": "cppdbg",
                 "request": "launch",
                 "program": "${workspaceFolder}/onyx",
-                "args": ["--verbose", "progs/poly_solidify.onyx"],
+                "args": ["--verbose", "tests/struct_robustness.onyx"],
                 "stopAtEntry": true,
                 "cwd": "~/dev/c/onyx",
                 "environment": [],

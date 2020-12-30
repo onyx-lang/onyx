@@ -145,12 +145,6 @@ AstType* symres_type(AstType* type) {
 
                     return type;
                 }
-
-                bh_arr_insertn(s_node->members, i, bh_arr_length(used->members));
-
-                fori (j, 0, bh_arr_length(used->members)) {
-                    s_node->members[i + j + 1] = used->members[j];
-                }
             }
 
             if (member->initial_value != NULL) {
@@ -351,13 +345,14 @@ static void symres_struct_literal(AstStructLiteral* sl) {
             }
             token_toggle_end((*smem)->token);
 
-            if (sl->values[s.idx] != NULL) {
-                onyx_report_error((*smem)->token->pos, "Multiple values given for '%b'.", (*smem)->token->text, (*smem)->token->length);
+            if (s.included_through_use) {
+                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%b', whic was included through a 'use' statement.", s.name);
                 return;
             }
 
-            if (s.member_was_used) {
-                (*smem)->flags |= Ast_Flag_Struct_Mem_Used;
+            if (sl->values[s.idx] != NULL) {
+                onyx_report_error((*smem)->token->pos, "Multiple values given for '%b'.", (*smem)->token->text, (*smem)->token->length);
+                return;
             }
 
             sl->values[s.idx] = (*smem)->initial_value;
@@ -759,29 +754,23 @@ void symres_function_header(AstFunction* func) {
 
         if (param->local->flags & Ast_Flag_Param_Use) {
             if (type_is_struct(param->local->type)) {
-                AstStructType* st;
+                Type* st;
                 if (param->local->type->kind == Type_Kind_Struct) {
-                    st = (AstStructType *) param->local->type_node;
+                    st = param->local->type;
                 } else {
-                    st = (AstStructType *) ((AstPointerType *) param->local->type_node)->elem;
+                    st = param->local->type->Pointer.elem;
                 }
 
-                if (st->kind == Ast_Kind_Poly_Call_Type) {
-                    st = (AstStructType *) (((AstPolyStructType *) (((AstPolyCallType *) st)->callee))->base_struct);
-                }
-
-                bh_arr_each(AstStructMember *, mem, st->members) {
+                bh_table_each_start(StructMember, st->Struct.members);
                     AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
-                    fa->token = (*mem)->token;
                     fa->expr = (AstTyped *) param->local;
+                    fa->field = value.name;
 
-                    token_toggle_end((*mem)->token);
                     symbol_raw_introduce(semstate.curr_scope,
-                            (*mem)->token->text,
+                            value.name,
                             param->local->token->pos,
                             (AstNode *) fa);
-                    token_toggle_end((*mem)->token);
-                }
+                bh_table_each_end;
 
             } else {
                 onyx_report_error(param->local->token->pos, "can only 'use' structures or pointers to structures.");

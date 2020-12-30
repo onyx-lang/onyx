@@ -69,8 +69,7 @@ typedef struct StructMember {
     char *name;
 
     struct AstTyped* initial_value;
-
-    b32 member_was_used : 1;
+    b32 included_through_use : 1;
 } StructMember;
 
 #define TYPE_KINDS \

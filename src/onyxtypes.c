@@ -367,32 +367,43 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .type = (*member)->type,
                     .idx = idx,
                     .name = bh_strdup(alloc, (*member)->token->text),
-                    .member_was_used = ((*member)->flags & Ast_Flag_Struct_Mem_Used) != 0,
                     .initial_value = (*member)->initial_value,
+                    .included_through_use = 0,
                 };
 
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
                 token_toggle_end((*member)->token);
 
-                u32 type_size = type_size_of((*member)->type);
-                if (((*member)->flags & Ast_Flag_Struct_Mem_Used) == 0) {
-                    if (!is_union) offset += type_size;
-                    if (!is_union) size += type_size;
-                    else           size =  bh_max(size, type_size);
+                if (((*member)->flags & Ast_Flag_Struct_Mem_Used) != 0) {
+                    assert((*member)->type->kind == Type_Kind_Struct);
 
-                    idx++;
+                    bh_arr_each(StructMember*, psmem, (*member)->type->Struct.memarr) {
+                        StructMember new_smem = {
+                            .offset = offset + (*psmem)->offset,
+                            .type   = (*psmem)->type,
+                            .idx    = -1, // Dummy value because I don't think this is needed.
+                            .name   = (*psmem)->name,
+                            .initial_value = (*psmem)->initial_value,
+                            .included_through_use = 1,
+                        };
+
+                        bh_table_put(StructMember, s_type->Struct.members, (*psmem)->name, new_smem);
+                    }
                 }
+
+                u32 type_size = type_size_of((*member)->type);
+
+                if (!is_union) offset += type_size;
+                if (!is_union) size += type_size;
+                else           size =  bh_max(size, type_size);
+
+                idx++;
             }
 
             // NOTE: Need to do a second pass because the references to the
             // elements of the table may change if the internal arrays of the
             // table need to be resized.
-            s_type->Struct.mem_count = 0;
             bh_arr_each(AstStructMember *, member, s_node->members) {
-                if ((*member)->flags & Ast_Flag_Struct_Mem_Used) continue;
-
-                s_type->Struct.mem_count++;
-
                 token_toggle_end((*member)->token);
                 bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, (*member)->token->text));
                 token_toggle_end((*member)->token);
@@ -649,8 +660,8 @@ u32 type_get_alignment_log2(Type* type) {
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
     if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
 
-    smem->member_was_used = 0;
     smem->initial_value = NULL;
+    smem->included_through_use = 0;
 
     switch (type->kind) {
         case Type_Kind_Struct: {

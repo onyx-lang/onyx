@@ -78,26 +78,16 @@ main :: proc (args: [] cstr) {
 			y : f32;	
 		}
 
-		// This does not work, but it should.
-		// swu := StructWithUse.{ 1234, UsedMember.{ 1, 2 }, 5678 };
+		swu := StructWithUse.{ 1234, UsedMember.{ 1, 2 }, 5678 };
 
-		// Neither does this, but it also should.
-		// swu := StructWithUse.{
-		// 	first_member = 1234,
-		// 	used_member  = UsedMember.{ 1, 2 },
-		// 	last_member  = 5678,
-		// };
-
-		// This does, when all non-used members are listed out.
-		swu := StructWithUse.{ 1234, 1, 2, 5678 };
-
-		// This also does.
 		swu2 := StructWithUse.{
 			first_member = 1234,
-			x            = 1,
-			y            = 2,
+			used_member  = UsedMember.{ 1, 2 },
 			last_member  = 5678,
 		};
+
+		// This will not work. `use`d members cannot be set directly.
+		swu3 := StructWithUse.{ 1234, 1, 2, 5678 };
 
 		print_swu :: proc (use swu: StructWithUse) {
 			printf("StructWithUse(%i, (%f, %f), %i)\n",

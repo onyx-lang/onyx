@@ -55,7 +55,7 @@ List of known bugs:
 
 [X] Polymorphic structs do not recognize default values for members.
 
-[ ] `use` on struct members does not work correctly if the type is a union.
+[X] `use` on struct members does not work correctly if the type is a union.
     ```
     BadUnion :: struct {
         use container : struct #union {
@@ -67,7 +67,7 @@ List of known bugs:
     test :: proc () do print(sizeof BadUnion == 4);
     ```
 
-[ ] `use` on struct members breaks struct literals.
+[X] `use` on struct members breaks struct literals.
     ```
     Vec2   :: struct { x: i32; y: i32; }
     Entity :: struct { use pos: Vec2; }
