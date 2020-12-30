@@ -47,7 +47,7 @@ typedef struct OnyxCompileOptions {
     bh_allocator allocator;
     CompileAction action;
 
-    u32 verbose_output : 1;
+    u32 verbose_output : 2;
     u32 fun_output     : 1;
 
     bh_arr(const char *) included_folders;
@@ -92,6 +92,9 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
             }
             else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-V")) {
                 options.verbose_output = 1;
+            }
+            else if (!strcmp(argv[i], "-VV")) {
+                options.verbose_output = 2;
             }
             else if (!strcmp(argv[i], "--fun") || !strcmp(argv[i], "-F")) {
                 options.fun_output = 1;
@@ -440,6 +443,15 @@ static b32 process_include_entity(CompilerState* compiler_state, Entity* ent) {
 
 static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
     i32 changed = 1;
+
+    if (compiler_state->options->verbose_output == 2) {
+        if (ent->expr && ent->expr->token)
+            printf("%s | %s:%i:%i\n",
+                entity_state_strings[ent->state],
+                ent->expr->token->pos.filename,
+                ent->expr->token->pos.line,
+                ent->expr->token->pos.column);
+    }
 
     switch (ent->state) {
         case Entity_State_Parse_Builtin:
