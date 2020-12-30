@@ -168,7 +168,7 @@ Usability:
         - Maps
         - varargs
         - `use` keyword
-        - pipe operator
+        ✔ pipe operator
         - Overloaded procedures
         - Polymorphic procedures
         - WASM directives (#export, #foreign)

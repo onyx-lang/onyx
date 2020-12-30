@@ -1,0 +1,6 @@
+#include_file "core/std/wasi"
+
+use package core
+
+main :: proc (args: [] cstr) {
+}

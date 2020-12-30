@@ -1,0 +1,37 @@
+#include_file "core/std/wasi"
+
+use package core { println }
+
+main :: proc (args: [] cstr) {
+    // These functions will be used to demo the pipe operator.
+    Num    :: #type i32;
+    double :: proc (v: Num)         -> Num do return v * 2;
+    add    :: proc (a: Num, b: Num) -> Num do return a + b;
+    square :: proc (v: Num)         -> Num do return v * v;
+
+    // Something you may find yourself doing often is changing function
+    // calls together likes this:
+    println(square(add(double(4), 3)));
+
+    // I think we can agree that that line is hard to understand just
+    // by looking at it. This kind of pattern appears very often, at
+    // least in the way that I program, so I wanted to have a way to 
+    // make this kind of operation cleaner. My solution was the pipe
+    // operator (|>). The above code can be rewritten as so:
+    double(4) |> add(3) |> square() |> println();
+
+    // The pipe operator simply places the expression on its left into
+    // the FIRST argument slot of the function call on its right. The
+    // operator is left associative, so the implicit parentheses are
+    // exactly where you expect them to be. For example,
+    //      a |> f(b, c) |> g(d)
+    // is the same as,
+    //      (a |> f(b, c)) |> g(d)
+    // which becomes,
+    //      g(f(a, b, c), d)
+    //
+    // This may seem a little simple and useless, and that is okay.
+    // It is not an operator you probably will not have to use very
+    // often; But when you have code like the first println above,
+    // it can clean up the code and make it easier to read.
+}
