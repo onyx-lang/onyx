@@ -68,7 +68,7 @@ Language Cohesion:
         is that 'use package' can only be at the top level, and 'use' can only
         be used at the block level.
         
-    [ ] :: should not declare a local variable, just bind a name to an expression.
+    [X] :: should not declare a local variable, just bind a name to an expression.
         They can still be lexically scoped.
 
     [X] Currently accessing a field directly on a function call produces invalid

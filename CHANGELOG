@@ -1,6 +1,7 @@
 Release v0.0.6
 --------------
 Additions:
+* #solidify directive for explicitly specifying type variables in polymorphic procs.
 * properly different kinds of allocators in core/alloc/.
 * `map.empty`
 * `string.compare`
@@ -10,8 +11,14 @@ Additions:
 * `map.update`
 
 Removals:
+* struct literals can no longer specify values for members brought in through a `use`.
 
 Changes:
+* `::` declarations in a procedure are treated differently now. They used to represent a constant
+    value, but one that was still computed at the assignment site. Now, they instead are used to
+    declare top level expressions in the procedure scope. This means that things like structs and
+    enums can be declared at any block scope. The top-level expressions currently do not have
+    access to polymoprhic variables in the procedure.
 * enum values are compile time known.
 * struct literals are compile time known can be used at top level scope.
 * range literals are proper things in the compiler code now.
@@ -20,6 +27,7 @@ Changes:
 Bug fixes:
 * polymorphic procedures would get 'confused' when two structs in the program had the same name.
 * function argument type mismatch would give wrong function name.
+* `structs` with `use`d members caused all sorts of problems.
 
 
 Release v0.0.5
