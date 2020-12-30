@@ -94,6 +94,7 @@ main :: proc (args: [] cstr) {
     printf("%f\n", a.float);
 
     e := Entity.{ Vec2.{ 1, 2 } };
+    printf("Entity(%i, %i)\n", e.x, e.y);
 
     {
         foo : [5] [2] u32;
