@@ -92,23 +92,23 @@ empty :: proc (use map: ^Map($K, $V)) -> bool {
 }
 
 hash_function :: proc {
-	proc (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-	proc (key: i32) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-	proc (key: i64) -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
+    proc (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+    proc (key: i32) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+    proc (key: i64) -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
 
-	proc (key: str) -> u32 {
-	    hash: u32 = 5381;
-	    for ch: key do hash += (hash << 5) + ~~ch;
-	    return hash;
-	},
+    proc (key: str) -> u32 {
+        hash: u32 = 5381;
+        for ch: key do hash += (hash << 5) + ~~ch;
+        return hash;
+    },
 }
 
 cmp_function :: proc {
-	proc (a: rawptr, b: rawptr) -> bool { return a == b; },
-	proc (a: i32, b: i32) -> bool       { return a == b; },
-	proc (a: i64, b: i64) -> bool       { return a == b; },
+    proc (a: rawptr, b: rawptr) -> bool { return a == b; },
+    proc (a: i32, b: i32) -> bool       { return a == b; },
+    proc (a: i64, b: i64) -> bool       { return a == b; },
 
-	string.equal,
+    string.equal,
 }
 
 //

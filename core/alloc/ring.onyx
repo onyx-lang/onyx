@@ -39,17 +39,17 @@ ring_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u
 }
 
 make :: proc (buffer: rawptr, length: u32) -> RingState {
-	return RingState.{
-	    base_ptr = buffer,
-	    curr_ptr = buffer,
-	    size     = length,
-	};
+    return RingState.{
+        base_ptr = buffer,
+        curr_ptr = buffer,
+        size     = length,
+    };
 }
 
 make_allocator :: proc (rs: ^RingState) -> Allocator {
-	return Allocator.{
-		func = ring_alloc_proc,
-		data = rs,
-	};
+    return Allocator.{
+        func = ring_alloc_proc,
+        data = rs,
+    };
 }
 

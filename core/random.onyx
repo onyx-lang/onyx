@@ -10,7 +10,7 @@ set_seed :: proc (s: u32) do seed = s;
 
 int :: proc (s := ^seed) -> u32 {
     *s = *s * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
-	return *s;
+    return *s;
 }
 
 between :: proc (lo: i32, hi: i32) -> i32 do return int () % (hi + 1 - lo) + lo;
