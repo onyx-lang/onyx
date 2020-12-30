@@ -1022,6 +1022,8 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
         assert(current_block->binding_scope != NULL);
 
         AstBinding* binding = parse_top_level_binding(parser, symbol);
+        if (parser->hit_unexpected_token) return 2;
+
         symbol_introduce(current_block->binding_scope, symbol, binding->node);
         return 2;
     }
@@ -2076,7 +2078,8 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
             if (parser->curr->type == ':') {
                 AstBinding* binding = parse_top_level_binding(parser, symbol);
-                binding->node->flags |= private_kind;
+
+                if (binding != NULL) binding->node->flags |= private_kind;
 
                 return (AstNode *) binding;
 
