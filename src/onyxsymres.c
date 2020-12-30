@@ -567,7 +567,7 @@ static void symres_use(AstUse* use) {
         return;
     }
 
-    if (use->expr->type_node == NULL) goto cannot_use;
+    if (use->expr->type_node == NULL && use->expr->type == NULL) goto cannot_use;
 
     AstType* effective_type = use->expr->type_node;
     if (effective_type->kind == Ast_Kind_Pointer_Type)
@@ -584,16 +584,16 @@ static void symres_use(AstUse* use) {
         if (st->kind == Type_Kind_Pointer)
             st = st->Pointer.elem;
 
-        bh_arr_each(StructMember *, smem, st->Struct.memarr) {
-            AstFieldAccess* fa = make_field_access(use->expr, (*smem)->name);
-            symbol_raw_introduce(semstate.curr_scope, (*smem)->name, use->token->pos, (AstNode *) fa);
-        }
+        bh_table_each_start(StructMember, st->Struct.members);
+            AstFieldAccess* fa = make_field_access(use->expr, value.name);
+            symbol_raw_introduce(semstate.curr_scope, value.name, use->token->pos, (AstNode *) fa);
+        bh_table_each_end;
 
         return;
     }
 
 cannot_use:
-    onyx_report_error(use->token->pos, "Cannot use this.");
+    onyx_report_error(use->token->pos, "Cannot use this because its type is unknown.");
 }
 
 static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
@@ -762,14 +762,8 @@ void symres_function_header(AstFunction* func) {
                 }
 
                 bh_table_each_start(StructMember, st->Struct.members);
-                    AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
-                    fa->expr = (AstTyped *) param->local;
-                    fa->field = value.name;
-
-                    symbol_raw_introduce(semstate.curr_scope,
-                            value.name,
-                            param->local->token->pos,
-                            (AstNode *) fa);
+                    AstFieldAccess* fa = make_field_access((AstTyped *) param->local, value.name);
+                    symbol_raw_introduce(semstate.curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
                 bh_table_each_end;
 
             } else {

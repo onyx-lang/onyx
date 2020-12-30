@@ -22,12 +22,13 @@ main :: proc (args: [] cstr) {
             name : str;
         }
 
-        ss := SimpleStruct.{ 41, 67, "Steve" };
+        ss: SimpleStruct = SimpleStruct.{ 41, 67, "Steve" };
 
+        use ss;
         printf("SimpleStruct<%i, %i>(%i, %i, %s)\n",
             sizeof SimpleStruct,
             alignof SimpleStruct,
-            cast(u32) ss.age, ss.height, ss.name);
+            cast(u32) age, height, name);
     }
 
     test_simple_union :: proc () {
