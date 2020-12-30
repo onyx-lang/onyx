@@ -23,3 +23,18 @@ PolyStruct<f32, i32>(1234.0, 5678)
 
 Testing a polymorphic struct with default values.
 PolyStruct<i32, f32>(1234, 5678.0)
+
+
+Testing a union with use.
+Union(10, 20)
+Union(Joe)
+
+
+Testing a polymorphic union.
+PolyUnion(Hello World.)
+PolyUnion(1234)
+
+
+Testing a polymorphic union with use.
+8 == 8
+0, 5678.0
