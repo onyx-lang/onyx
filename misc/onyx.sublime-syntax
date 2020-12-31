@@ -35,7 +35,7 @@ contexts:
     - match: '\b(i8x16|i16x8|i32x4|i64x2|f32x4|f64x2|v128)\b'
       scope: storage.type
 
-    - match: '\b(true|false|null|context)\b'
+    - match: '\b(true|false|null|null_proc|context)\b'
       scope: constant.numeric.onyx
 
     # Numbers

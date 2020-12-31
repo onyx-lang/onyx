@@ -26,7 +26,7 @@ syn keyword onyxType rawptr
 syn keyword onyxType str cstr
 syn keyword onyxType i8x16 i16x8 i32x4 i64x2 f32x4 f64x2 v128
 
-syn keyword onyxConstant        true false null
+syn keyword onyxConstant        true false null null_proc
 
 syn match onyxNumber            "\<0x[a-fA-F0-9]\+\>"
 syn match onyxNumber            "\<\d\+[lf]\=\>"
