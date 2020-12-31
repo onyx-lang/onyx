@@ -1,8 +1,6 @@
 **/*.o
 *.o
 tags
-test.c
-test
 *.wasm
 *.html
 session.vim

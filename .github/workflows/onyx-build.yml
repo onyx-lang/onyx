@@ -18,4 +18,4 @@ jobs:
     - name: make
       run: make
     - name: run tests
-      run: ./runtests.sh
+      run: ./bin/test

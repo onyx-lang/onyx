@@ -33,7 +33,7 @@ endif
 
 INCLUDES=-I./include
 LIBS=
-TARGET=./onyx
+TARGET=./bin/onyx
 
 # These aren't working yet
 INSTALL_FOLDER=/usr/share/onyx

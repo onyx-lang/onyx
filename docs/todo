@@ -158,6 +158,7 @@ Usability:
     [ ] Make README on GitHub better, and actually describe what to do
     [ ] Make compiler work on Windows
     [ ] Make compiler work on MacOS
+    [ ] Make Onyx easier to use from JS
     [ ] Add examples for the following language features:
         - Slices
         - Dynamic Arrays
