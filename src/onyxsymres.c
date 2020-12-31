@@ -31,6 +31,7 @@ static void symres_global(AstGlobal* global);
 static void symres_overloaded_function(AstOverloadedFunction* ofunc);
 static void symres_use_package(AstUsePackage* package);
 static void symres_enum(AstEnumType* enum_node);
+static void symres_memres_type(AstMemRes** memres);
 static void symres_memres(AstMemRes** memres);
 
 static AstFieldAccess* make_field_access(AstTyped* node, char* field) {
@@ -679,6 +680,8 @@ void symres_function_header(AstFunction* func) {
     if (func->scope == NULL)
         func->scope = scope_create(semstate.node_allocator, semstate.curr_scope, func->token->pos);
 
+    func->flags |= Ast_Flag_Comptime;
+
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
             symres_expression(&param->default_value);
@@ -884,14 +887,13 @@ static void symres_enum(AstEnumType* enum_node) {
     }
 }
 
-static void symres_memres(AstMemRes** memres) {
+static void symres_memres_type(AstMemRes** memres) {
     (*memres)->type_node = symres_type((*memres)->type_node);
+}
 
+static void symres_memres(AstMemRes** memres) {
     if ((*memres)->initial_value != NULL) {
         symres_expression(&(*memres)->initial_value);
-
-        // if ((*memres)->type_node == NULL)
-        //     (*memres)->type_node = (*memres)->initial_value->type_node;
     }
 }
 
@@ -923,13 +925,14 @@ void symres_entity(Entity* ent) {
                                               next_state = Entity_State_Finalized;
                                               break;
 
-        case Entity_Type_Overloaded_Function: symres_overloaded_function(ent->overloaded_function); break;
-        case Entity_Type_Expression:          symres_expression(&ent->expr); break;
-        case Entity_Type_Type_Alias:          ent->type_alias = symres_type(ent->type_alias); break;
-        case Entity_Type_Enum:                symres_enum(ent->enum_type); break;
-        case Entity_Type_Memory_Reservation:  symres_memres(&ent->mem_res); break;
-        case Entity_Type_Polymorphic_Proc:    symres_polyproc(ent->poly_proc); break;
-        case Entity_Type_String_Literal:      symres_expression(&ent->expr); break;
+        case Entity_Type_Overloaded_Function:     symres_overloaded_function(ent->overloaded_function); break;
+        case Entity_Type_Expression:              symres_expression(&ent->expr); break;
+        case Entity_Type_Type_Alias:              ent->type_alias = symres_type(ent->type_alias); break;
+        case Entity_Type_Enum:                    symres_enum(ent->enum_type); break;
+        case Entity_Type_Memory_Reservation_Type: symres_memres_type(&ent->mem_res); break;
+        case Entity_Type_Memory_Reservation:      symres_memres(&ent->mem_res); break;
+        case Entity_Type_Polymorphic_Proc:        symres_polyproc(ent->poly_proc); break;
+        case Entity_Type_String_Literal:          symres_expression(&ent->expr); break;
 
         default: break;
     }

@@ -359,6 +359,10 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
             }
 
             case Ast_Kind_Memres: {
+                ent.type = Entity_Type_Memory_Reservation_Type;
+                ent.mem_res = (AstMemRes *) node;
+                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+
                 ent.type = Entity_Type_Memory_Reservation;
                 ent.mem_res = (AstMemRes *) node;
                 entity_heap_insert(&compiler_state->prog_info.entities, ent);

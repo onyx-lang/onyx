@@ -3041,6 +3041,12 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         break;
     }
 
+    case Ast_Kind_Function: {
+        AstFunction* func = (AstFunction *) node;
+        *((u32 *) data) = get_element_idx(mod, func);
+        break;
+    }
+
     case Ast_Kind_NumLit: {
         // NOTE: This makes a big assumption that we are running on a
         // little endian machine, since WebAssembly is little endian

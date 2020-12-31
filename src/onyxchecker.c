@@ -31,6 +31,7 @@ CHECK(function, AstFunction* func);
 CHECK(overloaded_function, AstOverloadedFunction* func);
 CHECK(struct, AstStructType* s_node);
 CHECK(function_header, AstFunction* func);
+CHECK(memres_type, AstMemRes* memres);
 CHECK(memres, AstMemRes* memres);
 
 static inline void fill_in_array_count(AstType* type_node) {
@@ -1474,9 +1475,12 @@ b32 check_function_header(AstFunction* func) {
     return 0;
 }
 
-b32 check_memres(AstMemRes* memres) {
+b32 check_memres_type(AstMemRes* memres) {
     fill_in_type((AstTyped *) memres);
+    return 0;
+}
 
+b32 check_memres(AstMemRes* memres) {
     if (memres->initial_value != NULL) {
         fill_in_type(memres->initial_value);
         check_expression(&memres->initial_value);
@@ -1550,6 +1554,10 @@ void check_entity(Entity* ent) {
         case Entity_Type_Type_Alias:
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 if (check_struct((AstStructType *) ent->type_alias)) return;
+            break;
+
+        case Entity_Type_Memory_Reservation_Type:
+            if (check_memres_type(ent->mem_res)) return;
             break;
 
         case Entity_Type_Memory_Reservation:
