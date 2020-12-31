@@ -1,0 +1,77 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+parse_factor :: proc (file: ^reader.StringReader) -> u64 {
+	reader.skip_whitespace(file);
+
+	switch *file.data {
+		// Now may be a good time to add a range based case statement...
+		case #char "0" .. #char "9" {
+			return reader.read_u64(file);
+		}
+
+		case #char "(" {
+			reader.skip_bytes(file, 1);
+
+			value := parse_expression_mul(file);
+
+			reader.skip_whitespace(file);
+			reader.skip_bytes(file, 1);
+
+			return value;
+		}
+	}
+	
+	return 0;
+}
+
+parse_expression_add :: proc (file: ^reader.StringReader) -> u64 {
+	reader.skip_whitespace(file);
+
+	left := parse_factor(file);
+
+	reader.skip_whitespace(file);
+	while *file.data == #char "+" {
+		op := reader.read_byte(file);
+		right := parse_factor(file);
+
+		left += right;
+
+		reader.skip_whitespace(file);
+	}
+
+	return left;
+}
+
+parse_expression_mul :: proc (file: ^reader.StringReader) -> u64 {
+	reader.skip_whitespace(file);
+
+	left := parse_expression_add(file);
+
+	reader.skip_whitespace(file);
+	while *file.data == #char "*" {
+		op   := reader.read_byte(file);
+		right := parse_expression_add(file);
+
+		left *= right;
+
+		reader.skip_whitespace(file);
+	}
+
+	return left;
+}
+
+main :: proc (args: [] cstr) {
+	contents := #file_contents "./tests/aoc-2020/input/day18.txt";
+
+	file := reader.make(contents);
+
+	total: u64 = 0;
+	while !reader.empty(^file) {
+		total += parse_expression_mul(^file);
+	}
+
+	printf("Total: %l\n", total);
+}

@@ -1,0 +1,109 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+CubePos :: struct {
+    x : i32;
+    y : i32;
+    z : i32;
+    w : i32;
+}
+
+CubeState :: struct {
+    alive : bool = false;
+    next  : bool = false;
+}
+
+proc (c: CubePos) -> u32 #add_overload map.hash_function {
+    return 17 * c.x + 13 * c.y + 11 * c.z + 19 * c.w;
+}
+
+proc (a: CubePos, b: CubePos) -> bool #add_overload map.cmp_function {
+    return (a.x == b.x)
+        && (a.y == b.y)
+        && (a.z == b.z)
+        && (a.w == b.w);
+}
+
+get_neighbor_count :: proc (cubes: ^map.Map(CubePos, CubeState), pos: CubePos) -> u32 {
+    count := 0;
+
+    for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
+        if x == 0 && y == 0 && z == 0 && w == 0 do continue;
+        key := CubePos.{ pos.x + x, pos.y + y, pos.z + z, pos.w + w };
+        state := map.get(cubes, key, CubeState.{});
+        if state.alive do count += 1;
+    }
+
+    return count;
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day17.txt";
+
+    file := reader.make(contents);
+
+    cubes : map.Map(CubePos, CubeState);
+    map.init(^cubes, 1021);
+    defer map.free(^cubes);
+
+    z := 0;
+    while !reader.empty(^file) {
+        line := reader.read_line(^file);
+
+        x := 0;
+        for ch: line {
+            if ch == #char "#" do map.put(^cubes, CubePos.{ x, 0, z, 0 }, CubeState.{ alive = true });
+
+            x += 1;
+        }
+
+        z += 1;
+    }
+
+    cubes_to_consider : [..] CubePos;
+    array.init(^cubes_to_consider);
+    defer array.free(^cubes_to_consider);
+
+    for i: 0 .. 6 {
+        for ^cube_entry: cubes.entries {
+            if cube_entry.value.alive {
+                for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
+                    array.push(^cubes_to_consider, CubePos.{
+                        cube_entry.key.x + x,
+                        cube_entry.key.y + y,
+                        cube_entry.key.z + z,
+                        cube_entry.key.w + w
+                    });
+                }
+            }
+        }
+
+        for ^cube: cubes_to_consider {
+            state  := map.get(^cubes, *cube, CubeState.{});
+            ncount := get_neighbor_count(^cubes, *cube);
+            
+            if state.alive {
+                state.next = ncount == 2 || ncount == 3;
+            } else {
+                state.next = ncount == 3;
+            }
+
+            map.put(^cubes, *cube, state);
+        }
+
+        for ^cube: cubes_to_consider {
+            state := map.get(^cubes, *cube, CubeState.{});
+            state.alive = state.next;
+            map.put(^cubes, *cube, state);
+        }
+
+        array.clear(^cubes_to_consider);
+    }
+
+    active_count := 0;
+    for ^cube_entry: cubes.entries do if cube_entry.value.alive do active_count += 1;
+
+    printf("Active count: %i\n", active_count);
+}

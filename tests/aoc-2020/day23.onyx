@@ -1,0 +1,94 @@
+#include_file "core/std/js"
+
+use package core
+
+cups : [..] i32;
+
+// Using this as a wrapping function, since the WASM modulus
+// operator (%) doesn't appear to do the correct thing.
+w :: proc (idx: $T, mod := cups.count) -> T {
+    res := idx;
+    while res <  0     do res += ~~mod; 
+    while res >= ~~mod do res -= ~~mod;
+    return res;
+}
+
+get_idx :: proc (cups: [] i32, cup: i32) -> i32 {
+    for i: 0 .. cups.count do if cups[i] == cup do return i;
+    return -1;
+}
+
+range_by :: proc (lo: i32, hi: i32) -> range {
+    if lo < hi do return range.{ lo, hi, 1 };
+    if hi < lo do return range.{ hi, lo, 1 };
+    return 0 .. 0;
+}
+
+simulate :: proc (cups: [] i32, moves := 100) {
+    cw : [] i32;
+    alloc.alloc_slice(^cw, cups.count);
+    defer cfree(cw.data);
+
+    for i: 0 .. cups.count do cw[cups[i]] = cups[w(i + 1)];
+
+    current_cup := cups[0];
+
+    for move: 0 .. moves {
+        next_1 := cw[current_cup];
+        next_2 := cw[next_1];
+        next_3 := cw[next_2];
+        
+        destination_cup := w(current_cup - 1);
+        while  destination_cup == ~~next_1
+            || destination_cup == ~~next_2
+            || destination_cup == ~~next_3 {
+            destination_cup = w(destination_cup - 1);
+        }
+
+        cw[current_cup] = cw[next_3];
+        cw[next_3] = cw[destination_cup];
+        cw[destination_cup] = next_1;
+
+        current_cup = cw[current_cup];
+    }
+
+    cup := 0;
+    for i: 0 .. cups.count {
+        cups[i] = cup;
+        cup = cw[cup];
+    }
+}
+
+main :: proc (args: [] cstr) {
+    cups_data := i32.[ 9, 6, 2, 7, 1, 3, 8, 5, 4 ];
+
+    // Easier think about in zero-indexed
+    for ^cup: cups_data do *cup -= 1;
+
+    array.init(^cups, 1000000);
+    defer array.free(^cups);
+
+    for cup: cups_data do array.push(^cups, cup);
+
+    // Part 1
+    // simulate(array.to_slice(^cups));
+    
+    // Part 2
+    for i: 9 .. 1000000 do array.push(^cups, i);
+    simulate(array.to_slice(^cups), 10000000);
+
+    // Undo the zero-indexing
+    for ^cup: cups do *cup += 1;
+
+    // Part 1
+    // one_idx := get_idx(array.to_slice(^cups), 1);
+    // for i: 1 .. 9 {
+    //     printf("%i", cast(i32) cups[w(one_idx + i)]);
+    // }
+    // printf("\n");
+
+    // Part 2
+    one_idx := get_idx(array.to_slice(^cups), 1);
+    prod: i64 = cast(i64) (cups[w(one_idx + 1)]) * cast(i64) (cups[w(one_idx + 2)]);
+    printf("Cup product: %l\n", prod);
+}

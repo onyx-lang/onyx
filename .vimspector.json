@@ -5,7 +5,7 @@
             "configuration": {
                 "type": "cppdbg",
                 "request": "launch",
-                "program": "${workspaceFolder}/onyx",
+                "program": "${workspaceFolder}/bin/onyx",
                 "args": ["--verbose", "tests/struct_robustness.onyx"],
                 "stopAtEntry": true,
                 "cwd": "~/dev/c/onyx",

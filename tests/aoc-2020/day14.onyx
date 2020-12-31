@@ -1,0 +1,135 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+MASK_SIZE :: 36
+Bitmask :: #type [MASK_SIZE] u8;
+
+// Part 1
+bitmask_p1 :: proc (mask: Bitmask, val: u64) -> u64 {
+	res: u64 = 0;
+	bit: u64 = 1;
+	for m: mask {
+		switch m {
+			case 1 do res |= bit;
+			case 2 do res |= (val & bit);
+		}	
+
+		bit <<= 1;
+	}
+
+	return res;
+}
+
+// Part 2
+BitmaskIter :: struct {
+	floating_indicies : [..] u8;
+	val               : u64;
+	done              : bool;
+}
+
+bitmask_iter_make :: proc (mask: Bitmask, val: u64) -> BitmaskIter {
+	bmi : BitmaskIter;
+	bmi.done = false;
+
+	array.init(^bmi.floating_indicies, 8);
+
+	v := val;
+	for i: 0 .. MASK_SIZE {
+		if mask[i] == 1 {
+			v |= 1 << cast(u64) i;
+		}
+
+		if mask[i] == 2 {
+			v &= ~(1 << cast(u64) i);
+
+			array.push(^bmi.floating_indicies, cast(u8) i);
+		}
+	}
+
+	bmi.val = v;
+	return bmi;
+}
+
+bitmask_iter_free :: proc (use bmi: ^BitmaskIter) {
+	array.free(^floating_indicies);
+}
+
+bitmask_iter_done :: proc (use bmi: ^BitmaskIter) -> bool do return done;
+
+bitmask_iter_next :: proc (use bmi: ^BitmaskIter) -> u64 {
+	{
+		for ind: floating_indicies {
+			is_set := (val & (1 << cast(u64) ind)) != 0;
+
+			val ^= 1 << cast(u64) ind;
+
+			if !is_set do break break;
+		}
+
+		done = true;
+	}
+
+	return val;
+}
+
+main :: proc (args: [] cstr) {
+	contents := #file_contents "./tests/aoc-2020/input/day14.txt";
+
+	file := reader.make(contents);
+
+	mem : map.Map(u64, u64);
+	map.init(^mem, 257);
+	defer map.free(^mem);
+
+	mask : Bitmask;
+	for ^m: mask do *m = 2;
+
+	while !reader.empty(^file) {
+		word := reader.read_word(^file);
+		if string.equal(word, "mask") {
+			reader.skip_bytes(^file, 3);
+
+			i := 35;
+			while ch := reader.read_byte(^file); ch != #char "\n" {
+				switch ch {
+					case #char "0" do mask[i] = 0;
+					case #char "1" do mask[i] = 1;
+					case #char "X" do mask[i] = 2;
+				}
+
+				i -= 1;
+
+				ch = reader.read_byte(^file);
+			}
+		}
+		elseif string.equal(word, "mem") {
+			reader.skip_bytes(^file, 1);
+
+			addr := reader.read_u64(^file);
+			reader.skip_bytes(^file, 4);
+
+			val := reader.read_u64(^file);
+
+			// Part 1
+			// map.put(^mem, addr, bitmask_p1(mask, val));
+
+			// Part 2
+			bmi := bitmask_iter_make(mask, addr);
+			while !bitmask_iter_done(^bmi) {
+				real_addr := bitmask_iter_next(^bmi);
+				map.put(^mem, real_addr, val);
+			}
+
+			bitmask_iter_free(^bmi);
+
+			reader.advance_line(^file);
+		}	
+	}	
+
+	s: u64 = 0;
+	for e: mem.entries do s += e.value;
+
+	printf("Sum: %l\n", s);
+}

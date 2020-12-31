@@ -1,8 +1,9 @@
 #!/bin/sh
 
 failed=0
-for test_file in ./tests/*.onyx ; do
+for test_file in $(find tests/ -name '*.onyx'); do
     filename=$(basename -- "$test_file")
+    dirname="$(dirname -- "$test_file")"
     name="${filename%.*}"
 
     echo "⏲ Checking $name.onyx"
@@ -19,9 +20,9 @@ for test_file in ./tests/*.onyx ; do
         continue
     fi
 
-    if ! diff ./tmpoutput "./tests/$name" >/dev/null; then
+    if ! diff ./tmpoutput "$dirname/$name" >/dev/null; then
         echo "❌ Test output did not match."
-        diff ./tmpoutput "./tests/$name"
+        diff ./tmpoutput "$dirname/$name"
         # failed=0
         continue
     fi

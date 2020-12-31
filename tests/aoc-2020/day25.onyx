@@ -1,0 +1,73 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+power_mod :: proc (base: u32, exp: u32, mod: u32) -> u32 {
+    t: u64 = 1;
+    e: u64 = ~~exp;
+    b: u64 = ~~base;
+    m: u64 = ~~mod;
+
+    while e > 0 {
+        if e % 2 != 0 do t = (t * b) % m;
+
+        b = (b * b) % m;
+        e /= 2;
+    }
+
+    return ~~(t % m);
+}
+
+dlp_bsgs :: proc (n: u32, a: u32, b: u32) -> u32 {
+    use package core.intrinsics.wasm { ceil_f64, sqrt_f64 }
+
+    m := cast(u32) ceil_f64(sqrt_f64(~~n));
+
+    t : map.Map(u32, u32);
+    map.init(^t, m / 2);
+    defer map.free(^t);
+
+    tmp: u64 = 1;
+    for i: 0 .. m {
+        map.put(^t, ~~tmp, i);
+        tmp = (tmp * ~~a) % ~~n;
+    }
+
+    f := power_mod(a, n - 1 - m, n);
+
+    tmp = ~~b;
+    for i: 0 .. m {
+        if map.has(^t, cast(u32) tmp) {
+            v := map.get(^t, cast(u32) tmp, 0);
+            return i * m + v; 
+        }
+
+        tmp = (tmp * ~~f) % ~~n;
+    }
+
+    return 0;
+}
+
+transform_subject :: proc (subject: u32, loop_size: u32) -> u32 {
+    value: u64 = 1;
+    for i: 0 .. loop_size do value = (value * ~~subject) % 20201227;
+    return cast(u32) value;
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day25.txt";
+
+    file := reader.make(contents);
+
+    card_pub_key := reader.read_u32(^file);
+    door_pub_key := reader.read_u32(^file);
+
+    card_loop_secret := dlp_bsgs(20201227, 7, card_pub_key);
+    door_loop_secret := dlp_bsgs(20201227, 7, door_pub_key);
+
+    encryption_key_0 := transform_subject(door_pub_key, card_loop_secret);
+    encryption_key_1 := transform_subject(card_pub_key, door_loop_secret);
+
+    printf("%i == %i\n", encryption_key_0, encryption_key_1);
+}

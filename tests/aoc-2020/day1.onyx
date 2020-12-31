@@ -1,0 +1,28 @@
+#include_file "core/std/js"
+
+use package core
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day1.txt";
+    contents_orig := contents;
+    defer cfree(contents_orig.data);
+
+    nums: [..] u32;
+    array.init(^nums, 128);
+    defer array.free(^nums);
+
+    while num := 1; num > 0 {
+        // This sets num to be 0 if there is no number
+        string.read_u32(^contents, ^num); 
+        if num != 0 do array.push(^nums, num);
+    }
+
+    for i: nums do for j: nums do for k: nums {
+        if j + i + k == 2020 {
+            printf("Answer: %i\n", i * j * k);
+
+            // Break out of all of the loops
+            break break break;
+        }
+    }
+}

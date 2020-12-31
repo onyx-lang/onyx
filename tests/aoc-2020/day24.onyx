@@ -1,0 +1,136 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+Vec2 :: struct {
+	x: i32 = 0;
+	y: i32 = 0;
+}
+
+proc (v: Vec2) -> u32 #add_overload map.hash_function {
+	return v.x * 11 + v.y * 17;
+}
+
+proc (v1: Vec2, v2: Vec2) -> bool #add_overload map.cmp_function {
+	return v1.x == v2.x
+		&& v1.y == v2.y;
+}
+
+Hex_Directions := Vec2.[
+	Vec2.{  1, 0 }, Vec2.{  1, -1 }, Vec2.{ 0, -1 }, 
+    Vec2.{ -1, 0 }, Vec2.{ -1,  1 }, Vec2.{ 0,  1 }, 
+];
+
+Cell :: struct {
+	alive : bool = false;
+	next  : bool = false;	
+}
+
+main :: proc (args: [] cstr) {
+	contents := #file_contents "./tests/aoc-2020/input/day24.txt";
+
+	file := reader.make(contents);
+
+	grid : map.Map(Vec2, Cell); // `true` is black
+	map.init(^grid, 1021);
+	defer map.free(^grid);
+
+	while !reader.empty(^file) {
+		line := reader.read_line(^file);	
+
+		loc := Vec2.{ 0, 0 };
+		s := 0;
+		for ch: line do switch s {
+			case 0 do switch ch {
+				case #char "e" do loc.x += 1;
+				case #char "w" do loc.x -= 1;
+				case #char "n" do s = 1;
+				case #char "s" do s = 2;
+			}
+
+			case 1 {
+				switch ch {
+					case #char "e" { loc.x += 1; loc.y -= 1; }
+					case #char "w" { loc.y -= 1; }
+				}
+				s = 0;
+			}
+
+			case 2 {
+				switch ch {
+					case #char "e" { loc.y += 1; }
+					case #char "w" { loc.x -= 1; loc.y += 1; }
+				}
+				s = 0;
+			}
+		}
+
+
+		curr := map.get(^grid, loc, Cell.{});
+		map.put(^grid, loc, Cell.{ alive = !curr.alive });
+	}
+
+	// Part 1
+	black_count := 0;
+	for ^cell: grid.entries {
+		if cell.value.alive do black_count += 1;
+	}	
+	printf("Black count: %i\n", black_count);
+
+	// Part 2
+	cells_to_consider : [..] Vec2;
+	array.init(^cells_to_consider);
+	defer array.free(^cells_to_consider);
+
+	for i: 0 .. 100 {
+		for ^cell: grid.entries {
+			if cell.value.alive {
+				array.push(^cells_to_consider, cell.key);
+
+				for ^dir: Hex_Directions {
+					array.push(^cells_to_consider, Vec2.{
+						x = cell.key.x + dir.x,
+						y = cell.key.y + dir.y,
+					});
+				}
+			}
+		}
+
+		for ^cell: cells_to_consider {
+			state  := map.get(^grid, *cell, Cell.{});
+			ncount := get_neighbor_count(^grid, *cell);
+
+			if state.alive {
+				state.next = ncount == 1 || ncount == 2;
+			} else {
+				state.next = ncount == 2;
+			}
+
+			map.put(^grid, *cell, state);
+		}
+
+		for ^cell: cells_to_consider {
+			map.update(^grid, *cell, proc (state: ^Cell) { state.alive = state.next; });
+		}
+
+		array.clear(^cells_to_consider);
+	}
+
+	black_count = 0;
+	for ^cell: grid.entries {
+		if cell.value.alive do black_count += 1;
+	}	
+	printf("GOL black count: %i\n", black_count);
+}
+
+get_neighbor_count :: proc (grid: ^map.Map(Vec2, Cell), pos: Vec2) -> u32 {
+	count := 0;
+
+	for ^dir: Hex_Directions {
+		cell := map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y }, Cell.{});
+		if cell.alive do count += 1;
+	}
+
+	return count;
+}

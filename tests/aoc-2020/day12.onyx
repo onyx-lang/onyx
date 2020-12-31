@@ -1,0 +1,71 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+Ship :: struct {
+    x : i32 = 0;
+    y : i32 = 0;
+
+    fx : i32 = 1;
+    fy : i32 = 0;
+}
+
+rotate_left :: proc (ship: ^Ship) {
+    ofx := ship.fx;
+    ofy := ship.fy;
+
+    ship.fx = ofy;
+    ship.fy = -ofx;
+}
+
+rotate_right :: proc (ship: ^Ship) {
+    ofx := ship.fx;
+    ofy := ship.fy;
+
+    ship.fx = -ofy;
+    ship.fy = ofx;
+}
+
+turn_around :: proc (ship: ^Ship) {
+    ship.fx = -ship.fx;
+    ship.fy = -ship.fy;
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day12.txt";
+
+    file := reader.make(contents);
+
+    ship := Ship.{ fx = 10, fy = -1 };
+    while !reader.empty(^file) {
+        dir := reader.read_byte(^file);
+        val := reader.read_u32(^file);
+        reader.advance_line(^file); 
+        
+        switch dir {
+            case #char "N" do ship.fy -= val;
+            case #char "E" do ship.fx += val;
+            case #char "S" do ship.fy += val;
+            case #char "W" do ship.fx -= val;
+            case #char "F" {
+                ship.x += ship.fx * val;
+                ship.y += ship.fy * val;
+            }
+
+            case #char "L" do switch val {
+                case 90 do rotate_left(^ship);
+                case 180 do turn_around(^ship);
+                case 270 do rotate_right(^ship);
+            }
+
+            case #char "R" do switch val {
+                case 90 do rotate_right(^ship);
+                case 180 do turn_around(^ship);
+                case 270 do rotate_left(^ship);
+            }
+        }
+    }
+
+    printf("Ship distance: %i\n", math.abs(ship.x) + math.abs(ship.y));
+}

@@ -1,0 +1,74 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+StartEnd :: struct { start: i32; end: i32; }
+
+find_contiguous_subarray_with_sum :: proc (nums: [..] u64, sum: u64) -> StartEnd {
+    start := 0;
+    end   := 0;
+    con_sum: u64 = nums[0];
+
+    for i: 1 .. nums.count {
+        end += 1;
+        con_sum += nums[end];
+
+        if con_sum == sum do break;
+
+        while con_sum > sum && start <= end {
+            con_sum -= nums[start];
+            start += 1;
+
+            if con_sum == sum do break break;
+        }
+    }
+
+    return StartEnd.{ start, end };
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day9.txt";
+
+    file := reader.make(contents);
+
+    nums: [..] u64;
+    array.init(^nums, 32);
+    defer array.free(^nums);
+
+    while !reader.empty(^file) {
+        num := reader.read_u64(^file);
+        array.push(^nums, num);
+    }
+
+    preamble_length :: 25;
+
+    invalid: u64;
+    for i: 0 .. nums.count {
+        if i < preamble_length do continue;
+
+        success := false;
+        for j: 0 .. preamble_length - 1 {
+            for k: j + 1 .. preamble_length {
+                if nums[i - j - 1] + nums[i - k - 1] == nums[i] {
+                    success = true;
+                    break break;
+                }
+            }
+        }
+
+        if !success {
+            invalid = nums[i];
+            break;
+        }
+    }
+
+    printf("Invalid number: %l\n", invalid);
+
+    se := find_contiguous_subarray_with_sum(nums, invalid);
+
+    max := array.fold_slice(nums.data[se.start .. se.end + 1], cast(u64) 0, math.max);
+    min := array.fold_slice(nums.data[se.start .. se.end + 1], cast(u64) max, math.min);
+
+    printf("Extrema sum: %l\n", min + max);
+}

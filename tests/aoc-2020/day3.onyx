@@ -1,0 +1,66 @@
+#include_file "core/std/js"
+
+use package core
+
+Point :: struct {
+    x : i32;
+    y : i32;
+};
+
+LineInterp :: struct {
+    ox : i32;
+    oy : i32;
+    dx : i32;
+    dy : i32;
+}
+
+line_interp_at :: proc (use li: LineInterp, t: i32) -> Point {
+    return Point.{ ox + dx * t, oy + dy * t };
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day3.txt";
+
+    forest: [..] u8;
+    array.init(^forest, 1024);
+    defer array.free(^forest);
+
+    width := 0;
+    height := 0;
+    while true {
+        line := "";
+        string.read_line(^contents, ^line);
+        if line.count == 0 do break;
+
+        width = line.count;
+        height = height + 1;
+
+        for ch: line do array.push(^forest, ch);
+    }
+
+    lis : [5] LineInterp;
+    lis[0] = LineInterp.{ 0, 0, 1, 1 };
+    lis[1] = LineInterp.{ 0, 0, 3, 1 };
+    lis[2] = LineInterp.{ 0, 0, 5, 1 };
+    lis[3] = LineInterp.{ 0, 0, 7, 1 };
+    lis[4] = LineInterp.{ 0, 0, 1, 2 };
+
+    tree_prod: u64 = 1;
+
+    for li: lis {
+        tree_count: u64 = 0;
+        while i := 0; true {
+            p := line_interp_at(li, i); 
+            if p.y >= height || p.y < 0 do break; 
+            i += 1;
+
+            p.x %= width;
+
+            if forest[p.x + p.y * width] == #char "#" do tree_count += 1;
+        }
+
+        tree_prod *= tree_count;
+    }
+
+    printf("Tree product: %l\n", tree_prod);
+}

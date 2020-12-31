@@ -1,0 +1,175 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+// nt -> t
+Term :: struct {
+    nt : u32;
+
+    t  : u8;  // character
+}
+
+// nt0 -> nt1
+Unit :: struct {
+    nt0 : u32;
+
+    nt1 : u32;
+}
+
+// nt0 -> nt1 nt2
+Prod :: struct {
+    nt0 : u32;
+
+    nt1 : u32;
+    nt2 : u32;
+}
+
+Grammar :: struct {
+    terminate_rules  : [..] Term;
+    unit_rules       : [..] Unit;
+    production_rules : [..] Prod;
+
+    max_terminal     : u32;
+}
+
+grammar_init :: proc (use g: ^Grammar) {
+    array.init(^terminate_rules);
+    array.init(^unit_rules);
+    array.init(^production_rules);
+
+    max_terminal = 0;
+}
+
+grammar_free :: proc (use g: ^Grammar) {
+    array.free(^terminate_rules);
+    array.free(^unit_rules);
+    array.free(^production_rules);
+}
+
+grammar_prepare :: proc (use g: ^Grammar) {
+    // Not full-proof, but good enough for AOC.
+    for ^solo: unit_rules {
+        for ^prod: production_rules {
+            if prod.nt0 == solo.nt1 {
+                array.push(^production_rules, Prod.{ solo.nt0, prod.nt1, prod.nt2 });
+            }
+        }
+
+        for ^unit: terminate_rules {
+            if unit.nt == solo.nt1 {
+                array.push(^terminate_rules, Term.{ solo.nt0, unit.t });
+            } 
+        }
+    }
+
+    array.sort(^terminate_rules, proc (a: Term, b: Term) -> i32 {
+        return (cast(i32) a.nt) - (cast(i32) b.nt);
+    });
+
+    array.sort(^production_rules, proc (a: Prod, b: Prod) -> i32 {
+        return (cast(i32) a.nt0) - (cast(i32) b.nt0);
+    });
+
+    max_terminal = math.max(
+        production_rules[production_rules.count - 1].nt0,
+        terminate_rules[terminate_rules.count - 1].nt) + 1;
+}
+
+cyk_algorithm :: proc (use grammar: ^Grammar, input: str) -> bool {
+    dim_0 := input.count * max_terminal;
+    dim_1 := max_terminal;
+    dim_2 := 1;
+
+    mem_size := sizeof bool * input.count * input.count * max_terminal;
+    T := cast(^bool) calloc(mem_size);
+    defer cfree(T);
+    memory.set(T, mem_size, ~~false);
+
+    for s: 0 .. input.count {
+        for ^term: terminate_rules {
+            if term.t == input[s] {
+                T[0 * dim_0 + s * dim_1 + term.nt * dim_2] = true;
+            }
+        }
+    }
+
+    for l: 1 .. input.count {
+        for s: 0 .. input.count - l {
+            for p: 1 .. l + 1 {
+                for ^prod: production_rules {
+                    if    T[(p - 1) * dim_0 + s       * dim_1 + prod.nt1 * dim_2]
+                       && T[(l - p) * dim_0 + (s + p) * dim_1 + prod.nt2 * dim_2] {
+                        T[l * dim_0 + s * dim_1 + prod.nt0 * dim_2] = true;
+                    }
+                }
+            }
+        }   
+    }
+
+    return T[(input.count - 1) * dim_0];
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day19.txt";
+
+    file := reader.make(contents);
+
+    grammar : Grammar;
+    grammar_init(^grammar);
+    defer grammar_free(^grammar);
+
+    while *file.data != #char "\n" {
+        nt0 := reader.read_u32(^file);
+
+        reader.skip_bytes(^file, 2); // ': '
+
+        if *file.data == #char "\"" {
+            reader.skip_bytes(^file, 1); // '"'
+            t := reader.read_byte(^file);
+
+            array.push(^grammar.terminate_rules, Term.{ nt0, t });
+
+        } else {
+            while true {
+                nt1 := reader.read_u32(^file);
+
+                if *file.data == #char "\n" {
+                    array.push(^grammar.unit_rules, Unit.{ nt0, nt1 });
+                    break;
+
+                } else {
+                    reader.skip_bytes(^file, 1); // ' '
+
+                    if next_ch := *file.data; next_ch >= #char "0" && next_ch <= #char "9" {
+                        nt2 := reader.read_u32(^file);
+                        array.push(^grammar.production_rules, Prod.{ nt0, nt1, nt2 });
+
+                        if *file.data == #char " " do reader.skip_bytes(^file, 1);
+                    } else {
+                        array.push(^grammar.unit_rules, Unit.{ nt0, nt1 });
+                    }
+
+                    if *file.data == #char "|" {
+                        reader.skip_bytes(^file, 1); // ' |'
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        reader.advance_line(^file);
+    }
+
+    grammar_prepare(^grammar);
+
+    valid_count := 0;
+    reader.advance_line(^file);
+    while !reader.empty(^file) {
+        line := reader.read_line(^file);
+        if cyk_algorithm(^grammar, line) do valid_count += 1;
+    }   
+
+    printf("Valid count: %i\n", valid_count);
+}

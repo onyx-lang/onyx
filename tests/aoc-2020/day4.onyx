@@ -1,0 +1,44 @@
+#include_file "core/std/js"
+
+use package core
+
+// Returns the number of fields
+process_passport :: proc (contents: ^str) -> u32 {
+    field_count := 0;
+
+    while true {
+        line: str;
+        string.read_line(contents, ^line);
+        if line.count == 0 do break;
+
+        fields := string.split(line, #char " ");
+        defer cfree(fields.data);
+
+        for field: fields {
+            data := string.split(field, #char ":");
+            defer cfree(data.data);
+
+            if !string.equal(data[0], "cid") {
+                field_count += 1;
+            }
+        }
+    }
+
+    return field_count;
+}
+
+// This does not include part 2 because it is gross and
+// not worth the effort to implement it.
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day4.txt";
+
+    valid_passports := 0;
+    while true {
+        if contents.count == 0 do break;
+
+        field_count := process_passport(^contents);
+        if field_count == 7 do valid_passports += 1;
+    }
+
+    printf("Valid passports: %i\n", valid_passports);
+}

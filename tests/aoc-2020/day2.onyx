@@ -1,0 +1,39 @@
+package main
+
+#include_file "core/std/js"
+
+use package core
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day2.txt";
+
+    valid := 0;
+    lo : u32;
+    hi : u32;
+    ch : u8;
+    pw : str = "";
+
+    while true {
+        string.read_u32(^contents, ^lo);
+        if lo == 0 do break;
+        string.discard_chars(^contents);
+        string.read_u32(^contents, ^hi);
+        string.discard_chars(^contents);
+        string.read_char(^contents, ^ch);
+        string.discard_chars(^contents, 2);
+        string.read_line(^contents, ^pw);
+
+        // Part 1
+        // count := 0;
+        // for c: pw do if c == ch do count += 1;
+        // if count >= lo && count <= hi do valid += 1;
+
+        // Part 2
+        count := 0;
+        if pw[lo - 1] == ch do count += 1;
+        if pw[hi - 1] == ch do count += 1;
+        if count == 1 do valid += 1;
+    }
+
+    printf("Number valid: %i\n", valid);
+}

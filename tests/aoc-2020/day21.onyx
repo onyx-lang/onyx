@@ -1,0 +1,182 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+/*
+	What questions the data layout needs to answer easily:
+		1. What are the lists that this item appears on?
+		2. What allergens are on each list?
+		3. What are the lists that each allergen appears on?
+*/
+
+Ingredient :: struct {
+    // This will just be a pointer into the file contents.
+    name       : str      = str.{ null, 0 };
+    appears_on : [..] u32 = (#type [..] u32).{ null, 0, 0 };
+
+    allergen   : str      = str.{ null, 0 };
+}
+
+Allergen :: struct {
+	name       : str      = str.{ null, 0 };
+    appears_on : [..] u32 = (#type [..] u32).{ null, 0, 0 };
+}
+
+Food :: struct {
+    ingredients : [..] str;
+    allergens   : [..] str;
+}
+
+ingredient_map : map.Map(str, Ingredient);
+allergen_map   : map.Map(str, Allergen);
+
+main :: proc (args: [] cstr) {
+	contents := #file_contents "./tests/aoc-2020/input/day21.txt";
+
+	file := reader.make(contents);
+
+    map.init(^ingredient_map, 127);
+    map.init(^allergen_map);
+    defer {
+        map.free(^ingredient_map);
+        map.free(^allergen_map);
+    }
+
+    foods : [..] Food;
+    array.init(^foods);
+    defer array.free(^foods);
+
+    line_num := 0;
+	while !reader.empty(^file) {
+        food : Food;
+        array.init(^food.ingredients, 16);
+        array.init(^food.allergens);
+
+        while *file.data != #char "(" {
+            ingredient_name := reader.read_word(^file);
+            reader.skip_bytes(^file, 1); // ' '
+
+            array.push(^food.ingredients, ingredient_name);
+
+            ingredient := map.get(^ingredient_map, ingredient_name, Ingredient.{});
+            if ingredient.name.data == null {
+                ingredient.name = ingredient_name;
+                array.init(^ingredient.appears_on, 4);
+            }
+
+            array.push(^ingredient.appears_on, line_num);
+
+            map.put(^ingredient_map, ingredient_name, ingredient);
+        }
+
+        reader.skip_bytes(^file, 10); // '(contains '
+
+        while *file.data != #char ")" {
+            allergen_name := reader.read_word(^file);
+            if *file.data == #char "," do reader.skip_bytes(^file, 2); // ', '
+
+            array.push(^food.allergens, allergen_name);
+
+            allergen := map.get(^allergen_map, allergen_name, Allergen.{});
+            if allergen.name.data == null {
+                allergen.name = allergen_name;
+                array.init(^allergen.appears_on, 4);
+            }
+
+            array.push(^allergen.appears_on, line_num);
+
+            map.put(^allergen_map, allergen_name, allergen);
+        }
+
+        array.push(^foods, food);
+        
+        reader.advance_line(^file);
+        line_num += 1;
+	}
+
+    definitely_safe : [..] str;
+    array.init(^definitely_safe);
+    defer array.free(^definitely_safe);
+
+    for ^ingredient_entry: ingredient_map.entries {
+        potential_allergens : [..] str;
+        array.init(^potential_allergens);
+        defer array.free(^potential_allergens);
+
+        for food_num: ingredient_entry.value.appears_on {
+            for ^allergen_name: foods[food_num].allergens {
+                array.push(^potential_allergens, *allergen_name);
+            }
+        }
+
+        potential_allergen_count := 0;
+        for ^allergen_name: potential_allergens {
+            c := array_count_contains(^potential_allergens, *allergen_name, string.equal);
+            allergen := map.get(^allergen_map, *allergen_name, Allergen.{}); 
+            if c == allergen.appears_on.count {
+                potential_allergen_count += 1;
+            }
+        }
+
+        if potential_allergen_count == 0 {
+            array.push(^definitely_safe, ingredient_entry.key);
+        }
+    }
+
+    total_safe := 0;
+    for safe: definitely_safe {
+        ingredient := map.get(^ingredient_map, safe, Ingredient.{});
+        total_safe += ingredient.appears_on.count;
+
+        map.delete(^ingredient_map, safe);
+    }
+
+    printf("Total safe: %i\n", total_safe);
+
+    matched_ingredients : [..] Ingredient;
+    array.init(^matched_ingredients);
+    defer array.free(^matched_ingredients);
+
+    while !map.empty(^ingredient_map) {
+        for ^allergen_entry: allergen_map.entries {
+            match_count := 0;
+            matching_ingredient_name := str.{ null, 0 };
+
+            for ^ingredient_entry: ingredient_map.entries {
+                matches := true;
+
+                for ap: allergen_entry.value.appears_on {
+                    if !array.contains(^ingredient_entry.value.appears_on, ap) do matches = false;
+                }
+
+                if matches {
+                    match_count += 1;
+                    matching_ingredient_name = ingredient_entry.key;
+                }
+            }
+
+            if match_count == 1 {
+                ingredient := map.get(^ingredient_map, matching_ingredient_name, Ingredient.{});
+                map.delete(^ingredient_map, matching_ingredient_name);
+
+                ingredient.allergen = allergen_entry.key;
+                array.push(^matched_ingredients, ingredient);
+            }
+        }
+    }
+
+    array.sort(^matched_ingredients, proc (i1: Ingredient, i2: Ingredient) -> i32 {
+        return string.compare(i1.allergen, i2.allergen);
+    });
+
+    for ^mi: matched_ingredients do printf("%s -> %s\n", mi.name, mi.allergen);
+    for ^mi: matched_ingredients do printf("%s,", mi.name);
+    println("\n(Don't copy the last ','!)");
+}
+
+array_count_contains :: proc (arr: ^[..] $T, x: T, equal: proc (T, T) -> bool) -> u32 {
+    count := 0;
+    for ^it: *arr do if equal(*it, x) do count += 1;
+    return count;
+}

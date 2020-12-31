@@ -1,0 +1,142 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+Field :: struct {
+	name : str = "";
+
+	column : i32 = -1;
+
+	lower0 : u32 = 0;
+	upper0 : u32 = 0;
+	lower1 : u32 = 0;
+	upper1 : u32 = 0;
+}
+
+field_valid :: proc (use field: ^Field, n: u32) -> bool {
+	return (lower0 <= n && n <= upper0) || (lower1 <= n && n <= upper1);
+}
+
+total_scanning_error := 0;
+
+read_ticket_and_validate :: proc (file: ^reader.StringReader, fields: [..] Field, ticket_store: ^u32) -> bool {
+	retval := true;
+
+	for i: 0 .. fields.count {
+		n := reader.read_u32(file);
+		ticket_store[i] = n;
+
+		if file.data[0] == #char "," do reader.skip_bytes(file, 1);
+
+		valid_count := 0;
+		for ^field: fields {
+			if field_valid(field, n) do valid_count += 1;
+		}
+
+		if valid_count == 0 {
+			total_scanning_error += n;
+			retval = false;
+		}
+	}
+
+	reader.advance_line(file);
+	return retval;
+}
+
+main :: proc (args: [] cstr) {
+	contents := #file_contents "./tests/aoc-2020/input/day16.txt";
+
+	file := reader.make(contents);
+
+	fields : [..] Field;
+	array.init(^fields, 20);
+	defer array.free(^fields);
+
+	// Read until the first empty line
+	while *file.data != #char "\n" {
+		field := Field.{};
+		field.name = reader.read_until(^file, 0, #char ":");		
+
+		reader.skip_bytes(^file, 2);
+		field.lower0 = reader.read_u32(^file);
+
+		reader.skip_bytes(^file, 1);
+		field.upper0 = reader.read_u32(^file);
+
+		reader.skip_bytes(^file, 4);
+		field.lower1 = reader.read_u32(^file);
+
+		reader.skip_bytes(^file, 1);
+		field.upper1 = reader.read_u32(^file);
+
+		reader.advance_line(^file);
+
+		array.push(^fields, field);
+	}
+
+	for i: 0 .. 2 do reader.advance_line(^file);
+
+	my_ticket : [..] u32;
+	array.init(^my_ticket, fields.count);
+	defer array.free(^my_ticket);
+	read_ticket_and_validate(^file, fields, my_ticket.data);
+
+	for i: 0 .. 2 do reader.advance_line(^file);
+
+	ticket_data : [..] u32;
+	array.init(^ticket_data, 1024);
+	defer array.free(^ticket_data);
+
+	while !reader.empty(^file) {
+		array.ensure_capacity(^ticket_data, ticket_data.count + fields.count);
+		if read_ticket_and_validate(^file, fields, ^ticket_data[ticket_data.count]) {
+			ticket_data.count += fields.count;
+		}
+	}
+
+	printf("Scanning error: %i\n", total_scanning_error);
+
+	cols_to_assign : [..] u32;
+	array.init(^cols_to_assign, fields.count);
+	defer array.free(^cols_to_assign);
+
+	for i: 0 .. fields.count do array.push(^cols_to_assign, i);
+
+	while cols_to_assign.count > 0 {
+		for col: cols_to_assign {
+			work_count := 0;
+			recent_work: ^Field = null;
+
+			for ^field: fields {
+				if field.column != -1 do continue;
+				works := true;
+
+				for row: 0 .. (ticket_data.count / fields.count) {
+					if !field_valid(field, ticket_data[col + fields.count * row]) {
+						works = false;
+						break;
+					}
+				}
+
+				if works {
+					work_count += 1;
+					recent_work = field;
+				}
+			}
+
+			if work_count == 1 {
+				recent_work.column = col;
+				array.remove(^cols_to_assign, col);
+				break;
+			}
+		}
+	}
+
+	prod: u64 = 1;
+	for ^field: fields {
+		if string.starts_with(field.name, "departure") do prod *= ~~my_ticket[field.column];
+	}
+
+	printf("Departure multiply: %l\n", prod);
+}

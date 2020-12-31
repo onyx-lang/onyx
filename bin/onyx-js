@@ -3,12 +3,12 @@
 const fs = require('fs');
 const buf = fs.readFileSync(process.argv[2]);
 
-let wasm_memory;
+let wasm_instance;
 
 const ENV = {
     host: {
         print_str(ptr, len) {
-            const data = new Uint8Array(wasm_memory, ptr, len);
+            const data = new Uint8Array(wasm_instance.exports.memory.buffer, ptr, len);
             const str  = new TextDecoder().decode(data);
             process.stdout.write(str);
         }
@@ -17,9 +17,9 @@ const ENV = {
 
 WebAssembly.instantiate(new Uint8Array(buf), ENV)
     .then(res => {
-        const lib = res.instance.exports;
-        wasm_memory = lib.memory.buffer;
+        wasm_instance = res.instance;
 
+        const lib = res.instance.exports;
         lib._start();
     });
 

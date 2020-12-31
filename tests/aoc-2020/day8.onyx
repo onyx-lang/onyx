@@ -1,0 +1,90 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+OpCode :: enum (u16) {
+    Nop; Acc; Jmp;
+}
+
+Instruction :: struct {
+    opcode  : OpCode;
+    operand : i16;
+}
+
+// Returns if the program successfully exited.
+get_acc_value :: proc (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
+    already_been: map.Map(i32, bool);
+    map.init(^already_been);
+    defer map.free(^already_been);
+
+    ip   := 0;
+    acc  := 0;
+    succ := false;
+    while true {
+        if ip >= instrs.count {
+            succ = true;
+            break;
+        }
+        
+        if map.has(^already_been, ip) do break;
+        map.put(^already_been, ip, true);
+
+        switch instrs[ip].opcode {
+            case OpCode.Nop do ip += 1;
+            case OpCode.Acc {
+                acc += ~~instrs[ip].operand;
+                ip += 1;
+            }
+            case OpCode.Jmp do ip += ~~instrs[ip].operand;
+        }
+    }
+
+    *ret_acc = acc;
+    return succ;
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day8.txt";
+
+    file := reader.make(contents);
+
+    instrs: [..] Instruction;
+    array.init(^instrs, 32);
+    defer array.free(^instrs);
+
+    while !reader.empty(^file) {
+        word := reader.read_bytes(^file, 3);
+        reader.skip_bytes(^file, 1);
+
+        sign := reader.read_byte(^file);
+        val := reader.read_u32(^file);
+
+        reader.advance_line(^file);
+
+        if sign == #char "-" do val *= -1;
+
+        opcode : OpCode;
+        if     string.equal(word, "nop") do opcode = OpCode.Nop;
+        elseif string.equal(word, "acc") do opcode = OpCode.Acc;
+        elseif string.equal(word, "jmp") do opcode = OpCode.Jmp;
+
+        array.push(^instrs, Instruction.{
+            opcode  = opcode,
+            operand = ~~val,
+        });
+    }
+
+    acc: i32;
+    for ^instr: instrs {
+        if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp;
+        elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;
+
+        if get_acc_value(instrs, ^acc) do break;
+
+        if     instr.opcode == OpCode.Nop do instr.opcode = OpCode.Jmp;
+        elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;
+    }
+
+    printf("Accumulator value: %i\n", acc);
+}

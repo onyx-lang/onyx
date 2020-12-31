@@ -1,0 +1,94 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+inv_mod :: proc (a_: i64, m_: i64) -> i64 {
+    if m_ <= 1 do return 0;
+
+    a := a_; m := m_;
+    x: i64 = 0; y: i64 = 1;
+
+    while a > 1 {
+        quot  := a / m;
+        temp1 := m;
+        m      = a % m;
+        a      = temp1;
+        temp2 := x;
+        x      = y - quot * x;
+        y      = temp2;
+    }
+
+    if y < 0 do y += m_;
+    return y;
+}
+
+chinese_remainder_theorem :: proc (mods: [..] i64, rems: [..] i64) -> i64 {
+    N: i64 = 1;
+    for n: mods do N *= n;
+    
+    res: i64 = 0;
+    for i: 0 .. mods.count {
+        n := N / mods[i];
+        res += rems[i] * inv_mod(n, mods[i]) * n;
+    }
+
+    return res % N;
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day13.txt";
+
+    file := reader.make(contents);
+
+    est := reader.read_u32(^file);
+    reader.advance_line(^file);
+
+    buses: [..] i64;
+    array.init(^buses);
+    defer array.free(^buses);
+
+    rems: [..] i64;
+    array.init(^rems);
+    defer array.free(^rems);
+
+    offset: i64 = 0;
+    while !reader.empty(^file) {
+        if *file.data == #char "x" {
+            reader.skip_bytes(^file, 2);
+        } else {
+            bus := reader.read_u64(^file);
+            array.push(^buses, ~~bus);
+            array.push(^rems, bus - offset);
+
+            reader.skip_bytes(^file, 1);
+        }
+
+        offset += 1;
+    }
+
+    // Part 1
+    // min := array.fold(^buses, 0xffffffff, math.min);
+
+    // take_bus := 0;
+    // depart   := 0;
+
+    // for i: 0 .. min {
+    //     for bus: buses {
+    //         if (i + est) % bus == 0 {
+    //             take_bus = bus;
+    //             depart = i + est;
+    //             break break;
+    //         }
+    //     }
+    // }
+
+    // result := take_bus * (depart - est);
+    // printf("Bus: %i\n", take_bus);
+    // printf("Depart at: %i\n", depart);
+    // printf("Result: %i\n", result);
+
+    // Part 2
+    result := chinese_remainder_theorem(buses, rems); 
+    printf("Result: %l\n", result);
+}

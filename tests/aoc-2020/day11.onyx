@@ -1,0 +1,101 @@
+#include_file "core/std/js"
+
+use package core
+use package core.string.reader as reader
+
+GameOfSeats :: struct {
+    width  : u32;
+    height : u32;
+    seats  : [..] SeatState;
+    temp   : [..] SeatState;
+}
+
+SeatState :: enum (u8) { OOB; Floor; Empty; Occupied; }
+
+gos_get_seat :: proc (use gos: ^GameOfSeats, x: i32, y: i32) -> SeatState {
+    if x < 0 || y < 0 || x >= width || y >= height do return SeatState.OOB;
+    return seats[x + y * width];
+}
+
+gos_neighbors :: proc (use gos: ^GameOfSeats, x: i32, y: i32, state := SeatState.Occupied) -> u32 {
+    count := 0;
+
+    for dy: -1 .. 2 {
+        for dx: -1 .. 2 {
+            if dy == 0 && dx == 0 do continue;
+
+            t := 1;
+            seat := gos_get_seat(gos, x + dx, y + dy);
+            while seat == SeatState.Floor {
+                t += 1;
+                seat = gos_get_seat(gos, x + dx * t, y + dy * t);
+            }
+
+            if seat == state do count += 1;
+        }
+    }
+
+    return count;
+}
+
+gos_iter :: proc (use gos: ^GameOfSeats) -> bool {
+    for i: 0 .. seats.count do temp[i] = seats[i];
+
+    changed := false;
+    for y: 0 .. height {
+        for x: 0 .. width {
+            occ_neighbors := gos_neighbors(gos, x, y);
+
+            switch gos_get_seat(gos, x, y) {
+                case SeatState.Empty do if occ_neighbors == 0 {
+                    temp[x + y * width] = SeatState.Occupied;
+                    changed = true;
+                }
+
+                case SeatState.Occupied do if occ_neighbors >= 5 {
+                    temp[x + y * width] = SeatState.Empty;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    for i: 0 .. seats.count do seats[i] = temp[i];
+
+    return changed;
+}
+
+main :: proc (args: [] cstr) {
+    contents := #file_contents "./tests/aoc-2020/input/day11.txt";
+
+    file := reader.make(contents);
+
+    gos : GameOfSeats;
+    array.init(^gos.seats, 32);
+    defer array.free(^gos.seats);
+
+    gos.height = 0;
+
+    while !reader.empty(^file) {
+        line := reader.read_line(^file);
+        for ch: line do switch ch {
+            case #char "." do array.push(^gos.seats, SeatState.Floor);
+            case #char "L" do array.push(^gos.seats, SeatState.Empty);
+            case #char "#" do array.push(^gos.seats, SeatState.Occupied);
+        }
+
+        gos.width = line.count;
+        gos.height += 1;
+    }
+
+    array.init(^gos.temp, gos.seats.count);
+    defer array.free(^gos.temp);
+
+    while gos_iter(^gos) ---
+
+    occupied := 0;
+    for s: gos.seats do if s == SeatState.Occupied do occupied += 1;
+    
+    printf("Occupied: %i\n", occupied);
+}
+
