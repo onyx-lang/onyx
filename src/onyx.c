@@ -517,7 +517,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
 
             if (ent.expr->token) {
                 OnyxFilePos pos = ent.expr->token->pos;
-                printf("\e[0K%s on %s:%d:%d\n", entity_state_strings[ent.state], pos.filename, pos.line, pos.column);
+                printf("\e[0K%s on %s in %s:%d:%d\n", entity_state_strings[ent.state], entity_type_strings[ent.type], pos.filename, pos.line, pos.column);
             }
         }
 

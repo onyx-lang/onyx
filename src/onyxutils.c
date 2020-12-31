@@ -924,6 +924,9 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
         node = *pnode;
     }
 
+    // HACK: NullProcHack
+    if (type->kind == Type_Kind_Function && (node->flags & Ast_Flag_Proc_Is_Null) != 0) return 1;
+
     if (types_are_compatible(node->type, type)) return 1;
     if (node_is_auto_cast((AstNode *) node)) {
         // If the node is an auto cast, we convert it to a cast node which will reports errors if

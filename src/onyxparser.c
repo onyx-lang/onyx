@@ -1846,6 +1846,11 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
             }
         }
 
+        // HACK: NullProcHack
+        else if (parse_possible_directive(parser, "null")) {
+            func_def->flags |= Ast_Flag_Proc_Is_Null;
+        }
+
         else {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);

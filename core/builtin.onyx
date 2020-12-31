@@ -24,7 +24,9 @@ vararg_get :: proc (va: vararg, ret: ^$T) -> bool {
     return true;
 }
 
-null :: cast(rawptr) 0;
+// HACK: NullProcHack
+null_proc :: proc () #null ---
+null      :: cast(rawptr) 0;
 
 OnyxContext :: struct {
     allocator      : Allocator;

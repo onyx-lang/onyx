@@ -197,6 +197,9 @@ typedef enum AstFlags {
     Ast_Flag_Cannot_Take_Addr      = BH_BIT(20),
 
     Ast_Flag_Struct_Mem_Used       = BH_BIT(21),
+
+    // HACK: NullProcHack
+    Ast_Flag_Proc_Is_Null          = BH_BIT(22),
 } AstFlags;
 
 typedef enum UnaryOp {
