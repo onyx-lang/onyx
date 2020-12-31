@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const fs = require('fs');
 const buf = fs.readFileSync(process.argv[2]);
 

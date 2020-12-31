@@ -13,7 +13,7 @@ for test_file in ./tests/*.onyx ; do
         continue
     fi
     
-    if ! node onyxcmd.js "./tests/$name.wasm" > ./tmpoutput; then
+    if ! ./bin/onyx-js "./tests/$name.wasm" > ./tmpoutput; then
         echo "❌ Failed to run $name.onyx."
         failed=1
         continue
