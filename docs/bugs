@@ -1,6 +1,6 @@
 List of known bugs:
 
-[ ] Using an auto-cast on an argument when calling an overloaded proc leads
+[X] Using an auto-cast on an argument when calling an overloaded proc leads
     to an unexpected error. Take the following example:
     ```
     overloaded :: proc {

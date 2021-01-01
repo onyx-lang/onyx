@@ -1,0 +1,16 @@
+#include_file "core/std/js"
+
+use package core
+
+overloaded :: proc {
+    proc (x: f32, y: str) do println("Called f32, str"); ,
+    proc (x: i32, y: i32) do println("Called i32, i32"); ,
+}
+
+main :: proc (args: [] cstr) {
+    x: i32 = 1234;
+    overloaded(~~x, 4);
+
+    y: i32 = 1234;
+    overloaded(~~x, "Test");
+}

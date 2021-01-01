@@ -875,7 +875,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
             if (type->Basic.size == 8) {
                 // TODO(Brendan): Check these boundary conditions
                 if (bh_abs(num->value.l) >= (1ull << 52)) {
-                    onyx_report_error(num->token->pos, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
+                    onyx_report_error(num->token->pos, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
                     return 0;
                 }
 
@@ -932,7 +932,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
         // If the node is an auto cast, we convert it to a cast node which will reports errors if
         // the cast is illegal in the code generation.
         ((AstUnaryOp *) node)->type = type;
-        ((AstUnaryOp *) node)->operation = Unary_Op_Cast;
+        // ((AstUnaryOp *) node)->operation = Unary_Op_Cast;
         return 1;
     }
     else if (node->kind == Ast_Kind_NumLit) {

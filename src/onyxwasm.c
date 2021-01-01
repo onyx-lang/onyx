@@ -1346,12 +1346,17 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 
             TypeBasic* type = &unop->type->Basic;
 
-            if (type->kind == Basic_Kind_I32 || type->kind == Basic_Kind_U32
-                    || type->kind == Basic_Kind_I16 || type->kind == Basic_Kind_U16
-                    || type->kind == Basic_Kind_I8 || type->kind == Basic_Kind_U8) {
+            if (type->kind == Basic_Kind_I8 || type->kind == Basic_Kind_U8) {
+                WID(WI_I32_CONST, 0xff);
+                WI(WI_I32_XOR);
+            }
+            else if (type->kind == Basic_Kind_I16 || type->kind == Basic_Kind_U16) {
+                WID(WI_I32_CONST, 0xffff);
+                WI(WI_I32_XOR);
+            }
+            else if (type->kind == Basic_Kind_I32 || type->kind == Basic_Kind_U32) {
                 WID(WI_I32_CONST, 0xffffffff);
                 WI(WI_I32_XOR);
-
             }
             else if (type->kind == Basic_Kind_I64 || type->kind == Basic_Kind_U64) {
                 WIL(WI_I64_CONST, 0xffffffffffffffff);
@@ -1364,7 +1369,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
 
         // NOTE: Any remaining auto casts can be ignored since it means that a cast was not necessary. - brendanfh 2020/09/19
-        case Unary_Op_Auto_Cast: emit_expression(mod, &code, unop->expr); break;
+        case Unary_Op_Auto_Cast: emit_cast(mod, &code, unop); break;
     }
 
     *pcode = code;
