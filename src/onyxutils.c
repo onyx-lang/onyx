@@ -929,10 +929,8 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
 
     if (types_are_compatible(node->type, type)) return 1;
     if (node_is_auto_cast((AstNode *) node)) {
-        // If the node is an auto cast, we convert it to a cast node which will reports errors if
-        // the cast is illegal in the code generation.
+        // HACK: Check that this cast is legal!
         ((AstUnaryOp *) node)->type = type;
-        // ((AstUnaryOp *) node)->operation = Unary_Op_Cast;
         return 1;
     }
     else if (node->kind == Ast_Kind_NumLit) {

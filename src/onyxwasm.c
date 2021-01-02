@@ -1366,10 +1366,8 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
             break;
         }
 
+        case Unary_Op_Auto_Cast:
         case Unary_Op_Cast: emit_cast(mod, &code, unop); break;
-
-        // NOTE: Any remaining auto casts can be ignored since it means that a cast was not necessary. - brendanfh 2020/09/19
-        case Unary_Op_Auto_Cast: emit_cast(mod, &code, unop); break;
     }
 
     *pcode = code;
