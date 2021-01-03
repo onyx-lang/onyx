@@ -1,7 +1,7 @@
 package main
 
-#include_file "core/std/wasi"
-#include_file "core/simd_intrinsics"
+#load "core/std/wasi"
+#load "core/simd_intrinsics"
 
 use package core
 use package simd

@@ -1,5 +1,5 @@
-#include_file "core/std/wasi"
-#include_file "progs/foo_test"
+#load "core/std/wasi"
+#load "progs/foo_test"
 
 use package core
 

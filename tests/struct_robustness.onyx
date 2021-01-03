@@ -192,4 +192,4 @@ main :: proc (args: [] cstr) {
     }
 }
 
-#include_file "core/std/js"
+#load "core/std/js"

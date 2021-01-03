@@ -1,9 +1,9 @@
 package core.alloc
 
-#include_file "core/alloc/arena"
-#include_file "core/alloc/fixed"
-#include_file "core/alloc/heap"
-#include_file "core/alloc/ring"
+#load "core/alloc/arena"
+#load "core/alloc/fixed"
+#load "core/alloc/heap"
+#load "core/alloc/ring"
 
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
 

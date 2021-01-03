@@ -86,8 +86,8 @@ typedef enum AstKind {
     Ast_Kind_Error,
     Ast_Kind_Program,
     Ast_Kind_Package,
-    Ast_Kind_Include_File,
-    Ast_Kind_Include_Folder,
+    Ast_Kind_Load_File,
+    Ast_Kind_Load_Path,
     Ast_Kind_Use_Package,
     Ast_Kind_Alias,
     Ast_Kind_Memres,
@@ -793,8 +793,8 @@ extern const char* entity_state_strings[Entity_State_Count];
 typedef enum EntityType {
     Entity_Type_Unknown,
 
-    Entity_Type_Include_Folder,
-    Entity_Type_Include_File,
+    Entity_Type_Load_Path,
+    Entity_Type_Load_File,
     Entity_Type_Use_Package,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,

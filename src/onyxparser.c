@@ -2121,8 +2121,8 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
             while (parser->curr->type == '#') {
                 OnyxToken* dir_token = parser->curr;
 
-                if (parse_possible_directive(parser, "include_file")) {
-                    AstInclude* include = make_node(AstInclude, Ast_Kind_Include_File);
+                if (parse_possible_directive(parser, "load")) {
+                    AstInclude* include = make_node(AstInclude, Ast_Kind_Load_File);
                     include->token = dir_token;
 
                     OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
@@ -2134,8 +2134,8 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
 
                     return (AstNode *) include;
                 }
-                else if (parse_possible_directive(parser, "include_folder")) {
-                    AstInclude* include = make_node(AstInclude, Ast_Kind_Include_Folder);
+                else if (parse_possible_directive(parser, "load_path")) {
+                    AstInclude* include = make_node(AstInclude, Ast_Kind_Load_Path);
                     include->token = dir_token;
                     
                     OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
@@ -2291,8 +2291,8 @@ ParseResults onyx_parse(OnyxParser *parser) {
                 if (parser->hit_unexpected_token) return parser->results;
 
                 switch (curr_stmt->kind) {
-                    case Ast_Kind_Include_File:
-                    case Ast_Kind_Include_Folder:
+                    case Ast_Kind_Load_File:
+                    case Ast_Kind_Load_Path:
                         add_node_to_process(parser, curr_stmt);
                         break;
 

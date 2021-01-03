@@ -15,7 +15,7 @@
 // This file will give examples of all of these things, as well as some of the gotchas
 // you need to be aware of.
 
-#include_file "core/std/wasi"
+#load "core/std/wasi"
 
 use package core
 

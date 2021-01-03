@@ -1,4 +1,4 @@
-#include_file "core/std/wasi"
+#load "core/std/wasi"
 
 use package core { println }
 

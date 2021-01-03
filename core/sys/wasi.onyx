@@ -1,6 +1,6 @@
 package system
 
-#include_file "core/wasi"
+#load "core/wasi"
 
 use package wasi
 use package core

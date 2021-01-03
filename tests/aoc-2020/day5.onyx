@@ -1,4 +1,4 @@
-#include_file "core/std/js"
+#load "core/std/js"
 
 use package core
 

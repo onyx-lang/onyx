@@ -108,8 +108,8 @@ const char* entity_state_strings[Entity_State_Count] = {
 
 const char* entity_type_strings[Entity_Type_Count] = {
     "Unknown",
-    "Include Folder",
-    "Include File",
+    "Add to Load Path",
+    "Load File",
     "Use Package",
     "String Literal",
     "File Contents",

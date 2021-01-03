@@ -141,8 +141,8 @@ typedef struct CompilerState {
 
 static char* lookup_included_file(CompilerState* cs, char* filename);
 
-static AstInclude* create_include_file(bh_allocator alloc, char* filename) {
-    AstInclude* include_node = onyx_ast_node_new(alloc, sizeof(AstInclude), Ast_Kind_Include_File);
+static AstInclude* create_load(bh_allocator alloc, char* filename) {
+    AstInclude* include_node = onyx_ast_node_new(alloc, sizeof(AstInclude), Ast_Kind_Load_File);
     include_node->name = filename;
 
     return include_node;
@@ -174,9 +174,9 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
     // NOTE: Add builtin entities to pipeline.
     entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
-        .type = Entity_Type_Include_File,
+        .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_include_file(compiler_state->sp_alloc, "core/builtin"),
+        .include = create_load(compiler_state->sp_alloc, "core/builtin"),
     }));
 
     entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
@@ -195,9 +195,9 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
     bh_arr_each(const char *, filename, opts->files) {
         entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
             .state = Entity_State_Parse,
-            .type = Entity_Type_Include_File,
+            .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_include_file(compiler_state->sp_alloc, (char *) *filename),
+            .include = create_load(compiler_state->sp_alloc, (char *) *filename),
         }));
     }
 }
@@ -255,17 +255,17 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
         ent.scope   = n->scope;
 
         switch (nkind) {
-            case Ast_Kind_Include_File: {
+            case Ast_Kind_Load_File: {
                 ent.state = Entity_State_Parse;
-                ent.type = Entity_Type_Include_File;
+                ent.type = Entity_Type_Load_File;
                 ent.include = (AstInclude *) node;
                 entity_heap_insert(&compiler_state->prog_info.entities, ent);
                 break;
             }
                                    
-            case Ast_Kind_Include_Folder: {
+            case Ast_Kind_Load_Path: {
                 ent.state = Entity_State_Parse;
-                ent.type = Entity_Type_Include_Folder;
+                ent.type = Entity_Type_Load_Path;
                 ent.include = (AstInclude *) node;
                 entity_heap_insert(&compiler_state->prog_info.entities, ent);
                 break;
@@ -428,17 +428,17 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     }
 }
 
-static b32 process_include_entity(CompilerState* compiler_state, Entity* ent) {
-    assert(ent->type == Entity_Type_Include_File || ent->type == Entity_Type_Include_Folder);
+static b32 process_load_entity(CompilerState* compiler_state, Entity* ent) {
+    assert(ent->type == Entity_Type_Load_File || ent->type == Entity_Type_Load_Path);
     AstInclude* include = ent->include;
 
-    if (include->kind == Ast_Kind_Include_File) {
+    if (include->kind == Ast_Kind_Load_File) {
         char* filename = lookup_included_file(compiler_state, include->name);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         process_source_file(compiler_state, formatted_name);
 
-    } else if (include->kind == Ast_Kind_Include_Folder) {
+    } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(compiler_state->options->included_folders, include->name);
     }
 
@@ -459,7 +459,7 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
 
     switch (ent->state) {
         case Entity_State_Parse_Builtin:
-            process_include_entity(compiler_state, ent);
+            process_load_entity(compiler_state, ent);
             ent->state = Entity_State_Finalized;
 
             if (onyx_has_errors()) return 0;
@@ -469,7 +469,7 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
             break;
 
         case Entity_State_Parse:
-            process_include_entity(compiler_state, ent);
+            process_load_entity(compiler_state, ent);
             ent->state = Entity_State_Finalized;
             break;
 

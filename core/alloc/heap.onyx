@@ -6,8 +6,8 @@ package core.alloc.heap
 // of the language. You will not make your own instance of the heap
 // allocator, since it controls WASM intrinsics such as memory_grow.
 
-#include_file "core/memory"
-#include_file "core/intrinsics/wasm"
+#load "core/memory"
+#load "core/intrinsics/wasm"
 
 use package core.intrinsics.wasm { memory_size, memory_grow }
 use package core.memory as memory
