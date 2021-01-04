@@ -25,6 +25,14 @@
     #include "small_windows.h"
 #endif
 
+#if defined(_WIN32) || defined(_WIN64)
+    #define _BH_WINDOWS 1
+#endif
+
+#if defined(__unix__)
+    #define _BH_LINUX 1
+#endif
+
 
 //-------------------------------------------------------------------------------------
 // Better types
@@ -178,7 +186,7 @@ u8* double_to_ieee754(f64 f, b32 reverse);
 #define forir(var, hi, lo)                for (i64 var = (hi); var >= (lo); var--)
 #define forll(T, var, start, step)        for (T* var = (start); var != NULL; var = var->step)
 
-#ifdef BH_DEBUG
+#if defined(BH_DEBUG) && !defined(_BH_WINDOWS)
     #define DEBUG_HERE                        __asm("int $3")
 #else
     #define DEBUG_HERE
@@ -323,7 +331,7 @@ typedef enum bh_file_whence {
     BH_FILE_WHENCE_END = SEEK_END,
 } bh_file_whence;
 
-#ifdef _WIN32
+#ifdef _BH_WINDOWS
     typedef HANDLE bh_file_descriptor;
 #else
     typedef int bh_file_descriptor;
@@ -355,7 +363,7 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
 bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* filename);
 b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read);
 b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote);
-static b32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset);
+i64 bh_file_seek_to(bh_file* file, i64 offset);
 i64 bh_file_seek_to_end(bh_file* file);
 i64 bh_file_skip(bh_file* file, i64 bytes);
 i64 bh_file_tell(bh_file* file);
@@ -423,54 +431,6 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va);
 
 
 
-
-
-
-
-
-//-------------------------------------------------------------------------------------
-// Better debug functions
-//-------------------------------------------------------------------------------------
-#ifdef BH_DEBUG
-
-void* bh__debug_malloc(size_t size, const char* file, u64 line);
-i32   bh__debug_posix_memalign(void** ret, size_t alignment, size_t size, const char* file, u64 line);
-void  bh__debug_free(void* ptr, const char* file, u64 line);
-void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
-
-#ifdef BH_DEFINE
-
-void* bh__debug_malloc(size_t size, const char* file, u64 line) {
-    void* p = malloc(size);
-    bh_printf("[DEBUG] %p = malloc(%d) at %s:%d\n", p, size, file, line);
-    return p;
-}
-
-i32 bh__debug_posix_memalign(void** ret, size_t alignment, size_t size, const char* file, u64 line) {
-    i32 success = posix_memalign(ret, alignment, size);
-    bh_printf("[DEBUG] %p = posix_memalign(%d, %d) at %s:%d\n", *ret, alignment, size, file, line);
-    return success;
-}
-
-void bh__debug_free(void* ptr, const char* file, u64 line) {
-    bh_printf("[DEBUG] free(%p) at %s:%d\n", ptr, file, line);
-    free(ptr);
-}
-
-void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
-    void* p = realloc(ptr, size);
-    bh_printf("[DEBUG] %p = realloc(%p, %d) at %s:%d\n", p, ptr, size, file, line);
-    return p;
-}
-
-#endif
-
-#define malloc(size)                            (bh__debug_malloc(size, __FILE__, __LINE__))
-#define posix_memalign(ret, alignment, size)    (bh__debug_posix_memalign(ret, alignment, size, __FILE__, __LINE__))
-#define free(ptr)                               (bh__debug_free(ptr, __FILE__, __LINE__))
-#define realloc(ptr, size)                      (bh__debug_realloc(ptr, size, __FILE__, __LINE__))
-
-#endif
 
 
 
@@ -556,9 +516,7 @@ typedef struct bh__arr {
 
 #define bh_arr_grow(arr, cap)          (bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), cap))
 #define bh_arr_shrink(arr, cap)        (bh__arr_shrink((void **) &(arr), sizeof(*(arr)), cap))
-#define bh_arr_set_length(arr, n)      ( \
-    bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), n), \
-    bh__arrhead(arr)->length = n)
+#define bh_arr_set_length(arr, n)      (bh__arrhead(arr)->length = n)
 
 #define bh_arr_insertn(arr, i, n)      (bh__arr_insertn((void **) &(arr), sizeof(*(arr)), i, n))
 
@@ -836,7 +794,7 @@ b32 char_is_whitespace(const char a) {
 }
 
 b32 char_in_range(const char lo, const char hi, const char a) {
-    return lo <= a <= hi;
+    return lo <= a && a <= hi;
 }
 
 i64 chars_match(char* ptr1, char* ptr2) {
@@ -890,8 +848,11 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
+#if defined(_BH_WINDOWS)
+        retval = _aligned_malloc(size, alignment);
+#elif defined(_BH_LINUX)
         i32 success = posix_memalign(&retval, alignment, size);
-
+#endif
         if (flags & bh_allocator_flag_clear && retval != NULL) {
             memset(retval, 0, size);
         }
@@ -899,11 +860,19 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
     case bh_allocator_action_resize: {
         // TODO: Maybe replace with better custom function
+#if defined(_BH_WINDOWS)
+        retval = _aligned_realloc(prev_memory, size, alignment);
+#elif defined(_BH_LINUX)
         retval = realloc(prev_memory, size);
+#endif
     } break;
 
     case bh_allocator_action_free: {
+#if defined(_BH_WINDOWS)
+        _aligned_free(prev_memory);
+#elif defined(_BH_LINUX)
         free(prev_memory);
+#endif
     } break;
     }
 
@@ -922,7 +891,11 @@ void bh_managed_heap_init(bh_managed_heap* mh) {
 
 void bh_managed_heap_free(bh_managed_heap* mh) {
     bh_arr_each(bh__imap_entry, p, mh->ptrs.entries) {
+#if defined(_BH_WINDOWS)
+        _aligned_free((void *) p->key);
+#elif defined(_BH_LINUX)
         free((void *) p->key);
+#endif
     }
 
     bh_imap_free(&mh->ptrs);
@@ -941,7 +914,11 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
+#if defined(_BH_WINDOWS)
+        retval = _aligned_malloc(size, alignment);
+#elif defined(_BH_LINUX)
         i32 success = posix_memalign(&retval, alignment, size);
+#endif
 
         if (flags & bh_allocator_flag_clear && retval != NULL) {
             memset(retval, 0, size);
@@ -953,13 +930,21 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
 
     case bh_allocator_action_resize: {
         bh_imap_delete(&mh->ptrs, (u64) prev_memory);
+#if defined(_BH_WINDOWS)
+        retval = _aligned_realloc(prev_memory, size, alignment);
+#elif defined(_BH_LINUX)
         retval = realloc(prev_memory, size);
+#endif
         bh_imap_put(&mh->ptrs, (u64) retval, 1);
     } break;
 
     case bh_allocator_action_free: {
         bh_imap_delete(&mh->ptrs, (u64) prev_memory);
+#if defined(_BH_WINDOWS)
+        _aligned_free(prev_memory);
+#elif defined(_BH_LINUX)
         free(prev_memory);
+#endif
     } break;
     }
 
@@ -1257,10 +1242,12 @@ char* bh_strdup(bh_allocator a, char* str) {
 //-------------------------------------------------------------------------------------
 #ifndef BH_NO_FILE
 
+static b32 bh__file_seek_wrapper(bh_file_descriptor fd, i64 offset, bh_file_whence whence, i64* new_offset);
+
 bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
     const char* filename = NULL;
 
-#if defined(_WIN32)
+#if defined(_BH_WINDOWS)
     bh_file_descriptor sd_fd;
 
     switch (stand) {
@@ -1279,8 +1266,9 @@ bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
     default:
         return BH_FILE_ERROR_BAD_FD;
     }
+    file->fd = sd_fd;
 
-#elif defined(__linux__)
+#elif defined(_BH_LINUX)
     i32 sd_fd = -1;
 
     switch (stand) {
@@ -1303,6 +1291,7 @@ bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
     file->fd = sd_fd;
 #endif
 
+
     file->filename = filename;
     return BH_FILE_ERROR_NONE;
 }
@@ -1318,12 +1307,9 @@ bh_file_error bh_file_open(bh_file* file, const char* filename) {
 }
 
 bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* filename) {
-#if _WIN32
+#if defined(_BH_WINDOWS)
     DWORD desired_access;
     DWORD creation_disposition;
-
-    void *handle;
-    wchar_t *w_text;
 
     switch (mode & BH_FILE_MODE_MODES) {
         case BH_FILE_MODE_READ:
@@ -1355,12 +1341,22 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
     }
 
 
-    file->fd = CreateFileA(filename, desired_access, FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+    file->fd = CreateFileA(filename,
+                    desired_access,
+                    FILE_SHARE_READ,
+                    NULL,
+                    creation_disposition,
+                    FILE_ATTRIBUTE_NORMAL,
+                    NULL);
+
+    if (file->fd == INVALID_HANDLE_VALUE) {
+        return BH_FILE_ERROR_INVALID;
+    }
 
     file->filename = filename;
     return BH_FILE_ERROR_NONE;
 
-#elif __linux__
+#elif defined(_BH_LINUX)
     i32 os_mode = 0;
 
     switch (mode & BH_FILE_MODE_MODES) {
@@ -1384,8 +1380,6 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
     file->filename = filename;
 
     return BH_FILE_ERROR_NONE;
-#else
-    return BH_FILE_ERROR_INVALID;
 #endif
 }
 
@@ -1396,16 +1390,30 @@ bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* file
 }
 
 b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read) {
+#if defined(_BH_WINDOWS)
+    bh_file_seek_to(file, offset);
+    BOOL res = ReadFile(file->fd, buffer, buff_size, (i32 *) bytes_read, NULL);
+    if (res) return 1;
+    else     return 0;
+
+#elif defined(_BH_LINUX)
     isize res = pread(file->fd, buffer, buff_size, offset);
     if (res < 0) return 0;
     if (bytes_read) *bytes_read = res;
     return 1;
+#endif
 }
 
 b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote) {
     isize res;
     i64 current_offset = 0;
+
+#if defined(_BH_WINDOWS)
     bh__file_seek_wrapper(file->fd, 0, BH_FILE_WHENCE_CURRENT, &current_offset);
+    res = (isize) WriteFile(file->fd, buffer, buff_size, (i32 *) bytes_wrote, NULL);
+    return res;
+
+#elif defined(_BH_LINUX)
     if (current_offset == offset || file->fd == 1 || file->fd == 2) {
         // Standard in and out do like pwrite()
         res = write(file->fd, buffer, buff_size);
@@ -1416,13 +1424,26 @@ b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_s
     if (bytes_wrote) *bytes_wrote = res;
 
     return 1;
+#endif
 }
 
-static b32 bh__file_seek_wrapper(i32 fd, i64 offset, bh_file_whence whence, i64* new_offset) {
+static b32 bh__file_seek_wrapper(bh_file_descriptor fd, i64 offset, bh_file_whence whence, i64* new_offset) {
+#if defined(_BH_WINDOWS)
+    LARGE_INTEGER new_file_pointer;
+    LARGE_INTEGER dest;
+    dest.QuadPart = offset;
+
+    BOOL res = SetFilePointerEx(fd, dest, &new_file_pointer, whence);
+    *new_offset = new_file_pointer.QuadPart;
+
+    return res;
+
+#elif defined(_BH_LINUX)
     i64 res = lseek64(fd, offset, whence);
     if (res < 0) return 0;
     if (new_offset) *new_offset = res;
     return 1;
+#endif
 }
 
 // Returns new offset
@@ -1452,11 +1473,20 @@ i64 bh_file_tell(bh_file* file) {
 
 bh_file_error bh_file_close(bh_file* file) {
     bh_file_error err = BH_FILE_ERROR_NONE;
+
+#if defined(_BH_WINDOWS)
+    BOOL success = CloseHandle(file->fd);
+    if (!success) err = BH_FILE_ERROR_INVALID;
+
+    return err;
+
+#elif defined(_BH_LINUX)
     i32 res = close(file->fd);
     if (res < 0)
         err = BH_FILE_ERROR_INVALID;
 
     return err;
+#endif
 }
 
 b32 bh_file_read(bh_file* file, void* buffer, isize buff_size) {
@@ -1952,6 +1982,7 @@ b32 bh__arr_free(void **arr) {
     bh__arr* arrptr = bh__arrhead(*arr);
     bh_free(arrptr->allocator, arrptr);
     *arr = NULL;
+    return 1;
 }
 
 void* bh__arr_copy(bh_allocator alloc, void *arr, i32 elemsize) {
@@ -2045,6 +2076,7 @@ b32 bh__table_free(bh__table **table) {
 
     bh_free((*table)->allocator, *table);
     *table = NULL;
+    return 1;
 }
 
 // Assumes NULL terminated string for key
@@ -2358,6 +2390,10 @@ void bh_imap_clear(bh_imap* imap) {
 
 
 u64 bh_time_curr() {
+#if defined(_BH_WINDOWS)
+    return clock();
+
+#elif defined(_BH_LINUX)
     struct timespec spec;
     clock_gettime(CLOCK_REALTIME, &spec);
 
@@ -2369,11 +2405,18 @@ u64 bh_time_curr() {
     }
 
     return sec * 1000 + ms;
+#endif
 }
 
 u64 bh_time_duration(u64 old) {
+#if defined(_BH_WINDOWS)
+    u64 curr = bh_time_curr();
+    return (u64) (((f64) (curr - old)) / CLOCKS_PER_SEC);
+
+#elif defined(_BH_LINUX)
     u64 curr = bh_time_curr();
     return curr - old;
+#endif
 }
 
 #endif // ifdef BH_DEFINE

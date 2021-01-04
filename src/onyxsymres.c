@@ -329,6 +329,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     }
 
     if (bh_arr_length(sl->values) == 0) {
+        bh_arr_new(global_heap_allocator, sl->values, type_structlike_mem_count(sl->type));
         bh_arr_set_length(sl->values, type_structlike_mem_count(sl->type));
         bh_arr_zero(sl->values);
 

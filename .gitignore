@@ -6,3 +6,7 @@ tags
 session.vim
 *.sublime-project
 *.sublime-workspace
+*.pdb
+*.ilk
+*.obj
+*.rdbg

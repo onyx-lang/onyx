@@ -823,29 +823,39 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
                     num->type = type;
                     return 1;
                 }
-                if (value <= ((u64) 1 << (type->Basic.size * 8)) - 1) {
-                    num->type = type;
-                    return 1;
+                switch (type->Basic.size) {
+                    case 1: if (value <= 255) {
+                                num->type = type;
+                                return 1;
+                            }
+                    case 2: if (value <= 65535) {
+                                num->type = type;
+                                return 1;
+                            }
+                    case 4: if (value <= 4294967295) {
+                                num->type = type;
+                                return 1;
+                            }
                 }
                 
-                onyx_report_error(num->token->pos, "Integer constant with value '%l' does not fit into %d-bits.",
+                onyx_report_error(num->token->pos, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
 
             } else {
                 i64 value = (i64) num->value.l;
                 switch (type->Basic.size) {
-                    case 1: if (-128 <= value && value <= 127) {
+                    case 1: if (-128ll <= value && value <= 127ll) {
                                 num->value.i = (i32) value;
                                 num->type = type;
                                 return 1;
                             } break;
-                    case 2: if (-32768 <= value && value <= 32767) {
+                    case 2: if (-32768ll <= value && value <= 32767ll) {
                                 num->value.i = (i32) value;
                                 num->type = type;
                                 return 1;
                             } break;
-                    case 4: if (-2147483648 <= value && value <= 2147483647) {
+                    case 4: if (-2147483648ll <= value && value <= 2147483647ll) {
                                 num->value.i = (i32) value;
                                 num->type = type;
                                 return 1;

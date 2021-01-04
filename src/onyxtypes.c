@@ -281,6 +281,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             func_type->kind = Type_Kind_Function;
             func_type->Function.param_count = param_count;
+            func_type->Function.needed_param_count = param_count;
             func_type->Function.return_type = type_build_from_ast(alloc, ftype_node->return_type);
 
             if (param_count > 0)
@@ -488,9 +489,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Symbol:
             assert(("symbol node in type expression", 0));
             return NULL;
-
-        default: return NULL;
     }
+
+    return NULL;
 }
 
 Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {

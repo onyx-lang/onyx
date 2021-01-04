@@ -1,5 +1,15 @@
 package core.intrinsics.simd
 
+use package simd as simd
+
+i8x16 :: #type simd.i8x16
+i16x8 :: #type simd.i16x8
+i32x4 :: #type simd.i32x4
+i64x2 :: #type simd.i64x2
+f32x4 :: #type simd.f32x4
+f64x2 :: #type simd.f64x2
+v128  :: #type simd.v128
+
 // NOTE: These u8 values must be compile time known values.
 v128_const :: proc (b1: u8,  b2: u8,  b3: u8,  b4: u8,
                     b5: u8,  b6: u8,  b7: u8,  b8: u8,

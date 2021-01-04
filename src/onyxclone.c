@@ -91,6 +91,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_Solidify: return sizeof(AstDirectiveSolidify);
         case Ast_Kind_Count: return 0;
 	}
+
+    return 0;
 }
 
 AstNode* ast_clone_list(bh_allocator a, void* n) {

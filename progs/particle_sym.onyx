@@ -1,10 +1,10 @@
 package main
 
 #load "core/std/wasi"
-#load "core/simd_intrinsics"
+#load "core/intrinsics/simd"
 
 use package core
-use package simd
+use package core.intrinsics.simd
 
 main :: proc (args: [] cstr) {
     init_positions();

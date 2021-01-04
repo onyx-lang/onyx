@@ -425,7 +425,7 @@ typedef struct tagMONITORINFO {
 } MONITORINFO;
 
 #define INFINITE 0xffffffffl
-#define INVALID_HANDLE_VALUE ((void *)(intptr)(-1))
+#define INVALID_HANDLE_VALUE ((void *)(intptr_t)(-1))
 
 
 typedef DWORD WINAPI THREAD_START_ROUTINE(void *parameter);

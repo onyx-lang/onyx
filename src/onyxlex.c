@@ -411,7 +411,7 @@ OnyxTokenizer onyx_tokenizer_create(bh_allocator allocator, bh_file_contents *fc
     OnyxTokenizer tknizer = {
         .start          = fc->data,
         .curr           = fc->data,
-        .end            = fc->data + fc->length,
+        .end            = bh_pointer_add(fc->data, fc->length),
 
         .filename       = fc->filename,
 

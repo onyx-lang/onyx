@@ -14,7 +14,7 @@
 
 
 #ifndef CORE_INSTALLATION
-    #ifdef __unix__
+    #ifdef _BH_LINUX
     #define CORE_INSTALLATION "/usr/share/onyx"
     #elif defined(_WIN32) || defined(_WIN64)
     #define CORE_INSTALLATION "C:\\Program Files\\Onyx"
@@ -528,7 +528,11 @@ static i32 onyx_compile(CompilerState* compiler_state) {
             output_dummy_progress_bar(compiler_state);
 
             // Slowing things down for the effect
+#if defined(_BH_WINDOWS)
+            Sleep(1);
+#elif defined(_BH_LINUX)
             usleep(1000);
+#endif
 
             if (ent.expr->token) {
                 OnyxFilePos pos = ent.expr->token->pos;
