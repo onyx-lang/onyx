@@ -33,6 +33,7 @@ static void symres_use_package(AstUsePackage* package);
 static void symres_enum(AstEnumType* enum_node);
 static void symres_memres_type(AstMemRes** memres);
 static void symres_memres(AstMemRes** memres);
+static void symres_struct_defaults(AstType* st);
 
 static AstFieldAccess* make_field_access(AstTyped* node, char* field) {
     AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
@@ -146,10 +147,6 @@ AstType* symres_type(AstType* type) {
 
                     return type;
                 }
-            }
-
-            if (member->initial_value != NULL) {
-                symres_expression(&member->initial_value);
             }
         }
 
@@ -897,6 +894,32 @@ static void symres_memres(AstMemRes** memres) {
     }
 }
 
+static void symres_struct_defaults(AstType* t) {
+    switch (t->kind) {
+        case Ast_Kind_Struct_Type: {
+            AstStructType* st = (AstStructType *) t;
+            bh_arr_each(AstStructMember *, smem, st->members) {
+                if ((*smem)->initial_value != NULL) {
+                    symres_expression(&(*smem)->initial_value);
+                }
+            }
+            break;
+        }
+
+        case Ast_Kind_Poly_Struct_Type: {
+            AstPolyStructType* st = (AstPolyStructType *) t;
+            bh_arr_each(AstStructMember *, smem, st->base_struct->members) {
+                if ((*smem)->initial_value != NULL) {
+                    symres_expression(&(*smem)->initial_value);
+                }
+            }
+            break;
+        }
+
+        default: break;
+    }
+}
+
 static void symres_polyproc(AstPolyProc* pp) {
     pp->poly_scope = semstate.curr_scope;
 }
@@ -933,6 +956,7 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Memory_Reservation:      symres_memres(&ent->mem_res); break;
         case Entity_Type_Polymorphic_Proc:        symres_polyproc(ent->poly_proc); break;
         case Entity_Type_String_Literal:          symres_expression(&ent->expr); break;
+        case Entity_Type_Struct_Member_Default:   symres_struct_defaults((AstType *) ent->type_alias); break;
 
         default: break;
     }

@@ -122,6 +122,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Foreign_Global Header",
     "Function Header",
     "Global Header",
+    "Struct Member Default",
     "Memory Reservation",
     "Expression",
     "Global",

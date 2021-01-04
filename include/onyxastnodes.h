@@ -807,6 +807,7 @@ typedef enum EntityType {
     Entity_Type_Foreign_Global_Header,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
+    Entity_Type_Struct_Member_Default,
     Entity_Type_Memory_Reservation,
     Entity_Type_Expression,
     Entity_Type_Global,

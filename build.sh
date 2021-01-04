@@ -3,9 +3,14 @@
 C_FILES="onyx onyxbuiltins onyxchecker onyxclone onyxdoc onyxentities onyxerrors onyxlex onyxparser onyxsempass onyxsymres onyxtypes onyxutils onyxwasm"
 TARGET='./bin/onyx'
 CC='gcc'
-FLAGS='-O3 -I./include'
-BUILD_DIR='./build'
 
+if [ "$1" = "debug" ]; then
+    FLAGS='-g3 -I./include'
+else
+    FLAGS='-O3 -I./include'
+fi
+
+BUILD_DIR='./build'
 mkdir -p "$BUILD_DIR"
 
 for file in $C_FILES ; do

@@ -338,9 +338,14 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 break;
             }
 
-            case Ast_Kind_Type_Alias:
             case Ast_Kind_Struct_Type:
             case Ast_Kind_Poly_Struct_Type: {
+                ent.type = Entity_Type_Struct_Member_Default;
+                ent.type_alias = (AstType *) node;
+                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                // fallthrough
+            }
+            case Ast_Kind_Type_Alias: {
                 ent.type = Entity_Type_Type_Alias;
                 ent.type_alias = (AstType *) node;
                 entity_heap_insert(&compiler_state->prog_info.entities, ent);
