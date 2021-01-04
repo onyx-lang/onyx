@@ -56,12 +56,12 @@ Allocator :: struct {
     func: allocator_proc;
 }
 
-raw_alloc :: proc (use a: Allocator, size: u32) -> rawptr {
-    return func(data, AllocationAction.Alloc, size, __DEFAULT_ALLOCATION_ALIGNMENT, null);
+raw_alloc :: proc (use a: Allocator, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
+    return func(data, AllocationAction.Alloc, size, alignment, null);
 }
 
-raw_resize :: proc (use a: Allocator, ptr: rawptr, size: u32) -> rawptr {
-    return func(data, AllocationAction.Resize, size, __DEFAULT_ALLOCATION_ALIGNMENT, ptr);
+raw_resize :: proc (use a: Allocator, ptr: rawptr, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
+    return func(data, AllocationAction.Resize, size, alignment, ptr);
 }
 
 raw_free :: proc (use a: Allocator, ptr: rawptr) {
