@@ -6,7 +6,7 @@ CC='gcc'
 FLAGS='-O3 -I./include'
 BUILD_DIR='./build'
 
-mkdir -p '$BUILD_DIR'
+mkdir -p "$BUILD_DIR"
 
 for file in $C_FILES ; do
     echo "Compiling $file.c"
