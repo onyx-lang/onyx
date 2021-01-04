@@ -218,7 +218,7 @@ void symbol_subpackage_introduce(Scope* scope, OnyxToken* sym, AstPackage* packa
         AstNode* maybe_package = bh_table_get(AstNode *, scope->symbols, sym->text);
         assert(maybe_package->kind == Ast_Kind_Package);
     } else {
-        bh_table_put(AstNode *, scope->symbols, sym->text, package);
+        bh_table_put(AstNode *, scope->symbols, sym->text, (AstNode *) package);
     }
 
     token_toggle_end(sym);

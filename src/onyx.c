@@ -16,7 +16,7 @@
 #ifndef CORE_INSTALLATION
     #ifdef __unix__
     #define CORE_INSTALLATION "/usr/share/onyx"
-    #elif _WIN32
+    #elif defined(_WIN32) || defined(_WIN64)
     #define CORE_INSTALLATION "C:\\Program Files\\Onyx"
     #endif
 #endif

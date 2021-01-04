@@ -21,6 +21,11 @@
 #include <assert.h>
 #include <stdio.h>
 
+#if defined(_MSC_VER) && !defined(_WINDOWS_)
+    #include "small_windows.h"
+#endif
+
+
 //-------------------------------------------------------------------------------------
 // Better types
 //-------------------------------------------------------------------------------------
@@ -318,7 +323,11 @@ typedef enum bh_file_whence {
     BH_FILE_WHENCE_END = SEEK_END,
 } bh_file_whence;
 
-typedef int bh_file_descriptor;
+#ifdef _WIN32
+    typedef HANDLE bh_file_descriptor;
+#else
+    typedef int bh_file_descriptor;
+#endif
 
 typedef struct bh_file {
     bh_file_descriptor fd;
@@ -640,7 +649,7 @@ typedef struct bh__table {
 #else
     #define bh_table_init(allocator_, tab, hs)    bh__table_init(allocator_, (bh__table **)&(tab), hs)
     #define bh_table_free(tab)                    bh__table_free((bh__table **)&(tab))
-    #define bh_table_put(T, tab, key, value)      (*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = (T) value)
+    #define bh_table_put(T, tab, key, value)      (*((T *) bh__table_put((bh__table *) tab, sizeof(T), key)) = value)
     #define bh_table_has(T, tab, key)             (bh__table_has((bh__table *) tab, sizeof(T), key))
     #define bh_table_get(T, tab, key)             (*((T *) bh__table_get((bh__table *) tab, sizeof(T), key)))
     #define bh_table_delete(T, tab, key)          (bh__table_delete((bh__table *) tab, sizeof(T), key))
@@ -791,6 +800,7 @@ u64 bh_time_duration(u64 old);
 
 
 #ifdef BH_DEFINE
+
 #undef BH_DEFINE
 //-------------------------------------------------------------------------------------
 // IMPLEMENTATIONS
@@ -1248,8 +1258,30 @@ char* bh_strdup(bh_allocator a, char* str) {
 #ifndef BH_NO_FILE
 
 bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
-    i32 sd_fd = -1;
     const char* filename = NULL;
+
+#if defined(_WIN32)
+    bh_file_descriptor sd_fd;
+
+    switch (stand) {
+    case BH_FILE_STANDARD_INPUT:
+        sd_fd = GetStdHandle(STD_INPUT_HANDLE);
+        filename = "stdin";
+        break;
+    case BH_FILE_STANDARD_OUTPUT:
+        sd_fd = GetStdHandle(STD_OUTPUT_HANDLE);
+        filename = "stdout";
+        break;
+    case BH_FILE_STANDARD_ERROR:
+        sd_fd = GetStdHandle(STD_ERROR_HANDLE);
+        filename = "stderr";
+        break;
+    default:
+        return BH_FILE_ERROR_BAD_FD;
+    }
+
+#elif defined(__linux__)
+    i32 sd_fd = -1;
 
     switch (stand) {
     case BH_FILE_STANDARD_INPUT:
@@ -1269,8 +1301,9 @@ bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand) {
     }
 
     file->fd = sd_fd;
-    file->filename = filename;
+#endif
 
+    file->filename = filename;
     return BH_FILE_ERROR_NONE;
 }
 
@@ -1285,7 +1318,49 @@ bh_file_error bh_file_open(bh_file* file, const char* filename) {
 }
 
 bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* filename) {
+#if _WIN32
+    DWORD desired_access;
+    DWORD creation_disposition;
 
+    void *handle;
+    wchar_t *w_text;
+
+    switch (mode & BH_FILE_MODE_MODES) {
+        case BH_FILE_MODE_READ:
+            desired_access = GENERIC_READ;
+            creation_disposition = OPEN_EXISTING;
+            break;
+        case BH_FILE_MODE_WRITE:
+            desired_access = GENERIC_WRITE;
+            creation_disposition = CREATE_ALWAYS;
+            break;
+        case BH_FILE_MODE_APPEND:
+            desired_access = GENERIC_WRITE;
+            creation_disposition = OPEN_ALWAYS;
+            break;
+        case BH_FILE_MODE_READ | BH_FILE_MODE_RW:
+            desired_access = GENERIC_READ | GENERIC_WRITE;
+            creation_disposition = OPEN_EXISTING;
+            break;
+        case BH_FILE_MODE_WRITE | BH_FILE_MODE_RW:
+            desired_access = GENERIC_READ | GENERIC_WRITE;
+            creation_disposition = CREATE_ALWAYS;
+            break;
+        case BH_FILE_MODE_APPEND | BH_FILE_MODE_RW:
+            desired_access = GENERIC_READ | GENERIC_WRITE;
+            creation_disposition = OPEN_ALWAYS;
+            break;
+        default:
+            return BH_FILE_ERROR_INVALID;
+    }
+
+
+    file->fd = CreateFileA(filename, desired_access, FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    file->filename = filename;
+    return BH_FILE_ERROR_NONE;
+
+#elif __linux__
     i32 os_mode = 0;
 
     switch (mode & BH_FILE_MODE_MODES) {
@@ -1309,6 +1384,9 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
     file->filename = filename;
 
     return BH_FILE_ERROR_NONE;
+#else
+    return BH_FILE_ERROR_INVALID;
+#endif
 }
 
 bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* filename) {
@@ -2281,7 +2359,7 @@ void bh_imap_clear(bh_imap* imap) {
 
 u64 bh_time_curr() {
     struct timespec spec;
-    clock_gettime(CLOCK_MONOTONIC, &spec);
+    clock_gettime(CLOCK_REALTIME, &spec);
 
     time_t sec = spec.tv_sec;
     u64 ms  = spec.tv_nsec / 1000000;
