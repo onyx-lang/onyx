@@ -5,17 +5,21 @@
 #define _LARGEFILE64_SOURCE
 
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <malloc.h>
 #include <time.h>
+
+#ifdef __unix__
+    #include <unistd.h>
+#endif
 
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h> // TODO: Replace with needed functions
 #include <stdint.h>
 #include <assert.h>
+#include <stdio.h>
 
 //-------------------------------------------------------------------------------------
 // Better types
@@ -421,7 +425,7 @@ isize bh_snprintf_va(char *str, isize n, char const *fmt, va_list va);
 #ifdef BH_DEBUG
 
 void* bh__debug_malloc(size_t size, const char* file, u64 line);
-void* bh__debug_memalign(size_t alignment, size_t size, const char* file, u64 line);
+i32   bh__debug_posix_memalign(void** ret, size_t alignment, size_t size, const char* file, u64 line);
 void  bh__debug_free(void* ptr, const char* file, u64 line);
 void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line);
 
@@ -433,10 +437,10 @@ void* bh__debug_malloc(size_t size, const char* file, u64 line) {
     return p;
 }
 
-void* bh__debug_memalign(size_t alignment, size_t size, const char* file, u64 line) {
-    void* p = memalign(alignment, size);
-    bh_printf("[DEBUG] %p = memalign(%d, %d) at %s:%d\n", p, alignment, size, file, line);
-    return p;
+i32 bh__debug_posix_memalign(void** ret, size_t alignment, size_t size, const char* file, u64 line) {
+    i32 success = posix_memalign(ret, alignment, size);
+    bh_printf("[DEBUG] %p = posix_memalign(%d, %d) at %s:%d\n", *ret, alignment, size, file, line);
+    return success;
 }
 
 void bh__debug_free(void* ptr, const char* file, u64 line) {
@@ -452,10 +456,10 @@ void* bh__debug_realloc(void* ptr, size_t size, const char* file, u64 line) {
 
 #endif
 
-#define malloc(size)                    (bh__debug_malloc(size, __FILE__, __LINE__))
-#define memalign(alignment, size)    (bh__debug_memalign(alignment, size, __FILE__, __LINE__))
-#define free(ptr)                        (bh__debug_free(ptr, __FILE__, __LINE__))
-#define realloc(ptr, size)                (bh__debug_realloc(ptr, size, __FILE__, __LINE__))
+#define malloc(size)                            (bh__debug_malloc(size, __FILE__, __LINE__))
+#define posix_memalign(ret, alignment, size)    (bh__debug_posix_memalign(ret, alignment, size, __FILE__, __LINE__))
+#define free(ptr)                               (bh__debug_free(ptr, __FILE__, __LINE__))
+#define realloc(ptr, size)                      (bh__debug_realloc(ptr, size, __FILE__, __LINE__))
 
 #endif
 
@@ -876,7 +880,7 @@ BH_ALLOCATOR_PROC(bh_heap_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
-        retval = memalign(alignment, size);
+        i32 success = posix_memalign(&retval, alignment, size);
 
         if (flags & bh_allocator_flag_clear && retval != NULL) {
             memset(retval, 0, size);
@@ -927,7 +931,7 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
-        retval = memalign(alignment, size);
+        i32 success = posix_memalign(&retval, alignment, size);
 
         if (flags & bh_allocator_flag_clear && retval != NULL) {
             memset(retval, 0, size);
@@ -1050,7 +1054,7 @@ void bh_scratch_init(bh_scratch* scratch, bh_allocator backing, isize scratch_si
     scratch->backing = backing;
     scratch->memory = memory;
     scratch->curr = memory;
-    scratch->end = memory + scratch_size;
+    scratch->end = bh_pointer_add(memory, scratch_size);
 }
 
 void bh_scratch_free(bh_scratch* scratch) {
@@ -1074,12 +1078,12 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
-        if (size > scratch->end - scratch->memory) {
+        if (size > ((u8 *) scratch->end) - ((u8 *) scratch->memory)) {
             return NULL;
         }
 
         retval = scratch->curr;
-        scratch->curr += size;
+        scratch->curr = bh_pointer_add(scratch->curr, size);
 
         if (scratch->curr >= scratch->end) {
             scratch->curr = scratch->memory;
@@ -1090,12 +1094,12 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
     case bh_allocator_action_free: break;
 
     case bh_allocator_action_resize: {
-        if (size > scratch->end - scratch->memory) {
+        if (size > ((u8 *) scratch->end) - ((u8 *) scratch->memory)) {
             return NULL;
         }
 
         retval = scratch->curr;
-        scratch->curr += size;
+        scratch->curr = bh_pointer_add(scratch->curr, size);
 
         if (scratch->curr >= scratch->end) {
             scratch->curr = scratch->memory;

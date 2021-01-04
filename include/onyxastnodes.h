@@ -426,8 +426,8 @@ typedef enum VarArgKind {
     AstKind kind;             \
     u32 flags;                \
     OnyxToken *token;         \
-    AstNode *next;
-struct AstNode { AstNode_base };
+    AstNode *next
+struct AstNode { AstNode_base; };
 
 // NOTE: 'type_node' is filled out by the parser.
 // For a type such as '^^i32', the tree would look something like
@@ -443,8 +443,8 @@ struct AstNode { AstNode_base };
 #define AstTyped_base       \
     AstNode_base;           \
     AstType *type_node;     \
-    Type *type;
-struct AstTyped { AstTyped_base };
+    Type *type
+struct AstTyped { AstTyped_base; };
 
 // Expression Nodes
 struct AstBinaryOp      { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
@@ -605,8 +605,8 @@ struct AstSwitch {
     AstKind kind;       \
     u32 flags;          \
     OnyxToken* token;   \
-    char* name;
-struct AstType { AstType_base };
+    char* name
+struct AstType { AstType_base; };
 
 struct AstBasicType     { AstType_base; Type* type; };
 struct AstPointerType   { AstType_base; AstType* elem; };

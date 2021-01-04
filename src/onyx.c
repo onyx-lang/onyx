@@ -16,6 +16,8 @@
 #ifndef CORE_INSTALLATION
     #ifdef __unix__
     #define CORE_INSTALLATION "/usr/share/onyx"
+    #elif _WIN32
+    #define CORE_INSTALLATION "C:\\Program Files\\Onyx"
     #endif
 #endif
 
@@ -224,9 +226,15 @@ static char* lookup_included_file(CompilerState* cs, char* filename) {
         bh_snprintf(fn, 128, "%s", filename);
     }
 
+#ifdef __unix__
+    #define DIR_SEPARATOR '/'
+#elif _WIN32
+    #define DIR_SEPARATOR '\\'
+#endif
+
     bh_arr_each(const char *, folder, cs->options->included_folders) {
-        if ((*folder)[strlen(*folder) - 1] != '/')
-            bh_snprintf(path, 256, "%s/%s", *folder, fn);
+        if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
+            bh_snprintf(path, 256, "%s%c%s", *folder, DIR_SEPARATOR, fn);
         else
             bh_snprintf(path, 256, "%s%s", *folder, fn);
 
@@ -234,6 +242,8 @@ static char* lookup_included_file(CompilerState* cs, char* filename) {
     }
 
     return fn;
+
+#undef DIR_SEPARATOR
 }
 
 static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
