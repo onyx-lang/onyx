@@ -369,6 +369,7 @@ EMIT_FUNC(function_body,                 AstFunction* fd);
 EMIT_FUNC(block,                         AstBlock* block, b32 generate_block_headers);
 EMIT_FUNC(statement,                     AstNode* stmt);
 EMIT_FUNC(assignment,                    AstBinaryOp* assign);
+EMIT_FUNC(assignment_of_array,           AstBinaryOp* assign);
 EMIT_FUNC(store_instruction,             Type* type, u32 offset);
 EMIT_FUNC(load_instruction,              Type* type, u32 offset);
 EMIT_FUNC(if,                            AstIfWhile* if_node);
@@ -496,50 +497,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
     }
 
     if (assign->right->type->kind == Type_Kind_Array) {
-        Type* rtype = assign->right->type;
-
-        Type* elem_type = rtype;
-        u32 elem_count = 1;
-        while (elem_type->kind == Type_Kind_Array) {
-            elem_count *= elem_type->Array.count;
-            elem_type = elem_type->Array.elem;
-        }
-        u32 elem_size = type_size_of(elem_type);
-
-        u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-
-        emit_location(mod, &code, assign->left);
-        WIL(WI_LOCAL_SET, lptr_local);
-
-        emit_expression(mod, &code, assign->right);
-        WIL(WI_LOCAL_SET, rptr_local);
-
-        // NOTE: Currently, we inline the copying of the array; But if the array has
-        // many elements, this could result in a LOT of instructions. Maybe for lengths
-        // greater than like 16 we output a loop that copies them?
-        //                                               - brendanfh 2020/12/16
-        fori (i, 0, elem_count) {
-            if (!type_is_structlike(elem_type))
-                WIL(WI_LOCAL_GET, lptr_local);
-
-            if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == rptr_local)
-                bh_arr_last(code).type = WI_LOCAL_TEE;
-            else
-                WIL(WI_LOCAL_GET, rptr_local);
-            emit_load_instruction(mod, &code, elem_type, i * elem_size);
-
-            if (!type_is_structlike(elem_type)) {
-                emit_store_instruction(mod, &code, elem_type, i * elem_size);
-            } else {
-                WIL(WI_LOCAL_GET, lptr_local);
-                emit_store_instruction(mod, &code, elem_type, i * elem_size);
-            }
-        }
-
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-
+        emit_assignment_of_array(mod, &code, assign);
         *pcode = code;
         return;
     }
@@ -602,6 +560,83 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
     }
 
     *pcode = code;
+}
+
+EMIT_FUNC(assignment_of_array, AstBinaryOp* assign) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    Type* rtype = assign->right->type;
+    assert(rtype->kind == Type_Kind_Array);
+
+    Type* elem_type = rtype;
+    u32 elem_count = 1;
+    while (elem_type->kind == Type_Kind_Array) {
+        elem_count *= elem_type->Array.count;
+        elem_type = elem_type->Array.elem;
+    }
+    u32 elem_size = type_size_of(elem_type);
+
+    if (assign->right->kind == Ast_Kind_Array_Literal) {
+        u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+        emit_location(mod, &code, assign->left);
+        WIL(WI_LOCAL_SET, lptr_local);
+
+        AstArrayLiteral* al = (AstArrayLiteral *) assign->right;
+        fori (i, 0, elem_count) {
+            if (!type_is_structlike(elem_type))
+                WIL(WI_LOCAL_GET, lptr_local);
+
+            emit_expression(mod, &code, al->values[i]);
+
+            if (!type_is_structlike(elem_type)) {
+                emit_store_instruction(mod, &code, elem_type, i * elem_size);
+            } else {
+                WIL(WI_LOCAL_GET, lptr_local);
+                emit_store_instruction(mod, &code, elem_type, i * elem_size);
+            }
+        }
+        
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
+    } else {
+        u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+
+        emit_location(mod, &code, assign->left);
+        WIL(WI_LOCAL_SET, lptr_local);
+
+        emit_expression(mod, &code, assign->right);
+        WIL(WI_LOCAL_SET, rptr_local);
+
+        // NOTE: Currently, we inline the copying of the array; But if the array has
+        // many elements, this could result in a LOT of instructions. Maybe for lengths
+        // greater than like 16 we output a loop that copies them?
+        //                                               - brendanfh 2020/12/16
+        fori (i, 0, elem_count) {
+            if (!type_is_structlike(elem_type))
+                WIL(WI_LOCAL_GET, lptr_local);
+
+            if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == rptr_local)
+                bh_arr_last(code).type = WI_LOCAL_TEE;
+            else
+                WIL(WI_LOCAL_GET, rptr_local);
+            emit_load_instruction(mod, &code, elem_type, i * elem_size);
+
+            if (!type_is_structlike(elem_type)) {
+                emit_store_instruction(mod, &code, elem_type, i * elem_size);
+            } else {
+                WIL(WI_LOCAL_GET, lptr_local);
+                emit_store_instruction(mod, &code, elem_type, i * elem_size);
+            }
+        }
+
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    }
+
+    *pcode = code;
+    return;
 }
 
 EMIT_FUNC(store_instruction, Type* type, u32 offset) {

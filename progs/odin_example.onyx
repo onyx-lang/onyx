@@ -85,6 +85,14 @@ BadUnion :: struct {
 Vec2   :: struct { x: i32; y: i32; }
 Entity :: struct { use pos: Vec2; }
 
+array_literal_optim :: proc () #export {
+    // This needs to be optimized
+    bar : [5] u32;
+    bar = u32.[ 1, 2, 3, 4, 5 ];
+    bar[2] = 1234;
+    for b: bar do printf("b: %i\n", b);
+}
+
 main :: proc (args: [] cstr) {
     a : BadUnion;
     a.int = 1234;
@@ -100,13 +108,10 @@ main :: proc (args: [] cstr) {
         foo : [5] [2] u32;
         foo = f();
 
+        array_literal_optim();
+
         printf("%p == %p\n", cast(^u32) foo, ^foo);
         for ^thing: foo do for t: *thing do printf("%p %i\n", thing, t);
-
-        // This needs to be optimized
-        bar := u32.[ 1, 2, 3, 4, 5 ];
-        bar[2] = 1234;
-        for b: bar do printf("b: %i\n", b);
 
         println(compress(f32.[ 1, 2, 3, 4, 5 ], proc (a: $T, b: T) -> T { return a + b; }));
     }
