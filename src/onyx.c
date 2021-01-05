@@ -17,7 +17,7 @@
     #ifdef _BH_LINUX
     #define CORE_INSTALLATION "/usr/share/onyx"
     #elif defined(_WIN32) || defined(_WIN64)
-    #define CORE_INSTALLATION "C:\\Program Files\\Onyx"
+    #define CORE_INSTALLATION "\\dev\\onyx\\"
     #endif
 #endif
 
