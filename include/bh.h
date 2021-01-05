@@ -4,13 +4,21 @@
 // NOTE: For lseek64
 #define _LARGEFILE64_SOURCE
 
+#if defined(_WIN32) || defined(_WIN64)
+    #define _BH_WINDOWS 1
+#endif
+
+#if defined(__unix__)
+    #define _BH_LINUX 1
+#endif
+
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <malloc.h>
 #include <time.h>
 
-#ifdef __unix__
+#ifdef _BH_LINUX
+    #include <errno.h>
+    #include <fcntl.h>
     #include <unistd.h>
 #endif
 
@@ -24,15 +32,6 @@
 #if defined(_MSC_VER) && !defined(_WINDOWS_)
     #include "small_windows.h"
 #endif
-
-#if defined(_WIN32) || defined(_WIN64)
-    #define _BH_WINDOWS 1
-#endif
-
-#if defined(__unix__)
-    #define _BH_LINUX 1
-#endif
-
 
 //-------------------------------------------------------------------------------------
 // Better types

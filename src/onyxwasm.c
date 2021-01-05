@@ -2909,8 +2909,13 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         // by specification. This is probably a safe assumption, but
         // should probably be fixed at some point.
         //                                - brendanfh  2020/12/15
+
+        Type* effective_type = node->type;
+
+        if (effective_type->kind == Type_Kind_Enum)
+            effective_type = effective_type->Enum.backing;
         
-        switch (node->type->Basic.kind) {
+        switch (effective_type->Basic.kind) {
         case Basic_Kind_Bool:
         case Basic_Kind_I8:
         case Basic_Kind_U8:

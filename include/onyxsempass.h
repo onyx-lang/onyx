@@ -32,8 +32,6 @@ extern SemState semstate;
 
 AstType* symres_type(AstType* type);
 
-b32 check_expression(AstTyped** expr);
-
 // TODO: This should be moved elsewhere.
 void onyx_sempass_init(bh_allocator alloc, bh_allocator node_alloc);
 

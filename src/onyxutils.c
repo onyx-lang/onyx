@@ -96,6 +96,20 @@ const char* onyx_ast_node_kind_string(AstKind kind) {
     return ast_node_names[kind];
 }
 
+const char *binaryop_string[Binary_Op_Count] = {
+    "+", "-", "*", "/", "%",
+    "==", "!=", "<", "<=", ">", ">=",
+    "&", "|", "^", "<<", ">>", ">>>",
+    "&&", "||"
+
+    "NONE",
+    "=", "+=", "-=", "*=", "/=", "%=",
+    "&=", "|=", "^=", "<<=", ">>=", ">>>=",
+    "NONE",
+
+    "|>", "..",
+};
+
 const char* entity_state_strings[Entity_State_Count] = {
     "Error",
     "Parse Builtin",
@@ -954,7 +968,7 @@ Type* resolve_expression_type(AstTyped* node) {
     if (node->type == NULL)
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
 
-    if (node->kind == Ast_Kind_NumLit) {
+    if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
             if ((((u64) ((AstNumLit *) node)->value.l) >> 32) > 0)
                 convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);

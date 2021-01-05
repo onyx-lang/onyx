@@ -3,36 +3,48 @@
 #include "onyxparser.h"
 #include "onyxutils.h"
 
-#define CHECK(kind, ...) b32 check_ ## kind (__VA_ARGS__)
+// All of the `check` functions return a boolean that signals if an issue
+// was reached while processing the node. These error booleans propagate
+// up the call stack until they reach `check_entity`.
 
-CHECK(block, AstBlock* block);
-CHECK(statement_chain, AstNode* start);
-CHECK(statement, AstNode* stmt);
-CHECK(return, AstReturn* retnode);
-CHECK(if, AstIfWhile* ifnode);
-CHECK(while, AstIfWhile* whilenode);
-CHECK(for, AstFor* fornode);
-CHECK(switch, AstSwitch* switchnode);
-CHECK(call, AstCall* call);
-CHECK(binaryop, AstBinaryOp** pbinop, b32 assignment_is_ok);
-CHECK(unaryop, AstUnaryOp** punop);
-CHECK(struct_literal, AstStructLiteral* sl);
-CHECK(array_literal, AstArrayLiteral* al);
-CHECK(range_literal, AstRangeLiteral** range);
-CHECK(expression, AstTyped** expr);
-CHECK(address_of, AstAddressOf* aof);
-CHECK(dereference, AstDereference* deref);
-CHECK(array_access, AstArrayAccess* expr);
-CHECK(field_access, AstFieldAccess** pfield);
-CHECK(size_of, AstSizeOf* so);
-CHECK(align_of, AstAlignOf* ao);
-CHECK(global, AstGlobal* global);
-CHECK(function, AstFunction* func);
-CHECK(overloaded_function, AstOverloadedFunction* func);
-CHECK(struct, AstStructType* s_node);
-CHECK(function_header, AstFunction* func);
-CHECK(memres_type, AstMemRes* memres);
-CHECK(memres, AstMemRes* memres);
+#define CHECK(kind, ...) do { \
+    CheckStatus cs = check_ ## kind (__VA_ARGS__); \
+    if (cs != Check_Success) return cs; \
+    } while (0)
+
+typedef enum CheckStatus {
+    Check_Success,
+    Check_Error,
+} CheckStatus;
+
+CheckStatus check_block(AstBlock* block);
+CheckStatus check_statement_chain(AstNode* start);
+CheckStatus check_statement(AstNode* stmt);
+CheckStatus check_return(AstReturn* retnode);
+CheckStatus check_if(AstIfWhile* ifnode);
+CheckStatus check_while(AstIfWhile* whilenode);
+CheckStatus check_for(AstFor* fornode);
+CheckStatus check_switch(AstSwitch* switchnode);
+CheckStatus check_call(AstCall* call);
+CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok);
+CheckStatus check_unaryop(AstUnaryOp** punop);
+CheckStatus check_struct_literal(AstStructLiteral* sl);
+CheckStatus check_array_literal(AstArrayLiteral* al);
+CheckStatus check_range_literal(AstRangeLiteral** range);
+CheckStatus check_expression(AstTyped** expr);
+CheckStatus check_address_of(AstAddressOf* aof);
+CheckStatus check_dereference(AstDereference* deref);
+CheckStatus check_array_access(AstArrayAccess* expr);
+CheckStatus check_field_access(AstFieldAccess** pfield);
+CheckStatus check_size_of(AstSizeOf* so);
+CheckStatus check_align_of(AstAlignOf* ao);
+CheckStatus check_global(AstGlobal* global);
+CheckStatus check_function(AstFunction* func);
+CheckStatus check_overloaded_function(AstOverloadedFunction* func);
+CheckStatus check_struct(AstStructType* s_node);
+CheckStatus check_function_header(AstFunction* func);
+CheckStatus check_memres_type(AstMemRes* memres);
+CheckStatus check_memres(AstMemRes* memres);
 
 static inline void fill_in_array_count(AstType* type_node) {
     if (type_node == NULL) return;
@@ -56,16 +68,16 @@ static inline void fill_in_type(AstTyped* node) {
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
 }
 
-b32 check_return(AstReturn* retnode) {
+CheckStatus check_return(AstReturn* retnode) {
     if (retnode->expr) {
-        if (check_expression(&retnode->expr)) return 1;
+        CHECK(expression, &retnode->expr);
 
         if (!type_check_or_auto_cast(&retnode->expr, semstate.expected_return_type)) {
             onyx_report_error(retnode->expr->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
                     type_get_name(semstate.expected_return_type),
                     type_get_name(retnode->expr->type));
-            return 1;
+            return Check_Error;
         }
 
     } else {
@@ -73,47 +85,47 @@ b32 check_return(AstReturn* retnode) {
             onyx_report_error(retnode->token->pos,
                 "Returning from non-void function without value. Expected a value of type '%s'.",
                 type_get_name(semstate.expected_return_type));
-            return 1;
+            return Check_Error;
         }
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_if(AstIfWhile* ifnode) {
-    if (ifnode->assignment != NULL) check_statement((AstNode *) ifnode->assignment);
+CheckStatus check_if(AstIfWhile* ifnode) {
+    if (ifnode->assignment != NULL) CHECK(statement, (AstNode *) ifnode->assignment);
 
-    if (check_expression(&ifnode->cond)) return 1;
+    CHECK(expression, &ifnode->cond);
 
     if (!type_is_bool(ifnode->cond->type)) {
         onyx_report_error(ifnode->cond->token->pos, "expected boolean type for condition");
-        return 1;
+        return Check_Error;
     }
 
-    if (ifnode->true_stmt)  if (check_statement((AstNode *) ifnode->true_stmt))  return 1;
-    if (ifnode->false_stmt) if (check_statement((AstNode *) ifnode->false_stmt)) return 1;
+    if (ifnode->true_stmt)  CHECK(statement, (AstNode *) ifnode->true_stmt);
+    if (ifnode->false_stmt) CHECK(statement, (AstNode *) ifnode->false_stmt);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_while(AstIfWhile* whilenode) {
-    if (whilenode->assignment != NULL) check_statement((AstNode *) whilenode->assignment);
+CheckStatus check_while(AstIfWhile* whilenode) {
+    if (whilenode->assignment != NULL) CHECK(statement, (AstNode *) whilenode->assignment);
 
-    if (check_expression(&whilenode->cond)) return 1;
+    CHECK(expression, &whilenode->cond);
 
     if (!type_is_bool(whilenode->cond->type)) {
         onyx_report_error(whilenode->cond->token->pos, "expected boolean type for condition");
-        return 1;
+        return Check_Error;
     }
 
-    if (whilenode->true_stmt)  if (check_block(whilenode->true_stmt))  return 1;
-    if (whilenode->false_stmt) if (check_block(whilenode->false_stmt)) return 1;
+    if (whilenode->true_stmt)  CHECK(statement, (AstNode *) whilenode->true_stmt);
+    if (whilenode->false_stmt) CHECK(statement, (AstNode *) whilenode->false_stmt);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_for(AstFor* fornode) {
-    if (check_expression(&fornode->iter)) return 1;
+CheckStatus check_for(AstFor* fornode) {
+    CHECK(expression, &fornode->iter);
     fornode->loop_type = For_Loop_Invalid;
 
     Type* iter_type = fornode->iter->type;
@@ -121,7 +133,7 @@ b32 check_for(AstFor* fornode) {
     if (types_are_compatible(iter_type, builtin_range_type_type)) {
         if (fornode->by_pointer) {
             onyx_report_error(fornode->var->token->pos, "Cannot iterate by pointer over a range.");
-            return 1;
+            return Check_Error;
         }
 
         can_iterate = 1;
@@ -153,7 +165,7 @@ b32 check_for(AstFor* fornode) {
     else if (iter_type->kind == Type_Kind_VarArgs) {
         if (fornode->by_pointer) {
             onyx_report_error(fornode->var->token->pos, "Cannot iterate by pointer over '%s'.", type_get_name(iter_type));
-            return 1;
+            return Check_Error;
         }
 
         can_iterate = 1;
@@ -179,12 +191,12 @@ b32 check_for(AstFor* fornode) {
         onyx_report_error(fornode->iter->token->pos,
                 "Cannot iterate over a '%s'.",
                 type_get_name(iter_type));
-        return 1;
+        return Check_Error;
     }
 
-    if (check_block(fornode->stmt)) return 1;
+    CHECK(block, fornode->stmt);
 
-    return 0;
+    return Check_Success;
 }
 
 static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, AstBlock* block, OnyxFilePos pos) {
@@ -200,13 +212,13 @@ static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, A
     return 0;
 }
 
-b32 check_switch(AstSwitch* switchnode) {
-    if (switchnode->assignment != NULL) check_statement((AstNode *) switchnode->assignment);
+CheckStatus check_switch(AstSwitch* switchnode) {
+    if (switchnode->assignment != NULL) CHECK(statement, (AstNode *) switchnode->assignment);
 
-    if (check_expression(&switchnode->expr)) return 1;
+    CHECK(expression, &switchnode->expr);
     if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
         onyx_report_error(switchnode->expr->token->pos, "expected integer or enum type for switch expression");
-        return 1;
+        return Check_Error;
     }
 
     bh_imap_init(&switchnode->case_map, global_heap_allocator, bh_arr_length(switchnode->cases) * 2);
@@ -214,10 +226,10 @@ b32 check_switch(AstSwitch* switchnode) {
     switchnode->min_case = 0xffffffffffffffff;
 
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
-        if (check_block(sc->block)) return 1;
+        CHECK(block, sc->block);
 
         bh_arr_each(AstTyped *, value, sc->values) {
-            if (check_expression(value)) return 1;
+            CHECK(expression, value);
 
             if ((*value)->kind == Ast_Kind_Range_Literal) {
                 AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
@@ -232,8 +244,10 @@ b32 check_switch(AstSwitch* switchnode) {
                 i64 upper = ((AstNumLit *) rl->high)->value.l;
 
                 // NOTE: This is inclusive!!!!
-                fori (case_value, lower, upper + 1)
-                    add_case_to_switch_statement(switchnode, case_value, sc->block, rl->token->pos);
+                fori (case_value, lower, upper + 1) {
+                    if (add_case_to_switch_statement(switchnode, case_value, sc->block, rl->token->pos))
+                        return Check_Error;
+                }
 
                 continue;
             }
@@ -244,18 +258,19 @@ b32 check_switch(AstSwitch* switchnode) {
 
             if ((*value)->kind != Ast_Kind_NumLit) {
                 onyx_report_error((*value)->token->pos, "case statement expected compile time known integer");
-                return 1;
+                return Check_Error;
             }
 
             resolve_expression_type((*value));
             promote_numlit_to_larger((AstNumLit *) (*value));
 
-            add_case_to_switch_statement(switchnode, ((AstNumLit *) (*value))->value.l, sc->block, sc->block->token->pos);
+            if (add_case_to_switch_statement(switchnode, ((AstNumLit *) (*value))->value.l, sc->block, sc->block->token->pos))
+                return Check_Error;
         }
     }
 
     if (switchnode->default_case)
-        check_block(switchnode->default_case);
+        CHECK(block, switchnode->default_case);
 
     return 0;
 }
@@ -315,7 +330,7 @@ typedef enum ArgState {
     AS_Expecting_Untyped_VA,
 } ArgState;
 
-b32 check_call(AstCall* call) {
+CheckStatus check_call(AstCall* call) {
     // All the things that need to be done when checking a call node.
     //      1. Ensure the callee is not a symbol
     //      2. Check the callee expression (since it could be a variable or a field access, etc)
@@ -329,7 +344,7 @@ b32 check_call(AstCall* call) {
     //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
     //      9. Check types of formal and actual params against each other, handling varargs
 
-    if (check_expression(&call->callee)) return 1;
+    CHECK(expression, &call->callee);
     AstFunction* callee = (AstFunction *) call->callee;
 
     bh_arr(AstArgument *) arg_arr = NULL;
@@ -338,13 +353,13 @@ b32 check_call(AstCall* call) {
     // NOTE: Check arguments
     AstArgument* actual = call->arguments;
     while (actual != NULL) {
-        if (check_expression((AstTyped **) &actual)) return 1;
+        CHECK(expression, (AstTyped **) &actual);
 
         if (actual->value->kind == Ast_Kind_Overloaded_Function) {
             onyx_report_error(actual->token->pos,
                 "Cannot pass overloaded function '%b' as argument.",
                 actual->value->token->text, actual->value->token->length);
-            return 1;
+            return Check_Error;
         }
 
         bh_arr_push(arg_arr, actual);
@@ -355,7 +370,7 @@ b32 check_call(AstCall* call) {
         call->callee = match_overloaded_function(call, (AstOverloadedFunction *) callee);
         callee = (AstFunction *) call->callee;
 
-        if (callee == NULL) return 1;
+        if (callee == NULL) return Check_Error;
     }
 
     if (callee->kind == Ast_Kind_Polymorphic_Proc) {
@@ -365,7 +380,7 @@ b32 check_call(AstCall* call) {
                 call,
                 call->token->pos);
 
-        if (call->callee == NULL) return 1;
+        if (call->callee == NULL) return Check_Error;
 
         callee = (AstFunction *) call->callee;
     }
@@ -377,7 +392,7 @@ b32 check_call(AstCall* call) {
         onyx_report_error(call->token->pos,
                 "Attempting to call something that is not a function, '%b'.",
                 callee->token->text, callee->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (callee->kind == Ast_Kind_Function) {
@@ -411,7 +426,7 @@ b32 check_call(AstCall* call) {
         } else {
             onyx_report_error(callee->token->pos, "Intrinsic not supported, '%s'.", intr_name);
             token_toggle_end(callee->intrinsic_name);
-            return 1;
+            return Check_Error;
         }
 
         token_toggle_end(callee->intrinsic_name);
@@ -454,7 +469,7 @@ b32 check_call(AstCall* call) {
                             arg_pos + 1,
                             bh_num_suffix(arg_pos + 1),
                             type_get_name(arg_arr[arg_pos]->value->type));
-                    return 1;
+                    return Check_Error;
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Not_VA;
@@ -473,7 +488,7 @@ b32 check_call(AstCall* call) {
                             variadic_param->local->token->text,
                             variadic_param->local->token->length,
                             type_get_name(arg_arr[arg_pos]->value->type));
-                    return 1;
+                    return Check_Error;
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Typed;
@@ -498,45 +513,45 @@ type_checking_done:
 
     if (arg_pos < callee->type->Function.needed_param_count) {
         onyx_report_error(call->token->pos, "Too few arguments to function call.");
-        return 1;
+        return Check_Error;
     }
 
     if (arg_pos < (u32) bh_arr_length(arg_arr)) {
         onyx_report_error(call->token->pos, "Too many arguments to function call.");
-        return 1;
+        return Check_Error;
     }
 
     callee->flags |= Ast_Flag_Function_Used;
     call->arg_arr = arg_arr;
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
+CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     if (!assignment_is_ok) {
         onyx_report_error(binop->token->pos, "Assignment not valid in expression.");
-        return 1;
+        return Check_Error;
     }
 
     if (!is_lval((AstNode *) binop->left)) {
         onyx_report_error(binop->left->token->pos,
                 "Cannot assign to '%b'.",
                 binop->left->token->text, binop->left->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL) {
         onyx_report_error(binop->token->pos,
                 "Cannot assign to constant '%b.'.",
                 binop->left->token->text, binop->left->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (binop->right->type == NULL) {
         onyx_report_error(binop->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (binop->operation == Binary_Op_Assign) {
@@ -575,7 +590,7 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         binop->right = (AstTyped *) binop_node;
         binop->operation = Binary_Op_Assign;
 
-        if (check_binaryop(&binop_node, 0)) return 1;
+        CHECK(binaryop, &binop_node, 0);
     }
 
     if (!type_check_or_auto_cast(&binop->right, binop->left->type)) {
@@ -583,39 +598,39 @@ b32 check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
                 "Cannot assign value of type '%s' to a '%s'.",
                 type_get_name(binop->right->type),
                 type_get_name(binop->left->type));
-        return 1;
+        return Check_Error;
     }
 
     binop->type = &basic_types[Basic_Kind_Void];
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_binaryop_compare(AstBinaryOp** pbinop) {
+CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
     if (binop->left->type == NULL) {
         onyx_report_error(binop->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->left->token->text, binop->left->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (binop->right->type == NULL) {
         onyx_report_error(binop->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (type_is_structlike_strict(binop->left->type)) {
         onyx_report_error(binop->token->pos, "Invalid type for left side of comparison operator.");
-        return 1;
+        return Check_Error;
     }
 
     if (type_is_structlike_strict(binop->right->type)) {
         onyx_report_error(binop->token->pos, "Invalid type for right side of comparison operator.");
-        return 1;
+        return Check_Error;
     }
 
     // HACK: Since ^... to rawptr is a one way conversion, strip any pointers
@@ -633,7 +648,7 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
 
         if (left_ac && right_ac) {
             onyx_report_error(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
-            return 1;
+            return Check_Error;
         }
         else if (type_check_or_auto_cast(&binop->left, rtype));
         else if (type_check_or_auto_cast(&binop->right, ltype));
@@ -642,7 +657,7 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
                     "Cannot compare '%s' to '%s'.",
                     type_get_name(ltype),
                     type_get_name(rtype));
-            return 1;
+            return Check_Error;
         }
     }
 
@@ -652,29 +667,29 @@ b32 check_binaryop_compare(AstBinaryOp** pbinop) {
         *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_binaryop_bool(AstBinaryOp** pbinop) {
+CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
     if (binop->left->type == NULL) {
         onyx_report_error(binop->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->left->token->text, binop->left->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (binop->right->type == NULL) {
         onyx_report_error(binop->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
         onyx_report_error(binop->token->pos, "Boolean operator expects boolean types for both operands.");
-        return 1;
+        return Check_Error;
     }
 
     binop->type = &basic_types[Basic_Kind_Bool];
@@ -683,16 +698,14 @@ b32 check_binaryop_bool(AstBinaryOp** pbinop) {
         // NOTE: Not a binary op
         *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
     }
-    return 0;
+    return Check_Success;
 }
 
-b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
+CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     AstBinaryOp* binop = *pbinop;
 
-    if (check_expression(&binop->left)) return 1;
-    if (check_expression(&binop->right)) return 1;
-    // resolve_expression_type(binop->left);
-    // resolve_expression_type(binop->right);
+    CHECK(expression, &binop->left);
+    CHECK(expression, &binop->right);
 
     if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
         binop->flags |= Ast_Flag_Comptime;
@@ -708,53 +721,53 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         onyx_report_error(binop->left->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->left->token->text, binop->left->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (binop->right->type == NULL) {
         onyx_report_error(binop->right->token->pos,
                 "Unable to resolve type for symbol '%b'.",
                 binop->right->token->text, binop->right->token->length);
-        return 1;
+        return Check_Error;
     }
 
     if (!type_is_numeric(binop->left->type) && !type_is_pointer(binop->left->type)) {
         onyx_report_error(binop->token->pos,
                 "Expected numeric or pointer type for left side of binary operator, got '%s'.",
                 type_get_name(binop->left->type));
-        return 1;
+        return Check_Error;
     }
 
     if (!type_is_numeric(binop->right->type)) {
         onyx_report_error(binop->token->pos,
                 "Expected numeric type for right side of binary operator, got '%s'.",
                 type_get_name(binop->right->type));
-        return 1;
+        return Check_Error;
     }
 
     if (type_is_pointer(binop->right->type)) {
         onyx_report_error(binop->token->pos, "Right side of a binary operator cannot be a pointer.");
-        return 1;
+        return Check_Error;
     }
 
     if (binop->left->type->kind == Type_Kind_Basic
         && binop->left->type->Basic.kind == Basic_Kind_Rawptr) {
         onyx_report_error(binop->token->pos, "Cannot operate on a 'rawptr'. Cast it to a another pointer type first.");
-        return 1;
+        return Check_Error;
     }
     
     // CLEANUP: Remove this check since it is kind of redundant with the code below.
     b32 lptr = type_is_pointer(binop->left->type);
     if (lptr && (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus)) {
         onyx_report_error(binop->token->pos, "This operator is not supported for these operands.");
-        return 1;
+        return Check_Error;
     }
 
     if (lptr) {
         resolve_expression_type(binop->right);
         if (!type_is_integer(binop->right->type)) {
             onyx_report_error(binop->right->token->pos, "Expected integer type.");
-            return 1;
+            return Check_Error;
         }
 
         AstNumLit* numlit = onyx_ast_node_new(
@@ -777,7 +790,7 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         binop_node->type  = binop->right->type;
         binop_node->operation = Binary_Op_Multiply;
 
-        if (check_binaryop(&binop_node, 0)) return 1;
+        CHECK(binaryop, &binop_node, 0);
 
         binop->right = (AstTyped *) binop_node;
         binop->type = binop->left->type;
@@ -790,16 +803,17 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
 
         if (left_ac && right_ac) {
             onyx_report_error(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
-            return 1;
+            return Check_Error;
         }
         else if (type_check_or_auto_cast(&binop->left, binop->right->type));
         else if (type_check_or_auto_cast(&binop->right, binop->left->type));
         else {
             onyx_report_error(binop->token->pos,
-                    "Mismatched types for binary operation. left: '%s', right: '%s'.",
+                    "Mismatched types for binary operation '%s'. left: '%s', right: '%s'.",
+                    binaryop_string[binop->operation],
                     type_get_name(binop->left->type),
                     type_get_name(binop->right->type));
-            return 1;
+            return Check_Error;
         }
     }
 
@@ -858,20 +872,20 @@ b32 check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     if ((binop_allowed[binop->operation] & effective_flags) == 0) {
         onyx_report_error(binop->token->pos, "Binary operator not allowed for arguments of type '%s'.",
                 type_get_name(binop->type));
-        return 1;
+        return Check_Error;
     }
 
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
         *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
     }
-    return 0;
+    return Check_Success;
 }
 
-b32 check_unaryop(AstUnaryOp** punop) {
+CheckStatus check_unaryop(AstUnaryOp** punop) {
     AstUnaryOp* unaryop = *punop;
 
-    if (check_expression(&unaryop->expr)) return 1;
+    CHECK(expression, &unaryop->expr);
     resolve_expression_type(unaryop->expr);
 
     if (unaryop->operation != Unary_Op_Cast) {
@@ -883,7 +897,7 @@ b32 check_unaryop(AstUnaryOp** punop) {
             onyx_report_error(unaryop->token->pos,
                     "Bool negation operator expected bool type, got '%s'.",
                     type_get_name(unaryop->expr->type));
-            return 1;
+            return Check_Error;
         }
     }
 
@@ -892,7 +906,7 @@ b32 check_unaryop(AstUnaryOp** punop) {
             onyx_report_error(unaryop->token->pos,
                     "Bitwise operator expected integer type, got '%s'.",
                     type_get_name(unaryop->expr->type));
-            return 1;
+            return Check_Error;
         }
     }
 
@@ -902,10 +916,10 @@ b32 check_unaryop(AstUnaryOp** punop) {
         *punop = (AstUnaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) unaryop);
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_struct_literal(AstStructLiteral* sl) {
+CheckStatus check_struct_literal(AstStructLiteral* sl) {
     fill_in_type((AstTyped *) sl);
 
     i32 mem_count = type_structlike_mem_count(sl->type);
@@ -916,7 +930,7 @@ b32 check_struct_literal(AstStructLiteral* sl) {
                 type_get_name(sl->type),
                 mem_count,
                 bh_arr_length(sl->values));
-        return 1;
+        return Check_Error;
     }
 
     AstTyped** actual = sl->values;
@@ -925,7 +939,7 @@ b32 check_struct_literal(AstStructLiteral* sl) {
     b32 all_comptime = 1;
 
     fori (i, 0, mem_count) {
-        if (check_expression(actual)) return 1;
+        CHECK(expression, actual);
 
         // NOTE: Not checking the return on this function because
         // this for loop is bounded by the number of members in the
@@ -940,7 +954,7 @@ b32 check_struct_literal(AstStructLiteral* sl) {
                     smem.name,
                     type_get_name(formal),
                     type_get_name((*actual)->type));
-            return 1;
+            return Check_Error;
         }
 
         if (((*actual)->flags & Ast_Flag_Comptime) == 0)
@@ -952,10 +966,10 @@ b32 check_struct_literal(AstStructLiteral* sl) {
     if (all_comptime)
         sl->flags |= Ast_Flag_Comptime;
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_array_literal(AstArrayLiteral* al) {
+CheckStatus check_array_literal(AstArrayLiteral* al) {
     fill_in_type((AstTyped *) al);
 
     assert(al->type->kind == Type_Kind_Array);
@@ -963,14 +977,15 @@ b32 check_array_literal(AstArrayLiteral* al) {
     if (al->type->Array.count != (u32) bh_arr_length(al->values)) {
         onyx_report_error(al->token->pos, "Wrong array size (%d) for number of values (%d).",
             al->type->Array.count, bh_arr_length(al->values));
-        return 1;
+        return Check_Error;
     }
 
     b32 all_comptime = 1;
 
     Type* elem_type = al->type->Array.elem;
     bh_arr_each(AstTyped *, expr, al->values) {
-        if (check_expression(expr)) return 1;
+        CHECK(expression, expr);
+
         if (((*expr)->flags & Ast_Flag_Comptime) == 0)
             all_comptime = 0;
 
@@ -978,20 +993,20 @@ b32 check_array_literal(AstArrayLiteral* al) {
             onyx_report_error((*expr)->token->pos, "Mismatched types for value of in array, expected '%s', got '%s'.",
                 type_get_name(elem_type),
                 type_get_name((*expr)->type));
-            return 1;
+            return Check_Error;
         }
     }
     
     if (all_comptime)
         al->flags |= Ast_Flag_Comptime;
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_range_literal(AstRangeLiteral** prange) {
+CheckStatus check_range_literal(AstRangeLiteral** prange) {
     AstRangeLiteral* range = *prange;
-    if (check_expression(&range->low))  return 1;
-    if (check_expression(&range->high)) return 1;
+    CHECK(expression, &range->low);
+    CHECK(expression, &range->high);
 
     Type* expected_range_type = builtin_range_type_type;
     StructMember smem;
@@ -999,28 +1014,28 @@ b32 check_range_literal(AstRangeLiteral** prange) {
     type_lookup_member(expected_range_type, "low", &smem);
     if (!type_check_or_auto_cast(&range->low, smem.type)) {
         onyx_report_error(range->token->pos, "Expected left side of range to be a 32-bit integer.");
-        return 1;
+        return Check_Error;
     }
 
     type_lookup_member(expected_range_type, "high", &smem);
     if (!type_check_or_auto_cast(&range->high, smem.type)) {
         onyx_report_error(range->token->pos, "Expected right side of range to be a 32-bit integer.");
-        return 1;
+        return Check_Error;
     }
 
     if (range->step == NULL) {
         type_lookup_member(expected_range_type, "step", &smem);
         assert(smem.initial_value != NULL);
-        if (check_expression(&smem.initial_value)) return 1;
+        CHECK(expression, &smem.initial_value);
 
         range->step = smem.initial_value;
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_address_of(AstAddressOf* aof) {
-    if (check_expression(&aof->expr)) return 1;
+CheckStatus check_address_of(AstAddressOf* aof) {
+    CHECK(expression, &aof->expr);
 
     if ((aof->expr->kind != Ast_Kind_Array_Access
             && aof->expr->kind != Ast_Kind_Dereference
@@ -1029,43 +1044,43 @@ b32 check_address_of(AstAddressOf* aof) {
             && aof->expr->kind != Ast_Kind_Local)
             || (aof->expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
         onyx_report_error(aof->token->pos, "Cannot take the address of value.");
-        return 1;
+        return Check_Error;
     }
 
     aof->expr->flags |= Ast_Flag_Address_Taken;
 
     aof->type = type_make_pointer(semstate.allocator, aof->expr->type);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_dereference(AstDereference* deref) {
-    if (check_expression(&deref->expr)) return 1;
+CheckStatus check_dereference(AstDereference* deref) {
+    CHECK(expression, &deref->expr);
 
     if (!type_is_pointer(deref->expr->type)) {
         onyx_report_error(deref->token->pos, "Cannot dereference non-pointer value.");
-        return 1;
+        return Check_Error;
     }
 
     if (deref->expr->type == basic_type_rawptr.type) {
         onyx_report_error(deref->token->pos, "Cannot dereference 'rawptr'. Cast to another pointer type first.");
-        return 1;
+        return Check_Error;
     }
 
     deref->type = deref->expr->type->Pointer.elem;
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_array_access(AstArrayAccess* aa) {
-    if (check_expression(&aa->addr)) return 1;
-    if (check_expression(&aa->expr)) return 1;
+CheckStatus check_array_access(AstArrayAccess* aa) {
+    CHECK(expression, &aa->addr);
+    CHECK(expression, &aa->expr);
 
     if (!type_is_array_accessible(aa->addr->type)) {
         onyx_report_error(aa->token->pos,
                 "Expected pointer or array type for left of array access, got '%s'.",
                 type_get_name(aa->addr->type));
-        return 1;
+        return Check_Error;
     }
 
     if (types_are_compatible(aa->expr->type, builtin_range_type_type)) {
@@ -1075,22 +1090,24 @@ b32 check_array_access(AstArrayAccess* aa) {
         else if (aa->addr->type->kind == Type_Kind_Array)
             of = aa->addr->type->Array.elem;
         else {
+            // FIXME: Slice creation should be allowed for slice types and dynamic array types, like it
+            // is below, but this code doesn't look at that.
             onyx_report_error(aa->token->pos, "Invalid type for left of slice creation.");
-            return 1;
+            return Check_Error;
         }
 
         aa->kind = Ast_Kind_Slice;
         aa->type = type_make_slice(semstate.node_allocator, of);
         aa->elem_size = type_size_of(of);
 
-        return 0;
+        return Check_Success;
     }
 
     resolve_expression_type(aa->expr);
     if (aa->expr->type->kind != Type_Kind_Basic
             || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
         onyx_report_error(aa->token->pos, "Expected type u32 or i32 for index.");
-        return 1;
+        return Check_Error;
     }
 
     if (aa->addr->type->kind == Type_Kind_Pointer)
@@ -1118,20 +1135,20 @@ b32 check_array_access(AstArrayAccess* aa) {
     }
     else {
         onyx_report_error(aa->token->pos, "Invalid type for left of array access.");
-        return 1;
+        return Check_Error;
     }
 
     aa->elem_size = type_size_of(aa->type);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_field_access(AstFieldAccess** pfield) {
+CheckStatus check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
-    if (check_expression(&field->expr)) return 1;
+    CHECK(expression, &field->expr);
     if (field->expr->type == NULL) {
         onyx_report_error(field->token->pos, "Unable able to deduce type of expression for accessing field.");
-        return 1;
+        return Check_Error;
     }
 
     if (!type_is_structlike(field->expr->type)) {
@@ -1140,7 +1157,7 @@ b32 check_field_access(AstFieldAccess** pfield) {
             field->token->text,
             field->token->length,
             type_get_name(field->expr->type));
-        return 1;
+        return Check_Error;
     }
 
     if (!is_lval((AstNode *) field->expr)) {
@@ -1148,7 +1165,7 @@ b32 check_field_access(AstFieldAccess** pfield) {
             "Cannot access field '%b'. Expression is not an lval.",
             field->token->text,
             field->token->length);
-        return 1;
+        return Check_Error;
     }
 
     StructMember smem;
@@ -1167,52 +1184,52 @@ b32 check_field_access(AstFieldAccess** pfield) {
             field->field,
             type_get_name(field->expr->type));
 
-        return 1;
+        return Check_Error;
     }
 
     field->offset = smem.offset;
     field->idx = smem.idx;
     field->type = smem.type;
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_size_of(AstSizeOf* so) {
+CheckStatus check_size_of(AstSizeOf* so) {
     fill_in_array_count(so->so_ast_type);
 
     so->so_type = type_build_from_ast(semstate.allocator, so->so_ast_type);
     if (so->so_type == NULL) {
         onyx_report_error(so->token->pos, "Error with type used here.");
-        return 1;
+        return Check_Error;
     }
     so->size = type_size_of(so->so_type);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_align_of(AstAlignOf* ao) {
+CheckStatus check_align_of(AstAlignOf* ao) {
     fill_in_array_count(ao->ao_ast_type);
 
     ao->ao_type = type_build_from_ast(semstate.allocator, ao->ao_ast_type);
     if (ao->ao_type == NULL) {
         onyx_report_error(ao->token->pos, "Error with type used here.");
-        return 1;
+        return Check_Error;
     }
     ao->alignment = type_alignment_of(ao->ao_type);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_expression(AstTyped** pexpr) {
+CheckStatus check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         onyx_report_error(expr->token->pos, "Type used as part of an expression.");
-        return 1;
+        return Check_Error;
     }
 
     fill_in_type(expr);
 
-    i32 retval = 0;
+    CheckStatus retval = Check_Success;
     switch (expr->kind) {
         case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp **) pexpr, 0); break;
         case Ast_Kind_Unary_Op:  retval = check_unaryop((AstUnaryOp **) pexpr); break;
@@ -1224,13 +1241,13 @@ b32 check_expression(AstTyped** pexpr) {
             onyx_report_error(expr->token->pos,
                     "Unable to resolve symbol '%b'.",
                     expr->token->text, expr->token->length);
-            retval = 1;
+            retval = Check_Error;
             break;
 
         case Ast_Kind_Param:
             if (expr->type == NULL) {
                 onyx_report_error(expr->token->pos, "Parameter with unknown type. You should hopefully never see this.");
-                retval = 1;
+                retval = Check_Error;
             }
             break;
 
@@ -1248,7 +1265,7 @@ b32 check_expression(AstTyped** pexpr) {
         case Ast_Kind_Global:
             if (expr->type == NULL) {
                 onyx_report_error(expr->token->pos, "Global with unknown type.");
-                retval = 1;
+                retval = Check_Error;
             }
             break;
 
@@ -1257,8 +1274,7 @@ b32 check_expression(AstTyped** pexpr) {
             break;
 
         case Ast_Kind_NumLit:
-            // NOTE: Literal types should have been decided
-            // in the parser (for now).
+            // NOTE: Literal types should have been decided in the parser (for now).
             assert(expr->type != NULL);
             break;
 
@@ -1294,17 +1310,13 @@ b32 check_expression(AstTyped** pexpr) {
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;
-
         case Ast_Kind_Memres: break;
-
         case Ast_Kind_Polymorphic_Proc: break;
-
         case Ast_Kind_Package: break;
-
         case Ast_Kind_Error: break;
 
         default:
-            retval = 1;
+            retval = Check_Error;
             DEBUG_HERE;
             break;
     }
@@ -1312,7 +1324,7 @@ b32 check_expression(AstTyped** pexpr) {
     return retval;
 }
 
-b32 check_global(AstGlobal* global) {
+CheckStatus check_global(AstGlobal* global) {
     fill_in_type((AstTyped *) global);
 
     if (global->type == NULL) {
@@ -1321,15 +1333,15 @@ b32 check_global(AstGlobal* global) {
                 global->exported_name->text,
                 global->exported_name->length);
 
-        return 1;
+        return Check_Error;
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_statement(AstNode* stmt) {
+CheckStatus check_statement(AstNode* stmt) {
     switch (stmt->kind) {
-        case Ast_Kind_Jump:      return 0;
+        case Ast_Kind_Jump:       return Check_Success;
 
         case Ast_Kind_Return:     return check_return((AstReturn *) stmt);
         case Ast_Kind_If:         return check_if((AstIfWhile *) stmt);
@@ -1349,17 +1361,17 @@ b32 check_statement(AstNode* stmt) {
     }
 }
 
-b32 check_statement_chain(AstNode* start) {
+CheckStatus check_statement_chain(AstNode* start) {
     while (start) {
-        if (check_statement(start)) return 1;
+        CHECK(statement, start);
         start = start->next;
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_block(AstBlock* block) {
-    if (check_statement_chain(block->body)) return 1;
+CheckStatus check_block(AstBlock* block) {
+    CHECK(statement_chain, block->body);
 
     bh_table_each_start(AstTyped *, block->scope->symbols);
         fill_in_type(value);
@@ -1372,45 +1384,43 @@ b32 check_block(AstBlock* block) {
         // }
     bh_table_each_end;
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_function(AstFunction* func) {
+CheckStatus check_function(AstFunction* func) {
     semstate.expected_return_type = func->type->Function.return_type;
-    if (func->body) {
-        return check_block(func->body);
-    }
+    if (func->body) return check_block(func->body);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_overloaded_function(AstOverloadedFunction* func) {
+CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
     bh_arr_each(AstTyped *, node, func->overloads) {
         if ((*node)->kind == Ast_Kind_Overloaded_Function) {
             onyx_report_error((*node)->token->pos, "Overload option can not be another overloaded function.");
 
-            return 1;
+            return Check_Error;
         }
 
         if ((*node)->kind != Ast_Kind_Function) {
             onyx_report_error((*node)->token->pos, "Overload option not function. Got '%s'",
                 onyx_ast_node_kind_string((*node)->kind));
 
-            return 1;
+            return Check_Error;
         }
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_struct(AstStructType* s_node) {
+CheckStatus check_struct(AstStructType* s_node) {
     // NOTE: fills in the stcache
     type_build_from_ast(semstate.allocator, (AstType *) s_node);
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_function_header(AstFunction* func) {
+CheckStatus check_function_header(AstFunction* func) {
     b32 expect_default_param = 0;
     b32 has_had_varargs = 0;
 
@@ -1420,28 +1430,62 @@ b32 check_function_header(AstFunction* func) {
         if (expect_default_param && param->default_value == NULL) {
             onyx_report_error(local->token->pos,
                     "All parameters must have default values after the first default valued parameter.");
-            return 1;
+            return Check_Error;
         }
 
         if (has_had_varargs && param->vararg_kind != VA_Kind_Not_VA) {
             onyx_report_error(local->token->pos,
                     "Can only have one param that is of variable argument type.");
-            return 1;
+            return Check_Error;
         }
 
         if (has_had_varargs && param->vararg_kind != VA_Kind_Not_VA) {
             onyx_report_error(local->token->pos,
                     "Variable arguments must be last in parameter list");
-            return 1;
+            return Check_Error;
         }
 
-        if (param->default_value != NULL) expect_default_param = 1;
+        if (param->vararg_kind == VA_Kind_Untyped) {
+            // HACK
+            if (builtin_vararg_type_type == NULL)
+                builtin_vararg_type_type = type_build_from_ast(semstate.node_allocator, builtin_vararg_type);
+
+            local->type = builtin_vararg_type_type;
+        }
+
+        if (param->default_value != NULL) {
+            if (param->vararg_kind != VA_Kind_Not_VA) {
+                onyx_report_error(local->token->pos, "Variadic arguments cannot have default values.");
+                return Check_Error;
+            }
+
+            CHECK(expression, &param->default_value);
+
+            if (local->type_node == NULL && local->type == NULL) {
+                local->type = resolve_expression_type(param->default_value);
+            }
+
+            expect_default_param = 1;
+        }
 
         fill_in_type((AstTyped *) local);
 
         if (local->type == NULL) {
-            onyx_report_error(local->token->pos, "Function parameter types must be known.");
-            return 1;
+            onyx_report_error(param->local->token->pos,
+                    "Unable to resolve type for parameter, '%b'.\n",
+                    local->token->text,
+                    local->token->length);
+            return Check_Error;
+        }
+
+        if (param->default_value != NULL) {
+            if (!type_check_or_auto_cast(&param->default_value, param->local->type)) {
+                onyx_report_error(param->local->token->pos,
+                        "Expected default value of type '%s', was of type '%s'.",
+                        type_get_name(param->local->type),
+                        type_get_name(param->default_value->type));
+                return Check_Error;
+            }
         }
 
         if (param->vararg_kind != VA_Kind_Not_VA) has_had_varargs = 1;
@@ -1449,7 +1493,7 @@ b32 check_function_header(AstFunction* func) {
         if (local->type->kind != Type_Kind_Array
             && type_size_of(local->type) == 0) {
             onyx_report_error(local->token->pos, "Function parameters cannot have zero-width types.");
-            return 1;
+            return Check_Error;
         }
     }
 
@@ -1458,37 +1502,36 @@ b32 check_function_header(AstFunction* func) {
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {
             onyx_report_error(func->token->pos, "exporting a foreign function");
-            return 1;
+            return Check_Error;
         }
 
         if ((func->flags & Ast_Flag_Intrinsic) != 0) {
             onyx_report_error(func->token->pos, "exporting a intrinsic function");
-            return 1;
+            return Check_Error;
         }
 
         if (func->exported_name == NULL) {
             onyx_report_error(func->token->pos, "exporting function without a name");
-            return 1;
+            return Check_Error;
         }
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_memres_type(AstMemRes* memres) {
+CheckStatus check_memres_type(AstMemRes* memres) {
     fill_in_type((AstTyped *) memres);
-    return 0;
+    return Check_Success;
 }
 
-b32 check_memres(AstMemRes* memres) {
+CheckStatus check_memres(AstMemRes* memres) {
     if (memres->initial_value != NULL) {
-        fill_in_type(memres->initial_value);
-        check_expression(&memres->initial_value);
+        CHECK(expression, &memres->initial_value);
         resolve_expression_type(memres->initial_value);
 
         if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
             onyx_report_error(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
-            return 1;
+            return Check_Error;
         }
 
         if (memres->type != NULL) {
@@ -1498,7 +1541,7 @@ b32 check_memres(AstMemRes* memres) {
                         "Cannot assign value of type '%s' to a '%s'.",
                         type_get_name(memres->initial_value->type),
                         type_get_name(memres_type));
-                return 1;
+                return Check_Error;
             }
 
         } else {
@@ -1506,10 +1549,10 @@ b32 check_memres(AstMemRes* memres) {
         }
     }
 
-    return 0;
+    return Check_Success;
 }
 
-b32 check_node(AstNode* node) {
+CheckStatus check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
         case Ast_Kind_Overloaded_Function:  return check_overloaded_function((AstOverloadedFunction *) node);
@@ -1524,18 +1567,20 @@ b32 check_node(AstNode* node) {
 }
 
 void check_entity(Entity* ent) {
+    CheckStatus cs = Check_Success;
+
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function_Header:
-            if (check_function_header(ent->function)) return;
+            cs = check_function_header(ent->function);
             break;
 
         case Entity_Type_Function:
-            if (check_function(ent->function)) return;
+            cs = check_function(ent->function);
             break;
 
         case Entity_Type_Overloaded_Function:
-            if (check_overloaded_function(ent->overloaded_function)) return;
+            cs = check_overloaded_function(ent->overloaded_function);
             break;
 
         case Entity_Type_Foreign_Global_Header:
@@ -1543,29 +1588,34 @@ void check_entity(Entity* ent) {
             // fallthrough
 
         case Entity_Type_Global:
-            if (check_global(ent->global)) return;
+            cs = check_global(ent->global);
             break;
 
         case Entity_Type_Expression:
-            if (check_expression(&ent->expr)) return;
+            cs = check_expression(&ent->expr);
             resolve_expression_type(ent->expr);
             break;
 
         case Entity_Type_Type_Alias:
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
-                if (check_struct((AstStructType *) ent->type_alias)) return;
+                cs = check_struct((AstStructType *) ent->type_alias);
             break;
 
         case Entity_Type_Memory_Reservation_Type:
-            if (check_memres_type(ent->mem_res)) return;
+            cs = check_memres_type(ent->mem_res);
             break;
 
         case Entity_Type_Memory_Reservation:
-            if (check_memres(ent->mem_res)) return;
+            cs = check_memres(ent->mem_res);
             break;
 
         default: break;
     }
 
-    ent->state = Entity_State_Code_Gen;
+    if (cs == Check_Success) {
+        ent->state = Entity_State_Code_Gen;
+    }
+    // else if (cs == Check_Yield) {
+    //     ent->attempts++;
+    // }
 }

@@ -255,6 +255,8 @@ typedef enum BinaryOp {
     Binary_Op_Count
 } BinaryOp;
 
+extern const char *binaryop_string[Binary_Op_Count];
+
 typedef enum OnyxIntrinsic {
     ONYX_INTRINSIC_UNDEFINED,
 

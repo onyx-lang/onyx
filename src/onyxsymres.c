@@ -691,8 +691,6 @@ void symres_function_header(AstFunction* func) {
             //                                                      -brendanfh 2020/12/24
             symres_expression(&param->default_value);
             if (onyx_has_errors()) return;
-
-            if (check_expression(&param->default_value)) return;
         }
     }
 
@@ -720,40 +718,15 @@ void symres_function_header(AstFunction* func) {
     bh_arr_each(AstParam, param, func->params) {
         if (param->local->type_node != NULL) {
             param->local->type_node = symres_type(param->local->type_node);
-            param->local->type = type_build_from_ast(semstate.node_allocator, param->local->type_node);
-
-            if (param->default_value != NULL) {
-                if (!type_check_or_auto_cast(&param->default_value, param->local->type)) {
-                    onyx_report_error(param->local->token->pos,
-                            "Expected default value of type '%s', was of type '%s'.",
-                            type_get_name(param->local->type),
-                            type_get_name(param->default_value->type));
-                    return;
-                }
-            }
-
-        } else if (param->default_value != NULL) {
-            param->local->type = resolve_expression_type(param->default_value);
-
-        } else if (param->vararg_kind == VA_Kind_Untyped) {
-            // HACK
-            if (builtin_vararg_type_type == NULL)
-                builtin_vararg_type_type = type_build_from_ast(semstate.node_allocator, builtin_vararg_type);
-
-            param->local->type = builtin_vararg_type_type;
-        }
-
-        if (param->local->type == NULL) {
-            onyx_report_error(param->local->token->pos,
-                    "Unable to resolve type for parameter, '%b'.\n",
-                    param->local->token->text,
-                    param->local->token->length);
-            return;
         }
 
         symbol_introduce(semstate.curr_scope, param->local->token, (AstNode *) param->local);
 
         if (param->local->flags & Ast_Flag_Param_Use) {
+            if (param->local->type_node != NULL && param->local->type == NULL) {
+                param->local->type = type_build_from_ast(semstate.allocator, param->local->type_node);
+            }
+
             if (type_is_struct(param->local->type)) {
                 Type* st;
                 if (param->local->type->kind == Type_Kind_Struct) {
@@ -767,8 +740,12 @@ void symres_function_header(AstFunction* func) {
                     symbol_raw_introduce(semstate.curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
                 bh_table_each_end;
 
+            } else if (param->local->type != NULL) {
+                onyx_report_error(param->local->token->pos, "Can only 'use' structures or pointers to structures.");
             } else {
-                onyx_report_error(param->local->token->pos, "can only 'use' structures or pointers to structures.");
+                onyx_report_error(param->local->token->pos, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
+                    param->local->token->text,
+                    param->local->token->length);
             }
         }
     }
@@ -851,6 +828,7 @@ static void symres_enum(AstEnumType* enum_node) {
     u64 next_assign_value = (enum_node->flags & Ast_Flag_Enum_Is_Flags) ? 1 : 0;
     bh_arr_each(AstEnumValue *, value, enum_node->values) {
         symbol_introduce(enum_node->scope, (*value)->token, (AstNode *) *value);
+        (*value)->type = enum_node->etcache;
 
         if ((*value)->value != NULL) {
             // HACK
