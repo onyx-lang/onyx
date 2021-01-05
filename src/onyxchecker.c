@@ -187,7 +187,7 @@ b32 check_for(AstFor* fornode) {
     return 0;
 }
 
-static b32 add_case_to_switch_statement(AstSwitch* switchnode, i64 case_value, AstBlock* block, OnyxFilePos pos) {
+static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, AstBlock* block, OnyxFilePos pos) {
     switchnode->min_case = bh_min(switchnode->min_case, case_value);
     switchnode->max_case = bh_max(switchnode->max_case, case_value);
 
@@ -426,7 +426,7 @@ b32 check_call(AstCall* call) {
     AstParam* variadic_param = NULL;
 
     ArgState arg_state = AS_Expecting_Exact;
-    i32 arg_pos = 0;
+    u32 arg_pos = 0;
     while (1) {
         switch (arg_state) {
             case AS_Expecting_Exact: {
@@ -445,7 +445,7 @@ b32 check_call(AstCall* call) {
                     continue;
                 }
 
-                if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
+                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(&arg_arr[arg_pos]->value, formal_params[arg_pos])) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
@@ -464,7 +464,7 @@ b32 check_call(AstCall* call) {
             case AS_Expecting_Typed_VA: {
                 call->va_kind = VA_Kind_Typed;
 
-                if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
+                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(&arg_arr[arg_pos]->value, variadic_type)) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The procedure '%s' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
@@ -483,7 +483,7 @@ b32 check_call(AstCall* call) {
             case AS_Expecting_Untyped_VA: {
                 call->va_kind = VA_Kind_Untyped;
 
-                if (arg_pos >= bh_arr_length(arg_arr)) goto type_checking_done;
+                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 resolve_expression_type(arg_arr[arg_pos]->value);
                 arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
@@ -501,7 +501,7 @@ type_checking_done:
         return 1;
     }
 
-    if (arg_pos < bh_arr_length(arg_arr)) {
+    if (arg_pos < (u32) bh_arr_length(arg_arr)) {
         onyx_report_error(call->token->pos, "Too many arguments to function call.");
         return 1;
     }
@@ -908,7 +908,7 @@ b32 check_unaryop(AstUnaryOp** punop) {
 b32 check_struct_literal(AstStructLiteral* sl) {
     fill_in_type((AstTyped *) sl);
 
-    u32 mem_count = type_structlike_mem_count(sl->type);
+    i32 mem_count = type_structlike_mem_count(sl->type);
 
     if (mem_count != bh_arr_length(sl->values)) {
         onyx_report_error(sl->token->pos,
@@ -960,7 +960,7 @@ b32 check_array_literal(AstArrayLiteral* al) {
 
     assert(al->type->kind == Type_Kind_Array);
 
-    if (al->type->Array.count != bh_arr_length(al->values)) {
+    if (al->type->Array.count != (u32) bh_arr_length(al->values)) {
         onyx_report_error(al->token->pos, "Wrong array size (%d) for number of values (%d).",
             al->type->Array.count, bh_arr_length(al->values));
         return 1;

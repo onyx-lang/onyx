@@ -98,19 +98,6 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     return token;
 }
 
-static OnyxToken* soft_expect_token(OnyxParser* parser, TokenType token_type) {
-    if (parser->hit_unexpected_token) return NULL;
-
-    OnyxToken* token = parser->curr;
-
-    if (token->type == token_type) {
-        consume_token(parser);
-        return token;
-    }
-
-    return NULL;
-}
-
 static void add_node_to_process(OnyxParser* parser, AstNode* node) {
     Scope* scope = parser->file_scope;
 
@@ -137,15 +124,6 @@ static AstNumLit* make_int_literal(bh_allocator a, i64 i) {
     num->value.l = i;
     return num;
 }
-
-static AstUnaryOp* wrap_in_auto_cast(bh_allocator a, AstTyped* expr) {
-    AstUnaryOp* ac = onyx_ast_node_new(a, sizeof(AstUnaryOp), Ast_Kind_Unary_Op);
-    ac->operation = Unary_Op_Auto_Cast;
-    ac->token = expr->token;
-    ac->expr = expr;
-    return ac;
-}
-
 
 static AstNumLit* parse_int_literal(OnyxParser* parser) {
     AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
@@ -738,7 +716,7 @@ static AstTyped* parse_expression(OnyxParser* parser) {
     while (1) {
         if (parser->hit_unexpected_token) return root;
 
-        bin_op_kind = -1;
+        bin_op_kind = Binary_Op_Count;
         switch ((u16) parser->curr->type) {
             case Token_Type_Equal_Equal:       bin_op_kind = Binary_Op_Equal; break;
             case Token_Type_Not_Equal:         bin_op_kind = Binary_Op_Not_Equal; break;
@@ -781,7 +759,7 @@ static AstTyped* parse_expression(OnyxParser* parser) {
             default: goto expression_done;
         }
 
-        if (bin_op_kind != -1) {
+        if (bin_op_kind != Binary_Op_Count) {
             bin_op_tok = parser->curr;
             consume_token(parser);
 
@@ -1452,7 +1430,7 @@ static AstType* parse_type(OnyxParser* parser) {
                 return_type = parse_type(parser);
             }
 
-            u64 param_count = bh_arr_length(params);
+            i64 param_count = bh_arr_length(params);
             AstFunctionType* new = onyx_ast_node_new(parser->allocator,
                     sizeof(AstFunctionType) + sizeof(AstType*) * param_count,
                     Ast_Kind_Function_Type);
@@ -1755,7 +1733,7 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
     expect_token(parser, '#');
     OnyxToken* sym = expect_token(parser, Token_Type_Symbol);
 
-    b32 match = (strlen(dir) == sym->length) && (strncmp(dir, sym->text, sym->length) == 0);
+    b32 match = (strlen(dir) == (u64) sym->length) && (strncmp(dir, sym->text, sym->length) == 0);
     if (!match) {
         unconsume_token(parser);
         unconsume_token(parser);

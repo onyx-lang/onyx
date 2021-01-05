@@ -341,7 +341,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 		case Ast_Kind_Function_Type:
 			((AstFunctionType *) nn)->return_type = (AstType *) ast_clone(a, ((AstFunctionType *) node)->return_type);
 			((AstFunctionType *) nn)->param_count = ((AstFunctionType *) node)->param_count;
-			fori (i, 0, ((AstFunctionType *) nn)->param_count) {
+			fori (i, 0, (i64) ((AstFunctionType *) nn)->param_count) {
 				((AstFunctionType *) nn)->params[i] = (AstType *) ast_clone(a, ((AstFunctionType *) node)->params[i]);
 			}
 			break;

@@ -97,7 +97,7 @@ static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, 
     while (*ptr2 != '\0' && *ptr1 == *ptr2) ptr1++, ptr2++, len++;
     if (*ptr2 != '\0') return 0;
 
-    if (is_word && char_is_alphanum(*ptr1) || *ptr1 == '_')
+    if (is_word && (char_is_alphanum(*ptr1) || *ptr1 == '_'))
         return 0;
 
     tk->type = type;

@@ -87,7 +87,7 @@ AstType* symres_type(AstType* type) {
         ftype->return_type = symres_type(ftype->return_type);
 
         if (ftype->param_count > 0)
-            fori (i, 0, ftype->param_count) {
+            fori (i, 0, (i64) ftype->param_count) {
                 ftype->params[i] = symres_type(ftype->params[i]);
             }
 
@@ -928,7 +928,7 @@ static void symres_polyproc(AstPolyProc* pp) {
 void symres_entity(Entity* ent) {
     if (ent->package) semstate.curr_package = ent->package;
 
-    Scope* old_scope;
+    Scope* old_scope = NULL;
     if (ent->scope) {
         old_scope = semstate.curr_scope;
         scope_enter(ent->scope);

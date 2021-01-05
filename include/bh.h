@@ -92,6 +92,7 @@ i64 chars_match(char* ptr1, char* ptr2);
 #define bh_min(a, b)         ((a) < (b) ? (a) : (b))
 #define bh_clamp(v, a, b)    (bh_min((b), bh_max((a), (v))))
 #define bh_abs(x)            ((x) < 0 ? -(x) : (x))
+#define size_of(x)           (isize) sizeof(x)
 
 static inline u64 log2_dumb(u64 n) {
     switch (n) {
@@ -960,7 +961,7 @@ BH_ALLOCATOR_PROC(bh_managed_heap_allocator_proc) {
 
 // ARENA ALLOCATOR IMPLEMENTATION
 void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size) {
-    arena_size = bh_max(arena_size, sizeof(ptr));
+    arena_size = bh_max(arena_size, size_of(ptr));
     ptr data = bh_alloc(backing, arena_size);
 
     alloc->backing = backing;
@@ -1004,7 +1005,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
         // TODO: Do this better because right now bh__align is bad
         // size = bh__align(size, alignment);
-        if (size > alloc_arena->arena_size - sizeof(ptr)) {
+        if (size > alloc_arena->arena_size - size_of(ptr)) {
             // Size too large for the arena
             return NULL;
         }
@@ -1229,7 +1230,7 @@ char* bh_strdup(bh_allocator a, char* str) {
     char* buf = bh_alloc(a, len + 1);
 
     char* t = buf;
-    while (*t++ = *str++);
+    while ((*t++ = *str++));
     return buf;
 }
 
@@ -1699,7 +1700,7 @@ isize bh__printi64(char* str, isize n, bh__print_format format, i64 value) {
     char* walker = buf + 127;
     u32 base = format.base ? format.base : 10, tmp;
 
-    b32 negative = value < 0;
+    b32 negative = value < 0 ? 1 : 0;
     if (negative) value = -value;
 
     if (value == 0) {
@@ -2068,7 +2069,7 @@ b32 bh__table_init(bh_allocator allocator, bh__table **table, i32 table_size) {
 b32 bh__table_free(bh__table **table) {
     if (*table == NULL) return 0;
 
-    for (i32 i = 0; i < (*table)->table_size; i++) {
+    for (u64 i = 0; i < (*table)->table_size; i++) {
         if ((*table)->arrs[i] != NULL) {
             bh_arr_free((*table)->arrs[i]);
         }
@@ -2219,7 +2220,7 @@ found_matching:
 }
 
 void bh__table_clear(bh__table *table) {
-    for (i32 i = 0; i < table->table_size; i++) {
+    for (u64 i = 0; i < table->table_size; i++) {
         if (table->arrs[i] != NULL) {
             // NOTE: Set length property to 0
             *((u64 *) table->arrs[i]) = 0;

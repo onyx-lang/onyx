@@ -208,6 +208,8 @@ static void compiler_state_free(CompilerState* cs) {
     bh_arena_free(&cs->ast_arena);
     bh_arena_free(&cs->sp_arena);
     bh_table_free(cs->loaded_files);
+
+    compile_opts_free(cs->options);
 }
 
 // NOTE: This should not be called until immediately before using the return value.

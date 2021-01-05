@@ -285,7 +285,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             func_type->Function.return_type = type_build_from_ast(alloc, ftype_node->return_type);
 
             if (param_count > 0)
-                fori (i, 0, param_count) {
+                fori (i, 0, (i64) param_count) {
                     func_type->Function.params[i] = type_build_from_ast(alloc, ftype_node->params[i]);
                 }
 

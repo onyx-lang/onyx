@@ -493,7 +493,7 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
 
                 AstFunctionType* ft = (AstFunctionType *) elem.type_expr;
 
-                fori (i, 0, ft->param_count) {
+                fori (i, 0, (i64) ft->param_count) {
                     bh_arr_push(elem_queue, ((PolySolveElem) {
                         .type_expr = ft->params[i],
                         .actual = elem.actual->Function.params[i],
@@ -528,7 +528,6 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
         }
     }
 
-solving_done:
     bh_arr_free(elem_queue);
 
     return result;
@@ -563,7 +562,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
                 return NULL;
             }
 
-            fori (i, 0, param->idx) arg = (AstArgument *) arg->next;
+            fori (i, 0, (i64) param->idx) arg = (AstArgument *) arg->next;
             actual_type = resolve_expression_type(arg->value);
         }
 

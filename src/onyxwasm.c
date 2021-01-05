@@ -21,188 +21,6 @@ OnyxWasmModule global_wasm_module;
 #define WASM_TYPE_VOID    'E'
 #endif
 
-static const char* wi_string(WasmInstructionType wit) {
-    switch (wit) {
-        case WI_UNREACHABLE: return "WI_UNREACHABLE";
-        case WI_NOP: return "WI_NOP";
-        case WI_BLOCK_START: return "WI_BLOCK_START";
-        case WI_BLOCK_END: return "WI_BLOCK_END";
-        case WI_LOOP_START: return "WI_LOOP_START";
-        case WI_IF_START: return "WI_IF_START";
-        case WI_ELSE: return "WI_ELSE";
-        case WI_JUMP: return "WI_JUMP";
-        case WI_COND_JUMP: return "WI_COND_JUMP";
-        case WI_JUMP_TABLE: return "WI_JUMP_TABLE";
-        case WI_RETURN: return "WI_RETURN";
-        case WI_CALL: return "WI_CALL";
-        case WI_CALL_INDIRECT: return "WI_CALL_INDIRECT";
-        case WI_DROP: return "WI_DROP";
-        case WI_SELECT: return "WI_SELECT";
-        case WI_LOCAL_GET: return "WI_LOCAL_GET";
-        case WI_LOCAL_SET: return "WI_LOCAL_SET";
-        case WI_LOCAL_TEE: return "WI_LOCAL_TEE";
-        case WI_GLOBAL_GET: return "WI_GLOBAL_GET";
-        case WI_GLOBAL_SET: return "WI_GLOBAL_SET";
-        case WI_I32_LOAD: return "WI_I32_LOAD";
-        case WI_I64_LOAD: return "WI_I64_LOAD";
-        case WI_F32_LOAD: return "WI_F32_LOAD";
-        case WI_F64_LOAD: return "WI_F64_LOAD";
-        case WI_I32_LOAD_8_S: return "WI_I32_LOAD_8_S";
-        case WI_I32_LOAD_8_U: return "WI_I32_LOAD_8_U";
-        case WI_I32_LOAD_16_S: return "WI_I32_LOAD_16_S";
-        case WI_I32_LOAD_16_U: return "WI_I32_LOAD_16_U";
-        case WI_I64_LOAD_8_S: return "WI_I64_LOAD_8_S";
-        case WI_I64_LOAD_8_U: return "WI_I64_LOAD_8_U";
-        case WI_I64_LOAD_16_S: return "WI_I64_LOAD_16_S";
-        case WI_I64_LOAD_16_U: return "WI_I64_LOAD_16_U";
-        case WI_I64_LOAD_32_S: return "WI_I64_LOAD_32_S";
-        case WI_I64_LOAD_32_U: return "WI_I64_LOAD_32_U";
-        case WI_I32_STORE: return "WI_I32_STORE";
-        case WI_I64_STORE: return "WI_I64_STORE";
-        case WI_F32_STORE: return "WI_F32_STORE";
-        case WI_F64_STORE: return "WI_F64_STORE";
-        case WI_I32_STORE_8: return "WI_I32_STORE_8";
-        case WI_I32_STORE_16: return "WI_I32_STORE_16";
-        case WI_I64_STORE_8: return "WI_I64_STORE_8";
-        case WI_I64_STORE_16: return "WI_I64_STORE_16";
-        case WI_I64_STORE_32: return "WI_I64_STORE_32";
-        case WI_MEMORY_SIZE: return "WI_MEMORY_SIZE";
-        case WI_MEMORY_GROW: return "WI_MEMORY_GROW";
-        case WI_I32_CONST: return "WI_I32_CONST";
-        case WI_I64_CONST: return "WI_I64_CONST";
-        case WI_F32_CONST: return "WI_F32_CONST";
-        case WI_F64_CONST: return "WI_F64_CONST";
-        case WI_I32_EQZ: return "WI_I32_EQZ";
-        case WI_I32_EQ: return "WI_I32_EQ";
-        case WI_I32_NE: return "WI_I32_NE";
-        case WI_I32_LT_S: return "WI_I32_LT_S";
-        case WI_I32_LT_U: return "WI_I32_LT_U";
-        case WI_I32_GT_S: return "WI_I32_GT_S";
-        case WI_I32_GT_U: return "WI_I32_GT_U";
-        case WI_I32_LE_S: return "WI_I32_LE_S";
-        case WI_I32_LE_U: return "WI_I32_LE_U";
-        case WI_I32_GE_S: return "WI_I32_GE_S";
-        case WI_I32_GE_U: return "WI_I32_GE_U";
-        case WI_I64_EQZ: return "WI_I64_EQZ";
-        case WI_I64_EQ: return "WI_I64_EQ";
-        case WI_I64_NE: return "WI_I64_NE";
-        case WI_I64_LT_S: return "WI_I64_LT_S";
-        case WI_I64_LT_U: return "WI_I64_LT_U";
-        case WI_I64_GT_S: return "WI_I64_GT_S";
-        case WI_I64_GT_U: return "WI_I64_GT_U";
-        case WI_I64_LE_S: return "WI_I64_LE_S";
-        case WI_I64_LE_U: return "WI_I64_LE_U";
-        case WI_I64_GE_S: return "WI_I64_GE_S";
-        case WI_I64_GE_U: return "WI_I64_GE_U";
-        case WI_F32_EQ: return "WI_F32_EQ";
-        case WI_F32_NE: return "WI_F32_NE";
-        case WI_F32_LT: return "WI_F32_LT";
-        case WI_F32_GT: return "WI_F32_GT";
-        case WI_F32_LE: return "WI_F32_LE";
-        case WI_F32_GE: return "WI_F32_GE";
-        case WI_F64_EQ: return "WI_F64_EQ";
-        case WI_F64_NE: return "WI_F64_NE";
-        case WI_F64_LT: return "WI_F64_LT";
-        case WI_F64_GT: return "WI_F64_GT";
-        case WI_F64_LE: return "WI_F64_LE";
-        case WI_F64_GE: return "WI_F64_GE";
-        case WI_I32_CLZ: return "WI_I32_CLZ";
-        case WI_I32_CTZ: return "WI_I32_CTZ";
-        case WI_I32_POPCNT: return "WI_I32_POPCNT";
-        case WI_I32_ADD: return "WI_I32_ADD";
-        case WI_I32_SUB: return "WI_I32_SUB";
-        case WI_I32_MUL: return "WI_I32_MUL";
-        case WI_I32_DIV_S: return "WI_I32_DIV_S";
-        case WI_I32_DIV_U: return "WI_I32_DIV_U";
-        case WI_I32_REM_S: return "WI_I32_REM_S";
-        case WI_I32_REM_U: return "WI_I32_REM_U";
-        case WI_I32_AND: return "WI_I32_AND";
-        case WI_I32_OR: return "WI_I32_OR";
-        case WI_I32_XOR: return "WI_I32_XOR";
-        case WI_I32_SHL: return "WI_I32_SHL";
-        case WI_I32_SHR_S: return "WI_I32_SHR_S";
-        case WI_I32_SHR_U: return "WI_I32_SHR_U";
-        case WI_I32_ROTL: return "WI_I32_ROTL";
-        case WI_I32_ROTR: return "WI_I32_ROTR";
-        case WI_I64_CLZ: return "WI_I64_CLZ";
-        case WI_I64_CTZ: return "WI_I64_CTZ";
-        case WI_I64_POPCNT: return "WI_I64_POPCNT";
-        case WI_I64_ADD: return "WI_I64_ADD";
-        case WI_I64_SUB: return "WI_I64_SUB";
-        case WI_I64_MUL: return "WI_I64_MUL";
-        case WI_I64_DIV_S: return "WI_I64_DIV_S";
-        case WI_I64_DIV_U: return "WI_I64_DIV_U";
-        case WI_I64_REM_S: return "WI_I64_REM_S";
-        case WI_I64_REM_U: return "WI_I64_REM_U";
-        case WI_I64_AND: return "WI_I64_AND";
-        case WI_I64_OR: return "WI_I64_OR";
-        case WI_I64_XOR: return "WI_I64_XOR";
-        case WI_I64_SHL: return "WI_I64_SHL";
-        case WI_I64_SHR_S: return "WI_I64_SHR_S";
-        case WI_I64_SHR_U: return "WI_I64_SHR_U";
-        case WI_I64_ROTL: return "WI_I64_ROTL";
-        case WI_I64_ROTR: return "WI_I64_ROTR";
-        case WI_F32_ABS: return "WI_F32_ABS";
-        case WI_F32_NEG: return "WI_F32_NEG";
-        case WI_F32_CEIL: return "WI_F32_CEIL";
-        case WI_F32_FLOOR: return "WI_F32_FLOOR";
-        case WI_F32_TRUNC: return "WI_F32_TRUNC";
-        case WI_F32_NEAREST: return "WI_F32_NEAREST";
-        case WI_F32_SQRT: return "WI_F32_SQRT";
-        case WI_F32_ADD: return "WI_F32_ADD";
-        case WI_F32_SUB: return "WI_F32_SUB";
-        case WI_F32_MUL: return "WI_F32_MUL";
-        case WI_F32_DIV: return "WI_F32_DIV";
-        case WI_F32_MIN: return "WI_F32_MIN";
-        case WI_F32_MAX: return "WI_F32_MAX";
-        case WI_F32_COPYSIGN: return "WI_F32_COPYSIGN";
-        case WI_F64_ABS: return "WI_F64_ABS";
-        case WI_F64_NEG: return "WI_F64_NEG";
-        case WI_F64_CEIL: return "WI_F64_CEIL";
-        case WI_F64_FLOOR: return "WI_F64_FLOOR";
-        case WI_F64_TRUNC: return "WI_F64_TRUNC";
-        case WI_F64_NEAREST: return "WI_F64_NEAREST";
-        case WI_F64_SQRT: return "WI_F64_SQRT";
-        case WI_F64_ADD: return "WI_F64_ADD";
-        case WI_F64_SUB: return "WI_F64_SUB";
-        case WI_F64_MUL: return "WI_F64_MUL";
-        case WI_F64_DIV: return "WI_F64_DIV";
-        case WI_F64_MIN: return "WI_F64_MIN";
-        case WI_F64_MAX: return "WI_F64_MAX";
-        case WI_F64_COPYSIGN: return "WI_F64_COPYSIGN";
-        case WI_I32_FROM_I64: return "WI_I32_FROM_I64";
-        case WI_I32_FROM_F32_S: return "WI_I32_FROM_F32_S";
-        case WI_I32_FROM_F32_U: return "WI_I32_FROM_F32_U";
-        case WI_I32_FROM_F64_S: return "WI_I32_FROM_F64_S";
-        case WI_I32_FROM_F64_U: return "WI_I32_FROM_F64_U";
-        case WI_I64_FROM_I32_S: return "WI_I64_FROM_I32_S";
-        case WI_I64_FROM_I32_U: return "WI_I64_FROM_I32_U";
-        case WI_I64_FROM_F32_S: return "WI_I64_FROM_F32_S";
-        case WI_I64_FROM_F32_U: return "WI_I64_FROM_F32_U";
-        case WI_I64_FROM_F64_S: return "WI_I64_FROM_F64_S";
-        case WI_I64_FROM_F64_U: return "WI_I64_FROM_F64_U";
-        case WI_F32_FROM_I32_S: return "WI_F32_FROM_I32_S";
-        case WI_F32_FROM_I32_U: return "WI_F32_FROM_I32_U";
-        case WI_F32_FROM_I64_S: return "WI_F32_FROM_I64_S";
-        case WI_F32_FROM_I64_U: return "WI_F32_FROM_I64_U";
-        case WI_F32_FROM_F64: return "WI_F32_FROM_F64";
-        case WI_F64_FROM_I32_S: return "WI_F64_FROM_I32_S";
-        case WI_F64_FROM_I32_U: return "WI_F64_FROM_I32_U";
-        case WI_F64_FROM_I64_S: return "WI_F64_FROM_I64_S";
-        case WI_F64_FROM_I64_U: return "WI_F64_FROM_I64_U";
-        case WI_F64_FROM_F32: return "WI_F64_FROM_F32";
-        case WI_I32_REINTERPRET_F32: return "WI_I32_REINTERPRET_F32";
-        case WI_I64_REINTERPRET_F64: return "WI_I64_REINTERPRET_F64";
-        case WI_F32_REINTERPRET_I32: return "WI_F32_REINTERPRET_I32";
-        case WI_F64_REINTERPRET_I64: return "WI_F64_REINTERPRET_I64";
-        case WI_I32_EXTEND_8_S: return "WI_I32_EXTEND_8_S";
-        case WI_I32_EXTEND_16_S: return "WI_I32_EXTEND_16_S";
-        case WI_I64_EXTEND_8_S: return "WI_I64_EXTEND_8_S";
-        case WI_I64_EXTEND_16_S: return "WI_I64_EXTEND_16_S";
-        case WI_I64_EXTEND_32_S: return "WI_I64_EXTEND_32_S";
-    }
-}
-
 static WasmType onyx_type_to_wasm_type(Type* type) {
     if (type->kind == Type_Kind_Struct) {
         return WASM_TYPE_VOID;
@@ -321,7 +139,7 @@ static u64 local_allocate(LocalAllocator* la, AstTyped* local) {
         if (size % alignment != 0)
             size += alignment - (size % alignment);
 
-        if (la->max_stack - la->curr_stack >= size) {
+        if (la->max_stack - la->curr_stack >= (i32) size) {
             la->curr_stack += size;
         } else {
             la->max_stack += size - (la->max_stack - la->curr_stack);
@@ -617,7 +435,7 @@ EMIT_FUNC(assignment_of_array, AstBinaryOp* assign) {
             if (!type_is_structlike(elem_type))
                 WIL(WI_LOCAL_GET, lptr_local);
 
-            if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == rptr_local)
+            if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == rptr_local)
                 bh_arr_last(code).type = WI_LOCAL_TEE;
             else
                 WIL(WI_LOCAL_GET, rptr_local);
@@ -1415,7 +1233,7 @@ EMIT_FUNC(call, AstCall* call) {
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
     u32 vararg_count = 0;
-    u32 vararg_offset = -1;
+    u32 vararg_offset = 0xffffffff;
     u64 stack_top_store_local;
 
     bh_arr_each(AstArgument *, parg, call->arg_arr) {
@@ -1425,7 +1243,7 @@ EMIT_FUNC(call, AstCall* call) {
         b32 arg_is_struct  = type_is_structlike(arg->value->type);
 
         if (arg->va_kind != VA_Kind_Not_VA) {
-            if (vararg_offset == -1) vararg_offset = stack_grow_amm;
+            if (vararg_offset == 0xffffffff) vararg_offset = stack_grow_amm;
             place_on_stack = 1;
         }
         if (type_get_param_pass(arg->value->type) == Param_Pass_By_Implicit_Pointer) place_on_stack = 1;
@@ -2101,7 +1919,7 @@ EMIT_FUNC(struct_store, Type* type, u64 offset) {
         type_lookup_member_by_idx(type, i, &smem);
 
         if (type_is_structlike_strict(smem.type)) {
-            if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == loc_idx) {
+            if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == loc_idx) {
                 bh_arr_last(code).type = WI_LOCAL_TEE;
             } else {
                 WIL(WI_LOCAL_GET, loc_idx);
@@ -2273,7 +2091,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             u64 tmp = bh_imap_get(&mod->local_map, (u64) expr);
 
             if (tmp & LOCAL_IS_WASM) {
-                if (bh_arr_last(code).type == WI_LOCAL_SET && bh_arr_last(code).data.l == tmp) {
+                if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == tmp) {
                     bh_arr_last(code).type = WI_LOCAL_TEE;
                 } else {
                     WIL(WI_LOCAL_GET, tmp);
@@ -2884,7 +2702,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     // HACK: This is gross
     bh_arr_grow(mod->funcs, func_idx - mod->foreign_function_count + 1);
     mod->funcs[func_idx - mod->foreign_function_count] = wasm_func;
-    bh_arr_set_length(mod->funcs, bh_max(bh_arr_length(mod->funcs), func_idx - mod->foreign_function_count + 1));
+    bh_arr_set_length(mod->funcs, bh_max((u32) bh_arr_length(mod->funcs), func_idx - mod->foreign_function_count + 1));
 
     // NOTE: Clear the local map on exit of generating this function
     bh_imap_clear(&mod->local_map);
@@ -2943,7 +2761,7 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
 
     bh_arr_grow(module->globals, global_idx - module->foreign_global_count + 1);
     module->globals[global_idx - module->foreign_global_count] = glob;
-    bh_arr_set_length(module->globals, bh_max(bh_arr_length(module->globals), global_idx - module->foreign_global_count + 1));
+    bh_arr_set_length(module->globals, bh_max((u32) bh_arr_length(module->globals), global_idx - module->foreign_global_count + 1));
 
     if (global->flags & Ast_Flag_Global_Stack_Top)
         module->stack_top_ptr = &module->globals[global_idx - module->foreign_global_count].initial_value[0].data.i1;
