@@ -228,9 +228,9 @@ static char* lookup_included_file(CompilerState* cs, char* filename) {
         bh_snprintf(fn, 128, "%s", filename);
     }
 
-#ifdef __unix__
+#if defined(_BH_LINUX)
     #define DIR_SEPARATOR '/'
-#elif _WIN32
+#elif defined(_BH_WINDOWS)
     #define DIR_SEPARATOR '\\'
 #endif
 

@@ -1,8 +1,15 @@
 Release v0.0.6
 --------------
 Additions:
+* Compilation on Windows. All you should need is `cl.exe` in the current environment,
+    and then simply run `build.bat`. I haven't thoroughly tested this, but I believe
+    it will work on many systems. ARM / PowerPC may not work correctly.
 * #solidify directive for explicitly specifying type variables in polymorphic procs.
 * properly different kinds of allocators in core/alloc/.
+* `null_proc` in builtin.onyx type matches against all procedure types, allowing for a
+    'null' procedure.
+* '-VV' for very verbose printing. Easier to nail down compiler issues because it stops
+    printing in the entity where the problem is.
 * `map.empty`
 * `string.compare`
 * `array.copy`
@@ -19,15 +26,23 @@ Changes:
     declare top level expressions in the procedure scope. This means that things like structs and
     enums can be declared at any block scope. The top-level expressions currently do not have
     access to polymoprhic variables in the procedure.
+* `#include_file` is now `#load` and `#include_folder` is now `#load_path`. I like the shorter names.
 * enum values are compile time known.
 * struct literals are compile time known can be used at top level scope.
 * range literals are proper things in the compiler code now.
 * polymorphic procedure generation code is much cleaner now, making new polymorphic features easier.
+* procedures can be part of top-level struct literals.
+* `raw_alloc` and `raw_resize` take alignment arguments, with defaults provided.
 
 Bug fixes:
 * polymorphic procedures would get 'confused' when two structs in the program had the same name.
 * function argument type mismatch would give wrong function name.
 * `structs` with `use`d members caused all sorts of problems.
+* bug fix with field access of unknown type causing infinite loop.
+* auto-cast in overloaded function call resulted in no match found, even though there was one.
+* struct member defaults were processed too early in the pipeline, causing errors.
+* assignment of array type with array literal optimization.
+* probably many more since everything is compiled with warnings now.
 
 
 Release v0.0.5
