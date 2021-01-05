@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: make build.sh executable
+      run: chmod +x build.sh
     - name: build onyx
       run: ./build.sh
     - name: run tests
