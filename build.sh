@@ -7,22 +7,24 @@ CC='gcc'
 WARNINGS='-Wimplicit -Wmisleading-indentation -Wmultistatement-macros -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
 
 if [ "$1" = "debug" ]; then
-    FLAGS='-g3 -I./include'
+    FLAGS="$WARNINGS -g3 -I./include"
 else
     FLAGS="$WARNINGS -O3 -I./include"
 fi
 
-BUILD_DIR='./build'
+BUILD_DIR='.'
 mkdir -p "$BUILD_DIR"
 
 for file in $C_FILES ; do
     echo "Compiling $file.c"
-    $CC -o build/$file.o $FLAGS -c src/$file.c
+    $CC -o $BUILD_DIR/$file.o $FLAGS -c src/$file.c
 done
 
-ALL_FILES="$(for file in $C_FILES ; do printf "$BUILD_DIR/%s.o " $file ; done)"
 echo "Linking $TARGET"
-$CC -o $TARGET $FLAGS $ALL_FILES
+$CC -o $TARGET $FLAGS $(for file in $C_FILES ; do printf "$BUILD_DIR/%s.o " $file ; done)
+
+echo "Removing object files"
+for file in $C_FILES ; do rm -f "$BUILD_DIR/$file".o 2>/dev/null ; done
 
 echo "Installing onyx executable"
 BIN_DIR='/usr/bin'
@@ -32,7 +34,6 @@ echo "Installing core libs"
 CORE_DIR='/usr/share/onyx'
 sudo mkdir -p "$CORE_DIR"
 sudo cp -r ./core/ "$CORE_DIR"
-
 
 # Otherwise the prompt ends on the same line
 printf "\n"

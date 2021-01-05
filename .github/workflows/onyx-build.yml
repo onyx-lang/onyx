@@ -13,9 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: add build folder
-      run: mkdir build
-    - name: make
-      run: make
+    - name: build onyx
+      run: ./build.sh
     - name: run tests
       run: ./bin/test
