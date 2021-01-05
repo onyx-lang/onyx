@@ -4,7 +4,7 @@ C_FILES="onyx onyxbuiltins onyxchecker onyxclone onyxdoc onyxentities onyxerrors
 TARGET='./bin/onyx'
 CC='gcc'
 
-WARNINGS='-Wimplicit -Wmisleading-indentation -Wmultistatement-macros -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
+WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
 
 if [ "$1" = "debug" ]; then
     FLAGS="$WARNINGS -g3 -I./include"
