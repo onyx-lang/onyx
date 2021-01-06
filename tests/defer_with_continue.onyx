@@ -1,0 +1,51 @@
+#load "core/std/js"
+
+use package core
+
+main :: proc (args: [] cstr) {
+    defer println("At the end!");
+    i := 0;
+    while i < 10 {
+        defer i += 1;
+        defer printf("Index is %i\n", i);
+
+        if i == 3 {
+            printf("Skipping %i!!\n", i);
+            continue;
+        }
+
+        printf("Doing something with ");
+    }
+    printf("i is %i\n", i);
+
+    println("\n\n===================================");
+    i = 0;
+    while i < 10 {
+        defer i += 1;
+        defer printf("Index is %i\n", i);
+
+        if i == 3 {
+            printf("Skipping %i!!\n", i);
+            break;
+        }
+
+        printf("Doing something with ");
+    }
+    printf("i is %i\n", i);
+
+    println("\n\n===================================");
+    switch i {
+        case 4 {
+            defer println("Deferred!");
+            {
+                defer println("In block deferred!");
+                fallthrough;
+            }
+            println("Case 4!");
+        }
+
+        case #default {
+            println("Default!");
+        }
+    }
+}

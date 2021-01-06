@@ -256,7 +256,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
 
     static const u8 wants[Jump_Type_Count] = { 1, 2, 3 };
 
-    i32 labelidx = 0;
+    u64 labelidx = 0;
     u8 wanted = wants[jump->jump];
     b32 success = 0;
 
@@ -271,6 +271,14 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         }
 
         labelidx++;
+    }
+
+    if (bh_arr_length(mod->deferred_stmts) != 0) {
+        i32 i = bh_arr_length(mod->deferred_stmts) - 1;
+        while (i >= 0 && mod->deferred_stmts[i].depth >= labelidx) {
+            emit_statement(mod, &code, mod->deferred_stmts[i].stmt);
+            i--;
+        }
     }
 
     if (success) {

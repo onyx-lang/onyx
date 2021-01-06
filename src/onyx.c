@@ -234,6 +234,8 @@ static char* lookup_included_file(CompilerState* cs, char* filename) {
     #define DIR_SEPARATOR '\\'
 #endif
 
+    fori (i, 0, 128) if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
+
     bh_arr_each(const char *, folder, cs->options->included_folders) {
         if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
             bh_snprintf(path, 256, "%s%c%s", *folder, DIR_SEPARATOR, fn);

@@ -216,6 +216,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) CHECK(statement, (AstNode *) switchnode->assignment);
 
     CHECK(expression, &switchnode->expr);
+    resolve_expression_type(switchnode->expr);
     if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
         onyx_report_error(switchnode->expr->token->pos, "expected integer or enum type for switch expression");
         return Check_Error;
@@ -387,6 +388,10 @@ CheckStatus check_call(AstCall* call) {
 
     // NOTE: Build callee's type
     fill_in_type((AstTyped *) callee);
+    if (callee->type == NULL) {
+        onyx_report_error(call->token->pos, "There was an error with looking up the type of this function.");
+        return Check_Error;
+    }
 
     if (callee->type->kind != Type_Kind_Function) {
         onyx_report_error(call->token->pos,

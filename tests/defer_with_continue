@@ -1,0 +1,28 @@
+Doing something with Index is 0
+Doing something with Index is 1
+Doing something with Index is 2
+Skipping 3!!
+Index is 3
+Doing something with Index is 4
+Doing something with Index is 5
+Doing something with Index is 6
+Doing something with Index is 7
+Doing something with Index is 8
+Doing something with Index is 9
+i is 10
+
+
+===================================
+Doing something with Index is 0
+Doing something with Index is 1
+Doing something with Index is 2
+Skipping 3!!
+Index is 3
+i is 4
+
+
+===================================
+In block deferred!
+Deferred!
+Default!
+At the end!
