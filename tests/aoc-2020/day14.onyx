@@ -71,7 +71,6 @@ bitmask_iter_next :: proc (use bmi: ^BitmaskIter) -> u64 {
 		done = true;
 	}
 
-	printf("val is %l\n", val);
 	return val;
 }
 

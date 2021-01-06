@@ -395,8 +395,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 u32 type_size = type_size_of((*member)->type);
 
                 if (!is_union) offset += type_size;
-                if (!is_union) size += type_size;
-                else           size =  bh_max(size, type_size);
+                if (!is_union) size = offset;
+                else           size = bh_max(size, type_size);
 
                 idx++;
             }
