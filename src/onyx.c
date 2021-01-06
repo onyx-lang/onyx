@@ -469,8 +469,9 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
 
     if (compiler_state->options->verbose_output == 2) {
         if (ent->expr && ent->expr->token)
-            printf("%s | %s:%i:%i\n",
+            printf("%s | %s | %s:%i:%i\n",
                 entity_state_strings[ent->state],
+                entity_type_strings[ent->type],
                 ent->expr->token->pos.filename,
                 ent->expr->token->pos.line,
                 ent->expr->token->pos.column);

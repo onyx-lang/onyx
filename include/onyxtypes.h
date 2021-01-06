@@ -68,7 +68,7 @@ typedef struct StructMember {
     // easier and less costly.                  - brendanfh 2020/09/17
     char *name;
 
-    struct AstTyped* initial_value;
+    struct AstTyped** initial_value;
     b32 included_through_use : 1;
 } StructMember;
 

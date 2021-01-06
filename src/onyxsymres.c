@@ -305,13 +305,7 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
 }
 
 static void symres_struct_literal(AstStructLiteral* sl) {
-    // @CLEANUP
     if (sl->stnode != NULL) symres_expression(&sl->stnode);
-    if (!node_is_type((AstNode *) sl->stnode)) {
-        onyx_report_error(sl->token->pos, "Struct type is not a type.");
-        return;
-    }
-
     sl->stnode = (AstTyped *) symres_type((AstType *) sl->stnode);
     if (sl->stnode == NULL || sl->stnode->kind == Ast_Kind_Error || sl->stnode->kind == Ast_Kind_Symbol) return;
 
@@ -319,72 +313,23 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     while (sl->type_node->kind == Ast_Kind_Type_Alias)
         sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
 
-    sl->type = type_build_from_ast(semstate.allocator, sl->type_node);
-
-    if (sl->type == NULL) return;
-
-    if (!type_is_structlike_strict(sl->type)) {
-        onyx_report_error(sl->token->pos, "Type is not a constructable using a struct literal.");
-        return;
+    if (sl->values != NULL) {
+        bh_arr_each(AstTyped *, expr, sl->values) {
+            if (*expr == NULL) onyx_report_error(sl->token->pos, "Some kind of error occured with this struct literal.");
+            else               symres_expression(expr);
+        }
     }
 
-    if (bh_arr_length(sl->values) == 0) {
-        bh_arr_new(global_heap_allocator, sl->values, type_structlike_mem_count(sl->type));
-        bh_arr_set_length(sl->values, type_structlike_mem_count(sl->type));
-        bh_arr_zero(sl->values);
-
-        StructMember s;
+    if (sl->named_values != NULL) {
         bh_arr_each(AstStructMember *, smem, sl->named_values) {
-            token_toggle_end((*smem)->token);
-            if (!type_lookup_member(sl->type, (*smem)->token->text, &s)) {
-                onyx_report_error((*smem)->token->pos,
-                    "The field '%s' does not exist on type '%s'.", (*smem)->token->text, type_get_name(sl->type));
-                token_toggle_end((*smem)->token);
-                return;
-            }
-            token_toggle_end((*smem)->token);
-
-            if (s.included_through_use) {
-                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%s', whic was included through a 'use' statement.", s.name);
-                return;
-            }
-
-            if (sl->values[s.idx] != NULL) {
-                onyx_report_error((*smem)->token->pos, "Multiple values given for '%b'.", (*smem)->token->text, (*smem)->token->length);
-                return;
-            }
-
-            sl->values[s.idx] = (*smem)->initial_value;
+            if ((*smem)->initial_value == NULL) onyx_report_error(sl->token->pos, "Some kind of error occured with this struct literal.");
+            else                                symres_expression(&(*smem)->initial_value);
         }
-
-        if (sl->type->kind == Type_Kind_Struct) {
-            bh_arr_each(StructMember*, smem, sl->type->Struct.memarr) {
-                u32 idx = (*smem)->idx;
-
-                if (sl->values[idx] == NULL) {
-                    if ((*smem)->initial_value == NULL) {
-                        onyx_report_error(sl->token->pos, "No value was given for the field '%s'.", (*smem)->name);
-                        return;
-                    }
-
-                    sl->values[idx] = (*smem)->initial_value;
-                }
-            }
-        }
-    }
-
-    bh_arr_each(AstTyped *, expr, sl->values) {
-        if (*expr == NULL) onyx_report_error(sl->token->pos, "Some kind of error occured with this struct literal.");
-        else               symres_expression(expr);
     }
 }
 
 static void symres_array_literal(AstArrayLiteral* al) {
     if (al->atnode != NULL) symres_expression(&al->atnode);
-    if (!node_is_type((AstNode *) al->atnode)) {
-        onyx_report_error(al->token->pos, "Array type is not a type.");
-        return;
-    }
 
     al->atnode = (AstTyped *) symres_type((AstType *) al->atnode);
     if (al->atnode == NULL || al->atnode->kind == Ast_Kind_Error || al->atnode->kind == Ast_Kind_Symbol) return;
@@ -392,12 +337,6 @@ static void symres_array_literal(AstArrayLiteral* al) {
     al->type_node = (AstType *) al->atnode;
     while (al->type_node->kind == Ast_Kind_Type_Alias)
         al->type_node = ((AstTypeAlias *) al->type_node)->to;
-
-    al->type = type_build_from_ast(semstate.allocator, al->type_node);
-    if (al->type == NULL) return;
-
-    al->type = type_make_array(semstate.allocator, al->type, bh_arr_length(al->values));
-    if (al->type == NULL) return;
 
     bh_arr_each(AstTyped *, expr, al->values)
         symres_expression(expr);

@@ -925,7 +925,63 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
 }
 
 CheckStatus check_struct_literal(AstStructLiteral* sl) {
+    if (!node_is_type((AstNode *) sl->stnode)) {
+        onyx_report_error(sl->token->pos, "Struct type is not a type.");
+        return Check_Error;
+    }
+
     fill_in_type((AstTyped *) sl);
+    if (sl->type == NULL) return Check_Error;
+
+    if (!type_is_structlike_strict(sl->type)) {
+        onyx_report_error(sl->token->pos, "Type is not a constructable using a struct literal.");
+        return Check_Error;
+    }
+
+    if (bh_arr_length(sl->values) == 0) {
+        bh_arr_new(global_heap_allocator, sl->values, type_structlike_mem_count(sl->type));
+        bh_arr_set_length(sl->values, type_structlike_mem_count(sl->type));
+        bh_arr_zero(sl->values);
+
+        StructMember s;
+        bh_arr_each(AstStructMember *, smem, sl->named_values) {
+            token_toggle_end((*smem)->token);
+            if (!type_lookup_member(sl->type, (*smem)->token->text, &s)) {
+                onyx_report_error((*smem)->token->pos,
+                    "The field '%s' does not exist on type '%s'.", (*smem)->token->text, type_get_name(sl->type));
+                token_toggle_end((*smem)->token);
+                return Check_Error;
+            }
+            token_toggle_end((*smem)->token);
+
+            if (s.included_through_use) {
+                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%s', whic was included through a 'use' statement.", s.name);
+                return Check_Error;
+            }
+
+            if (sl->values[s.idx] != NULL) {
+                onyx_report_error((*smem)->token->pos, "Multiple values given for '%b'.", (*smem)->token->text, (*smem)->token->length);
+                return Check_Error;
+            }
+
+            sl->values[s.idx] = (*smem)->initial_value;
+        }
+
+        if (sl->type->kind == Type_Kind_Struct) {
+            bh_arr_each(StructMember*, smem, sl->type->Struct.memarr) {
+                u32 idx = (*smem)->idx;
+
+                if (sl->values[idx] == NULL) {
+                    if ((*smem)->initial_value == NULL) {
+                        onyx_report_error(sl->token->pos, "No value was given for the field '%s'.", (*smem)->name);
+                        return Check_Error;
+                    }
+
+                    sl->values[idx] = *(*smem)->initial_value;
+                }
+            }
+        }
+    }
 
     i32 mem_count = type_structlike_mem_count(sl->type);
 
@@ -975,9 +1031,18 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
 }
 
 CheckStatus check_array_literal(AstArrayLiteral* al) {
+    if (!node_is_type((AstNode *) al->atnode)) {
+        onyx_report_error(al->token->pos, "Array type is not a type.");
+        return Check_Error;
+    }
+
     fill_in_type((AstTyped *) al);
 
-    assert(al->type->kind == Type_Kind_Array);
+    al->type = type_make_array(semstate.allocator, al->type, bh_arr_length(al->values));
+    if (al->type == NULL || al->type->kind != Type_Kind_Array) {
+        onyx_report_error(al->token->pos, "Expected array type for array literal. This is a compiler bug.");
+        return Check_Error;
+    }
 
     if (al->type->Array.count != (u32) bh_arr_length(al->values)) {
         onyx_report_error(al->token->pos, "Wrong array size (%d) for number of values (%d).",
@@ -1031,9 +1096,9 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     if (range->step == NULL) {
         type_lookup_member(expected_range_type, "step", &smem);
         assert(smem.initial_value != NULL);
-        CHECK(expression, &smem.initial_value);
+        CHECK(expression, smem.initial_value);
 
-        range->step = smem.initial_value;
+        range->step = *smem.initial_value;
     }
 
     return Check_Success;
@@ -1244,7 +1309,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Symbol:
             onyx_report_error(expr->token->pos,
-                    "Unable to resolve symbol '%b'.",
+                    "Symbol was unresolved in symbol resolution phase, '%b'. This is definitely a compiler bug.",
                     expr->token->text, expr->token->length);
             retval = Check_Error;
             break;

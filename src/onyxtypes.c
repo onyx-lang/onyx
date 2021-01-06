@@ -368,7 +368,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .type = (*member)->type,
                     .idx = idx,
                     .name = bh_strdup(alloc, (*member)->token->text),
-                    .initial_value = (*member)->initial_value,
+                    .initial_value = &(*member)->initial_value,
                     .included_through_use = 0,
                 };
 
