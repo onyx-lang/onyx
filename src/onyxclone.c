@@ -143,7 +143,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			break;
 
 		case Ast_Kind_Call:
-			((AstCall *) nn)->arguments = (AstArgument *) ast_clone_list(a, ((AstCall *) node)->arguments);
+            ((AstCall *) nn)->arg_arr = NULL;
+            bh_arr_new(global_heap_allocator, ((AstCall *) nn)->arg_arr, bh_arr_length(((AstCall *) node)->arg_arr));
+            bh_arr_each(AstArgument *, arg, ((AstCall *) node)->arg_arr) {
+                bh_arr_push(((AstCall *) nn)->arg_arr, (AstArgument *) ast_clone(a, *arg));
+            }
 			break;
 
 		case Ast_Kind_Argument:

@@ -230,7 +230,8 @@ static void symres_call(AstCall* call) {
     symres_expression((AstTyped **) &call->callee);
     if (call->callee == NULL) return;
 
-    symres_statement_chain((AstNode **) &call->arguments);
+    bh_arr_each(AstArgument *, arg, call->arg_arr)
+        symres_statement((AstNode **) arg);
 }
 
 static void symres_size_of(AstSizeOf* so) {
@@ -286,9 +287,9 @@ static void symres_pipe(AstBinaryOp** pipe) {
             Ast_Kind_Argument);
     implicit_arg->token = (*pipe)->left->token;
     implicit_arg->value = (*pipe)->left;
-    implicit_arg->next = (AstNode *) call_node->arguments;
 
-    call_node->arguments = implicit_arg;
+    bh_arr_insertn(call_node->arg_arr, 0, 1);
+    call_node->arg_arr[0] = implicit_arg;
     call_node->arg_count++;
     call_node->next = (*pipe)->next;
 

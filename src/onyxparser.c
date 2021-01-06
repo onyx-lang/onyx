@@ -599,19 +599,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 call_node->callee = retval;
                 call_node->arg_count = 0;
 
-                AstArgument** prev = &call_node->arguments;
-                AstArgument* curr = NULL;
+                bh_arr_new(global_heap_allocator, call_node->arg_arr, 2);
+
                 while (parser->curr->type != ')') {
                     if (parser->hit_unexpected_token) return retval;
 
-                    curr = make_node(AstArgument, Ast_Kind_Argument);
-                    curr->token = parser->curr;
-                    curr->value = parse_expression(parser);
+                    AstArgument* arg = make_node(AstArgument, Ast_Kind_Argument);
+                    arg->token = parser->curr;
+                    arg->value = parse_expression(parser);
 
-                    if (curr != NULL && curr->kind != Ast_Kind_Error) {
-                        *prev = curr;
-                        prev = (AstArgument **) &curr->next;
-
+                    if (arg != NULL && arg->kind != Ast_Kind_Error) {
+                        bh_arr_push(call_node->arg_arr, arg);
                         call_node->arg_count++;
                     }
 

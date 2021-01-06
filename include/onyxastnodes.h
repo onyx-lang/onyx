@@ -496,10 +496,9 @@ struct AstRangeLiteral {
 struct AstCall {
     AstTyped_base;
 
-    AstArgument *arguments;
     u64 arg_count;
-
     bh_arr(AstArgument *) arg_arr;
+
     AstTyped *callee;
 
     VarArgKind va_kind;
@@ -507,9 +506,7 @@ struct AstCall {
 struct AstIntrinsicCall {
     AstTyped_base;
 
-    AstArgument *arguments;
     u64 arg_count;
-
     bh_arr(AstArgument *) arg_arr;
 
     OnyxIntrinsic intrinsic;

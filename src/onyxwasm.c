@@ -1378,42 +1378,38 @@ EMIT_FUNC(call, AstCall* call) {
 // little endian integers.
 #define SIMD_INT_CONST_INTRINSIC(type, count) { \
         type* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16); \
-        AstArgument* arg = call->arguments; \
+        bh_arr(AstArgument *) arg_arr = call->arg_arr; \
         fori (i, 0, count) { \
-            if (arg->value->kind != Ast_Kind_NumLit) { \
-                onyx_report_error(arg->token->pos, \
+            if (arg_arr[i]->value->kind != Ast_Kind_NumLit) { \
+                onyx_report_error(arg_arr[i]->token->pos, \
                         "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.", \
                         i, bh_num_suffix(i)); \
                 *pcode = code; \
                 return; \
             } \
-            byte_buffer[i] = (type) ((AstNumLit *) arg->value)->value.l; \
-            arg = (AstArgument *) arg->next; \
+            byte_buffer[i] = (type) ((AstNumLit *) arg_arr[i]->value)->value.l; \
         } \
         WIP(WI_V128_CONST, byte_buffer); \
     }
 
-#define SIMD_EXTRACT_LANE_INSTR(instr, arg) \
-    emit_expression(mod, &code, arg->value);\
-    arg = (AstArgument *) arg->next; \
-    if (arg->value->kind != Ast_Kind_NumLit) { \
-        onyx_report_error(arg->token->pos, "SIMD lane instructions expect a compile time lane number."); \
+#define SIMD_EXTRACT_LANE_INSTR(instr, arg_arr) \
+    emit_expression(mod, &code, arg_arr[1]->value);\
+    if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
+        onyx_report_error(arg_arr[1]->token->pos, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
         return; \
     } \
-    WID(instr, (u8) ((AstNumLit *) arg->value)->value.i);
+    WID(instr, (u8) ((AstNumLit *) arg_arr[1]->value)->value.i);
 
-#define SIMD_REPLACE_LANE_INSTR(instr, arg) { \
-        emit_expression(mod, &code, arg->value);\
-        arg = (AstArgument *) arg->next; \
-        if (arg->value->kind != Ast_Kind_NumLit) { \
-            onyx_report_error(arg->token->pos, "SIMD lane instructions expect a compile time lane number."); \
+#define SIMD_REPLACE_LANE_INSTR(instr, arg_arr) { \
+        emit_expression(mod, &code, arg_arr[1]->value);\
+        if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
+            onyx_report_error(arg_arr[1]->token->pos, "SIMD lane instructions expect a compile time lane number."); \
             *pcode = code; \
             return; \
         } \
-        u8 lane = (u8) ((AstNumLit *) arg->value)->value.i; \
-        arg = (AstArgument *) arg->next; \
-        emit_expression(mod, &code, arg->value); \
+        u8 lane = (u8) ((AstNumLit *) arg_arr[1]->value)->value.i; \
+        emit_expression(mod, &code, arg_arr[2]->value); \
         WID(instr, lane); \
     }
 
@@ -1442,10 +1438,8 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
     }
 
     if (place_arguments_normally) {
-        for (AstArgument *arg = call->arguments;
-                arg != NULL;
-                arg = (AstArgument *) arg->next) {
-            emit_expression(mod, &code, arg->value);
+        bh_arr_each(AstArgument *, arg, call->arg_arr) {
+            emit_expression(mod, &code, (*arg)->value);
         }
     }
 
@@ -1504,17 +1498,16 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
         case ONYX_INTRINSIC_I64X2_CONST:  SIMD_INT_CONST_INTRINSIC(u64, 2);   break;
         case ONYX_INTRINSIC_F32X4_CONST: {
             f32* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
-            AstArgument* arg = call->arguments;
+            bh_arr(AstArgument *) arg_arr = call->arg_arr;
             fori (i, 0, 4) {
-                if (arg->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg->token->pos,
+                if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
+                    onyx_report_error(arg_arr[i]->token->pos,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
                     return;
                 }
-                byte_buffer[i] = (f32) ((AstNumLit *) arg->value)->value.f;
-                arg = (AstArgument *) arg->next;
+                byte_buffer[i] = (f32) ((AstNumLit *) arg_arr[i]->value)->value.f;
             }
             WIP(WI_V128_CONST, byte_buffer);
             break;
@@ -1522,17 +1515,16 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
 
         case ONYX_INTRINSIC_F64X2_CONST: {
             f64* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
-            AstArgument* arg = call->arguments;
+            bh_arr(AstArgument *) arg_arr = call->arg_arr;
             fori (i, 0, 2) {
-                if (arg->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg->token->pos,
+                if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
+                    onyx_report_error(arg_arr[i]->token->pos,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
                     return;
                 }
-                byte_buffer[i] = (f64) ((AstNumLit *) arg->value)->value.d;
-                arg = (AstArgument *) arg->next;
+                byte_buffer[i] = (f64) ((AstNumLit *) arg_arr[i]->value)->value.d;
             }
             WIP(WI_V128_CONST, byte_buffer);
             break;
@@ -1540,44 +1532,41 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
 
         case ONYX_INTRINSIC_I8X16_SHUFFLE: {
             u8* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
-            AstArgument* arg = call->arguments;
+            bh_arr(AstArgument *) arg_arr = call->arg_arr;
 
             // NOTE: There are two parameters that have to be outputted before
             // the immediate bytes
-            emit_expression(mod, &code, arg->value);
-            arg = (AstArgument *) arg->next;
-            emit_expression(mod, &code, arg->value);
-            arg = (AstArgument *) arg->next;
+            emit_expression(mod, &code, arg_arr[0]->value);
+            emit_expression(mod, &code, arg_arr[1]->value);
 
             fori (i, 0, 16) {
-                if (arg->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg->token->pos,
+                if (arg_arr[i + 2]->value->kind != Ast_Kind_NumLit) {
+                    onyx_report_error(arg_arr[i + 2]->token->pos,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
                     return;
                 }
-                byte_buffer[i] = (u8) ((AstNumLit *) arg->value)->value.i;
-                arg = (AstArgument *) arg->next;
+                byte_buffer[i] = (u8) ((AstNumLit *) arg_arr[i + 2]->value)->value.i;
             }
             WIP(WI_I8X16_SHUFFLE, byte_buffer);
             break;
         }
 
-        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_S, call->arguments); break;
-        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_U, call->arguments); break;
-        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I8X16_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_S, call->arguments); break;
-        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_U, call->arguments); break;
-        case ONYX_INTRINSIC_I16X8_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I16X8_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I32X4_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I32X4_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I64X2_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_I64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I64X2_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F32X4_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F32X4_REPLACE_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F64X2_EXTRACT_LANE, call->arguments); break;
-        case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F64X2_REPLACE_LANE, call->arguments); break;
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_S, call->arg_arr); break;
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_U, call->arg_arr); break;
+        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I8X16_REPLACE_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_S, call->arg_arr); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_U, call->arg_arr); break;
+        case ONYX_INTRINSIC_I16X8_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I16X8_REPLACE_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I32X4_EXTRACT_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I32X4_REPLACE_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I64X2_EXTRACT_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_I64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I64X2_REPLACE_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F32X4_EXTRACT_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F32X4_REPLACE_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F64X2_EXTRACT_LANE, call->arg_arr); break;
+        case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F64X2_REPLACE_LANE, call->arg_arr); break;
 
         case ONYX_INTRINSIC_I8X16_SWIZZLE: WI(WI_I8X16_SWIZZLE); break;
         case ONYX_INTRINSIC_I8X16_SPLAT:   WI(WI_I8X16_SPLAT); break;

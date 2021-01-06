@@ -570,14 +570,13 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
         Type* actual_type;
 
         if (pp_lookup == PPLM_By_Call) {
-            AstArgument* arg = ((AstCall *) actual)->arguments;
             if (param->idx >= ((AstCall *) actual)->arg_count) {
                 onyx_report_error(pos, "Not enough arguments to polymorphic procedure.");
                 return NULL;
             }
 
-            fori (i, 0, (i64) param->idx) arg = (AstArgument *) arg->next;
-            actual_type = resolve_expression_type(arg->value);
+            bh_arr(AstArgument *) arg_arr = ((AstCall *) actual)->arg_arr;
+            actual_type = resolve_expression_type(arg_arr[param->idx]->value);
         }
 
         else if (pp_lookup == PPLM_By_Function_Type) {

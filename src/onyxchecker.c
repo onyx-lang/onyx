@@ -286,19 +286,16 @@ static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction*
 
         if (call->arg_count < ol_type->needed_param_count) continue;
 
-        AstArgument* arg = call->arguments;
         Type** param_type = ol_type->params;
-        while (arg != NULL) {
-            fill_in_type((AstTyped *) arg);
-
+        bh_arr_each(AstArgument*, arg, call->arg_arr) {
+            fill_in_type((AstTyped *) *arg);
             if ((*param_type)->kind == Type_Kind_VarArgs) {
-                if (!type_check_or_auto_cast(&arg->value, (*param_type)->VarArgs.ptr_to_data->Pointer.elem))
+                if (!type_check_or_auto_cast(&(*arg)->value, (*param_type)->VarArgs.ptr_to_data->Pointer.elem))
                     goto no_match;
             }
-            else if (!type_check_or_auto_cast(&arg->value, *param_type)) goto no_match;
+            else if (!type_check_or_auto_cast(&(*arg)->value, *param_type)) goto no_match;
 
             param_type++;
-            arg = (AstArgument *) arg->next;
         }
 
         return (AstTyped *) overload;
@@ -309,14 +306,11 @@ no_match:
 
     char* arg_str = bh_alloc(global_scratch_allocator, 1024);
 
-    AstArgument* arg = call->arguments;
-    while (arg != NULL) {
-        strncat(arg_str, type_get_name(arg->value->type), 1023);
+    bh_arr_each(AstArgument *, arg, call->arg_arr) {
+        strncat(arg_str, type_get_name((*arg)->value->type), 1023);
 
-        if (arg->next != NULL)
+        if ((*arg)->next != NULL)
             strncat(arg_str, ", ", 1023);
-
-        arg = (AstArgument *) arg->next;
     }
 
     onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
@@ -348,23 +342,18 @@ CheckStatus check_call(AstCall* call) {
     CHECK(expression, &call->callee);
     AstFunction* callee = (AstFunction *) call->callee;
 
-    bh_arr(AstArgument *) arg_arr = NULL;
-    bh_arr_new(global_heap_allocator, arg_arr, call->arg_count);
+    bh_arr(AstArgument *) arg_arr = call->arg_arr;
 
     // NOTE: Check arguments
-    AstArgument* actual = call->arguments;
-    while (actual != NULL) {
-        CHECK(expression, (AstTyped **) &actual);
+    bh_arr_each (AstArgument *, actual, arg_arr) {
+        CHECK(expression, (AstTyped **) actual);
 
-        if (actual->value->kind == Ast_Kind_Overloaded_Function) {
-            onyx_report_error(actual->token->pos,
+        if ((*actual)->value->kind == Ast_Kind_Overloaded_Function) {
+            onyx_report_error((*actual)->token->pos,
                 "Cannot pass overloaded function '%b' as argument.",
-                actual->value->token->text, actual->value->token->length);
+                (*actual)->value->token->text, (*actual)->value->token->length);
             return Check_Error;
         }
-
-        bh_arr_push(arg_arr, actual);
-        actual = (AstArgument *) actual->next;
     }
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
