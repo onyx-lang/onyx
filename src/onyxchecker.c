@@ -1555,15 +1555,19 @@ CheckStatus check_function_header(AstFunction* func) {
             return Check_Error;
         }
 
-        if (param->default_value != NULL) {
-            if (!type_check_or_auto_cast(&param->default_value, param->local->type)) {
-                onyx_report_error(param->local->token->pos,
-                        "Expected default value of type '%s', was of type '%s'.",
-                        type_get_name(param->local->type),
-                        type_get_name(param->default_value->type));
-                return Check_Error;
-            }
-        }
+        // NOTE: I decided to make parameter default values not type checked against
+        // the actual parameter type. The actual type checking will happen in check_call
+        // when the default value is used as an argument and then has to be checked against
+        // the parameter type                                  - brendanfh 2021/01/06
+        // if (param->default_value != NULL) {
+        //     if (!type_check_or_auto_cast(&param->default_value, param->local->type)) {
+        //         onyx_report_error(param->local->token->pos,
+        //                 "Expected default value of type '%s', was of type '%s'.",
+        //                 type_get_name(param->local->type),
+        //                 type_get_name(param->default_value->type));
+        //         return Check_Error;
+        //     }
+        // }
 
         if (param->vararg_kind != VA_Kind_Not_VA) has_had_varargs = 1;
 
