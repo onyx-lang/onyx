@@ -257,7 +257,7 @@ main :: proc (args: [] cstr) {
 	defer array.free(^tiles);
 
     tile_map : map.Map(u32, ^Tile);
-    map.init(^tile_map, 67);
+    map.init(^tile_map, null, 67);
     defer map.free(^tile_map);
 
 	tile_data := calloc(200 * sizeof TileData);

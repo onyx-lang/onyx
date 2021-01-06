@@ -36,8 +36,8 @@ main :: proc (args: [] cstr) {
 
 	file := reader.make(contents);
 
-    map.init(^ingredient_map, 127);
-    map.init(^allergen_map);
+    map.init(^ingredient_map, Ingredient.{}, 127);
+    map.init(^allergen_map, Allergen.{});
     defer {
         map.free(^ingredient_map);
         map.free(^allergen_map);
@@ -59,7 +59,7 @@ main :: proc (args: [] cstr) {
 
             array.push(^food.ingredients, ingredient_name);
 
-            ingredient := map.get(^ingredient_map, ingredient_name, Ingredient.{});
+            ingredient := map.get(^ingredient_map, ingredient_name);
             if ingredient.name.data == null {
                 ingredient.name = ingredient_name;
                 array.init(^ingredient.appears_on, 4);
@@ -78,7 +78,7 @@ main :: proc (args: [] cstr) {
 
             array.push(^food.allergens, allergen_name);
 
-            allergen := map.get(^allergen_map, allergen_name, Allergen.{});
+            allergen := map.get(^allergen_map, allergen_name);
             if allergen.name.data == null {
                 allergen.name = allergen_name;
                 array.init(^allergen.appears_on, 4);
@@ -113,7 +113,7 @@ main :: proc (args: [] cstr) {
         potential_allergen_count := 0;
         for ^allergen_name: potential_allergens {
             c := array_count_contains(^potential_allergens, *allergen_name, string.equal);
-            allergen := map.get(^allergen_map, *allergen_name, Allergen.{}); 
+            allergen := map.get(^allergen_map, *allergen_name); 
             if c == allergen.appears_on.count {
                 potential_allergen_count += 1;
             }
@@ -126,7 +126,7 @@ main :: proc (args: [] cstr) {
 
     total_safe := 0;
     for safe: definitely_safe {
-        ingredient := map.get(^ingredient_map, safe, Ingredient.{});
+        ingredient := map.get(^ingredient_map, safe);
         total_safe += ingredient.appears_on.count;
 
         map.delete(^ingredient_map, safe);
@@ -157,7 +157,7 @@ main :: proc (args: [] cstr) {
             }
 
             if match_count == 1 {
-                ingredient := map.get(^ingredient_map, matching_ingredient_name, Ingredient.{});
+                ingredient := map.get(^ingredient_map, matching_ingredient_name);
                 map.delete(^ingredient_map, matching_ingredient_name);
 
                 ingredient.allergen = allergen_entry.key;

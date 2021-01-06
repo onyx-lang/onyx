@@ -953,9 +953,14 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
 
     if (types_are_compatible(node->type, type)) return 1;
     if (node_is_auto_cast((AstNode *) node)) {
-        // HACK: Check that this cast is legal!
-        ((AstUnaryOp *) node)->type = type;
-        return 1;
+        char* dummy;
+        if (!cast_is_legal(((AstUnaryOp *) node)->expr->type, type, &dummy)) {
+            return 0;
+
+        } else {
+            ((AstUnaryOp *) node)->type = type;
+            return 1;
+        }
     }
     else if (node->kind == Ast_Kind_NumLit) {
         if (convert_numlit_to_type((AstNumLit *) node, type)) return 1;
@@ -981,6 +986,95 @@ Type* resolve_expression_type(AstTyped* node) {
     }
 
     return node->type;
+}
+
+static const b32 cast_legality[][11] = {
+    /* I8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
+    /* U8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
+    /* I16 */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
+    /* U16 */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
+    /* I32 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+    /* U32 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+    /* I64 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+    /* U64 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+    /* F32 */ { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0 },
+    /* F64 */ { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0 },
+    /* PTR */ { 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1 },
+};
+
+b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
+    Type* from = from_;
+    Type* to   = to_;
+
+    if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
+    if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
+
+    if (from->kind == Type_Kind_Struct || to->kind == Type_Kind_Struct) {
+        *err_msg = "Cannot cast to or from a struct.";
+        return 0;
+    }
+
+    if (from->kind == Type_Kind_Slice || to->kind == Type_Kind_Slice) {
+        *err_msg = "Cannot cast to or from a slice.";
+        return 0;
+    }
+
+    if (from->kind == Type_Kind_DynArray || to->kind == Type_Kind_DynArray) {
+        *err_msg = "Cannot cast to or from a dynamic array.";
+        return 0;
+    }
+
+    if (to->kind == Type_Kind_Function) {
+        *err_msg = "Cannot cast to a function.";
+        return 0;
+    }
+
+    if (   (type_is_simd(to) && !type_is_simd(from))
+        || (!type_is_simd(to) && type_is_simd(from))) {
+        *err_msg = "Can only perform a SIMD cast between SIMD types.";
+        return 0;
+    }
+
+    if (from->kind == Type_Kind_Basic && from->Basic.kind == Basic_Kind_Void) {
+        *err_msg = "Cannot cast from void.";
+        return 0;
+    }
+    i32 fromidx = -1, toidx = -1;
+    if (from->Basic.flags & Basic_Flag_Pointer || from->kind == Type_Kind_Array) {
+        fromidx = 10;
+    }
+    else if (from->Basic.flags & Basic_Flag_Integer) {
+        b32 unsign = (from->Basic.flags & Basic_Flag_Unsigned) != 0;
+
+        fromidx = log2_dumb(from->Basic.size) * 2 + unsign;
+    }
+    else if (from->Basic.flags & Basic_Flag_Float) {
+        if      (from->Basic.size == 4) fromidx = 8;
+        else if (from->Basic.size == 8) fromidx = 9;
+    }
+
+    if (to->Basic.flags & Basic_Flag_Pointer || to->kind == Type_Kind_Array) {
+        toidx = 10;
+    }
+    else if (to->Basic.flags & Basic_Flag_Integer) {
+        b32 unsign = (to->Basic.flags & Basic_Flag_Unsigned) != 0;
+
+        toidx = log2_dumb(to->Basic.size) * 2 + unsign;
+    }
+    else if (to->Basic.flags & Basic_Flag_Float) {
+        if      (to->Basic.size == 4) toidx = 8;
+        else if (to->Basic.size == 8) toidx = 9;
+    }
+
+    if (fromidx != -1 && toidx != -1) {
+        if (!cast_legality[fromidx][toidx]) {
+            *err_msg = bh_aprintf(global_heap_allocator, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
+            return 0;
+        }
+    }
+
+    *err_msg = NULL;
+    return 1;
 }
 
 char* get_function_name(AstFunction* func) {

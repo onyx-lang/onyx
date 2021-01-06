@@ -15,7 +15,7 @@ main :: proc (args: [] cstr) {
     // Any changes to the implementation of Map should be tested on this
     // file to validate if they 1) work and 2) are faster.
     nums : map.Map(u32, spoken_times);
-    map.init(^nums, 32767);
+    map.init(^nums, spoken_times.{}, 32767);
     defer map.free(^nums);
 
     turn := 1;
@@ -28,12 +28,12 @@ main :: proc (args: [] cstr) {
     }
 
     while turn != 2021 {
-        st := map.get(^nums, last_num, spoken_times.{});
+        st := map.get(^nums, last_num);
 
         if st.previous == 0 do last_num = 0;
         else                do last_num = st.recent - st.previous;
 
-        st = map.get(^nums, last_num, spoken_times.{});
+        st = map.get(^nums, last_num);
         st.previous = st.recent;
         st.recent = turn;
         map.put(^nums, last_num, st);

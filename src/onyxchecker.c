@@ -893,7 +893,14 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
     CHECK(expression, &unaryop->expr);
     resolve_expression_type(unaryop->expr);
 
-    if (unaryop->operation != Unary_Op_Cast) {
+    if (unaryop->operation == Unary_Op_Cast) {
+        char* err;
+        if (!cast_is_legal(unaryop->expr->type, unaryop->type, &err)) {
+            onyx_report_error(unaryop->token->pos, "Cast Error: %s", err);
+            return Check_Error;
+        }
+        
+    } else {
         unaryop->type = unaryop->expr->type;
     }
 

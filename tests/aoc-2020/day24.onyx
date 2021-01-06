@@ -33,7 +33,7 @@ main :: proc (args: [] cstr) {
 	file := reader.make(contents);
 
 	grid : map.Map(Vec2, Cell); // `true` is black
-	map.init(^grid, 1021);
+	map.init(^grid, Cell.{}, 1021);
 	defer map.free(^grid);
 
 	while !reader.empty(^file) {
@@ -67,7 +67,7 @@ main :: proc (args: [] cstr) {
 		}
 
 
-		curr := map.get(^grid, loc, Cell.{});
+		curr := map.get(^grid, loc);
 		map.put(^grid, loc, Cell.{ alive = !curr.alive });
 	}
 
@@ -98,7 +98,7 @@ main :: proc (args: [] cstr) {
 		}
 
 		for ^cell: cells_to_consider {
-			state  := map.get(^grid, *cell, Cell.{});
+			state  := map.get(^grid, *cell);
 			ncount := get_neighbor_count(^grid, *cell);
 
 			if state.alive {
@@ -128,7 +128,7 @@ get_neighbor_count :: proc (grid: ^map.Map(Vec2, Cell), pos: Vec2) -> u32 {
 	count := 0;
 
 	for ^dir: Hex_Directions {
-		cell := map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y }, Cell.{});
+		cell := map.get(grid, Vec2.{ x = pos.x + dir.x, y = pos.y + dir.y });
 		if cell.alive do count += 1;
 	}
 

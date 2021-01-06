@@ -15,7 +15,7 @@ Instruction :: struct {
 // Returns if the program successfully exited.
 get_acc_value :: proc (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
     already_been: map.Map(i32, bool);
-    map.init(^already_been);
+    map.init(^already_been, false);
     defer map.free(^already_been);
 
     ip   := 0;

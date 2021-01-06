@@ -6,7 +6,7 @@ use package core
 
 main :: proc (args: [] cstr) {
     imap : map.Map(i32, str);
-    map.init(^imap);
+    map.init(^imap, "");
     defer {
         print("Freeing map\n");
         map.free(^imap);
@@ -17,7 +17,7 @@ main :: proc (args: [] cstr) {
     println(map.has(^imap, 50));
     println(map.has(^imap, 51));
 
-    printf("%s%s\n", map.get(^imap, 50, ""), map.get(^imap, 1234, ""));
+    printf("%s%s\n", map.get(^imap, 50), map.get(^imap, 1234));
 
     map.delete(^imap, 50);
     println(map.has(^imap, 50));

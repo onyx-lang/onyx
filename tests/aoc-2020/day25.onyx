@@ -25,7 +25,7 @@ dlp_bsgs :: proc (n: u32, a: u32, b: u32) -> u32 {
     m := cast(u32) ceil_f64(sqrt_f64(~~n));
 
     t : map.Map(u32, u32);
-    map.init(^t, m / 2);
+    map.init(^t, 0, m / 2);
     defer map.free(^t);
 
     tmp: u64 = 1;
@@ -39,7 +39,7 @@ dlp_bsgs :: proc (n: u32, a: u32, b: u32) -> u32 {
     tmp = ~~b;
     for i: 0 .. m {
         if map.has(^t, cast(u32) tmp) {
-            v := map.get(^t, cast(u32) tmp, 0);
+            v := map.get(^t, cast(u32) tmp);
             return i * m + v; 
         }
 

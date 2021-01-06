@@ -71,6 +71,7 @@ bitmask_iter_next :: proc (use bmi: ^BitmaskIter) -> u64 {
 		done = true;
 	}
 
+	printf("val is %l\n", val);
 	return val;
 }
 
@@ -80,7 +81,7 @@ main :: proc (args: [] cstr) {
 	file := reader.make(contents);
 
 	mem : map.Map(u64, u64);
-	map.init(^mem, 257);
+	map.init(^mem, 0, 257);
 	defer map.free(^mem);
 
 	mask : Bitmask;

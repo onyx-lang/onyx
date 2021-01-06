@@ -234,7 +234,7 @@ main :: proc (args: [] cstr) {
     print("\n");
 
     pmap : map.Map(rawptr, rawptr);
-    map.init(^pmap, 50);
+    map.init(^pmap, null, 50);
     defer map.free(^pmap);
 
     for i: 0 .. 100 do map.put(^pmap, ^s.a[i], ^s.b[i]);

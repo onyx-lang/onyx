@@ -3,6 +3,7 @@
 use package core
 
 overloaded :: proc {
+    proc (x: str, y: i32) do println("Called str, i32"); ,
     proc (x: f32, y: str) do println("Called f32, str"); ,
     proc (x: i32, y: i32) do println("Called i32, i32"); ,
 }

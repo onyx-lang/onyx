@@ -61,7 +61,7 @@ encode_hands :: proc (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
 
 recursive_combat :: proc (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
     hand_seen : map.Map(str, bool);
-    map.init(^hand_seen, 31);
+    map.init(^hand_seen, false, 31);
     defer map.free(^hand_seen);
 
     while player1.count > 0 && player2.count > 0 {

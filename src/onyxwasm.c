@@ -2346,56 +2346,10 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 
     Type* from = cast->expr->type;
     Type* to = cast->type;
-
-    if (from->kind == Type_Kind_Struct || to->kind == Type_Kind_Struct) {
-        onyx_report_error(cast->token->pos, "Cannot cast to or from a struct.");
-        WI(WI_DROP);
-        *pcode = code;
-        return;
-    }
-
-    if (from->kind == Type_Kind_Slice || to->kind == Type_Kind_Slice) {
-        onyx_report_error(cast->token->pos, "Cannot cast to or from a slice.");
-        WI(WI_DROP);
-        *pcode = code;
-        return;
-    }
-
-    if (from->kind == Type_Kind_DynArray || to->kind == Type_Kind_DynArray) {
-        onyx_report_error(cast->token->pos, "Cannot cast to or from a dynamic array.");
-        WI(WI_DROP);
-        *pcode = code;
-        return;
-    }
-
-    if (to->kind == Type_Kind_Function) {
-        onyx_report_error(cast->token->pos, "Cannot cast to a function.");
-        WI(WI_DROP);
-        *pcode = code;
-        return;
-    }
-
-    if (type_is_simd(to) && !type_is_simd(from)) {
-        onyx_report_error(cast->token->pos, "Can only perform a SIMD cast between SIMD types.");
-        return;
-    }
-
-    if (type_is_simd(from) && !type_is_simd(to)) {
-        onyx_report_error(cast->token->pos, "Can only perform a SIMD cast between SIMD types.");
-        return;
-    }
-
-    if (type_is_simd(from) && type_is_simd(to)) {
-        *pcode = code;
-        return;
-    }
-
     if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
     if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
 
-    if (from->kind == Type_Kind_Basic && from->Basic.kind == Basic_Kind_Void) {
-        onyx_report_error(cast->token->pos, "Cannot cast from void.");
-        WI(WI_DROP);
+    if (type_is_simd(from) && type_is_simd(to)) {
         *pcode = code;
         return;
     }
@@ -2435,11 +2389,9 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 
     if (fromidx != -1 && toidx != -1) {
         WasmInstructionType cast_op = cast_map[fromidx][toidx];
-        if (cast_op == WI_UNREACHABLE) {
-            bh_printf("%d %d\n", fromidx, toidx);
-            onyx_report_error(cast->token->pos, "Bad cast.");
-        }
-        else if (cast_op != WI_NOP) {
+        assert(cast_op != WI_UNREACHABLE);
+        
+        if (cast_op != WI_NOP) {
             WI(cast_op);
         }
     }

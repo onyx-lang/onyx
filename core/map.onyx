@@ -7,6 +7,9 @@ use package core.string as string
 Map :: struct ($K, $V) {
     hashes  : [..] i32;
     entries : [..] MapEntry(K, V);
+
+    // The value provided by `map.get`, if nothing was found.
+    default_value : V;
 }
 
 MapEntry :: struct ($K, $T) {
@@ -15,9 +18,11 @@ MapEntry :: struct ($K, $T) {
     value : T;
 }
 
-init :: proc (use map: ^Map($K, $V), hash_count: i32 = 16) {
+init :: proc (use map: ^Map($K, $V), dv: V, hash_count: i32 = 16) {
     array.init(^hashes, hash_count);
     array.init(^entries, 4);
+
+    default_value = dv;
 
     for i: 0 .. hash_count do array.push(^hashes, -1);
 }
@@ -50,11 +55,11 @@ has :: proc (use map: ^Map($K, $V), key: K) -> bool {
     return lr.entry_index >= 0;
 }
 
-get :: proc (use map: ^Map($K, $V), key: K, default := cast(V) 0) -> V {
+get :: proc (use map: ^Map($K, $V), key: K) -> V {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
-    return default;
+    return default_value;
 }
 
 delete :: proc (use map: ^Map($K, $V), key: K) {

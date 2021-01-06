@@ -32,7 +32,7 @@ get_neighbor_count :: proc (cubes: ^map.Map(CubePos, CubeState), pos: CubePos) -
     for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
         if x == 0 && y == 0 && z == 0 && w == 0 do continue;
         key := CubePos.{ pos.x + x, pos.y + y, pos.z + z, pos.w + w };
-        state := map.get(cubes, key, CubeState.{});
+        state := map.get(cubes, key);
         if state.alive do count += 1;
     }
 
@@ -45,7 +45,7 @@ main :: proc (args: [] cstr) {
     file := reader.make(contents);
 
     cubes : map.Map(CubePos, CubeState);
-    map.init(^cubes, 1021);
+    map.init(^cubes, CubeState.{}, 1021);
     defer map.free(^cubes);
 
     z := 0;
@@ -81,7 +81,7 @@ main :: proc (args: [] cstr) {
         }
 
         for ^cube: cubes_to_consider {
-            state  := map.get(^cubes, *cube, CubeState.{});
+            state  := map.get(^cubes, *cube);
             ncount := get_neighbor_count(^cubes, *cube);
             
             if state.alive {
@@ -94,7 +94,7 @@ main :: proc (args: [] cstr) {
         }
 
         for ^cube: cubes_to_consider {
-            state := map.get(^cubes, *cube, CubeState.{});
+            state := map.get(^cubes, *cube);
             state.alive = state.next;
             map.put(^cubes, *cube, state);
         }
