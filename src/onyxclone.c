@@ -399,6 +399,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 			bh_arr_each(AstPolySolution, sln, sd->known_polyvars) {
 				AstPolySolution new_sln;
+                new_sln.kind     = sln->kind;
 				new_sln.poly_sym = (AstNode *) ast_clone(a, (AstNode *) sln->poly_sym);
 				new_sln.ast_type = (AstType *) ast_clone(a, (AstNode *) sln->ast_type);
 				bh_arr_push(dd->known_polyvars, new_sln);

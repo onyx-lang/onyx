@@ -1,0 +1,23 @@
+#load "core/std/js"
+
+use package core
+
+main :: proc (args: [] cstr) {
+    arr := u32.[ 1, 2, 3, 4, 5 ];
+    for elem: array_to_slice(arr) do printf("%i ", elem);
+
+    roots : [20] f32;
+    compute_roots(roots);
+
+    for root: roots do println(root);
+
+    array_to_slice :: proc (arr: [$N] $T) -> [] T {
+        return (#type [] T).{ ~~arr, N };
+    }
+
+    compute_roots :: proc (arr: [$N] f32) {
+        for i: 0 .. N {
+            arr[i] = math.sqrt(cast(f32) i);
+        }
+    }
+}

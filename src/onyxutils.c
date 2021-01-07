@@ -471,6 +471,8 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
             break;
         }
 
+        if (elem.kind != PSK_Type) continue;
+
         switch (elem.type_expr->kind) {
             case Ast_Kind_Pointer_Type: {
                 if (elem.actual->kind != Type_Kind_Pointer) break;
@@ -807,6 +809,12 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         new_pp->poly_scope = new_pp->poly_scope;
         new_pp->flags = pp->flags;
         new_pp->poly_params = pp->poly_params;
+
+        // POTENTIAL BUG: Copying this doesn't feel right...
+        if (pp->concrete_funcs == NULL) {
+            bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
+        }
+        new_pp->concrete_funcs = pp->concrete_funcs;
 
         new_pp->known_slns = NULL;
         bh_arr_new(global_heap_allocator, new_pp->known_slns, bh_arr_length(pp->known_slns) + bh_arr_length(slns));
