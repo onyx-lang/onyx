@@ -114,7 +114,7 @@ static void add_node_to_process(OnyxParser* parser, AstNode* node) {
 }
 
 
-static AstNumLit* make_int_literal(bh_allocator a, i64 i) {
+AstNumLit* make_int_literal(bh_allocator a, i64 i) {
     AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
     if (bh_abs(i) >= ((u64) 1 << 32))
         num->type_node = (AstType *) &basic_type_i64;
@@ -536,7 +536,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     expect_token(parser, '=');
                     AstType* poly_type = parse_type(parser);
 
+                    PolySolutionKind sln_kind = PSK_Type;
+                    if (!node_is_type((AstNode *) poly_type)) sln_kind = PSK_Value;
+
                     bh_arr_push(solid->known_polyvars, ((AstPolySolution) {
+                        .kind     = sln_kind,
                         .poly_sym = poly_var,
                         .ast_type = poly_type,
                         .type     = NULL
@@ -1362,6 +1366,35 @@ static AstBlock* parse_block(OnyxParser* parser) {
     return block;
 }
 
+static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_insertion) {
+    bh_arr(AstPolyParam) pv = NULL;
+
+    if (parser->polymorph_context.poly_params == NULL)
+        onyx_report_error(parser->curr->pos, "polymorphic variable not valid here.");
+    else
+        pv = *parser->polymorph_context.poly_params;
+
+    consume_token(parser);
+
+    AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
+    symbol_node->token = expect_token(parser, Token_Type_Symbol);
+
+    **next_insertion = (AstType *) symbol_node;
+    *next_insertion = NULL;
+
+    if (pv != NULL) {
+        bh_arr_push(pv, ((AstPolyParam) {
+            .poly_sym = symbol_node,
+
+            // These will be filled out by function_params()
+            .type_expr = NULL,
+            .idx = -1,
+        }));
+
+        *parser->polymorph_context.poly_params = pv;
+    }
+}
+
 // <symbol>
 // '^' <type>
 static AstType* parse_type(OnyxParser* parser) {
@@ -1380,7 +1413,7 @@ static AstType* parse_type(OnyxParser* parser) {
         }
 
         else if (parser->curr->type == '[') {
-            AstSliceType *new;
+            AstType *new;
             OnyxToken *open_bracket = expect_token(parser, '[');
 
             if (parser->curr->type == ']') {
@@ -1395,12 +1428,18 @@ static AstType* parse_type(OnyxParser* parser) {
             } else {
                 new = make_node(AstArrayType, Ast_Kind_Array_Type);
                 new->token = open_bracket;
-                ((AstArrayType *) new)->count_expr = parse_expression(parser);
+
+                if (parser->curr->type == '$') {
+                    AstType** insertion = (AstType **) &((AstArrayType *) new)->count_expr;
+                    parse_polymorphic_variable(parser, &insertion);
+                } else {
+                    ((AstArrayType *) new)->count_expr = parse_expression(parser);
+                }
             }
 
             expect_token(parser, ']');
             *next_insertion = (AstType *) new;
-            next_insertion = &new->elem;
+            next_insertion = &((AstSliceType *) new)->elem;
         }
 
         else if (parser->curr->type == Token_Type_Keyword_Proc) {
@@ -1444,32 +1483,7 @@ static AstType* parse_type(OnyxParser* parser) {
         }
 
         else if (parser->curr->type == '$') {
-            bh_arr(AstPolyParam) pv = NULL;
-
-            if (parser->polymorph_context.poly_params == NULL)
-                onyx_report_error(parser->curr->pos, "polymorphic variable not valid here.");
-            else
-                pv = *parser->polymorph_context.poly_params;
-
-            consume_token(parser);
-
-            AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
-            symbol_node->token = expect_token(parser, Token_Type_Symbol);
-
-            *next_insertion = (AstType *) symbol_node;
-            next_insertion = NULL;
-
-            if (pv != NULL) {
-                bh_arr_push(pv, ((AstPolyParam) {
-                    .poly_sym = symbol_node,
-
-                    // These will be filled out by function_params()
-                    .type_expr = NULL,
-                    .idx = -1,
-                }));
-
-                *parser->polymorph_context.poly_params = pv;
-            }
+            parse_polymorphic_variable(parser, &next_insertion);
         }
 
         else if (parser->curr->type == Token_Type_Symbol) {
@@ -1519,6 +1533,13 @@ static AstType* parse_type(OnyxParser* parser) {
             AstStructType* s_node = parse_struct(parser);
             *next_insertion = (AstType *) s_node;
             next_insertion = NULL;
+        }
+
+        else if (parse_possible_directive(parser, "value")) {
+            // :ValueDirectiveHack
+            *next_insertion = (AstType *) parse_expression(parser);
+            next_insertion = NULL;
+            break;
         }
 
         else {

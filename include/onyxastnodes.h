@@ -743,12 +743,25 @@ struct AstPolyParam {
     // The parameter index where the polymorphic variable occurs.
     u64 idx;
 };
-struct AstPolySolution {
-    AstNode* poly_sym;
-    Type*    type;
 
-    // If `type` is null, it is filled in with this type.
-    AstType* ast_type;
+typedef enum PolySolutionKind {
+    PSK_Type,
+    PSK_Value,
+} PolySolutionKind;
+
+struct AstPolySolution {
+    PolySolutionKind kind;
+    AstNode* poly_sym;
+
+    union {
+        struct {
+            // If `type` is null, it is filled in with this type.
+            AstType* ast_type;
+            Type*    type;
+        };
+
+        AstTyped* value;
+    };
 };
 struct AstPolyProc {
     AstNode_base;
@@ -924,6 +937,7 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 AstNode* ast_clone(bh_allocator a, void* n);
 void promote_numlit_to_larger(AstNumLit* num);
+AstNumLit* make_int_literal(bh_allocator, i64 value);
 b32 convert_numlit_to_type(AstNumLit* num, Type* type);
 b32 type_check_or_auto_cast(AstTyped** pnode, Type* type);
 Type* resolve_expression_type(AstTyped* node);

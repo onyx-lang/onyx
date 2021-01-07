@@ -428,16 +428,29 @@ void promote_numlit_to_larger(AstNumLit* num) {
     }
 }
 
+typedef struct PolySolveResult {
+    PolySolutionKind kind;
+    union {
+        AstTyped* value;
+        Type*     actual;
+    };
+} PolySolveResult;
+
 typedef struct PolySolveElem {
     AstType* type_expr;
-    Type*    actual;
+
+    PolySolutionKind kind;
+    union {
+        AstTyped* value;
+        Type*     actual;
+    };
 } PolySolveElem;
 
-static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) {
+static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) {
     bh_arr(PolySolveElem) elem_queue = NULL;
     bh_arr_new(global_heap_allocator, elem_queue, 4);
 
-    Type* result = NULL;
+    PolySolveResult result = { -1, { NULL } };
 
     bh_arr_push(elem_queue, ((PolySolveElem) {
         .type_expr = type_expr,
@@ -449,7 +462,12 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
         bh_arr_deleten(elem_queue, 0, 1);
 
         if (elem.type_expr == (AstType *) target) {
-            result = elem.actual;
+            result.kind = elem.kind;
+            if (result.kind == PSK_Type) {
+                result.actual = elem.actual;
+            } else {
+                result.value = elem.value;
+            }
             break;
         }
 
@@ -459,17 +477,24 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
 
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstPointerType *) elem.type_expr)->elem,
+                    .kind = PSK_Type,
                     .actual = elem.actual->Pointer.elem,
                 }));
                 break;
             }
 
             case Ast_Kind_Array_Type: {
-                // TODO: Add check for same size array
                 if (elem.actual->kind != Type_Kind_Array) break;
 
                 bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = (AstType*) ((AstArrayType *) elem.type_expr)->count_expr,
+                    .kind = PSK_Value,
+                    .value = (AstTyped *) make_int_literal(semstate.node_allocator, elem.actual->Array.count)
+                }));
+
+                bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstArrayType *) elem.type_expr)->elem,
+                    .kind = PSK_Type,
                     .actual = elem.actual->Array.elem,
                 }));
                 break;
@@ -480,6 +505,7 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
 
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstSliceType *) elem.type_expr)->elem,
+                    .kind = PSK_Type,
                     .actual = elem.actual->Slice.ptr_to_data->Pointer.elem,
                 }));
                 break;
@@ -490,6 +516,7 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
 
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstDynArrType *) elem.type_expr)->elem,
+                    .kind = PSK_Type,
                     .actual = elem.actual->DynArray.ptr_to_data->Pointer.elem,
                 }));
                 break;
@@ -498,6 +525,7 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
             case Ast_Kind_VarArg_Type:
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstVarArgType *) elem.type_expr)->elem,
+                    .kind = PSK_Type,
                     .actual = actual,
                 }));
                 break;
@@ -510,12 +538,14 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
                 fori (i, 0, (i64) ft->param_count) {
                     bh_arr_push(elem_queue, ((PolySolveElem) {
                         .type_expr = ft->params[i],
+                        .kind = PSK_Type,
                         .actual = elem.actual->Function.params[i],
                     }));
                 }
 
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ft->return_type,
+                    .kind = PSK_Type,
                     .actual = elem.actual->Function.return_type,
                 }));
 
@@ -531,6 +561,7 @@ static Type* solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) 
                 fori (i, 0, bh_arr_length(pt->params)) {
                     bh_arr_push(elem_queue, ((PolySolveElem) {
                         .type_expr = pt->params[i],
+                        .kind = PSK_Type,
                         .actual = elem.actual->Struct.poly_args[i],
                     }));
                 }
@@ -594,23 +625,67 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
             return NULL;
         }
 
-        Type* resolved_type = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
+        PolySolveResult resolved = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
 
-        if (resolved_type == NULL) {
-            onyx_report_error(pos, "Unable to match polymorphic procedure type with actual type, '%s'.", type_get_name(actual_type));
-            return NULL;
+        switch (resolved.kind) {
+            case -1:
+                onyx_report_error(pos,
+                    "Unable to solve for polymoprhic variable '%b', using the type '%s'.",
+                    param->poly_sym->token->text,
+                    param->poly_sym->token->length,
+                    type_get_name(actual_type));
+                return NULL;
+
+            case PSK_Type:
+                bh_arr_push(slns, ((AstPolySolution) {
+                    .kind     = PSK_Type,
+                    .poly_sym = param->poly_sym,
+                    .type     = resolved.actual,
+                }));
+                break;
+
+            case PSK_Value:
+                bh_arr_push(slns, ((AstPolySolution) {
+                    .kind     = PSK_Value,
+                    .poly_sym = param->poly_sym,
+                    .value    = resolved.value,
+                }));
+                break;
         }
-
-        bh_arr_push(slns, ((AstPolySolution) {
-            .poly_sym = param->poly_sym,
-            .type     = resolved_type
-        }));
     }
 
     AstFunction* result = polymorphic_proc_solidify(pp, slns, pos);
     
     bh_arr_free(slns);
     return result;
+}
+
+// NOTE: This might return a volatile string. Do not store it without copying it.
+static char* build_poly_solution_key(AstPolySolution* sln) {
+    static char buffer[128];
+
+    if (sln->kind == PSK_Type) {
+        return (char *) type_get_unique_name(sln->type);
+    }
+
+    else if (sln->kind == PSK_Value) {
+        fori (i, 0, 128) buffer[i] = 0;
+
+        if (sln->value->kind == Ast_Kind_NumLit) {
+            strncat(buffer, "NUMLIT:", 127);
+            strncat(buffer, bh_bprintf("%l", ((AstNumLit *) sln->value)->value.l), 127);
+
+        } else {
+            // HACK: For now, the value pointer is just used. This means that
+            // sometimes, even through the solution is the same, it won't be
+            // stored the same.
+            bh_snprintf(buffer, 128, "%p", sln->value);
+        }
+
+        return buffer;
+    }
+
+    return NULL;
 }
 
 // NOTE: This returns a volatile string. Do not store it without copying it.
@@ -623,7 +698,7 @@ static char* build_polyproc_unique_key(bh_arr(AstPolySolution) slns) {
 
         strncat(key_buf, sln->poly_sym->token->text, 1023);
         strncat(key_buf, "=", 1023);
-        strncat(key_buf, type_get_unique_name(sln->type), 1023);
+        strncat(key_buf, build_poly_solution_key(sln), 1023);
         strncat(key_buf, ";", 1023);
 
         token_toggle_end(sln->poly_sym->token);
@@ -645,10 +720,21 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 
     Scope* poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, pos);
     bh_arr_each(AstPolySolution, sln, slns) {
-        AstTypeRawAlias* raw = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-        raw->to = sln->type;
+        AstNode *node = NULL;
 
-        symbol_introduce(poly_scope, sln->poly_sym->token, (AstNode *) raw);
+        switch (sln->kind) {
+            case PSK_Type:
+                node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+                ((AstTypeRawAlias *) node)->to = sln->type;
+                break;
+
+            case PSK_Value:
+                // CLEANUP: Maybe clone this?
+                node = (AstNode *) sln->value;
+                break;
+        }
+
+        symbol_introduce(poly_scope, sln->poly_sym->token, node);
     }
 
     AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
