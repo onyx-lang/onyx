@@ -1440,16 +1440,15 @@ CheckStatus check_statement_chain(AstNode* start) {
 CheckStatus check_block(AstBlock* block) {
     CHECK(statement_chain, block->body);
 
-    bh_table_each_start(AstTyped *, block->scope->symbols);
-        fill_in_type(value);
-
-        // if (value->type == NULL) {
-        //     onyx_report_error(value->token->pos,
-        //             "Unable to resolve type for local '%b'.",
-        //             value->token->text, value->token->length);
-        //     return 1;
-        // }
-    bh_table_each_end;
+    bh_arr_each(AstTyped *, value, block->allocate_exprs) {
+        fill_in_type(*value);
+        if ((*value)->type == NULL) {
+            onyx_report_error((*value)->token->pos,
+                    "Unable to resolve type for local '%b'.",
+                    (*value)->token->text, (*value)->token->length);
+            return 1;
+        }
+    }
 
     return Check_Success;
 }

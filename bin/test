@@ -6,26 +6,28 @@ for test_file in $(find tests/ -name '*.onyx'); do
     dirname="$(dirname -- "$test_file")"
     name="${filename%.*}"
 
-    echo "⏲ Checking $name.onyx"
+    printf "%-$((($(tput cols) - 8)))s" "⏲ Checking $name.onyx"
 
     if ! ./bin/onyx "$test_file" -o "./tests/$name.wasm" >/dev/null; then
-        echo "❌ Failed to compile $name.onyx."
+        print "\n❌ Failed to compile $name.onyx.\n"
         failed=1
         continue
     fi
     
     if ! ./bin/onyx-js "./tests/$name.wasm" > ./tmpoutput; then
-        echo "❌ Failed to run $name.onyx."
+        print "\n❌ Failed to run $name.onyx.\n"
         failed=1
         continue
     fi
 
     if ! diff ./tmpoutput "$dirname/$name" >/dev/null; then
-        echo "❌ Test output did not match."
+        print "\n❌ Test output did not match.\n"
         diff ./tmpoutput "$dirname/$name"
         # failed=0
         continue
     fi
+
+    echo "✔ Passed"
 
     rm "./tests/$name.wasm"
 done

@@ -25,7 +25,7 @@ List of known bugs:
     which is doesn't match the second one, when the original parameters would
     have matched correctly.
 
-[ ] `defer` statements are not executed at the end of a loop if the loop is
+[X] `defer` statements are not executed at the end of a loop if the loop is
     exited using a `break` statement, or a `continue` statement. The semantics
     of this need to change because it is not expected behaviour. Also it would
     prevent the usefulness of this pattern:
