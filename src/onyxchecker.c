@@ -305,11 +305,12 @@ no_match:
     }
 
     char* arg_str = bh_alloc(global_scratch_allocator, 1024);
+    arg_str[0] = '\0';
 
     bh_arr_each(AstArgument *, arg, call->arg_arr) {
         strncat(arg_str, type_get_name((*arg)->value->type), 1023);
 
-        if ((*arg)->next != NULL)
+        if (arg != &bh_arr_last(call->arg_arr))
             strncat(arg_str, ", ", 1023);
     }
 

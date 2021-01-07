@@ -1,6 +1,44 @@
+// Slices are a useful and simple data structure that are commonly
+// used throughout almost all Onyx programs. A slice in Onyx simply
+// represents a two member structure, consisting of a pointer, and
+// an unsigned count. Although that sounds deceptively simple, it
+// is a powerful construct to have. In fact, strings in Onyx, i.e.
+// the 'str' type, is actually just a slice of u8.
+
 #load "core/std/wasi"
 
 use package core
 
 main :: proc (args: [] cstr) {
+    // A dummy array to demonstrate.
+    arr := i32.[ 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 ];
+
+    // In Onyx a slice type is simply written as an empty pair of
+    // square brackets, with the type of elements of the slice
+    // immediately following.
+    slice : [] i32;
+
+    // Slices have two members, data and count. You can set them directly.
+    slice.data  = ^arr[3];
+    slice.count = 4;
+
+    // You can iterate over slices directly using a for-loop.
+    for elem: slice do printf("%i ", elem);
+    print("\n");
+
+    // Another equivalent way of writing lines 21 and 22 is to
+    // use the array subscript notation, but provide a range for
+    // the index as so. This is generally called the slice literal
+    // notation.
+    slice = arr[3 .. 7];
+
+    // Printing it out to verify it is the same.
+    for elem: slice do printf("%i ", elem);
+    print("\n");
+
+    // Since strings are represented as slices in Onyx, substrings
+    // are easily accessed using the same slice literal syntax.
+    some_string := "This is a test string for demoing purposes.";
+    substr      := some_string.data[10 .. 14];
+    println(substr);
 }

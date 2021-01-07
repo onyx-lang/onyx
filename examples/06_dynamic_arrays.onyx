@@ -1,6 +1,50 @@
+// Dynamic arrays are arguably the most useful data structure of
+// all time. They allow for the array to be dynamically resized,
+// which means you don't need to know upfront the maximum number
+// of elements that will be in your array. It can always grow to
+// the size it needs to.
+
+// Dynamic arrays in Onyx are easy to use on purpose, because I
+// know how useful they are in almost every program I write.
+
 #load "core/std/wasi"
 
 use package core
 
 main :: proc (args: [] cstr) {
+    // Declaring dynamic arrays in Onyx looks like this. The
+    // '..' makes it a dynamic array, as opposed to a slice
+    // or fixed size array.
+    arr : [..] i32;    
+
+    // Currently, there are no implicit procedure calls anywhere
+    // in the language because I find explicitly specifying
+    // everything to be less bug prone in the long run, at the
+    // trade off of being mildly tedious. Since there are implicit
+    // procedure calls, we have to initialize and free the dynamic
+    // array explicitly. The 'defer' simply runs array.free at the
+    // end of this procedure scope. We will talk more about how to
+    // use the defer keyword later.
+    array.init(^arr);
+    defer array.free(^arr);
+
+    // Once the dynamic array has been initialized, we can begin
+    // to use it. The most common function you will probably use
+    // is array.push. It simply appends a new element to end of
+    // the array.
+    for i: 0 .. 10 do array.push(^arr, i);
+
+    // Now if we print the array, we will see the numbers from 0 to 9.
+    print_array(arr);
+
+    // We can remove elements from the end using array.pop.
+    for i: 0 .. 4 do array.pop(^arr);
+    print_array(arr);
+
+    // We can insert elements at the beginning using array.insert.
+    for i: 6 .. 10 do array.insert(^arr, 0, i);
+    print_array(arr);
+
+    // There are many other useful functions in the core.array package.
+    // You can look in core/array.onyx for a list of all of them.
 }
