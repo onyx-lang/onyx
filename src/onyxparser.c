@@ -428,6 +428,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        // :TypeValueInterchange
+        case '<': {
+            AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
+            alias->token = expect_token(parser, '<');
+            alias->to = parse_type(parser);
+            expect_token(parser, '>');
+
+            retval = (AstTyped *) alias;
+            break;
+        }
+
         case '#': {
             if (parse_possible_directive(parser, "file_contents")) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
@@ -1539,6 +1550,16 @@ static AstType* parse_type(OnyxParser* parser) {
             // :ValueDirectiveHack
             *next_insertion = (AstType *) parse_expression(parser);
             next_insertion = NULL;
+            break;
+        }
+
+        else if (parser->curr->type == '<') {
+            // :TypeValueInterchange
+            expect_token(parser, '<');
+            *next_insertion = (AstType *) parse_expression(parser);
+            next_insertion = NULL;
+            expect_token(parser, '>');
+
             break;
         }
 

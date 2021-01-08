@@ -16,3 +16,9 @@ Some tags to watch out for in the code with features that may be removed in the 
         The implementation of `null_proc` is rather simple, but feels a
         little verbose an targential compared to everything else being done
         in the compiler.
+
+    :TypeValueInterchange
+        Angle brackets are being used to specify types in value expressions
+        and vice versa. This is just a temporary hack. The long term goal
+        is that type expressions are automatically detected in value
+        expressions.
