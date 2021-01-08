@@ -3,7 +3,6 @@
 use package core
 
 main :: proc (args: [] cstr) {
-
     NewPolyStruct :: struct (T: type_expr, N: i32) {
         x : [N] T; 
         y : [N] f32;
@@ -16,6 +15,10 @@ main :: proc (args: [] cstr) {
 
     for x: nps.x do println(x);
 
+
+
+    
+
     SimpleWithDefault :: struct (T: type_expr, default: str) {
         x : T;
         str_member : str = default; 
@@ -24,4 +27,7 @@ main :: proc (args: [] cstr) {
     swd := <SimpleWithDefault(i32, #value "Hello World!")>.{ x = 1234 };
     println(swd.x);
     println(swd.str_member);
+    poly_match(swd);
+
+    poly_match :: proc (swd: SimpleWithDefault($T, $D)) do println(D);
 }

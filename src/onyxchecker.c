@@ -1308,7 +1308,12 @@ CheckStatus check_align_of(AstAlignOf* ao) {
 CheckStatus check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
-        onyx_report_error(expr->token->pos, "Type used as part of an expression.");
+        if (expr->token) {
+            onyx_report_error(expr->token->pos, "Type used as part of an expression.");
+        }
+        else {
+            onyx_report_error((OnyxFilePos) { 0 }, "Type used as part of an expression somewhere in the program.");
+        }
         return Check_Error;
     }
 

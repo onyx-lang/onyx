@@ -254,7 +254,8 @@ whitespace_skipped:
         if (*tokenizer->curr == '.') hit_decimal = 1;
 
         u32 len = 1;
-        while (char_is_num(*(tokenizer->curr + 1)) || (!hit_decimal && *(tokenizer->curr + 1) == '.')) {
+        while (char_is_num(*(tokenizer->curr + 1))
+            || (!hit_decimal && *(tokenizer->curr + 1) == '.' && *(tokenizer->curr + 2) != '.')) {
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
 

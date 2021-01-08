@@ -428,6 +428,27 @@ void promote_numlit_to_larger(AstNumLit* num) {
     }
 }
 
+static void insert_poly_slns_into_scope(Scope* scope, bh_arr(AstPolySolution) slns) {
+    bh_arr_each(AstPolySolution, sln, slns) {
+        AstNode *node = NULL;
+
+        switch (sln->kind) {
+            case PSK_Type:
+                node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+                ((AstTypeRawAlias *) node)->token = sln->poly_sym->token;
+                ((AstTypeRawAlias *) node)->to = sln->type;
+                break;
+
+            case PSK_Value:
+                // CLEANUP: Maybe clone this?
+                node = (AstNode *) sln->value;
+                break;
+        }
+
+        symbol_introduce(scope, sln->poly_sym->token, node);
+    }
+}
+
 typedef struct PolySolveResult {
     PolySolutionKind kind;
     union {
@@ -730,23 +751,7 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     }
 
     Scope* poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, pos);
-    bh_arr_each(AstPolySolution, sln, slns) {
-        AstNode *node = NULL;
-
-        switch (sln->kind) {
-            case PSK_Type:
-                node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-                ((AstTypeRawAlias *) node)->to = sln->type;
-                break;
-
-            case PSK_Value:
-                // CLEANUP: Maybe clone this?
-                node = (AstNode *) sln->value;
-                break;
-        }
-
-        symbol_introduce(poly_scope, sln->poly_sym->token, node);
-    }
+    insert_poly_slns_into_scope(poly_scope, slns);
 
     AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
     bh_table_put(AstFunction *, pp->concrete_funcs, unique_key, func);
@@ -936,26 +941,10 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
     }
 
     scope_clear(ps_type->scope);
-
-    bh_arr_each(AstPolySolution, sln, slns) {
-        AstNode *node = NULL;
-        
-        switch (sln->kind) {
-            case PSK_Type:
-                node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-                ((AstTypeRawAlias *) node)->to = sln->type;
-                break;
-
-            case PSK_Value:
-                // CLEANUP: Maybe clone this?
-                node = (AstNode *) sln->value;
-                break;
-        }
-
-        symbol_introduce(ps_type->scope, sln->poly_sym->token, node);
-    }
+    insert_poly_slns_into_scope(ps_type->scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(semstate.node_allocator, ps_type->base_struct);
+    bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
     Entity struct_entity = {
         .state = Entity_State_Resolve_Symbols,
@@ -979,8 +968,6 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
         onyx_report_error(pos, "Error in creating polymoprhic struct instantiation here.");
         return NULL;
     }
-
-    bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
     Type* cs_type = type_build_from_ast(semstate.node_allocator, (AstType *) concrete_struct);
     cs_type->Struct.poly_sln = NULL;
