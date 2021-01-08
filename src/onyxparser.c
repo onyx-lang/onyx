@@ -1515,13 +1515,13 @@ static AstType* parse_type(OnyxParser* parser) {
             if (parser->curr->type == '(') {
                 OnyxToken* paren_token = expect_token(parser, '(');
 
-                bh_arr(AstType *) params = NULL;
+                bh_arr(AstNode *) params = NULL;
                 bh_arr_new(global_heap_allocator, params, 2);
 
                 while (parser->curr->type != ')') {
                     if (parser->hit_unexpected_token) break;
 
-                    AstType* t = parse_type(parser);
+                    AstNode* t = (AstNode *) parse_type(parser);
                     bh_arr_push(params, t);
 
                     if (parser->curr->type != ')')
@@ -1587,15 +1587,22 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     if (parser->curr->type == '(') {
         consume_token(parser);
 
-        bh_arr(OnyxToken *) poly_params = NULL;
+        bh_arr(AstPolyStructParam) poly_params = NULL;
         bh_arr_new(global_heap_allocator, poly_params, 1);
 
-        while (parser->curr->type == '$') {
-            consume_token(parser);
+        while (parser->curr->type != ')') {
             if (parser->hit_unexpected_token) return NULL;
 
             OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
-            bh_arr_push(poly_params, sym_token);
+            expect_token(parser, ':');
+
+            AstType* param_type = parse_type(parser);
+
+            bh_arr_push(poly_params, ((AstPolyStructParam) {
+                .token = sym_token,
+                .type_node = param_type,
+                .type = NULL, 
+            }));
 
             if (parser->curr->type != ')')
                 expect_token(parser, ',');

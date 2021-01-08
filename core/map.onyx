@@ -4,7 +4,7 @@ use package core { printf }
 use package core.array as array
 use package core.string as string
 
-Map :: struct ($K, $V) {
+Map :: struct (K: type_expr, V: type_expr) {
     hashes  : [..] i32;
     entries : [..] MapEntry(K, V);
 
@@ -12,10 +12,10 @@ Map :: struct ($K, $V) {
     default_value : V;
 }
 
-MapEntry :: struct ($K, $T) {
+MapEntry :: struct (K: type_expr, V: type_expr) {
     next  : i32;
     key   : K;
-    value : T;
+    value : V;
 }
 
 init :: proc (use map: ^Map($K, $V), dv: V = ~~0, hash_count: i32 = 16) {

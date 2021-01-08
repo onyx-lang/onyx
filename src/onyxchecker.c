@@ -46,6 +46,8 @@ CheckStatus check_function_header(AstFunction* func);
 CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
 
+static inline void fill_in_type(AstTyped* node);
+
 static inline void fill_in_array_count(AstType* type_node) {
     if (type_node == NULL) return;
 
@@ -61,8 +63,24 @@ static inline void fill_in_array_count(AstType* type_node) {
     }
 }
 
+static inline void fill_in_poly_call_args(AstType* type_node) {
+    if (type_node == NULL) return;
+    if (type_node->kind != Ast_Kind_Poly_Call_Type) return;
+
+    AstPolyCallType* pctype = (AstPolyCallType *) type_node;
+
+    bh_arr_each(AstNode *, param, pctype->params) {
+        if (!node_is_type(*param)) {
+            check_expression((AstTyped **) param);
+            resolve_expression_type((AstTyped *) *param);
+            fill_in_type((AstTyped *) *param);
+        }
+    }
+}
+
 static inline void fill_in_type(AstTyped* node) {
     fill_in_array_count(node->type_node);
+    fill_in_poly_call_args(node->type_node);
 
     if (node->type == NULL)
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
@@ -952,7 +970,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             token_toggle_end((*smem)->token);
 
             if (s.included_through_use) {
-                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%s', whic was included through a 'use' statement.", s.name);
+                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%s', which was included through a 'use' statement.", s.name);
                 return Check_Error;
             }
 
@@ -969,7 +987,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
                 u32 idx = (*smem)->idx;
 
                 if (sl->values[idx] == NULL) {
-                    if ((*smem)->initial_value == NULL) {
+                    if (*(*smem)->initial_value == NULL) {
                         onyx_report_error(sl->token->pos, "No value was given for the field '%s'.", (*smem)->name);
                         return Check_Error;
                     }

@@ -38,6 +38,10 @@ static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_to
 AstNumLit builtin_heap_start  = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
 AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token,  NULL, (AstType *) &basic_type_rawptr, NULL };
 
+// :TypeExprHack
+static OnyxToken type_expr_token = { Token_Type_Symbol, 9, "type_expr", { 0 } };
+AstNode type_expr_symbol         = { Ast_Kind_Basic_Type, 0, &type_expr_token, NULL };
+
 AstType  *builtin_string_type;
 AstType  *builtin_range_type;
 Type     *builtin_range_type_type;
@@ -59,6 +63,7 @@ const BuiltinSymbol builtin_symbols[] = {
     { NULL, "f32",        (AstNode *) &basic_type_f32 },
     { NULL, "f64",        (AstNode *) &basic_type_f64 },
     { NULL, "rawptr",     (AstNode *) &basic_type_rawptr },
+    { NULL, "type_expr",  (AstNode *) &type_expr_symbol },
 
     { "simd", "i8x16",    (AstNode *) &basic_type_i8x16 },
     { "simd", "i16x8",    (AstNode *) &basic_type_i16x8 },

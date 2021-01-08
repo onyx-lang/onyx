@@ -192,6 +192,11 @@ AstType* symres_type(AstType* type) {
         AstPolyStructType* pst_node = (AstPolyStructType *) type;
         pst_node->scope = scope_create(semstate.node_allocator, semstate.curr_scope, pst_node->token->pos);
 
+        bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
+            param->type_node = symres_type(param->type_node);
+            param->type      = type_build_from_ast(semstate.node_allocator, param->type_node);
+        }
+
         return type;
     }
 
@@ -200,8 +205,12 @@ AstType* symres_type(AstType* type) {
 
         pc_node->callee = symres_type(pc_node->callee);
 
-        bh_arr_each(AstType *, param, pc_node->params) {
-            *param = symres_type(*param);
+        bh_arr_each(AstNode *, param, pc_node->params) {
+            if (node_is_type(*param)) {
+                *param = (AstNode *) symres_type((AstType *) *param);
+            } else {
+                symres_expression((AstTyped **) param);
+            }
         }
 
         return type;
@@ -814,28 +823,13 @@ static void symres_memres(AstMemRes** memres) {
 }
 
 static void symres_struct_defaults(AstType* t) {
-    switch (t->kind) {
-        case Ast_Kind_Struct_Type: {
-            AstStructType* st = (AstStructType *) t;
-            bh_arr_each(AstStructMember *, smem, st->members) {
-                if ((*smem)->initial_value != NULL) {
-                    symres_expression(&(*smem)->initial_value);
-                }
-            }
-            break;
+    if (t->kind != Ast_Kind_Struct_Type) return;
+    
+    AstStructType* st = (AstStructType *) t;
+    bh_arr_each(AstStructMember *, smem, st->members) {
+        if ((*smem)->initial_value != NULL) {
+            symres_expression(&(*smem)->initial_value);
         }
-
-        case Ast_Kind_Poly_Struct_Type: {
-            AstPolyStructType* st = (AstPolyStructType *) t;
-            bh_arr_each(AstStructMember *, smem, st->base_struct->members) {
-                if ((*smem)->initial_value != NULL) {
-                    symres_expression(&(*smem)->initial_value);
-                }
-            }
-            break;
-        }
-
-        default: break;
     }
 }
 

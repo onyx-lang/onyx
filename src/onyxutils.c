@@ -450,10 +450,11 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
     bh_arr(PolySolveElem) elem_queue = NULL;
     bh_arr_new(global_heap_allocator, elem_queue, 4);
 
-    PolySolveResult result = { -1, { NULL } };
+    PolySolveResult result = { PSK_Undefined, { NULL } };
 
     bh_arr_push(elem_queue, ((PolySolveElem) {
         .type_expr = type_expr,
+        .kind = PSK_Type,
         .actual    = actual
     }));
 
@@ -463,11 +464,10 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
 
         if (elem.type_expr == (AstType *) target) {
             result.kind = elem.kind;
-            if (result.kind == PSK_Type) {
-                result.actual = elem.actual;
-            } else {
-                result.value = elem.value;
-            }
+
+            assert(elem.kind != PSK_Undefined);
+            if (result.kind == PSK_Type)  result.actual = elem.actual;
+            if (result.kind == PSK_Value) result.value = elem.value;
             break;
         }
 
@@ -556,16 +556,25 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
 
             case Ast_Kind_Poly_Call_Type: {
                 if (elem.actual->kind != Type_Kind_Struct) break;
-                if (bh_arr_length(elem.actual->Struct.poly_args) != bh_arr_length(((AstPolyCallType *) elem.type_expr)->params)) break;
+                if (bh_arr_length(elem.actual->Struct.poly_sln) != bh_arr_length(((AstPolyCallType *) elem.type_expr)->params)) break;
 
                 AstPolyCallType* pt = (AstPolyCallType *) elem.type_expr;
 
                 fori (i, 0, bh_arr_length(pt->params)) {
-                    bh_arr_push(elem_queue, ((PolySolveElem) {
-                        .type_expr = pt->params[i],
-                        .kind = PSK_Type,
-                        .actual = elem.actual->Struct.poly_args[i],
-                    }));
+                    PolySolutionKind kind = elem.actual->Struct.poly_sln[i].kind;
+                    if (kind == PSK_Type) {
+                        bh_arr_push(elem_queue, ((PolySolveElem) {
+                            .kind = kind,
+                            .type_expr = (AstType *) pt->params[i],
+                            .actual = elem.actual->Struct.poly_sln[i].type,
+                        }));
+                    } else {
+                        bh_arr_push(elem_queue, ((PolySolveElem) {
+                            .kind = kind,
+                            .type_expr = (AstType *) pt->params[i],
+                            .value = elem.actual->Struct.poly_sln[i].value,
+                        }));
+                    }
                 }
 
                 break;
@@ -630,7 +639,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
         PolySolveResult resolved = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
 
         switch (resolved.kind) {
-            case -1:
+            case PSK_Undefined:
                 onyx_report_error(pos,
                     "Unable to solve for polymoprhic variable '%b', using the type '%s'.",
                     param->poly_sym->token->text,
@@ -691,7 +700,7 @@ static char* build_poly_solution_key(AstPolySolution* sln) {
 }
 
 // NOTE: This returns a volatile string. Do not store it without copying it.
-static char* build_polyproc_unique_key(bh_arr(AstPolySolution) slns) {
+static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
     static char key_buf[1024];
     fori (i, 0, 1024) key_buf[i] = 0;
 
@@ -715,7 +724,7 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     }
 
     // NOTE: Check if a version of this polyproc has already been created.
-    char* unique_key = build_polyproc_unique_key(slns);
+    char* unique_key = build_poly_slns_unique_key(slns);
     if (bh_table_has(AstFunction *, pp->concrete_funcs, unique_key)) {
         return bh_table_get(AstFunction *, pp->concrete_funcs, unique_key);
     }
@@ -826,81 +835,160 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     }
 }
 
+char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
+    char name_buf[256];
+    fori (i, 0, 256) name_buf[i] = 0;
 
-AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params, OnyxFilePos pos) {
+    strncat(name_buf, ps_type->name, 255);
+    strncat(name_buf, "(", 255);
+    bh_arr_each(AstPolySolution, ptype, cs_type->Struct.poly_sln) {
+        if (ptype != cs_type->Struct.poly_sln)
+            strncat(name_buf, ", ", 255);
+
+        // This logic will have to be other places as well.
+
+        switch (ptype->kind) {
+            case PSK_Undefined: assert(0); break;
+            case PSK_Type:      strncat(name_buf, type_get_name(ptype->type), 255); break;
+            case PSK_Value: {
+                // FIX
+                if (ptype->value->kind == Ast_Kind_NumLit) {
+                    AstNumLit* nl = (AstNumLit *) ptype->value;
+                    if (type_is_integer(nl->type)) {
+                        strncat(name_buf, bh_bprintf("%l", nl->value.l), 127);
+                    } else {
+                        strncat(name_buf, "numlit (FIX ME)", 127);
+                    }
+                } else {
+                    strncat(name_buf, "<expr>", 127);
+                }
+
+                break;
+            }
+        }
+    }
+    strncat(name_buf, ")", 255);
+
+    return bh_aprintf(global_heap_allocator, "%s", name_buf);
+}
+
+AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
     // @Cleanup
-    assert(bh_arr_length(ps_type->poly_params) == bh_arr_length(params));
     assert(ps_type->scope != NULL);
 
     if (ps_type->concrete_structs == NULL) {
         bh_table_init(global_heap_allocator, ps_type->concrete_structs, 16);
     }
 
-    scope_clear(ps_type->scope);
+    if (bh_arr_length(slns) < bh_arr_length(ps_type->poly_params)) {
+        onyx_report_error(pos, "Not enough arguments for polymorphic struct creation. Expected %d, got %d",
+            bh_arr_length(ps_type->poly_params),
+            bh_arr_length(slns));
 
-    fori (i, 0, bh_arr_length(ps_type->poly_params)) {
-        if (params[i] == NULL) {
-            onyx_report_error((OnyxFilePos) { 0 }, "Type parameter is not a type.");
+        return NULL;
+    }
+
+    i32 i = 0;
+    bh_arr_each(AstPolySolution, sln, slns) {
+        PolySolutionKind expected_kind = PSK_Undefined;
+        if ((AstNode *) ps_type->poly_params[i].type_node == &type_expr_symbol) {
+            expected_kind = PSK_Type;
+        } else {
+            expected_kind = PSK_Value;
+        }
+
+        if (sln->kind != expected_kind) {
+            if (expected_kind == PSK_Type) 
+                onyx_report_error(pos, "Expected type expression for %d%s argument.", i + 1, bh_num_suffix(i + 1));
+
+            if (expected_kind == PSK_Value)
+                onyx_report_error(pos, "Expected value expression of type '%s' for %d%s argument.",
+                    type_get_name(ps_type->poly_params[i].type),
+                    i + 1, bh_num_suffix(i + 1));
+
             return NULL;
         }
 
-        AstTypeRawAlias* raw = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-        raw->to = params[i];
+        if (sln->kind == PSK_Value) {
+            if ((sln->value->flags & Ast_Flag_Comptime) == 0) {
+                onyx_report_error(pos,
+                    "Expected compile-time known argument for '%b'.",
+                    sln->poly_sym->token->text,
+                    sln->poly_sym->token->length);
+                return NULL;
+            }
 
-        symbol_introduce(ps_type->scope, ps_type->poly_params[i], (AstNode *) raw);
+            if (!types_are_compatible(sln->value->type, ps_type->poly_params[i].type)) {
+                onyx_report_error(pos, "Expected compile-time argument of type '%s', got '%s'.",
+                    type_get_name(ps_type->poly_params[i].type),
+                    type_get_name(sln->value->type));
+                return NULL;
+            }
+        }
+
+        sln->poly_sym = (AstNode *) &ps_type->poly_params[i];
+        i++;
     }
 
-    char key_buf[1024];
-    fori (i, 0, 1024) key_buf[i] = 0;
-    bh_table_each_start(AstNode *, ps_type->scope->symbols);
-        strncat(key_buf, key, 1023);
-        strncat(key_buf, "=", 1023);
-        strncat(key_buf, type_get_unique_name(((AstTypeRawAlias *) value)->to), 1023);
-        strncat(key_buf, ";", 1023);
-    bh_table_each_end;
+    char* unique_key = build_poly_slns_unique_key(slns);
+    if (bh_table_has(AstStructType *, ps_type->concrete_structs, unique_key)) {
+        return bh_table_get(AstStructType *, ps_type->concrete_structs, unique_key);
+    }
 
-    if (bh_table_has(AstStructType *, ps_type->concrete_structs, key_buf)) {
-        return bh_table_get(AstStructType *, ps_type->concrete_structs, key_buf);
+    scope_clear(ps_type->scope);
+
+    bh_arr_each(AstPolySolution, sln, slns) {
+        AstNode *node = NULL;
+        
+        switch (sln->kind) {
+            case PSK_Type:
+                node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+                ((AstTypeRawAlias *) node)->to = sln->type;
+                break;
+
+            case PSK_Value:
+                // CLEANUP: Maybe clone this?
+                node = (AstNode *) sln->value;
+                break;
+        }
+
+        symbol_introduce(ps_type->scope, sln->poly_sym->token, node);
     }
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(semstate.node_allocator, ps_type->base_struct);
 
-    Scope* old_scope = semstate.curr_scope;
-    semstate.curr_scope = ps_type->scope;
-    concrete_struct = (AstStructType *) symres_type((AstType *) concrete_struct);
-    semstate.curr_scope = old_scope;
+    Entity struct_entity = {
+        .state = Entity_State_Resolve_Symbols,
+        .type = Entity_Type_Type_Alias,
+        .type_alias = (AstType *) concrete_struct,
+        .package = NULL,
+        .scope = ps_type->scope,
+    };
+    Entity struct_default_entity = {
+        .state = Entity_State_Resolve_Symbols,
+        .type = Entity_Type_Struct_Member_Default,
+        .type_alias = (AstType *) concrete_struct,
+        .package = NULL,
+        .scope = ps_type->scope,
+    };
 
-    if (onyx_has_errors()) goto has_error;
-    goto no_errors;
+    entity_bring_to_state(&struct_entity, Entity_State_Code_Gen);
+    entity_bring_to_state(&struct_default_entity, Entity_State_Code_Gen);
+ 
+    if (onyx_has_errors()) {
+        onyx_report_error(pos, "Error in creating polymoprhic struct instantiation here.");
+        return NULL;
+    }
 
-has_error:
-    // onyx_report_error(pos, "Error in polymorphic struct generated from this call site.");
-    return NULL;
-
-no_errors:
-    bh_table_put(AstStructType *, ps_type->concrete_structs, key_buf, concrete_struct);
+    bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
     Type* cs_type = type_build_from_ast(semstate.node_allocator, (AstType *) concrete_struct);
+    cs_type->Struct.poly_sln = NULL;
+    bh_arr_new(global_heap_allocator, cs_type->Struct.poly_sln, bh_arr_length(slns));
 
-    cs_type->Struct.poly_args = NULL;
-    bh_arr_new(global_heap_allocator, cs_type->Struct.poly_args, bh_arr_length(params));
+    fori (i, 0, bh_arr_length(slns)) bh_arr_push(cs_type->Struct.poly_sln, slns[i]);
 
-    fori (i, 0, bh_arr_length(params)) bh_arr_push(cs_type->Struct.poly_args, params[i]);
-
-    char name_buf[256];
-    fori (i, 0, 256) name_buf[i] = 0;
-
-    strncat(name_buf, ps_type->name, 255);
-    strncat(name_buf, "(", 255);
-    bh_arr_each(Type *, ptype, cs_type->Struct.poly_args) {
-        if (ptype != cs_type->Struct.poly_args)
-            strncat(name_buf, ", ", 255);
-
-        strncat(name_buf, type_get_name(*ptype), 255);
-    }
-    strncat(name_buf, ")", 255);
-    cs_type->Struct.name = bh_aprintf(semstate.node_allocator, "%s", name_buf);
-
+    cs_type->Struct.name = build_poly_struct_name(ps_type, cs_type);
     return concrete_struct;
 }
 

@@ -335,8 +335,8 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             pcd->params = NULL;
             bh_arr_new(global_heap_allocator, pcd->params, bh_arr_length(pcs->params));
 
-            bh_arr_each(AstType *, param, pcs->params) {
-                bh_arr_push(pcd->params, (AstType *) ast_clone(a, *param));
+            bh_arr_each(AstNode *, param, pcs->params) {
+                bh_arr_push(pcd->params, ast_clone(a, *param));
             }
 
             break;

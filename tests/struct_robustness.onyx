@@ -105,7 +105,7 @@ main :: proc (args: [] cstr) {
     test_polymorphic :: proc () {
         println("\n\nTesting a polymorphic struct.");
 
-        PolyStruct :: struct ($T, $R) {
+        PolyStruct :: struct (T: type_expr, R: type_expr) {
             t_data : T;
             r_data : R;
         }
@@ -124,7 +124,7 @@ main :: proc (args: [] cstr) {
     test_polymorphic_with_defaults :: proc () {
         println("\n\nTesting a polymorphic struct with default values.");
 
-        PolyStruct :: struct ($T, $R) {
+        PolyStruct :: struct (T: type_expr, R: type_expr) {
             t_data : T = 1234;
             r_data : R = 5678;
         }
@@ -138,7 +138,7 @@ main :: proc (args: [] cstr) {
     test_polymorphic_union_with_use :: proc () {
         println("\n\nTesting a polymorphic union with use.");
 
-        PolyStruct :: struct ($T, $R) {
+        PolyStruct :: struct (T: type_expr, R: type_expr) {
             use container : struct #union {
                 t_data : T;
                 r_data : R;
@@ -178,7 +178,7 @@ main :: proc (args: [] cstr) {
     test_polymorphic_union :: proc () {
         println("\n\nTesting a polymorphic union.");
 
-        PolyUnion :: struct ($T, $R) #union {
+        PolyUnion :: struct (T: type_expr, R: type_expr) #union {
             t_data : T;
             r_data : R;
         }

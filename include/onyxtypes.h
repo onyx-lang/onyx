@@ -88,7 +88,7 @@ typedef struct StructMember {
         u16 alignment, mem_count;                                 \
         bh_table(StructMember) members;                           \
         bh_arr(StructMember *) memarr;                            \
-        bh_arr(Type *)         poly_args;                         \
+        bh_arr(struct AstPolySolution) poly_sln;                  \
     })                                                            \
     TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
     TYPE_KIND(Slice, struct { Type *ptr_to_data; })               \

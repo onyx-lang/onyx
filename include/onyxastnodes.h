@@ -50,6 +50,7 @@ typedef struct AstVarArgType AstVarArgType;
 typedef struct AstStructType AstStructType;
 typedef struct AstStructMember AstStructMember;
 typedef struct AstPolyStructType AstPolyStructType;
+typedef struct AstPolyStructParam AstPolyStructParam;
 typedef struct AstPolyCallType AstPolyCallType;
 typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
@@ -630,11 +631,14 @@ struct AstStructMember {
     AstTyped_base;
     AstTyped* initial_value;
 };
+struct AstPolyStructParam {
+    AstTyped_base;
+};
 struct AstPolyStructType {
     AstType_base;
 
     Scope *scope;
-    bh_arr(OnyxToken *) poly_params;
+    bh_arr(AstPolyStructParam) poly_params;
     bh_table(AstStructType *) concrete_structs;
 
     AstStructType* base_struct;
@@ -643,7 +647,9 @@ struct AstPolyCallType {
     AstType_base;
 
     AstType* callee;
-    bh_arr(AstType *) params;
+
+    // NOTE: These nodes can be either AstTypes, or AstTyped expressions.
+    bh_arr(AstNode *) params;
 };
 struct AstEnumType {
     AstType_base;
@@ -745,6 +751,7 @@ struct AstPolyParam {
 };
 
 typedef enum PolySolutionKind {
+    PSK_Undefined,
     PSK_Type,
     PSK_Value,
 } PolySolutionKind;
@@ -905,6 +912,9 @@ extern AstBasicType basic_type_rawptr;
 extern AstBasicType basic_type_int_unsized;
 extern AstBasicType basic_type_float_unsized;
 
+// :TypeExprHack
+extern AstNode type_expr_symbol;
+
 extern AstNode   builtin_package_node;
 extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
@@ -953,7 +963,7 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
 
 
-AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(Type *) params, OnyxFilePos pos);
+AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

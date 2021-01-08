@@ -475,15 +475,27 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             AstPolyStructType* ps_type = (AstPolyStructType *) pc_type->callee;
 
-            bh_arr(Type *) param_types = NULL;
-            bh_arr_new(global_heap_allocator, param_types, bh_arr_length(pc_type->params));
-            bh_arr_each(AstType *, ptype, pc_type->params) {
-                bh_arr_push(param_types, type_build_from_ast(alloc, *ptype));
+            bh_arr(AstPolySolution) slns = NULL;
+            bh_arr_new(global_heap_allocator, slns, bh_arr_length(pc_type->params));
+            bh_arr_each(AstNode *, given, pc_type->params) {
+                if (node_is_type(*given)) {
+                    bh_arr_push(slns, ((AstPolySolution) {
+                        .kind     = PSK_Type,
+                        .type     = type_build_from_ast(alloc, (AstType *) *given),
+                    }));
+                } else {
+                    bh_arr_push(slns, ((AstPolySolution) {
+                        .kind  = PSK_Value,
+                        .value = (AstTyped *) *given,
+                    }));
+                }
             }
 
-            AstStructType* concrete = polymorphic_struct_lookup(ps_type, param_types, pc_type->token->pos);
+            AstStructType* concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos);
 
-            bh_arr_free(param_types);
+            // This should be copied in the previous function.
+            // CLEANUP: Maybe don't copy it and just use this one since it is allocated on the heap?
+            bh_arr_free(slns);
 
             return type_build_from_ast(alloc, (AstType *) concrete);
         }
