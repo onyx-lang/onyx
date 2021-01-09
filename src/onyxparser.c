@@ -1415,158 +1415,170 @@ static AstType* parse_type(OnyxParser* parser) {
     while (1) {
         if (parser->hit_unexpected_token) return root;
 
-        if (parser->curr->type == '^') {
-            AstPointerType* new = make_node(AstPointerType, Ast_Kind_Pointer_Type);
-            new->flags |= Basic_Flag_Pointer;
-            new->token = expect_token(parser, '^');
-            *next_insertion = (AstType *) new;
-            next_insertion = &new->elem;
-        }
+        switch (parser->curr->type) {
+            case '^': {
+                AstPointerType* new = make_node(AstPointerType, Ast_Kind_Pointer_Type);
+                new->flags |= Basic_Flag_Pointer;
+                new->token = expect_token(parser, '^');
 
-        else if (parser->curr->type == '[') {
-            AstType *new;
-            OnyxToken *open_bracket = expect_token(parser, '[');
+                *next_insertion = (AstType *) new;
+                next_insertion = &new->elem;
+                break;
+            }
 
-            if (parser->curr->type == ']') {
-                new = make_node(AstSliceType, Ast_Kind_Slice_Type);
-                new->token = open_bracket;
+            case '[': {
+                AstType *new;
+                OnyxToken *open_bracket = expect_token(parser, '[');
 
-            } else if (parser->curr->type == Token_Type_Dot_Dot) {
-                new = make_node(AstDynArrType, Ast_Kind_DynArr_Type);
-                new->token = open_bracket;
-                consume_token(parser);
+                if (parser->curr->type == ']') {
+                    new = make_node(AstSliceType, Ast_Kind_Slice_Type);
+                    new->token = open_bracket;
 
-            } else {
-                new = make_node(AstArrayType, Ast_Kind_Array_Type);
-                new->token = open_bracket;
+                } else if (parser->curr->type == Token_Type_Dot_Dot) {
+                    new = make_node(AstDynArrType, Ast_Kind_DynArr_Type);
+                    new->token = open_bracket;
+                    consume_token(parser);
 
-                if (parser->curr->type == '$') {
-                    AstType** insertion = (AstType **) &((AstArrayType *) new)->count_expr;
-                    parse_polymorphic_variable(parser, &insertion);
                 } else {
-                    ((AstArrayType *) new)->count_expr = parse_expression(parser);
+                    new = make_node(AstArrayType, Ast_Kind_Array_Type);
+                    new->token = open_bracket;
+
+                    if (parser->curr->type == '$') {
+                        AstType** insertion = (AstType **) &((AstArrayType *) new)->count_expr;
+                        parse_polymorphic_variable(parser, &insertion);
+                    } else {
+                        ((AstArrayType *) new)->count_expr = parse_expression(parser);
+                    }
                 }
+
+                expect_token(parser, ']');
+                *next_insertion = (AstType *) new;
+                next_insertion = &((AstSliceType *) new)->elem;
+                break;
             }
 
-            expect_token(parser, ']');
-            *next_insertion = (AstType *) new;
-            next_insertion = &((AstSliceType *) new)->elem;
-        }
+            case Token_Type_Keyword_Proc: {
+                OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
 
-        else if (parser->curr->type == Token_Type_Keyword_Proc) {
-            OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
+                bh_arr(AstType *) params = NULL;
+                bh_arr_new(global_scratch_allocator, params, 4);
+                bh_arr_set_length(params, 0);
 
-            bh_arr(AstType *) params = NULL;
-            bh_arr_new(global_scratch_allocator, params, 4);
-            bh_arr_set_length(params, 0);
-
-            expect_token(parser, '(');
-            while (parser->curr->type != ')') {
-                if (parser->hit_unexpected_token) return root;
-
-                AstType* param_type = parse_type(parser);
-                bh_arr_push(params, param_type);
-
-                if (parser->curr->type != ')')
-                    expect_token(parser, ',');
-            }
-            consume_token(parser);
-
-            AstType* return_type = (AstType *) &basic_type_void;
-            if (parser->curr->type == Token_Type_Right_Arrow) {
-                consume_token(parser);
-                return_type = parse_type(parser);
-            }
-
-            i64 param_count = bh_arr_length(params);
-            AstFunctionType* new = onyx_ast_node_new(parser->allocator,
-                    sizeof(AstFunctionType) + sizeof(AstType*) * param_count,
-                    Ast_Kind_Function_Type);
-            new->token = proc_token;
-            new->param_count = param_count;
-            new->return_type = return_type;
-
-            if (param_count > 0)
-                fori (i, 0, param_count) new->params[i] = params[i];
-
-            *next_insertion = (AstType *) new;
-            next_insertion = NULL;
-        }
-
-        else if (parser->curr->type == '$') {
-            parse_polymorphic_variable(parser, &next_insertion);
-        }
-
-        else if (parser->curr->type == Token_Type_Symbol) {
-            AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
-            symbol_node->token = expect_token(parser, Token_Type_Symbol);
-
-            *next_insertion = (AstType *) symbol_node;
-
-            while (parser->curr->type == '.') {
-                consume_token(parser);
-                AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
-                field->token = expect_token(parser, Token_Type_Symbol);
-                field->expr  = (AstTyped *) *next_insertion;
-
-                *next_insertion = (AstType *) field;
-            }
-
-            if (parser->curr->type == '(') {
-                OnyxToken* paren_token = expect_token(parser, '(');
-
-                bh_arr(AstNode *) params = NULL;
-                bh_arr_new(global_heap_allocator, params, 2);
-
+                expect_token(parser, '(');
                 while (parser->curr->type != ')') {
-                    if (parser->hit_unexpected_token) break;
+                    if (parser->hit_unexpected_token) return root;
 
-                    AstNode* t = (AstNode *) parse_type(parser);
-                    bh_arr_push(params, t);
+                    if ((parser->curr + 1)->type == ':') {
+                        expect_token(parser, Token_Type_Symbol);
+                        expect_token(parser, ':');
+                    }
+
+                    AstType* param_type = parse_type(parser);
+                    bh_arr_push(params, param_type);
 
                     if (parser->curr->type != ')')
                         expect_token(parser, ',');
                 }
-                expect_token(parser, ')');
+                consume_token(parser);
 
-                AstPolyCallType* pc_type = make_node(AstPolyCallType, Ast_Kind_Poly_Call_Type);
-                pc_type->token = paren_token;
-                pc_type->callee = *next_insertion;
-                pc_type->params = params;
+                AstType* return_type = (AstType *) &basic_type_void;
+                if (parser->curr->type == Token_Type_Right_Arrow) {
+                    consume_token(parser);
+                    return_type = parse_type(parser);
+                }
 
-                *next_insertion = (AstType *) pc_type;
+                i64 param_count = bh_arr_length(params);
+                AstFunctionType* new = onyx_ast_node_new(parser->allocator,
+                        sizeof(AstFunctionType) + sizeof(AstType*) * param_count,
+                        Ast_Kind_Function_Type);
+                new->token = proc_token;
+                new->param_count = param_count;
+                new->return_type = return_type;
+
+                if (param_count > 0)
+                    fori (i, 0, param_count) new->params[i] = params[i];
+
+                *next_insertion = (AstType *) new;
+                next_insertion = NULL;
+                break;
             }
 
-            next_insertion = NULL;
-        }
+            case '$': {
+                parse_polymorphic_variable(parser, &next_insertion);
+                break;
+            }
 
-        else if (parser->curr->type == Token_Type_Keyword_Struct) {
-            AstStructType* s_node = parse_struct(parser);
-            *next_insertion = (AstType *) s_node;
-            next_insertion = NULL;
-        }
+            case Token_Type_Symbol: {
+                AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
+                symbol_node->token = expect_token(parser, Token_Type_Symbol);
 
-        else if (parse_possible_directive(parser, "value")) {
-            // :ValueDirectiveHack
-            *next_insertion = (AstType *) parse_expression(parser);
-            next_insertion = NULL;
-            break;
-        }
+                *next_insertion = (AstType *) symbol_node;
 
-        else if (parser->curr->type == '<') {
-            // :TypeValueInterchange
-            expect_token(parser, '<');
-            *next_insertion = (AstType *) parse_expression(parser);
-            next_insertion = NULL;
-            expect_token(parser, '>');
+                while (parser->curr->type == '.') {
+                    consume_token(parser);
+                    AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
+                    field->token = expect_token(parser, Token_Type_Symbol);
+                    field->expr  = (AstTyped *) *next_insertion;
 
-            break;
-        }
+                    *next_insertion = (AstType *) field;
+                }
 
-        else {
-            onyx_report_error(parser->curr->pos, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
-            consume_token(parser);
-            break;
+                if (parser->curr->type == '(') {
+                    OnyxToken* paren_token = expect_token(parser, '(');
+
+                    bh_arr(AstNode *) params = NULL;
+                    bh_arr_new(global_heap_allocator, params, 2);
+
+                    while (parser->curr->type != ')') {
+                        if (parser->hit_unexpected_token) break;
+
+                        AstNode* t = (AstNode *) parse_type(parser);
+                        bh_arr_push(params, t);
+
+                        if (parser->curr->type != ')')
+                            expect_token(parser, ',');
+                    }
+                    expect_token(parser, ')');
+
+                    AstPolyCallType* pc_type = make_node(AstPolyCallType, Ast_Kind_Poly_Call_Type);
+                    pc_type->token = paren_token;
+                    pc_type->callee = *next_insertion;
+                    pc_type->params = params;
+
+                    *next_insertion = (AstType *) pc_type;
+                }
+
+                next_insertion = NULL;
+                break;
+            }
+
+            case Token_Type_Keyword_Struct: {
+                AstStructType* s_node = parse_struct(parser);
+                *next_insertion = (AstType *) s_node;
+                next_insertion = NULL;
+                break;
+            }
+
+            case '#': {
+                // :ValueDirectiveHack
+                if (parse_possible_directive(parser, "value")) {
+                // It is very weird to put these here.
+                case Token_Type_Literal_Integer:
+                case Token_Type_Literal_String:
+                case Token_Type_Literal_Float:
+                case Token_Type_Literal_True:
+                case Token_Type_Literal_False:
+                    *next_insertion = (AstType *) parse_expression(parser);
+                    next_insertion = NULL;
+                    break;
+                }
+
+            }
+
+            default:
+                onyx_report_error(parser->curr->pos, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
+                consume_token(parser);
+                break;
         }
 
         if (next_insertion == NULL) break;

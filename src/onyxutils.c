@@ -885,8 +885,9 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
         bh_table_init(global_heap_allocator, ps_type->concrete_structs, 16);
     }
 
-    if (bh_arr_length(slns) < bh_arr_length(ps_type->poly_params)) {
-        onyx_report_error(pos, "Not enough arguments for polymorphic struct creation. Expected %d, got %d",
+    if (bh_arr_length(slns) != bh_arr_length(ps_type->poly_params)) {
+        onyx_report_error(pos, "Wrong number of arguments for '%s'. Expected %d, got %d",
+            ps_type->name,
             bh_arr_length(ps_type->poly_params),
             bh_arr_length(slns));
 
