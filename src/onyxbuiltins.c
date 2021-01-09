@@ -40,7 +40,7 @@ AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Glo
 
 // :TypeExprHack
 static OnyxToken type_expr_token = { Token_Type_Symbol, 9, "type_expr", { 0 } };
-AstNode type_expr_symbol         = { Ast_Kind_Basic_Type, 0, &type_expr_token, NULL };
+AstNode type_expr_symbol         = { Ast_Kind_Error, 0, &type_expr_token, NULL };
 
 AstType  *builtin_string_type;
 AstType  *builtin_range_type;

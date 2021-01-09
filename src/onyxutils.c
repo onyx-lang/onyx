@@ -896,6 +896,8 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
 
     i32 i = 0;
     bh_arr_each(AstPolySolution, sln, slns) {
+        sln->poly_sym = (AstNode *) &ps_type->poly_params[i];
+        
         PolySolutionKind expected_kind = PSK_Undefined;
         if ((AstNode *) ps_type->poly_params[i].type_node == &type_expr_symbol) {
             expected_kind = PSK_Type;
@@ -932,7 +934,6 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
             }
         }
 
-        sln->poly_sym = (AstNode *) &ps_type->poly_params[i];
         i++;
     }
 
