@@ -5,6 +5,19 @@ use package main as main
 
 output_str :: proc (s: str) -> u32 #foreign "host" "print_str" ---
 
+assert_handler :: proc (msg: str, file: str) {
+    output_str("Assert failed: ");
+    output_str(msg);
+
+    if file.data != null {
+        output_str(" in ");
+        output_str(file);
+    }
+
+    process_exit :: proc (status: i32) #foreign "host" "exit" ---
+    process_exit(1);
+}
+
 // The builtin _start proc.
 // Sets up everything needed for execution.
 proc () #export "_start" {
@@ -12,6 +25,7 @@ proc () #export "_start" {
 
     context.allocator = alloc.heap_allocator;
     context.temp_allocator = alloc.temp_allocator;
+    context.assert_handler = assert_handler;
 
     args : [] cstr;
     args.data  = null;

@@ -151,7 +151,15 @@ b32 types_are_compatible(Type* t1, Type* t2) {
 
         case Type_Kind_Pointer: {
             if (t2->kind == Type_Kind_Pointer) {
-                return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
+                if (types_are_compatible(t1->Pointer.elem, t2->Pointer.elem)) return 1;
+
+                if (t1->Pointer.elem->kind == Type_Kind_Struct && t2->Pointer.elem->kind == Type_Kind_Struct) {
+                    Type* t1_struct = t1->Pointer.elem;
+                    Type* t2_struct = t2->Pointer.elem;
+
+                    if (t1_struct->Struct.memarr[0]->used)
+                        return types_are_compatible(t2_struct, t1_struct->Struct.memarr[0]->type);
+                }
             }
 
             if (t2->kind == Type_Kind_Basic && t2->Basic.kind == Basic_Kind_Rawptr) return 1;
@@ -370,6 +378,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .name = bh_strdup(alloc, (*member)->token->text),
                     .initial_value = &(*member)->initial_value,
                     .included_through_use = 0,
+                    .used = (((*member)->flags & Ast_Flag_Struct_Mem_Used) != 0),
                 };
 
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
@@ -386,6 +395,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                             .name   = (*psmem)->name,
                             .initial_value = (*psmem)->initial_value,
                             .included_through_use = 1,
+                            .used = 0,
                         };
 
                         bh_table_put(StructMember, s_type->Struct.members, (*psmem)->name, new_smem);

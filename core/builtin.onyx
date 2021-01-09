@@ -31,9 +31,15 @@ null      :: cast(rawptr) 0;
 OnyxContext :: struct {
     allocator      : Allocator;
     temp_allocator : Allocator;
+
+    assert_handler : proc (msg: str, file: str);
 }
 
 context : OnyxContext;
+
+assert :: proc (cond: bool, msg: str, file: str = str.{ null, 0 }) {
+    if !cond do context.assert_handler(msg, file);
+}
 
 
 //
@@ -49,7 +55,7 @@ AllocationAction :: enum {
     Resize;
 }
 
-allocator_proc :: #type proc (rawptr, AllocationAction, u32, u32, rawptr) -> rawptr;
+allocator_proc :: #type proc (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
 
 Allocator :: struct {
     data: rawptr;

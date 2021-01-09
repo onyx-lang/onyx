@@ -11,6 +11,10 @@ const ENV = {
             const data = new Uint8Array(wasm_instance.exports.memory.buffer, ptr, len);
             const str  = new TextDecoder().decode(data);
             process.stdout.write(str);
+        },
+
+        exit(status) {
+            process.exit(status);
         }
     }   
 }

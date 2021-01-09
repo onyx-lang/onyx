@@ -1,0 +1,17 @@
+package core.io
+
+Error :: enum {
+    None           :: 0x00;
+
+    // The procedure is not implemented for this kind of stream.
+    NotImplemented :: 0x01;
+
+    // The stream reached the end.
+    EOF            :: 0x02;
+
+    // The vtable was not set for this stream.
+    NoVtable       :: 0x03;
+
+    // A seek was outside the bounds of the stream.
+    OutOfBounds    :: 0x04;
+}

@@ -70,6 +70,7 @@ typedef struct StructMember {
 
     struct AstTyped** initial_value;
     b32 included_through_use : 1;
+    b32 used : 1;
 } StructMember;
 
 #define TYPE_KINDS \

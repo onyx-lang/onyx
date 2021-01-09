@@ -17,6 +17,10 @@ package core
 #load "core/string/reader"
 #load "core/wasi"
 
+#load "core/io/io"
+#load "core/io/stream"
+#load "core/io/reader"
+
 #load "core/sys/wasi"
 
 

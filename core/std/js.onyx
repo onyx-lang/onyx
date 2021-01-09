@@ -15,6 +15,10 @@ package core
 #load "core/string/builder"
 #load "core/string/reader"
 
+#load "core/io/io"
+#load "core/io/stream"
+#load "core/io/reader"
+
 #load "core/sys/js"
 
 

@@ -1,0 +1,130 @@
+package core.io
+
+Reader :: struct {
+    stream : ^Stream;
+}
+
+reader_make :: proc (s: ^Stream) -> Reader {
+    assert(s.vtable != null, "Stream vtable was not setup correctly.");
+    
+    return Reader.{ s };
+}
+
+read_u32 :: proc (use reader: ^Reader) -> u32 {
+    n: u32 = 0;
+
+    skip_whitespace(reader);
+
+    curr  := cast(u8) 0;
+    stream_peek_byte(stream, ^curr);
+    while curr >= #char "0" && curr <= #char "9" {
+        stream_read_byte(stream, ^curr);
+
+        n *= 10;
+        n += cast(u32) (curr - #char "0"); 
+
+        if stream_peek_byte(stream, ^curr) == Error.EOF do break;
+    }
+
+    return n;
+}
+
+read_u64 :: proc (use reader: ^Reader) -> u64 {
+    n: u64 = 0;
+
+    skip_whitespace(reader);
+
+    curr  := cast(u8) 0;
+    stream_peek_byte(stream, ^curr);
+    while curr >= #char "0" && curr <= #char "9" {
+        stream_read_byte(stream, ^curr);
+
+        n *= 10;
+        n += cast(u64) (curr - #char "0"); 
+
+        if stream_peek_byte(stream, ^curr) == Error.EOF do break;
+    }
+
+    return n;
+}
+
+read_line :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
+    curr_pos : i32;
+    stream_tell(stream, ^curr_pos);
+
+    count := 0;
+    curr  := cast(u8) 0;
+    stream_read_byte(stream, ^curr);
+    while curr != #char "\n" {
+        count += 1;
+        if stream_read_byte(stream, ^curr) != Error.None do break;
+    }
+
+    stream_seek(stream, curr_pos, SeekFrom.Start);
+
+    out := str.{
+        data  = raw_alloc(allocator, count * sizeof(u8)),
+        count = count,
+    };
+
+    stream_read(stream, out);
+    return out;
+}
+
+read_word :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
+    skip_whitespace(reader);
+
+    curr_pos : i32;
+    stream_tell(stream, ^curr_pos);
+
+    count := 0;
+    curr  := cast(u8) 0;
+    stream_read_byte(stream, ^curr);
+
+    while true {
+        if     (curr >= #char "a" && curr <= #char "z")
+            || (curr >= #char "A" && curr <= #char "Z")
+            || curr == #char "_" {
+            count += 1;
+        } else {
+            break;
+        }
+
+        if stream_read_byte(stream, ^curr) != Error.None do break;
+    }
+
+    stream_seek(stream, curr_pos, SeekFrom.Start);
+
+    out := str.{
+        data  = raw_alloc(allocator, count * sizeof(u8)),
+        count = count,
+    };
+
+    stream_read(stream, out);
+    return out;
+}
+
+advance_line :: proc (use reader: ^Reader) {
+    curr := cast(u8) 0;
+    if stream_read_byte(stream, ^curr) != Error.None do return;
+    while curr != #char "\n" {
+        if stream_read_byte(stream, ^curr) != Error.None do return;
+    }
+
+    stream_read_byte(stream, ^curr);
+}
+
+skip_whitespace :: proc (use reader: ^Reader) {
+    while true {
+        byte := cast(u8) 0;
+        if stream_peek_byte(stream, ^byte) == Error.EOF do break;
+
+        switch byte {
+            case #char " ", #char "\t", #char "\n", #char "\r" {
+                stream_read_byte(stream, ^byte);
+            }
+
+            case #default do return;
+        }
+    }
+}

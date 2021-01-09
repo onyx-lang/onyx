@@ -16,6 +16,18 @@ output_str :: proc (s: str) -> u32 {
     return tmp;
 }
 
+assert_handler :: proc (msg: str, file: str) {
+    output_str("Assert failed: ");
+    output_str(msg);
+
+    if file.data != null {
+        output_str(" in ");
+        output_str(file);
+    }
+
+    proc_exit(1);
+}
+
 // The builtin _start proc.
 // Sets up everything needed for execution.
 proc () #export "_start" {
@@ -23,6 +35,7 @@ proc () #export "_start" {
 
     context.allocator = alloc.heap_allocator;
     context.temp_allocator = alloc.heap_allocator;
+    context.assert_handler = assert_handler;
 
     argc : Size;
     argv_buf_size : Size;

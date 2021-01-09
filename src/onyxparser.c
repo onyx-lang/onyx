@@ -1575,6 +1575,16 @@ static AstType* parse_type(OnyxParser* parser) {
 
             }
 
+            case '(': {
+                expect_token(parser, '(');
+                
+                *next_insertion = parse_type(parser);
+                next_insertion = NULL;
+
+                expect_token(parser, ')');
+                break;
+            }
+
             default:
                 onyx_report_error(parser->curr->pos, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
                 consume_token(parser);
