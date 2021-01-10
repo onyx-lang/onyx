@@ -322,6 +322,8 @@ static IntrinsicMap builtin_intrinsics[] = {
     { NULL, ONYX_INTRINSIC_UNDEFINED },
 };
 
+bh_arr(AstTyped *) operator_overloads[Binary_Op_Count] = { 0 };
+
 void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
     // HACK
     builtin_package_token.text = bh_strdup(global_heap_allocator, builtin_package_token.text);
@@ -369,6 +371,9 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
         return;
     }
 
+    fori (i, 0, Binary_Op_Count) {
+        bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
+    }
 
     bh_table_init(global_heap_allocator, intrinsic_table, 128);
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];

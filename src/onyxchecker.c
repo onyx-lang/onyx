@@ -293,25 +293,29 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
     return 0;
 }
-
-static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction* ofunc) {
-    bh_arr_each(AstTyped *, node, ofunc->overloads) {
+static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(AstTyped *) overloads) {
+    bh_arr_each(AstTyped *, node, overloads) {
         AstFunction* overload = (AstFunction *) *node;
 
         fill_in_type((AstTyped *) overload);
 
         TypeFunction* ol_type = &overload->type->Function;
 
-        if (call->arg_count < ol_type->needed_param_count) continue;
+        if (bh_arr_length(arg_arr) < (i32) ol_type->needed_param_count) continue;
 
         Type** param_type = ol_type->params;
-        bh_arr_each(AstArgument*, arg, call->arg_arr) {
-            fill_in_type((AstTyped *) *arg);
-            if ((*param_type)->kind == Type_Kind_VarArgs) {
-                if (!type_check_or_auto_cast(&(*arg)->value, (*param_type)->VarArgs.ptr_to_data->Pointer.elem))
-                    goto no_match;
-            }
-            else if (!type_check_or_auto_cast(&(*arg)->value, *param_type)) goto no_match;
+        bh_arr_each(AstTyped*, arg, arg_arr) {
+            fill_in_type(*arg);
+
+            Type* type_to_match = *param_type;
+            if ((*param_type)->kind == Type_Kind_VarArgs)
+                type_to_match = (*param_type)->VarArgs.ptr_to_data->Pointer.elem;
+
+            AstTyped** value = arg;
+            if ((*arg)->kind == Ast_Kind_Argument)
+                value = &((AstArgument *) *arg)->value;
+
+            if (!type_check_or_auto_cast(value, type_to_match)) goto no_match;
 
             param_type++;
         }
@@ -321,20 +325,6 @@ static AstTyped* match_overloaded_function(AstCall* call, AstOverloadedFunction*
 no_match:
         continue;
     }
-
-    char* arg_str = bh_alloc(global_scratch_allocator, 1024);
-    arg_str[0] = '\0';
-
-    bh_arr_each(AstArgument *, arg, call->arg_arr) {
-        strncat(arg_str, type_get_name((*arg)->value->type), 1023);
-
-        if (arg != &bh_arr_last(call->arg_arr))
-            strncat(arg_str, ", ", 1023);
-    }
-
-    onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
-
-    bh_free(global_scratch_allocator, arg_str);
     return NULL;
 }
 
@@ -376,10 +366,28 @@ CheckStatus check_call(AstCall* call) {
     }
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
-        call->callee = match_overloaded_function(call, (AstOverloadedFunction *) callee);
-        callee = (AstFunction *) call->callee;
+        call->callee = match_overloaded_function(
+            (bh_arr(AstTyped *)) call->arg_arr,
+            ((AstOverloadedFunction *) callee)->overloads);
 
-        if (callee == NULL) return Check_Error;
+        if (call->callee == NULL) {
+            char* arg_str = bh_alloc(global_scratch_allocator, 1024);
+            arg_str[0] = '\0';
+
+            bh_arr_each(AstArgument *, arg, call->arg_arr) {
+                strncat(arg_str, type_get_name((*arg)->value->type), 1023);
+
+                if (arg != &bh_arr_last(call->arg_arr))
+                    strncat(arg_str, ", ", 1023);
+            }
+
+            onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
+
+            bh_free(global_scratch_allocator, arg_str);
+            return Check_Error;
+        }
+
+        callee = (AstFunction *) call->callee;
     }
 
     if (callee->kind == Ast_Kind_Polymorphic_Proc) {
@@ -744,6 +752,45 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         return Check_Error;
     }
 
+    if (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic) {
+        bh_arr(AstTyped *) args = NULL;
+        bh_arr_new(global_heap_allocator, args, 2);
+        bh_arr_push(args, binop->left);
+        bh_arr_push(args, binop->right);
+
+        AstTyped* overload = match_overloaded_function(args, operator_overloads[binop->operation]);
+        if (overload == NULL) {
+            bh_arr_free(args);
+            goto not_overloaded;
+        }
+
+        AstCall* implicit_call = onyx_ast_node_new(semstate.node_allocator, sizeof(AstCall), Ast_Kind_Call);
+        implicit_call->token = binop->token;
+        implicit_call->arg_count = 2;
+        implicit_call->callee = overload;
+        implicit_call->va_kind = VA_Kind_Not_VA;
+
+        bh_arr_each(AstTyped *, arg, args) {
+            AstArgument* new_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
+            new_arg->token = (*arg)->token;
+            new_arg->type  = (*arg)->type;
+            new_arg->value = *arg;
+            new_arg->va_kind = VA_Kind_Not_VA;
+
+            *arg = (AstTyped *) new_arg;
+        }
+
+        implicit_call->arg_arr = (AstArgument **) args;
+
+        CHECK(call, implicit_call);
+
+        // NOTE: Not a binary op
+        *pbinop = (AstBinaryOp *) implicit_call;
+        return Check_Success;
+    }
+
+not_overloaded:
+
     if (!type_is_numeric(binop->left->type) && !type_is_pointer(binop->left->type)) {
         onyx_report_error(binop->token->pos,
                 "Expected numeric or pointer type for left side of binary operator, got '%s'.",
@@ -883,8 +930,9 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if ((binop_allowed[binop->operation] & effective_flags) == 0) {
-        onyx_report_error(binop->token->pos, "Binary operator not allowed for arguments of type '%s'.",
-                type_get_name(binop->type));
+        onyx_report_error(binop->token->pos, "Binary operator not allowed for arguments of type '%s' and '%s'.",
+                type_get_name(binop->left->type),
+                type_get_name(binop->right->type));
         return Check_Error;
     }
 

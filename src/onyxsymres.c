@@ -657,6 +657,14 @@ void symres_function_header(AstFunction* func) {
         }
     }
 
+    if (func->operator_overload != (BinaryOp) -1) {
+        if (bh_arr_length(func->params) != 2) {
+            onyx_report_error(func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
+        }
+
+        bh_arr_push(operator_overloads[func->operator_overload], (AstTyped *) func);
+    }
+
     func->return_type = symres_type(func->return_type);
     if (!node_is_type((AstNode *) func->return_type)) {
         onyx_report_error(func->token->pos, "Return type is not a type.");

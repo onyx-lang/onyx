@@ -695,6 +695,50 @@ static inline i32 get_precedence(BinaryOp kind) {
     }
 }
 
+static BinaryOp binary_op_from_token_type(TokenType t) {
+    switch (t) {
+        case Token_Type_Equal_Equal:       return Binary_Op_Equal;
+        case Token_Type_Not_Equal:         return Binary_Op_Not_Equal;
+        case Token_Type_Less_Equal:        return Binary_Op_Less_Equal;
+        case Token_Type_Greater_Equal:     return Binary_Op_Greater_Equal;
+        case '<':                          return Binary_Op_Less;
+        case '>':                          return Binary_Op_Greater;
+
+        case '+':                          return Binary_Op_Add;
+        case '-':                          return Binary_Op_Minus;
+        case '*':                          return Binary_Op_Multiply;
+        case '/':                          return Binary_Op_Divide;
+        case '%':                          return Binary_Op_Modulus;
+
+        case '&':                          return Binary_Op_And;
+        case '|':                          return Binary_Op_Or;
+        case '^':                          return Binary_Op_Xor;
+        case Token_Type_Shift_Left:        return Binary_Op_Shl;
+        case Token_Type_Shift_Right:       return Binary_Op_Shr;
+        case Token_Type_Shift_Arith_Right: return Binary_Op_Sar;
+
+        case Token_Type_And_And:           return Binary_Op_Bool_And;
+        case Token_Type_Or_Or:             return Binary_Op_Bool_Or;
+
+        case '=':                          return Binary_Op_Assign;
+        case Token_Type_Plus_Equal:        return Binary_Op_Assign_Add;
+        case Token_Type_Minus_Equal:       return Binary_Op_Assign_Minus;
+        case Token_Type_Star_Equal:        return Binary_Op_Assign_Multiply;
+        case Token_Type_Fslash_Equal:      return Binary_Op_Assign_Divide;
+        case Token_Type_Percent_Equal:     return Binary_Op_Assign_Modulus;
+        case Token_Type_And_Equal:         return Binary_Op_Assign_And;
+        case Token_Type_Or_Equal:          return Binary_Op_Assign_Or;
+        case Token_Type_Xor_Equal:         return Binary_Op_Assign_Xor;
+        case Token_Type_Shl_Equal:         return Binary_Op_Assign_Shl;
+        case Token_Type_Shr_Equal:         return Binary_Op_Assign_Shr;
+        case Token_Type_Sar_Equal:         return Binary_Op_Assign_Sar;
+
+        case Token_Type_Pipe:              return Binary_Op_Pipe;
+        case Token_Type_Dot_Dot:           return Binary_Op_Range;
+        default: return Binary_Op_Count;
+    }
+}
+
 // <expr> +  <expr>
 // <expr> -  <expr>
 // <expr> *  <expr>
@@ -729,85 +773,43 @@ static AstTyped* parse_expression(OnyxParser* parser) {
     while (1) {
         if (parser->hit_unexpected_token) return root;
 
-        bin_op_kind = Binary_Op_Count;
-        switch ((u16) parser->curr->type) {
-            case Token_Type_Equal_Equal:       bin_op_kind = Binary_Op_Equal; break;
-            case Token_Type_Not_Equal:         bin_op_kind = Binary_Op_Not_Equal; break;
-            case Token_Type_Less_Equal:        bin_op_kind = Binary_Op_Less_Equal; break;
-            case Token_Type_Greater_Equal:     bin_op_kind = Binary_Op_Greater_Equal; break;
-            case '<':                          bin_op_kind = Binary_Op_Less; break;
-            case '>':                          bin_op_kind = Binary_Op_Greater; break;
+        bin_op_kind = binary_op_from_token_type(parser->curr->type);
+        if (bin_op_kind == Binary_Op_Count) goto expression_done;
 
-            case '+':                          bin_op_kind = Binary_Op_Add; break;
-            case '-':                          bin_op_kind = Binary_Op_Minus; break;
-            case '*':                          bin_op_kind = Binary_Op_Multiply; break;
-            case '/':                          bin_op_kind = Binary_Op_Divide; break;
-            case '%':                          bin_op_kind = Binary_Op_Modulus; break;
+        bin_op_tok = parser->curr;
+        consume_token(parser);
 
-            case '&':                          bin_op_kind = Binary_Op_And; break;
-            case '|':                          bin_op_kind = Binary_Op_Or; break;
-            case '^':                          bin_op_kind = Binary_Op_Xor; break;
-            case Token_Type_Shift_Left:        bin_op_kind = Binary_Op_Shl; break;
-            case Token_Type_Shift_Right:       bin_op_kind = Binary_Op_Shr; break;
-            case Token_Type_Shift_Arith_Right: bin_op_kind = Binary_Op_Sar; break;
+        AstBinaryOp* bin_op;
+        if (bin_op_kind == Binary_Op_Pipe) {
+            bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
 
-            case Token_Type_And_And:           bin_op_kind = Binary_Op_Bool_And; break;
-            case Token_Type_Or_Or:             bin_op_kind = Binary_Op_Bool_Or; break;
+        } else if (bin_op_kind == Binary_Op_Range) {
+            bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
 
-            case '=':                          bin_op_kind = Binary_Op_Assign; break;
-            case Token_Type_Plus_Equal:        bin_op_kind = Binary_Op_Assign_Add; break;
-            case Token_Type_Minus_Equal:       bin_op_kind = Binary_Op_Assign_Minus; break;
-            case Token_Type_Star_Equal:        bin_op_kind = Binary_Op_Assign_Multiply; break;
-            case Token_Type_Fslash_Equal:      bin_op_kind = Binary_Op_Assign_Divide; break;
-            case Token_Type_Percent_Equal:     bin_op_kind = Binary_Op_Assign_Modulus; break;
-            case Token_Type_And_Equal:         bin_op_kind = Binary_Op_Assign_And; break;
-            case Token_Type_Or_Equal:          bin_op_kind = Binary_Op_Assign_Or; break;
-            case Token_Type_Xor_Equal:         bin_op_kind = Binary_Op_Assign_Xor; break;
-            case Token_Type_Shl_Equal:         bin_op_kind = Binary_Op_Assign_Shl; break;
-            case Token_Type_Shr_Equal:         bin_op_kind = Binary_Op_Assign_Shr; break;
-            case Token_Type_Sar_Equal:         bin_op_kind = Binary_Op_Assign_Sar; break;
-
-            case Token_Type_Pipe:              bin_op_kind = Binary_Op_Pipe; break;
-            case Token_Type_Dot_Dot:           bin_op_kind = Binary_Op_Range; break;
-            default: goto expression_done;
+        } else {
+            bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
         }
 
-        if (bin_op_kind != Binary_Op_Count) {
-            bin_op_tok = parser->curr;
-            consume_token(parser);
+        bin_op->token = bin_op_tok;
+        bin_op->operation = bin_op_kind;
 
-            AstBinaryOp* bin_op;
-            if (bin_op_kind == Binary_Op_Pipe) {
-                bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
+        while ( !bh_arr_is_empty(tree_stack) &&
+                get_precedence(bh_arr_last(tree_stack)->operation) >= get_precedence(bin_op_kind))
+            bh_arr_pop(tree_stack);
 
-            } else if (bin_op_kind == Binary_Op_Range) {
-                bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
-
-            } else {
-                bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
-            }
-
-            bin_op->token = bin_op_tok;
-            bin_op->operation = bin_op_kind;
-
-            while ( !bh_arr_is_empty(tree_stack) &&
-                    get_precedence(bh_arr_last(tree_stack)->operation) >= get_precedence(bin_op_kind))
-                bh_arr_pop(tree_stack);
-
-            if (bh_arr_is_empty(tree_stack)) {
-                // NOTE: new is now the root node
-                bin_op->left = root;
-                root = (AstTyped *) bin_op;
-            } else {
-                bin_op->left = bh_arr_last(tree_stack)->right;
-                bh_arr_last(tree_stack)->right = (AstTyped *) bin_op;
-            }
-
-            bh_arr_push(tree_stack, bin_op);
-
-            right = parse_factor(parser);
-            bin_op->right = right;
+        if (bh_arr_is_empty(tree_stack)) {
+            // NOTE: new is now the root node
+            bin_op->left = root;
+            root = (AstTyped *) bin_op;
+        } else {
+            bin_op->left = bh_arr_last(tree_stack)->right;
+            bh_arr_last(tree_stack)->right = (AstTyped *) bin_op;
         }
+
+        bh_arr_push(tree_stack, bin_op);
+
+        right = parse_factor(parser);
+        bin_op->right = right;
     }
 
     bh_arr_free(tree_stack);
@@ -1838,6 +1840,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
 
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = proc_token;
+    func_def->operator_overload = -1;
 
     bh_arr_new(global_heap_allocator, func_def->allocate_exprs, 4);
     bh_arr_new(global_heap_allocator, func_def->params, 4);
@@ -1864,7 +1867,22 @@ static AstFunction* parse_function_definition(OnyxParser* parser) {
                 expect_token(parser, Token_Type_Symbol);
 
             } else {
+                if (bh_arr_length(parser->block_stack) != 0) {
+                    onyx_report_error(parser->curr->pos, "#add_overload cannot be placed on procedures inside of other scopes");
+                }
+
                 func_def->overloaded_function = (AstNode *) parse_expression(parser);
+            }
+        }
+
+        else if (parse_possible_directive(parser, "operator")) {
+            BinaryOp op = binary_op_from_token_type(parser->curr->type);
+            consume_token(parser);
+            
+            if (op == Binary_Op_Count) {
+                onyx_report_error(parser->curr->pos, "Invalid binary operator.");
+            } else {
+                func_def->operator_overload = op;
             }
         }
 

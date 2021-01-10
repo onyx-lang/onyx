@@ -722,6 +722,10 @@ struct AstFunction {
     // then resolved to an overloaded function.
     AstNode *overloaded_function;
 
+    // NOTE: set to -1 if the function is not an operator overload;
+    // set to a BinaryOp value if it is.
+    BinaryOp operator_overload;
+
     OnyxToken* name;
 
     union {
@@ -939,6 +943,8 @@ typedef struct IntrinsicMap {
 } IntrinsicMap;
 
 extern bh_table(OnyxIntrinsic) intrinsic_table;
+
+extern bh_arr(AstTyped *) operator_overloads[Binary_Op_Count];
 
 void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 
