@@ -982,14 +982,12 @@ static inline b32 is_lval(AstNode* node) {
         || (node->kind == Ast_Kind_Memres);
 }
 
-static inline b32 binop_is_assignment(AstBinaryOp* binop) {
-    return (binop->operation >= Binary_Op_Assign_Start
-            && binop->operation <= Binary_Op_Assign_End);
+static inline b32 binop_is_assignment(BinaryOp binop) {
+    return (binop >= Binary_Op_Assign_Start && binop <= Binary_Op_Assign_End);
 }
 
-static inline b32 binop_is_compare(AstBinaryOp* binop) {
-    return (binop->operation >= Binary_Op_Equal
-            && binop->operation <= Binary_Op_Greater_Equal);
+static inline b32 binop_is_compare(BinaryOp binop) {
+    return (binop >= Binary_Op_Equal && binop <= Binary_Op_Greater_Equal);
 }
 
 static inline b32 node_is_type(AstNode* node) {

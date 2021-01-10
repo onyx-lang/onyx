@@ -732,10 +732,9 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         binop->flags |= Ast_Flag_Comptime;
     }
 
-    if (binop_is_assignment(binop)) return check_binop_assignment(binop, assignment_is_ok);
-    if (binop_is_compare(binop))    return check_binaryop_compare(pbinop);
-    if (binop->operation == Binary_Op_Bool_And
-        || binop->operation == Binary_Op_Bool_Or)
+    if (binop_is_assignment(binop->operation)) return check_binop_assignment(binop, assignment_is_ok);
+    if (binop_is_compare(binop->operation))    return check_binaryop_compare(pbinop);
+    if (binop->operation == Binary_Op_Bool_And || binop->operation == Binary_Op_Bool_Or)
         return check_binaryop_bool(pbinop);
 
     if (binop->left->type == NULL) {
@@ -753,6 +752,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic) {
+        if (bh_arr_length(operator_overloads[binop->operation]) == 0) goto not_overloaded;
+
         bh_arr(AstTyped *) args = NULL;
         bh_arr_new(global_heap_allocator, args, 2);
         bh_arr_push(args, binop->left);

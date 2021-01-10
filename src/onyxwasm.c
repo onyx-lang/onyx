@@ -1114,7 +1114,7 @@ static const WasmInstructionType binop_map[][4] = {
 EMIT_FUNC(binop, AstBinaryOp* binop) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (binop_is_assignment(binop)) {
+    if (binop_is_assignment(binop->operation)) {
         emit_assignment(mod, &code, binop);
         *pcode = code;
         return;

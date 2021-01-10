@@ -98,6 +98,9 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
             else if (!strcmp(argv[i], "-VV")) {
                 options.verbose_output = 2;
             }
+            else if (!strcmp(argv[i], "-VVV")) {
+                options.verbose_output = 3;
+            }
             else if (!strcmp(argv[i], "--fun") || !strcmp(argv[i], "-F")) {
                 options.fun_output = 1;
             }
@@ -434,7 +437,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
 
-    if (compiler_state->options->verbose_output)
+    if (compiler_state->options->verbose_output == 2)
         bh_printf("Processing source file:    %s\n", file.filename);
 
     ParseResults results = parse_source_file(compiler_state, &fc);
@@ -467,7 +470,7 @@ static b32 process_load_entity(CompilerState* compiler_state, Entity* ent) {
 static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
     i32 changed = 1;
 
-    if (compiler_state->options->verbose_output == 2) {
+    if (compiler_state->options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             printf("%s | %s | %s:%i:%i\n",
                 entity_state_strings[ent->state],
@@ -570,7 +573,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
 
     u64 duration = bh_time_duration(start_time);
     
-    if (compiler_state->options->verbose_output) {
+    if (compiler_state->options->verbose_output > 0) {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf seconds\n", (double) duration / 1000);

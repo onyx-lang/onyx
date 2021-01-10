@@ -662,6 +662,11 @@ void symres_function_header(AstFunction* func) {
             onyx_report_error(func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
         }
 
+        if (binop_is_assignment(func->operator_overload) ||
+             binop_is_compare(func->operator_overload)) {
+            onyx_report_error(func->token->pos, "'%s' is not currently overloadable.", binaryop_string[func->operator_overload]);
+        }
+
         bh_arr_push(operator_overloads[func->operator_overload], (AstTyped *) func);
     }
 
