@@ -418,15 +418,10 @@ CheckStatus check_call(AstCall* call) {
 
     if (callee->kind == Ast_Kind_Function) {
         if (bh_arr_length(arg_arr) < bh_arr_length(callee->params)) {
-            while (bh_arr_length(arg_arr) < bh_arr_length(callee->params)
-                && callee->params[call->arg_count].default_value != NULL) {
+            while (bh_arr_length(arg_arr) < bh_arr_length(callee->params) && callee->params[call->arg_count].default_value != NULL) {
                 AstTyped* dv = callee->params[call->arg_count].default_value;
 
-                AstArgument* new_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
-                new_arg->token = dv->token;
-                new_arg->value = dv;
-                new_arg->next = NULL;
-
+                AstArgument* new_arg = make_argument(semstate.node_allocator, dv);
                 bh_arr_push(arg_arr, new_arg);
             }
         }
@@ -586,30 +581,24 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     } else {
         // NOTE: +=, -=, ...
 
-        AstBinaryOp* binop_node = onyx_ast_node_new(
-                semstate.node_allocator,
-                sizeof(AstBinaryOp),
-                Ast_Kind_Binary_Op);
+        BinaryOp operation = -1;
+        if      (binop->operation == Binary_Op_Assign_Add)      operation = Binary_Op_Add;
+        else if (binop->operation == Binary_Op_Assign_Minus)    operation = Binary_Op_Minus;
+        else if (binop->operation == Binary_Op_Assign_Multiply) operation = Binary_Op_Multiply;
+        else if (binop->operation == Binary_Op_Assign_Divide)   operation = Binary_Op_Divide;
+        else if (binop->operation == Binary_Op_Assign_Modulus)  operation = Binary_Op_Modulus;
+        else if (binop->operation == Binary_Op_Assign_And)      operation = Binary_Op_And;
+        else if (binop->operation == Binary_Op_Assign_Or)       operation = Binary_Op_Or;
+        else if (binop->operation == Binary_Op_Assign_Xor)      operation = Binary_Op_Xor;
+        else if (binop->operation == Binary_Op_Assign_Shl)      operation = Binary_Op_Shl;
+        else if (binop->operation == Binary_Op_Assign_Shr)      operation = Binary_Op_Shr;
+        else if (binop->operation == Binary_Op_Assign_Sar)      operation = Binary_Op_Sar;
 
-        binop_node->token = binop->token;
-        binop_node->left  = binop->left;
-        binop_node->right = binop->right;
+        AstBinaryOp* new_right = make_binary_op(semstate.node_allocator, operation, binop->left, binop->right);
+        new_right->token = binop->token;
+        CHECK(binaryop, &new_right, 0);
 
-        if      (binop->operation == Binary_Op_Assign_Add)      binop_node->operation = Binary_Op_Add;
-        else if (binop->operation == Binary_Op_Assign_Minus)    binop_node->operation = Binary_Op_Minus;
-        else if (binop->operation == Binary_Op_Assign_Multiply) binop_node->operation = Binary_Op_Multiply;
-        else if (binop->operation == Binary_Op_Assign_Divide)   binop_node->operation = Binary_Op_Divide;
-        else if (binop->operation == Binary_Op_Assign_Modulus)  binop_node->operation = Binary_Op_Modulus;
-        else if (binop->operation == Binary_Op_Assign_And)      binop_node->operation = Binary_Op_And;
-        else if (binop->operation == Binary_Op_Assign_Or)       binop_node->operation = Binary_Op_Or;
-        else if (binop->operation == Binary_Op_Assign_Xor)      binop_node->operation = Binary_Op_Xor;
-        else if (binop->operation == Binary_Op_Assign_Shl)      binop_node->operation = Binary_Op_Shl;
-        else if (binop->operation == Binary_Op_Assign_Shr)      binop_node->operation = Binary_Op_Shr;
-        else if (binop->operation == Binary_Op_Assign_Sar)      binop_node->operation = Binary_Op_Sar;
-
-        CHECK(binaryop, &binop_node, 0);
-
-        binop->right = (AstTyped *) binop_node;
+        binop->right = (AstTyped *) new_right;
         binop->operation = Binary_Op_Assign;
     }
 
@@ -713,15 +702,8 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
 
-    bh_arr_each(AstTyped *, arg, args) {
-        AstArgument* new_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
-        new_arg->token = (*arg)->token;
-        new_arg->type  = (*arg)->type;
-        new_arg->value = *arg;
-        new_arg->va_kind = VA_Kind_Not_VA;
-
-        *arg = (AstTyped *) new_arg;
-    }
+    bh_arr_each(AstTyped *, arg, args)
+        *arg = (AstTyped *) make_argument(semstate.node_allocator, *arg);
 
     implicit_call->arg_arr = (AstArgument **) args;
     return implicit_call;
@@ -787,22 +769,14 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         if (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus) goto bad_binaryop;
 
         resolve_expression_type(binop->right);
-        if (!type_is_integer(binop->right->type)) {
-            onyx_report_error(binop->right->token->pos, "Expected integer type.");
-            return Check_Error;
-        }
+        if (!type_is_integer(binop->right->type)) goto bad_binaryop;
 
-        AstNumLit* numlit = onyx_ast_node_new(semstate.node_allocator, sizeof(AstNumLit), Ast_Kind_NumLit);
+        AstNumLit* numlit = make_int_literal(semstate.node_allocator, type_size_of(binop->left->type->Pointer.elem));
         numlit->token = binop->right->token;
         numlit->type = binop->right->type;
-        numlit->value.i = type_size_of(binop->left->type->Pointer.elem);
 
-        AstBinaryOp* binop_node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
+        AstBinaryOp* binop_node = make_binary_op(semstate.node_allocator, Binary_Op_Multiply, binop->right, (AstTyped *) numlit);
         binop_node->token = binop->token;
-        binop_node->left  = binop->right;
-        binop_node->right = (AstTyped *) numlit;
-        binop_node->operation = Binary_Op_Multiply;
-
         CHECK(binaryop, &binop_node, 0);
 
         binop->right = (AstTyped *) binop_node;
@@ -1211,13 +1185,11 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
         StructMember smem;
         type_lookup_member(aa->addr->type, "data", &smem);
 
-        AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
-        fa->token = aa->addr->token;
-        fa->type = smem.type;
+
+        AstFieldAccess* fa = make_field_access(semstate.node_allocator, aa->addr, "data");
+        fa->type   = smem.type;
         fa->offset = smem.offset;
-        fa->idx = smem.idx;
-        fa->expr = aa->addr;
-        fa->field = "data";
+        fa->idx    = smem.idx;
 
         aa->addr = (AstTyped *) fa;
         aa->type = aa->addr->type->Pointer.elem;

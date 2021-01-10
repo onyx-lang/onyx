@@ -796,6 +796,8 @@ struct AstPackage {
     Package* package;
 };
 
+extern AstNode empty_node;
+
 typedef enum EntityState {
     Entity_State_Error,
     
@@ -953,12 +955,17 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 AstNode* ast_clone(bh_allocator a, void* n);
 void promote_numlit_to_larger(AstNumLit* num);
-AstNumLit* make_int_literal(bh_allocator, i64 value);
 b32 convert_numlit_to_type(AstNumLit* num, Type* type);
 b32 type_check_or_auto_cast(AstTyped** pnode, Type* type);
 Type* resolve_expression_type(AstTyped* node);
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
+
+AstNumLit* make_int_literal(bh_allocator a, i64 value);
+AstNumLit* make_float_literal(bh_allocator a, f64 value);
+AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
+AstArgument* make_argument(bh_allocator a, AstTyped* value);
+AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);
 
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,

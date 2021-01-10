@@ -114,17 +114,6 @@ static void add_node_to_process(OnyxParser* parser, AstNode* node) {
 }
 
 
-AstNumLit* make_int_literal(bh_allocator a, i64 i) {
-    AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
-    if (bh_abs(i) >= ((u64) 1 << 32))
-        num->type_node = (AstType *) &basic_type_i64;
-    else
-        num->type_node = (AstType *) &basic_type_i32;
-
-    num->value.l = i;
-    return num;
-}
-
 static AstNumLit* parse_int_literal(OnyxParser* parser) {
     AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
     int_node->token = expect_token(parser, Token_Type_Literal_Integer);

@@ -35,14 +35,6 @@ static void symres_memres_type(AstMemRes** memres);
 static void symres_memres(AstMemRes** memres);
 static void symres_struct_defaults(AstType* st);
 
-static AstFieldAccess* make_field_access(AstTyped* node, char* field) {
-    AstFieldAccess* fa = onyx_ast_node_new(semstate.node_allocator, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
-    fa->field = field;
-    fa->expr = node;
-
-    return fa;
-}
-
 static void scope_enter(Scope* new_scope) {
     semstate.curr_scope = new_scope;
 }
@@ -291,14 +283,8 @@ static void symres_pipe(AstBinaryOp** pipe) {
 
     if ((*pipe)->left == NULL) return;
 
-    AstArgument* implicit_arg = onyx_ast_node_new(semstate.node_allocator,
-            sizeof(AstArgument),
-            Ast_Kind_Argument);
-    implicit_arg->token = (*pipe)->left->token;
-    implicit_arg->value = (*pipe)->left;
-
     bh_arr_insertn(call_node->arg_arr, 0, 1);
-    call_node->arg_arr[0] = implicit_arg;
+    call_node->arg_arr[0] = make_argument(semstate.node_allocator, (*pipe)->left);
     call_node->arg_count++;
     call_node->next = (*pipe)->next;
 
@@ -533,7 +519,7 @@ static void symres_use(AstUse* use) {
             st = st->Pointer.elem;
 
         bh_table_each_start(StructMember, st->Struct.members);
-            AstFieldAccess* fa = make_field_access(use->expr, value.name);
+            AstFieldAccess* fa = make_field_access(semstate.node_allocator, use->expr, value.name);
             symbol_raw_introduce(semstate.curr_scope, value.name, use->token->pos, (AstNode *) fa);
         bh_table_each_end;
 
@@ -697,7 +683,7 @@ void symres_function_header(AstFunction* func) {
                 }
 
                 bh_table_each_start(StructMember, st->Struct.members);
-                    AstFieldAccess* fa = make_field_access((AstTyped *) param->local, value.name);
+                    AstFieldAccess* fa = make_field_access(semstate.node_allocator, (AstTyped *) param->local, value.name);
                     symbol_raw_introduce(semstate.curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
                 bh_table_each_end;
 
@@ -806,9 +792,7 @@ static void symres_enum(AstEnumType* enum_node) {
             (*value)->value->type = enum_node->etcache;
 
         } else {
-            AstNumLit* num = onyx_ast_node_new(semstate.node_allocator, sizeof(AstNumLit), Ast_Kind_NumLit);
-            num->value.l = next_assign_value;
-            num->flags |= Ast_Flag_Comptime;
+            AstNumLit* num = make_int_literal(semstate.node_allocator, next_assign_value);
             num->type = enum_node->etcache;
 
             (*value)->value = num;
