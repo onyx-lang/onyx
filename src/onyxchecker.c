@@ -594,7 +594,6 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         binop_node->token = binop->token;
         binop_node->left  = binop->left;
         binop_node->right = binop->right;
-        binop_node->type  = binop->right->type;
 
         if      (binop->operation == Binary_Op_Assign_Add)      binop_node->operation = Binary_Op_Add;
         else if (binop->operation == Binary_Op_Assign_Minus)    binop_node->operation = Binary_Op_Minus;
@@ -608,10 +607,10 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         else if (binop->operation == Binary_Op_Assign_Shr)      binop_node->operation = Binary_Op_Shr;
         else if (binop->operation == Binary_Op_Assign_Sar)      binop_node->operation = Binary_Op_Sar;
 
+        CHECK(binaryop, &binop_node, 0);
+
         binop->right = (AstTyped *) binop_node;
         binop->operation = Binary_Op_Assign;
-
-        CHECK(binaryop, &binop_node, 0);
     }
 
     if (!type_check_or_auto_cast(&binop->right, binop->left->type)) {
