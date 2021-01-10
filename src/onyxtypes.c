@@ -868,8 +868,9 @@ b32 type_is_numeric(Type* type) {
 }
 
 b32 type_is_compound(Type* type) {
-    return type->kind == Type_Kind_Array
-        || type->kind == Type_Kind_Struct;
+    return type->kind != Type_Kind_Basic
+        && type->kind != Type_Kind_Pointer
+        && type->kind != Type_Kind_Enum;
 }
 
 b32 type_is_simd(Type* type) {

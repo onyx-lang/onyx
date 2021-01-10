@@ -630,20 +630,6 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
 CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
-    if (binop->left->type == NULL) {
-        onyx_report_error(binop->token->pos,
-                "Unable to resolve type for symbol '%b'.",
-                binop->left->token->text, binop->left->token->length);
-        return Check_Error;
-    }
-
-    if (binop->right->type == NULL) {
-        onyx_report_error(binop->token->pos,
-                "Unable to resolve type for symbol '%b'.",
-                binop->right->token->text, binop->right->token->length);
-        return Check_Error;
-    }
-
     if (type_is_structlike_strict(binop->left->type)) {
         onyx_report_error(binop->token->pos, "Invalid type for left side of comparison operator.");
         return Check_Error;
@@ -694,20 +680,6 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
 CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
-    if (binop->left->type == NULL) {
-        onyx_report_error(binop->token->pos,
-                "Unable to resolve type for symbol '%b'.",
-                binop->left->token->text, binop->left->token->length);
-        return Check_Error;
-    }
-
-    if (binop->right->type == NULL) {
-        onyx_report_error(binop->token->pos,
-                "Unable to resolve type for symbol '%b'.",
-                binop->right->token->text, binop->right->token->length);
-        return Check_Error;
-    }
-
     if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
         onyx_report_error(binop->token->pos, "Boolean operator expects boolean types for both operands.");
         return Check_Error;
@@ -722,6 +694,40 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
     return Check_Success;
 }
 
+static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
+    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
+
+    bh_arr(AstTyped *) args = NULL;
+    bh_arr_new(global_heap_allocator, args, 2);
+    bh_arr_push(args, binop->left);
+    bh_arr_push(args, binop->right);
+
+    AstTyped* overload = match_overloaded_function(args, operator_overloads[binop->operation]);
+    if (overload == NULL) {
+        bh_arr_free(args);
+        return NULL;
+    }
+
+    AstCall* implicit_call = onyx_ast_node_new(semstate.node_allocator, sizeof(AstCall), Ast_Kind_Call);
+    implicit_call->token = binop->token;
+    implicit_call->arg_count = 2;
+    implicit_call->callee = overload;
+    implicit_call->va_kind = VA_Kind_Not_VA;
+
+    bh_arr_each(AstTyped *, arg, args) {
+        AstArgument* new_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
+        new_arg->token = (*arg)->token;
+        new_arg->type  = (*arg)->type;
+        new_arg->value = *arg;
+        new_arg->va_kind = VA_Kind_Not_VA;
+
+        *arg = (AstTyped *) new_arg;
+    }
+
+    implicit_call->arg_arr = (AstArgument **) args;
+    return implicit_call;
+}
+
 CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     AstBinaryOp* binop = *pbinop;
 
@@ -733,10 +739,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if (binop_is_assignment(binop->operation)) return check_binop_assignment(binop, assignment_is_ok);
-    if (binop_is_compare(binop->operation))    return check_binaryop_compare(pbinop);
-    if (binop->operation == Binary_Op_Bool_And || binop->operation == Binary_Op_Bool_Or)
-        return check_binaryop_bool(pbinop);
-
+    
     if (binop->left->type == NULL) {
         onyx_report_error(binop->left->token->pos,
                 "Unable to resolve type for symbol '%b'.",
@@ -751,104 +754,54 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         return Check_Error;
     }
 
+    // NOTE: Try operator overloading before checking everything else.
     if (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic) {
-        if (bh_arr_length(operator_overloads[binop->operation]) == 0) goto not_overloaded;
+        AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
-        bh_arr(AstTyped *) args = NULL;
-        bh_arr_new(global_heap_allocator, args, 2);
-        bh_arr_push(args, binop->left);
-        bh_arr_push(args, binop->right);
+        if (implicit_call != NULL) {
+            CHECK(call, implicit_call);
 
-        AstTyped* overload = match_overloaded_function(args, operator_overloads[binop->operation]);
-        if (overload == NULL) {
-            bh_arr_free(args);
-            goto not_overloaded;
+            // NOTE: Not a binary op
+            *pbinop = (AstBinaryOp *) implicit_call;
+            return Check_Success;
         }
-
-        AstCall* implicit_call = onyx_ast_node_new(semstate.node_allocator, sizeof(AstCall), Ast_Kind_Call);
-        implicit_call->token = binop->token;
-        implicit_call->arg_count = 2;
-        implicit_call->callee = overload;
-        implicit_call->va_kind = VA_Kind_Not_VA;
-
-        bh_arr_each(AstTyped *, arg, args) {
-            AstArgument* new_arg = onyx_ast_node_new(semstate.node_allocator, sizeof(AstArgument), Ast_Kind_Argument);
-            new_arg->token = (*arg)->token;
-            new_arg->type  = (*arg)->type;
-            new_arg->value = *arg;
-            new_arg->va_kind = VA_Kind_Not_VA;
-
-            *arg = (AstTyped *) new_arg;
-        }
-
-        implicit_call->arg_arr = (AstArgument **) args;
-
-        CHECK(call, implicit_call);
-
-        // NOTE: Not a binary op
-        *pbinop = (AstBinaryOp *) implicit_call;
-        return Check_Success;
     }
 
-not_overloaded:
+    // NOTE: Comparision operators and boolean operators are handled separately.
+    if (binop_is_compare(binop->operation)) 
+        return check_binaryop_compare(pbinop);
+    if (binop->operation == Binary_Op_Bool_And || binop->operation == Binary_Op_Bool_Or)
+        return check_binaryop_bool(pbinop);
 
-    if (!type_is_numeric(binop->left->type) && !type_is_pointer(binop->left->type)) {
-        onyx_report_error(binop->token->pos,
-                "Expected numeric or pointer type for left side of binary operator, got '%s'.",
-                type_get_name(binop->left->type));
-        return Check_Error;
-    }
-
-    if (!type_is_numeric(binop->right->type)) {
-        onyx_report_error(binop->token->pos,
-                "Expected numeric type for right side of binary operator, got '%s'.",
-                type_get_name(binop->right->type));
-        return Check_Error;
-    }
-
-    if (type_is_pointer(binop->right->type)) {
-        onyx_report_error(binop->token->pos, "Right side of a binary operator cannot be a pointer.");
-        return Check_Error;
-    }
-
-    if (binop->left->type->kind == Type_Kind_Basic
-        && binop->left->type->Basic.kind == Basic_Kind_Rawptr) {
+    // NOTE: The left side cannot be compound.
+    //       The right side always is numeric.
+    //       The left side cannot be rawptr.
+    if (type_is_compound(binop->left->type))  goto bad_binaryop;
+    if (!type_is_numeric(binop->right->type)) goto bad_binaryop;
+    if (type_is_rawptr(binop->left->type)) {
         onyx_report_error(binop->token->pos, "Cannot operate on a 'rawptr'. Cast it to a another pointer type first.");
         return Check_Error;
     }
-    
-    // CLEANUP: Remove this check since it is kind of redundant with the code below.
-    b32 lptr = type_is_pointer(binop->left->type);
-    if (lptr && (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus)) {
-        onyx_report_error(binop->token->pos, "This operator is not supported for these operands.");
-        return Check_Error;
-    }
 
-    if (lptr) {
+    // NOTE: Handle basic pointer math.
+    if (type_is_pointer(binop->left->type)) {
+        if (binop->operation != Binary_Op_Add && binop->operation != Binary_Op_Minus) goto bad_binaryop;
+
         resolve_expression_type(binop->right);
         if (!type_is_integer(binop->right->type)) {
             onyx_report_error(binop->right->token->pos, "Expected integer type.");
             return Check_Error;
         }
 
-        AstNumLit* numlit = onyx_ast_node_new(
-                semstate.node_allocator,
-                sizeof(AstNumLit),
-                Ast_Kind_NumLit);
-
+        AstNumLit* numlit = onyx_ast_node_new(semstate.node_allocator, sizeof(AstNumLit), Ast_Kind_NumLit);
         numlit->token = binop->right->token;
         numlit->type = binop->right->type;
         numlit->value.i = type_size_of(binop->left->type->Pointer.elem);
 
-        AstBinaryOp* binop_node = onyx_ast_node_new(
-                semstate.node_allocator,
-                sizeof(AstBinaryOp),
-                Ast_Kind_Binary_Op);
-
+        AstBinaryOp* binop_node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
         binop_node->token = binop->token;
         binop_node->left  = binop->right;
         binop_node->right = (AstTyped *) numlit;
-        binop_node->type  = binop->right->type;
         binop_node->operation = Binary_Op_Multiply;
 
         CHECK(binaryop, &binop_node, 0);
@@ -930,18 +883,21 @@ not_overloaded:
         case Type_Kind_Enum:    effective_flags = Basic_Flag_Integer;       break;
     }
 
-    if ((binop_allowed[binop->operation] & effective_flags) == 0) {
-        onyx_report_error(binop->token->pos, "Binary operator not allowed for arguments of type '%s' and '%s'.",
-                type_get_name(binop->left->type),
-                type_get_name(binop->right->type));
-        return Check_Error;
-    }
+    if ((binop_allowed[binop->operation] & effective_flags) == 0) goto bad_binaryop;
 
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
         *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
     }
     return Check_Success;
+
+bad_binaryop:
+    onyx_report_error(binop->token->pos, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
+            binaryop_string[binop->operation],
+            type_get_name(binop->left->type),
+            type_get_name(binop->right->type));
+
+    return Check_Error;
 }
 
 CheckStatus check_unaryop(AstUnaryOp** punop) {
