@@ -201,6 +201,8 @@ typedef enum AstFlags {
 
     // HACK: NullProcHack
     Ast_Flag_Proc_Is_Null          = BH_BIT(22),
+
+    Ast_Flag_From_Polymorphism     = BH_BIT(23),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -954,10 +956,14 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 // NOTE: Useful not inlined functions
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 AstNode* ast_clone(bh_allocator a, void* n);
+AstFunction* clone_function_header(bh_allocator a, AstFunction* func);
+
 void promote_numlit_to_larger(AstNumLit* num);
 b32 convert_numlit_to_type(AstNumLit* num, Type* type);
+
 b32 type_check_or_auto_cast(AstTyped** pnode, Type* type);
 Type* resolve_expression_type(AstTyped* node);
+
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
 
@@ -970,10 +976,12 @@ AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,
     PPLM_By_Function_Type,
+    PPLM_By_Value_Array,
 } PolyProcLookupMethod;
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos);
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
 AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
+AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
 
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);

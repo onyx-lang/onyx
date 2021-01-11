@@ -209,6 +209,7 @@ EMIT_FUNC(struct_load,                   Type* type, u64 offset);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
 EMIT_FUNC(struct_store,                  Type* type, u64 offset);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
+EMIT_FUNC(array_store,                   Type* type, u32 offset);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                 AstRangeLiteral* range);
 EMIT_FUNC(expression,                    AstTyped* expr);
@@ -394,15 +395,15 @@ EMIT_FUNC(assignment_of_array, AstBinaryOp* assign) {
     Type* rtype = assign->right->type;
     assert(rtype->kind == Type_Kind_Array);
 
-    Type* elem_type = rtype;
-    u32 elem_count = 1;
-    while (elem_type->kind == Type_Kind_Array) {
-        elem_count *= elem_type->Array.count;
-        elem_type = elem_type->Array.elem;
-    }
-    u32 elem_size = type_size_of(elem_type);
-
     if (assign->right->kind == Ast_Kind_Array_Literal) {
+        Type* elem_type = rtype;
+        u32 elem_count = 1;
+        while (elem_type->kind == Type_Kind_Array) {
+            elem_count *= elem_type->Array.count;
+            elem_type = elem_type->Array.elem;
+        }
+        u32 elem_size = type_size_of(elem_type);
+
         u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
 
         emit_location(mod, &code, assign->left);
@@ -426,39 +427,9 @@ EMIT_FUNC(assignment_of_array, AstBinaryOp* assign) {
         local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     } else {
-        u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-
         emit_location(mod, &code, assign->left);
-        WIL(WI_LOCAL_SET, lptr_local);
-
         emit_expression(mod, &code, assign->right);
-        WIL(WI_LOCAL_SET, rptr_local);
-
-        // NOTE: Currently, we inline the copying of the array; But if the array has
-        // many elements, this could result in a LOT of instructions. Maybe for lengths
-        // greater than like 16 we output a loop that copies them?
-        //                                               - brendanfh 2020/12/16
-        fori (i, 0, elem_count) {
-            if (!type_is_structlike(elem_type))
-                WIL(WI_LOCAL_GET, lptr_local);
-
-            if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == rptr_local)
-                bh_arr_last(code).type = WI_LOCAL_TEE;
-            else
-                WIL(WI_LOCAL_GET, rptr_local);
-            emit_load_instruction(mod, &code, elem_type, i * elem_size);
-
-            if (!type_is_structlike(elem_type)) {
-                emit_store_instruction(mod, &code, elem_type, i * elem_size);
-            } else {
-                WIL(WI_LOCAL_GET, lptr_local);
-                emit_store_instruction(mod, &code, elem_type, i * elem_size);
-            }
-        }
-
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        emit_array_store(mod, &code, rtype, 0);
     }
 
     *pcode = code;
@@ -470,6 +441,11 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
 
     if (type_is_structlike_strict(type)) {
         emit_struct_store(mod, pcode, type, offset);
+        return;
+    }
+
+    if (type->kind == Type_Kind_Array) {
+        emit_array_store(mod, pcode, type, offset);
         return;
     }
 
@@ -1953,6 +1929,52 @@ EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
     *pcode = code;
 }
 
+EMIT_FUNC(array_store, Type* type, u32 offset) {
+    assert(type->kind == Type_Kind_Array);
+    bh_arr(WasmInstruction) code = *pcode;
+
+    Type* elem_type = type;
+    u32 elem_count = 1;
+    while (elem_type->kind == Type_Kind_Array) {
+        elem_count *= elem_type->Array.count;
+        elem_type = elem_type->Array.elem;
+    }
+    u32 elem_size = type_size_of(elem_type);
+
+    u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WIL(WI_LOCAL_SET, rptr_local);
+    WIL(WI_LOCAL_SET, lptr_local);
+
+    // NOTE: Currently, we inline the copying of the array; But if the array has
+    // many elements, this could result in a LOT of instructions. Maybe for lengths
+    // greater than like 16 we output a loop that copies them?
+    //                                               - brendanfh 2020/12/16
+    fori (i, 0, elem_count) {
+        if (!type_is_structlike(elem_type))
+            WIL(WI_LOCAL_GET, lptr_local);
+
+        if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == rptr_local)
+            bh_arr_last(code).type = WI_LOCAL_TEE;
+        else
+            WIL(WI_LOCAL_GET, rptr_local);
+        emit_load_instruction(mod, &code, elem_type, i * elem_size);
+
+        if (!type_is_structlike(elem_type)) {
+            emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
+        } else {
+            WIL(WI_LOCAL_GET, lptr_local);
+            emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
+        }
+    }
+
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
+    *pcode = code;
+    return;
+}
+
 EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -2442,12 +2464,19 @@ EMIT_FUNC(stack_enter, u64 stacksize) {
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
     // HACK: slightly... There will be space for 5 instructions
-    code[0] = (WasmInstruction) { WI_GLOBAL_GET, { .l = stack_top_idx } };
-    code[1] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_base_idx} };
-    code[2] = (WasmInstruction) { WI_I32_CONST,  { .l = stacksize } };
-    code[3] = (WasmInstruction) { WI_I32_ADD,    0 };
-    code[4] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
-
+    if (stacksize == 0) {
+        code[0] = (WasmInstruction) { WI_GLOBAL_GET, { .l = stack_top_idx } };
+        code[1] = (WasmInstruction) { WI_LOCAL_SET,  { .l = mod->stack_base_idx} };
+        code[2] = (WasmInstruction) { WI_NOP,        0 };
+        code[3] = (WasmInstruction) { WI_NOP,        0 };
+        code[4] = (WasmInstruction) { WI_NOP,        0 };
+    } else {
+        code[0] = (WasmInstruction) { WI_GLOBAL_GET, { .l = stack_top_idx } };
+        code[1] = (WasmInstruction) { WI_LOCAL_TEE,  { .l = mod->stack_base_idx} };
+        code[2] = (WasmInstruction) { WI_I32_CONST,  { .l = stacksize } };
+        code[3] = (WasmInstruction) { WI_I32_ADD,    0 };
+        code[4] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
+    }
     *pcode = code;
 }
 
@@ -3527,6 +3556,8 @@ static i32 output_locals(WasmFunc* func, bh_buffer* buff) {
 static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer* buff) {
     i32 leb_len;
     u8* leb;
+
+    if (instr->type == WI_NOP) return;
 
     if (instr->type & SIMD_INSTR_MASK) {
         bh_buffer_write_byte(buff, 0xFD);

@@ -411,3 +411,26 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 	return nn;
 }
+
+AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
+    if (func->kind != Ast_Kind_Function) return NULL;
+
+    if (func->flags & Ast_Flag_Foreign) return func;
+
+    AstFunction* new_func = onyx_ast_node_new(a, sizeof(AstFunction), func->kind);
+    memmove(new_func, func, sizeof(AstFunction));
+
+    new_func->return_type = (AstType *) ast_clone(a, func->return_type);
+
+    new_func->params = NULL;
+    bh_arr_new(global_heap_allocator, new_func->params, bh_arr_length(func->params));
+    bh_arr_each(AstParam, param, func->params) {
+        AstParam new_param;
+        new_param.local = (AstLocal *) ast_clone(a, param->local);
+        new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
+        new_param.vararg_kind = param->vararg_kind;
+        bh_arr_push(new_func->params, new_param);
+    }
+
+    return new_func;
+}

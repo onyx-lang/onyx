@@ -30,5 +30,6 @@ void onyx_errors_init(bh_table(bh_file_contents)* files);
 void onyx_report_error(OnyxFilePos pos, char * format, ...);
 void onyx_errors_print();
 b32  onyx_has_errors();
+void onyx_clear_errors();
 
 #endif

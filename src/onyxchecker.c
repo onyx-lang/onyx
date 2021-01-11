@@ -45,6 +45,7 @@ CheckStatus check_struct(AstStructType* s_node);
 CheckStatus check_function_header(AstFunction* func);
 CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
+CheckStatus check_type_alias(AstTypeAlias* type_alias);
 
 static inline void fill_in_type(AstTyped* node);
 
@@ -295,12 +296,19 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 }
 static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(AstTyped *) overloads) {
     bh_arr_each(AstTyped *, node, overloads) {
-        AstFunction* overload = (AstFunction *) *node;
+        AstFunction* overload = NULL;
+        if ((*node)->kind == Ast_Kind_Function) {
+            overload = (AstFunction *) *node;
+        }
+        else if ((*node)->kind == Ast_Kind_Polymorphic_Proc) {
+            overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Value_Array, arg_arr);
+        }
+
+        if (overload == NULL) continue;
 
         fill_in_type((AstTyped *) overload);
 
         TypeFunction* ol_type = &overload->type->Function;
-
         if (bh_arr_length(arg_arr) < (i32) ol_type->needed_param_count) continue;
 
         Type** param_type = ol_type->params;
@@ -320,7 +328,7 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
             param_type++;
         }
 
-        return (AstTyped *) overload;
+        return (AstTyped *) *node;
 
 no_match:
         continue;
@@ -356,6 +364,7 @@ CheckStatus check_call(AstCall* call) {
     // NOTE: Check arguments
     bh_arr_each (AstArgument *, actual, arg_arr) {
         CHECK(expression, (AstTyped **) actual);
+        (*actual)->type = (*actual)->value->type;
 
         if ((*actual)->value->kind == Ast_Kind_Overloaded_Function) {
             onyx_report_error((*actual)->token->pos,
@@ -1467,8 +1476,8 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
             return Check_Error;
         }
 
-        if ((*node)->kind != Ast_Kind_Function) {
-            onyx_report_error((*node)->token->pos, "Overload option not function. Got '%s'",
+        if ((*node)->kind != Ast_Kind_Function && (*node)->kind != Ast_Kind_Polymorphic_Proc) {
+            onyx_report_error((*node)->token->pos, "Overload option not procedure. Got '%s'",
                 onyx_ast_node_kind_string((*node)->kind));
 
             return Check_Error;
@@ -1621,6 +1630,22 @@ CheckStatus check_memres(AstMemRes* memres) {
     return Check_Success;
 }
 
+CheckStatus check_type_alias(AstTypeAlias* type_alias) {
+    AstType* to = type_alias->to;
+
+    if (to->kind == Ast_Kind_Poly_Call_Type) {
+        AstPolyCallType* pc_node = (AstPolyCallType *) to;
+        bh_arr_each(AstNode *, param, pc_node->params) {
+            if (!node_is_type(*param)) {
+                CHECK(expression, (AstTyped **) param);
+                resolve_expression_type((AstTyped *) *param);
+            }
+        }
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -1668,6 +1693,8 @@ void check_entity(Entity* ent) {
         case Entity_Type_Type_Alias:
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 cs = check_struct((AstStructType *) ent->type_alias);
+            else if (ent->type_alias->kind == Ast_Kind_Type_Alias)
+                check_type_alias((AstTypeAlias *) ent->type_alias);
             break;
 
         case Entity_Type_Memory_Reservation_Type:

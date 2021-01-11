@@ -26,7 +26,7 @@ range_by :: proc (lo: i32, hi: i32) -> range {
 
 simulate :: proc (cups: [] i32, moves := 100) {
     cw : [] i32;
-    alloc.alloc_slice(^cw, cups.count);
+    memory.alloc_slice(^cw, cups.count);
     defer cfree(cw.data);
 
     for i: 0 .. cups.count do cw[cups[i]] = cups[w(i + 1)];

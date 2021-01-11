@@ -10,3 +10,8 @@ set :: proc (start: rawptr, length: u32, value: u8) {
     s := cast(^u8) start;
     for i: 0 .. length do s[i] = value;
 }
+
+alloc_slice :: proc (sl: ^[] $T, count: i32) {
+    sl.data  = calloc(sizeof T * count);
+    sl.count = count;
+}

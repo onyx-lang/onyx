@@ -71,3 +71,8 @@ void onyx_errors_print() {
 b32 onyx_has_errors() {
     return bh_arr_length(errors.errors) > 0;
 }
+
+void onyx_clear_errors() {
+    bh_printf("ERRORS WERE CLEARED!!!\n");
+    bh_arr_set_length(errors.errors, 0);
+}

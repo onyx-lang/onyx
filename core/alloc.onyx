@@ -15,12 +15,6 @@ heap_allocator : Allocator;
 temp_state     : ring.RingState;
 temp_allocator : Allocator;
 
-
-alloc_slice :: proc (sl: ^[] $T, count: i32) {
-    sl.data  = calloc(sizeof T * count);
-    sl.count = count;
-}
-
 init :: proc () {
     heap.init();
 

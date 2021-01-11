@@ -643,7 +643,7 @@ void symres_function_header(AstFunction* func) {
         }
     }
 
-    if (func->operator_overload != (BinaryOp) -1) {
+    if ((func->flags & Ast_Flag_From_Polymorphism) == 0 && func->operator_overload != (BinaryOp) -1) {
         if (bh_arr_length(func->params) != 2) {
             onyx_report_error(func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
         }
@@ -831,6 +831,18 @@ static void symres_struct_defaults(AstType* t) {
 
 static void symres_polyproc(AstPolyProc* pp) {
     pp->poly_scope = semstate.curr_scope;
+
+    if (pp->base_func->operator_overload != (BinaryOp) -1) {
+        if (bh_arr_length(pp->base_func->params) != 2) {
+            onyx_report_error(pp->base_func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
+        }
+
+        if (binop_is_assignment(pp->base_func->operator_overload)) {
+            onyx_report_error(pp->base_func->token->pos, "'%s' is not currently overloadable.", binaryop_string[pp->base_func->operator_overload]);
+        }
+
+        bh_arr_push(operator_overloads[pp->base_func->operator_overload], (AstTyped *) pp);
+    }
 }
 
 void symres_entity(Entity* ent) {
