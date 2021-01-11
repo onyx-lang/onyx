@@ -294,6 +294,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
     return 0;
 }
+
 static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(AstTyped *) overloads) {
     bh_arr_each(AstTyped *, node, overloads) {
         AstFunction* overload = NULL;
@@ -311,8 +312,12 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
         TypeFunction* ol_type = &overload->type->Function;
         if (bh_arr_length(arg_arr) < (i32) ol_type->needed_param_count) continue;
 
+        i32 param_left = ol_type->param_count;
         Type** param_type = ol_type->params;
         bh_arr_each(AstTyped*, arg, arg_arr) {
+            if (param_left == 0) goto no_match;
+            param_left--;
+
             fill_in_type(*arg);
 
             Type* type_to_match = *param_type;

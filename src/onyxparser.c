@@ -1726,7 +1726,6 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
         curr_param.vararg_kind = VA_Kind_Not_VA;
         curr_param.local = make_node(AstLocal, Ast_Kind_Param);
         curr_param.local->token = symbol;
-        curr_param.local->flags |= Ast_Flag_Const;
 
         if (param_use) {
             curr_param.local->flags |= Ast_Flag_Param_Use;

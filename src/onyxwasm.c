@@ -331,7 +331,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
 
     AstTyped* lval = assign->left;
 
-    if (lval->kind == Ast_Kind_Local) {
+    if (lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param) {
         if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
             u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
             emit_expression(mod, &code, assign->right);
