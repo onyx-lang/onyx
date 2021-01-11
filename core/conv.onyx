@@ -1,12 +1,10 @@
 package core.conv
 
-i64_to_str :: proc (n_: i64, base: u64, buf: [] u8) -> str {
-    n := cast(u64) n_;
-
+i64_to_str :: proc (n: i64, base: u64, buf: [] u8) -> str {
     is_neg := false;
-    if n_ < 0 && base == 10 {
+    if n < 0 && base == 10 {
         is_neg = true;
-        n = cast(u64) -n_;
+        n = -n;
     }
 
     c := ^buf[buf.count - 1];
@@ -16,7 +14,7 @@ i64_to_str :: proc (n_: i64, base: u64, buf: [] u8) -> str {
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
 
     while n > 0 {
-        m := n % base;
+        m := cast(u64) n % base;
 
         *c = BASE64_MAP[cast(u32) m];
         len += 1;
@@ -59,9 +57,8 @@ i64_to_str :: proc (n_: i64, base: u64, buf: [] u8) -> str {
 
 // NOTE: This is a big hack but it will work for now
 f64_to_str :: proc (f: f64, buf: [] u8) -> str {
-    a := f;
-    a *= 10000.0;
-    v := cast(i64) a;
+    f *= 10000.0;
+    v := cast(i64) f;
 
     len := 0;
 

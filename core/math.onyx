@@ -9,8 +9,7 @@ PI  :: 3.14159265f;
 TAU :: 6.28318330f;
 
 // Simple taylor series approximation of sin(t)
-sin :: proc (t_: f32) -> f32 {
-    t := t_;
+sin :: proc (t: f32) -> f32 {
     while t >=  PI do t -= TAU;
     while t <= -PI do t += TAU;
 
@@ -32,8 +31,7 @@ sin :: proc (t_: f32) -> f32 {
 }
 
 // Simple taylor series approximation of cos(t)
-cos :: proc (t_: f32) -> f32 {
-    t := t_;
+cos :: proc (t: f32) -> f32 {
     while t >=  PI do t -= TAU;
     while t <= -PI do t += TAU;
 
