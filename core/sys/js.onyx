@@ -35,5 +35,5 @@ proc () #export "_start" {
 
     main.main(args);
 
-    print_buffer_flush();
+    print_stream_flush();
 }

@@ -5,8 +5,8 @@ use package core
 Vec2 :: struct { x: i32; y: i32; }
 
 // Overload print() to print Vec2's.
-proc (use v: Vec2) #add_overload print {
-    printf("Vec2(%i, %i)", x, y);
+proc (use writer: ^io.Writer, use v: Vec2) #add_overload io.write {
+    io.write_format(writer, "Vec2(%i, %i)", x, y);
 }
 
 EntityStore :: struct {

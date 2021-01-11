@@ -1,5 +1,8 @@
 package core.string.builder
 
+// DEPRECATED: This package is deprecated in favor of using
+// an io.DynamicStringStream with an io.Writer.
+
 use package core.array as array
 use package core.string as string
 use package core.conv as conv

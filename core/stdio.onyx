@@ -11,39 +11,22 @@ package core
 // of the system package
 use package system as system
 
-#private_file print_buffer : string.builder.Builder;
+#private_file print_stream : io.DynamicStringStream;
+#private_file print_writer : io.Writer;
 
 stdio_init :: proc () {
-    print_buffer = string.builder.make(2048);
-}
-
-print_str  :: proc (s: str) {
-    string.builder.append(^print_buffer, s);
-    if s.data[s.count - 1] == #char "\n" do print_buffer_flush();
-}
-
-print_cstr :: proc (s: cstr)                do string.builder.append(^print_buffer, s);
-print_i64  :: proc (n: i64, base: u64 = 10) do string.builder.append(^print_buffer, n, base);
-print_i32  :: proc (n: i32, base: u32 = 10) do string.builder.append(^print_buffer, cast(i64) n, cast(u64) base);
-print_f64  :: proc (n: f64)                 do string.builder.append(^print_buffer, n);
-print_f32  :: proc (n: f32)                 do string.builder.append(^print_buffer, cast(f64) n);
-print_bool :: proc (b: bool)                do string.builder.append(^print_buffer, b);
-print_ptr  :: proc (p: ^void)               do string.builder.append(^print_buffer, cast(i64) p, cast(u64) 16);
-
-print_range :: proc (r: range, sep := " ") {
-    for i: r {
-        print(i);
-        if i + r.step < r.high do print(sep);
-    }
-    print("\n");
+    print_stream = io.dynamic_string_stream_make(2048, context.allocator);
+    print_writer = io.writer_make(^print_stream);
 }
 
 print :: proc {
-    print_str,    print_cstr,
-    print_i64,    print_i32,
-    print_f64,    print_f32,
-    print_bool,   print_ptr,
-    print_range,
+    proc (x: str) {
+        io.write(^print_writer, x);
+        if x[x.count - 1] == #char "\n" do print_stream_flush();
+    },
+
+    proc (x: $T)        { io.write(^print_writer, x); },
+    proc (x: $T, y: $R) { io.write(^print_writer, x, y); },
 }
 
 println :: proc (x: $T) {
@@ -66,13 +49,13 @@ print_array :: proc (arr: $T, sep := " ") {
     print("\n");
 }
 
-print_buffer_flush :: proc () {
-    if print_buffer.data.count == 0 do return;
+print_stream_flush :: proc () {
+    if print_stream.data.count == 0 do return;
 
-    ^print_buffer
-        |> string.builder.to_str()
+    ^print_stream
+        |> io.dynamic_string_stream_to_str()
         |> system.output_str();
 
-    ^print_buffer |> string.builder.clear();
+    ^print_stream |> io.stream_flush();
 }
 

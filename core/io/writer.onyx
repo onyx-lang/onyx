@@ -1,0 +1,89 @@
+package core.io
+
+use package core.conv as conv
+
+Writer :: struct {
+    stream : ^Stream;
+}
+
+writer_make :: proc (s: ^Stream) -> Writer {
+    assert(s.vtable != null, "Stream vtable was not setup correctly.");
+
+    return Writer.{ s };
+}
+
+write_str :: proc (use writer: ^Writer, s: str) {
+    stream_write(stream, s);
+}
+
+write_cstr :: proc (use writer: ^Writer, cs: cstr) {
+    use package core
+
+    s := string.make(cs);
+    write_str(writer, s);
+}
+
+write_i32 :: proc (use writer: ^Writer, n: i32, base: u32 = 10) {
+    use package core
+
+    buf : [256] u8;
+    s := conv.i64_to_str(cast(i64) n, cast(u64) base, buf[0 .. 256]);
+    write_str(writer, s);
+}
+
+write_i64 :: proc (use writer: ^Writer, n: i64, base: u64 = 10) {
+    use package core
+
+    buf : [256] u8;
+    s := conv.i64_to_str(n, base, buf[0 .. 256]);
+    write_str(writer, s);
+}
+
+write_f32 :: proc (use writer: ^Writer, f: f32) {
+    use package core
+
+    buf : [256] u8;
+    s := conv.f64_to_str(cast(f64) f, buf[0 .. 256]);
+    write_str(writer, s);
+}
+
+write_f64 :: proc (use writer: ^Writer, f: f64) {
+    use package core
+
+    buf : [256] u8;
+    s := conv.f64_to_str(f, buf[0 .. 256]);
+    write_str(writer, s);
+}
+
+write_bool :: proc (use writer: ^Writer, b: bool) {
+    if b do write_str(writer, "true");
+    else do write_str(writer, "false");
+}
+
+write_ptr :: proc (use writer: ^Writer, p: ^void) {
+    write_i64(writer, cast(i64) p, 16);
+}
+
+write_range :: proc (use writer: ^Writer, r: range, sep := " ") {
+    for i: r {
+        write_i32(writer, i);
+        if i + r.step < r.high do write_str(writer, sep);
+    }
+}
+
+write_format :: proc (use writer: ^Writer, format: str, va: ...) {
+    // POTENTIAL BUG: this buffer will need to be bigger (or dynamic).
+    buffer: [2048] u8;
+    write_str(writer, conv.str_format_va(format, buffer[0 .. 2048], va));
+}
+
+write :: proc {
+    write_str, write_cstr, 
+    write_i32, write_f32,
+    write_i64, write_f64,
+    write_bool,
+    write_ptr,
+    write_range,
+
+    write_format,
+}

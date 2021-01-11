@@ -18,6 +18,7 @@ package core
 #load "core/io/io"
 #load "core/io/stream"
 #load "core/io/reader"
+#load "core/io/writer"
 
 #load "core/sys/js"
 
