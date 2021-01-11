@@ -628,31 +628,33 @@ void symres_function_header(AstFunction* func) {
             if (onyx_has_errors()) return;
         }
     }
+    
+    if ((func->flags & Ast_Flag_From_Polymorphism) == 0) {
+        if (func->overloaded_function != NULL) {
+            symres_expression((AstTyped **) &func->overloaded_function);
+            if (func->overloaded_function == NULL) return; // NOTE: Error message will already be generated
 
-    if (func->overloaded_function != NULL) {
-        symres_expression((AstTyped **) &func->overloaded_function);
-        if (func->overloaded_function == NULL) return; // NOTE: Error message will already be generated
+            if (func->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
+                onyx_report_error(func->token->pos, "#add_overload directive did not resolve to an overloaded function.");
+                return;
 
-        if (func->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
-            onyx_report_error(func->token->pos, "#add_overload directive did not resolve to an overloaded function.");
-            return;
-
-        } else {
-            AstOverloadedFunction* ofunc = (AstOverloadedFunction *) func->overloaded_function;
-            bh_arr_push(ofunc->overloads, (AstTyped *) func);
-        }
-    }
-
-    if ((func->flags & Ast_Flag_From_Polymorphism) == 0 && func->operator_overload != (BinaryOp) -1) {
-        if (bh_arr_length(func->params) != 2) {
-            onyx_report_error(func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
+            } else {
+                AstOverloadedFunction* ofunc = (AstOverloadedFunction *) func->overloaded_function;
+                bh_arr_push(ofunc->overloads, (AstTyped *) func);
+            }
         }
 
-        if (binop_is_assignment(func->operator_overload)) {
-            onyx_report_error(func->token->pos, "'%s' is not currently overloadable.", binaryop_string[func->operator_overload]);
-        }
+        if (func->operator_overload != (BinaryOp) -1) {
+            if (bh_arr_length(func->params) != 2) {
+                onyx_report_error(func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
+            }
 
-        bh_arr_push(operator_overloads[func->operator_overload], (AstTyped *) func);
+            if (binop_is_assignment(func->operator_overload)) {
+                onyx_report_error(func->token->pos, "'%s' is not currently overloadable.", binaryop_string[func->operator_overload]);
+            }
+
+            bh_arr_push(operator_overloads[func->operator_overload], (AstTyped *) func);
+        }
     }
 
     func->return_type = symres_type(func->return_type);

@@ -45,7 +45,7 @@ CheckStatus check_struct(AstStructType* s_node);
 CheckStatus check_function_header(AstFunction* func);
 CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
-CheckStatus check_type_alias(AstTypeAlias* type_alias);
+CheckStatus check_type(AstType* type);
 
 static inline void fill_in_type(AstTyped* node);
 
@@ -1542,6 +1542,8 @@ CheckStatus check_function_header(AstFunction* func) {
             expect_default_param = 1;
         }
 
+        if (local->type_node != NULL) CHECK(type, local->type_node);
+
         fill_in_type((AstTyped *) local);
 
         if (local->type == NULL) {
@@ -1574,6 +1576,8 @@ CheckStatus check_function_header(AstFunction* func) {
             return Check_Error;
         }
     }
+
+    if (func->return_type != NULL) CHECK(type, func->return_type);
 
     func->type = type_build_function_type(semstate.node_allocator, func);
 
@@ -1630,11 +1634,13 @@ CheckStatus check_memres(AstMemRes* memres) {
     return Check_Success;
 }
 
-CheckStatus check_type_alias(AstTypeAlias* type_alias) {
-    AstType* to = type_alias->to;
+CheckStatus check_type(AstType* type) {
+    while (type->kind == Ast_Kind_Type_Alias)
+        type = ((AstTypeAlias *) type)->to;
 
-    if (to->kind == Ast_Kind_Poly_Call_Type) {
-        AstPolyCallType* pc_node = (AstPolyCallType *) to;
+    if (type->kind == Ast_Kind_Poly_Call_Type) {
+        AstPolyCallType* pc_node = (AstPolyCallType *) type;
+
         bh_arr_each(AstNode *, param, pc_node->params) {
             if (!node_is_type(*param)) {
                 CHECK(expression, (AstTyped **) param);
@@ -1693,8 +1699,8 @@ void check_entity(Entity* ent) {
         case Entity_Type_Type_Alias:
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 cs = check_struct((AstStructType *) ent->type_alias);
-            else if (ent->type_alias->kind == Ast_Kind_Type_Alias)
-                check_type_alias((AstTypeAlias *) ent->type_alias);
+            else
+                check_type(ent->type_alias);
             break;
 
         case Entity_Type_Memory_Reservation_Type:
