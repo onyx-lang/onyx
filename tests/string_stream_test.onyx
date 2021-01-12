@@ -1,0 +1,24 @@
+#load "core/std/js"
+
+use package core
+
+main :: proc (args: [] cstr) {
+    some_string := "This is a test string that can be read.\n\n\n\n\n\n1234 4567";
+
+    sstream := io.string_stream_make(some_string);
+    sreader := io.reader_make(^sstream);
+
+    for i: 0 .. 2 {
+        word := io.read_word(^sreader, context.temp_allocator);
+        println(word);
+    }
+
+    println(io.read_line(^sreader, context.temp_allocator));
+
+    a := io.read_u32(^sreader);
+    b := io.read_u32(^sreader);
+
+    println(a);
+    println(b);
+    println(a + b);
+}

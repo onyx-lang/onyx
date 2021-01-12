@@ -512,7 +512,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
         u32 placement = offset + type_size_of(type);
         forir (i, type->Compound.count - 1, 0) {
             Type* curr_type = type->Compound.types[i];
-            placement -= type_size_of(curr_type);
+            placement -= bh_max(type_size_of(curr_type), 4);
 
             if (type_is_compound(curr_type)) {
                 if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == loc_tmp) {
@@ -606,7 +606,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
             if (i != 0) WIL(WI_LOCAL_GET, loc_tmp);
 
             emit_load_instruction(mod, &code, type->Compound.types[i], accum_offset);
-            accum_offset += type_size_of(type->Compound.types[i]);
+            accum_offset += bh_max(type_size_of(type->Compound.types[i]), 4);
         }
 
         local_raw_free(mod->local_alloc, WASM_TYPE_INT32);

@@ -541,6 +541,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 comp_type->Compound.size += type_size_of(comp_type->Compound.types[i]);
             }
 
+            bh_align(comp_type->Compound.size, 8);
+
             return comp_type;
         }
 
@@ -590,6 +592,8 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
         comp_type->Compound.size += type_size_of(compound->exprs[i]->type);
         comp_type->Compound.types[i] = compound->exprs[i]->type;
     }
+    
+    bh_align(comp_type->Compound.size, 8);
 
     return comp_type;
 }
