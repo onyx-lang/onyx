@@ -62,7 +62,7 @@ stream_read_at :: proc (use s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) 
 
 stream_read_byte :: proc (use s: ^Stream) -> (Error, u8) {
     if vtable == null do return Error.NoVtable, cast(u8) 0;
-    if vtable.read_byte == null_proc do return Error.NotImplemented, cast(u8) 0;
+    if vtable.read_byte == null_proc do return Error.NotImplemented, 0;
     
     return vtable.read_byte(s);
 }
@@ -121,10 +121,10 @@ stream_peek_byte :: proc (use s: ^Stream) -> (Error, u8) {
     err : io.Error;
 
     err, out = stream_read_byte(s);
-    if err != Error.None do return err, cast(u8) 0;
+    if err != Error.None do return err, 0;
 
     err = stream_unread_byte(s);
-    if err != Error.None do return err, cast(u8) 0;
+    if err != Error.None do return err, 0;
 
     return Error.None, out;
 }
@@ -202,11 +202,11 @@ string_stream_vtable := Stream_Vtable.{
         return Error.None, bytes_to_read;
     },
 
-    read_byte = proc (s: ^Stream) -> (Error, u8) #export "DEBUG ME" {
+    read_byte = proc (s: ^Stream) -> (Error, u8) {
         ss : ^StringStream = ~~s;
         use ss;
 
-        if curr_pos >= data.count do return Error.EOF, cast(u8) 0;
+        if curr_pos >= data.count do return Error.EOF, 0;
 
         defer curr_pos += 1;
         return Error.None, data[curr_pos];
@@ -362,7 +362,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         dss : ^DynamicStringStream = ~~s;
         use dss;
 
-        if curr_pos >= data.count do return Error.EOF, cast(u8) 0;
+        if curr_pos >= data.count do return Error.EOF, 0;
 
         defer curr_pos += 1;
         return Error.None, data[curr_pos];

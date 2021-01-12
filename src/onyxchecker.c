@@ -1132,7 +1132,6 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
 CheckStatus check_compound(AstCompound* compound) {
     bh_arr_each(AstTyped *, expr, compound->exprs) {
         CHECK(expression, expr);
-        resolve_expression_type(*expr);
     }
 
     compound->type = type_build_compound_type(semstate.node_allocator, compound);

@@ -439,11 +439,33 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     else if (node->kind == Ast_Kind_NumLit) {
         if (convert_numlit_to_type((AstNumLit *) node, type)) return 1;
     }
+    else if (node->kind == Ast_Kind_Compound) {
+        if (type->kind != Type_Kind_Compound) return 0;
+
+        AstCompound* compound = (AstCompound *) node;
+
+        u32 expr_count = bh_arr_length(compound->exprs);
+        if (expr_count != type->Compound.count) return 0;
+
+        fori (i, 0, (i64) expr_count) {
+            if (!type_check_or_auto_cast(&compound->exprs[i], type->Compound.types[i])) return 0;
+        }
+
+        compound->type = type_build_compound_type(semstate.node_allocator, compound);
+        
+        return 1;
+    }
 
     return 0;
 }
 
 Type* resolve_expression_type(AstTyped* node) {
+    if (node->kind == Ast_Kind_Compound) {
+        bh_arr_each(AstTyped *, expr, ((AstCompound *) node)->exprs) {
+            resolve_expression_type(*expr);
+        }
+    }
+
     if (node->type == NULL)
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
 
