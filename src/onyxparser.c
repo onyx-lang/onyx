@@ -1077,8 +1077,9 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
 
     } else {
         AstType* type_for_all = parse_type(parser);
-        bh_arr_each(AstTyped *, local, local_compound->exprs)
-            (*local)->type_node = type_for_all;
+        forll (AstLocal, local, first_local, next) {
+            local->type_node = type_for_all;
+        }
     }
 
     *ret = (AstNode *) first_local;
