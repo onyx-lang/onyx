@@ -4,12 +4,17 @@ Additions:
 * Compilation on Windows. All you should need is `cl.exe` in the current environment,
     and then simply run `build.bat`. I haven't thoroughly tested this, but I believe
     it will work on many systems. ARM / PowerPC may not work correctly.
+* procedures can be polymorphic on an array size.
+* structures can be polymorphic on any compile-time known value.
+* basics of operator overloading using `#operator +`.
+* multiple return values and multiple assignment / declarations.
 * #solidify directive for explicitly specifying type variables in polymorphic procs.
 * properly different kinds of allocators in core/alloc/.
 * `null_proc` in builtin.onyx type matches against all procedure types, allowing for a
     'null' procedure.
-* '-VV' for very verbose printing. Easier to nail down compiler issues because it stops
+* '-VV' and '-VVV' for very verbose printing. Easier to nail down compiler issues because it stops
     printing in the entity where the problem is.
+* `io.Stream` API with `io.Reader` and `io.Writer`.
 * `map.empty`
 * `string.compare`
 * `array.copy`
@@ -19,6 +24,7 @@ Additions:
 
 Removals:
 * struct literals can no longer specify values for members brought in through a `use`.
+* Makefile; just use ./build.sh or ./build.bat
 
 Changes:
 * `::` declarations in a procedure are treated differently now. They used to represent a constant
@@ -43,6 +49,8 @@ Bug fixes:
 * struct member defaults were processed too early in the pipeline, causing errors.
 * assignment of array type with array literal optimization.
 * probably many more since everything is compiled with warnings now.
+* deferred statements are correctly executed with break, continue and fallthrough.
+* `0..10` was not parsed correctly.
 
 
 Release v0.0.5

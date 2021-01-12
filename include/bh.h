@@ -184,7 +184,7 @@ u8* double_to_ieee754(f64 f, b32 reverse);
 
 #define fori(var, lo, hi)                 for (i64 var = (lo); var < (hi); var++)
 #define forir(var, hi, lo)                for (i64 var = (hi); var >= (lo); var--)
-#define forll(T, var, start, step)        for (T* var = (start); var != NULL; var = var->step)
+#define forll(T, var, start, step)        for (T* var = (start); var != NULL; var = (T *) var->step)
 
 #if defined(BH_DEBUG) && !defined(_BH_WINDOWS)
     #define DEBUG_HERE                        __asm("int $3")

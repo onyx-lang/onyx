@@ -93,7 +93,7 @@ CheckStatus check_return(AstReturn* retnode) {
         CHECK(expression, &retnode->expr);
 
         if (!type_check_or_auto_cast(&retnode->expr, semstate.expected_return_type)) {
-            onyx_report_error(retnode->expr->token->pos,
+            onyx_report_error(retnode->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
                     type_get_name(semstate.expected_return_type),
                     type_get_name(retnode->expr->type));

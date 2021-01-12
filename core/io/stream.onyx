@@ -117,10 +117,7 @@ stream_size :: proc (use s: ^Stream) -> i32 {
 }
 
 stream_peek_byte :: proc (use s: ^Stream) -> (Error, u8) {
-    out : u8;
-    err : io.Error;
-
-    err, out = stream_read_byte(s);
+    err, out := stream_read_byte(s);
     if err != Error.None do return err, 0;
 
     err = stream_unread_byte(s);
