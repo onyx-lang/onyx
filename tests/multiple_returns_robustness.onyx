@@ -1,0 +1,58 @@
+#load "core/std/js"
+
+use package core
+
+foo :: proc () -> (i32, i32) {
+    return 50, 60;
+}
+
+something :: proc (f: proc () -> ($T, T)) -> T {
+    a, b := f();
+    return a + b;
+}
+
+get_extrema :: proc (arr: [$N] $T) -> (T, T) {
+    min := arr[0];
+    max := arr[0];
+
+    for e: arr {
+        if e < min do min = e;
+        if e > max do max = e;
+    }
+
+    return min, max;
+}
+
+return_multiple_arrays :: proc () -> ([3] i32, [3] f32) {
+    iarr := i32.[ 0, 1, 2 ];
+    farr := f32.[ 3, 4, 5 ];
+    return iarr, farr;
+}
+
+main :: proc (args: [] cstr) {
+    a, b := foo();
+    a, b = b, a;
+
+    c := something(foo);
+
+    println(a);
+    println(b);
+    println(c);
+
+
+    least, greatest := get_extrema(i32.[ -5, 20, 5, -10, 200, 8 ]);
+    printf("%i to %i\n", least, greatest);
+
+    iarr, farr := return_multiple_arrays();
+    array_print(iarr);
+    array_print(farr);
+
+    array_print :: proc (arr: [$N] $T) {
+        for ^e: arr {
+            print(*e);
+            print(" ");
+        }
+
+        print("\n");
+    }
+}
