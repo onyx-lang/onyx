@@ -14,6 +14,7 @@ static void symres_call(AstCall* call);
 static void symres_size_of(AstSizeOf* so);
 static void symres_align_of(AstAlignOf* so);
 static void symres_field_access(AstFieldAccess** fa);
+static void symres_compound(AstCompound* compound);
 static void symres_expression(AstTyped** expr);
 static void symres_return(AstReturn* ret);
 static void symres_if(AstIfWhile* ifnode);
@@ -271,6 +272,12 @@ static void symres_field_access(AstFieldAccess** fa) {
     }
 }
 
+static void symres_compound(AstCompound* compound) {
+    bh_arr_each(AstTyped *, expr, compound->exprs) {
+        symres_expression(expr);
+    }
+}
+
 static void symres_pipe(AstBinaryOp** pipe) {
     AstCall* call_node = (AstCall *) (*pipe)->right;
     symres_expression((AstTyped **) &call_node);
@@ -403,6 +410,10 @@ static void symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Directive_Solidify:
             symres_directive_solidify((AstDirectiveSolidify **) expr);
+            break;
+
+        case Ast_Kind_Compound:
+            symres_compound((AstCompound *) *expr);
             break;
 
         default: break;

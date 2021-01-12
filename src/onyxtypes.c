@@ -231,6 +231,17 @@ b32 types_are_compatible(Type* t1, Type* t2) {
             return types_are_compatible(t1->DynArray.ptr_to_data->Pointer.elem, t2->DynArray.ptr_to_data->Pointer.elem);
         }
 
+        case Type_Kind_Compound: {
+            if (t2->kind != Type_Kind_Compound) return 0;
+            if (t1->Compound.count != t2->Compound.count) return 0;
+
+            fori (i, 0, (i64) t1->Compound.count) {
+                if (!types_are_compatible(t1->Compound.types[i], t2->Compound.types[i])) return 0;
+            }
+
+            return 1;
+        }
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -540,6 +551,23 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
     }
 
     return func_type;
+}
+
+Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
+    i64 expr_count = bh_arr_length(compound->exprs);
+
+    Type* comp_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * expr_count);
+    comp_type->kind = Type_Kind_Compound;
+    comp_type->Compound.size = 0;
+    comp_type->Compound.count = expr_count;
+
+    fori (i, 0, expr_count) {
+        assert(compound->exprs[i]->type != NULL);
+        comp_type->Compound.size += type_size_of(compound->exprs[i]->type);
+        comp_type->Compound.types[i] = compound->exprs[i]->type;
+    }
+
+    return comp_type;
 }
 
 Type* type_make_pointer(bh_allocator alloc, Type* to) {

@@ -31,6 +31,7 @@ CheckStatus check_unaryop(AstUnaryOp** punop);
 CheckStatus check_struct_literal(AstStructLiteral* sl);
 CheckStatus check_array_literal(AstArrayLiteral* al);
 CheckStatus check_range_literal(AstRangeLiteral** range);
+CheckStatus check_compound(AstCompound* compound);
 CheckStatus check_expression(AstTyped** expr);
 CheckStatus check_address_of(AstAddressOf* aof);
 CheckStatus check_dereference(AstDereference* deref);
@@ -1111,6 +1112,16 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     return Check_Success;
 }
 
+CheckStatus check_compound(AstCompound* compound) {
+    bh_arr_each(AstTyped *, expr, compound->exprs) {
+        CHECK(expression, expr);
+        resolve_expression_type(*expr);        
+    }
+
+    compound->type = type_build_compound_type(semstate.node_allocator, compound);
+    return Check_Success;
+}
+
 CheckStatus check_address_of(AstAddressOf* aof) {
     CHECK(expression, &aof->expr);
 
@@ -1384,6 +1395,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Directive_Solidify:
             *pexpr = (AstTyped *) ((AstDirectiveSolidify *) expr)->resolved_proc;
+            break;
+
+        case Ast_Kind_Compound:
+            CHECK(compound, (AstCompound *) expr);
             break;
 
         case Ast_Kind_StrLit: break;

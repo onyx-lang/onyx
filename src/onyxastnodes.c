@@ -28,6 +28,8 @@ static const char* ast_node_names[] = {
     "UN_OP",
     "BIN_OP",
 
+    "COMPOUND",
+
     "TYPE_START (BAD)",
     "TYPE",
     "BASIC_TYPE",
@@ -43,6 +45,7 @@ static const char* ast_node_names[] = {
     "ENUM TYPE",
     "TYPE_ALIAS",
     "TYPE RAW ALIAS",
+    "COMPOUND TYPE",
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",
