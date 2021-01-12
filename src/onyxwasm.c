@@ -182,12 +182,25 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
 #define WIL(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } }))
 #define WIP(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } }))
 #define EMIT_FUNC(kind, ...) static void emit_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
+#define STACK_SWAP(type1, type2) { \
+    u64 t0 = local_raw_allocate(mod->local_alloc, type1); \
+    u64 t1 = local_raw_allocate(mod->local_alloc, type2); \
+                                                          \
+    WIL(WI_LOCAL_SET, t0);                                \
+    WIL(WI_LOCAL_SET, t1);                                \
+    WIL(WI_LOCAL_GET, t0);                                \
+    WIL(WI_LOCAL_GET, t1);                                \
+                                                          \
+    local_raw_free(mod->local_alloc, type1);              \
+    local_raw_free(mod->local_alloc, type2);              \
+    }
 
 EMIT_FUNC(function_body,                 AstFunction* fd);
 EMIT_FUNC(block,                         AstBlock* block, b32 generate_block_headers);
 EMIT_FUNC(statement,                     AstNode* stmt);
 EMIT_FUNC(assignment,                    AstBinaryOp* assign);
-EMIT_FUNC(assignment_of_array,           AstBinaryOp* assign);
+EMIT_FUNC(assignment_of_array,           AstTyped* left, AstTyped* right);
+EMIT_FUNC(compound_assignment,           AstBinaryOp* assign);
 EMIT_FUNC(store_instruction,             Type* type, u32 offset);
 EMIT_FUNC(load_instruction,              Type* type, u32 offset);
 EMIT_FUNC(if,                            AstIfWhile* if_node);
@@ -204,6 +217,7 @@ EMIT_FUNC(array_access_location,         AstArrayAccess* aa, u64* offset_return)
 EMIT_FUNC(field_access_location,         AstFieldAccess* field, u64* offset_return);
 EMIT_FUNC(local_location,                AstLocal* local, u64* offset_return);
 EMIT_FUNC(memory_reservation_location,   AstMemRes* memres);
+EMIT_FUNC(location_return_offset,        AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                      AstTyped* expr);
 EMIT_FUNC(struct_load,                   Type* type, u64 offset);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
@@ -324,7 +338,13 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
     }
 
     if (assign->right->type->kind == Type_Kind_Array) {
-        emit_assignment_of_array(mod, &code, assign);
+        emit_assignment_of_array(mod, &code, assign->left, assign->right);
+        *pcode = code;
+        return;
+    }
+
+    if (assign->right->type->kind == Type_Kind_Compound) {
+        emit_compound_assignment(mod, &code, assign);
         *pcode = code;
         return;
     }
@@ -389,13 +409,13 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
     *pcode = code;
 }
 
-EMIT_FUNC(assignment_of_array, AstBinaryOp* assign) {
+EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    Type* rtype = assign->right->type;
+    Type* rtype = right->type;
     assert(rtype->kind == Type_Kind_Array);
 
-    if (assign->right->kind == Ast_Kind_Array_Literal) {
+    if (right->kind == Ast_Kind_Array_Literal) {
         Type* elem_type = rtype;
         u32 elem_count = 1;
         while (elem_type->kind == Type_Kind_Array) {
@@ -406,17 +426,17 @@ EMIT_FUNC(assignment_of_array, AstBinaryOp* assign) {
 
         u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
 
-        emit_location(mod, &code, assign->left);
+        emit_location(mod, &code, left);
         WIL(WI_LOCAL_SET, lptr_local);
 
-        AstArrayLiteral* al = (AstArrayLiteral *) assign->right;
+        AstArrayLiteral* al = (AstArrayLiteral *) right;
         fori (i, 0, elem_count) {
-            if (!type_is_structlike(elem_type))
+            if (!type_is_compound(elem_type))
                 WIL(WI_LOCAL_GET, lptr_local);
 
             emit_expression(mod, &code, al->values[i]);
 
-            if (!type_is_structlike(elem_type)) {
+            if (!type_is_compound(elem_type)) {
                 emit_store_instruction(mod, &code, elem_type, i * elem_size);
             } else {
                 WIL(WI_LOCAL_GET, lptr_local);
@@ -427,9 +447,45 @@ EMIT_FUNC(assignment_of_array, AstBinaryOp* assign) {
         local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     } else {
-        emit_location(mod, &code, assign->left);
-        emit_expression(mod, &code, assign->right);
+        emit_location(mod, &code, left);
+        emit_expression(mod, &code, right);
         emit_array_store(mod, &code, rtype, 0);
+    }
+
+    *pcode = code;
+    return;
+}
+
+EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    emit_expression(mod, &code, assign->right);
+
+    AstCompound* compound_lval = (AstCompound *) assign->left;
+    bh_arr_rev_each(AstTyped *, plval, compound_lval->exprs) {
+        AstTyped *lval = *plval;
+
+        if (type_is_structlike_strict(lval->type)) {
+            emit_struct_lval(mod, &code, lval);
+            continue;
+        }
+
+        if (lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param) {
+            if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
+                u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
+                WIL(WI_LOCAL_SET, localidx);
+                continue;
+            }
+        }
+
+        u64 expr_tmp = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(WI_LOCAL_SET, expr_tmp);
+        u64 offset = 0;
+        emit_location_return_offset(mod, &code, lval, &offset);
+        WIL(WI_LOCAL_GET, expr_tmp);
+        
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        emit_store_instruction(mod, &code, lval->type, offset);
     }
 
     *pcode = code;
@@ -446,6 +502,42 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
 
     if (type->kind == Type_Kind_Array) {
         emit_array_store(mod, pcode, type, offset);
+        return;
+    }
+
+    if (type->kind == Type_Kind_Compound) {
+        u64 loc_tmp = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(WI_LOCAL_SET, loc_tmp);
+
+        u32 placement = offset + type_size_of(type);
+        forir (i, type->Compound.count - 1, 0) {
+            Type* curr_type = type->Compound.types[i];
+            placement -= type_size_of(curr_type);
+
+            if (type_is_compound(curr_type)) {
+                if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == loc_tmp) {
+                    bh_arr_last(code).type = WI_LOCAL_TEE;
+                } else {
+                    WIL(WI_LOCAL_GET, loc_tmp);
+                }
+
+                emit_store_instruction(mod, &code, curr_type, placement);
+            } else {
+                WasmType wt = onyx_type_to_wasm_type(curr_type);
+                u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
+
+                WIL(WI_LOCAL_SET, tmp_idx);
+                WIL(WI_LOCAL_GET, loc_tmp);
+                WIL(WI_LOCAL_GET, tmp_idx);
+
+                emit_store_instruction(mod, &code, curr_type, placement);
+
+                local_raw_free(mod->local_alloc, wt);
+            }
+        }
+
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        *pcode = code;
         return;
     }
 
@@ -501,6 +593,23 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
             WI(WI_I32_ADD);
         }
 
+        *pcode = code;
+        return;
+    }
+
+    if (type->kind == Type_Kind_Compound) {
+        u64 loc_tmp = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(WI_LOCAL_TEE, loc_tmp);
+
+        u32 accum_offset = offset;
+        fori (i, 0, type->Compound.count) {
+            if (i != 0) WIL(WI_LOCAL_GET, loc_tmp);
+
+            emit_load_instruction(mod, &code, type->Compound.types[i], accum_offset);
+            accum_offset += type_size_of(type->Compound.types[i]);
+        }
+
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
         *pcode = code;
         return;
     }
@@ -1223,8 +1332,8 @@ EMIT_FUNC(call, AstCall* call) {
     bh_arr_each(AstArgument *, parg, call->arg_arr) {
         AstArgument* arg = *parg;
 
-        b32 place_on_stack = 0;
-        b32 arg_is_struct  = type_is_structlike(arg->value->type);
+        b32 place_on_stack  = 0;
+        b32 arg_is_compound = type_is_compound(arg->value->type);
 
         if (arg->va_kind != VA_Kind_Not_VA) {
             if (vararg_offset == 0xffffffff) vararg_offset = stack_grow_amm;
@@ -1232,7 +1341,7 @@ EMIT_FUNC(call, AstCall* call) {
         }
         if (type_get_param_pass(arg->value->type) == Param_Pass_By_Implicit_Pointer) place_on_stack = 1;
 
-        if (place_on_stack && !arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
+        if (place_on_stack && !arg_is_compound) WID(WI_GLOBAL_GET, stack_top_idx);
 
         if (stack_grow_amm != 0) {
             stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
@@ -1255,7 +1364,7 @@ EMIT_FUNC(call, AstCall* call) {
         }
 
         if (place_on_stack) {
-            if (arg_is_struct) WID(WI_GLOBAL_GET, stack_top_idx);
+            if (arg_is_compound) WID(WI_GLOBAL_GET, stack_top_idx);
             emit_store_instruction(mod, &code, arg->value->type, stack_grow_amm);
 
             if (arg->va_kind != VA_Kind_Not_VA) vararg_count += 1;
@@ -1951,7 +2060,7 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     // greater than like 16 we output a loop that copies them?
     //                                               - brendanfh 2020/12/16
     fori (i, 0, elem_count) {
-        if (!type_is_structlike(elem_type))
+        if (!type_is_compound(elem_type))
             WIL(WI_LOCAL_GET, lptr_local);
 
         if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == rptr_local)
@@ -1960,7 +2069,7 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
             WIL(WI_LOCAL_GET, rptr_local);
         emit_load_instruction(mod, &code, elem_type, i * elem_size);
 
-        if (!type_is_structlike(elem_type)) {
+        if (!type_is_compound(elem_type)) {
             emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
         } else {
             WIL(WI_LOCAL_GET, lptr_local);
@@ -1986,12 +2095,12 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     u32 elem_size = type_size_of(al->type->Array.elem);
 
     fori (i, 0, al->type->Array.count) {
-        if (!type_is_structlike(al->type->Array.elem))
+        if (!type_is_compound(al->type->Array.elem))
             WIL(WI_LOCAL_GET, mod->stack_base_idx);
 
         emit_expression(mod, &code, al->values[i]);
 
-        if (!type_is_structlike(al->type->Array.elem)) {
+        if (!type_is_compound(al->type->Array.elem)) {
             emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
         } else {
             WIL(WI_LOCAL_GET, mod->stack_base_idx);
@@ -2016,52 +2125,38 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
     *pcode = code;
 }
 
-EMIT_FUNC(location, AstTyped* expr) {
+EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (expr->kind) {
         case Ast_Kind_Param:
         case Ast_Kind_Local: {
-            u64 offset = 0;
-            emit_local_location(mod, &code, (AstLocal *) expr, &offset);
-            if (offset != 0) {
-                WID(WI_I32_CONST, offset);
-                WI(WI_I32_ADD);
-            }
+            emit_local_location(mod, &code, (AstLocal *) expr, offset_return);
             break;
         }
 
         case Ast_Kind_Dereference: {
             emit_expression(mod, &code, ((AstDereference *) expr)->expr);
+            *offset_return = 0;
             break;
         }
 
         case Ast_Kind_Array_Access: {
             AstArrayAccess* aa = (AstArrayAccess *) expr;
-            u64 offset = 0;
-            emit_array_access_location(mod, &code, aa, &offset);
-            if (offset != 0) {
-                WID(WI_I32_CONST, offset);
-                WI(WI_I32_ADD);
-            }
+            emit_array_access_location(mod, &code, aa, offset_return);
             break;
         }
 
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess *) expr;
-
-            u64 offset = 0;
-            emit_field_access_location(mod, &code, field, &offset);
-            if (offset != 0) {
-                WID(WI_I32_CONST, offset);
-                WI(WI_I32_ADD);
-            }
+            emit_field_access_location(mod, &code, field, offset_return);
             break;
         }
 
         case Ast_Kind_Memres: {
             AstMemRes* memres = (AstMemRes *) expr;
             WID(WI_I32_CONST, memres->addr);
+            *offset_return = 0;
             break;
         }
 
@@ -2070,6 +2165,19 @@ EMIT_FUNC(location, AstTyped* expr) {
             break;
         }
     }
+
+    *pcode = code;
+}
+
+EMIT_FUNC(location, AstTyped* expr) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 offset = 0;
+    emit_location_return_offset(mod, &code, expr, &offset);
+    if (offset != 0) {
+        WID(WI_I32_CONST, offset);
+        WI(WI_I32_ADD);
+    } 
 
     *pcode = code;
 }
@@ -2322,15 +2430,31 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Compound: {
+            AstCompound* compound = (AstCompound *) expr;
+
+            bh_arr_each(AstTyped *, expr, compound->exprs) {
+                emit_expression(mod, &code, *expr);
+            }
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
             assert(0);
     }
 
+    // FIX: This is going to be wrong for struct types.
     if (expr->flags & Ast_Flag_Expr_Ignored &&
-        !type_results_in_void(expr->type))
-        WI(WI_DROP);
+        !type_results_in_void(expr->type)) {
+         if (expr->type->kind == Type_Kind_Compound) {
+             fori (i, 0, expr->type->Compound.count)
+                 WI(WI_DROP);
+         } else {
+            WI(WI_DROP);
+        }
+    }
 
     *pcode = code;
 }
@@ -2415,7 +2539,7 @@ EMIT_FUNC(return, AstReturn* ret) {
 
     if (ret->expr) {
         if (mod->curr_cc == CC_Return_Stack) {
-            if (type_is_structlike_strict(ret->expr->type)) {
+            if (type_is_compound(ret->expr->type)) {
                 emit_expression(mod, &code, ret->expr);
 
                 WIL(WI_LOCAL_GET, mod->stack_base_idx);
@@ -3115,6 +3239,12 @@ void emit_entity(Entity* ent) {
         case Entity_Type_Function_Header:
             if (!should_emit_function(ent->function)) break;
 
+            // bh_printf("%d -> %s:%d:%d\n",
+            //     module->next_func_idx,
+            //     ent->expr->token->pos.filename,
+            //     ent->expr->token->pos.line,
+            //     ent->expr->token->pos.column);
+            
             bh_imap_put(&module->index_map, (u64) ent->function, module->next_func_idx++);
             break;
 

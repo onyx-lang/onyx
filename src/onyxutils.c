@@ -78,13 +78,14 @@ b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
 }
 
 b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
-    if (bh_table_has(AstNode *, scope->symbols, name)) {
-        if (bh_table_get(AstNode *, scope->symbols, name) != symbol) {
-            onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
-            return 0;
+    if (strcmp(name, "_")) {
+        if (bh_table_has(AstNode *, scope->symbols, name)) {
+            if (bh_table_get(AstNode *, scope->symbols, name) != symbol) {
+                onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
+                return 0;
+            }
+            return 1;
         }
-
-        return 1;
     }
 
     bh_table_put(AstNode *, scope->symbols, name, symbol);
@@ -315,6 +316,23 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                             .value = elem.actual->Struct.poly_sln[i].value,
                         }));
                     }
+                }
+
+                break;
+            }
+
+            case Ast_Kind_Type_Compound: {
+                if (elem.actual->kind != Type_Kind_Compound) break;
+                if (bh_arr_length(elem.actual->Compound.types) != bh_arr_length(((AstCompoundType *) elem.type_expr)->types)) break;
+
+                AstCompoundType* ct = (AstCompoundType *) elem.type_expr;
+
+                fori (i, 0, bh_arr_length(ct->types)) {
+                    bh_arr_push(elem_queue, ((PolySolveElem) {
+                        .kind = PSK_Type,
+                        .type_expr = ct->types[i],
+                        .actual = elem.actual->Compound.types[i],
+                    }));
                 }
 
                 break;

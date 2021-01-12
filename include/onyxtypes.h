@@ -91,6 +91,11 @@ typedef struct StructMember {
         bh_arr(StructMember *) memarr;                            \
         bh_arr(struct AstPolySolution) poly_sln;                  \
     })                                                            \
+    TYPE_KIND(Compound, struct {                                  \
+        u32 count;                                                \
+        u32 size;                                                 \
+        Type* types[];                                            \
+    })                                                            \
     TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
     TYPE_KIND(Slice, struct { Type *ptr_to_data; })               \
     TYPE_KIND(DynArray, struct { Type *ptr_to_data; })            \
@@ -100,6 +105,7 @@ typedef struct StructMember {
         char* name;                                               \
         Type* backing;                                            \
     })
+
 
 typedef enum TypeKind {
     Type_Kind_Invalid,
@@ -135,6 +141,7 @@ extern Type basic_types[];
 
 struct AstType;
 struct AstFunction;
+struct AstCompound;
 
 b32 types_are_compatible(Type* t1, Type* t2);
 u32 type_size_of(Type* type);
@@ -142,6 +149,7 @@ u32 type_alignment_of(Type* type);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 
 Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);
+Type* type_build_compound_type(bh_allocator alloc, struct AstCompound* compound);
 
 Type* type_make_pointer(bh_allocator alloc, Type* to);
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count);

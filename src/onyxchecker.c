@@ -31,6 +31,7 @@ CheckStatus check_unaryop(AstUnaryOp** punop);
 CheckStatus check_struct_literal(AstStructLiteral* sl);
 CheckStatus check_array_literal(AstArrayLiteral* al);
 CheckStatus check_range_literal(AstRangeLiteral** range);
+CheckStatus check_compound(AstCompound* compound);
 CheckStatus check_expression(AstTyped** expr);
 CheckStatus check_address_of(AstAddressOf* aof);
 CheckStatus check_dereference(AstDereference* deref);
@@ -590,7 +591,24 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         // NOTE: This is the 'type inference' system. Very stupid, but very easy.
         // If a left operand has an unknown type, fill it in with the type of
         // the right hand side.
-        if (binop->left->type == NULL) binop->left->type = resolve_expression_type(binop->right);
+        if (binop->left->type == NULL) {
+            resolve_expression_type(binop->right);
+
+            if (binop->right->type->kind == Type_Kind_Compound) {
+                i32 expr_count = binop->right->type->Compound.count;
+                AstCompound* lhs = (AstCompound *) binop->left;
+                assert(lhs->kind == Ast_Kind_Compound);
+
+                fori (i, 0, expr_count) {
+                    lhs->exprs[i]->type = binop->right->type->Compound.types[i];
+                }
+
+                lhs->type = type_build_compound_type(semstate.node_allocator, lhs);
+
+            } else {
+                binop->left->type = binop->right->type;
+            }
+        }
 
     } else {
         // NOTE: +=, -=, ...
@@ -1111,6 +1129,16 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     return Check_Success;
 }
 
+CheckStatus check_compound(AstCompound* compound) {
+    bh_arr_each(AstTyped *, expr, compound->exprs) {
+        CHECK(expression, expr);
+        resolve_expression_type(*expr);
+    }
+
+    compound->type = type_build_compound_type(semstate.node_allocator, compound);
+    return Check_Success;
+}
+
 CheckStatus check_address_of(AstAddressOf* aof) {
     CHECK(expression, &aof->expr);
 
@@ -1183,7 +1211,9 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
     resolve_expression_type(aa->expr);
     if (aa->expr->type->kind != Type_Kind_Basic
             || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_report_error(aa->token->pos, "Expected type u32 or i32 for index.");
+        onyx_report_error(aa->token->pos,
+            "Expected type u32 or i32 for index, got '%s'.",
+            type_get_name(aa->expr->type));
         return Check_Error;
     }
 
@@ -1386,6 +1416,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             *pexpr = (AstTyped *) ((AstDirectiveSolidify *) expr)->resolved_proc;
             break;
 
+        case Ast_Kind_Compound:
+            CHECK(compound, (AstCompound *) expr);
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -1459,7 +1493,13 @@ CheckStatus check_block(AstBlock* block) {
             onyx_report_error((*value)->token->pos,
                     "Unable to resolve type for local '%b'.",
                     (*value)->token->text, (*value)->token->length);
-            return 1;
+            return Check_Error;
+        }
+
+        if ((*value)->type->kind == Type_Kind_Compound) {
+            onyx_report_error((*value)->token->pos,
+                    "Compound type not allowed as local variable type. Try splitting this into multiple variables.");
+            return Check_Error;
         }
     }
 
@@ -1495,6 +1535,14 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 CheckStatus check_struct(AstStructType* s_node) {
     // NOTE: fills in the stcache
     type_build_from_ast(semstate.allocator, (AstType *) s_node);
+    if (s_node->stcache == NULL) return Check_Error;
+
+    bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
+        if ((*smem)->type->kind == Type_Kind_Compound) {
+            onyx_report_error(s_node->token->pos, "Compound types are not allowed as struct member types.");
+            return Check_Error;
+        }
+    }
 
     return Check_Success;
 }
@@ -1556,6 +1604,11 @@ CheckStatus check_function_header(AstFunction* func) {
                     "Unable to resolve type for parameter, '%b'.\n",
                     local->token->text,
                     local->token->length);
+            return Check_Error;
+        }
+
+        if (local->type->kind == Type_Kind_Compound) {
+            onyx_report_error(param->local->token->pos, "Compound types are not allowed as parameter types. Try splitting this into multiple parameters.");
             return Check_Error;
         }
 

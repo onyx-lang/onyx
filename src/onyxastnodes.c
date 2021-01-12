@@ -28,6 +28,8 @@ static const char* ast_node_names[] = {
     "UN_OP",
     "BIN_OP",
 
+    "COMPOUND",
+
     "TYPE_START (BAD)",
     "TYPE",
     "BASIC_TYPE",
@@ -43,6 +45,7 @@ static const char* ast_node_names[] = {
     "ENUM TYPE",
     "TYPE_ALIAS",
     "TYPE RAW ALIAS",
+    "COMPOUND TYPE",
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",
@@ -614,3 +617,16 @@ AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field) {
     return fa;
 }
 
+AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node) {
+    AstLocal* local = onyx_ast_node_new(a, sizeof(AstLocal), Ast_Kind_Local);
+    local->token = token;
+    local->type_node = type_node;
+
+    return local;
+}
+
+AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
+    AstNode* symbol = onyx_ast_node_new(a, sizeof(AstNode), Ast_Kind_Symbol);
+    symbol->token = sym;
+    return symbol;
+}

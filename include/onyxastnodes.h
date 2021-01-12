@@ -25,6 +25,7 @@ typedef struct AstFileContents AstFileContents;
 typedef struct AstStructLiteral AstStructLiteral;
 typedef struct AstArrayLiteral AstArrayLiteral;
 typedef struct AstRangeLiteral AstRangeLiteral;
+typedef struct AstCompound AstCompound;
 
 typedef struct AstDirectiveSolidify AstDirectiveSolidify;
 
@@ -56,6 +57,7 @@ typedef struct AstEnumType AstEnumType;
 typedef struct AstEnumValue AstEnumValue;
 typedef struct AstTypeAlias AstTypeAlias;
 typedef struct AstTypeRawAlias AstTypeRawAlias;
+typedef struct AstCompoundType AstCompoundType;
 
 typedef struct AstBinding AstBinding;
 typedef struct AstMemRes AstMemRes;
@@ -106,6 +108,8 @@ typedef enum AstKind {
     Ast_Kind_Unary_Op,
     Ast_Kind_Binary_Op,
 
+    Ast_Kind_Compound,
+
     Ast_Kind_Type_Start,
     Ast_Kind_Type,
     Ast_Kind_Basic_Type,
@@ -121,6 +125,7 @@ typedef enum AstKind {
     Ast_Kind_Enum_Type,
     Ast_Kind_Type_Alias,
     Ast_Kind_Type_Raw_Alias,
+    Ast_Kind_Type_Compound,
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
@@ -516,6 +521,11 @@ struct AstIntrinsicCall {
 
     VarArgKind va_kind;
 };
+struct AstCompound {
+    AstTyped_base;
+
+    bh_arr(AstTyped *) exprs;
+};
 
 struct AstDirectiveSolidify {
     AstTyped_base;
@@ -668,6 +678,11 @@ struct AstEnumType {
 struct AstEnumValue    { AstTyped_base; AstNumLit* value; };
 struct AstTypeAlias    { AstType_base; AstType* to; };
 struct AstTypeRawAlias { AstType_base; Type* to; };
+struct AstCompoundType {
+    AstType_base;
+
+    bh_arr(AstType *) types;
+};
 
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
@@ -972,6 +987,8 @@ AstNumLit* make_float_literal(bh_allocator a, f64 value);
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
 AstArgument* make_argument(bh_allocator a, AstTyped* value);
 AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);
+AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
+AstNode* make_symbol(bh_allocator a, OnyxToken* sym);
 
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,
@@ -988,13 +1005,22 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {
-    return (node->kind == Ast_Kind_Local)
+    if    ((node->kind == Ast_Kind_Local)
         || (node->kind == Ast_Kind_Param)
         || (node->kind == Ast_Kind_Global)
         || (node->kind == Ast_Kind_Dereference)
         || (node->kind == Ast_Kind_Array_Access)
         || (node->kind == Ast_Kind_Field_Access)
-        || (node->kind == Ast_Kind_Memres);
+        || (node->kind == Ast_Kind_Memres))
+        return 1;
+
+    if (node->kind == Ast_Kind_Compound) {
+        b32 all_lval = 1;
+        bh_arr_each(AstTyped *, expr, ((AstCompound *) node)->exprs) all_lval = all_lval && is_lval((AstNode *) *expr);
+        return all_lval;
+    }
+
+    return 0;
 }
 
 static inline b32 binop_is_assignment(BinaryOp binop) {
@@ -1019,6 +1045,7 @@ static inline CallingConvention type_function_get_cc(Type* type) {
     if (type->Function.return_type->kind == Type_Kind_Struct) return CC_Return_Stack;
     if (type->Function.return_type->kind == Type_Kind_Slice) return CC_Return_Stack;
     if (type->Function.return_type->kind == Type_Kind_DynArray) return CC_Return_Stack;
+    if (type->Function.return_type->kind == Type_Kind_Compound) return CC_Return_Stack;
     return CC_Return_Wasm;
 }
 

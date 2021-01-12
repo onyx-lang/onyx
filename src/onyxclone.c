@@ -58,6 +58,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Enum_Type: return sizeof(AstEnumType);
         case Ast_Kind_Type_Alias: return sizeof(AstTypeAlias);
         case Ast_Kind_Type_Raw_Alias: return sizeof(AstTypeRawAlias);
+        case Ast_Kind_Type_Compound: return sizeof(AstCompoundType);
         case Ast_Kind_Type_End: return 0;
         case Ast_Kind_Struct_Member: return sizeof(AstStructMember);
         case Ast_Kind_Enum_Value: return sizeof(AstEnumValue);
@@ -89,6 +90,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Switch: return sizeof(AstSwitch);
         case Ast_Kind_Switch_Case: return sizeof(AstSwitchCase);
         case Ast_Kind_Directive_Solidify: return sizeof(AstDirectiveSolidify);
+        case Ast_Kind_Compound: return sizeof(AstCompound);
         case Ast_Kind_Count: return 0;
 	}
 
@@ -342,6 +344,19 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             break;
         }
 
+        case Ast_Kind_Type_Compound: {
+            AstCompoundType* cd = (AstCompoundType *) nn;
+            AstCompoundType* cs = (AstCompoundType *) node;
+
+            cd->types = NULL;
+            bh_arr_new(global_heap_allocator, cd->types, bh_arr_length(cs->types));
+
+            bh_arr_each(AstType *, type, cs->types) {
+                bh_arr_push(cd->types, (AstType *) ast_clone(a, (AstNode *) *type));
+            }
+            break;
+        }
+
 		case Ast_Kind_Function_Type:
 			((AstFunctionType *) nn)->return_type = (AstType *) ast_clone(a, ((AstFunctionType *) node)->return_type);
 			((AstFunctionType *) nn)->param_count = ((AstFunctionType *) node)->param_count;
@@ -407,6 +422,19 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 			break;
 		}
+
+        case Ast_Kind_Compound: {
+            AstCompound* cd = (AstCompound *) nn;
+            AstCompound* cs = (AstCompound *) node;
+
+            cd->exprs = NULL;
+            bh_arr_new(global_heap_allocator, cd->exprs, bh_arr_length(cs->exprs));
+
+            bh_arr_each(AstTyped *, expr, cs->exprs) {
+                bh_arr_push(cd->exprs, (AstTyped *) ast_clone(a, (AstNode *) *expr));
+            }
+            break;
+        }
 	}
 
 	return nn;
