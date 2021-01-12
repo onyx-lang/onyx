@@ -576,6 +576,9 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
 
 Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
     i64 expr_count = bh_arr_length(compound->exprs);
+    fori (i, 0, expr_count) {
+        if (compound->exprs[i]->type == NULL) return NULL;
+    }
 
     Type* comp_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * expr_count);
     comp_type->kind = Type_Kind_Compound;

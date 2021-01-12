@@ -617,3 +617,16 @@ AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field) {
     return fa;
 }
 
+AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node) {
+    AstLocal* local = onyx_ast_node_new(a, sizeof(AstLocal), Ast_Kind_Local);
+    local->token = token;
+    local->type_node = type_node;
+
+    return local;
+}
+
+AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
+    AstNode* symbol = onyx_ast_node_new(a, sizeof(AstNode), Ast_Kind_Symbol);
+    symbol->token = sym;
+    return symbol;
+}

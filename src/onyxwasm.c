@@ -2445,10 +2445,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
             assert(0);
     }
 
-    // FIX: This is going to be wrong for structs and compound types.
+    // FIX: This is going to be wrong for struct types.
     if (expr->flags & Ast_Flag_Expr_Ignored &&
         !type_results_in_void(expr->type)) {
-        WI(WI_DROP);
+         if (expr->type->kind == Type_Kind_Compound) {
+             fori (i, 0, expr->type->Compound.count)
+                 WI(WI_DROP);
+         } else {
+            WI(WI_DROP);
+        }
     }
 
     *pcode = code;
@@ -3234,6 +3239,12 @@ void emit_entity(Entity* ent) {
         case Entity_Type_Function_Header:
             if (!should_emit_function(ent->function)) break;
 
+            // bh_printf("%d -> %s:%d:%d\n",
+            //     module->next_func_idx,
+            //     ent->expr->token->pos.filename,
+            //     ent->expr->token->pos.line,
+            //     ent->expr->token->pos.column);
+            
             bh_imap_put(&module->index_map, (u64) ent->function, module->next_func_idx++);
             break;
 

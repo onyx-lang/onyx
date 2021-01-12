@@ -78,13 +78,14 @@ b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
 }
 
 b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
-    if (bh_table_has(AstNode *, scope->symbols, name)) {
-        if (bh_table_get(AstNode *, scope->symbols, name) != symbol) {
-            onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
-            return 0;
+    if (strcmp(name, "_")) {
+        if (bh_table_has(AstNode *, scope->symbols, name)) {
+            if (bh_table_get(AstNode *, scope->symbols, name) != symbol) {
+                onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
+                return 0;
+            }
+            return 1;
         }
-
-        return 1;
     }
 
     bh_table_put(AstNode *, scope->symbols, name, symbol);

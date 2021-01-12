@@ -987,6 +987,8 @@ AstNumLit* make_float_literal(bh_allocator a, f64 value);
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
 AstArgument* make_argument(bh_allocator a, AstTyped* value);
 AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);
+AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
+AstNode* make_symbol(bh_allocator a, OnyxToken* sym);
 
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,

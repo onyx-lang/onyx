@@ -591,7 +591,24 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         // NOTE: This is the 'type inference' system. Very stupid, but very easy.
         // If a left operand has an unknown type, fill it in with the type of
         // the right hand side.
-        if (binop->left->type == NULL) binop->left->type = resolve_expression_type(binop->right);
+        if (binop->left->type == NULL) {
+            resolve_expression_type(binop->right);
+
+            if (binop->right->type->kind == Type_Kind_Compound) {
+                i32 expr_count = binop->right->type->Compound.count;
+                AstCompound* lhs = (AstCompound *) binop->left;
+                assert(lhs->kind == Ast_Kind_Compound);
+
+                fori (i, 0, expr_count) {
+                    lhs->exprs[i]->type = binop->right->type->Compound.types[i];
+                }
+
+                lhs->type = type_build_compound_type(semstate.node_allocator, lhs);
+
+            } else {
+                binop->left->type = binop->right->type;
+            }
+        }
 
     } else {
         // NOTE: +=, -=, ...
@@ -1115,7 +1132,7 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
 CheckStatus check_compound(AstCompound* compound) {
     bh_arr_each(AstTyped *, expr, compound->exprs) {
         CHECK(expression, expr);
-        resolve_expression_type(*expr);        
+        resolve_expression_type(*expr);
     }
 
     compound->type = type_build_compound_type(semstate.node_allocator, compound);
@@ -1194,7 +1211,9 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
     resolve_expression_type(aa->expr);
     if (aa->expr->type->kind != Type_Kind_Basic
             || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_report_error(aa->token->pos, "Expected type u32 or i32 for index.");
+        onyx_report_error(aa->token->pos,
+            "Expected type u32 or i32 for index, got '%s'.",
+            type_get_name(aa->expr->type));
         return Check_Error;
     }
 
