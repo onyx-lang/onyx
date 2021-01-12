@@ -263,6 +263,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Slice:    return 8;
         case Type_Kind_VarArgs:  return 8;
         case Type_Kind_DynArray: return 12;
+        case Type_Kind_Compound: return type->Compound.size;
         default:                 return 0;
     }
 }
@@ -280,6 +281,7 @@ u32 type_alignment_of(Type* type) {
         case Type_Kind_Slice:    return 4;
         case Type_Kind_VarArgs:  return 4;
         case Type_Kind_DynArray: return 4;
+        case Type_Kind_Compound: return 8; // HACK
         default: return 1;
     }
 }
@@ -523,6 +525,25 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return type_build_from_ast(alloc, (AstType *) concrete);
         }
 
+        case Ast_Kind_Type_Compound: {
+            AstCompoundType* ctype = (AstCompoundType *) type_node;
+
+            i64 type_count = bh_arr_length(ctype->types);
+
+            Type* comp_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * type_count);
+            comp_type->kind = Type_Kind_Compound;
+            comp_type->Compound.size = 0;
+            comp_type->Compound.count = type_count;
+
+            fori (i, 0, type_count) {
+                assert(ctype->types[i] != NULL);
+                comp_type->Compound.types[i] = type_build_from_ast(alloc, ctype->types[i]);
+                comp_type->Compound.size += type_size_of(comp_type->Compound.types[i]);
+            }
+
+            return comp_type;
+        }
+
         case Ast_Kind_Symbol:
             assert(("symbol node in type expression", 0));
             return NULL;
@@ -694,6 +715,21 @@ const char* type_get_name(Type* type) {
 
             strncat(buf, ") -> ", 511);
             strncat(buf, type_get_name(type->Function.return_type), 511);
+
+            return bh_aprintf(global_scratch_allocator, "%s", buf);
+        }
+
+        case Type_Kind_Compound: {
+            char buf[512];
+            fori (i, 0, 512) buf[i] = 0;
+
+            strncat(buf, "(", 511);
+            fori (i, 0, type->Compound.count) {
+                strncat(buf, type_get_name(type->Compound.types[i]), 511);
+                if (i != type->Compound.count - 1)
+                    strncat(buf, ", ", 511);
+            }
+            strncat(buf, ")", 511);
 
             return bh_aprintf(global_scratch_allocator, "%s", buf);
         }
@@ -900,7 +936,9 @@ b32 type_is_numeric(Type* type) {
 b32 type_is_compound(Type* type) {
     return type->kind != Type_Kind_Basic
         && type->kind != Type_Kind_Pointer
-        && type->kind != Type_Kind_Enum;
+        && type->kind != Type_Kind_Enum
+        && type->kind != Type_Kind_Function
+        && type->kind != Type_Kind_Array;
 }
 
 b32 type_is_simd(Type* type) {
@@ -942,7 +980,7 @@ b32 type_is_structlike_strict(Type* type) {
     if (type->kind == Type_Kind_Struct)   return 1;
     if (type->kind == Type_Kind_Slice)    return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
-    if (type->kind == Type_Kind_VarArgs) return 1;
+    if (type->kind == Type_Kind_VarArgs)  return 1;
     return 0;
 }
 

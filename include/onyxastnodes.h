@@ -1043,6 +1043,7 @@ static inline CallingConvention type_function_get_cc(Type* type) {
     if (type->Function.return_type->kind == Type_Kind_Struct) return CC_Return_Stack;
     if (type->Function.return_type->kind == Type_Kind_Slice) return CC_Return_Stack;
     if (type->Function.return_type->kind == Type_Kind_DynArray) return CC_Return_Stack;
+    if (type->Function.return_type->kind == Type_Kind_Compound) return CC_Return_Stack;
     return CC_Return_Wasm;
 }
 

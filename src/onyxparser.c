@@ -1441,6 +1441,30 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     }
 }
 
+static AstType* parse_compound_type(OnyxParser* parser) {
+    AstType* first = parse_type(parser);
+
+    if (parser->curr->type == ',') {
+        AstCompoundType* ctype = make_node(AstCompoundType, Ast_Kind_Type_Compound);
+        ctype->token = parser->curr;
+
+        bh_arr_new(global_heap_allocator, ctype->types, 2);
+        bh_arr_push(ctype->types, first);
+
+        while (parser->curr->type == ',') {
+            if (parser->hit_unexpected_token) return (AstType *) ctype;
+            consume_token(parser);
+
+            bh_arr_push(ctype->types, parse_type(parser));
+        }
+
+        return (AstType *) ctype;
+
+    } else {
+        return first;
+    }
+}
+
 // <symbol>
 // '^' <type>
 static AstType* parse_type(OnyxParser* parser) {
@@ -1613,7 +1637,7 @@ static AstType* parse_type(OnyxParser* parser) {
             case '(': {
                 expect_token(parser, '(');
                 
-                *next_insertion = parse_type(parser);
+                *next_insertion = parse_compound_type(parser);
                 next_insertion = NULL;
 
                 expect_token(parser, ')');

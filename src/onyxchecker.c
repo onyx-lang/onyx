@@ -1474,7 +1474,13 @@ CheckStatus check_block(AstBlock* block) {
             onyx_report_error((*value)->token->pos,
                     "Unable to resolve type for local '%b'.",
                     (*value)->token->text, (*value)->token->length);
-            return 1;
+            return Check_Error;
+        }
+
+        if ((*value)->type->kind == Type_Kind_Compound) {
+            onyx_report_error((*value)->token->pos,
+                    "Compound type not allowed as local variable type. Try splitting this into multiple variables.");
+            return Check_Error;
         }
     }
 
@@ -1510,6 +1516,14 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 CheckStatus check_struct(AstStructType* s_node) {
     // NOTE: fills in the stcache
     type_build_from_ast(semstate.allocator, (AstType *) s_node);
+    if (s_node->stcache == NULL) return Check_Error;
+
+    bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
+        if ((*smem)->type->kind == Type_Kind_Compound) {
+            onyx_report_error(s_node->token->pos, "Compound types are not allowed as struct member types.");
+            return Check_Error;
+        }
+    }
 
     return Check_Success;
 }
@@ -1571,6 +1585,11 @@ CheckStatus check_function_header(AstFunction* func) {
                     "Unable to resolve type for parameter, '%b'.\n",
                     local->token->text,
                     local->token->length);
+            return Check_Error;
+        }
+
+        if (local->type->kind == Type_Kind_Compound) {
+            onyx_report_error(param->local->token->pos, "Compound types are not allowed as parameter types. Try splitting this into multiple parameters.");
             return Check_Error;
         }
 

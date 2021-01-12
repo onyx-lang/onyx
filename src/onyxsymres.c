@@ -209,6 +209,14 @@ AstType* symres_type(AstType* type) {
         return type;
     }
 
+    if (type->kind == Ast_Kind_Type_Compound) {
+        AstCompoundType* ctype = (AstCompoundType *) type;
+
+        bh_arr_each(AstType *, type, ctype->types) {
+            *type = symres_type(*type);
+        }
+    }
+
     return type;
 }
 
