@@ -34,7 +34,7 @@ proc () #export "_start" {
     alloc.init();
 
     context.allocator = alloc.heap_allocator;
-    context.temp_allocator = alloc.heap_allocator;
+    context.temp_allocator = alloc.temp_allocator;
     context.assert_handler = assert_handler;
 
     argc : Size;

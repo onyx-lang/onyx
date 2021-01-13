@@ -73,14 +73,14 @@ HOW:
             - Compile time conditions
             - Only evalutate code blocks that evaluate to be true
 
-        [ ] multiple lvals and compound assignment
+        [X] multiple lvals and compound assignment
             a := 2
             b := 5
             a, b = b, a;
 
         [ ] All code paths return correct value
 
-        [ ] Better checking for casts
+        [X] Better checking for casts
             - Checking which things are allowed to cast to/from should be checked in the checker,
                 not in the wasm generatation
 

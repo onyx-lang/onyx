@@ -99,7 +99,7 @@ Language Cohesion:
         thought to remember that ranges in for-loops and slices are NOT inclusive
         on the upper end.
 
-    [ ] Functions should be polymorphic on the size of array parameters. For example,
+    [X] Functions should be polymorphic on the size of array parameters. For example,
             foo :: proc (arr: [$N] $T) { ... }
         should be polymorphic on both the type of the array elements and the array
         size. This would allow for better support for fixed size arrays, as well
@@ -136,7 +136,7 @@ API Expansion:
     There are many different places where the standard API for WASI and JS
     backends could be improved. Here are some of the target areas.
 
-    [ ] Rearrange APIs. There is a lot of functionality in the standard libraries,
+    [X] Rearrange APIs. There is a lot of functionality in the standard libraries,
         but it isn't organized in a usable way.
         - 'core.array' contains a lot of functionality that would also apply to
           slices. 'core.slice' should contain this functionality and 'core.array'
