@@ -1,6 +1,167 @@
+// Structured data is the backbone of most modern programming languages.
+// It allows the programmer to think in terms of higher level data structures
+// that otherwise would be very hard to talk about otherwise.
+
+// 'structs' in Onyx are very similar to structs in C and C++, with a couple
+// of additional capabilities to make using them even easier.
+
 #load "core/std/wasi"
 
 use package core
 
 main :: proc (args: [] cstr) {
+
+    // This is the basic struct syntax. Members are declared just like
+    // local variables in procedures.
+    Person :: struct {
+        name   : str;
+        age    : u32;
+        height : u32;
+    }
+
+    // Structs can be passed by value to procedures.
+    print_person :: proc (person: Person) {
+        printf("Person(%s, %i, %i)\n", person.name, person.age, person.height);
+    }
+
+    // This is the verbose way to declare a local variable with a struct
+    // type and initialize its values.
+    person : Person;
+    person.name = "Joe";
+    person.age = 37;
+    person.height = 168;
+
+    print_person(person);
+
+    // A quicker way to write the same thing as above is to use struct literals.
+    // Like array literals, the struct name goes before the '.', and then the
+    // members are listed off in the order that the appear in the struct definition.
+    other_person := Person.{ "Joe", 37, 168 };
+    print_person(other_person);
+
+    // You can also name the members in the struct literal, if a different order makes
+    // sense in a particular situtation.
+    one_more_person := Person.{ age = 37, height = 168, name = "Joe" };
+    print_person(one_more_person);
+
+
+    print_spacer();
+
+    // One capability that Onyx structs have is default values for struct members.
+    // These are only used when a member is omitted from a struct literal at the
+    // moment. This means that the following example does NOT initialize the members
+    // to their defaults:
+    //
+    //          vec : Vector2f;
+    //
+    Vector2f :: struct {
+        x : f32 = 12;
+        y : f32 = 34;
+    }
+
+    print_vector2f :: proc (vec: Vector2f) {
+        printf("Vector2f(%f, %f)", vec.x, vec.y);
+    }
+
+    // This does initialize the members to their defaults.
+    vec := Vector2f.{};
+    print_vector2f(vec);
+    print("\n");
+
+
+
+
+    print_spacer();
+
+    // Structs in Onyx can behave like C unions, simply by usings the '#union' directive.
+    FloatIntUnion :: struct #union {
+        i : i32;
+        f : f32;
+    }
+
+    fiu : FloatIntUnion;
+    fiu.f = 0.5f;
+    printf("Integer representation of 0.5: %p\n", fiu.i);
+
+
+
+    print_spacer();
+
+    // Onyx does not support "inheritance" in structures because it is trying to stay
+    // away from that OOP mindset. Instead, Onyx supports a composition way of structuring data.
+    // The 'use' keyword can be applied to any struct member that is of struct type, and it
+    // will automatically bring in all of the members from the other struct into the current struct.
+    // For example,
+
+    // We define two dummy structs that will be composed.
+    ComponentOne :: struct {
+        name     : str;
+        position : Vector2f;
+    }
+
+    ComponentTwo :: struct {
+        velocity     : Vector2f;
+        acceleration : Vector2f;
+    }
+
+    // `Thing` is a composition of two different structs. All of the members from ComponentOne
+    // and ComponentTwo can be used directly, without needing to say something like,
+    // '.component_one.name'.
+    Thing :: struct {
+        use component_one : ComponentOne;
+        use component_two : ComponentTwo;
+
+        another_data_member : i32;
+    }
+
+    thing := Thing.{
+        component_one = ComponentOne.{ "Player", Vector2f.{ 0, 0 } },
+        component_two = ComponentTwo.{ Vector2f.{ 10, 10 }, Vector2f.{ 0, 0 } },
+
+        another_data_member = 1234,
+    };
+
+    printf("%s, (%f, %f)\n", thing.name, thing.velocity.x, thing.velocity.y);
+
+    // This is very useful in many different situtations. Another useful feature is an implicit
+    // pointer conversion between two structs, A and B, if A is the first member of B, and is used.
+    // For example, we can pass `thing` to this procedure, even though it is not a ComponentOne.
+    // The first member is a ComponentOne and is used, so a implicit pointer conversion is always safe.
+    do_something_with_component_one :: proc (c: ^ComponentOne) {
+        printf("ComponentOne's name is %s.\n", c.name);
+    }
+
+    do_something_with_component_one(^thing);
+
+
+
+    print_spacer();
+
+    // One final thing to talk about is structs with parameters, or parameterized structs.
+    // Structs in Onyx can take in compile-time known values as arguments, and use them in the struct body.
+    // For exmaple,
+    ParamStruct :: struct (T: type_expr, N: i32) {
+        t_member   : T;
+        array_of_T : [N] T;
+    }
+
+    // This struct takes in two parameters: A type expression T (which is only valid for struct parameters,
+    // not procedure parameters at the moment), and an integer N. It has two members. The first being of
+    // type T, and the second being an N dimensional array of type T.
+
+    // To use a struct with parameters, simply pass them in the type.
+    param_struct_instance : ParamStruct(f32, 10);
+    param_struct_instance.t_member = 3.14159;
+    param_struct_instance.array_of_T = f32.[ 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 ];
+
+    println("param_struct_instance values:");
+    println(param_struct_instance.t_member);
+    for elem: param_struct_instance.array_of_T do printf("%f ", elem);
+    print("\n");
+
+
+
+
+    print_spacer :: proc () do println("\n===========================================");
 }
+
