@@ -2495,6 +2495,12 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_Array) {
+        WID(WI_I32_CONST, from->Array.count);
+        *pcode = code;
+        return;
+    }
+
     i32 fromidx = -1, toidx = -1;
     if (from->Basic.flags & Basic_Flag_Pointer || from->kind == Type_Kind_Array) {
         fromidx = 10;

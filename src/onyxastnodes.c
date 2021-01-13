@@ -263,9 +263,8 @@ AstTyped* ast_reduce(bh_allocator a, AstTyped* node) {
     switch (node->kind) {
         case Ast_Kind_Binary_Op:  return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
         case Ast_Kind_Unary_Op:   return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
-        case Ast_Kind_NumLit:     return node;
         case Ast_Kind_Enum_Value: return (AstTyped *) ((AstEnumValue *) node)->value;
-        default:                  return NULL;
+        default:                  return node;
     }
 }
 
@@ -508,6 +507,15 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     if (from->kind == Type_Kind_Struct || to->kind == Type_Kind_Struct) {
         *err_msg = "Cannot cast to or from a struct.";
         return 0;
+    }
+
+    if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_Array) {
+        if (!types_are_compatible(to->Slice.ptr_to_data->Pointer.elem, from->Array.elem)) {
+            *err_msg = "Array to slice cast is not valid here because the types are different.";
+            return 0;
+        } else {
+            return 1;
+        }
     }
 
     if (from->kind == Type_Kind_Slice || to->kind == Type_Kind_Slice) {
