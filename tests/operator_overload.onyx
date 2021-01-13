@@ -1,0 +1,106 @@
+#load "core/std/js"
+
+use package core
+
+Complex :: struct {
+    re : f32 = 0;
+    im : f32 = 0;
+}
+
+proc (a: Complex, b: Complex) -> Complex #operator+ {
+    return Complex.{ a.re + b.re, a.im + b.im };
+}
+
+proc (a: Complex, b: Complex) -> Complex #operator- {
+    return Complex.{ a.re - b.re, a.im - b.im };
+}
+
+proc (a: Complex, b: Complex) -> Complex #operator* {
+    return Complex.{ a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re };
+}
+
+C :: proc (re: f32, im: f32) -> Complex do return Complex.{ re, im };
+
+
+
+
+Vec :: struct (T: type_expr, N: i32) {
+    data: [N] T;
+}
+
+proc (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) #operator+ {
+    out : Vec(T, N);
+    for i: 0 .. N do out.data[i] = a.data[i] + b.data[i];
+    return out;
+}
+
+proc (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) #operator- {
+    out : Vec(T, N);
+    for i: 0 .. N do out.data[i] = a.data[i] - b.data[i];
+    return out;
+}
+
+proc (a: Vec($T, $N), s: T) -> Vec(T, N) #operator* {
+    out : Vec(T, N);
+    for i: 0 .. N do out.data[i] = a.data[i] * s;
+    return out;
+}
+
+proc (a: Vec($T, $N), b: Vec(T, N)) -> T #operator* {
+    res := T.{};
+    for i: 0 .. N do res += a.data[i] * b.data[i];
+    return res;
+}
+
+join :: proc (a: Vec($T, $N), b: Vec(T, $M)) -> Vec(T, #value N + M) {
+    out : Vec(T, #value N + M);
+    for i: 0 .. N do out.data[i]     = a.data[i]; 
+    for i: 0 .. M do out.data[i + N] = b.data[i]; 
+    return out;
+}
+
+make_vec :: proc (data: [$N] $T) -> Vec(T, N) {
+    return <Vec(T, N)>.{ data };
+}
+
+main :: proc (args: [] cstr) {
+    {
+        a := C(2, 3);
+        b := C(0, 1);
+
+        c := a + b;
+        printf("(%f, %f)\n", c.re, c.im);
+
+        c = a - b;
+        printf("(%f, %f)\n", c.re, c.im);
+
+        c = a * b;
+        printf("(%f, %f)\n", c.re, c.im);
+    }
+
+    {
+        a := make_vec(f32.[10, 20]);
+        b := make_vec(f32.[3,  4]);
+        c := a + b;
+        printf("(%f, %f)\n", c.data[0], c.data[1]);
+
+        d := make_vec(f32.[2, 3, 5, 7]);
+        e := join(d, c);
+        for v: e.data do printf("%f ", v);
+        print("\n");
+    }
+
+    {
+        a := make_vec(Complex.[C(2, 3), C(0, 1)]);
+        b := make_vec(Complex.[C(1, 0), C(3, 7)]);
+        c := a * b;
+        printf("(%f, %f)\n", c.re, c.im);
+    }
+
+    println(test_overload("World!", "Hello!"));
+}
+
+test_overload :: proc {
+    proc (x: $T, y: T)  -> T { return x; },
+    proc (x: $T, y: $R) -> R { return y; },
+}
