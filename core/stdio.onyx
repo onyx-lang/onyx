@@ -40,13 +40,24 @@ printf :: proc (format: str, va: ...) {
 }
 
 // This works on both slices and arrays
-print_array :: proc (arr: $T, sep := " ") {
-    for i: 0 .. arr.count {
-        print(arr.data[i]);
-        if i != arr.count - 1 do print(sep);
-    }
+print_array :: proc {
+    proc (arr: [$N] $T, sep := " ") {
+        for i: 0 .. N {
+            print(arr[i]);
+            if i != N - 1 do print(sep);
+        }
 
-    print("\n");
+        print("\n");
+    },
+
+    proc (arr: $T, sep := " ") {
+        for i: 0 .. arr.count {
+            print(arr.data[i]);
+            if i != arr.count - 1 do print(sep);
+        }
+
+        print("\n");
+    }
 }
 
 print_stream_flush :: proc () {

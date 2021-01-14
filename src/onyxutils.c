@@ -395,7 +395,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         else if (pp_lookup == PPLM_By_Function_Type) {
             Type* ft = (Type*) actual;
             if (param->idx >= ft->Function.param_count) {
-                if (err_msg) *err_msg = "Incompatible polymorphic argument to function paramter.";
+                if (err_msg) *err_msg = "Incompatible polymorphic argument to function parameter.";
                 goto sln_not_found;
             }
 
