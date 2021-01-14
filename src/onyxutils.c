@@ -148,6 +148,12 @@ void scope_clear(Scope* scope) {
     bh_table_clear(scope->symbols);
 }
 
+static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
+    if (pp->concrete_funcs == NULL) {
+        bh_table_init(global_heap_allocator, pp->concrete_funcs, 16);
+    }
+}
+
 static void insert_poly_slns_into_scope(Scope* scope, bh_arr(AstPolySolution) slns) {
     bh_arr_each(AstPolySolution, sln, slns) {
         AstNode *node = NULL;
@@ -438,9 +444,7 @@ sln_not_found:
 }
 
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos) {
-    if (pp->concrete_funcs == NULL) {
-        bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
-    }
+    ensure_polyproc_cache_is_created(pp);
 
     char *err_msg = NULL;
     bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, &err_msg);
@@ -502,51 +506,72 @@ static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
     return key_buf;
 }
 
-AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
-    if (pp->concrete_funcs == NULL) {
-        bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
-    }
+b32 add_solidified_function_entities(AstSolidifiedFunction solidified_func, b32 header_already_processed) {
+    solidified_func.func->flags |= Ast_Flag_Function_Used;
+    solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
 
-    // NOTE: Check if a version of this polyproc has already been created.
-    char* unique_key = build_poly_slns_unique_key(slns);
-    if (bh_table_has(AstFunction *, pp->concrete_funcs, unique_key)) {
-        return bh_table_get(AstFunction *, pp->concrete_funcs, unique_key);
-    }
-
-    Scope* poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, pos);
-    insert_poly_slns_into_scope(poly_scope, slns);
-
-    AstFunction* func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
-    bh_table_put(AstFunction *, pp->concrete_funcs, unique_key, func);
-
-    func->flags |= Ast_Flag_Function_Used;
-    func->flags |= Ast_Flag_From_Polymorphism;
+    EntityState header_start_state = Entity_State_Resolve_Symbols;
+    if (header_already_processed) header_start_state = Entity_State_Code_Gen;
 
     Entity func_header_entity = {
-        .state = Entity_State_Resolve_Symbols,
+        .state = header_start_state,
         .type = Entity_Type_Function_Header,
-        .function = func,
+        .function = solidified_func.func,
         .package = NULL,
-        .scope = poly_scope,
+        .scope = solidified_func.poly_scope,
     };
 
     entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
-    if (onyx_has_errors()) {
-        onyx_report_error(pos, "Error in polymorphic procedure header generated from this call site.");
-        return NULL;
-    }
+    if (onyx_has_errors()) return 0;
 
     Entity func_entity = {
         .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Function,
-        .function = func,
+        .function = solidified_func.func,
         .package = NULL,
-        .scope = poly_scope,
+        .scope = solidified_func.poly_scope,
     };
 
     entity_heap_insert(&semstate.program->entities, func_header_entity);
     entity_heap_insert(&semstate.program->entities, func_entity);
-    return func;
+
+    return 1;
+}
+
+AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
+    ensure_polyproc_cache_is_created(pp);
+
+    // NOTE: Check if a version of this polyproc has already been created.
+    char* unique_key = build_poly_slns_unique_key(slns);
+    if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
+        AstSolidifiedFunction solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
+
+        if (solidified_func.func->flags & Ast_Flag_Incomplete_Body) {
+            clone_function_body(semstate.node_allocator, solidified_func.func, pp->base_func);
+
+            if (!add_solidified_function_entities(solidified_func, 1)) {
+                onyx_report_error(pos, "Error in polymorphic procedure header generated from this call site.");
+                return NULL;
+            }
+
+            solidified_func.func->flags &= ~Ast_Flag_Incomplete_Body;
+        }
+
+        return solidified_func.func;
+    }
+
+    AstSolidifiedFunction solidified_func;
+    solidified_func.poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, pos);
+    insert_poly_slns_into_scope(solidified_func.poly_scope, slns);
+
+    solidified_func.func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
+    bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
+
+    if (!add_solidified_function_entities(solidified_func, 0)) {
+        onyx_report_error(pos, "Error in polymorphic procedure header generated from this call site.");
+        return NULL;
+    }
+    return solidified_func.func;
 }
 
 // NOTE: This can return either a AstFunction or an AstPolyProc, depending if enough parameters were
@@ -588,10 +613,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         new_pp->flags = pp->flags;
         new_pp->poly_params = pp->poly_params;
 
-        // POTENTIAL BUG: Copying this doesn't feel right...
-        if (pp->concrete_funcs == NULL) {
-            bh_table_init(global_heap_allocator, pp->concrete_funcs, 8);
-        }
+        ensure_polyproc_cache_is_created(pp);
         new_pp->concrete_funcs = pp->concrete_funcs;
 
         new_pp->known_slns = NULL;
@@ -608,21 +630,31 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
     bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, NULL);
     if (slns == NULL) return NULL;
 
-    Scope* poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, (OnyxFilePos) { 0 });
-    insert_poly_slns_into_scope(poly_scope, slns);
+    ensure_polyproc_cache_is_created(pp);
+
+    char* unique_key = build_poly_slns_unique_key(slns);
+    if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
+        AstSolidifiedFunction solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
+        return solidified_func.func;
+    }
 
     // NOTE: This function is only going to have the header of it correctly created.
     // Nothing should happen to this function's body or else the original will be corrupted.
     //                                                      - brendanfh 2021/01/10
-    AstFunction* new_func = clone_function_header(semstate.node_allocator, pp->base_func);
-    new_func->flags |= Ast_Flag_From_Polymorphism;
+    AstSolidifiedFunction solidified_func;
+    solidified_func.poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, (OnyxFilePos) { 0 });
+    insert_poly_slns_into_scope(solidified_func.poly_scope, slns);
+
+    solidified_func.func = clone_function_header(semstate.node_allocator, pp->base_func);
+    solidified_func.func->flags |= Ast_Flag_Incomplete_Body;
+    solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Function_Header,
-        .function = new_func,
+        .function = solidified_func.func,
         .package = NULL,
-        .scope = poly_scope,
+        .scope = solidified_func.poly_scope,
     };
 
     entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
@@ -631,7 +663,8 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
         return NULL;
     }
 
-    return new_func;
+    bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
+    return solidified_func.func;
 }
 
 char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {

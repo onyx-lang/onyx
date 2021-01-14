@@ -71,6 +71,7 @@ typedef struct AstOverloadedFunction AstOverloadedFunction;
 
 typedef struct AstPolyParam AstPolyParam;
 typedef struct AstPolySolution AstPolySolution;
+typedef struct AstSolidifiedFunction AstSolidifiedFunction;
 typedef struct AstPolyProc AstPolyProc;
 
 typedef struct AstPackage AstPackage;
@@ -177,8 +178,8 @@ typedef enum AstFlags {
     Ast_Flag_Private_File          = BH_BIT(6),
 
     // Global flags
-    Ast_Flag_Global_Stack_Top      = BH_BIT(7),
-    Ast_Flag_Global_Stack_Base     = BH_BIT(8),
+    Ast_Flag_Global_Stack_Top      = BH_BIT(7), // These can go away for something better,
+    Ast_Flag_Global_Stack_Base     = BH_BIT(8), // like just checking the pointers since they will be unique.
 
     // Function flags
     Ast_Flag_Intrinsic             = BH_BIT(10),
@@ -186,28 +187,30 @@ typedef enum AstFlags {
 
     // Expression flags
     Ast_Flag_Expr_Ignored          = BH_BIT(13),
-    Ast_Flag_Param_Use             = BH_BIT(14),
+    Ast_Flag_Param_Use             = BH_BIT(14), // Unneeded, just use a bool on AstParam
     Ast_Flag_Address_Taken         = BH_BIT(15),
 
     // Type flags
     Ast_Flag_Type_Is_Resolved      = BH_BIT(16),
 
     // Enum flags
-    Ast_Flag_Enum_Is_Flags         = BH_BIT(17),
+    Ast_Flag_Enum_Is_Flags         = BH_BIT(17), // Unneeded, just use a bool on AstEnum
 
     // Struct flags
-    Ast_Flag_Struct_Is_Union       = BH_BIT(18),
+    Ast_Flag_Struct_Is_Union       = BH_BIT(18), // Unneeded, just a usea bool on AstStruct
 
     Ast_Flag_No_Clone              = BH_BIT(19),
 
     Ast_Flag_Cannot_Take_Addr      = BH_BIT(20),
 
-    Ast_Flag_Struct_Mem_Used       = BH_BIT(21),
+    Ast_Flag_Struct_Mem_Used       = BH_BIT(21), // Unneeded, just a usea bool on AstStructMember
 
     // HACK: NullProcHack
     Ast_Flag_Proc_Is_Null          = BH_BIT(22),
 
     Ast_Flag_From_Polymorphism     = BH_BIT(23),
+
+    Ast_Flag_Incomplete_Body       = BH_BIT(24),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -791,6 +794,10 @@ struct AstPolySolution {
         AstTyped* value;
     };
 };
+struct AstSolidifiedFunction {
+    AstFunction* func;
+    Scope*       poly_scope;
+};
 struct AstPolyProc {
     AstNode_base;
 
@@ -800,7 +807,7 @@ struct AstPolyProc {
     bh_arr(AstPolySolution) known_slns;
 
     AstFunction* base_func;
-    bh_table(AstFunction *) concrete_funcs;
+    bh_table(AstSolidifiedFunction) concrete_funcs;
 };
 struct AstOverloadedFunction {
     AstTyped_base;
@@ -972,6 +979,7 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog);
 AstTyped* ast_reduce(bh_allocator a, AstTyped* node);
 AstNode* ast_clone(bh_allocator a, void* n);
 AstFunction* clone_function_header(bh_allocator a, AstFunction* func);
+void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source);
 
 void promote_numlit_to_larger(AstNumLit* num);
 b32 convert_numlit_to_type(AstNumLit* num, Type* type);

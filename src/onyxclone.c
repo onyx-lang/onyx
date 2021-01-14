@@ -462,3 +462,15 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
 
     return new_func;
 }
+
+// Clones a function body from a given function. It is assumed that `dest` is
+// a function from `clone_function_header`.
+void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source) {
+    if (dest->kind != Ast_Kind_Function) return;
+    if (source->kind != Ast_Kind_Function) return;
+
+    dest->body = (AstBlock *) ast_clone(a, source->body);
+
+    dest->allocate_exprs = NULL;
+    bh_arr_new(global_heap_allocator, dest->allocate_exprs, 4);
+}
