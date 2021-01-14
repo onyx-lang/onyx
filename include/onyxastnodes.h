@@ -995,6 +995,8 @@ Type* resolve_expression_type(AstTyped* node);
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
 
+b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_values, AstNode* provider);
+
 AstNumLit* make_int_literal(bh_allocator a, i64 value);
 AstNumLit* make_float_literal(bh_allocator a, f64 value);
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);

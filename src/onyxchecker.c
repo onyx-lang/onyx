@@ -963,59 +963,23 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         return Check_Error;
     }
 
-    if (bh_arr_length(sl->values) == 0) {
-        bh_arr_new(global_heap_allocator, sl->values, type_structlike_mem_count(sl->type));
-        bh_arr_set_length(sl->values, type_structlike_mem_count(sl->type));
-        bh_arr_zero(sl->values);
-
-        StructMember s;
-        bh_arr_each(AstNamedValue *, named_value, sl->named_values) {
-            token_toggle_end((*named_value)->token);
-            if (!type_lookup_member(sl->type, (*named_value)->token->text, &s)) {
-                onyx_report_error((*named_value)->token->pos,
-                    "The field '%s' does not exist on type '%s'.", (*named_value)->token->text, type_get_name(sl->type));
-                token_toggle_end((*named_value)->token);
-                return Check_Error;
-            }
-            token_toggle_end((*named_value)->token);
-
-            if (s.included_through_use) {
-                onyx_report_error((*named_value)->token->pos, "Cannot specify value for member '%s', which was included through a 'use' statement.", s.name);
-                return Check_Error;
-            }
-
-            if (sl->values[s.idx] != NULL) {
-                onyx_report_error((*named_value)->token->pos, "Multiple values given for '%b'.", (*named_value)->token->text, (*named_value)->token->length);
-                return Check_Error;
-            }
-
-            sl->values[s.idx] = (AstTyped *) (*named_value)->value;
-        }
-
-        if (sl->type->kind == Type_Kind_Struct) {
-            bh_arr_each(StructMember*, smem, sl->type->Struct.memarr) {
-                u32 idx = (*smem)->idx;
-
-                if (sl->values[idx] == NULL) {
-                    if (*(*smem)->initial_value == NULL) {
-                        onyx_report_error(sl->token->pos, "No value was given for the field '%s'.", (*smem)->name);
-                        return Check_Error;
-                    }
-
-                    sl->values[idx] = *(*smem)->initial_value;
-                }
-            }
-        }
-    }
-
     i32 mem_count = type_structlike_mem_count(sl->type);
 
-    if (mem_count != bh_arr_length(sl->values)) {
-        onyx_report_error(sl->token->pos,
-                "'%s' expects %d values, given %d.",
-                type_get_name(sl->type),
-                mem_count,
-                bh_arr_length(sl->values));
+    bh_arr_grow(sl->values, mem_count);
+    fori (i, bh_arr_length(sl->values), mem_count) sl->values[i] = NULL;
+    bh_arr_set_length(sl->values, mem_count);
+    if (!fill_in_arguments((bh_arr(AstNode *)) sl->values, sl->named_values, (AstNode *) sl)) {
+        bh_arr_each(AstTyped *, value, sl->values) {
+            if (*value == NULL) {
+                i32 member_idx = value - sl->values; // Pointer subtraction hack
+
+                onyx_report_error(sl->token->pos,
+                    "Value not given for %d%s member, '%s'.",
+                    member_idx + 1, bh_num_suffix(member_idx + 1),
+                    sl->type->Struct.memarr[member_idx]->name);
+            }
+        }
+
         return Check_Error;
     }
 

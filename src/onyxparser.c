@@ -27,6 +27,8 @@ static AstNumLit*     parse_int_literal(OnyxParser* parser);
 static AstNumLit*     parse_float_literal(OnyxParser* parser);
 static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
 static b32            parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
+static void           parse_values_and_named_values(OnyxParser* parser, TokenType end_token,
+                                                    bh_arr(AstNode *)* values, bh_arr(AstNamedValue *)* named_values);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_compound_assignment(OnyxParser* parser, AstTyped* lhs);
 static AstTyped*      parse_compound_expression(OnyxParser* parser, b32 assignment_allowed);
@@ -183,37 +185,10 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, Ast
 
     expect_token(parser, '.');
     expect_token(parser, '{');
-    b32 is_named = (peek_token(1)->type == '=');
 
-    OnyxToken* name = NULL;
-    while (parser->curr->type != '}') {
-        if (parser->hit_unexpected_token) break;
-
-        if (is_named) {
-            name = expect_token(parser, Token_Type_Symbol);
-            expect_token(parser, '=');
-        } else {
-            name = NULL;
-        }
-
-        AstTyped *expr = parse_expression(parser, 0);
-
-        if (is_named) {
-            AstNamedValue* nv = make_node(AstStructMember, Ast_Kind_Named_Value);
-            nv->token = name;
-            nv->value = (AstNode *) expr;
-
-            bh_arr_push(sl->named_values, nv);
-
-        } else {
-            bh_arr_push(sl->values, expr);
-        }
-
-        if (parser->curr->type != '}')
-            expect_token(parser, ',');
-    }
-
-    expect_token(parser, '}');
+    parse_values_and_named_values(parser, '}',
+        (bh_arr(AstNode *)*) &sl->values,
+        (bh_arr(AstNamedValue *)*) &sl->named_values);
 
     *ret = (AstTyped *) sl;
     return 1;
@@ -245,6 +220,39 @@ static b32 parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstT
     *ret = (AstTyped *) al;
 
     return 1;
+}
+
+static void parse_values_and_named_values(OnyxParser* parser, TokenType end_token,
+                                          bh_arr(AstNode *)* pvalues, bh_arr(AstNamedValue *)* pnamed_values) {
+    bh_arr(AstNode *)       values       = *pvalues;
+    bh_arr(AstNamedValue *) named_values = *pnamed_values;
+
+    while (parser->curr->type != end_token) {
+        if (parser->hit_unexpected_token) return;
+
+        if (peek_token(0)->type == Token_Type_Symbol && peek_token(1)->type == '=') {
+            OnyxToken* name = expect_token(parser, Token_Type_Symbol);
+            expect_token(parser, '=');
+
+            AstNamedValue* named_value = make_node(AstNamedValue, Ast_Kind_Named_Value);
+            named_value->token = name;
+            named_value->value = (AstNode *) parse_expression(parser, 0);
+
+            bh_arr_push(named_values, named_value);
+
+        } else {
+            AstNode* value = (AstNode *) parse_expression(parser, 0);
+            bh_arr_push(values, value);
+        }
+
+        if (parser->curr->type != end_token)
+            expect_token(parser, ',');
+    }
+
+    expect_token(parser, end_token);
+
+    *pvalues = values;
+    *pnamed_values = named_values; 
 }
 
 // ( <expr> )

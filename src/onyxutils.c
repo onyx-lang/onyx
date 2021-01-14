@@ -900,10 +900,7 @@ b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_va
         token_toggle_end(named_value->token);
         i32 idx = lookup_idx_by_name(provider, named_value->token->text);
         if (idx == -1) {
-            onyx_report_error(provider->token->pos,
-                "'%s' is not a valid named parameter here.",
-                named_value->token->text);
-
+            onyx_report_error(provider->token->pos, "'%s' is not a valid named parameter here.", named_value->token->text);
             token_toggle_end(named_value->token);
             return 0;
         }
@@ -914,13 +911,11 @@ b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_va
         values[idx] = named_value->value;
     }
 
+    b32 success = 1;
     fori (idx, 0, bh_arr_length(values)) {
-        if (values[idx] == NULL) {
-            values[idx] = lookup_default_value_by_idx(provider, idx);
-
-            if (values[idx] == NULL) return 0;
-        }
+        if (values[idx] == NULL) values[idx] = lookup_default_value_by_idx(provider, idx);
+        if (values[idx] == NULL) success = 0;
     }
 
-    return 1;
+    return success;
 }
