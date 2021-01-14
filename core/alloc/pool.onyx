@@ -1,0 +1,66 @@
+package core.alloc.pool
+
+PoolAllocator :: struct (Elem: type_expr) {
+    buffer     : [] Elem;
+    first_free : ^Elem;
+}
+
+#private_file
+pool_allocator_proc :: proc (pool: ^PoolAllocator($Elem), aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    switch aa {
+        case AllocationAction.Alloc {
+            assert(size == sizeof Elem, "Allocating wrong size from pool allocator.");
+            return pool_alloc(pool);
+        }
+
+        case AllocationAction.Resize {
+            assert(false, "Cannot resize in a pool allocator!");
+            return null;
+        }
+
+        case AllocationAction.Free {
+            pool_free(pool, ~~ oldptr);
+            return null;
+        }
+    }
+
+    return null;
+}
+
+pool_alloc :: proc (pool: ^PoolAllocator($Elem)) -> ^Elem {
+    if pool.first_free == null do return null;
+
+    defer pool.first_free = cast(^Elem) *(cast(^rawptr) pool.first_free);
+    return pool.first_free;
+}
+
+pool_free :: proc (pool: ^PoolAllocator($Elem), elem: ^Elem) {
+    // TODO: Maybe add a check that the elem pointer is actually in the buffer?? 
+    *(cast(^rawptr) elem) = cast(rawptr) pool.first_free;
+    pool.first_free = elem;
+}
+
+
+// This could become: proc (buffer: [] u8, $Elem: type_expr) -> PoolAllocator(Elem)
+// when that feature is implemented.
+make :: proc (buffer: [] $Elem) -> PoolAllocator(Elem) {
+    assert(sizeof Elem >= sizeof rawptr, "Cannot have a pool allocator of a type less than a rawptr in size.");
+
+    for i: 0 .. buffer.count - 1 {
+        *(cast(^rawptr) ^buffer[i]) = cast(rawptr) ^buffer[i + 1];
+    }
+
+    *(cast(^rawptr) ^buffer[buffer.count - 1]) = null;
+
+    return <PoolAllocator(Elem)>.{
+        buffer     = buffer,
+        first_free = ^buffer[0],
+    };
+}
+
+make_allocator :: proc (pool: ^PoolAllocator($Elem)) -> Allocator {
+    return Allocator.{
+        func = #solidify pool_allocator_proc { Elem = Elem },
+        data = pool,
+    };
+}
