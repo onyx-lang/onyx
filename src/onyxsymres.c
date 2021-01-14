@@ -300,7 +300,6 @@ static void symres_pipe(AstBinaryOp** pipe) {
 
     bh_arr_insertn(call_node->arg_arr, 0, 1);
     call_node->arg_arr[0] = make_argument(semstate.node_allocator, (*pipe)->left);
-    call_node->arg_count++;
     call_node->next = (*pipe)->next;
 
     // NOTE: Not a BinaryOp node

@@ -612,27 +612,20 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
                 call_node->token = expect_token(parser, '(');
                 call_node->callee = retval;
-                call_node->arg_count = 0;
 
                 bh_arr_new(global_heap_allocator, call_node->arg_arr, 2);
+                bh_arr_new(global_heap_allocator, call_node->named_args, 2);
 
-                while (parser->curr->type != ')') {
-                    if (parser->hit_unexpected_token) return retval;
+                parse_values_and_named_values(parser, ')',
+                    (bh_arr(AstNode *) *) &call_node->arg_arr,
+                    &call_node->named_args);
 
-                    AstArgument* arg = make_node(AstArgument, Ast_Kind_Argument);
-                    arg->token = parser->curr;
-                    arg->value = parse_expression(parser, 0);
+                // Wrap expressions in AstArgument
+                bh_arr_each(AstArgument *, arg, call_node->arg_arr)
+                    *arg = make_argument(parser->allocator, (AstTyped *) *arg);
 
-                    if (arg != NULL && arg->kind != Ast_Kind_Error) {
-                        bh_arr_push(call_node->arg_arr, arg);
-                        call_node->arg_count++;
-                    }
-
-                    if (parser->curr->type != ')')
-                        expect_token(parser, ',');
-                }
-
-                consume_token(parser);
+                bh_arr_each(AstNamedValue *, named_value, call_node->named_args)
+                    (*named_value)->value = (AstNode *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
 
                 retval = (AstTyped *) call_node;
                 break;

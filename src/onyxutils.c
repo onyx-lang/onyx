@@ -372,7 +372,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         Type* actual_type;
 
         if (pp_lookup == PPLM_By_Call) {
-            if (param->idx >= ((AstCall *) actual)->arg_count) {
+            if (param->idx >= (u64) bh_arr_length(((AstCall *) actual)->arg_arr)) {
                 if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure.";
                 goto sln_not_found;
             }

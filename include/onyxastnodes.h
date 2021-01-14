@@ -510,7 +510,6 @@ struct AstRangeLiteral {
 struct AstCall {
     AstTyped_base;
 
-    u64 arg_count;
     bh_arr(AstArgument *) arg_arr;
     bh_arr(AstNamedValue *) named_args; // '.value' is a pointer to AstArgument.
 
@@ -521,7 +520,6 @@ struct AstCall {
 struct AstIntrinsicCall {
     AstTyped_base;
 
-    u64 arg_count;
     bh_arr(AstArgument *) arg_arr;
     bh_arr(AstNamedValue *) named_args;
 

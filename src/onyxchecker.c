@@ -433,8 +433,9 @@ CheckStatus check_call(AstCall* call) {
 
     if (callee->kind == Ast_Kind_Function) {
         if (bh_arr_length(arg_arr) < bh_arr_length(callee->params)) {
-            while (bh_arr_length(arg_arr) < bh_arr_length(callee->params) && callee->params[call->arg_count].default_value != NULL) {
-                AstTyped* dv = callee->params[call->arg_count].default_value;
+            while (bh_arr_length(arg_arr) < bh_arr_length(callee->params)
+                && callee->params[bh_arr_length(arg_arr)].default_value != NULL) {
+                AstTyped* dv = callee->params[bh_arr_length(arg_arr)].default_value;
 
                 AstArgument* new_arg = make_argument(semstate.node_allocator, dv);
                 bh_arr_push(arg_arr, new_arg);
@@ -730,7 +731,6 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
 
     AstCall* implicit_call = onyx_ast_node_new(semstate.node_allocator, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = binop->token;
-    implicit_call->arg_count = 2;
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
 
