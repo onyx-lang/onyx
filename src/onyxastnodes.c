@@ -29,6 +29,7 @@ static const char* ast_node_names[] = {
     "BIN_OP",
 
     "COMPOUND",
+    "NAMED_VALUE"
 
     "TYPE_START (BAD)",
     "TYPE",

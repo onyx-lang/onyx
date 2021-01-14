@@ -193,8 +193,8 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			bh_arr_new(global_heap_allocator, dt->named_values, bh_arr_length(st->named_values));
 			bh_arr_new(global_heap_allocator, dt->values, bh_arr_length(st->values));
 
-			bh_arr_each(AstStructMember *, smem, st->named_values)
-				bh_arr_push(dt->named_values, (AstStructMember *) ast_clone(a, *smem));
+			bh_arr_each(AstNamedValue *, nv, st->named_values)
+				bh_arr_push(dt->named_values, (AstNamedValue *) ast_clone(a, *nv));
 
 			bh_arr_each(AstTyped *, val, st->values)
 				bh_arr_push(dt->values, (AstTyped *) ast_clone(a, *val));

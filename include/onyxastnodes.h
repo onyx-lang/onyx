@@ -7,6 +7,7 @@
 typedef struct AstNode AstNode;
 typedef struct AstTyped AstTyped;
 
+typedef struct AstNamedValue AstNamedValue;
 typedef struct AstBinaryOp AstBinaryOp;
 typedef struct AstUnaryOp AstUnaryOp;
 typedef struct AstNumLit AstNumLit;
@@ -110,6 +111,7 @@ typedef enum AstKind {
     Ast_Kind_Binary_Op,
 
     Ast_Kind_Compound,
+    Ast_Kind_Named_Value,
 
     Ast_Kind_Type_Start,
     Ast_Kind_Type,
@@ -460,6 +462,7 @@ struct AstNode { AstNode_base; };
 struct AstTyped { AstTyped_base; };
 
 // Expression Nodes
+struct AstNamedValue    { AstTyped_base; AstNode* value; };
 struct AstBinaryOp      { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
@@ -478,7 +481,7 @@ struct AstStructLiteral {
 
     AstTyped *stnode;
 
-    bh_arr(AstStructMember *) named_values;
+    bh_arr(AstNamedValue *) named_values;
     bh_arr(AstTyped *) values;
 };
 struct AstArrayLiteral {
@@ -509,6 +512,7 @@ struct AstCall {
 
     u64 arg_count;
     bh_arr(AstArgument *) arg_arr;
+    bh_arr(AstNamedValue *) named_args; // '.value' is a pointer to AstArgument.
 
     AstTyped *callee;
 
@@ -519,6 +523,7 @@ struct AstIntrinsicCall {
 
     u64 arg_count;
     bh_arr(AstArgument *) arg_arr;
+    bh_arr(AstNamedValue *) named_args;
 
     OnyxIntrinsic intrinsic;
 

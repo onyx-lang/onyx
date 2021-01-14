@@ -332,9 +332,9 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     }
 
     if (sl->named_values != NULL) {
-        bh_arr_each(AstStructMember *, smem, sl->named_values) {
-            if ((*smem)->initial_value == NULL) onyx_report_error(sl->token->pos, "Some kind of error occured with this struct literal.");
-            else                                symres_expression(&(*smem)->initial_value);
+        bh_arr_each(AstNamedValue *, smem, sl->named_values) {
+            if ((*smem)->value == NULL) onyx_report_error(sl->token->pos, "Some kind of error occured with this struct literal.");
+            else                        symres_expression((AstTyped **) &(*smem)->value);
         }
     }
 }

@@ -969,27 +969,27 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         bh_arr_zero(sl->values);
 
         StructMember s;
-        bh_arr_each(AstStructMember *, smem, sl->named_values) {
-            token_toggle_end((*smem)->token);
-            if (!type_lookup_member(sl->type, (*smem)->token->text, &s)) {
-                onyx_report_error((*smem)->token->pos,
-                    "The field '%s' does not exist on type '%s'.", (*smem)->token->text, type_get_name(sl->type));
-                token_toggle_end((*smem)->token);
+        bh_arr_each(AstNamedValue *, named_value, sl->named_values) {
+            token_toggle_end((*named_value)->token);
+            if (!type_lookup_member(sl->type, (*named_value)->token->text, &s)) {
+                onyx_report_error((*named_value)->token->pos,
+                    "The field '%s' does not exist on type '%s'.", (*named_value)->token->text, type_get_name(sl->type));
+                token_toggle_end((*named_value)->token);
                 return Check_Error;
             }
-            token_toggle_end((*smem)->token);
+            token_toggle_end((*named_value)->token);
 
             if (s.included_through_use) {
-                onyx_report_error((*smem)->token->pos, "Cannot specify value for member '%s', which was included through a 'use' statement.", s.name);
+                onyx_report_error((*named_value)->token->pos, "Cannot specify value for member '%s', which was included through a 'use' statement.", s.name);
                 return Check_Error;
             }
 
             if (sl->values[s.idx] != NULL) {
-                onyx_report_error((*smem)->token->pos, "Multiple values given for '%b'.", (*smem)->token->text, (*smem)->token->length);
+                onyx_report_error((*named_value)->token->pos, "Multiple values given for '%b'.", (*named_value)->token->text, (*named_value)->token->length);
                 return Check_Error;
             }
 
-            sl->values[s.idx] = (*smem)->initial_value;
+            sl->values[s.idx] = (AstTyped *) (*named_value)->value;
         }
 
         if (sl->type->kind == Type_Kind_Struct) {

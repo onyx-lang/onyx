@@ -199,11 +199,11 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, Ast
         AstTyped *expr = parse_expression(parser, 0);
 
         if (is_named) {
-            AstStructMember* sm = make_node(AstStructMember, Ast_Kind_Struct_Member);
-            sm->token = name;
-            sm->initial_value = expr;
+            AstNamedValue* nv = make_node(AstStructMember, Ast_Kind_Named_Value);
+            nv->token = name;
+            nv->value = (AstNode *) expr;
 
-            bh_arr_push(sl->named_values, sm);
+            bh_arr_push(sl->named_values, nv);
 
         } else {
             bh_arr_push(sl->values, expr);

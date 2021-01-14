@@ -821,3 +821,106 @@ void entity_bring_to_state(Entity* ent, EntityState state) {
         if (onyx_has_errors()) return;
     }
 }
+
+
+static i32 lookup_idx_by_name(AstNode* provider, char* name) {
+    switch (provider->kind) {
+        case Ast_Kind_Struct_Literal: {
+            AstStructLiteral* sl = (AstStructLiteral *) provider;
+            assert(sl->type);
+
+            StructMember s;
+            if (!type_lookup_member(sl->type, name, &s)) return -1; // nocheckin: Report error
+
+            if (s.included_through_use) return -1; // nocheckin: Report error
+
+            return s.idx;
+        }
+
+        case Ast_Kind_Function: {
+            AstFunction* func = (AstFunction *) provider;
+
+            // CLEANUP nocheckin
+            i32 param_idx = -1;
+            i32 idx = 0;
+            bh_arr_each(AstParam, param, func->params) {
+                token_toggle_end(param->local->token);
+
+                if (strncmp(param->local->token->text, name, param->local->token->length) == 0) {
+                    param_idx = idx;
+
+                    token_toggle_end(param->local->token);
+                    break;
+                }
+
+                token_toggle_end(param->local->token);
+
+                idx++;
+            }
+
+            return param_idx;
+        }
+
+        default: return -1;
+    }
+}
+
+static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
+    switch (provider->kind) {
+        case Ast_Kind_Struct_Literal: {
+            AstStructLiteral* sl = (AstStructLiteral *) provider;
+            assert(sl->type);
+
+            if (sl->type->kind == Type_Kind_Struct) {
+                bh_arr(StructMember *) memarr = sl->type->Struct.memarr;
+                if (idx >= bh_arr_length(memarr)) return NULL;
+
+                return (AstNode *) *memarr[idx]->initial_value;
+            }
+
+            return NULL;
+        }
+
+        case Ast_Kind_Function: {
+            AstFunction* func = (AstFunction *) provider;
+
+            return (AstNode *) func->params[idx].default_value;
+        }
+
+        default: return NULL;
+    }
+}
+
+// NOTE: The values array can be partially filled out, and is the resulting array.
+// Returns if all the values were filled in.
+b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_values, AstNode* provider) {
+    bh_arr_each(AstNamedValue *, p_named_value, named_values) {
+        AstNamedValue* named_value = *p_named_value;
+
+        token_toggle_end(named_value->token);
+        i32 idx = lookup_idx_by_name(provider, named_value->token->text);
+        if (idx == -1) {
+            onyx_report_error(provider->token->pos,
+                "'%s' is not a valid named parameter here.",
+                named_value->token->text);
+
+            token_toggle_end(named_value->token);
+            return 0;
+        }
+
+        token_toggle_end(named_value->token);
+
+        assert(idx < bh_arr_length(values));
+        values[idx] = named_value->value;
+    }
+
+    fori (idx, 0, bh_arr_length(values)) {
+        if (values[idx] == NULL) {
+            values[idx] = lookup_default_value_by_idx(provider, idx);
+
+            if (values[idx] == NULL) return 0;
+        }
+    }
+
+    return 1;
+}
