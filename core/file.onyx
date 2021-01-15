@@ -106,9 +106,9 @@ close :: proc (file: File) -> bool {
 }
 
 write :: proc (file: File, data: str) {
-    vec := IOVec.{ buf = data.data, len = data.count };
+    vec := IOVec.{ buf = cast(u32) data.data, len = data.count };
     tmp : Size;
-    fd_write(file.fd, IOVecArray.{ ^vec, 1 }, ^tmp);
+    fd_write(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^tmp);
     fd_datasync(file.fd);
 }
 
@@ -131,8 +131,8 @@ get_contents_from_file :: proc (file: File) -> str {
     fd_seek(file.fd, 0, Whence.Set, ^dummy);
 
     dummy2: u32;
-    buf := IOVec.{ data, size };
-    fd_pread(file.fd, IOVecArray.{ ^buf, 1 }, 0, ^dummy2);
+    buf := IOVec.{ cast(u32) data, size };
+    fd_pread(file.fd, IOVecArray.{ cast(u32) ^buf, 1 }, 0, ^dummy2);
 
     fd_seek(file.fd, prev_loc, Whence.Set, ^dummy);
 

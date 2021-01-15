@@ -127,7 +127,7 @@ Rights :: enum #flags (u64) {
 FileDescriptor :: #type i32;
 
 IOVec :: struct {
-    buf : ^u8;
+    buf : u32; // actually a ^u8, but WASM is 32-bit at the moment;
     len : u32;
 }
 
@@ -358,7 +358,7 @@ PrestatTagged :: struct {
 }
 
 IOVecArray :: struct {
-    iovs     : ^IOVec;
+    iovs     : u32; // actually ^IOVec; see comment above
     iovs_len : Size;
 }
 

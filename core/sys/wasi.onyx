@@ -9,9 +9,9 @@ use package main as main
 STDOUT_FILENO :: 1
 
 output_str :: proc (s: str) -> u32 {
-    vec := IOVec.{ buf = s.data, len = s.count };
+    vec := IOVec.{ buf = cast(u32) s.data, len = s.count };
     tmp : Size;
-    fd_write(STDOUT_FILENO, IOVecArray.{ ^vec, 1 }, ^tmp);
+    fd_write(STDOUT_FILENO, IOVecArray.{ cast(u32) ^vec, 1 }, ^tmp);
     fd_datasync(STDOUT_FILENO);
     return tmp;
 }
@@ -39,13 +39,27 @@ proc () #export "_start" {
 
     argc : Size;
     argv_buf_size : Size;
-
     args_sizes_get(^argc, ^argv_buf_size);
 
     argv := cast(^cstr) calloc(sizeof cstr * argc);
     argv_buf := cast(cstr) calloc(argv_buf_size);
-
     args_get(argv, argv_buf);
+
+
+    // This post processing of the argv array needs to happen if the target is using
+    // 32-bit pointers, instead of 64-bits. Right now, Onyx pointers take up 64-bits,
+    // but in most circumstances, only the lower 32-bits are used. When webassembly
+    // standardizes the 64-bit address space, it will be an easy conversion over.
+    // But for right now, WASI will give the argv array 32-bit pointers, instead of
+    // 64-bit pointers. This loops expands the 32-bit pointers into 64-bit pointers
+    // while not clobbering any of them.
+    while i := cast(i32) (argc - 1); i >= 0 {
+        defer i -= 1;
+
+        argv[i] = cast(cstr) (cast(^u32) argv)[i];
+    }
+
+
 
     stdio_init();
 
