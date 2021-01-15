@@ -372,18 +372,33 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         Type* actual_type;
 
         if (pp_lookup == PPLM_By_Call) {
-            if (param->idx >= (u64) bh_arr_length(((AstCall *) actual)->arg_arr)) {
-                if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure.";
-                goto sln_not_found;
-            }
-
             bh_arr(AstArgument *) arg_arr = ((AstCall *) actual)->arg_arr;
-            actual_type = resolve_expression_type(arg_arr[param->idx]->value);
+            bh_arr(AstNamedValue *) named_values = ((AstCall *) actual)->named_args;
+
+            if (param->idx >= (u64) bh_arr_length(arg_arr)) {
+                // CLEANUP: This is a really long access chain.
+                OnyxToken* param_name = pp->base_func->params[param->idx].local->token;
+
+                bh_arr_each(AstNamedValue *, named_value, named_values) {
+                    if (token_equals(param_name, (*named_value)->token)) {
+                        actual_type = resolve_expression_type((AstTyped *) (*named_value)->value);
+                        break;
+                    }
+                }
+
+                // nocheckin
+                if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure. This error message may not be entirely right.";
+                goto sln_not_found;
+
+            } else {
+                actual_type = resolve_expression_type(arg_arr[param->idx]->value);
+            }
         }
 
         else if (pp_lookup == PPLM_By_Value_Array) {
             bh_arr(AstTyped *) arg_arr = (bh_arr(AstTyped *)) actual;
 
+            // nocheckin
             if ((i32) param->idx >= bh_arr_length(arg_arr)) {
                 if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure.";
                 goto sln_not_found;
@@ -884,7 +899,8 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
         case Ast_Kind_Function: {
             AstFunction* func = (AstFunction *) provider;
 
-            return (AstNode *) func->params[idx].default_value;
+            AstArgument* arg = make_argument(semstate.node_allocator, func->params[idx].default_value);
+            return (AstNode *) arg;
         }
 
         default: return NULL;
@@ -893,22 +909,28 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
 
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
-b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_values, AstNode* provider) {
+b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_values, AstNode* provider, char** err_msg) {
     bh_arr_each(AstNamedValue *, p_named_value, named_values) {
         AstNamedValue* named_value = *p_named_value;
 
         token_toggle_end(named_value->token);
         i32 idx = lookup_idx_by_name(provider, named_value->token->text);
         if (idx == -1) {
-            onyx_report_error(provider->token->pos, "'%s' is not a valid named parameter here.", named_value->token->text);
+            if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "'%s' is not a valid named parameter here.", named_value->token->text);
             token_toggle_end(named_value->token);
             return 0;
         }
 
-        token_toggle_end(named_value->token);
-
         assert(idx < bh_arr_length(values));
+
+        if (values[idx] != NULL) {
+            if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
+            token_toggle_end(named_value->token);
+            return 0;
+        }
+
         values[idx] = named_value->value;
+        token_toggle_end(named_value->token);
     }
 
     b32 success = 1;

@@ -296,7 +296,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     return 0;
 }
 
-static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(AstTyped *) overloads) {
+static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(AstNamedValue *) named_values, bh_arr(AstTyped *) overloads) {
     bh_arr_each(AstTyped *, node, overloads) {
         AstFunction* overload = NULL;
         if ((*node)->kind == Ast_Kind_Function) {
@@ -308,14 +308,29 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
 
         if (overload == NULL) continue;
 
-        fill_in_type((AstTyped *) overload);
+        bh_arr(AstTyped *) new_arg_arr = arg_arr;
+        if (named_values != NULL && bh_arr_length(named_values) > 0) {
+            new_arg_arr = NULL;
+            bh_arr_new(global_heap_allocator, new_arg_arr, bh_arr_length(arg_arr) + bh_arr_length(named_values));
+            fori (i, 0, bh_arr_length(arg_arr))
+                new_arg_arr[i] = arg_arr[i];
 
+            b32 values_place_correctly = fill_in_arguments(
+                (bh_arr(AstNode *)) new_arg_arr,
+                named_values,
+                (AstNode *) overload,
+                NULL);
+
+            if (!values_place_correctly) goto no_match;
+        }
+
+        fill_in_type((AstTyped *) overload);
         TypeFunction* ol_type = &overload->type->Function;
-        if (bh_arr_length(arg_arr) < (i32) ol_type->needed_param_count) continue;
+        if (bh_arr_length(new_arg_arr) < (i32) ol_type->needed_param_count) continue;
 
         i32 param_left = ol_type->param_count;
         Type** param_type = ol_type->params;
-        bh_arr_each(AstTyped*, arg, arg_arr) {
+        bh_arr_each(AstTyped*, arg, new_arg_arr) {
             if (param_left == 0) goto no_match;
             param_left--;
 
@@ -337,9 +352,26 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
         return (AstTyped *) *node;
 
 no_match:
+        if (named_values != NULL) 
+            bh_arr_free(new_arg_arr);
+
         continue;
     }
     return NULL;
+}
+
+CheckStatus check_argument(AstArgument** parg) {
+    CHECK(expression, (AstTyped **) parg);
+    (*parg)->type = (*parg)->value->type;
+
+    if ((*parg)->value->kind == Ast_Kind_Overloaded_Function) {
+        onyx_report_error((*parg)->token->pos,
+            "Cannot pass overloaded function '%b' as argument.",
+            (*parg)->value->token->text, (*parg)->value->token->length);
+        return Check_Error;
+    }
+
+    return Check_Success;
 }
 
 typedef enum ArgState {
@@ -365,24 +397,17 @@ CheckStatus check_call(AstCall* call) {
     CHECK(expression, &call->callee);
     AstFunction* callee = (AstFunction *) call->callee;
 
-    bh_arr(AstArgument *) arg_arr = call->arg_arr;
-
     // NOTE: Check arguments
-    bh_arr_each (AstArgument *, actual, arg_arr) {
-        CHECK(expression, (AstTyped **) actual);
-        (*actual)->type = (*actual)->value->type;
+    bh_arr_each(AstArgument *, actual, call->arg_arr)
+        CHECK(argument, actual);
 
-        if ((*actual)->value->kind == Ast_Kind_Overloaded_Function) {
-            onyx_report_error((*actual)->token->pos,
-                "Cannot pass overloaded function '%b' as argument.",
-                (*actual)->value->token->text, (*actual)->value->token->length);
-            return Check_Error;
-        }
-    }
+    bh_arr_each(AstNamedValue *, named_value, call->named_args)
+        CHECK(argument, (AstArgument **) &(*named_value)->value);
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
         call->callee = match_overloaded_function(
             (bh_arr(AstTyped *)) call->arg_arr,
+            call->named_args,
             ((AstOverloadedFunction *) callee)->overloads);
 
         if (call->callee == NULL) {
@@ -394,6 +419,20 @@ CheckStatus check_call(AstCall* call) {
 
                 if (arg != &bh_arr_last(call->arg_arr))
                     strncat(arg_str, ", ", 1023);
+            }
+
+            if (bh_arr_length(call->named_args) > 0) {
+                bh_arr_each(AstNamedValue *, named_value, call->named_args) { 
+                    token_toggle_end((*named_value)->token);
+                    strncat(arg_str, (*named_value)->token->text, 1023);
+                    token_toggle_end((*named_value)->token);
+
+                    strncat(arg_str, "=", 1023);
+                    strncat(arg_str, type_get_name(((AstTyped *) (*named_value)->value)->type), 1023); // CHECK: this might say 'unknown'.
+
+                    if (named_value != &bh_arr_last(call->named_args))
+                        strncat(arg_str, ", ", 1023);
+                }
             }
 
             onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
@@ -431,17 +470,25 @@ CheckStatus check_call(AstCall* call) {
         return Check_Error;
     }
 
-    if (callee->kind == Ast_Kind_Function) {
-        if (bh_arr_length(arg_arr) < bh_arr_length(callee->params)) {
-            while (bh_arr_length(arg_arr) < bh_arr_length(callee->params)
-                && callee->params[bh_arr_length(arg_arr)].default_value != NULL) {
-                AstTyped* dv = callee->params[bh_arr_length(arg_arr)].default_value;
+    i32 arg_count = bh_max(
+        bh_arr_length(call->arg_arr) + bh_arr_length(call->named_args),
+        (i32) callee->type->Function.param_count);
 
-                AstArgument* new_arg = make_argument(semstate.node_allocator, dv);
-                bh_arr_push(arg_arr, new_arg);
-            }
+    bh_arr_grow(call->arg_arr, arg_count);
+    fori (i, bh_arr_length(call->arg_arr), arg_count) call->arg_arr[i] = NULL;
+    bh_arr_set_length(call->arg_arr, arg_count);
+
+    {
+        char* err_msg = NULL;
+        fill_in_arguments((AstNode **) call->arg_arr, call->named_args, (AstNode *) callee, &err_msg);
+
+        if (err_msg != NULL) {
+            onyx_report_error(call->token->pos, err_msg);
+            return Check_Error;
         }
     }
+
+    bh_arr(AstArgument *) arg_arr = call->arg_arr;
 
     // NOTE: If we are calling an intrinsic function, translate the
     // call into an intrinsic call node.
@@ -723,7 +770,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     bh_arr_push(args, binop->left);
     bh_arr_push(args, binop->right);
 
-    AstTyped* overload = match_overloaded_function(args, operator_overloads[binop->operation]);
+    AstTyped* overload = match_overloaded_function(args, NULL, operator_overloads[binop->operation]);
     if (overload == NULL) {
         bh_arr_free(args);
         return NULL;
@@ -968,7 +1015,11 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     bh_arr_grow(sl->values, mem_count);
     fori (i, bh_arr_length(sl->values), mem_count) sl->values[i] = NULL;
     bh_arr_set_length(sl->values, mem_count);
-    if (!fill_in_arguments((bh_arr(AstNode *)) sl->values, sl->named_values, (AstNode *) sl)) {
+
+    char* err_msg = NULL;
+    if (!fill_in_arguments((bh_arr(AstNode *)) sl->values, sl->named_values, (AstNode *) sl, &err_msg)) {
+        onyx_report_error(sl->token->pos, err_msg);
+        
         bh_arr_each(AstTyped *, value, sl->values) {
             if (*value == NULL) {
                 i32 member_idx = value - sl->values; // Pointer subtraction hack

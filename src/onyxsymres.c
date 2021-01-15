@@ -242,6 +242,9 @@ static void symres_call(AstCall* call) {
 
     bh_arr_each(AstArgument *, arg, call->arg_arr)
         symres_statement((AstNode **) arg);
+
+    bh_arr_each(AstNamedValue *, named_arg, call->named_args)
+        symres_statement(&(*named_arg)->value);
 }
 
 static void symres_size_of(AstSizeOf* so) {
