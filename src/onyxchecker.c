@@ -505,6 +505,12 @@ CheckStatus check_call(AstCall* call) {
     }
 
     bh_arr(AstArgument *) arg_arr = call->arg_arr;
+    bh_arr_each(AstArgument *, arg, arg_arr) {
+        if (*arg != NULL) continue;
+
+        onyx_report_error(call->token->pos, "Not all arguments were given a value.");
+        return Check_Error;
+    }
 
     // NOTE: If we are calling an intrinsic function, translate the
     // call into an intrinsic call node.
