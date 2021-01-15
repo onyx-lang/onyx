@@ -445,3 +445,13 @@ b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2) {
         if (tkn1->text[i] != tkn2->text[i]) return 0;
     return 1;
 }
+
+b32 token_text_equals(OnyxToken* tkn, char* text) {
+    i32 text_len = strlen(text);
+    if (tkn->length != text_len) return 0;
+
+    fori (i, 0, tkn->length)
+        if (tkn->text[i] != text[i]) return 0;
+        
+    return 1;
+}

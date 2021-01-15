@@ -438,8 +438,9 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
     fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
 
-    if (compiler_state->options->verbose_output == 2)
-        bh_printf("Processing source file:    %s\n", file.filename);
+    if (compiler_state->options->verbose_output == 2) {
+        bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
+    }
 
     ParseResults results = parse_source_file(compiler_state, &fc);
     merge_parse_results(compiler_state, &results);

@@ -67,7 +67,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Param: return sizeof(AstLocal);
         case Ast_Kind_Argument: return sizeof(AstArgument);
         case Ast_Kind_Call: return sizeof(AstCall);
-        case Ast_Kind_Intrinsic_Call: return sizeof(AstIntrinsicCall);
+        case Ast_Kind_Intrinsic_Call: return sizeof(AstCall);
         case Ast_Kind_Return: return sizeof(AstReturn);
         case Ast_Kind_Address_Of: return sizeof(AstAddressOf);
         case Ast_Kind_Dereference: return sizeof(AstDereference);
@@ -91,6 +91,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Switch_Case: return sizeof(AstSwitchCase);
         case Ast_Kind_Directive_Solidify: return sizeof(AstDirectiveSolidify);
         case Ast_Kind_Compound: return sizeof(AstCompound);
+        case Ast_Kind_Named_Value: return sizeof(AstNamedValue);
         case Ast_Kind_Count: return 0;
 	}
 
@@ -145,11 +146,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			break;
 
 		case Ast_Kind_Call:
-            ((AstCall *) nn)->arg_arr = NULL;
-            bh_arr_new(global_heap_allocator, ((AstCall *) nn)->arg_arr, bh_arr_length(((AstCall *) node)->arg_arr));
-            bh_arr_each(AstArgument *, arg, ((AstCall *) node)->arg_arr) {
-                bh_arr_push(((AstCall *) nn)->arg_arr, (AstArgument *) ast_clone(a, *arg));
-            }
+            arguments_deep_clone(a, &((AstCall *) nn)->args, &((AstCall *) node)->args);
 			break;
 
 		case Ast_Kind_Argument:
@@ -188,17 +185,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 			dt->stnode = (AstTyped *) ast_clone(a, st->stnode);
 
-			dt->named_values = NULL;
-			dt->values = NULL;
-			bh_arr_new(global_heap_allocator, dt->named_values, bh_arr_length(st->named_values));
-			bh_arr_new(global_heap_allocator, dt->values, bh_arr_length(st->values));
-
-			bh_arr_each(AstNamedValue *, nv, st->named_values)
-				bh_arr_push(dt->named_values, (AstNamedValue *) ast_clone(a, *nv));
-
-			bh_arr_each(AstTyped *, val, st->values)
-				bh_arr_push(dt->values, (AstTyped *) ast_clone(a, *val));
-
+            arguments_deep_clone(a, &dt->args, &st->args);
 			break;
 		}
 
@@ -433,6 +420,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             bh_arr_each(AstTyped *, expr, cs->exprs) {
                 bh_arr_push(cd->exprs, (AstTyped *) ast_clone(a, (AstNode *) *expr));
             }
+            break;
+        }
+
+        case Ast_Kind_Named_Value: {
+            ((AstNamedValue *) nn)->value = (AstTyped *) ast_clone(a, ((AstNamedValue *) node)->value);
             break;
         }
 	}

@@ -27,8 +27,7 @@ static AstNumLit*     parse_int_literal(OnyxParser* parser);
 static AstNumLit*     parse_float_literal(OnyxParser* parser);
 static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
 static b32            parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
-static void           parse_values_and_named_values(OnyxParser* parser, TokenType end_token,
-                                                    bh_arr(AstNode *)* values, bh_arr(AstNamedValue *)* named_values);
+static void           parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* args);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_compound_assignment(OnyxParser* parser, AstTyped* lhs);
 static AstTyped*      parse_compound_expression(OnyxParser* parser, b32 assignment_allowed);
@@ -176,19 +175,12 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, Ast
     sl->token = parser->curr;
     sl->stnode = left;
 
-    bh_arr_new(global_heap_allocator, sl->values, 4);
-    bh_arr_new(global_heap_allocator, sl->named_values, 4);
-    fori (i, 0, 4) {
-        sl->values[i] = NULL;
-        sl->named_values[i] = NULL;
-    }
+    arguments_initialize(&sl->args);
 
     expect_token(parser, '.');
     expect_token(parser, '{');
 
-    parse_values_and_named_values(parser, '}',
-        (bh_arr(AstNode *)*) &sl->values,
-        (bh_arr(AstNamedValue *)*) &sl->named_values);
+    parse_arguments(parser, '}', &sl->args);
 
     *ret = (AstTyped *) sl;
     return 1;
@@ -222,11 +214,7 @@ static b32 parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstT
     return 1;
 }
 
-static void parse_values_and_named_values(OnyxParser* parser, TokenType end_token,
-                                          bh_arr(AstNode *)* pvalues, bh_arr(AstNamedValue *)* pnamed_values) {
-    bh_arr(AstNode *)       values       = *pvalues;
-    bh_arr(AstNamedValue *) named_values = *pnamed_values;
-
+static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* args) {
     while (parser->curr->type != end_token) {
         if (parser->hit_unexpected_token) return;
 
@@ -236,13 +224,13 @@ static void parse_values_and_named_values(OnyxParser* parser, TokenType end_toke
 
             AstNamedValue* named_value = make_node(AstNamedValue, Ast_Kind_Named_Value);
             named_value->token = name;
-            named_value->value = (AstNode *) parse_expression(parser, 0);
+            named_value->value = parse_expression(parser, 0);
 
-            bh_arr_push(named_values, named_value);
+            bh_arr_push(args->named_values, named_value);
 
         } else {
-            AstNode* value = (AstNode *) parse_expression(parser, 0);
-            bh_arr_push(values, value);
+            AstTyped* value = parse_expression(parser, 0);
+            bh_arr_push(args->values, value);
         }
 
         if (parser->curr->type != end_token)
@@ -250,9 +238,6 @@ static void parse_values_and_named_values(OnyxParser* parser, TokenType end_toke
     }
 
     expect_token(parser, end_token);
-
-    *pvalues = values;
-    *pnamed_values = named_values; 
 }
 
 // ( <expr> )
@@ -613,19 +598,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 call_node->token = expect_token(parser, '(');
                 call_node->callee = retval;
 
-                bh_arr_new(global_heap_allocator, call_node->arg_arr, 2);
-                bh_arr_new(global_heap_allocator, call_node->named_args, 2);
+                arguments_initialize(&call_node->args);
 
-                parse_values_and_named_values(parser, ')',
-                    (bh_arr(AstNode *) *) &call_node->arg_arr,
-                    &call_node->named_args);
+                parse_arguments(parser, ')', &call_node->args);
 
                 // Wrap expressions in AstArgument
-                bh_arr_each(AstArgument *, arg, call_node->arg_arr)
-                    *arg = make_argument(parser->allocator, (AstTyped *) *arg);
+                bh_arr_each(AstTyped *, arg, call_node->args.values)
+                    *arg = (AstTyped *) make_argument(parser->allocator, *arg);
 
-                bh_arr_each(AstNamedValue *, named_value, call_node->named_args)
-                    (*named_value)->value = (AstNode *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
+                bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values)
+                    (*named_value)->value = (AstTyped *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
 
                 retval = (AstTyped *) call_node;
                 break;

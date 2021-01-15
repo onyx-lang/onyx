@@ -212,7 +212,7 @@ EMIT_FUNC(deferred_stmts,                AstNode* node);
 EMIT_FUNC(binop,                         AstBinaryOp* binop);
 EMIT_FUNC(unaryop,                       AstUnaryOp* unop);
 EMIT_FUNC(call,                          AstCall* call);
-EMIT_FUNC(intrinsic_call,                AstIntrinsicCall* call);
+EMIT_FUNC(intrinsic_call,                AstCall* call);
 EMIT_FUNC(array_access_location,         AstArrayAccess* aa, u64* offset_return);
 EMIT_FUNC(field_access_location,         AstFieldAccess* field, u64* offset_return);
 EMIT_FUNC(local_location,                AstLocal* local, u64* offset_return);
@@ -1329,8 +1329,8 @@ EMIT_FUNC(call, AstCall* call) {
     u32 vararg_offset = 0xffffffff;
     u64 stack_top_store_local;
 
-    bh_arr_each(AstArgument *, parg, call->arg_arr) {
-        AstArgument* arg = *parg;
+    bh_arr_each(AstTyped *, parg, call->args.values) {
+        AstArgument* arg = (AstArgument *) *parg;
 
         b32 place_on_stack  = 0;
         b32 arg_is_compound = type_is_compound(arg->value->type);
@@ -1463,7 +1463,7 @@ EMIT_FUNC(call, AstCall* call) {
 // little endian integers.
 #define SIMD_INT_CONST_INTRINSIC(type, count) { \
         type* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16); \
-        bh_arr(AstArgument *) arg_arr = call->arg_arr; \
+        bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values; \
         fori (i, 0, count) { \
             if (arg_arr[i]->value->kind != Ast_Kind_NumLit) { \
                 onyx_report_error(arg_arr[i]->token->pos, \
@@ -1499,7 +1499,7 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
 
-EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
+EMIT_FUNC(intrinsic_call, AstCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
     b32 place_arguments_normally = 1;
@@ -1523,8 +1523,8 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
     }
 
     if (place_arguments_normally) {
-        bh_arr_each(AstArgument *, arg, call->arg_arr) {
-            emit_expression(mod, &code, (*arg)->value);
+        bh_arr_each(AstTyped *, arg, call->args.values) {
+            emit_expression(mod, &code, *arg);
         }
     }
 
@@ -1583,7 +1583,7 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
         case ONYX_INTRINSIC_I64X2_CONST:  SIMD_INT_CONST_INTRINSIC(u64, 2);   break;
         case ONYX_INTRINSIC_F32X4_CONST: {
             f32* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
-            bh_arr(AstArgument *) arg_arr = call->arg_arr;
+            bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 4) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
                     onyx_report_error(arg_arr[i]->token->pos,
@@ -1600,7 +1600,7 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
 
         case ONYX_INTRINSIC_F64X2_CONST: {
             f64* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
-            bh_arr(AstArgument *) arg_arr = call->arg_arr;
+            bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 2) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
                     onyx_report_error(arg_arr[i]->token->pos,
@@ -1617,7 +1617,7 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
 
         case ONYX_INTRINSIC_I8X16_SHUFFLE: {
             u8* byte_buffer = bh_alloc(mod->extended_instr_alloc, 16);
-            bh_arr(AstArgument *) arg_arr = call->arg_arr;
+            bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
 
             // NOTE: There are two parameters that have to be outputted before
             // the immediate bytes
@@ -1638,20 +1638,21 @@ EMIT_FUNC(intrinsic_call, AstIntrinsicCall* call) {
             break;
         }
 
-        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_S, call->arg_arr); break;
-        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_U, call->arg_arr); break;
-        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I8X16_REPLACE_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_S, call->arg_arr); break;
-        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_U, call->arg_arr); break;
-        case ONYX_INTRINSIC_I16X8_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I16X8_REPLACE_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I32X4_EXTRACT_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I32X4_REPLACE_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I64X2_EXTRACT_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_I64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I64X2_REPLACE_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F32X4_EXTRACT_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F32X4_REPLACE_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F64X2_EXTRACT_LANE, call->arg_arr); break;
-        case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F64X2_REPLACE_LANE, call->arg_arr); break;
+        // CLEANUP ALL OF THIS
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_S, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I8X16_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I8X16_EXTRACT_LANE_U, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I8X16_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I8X16_REPLACE_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_S: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_S, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I16X8_EXTRACT_LANE_U: SIMD_EXTRACT_LANE_INSTR(WI_I16X8_EXTRACT_LANE_U, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I16X8_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I16X8_REPLACE_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I32X4_EXTRACT_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I32X4_REPLACE_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_I64X2_EXTRACT_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_I64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_I64X2_REPLACE_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_F32X4_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F32X4_EXTRACT_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_F32X4_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F32X4_REPLACE_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F64X2_EXTRACT_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
+        case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F64X2_REPLACE_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
 
         case ONYX_INTRINSIC_I8X16_SWIZZLE: WI(WI_I8X16_SWIZZLE); break;
         case ONYX_INTRINSIC_I8X16_SPLAT:   WI(WI_I8X16_SPLAT); break;
@@ -2031,7 +2032,7 @@ EMIT_FUNC(struct_store, Type* type, u64 offset) {
 EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    bh_arr_each(AstTyped *, val, sl->values) {
+    bh_arr_each(AstTyped *, val, sl->args.values) {
         emit_expression(mod, &code, *val);
     }
 
@@ -2299,7 +2300,8 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Block:          emit_block(mod, &code, (AstBlock *) expr, 1); break;
         case Ast_Kind_Call:           emit_call(mod, &code, (AstCall *) expr); break;
-        case Ast_Kind_Intrinsic_Call: emit_intrinsic_call(mod, &code, (AstIntrinsicCall *) expr); break;
+        case Ast_Kind_Argument:       emit_expression(mod, &code, ((AstArgument *) expr)->value); break;
+        case Ast_Kind_Intrinsic_Call: emit_intrinsic_call(mod, &code, (AstCall *) expr); break;
         case Ast_Kind_Binary_Op:      emit_binop(mod, &code, (AstBinaryOp *) expr); break;
         case Ast_Kind_Unary_Op:       emit_unaryop(mod, &code, (AstUnaryOp *) expr); break;
 
@@ -2980,7 +2982,7 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         assert(sl_type->kind == Type_Kind_Struct);
 
         i32 i = 0;
-        bh_arr_each(AstTyped *, expr, sl->values) {
+        bh_arr_each(AstTyped *, expr, sl->args.values) {
             emit_raw_data(mod, bh_pointer_add(data, sl_type->Struct.memarr[i]->offset), *expr);
             i++;
         }

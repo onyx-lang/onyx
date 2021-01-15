@@ -112,5 +112,6 @@ void onyx_tokenizer_free(OnyxTokenizer* tokenizer);
 void onyx_lex_tokens(OnyxTokenizer* tokenizer);
 
 b32 token_equals(OnyxToken* tkn1, OnyxToken* tkn2);
+b32 token_text_equals(OnyxToken* tkn, char* text);
 
 #endif

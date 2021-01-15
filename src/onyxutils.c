@@ -354,7 +354,7 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
 }
 
 static Type* lookup_actual_type_in_arguments(AstPolyProc* pp, AstPolyParam* param, Arguments* args, char** err_msg) {
-    bh_arr(AstNode *) arg_arr = args->values;
+    bh_arr(AstTyped *) arg_arr = args->values;
     bh_arr(AstNamedValue *) named_values = args->named_values;
 
     if (param->idx >= (u64) bh_arr_length(arg_arr)) {
@@ -366,7 +366,7 @@ static Type* lookup_actual_type_in_arguments(AstPolyProc* pp, AstPolyParam* para
             }
         }
 
-        // nocheckin
+        // CLEANUP
         if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure. This error message may not be entirely right.";
 
     } else {
@@ -395,11 +395,9 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         Type* actual_type = NULL;
 
         if (pp_lookup == PPLM_By_Call) {
-            Arguments args;
-            args.values = (bh_arr(AstNode *)) ((AstCall *) actual)->arg_arr;
-            args.named_values = ((AstCall *) actual)->named_args;
+            AstCall* call = (AstCall *) actual;
 
-            actual_type = lookup_actual_type_in_arguments(pp, param, &args, err_msg);
+            actual_type = lookup_actual_type_in_arguments(pp, param, &call->args, err_msg);
             if (actual_type == NULL) goto sln_not_found;
         }
 
@@ -858,20 +856,13 @@ static i32 lookup_idx_by_name(AstNode* provider, char* name) {
         case Ast_Kind_Function: {
             AstFunction* func = (AstFunction *) provider;
 
-            // CLEANUP nocheckin
             i32 param_idx = -1;
             i32 idx = 0;
             bh_arr_each(AstParam, param, func->params) {
-                token_toggle_end(param->local->token);
-
-                if (strncmp(param->local->token->text, name, param->local->token->length) == 0) {
+                if (token_text_equals(param->local->token, name)) {
                     param_idx = idx;
-
-                    token_toggle_end(param->local->token);
                     break;
                 }
-
-                token_toggle_end(param->local->token);
 
                 idx++;
             }
@@ -915,9 +906,9 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
 
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
-b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_values, AstNode* provider, char** err_msg) {
-    if (named_values != NULL) {
-        bh_arr_each(AstNamedValue *, p_named_value, named_values) {
+b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
+    if (args->named_values != NULL) {
+        bh_arr_each(AstNamedValue *, p_named_value, args->named_values) {
             AstNamedValue* named_value = *p_named_value;
 
             token_toggle_end(named_value->token);
@@ -928,23 +919,23 @@ b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_va
                 return 0;
             }
 
-            assert(idx < bh_arr_length(values));
+            assert(idx < bh_arr_length(args->values));
 
-            if (values[idx] != NULL) {
+            if (args->values[idx] != NULL) {
                 if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
                 token_toggle_end(named_value->token);
                 return 0;
             }
 
-            values[idx] = named_value->value;
+            args->values[idx] = named_value->value;
             token_toggle_end(named_value->token);
         }
     }
 
     b32 success = 1;
-    fori (idx, 0, bh_arr_length(values)) {
-        if (values[idx] == NULL) values[idx] = lookup_default_value_by_idx(provider, idx);
-        if (values[idx] == NULL) success = 0;
+    fori (idx, 0, bh_arr_length(args->values)) {
+        if (args->values[idx] == NULL) args->values[idx] = (AstTyped *) lookup_default_value_by_idx(provider, idx);
+        if (args->values[idx] == NULL) success = 0;
     }
 
     return success;

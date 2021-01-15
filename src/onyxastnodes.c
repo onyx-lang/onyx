@@ -665,3 +665,45 @@ AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
     symbol->token = sym;
     return symbol;
 }
+
+void arguments_initialize(Arguments* args) {
+    if (args->values == NULL)       bh_arr_new(global_heap_allocator, args->values, 2);
+    if (args->named_values == NULL) bh_arr_new(global_heap_allocator, args->named_values, 2);
+
+    // CLEANUP: I'm not sure if I need to initialize these to NULL values, but it doesn't hurt.
+    fori (i, 0, 2) {
+        args->values[i] = NULL;
+        args->named_values[i] = NULL;
+    }
+}
+
+void arguments_ensure_length(Arguments* args, u32 count) {
+    // Make the array big enough
+    bh_arr_grow(args->values, count);
+
+    // NULL initialize the new elements
+    fori (i, bh_arr_length(args->values), count) args->values[i] = NULL;
+
+    // Set the actual length to the count, but never let it decrease in size
+    bh_arr_set_length(args->values, bh_max(count, (u32) bh_arr_length(args->values)));
+}
+
+// In clone, the named_values are not copied. This is used in match_overloaded_function since it doesn't need them to be copied.
+void arguments_clone(Arguments* dest, Arguments* src) {
+    dest->named_values = src->named_values;
+    dest->values = bh_arr_copy(global_heap_allocator, src->values);
+}
+
+void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src) {
+    dest->values = NULL;
+    dest->named_values = NULL;
+
+    bh_arr_new(global_heap_allocator, dest->named_values, bh_arr_length(src->named_values));
+    bh_arr_new(global_heap_allocator, dest->values, bh_arr_length(src->values));
+
+    bh_arr_each(AstNamedValue *, nv, src->named_values)
+        bh_arr_push(dest->named_values, (AstNamedValue *) ast_clone(a, *nv));
+
+    bh_arr_each(AstTyped *, val, src->values)
+        bh_arr_push(dest->values, (AstTyped *) ast_clone(a, (AstNode *) *val));
+}

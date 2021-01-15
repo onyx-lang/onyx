@@ -296,46 +296,38 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     return 0;
 }
 
-static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(AstNamedValue *) named_values, bh_arr(AstTyped *) overloads) {
+static AstTyped* match_overloaded_function(Arguments* args, bh_arr(AstTyped *) overloads) {
     bh_arr_each(AstTyped *, node, overloads) {
         AstFunction* overload = NULL;
         if ((*node)->kind == Ast_Kind_Function) {
             overload = (AstFunction *) *node;
         }
         else if ((*node)->kind == Ast_Kind_Polymorphic_Proc) {
-            Arguments args;
-            args.values       = (bh_arr(AstNode*)) arg_arr;
-            args.named_values = named_values;
-
-            overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Arguments, &args);
+            overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Arguments, args);
         }
 
         if (overload == NULL) continue;
 
-        bh_arr(AstTyped *) new_arg_arr = arg_arr;
-        if (named_values != NULL && bh_arr_length(named_values) > 0) {
-            new_arg_arr = NULL;
-            bh_arr_new(global_heap_allocator, new_arg_arr, bh_arr_length(arg_arr) + bh_arr_length(named_values));
-            fori (i, 0, bh_arr_length(arg_arr)) new_arg_arr[i] = arg_arr[i];
-            fori (i, 0, bh_arr_length(named_values)) new_arg_arr[i + bh_arr_length(arg_arr)] = NULL;
-            bh_arr_set_length(new_arg_arr, bh_arr_length(arg_arr) + bh_arr_length(named_values));
+        Arguments* args_to_use = args;
+        if (args->named_values != NULL && bh_arr_length(args->named_values) > 0) {
+            args_to_use = bh_alloc_item(global_scratch_allocator, Arguments);
 
-            b32 values_place_correctly = fill_in_arguments(
-                (bh_arr(AstNode *)) new_arg_arr,
-                named_values,
-                (AstNode *) overload,
-                NULL);
+            arguments_clone(args_to_use, args);
+            arguments_ensure_length(args_to_use, bh_arr_length(args->values) + bh_arr_length(args->named_values));
+
+            b32 values_place_correctly = fill_in_arguments(args_to_use, (AstNode *) overload, NULL);
 
             if (!values_place_correctly) goto no_match;
         }
 
         fill_in_type((AstTyped *) overload);
+
         TypeFunction* ol_type = &overload->type->Function;
-        if (bh_arr_length(new_arg_arr) < (i32) ol_type->needed_param_count) continue;
+        if (bh_arr_length(args_to_use->values) < (i32) ol_type->needed_param_count) continue;
 
         i32 param_left = ol_type->param_count;
         Type** param_type = ol_type->params;
-        bh_arr_each(AstTyped*, arg, new_arg_arr) {
+        bh_arr_each(AstTyped*, arg, args_to_use->values) {
             if (param_left == 0) goto no_match;
             param_left--;
 
@@ -357,11 +349,13 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
         return (AstTyped *) *node;
 
 no_match:
-        if (named_values != NULL && bh_arr_length(named_values) > 0)
-            bh_arr_free(new_arg_arr);
+        if (args->named_values != NULL && bh_arr_length(args->named_values) > 0) {
+            bh_arr_free(args_to_use->values);
+        }
 
         continue;
     }
+
     return NULL;
 }
 
@@ -369,23 +363,23 @@ static void report_unable_to_match_overload(AstCall* call) {
     char* arg_str = bh_alloc(global_scratch_allocator, 1024);
     arg_str[0] = '\0';
 
-    bh_arr_each(AstArgument *, arg, call->arg_arr) {
-        strncat(arg_str, type_get_name((*arg)->value->type), 1023);
+    bh_arr_each(AstTyped *, arg, call->args.values) {
+        strncat(arg_str, type_get_name((*arg)->type), 1023);
 
-        if (arg != &bh_arr_last(call->arg_arr))
+        if (arg != &bh_arr_last(call->args.values))
             strncat(arg_str, ", ", 1023);
     }
 
-    if (bh_arr_length(call->named_args) > 0) {
-        bh_arr_each(AstNamedValue *, named_value, call->named_args) { 
+    if (bh_arr_length(call->args.named_values) > 0) {
+        bh_arr_each(AstNamedValue *, named_value, call->args.named_values) { 
             token_toggle_end((*named_value)->token);
             strncat(arg_str, (*named_value)->token->text, 1023);
             token_toggle_end((*named_value)->token);
 
             strncat(arg_str, "=", 1023);
-            strncat(arg_str, type_get_name(((AstTyped *) (*named_value)->value)->type), 1023); // CHECK: this might say 'unknown'.
+            strncat(arg_str, type_get_name((*named_value)->value->type), 1023); // CHECK: this might say 'unknown'.
 
-            if (named_value != &bh_arr_last(call->named_args))
+            if (named_value != &bh_arr_last(call->args.named_values))
                 strncat(arg_str, ", ", 1023);
         }
     }
@@ -395,9 +389,18 @@ static void report_unable_to_match_overload(AstCall* call) {
     bh_free(global_scratch_allocator, arg_str);
 }
 
+CheckStatus check_arguments(Arguments* args) {
+    bh_arr_each(AstTyped *, actual, args->values)
+        CHECK(expression, actual);
+
+    bh_arr_each(AstNamedValue *, named_value, args->named_values)
+        CHECK(expression, &(*named_value)->value);
+
+    return Check_Success;
+}
 
 CheckStatus check_argument(AstArgument** parg) {
-    CHECK(expression, (AstTyped **) parg);
+    CHECK(expression, &(*parg)->value);
     (*parg)->type = (*parg)->value->type;
 
     if ((*parg)->value->kind == Ast_Kind_Overloaded_Function) {
@@ -433,18 +436,10 @@ CheckStatus check_call(AstCall* call) {
     CHECK(expression, &call->callee);
     AstFunction* callee = (AstFunction *) call->callee;
 
-    // NOTE: Check arguments
-    bh_arr_each(AstArgument *, actual, call->arg_arr)
-        CHECK(argument, actual);
-
-    bh_arr_each(AstNamedValue *, named_value, call->named_args)
-        CHECK(argument, (AstArgument **) &(*named_value)->value);
+    check_arguments(&call->args);
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
-        call->callee = match_overloaded_function(
-            (bh_arr(AstTyped *)) call->arg_arr,
-            call->named_args,
-            ((AstOverloadedFunction *) callee)->overloads);
+        call->callee = match_overloaded_function(&call->args, ((AstOverloadedFunction *) callee)->overloads);
 
         if (call->callee == NULL) {
             report_unable_to_match_overload(call);
@@ -488,15 +483,13 @@ CheckStatus check_call(AstCall* call) {
             non_vararg_param_count--;
 
         i32 arg_count = bh_max(
-            bh_arr_length(call->arg_arr) + bh_arr_length(call->named_args),
+            bh_arr_length(call->args.values) + bh_arr_length(call->args.named_values),
             non_vararg_param_count);
 
-        bh_arr_grow(call->arg_arr, arg_count);
-        fori (i, bh_arr_length(call->arg_arr), arg_count) call->arg_arr[i] = NULL;
-        bh_arr_set_length(call->arg_arr, arg_count);
+        arguments_ensure_length(&call->args, arg_count);
 
         char* err_msg = NULL;
-        fill_in_arguments((AstNode **) call->arg_arr, call->named_args, (AstNode *) callee, &err_msg);
+        fill_in_arguments(&call->args, (AstNode *) callee, &err_msg);
 
         if (err_msg != NULL) {
             onyx_report_error(call->token->pos, err_msg);
@@ -504,7 +497,7 @@ CheckStatus check_call(AstCall* call) {
         }
     }
 
-    bh_arr(AstArgument *) arg_arr = call->arg_arr;
+    bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
     bh_arr_each(AstArgument *, arg, arg_arr) {
         if (*arg != NULL) continue;
 
@@ -522,7 +515,7 @@ CheckStatus check_call(AstCall* call) {
         char* intr_name = callee->intrinsic_name->text;
 
         if (bh_table_has(OnyxIntrinsic, intrinsic_table, intr_name)) {
-            ((AstIntrinsicCall *)call)->intrinsic = bh_table_get(OnyxIntrinsic, intrinsic_table, intr_name);
+            call->intrinsic = bh_table_get(OnyxIntrinsic, intrinsic_table, intr_name);
 
         } else {
             onyx_report_error(callee->token->pos, "Intrinsic not supported, '%s'.", intr_name);
@@ -623,7 +616,6 @@ type_checking_done:
     }
 
     callee->flags |= Ast_Flag_Function_Used;
-    call->arg_arr = arg_arr;
 
     return Check_Success;
 }
@@ -787,14 +779,14 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
 
-    bh_arr(AstTyped *) args = NULL;
-    bh_arr_new(global_heap_allocator, args, 2);
-    bh_arr_push(args, binop->left);
-    bh_arr_push(args, binop->right);
+    Arguments args = ((Arguments) { NULL, NULL });
+    bh_arr_new(global_heap_allocator, args.values, 2);
+    bh_arr_push(args.values, binop->left);
+    bh_arr_push(args.values, binop->right);
 
-    AstTyped* overload = match_overloaded_function(args, NULL, operator_overloads[binop->operation]);
+    AstTyped* overload = match_overloaded_function(&args, operator_overloads[binop->operation]);
     if (overload == NULL) {
-        bh_arr_free(args);
+        bh_arr_free(args.values);
         return NULL;
     }
 
@@ -803,11 +795,10 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
 
-    bh_arr_each(AstTyped *, arg, args)
+    bh_arr_each(AstTyped *, arg, args.values)
         *arg = (AstTyped *) make_argument(semstate.node_allocator, *arg);
 
-    implicit_call->arg_arr = (AstArgument **) args;
-    implicit_call->named_args = NULL;
+    implicit_call->args = args;
     return implicit_call;
 }
 
@@ -1035,17 +1026,15 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
 
     i32 mem_count = type_structlike_mem_count(sl->type);
 
-    bh_arr_grow(sl->values, mem_count);
-    fori (i, bh_arr_length(sl->values), mem_count) sl->values[i] = NULL;
-    bh_arr_set_length(sl->values, mem_count);
+    arguments_ensure_length(&sl->args, mem_count);
 
     char* err_msg = NULL;
-    if (!fill_in_arguments((bh_arr(AstNode *)) sl->values, sl->named_values, (AstNode *) sl, &err_msg)) {
+    if (!fill_in_arguments(&sl->args, (AstNode *) sl, &err_msg)) {
         onyx_report_error(sl->token->pos, err_msg);
         
-        bh_arr_each(AstTyped *, value, sl->values) {
+        bh_arr_each(AstTyped *, value, sl->args.values) {
             if (*value == NULL) {
-                i32 member_idx = value - sl->values; // Pointer subtraction hack
+                i32 member_idx = value - sl->args.values; // Pointer subtraction hack
 
                 onyx_report_error(sl->token->pos,
                     "Value not given for %d%s member, '%s'.",
@@ -1057,7 +1046,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         return Check_Error;
     }
 
-    AstTyped** actual = sl->values;
+    AstTyped** actual = sl->args.values;
     StructMember smem;
 
     b32 all_comptime = 1;
@@ -1381,8 +1370,9 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp **) pexpr, 0); break;
         case Ast_Kind_Unary_Op:  retval = check_unaryop((AstUnaryOp **) pexpr); break;
 
-        case Ast_Kind_Call:  retval = check_call((AstCall *) expr); break;
-        case Ast_Kind_Block: retval = check_block((AstBlock *) expr); break;
+        case Ast_Kind_Call:     retval = check_call((AstCall *) expr); break;
+        case Ast_Kind_Argument: retval = check_argument((AstArgument **) pexpr); break;
+        case Ast_Kind_Block:    retval = check_block((AstBlock *) expr); break;
 
         case Ast_Kind_Symbol:
             onyx_report_error(expr->token->pos,
@@ -1414,10 +1404,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
                 onyx_report_error(expr->token->pos, "Global with unknown type.");
                 retval = Check_Error;
             }
-            break;
-
-        case Ast_Kind_Argument:
-            retval = check_expression(&((AstArgument *) expr)->value);
             break;
 
         case Ast_Kind_NumLit:

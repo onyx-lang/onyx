@@ -236,15 +236,19 @@ static void symres_local(AstLocal** local, b32 add_to_block_locals) {
         symbol_introduce(semstate.curr_scope, (*local)->token, (AstNode *) *local);
 }
 
+static void symres_arguments(Arguments* args) {
+    bh_arr_each(AstTyped *, arg, args->values)
+        symres_expression(arg);
+
+    bh_arr_each(AstNamedValue *, named_arg, args->named_values)
+        symres_expression(&(*named_arg)->value);
+}
+
 static void symres_call(AstCall* call) {
     symres_expression((AstTyped **) &call->callee);
     if (call->callee == NULL) return;
 
-    bh_arr_each(AstArgument *, arg, call->arg_arr)
-        symres_statement((AstNode **) arg);
-
-    bh_arr_each(AstNamedValue *, named_arg, call->named_args)
-        symres_statement(&(*named_arg)->value);
+    symres_arguments(&call->args);
 }
 
 static void symres_size_of(AstSizeOf* so) {
@@ -301,8 +305,8 @@ static void symres_pipe(AstBinaryOp** pipe) {
 
     if ((*pipe)->left == NULL) return;
 
-    bh_arr_insertn(call_node->arg_arr, 0, 1);
-    call_node->arg_arr[0] = make_argument(semstate.node_allocator, (*pipe)->left);
+    bh_arr_insertn(call_node->args.values, 0, 1);
+    call_node->args.values[0] = (AstTyped *) make_argument(semstate.node_allocator, (*pipe)->left);
     call_node->next = (*pipe)->next;
 
     // NOTE: Not a BinaryOp node
@@ -326,19 +330,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
     while (sl->type_node->kind == Ast_Kind_Type_Alias)
         sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
 
-    if (sl->values != NULL) {
-        bh_arr_each(AstTyped *, expr, sl->values) {
-            if (*expr == NULL) onyx_report_error(sl->token->pos, "Some kind of error occured with this struct literal.");
-            else               symres_expression(expr);
-        }
-    }
-
-    if (sl->named_values != NULL) {
-        bh_arr_each(AstNamedValue *, smem, sl->named_values) {
-            if ((*smem)->value == NULL) onyx_report_error(sl->token->pos, "Some kind of error occured with this struct literal.");
-            else                        symres_expression((AstTyped **) &(*smem)->value);
-        }
-    }
+    symres_arguments(&sl->args);
 }
 
 static void symres_array_literal(AstArrayLiteral* al) {
@@ -376,6 +368,7 @@ static void symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Unary_Op:     symres_unaryop((AstUnaryOp **) expr); break;
         case Ast_Kind_Call:         symres_call((AstCall *) *expr); break;
+        case Ast_Kind_Argument:     symres_expression(&((AstArgument *) *expr)->value); break;
         case Ast_Kind_Block:        symres_block((AstBlock *) *expr); break;
         case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
         case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;

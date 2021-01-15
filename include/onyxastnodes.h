@@ -14,7 +14,6 @@ typedef struct AstNumLit AstNumLit;
 typedef struct AstStrLit AstStrLit;
 typedef struct AstLocal AstLocal;
 typedef struct AstCall AstCall;
-typedef struct AstIntrinsicCall AstIntrinsicCall;
 typedef struct AstArgument AstArgument;
 typedef struct AstAddressOf AstAddressOf;
 typedef struct AstDereference AstDereference;
@@ -436,6 +435,13 @@ typedef enum VarArgKind {
     VA_Kind_Untyped,
 } VarArgKind;
 
+typedef struct Arguments Arguments;
+struct Arguments {
+    bh_arr(AstTyped *) values;
+    bh_arr(AstNamedValue *) named_values;
+};
+
+
 // Base Nodes
 #define AstNode_base \
     AstKind kind;             \
@@ -462,7 +468,7 @@ struct AstNode { AstNode_base; };
 struct AstTyped { AstTyped_base; };
 
 // Expression Nodes
-struct AstNamedValue    { AstTyped_base; AstNode* value; };
+struct AstNamedValue    { AstTyped_base; AstTyped* value; };
 struct AstBinaryOp      { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
@@ -481,8 +487,7 @@ struct AstStructLiteral {
 
     AstTyped *stnode;
 
-    bh_arr(AstNamedValue *) named_values;
-    bh_arr(AstTyped *) values;
+    Arguments args;
 };
 struct AstArrayLiteral {
     AstTyped_base;
@@ -510,20 +515,12 @@ struct AstRangeLiteral {
 struct AstCall {
     AstTyped_base;
 
-    bh_arr(AstArgument *) arg_arr;
-    bh_arr(AstNamedValue *) named_args; // '.value' is a pointer to AstArgument.
+    Arguments args;
 
-    AstTyped *callee;
-
-    VarArgKind va_kind;
-};
-struct AstIntrinsicCall {
-    AstTyped_base;
-
-    bh_arr(AstArgument *) arg_arr;
-    bh_arr(AstNamedValue *) named_args;
-
-    OnyxIntrinsic intrinsic;
+    union {
+        AstTyped *callee;
+        OnyxIntrinsic intrinsic;
+    };
 
     VarArgKind va_kind;
 };
@@ -823,12 +820,6 @@ struct AstPackage {
     Package* package;
 };
 
-typedef struct Arguments Arguments;
-struct Arguments {
-    bh_arr(AstNode *) values;
-    bh_arr(AstNamedValue *) named_values;
-};
-
 extern AstNode empty_node;
 
 typedef enum EntityState {
@@ -999,8 +990,6 @@ Type* resolve_expression_type(AstTyped* node);
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
 
-b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_values, AstNode* provider, char** err_msg);
-
 AstNumLit* make_int_literal(bh_allocator a, i64 value);
 AstNumLit* make_float_literal(bh_allocator a, f64 value);
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
@@ -1008,6 +997,12 @@ AstArgument* make_argument(bh_allocator a, AstTyped* value);
 AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);
 AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
 AstNode* make_symbol(bh_allocator a, OnyxToken* sym);
+
+void arguments_initialize(Arguments* args);
+b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg);
+void arguments_ensure_length(Arguments* args, u32 count);
+void arguments_clone(Arguments* dest, Arguments* src);
+void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
 
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,
