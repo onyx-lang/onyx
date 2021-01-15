@@ -477,6 +477,7 @@ CheckStatus check_call(AstCall* call) {
 
 
     {
+        // CLEANUP maybe make function_get_expected_arguments?
         i32 non_vararg_param_count = (i32) callee->type->Function.param_count;
         if (non_vararg_param_count > 0 &&
             callee->type->Function.params[callee->type->Function.param_count - 1] == builtin_vararg_type_type)
@@ -657,10 +658,10 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
             resolve_expression_type(binop->right);
 
             if (binop->right->type->kind == Type_Kind_Compound) {
-                i32 expr_count = binop->right->type->Compound.count;
                 AstCompound* lhs = (AstCompound *) binop->left;
                 assert(lhs->kind == Ast_Kind_Compound);
 
+                i32 expr_count = binop->right->type->Compound.count;
                 fori (i, 0, expr_count) {
                     lhs->exprs[i]->type = binop->right->type->Compound.types[i];
                 }
@@ -1025,7 +1026,6 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     }
 
     i32 mem_count = type_structlike_mem_count(sl->type);
-
     arguments_ensure_length(&sl->args, mem_count);
 
     char* err_msg = NULL;
@@ -1049,7 +1049,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     AstTyped** actual = sl->args.values;
     StructMember smem;
 
-    b32 all_comptime = 1;
+    sl->flags |= Ast_Flag_Comptime;
 
     fori (i, 0, mem_count) {
         CHECK(expression, actual);
@@ -1070,14 +1070,9 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             return Check_Error;
         }
 
-        if (((*actual)->flags & Ast_Flag_Comptime) == 0)
-            all_comptime = 0;
-
+        sl->flags &= ((*actual)->flags & Ast_Flag_Comptime);
         actual++;
     }
-
-    if (all_comptime)
-        sl->flags |= Ast_Flag_Comptime;
 
     return Check_Success;
 }
@@ -1102,14 +1097,13 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
         return Check_Error;
     }
 
-    b32 all_comptime = 1;
+    al->flags |= Ast_Flag_Comptime;
 
     Type* elem_type = al->type->Array.elem;
     bh_arr_each(AstTyped *, expr, al->values) {
         CHECK(expression, expr);
 
-        if (((*expr)->flags & Ast_Flag_Comptime) == 0)
-            all_comptime = 0;
+        al->flags &= ((*expr)->flags & Ast_Flag_Comptime);
 
         if (!type_check_or_auto_cast(expr, elem_type)) {
             onyx_report_error((*expr)->token->pos, "Mismatched types for value of in array, expected '%s', got '%s'.",
@@ -1118,9 +1112,6 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
             return Check_Error;
         }
     }
-    
-    if (all_comptime)
-        al->flags |= Ast_Flag_Comptime;
 
     return Check_Success;
 }

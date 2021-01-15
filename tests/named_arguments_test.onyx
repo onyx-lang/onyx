@@ -19,8 +19,8 @@ main :: proc (args: [] cstr) {
         print_array(y);
     }
 
-    poly_named(10, ~~ u32.[ 10, 20, 30 ]);
-    poly_named(y = ~~ f32.[ 10, 20, 30 ], 10.0f);
+    poly_named(10, u32.[ 10, 20, 30 ]);
+    poly_named(y = f32.[ 10, 20, 30 ], 10.0f);
 
 
     println("\n\n=========================");

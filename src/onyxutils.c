@@ -846,9 +846,8 @@ static i32 lookup_idx_by_name(AstNode* provider, char* name) {
             assert(sl->type);
 
             StructMember s;
-            if (!type_lookup_member(sl->type, name, &s)) return -1; // nocheckin: Report error
-
-            if (s.included_through_use) return -1; // nocheckin: Report error
+            if (!type_lookup_member(sl->type, name, &s)) return -1;
+            if (s.included_through_use) return -1;
 
             return s.idx;
         }
@@ -914,7 +913,7 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
             token_toggle_end(named_value->token);
             i32 idx = lookup_idx_by_name(provider, named_value->token->text);
             if (idx == -1) {
-                if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "'%s' is not a valid named parameter here.", named_value->token->text);
+                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "'%s' is not a valid named parameter here.", named_value->token->text);
                 token_toggle_end(named_value->token);
                 return 0;
             }
@@ -922,7 +921,7 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
             assert(idx < bh_arr_length(args->values));
 
             if (args->values[idx] != NULL) {
-                if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
+                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
                 token_toggle_end(named_value->token);
                 return 0;
             }

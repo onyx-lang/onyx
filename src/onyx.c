@@ -589,7 +589,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
 
 int main(int argc, char *argv[]) {
 
-    bh_scratch_init(&global_scratch, bh_heap_allocator(), 128 * 1024); // NOTE: 128 KB
+    bh_scratch_init(&global_scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
 
     bh_managed_heap_init(&global_heap);
