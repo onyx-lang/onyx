@@ -303,7 +303,11 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
             overload = (AstFunction *) *node;
         }
         else if ((*node)->kind == Ast_Kind_Polymorphic_Proc) {
-            overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Value_Array, arg_arr);
+            Arguments args;
+            args.values       = (bh_arr(AstNode*)) arg_arr;
+            args.named_values = named_values;
+
+            overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Arguments, &args);
         }
 
         if (overload == NULL) continue;
@@ -312,8 +316,9 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
         if (named_values != NULL && bh_arr_length(named_values) > 0) {
             new_arg_arr = NULL;
             bh_arr_new(global_heap_allocator, new_arg_arr, bh_arr_length(arg_arr) + bh_arr_length(named_values));
-            fori (i, 0, bh_arr_length(arg_arr))
-                new_arg_arr[i] = arg_arr[i];
+            fori (i, 0, bh_arr_length(arg_arr)) new_arg_arr[i] = arg_arr[i];
+            fori (i, 0, bh_arr_length(named_values)) new_arg_arr[i + bh_arr_length(arg_arr)] = NULL;
+            bh_arr_set_length(new_arg_arr, bh_arr_length(arg_arr) + bh_arr_length(named_values));
 
             b32 values_place_correctly = fill_in_arguments(
                 (bh_arr(AstNode *)) new_arg_arr,
@@ -352,13 +357,44 @@ static AstTyped* match_overloaded_function(bh_arr(AstTyped *) arg_arr, bh_arr(As
         return (AstTyped *) *node;
 
 no_match:
-        if (named_values != NULL) 
+        if (named_values != NULL && bh_arr_length(named_values) > 0)
             bh_arr_free(new_arg_arr);
 
         continue;
     }
     return NULL;
 }
+
+static void report_unable_to_match_overload(AstCall* call) {
+    char* arg_str = bh_alloc(global_scratch_allocator, 1024);
+    arg_str[0] = '\0';
+
+    bh_arr_each(AstArgument *, arg, call->arg_arr) {
+        strncat(arg_str, type_get_name((*arg)->value->type), 1023);
+
+        if (arg != &bh_arr_last(call->arg_arr))
+            strncat(arg_str, ", ", 1023);
+    }
+
+    if (bh_arr_length(call->named_args) > 0) {
+        bh_arr_each(AstNamedValue *, named_value, call->named_args) { 
+            token_toggle_end((*named_value)->token);
+            strncat(arg_str, (*named_value)->token->text, 1023);
+            token_toggle_end((*named_value)->token);
+
+            strncat(arg_str, "=", 1023);
+            strncat(arg_str, type_get_name(((AstTyped *) (*named_value)->value)->type), 1023); // CHECK: this might say 'unknown'.
+
+            if (named_value != &bh_arr_last(call->named_args))
+                strncat(arg_str, ", ", 1023);
+        }
+    }
+
+    onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
+
+    bh_free(global_scratch_allocator, arg_str);
+}
+
 
 CheckStatus check_argument(AstArgument** parg) {
     CHECK(expression, (AstTyped **) parg);
@@ -411,33 +447,7 @@ CheckStatus check_call(AstCall* call) {
             ((AstOverloadedFunction *) callee)->overloads);
 
         if (call->callee == NULL) {
-            char* arg_str = bh_alloc(global_scratch_allocator, 1024);
-            arg_str[0] = '\0';
-
-            bh_arr_each(AstArgument *, arg, call->arg_arr) {
-                strncat(arg_str, type_get_name((*arg)->value->type), 1023);
-
-                if (arg != &bh_arr_last(call->arg_arr))
-                    strncat(arg_str, ", ", 1023);
-            }
-
-            if (bh_arr_length(call->named_args) > 0) {
-                bh_arr_each(AstNamedValue *, named_value, call->named_args) { 
-                    token_toggle_end((*named_value)->token);
-                    strncat(arg_str, (*named_value)->token->text, 1023);
-                    token_toggle_end((*named_value)->token);
-
-                    strncat(arg_str, "=", 1023);
-                    strncat(arg_str, type_get_name(((AstTyped *) (*named_value)->value)->type), 1023); // CHECK: this might say 'unknown'.
-
-                    if (named_value != &bh_arr_last(call->named_args))
-                        strncat(arg_str, ", ", 1023);
-                }
-            }
-
-            onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
-
-            bh_free(global_scratch_allocator, arg_str);
+            report_unable_to_match_overload(call);
             return Check_Error;
         }
 
@@ -470,15 +480,21 @@ CheckStatus check_call(AstCall* call) {
         return Check_Error;
     }
 
-    i32 arg_count = bh_max(
-        bh_arr_length(call->arg_arr) + bh_arr_length(call->named_args),
-        (i32) callee->type->Function.param_count);
-
-    bh_arr_grow(call->arg_arr, arg_count);
-    fori (i, bh_arr_length(call->arg_arr), arg_count) call->arg_arr[i] = NULL;
-    bh_arr_set_length(call->arg_arr, arg_count);
 
     {
+        i32 non_vararg_param_count = (i32) callee->type->Function.param_count;
+        if (non_vararg_param_count > 0 &&
+            callee->type->Function.params[callee->type->Function.param_count - 1] == builtin_vararg_type_type)
+            non_vararg_param_count--;
+
+        i32 arg_count = bh_max(
+            bh_arr_length(call->arg_arr) + bh_arr_length(call->named_args),
+            non_vararg_param_count);
+
+        bh_arr_grow(call->arg_arr, arg_count);
+        fori (i, bh_arr_length(call->arg_arr), arg_count) call->arg_arr[i] = NULL;
+        bh_arr_set_length(call->arg_arr, arg_count);
+
         char* err_msg = NULL;
         fill_in_arguments((AstNode **) call->arg_arr, call->named_args, (AstNode *) callee, &err_msg);
 
@@ -785,6 +801,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
         *arg = (AstTyped *) make_argument(semstate.node_allocator, *arg);
 
     implicit_call->arg_arr = (AstArgument **) args;
+    implicit_call->named_args = NULL;
     return implicit_call;
 }
 

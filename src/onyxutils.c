@@ -353,6 +353,29 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
     return result;
 }
 
+static Type* lookup_actual_type_in_arguments(AstPolyProc* pp, AstPolyParam* param, Arguments* args, char** err_msg) {
+    bh_arr(AstNode *) arg_arr = args->values;
+    bh_arr(AstNamedValue *) named_values = args->named_values;
+
+    if (param->idx >= (u64) bh_arr_length(arg_arr)) {
+        OnyxToken* param_name = pp->base_func->params[param->idx].local->token;
+
+        bh_arr_each(AstNamedValue *, named_value, named_values) {
+            if (token_equals(param_name, (*named_value)->token)) {
+                return resolve_expression_type((AstTyped *) (*named_value)->value);
+            }
+        }
+
+        // nocheckin
+        if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure. This error message may not be entirely right.";
+
+    } else {
+        return resolve_expression_type((AstTyped *) arg_arr[param->idx]);
+    }
+
+    return NULL;
+}
+
 static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
     bh_arr(AstPolySolution) slns = NULL;
     bh_arr_new(global_heap_allocator, slns, bh_arr_length(pp->poly_params));
@@ -369,42 +392,22 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         }
         if (already_solved) continue;
 
-        Type* actual_type;
+        Type* actual_type = NULL;
 
         if (pp_lookup == PPLM_By_Call) {
-            bh_arr(AstArgument *) arg_arr = ((AstCall *) actual)->arg_arr;
-            bh_arr(AstNamedValue *) named_values = ((AstCall *) actual)->named_args;
+            Arguments args;
+            args.values = (bh_arr(AstNode *)) ((AstCall *) actual)->arg_arr;
+            args.named_values = ((AstCall *) actual)->named_args;
 
-            if (param->idx >= (u64) bh_arr_length(arg_arr)) {
-                // CLEANUP: This is a really long access chain.
-                OnyxToken* param_name = pp->base_func->params[param->idx].local->token;
-
-                bh_arr_each(AstNamedValue *, named_value, named_values) {
-                    if (token_equals(param_name, (*named_value)->token)) {
-                        actual_type = resolve_expression_type((AstTyped *) (*named_value)->value);
-                        break;
-                    }
-                }
-
-                // nocheckin
-                if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure. This error message may not be entirely right.";
-                goto sln_not_found;
-
-            } else {
-                actual_type = resolve_expression_type(arg_arr[param->idx]->value);
-            }
+            actual_type = lookup_actual_type_in_arguments(pp, param, &args, err_msg);
+            if (actual_type == NULL) goto sln_not_found;
         }
 
-        else if (pp_lookup == PPLM_By_Value_Array) {
-            bh_arr(AstTyped *) arg_arr = (bh_arr(AstTyped *)) actual;
+        else if (pp_lookup == PPLM_By_Arguments) {
+            Arguments* args = (Arguments *) actual;
 
-            // nocheckin
-            if ((i32) param->idx >= bh_arr_length(arg_arr)) {
-                if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure.";
-                goto sln_not_found;
-            }
-
-            actual_type = resolve_expression_type(arg_arr[param->idx]);
+            actual_type = lookup_actual_type_in_arguments(pp, param, args, err_msg);
+            if (actual_type == NULL) goto sln_not_found;
         }
 
         else if (pp_lookup == PPLM_By_Function_Type) {
@@ -899,7 +902,10 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
         case Ast_Kind_Function: {
             AstFunction* func = (AstFunction *) provider;
 
-            AstArgument* arg = make_argument(semstate.node_allocator, func->params[idx].default_value);
+            AstTyped* default_value = func->params[idx].default_value;
+            if (default_value == NULL) return NULL;
+
+            AstArgument* arg = make_argument(semstate.node_allocator, default_value);
             return (AstNode *) arg;
         }
 
@@ -910,27 +916,29 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
 b32 fill_in_arguments(bh_arr(AstNode *) values, bh_arr(AstNamedValue *) named_values, AstNode* provider, char** err_msg) {
-    bh_arr_each(AstNamedValue *, p_named_value, named_values) {
-        AstNamedValue* named_value = *p_named_value;
+    if (named_values != NULL) {
+        bh_arr_each(AstNamedValue *, p_named_value, named_values) {
+            AstNamedValue* named_value = *p_named_value;
 
-        token_toggle_end(named_value->token);
-        i32 idx = lookup_idx_by_name(provider, named_value->token->text);
-        if (idx == -1) {
-            if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "'%s' is not a valid named parameter here.", named_value->token->text);
             token_toggle_end(named_value->token);
-            return 0;
-        }
+            i32 idx = lookup_idx_by_name(provider, named_value->token->text);
+            if (idx == -1) {
+                if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "'%s' is not a valid named parameter here.", named_value->token->text);
+                token_toggle_end(named_value->token);
+                return 0;
+            }
 
-        assert(idx < bh_arr_length(values));
+            assert(idx < bh_arr_length(values));
 
-        if (values[idx] != NULL) {
-            if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
+            if (values[idx] != NULL) {
+                if (err_msg) *err_msg = bh_aprintf(global_heap_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);
+                token_toggle_end(named_value->token);
+                return 0;
+            }
+
+            values[idx] = named_value->value;
             token_toggle_end(named_value->token);
-            return 0;
         }
-
-        values[idx] = named_value->value;
-        token_toggle_end(named_value->token);
     }
 
     b32 success = 1;

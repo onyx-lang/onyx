@@ -466,6 +466,10 @@ Type* resolve_expression_type(AstTyped* node) {
         }
     }
 
+    if (node->kind == Ast_Kind_Argument) {
+        node->type = resolve_expression_type(((AstArgument *) node)->value);
+    }
+
     if (node->type == NULL)
         node->type = type_build_from_ast(semstate.allocator, node->type_node);
 

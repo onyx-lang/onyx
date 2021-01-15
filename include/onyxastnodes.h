@@ -823,6 +823,12 @@ struct AstPackage {
     Package* package;
 };
 
+typedef struct Arguments Arguments;
+struct Arguments {
+    bh_arr(AstNode *) values;
+    bh_arr(AstNamedValue *) named_values;
+};
+
 extern AstNode empty_node;
 
 typedef enum EntityState {
@@ -1006,7 +1012,7 @@ AstNode* make_symbol(bh_allocator a, OnyxToken* sym);
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,
     PPLM_By_Function_Type,
-    PPLM_By_Value_Array,
+    PPLM_By_Arguments,
 } PolyProcLookupMethod;
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxFilePos pos);
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
