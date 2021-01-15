@@ -1,5 +1,5 @@
 Testing a simple structure.
-SimpleStruct<16, 4>(41, 67, Steve)
+SimpleStruct<24, 8>(41, 67, Steve)
 
 
 Testing a simple union.
@@ -36,5 +36,5 @@ PolyUnion(1234)
 
 
 Testing a polymorphic union with use.
-8 == 8
+16 == 16
 0, 5678.0

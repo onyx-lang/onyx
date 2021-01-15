@@ -146,6 +146,7 @@ struct AstCompound;
 b32 types_are_compatible(Type* t1, Type* t2);
 u32 type_size_of(Type* type);
 u32 type_alignment_of(Type* type);
+u32 type_aligned_size_of(Type* type);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 
 Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);

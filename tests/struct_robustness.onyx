@@ -145,7 +145,7 @@ main :: proc (args: [] cstr) {
             };
         }
 
-        printf("%i == 8\n", sizeof PolyStruct(i32, [] u32));
+        printf("%i == 16\n", sizeof PolyStruct(i32, [] u32));
 
         ps : PolyStruct(i32, f64);
         ps.t_data = 1234;

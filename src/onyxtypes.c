@@ -26,7 +26,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } },
     { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       4,  4, "rawptr" } },
+    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       8,  8, "rawptr" } },
 
     { Type_Kind_Basic, 0, { Basic_Kind_I8X16,  Basic_Flag_SIMD,                          16, 16, "i8x16" } },
     { Type_Kind_Basic, 0, { Basic_Kind_I16X8,  Basic_Flag_SIMD,                          16, 16, "i16x8" } },
@@ -255,14 +255,14 @@ u32 type_size_of(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.size;
-        case Type_Kind_Pointer:  return 4;
+        case Type_Kind_Pointer:  return 8;
         case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
-        case Type_Kind_Slice:    return 8;
-        case Type_Kind_VarArgs:  return 8;
-        case Type_Kind_DynArray: return 12;
+        case Type_Kind_Slice:    return 16; // HACK: These should not have to be 16 bytes in size, they should only have to be 12,
+        case Type_Kind_VarArgs:  return 16; // but there are alignment issues right now with that so I decided to not fight it and just make them 16 bytes in size.
+        case Type_Kind_DynArray: return 16;
         case Type_Kind_Compound: return type->Compound.size;
         default:                 return 0;
     }
@@ -273,17 +273,26 @@ u32 type_alignment_of(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.alignment;
-        case Type_Kind_Pointer:  return 4;
+        case Type_Kind_Pointer:  return 8;
         case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type_alignment_of(type->Array.elem);
         case Type_Kind_Struct:   return type->Struct.alignment;
         case Type_Kind_Enum:     return type_alignment_of(type->Enum.backing);
-        case Type_Kind_Slice:    return 4;
-        case Type_Kind_VarArgs:  return 4;
-        case Type_Kind_DynArray: return 4;
+        case Type_Kind_Slice:    return 8;
+        case Type_Kind_VarArgs:  return 8;
+        case Type_Kind_DynArray: return 8;
         case Type_Kind_Compound: return 8; // HACK
         default: return 1;
     }
+}
+
+u32 type_aligned_size_of(Type* type) {
+    u32 size = type_size_of(type);
+    u32 alignment = type_alignment_of(type);
+
+    bh_align(size, alignment);
+
+    return size;
 }
 
 Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
@@ -603,7 +612,7 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
 
     ptr_type->kind = Type_Kind_Pointer;
     ptr_type->Pointer.base.flags |= Basic_Flag_Pointer;
-    ptr_type->Pointer.base.size = 4;
+    ptr_type->Pointer.base.size = 8;
     ptr_type->Pointer.elem = to;
 
     return ptr_type;
@@ -781,7 +790,7 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             }
             if (strcmp(member, "count") == 0) {
                 smem->idx = 1;
-                smem->offset = 4;
+                smem->offset = 8;
                 smem->type = &basic_types[Basic_Kind_U32];
                 smem->name = "count";
                 return 1;
@@ -800,14 +809,14 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             }
             if (strcmp(member, "count") == 0) {
                 smem->idx = 1;
-                smem->offset = 4;
+                smem->offset = 8;
                 smem->type = &basic_types[Basic_Kind_U32];
                 smem->name = "count";
                 return 1;
             }
             if (strcmp(member, "capacity") == 0) {
                 smem->idx = 2;
-                smem->offset = 8;
+                smem->offset = 12;
                 smem->type = &basic_types[Basic_Kind_U32];
                 smem->name = "capacity";
                 return 1;
@@ -843,7 +852,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             }
             if (idx == 1) {
                 smem->idx = 1;
-                smem->offset = 4;
+                smem->offset = 8;
                 smem->type = &basic_types[Basic_Kind_U32];
                 smem->name = "count";
                 return 1;
@@ -862,14 +871,14 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             }
             if (idx == 1) {
                 smem->idx = 1;
-                smem->offset = 4;
+                smem->offset = 8;
                 smem->type = &basic_types[Basic_Kind_U32];
                 smem->name = "count";
                 return 1;
             }
             if (idx == 2) {
                 smem->idx = 2;
-                smem->offset = 8;
+                smem->offset = 12;
                 smem->type = &basic_types[Basic_Kind_U32];
                 smem->name = "capacity";
                 return 1;

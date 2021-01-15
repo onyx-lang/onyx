@@ -559,7 +559,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 is_simd     = is_basic && (type->Basic.flags & Basic_Flag_SIMD);
 
     if (is_pointer) {
-        WID(WI_I32_STORE, ((WasmInstructionData) { alignment, offset }));
+        WID(WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
     } else if (is_integer) {
         if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
@@ -635,6 +635,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
 
     if (is_pointer) {
         instr = WI_I32_LOAD;
+        alignment = 2;
     }
     else if (is_integer) {
         if      (load_size == 1) instr = WI_I32_LOAD_8_S;
@@ -1392,17 +1393,19 @@ EMIT_FUNC(call, AstCall* call) {
             WID(WI_GLOBAL_GET, stack_top_idx);
             WID(WI_I32_CONST, vararg_offset);
             WI(WI_I32_ADD);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], stack_grow_amm);
+
+            // NOTE: There will be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
 
             WID(WI_GLOBAL_GET, stack_top_idx);
             WID(WI_I32_CONST, vararg_count);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm + 4);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm + 8);
 
             WID(WI_GLOBAL_GET, stack_top_idx);
             WID(WI_I32_CONST, stack_grow_amm);
             WI(WI_I32_ADD);
 
-            stack_grow_amm += 8;
+            stack_grow_amm += 12;
             break;
         }
 
@@ -2282,7 +2285,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Array_Literal: {
-            // assert(("Array literals are not allowed as expressions currently. This will be added in a future update.", 0));
             emit_array_literal(mod, &code, (AstArrayLiteral *) expr);
             break;
         }
@@ -2997,7 +2999,8 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         // by emit_string_literal.
         u32* sdata = (u32 *) data;
         sdata[0] = sl->addr;
-        sdata[1] = sl->length;
+        sdata[1] = 0x00;
+        sdata[2] = sl->length;
         break;
     }
 
@@ -3039,12 +3042,12 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
         case Basic_Kind_I32:
         case Basic_Kind_U32:
-        case Basic_Kind_Rawptr:
             *((i32 *) data) = ((AstNumLit *) node)->value.i;
             return;
 
         case Basic_Kind_I64:
         case Basic_Kind_U64:
+        case Basic_Kind_Rawptr:
             *((i64 *) data) = ((AstNumLit *) node)->value.l;
             return;
 
