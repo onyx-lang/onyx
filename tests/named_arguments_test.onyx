@@ -1,0 +1,73 @@
+#load "core/std/js"
+
+use package core
+
+main :: proc (args: [] cstr) {
+    foo :: proc (x: i32, y: f32) {
+        printf("x is %i\n", x);
+        printf("y is %f\n", y);
+    }
+
+    foo(10, 20);
+    foo(y = 10, x = 20);
+
+
+    println("\n\n=========================");
+
+    poly_named :: proc (x: $T, y: [$N] T) {
+        println(x);
+        print_array(y);
+    }
+
+    poly_named(10, ~~ u32.[ 10, 20, 30 ]);
+    poly_named(y = ~~ f32.[ 10, 20, 30 ], 10.0f);
+
+
+    println("\n\n=========================");
+
+    poly_overloaded :: proc {
+        proc (y: [$N] $T) { print("MATCHED Y: "); print_array(y); },
+        proc (x: $T)      { print("MATCHED X: "); println(x); },
+        proc (z: $T)      { print("MATCHED Z: "); println(z); },
+    }
+
+    poly_overloaded(u32.[ 10, 20 ]);
+    poly_overloaded(10);
+    poly_overloaded(z = 10);
+
+
+    println("\n\n=========================");
+
+    overload_with_varargs :: proc (x: i32, y: i32, z: ..f32) {
+        println(x);
+        println(y);
+
+        for elem: z do printf("%f ", elem);
+        printf("\n");
+    }
+
+    overload_with_varargs(10, 20, 30, 40, 50);
+
+
+
+    println("\n\n=========================");
+
+    lotza_options :: proc (
+        options_a : bool,
+        options_b := false,
+        options_c := true,
+        options_d := true,
+        options_e := false,
+        options_f := false,
+        options_g := true,
+        ) {
+        printf("%b %b %b %b %b %b %b\n",
+            options_a, options_b,
+            options_c, options_d,
+            options_e, options_f,
+            options_g);
+    }
+
+    lotza_options(options_e = true, options_c = false, /* option_a */ false, /* option_b */ true);
+    lotza_options(options_e = true, options_c = false, options_a = true);
+}

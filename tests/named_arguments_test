@@ -1,0 +1,28 @@
+x is 10
+y is 20.0
+x is 20
+y is 10.0
+
+
+=========================
+10
+10 20 30
+10.0
+10.0 20.0 30.0
+
+
+=========================
+MATCHED Y: 10 20
+MATCHED X: 10
+MATCHED Z: 10
+
+
+=========================
+10
+20
+30.0 40.0 50.0 
+
+
+=========================
+false true false true true false true
+true false false true true false true
