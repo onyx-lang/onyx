@@ -414,6 +414,8 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     assert(type != NULL);
     assert(node != NULL);
 
+    if (node_is_type((AstNode *) node)) return 0;
+
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return 0;
@@ -724,4 +726,15 @@ void arguments_removed_baked(Arguments* args) {
         bh_arr_deleten(args->named_values, i, 1);
         i--;
     }
+}
+
+// GROSS: Using void* to avoid having to cast everything.
+const char* node_get_type_name(void* node) {
+    if (node_is_type((AstNode *) node)) return "type_expr";
+
+    if (((AstNode *) node)->kind == Ast_Kind_Argument) {
+        return node_get_type_name(((AstArgument *) node)->value);
+    }
+
+    return type_get_name(((AstTyped *) node)->type);
 }

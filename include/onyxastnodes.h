@@ -1031,6 +1031,9 @@ void arguments_clone(Arguments* dest, Arguments* src);
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
 void arguments_removed_baked(Arguments* args);
 
+// GROSS: Using void* to avoid having to cast everything.
+const char* node_get_type_name(void* node);
+
 typedef enum PolyProcLookupMethod {
     PPLM_By_Call,
     PPLM_By_Function_Type,

@@ -70,4 +70,16 @@ main :: proc (args: [] cstr) {
 
     lotza_options(options_e = true, options_c = false, /* option_a */ false, /* option_b */ true);
     lotza_options(options_e = true, options_c = false, options_a = true);
+
+
+    // This currently does not work and would require a lot of rewriting of compiler internals to make work.
+    // named_baked_overloaded_parameters :: proc {
+    //     proc ($T: type_expr, x: T)      do { println("MATCHED X"); },
+    //     proc ($T: type_expr, y: [$N] T) do { println("MATCHED X"); },
+    //     proc ($T: type_expr, z: T)      do { println("MATCHED X"); },
+    // }
+
+    // named_baked_overloaded_parameters(i32, 10);
+    // named_baked_overloaded_parameters(i32, u32.[ 10, 20, 30 ]);
+    // named_baked_overloaded_parameters(i32, z = u32.[ 10, 20, 30 ]);
 }

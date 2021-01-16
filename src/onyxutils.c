@@ -394,7 +394,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         if (already_solved) continue;
 
         // CLEANUP CLEANUP CLEANUP
-        PolySolveResult resolved;
+        PolySolveResult resolved = { 0 };
 
         if (param->kind == PPK_Poly_Type) {
             Type* actual_type = NULL;
@@ -758,6 +758,15 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
     solidified_func.func = clone_function_header(semstate.node_allocator, pp->base_func);
     solidified_func.func->flags |= Ast_Flag_Incomplete_Body;
     solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
+
+    // HACK HACK HACK
+    u32 removed_params = 0;
+    bh_arr_each(AstPolyParam, param, pp->poly_params) {
+        if (param->kind != PPK_Baked_Value) continue;
+
+        bh_arr_deleten(solidified_func.func->params, param->idx - removed_params, 1);
+        removed_params++;
+    }
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,

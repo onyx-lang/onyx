@@ -29,7 +29,7 @@ contexts:
     - match: '\b(package|struct|proc|use|global|enum|if|elseif|else|for|while|do|break|continue|fallthrough|return|as|cast|sizeof|alignof|defer|switch|case)\b'
       scope: keyword.control.onyx
 
-    - match: '\b(bool|void|i8|u8|i16|u16|i32|u32|i64|u64|f32|f64|rawptr|str|cstr|range)\b'
+    - match: '\b(bool|void|i8|u8|i16|u16|i32|u32|i64|u64|f32|f64|rawptr|str|cstr|range|type_expr)\b'
       scope: storage.type
 
     - match: '\b(i8x16|i16x8|i32x4|i64x2|f32x4|f64x2|v128)\b'

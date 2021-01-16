@@ -96,7 +96,7 @@ CheckStatus check_return(AstReturn* retnode) {
             onyx_report_error(retnode->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
                     type_get_name(semstate.expected_return_type),
-                    type_get_name(retnode->expr->type));
+                    node_get_type_name(retnode->expr));
             return Check_Error;
         }
 
@@ -364,7 +364,7 @@ static void report_unable_to_match_overload(AstCall* call) {
     arg_str[0] = '\0';
 
     bh_arr_each(AstTyped *, arg, call->args.values) {
-        strncat(arg_str, type_get_name((*arg)->type), 1023);
+        strncat(arg_str, node_get_type_name(*arg), 1023);
 
         if (arg != &bh_arr_last(call->args.values))
             strncat(arg_str, ", ", 1023);
@@ -377,7 +377,7 @@ static void report_unable_to_match_overload(AstCall* call) {
             token_toggle_end((*named_value)->token);
 
             strncat(arg_str, "=", 1023);
-            strncat(arg_str, type_get_name((*named_value)->value->type), 1023); // CHECK: this might say 'unknown'.
+            strncat(arg_str, node_get_type_name((*named_value)->value), 1023); // CHECK: this might say 'unknown'.
 
             if (named_value != &bh_arr_last(call->args.named_values))
                 strncat(arg_str, ", ", 1023);
@@ -572,7 +572,7 @@ CheckStatus check_call(AstCall* call) {
                             type_get_name(formal_params[arg_pos]),
                             arg_pos + 1,
                             bh_num_suffix(arg_pos + 1),
-                            type_get_name(arg_arr[arg_pos]->value->type));
+                            node_get_type_name(arg_arr[arg_pos]->value));
                     return Check_Error;
                 }
 
@@ -591,7 +591,7 @@ CheckStatus check_call(AstCall* call) {
                             type_get_name(variadic_type),
                             variadic_param->local->token->text,
                             variadic_param->local->token->length,
-                            type_get_name(arg_arr[arg_pos]->value->type));
+                            node_get_type_name(arg_arr[arg_pos]->value));
                     return Check_Error;
                 }
 
@@ -620,7 +620,7 @@ type_checking_done:
         return Check_Error;
     }
 
-    if (arg_pos < arg_count) {
+    if (arg_pos < (u32) arg_count) {
         onyx_report_error(call->token->pos, "Too many arguments to function call.");
         return Check_Error;
     }
@@ -709,8 +709,8 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     if (!type_check_or_auto_cast(&binop->right, binop->left->type)) {
         onyx_report_error(binop->token->pos,
                 "Cannot assign value of type '%s' to a '%s'.",
-                type_get_name(binop->right->type),
-                type_get_name(binop->left->type));
+                node_get_type_name(binop->right),
+                node_get_type_name(binop->left));
         return Check_Error;
     }
 
@@ -901,8 +901,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
             onyx_report_error(binop->token->pos,
                     "Mismatched types for binary operation '%s'. left: '%s', right: '%s'.",
                     binaryop_string[binop->operation],
-                    type_get_name(binop->left->type),
-                    type_get_name(binop->right->type));
+                    node_get_type_name(binop->left),
+                    node_get_type_name(binop->right));
             return Check_Error;
         }
     }
@@ -970,8 +970,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
 bad_binaryop:
     onyx_report_error(binop->token->pos, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
             binaryop_string[binop->operation],
-            type_get_name(binop->left->type),
-            type_get_name(binop->right->type));
+            node_get_type_name(binop->left),
+            node_get_type_name(binop->right));
 
     return Check_Error;
 }
@@ -997,7 +997,7 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
         if (!type_is_bool(unaryop->expr->type)) {
             onyx_report_error(unaryop->token->pos,
                     "Bool negation operator expected bool type, got '%s'.",
-                    type_get_name(unaryop->expr->type));
+                    node_get_type_name(unaryop->expr));
             return Check_Error;
         }
     }
@@ -1006,7 +1006,7 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
         if (!type_is_integer(unaryop->expr->type)) {
             onyx_report_error(unaryop->token->pos,
                     "Bitwise operator expected integer type, got '%s'.",
-                    type_get_name(unaryop->expr->type));
+                    node_get_type_name(unaryop->expr));
             return Check_Error;
         }
     }
@@ -1075,7 +1075,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
                     i + 1, bh_num_suffix(i + 1),
                     smem.name,
                     type_get_name(formal),
-                    type_get_name((*actual)->type));
+                    node_get_type_name(*actual));
             return Check_Error;
         }
 
@@ -1117,7 +1117,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
         if (!type_check_or_auto_cast(expr, elem_type)) {
             onyx_report_error((*expr)->token->pos, "Mismatched types for value of in array, expected '%s', got '%s'.",
                 type_get_name(elem_type),
-                type_get_name((*expr)->type));
+                node_get_type_name(*expr));
             return Check_Error;
         }
     }
@@ -1137,7 +1137,7 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     if (!type_check_or_auto_cast(&range->low, smem.type)) {
         onyx_report_error(range->token->pos,
             "Expected left side of range to be a 32-bit integer, got '%s'.",
-            type_get_name(range->low->type));
+            node_get_type_name(range->low));
         return Check_Error;
     }
 
@@ -1145,7 +1145,7 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     if (!type_check_or_auto_cast(&range->high, smem.type)) {
         onyx_report_error(range->token->pos,
             "Expected right side of range to be a 32-bit integer, got '%s'.",
-            type_get_name(range->high->type));
+            node_get_type_name(range->high));
         return Check_Error;
     }
 
@@ -1214,7 +1214,7 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
     if (!type_is_array_accessible(aa->addr->type)) {
         onyx_report_error(aa->token->pos,
                 "Expected pointer or array type for left of array access, got '%s'.",
-                type_get_name(aa->addr->type));
+                node_get_type_name(aa->addr));
         return Check_Error;
     }
 
@@ -1243,7 +1243,7 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
             || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
         onyx_report_error(aa->token->pos,
             "Expected type u32 or i32 for index, got '%s'.",
-            type_get_name(aa->expr->type));
+            node_get_type_name(aa->expr));
         return Check_Error;
     }
 
@@ -1291,7 +1291,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
             "Cannot access field '%b' on '%s'. Type is not a struct.",
             field->token->text,
             field->token->length,
-            type_get_name(field->expr->type));
+            node_get_type_name(field->expr));
         return Check_Error;
     }
 
@@ -1317,7 +1317,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         onyx_report_error(field->token->pos,
             "Field '%s' does not exists on '%s'.",
             field->field,
-            type_get_name(field->expr->type));
+            node_get_type_name(field->expr));
 
         return Check_Error;
     }
@@ -1713,7 +1713,7 @@ CheckStatus check_memres(AstMemRes* memres) {
             if (!type_check_or_auto_cast(&memres->initial_value, memres_type)) {
                 onyx_report_error(memres->token->pos,
                         "Cannot assign value of type '%s' to a '%s'.",
-                        type_get_name(memres->initial_value->type),
+                        node_get_type_name(memres->initial_value),
                         type_get_name(memres_type));
                 return Check_Error;
             }
