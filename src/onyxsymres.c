@@ -353,6 +353,11 @@ static void symres_array_literal(AstArrayLiteral* al) {
 }
 
 static void symres_expression(AstTyped** expr) {
+    if (node_is_type((AstNode *) *expr)) {
+        *((AstType **) expr) = symres_type((AstType *) *expr);
+        return;
+    }
+
     switch ((*expr)->kind) {
         case Ast_Kind_Symbol:
             *expr = (AstTyped *) symbol_resolve(semstate.curr_scope, ((AstNode *) *expr)->token);
