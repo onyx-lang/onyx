@@ -415,7 +415,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     assert(node != NULL);
 
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
-        AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token->pos);
+        AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return 0;
 
         *pnode = (AstTyped *) func;

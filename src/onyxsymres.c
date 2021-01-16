@@ -565,7 +565,7 @@ static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
         if (onyx_has_errors()) return;
     }
 
-    solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token->pos);
+    solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token);
 
     // NOTE: Not a DirectiveSolidify.
     *psolid = (AstDirectiveSolidify *) solid->resolved_proc;

@@ -450,11 +450,7 @@ CheckStatus check_call(AstCall* call) {
     }
 
     if (callee->kind == Ast_Kind_Polymorphic_Proc) {
-        call->callee = (AstTyped *) polymorphic_proc_lookup(
-                (AstPolyProc *) call->callee,
-                PPLM_By_Call,
-                call,
-                call->token->pos);
+        call->callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Call, call, call->token);
 
         if (call->callee == NULL) return Check_Error;
 
@@ -1126,13 +1122,17 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
 
     type_lookup_member(expected_range_type, "low", &smem);
     if (!type_check_or_auto_cast(&range->low, smem.type)) {
-        onyx_report_error(range->token->pos, "Expected left side of range to be a 32-bit integer.");
+        onyx_report_error(range->token->pos,
+            "Expected left side of range to be a 32-bit integer, got '%s'.",
+            type_get_name(range->low->type));
         return Check_Error;
     }
 
     type_lookup_member(expected_range_type, "high", &smem);
     if (!type_check_or_auto_cast(&range->high, smem.type)) {
-        onyx_report_error(range->token->pos, "Expected right side of range to be a 32-bit integer.");
+        onyx_report_error(range->token->pos,
+            "Expected right side of range to be a 32-bit integer, got '%s'.",
+            type_get_name(range->high->type));
         return Check_Error;
     }
 
@@ -1522,7 +1522,13 @@ CheckStatus check_block(AstBlock* block) {
 
 CheckStatus check_function(AstFunction* func) {
     semstate.expected_return_type = func->type->Function.return_type;
-    if (func->body) return check_block(func->body);
+    if (func->body) {
+        CheckStatus status = check_block(func->body);
+        if (status != Check_Success && func->generated_from)
+            onyx_report_error(func->generated_from->pos, "Error in polymorphic procedure generated from this location.");
+
+        return status;
+    }
 
     return Check_Success;
 }
