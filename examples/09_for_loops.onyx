@@ -1,6 +1,50 @@
+// Looping over data structures is a very common operation done in all programming
+// practices. In fact, I'd argue 97% of all programming problems can be solved by
+// putting information into an array and looping over it. For this reason, for loops
+// in Onyx are extremely simple to use by design and should make programming very
+// enjoyable. But I digress, let's look at some examples.
+
 #load "core/std/wasi"
 
 use package core
 
 main :: proc (args: [] cstr) {
+    // Currently, for loops can iterate over four kinds of data structures in Onyx:
+    //      * Ranges
+    //      * Fixed arrays
+    //      * Slices
+    //      * Dynamic arrays
+
+    // The syntax of for loops is very simple:
+    // for ^? <iteration variable>: <iterator> <block>
+
+    // For example, this will print out the numbers in the array literal:
+    for i: u32.[ 10, 20, 30, 40, 50 ] {
+        println(i);
+    }
+    print("\n\n");
+
+
+    // You may have noticed the options caret (^) in the definition of the for loop
+    // syntax. When a caret is placed before the iteration variable, the iteration
+    // variable will be a *pointer* to the data inside the iterator. This is useful
+    // for iterating over larger data structures that don't need to be copied for
+    // every iteration, or when you want to modify the elements of the iterator, as
+    // so:
+
+    primes := u32.[ 2, 3, 5, 7, 11, 13, 17 ];
+    for ^prime: primes {
+        *prime *= 2;
+    }
+
+    print("Doubled primes: ");
+    print_array(primes);
+
+    // Currently, there is not support for defining custom iterators for for-loops.
+    // At the moment, this pattern is the best for that purpose:
+    //
+    //  while it := iterator_create(...); !iterator_done(^it) {
+    //      defer iterator_next(^it);
+    //      ...
+    //  }
 }
