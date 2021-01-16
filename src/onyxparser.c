@@ -167,6 +167,22 @@ static AstNumLit* parse_float_literal(OnyxParser* parser) {
     return float_node;
 }
 
+// e
+// '#' <symbol>
+static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
+    if (parser->curr->type != '#') return 0;
+
+    expect_token(parser, '#');
+    OnyxToken* sym = expect_token(parser, Token_Type_Symbol);
+
+    b32 match = (strlen(dir) == (u64) sym->length) && (strncmp(dir, sym->text, sym->length) == 0);
+    if (!match) {
+        unconsume_token(parser);
+        unconsume_token(parser);
+    }
+    return match;
+}
+
 static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret) {
     if (parser->curr->type != '.'
         || peek_token(1)->type != '{') return 0;
@@ -1461,7 +1477,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     bh_arr(AstPolyParam) pv = NULL;
 
     if (parser->polymorph_context.poly_params == NULL)
-        onyx_report_error(parser->curr->pos, "polymorphic variable not valid here.");
+        onyx_report_error(parser->curr->pos, "Polymorphic variable not valid here.");
     else
         pv = *parser->polymorph_context.poly_params;
 
@@ -1475,6 +1491,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
 
     if (pv != NULL) {
         bh_arr_push(pv, ((AstPolyParam) {
+            .kind     = PPK_Poly_Type,
             .poly_sym = symbol_node,
 
             // These will be filled out by function_params()
@@ -1824,6 +1841,7 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
     assert(parser->polymorph_context.poly_params != NULL);
 
     b32 param_use = 0;
+    b32 param_is_baked = 0;
     OnyxToken* symbol;
     while (parser->curr->type != ')') {
         if (parser->hit_unexpected_token) return;
@@ -1831,6 +1849,11 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
         if (parser->curr->type == Token_Type_Keyword_Use) {
             consume_token(parser);
             param_use = 1;
+        }
+
+        if (parser->curr->type == '$') {
+            consume_token(parser);
+            param_is_baked = 1;
         }
 
         symbol = expect_token(parser, Token_Type_Symbol);
@@ -1858,6 +1881,8 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 
             i32 old_len = 0, new_len = 0;
             if (curr_param.vararg_kind != VA_Kind_Untyped) {
+                // CLEANUP: This is mess and it is hard to follow what is going on here.
+                // I think with recent rewrites, this should be easier to do.
                 old_len = bh_arr_length(*parser->polymorph_context.poly_params);
                 curr_param.local->type_node = parse_type(parser);
                 new_len = bh_arr_length(*parser->polymorph_context.poly_params);
@@ -1885,6 +1910,23 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 
         bh_arr_push(func->params, curr_param);
 
+        if (param_is_baked) {
+            param_is_baked = 0;    
+
+            assert(parser->polymorph_context.poly_params != NULL);
+
+            bh_arr(AstPolyParam) pv = *parser->polymorph_context.poly_params;
+            bh_arr_push(pv, ((AstPolyParam) {
+                .kind = PPK_Baked_Value,
+                .idx = param_idx,
+
+                .poly_sym = (AstNode *) curr_param.local,
+                .type_expr = curr_param.local->type_node,
+            }));
+
+            *parser->polymorph_context.poly_params = pv;
+        }
+
         curr_param.default_value = NULL;
 
         if (parser->curr->type != ')')
@@ -1895,22 +1937,6 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 
     consume_token(parser); // Skip the )
     return;
-}
-
-// e
-// '#' <symbol>
-static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
-    if (parser->curr->type != '#') return 0;
-
-    expect_token(parser, '#');
-    OnyxToken* sym = expect_token(parser, Token_Type_Symbol);
-
-    b32 match = (strlen(dir) == (u64) sym->length) && (strncmp(dir, sym->text, sym->length) == 0);
-    if (!match) {
-        unconsume_token(parser);
-        unconsume_token(parser);
-    }
-    return match;
 }
 
 // 'proc' <func_params> ('->' <type>)? <directive>* <block>

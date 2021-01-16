@@ -1332,6 +1332,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     bh_arr_each(AstTyped *, parg, call->args.values) {
         AstArgument* arg = (AstArgument *) *parg;
+        if (arg->is_baked) continue;
 
         b32 place_on_stack  = 0;
         b32 arg_is_compound = type_is_compound(arg->value->type);

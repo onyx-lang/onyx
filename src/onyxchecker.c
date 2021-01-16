@@ -413,6 +413,22 @@ CheckStatus check_argument(AstArgument** parg) {
     return Check_Success;
 }
 
+static i32 non_baked_argument_count(Arguments* args) {
+    i32 count = 0;
+
+    bh_arr_each(AstTyped *, actual, args->values) {
+        assert((*actual)->kind == Ast_Kind_Argument);
+        if (!((AstArgument *) (*actual))->is_baked) count++;
+    }
+
+    bh_arr_each(AstNamedValue *, named_value, args->named_values) {
+        assert((*named_value)->value->kind == Ast_Kind_Argument);
+        if (!((AstArgument *) (*named_value)->value)->is_baked) count++;
+    }
+
+    return count;
+}
+
 typedef enum ArgState {
     AS_Expecting_Exact,
     AS_Expecting_Typed_VA,
@@ -455,6 +471,7 @@ CheckStatus check_call(AstCall* call) {
         if (call->callee == NULL) return Check_Error;
 
         callee = (AstFunction *) call->callee;
+        arguments_removed_baked(&call->args);
     }
 
     // NOTE: Build callee's type
@@ -472,26 +489,22 @@ CheckStatus check_call(AstCall* call) {
     }
 
 
-    {
-        // CLEANUP maybe make function_get_expected_arguments?
-        i32 non_vararg_param_count = (i32) callee->type->Function.param_count;
-        if (non_vararg_param_count > 0 &&
-            callee->type->Function.params[callee->type->Function.param_count - 1] == builtin_vararg_type_type)
-            non_vararg_param_count--;
+    // CLEANUP maybe make function_get_expected_arguments?
+    i32 non_vararg_param_count = (i32) callee->type->Function.param_count;
+    if (non_vararg_param_count > 0 &&
+        callee->type->Function.params[callee->type->Function.param_count - 1] == builtin_vararg_type_type)
+        non_vararg_param_count--;
 
-        i32 arg_count = bh_max(
-            bh_arr_length(call->args.values) + bh_arr_length(call->args.named_values),
-            non_vararg_param_count);
+    i32 arg_count = bh_max(non_vararg_param_count, non_baked_argument_count(&call->args));
 
-        arguments_ensure_length(&call->args, arg_count);
+    arguments_ensure_length(&call->args, arg_count);
 
-        char* err_msg = NULL;
-        fill_in_arguments(&call->args, (AstNode *) callee, &err_msg);
+    char* err_msg = NULL;
+    fill_in_arguments(&call->args, (AstNode *) callee, &err_msg);
 
-        if (err_msg != NULL) {
-            onyx_report_error(call->token->pos, err_msg);
-            return Check_Error;
-        }
+    if (err_msg != NULL) {
+        onyx_report_error(call->token->pos, err_msg);
+        return Check_Error;
     }
 
     bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
@@ -607,7 +620,7 @@ type_checking_done:
         return Check_Error;
     }
 
-    if (arg_pos < (u32) bh_arr_length(arg_arr)) {
+    if (arg_pos < arg_count) {
         onyx_report_error(call->token->pos, "Too many arguments to function call.");
         return Check_Error;
     }
@@ -1345,13 +1358,14 @@ CheckStatus check_align_of(AstAlignOf* ao) {
 CheckStatus check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
-        if (expr->token) {
-            onyx_report_error(expr->token->pos, "Type used as part of an expression.");
-        }
-        else {
-            onyx_report_error((OnyxFilePos) { 0 }, "Type used as part of an expression somewhere in the program.");
-        }
-        return Check_Error;
+        return Check_Success;
+        // if (expr->token) {
+        //     onyx_report_error(expr->token->pos, "Type used as part of an expression.");
+        // }
+        // else {
+        //     onyx_report_error((OnyxFilePos) { 0 }, "Type used as part of an expression somewhere in the program.");
+        // }
+        // return Check_Error;
     }
 
     fill_in_type(expr);

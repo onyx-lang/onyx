@@ -707,3 +707,21 @@ void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src) {
     bh_arr_each(AstTyped *, val, src->values)
         bh_arr_push(dest->values, (AstTyped *) ast_clone(a, (AstNode *) *val));
 }
+
+void arguments_removed_baked(Arguments* args) {
+    fori (i, 0, bh_arr_length(args->values)) {
+        if (args->values[i]->kind != Ast_Kind_Argument) continue;
+        if (!((AstArgument *) args->values[i])->is_baked) continue;
+
+        bh_arr_deleten(args->values, i, 1);
+        i--;
+    }
+
+    fori (i, 0, bh_arr_length(args->named_values)) {
+        if (args->named_values[i]->value->kind != Ast_Kind_Argument) continue;
+        if (!((AstArgument *) args->named_values[i]->value)->is_baked) continue;
+
+        bh_arr_deleten(args->named_values, i, 1);
+        i--;
+    }
+}

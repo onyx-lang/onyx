@@ -848,6 +848,13 @@ static void symres_struct_defaults(AstType* t) {
 static void symres_polyproc(AstPolyProc* pp) {
     pp->poly_scope = semstate.curr_scope;
 
+    bh_arr_each(AstPolyParam, param, pp->poly_params) {
+        if (param->kind != PPK_Baked_Value) continue;
+
+        param->type_expr = symres_type(param->type_expr);
+    }
+
+    // CLEANUP: This was copied from symres_function_header.
     if (pp->base_func->operator_overload != (BinaryOp) -1) {
         if (bh_arr_length(pp->base_func->params) != 2) {
             onyx_report_error(pp->base_func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
