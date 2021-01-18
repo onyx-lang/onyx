@@ -14,6 +14,9 @@ bh_allocator global_scratch_allocator;
 bh_managed_heap global_heap;
 bh_allocator global_heap_allocator;
 
+//
+// Program info and packages
+//
 void program_info_init(ProgramInfo* prog, bh_allocator alloc) {
     prog->global_scope = scope_create(alloc, NULL, (OnyxFilePos) { 0 });
 
@@ -51,6 +54,10 @@ Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_
     }
 }
 
+
+//
+// Scoping
+//
 Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     Scope* scope = bh_alloc_item(a, Scope);
     scope->parent = parent;
@@ -148,6 +155,10 @@ void scope_clear(Scope* scope) {
     bh_table_clear(scope->symbols);
 }
 
+
+//
+// Polymorphic things
+//
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
     if (pp->concrete_funcs == NULL) {
         bh_table_init(global_heap_allocator, pp->concrete_funcs, 16);
@@ -176,6 +187,151 @@ static void insert_poly_slns_into_scope(Scope* scope, bh_arr(AstPolySolution) sl
     }
 }
 
+// NOTE: This might return a volatile string. Do not store it without copying it.
+static char* build_poly_solution_key(AstPolySolution* sln) {
+    static char buffer[128];
+
+    if (sln->kind == PSK_Type) {
+        return (char *) type_get_unique_name(sln->type);
+    }
+
+    else if (sln->kind == PSK_Value) {
+        fori (i, 0, 128) buffer[i] = 0;
+
+        if (sln->value->kind == Ast_Kind_NumLit) {
+            strncat(buffer, "NUMLIT:", 127);
+            strncat(buffer, bh_bprintf("%l", ((AstNumLit *) sln->value)->value.l), 127);
+
+        } else {
+            // HACK: For now, the value pointer is just used. This means that
+            // sometimes, even through the solution is the same, it won't be
+            // stored the same.
+            bh_snprintf(buffer, 128, "%p", sln->value);
+        }
+
+        return buffer;
+    }
+
+    return NULL;
+}
+
+// NOTE: This returns a volatile string. Do not store it without copying it.
+static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
+    static char key_buf[1024];
+    fori (i, 0, 1024) key_buf[i] = 0;
+
+    bh_arr_each(AstPolySolution, sln, slns) {
+        token_toggle_end(sln->poly_sym->token);
+
+        strncat(key_buf, sln->poly_sym->token->text, 1023);
+        strncat(key_buf, "=", 1023);
+        strncat(key_buf, build_poly_solution_key(sln), 1023);
+        strncat(key_buf, ";", 1023);
+
+        token_toggle_end(sln->poly_sym->token);
+    }
+
+    return key_buf;
+}
+
+// NOTE: This function adds a solidified function to the entity heap for it to be processed
+// later. It optionally can start the function header entity at the code generation state if
+// the header has already been processed.
+static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_func, b32 header_already_processed) {
+    solidified_func.func->flags |= Ast_Flag_Function_Used;
+    solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
+
+    EntityState header_start_state = Entity_State_Resolve_Symbols;
+    if (header_already_processed) header_start_state = Entity_State_Code_Gen;
+
+    Entity func_header_entity = {
+        .state = header_start_state,
+        .type = Entity_Type_Function_Header,
+        .function = solidified_func.func,
+        .package = NULL,
+        .scope = solidified_func.poly_scope,
+    };
+
+    entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
+    if (onyx_has_errors()) return 0;
+
+    Entity func_entity = {
+        .state = Entity_State_Resolve_Symbols,
+        .type = Entity_Type_Function,
+        .function = solidified_func.func,
+        .package = NULL,
+        .scope = solidified_func.poly_scope,
+    };
+
+    entity_heap_insert(&semstate.program->entities, func_header_entity);
+    entity_heap_insert(&semstate.program->entities, func_entity);
+
+    return 1;
+}
+
+// NOTE: This function is responsible for taking all of the information about generating
+// a new polymorphic variant, and producing a solidified function. It optionally can only
+// generate the header of the function, which is useful for cases such as checking if a
+// set of arguments works for a polymorphic overload option.
+static AstSolidifiedFunction generate_solidified_function(
+    AstPolyProc* pp,
+    bh_arr(AstPolySolution) slns,
+    OnyxToken* tkn,
+    b32 header_only) {
+
+    AstSolidifiedFunction solidified_func;
+
+    // NOTE: Use the position of token if one was provided, otherwise just use NULL.
+    OnyxFilePos poly_scope_pos = { 0 };
+    if (tkn) poly_scope_pos = tkn->pos;
+
+    solidified_func.poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, poly_scope_pos);
+    insert_poly_slns_into_scope(solidified_func.poly_scope, slns);
+
+    if (header_only) {
+        solidified_func.func = (AstFunction *) clone_function_header(semstate.node_allocator, pp->base_func);
+        solidified_func.func->flags |= Ast_Flag_Incomplete_Body;
+
+    } else {
+        solidified_func.func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
+    }
+
+    solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
+    solidified_func.func->generated_from = tkn;
+
+    // HACK: Remove the baked parameters from the function defintion so they can be
+    // resolved in the poly scope above the function. This does feel kinda of gross
+    // and I would love an alternative to tell it to just "skip" the parameter, but
+    // that is liable to breaking because it is one more thing to remember.
+    //                                             - brendanfh 2021/01/18
+    u32 removed_params = 0;
+    bh_arr_each(AstPolyParam, param, pp->poly_params) {
+        if (param->kind != PPK_Baked_Value) continue;
+
+        bh_arr_deleten(solidified_func.func->params, param->idx - removed_params, 1);
+        removed_params++;
+    }
+
+    return solidified_func;
+}
+
+static void ensure_solidified_function_has_body(AstPolyProc* pp, AstSolidifiedFunction solidified_func) {
+    if (solidified_func.func->flags & Ast_Flag_Incomplete_Body) {
+        clone_function_body(semstate.node_allocator, solidified_func.func, pp->base_func);
+
+        // HACK: I'm asserting that this function should return without an error, because
+        // the only case where it can return an error is if there was a problem with the
+        // header. This should never be the case in this situation, since the header would
+        // have to have successfully passed type checking before it would become a solidified
+        // procedure.
+        assert(add_solidified_function_entities(solidified_func, 1));
+
+        solidified_func.func->flags &= ~Ast_Flag_Incomplete_Body;
+    }
+}
+
+// NOTE: These are temporary data structures used to represent the pattern matching system
+// of polymoprhic type resolution.
 typedef struct PolySolveResult {
     PolySolutionKind kind;
     union {
@@ -194,6 +350,15 @@ typedef struct PolySolveElem {
     };
 } PolySolveElem;
 
+// NOTE: The job of this function is to solve for the type/value that belongs in a
+// polymoprhic variable. This function takes in three arguments:
+//  * The symbol node of the polymorphic parameter being searched for
+//  * The type expression that should contain the symbol node it is some where
+//  * The actual type to pattern match against
+//
+// This function utilizes a basic breadth-first search of the type_expr and actual type
+// trees, always moving along them in parallel, so when the target is reached (if it is
+// ever reached), the "actual" is the matched type/value.
 static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type* actual) {
     bh_arr(PolySolveElem) elem_queue = NULL;
     bh_arr_new(global_heap_allocator, elem_queue, 4);
@@ -354,10 +519,16 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
     return result;
 }
 
+// NOTE: The job of this function is to take a polymorphic parameter and a set of arguments
+// and solve for the argument that matches the parameter. This is needed because polymorphic
+// procedure resolution has to happen before the named arguments are placed in their correct
+// positions.
 static AstTyped* lookup_param_in_arguments(AstPolyProc* pp, AstPolyParam* param, Arguments* args, char** err_msg) {
     bh_arr(AstTyped *) arg_arr = args->values;
     bh_arr(AstNamedValue *) named_values = args->named_values;
 
+    // NOTE: This check is safe because currently the arguments given without a name
+    // always map to the beginning indidies of the argument array.
     if (param->idx >= (u64) bh_arr_length(arg_arr)) {
         OnyxToken* param_name = pp->base_func->params[param->idx].local->token;
 
@@ -377,13 +548,117 @@ static AstTyped* lookup_param_in_arguments(AstPolyProc* pp, AstPolyParam* param,
     return NULL;
 }
 
+// NOTE: The job of this function is to solve for type of AstPolySolution using the provided
+// information. It is asssumed that the "param" is of kind PPK_Poly_Type. This function uses
+// either the arguments provided, or a function type to compare against to pattern match for
+// the type that the parameter but be.
+static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstPolyProc* pp, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+    Type* actual_type = NULL;
+
+    switch (pp_lookup) {
+        case PPLM_By_Arguments: {
+            Arguments* args = (Arguments *) actual;
+
+            AstTyped* typed_param = lookup_param_in_arguments(pp, param, args, err_msg);
+            if (typed_param == NULL) return;
+
+            actual_type = resolve_expression_type(typed_param);
+            if (actual_type == NULL) return;
+
+            break;
+        }
+
+        case PPLM_By_Function_Type: {
+            Type* ft = (Type *) actual;
+            if (param->idx >= ft->Function.param_count) {
+                if (err_msg) *err_msg = "Incompatible polymorphic argument to function parameter.";
+                return;
+            }
+
+            actual_type = ft->Function.params[param->idx];
+            break;
+        }
+
+        default: return;
+    }
+
+    *resolved = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
+}
+
+// NOTE: The job of this function is to look through the arguments provided and find a matching
+// value that is to be baked into the polymorphic procedures poly-scope. It expected that param
+// will be of kind PPK_Baked_Value.
+// CLEANUP: This function is kind of gross at the moment, because it handles different cases for
+// the argument kind. When type expressions (type_expr) become first-class types in the type
+// system, this code should be able to be a lot cleaner.
+static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPolyProc* pp, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+    if (pp_lookup != PPLM_By_Arguments) {
+        *err_msg = "Function type cannot be used to solved for baked parameter value.";
+        return;
+    }
+
+    Arguments* args = (Arguments *) actual;
+    AstTyped* value = lookup_param_in_arguments(pp, param, args, err_msg);
+    if (value == NULL) return;
+
+    // HACK: Storing the original value because if this was an AstArgument, we need to flag
+    // it as baked if it is determined that the argument is of the correct kind and type.
+    AstTyped* orig_value = value;
+    if (value->kind == Ast_Kind_Argument) value = ((AstArgument *) value)->value;
+
+    if (param->type_expr == (AstType *) &type_expr_symbol) {
+        if (!node_is_type((AstNode *) value)) {
+            *err_msg = "Expected type expression.";
+            return;
+        }
+
+        Type* resolved_type = type_build_from_ast(semstate.node_allocator, (AstType *) value);
+        *resolved = ((PolySolveResult) { PSK_Type, .actual = resolved_type });
+
+    } else {
+        if ((value->flags & Ast_Flag_Comptime) == 0) {
+            *err_msg = "Expected compile-time known argument.";
+            return;
+        }
+
+        if (param->type == NULL)
+            param->type = type_build_from_ast(semstate.node_allocator, param->type_expr);
+
+        if (!type_check_or_auto_cast(&value, param->type)) {
+            *err_msg = bh_aprintf(global_scratch_allocator,
+                    "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
+                    get_function_name(pp->base_func),
+                    type_get_name(param->type),
+                    param->idx + 1,
+                    bh_num_suffix(param->idx + 1),
+                    node_get_type_name(value));
+            return;
+        }
+
+        *resolved = ((PolySolveResult) { PSK_Value, value });
+    }
+
+    if (orig_value->kind == Ast_Kind_Argument) {
+        ((AstArgument *) orig_value)->is_baked = 1;
+    }
+}
+
+// NOTE: The job of this function is to take a polymorphic procedure, as well as a method of
+// solving for the polymorphic variables, in order to return an array of the solutions for all
+// of the polymorphic variables.
 static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
     bh_arr(AstPolySolution) slns = NULL;
     bh_arr_new(global_heap_allocator, slns, bh_arr_length(pp->poly_params));
 
+    // NOTE: "known solutions" are given through a '#solidify' directive. If this polymorphic
+    // procedure is the result of a partially applied solidification, this array will be non-
+    // empty and these solutions will be used.
     bh_arr_each(AstPolySolution, known_sln, pp->known_slns) bh_arr_push(slns, *known_sln);
 
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
+
+        // NOTE: First check to see if this polymorphic variable was already specified in the
+        // known solutions.
         b32 already_solved = 0;
         bh_arr_each(AstPolySolution, known_sln, pp->known_slns) {
             if (token_equals(param->poly_sym->token, known_sln->poly_sym->token)) {
@@ -393,111 +668,25 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         }
         if (already_solved) continue;
 
-        // CLEANUP CLEANUP CLEANUP
-        PolySolveResult resolved = { 0 };
+        // NOTE: Solve for the polymoprhic parameter's value
+        PolySolveResult resolved = { PSK_Undefined };
+        switch (param->kind) {
+            case PPK_Poly_Type:   solve_for_polymorphic_param_type (&resolved, pp, param, pp_lookup, actual, err_msg); break;
+            case PPK_Baked_Value: solve_for_polymorphic_param_value(&resolved, pp, param, pp_lookup, actual, err_msg); break;
 
-        if (param->kind == PPK_Poly_Type) {
-            Type* actual_type = NULL;
-
-            if (pp_lookup == PPLM_By_Arguments) {
-                Arguments* args = (Arguments *) actual;
-
-                AstTyped* typed_param = lookup_param_in_arguments(pp, param, args, err_msg);
-                if (typed_param == NULL) goto sln_not_found;
-
-                actual_type = resolve_expression_type(typed_param);
-                if (actual_type == NULL) goto sln_not_found;
-            }
-
-            else if (pp_lookup == PPLM_By_Function_Type) {
-                Type* ft = (Type*) actual;
-                if (param->idx >= ft->Function.param_count) {
-                    if (err_msg) *err_msg = "Incompatible polymorphic argument to function parameter.";
-                    goto sln_not_found;
-                }
-
-                actual_type = ft->Function.params[param->idx];
-            }
-
-            else {
-                if (err_msg) *err_msg = "Cannot resolve polymorphic function type.";
-                goto sln_not_found;
-            }
-
-            resolved = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
-
-        } else if (param->kind == PPK_Baked_Value) {
-            AstTyped* value = NULL;
-
-            if (pp_lookup == PPLM_By_Arguments) {
-                Arguments* args = (Arguments *) actual;
-
-                value = lookup_param_in_arguments(pp, param, args, err_msg);
-                if (value == NULL) goto sln_not_found;
-            }
-
-            else if (pp_lookup == PPLM_By_Function_Type) {
-                *err_msg = "Function type cannot be used to solved for baked parameter value.";
-                goto sln_not_found;
-            }
-
-            else {
-                if (err_msg) *err_msg = "Cannot resolve polymorphic function type.";
-                goto sln_not_found;
-            }
-
-            AstTyped* orig_value = value;
-            if (value->kind == Ast_Kind_Argument) {
-                value = ((AstArgument *) value)->value;
-            }
-
-            if (param->type_expr == (AstType *) &type_expr_symbol) {
-                if (!node_is_type((AstNode *) value)) {
-                    *err_msg = "Expected type expression.";
-                    goto sln_not_found;
-                }
-
-                resolved = ((PolySolveResult) {
-                    .kind = PSK_Type,
-                    .actual = type_build_from_ast(semstate.node_allocator, (AstType *) value),
-                });
-
-            } else {
-                // CLEANUP
-                if ((value->flags & Ast_Flag_Comptime) == 0) {
-                    *err_msg = "Expected compile-time known argument.";
-                    goto sln_not_found;
-                }
-
-                if (param->type == NULL)
-                    param->type = type_build_from_ast(semstate.node_allocator, param->type_expr);
-
-                if (!type_check_or_auto_cast(&value, param->type)) {
-                    *err_msg = bh_aprintf(global_scratch_allocator,
-                            "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
-                            get_function_name(pp->base_func),
-                            type_get_name(param->type),
-                            param->idx + 1,
-                            bh_num_suffix(param->idx + 1),
-                            node_get_type_name(value));
-                    goto sln_not_found;
-                }
-
-                resolved = ((PolySolveResult) { PSK_Value, value });
-            }
-
-            if (orig_value->kind == Ast_Kind_Argument) {
-                ((AstArgument *) orig_value)->is_baked = 1;
-            }
+            default: if (err_msg) *err_msg = "Invalid polymorphic parameter kind. This is a compiler bug.";
         }
-
+        
         switch (resolved.kind) {
             case PSK_Undefined:
-                if (err_msg) *err_msg = bh_aprintf(global_heap_allocator,
-                    "Unable to solve for polymoprhic variable '%b'.",
-                    param->poly_sym->token->text,
-                    param->poly_sym->token->length);
-                    // type_get_name(actual_type));
+                // NOTE: If no error message has been assigned to why this polymorphic parameter
+                // resolution was unsuccessful, provide a basic dummy one.
+                if (err_msg && *err_msg == NULL)
+                    *err_msg = bh_aprintf(global_scratch_allocator,
+                        "Unable to solve for polymoprhic variable '%b'.",
+                        param->poly_sym->token->text,
+                        param->poly_sym->token->length);
+
                 goto sln_not_found;
 
             case PSK_Type:
@@ -520,11 +709,14 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
 
     return slns;
 
-sln_not_found:
+    sln_not_found:
     bh_arr_free(slns);
     return NULL;
 }
 
+// NOTE: The job of this function is to be a wrapper to other functions, providing an error
+// message if a solution could not be found. This can't be merged with polymoprhic_proc_solidify
+// because polymoprhic_proc_try_solidify uses the aforementioned function.
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn) {
     ensure_polyproc_cache_is_created(pp);
 
@@ -543,85 +735,6 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
     return result;
 }
 
-// NOTE: This might return a volatile string. Do not store it without copying it.
-static char* build_poly_solution_key(AstPolySolution* sln) {
-    static char buffer[128];
-
-    if (sln->kind == PSK_Type) {
-        return (char *) type_get_unique_name(sln->type);
-    }
-
-    else if (sln->kind == PSK_Value) {
-        fori (i, 0, 128) buffer[i] = 0;
-
-        if (sln->value->kind == Ast_Kind_NumLit) {
-            strncat(buffer, "NUMLIT:", 127);
-            strncat(buffer, bh_bprintf("%l", ((AstNumLit *) sln->value)->value.l), 127);
-
-        } else {
-            // HACK: For now, the value pointer is just used. This means that
-            // sometimes, even through the solution is the same, it won't be
-            // stored the same.
-            bh_snprintf(buffer, 128, "%p", sln->value);
-        }
-
-        return buffer;
-    }
-
-    return NULL;
-}
-
-// NOTE: This returns a volatile string. Do not store it without copying it.
-static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
-    static char key_buf[1024];
-    fori (i, 0, 1024) key_buf[i] = 0;
-
-    bh_arr_each(AstPolySolution, sln, slns) {
-        token_toggle_end(sln->poly_sym->token);
-
-        strncat(key_buf, sln->poly_sym->token->text, 1023);
-        strncat(key_buf, "=", 1023);
-        strncat(key_buf, build_poly_solution_key(sln), 1023);
-        strncat(key_buf, ";", 1023);
-
-        token_toggle_end(sln->poly_sym->token);
-    }
-
-    return key_buf;
-}
-
-static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_func, b32 header_already_processed) {
-    solidified_func.func->flags |= Ast_Flag_Function_Used;
-    solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
-
-    EntityState header_start_state = Entity_State_Resolve_Symbols;
-    if (header_already_processed) header_start_state = Entity_State_Code_Gen;
-
-    Entity func_header_entity = {
-        .state = header_start_state,
-        .type = Entity_Type_Function_Header,
-        .function = solidified_func.func,
-        .package = NULL,
-        .scope = solidified_func.poly_scope,
-    };
-
-    entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
-    if (onyx_has_errors()) return 0;
-
-    Entity func_entity = {
-        .state = Entity_State_Resolve_Symbols,
-        .type = Entity_Type_Function,
-        .function = solidified_func.func,
-        .package = NULL,
-        .scope = solidified_func.poly_scope,
-    };
-
-    entity_heap_insert(&semstate.program->entities, func_header_entity);
-    entity_heap_insert(&semstate.program->entities, func_entity);
-
-    return 1;
-}
-
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn) {
     ensure_polyproc_cache_is_created(pp);
 
@@ -630,37 +743,24 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
         AstSolidifiedFunction solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
 
-        if (solidified_func.func->flags & Ast_Flag_Incomplete_Body) {
-            clone_function_body(semstate.node_allocator, solidified_func.func, pp->base_func);
+        // NOTE: If this solution was originally created from a "build_only_header" call, then the body
+        // will not have been or type checked, or anything. This ensures that the body is copied, the
+        // entities are created and entered into the pipeline.
+        ensure_solidified_function_has_body(pp, solidified_func);
 
-            if (!add_solidified_function_entities(solidified_func, 1)) {
-                onyx_report_error(tkn->pos, "Error in polymorphic procedure header generated from this call site.");
-                return NULL;
-            }
-
-            solidified_func.func->flags &= ~Ast_Flag_Incomplete_Body;
-        }
+        // NOTE: Again, if this came from a "build_only_header" call, then there was no known token and
+        // the "generated_from" member will be null. It is best to set it here so errors reported in that
+        // function can report where the polymorphic instantiation occurred.
+        if (solidified_func.func->generated_from == NULL)
+            solidified_func.func->generated_from = tkn;
 
         return solidified_func.func;
     }
 
-    AstSolidifiedFunction solidified_func;
-    solidified_func.poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, tkn->pos);
-    insert_poly_slns_into_scope(solidified_func.poly_scope, slns);
+    AstSolidifiedFunction solidified_func = generate_solidified_function(pp, slns, tkn, 0);
 
-    solidified_func.func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
+    // NOTE: Cache the function for later use, reducing duplicate functions.
     bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
-
-    solidified_func.func->generated_from = tkn;
-
-    // HACK HACK HACK
-    u32 removed_params = 0;
-    bh_arr_each(AstPolyParam, param, pp->poly_params) {
-        if (param->kind != PPK_Baked_Value) continue;
-
-        bh_arr_deleten(solidified_func.func->params, param->idx - removed_params, 1);
-        removed_params++;
-    }
 
     if (!add_solidified_function_entities(solidified_func, 0)) {
         onyx_report_error(tkn->pos, "Error in polymorphic procedure header generated from this call site.");
@@ -737,22 +837,7 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
     // NOTE: This function is only going to have the header of it correctly created.
     // Nothing should happen to this function's body or else the original will be corrupted.
     //                                                      - brendanfh 2021/01/10
-    AstSolidifiedFunction solidified_func;
-    solidified_func.poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, (OnyxFilePos) { 0 });
-    insert_poly_slns_into_scope(solidified_func.poly_scope, slns);
-
-    solidified_func.func = clone_function_header(semstate.node_allocator, pp->base_func);
-    solidified_func.func->flags |= Ast_Flag_Incomplete_Body;
-    solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
-
-    // HACK HACK HACK
-    u32 removed_params = 0;
-    bh_arr_each(AstPolyParam, param, pp->poly_params) {
-        if (param->kind != PPK_Baked_Value) continue;
-
-        bh_arr_deleten(solidified_func.func->params, param->idx - removed_params, 1);
-        removed_params++;
-    }
+    AstSolidifiedFunction solidified_func = generate_solidified_function(pp, slns, NULL, 1);
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,
@@ -768,7 +853,9 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
         return NULL;
     }
 
+    // NOTE: Cache the function for later use, only if it didn't have errors in its header.
     bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
+    
     return solidified_func.func;
 }
 
@@ -928,6 +1015,9 @@ void entity_bring_to_state(Entity* ent, EntityState state) {
 }
 
 
+//
+// Arguments resolving
+//
 static i32 lookup_idx_by_name(AstNode* provider, char* name) {
     switch (provider->kind) {
         case Ast_Kind_Struct_Literal: {

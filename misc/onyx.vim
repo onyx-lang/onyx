@@ -20,11 +20,11 @@ syn keyword onyxType i8 u8
 syn keyword onyxType i16 u16
 syn keyword onyxType i32 u32
 syn keyword onyxType i64 u64
-syn keyword onyxType f32
-syn keyword onyxType f64
+syn keyword onyxType f32 f64
 syn keyword onyxType rawptr
 syn keyword onyxType str cstr
 syn keyword onyxType i8x16 i16x8 i32x4 i64x2 f32x4 f64x2 v128
+syn keyword onyxType type_expr
 
 syn keyword onyxConstant        true false null null_proc
 

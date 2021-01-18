@@ -17,6 +17,7 @@ count_to_30 :: #solidify count_to { N = #value 30 };
 main :: proc (args: [] cstr) {
     count_to(5);
     count_to(10);
+    count_to(10);
     count_to_30();
 
     // This counts as a compile-time known value.
