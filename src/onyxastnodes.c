@@ -714,7 +714,7 @@ void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src) {
         bh_arr_push(dest->values, (AstTyped *) ast_clone(a, (AstNode *) *val));
 }
 
-void arguments_removed_baked(Arguments* args) {
+void arguments_remove_baked(Arguments* args) {
     fori (i, 0, bh_arr_length(args->values)) {
         if (args->values[i]->kind != Ast_Kind_Argument) continue;
         if (!((AstArgument *) args->values[i])->is_baked) continue;
@@ -738,6 +738,10 @@ const char* node_get_type_name(void* node) {
 
     if (((AstNode *) node)->kind == Ast_Kind_Argument) {
         return node_get_type_name(((AstArgument *) node)->value);
+    }
+
+    if (((AstNode *) node)->kind == Ast_Kind_Polymorphic_Proc) {
+        return "polymorphic procedure";
     }
 
     return type_get_name(((AstTyped *) node)->type);

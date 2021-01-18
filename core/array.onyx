@@ -3,6 +3,12 @@ package core.array
 // ---------------------------------
 //           Dynamic Arrays
 // ---------------------------------
+make :: proc ($T: type_expr, initial_cap := 4) -> [..] T {
+    arr : [..] T;
+    init(^arr, initial_cap);
+    return arr;
+}
+
 init :: proc (arr: ^[..] $T, initial_cap := 4) {
     arr.count = 0;
     arr.capacity = initial_cap;

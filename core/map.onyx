@@ -18,6 +18,12 @@ MapEntry :: struct (K: type_expr, V: type_expr) {
     value : V;
 }
 
+make :: proc ($Key: type_expr, $Value: type_expr, default: Value = 0, hash_count: i32 = 16) -> Map(Key, Value) {
+    map : Map(Key, Value);
+    init(^map, default = default, hash_count = hash_count);
+    return map;
+}
+
 init :: proc (use map: ^Map($K, $V), default: V = ~~0, hash_count: i32 = 16) {
     array.init(^hashes, hash_count);
     array.init(^entries, 4);

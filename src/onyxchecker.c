@@ -466,12 +466,12 @@ CheckStatus check_call(AstCall* call) {
     }
 
     if (callee->kind == Ast_Kind_Polymorphic_Proc) {
-        call->callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Call, call, call->token);
+        call->callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Arguments, &call->args, call->token);
 
         if (call->callee == NULL) return Check_Error;
 
         callee = (AstFunction *) call->callee;
-        arguments_removed_baked(&call->args);
+        arguments_remove_baked(&call->args);
     }
 
     // NOTE: Build callee's type
@@ -496,12 +496,10 @@ CheckStatus check_call(AstCall* call) {
         non_vararg_param_count--;
 
     i32 arg_count = bh_max(non_vararg_param_count, non_baked_argument_count(&call->args));
-
     arguments_ensure_length(&call->args, arg_count);
 
     char* err_msg = NULL;
     fill_in_arguments(&call->args, (AstNode *) callee, &err_msg);
-
     if (err_msg != NULL) {
         onyx_report_error(call->token->pos, err_msg);
         return Check_Error;

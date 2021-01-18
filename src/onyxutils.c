@@ -399,17 +399,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         if (param->kind == PPK_Poly_Type) {
             Type* actual_type = NULL;
 
-            if (pp_lookup == PPLM_By_Call) {
-                AstCall* call = (AstCall *) actual;
-
-                AstTyped* typed_param = lookup_param_in_arguments(pp, param, &call->args, err_msg);
-                if (typed_param == NULL) goto sln_not_found;
-
-                actual_type = resolve_expression_type(typed_param);
-                if (actual_type == NULL) goto sln_not_found;
-            }
-
-            else if (pp_lookup == PPLM_By_Arguments) {
+            if (pp_lookup == PPLM_By_Arguments) {
                 Arguments* args = (Arguments *) actual;
 
                 AstTyped* typed_param = lookup_param_in_arguments(pp, param, args, err_msg);
@@ -439,14 +429,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         } else if (param->kind == PPK_Baked_Value) {
             AstTyped* value = NULL;
 
-            if (pp_lookup == PPLM_By_Call) {
-                AstCall* call = (AstCall *) actual;
-
-                value = lookup_param_in_arguments(pp, param, &call->args, err_msg);
-                if (value == NULL) goto sln_not_found;
-            }
-
-            else if (pp_lookup == PPLM_By_Arguments) {
+            if (pp_lookup == PPLM_By_Arguments) {
                 Arguments* args = (Arguments *) actual;
 
                 value = lookup_param_in_arguments(pp, param, args, err_msg);
@@ -490,14 +473,17 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
                     param->type = type_build_from_ast(semstate.node_allocator, param->type_expr);
 
                 if (!type_check_or_auto_cast(&value, param->type)) {
-                    *err_msg = "Expected parameter of a different type. This error message should be wayyy better.";
+                    *err_msg = bh_aprintf(global_scratch_allocator,
+                            "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
+                            get_function_name(pp->base_func),
+                            type_get_name(param->type),
+                            param->idx + 1,
+                            bh_num_suffix(param->idx + 1),
+                            node_get_type_name(value));
                     goto sln_not_found;
                 }
 
-                resolved = ((PolySolveResult) {
-                    .kind = PSK_Value,
-                    .value = value,
-                });
+                resolved = ((PolySolveResult) { PSK_Value, value });
             }
 
             if (orig_value->kind == Ast_Kind_Argument) {

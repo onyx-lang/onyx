@@ -1029,15 +1029,14 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg);
 void arguments_ensure_length(Arguments* args, u32 count);
 void arguments_clone(Arguments* dest, Arguments* src);
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
-void arguments_removed_baked(Arguments* args);
+void arguments_remove_baked(Arguments* args);
 
 // GROSS: Using void* to avoid having to cast everything.
 const char* node_get_type_name(void* node);
 
 typedef enum PolyProcLookupMethod {
-    PPLM_By_Call,
-    PPLM_By_Function_Type,
     PPLM_By_Arguments,
+    PPLM_By_Function_Type,
 } PolyProcLookupMethod;
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn);
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
