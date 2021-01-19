@@ -565,8 +565,17 @@ static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
     }
 
     bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
-        sln->ast_type = symres_type(sln->ast_type);
-        sln->type = type_build_from_ast(semstate.node_allocator, sln->ast_type);
+        // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
+        symres_expression(&sln->value);
+        if (onyx_has_errors()) return;
+
+        if (node_is_type(sln->value)) {
+            sln->type = type_build_from_ast(semstate.node_allocator, sln->ast_type);
+            sln->kind = PSK_Type;
+        } else {
+            sln->kind = PSK_Value;
+        }
+
         if (onyx_has_errors()) return;
     }
 

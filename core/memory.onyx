@@ -15,3 +15,10 @@ alloc_slice :: proc (sl: ^[] $T, count: i32) {
     sl.data  = calloc(sizeof T * count);
     sl.count = count;
 }
+
+make_slice :: proc ($T: type_expr, count: i32) -> [] T {
+    return <[] T>.{
+        data = calloc(sizeof T * count),
+        count = count
+    };
+}

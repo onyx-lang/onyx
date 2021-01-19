@@ -22,10 +22,8 @@ main :: proc (args: [] cstr) {
         proc (b: f32) -> f64 { return ~~(b + 6); }));
 
 
-    arr1 : [..] f32;
-    arr2 : [..] i32;
-    array.init(^arr1);
-    array.init(^arr2);
+    arr1 := array.make(f32);
+    arr2 := array.make(i32);
     defer array.free(^arr1);
     defer array.free(^arr2);
 
@@ -71,7 +69,7 @@ array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
         }
     }
 
-    InternalStruct :: struct ($SOMETHING) {
+    InternalStruct :: struct (SOMETHING: type_expr) {
         foo : SOMETHING;
     }
 }

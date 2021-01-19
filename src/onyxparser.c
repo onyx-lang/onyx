@@ -548,11 +548,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     expect_token(parser, '=');
                     AstType* poly_type = parse_type(parser);
 
-                    PolySolutionKind sln_kind = PSK_Type;
-                    if (!node_is_type((AstNode *) poly_type)) sln_kind = PSK_Value;
-
                     bh_arr_push(solid->known_polyvars, ((AstPolySolution) {
-                        .kind     = sln_kind,
+                        .kind     = PSK_Undefined,
                         .poly_sym = poly_var,
                         .ast_type = poly_type,
                         .type     = NULL
