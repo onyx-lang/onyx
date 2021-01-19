@@ -12,6 +12,10 @@ main :: proc (args: [] cstr) {
     map.init(^ages, default=0, hash_count=16);
     defer map.free(^ages);
 
+    // Alternatively you can use the map.make function to achieve the
+    // same thing:
+    // ages := map.make(str, u32, default = 0);
+
     // The defer statement ensures that the map memory will be freed
     // when this procedure exits, no matter through which way. The
     // 'default' argument is used to specify what value should be

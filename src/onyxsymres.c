@@ -569,7 +569,7 @@ static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
         symres_expression(&sln->value);
         if (onyx_has_errors()) return;
 
-        if (node_is_type(sln->value)) {
+        if (node_is_type((AstNode *) sln->value)) {
             sln->type = type_build_from_ast(semstate.node_allocator, sln->ast_type);
             sln->kind = PSK_Type;
         } else {
