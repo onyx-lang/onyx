@@ -160,16 +160,16 @@ Usability:
     [ ] Make compiler work on MacOS
     [ ] Make Onyx easier to use from JS
     [ ] Add examples for the following language features:
-        - Slices
-        - Dynamic Arrays
-        - Structs and unions
-        - Enums
-        - switch statements
-        - for loops
-        - Maps
+        ✔ Slices
+        ✔ Dynamic Arrays
+        ✔ Structs and unions
+        ✔ Enums
+        ✔ switch statements
+        ✔ for loops
+        ✔ Maps
+        ✔ pipe operator
         - varargs
         - `use` keyword
-        ✔ pipe operator
         - Overloaded procedures
         - Polymorphic procedures
         - WASM directives (#export, #foreign)

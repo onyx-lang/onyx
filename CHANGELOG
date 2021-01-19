@@ -6,6 +6,7 @@ Additions:
     it will work on many systems. ARM / PowerPC may not work correctly.
 * procedures can be polymorphic on an array size.
 * structures can be polymorphic on any compile-time known value.
+* procedures can be polymoprhic on any compile-time known value, including type expressions.
 * basics of operator overloading using `#operator +`.
 * multiple return values and multiple assignment / declarations.
 * #solidify directive for explicitly specifying type variables in polymorphic procs.
@@ -15,12 +16,9 @@ Additions:
 * '-VV' and '-VVV' for very verbose printing. Easier to nail down compiler issues because it stops
     printing in the entity where the problem is.
 * `io.Stream` API with `io.Reader` and `io.Writer`.
-* `map.empty`
-* `string.compare`
-* `array.copy`
 * ranges on switch cases, i.e. `case 4 .. 10`. Note, this is inclusive on the upper end,
     unlike most other uses of the range literal.
-* `map.update`
+* miscellaneous core library functions
 
 Removals:
 * struct literals can no longer specify values for members brought in through a `use`.

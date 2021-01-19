@@ -1,5 +1,16 @@
 package core.alloc.pool
 
+// A pool allocator is an O(1) allocator that is capable of allocating and freeing.
+// It is able to do both in constant time because it maintains a linked list of all
+// the free elements in the pool. When an element is requested the first element of
+// linked list is returned and the list is updated. When an element is freed, it
+// becomes the first element. The catch with this strategy however, is that all of
+// the allocations must be of the same size. This would not be an allocator to use
+// when dealing with heterogenous data, but when doing homogenous data, such as
+// game entities, this allocator is great. It allows you to allocate and free as
+// many times as you want, without worrying about fragmentation or slow allocators.
+// Just make sure you don't allocate more than the pool can provide.
+
 PoolAllocator :: struct (Elem: type_expr) {
     buffer     : [] Elem;
     first_free : ^Elem;

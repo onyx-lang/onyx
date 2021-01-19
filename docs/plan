@@ -41,7 +41,7 @@ HOW:
             - struct member names
             - array length
 
-        [ ] baked parameters
+        [X] baked parameters
             - Compile time known parameters
             - Removes the argument from the list and replaces the function with the
                 baked function
