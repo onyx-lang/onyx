@@ -48,6 +48,9 @@ contexts:
     - match: '#[a-zA-Z_]+'
       scope: keyword.other.onyx
 
+    - match: '\$[a-zA-Z0-9_]+'
+      scope: constant.other.onyx
+
     - match: '([a-zA-Z_][a-zA-Z0-9_]*)\s*::\s*(proc)'
       captures:
         1: entity.name.function
