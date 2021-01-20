@@ -1,13 +1,12 @@
 #!/bin/sh
 
 print_check() {
-    if [ ! -z "$TERM " ]; then
+    if [ ! -z "$TERM" ]; then
         printf "%-$((($(tput cols) - 8)))s" "⏲ Checking $1.onyx" ;
     else
         printf "%s ... " "⏲ Checking $1.onyx" ;
     fi
 }
-
 
 failed=0
 for test_file in $(find tests/ -name '*.onyx'); do
