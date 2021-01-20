@@ -1,12 +1,14 @@
 #define BH_DEBUG
-#include "onyxsempass.h"
 #include "onyxparser.h"
 #include "onyxutils.h"
 #include "onyxastnodes.h"
 #include "onyxerrors.h"
 
-static void scope_enter(Scope* new_scope);
-static void scope_leave();
+// Variables used during the symbol resolution phase.
+static Scope*       curr_scope    = NULL;
+static Package*     curr_package  = NULL;
+static AstFunction* curr_function = NULL;
+bh_arr(AstBlock *)  block_stack   = NULL;
 
 AstType* symres_type(AstType* type);
 static void symres_local(AstLocal** local, b32 add_to_block_locals);
@@ -37,11 +39,11 @@ static void symres_memres(AstMemRes** memres);
 static void symres_struct_defaults(AstType* st);
 
 static void scope_enter(Scope* new_scope) {
-    semstate.curr_scope = new_scope;
+    curr_scope = new_scope;
 }
 
 static void scope_leave() {
-    semstate.curr_scope = semstate.curr_scope->parent;
+    curr_scope = curr_scope->parent;
 }
 
 AstType* symres_type(AstType* type) {
@@ -53,7 +55,7 @@ AstType* symres_type(AstType* type) {
     }
 
     if (type->kind == Ast_Kind_Symbol) {
-        return (AstType *) symbol_resolve(semstate.curr_scope, ((AstNode *) type)->token);
+        return (AstType *) symbol_resolve(curr_scope, ((AstNode *) type)->token);
     }
 
     if (type->kind == Ast_Kind_Field_Access) {
@@ -183,11 +185,11 @@ AstType* symres_type(AstType* type) {
 
     if (type->kind == Ast_Kind_Poly_Struct_Type) {
         AstPolyStructType* pst_node = (AstPolyStructType *) type;
-        pst_node->scope = scope_create(semstate.node_allocator, semstate.curr_scope, pst_node->token->pos);
+        pst_node->scope = scope_create(context.ast_alloc, curr_scope, pst_node->token->pos);
 
         bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
             param->type_node = symres_type(param->type_node);
-            param->type      = type_build_from_ast(semstate.node_allocator, param->type_node);
+            param->type      = type_build_from_ast(context.ast_alloc, param->type_node);
         }
 
         return type;
@@ -228,12 +230,12 @@ static void symres_local(AstLocal** local, b32 add_to_block_locals) {
     // of unique WASM locals and stack space needed.
     //                                            - brendanfh 2020/12/16
     if (add_to_block_locals)
-        bh_arr_push(bh_arr_last(semstate.block_stack)->allocate_exprs, (AstTyped *) *local);
+        bh_arr_push(bh_arr_last(block_stack)->allocate_exprs, (AstTyped *) *local);
 
-    bh_arr_push(semstate.curr_function->allocate_exprs, (AstTyped *) *local);
+    bh_arr_push(curr_function->allocate_exprs, (AstTyped *) *local);
 
     if ((*local)->token != NULL)
-        symbol_introduce(semstate.curr_scope, (*local)->token, (AstNode *) *local);
+        symbol_introduce(curr_scope, (*local)->token, (AstNode *) *local);
 }
 
 static void symres_arguments(Arguments* args) {
@@ -306,7 +308,7 @@ static void symres_pipe(AstBinaryOp** pipe) {
     if ((*pipe)->left == NULL) return;
 
     bh_arr_insertn(call_node->args.values, 0, 1);
-    call_node->args.values[0] = (AstTyped *) make_argument(semstate.node_allocator, (*pipe)->left);
+    call_node->args.values[0] = (AstTyped *) make_argument(context.ast_alloc, (*pipe)->left);
     call_node->next = (*pipe)->next;
 
     // NOTE: Not a BinaryOp node
@@ -346,9 +348,9 @@ static void symres_array_literal(AstArrayLiteral* al) {
     bh_arr_each(AstTyped *, expr, al->values)
         symres_expression(expr);
 
-    if (bh_arr_length(semstate.block_stack) > 0) {
-        bh_arr_push(bh_arr_last(semstate.block_stack)->allocate_exprs, (AstTyped *) al);
-        bh_arr_push(semstate.curr_function->allocate_exprs, (AstTyped *) al);
+    if (bh_arr_length(block_stack) > 0) {
+        bh_arr_push(bh_arr_last(block_stack)->allocate_exprs, (AstTyped *) al);
+        bh_arr_push(curr_function->allocate_exprs, (AstTyped *) al);
     }
 }
 
@@ -360,7 +362,7 @@ static void symres_expression(AstTyped** expr) {
 
     switch ((*expr)->kind) {
         case Ast_Kind_Symbol:
-            *expr = (AstTyped *) symbol_resolve(semstate.curr_scope, ((AstNode *) *expr)->token);
+            *expr = (AstTyped *) symbol_resolve(curr_scope, ((AstNode *) *expr)->token);
             break;
 
         case Ast_Kind_Binary_Op:
@@ -390,7 +392,7 @@ static void symres_expression(AstTyped** expr) {
 
             // NOTE: This is a weird place to put this so maybe put it somewhere else eventually
             //                                                  - brendanfh   2020/09/04
-            builtin_range_type_type = type_build_from_ast(semstate.node_allocator, builtin_range_type);
+            builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
             break;
 
         case Ast_Kind_Function:
@@ -435,7 +437,7 @@ static void symres_return(AstReturn* ret) {
 
 static void symres_if(AstIfWhile* ifnode) {
     if (ifnode->assignment != NULL) {
-        ifnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, ifnode->token->pos);
+        ifnode->scope = scope_create(context.ast_alloc, curr_scope, ifnode->token->pos);
         scope_enter(ifnode->scope);
 
         symres_local(&ifnode->local, 0);
@@ -453,7 +455,7 @@ static void symres_if(AstIfWhile* ifnode) {
 
 static void symres_while(AstIfWhile* whilenode) {
     if (whilenode->assignment != NULL) {
-        whilenode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, whilenode->token->pos);
+        whilenode->scope = scope_create(context.ast_alloc, curr_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
         symres_local(&whilenode->local, 0);
@@ -470,7 +472,7 @@ static void symres_while(AstIfWhile* whilenode) {
 }
 
 static void symres_for(AstFor* fornode) {
-    fornode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, fornode->token->pos);
+    fornode->scope = scope_create(context.ast_alloc, curr_scope, fornode->token->pos);
     scope_enter(fornode->scope);
 
     symres_expression(&fornode->iter);
@@ -484,10 +486,10 @@ static void symres_for(AstFor* fornode) {
 
 static void symres_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) {
-        switchnode->scope = scope_create(semstate.node_allocator, semstate.curr_scope, switchnode->token->pos);
+        switchnode->scope = scope_create(context.ast_alloc, curr_scope, switchnode->token->pos);
         scope_enter(switchnode->scope);
 
-        symbol_introduce(semstate.curr_scope, switchnode->local->token, (AstNode *) switchnode->local);
+        symbol_introduce(curr_scope, switchnode->local->token, (AstNode *) switchnode->local);
 
         symres_statement((AstNode **) &switchnode->assignment);
     }
@@ -515,7 +517,7 @@ static void symres_use(AstUse* use) {
         AstEnumType* et = (AstEnumType *) use->expr;
 
         bh_arr_each(AstEnumValue *, ev, et->values)
-            symbol_introduce(semstate.curr_scope, (*ev)->token, (AstNode *) *ev);
+            symbol_introduce(curr_scope, (*ev)->token, (AstNode *) *ev);
 
         return;
     }
@@ -530,7 +532,7 @@ static void symres_use(AstUse* use) {
             effective_type->kind == Ast_Kind_Poly_Call_Type) {
 
         if (use->expr->type == NULL)
-            use->expr->type = type_build_from_ast(semstate.node_allocator, use->expr->type_node);
+            use->expr->type = type_build_from_ast(context.ast_alloc, use->expr->type_node);
         if (use->expr->type == NULL) goto cannot_use;
 
         Type* st = use->expr->type;
@@ -538,8 +540,8 @@ static void symres_use(AstUse* use) {
             st = st->Pointer.elem;
 
         bh_table_each_start(StructMember, st->Struct.members);
-            AstFieldAccess* fa = make_field_access(semstate.node_allocator, use->expr, value.name);
-            symbol_raw_introduce(semstate.curr_scope, value.name, use->token->pos, (AstNode *) fa);
+            AstFieldAccess* fa = make_field_access(context.ast_alloc, use->expr, value.name);
+            symbol_raw_introduce(curr_scope, value.name, use->token->pos, (AstNode *) fa);
         bh_table_each_end;
 
         return;
@@ -570,7 +572,7 @@ static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
         if (onyx_has_errors()) return;
 
         if (node_is_type((AstNode *) sln->value)) {
-            sln->type = type_build_from_ast(semstate.node_allocator, sln->ast_type);
+            sln->type = type_build_from_ast(context.ast_alloc, sln->ast_type);
             sln->kind = PSK_Type;
         } else {
             sln->kind = PSK_Value;
@@ -622,10 +624,10 @@ static void symres_statement_chain(AstNode** walker) {
 
 static void symres_block(AstBlock* block) {
     if (block->scope == NULL)
-        block->scope = scope_create(semstate.node_allocator, semstate.curr_scope, block->token->pos);
+        block->scope = scope_create(context.ast_alloc, curr_scope, block->token->pos);
 
     scope_enter(block->scope);
-    bh_arr_push(semstate.block_stack, block);
+    bh_arr_push(block_stack, block);
 
     if (block->binding_scope != NULL)
         scope_include(block->scope, block->binding_scope, block->token->pos);
@@ -633,13 +635,13 @@ static void symres_block(AstBlock* block) {
     if (block->body)
         symres_statement_chain(&block->body);
 
-    bh_arr_pop(semstate.block_stack);
+    bh_arr_pop(block_stack);
     scope_leave();
 }
 
 void symres_function_header(AstFunction* func) {
     if (func->scope == NULL)
-        func->scope = scope_create(semstate.node_allocator, semstate.curr_scope, func->token->pos);
+        func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
 
     func->flags |= Ast_Flag_Comptime;
 
@@ -697,11 +699,11 @@ void symres_function_header(AstFunction* func) {
             param->local->type_node = symres_type(param->local->type_node);
         }
 
-        symbol_introduce(semstate.curr_scope, param->local->token, (AstNode *) param->local);
+        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
 
         if (param->local->flags & Ast_Flag_Param_Use) {
             if (param->local->type_node != NULL && param->local->type == NULL) {
-                param->local->type = type_build_from_ast(semstate.allocator, param->local->type_node);
+                param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
             }
 
             if (type_is_struct(param->local->type)) {
@@ -713,8 +715,8 @@ void symres_function_header(AstFunction* func) {
                 }
 
                 bh_table_each_start(StructMember, st->Struct.members);
-                    AstFieldAccess* fa = make_field_access(semstate.node_allocator, (AstTyped *) param->local, value.name);
-                    symbol_raw_introduce(semstate.curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
+                    AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value.name);
+                    symbol_raw_introduce(curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
                 bh_table_each_end;
 
             } else if (param->local->type != NULL) {
@@ -733,7 +735,7 @@ void symres_function_header(AstFunction* func) {
 void symres_function(AstFunction* func) {
     scope_enter(func->scope);
 
-    semstate.curr_function = func;
+    curr_function = func;
     symres_block(func->body);
 
     scope_leave();
@@ -751,7 +753,7 @@ static void symres_overloaded_function(AstOverloadedFunction* ofunc) {
 
 static void symres_use_package(AstUsePackage* package) {
     token_toggle_end(package->package->token);
-    Package* p = program_info_package_lookup(semstate.program, package->package->token->text);
+    Package* p = package_lookup(package->package->token->text);
     token_toggle_end(package->package->token);
 
     if (p == NULL) {
@@ -759,14 +761,14 @@ static void symres_use_package(AstUsePackage* package) {
         return;
     }
 
-    if (p->scope == semstate.curr_scope) return;
+    if (p->scope == curr_scope) return;
 
     if (package->alias != NULL) {
-        AstPackage *pac_node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstPackage), Ast_Kind_Package);
+        AstPackage *pac_node = onyx_ast_node_new(context.ast_alloc, sizeof(AstPackage), Ast_Kind_Package);
         pac_node->package = p;
         pac_node->token = package->alias;
 
-        symbol_introduce(semstate.curr_scope, package->alias, (AstNode *) pac_node);
+        symbol_introduce(curr_scope, package->alias, (AstNode *) pac_node);
     }
 
     if (package->only != NULL) {
@@ -778,7 +780,7 @@ static void symres_use_package(AstUsePackage* package) {
                 return;
             }
 
-            symbol_introduce(semstate.curr_scope, (*alias)->alias, thing);
+            symbol_introduce(curr_scope, (*alias)->alias, thing);
         }
     }
 
@@ -787,20 +789,20 @@ static void symres_use_package(AstUsePackage* package) {
         if (package->token != NULL)
             pos = package->token->pos;
 
-        scope_include(semstate.curr_scope, p->scope, pos);
+        scope_include(curr_scope, p->scope, pos);
     }
 }
 
 static void symres_enum(AstEnumType* enum_node) {
     if (enum_node->backing->kind == Ast_Kind_Symbol) {
-        enum_node->backing = (AstType *) symbol_resolve(semstate.curr_scope, enum_node->backing->token);
+        enum_node->backing = (AstType *) symbol_resolve(curr_scope, enum_node->backing->token);
     }
     if (enum_node->backing == NULL) return;
 
-    enum_node->backing_type = type_build_from_ast(semstate.allocator, enum_node->backing);
-    enum_node->scope = scope_create(semstate.node_allocator, NULL, enum_node->token->pos);
+    enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
+    enum_node->scope = scope_create(context.ast_alloc, NULL, enum_node->token->pos);
 
-    type_build_from_ast(semstate.node_allocator, (AstType *) enum_node);
+    type_build_from_ast(context.ast_alloc, (AstType *) enum_node);
 
     u64 next_assign_value = (enum_node->flags & Ast_Flag_Enum_Is_Flags) ? 1 : 0;
     bh_arr_each(AstEnumValue *, value, enum_node->values) {
@@ -822,7 +824,7 @@ static void symres_enum(AstEnumType* enum_node) {
             (*value)->value->type = enum_node->etcache;
 
         } else {
-            AstNumLit* num = make_int_literal(semstate.node_allocator, next_assign_value);
+            AstNumLit* num = make_int_literal(context.ast_alloc, next_assign_value);
             num->type = enum_node->etcache;
 
             (*value)->value = num;
@@ -860,7 +862,7 @@ static void symres_struct_defaults(AstType* t) {
 }
 
 static void symres_polyproc(AstPolyProc* pp) {
-    pp->poly_scope = semstate.curr_scope;
+    pp->poly_scope = curr_scope;
 
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
         if (param->kind != PPK_Baked_Value) continue;
@@ -883,11 +885,14 @@ static void symres_polyproc(AstPolyProc* pp) {
 }
 
 void symres_entity(Entity* ent) {
-    if (ent->package) semstate.curr_package = ent->package;
+    if (block_stack == NULL)
+        bh_arr_new(global_heap_allocator, block_stack, 16);
+
+    if (ent->package) curr_package = ent->package;
 
     Scope* old_scope = NULL;
     if (ent->scope) {
-        old_scope = semstate.curr_scope;
+        old_scope = curr_scope;
         scope_enter(ent->scope);
     }
 
@@ -922,6 +927,6 @@ void symres_entity(Entity* ent) {
     ent->state = next_state;
 
     if (ent->scope) {
-        semstate.curr_scope = old_scope;
+        curr_scope = old_scope;
     }
 }

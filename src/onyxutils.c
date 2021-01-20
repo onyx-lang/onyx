@@ -6,7 +6,6 @@
 #include "onyxerrors.h"
 #include "onyxparser.h"
 #include "onyxastnodes.h"
-#include "onyxsempass.h"
 
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
@@ -17,26 +16,17 @@ bh_allocator global_heap_allocator;
 //
 // Program info and packages
 //
-void program_info_init(ProgramInfo* prog, bh_allocator alloc) {
-    prog->global_scope = scope_create(alloc, NULL, (OnyxFilePos) { 0 });
-
-    bh_table_init(alloc, prog->packages, 16);
-
-    // NOTE: This will be initialized upon the first call to entity_heap_insert.
-    prog->entities.entities = NULL;
-}
-
-Package* program_info_package_lookup(ProgramInfo* prog, char* package_name) {
-    if (bh_table_has(Package *, prog->packages, package_name)) {
-        return bh_table_get(Package *, prog->packages, package_name);
+Package* package_lookup(char* package_name) {
+    if (bh_table_has(Package *, context.packages, package_name)) {
+        return bh_table_get(Package *, context.packages, package_name);
     } else {
         return NULL;
     }
 }
 
-Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_name, Scope* parent_scope, bh_allocator alloc) {
-    if (bh_table_has(Package *, prog->packages, package_name)) {
-        return bh_table_get(Package *, prog->packages, package_name);
+Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_allocator alloc) {
+    if (bh_table_has(Package *, context.packages, package_name)) {
+        return bh_table_get(Package *, context.packages, package_name);
 
     } else {
         Package* package = bh_alloc_item(alloc, Package);
@@ -48,7 +38,7 @@ Package* program_info_package_lookup_or_create(ProgramInfo* prog, char* package_
         package->scope = scope_create(alloc, parent_scope, (OnyxFilePos) { 0 });
         package->private_scope = scope_create(alloc, package->scope, (OnyxFilePos) { 0 });
 
-        bh_table_put(Package *, prog->packages, pac_name, package);
+        bh_table_put(Package *, context.packages, pac_name, package);
 
         return package;
     }
@@ -171,7 +161,7 @@ static void insert_poly_slns_into_scope(Scope* scope, bh_arr(AstPolySolution) sl
 
         switch (sln->kind) {
             case PSK_Type:
-                node = onyx_ast_node_new(semstate.node_allocator, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+                node = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
                 ((AstTypeRawAlias *) node)->token = sln->poly_sym->token;
                 ((AstTypeRawAlias *) node)->to = sln->type;
                 break;
@@ -263,8 +253,8 @@ static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_fun
         .scope = solidified_func.poly_scope,
     };
 
-    entity_heap_insert(&semstate.program->entities, func_header_entity);
-    entity_heap_insert(&semstate.program->entities, func_entity);
+    entity_heap_insert(&context.entities, func_header_entity);
+    entity_heap_insert(&context.entities, func_entity);
 
     return 1;
 }
@@ -285,15 +275,15 @@ static AstSolidifiedFunction generate_solidified_function(
     OnyxFilePos poly_scope_pos = { 0 };
     if (tkn) poly_scope_pos = tkn->pos;
 
-    solidified_func.poly_scope = scope_create(semstate.node_allocator, pp->poly_scope, poly_scope_pos);
+    solidified_func.poly_scope = scope_create(context.ast_alloc, pp->poly_scope, poly_scope_pos);
     insert_poly_slns_into_scope(solidified_func.poly_scope, slns);
 
     if (header_only) {
-        solidified_func.func = (AstFunction *) clone_function_header(semstate.node_allocator, pp->base_func);
+        solidified_func.func = (AstFunction *) clone_function_header(context.ast_alloc, pp->base_func);
         solidified_func.func->flags |= Ast_Flag_Incomplete_Body;
 
     } else {
-        solidified_func.func = (AstFunction *) ast_clone(semstate.node_allocator, pp->base_func);
+        solidified_func.func = (AstFunction *) ast_clone(context.ast_alloc, pp->base_func);
     }
 
     solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
@@ -317,7 +307,7 @@ static AstSolidifiedFunction generate_solidified_function(
 
 static void ensure_solidified_function_has_body(AstPolyProc* pp, AstSolidifiedFunction solidified_func) {
     if (solidified_func.func->flags & Ast_Flag_Incomplete_Body) {
-        clone_function_body(semstate.node_allocator, solidified_func.func, pp->base_func);
+        clone_function_body(context.ast_alloc, solidified_func.func, pp->base_func);
 
         // HACK: I'm asserting that this function should return without an error, because
         // the only case where it can return an error is if there was a problem with the
@@ -404,7 +394,7 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = (AstType*) ((AstArrayType *) elem.type_expr)->count_expr,
                     .kind = PSK_Value,
-                    .value = (AstTyped *) make_int_literal(semstate.node_allocator, elem.actual->Array.count)
+                    .value = (AstTyped *) make_int_literal(context.ast_alloc, elem.actual->Array.count)
                 }));
 
                 bh_arr_push(elem_queue, ((PolySolveElem) {
@@ -612,7 +602,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
             return;
         }
 
-        Type* resolved_type = type_build_from_ast(semstate.node_allocator, (AstType *) value);
+        Type* resolved_type = type_build_from_ast(context.ast_alloc, (AstType *) value);
         *resolved = ((PolySolveResult) { PSK_Type, .actual = resolved_type });
 
     } else {
@@ -622,7 +612,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
         }
 
         if (param->type == NULL)
-            param->type = type_build_from_ast(semstate.node_allocator, param->type_expr);
+            param->type = type_build_from_ast(context.ast_alloc, param->type_expr);
 
         if (!type_check_or_auto_cast(&value, param->type)) {
             *err_msg = bh_aprintf(global_scratch_allocator,
@@ -802,7 +792,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         // HACK: Some of these initializations assume that the entity for this polyproc has
         // made it through the symbol resolution phase.
         //                                                    - brendanfh 2020/12/25
-        AstPolyProc* new_pp = onyx_ast_node_new(semstate.node_allocator, sizeof(AstPolyProc), Ast_Kind_Polymorphic_Proc);
+        AstPolyProc* new_pp = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyProc), Ast_Kind_Polymorphic_Proc);
         new_pp->token = pp->token;                            // TODO: Change this to be the solidify->token
         new_pp->base_func = pp->base_func;
         new_pp->poly_scope = new_pp->poly_scope;
@@ -964,7 +954,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
     scope_clear(ps_type->scope);
     insert_poly_slns_into_scope(ps_type->scope, slns);
 
-    AstStructType* concrete_struct = (AstStructType *) ast_clone(semstate.node_allocator, ps_type->base_struct);
+    AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
     bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
     Entity struct_entity = {
@@ -990,7 +980,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
         return NULL;
     }
 
-    Type* cs_type = type_build_from_ast(semstate.node_allocator, (AstType *) concrete_struct);
+    Type* cs_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_struct);
     cs_type->Struct.poly_sln = NULL;
     bh_arr_new(global_heap_allocator, cs_type->Struct.poly_sln, bh_arr_length(slns));
 
@@ -1074,7 +1064,7 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
             AstTyped* default_value = func->params[idx].default_value;
             if (default_value == NULL) return NULL;
 
-            AstArgument* arg = make_argument(semstate.node_allocator, default_value);
+            AstArgument* arg = make_argument(context.ast_alloc, default_value);
             return (AstNode *) arg;
         }
 

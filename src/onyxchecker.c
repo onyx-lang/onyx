@@ -1,5 +1,4 @@
 #define BH_DEBUG
-#include "onyxsempass.h"
 #include "onyxparser.h"
 #include "onyxutils.h"
 
@@ -85,26 +84,29 @@ static inline void fill_in_type(AstTyped* node) {
     fill_in_poly_call_args(node->type_node);
 
     if (node->type == NULL)
-        node->type = type_build_from_ast(semstate.allocator, node->type_node);
+        node->type = type_build_from_ast(context.ast_alloc, node->type_node);
 }
+
+// HACK: This should be baked into a structure, not a global variable.
+static Type* expected_return_type = NULL;
 
 CheckStatus check_return(AstReturn* retnode) {
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
 
-        if (!type_check_or_auto_cast(&retnode->expr, semstate.expected_return_type)) {
+        if (!type_check_or_auto_cast(&retnode->expr, expected_return_type)) {
             onyx_report_error(retnode->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
-                    type_get_name(semstate.expected_return_type),
+                    type_get_name(expected_return_type),
                     node_get_type_name(retnode->expr));
             return Check_Error;
         }
 
     } else {
-        if (semstate.expected_return_type->Basic.size > 0) {
+        if (expected_return_type->Basic.size > 0) {
             onyx_report_error(retnode->token->pos,
                 "Returning from non-void function without value. Expected a value of type '%s'.",
-                type_get_name(semstate.expected_return_type));
+                type_get_name(expected_return_type));
             return Check_Error;
         }
     }
@@ -168,7 +170,7 @@ CheckStatus check_for(AstFor* fornode) {
     else if (iter_type->kind == Type_Kind_Array) {
         can_iterate = 1;
 
-        if (fornode->by_pointer) fornode->var->type = type_make_pointer(semstate.node_allocator, iter_type->Array.elem);
+        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->Array.elem);
         else                     fornode->var->type = iter_type->Array.elem;
 
         fornode->loop_type = For_Loop_Array;
@@ -673,7 +675,7 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
                     lhs->exprs[i]->type = binop->right->type->Compound.types[i];
                 }
 
-                lhs->type = type_build_compound_type(semstate.node_allocator, lhs);
+                lhs->type = type_build_compound_type(context.ast_alloc, lhs);
 
             } else {
                 binop->left->type = binop->right->type;
@@ -696,7 +698,7 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         else if (binop->operation == Binary_Op_Assign_Shr)      operation = Binary_Op_Shr;
         else if (binop->operation == Binary_Op_Assign_Sar)      operation = Binary_Op_Sar;
 
-        AstBinaryOp* new_right = make_binary_op(semstate.node_allocator, operation, binop->left, binop->right);
+        AstBinaryOp* new_right = make_binary_op(context.ast_alloc, operation, binop->left, binop->right);
         new_right->token = binop->token;
         CHECK(binaryop, &new_right, 0);
 
@@ -761,7 +763,7 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     binop->type = &basic_types[Basic_Kind_Bool];
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
-        *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
+        *pbinop = (AstBinaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) binop);
     }
 
     return Check_Success;
@@ -779,7 +781,7 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
 
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
-        *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
+        *pbinop = (AstBinaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) binop);
     }
     return Check_Success;
 }
@@ -798,13 +800,13 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
         return NULL;
     }
 
-    AstCall* implicit_call = onyx_ast_node_new(semstate.node_allocator, sizeof(AstCall), Ast_Kind_Call);
+    AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = binop->token;
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
 
     bh_arr_each(AstTyped *, arg, args.values)
-        *arg = (AstTyped *) make_argument(semstate.node_allocator, *arg);
+        *arg = (AstTyped *) make_argument(context.ast_alloc, *arg);
 
     implicit_call->args = args;
     return implicit_call;
@@ -872,11 +874,11 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         resolve_expression_type(binop->right);
         if (!type_is_integer(binop->right->type)) goto bad_binaryop;
 
-        AstNumLit* numlit = make_int_literal(semstate.node_allocator, type_size_of(binop->left->type->Pointer.elem));
+        AstNumLit* numlit = make_int_literal(context.ast_alloc, type_size_of(binop->left->type->Pointer.elem));
         numlit->token = binop->right->token;
         numlit->type = binop->right->type;
 
-        AstBinaryOp* binop_node = make_binary_op(semstate.node_allocator, Binary_Op_Multiply, binop->right, (AstTyped *) numlit);
+        AstBinaryOp* binop_node = make_binary_op(context.ast_alloc, Binary_Op_Multiply, binop->right, (AstTyped *) numlit);
         binop_node->token = binop->token;
         CHECK(binaryop, &binop_node, 0);
 
@@ -961,7 +963,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
 
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
-        *pbinop = (AstBinaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) binop);
+        *pbinop = (AstBinaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) binop);
     }
     return Check_Success;
 
@@ -1012,7 +1014,7 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
     if (unaryop->expr->flags & Ast_Flag_Comptime) {
         unaryop->flags |= Ast_Flag_Comptime;
         // NOTE: Not a unary op
-        *punop = (AstUnaryOp *) ast_reduce(semstate.node_allocator, (AstTyped *) unaryop);
+        *punop = (AstUnaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) unaryop);
     }
 
     return Check_Success;
@@ -1092,7 +1094,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
 
     fill_in_type((AstTyped *) al);
 
-    al->type = type_make_array(semstate.allocator, al->type, bh_arr_length(al->values));
+    al->type = type_make_array(context.ast_alloc, al->type, bh_arr_length(al->values));
     if (al->type == NULL || al->type->kind != Type_Kind_Array) {
         onyx_report_error(al->token->pos, "Expected array type for array literal. This is a compiler bug.");
         return Check_Error;
@@ -1163,7 +1165,7 @@ CheckStatus check_compound(AstCompound* compound) {
         CHECK(expression, expr);
     }
 
-    compound->type = type_build_compound_type(semstate.node_allocator, compound);
+    compound->type = type_build_compound_type(context.ast_alloc, compound);
     return Check_Success;
 }
 
@@ -1182,7 +1184,7 @@ CheckStatus check_address_of(AstAddressOf* aof) {
 
     aof->expr->flags |= Ast_Flag_Address_Taken;
 
-    aof->type = type_make_pointer(semstate.allocator, aof->expr->type);
+    aof->type = type_make_pointer(context.ast_alloc, aof->expr->type);
 
     return Check_Success;
 }
@@ -1230,7 +1232,7 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
         }
 
         aa->kind = Ast_Kind_Slice;
-        aa->type = type_make_slice(semstate.node_allocator, of);
+        aa->type = type_make_slice(context.ast_alloc, of);
         aa->elem_size = type_size_of(of);
 
         return Check_Success;
@@ -1258,7 +1260,7 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
         type_lookup_member(aa->addr->type, "data", &smem);
 
 
-        AstFieldAccess* fa = make_field_access(semstate.node_allocator, aa->addr, "data");
+        AstFieldAccess* fa = make_field_access(context.ast_alloc, aa->addr, "data");
         fa->type   = smem.type;
         fa->offset = smem.offset;
         fa->idx    = smem.idx;
@@ -1307,7 +1309,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         // CLEANUP: Duplicating the string here isn't the best for effiency,
         // but it fixes a lot of bugs, so here we are.
         //                                      - brendanfh  2020/12/08
-        field->field = bh_strdup(semstate.allocator, field->token->text);
+        field->field = bh_strdup(context.ast_alloc, field->token->text);
         token_toggle_end(field->token);
     }
 
@@ -1330,7 +1332,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
 CheckStatus check_size_of(AstSizeOf* so) {
     fill_in_array_count(so->so_ast_type);
 
-    so->so_type = type_build_from_ast(semstate.allocator, so->so_ast_type);
+    so->so_type = type_build_from_ast(context.ast_alloc, so->so_ast_type);
     if (so->so_type == NULL) {
         onyx_report_error(so->token->pos, "Error with type used here.");
         return Check_Error;
@@ -1343,7 +1345,7 @@ CheckStatus check_size_of(AstSizeOf* so) {
 CheckStatus check_align_of(AstAlignOf* ao) {
     fill_in_array_count(ao->ao_ast_type);
 
-    ao->ao_type = type_build_from_ast(semstate.allocator, ao->ao_ast_type);
+    ao->ao_type = type_build_from_ast(context.ast_alloc, ao->ao_ast_type);
     if (ao->ao_type == NULL) {
         onyx_report_error(ao->token->pos, "Error with type used here.");
         return Check_Error;
@@ -1357,13 +1359,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
         return Check_Success;
-        // if (expr->token) {
-        //     onyx_report_error(expr->token->pos, "Type used as part of an expression.");
-        // }
-        // else {
-        //     onyx_report_error((OnyxFilePos) { 0 }, "Type used as part of an expression somewhere in the program.");
-        // }
-        // return Check_Error;
     }
 
     fill_in_type(expr);
@@ -1533,7 +1528,7 @@ CheckStatus check_block(AstBlock* block) {
 }
 
 CheckStatus check_function(AstFunction* func) {
-    semstate.expected_return_type = func->type->Function.return_type;
+    expected_return_type = func->type->Function.return_type;
     if (func->body) {
         CheckStatus status = check_block(func->body);
         if (status != Check_Success && func->generated_from)
@@ -1566,7 +1561,7 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 
 CheckStatus check_struct(AstStructType* s_node) {
     // NOTE: fills in the stcache
-    type_build_from_ast(semstate.allocator, (AstType *) s_node);
+    type_build_from_ast(context.ast_alloc, (AstType *) s_node);
     if (s_node->stcache == NULL) return Check_Error;
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
@@ -1607,7 +1602,7 @@ CheckStatus check_function_header(AstFunction* func) {
         if (param->vararg_kind == VA_Kind_Untyped) {
             // HACK
             if (builtin_vararg_type_type == NULL)
-                builtin_vararg_type_type = type_build_from_ast(semstate.node_allocator, builtin_vararg_type);
+                builtin_vararg_type_type = type_build_from_ast(context.ast_alloc, builtin_vararg_type);
 
             local->type = builtin_vararg_type_type;
         }
@@ -1669,7 +1664,7 @@ CheckStatus check_function_header(AstFunction* func) {
 
     if (func->return_type != NULL) CHECK(type, func->return_type);
 
-    func->type = type_build_function_type(semstate.node_allocator, func);
+    func->type = type_build_function_type(context.ast_alloc, func);
 
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {
@@ -1772,10 +1767,6 @@ void check_entity(Entity* ent) {
         case Entity_Type_Overloaded_Function:
             cs = check_overloaded_function(ent->overloaded_function);
             break;
-
-        case Entity_Type_Foreign_Global_Header:
-            semstate.program->foreign_global_count++;
-            // fallthrough
 
         case Entity_Type_Global:
             cs = check_global(ent->global);

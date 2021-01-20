@@ -1,5 +1,4 @@
 #include "onyxastnodes.h"
-#include "onyxsempass.h"
 #include "onyxparser.h"
 #include "onyxutils.h"
 
@@ -288,7 +287,7 @@ void promote_numlit_to_larger(AstNumLit* num) {
 // NOTE: Returns 1 if the conversion was successful.
 b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
     if (num->type == NULL)
-        num->type = type_build_from_ast(semstate.allocator, num->type_node);
+        num->type = type_build_from_ast(context.ast_alloc, num->type_node);
     assert(num->type);
 
     if (types_are_compatible(num->type, type)) return 1;
@@ -453,7 +452,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
             if (!type_check_or_auto_cast(&compound->exprs[i], type->Compound.types[i])) return 0;
         }
 
-        compound->type = type_build_compound_type(semstate.node_allocator, compound);
+        compound->type = type_build_compound_type(context.ast_alloc, compound);
         
         return 1;
     }
@@ -477,7 +476,7 @@ Type* resolve_expression_type(AstTyped* node) {
     }
 
     if (node->type == NULL)
-        node->type = type_build_from_ast(semstate.allocator, node->type_node);
+        node->type = type_build_from_ast(context.ast_alloc, node->type_node);
 
     if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {

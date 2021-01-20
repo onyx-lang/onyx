@@ -2358,11 +2358,7 @@ static AstPackage* parse_package_name(OnyxParser* parser) {
     AstPackage* package_node = make_node(AstPackage, Ast_Kind_Package);
 
     if (parser->curr->type != Token_Type_Keyword_Package) {
-        Package *package = program_info_package_lookup_or_create(
-            parser->program,
-            "main",
-            parser->program->global_scope,
-            parser->allocator);
+        Package *package = package_lookup_or_create("main", context.global_scope, parser->allocator);
 
         package_node->token = NULL;
         package_node->package = package;
@@ -2386,11 +2382,7 @@ static AstPackage* parse_package_name(OnyxParser* parser) {
         strncat(package_name, symbol->text, 1023);
         token_toggle_end(symbol);
 
-        Package *newpackage = program_info_package_lookup_or_create(
-            parser->program,
-            package_name,
-            parser->program->global_scope,
-            parser->allocator);
+        Package *newpackage = package_lookup_or_create(package_name, context.global_scope, parser->allocator);
 
         if (package != NULL) {
             AstPackage* pnode = make_node(AstPackage, Ast_Kind_Package);
@@ -2427,14 +2419,13 @@ void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
     return node;
 }
 
-OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer, ProgramInfo* program) {
+OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     OnyxParser parser;
 
     parser.allocator = alloc;
     parser.tokenizer = tokenizer;
     parser.curr = tokenizer->tokens;
     parser.prev = NULL;
-    parser.program = program;
     parser.hit_unexpected_token = 0;
     parser.block_stack = NULL;
 
@@ -2461,7 +2452,7 @@ void onyx_parser_free(OnyxParser* parser) {
 
 ParseResults onyx_parse(OnyxParser *parser) {
     // NOTE: Skip comments at the beginning of the file
-    if (parser->curr->type == Token_Type_Comment)
+    while (parser->curr->type == Token_Type_Comment)
         consume_token(parser);
 
     parser->package = parse_package_name(parser)->package;

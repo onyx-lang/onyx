@@ -1,6 +1,6 @@
 @echo off
 
-set SOURCE_FILES=src/onyx.c src/onyxastnodes.c src/onyxbuiltins.c src/onyxchecker.c src/onyxclone.c src/onyxdoc.c src/onyxentities.c src/onyxerrors.c src/onyxlex.c src/onyxparser.c src/onyxsempass.c src/onyxsymres.c src/onyxtypes.c src/onyxutils.c src/onyxwasm.c
+set SOURCE_FILES=src/onyx.c src/onyxastnodes.c src/onyxbuiltins.c src/onyxchecker.c src/onyxclone.c src/onyxdoc.c src/onyxentities.c src/onyxerrors.c src/onyxlex.c src/onyxparser.c src/onyxsymres.c src/onyxtypes.c src/onyxutils.c src/onyxwasm.c
 
 if "%1" == "1" (
     set FLAGS=/O2 /MT /Z7

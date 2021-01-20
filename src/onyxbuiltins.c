@@ -324,20 +324,16 @@ static IntrinsicMap builtin_intrinsics[] = {
 
 bh_arr(AstTyped *) operator_overloads[Binary_Op_Count] = { 0 };
 
-void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
+void initialize_builtins(bh_allocator a) {
     // HACK
     builtin_package_token.text = bh_strdup(global_heap_allocator, builtin_package_token.text);
 
     BuiltinSymbol* bsym = (BuiltinSymbol *) &builtin_symbols[0];
     while (bsym->sym != NULL) {
         if (bsym->package == NULL)
-            symbol_builtin_introduce(prog->global_scope, bsym->sym, bsym->node);
+            symbol_builtin_introduce(context.global_scope, bsym->sym, bsym->node);
         else {
-            Package* p = program_info_package_lookup_or_create(
-                    prog,
-                    bsym->package,
-                    prog->global_scope,
-                    a);
+            Package* p = package_lookup_or_create(bsym->package, context.global_scope, a);
             assert(p);
 
             symbol_builtin_introduce(p->scope, bsym->sym, bsym->node);
@@ -345,7 +341,7 @@ void initialize_builtins(bh_allocator a, ProgramInfo* prog) {
         bsym++;
     }
 
-    Package* p = program_info_package_lookup_or_create(prog, "builtin", prog->global_scope, a);
+    Package* p = package_lookup_or_create("builtin", context.global_scope, a);
 
     builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
     if (builtin_string_type == NULL) {

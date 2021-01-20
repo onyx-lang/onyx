@@ -32,7 +32,7 @@ typedef struct OnyxDocumentation {
 	bh_arr(DocPackage) package_docs;
 } OnyxDocumentation;
 
-OnyxDocumentation onyx_docs_generate(ProgramInfo* prog);
+OnyxDocumentation onyx_docs_generate();
 void onyx_docs_emit(OnyxDocumentation* doc);
 
 #endif

@@ -940,15 +940,42 @@ struct Package {
     Scope *private_scope;
 };
 
-// NOTE: Simple data structure for storing what comes out of the parser
-typedef struct ProgramInfo {
-    Scope *global_scope;
+typedef enum CompileAction CompileAction;
+enum CompileAction {
+    ONYX_COMPILE_ACTION_COMPILE,
+    ONYX_COMPILE_ACTION_DOCUMENT,
+    ONYX_COMPILE_ACTION_PRINT_HELP,
+};
 
+typedef struct CompileOptions CompileOptions;
+struct CompileOptions {
+    bh_allocator allocator;
+    CompileAction action;
+
+    u32 verbose_output : 31;
+    u32 fun_output     : 1;
+
+    bh_arr(const char *) included_folders;
+    bh_arr(const char *) files;
+    const char* target_file;
+};
+
+typedef struct Context Context;
+struct Context {
     bh_table(Package *)   packages;
     EntityHeap            entities;
 
-    u32 foreign_global_count;
-} ProgramInfo;
+    Scope *global_scope;
+
+    CompileOptions* options;
+
+    bh_arena     token_arena, ast_arena;
+    bh_allocator token_alloc, ast_alloc;
+
+    bh_arr(bh_file_contents) loaded_files;
+};
+
+extern Context context;
 
 // NOTE: Basic internal types constructed in the parser
 extern AstBasicType basic_type_void;
@@ -998,7 +1025,7 @@ extern bh_table(OnyxIntrinsic) intrinsic_table;
 
 extern bh_arr(AstTyped *) operator_overloads[Binary_Op_Count];
 
-void initialize_builtins(bh_allocator a, ProgramInfo* prog);
+void initialize_builtins(bh_allocator a);
 
 
 // NOTE: Useful not inlined functions

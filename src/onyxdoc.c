@@ -128,7 +128,7 @@ static DocPackage doc_package_create(Package* p, bh_allocator a) {
     return dp;
 }
 
-OnyxDocumentation onyx_docs_generate(ProgramInfo* prog) {
+OnyxDocumentation onyx_docs_generate() {
     OnyxDocumentation doc;
 
     bh_arena_init(&doc.doc_arena, global_heap_allocator, 16 * 1024);
@@ -137,7 +137,7 @@ OnyxDocumentation onyx_docs_generate(ProgramInfo* prog) {
     doc.package_docs = NULL;
     bh_arr_new(global_heap_allocator, doc.package_docs, 16);
 
-    bh_table_each_start(Package *, prog->packages);
+    bh_table_each_start(Package *, context.packages);
         DocPackage dp = doc_package_create(value, a);
         bh_arr_push(doc.package_docs, dp);
     bh_table_each_end;

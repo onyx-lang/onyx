@@ -546,7 +546,7 @@ typedef struct OnyxWasmModule {
 extern OnyxWasmModule global_wasm_module;
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
-void onyx_wasm_module_compile(OnyxWasmModule* module, ProgramInfo* program);
+void onyx_wasm_module_compile(OnyxWasmModule* module);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 

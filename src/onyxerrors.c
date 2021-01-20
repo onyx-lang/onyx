@@ -1,12 +1,9 @@
-
 #include "onyxerrors.h"
 #include "onyxutils.h"
 
-#define MAX_MSGS 100
-
 OnyxErrors errors;
 
-void onyx_errors_init(bh_table(bh_file_contents)* files) {
+void onyx_errors_init(bh_arr(bh_file_contents)* files) {
     errors.file_contents = files;
 
     bh_arena_init(&errors.msg_arena, global_heap_allocator, 16 * 1024);
@@ -59,8 +56,15 @@ void onyx_errors_print() {
 
     bh_arr_each(OnyxError, err, errors.errors) {
         if (err->pos.filename) {
-            bh_file_contents* fc = &bh_table_get(bh_file_contents, *errors.file_contents, (char *) err->pos.filename);
-            print_detailed_message(err, fc);
+            bh_file_contents file_contents = { 0 };
+            bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
+                if (!strcmp(fc->filename, err->pos.filename)) {
+                    file_contents = *fc;
+                    break;
+                }
+            }
+
+            print_detailed_message(err, &file_contents);
 
         } else {
             bh_printf("(%l,%l) %s\n", err->pos.line, err->pos.column, err->text);

@@ -5,7 +5,6 @@
 #include "onyxlex.h"
 #include "onyxerrors.h"
 #include "onyxparser.h"
-#include "onyxsempass.h"
 #include "onyxutils.h"
 #include "onyxwasm.h"
 #include "onyxdoc.h"
@@ -24,6 +23,8 @@
 
 
 
+Context context;
+
 
 static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
@@ -39,26 +40,8 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\t-o <target_file>        Specify the target file (default: out.wasm)\n"
     "\t--verbose               Verbose output\n";
 
-typedef enum CompileAction {
-    ONYX_COMPILE_ACTION_COMPILE,
-    ONYX_COMPILE_ACTION_DOCUMENT,
-    ONYX_COMPILE_ACTION_PRINT_HELP,
-} CompileAction;
-
-typedef struct OnyxCompileOptions {
-    bh_allocator allocator;
-    CompileAction action;
-
-    u32 verbose_output : 2;
-    u32 fun_output     : 1;
-
-    bh_arr(const char *) included_folders;
-    bh_arr(const char *) files;
-    const char* target_file;
-} OnyxCompileOptions;
-
-static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *argv[]) {
-    OnyxCompileOptions options = {
+static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *argv[]) {
+    CompileOptions options = {
         .allocator = alloc,
         .action = ONYX_COMPILE_ACTION_PRINT_HELP,
 
@@ -116,7 +99,7 @@ static OnyxCompileOptions compile_opts_parse(bh_allocator alloc, int argc, char 
     return options;
 }
 
-static void compile_opts_free(OnyxCompileOptions* opts) {
+static void compile_opts_free(CompileOptions* opts) {
     bh_arr_free(opts->files);
     bh_arr_free(opts->included_folders);
 }
@@ -133,18 +116,7 @@ typedef enum CompilerProgress {
     ONYX_COMPILER_PROGRESS_SUCCESS
 } CompilerProgress;
 
-typedef struct CompilerState {
-    OnyxCompileOptions* options;
-
-    bh_arena                  ast_arena, sp_arena;
-    bh_allocator token_alloc, ast_alloc, sp_alloc;
-
-    bh_table(bh_file_contents) loaded_files;
-
-    ProgramInfo prog_info;
-} CompilerState;
-
-static char* lookup_included_file(CompilerState* cs, char* filename);
+static char* lookup_included_file(char* filename);
 
 static AstInclude* create_load(bh_allocator alloc, char* filename) {
     AstInclude* include_node = onyx_ast_node_new(alloc, sizeof(AstInclude), Ast_Kind_Load_File);
@@ -153,44 +125,44 @@ static AstInclude* create_load(bh_allocator alloc, char* filename) {
     return include_node;
 }
 
-static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOptions* opts) {
-    compiler_state->options = opts;
+static void context_init(CompileOptions* opts) {
+    context.options = opts;
 
-    program_info_init(&compiler_state->prog_info, global_heap_allocator);
+    context.global_scope = scope_create(global_heap_allocator, NULL, (OnyxFilePos) { 0 });
+    bh_table_init(global_heap_allocator, context.packages, 16);
 
-    bh_table_init(opts->allocator, compiler_state->loaded_files, 15);
-    onyx_errors_init(&compiler_state->loaded_files);
+    // NOTE: This will be initialized upon the first call to entity_heap_insert.
+    context.entities.entities = NULL;
 
-    compiler_state->token_alloc = opts->allocator;
+    onyx_errors_init(&context.loaded_files);
 
-    // NOTE: Create the arena where AST nodes will exist
+    // NOTE: Create the arena where tokens and AST nodes will exist
     // Prevents nodes from being scattered across memory due to fragmentation
-    bh_arena_init(&compiler_state->ast_arena, opts->allocator, 16 * 1024 * 1024); // 16MB
-    compiler_state->ast_alloc = bh_arena_allocator(&compiler_state->ast_arena);
+    bh_arena_init(&context.token_arena, global_heap_allocator, 16 * 1024 * 1024); // 16MB
+    context.token_alloc = bh_arena_allocator(&context.token_arena);
 
-    bh_arena_init(&compiler_state->sp_arena, opts->allocator, 16 * 1024);
-    compiler_state->sp_alloc = bh_arena_allocator(&compiler_state->sp_arena);
-
-    onyx_sempass_init(compiler_state->sp_alloc, compiler_state->ast_alloc);
+    bh_arena_init(&context.ast_arena, global_heap_allocator, 16 * 1024 * 1024); // 16MB
+    context.ast_alloc = bh_arena_allocator(&context.ast_arena);
 
     // HACK
-    global_wasm_module = onyx_wasm_module_create(compiler_state->options->allocator);
+    // MOVE TO CONTEXT
+    global_wasm_module = onyx_wasm_module_create(context.options->allocator);
 
     // NOTE: Add builtin entities to pipeline.
-    entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
+    entity_heap_insert(&context.entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(compiler_state->sp_alloc, "core/builtin"),
+        .include = create_load(context.ast_alloc, "core/builtin"),
     }));
 
-    entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
+    entity_heap_insert(&context.entities, ((Entity) {
         .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Global_Header,
         .global = &builtin_stack_top
     }));
     
-    entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
+    entity_heap_insert(&context.entities, ((Entity) {
         .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Global,
         .global = &builtin_stack_top
@@ -198,27 +170,26 @@ static void compiler_state_init(CompilerState* compiler_state, OnyxCompileOption
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
-        entity_heap_insert(&compiler_state->prog_info.entities, ((Entity) {
+        entity_heap_insert(&context.entities, ((Entity) {
             .state = Entity_State_Parse,
             .type = Entity_Type_Load_File,
             .package = NULL,
-            .include = create_load(compiler_state->sp_alloc, (char *) *filename),
+            .include = create_load(context.ast_alloc, (char *) *filename),
         }));
     }
 }
 
-static void compiler_state_free(CompilerState* cs) {
-    bh_arena_free(&cs->ast_arena);
-    bh_arena_free(&cs->sp_arena);
-    bh_table_free(cs->loaded_files);
+static void context_free() {
+    bh_arena_free(&context.ast_arena);
+    bh_arr_free(context.loaded_files);
 
-    compile_opts_free(cs->options);
+    compile_opts_free(context.options);
 }
 
 // NOTE: This should not be called until immediately before using the return value.
 // This function can return a static variable which will change if this is called
 // another time.                                        -brendanfh 2020/10/09
-static char* lookup_included_file(CompilerState* cs, char* filename) {
+static char* lookup_included_file(char* filename) {
     static char path[256];
     fori (i, 0, 256) path[i] = 0;
 
@@ -239,7 +210,7 @@ static char* lookup_included_file(CompilerState* cs, char* filename) {
 
     fori (i, 0, 128) if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
 
-    bh_arr_each(const char *, folder, cs->options->included_folders) {
+    bh_arr_each(const char *, folder, context.options->included_folders) {
         if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
             bh_snprintf(path, 256, "%s%c%s", *folder, DIR_SEPARATOR, fn);
         else
@@ -253,15 +224,16 @@ static char* lookup_included_file(CompilerState* cs, char* filename) {
 #undef DIR_SEPARATOR
 }
 
-static ParseResults parse_source_file(CompilerState* compiler_state, bh_file_contents* file_contents) {
-    OnyxTokenizer tokenizer = onyx_tokenizer_create(compiler_state->token_alloc, file_contents);
+static ParseResults parse_source_file(bh_file_contents* file_contents) {
+    // :Remove passing the allocators as parameters
+    OnyxTokenizer tokenizer = onyx_tokenizer_create(context.token_alloc, file_contents);
     onyx_lex_tokens(&tokenizer);
 
-    OnyxParser parser = onyx_parser_create(compiler_state->ast_alloc, &tokenizer, &compiler_state->prog_info);
+    OnyxParser parser = onyx_parser_create(context.ast_alloc, &tokenizer);
     return onyx_parse(&parser);
 }
 
-static void merge_parse_results(CompilerState* compiler_state, ParseResults* results) {
+static void merge_parse_results(ParseResults* results) {
     Entity ent;
     bh_arr_each(NodeToProcess, n, results->nodes_to_process) {
         AstNode* node = n->node;
@@ -276,7 +248,7 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 ent.state = Entity_State_Parse;
                 ent.type = Entity_Type_Load_File;
                 ent.include = (AstInclude *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
                                    
@@ -284,7 +256,7 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 ent.state = Entity_State_Parse;
                 ent.type = Entity_Type_Load_Path;
                 ent.include = (AstInclude *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
@@ -292,16 +264,16 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 if ((node->flags & Ast_Flag_Foreign) != 0) {
                     ent.type     = Entity_Type_Foreign_Function_Header;
                     ent.function = (AstFunction *) node;
-                    entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                    entity_heap_insert(&context.entities, ent);
 
                 } else {
                     ent.type     = Entity_Type_Function_Header;
                     ent.function = (AstFunction *) node;
-                    entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                    entity_heap_insert(&context.entities, ent);
 
                     ent.type     = Entity_Type_Function;
                     ent.function = (AstFunction *) node;
-                    entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                    entity_heap_insert(&context.entities, ent);
                 }
                 break;
             }
@@ -309,7 +281,7 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
             case Ast_Kind_Overloaded_Function: {
                 ent.type                = Entity_Type_Overloaded_Function;
                 ent.overloaded_function = (AstOverloadedFunction *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
@@ -317,16 +289,16 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
                 if ((node->flags & Ast_Flag_Foreign) != 0) {
                     ent.type   = Entity_Type_Foreign_Global_Header;
                     ent.global = (AstGlobal *) node;
-                    entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                    entity_heap_insert(&context.entities, ent);
 
                 } else {
                     ent.type   = Entity_Type_Global_Header;
                     ent.global = (AstGlobal *) node;
-                    entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                    entity_heap_insert(&context.entities, ent);
 
                     ent.type   = Entity_Type_Global;
                     ent.global = (AstGlobal *) node;
-                    entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                    entity_heap_insert(&context.entities, ent);
                 }
                 break;
             }
@@ -334,21 +306,21 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
             case Ast_Kind_StrLit: {
                 ent.type   = Entity_Type_String_Literal;
                 ent.strlit = (AstStrLit *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             case Ast_Kind_File_Contents: {
                 ent.type = Entity_Type_File_Contents;
                 ent.file_contents = (AstFileContents *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             case Ast_Kind_Struct_Type: {
                 ent.type = Entity_Type_Struct_Member_Default;
                 ent.type_alias = (AstType *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 // fallthrough
             }
 
@@ -356,64 +328,70 @@ static void merge_parse_results(CompilerState* compiler_state, ParseResults* res
             case Ast_Kind_Type_Alias: {
                 ent.type = Entity_Type_Type_Alias;
                 ent.type_alias = (AstType *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             case Ast_Kind_Enum_Type: {
                 ent.type = Entity_Type_Enum;
                 ent.enum_type = (AstEnumType *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             case Ast_Kind_Use_Package: {
                 ent.type = Entity_Type_Use_Package;
                 ent.use_package = (AstUsePackage *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             case Ast_Kind_Use: {
                 ent.type = Entity_Type_Use;
                 ent.use = (AstUse *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             case Ast_Kind_Memres: {
                 ent.type = Entity_Type_Memory_Reservation_Type;
                 ent.mem_res = (AstMemRes *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
 
                 ent.type = Entity_Type_Memory_Reservation;
                 ent.mem_res = (AstMemRes *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             case Ast_Kind_Polymorphic_Proc: {
                 ent.type = Entity_Type_Polymorphic_Proc;
                 ent.poly_proc = (AstPolyProc *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
 
             default: {
                 ent.type = Entity_Type_Expression;
                 ent.expr = (AstTyped *) node;
-                entity_heap_insert(&compiler_state->prog_info.entities, ent);
+                entity_heap_insert(&context.entities, ent);
                 break;
             }
         }
     }
 }
 
-static CompilerProgress process_source_file(CompilerState* compiler_state, char* filename) {
-    if (bh_table_has(bh_file_contents, compiler_state->loaded_files, filename)) return ONYX_COMPILER_PROGRESS_SUCCESS;
+static CompilerProgress process_source_file(char* filename) {
+    bh_arr_each(bh_file_contents, fc, context.loaded_files) {
+        // CLEANUP: Add duplicate resolutions, such as
+        //          ./foo and ./test/../foo
+        // should be the same thing.
+        if (!strcmp(fc->filename, filename)) {
+            return ONYX_COMPILER_PROGRESS_SUCCESS;
+        }
+    }
 
     bh_file file;
-
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
         // bh_printf_err("Failed to open file %s\n", filename);
@@ -421,7 +399,7 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
         return ONYX_COMPILER_PROGRESS_FAILED_READ;
     }
 
-    bh_file_contents fc = bh_file_read_contents(compiler_state->token_alloc, &file);
+    bh_file_contents fc = bh_file_read_contents(context.token_alloc, &file);
     bh_file_close(&file);
 
     // POTENTIAL BUG: If there are too many files and too many collisions in the table,
@@ -435,15 +413,14 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
 
 
     // NOTE: Need to reget the value out of the table so token references work
-    bh_table_put(bh_file_contents, compiler_state->loaded_files, (char *) filename, fc);
-    fc = bh_table_get(bh_file_contents, compiler_state->loaded_files, (char *) filename);
+    bh_arr_push(context.loaded_files, fc);
 
-    if (compiler_state->options->verbose_output == 2) {
+    if (context.options->verbose_output == 2) {
         bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
     }
 
-    ParseResults results = parse_source_file(compiler_state, &fc);
-    merge_parse_results(compiler_state, &results);
+    ParseResults results = parse_source_file(&fc);
+    merge_parse_results(&results);
 
     if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
@@ -452,27 +429,27 @@ static CompilerProgress process_source_file(CompilerState* compiler_state, char*
     }
 }
 
-static b32 process_load_entity(CompilerState* compiler_state, Entity* ent) {
+static b32 process_load_entity(Entity* ent) {
     assert(ent->type == Entity_Type_Load_File || ent->type == Entity_Type_Load_Path);
     AstInclude* include = ent->include;
 
     if (include->kind == Ast_Kind_Load_File) {
-        char* filename = lookup_included_file(compiler_state, include->name);
+        char* filename = lookup_included_file(include->name);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
-        process_source_file(compiler_state, formatted_name);
+        process_source_file(formatted_name);
 
     } else if (include->kind == Ast_Kind_Load_Path) {
-        bh_arr_push(compiler_state->options->included_folders, include->name);
+        bh_arr_push(context.options->included_folders, include->name);
     }
 
     return 1;
 }
 
-static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
+static b32 process_entity(Entity* ent) {
     i32 changed = 1;
 
-    if (compiler_state->options->verbose_output == 3) {
+    if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             printf("%s | %s | %s:%i:%i\n",
                 entity_state_strings[ent->state],
@@ -484,17 +461,16 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
 
     switch (ent->state) {
         case Entity_State_Parse_Builtin:
-            process_load_entity(compiler_state, ent);
+            process_load_entity(ent);
             ent->state = Entity_State_Finalized;
 
             if (onyx_has_errors()) return 0;
 
-            initialize_builtins(compiler_state->ast_alloc, &compiler_state->prog_info);
-            semstate.program = &compiler_state->prog_info;
+            initialize_builtins(context.ast_alloc);
             break;
 
         case Entity_State_Parse:
-            process_load_entity(compiler_state, ent);
+            process_load_entity(ent);
             ent->state = Entity_State_Finalized;
             break;
 
@@ -510,8 +486,8 @@ static b32 process_entity(CompilerState* compiler_state, Entity* ent) {
 }
 
 // Just having fun with some visual output - brendanfh 2020/12/14
-static void output_dummy_progress_bar(CompilerState* compiler_state) {
-    EntityHeap* eh = &compiler_state->prog_info.entities;
+static void output_dummy_progress_bar() {
+    EntityHeap* eh = &context.entities;
 
     printf("\e[2;1H");
     for (i32 i = 0; i < Entity_State_Count - 1; i++) {
@@ -523,19 +499,19 @@ static void output_dummy_progress_bar(CompilerState* compiler_state) {
     }
 }
 
-static i32 onyx_compile(CompilerState* compiler_state) {
+static i32 onyx_compile() {
     u64 start_time = bh_time_curr();
 
-    if (compiler_state->options->fun_output)
+    if (context.options->fun_output)
         printf("\e[2J");
 
-    while (!bh_arr_is_empty(compiler_state->prog_info.entities.entities)) {
-        Entity ent = entity_heap_top(&compiler_state->prog_info.entities);
-        entity_heap_remove_top(&compiler_state->prog_info.entities);
+    while (!bh_arr_is_empty(context.entities.entities)) {
+        Entity ent = entity_heap_top(&context.entities);
+        entity_heap_remove_top(&context.entities);
         if (ent.state == Entity_State_Finalized) continue;
 
-        if (compiler_state->options->fun_output) {
-            output_dummy_progress_bar(compiler_state);
+        if (context.options->fun_output) {
+            output_dummy_progress_bar();
 
             // Slowing things down for the effect
 #if defined(_BH_WINDOWS)
@@ -550,7 +526,7 @@ static i32 onyx_compile(CompilerState* compiler_state) {
             }
         }
 
-        b32 changed = process_entity(compiler_state, &ent);
+        b32 changed = process_entity(&ent);
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
@@ -559,23 +535,23 @@ static i32 onyx_compile(CompilerState* compiler_state) {
         // gonna keep this how it is for now.                - brendanfh 2020/12/15
 
         // if (changed && ent.state != Entity_State_Finalized)
-        entity_heap_insert(&compiler_state->prog_info.entities, ent);
+        entity_heap_insert(&context.entities, ent);
     }
 
     // NOTE: Output to file
     bh_file output_file;
-    if (bh_file_create(&output_file, compiler_state->options->target_file) != BH_FILE_ERROR_NONE) {
+    if (bh_file_create(&output_file, context.options->target_file) != BH_FILE_ERROR_NONE) {
         return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
     }
 
-    if (compiler_state->options->verbose_output)
+    if (context.options->verbose_output)
         bh_printf("Outputting to WASM file:   %s\n", output_file.filename);
 
     onyx_wasm_module_write_to_file(&global_wasm_module, output_file);
 
     u64 duration = bh_time_duration(start_time);
     
-    if (compiler_state->options->verbose_output > 0) {
+    if (context.options->verbose_output > 0) {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
         printf("    Time taken: %lf seconds\n", (double) duration / 1000);
@@ -595,13 +571,10 @@ int main(int argc, char *argv[]) {
     bh_managed_heap_init(&global_heap);
     global_heap_allocator = bh_managed_heap_allocator(&global_heap);
 
-    OnyxCompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
-
-    CompilerState compile_state = { 0 };
-    compiler_state_init(&compile_state, &compile_opts);
+    CompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
+    context_init(&compile_opts);
 
     CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_FAILED_READ;
-
     switch (compile_opts.action) {
         case ONYX_COMPILE_ACTION_PRINT_HELP:
             // NOTE: This could probably be made better
@@ -609,7 +582,7 @@ int main(int argc, char *argv[]) {
             return 1;
 
         case ONYX_COMPILE_ACTION_COMPILE:
-            compiler_progress = onyx_compile(&compile_state);
+            compiler_progress = onyx_compile();
             break;
 
         case ONYX_COMPILE_ACTION_DOCUMENT:
@@ -638,7 +611,7 @@ int main(int argc, char *argv[]) {
             break;
     }
 
-    compiler_state_free(&compile_state);
+    context_free();
 
     bh_scratch_free(&global_scratch);
     bh_managed_heap_free(&global_heap);

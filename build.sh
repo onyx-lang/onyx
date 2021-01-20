@@ -1,6 +1,6 @@
 #!/bin/sh
 
-C_FILES="onyx onyxastnodes onyxbuiltins onyxchecker onyxclone onyxdoc onyxentities onyxerrors onyxlex onyxparser onyxsempass onyxsymres onyxtypes onyxutils onyxwasm"
+C_FILES="onyx onyxastnodes onyxbuiltins onyxchecker onyxclone onyxdoc onyxentities onyxerrors onyxlex onyxparser onyxsymres onyxtypes onyxutils onyxwasm"
 TARGET='./bin/onyx'
 CC='gcc'
 
