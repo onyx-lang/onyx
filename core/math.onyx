@@ -96,6 +96,9 @@ pow_int :: proc (base: $T, p: i32) -> T {
 }
 
 pow_float :: proc (base: $T, p: T) -> T {
+    if p == 0 do return 1;
+    if p < 0  do return 1 / pow_float(base, -p);
+
     if p >= 1 {
         tmp := pow_float(p = p / 2, base = base);
         return tmp * tmp;
