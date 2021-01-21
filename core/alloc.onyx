@@ -5,6 +5,7 @@ package core.alloc
 #load "core/alloc/heap"
 #load "core/alloc/ring"
 #load "core/alloc/pool"
+#load "core/alloc/logging"
 
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
 

@@ -1,0 +1,26 @@
+package core.alloc.log
+
+Allocation_Action_Strings := str.[
+    " alloc",
+    "resize",
+    "  free",
+];
+
+#private_file
+logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    allocator := cast(^Allocator) data;
+    res := allocator.func(allocator.data, aa, size, align, oldptr);
+
+    use package core { printf }
+    printf("%s with size %i, align %i, oldptr %p returns %p\n",
+        Allocation_Action_Strings[cast(u32) aa], size, align, oldptr, res);
+
+    return res;
+}
+
+logging_allocator :: (alloc: ^Allocator) -> Allocator {
+    return Allocator.{
+        func = logging_allocator_proc,
+        data = alloc,
+    };
+}

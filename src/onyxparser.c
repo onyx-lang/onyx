@@ -2113,18 +2113,15 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
             && token_after_paren->type != Token_Type_Empty_Block)
             return 0;
 
-        b32 hit_colon = 0;
+        b32 is_params = (parser->curr + 1) == matching_paren;
         OnyxToken* tmp_token = parser->curr;
-        while (tmp_token < matching_paren) {
-            if (tmp_token->type == ':') {
-                hit_colon = 1;
-                break;
-            }
+        while (!is_params && tmp_token < matching_paren) {
+            if (tmp_token->type == ':') is_params = 1;
 
             tmp_token++;
         }
 
-        if (!hit_colon) return 0;
+        if (!is_params) return 0;
 
         OnyxToken* proc_token = parser->curr;
         AstFunction* func_node = parse_function_definition(parser, proc_token);
