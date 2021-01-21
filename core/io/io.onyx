@@ -14,4 +14,10 @@ Error :: enum {
 
     // A seek was outside the bounds of the stream.
     OutOfBounds    :: 0x04;
+
+    // The file or stream was not found.
+    NotFound       :: 0x05;
+
+    // The file or stream was not initialized correctly.
+    BadFile        :: 0x06;
 }

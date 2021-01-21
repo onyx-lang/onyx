@@ -9,7 +9,7 @@ Stream :: struct {
 #private
 Stream_Vtable :: struct {
     seek         : proc (s: ^Stream, to: i32, whence: SeekFrom) -> Error;
-    tell         : proc (s: ^Stream, out: ^i32) -> Error;
+    tell         : proc (s: ^Stream) -> (Error, u32);
 
     read         : proc (s: ^Stream, buffer: [] u8) -> (Error, u32);
     read_at      : proc (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32);
@@ -32,91 +32,91 @@ SeekFrom :: enum {
     End     :: 0x02;    
 }
 
-stream_seek :: proc (use s: ^Stream, to: i32, whence: SeekFrom) -> Error {
+stream_seek :: (use s: ^Stream, to: i32, whence: SeekFrom) -> Error {
     if vtable == null do return Error.NoVtable;
     if vtable.seek == null_proc do return Error.NotImplemented;
 
     return vtable.seek(s, to, whence);
 }
 
-stream_tell :: proc (use s: ^Stream, out: ^i32) -> Error {
-    if vtable == null do return Error.NoVtable;
-    if vtable.tell == null_proc do return Error.NotImplemented;
+stream_tell :: (use s: ^Stream) -> (Error, u32) {
+    if vtable == null do return Error.NoVtable, 0;
+    if vtable.tell == null_proc do return Error.NotImplemented, 0;
     
-    return vtable.tell(s, out);
+    return vtable.tell(s);
 }
 
-stream_read :: proc (use s: ^Stream, buffer: [] u8) -> (Error, u32) {
+stream_read :: (use s: ^Stream, buffer: [] u8) -> (Error, u32) {
     if vtable == null do return Error.NoVtable, 0;
     if vtable.read == null_proc do return Error.NotImplemented, 0;
     
     return vtable.read(s, buffer);
 }
 
-stream_read_at :: proc (use s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
+stream_read_at :: (use s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
     if vtable == null do return Error.NoVtable, 0;
     if vtable.read_at == null_proc do return Error.NotImplemented, 0;
     
     return vtable.read_at(s, at, buffer);
 }
 
-stream_read_byte :: proc (use s: ^Stream) -> (Error, u8) {
+stream_read_byte :: (use s: ^Stream) -> (Error, u8) {
     if vtable == null do return Error.NoVtable, cast(u8) 0;
     if vtable.read_byte == null_proc do return Error.NotImplemented, 0;
     
     return vtable.read_byte(s);
 }
 
-stream_unread_byte :: proc (use s: ^Stream) -> Error {
+stream_unread_byte :: (use s: ^Stream) -> Error {
     if vtable == null do return Error.NoVtable;
     if vtable.unread_byte == null_proc do return Error.NotImplemented;
     
     return vtable.unread_byte(s);
 }
 
-stream_write :: proc (use s: ^Stream, buffer: [] u8) -> (Error, u32) {
+stream_write :: (use s: ^Stream, buffer: [] u8) -> (Error, u32) {
     if vtable == null do return Error.NoVtable, 0;
     if vtable.write == null_proc do return Error.NotImplemented, 0;
     
     return vtable.write(s, buffer);
 }
 
-stream_write_at :: proc (use s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
+stream_write_at :: (use s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
     if vtable == null do return Error.NoVtable, 0;
     if vtable.write_at == null_proc do return Error.NotImplemented, 0;
     
     return vtable.write_at(s, at, buffer);
 }
 
-stream_write_byte :: proc (use s: ^Stream, byte: u8) -> Error {
+stream_write_byte :: (use s: ^Stream, byte: u8) -> Error {
     if vtable == null do return Error.NoVtable;
     if vtable.write_byte == null_proc do return Error.NotImplemented;
     
     return vtable.write_byte(s, byte);
 }
 
-stream_close :: proc (use s: ^Stream) -> Error {
+stream_close :: (use s: ^Stream) -> Error {
     if vtable == null do return Error.NoVtable;
     if vtable.close == null_proc do return Error.NotImplemented;
 
     return vtable.close(s);
 }
 
-stream_flush :: proc (use s: ^Stream) -> Error {
+stream_flush :: (use s: ^Stream) -> Error {
     if vtable == null do return Error.NoVtable;
     if vtable.flush == null_proc do return Error.NotImplemented;
 
     return vtable.flush(s);
 }
 
-stream_size :: proc (use s: ^Stream) -> i32 {
+stream_size :: (use s: ^Stream) -> i32 {
     if vtable == null do return 0;
     if vtable.size == null_proc do return 0;
 
     return vtable.size(s);
 }
 
-stream_peek_byte :: proc (use s: ^Stream) -> (Error, u8) {
+stream_peek_byte :: (use s: ^Stream) -> (Error, u8) {
     err, out := stream_read_byte(s);
     if err != Error.None do return err, 0;
 
@@ -138,7 +138,7 @@ StringStream :: struct {
     data : str;
 }
 
-string_stream_make :: proc (s: str) -> StringStream {
+string_stream_make :: (s: str) -> StringStream {
     return StringStream.{
         stream = Stream.{
             vtable   = ^string_stream_vtable,
@@ -151,10 +151,7 @@ string_stream_make :: proc (s: str) -> StringStream {
 
 #private
 string_stream_vtable := Stream_Vtable.{
-    seek = proc (s: ^Stream, to: i32, whence: SeekFrom) -> Error {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    seek = (use ss: ^StringStream, to: i32, whence: SeekFrom) -> Error {
         if to >= data.count do return Error.OutOfBounds;
 
         switch whence {
@@ -166,18 +163,11 @@ string_stream_vtable := Stream_Vtable.{
         return Error.None;
     },
 
-    tell = proc (s: ^Stream, out: ^i32) -> Error {
-        ss : ^StringStream = ~~s;
-        use ss;
-
-        if out != null do *out = curr_pos;
-        return Error.None;
+    tell = (use ss: ^StringStream) -> (Error, u32) {
+        return Error.None, curr_pos;
     },
 
-    read = proc (s: ^Stream, buffer: [] u8) -> (Error, u32) {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    read = (use ss: ^StringStream, buffer: [] u8) -> (Error, u32) {
         if curr_pos >= data.count do return Error.EOF, 0;
 
         bytes_to_read := math.min(buffer.count, data.count - curr_pos);
@@ -187,10 +177,7 @@ string_stream_vtable := Stream_Vtable.{
         return Error.None, bytes_to_read;
     },
 
-    read_at = proc (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    read_at = (use ss: ^StringStream, at: u32, buffer: [] u8) -> (Error, u32) {
         if at >= data.count do return Error.EOF, 0;
 
         bytes_to_read := math.min(buffer.count, data.count - at);
@@ -199,30 +186,21 @@ string_stream_vtable := Stream_Vtable.{
         return Error.None, bytes_to_read;
     },
 
-    read_byte = proc (s: ^Stream) -> (Error, u8) {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    read_byte = (use ss: ^StringStream) -> (Error, u8) {
         if curr_pos >= data.count do return Error.EOF, 0;
 
         defer curr_pos += 1;
         return Error.None, data[curr_pos];
     },
 
-    unread_byte = proc (s: ^Stream) -> Error {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    unread_byte = (use ss: ^StringStream) -> Error {
         if curr_pos <= 0 do return Error.OutOfBounds;
 
         curr_pos -= 1;
         return Error.None;
     },
 
-    write = proc (s: ^Stream, buffer: [] u8) -> (Error, u32) {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    write = (use ss: ^StringStream, buffer: [] u8) -> (Error, u32) {
         if curr_pos >= data.count do return Error.EOF, 0;
 
         bytes_to_write := math.min(buffer.count, data.count - curr_pos);
@@ -232,10 +210,7 @@ string_stream_vtable := Stream_Vtable.{
         return Error.None, bytes_to_write;
     },
 
-    write_at = proc (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    write_at = (use ss: ^StringStream, at: u32, buffer: [] u8) -> (Error, u32) {
         if at >= data.count do return Error.EOF, 0;
 
         bytes_to_write := math.min(buffer.count, data.count - at);
@@ -244,10 +219,7 @@ string_stream_vtable := Stream_Vtable.{
         return Error.None, bytes_to_write;
     },
 
-    write_byte = proc (s: ^Stream, byte: u8) -> Error {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    write_byte = (use ss: ^StringStream, byte: u8) -> Error {
         if curr_pos >= data.count do return Error.EOF;
 
         data[curr_pos] = byte;
@@ -256,10 +228,7 @@ string_stream_vtable := Stream_Vtable.{
         return Error.None;
     },
 
-    size = proc (s: ^Stream) -> i32 {
-        ss : ^StringStream = ~~s;
-        use ss;
-
+    size = (use ss: ^StringStream) -> i32 {
         return data.count;
     },
 
@@ -279,7 +248,7 @@ DynamicStringStream :: struct {
     alloc : Allocator;
 }
 
-dynamic_string_stream_make :: proc (init_size := 128, a := context.allocator) -> DynamicStringStream {
+dynamic_string_stream_make :: (init_size := 128, a := context.allocator) -> DynamicStringStream {
     data : [..] u8;
     array.init(^data, init_size);
 
@@ -294,16 +263,13 @@ dynamic_string_stream_make :: proc (init_size := 128, a := context.allocator) ->
     };
 }
 
-dynamic_string_stream_to_str :: proc (use dds: ^DynamicStringStream) -> str {
+dynamic_string_stream_to_str :: (use dds: ^DynamicStringStream) -> str {
     return data.data[0 .. curr_pos];
 }
 
 #private
 dynamic_string_stream_vtable := Stream_Vtable.{
-    seek = proc (s: ^Stream, to: i32, whence: SeekFrom) -> Error {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    seek = (use dss: ^DynamicStringStream, to: i32, whence: SeekFrom) -> Error {
         dest : i32;
         switch whence {
             case SeekFrom.Start   do dest = to;
@@ -322,18 +288,11 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         return Error.None;
     },
 
-    tell = proc (s: ^Stream, out: ^i32) -> Error {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
-        if out != null do *out = curr_pos;
-        return Error.None;
+    tell = (use dss: ^DynamicStringStream) -> (Error, u32) {
+        return Error.None, curr_pos;
     },
 
-    read = proc (s: ^Stream, buffer: [] u8) -> (Error, u32) {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    read = (use dss: ^DynamicStringStream, buffer: [] u8) -> (Error, u32) {
         if curr_pos >= data.count do return Error.EOF, 0;
 
         bytes_to_read := math.min(buffer.count, data.count - curr_pos);
@@ -343,10 +302,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         return Error.None, bytes_to_read;
     },
 
-    read_at = proc (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    read_at = (use dss: ^DynamicStringStream, at: u32, buffer: [] u8) -> (Error, u32) {
         if at >= data.count do return Error.EOF, 0;
 
         bytes_to_read := math.min(buffer.count, data.count - at);
@@ -355,30 +311,21 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         return Error.None, bytes_to_read;
     },
 
-    read_byte = proc (s: ^Stream) -> (Error, u8) {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    read_byte = (use dss: ^DynamicStringStream) -> (Error, u8) {
         if curr_pos >= data.count do return Error.EOF, 0;
 
         defer curr_pos += 1;
         return Error.None, data[curr_pos];
     },
 
-    unread_byte = proc (s: ^Stream) -> Error {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    unread_byte = (use dss: ^DynamicStringStream) -> Error {
         if curr_pos <= 0 do return Error.OutOfBounds;
 
         curr_pos -= 1;
         return Error.None;
     },
 
-    write = proc (s: ^Stream, buffer: [] u8) -> (Error, u32) {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    write = (use dss: ^DynamicStringStream, buffer: [] u8) -> (Error, u32) {
         if curr_pos + buffer.count >= data.capacity {
             #context_scope {
                 context.allocator = alloc;
@@ -393,10 +340,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         return Error.None, buffer.count;
     },
 
-    write_at = proc (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32) {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    write_at = (use dss: ^DynamicStringStream, at: u32, buffer: [] u8) -> (Error, u32) {
         if at + buffer.count >= data.capacity {
             #context_scope {
                 context.allocator = alloc;
@@ -410,10 +354,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         return Error.None, buffer.count;
     },
 
-    write_byte = proc (s: ^Stream, byte: u8) -> Error {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    write_byte = (use dss: ^DynamicStringStream, byte: u8) -> Error {
         #context_scope {
             context.allocator = alloc;
             if !array.ensure_capacity(^data, data.count + 1) do return Error.EOF;
@@ -426,17 +367,11 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         return Error.None;
     },
 
-    size = proc (s: ^Stream) -> i32 {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    size = (use dss: ^DynamicStringStream) -> i32 {
         return data.count;
     },
 
-    flush = proc (s: ^Stream) -> Error {
-        dss : ^DynamicStringStream = ~~s;
-        use dss;
-
+    flush = (use dss: ^DynamicStringStream) -> Error {
         curr_pos = 0;
         array.clear(^data);
 

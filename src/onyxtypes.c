@@ -281,7 +281,7 @@ u32 type_alignment_of(Type* type) {
         case Type_Kind_Slice:    return 8;
         case Type_Kind_VarArgs:  return 8;
         case Type_Kind_DynArray: return 8;
-        case Type_Kind_Compound: return 8; // HACK
+        case Type_Kind_Compound: return 4; // HACK
         default: return 1;
     }
 }
@@ -547,10 +547,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             fori (i, 0, type_count) {
                 assert(ctype->types[i] != NULL);
                 comp_type->Compound.types[i] = type_build_from_ast(alloc, ctype->types[i]);
-                comp_type->Compound.size += type_size_of(comp_type->Compound.types[i]);
+                comp_type->Compound.size += bh_max(type_size_of(comp_type->Compound.types[i]), 4);
             }
 
-            bh_align(comp_type->Compound.size, 8);
+            bh_align(comp_type->Compound.size, 4);
 
             return comp_type;
         }
@@ -598,11 +598,11 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
 
     fori (i, 0, expr_count) {
         assert(compound->exprs[i]->type != NULL);
-        comp_type->Compound.size += type_size_of(compound->exprs[i]->type);
         comp_type->Compound.types[i] = compound->exprs[i]->type;
+        comp_type->Compound.size += bh_max(type_size_of(comp_type->Compound.types[i]), 4);
     }
     
-    bh_align(comp_type->Compound.size, 8);
+    bh_align(comp_type->Compound.size, 4);
 
     return comp_type;
 }

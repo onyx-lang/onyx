@@ -49,8 +49,7 @@ read_u64 :: proc (use reader: ^Reader) -> u64 {
 }
 
 read_line :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
-    curr_pos : i32;
-    stream_tell(stream, ^curr_pos);
+    _, curr_pos := stream_tell(stream);
 
     count := 0;
     err, curr := stream_read_byte(stream);
@@ -75,8 +74,7 @@ read_line :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
 read_word :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
     skip_whitespace(reader);
 
-    curr_pos : i32;
-    stream_tell(stream, ^curr_pos);
+    _, curr_pos := stream_tell(stream);
 
     count := 0;
     err, curr := stream_read_byte(stream);

@@ -3251,11 +3251,13 @@ void emit_entity(Entity* ent) {
         case Entity_Type_Function_Header:
             if (!should_emit_function(ent->function)) break;
 
-            // bh_printf("%d -> %s:%d:%d\n",
-            //     module->next_func_idx,
-            //     ent->expr->token->pos.filename,
-            //     ent->expr->token->pos.line,
-            //     ent->expr->token->pos.column);
+            if (context.options->print_function_mappings) {
+                bh_printf("%d -> %s:%d:%d\n",
+                    module->next_func_idx,
+                    ent->expr->token->pos.filename,
+                    ent->expr->token->pos.line,
+                    ent->expr->token->pos.column);
+            }
             
             bh_imap_put(&module->index_map, (u64) ent->function, module->next_func_idx++);
             break;

@@ -45,7 +45,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .allocator = alloc,
         .action = ONYX_COMPILE_ACTION_PRINT_HELP,
 
-        .verbose_output = 0,
+        .verbose_output          = 0,
+        .fun_output              = 0,
+        .print_function_mappings = 0,
 
         .files = NULL,
         .target_file = "out.wasm",
@@ -86,6 +88,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--fun") || !strcmp(argv[i], "-F")) {
                 options.fun_output = 1;
+            }
+            else if (!strcmp(argv[i], "--print-function-mappings")) {
+                options.print_function_mappings = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);

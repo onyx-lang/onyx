@@ -952,8 +952,9 @@ struct CompileOptions {
     bh_allocator allocator;
     CompileAction action;
 
-    u32 verbose_output : 31;
-    u32 fun_output     : 1;
+    u32 verbose_output          : 30;
+    b32 fun_output              : 1;
+    b32 print_function_mappings : 1; 
 
     bh_arr(const char *) included_folders;
     bh_arr(const char *) files;
