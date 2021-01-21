@@ -56,6 +56,10 @@ contexts:
         1: entity.name.function
         2: keyword.control.onyx
 
+    - match: '([a-zA-Z_][a-zA-Z0-9_]*)\s*::\s*\([^:]*:.*\)'
+      captures:
+        1: entity.name.function
+
     - match: '([a-zA-Z_][a-zA-Z0-9_]*)\s*::\s*(struct)'
       captures:
         1: entity.name.struct
