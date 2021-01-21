@@ -148,17 +148,30 @@ CheckStatus check_while(AstIfWhile* whilenode) {
 
 CheckStatus check_for(AstFor* fornode) {
     CHECK(expression, &fornode->iter);
-    fornode->loop_type = For_Loop_Invalid;
+    resolve_expression_type(fornode->iter);
 
     Type* iter_type = fornode->iter->type;
-    b32 can_iterate = 0;
-    if (types_are_compatible(iter_type, builtin_range_type_type)) {
+    fornode->loop_type = For_Loop_Invalid;
+    if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I32])) {
         if (fornode->by_pointer) {
             onyx_report_error(fornode->var->token->pos, "Cannot iterate by pointer over a range.");
             return Check_Error;
         }
 
-        can_iterate = 1;
+        AstNumLit* low_0    = make_int_literal(context.ast_alloc, 0);
+        AstRangeLiteral* rl = make_range_literal(context.ast_alloc, (AstTyped *) low_0, fornode->iter);
+        CHECK(range_literal, &rl);
+        fornode->iter = (AstTyped *) rl;
+
+        fornode->var->type = builtin_range_type_type->Struct.memarr[0]->type;
+        fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
+        fornode->loop_type = For_Loop_Range;
+    }
+    else if (types_are_compatible(iter_type, builtin_range_type_type)) {
+        if (fornode->by_pointer) {
+            onyx_report_error(fornode->var->token->pos, "Cannot iterate by pointer over a range.");
+            return Check_Error;
+        }
 
         // NOTE: Blindly copy the first range member's type which will
         // be the low value.                - brendanfh 2020/09/04
@@ -168,16 +181,12 @@ CheckStatus check_for(AstFor* fornode) {
 
     }
     else if (iter_type->kind == Type_Kind_Array) {
-        can_iterate = 1;
-
         if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->Array.elem);
         else                     fornode->var->type = iter_type->Array.elem;
 
         fornode->loop_type = For_Loop_Array;
     }
     else if (iter_type->kind == Type_Kind_Slice) {
-        can_iterate = 1;
-
         if (fornode->by_pointer) fornode->var->type = iter_type->Slice.ptr_to_data;
         else                     fornode->var->type = iter_type->Slice.ptr_to_data->Pointer.elem;
 
@@ -190,16 +199,12 @@ CheckStatus check_for(AstFor* fornode) {
             return Check_Error;
         }
 
-        can_iterate = 1;
-
         fornode->var->type = iter_type->VarArgs.ptr_to_data->Pointer.elem;
 
         // NOTE: Slices are VarArgs are being treated the same here.
         fornode->loop_type = For_Loop_Slice;
     }
     else if (iter_type->kind == Type_Kind_DynArray) {
-        can_iterate = 1;
-
         if (fornode->by_pointer) fornode->var->type = iter_type->DynArray.ptr_to_data;
         else                     fornode->var->type = iter_type->DynArray.ptr_to_data->Pointer.elem;
 
@@ -209,7 +214,7 @@ CheckStatus check_for(AstFor* fornode) {
     if (fornode->by_pointer)
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
 
-    if (!can_iterate) {
+    if (fornode->loop_type == For_Loop_Invalid) {
         onyx_report_error(fornode->iter->token->pos,
                 "Cannot iterate over a '%s'.",
                 type_get_name(iter_type));

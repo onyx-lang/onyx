@@ -22,9 +22,10 @@ main :: proc (args: [] cstr) {
     // of these types in terms of other types. Let's look at some of those types.
 
     // A pointer in Onyx is written as ^<type>. This is read as 'a pointer to a <type>'.
-    // I will not type to explain what a pointer is here, but it is something to note
-    // that pointers in Onyx are only 4-bytes instead of 8-bytes, since Onyx's compile
-    // target is WASM32.
+    // I will not try to explain what a pointer is here, but something to note is that
+    // pointers in Onyx are 8-bytes in size, but only have their lower 4-bytes used,
+    // since Onyx's compile target is WASM32. This way, when WASM64 is standardized,
+    // pointer will not cause any issues when moving over code to 64-bit.
     //
     // Here foo is an i32. The unary prefix ^ operator takes the address of a value.
     // The type of foo_ptr is ^i32, or a pointer to an i32. Another example of a pointer

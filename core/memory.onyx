@@ -11,14 +11,14 @@ set :: proc (start: rawptr, length: u32, value: u8) {
     for i: 0 .. length do s[i] = value;
 }
 
-alloc_slice :: proc (sl: ^[] $T, count: i32) {
-    sl.data  = calloc(sizeof T * count);
+alloc_slice :: proc (sl: ^[] $T, count: i32, allocator := context.allocator) {
+    sl.data  = raw_alloc(allocator, sizeof T * count);
     sl.count = count;
 }
 
-make_slice :: proc ($T: type_expr, count: i32) -> [] T {
+make_slice :: proc ($T: type_expr, count: i32, allocator := context.allocator) -> [] T {
     return <[] T>.{
-        data = calloc(sizeof T * count),
+        data = raw_alloc(allocator, sizeof T * count),
         count = count
     };
 }

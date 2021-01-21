@@ -1045,6 +1045,7 @@ char* get_function_name(AstFunction* func);
 
 AstNumLit* make_int_literal(bh_allocator a, i64 value);
 AstNumLit* make_float_literal(bh_allocator a, f64 value);
+AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
 AstArgument* make_argument(bh_allocator a, AstTyped* value);
 AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);

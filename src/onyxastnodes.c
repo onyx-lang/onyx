@@ -630,6 +630,14 @@ AstNumLit* make_float_literal(bh_allocator a, f64 d) {
     return num;
 }
 
+AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high) {
+    AstRangeLiteral* rl = onyx_ast_node_new(a, sizeof(AstRangeLiteral), Ast_Kind_Range_Literal);
+    rl->type = builtin_range_type_type;
+    rl->low = low;
+    rl->high = high;
+    return rl;
+}
+
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right) {
     AstBinaryOp* binop_node = onyx_ast_node_new(a, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
     binop_node->left  = left;
