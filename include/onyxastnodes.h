@@ -969,7 +969,7 @@ struct Context {
 
     CompileOptions* options;
 
-    bh_arena     token_arena, ast_arena;
+    bh_arena                  ast_arena;
     bh_allocator token_alloc, ast_alloc;
 
     bh_arr(bh_file_contents) loaded_files;

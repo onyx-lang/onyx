@@ -136,11 +136,10 @@ static void context_init(CompileOptions* opts) {
 
     onyx_errors_init(&context.loaded_files);
 
+    context.token_alloc = global_heap_allocator;
+
     // NOTE: Create the arena where tokens and AST nodes will exist
     // Prevents nodes from being scattered across memory due to fragmentation
-    bh_arena_init(&context.token_arena, global_heap_allocator, 16 * 1024 * 1024); // 16MB
-    context.token_alloc = bh_arena_allocator(&context.token_arena);
-
     bh_arena_init(&context.ast_arena, global_heap_allocator, 16 * 1024 * 1024); // 16MB
     context.ast_alloc = bh_arena_allocator(&context.ast_arena);
 
