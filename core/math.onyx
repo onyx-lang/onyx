@@ -2,9 +2,11 @@ package core.math
 
 use package core.intrinsics.wasm {
     sqrt_f32, sqrt_f64,
-    abs_f32,  abs_f64
+    abs_f32,  abs_f64,
+    copysign_f32, copysign_f64
 }
 
+E   :: 2.71828182845904523536f;
 PI  :: 3.14159265f;
 TAU :: 6.28318330f;
 
@@ -67,6 +69,8 @@ sqrt_i32 :: proc (x: i32) -> i32 do return ~~sqrt_f32(~~x);
 sqrt_i64 :: proc (x: i64) -> i64 do return ~~sqrt_f64(~~x);
 sqrt :: proc { sqrt_f32, sqrt_f64, sqrt_i32, sqrt_i64 }
 
+copysign :: proc { copysign_f32, copysign_f64 }
+
 abs_i32 :: proc (x: i32) -> i32 {
     if x >= 0 do return x;
     return -x;
@@ -78,26 +82,51 @@ abs_i64 :: proc (x: i64) -> i64 {
 abs :: proc { abs_i32, abs_i64, abs_f32, abs_f64 }
 
 pow_int :: proc (base: $T, p: i32) -> T {
-    if base == 0 && p == 0 do return 1;
-    elseif p == 0 do return 1;
+    if base == 0 do return 0;
+    if p == 0    do return 1;
+
     a := 1;
-    b := p;
-    c := base;
-    while b > 0 {
-        if b % 2 == 1 do a *= c;
-        b = b >> 1;
-        c *= c;
+    while p > 0 {
+        if p % 2 == 1 do a *= base;
+        p = p >> 1;
+        base *= base;
     }
+
     return a;
 }
 
-pow_float :: proc (base: $T, p: f32) -> T {
-    if base == 0 && p == 0 do return 1;
-    elseif p == 0 do return 1;
+pow_float :: proc (base: $T, p: T) -> T {
+    if p >= 1 {
+        tmp := pow_float(p = p / 2, base = base);
+        return tmp * tmp;
+    }
 
+    low  : T = 0;
+    high : T = 1;
+
+    sqr := sqrt(base);
+    acc := sqr;
+    mid := high / 2;
+
+    while abs(mid - p) > 0.00001 {
+        sqr = sqrt(sqr);
+
+        if mid <= p {
+            low = mid;
+            acc *= sqr;
+        } else {
+            high = mid;
+            acc /= sqr;
+        }
+
+        mid = (low + high) / 2;
+    }
+
+    return acc;
 }
 
 pow :: proc { pow_int, pow_float }
+exp :: proc (p: $T) -> T do return pow(base = cast(T) E, p = p);
 
 ln :: proc (a: f32) -> f32 {
 

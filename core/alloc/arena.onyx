@@ -35,6 +35,10 @@ arena_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: 
             return null;
         }
 
+        if alloc_arena.size % align != 0 {
+            alloc_arena.size += align - (alloc_arena.size % align);
+        }
+
         if alloc_arena.size + size >= alloc_arena.arena_size {
             new_arena := cast(^Arena) raw_alloc(alloc_arena.backing_allocator, alloc_arena.arena_size);
             if new_arena == null do return null;

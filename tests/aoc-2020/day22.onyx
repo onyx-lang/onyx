@@ -45,7 +45,7 @@ combat :: proc (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
 encode_hands :: proc (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
     use package core.string.builder as b
 
-    builder := b.make(128, alloc);
+    builder := b.make(256, alloc);
     for n: *p1 {
         b.add_i64(^builder, ~~n, 64);
         b.add_str(^builder, ",");
