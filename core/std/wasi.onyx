@@ -21,6 +21,7 @@ package core
 #load "core/io/stream"
 #load "core/io/reader"
 #load "core/io/writer"
+#load "core/io/binary"
 
 #load "core/sys/wasi"
 

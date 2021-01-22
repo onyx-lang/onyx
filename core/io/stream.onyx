@@ -8,22 +8,22 @@ Stream :: struct {
 
 #private
 Stream_Vtable :: struct {
-    seek         : proc (s: ^Stream, to: i32, whence: SeekFrom) -> Error;
-    tell         : proc (s: ^Stream) -> (Error, u32);
+    seek         : (s: ^Stream, to: i32, whence: SeekFrom) -> Error;
+    tell         : (s: ^Stream) -> (Error, u32);
 
-    read         : proc (s: ^Stream, buffer: [] u8) -> (Error, u32);
-    read_at      : proc (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32);
-    read_byte    : proc (s: ^Stream) -> (Error, u8);
-    unread_byte  : proc (s: ^Stream) -> Error;
+    read         : (s: ^Stream, buffer: [] u8) -> (Error, u32);
+    read_at      : (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32);
+    read_byte    : (s: ^Stream) -> (Error, u8);
+    unread_byte  : (s: ^Stream) -> Error;
 
-    write        : proc (s: ^Stream, buffer: [] u8) -> (Error, u32);
-    write_at     : proc (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32);
-    write_byte   : proc (s: ^Stream, byte: u8) -> Error;
+    write        : (s: ^Stream, buffer: [] u8) -> (Error, u32);
+    write_at     : (s: ^Stream, at: u32, buffer: [] u8) -> (Error, u32);
+    write_byte   : (s: ^Stream, byte: u8) -> Error;
 
-    close        : proc (s: ^Stream) -> Error;
-    flush        : proc (s: ^Stream) -> Error;
+    close        : (s: ^Stream) -> Error;
+    flush        : (s: ^Stream) -> Error;
 
-    size         : proc (s: ^Stream) -> i32;
+    size         : (s: ^Stream) -> i32;
 }
 
 SeekFrom :: enum {
