@@ -7,22 +7,22 @@ Testing a simple union.
 
 
 Testing a struct with default values.
-DefaultedStruct(0, 1.0, 2, 3.0)
-DefaultedStruct(3, 1.0, 2, 0.0)
+DefaultedStruct(0, 1.0000, 2, 3.0000)
+DefaultedStruct(3, 1.0000, 2, 0.0000)
 
 
 Testing a struct with `use`.
-StructWithUse(1234, (1.0, 2.0), 5678)
-StructWithUse(1234, (1.0, 2.0), 5678)
+StructWithUse(1234, (1.0000, 2.0000), 5678)
+StructWithUse(1234, (1.0000, 2.0000), 5678)
 
 
 Testing a polymorphic struct.
-PolyStruct<i32, f32>(1234, 5678.0)
-PolyStruct<f32, i32>(1234.0, 5678)
+PolyStruct<i32, f32>(1234, 5678.0000)
+PolyStruct<f32, i32>(1234.0000, 5678)
 
 
 Testing a polymorphic struct with default values.
-PolyStruct<i32, f32>(1234, 5678.0)
+PolyStruct<i32, f32>(1234, 5678.0000)
 
 
 Testing a union with use.
@@ -37,4 +37,4 @@ PolyUnion(1234)
 
 Testing a polymorphic union with use.
 16 == 16
-0, 5678.0
+0, 5678.0000

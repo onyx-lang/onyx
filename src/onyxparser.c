@@ -1557,6 +1557,48 @@ static AstType* parse_compound_type(OnyxParser* parser) {
     }
 }
 
+static AstType* parse_function_type(OnyxParser* parser, OnyxToken* proc_token) {
+    bh_arr(AstType *) params = NULL;
+    bh_arr_new(global_scratch_allocator, params, 4);
+    bh_arr_set_length(params, 0);
+
+    expect_token(parser, '(');
+    while (parser->curr->type != ')') {
+        if (parser->hit_unexpected_token) return NULL;
+
+        if (peek_token(1)->type == ':') {
+            expect_token(parser, Token_Type_Symbol);
+            expect_token(parser, ':');
+        }
+
+        AstType* param_type = parse_type(parser);
+        bh_arr_push(params, param_type);
+
+        if (parser->curr->type != ')')
+            expect_token(parser, ',');
+    }
+    consume_token(parser);
+
+    AstType* return_type = (AstType *) &basic_type_void;
+    if (parser->curr->type == Token_Type_Right_Arrow) {
+        consume_token(parser);
+        return_type = parse_type(parser);
+    }
+
+    i64 param_count = bh_arr_length(params);
+    AstFunctionType* new = onyx_ast_node_new(parser->allocator,
+            sizeof(AstFunctionType) + sizeof(AstType*) * param_count,
+            Ast_Kind_Function_Type);
+    new->token = proc_token;
+    new->param_count = param_count;
+    new->return_type = return_type;
+
+    if (param_count > 0)
+        fori (i, 0, param_count) new->params[i] = params[i];
+
+    return (AstType *) new;
+}
+
 // <symbol>
 // '^' <type>
 static AstType* parse_type(OnyxParser* parser) {
@@ -1610,46 +1652,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
             case Token_Type_Keyword_Proc: {
                 OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
-
-                bh_arr(AstType *) params = NULL;
-                bh_arr_new(global_scratch_allocator, params, 4);
-                bh_arr_set_length(params, 0);
-
-                expect_token(parser, '(');
-                while (parser->curr->type != ')') {
-                    if (parser->hit_unexpected_token) return root;
-
-                    if (peek_token(1)->type == ':') {
-                        expect_token(parser, Token_Type_Symbol);
-                        expect_token(parser, ':');
-                    }
-
-                    AstType* param_type = parse_type(parser);
-                    bh_arr_push(params, param_type);
-
-                    if (parser->curr->type != ')')
-                        expect_token(parser, ',');
-                }
-                consume_token(parser);
-
-                AstType* return_type = (AstType *) &basic_type_void;
-                if (parser->curr->type == Token_Type_Right_Arrow) {
-                    consume_token(parser);
-                    return_type = parse_type(parser);
-                }
-
-                i64 param_count = bh_arr_length(params);
-                AstFunctionType* new = onyx_ast_node_new(parser->allocator,
-                        sizeof(AstFunctionType) + sizeof(AstType*) * param_count,
-                        Ast_Kind_Function_Type);
-                new->token = proc_token;
-                new->param_count = param_count;
-                new->return_type = return_type;
-
-                if (param_count > 0)
-                    fori (i, 0, param_count) new->params[i] = params[i];
-
-                *next_insertion = (AstType *) new;
+                *next_insertion = parse_function_type(parser, proc_token);
                 next_insertion = NULL;
                 break;
             }
@@ -1727,12 +1730,18 @@ static AstType* parse_type(OnyxParser* parser) {
             }
 
             case '(': {
-                expect_token(parser, '(');
-                
-                *next_insertion = parse_compound_type(parser);
-                next_insertion = NULL;
+                OnyxToken* matching = find_matching_paren(parser->curr);
 
-                expect_token(parser, ')');
+                if ((matching + 1)->type == Token_Type_Right_Arrow) {
+                    *next_insertion = parse_function_type(parser, parser->curr);
+
+                } else {
+                    expect_token(parser, '(');
+                    *next_insertion = parse_compound_type(parser);
+                    expect_token(parser, ')');
+                }
+
+                next_insertion = NULL;
                 break;
             }
 
