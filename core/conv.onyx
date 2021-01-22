@@ -1,6 +1,6 @@
 package core.conv
 
-i64_to_str :: proc (n: i64, base: u64, buf: [] u8) -> str {
+i64_to_str :: proc (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
     is_neg := false;
     if n < 0 && base == 10 {
         is_neg = true;
@@ -26,6 +26,14 @@ i64_to_str :: proc (n: i64, base: u64, buf: [] u8) -> str {
         *c = #char "0";
         len += 1;
         c -= 1;
+    }
+
+    if min_length > 0 && len < min_length {
+        for i: min_length - len {
+            *c = #char "0";
+            len += 1;
+            c -= 1;
+        }
     }
 
     if base == 16 {
@@ -68,7 +76,7 @@ f64_to_str :: proc (f: f64, buf: [] u8) -> str {
     len = s1.count + 1;
 
     if v < ~~0 do v = -v;
-    s2 := i64_to_str(v % 10000, 10, buf);
+    s2 := i64_to_str(v % 10000, 10, buf, min_length = 4);
     for i: 0 .. s2.count do buf.data[s1.count + 1 + i] = s2.data[i];
     len += s2.count;
 

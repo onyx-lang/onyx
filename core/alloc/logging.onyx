@@ -2,8 +2,8 @@ package core.alloc.log
 
 Allocation_Action_Strings := str.[
     " alloc",
-    "resize",
     "  free",
+    "resize",
 ];
 
 #private_file
