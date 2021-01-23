@@ -1040,6 +1040,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type);
 
 b32 type_check_or_auto_cast(AstTyped** pnode, Type* type);
 Type* resolve_expression_type(AstTyped* node);
+i64 get_expression_integer_value(AstTyped* node);
 
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);

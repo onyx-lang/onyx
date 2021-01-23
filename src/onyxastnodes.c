@@ -429,7 +429,8 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     if (types_are_compatible(node->type, type)) return 1;
     if (node_is_auto_cast((AstNode *) node)) {
         char* dummy;
-        if (!cast_is_legal(((AstUnaryOp *) node)->expr->type, type, &dummy)) {
+        Type* from_type = ((AstUnaryOp *) node)->expr->type;
+        if (!from_type || !cast_is_legal(from_type, type, &dummy)) {
             return 0;
 
         } else {
@@ -491,6 +492,28 @@ Type* resolve_expression_type(AstTyped* node) {
     }
 
     return node->type;
+}
+
+i64 get_expression_integer_value(AstTyped* node) {
+    resolve_expression_type(node);
+
+    if (node->kind == Ast_Kind_NumLit && type_is_integer(node->type)) {
+        return ((AstNumLit *) node)->value.l;
+    }
+
+    if (node->kind == Ast_Kind_Argument) {
+        return get_expression_integer_value(((AstArgument *) node)->value);
+    }
+
+    if (node->kind == Ast_Kind_Size_Of) {
+        return ((AstSizeOf *) node)->size;
+    }
+
+    if (node->kind == Ast_Kind_Align_Of) {
+        return ((AstAlignOf *) node)->alignment;
+    }
+
+    return 0;
 }
 
 static const b32 cast_legality[][11] = {

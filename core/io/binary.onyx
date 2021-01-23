@@ -1,5 +1,7 @@
 package core.io
 
+use package core
+
 BinaryWriter :: struct {
     stream: ^Stream;
 }
@@ -14,43 +16,13 @@ binary_write_byte :: (use bw: ^BinaryWriter, byte: u8) {
     stream_write_byte(stream, byte);
 }
 
-binary_write_i16 :: (use bw: ^BinaryWriter, i: u16) {
-    v := i; 
-    bytes := *cast(^[2] u8) ^v;
-
-    stream_write(stream, ~~ bytes);
-}
-
-binary_write_i32 :: (use bw: ^BinaryWriter, i: u32) {
-    v := i; 
-    bytes := *cast(^[4] u8) ^v;
-
-    stream_write(stream, ~~ bytes);
-}
-
-binary_write_i64 :: (use bw: ^BinaryWriter, i: u64) {
-    v := i; 
-    bytes := *cast(^[8] u8) ^v;
-
-    stream_write(stream, ~~ bytes);
-}
-
-binary_write_f32 :: (use bw: ^BinaryWriter, f: f32) {
-    v := f; 
-    bytes := *cast(^[4] u8) ^v;
-
-    stream_write(stream, ~~ bytes);
-}
-
-binary_write_f64 :: (use bw: ^BinaryWriter, f: f64) {
-    v := f; 
-    bytes := *cast(^[8] u8) ^v;
-
-    stream_write(stream, ~~ bytes);
+binary_write :: (use bw: ^BinaryWriter, $T: type_expr, v: T) {
+    tmp_for_data := v;
+    stream_write(stream, <[] u8>.{ ~~ ^tmp_for_data, sizeof T });
 }
 
 binary_write_slice :: (use bw: ^BinaryWriter, sl: [] $T, output_size := false) {
-    if output_size do binary_write_i32(bw, sl.count);
+    if output_size do binary_write(bw, i32, sl.count);
 
     bytes := <[] u8>.{
         data = cast(^u8) ^sl.data[0],
@@ -79,39 +51,11 @@ binary_read_byte :: (use br: ^BinaryReader) -> u8 {
     return byte;
 }
 
-binary_read_i16 :: (use br: ^BinaryReader) -> u16 {
-    buf: [2] u8;
+binary_read :: (use br: ^BinaryReader, $T: type_expr) -> T {
+    buf: [sizeof T] u8;
     _, bytes_read := stream_read(stream, ~~ buf);
 
-    return *(cast(^u16) buf);
-}
-
-binary_read_i32 :: (use br: ^BinaryReader) -> u32 {
-    buf: [4] u8;
-    _, bytes_read := stream_read(stream, ~~ buf);
-
-    return *(cast(^u32) buf);
-}
-
-binary_read_i64 :: (use br: ^BinaryReader) -> u64 {
-    buf: [8] u8;
-    _, bytes_read := stream_read(stream, ~~ buf);
-
-    return *(cast(^u64) buf);
-}
-
-binary_read_f32 :: (use br: ^BinaryReader) -> f32 {
-    buf: [4] u8;
-    _, bytes_read := stream_read(stream, ~~ buf);
-
-    return *(cast(^f32) buf);
-}
-
-binary_read_f64 :: (use br: ^BinaryReader) -> f64 {
-    buf: [8] u8;
-    _, bytes_read := stream_read(stream, ~~ buf);
-
-    return *(cast(^f64) buf);
+    return *(cast(^T) buf);
 }
 
 binary_read_slice :: (use br: ^BinaryReader,
@@ -119,19 +63,11 @@ binary_read_slice :: (use br: ^BinaryReader,
     size := 0, read_size := false,
     allocator := context.allocator) -> [] T {
     if size == 0 && read_size {
-        size = binary_read_i32(br);
+        size = binary_read(br, i32);
     }
 
-    sl := memory.make_slice(u8, size * sizeof T);
+    sl := memory.make_slice(u8, size * sizeof T, allocator = allocator);
     _, bytes_read := stream_read(stream, sl);
 
     return <[] T>.{ data = cast(^T) sl.data, count = size };
 }
-
-// This should be possible
-// binary_read :: (use br: ^BinaryReader, $T: type_expr) -> T {
-//     buf: [sizeof T] u8;
-//     _, bytes_read := stream_read(stream, ~~ buf);
-// 
-//     return *(cast(^T) buf);
-// }
