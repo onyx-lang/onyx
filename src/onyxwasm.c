@@ -818,7 +818,6 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     //                                              -brendanfh   2020/09/04
 
     AstLocal* var = for_node->var;
-    b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
     u64 offset = 0;
 
     StructMember low_mem, high_mem, step_mem;
@@ -831,29 +830,14 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
 
     WIL(WI_LOCAL_SET, step_local);
     WIL(WI_LOCAL_SET, high_local);
-
-    if (it_is_local) {
-        WIL(WI_LOCAL_TEE, low_local);
-        WIL(WI_LOCAL_SET, iter_local);
-
-    } else {
-        WIL(WI_LOCAL_SET, low_local);
-        emit_local_location(mod, &code, var, &offset);
-        WIL(WI_LOCAL_GET, low_local);
-        emit_store_instruction(mod, &code, var->type, offset);
-    }
+    WIL(WI_LOCAL_TEE, low_local);
+    WIL(WI_LOCAL_SET, iter_local);
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block);
 
-    if (it_is_local) {
-        WIL(WI_LOCAL_GET, iter_local);
-    } else {
-        offset = 0;
-        emit_local_location(mod, &code, var, &offset);
-        emit_load_instruction(mod, &code, var->type, offset);
-    }
+    WIL(WI_LOCAL_GET, iter_local);
     WIL(WI_LOCAL_GET, high_local);
     WI(WI_I32_GE_S);
     WID(WI_COND_JUMP, 0x02);
@@ -862,21 +846,10 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
 
     emit_leave_structured_block(mod, &code);
 
-    if (it_is_local) {
-        WIL(WI_LOCAL_GET, iter_local);
-        WIL(WI_LOCAL_GET, step_local);
-        WI(WI_I32_ADD);
-        WIL(WI_LOCAL_SET, iter_local);
-    } else {
-        offset = 0;
-        emit_local_location(mod, &code, var, &offset);
-        offset = 0;
-        emit_local_location(mod, &code, var, &offset);
-        emit_load_instruction(mod, &code, var->type, offset);
-        WIL(WI_LOCAL_GET, step_local);
-        WI(WI_I32_ADD);
-        emit_store_instruction(mod, &code, var->type, offset);
-    }
+    WIL(WI_LOCAL_GET, iter_local);
+    WIL(WI_LOCAL_GET, step_local);
+    WI(WI_I32_ADD);
+    WIL(WI_LOCAL_SET, iter_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
         WID(WI_JUMP, 0x00);
@@ -2000,17 +1973,7 @@ EMIT_FUNC(struct_lval, AstTyped* lval) {
     assert(type_is_structlike_strict(lval->type));
 
     u64 offset = 0;
-
-    switch (lval->kind) {
-        case Ast_Kind_Local:        emit_local_location(mod, &code, (AstLocal *) lval, &offset); break;
-        case Ast_Kind_Dereference:  emit_expression(mod, &code, ((AstDereference *) lval)->expr); break;
-        case Ast_Kind_Array_Access: emit_array_access_location(mod, &code, (AstArrayAccess *) lval, &offset); break;
-        case Ast_Kind_Field_Access: emit_field_access_location(mod, &code, (AstFieldAccess *) lval, &offset); break;
-        case Ast_Kind_Memres:       emit_memory_reservation_location(mod, &code, (AstMemRes *) lval); break;
-
-        default: assert(0);
-    }
-
+    emit_location_return_offset(mod, &code, lval, &offset);
     emit_struct_store(mod, &code, lval->type, offset);
 
     *pcode = code;
