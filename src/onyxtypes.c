@@ -380,7 +380,14 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             u32 alignment = 1, mem_alignment;
             u32 idx = 0;
             bh_arr_each(AstStructMember *, member, s_node->members) {
-                (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
+                if ((*member)->type == NULL)
+                    (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
+
+                if ((*member)->type == NULL) {
+                    onyx_report_error((*member)->token->pos, "Unable to resolve member type. Try adding it explicitly."); 
+                    s_node->stcache = NULL;
+                    return NULL;
+                }
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {

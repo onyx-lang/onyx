@@ -120,27 +120,36 @@ AstType* symres_type(AstType* type) {
 
         fori (i, 0, bh_arr_length(s_node->members)) {
             AstStructMember *member = s_node->members[i];
-            member->type_node = symres_type(member->type_node);
 
-            if (!node_is_type((AstNode *) member->type_node)) {
-                onyx_report_error(member->token->pos, "Member type is not a type.");
-                return type;
-            }
+            if (member->type_node) {
+                member->type_node = symres_type(member->type_node);
 
-            if (member->flags & Ast_Flag_Struct_Mem_Used) {
-                AstStructType *used = (AstStructType *) member->type_node;
-
-                while (used->kind == Ast_Kind_Type_Alias) {
-                    // NOTE: Maybe not a struct type.
-                    used = (AstStructType *) ((AstTypeAlias *) used)->to;
+                if (!node_is_type((AstNode *) member->type_node)) {
+                    onyx_report_error(member->token->pos, "Member type is not a type.");
+                    return type;
                 }
 
-                if (used->kind != Ast_Kind_Struct_Type) {
-                    onyx_report_error(member->token->pos,
-                            "Can only 'use' members of struct type, got '%s'.",
-                            onyx_ast_node_kind_string(used->kind));
+                if (member->flags & Ast_Flag_Struct_Mem_Used) {
+                    AstType *used = (AstType *) member->type_node;
 
-                    return type;
+                    while (used->kind == Ast_Kind_Type_Alias) {
+                        used = ((AstTypeAlias *) used)->to;
+                    }
+
+                    b32 use_works = (used->kind == Ast_Kind_Struct_Type);
+
+                    if (used->kind == Ast_Kind_Type_Raw_Alias) {
+                        AstTypeRawAlias* alias = (AstTypeRawAlias *) used;
+                        use_works = (alias->to->kind == Type_Kind_Struct);
+                    }
+
+                    if (!use_works) {
+                        onyx_report_error(member->token->pos,
+                                "Can only 'use' members of struct type, got '%s'.",
+                                onyx_ast_node_kind_string(used->kind));
+
+                        return type;
+                    }
                 }
             }
         }
@@ -640,9 +649,6 @@ static void symres_block(AstBlock* block) {
 }
 
 void symres_function_header(AstFunction* func) {
-    if (func->scope == NULL)
-        func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
-
     func->flags |= Ast_Flag_Comptime;
 
     bh_arr_each(AstParam, param, func->params) {
@@ -692,6 +698,17 @@ void symres_function_header(AstFunction* func) {
         onyx_report_error(func->token->pos, "Return type is not a type.");
     }
 
+    bh_arr_each(AstParam, param, func->params) {
+        if (param->local->type_node != NULL) {
+            param->local->type_node = symres_type(param->local->type_node);
+        }
+    }
+}
+
+void symres_function(AstFunction* func) {
+    if (func->scope == NULL)
+        func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
+
     scope_enter(func->scope);
 
     bh_arr_each(AstParam, param, func->params) {
@@ -713,12 +730,7 @@ void symres_function_header(AstFunction* func) {
         //
         // The 'use t : T' member requires completely knowing the type of T, to know which
         // members should be brought in. At the moment, that requires completely building the
-        // type of Foo($T), which is not possible, because the defaulted member 'something_else'
-        // does not have a known type until the default memory gets checked and reduced.
-        if (param->local->type_node != NULL) {
-            param->local->type_node = symres_type(param->local->type_node);
-        }
-
+        // type of Foo($T).
         if (param->local->flags & Ast_Flag_Param_Use) {
             if (param->local->type_node != NULL && param->local->type == NULL) {
                 param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
@@ -739,6 +751,7 @@ void symres_function_header(AstFunction* func) {
 
             } else if (param->local->type != NULL) {
                 onyx_report_error(param->local->token->pos, "Can only 'use' structures or pointers to structures.");
+
             } else {
                 onyx_report_error(param->local->token->pos, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
                     param->local->token->text,
@@ -746,12 +759,6 @@ void symres_function_header(AstFunction* func) {
             }
         }
     }
-
-    scope_leave();
-}
-
-void symres_function(AstFunction* func) {
-    scope_enter(func->scope);
 
     curr_function = func;
     symres_block(func->body);

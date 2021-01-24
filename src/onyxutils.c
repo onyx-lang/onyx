@@ -971,6 +971,8 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
         .scope = ps_type->scope,
     };
 
+    entity_bring_to_state(&struct_entity, Entity_State_Check_Types);
+    entity_bring_to_state(&struct_default_entity, Entity_State_Check_Types);
     entity_bring_to_state(&struct_entity, Entity_State_Code_Gen);
     entity_bring_to_state(&struct_default_entity, Entity_State_Code_Gen);
  

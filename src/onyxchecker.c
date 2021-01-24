@@ -1565,6 +1565,14 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 }
 
 CheckStatus check_struct(AstStructType* s_node) {
+    bh_arr_each(AstStructMember *, smem, s_node->members) {
+        if ((*smem)->type_node == NULL && (*smem)->initial_value != NULL) {
+            check_expression(&(*smem)->initial_value);
+            fill_in_type((*smem)->initial_value);
+            (*smem)->type = resolve_expression_type((*smem)->initial_value);
+        }
+    }
+
     // NOTE: fills in the stcache
     type_build_from_ast(context.ast_alloc, (AstType *) s_node);
     if (s_node->stcache == NULL) return Check_Error;

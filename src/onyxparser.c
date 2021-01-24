@@ -1840,8 +1840,11 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         mem->token = expect_token(parser, Token_Type_Symbol);
+
         expect_token(parser, ':');
-        mem->type_node = parse_type(parser);
+        if (parser->curr->type != '=') {
+            mem->type_node = parse_type(parser);
+        }
 
         if (parser->curr->type == '=') {
             consume_token(parser);
