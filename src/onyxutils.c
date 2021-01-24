@@ -955,7 +955,6 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
     insert_poly_slns_into_scope(ps_type->scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
-    bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
     Entity struct_entity = {
         .state = Entity_State_Resolve_Symbols,
@@ -977,8 +976,11 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
  
     if (onyx_has_errors()) {
         onyx_report_error(pos, "Error in creating polymoprhic struct instantiation here.");
+        bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, NULL);
         return NULL;
     }
+
+    bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
     Type* cs_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_struct);
     cs_type->Struct.poly_sln = NULL;

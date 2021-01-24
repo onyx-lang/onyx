@@ -530,6 +530,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             // CLEANUP: Maybe don't copy it and just use this one since it is allocated on the heap?
             bh_arr_free(slns);
 
+            if (!concrete) return NULL;
             return type_build_from_ast(alloc, (AstType *) concrete);
         }
 

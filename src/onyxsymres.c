@@ -695,11 +695,29 @@ void symres_function_header(AstFunction* func) {
     scope_enter(func->scope);
 
     bh_arr_each(AstParam, param, func->params) {
+        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+
+        // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
+        // resolved and built. This is excessive because all that should need to be known
+        // is the names of the members, since all that happens is implicit field accesses
+        // are placed in the scope. So instead, there should be a way to just query all the
+        // member names in the structure, without needing to know their type. This would be
+        // easy if it were not for 'use' statements in structs. It is made even more complicated
+        // by this situtation:
+        //
+        //     Foo :: struct (T: type_expr) {
+        //         use t : T;
+        // 
+        //         something_else := 5 + 6 * 8;
+        //     }
+        //
+        // The 'use t : T' member requires completely knowing the type of T, to know which
+        // members should be brought in. At the moment, that requires completely building the
+        // type of Foo($T), which is not possible, because the defaulted member 'something_else'
+        // does not have a known type until the default memory gets checked and reduced.
         if (param->local->type_node != NULL) {
             param->local->type_node = symres_type(param->local->type_node);
         }
-
-        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
 
         if (param->local->flags & Ast_Flag_Param_Use) {
             if (param->local->type_node != NULL && param->local->type == NULL) {
