@@ -175,11 +175,30 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
     return (u64) idx;
 }
 
+
+typedef enum StructuredBlockType StructuredBlockType;
+enum StructuredBlockType {
+    SBT_Basic_Block,       // Cannot be targeted using jump
+    SBT_Breakable_Block,   // Targeted using break
+    SBT_Continue_Block,    // Targeted using continue
+    SBT_Fallthrough_Block, // Targeted using fallthrough
+
+    SBT_Basic_If,        // Cannot be targeted using jump
+    SBT_Breakable_If,    // Targeted using break
+
+    SBT_Basic_Loop,      // Cannot be targeted using jump
+    SBT_Continue_Loop, // Targeted using continue
+
+    SBT_Count,
+};
+
+
 #define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }))
 #define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }))
 #define WIL(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } }))
 #define WIP(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } }))
 #define EMIT_FUNC(kind, ...) static void emit_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
+#define EMIT_FUNC_NO_ARGS(kind) static void emit_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode)
 #define STACK_SWAP(type1, type2) { \
     u64 t0 = local_raw_allocate(mod->local_alloc, type1); \
     u64 t1 = local_raw_allocate(mod->local_alloc, type2); \
@@ -230,6 +249,9 @@ EMIT_FUNC(return,                        AstReturn* ret);
 EMIT_FUNC(stack_enter,                   u64 stacksize);
 EMIT_FUNC(stack_leave,                   u32 unused);
 
+EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
+EMIT_FUNC_NO_ARGS(leave_structured_block);
+
 EMIT_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
 
@@ -239,10 +261,8 @@ EMIT_FUNC(function_body, AstFunction* fd) {
 EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (generate_block_headers) {
-        bh_arr_push(mod->structured_jump_target, 1);
-        WID(WI_BLOCK_START, 0x40);
-    }
+    if (generate_block_headers)
+        emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
 
     bh_arr_each(AstTyped *, expr, block->allocate_exprs)
         bh_imap_put(&mod->local_map, (u64) *expr, local_allocate(mod->local_alloc, *expr));
@@ -256,10 +276,53 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     bh_arr_each(AstTyped *, expr, block->allocate_exprs)
         local_free(mod->local_alloc, *expr);
 
-    if (generate_block_headers) {
-        WI(WI_BLOCK_END);
-        bh_arr_pop(mod->structured_jump_target);
-    }
+    if (generate_block_headers)
+        emit_leave_structured_block(mod, &code);
+
+    *pcode = code;
+}
+
+EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    static const StructuredBlockType jump_numbers[SBT_Count] = {
+        /* SBT_Basic_Block */       0,
+        /* SBT_Breakable_Block */   1,
+        /* SBT_Continue_Block */    2,
+        /* SBT_Fallthrough_Block */ 3,
+
+        /* SBT_Basic_If */          0,
+        /* SBT_Breakable_If */      1,
+
+        /* SBT_Basic_Loop */        0,
+        /* SBT_Continue_Loop */   2,
+    };
+    
+    static const WasmInstructionType block_instrs[SBT_Count] = {
+        /* SBT_Basic_Block */       WI_BLOCK_START,
+        /* SBT_Breakable_Block */   WI_BLOCK_START,
+        /* SBT_Continue_Block */    WI_BLOCK_START,
+        /* SBT_Fallthrough_Block */ WI_BLOCK_START,
+
+        /* SBT_Basic_If */          WI_IF_START,
+        /* SBT_Breakable_If */      WI_IF_START,
+
+        /* SBT_Basic_Loop */        WI_LOOP_START,
+        /* SBT_Continue_Loop */   WI_LOOP_START,
+    };
+
+
+    WID(block_instrs[sbt], 0x40);
+    bh_arr_push(mod->structured_jump_target, jump_numbers[sbt]);
+
+    *pcode = code;
+}
+
+EMIT_FUNC_NO_ARGS(leave_structured_block) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    WI(WI_BLOCK_END);
+    bh_arr_pop(mod->structured_jump_target);
 
     *pcode = code;
 }
@@ -672,9 +735,8 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
     }
 
     emit_expression(mod, &code, if_node->cond);
-    WID(WI_IF_START, 0x40);
 
-    bh_arr_push(mod->structured_jump_target, 0);
+    emit_enter_structured_block(mod, &code, SBT_Basic_If);
     if (if_node->true_stmt) emit_block(mod, &code, if_node->true_stmt, 0);
 
     if (if_node->false_stmt) {
@@ -687,13 +749,12 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
         }
     }
 
-    bh_arr_pop(mod->structured_jump_target);
+    emit_leave_structured_block(mod, &code);
 
     if (if_node->assignment != NULL) {
         local_free(mod->local_alloc, (AstTyped *) if_node->local);
     }
 
-    WI(WI_IF_END);
 
     *pcode = code;
 }
@@ -708,46 +769,38 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     }
 
     if (while_node->false_stmt == NULL) {
-        WID(WI_BLOCK_START, 0x40);
-        WID(WI_LOOP_START, 0x40);
+        emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
+        emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
 
         emit_expression(mod, &code, while_node->cond);
         WI(WI_I32_EQZ);
         WID(WI_COND_JUMP, 0x01);
 
-        bh_arr_push(mod->structured_jump_target, 1);
-        bh_arr_push(mod->structured_jump_target, 2);
-
         emit_block(mod, &code, while_node->true_stmt, 0);
-
-        bh_arr_pop(mod->structured_jump_target);
-        bh_arr_pop(mod->structured_jump_target);
 
         if (bh_arr_last(code).type != WI_JUMP)
             WID(WI_JUMP, 0x00);
 
-        WI(WI_LOOP_END);
-        WI(WI_BLOCK_END);
+        emit_leave_structured_block(mod, &code);
+        emit_leave_structured_block(mod, &code);
 
     } else {
         emit_expression(mod, &code, while_node->cond);
 
-        bh_arr_push(mod->structured_jump_target, 1);
-        bh_arr_push(mod->structured_jump_target, 2);
-        WID(WI_IF_START, 0x40);
+        emit_enter_structured_block(mod, &code, SBT_Breakable_If);
+        emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
 
-        WID(WI_LOOP_START, 0x40);
         emit_block(mod, &code, while_node->true_stmt, 0);
+
         emit_expression(mod, &code, while_node->cond);
         WID(WI_COND_JUMP, 0x00);
-        WI(WI_LOOP_END);
 
+        emit_leave_structured_block(mod, &code);
         WI(WI_ELSE);
-        emit_block(mod, &code, while_node->false_stmt, 0);
-        WID(WI_IF_END, 0x40);
 
-        bh_arr_pop(mod->structured_jump_target);
-        bh_arr_pop(mod->structured_jump_target);
+        emit_block(mod, &code, while_node->false_stmt, 0);
+
+        emit_leave_structured_block(mod, &code);
     }
 
     if (while_node->assignment != NULL)
@@ -768,13 +821,13 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
     u64 offset = 0;
 
-    StructMember smem;
-    type_lookup_member(builtin_range_type_type, "low", &smem);
-    u64 low_local  = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
-    type_lookup_member(builtin_range_type_type, "high", &smem);
-    u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
-    type_lookup_member(builtin_range_type_type, "step", &smem);
-    u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+    StructMember low_mem, high_mem, step_mem;
+    type_lookup_member(builtin_range_type_type, "low", &low_mem);
+    type_lookup_member(builtin_range_type_type, "high", &high_mem);
+    type_lookup_member(builtin_range_type_type, "step", &step_mem);
+    u64 low_local  = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(low_mem.type));
+    u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
+    u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
     WIL(WI_LOCAL_SET, step_local);
     WIL(WI_LOCAL_SET, high_local);
@@ -790,13 +843,9 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
         emit_store_instruction(mod, &code, var->type, offset);
     }
 
-    WID(WI_BLOCK_START, 0x40);
-    WID(WI_LOOP_START, 0x40);
-    WID(WI_BLOCK_START, 0x40);
-
-    bh_arr_push(mod->structured_jump_target, 1);
-    bh_arr_push(mod->structured_jump_target, 0);
-    bh_arr_push(mod->structured_jump_target, 2);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block);
 
     if (it_is_local) {
         WIL(WI_LOCAL_GET, iter_local);
@@ -811,8 +860,7 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
 
     emit_block(mod, &code, for_node->stmt, 0);
 
-    bh_arr_pop(mod->structured_jump_target);
-    WI(WI_BLOCK_END);
+    emit_leave_structured_block(mod, &code);
 
     if (it_is_local) {
         WIL(WI_LOCAL_GET, iter_local);
@@ -830,21 +878,15 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
         emit_store_instruction(mod, &code, var->type, offset);
     }
 
-    bh_arr_pop(mod->structured_jump_target);
-    bh_arr_pop(mod->structured_jump_target);
-
     if (bh_arr_last(code).type != WI_JUMP)
         WID(WI_JUMP, 0x00);
 
-    WI(WI_LOOP_END);
-    WI(WI_BLOCK_END);
+    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code);
 
-    type_lookup_member(builtin_range_type_type, "low", &smem);
-    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
-    type_lookup_member(builtin_range_type_type, "high", &smem);
-    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
-    type_lookup_member(builtin_range_type_type, "step", &smem);
-    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(smem.type));
+    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(low_mem.type));
+    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
+    local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
     *pcode = code;
 }
@@ -879,13 +921,9 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     WI(WI_I32_ADD);
     WIL(WI_LOCAL_SET, end_ptr_local);
 
-    WID(WI_BLOCK_START, 0x40);
-    WID(WI_LOOP_START, 0x40);
-    WID(WI_BLOCK_START, 0x40);
-
-    bh_arr_push(mod->structured_jump_target, 1);
-    bh_arr_push(mod->structured_jump_target, 0);
-    bh_arr_push(mod->structured_jump_target, 2);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block);
 
     WIL(WI_LOCAL_GET, ptr_local);
     WIL(WI_LOCAL_GET, end_ptr_local);
@@ -916,8 +954,7 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
 
     emit_block(mod, &code, for_node->stmt, 0);
 
-    bh_arr_pop(mod->structured_jump_target);
-    WI(WI_BLOCK_END);
+    emit_leave_structured_block(mod, &code);
 
     WIL(WI_LOCAL_GET, ptr_local);
     if (elem_size != 0) {
@@ -926,14 +963,11 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     }
     WIL(WI_LOCAL_SET, ptr_local);
 
-    bh_arr_pop(mod->structured_jump_target);
-    bh_arr_pop(mod->structured_jump_target);
-
     if (bh_arr_last(code).type != WI_JUMP)
         WID(WI_JUMP, 0x00);
 
-    WI(WI_LOOP_END);
-    WI(WI_BLOCK_END);
+    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
@@ -977,13 +1011,9 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(WI_I32_ADD);
     WIL(WI_LOCAL_SET, end_ptr_local);
 
-    WID(WI_BLOCK_START, 0x40);
-    WID(WI_LOOP_START, 0x40);
-    WID(WI_BLOCK_START, 0x40);
-
-    bh_arr_push(mod->structured_jump_target, 1);
-    bh_arr_push(mod->structured_jump_target, 0);
-    bh_arr_push(mod->structured_jump_target, 2);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block);
 
     WIL(WI_LOCAL_GET, ptr_local);
     WIL(WI_LOCAL_GET, end_ptr_local);
@@ -1015,8 +1045,7 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
 
     emit_block(mod, &code, for_node->stmt, 0);
 
-    bh_arr_pop(mod->structured_jump_target);
-    WI(WI_BLOCK_END);
+    emit_leave_structured_block(mod, &code);
 
     WIL(WI_LOCAL_GET, ptr_local);
     if (elem_size != 0) {
@@ -1025,14 +1054,11 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     }
     WIL(WI_LOCAL_SET, ptr_local);
 
-    bh_arr_pop(mod->structured_jump_target);
-    bh_arr_pop(mod->structured_jump_target);
-
     if (bh_arr_last(code).type != WI_JUMP)
         WID(WI_JUMP, 0x00);
 
-    WI(WI_LOOP_END);
-    WI(WI_BLOCK_END);
+    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
@@ -1082,15 +1108,13 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         emit_assignment(mod, &code, switch_node->assignment);
     }
 
-    WID(WI_BLOCK_START, 0x40);
-    bh_arr_push(mod->structured_jump_target, 1);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
 
     u64 block_num = 0;
     bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
         if (bh_imap_has(&block_map, (u64) sc->block)) continue;
 
-        WID(WI_BLOCK_START, 0x40);
-        bh_arr_push(mod->structured_jump_target, 3);
+        emit_enter_structured_block(mod, &code, SBT_Fallthrough_Block);
 
         bh_imap_put(&block_map, (u64) sc->block, block_num);
         block_num++;
@@ -1106,6 +1130,18 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         bt->cases[sc->key - switch_node->min_case] = bh_imap_get(&block_map, (u64) sc->value);
     }
 
+    // CLEANUP: We enter a new block here in order to setup the correct
+    // indicies for the jump targets in the branch table. For example,
+    //
+    // <expr>
+    // jump_table
+    // label0:
+    // ...
+    // label1:
+    // ...
+    //
+    // If we didn't enter a new block, then jumping to label 0, would jump
+    // to the second block, and so on.
     WID(WI_BLOCK_START, 0x40);
     emit_expression(mod, &code, switch_node->expr);
     if (switch_node->min_case != 0) {
@@ -1125,8 +1161,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         if (bh_arr_last(code).type != WI_JUMP)
             WID(WI_JUMP, block_num - bn);
 
-        WI(WI_BLOCK_END);
-        bh_arr_pop(mod->structured_jump_target);
+        emit_leave_structured_block(mod, &code);
 
         bh_imap_put(&block_map, (u64) sc->block, 0xdeadbeef);
     }
@@ -1135,8 +1170,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         emit_block(mod, &code, switch_node->default_case, 0);
     }
 
-    WI(WI_BLOCK_END);
-    bh_arr_pop(mod->structured_jump_target);
+    emit_leave_structured_block(mod, &code);
 
     if (switch_node->assignment != NULL)
         local_free(mod->local_alloc, (AstTyped *) switch_node->local);
