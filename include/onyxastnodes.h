@@ -974,6 +974,9 @@ struct Context {
     bh_allocator token_alloc, ast_alloc;
 
     bh_arr(bh_file_contents) loaded_files;
+
+    // NOTE: This is defined in onyxwasm.h
+    struct OnyxWasmModule* wasm_module;
 };
 
 extern Context context;

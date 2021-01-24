@@ -2,8 +2,6 @@
 #include "onyxwasm.h"
 #include "onyxutils.h"
 
-OnyxWasmModule global_wasm_module;
-
 // NOTE: Allows easier testing of types since most of the characters
 // corresponding to these values are not printable
 #if 1
@@ -3225,7 +3223,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 }
 
 void emit_entity(Entity* ent) {
-    OnyxWasmModule* module = &global_wasm_module;
+    OnyxWasmModule* module = context.wasm_module;
 
     if (module->stack_top_ptr) {
         *module->stack_top_ptr = module->next_datum_offset;

@@ -148,9 +148,8 @@ static void context_init(CompileOptions* opts) {
     bh_arena_init(&context.ast_arena, global_heap_allocator, 16 * 1024 * 1024); // 16MB
     context.ast_alloc = bh_arena_allocator(&context.ast_arena);
 
-    // HACK
-    // MOVE TO CONTEXT
-    global_wasm_module = onyx_wasm_module_create(context.options->allocator);
+    context.wasm_module = bh_alloc_item(global_heap_allocator, OnyxWasmModule);
+    *context.wasm_module = onyx_wasm_module_create(global_heap_allocator);
 
     // NOTE: Add builtin entities to pipeline.
     entity_heap_insert(&context.entities, ((Entity) {
@@ -551,7 +550,7 @@ static i32 onyx_compile() {
     if (context.options->verbose_output)
         bh_printf("Outputting to WASM file:   %s\n", output_file.filename);
 
-    onyx_wasm_module_write_to_file(&global_wasm_module, output_file);
+    onyx_wasm_module_write_to_file(context.wasm_module, output_file);
 
     u64 duration = bh_time_duration(start_time);
     

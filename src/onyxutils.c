@@ -985,10 +985,11 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
     bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
     Type* cs_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_struct);
-    cs_type->Struct.poly_sln = NULL;
-    bh_arr_new(global_heap_allocator, cs_type->Struct.poly_sln, bh_arr_length(slns));
 
-    fori (i, 0, bh_arr_length(slns)) bh_arr_push(cs_type->Struct.poly_sln, slns[i]);
+    // CLEANUP: This should not be necessary since the only place this function can be
+    // called from is type_build_from_ast in the Ast_Kind_Poly_Call_Type case, which
+    // allocates the 'slns' array on the heap. So, duplicating it should not be necessary.
+    cs_type->Struct.poly_sln = bh_arr_copy(global_heap_allocator, slns);
 
     cs_type->Struct.name = build_poly_struct_name(ps_type, cs_type);
     return concrete_struct;

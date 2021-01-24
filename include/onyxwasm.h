@@ -543,8 +543,6 @@ typedef struct OnyxWasmModule {
     b32 has_stack_locals : 1;
 } OnyxWasmModule;
 
-extern OnyxWasmModule global_wasm_module;
-
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
 void onyx_wasm_module_compile(OnyxWasmModule* module);
 void onyx_wasm_module_free(OnyxWasmModule* module);

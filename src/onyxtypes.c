@@ -384,6 +384,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 if ((*member)->type == NULL) {
+                    // :ExplicitTyping
                     onyx_report_error((*member)->token->pos, "Unable to resolve member type. Try adding it explicitly."); 
                     s_node->stcache = NULL;
                     return NULL;

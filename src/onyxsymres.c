@@ -753,6 +753,7 @@ void symres_function(AstFunction* func) {
                 onyx_report_error(param->local->token->pos, "Can only 'use' structures or pointers to structures.");
 
             } else {
+                // :ExplicitTyping
                 onyx_report_error(param->local->token->pos, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
                     param->local->token->text,
                     param->local->token->length);
