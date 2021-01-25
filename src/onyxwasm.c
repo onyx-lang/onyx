@@ -238,7 +238,7 @@ EMIT_FUNC(location_return_offset,        AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                      AstTyped* expr);
 EMIT_FUNC(struct_load,                   Type* type, u64 offset);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
-EMIT_FUNC(struct_store,                  Type* type, u64 offset);
+EMIT_FUNC(struct_store,                  Type* type, u64 offset, b32 location_first);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
 EMIT_FUNC(array_store,                   Type* type, u32 offset);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
@@ -390,14 +390,6 @@ EMIT_FUNC(statement, AstNode* stmt) {
 EMIT_FUNC(assignment, AstBinaryOp* assign) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (type_is_structlike_strict(assign->right->type)) {
-        emit_expression(mod, &code, assign->right);
-        emit_struct_lval(mod, &code, assign->left);
-
-        *pcode = code;
-        return;
-    }
-
     if (assign->right->type->kind == Type_Kind_Array) {
         emit_assignment_of_array(mod, &code, assign->left, assign->right);
         *pcode = code;
@@ -492,17 +484,9 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
 
         AstArrayLiteral* al = (AstArrayLiteral *) right;
         fori (i, 0, elem_count) {
-            if (!type_is_compound(elem_type))
-                WIL(WI_LOCAL_GET, lptr_local);
-
+            WIL(WI_LOCAL_GET, lptr_local);
             emit_expression(mod, &code, al->values[i]);
-
-            if (!type_is_compound(elem_type)) {
-                emit_store_instruction(mod, &code, elem_type, i * elem_size);
-            } else {
-                WIL(WI_LOCAL_GET, lptr_local);
-                emit_store_instruction(mod, &code, elem_type, i * elem_size);
-            }
+            emit_store_instruction(mod, &code, elem_type, i * elem_size);
         }
         
         local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
@@ -557,7 +541,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (type_is_structlike_strict(type)) {
-        emit_struct_store(mod, pcode, type, offset);
+        emit_struct_store(mod, pcode, type, offset, 0);
         return;
     }
 
@@ -567,37 +551,42 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     }
 
     if (type->kind == Type_Kind_Compound) {
-        u64 loc_tmp = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        WIL(WI_LOCAL_SET, loc_tmp);
+        // CLEANUP: This is copy of struct_store
+        bh_arr(u64) temp_locals = NULL;
+        bh_arr_new(global_heap_allocator, temp_locals, 4);
 
-        u32 placement = offset + type_size_of(type);
-        forir (i, type->Compound.count - 1, 0) {
-            Type* curr_type = type->Compound.types[i];
-            placement -= bh_max(type_size_of(curr_type), 4);
+        TypeWithOffset two;
 
-            if (type_is_compound(curr_type)) {
-                if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == loc_tmp) {
-                    bh_arr_last(code).type = WI_LOCAL_TEE;
-                } else {
-                    WIL(WI_LOCAL_GET, loc_tmp);
-                }
+        u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
 
-                emit_store_instruction(mod, &code, curr_type, placement);
-            } else {
-                WasmType wt = onyx_type_to_wasm_type(curr_type);
-                u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
+        u32 elem_count = type_linear_member_count(type);
+        forir (i, elem_count - 1, 0) {
+            type_linear_member_lookup(type, i, &two);
 
-                WIL(WI_LOCAL_SET, tmp_idx);
-                WIL(WI_LOCAL_GET, loc_tmp);
-                WIL(WI_LOCAL_GET, tmp_idx);
+            WasmType wt = onyx_type_to_wasm_type(two.type);
+            u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
 
-                emit_store_instruction(mod, &code, curr_type, placement);
-
-                local_raw_free(mod->local_alloc, wt);
-            }
+            bh_arr_push(temp_locals, tmp_idx);
+            WIL(WI_LOCAL_SET, tmp_idx);
         }
 
+        WIL(WI_LOCAL_SET, loc_idx);
+
+        fori (i, 0, elem_count) {
+            type_linear_member_lookup(type, i, &two);
+
+            u64 tmp_idx = bh_arr_pop(temp_locals); 
+            WIL(WI_LOCAL_GET, loc_idx);
+            WIL(WI_LOCAL_GET, tmp_idx);
+            emit_store_instruction(mod, &code, two.type, offset + two.offset);
+
+            WasmType wt = onyx_type_to_wasm_type(two.type);
+            local_raw_free(mod->local_alloc, wt);
+        }
+
+        bh_arr_free(temp_locals);
         local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+
         *pcode = code;
         return;
     }
@@ -904,24 +893,17 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
-        // NOTE: Storing structs requires that the location to store it is,
-        // the top most thing on the stack. Everything requires it to be
-        // 'under' the other element being stored.  -brendanfh 2020/09/04
-        if (!it_is_local && !type_is_structlike(var->type)) {
+        if (!it_is_local) {
             emit_local_location(mod, &code, var, &offset);
         }
 
         WIL(WI_LOCAL_GET, ptr_local);
         emit_load_instruction(mod, &code, var->type, 0);
-        if (it_is_local) {
-            WIL(WI_LOCAL_SET, iter_local);
+
+        if (!it_is_local) {
+            emit_store_instruction(mod, &code, var->type, offset);
         } else {
-            if (!type_is_structlike(var->type)) {
-                emit_store_instruction(mod, &code, var->type, offset);
-            } else {
-                emit_local_location(mod, &code, var, &offset);
-                emit_store_instruction(mod, &code, var->type, offset);
-            }
+            WIL(WI_LOCAL_SET, iter_local);
         }
     }
 
@@ -994,25 +976,17 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
-        // NOTE: Storing structs requires that the location to store it is,
-        // the top most thing on the stack. Everything requires it to be
-        // 'under' the other element being stored.  -brendanfh 2020/09/04
-        if (!it_is_local && !type_is_structlike(var->type)) {
+        if (!it_is_local) {
             emit_local_location(mod, &code, var, &offset);
         }
 
         WIL(WI_LOCAL_GET, ptr_local);
         emit_load_instruction(mod, &code, var->type, 0);
-        if (it_is_local) {
-            WIL(WI_LOCAL_SET, iter_local);
+
+        if (!it_is_local) {
+            emit_store_instruction(mod, &code, var->type, offset);
         } else {
-            if (!type_is_structlike(var->type)) {
-                emit_store_instruction(mod, &code, var->type, offset);
-            } else {
-                offset = 0;
-                emit_local_location(mod, &code, var, &offset);
-                emit_store_instruction(mod, &code, var->type, offset);
-            }
+            WIL(WI_LOCAL_SET, iter_local);
         }
     }
 
@@ -1340,7 +1314,6 @@ EMIT_FUNC(call, AstCall* call) {
         if (arg->is_baked) continue;
 
         b32 place_on_stack  = 0;
-        b32 arg_is_compound = type_is_compound(arg->value->type);
 
         if (arg->va_kind != VA_Kind_Not_VA) {
             if (vararg_offset == 0xffffffff) vararg_offset = stack_grow_amm;
@@ -1348,7 +1321,7 @@ EMIT_FUNC(call, AstCall* call) {
         }
         if (type_get_param_pass(arg->value->type) == Param_Pass_By_Implicit_Pointer) place_on_stack = 1;
 
-        if (place_on_stack && !arg_is_compound) WID(WI_GLOBAL_GET, stack_top_idx);
+        if (place_on_stack) WID(WI_GLOBAL_GET, stack_top_idx);
 
         if (stack_grow_amm != 0) {
             stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
@@ -1371,7 +1344,6 @@ EMIT_FUNC(call, AstCall* call) {
         }
 
         if (place_on_stack) {
-            if (arg_is_compound) WID(WI_GLOBAL_GET, stack_top_idx);
             emit_store_instruction(mod, &code, arg->value->type, stack_grow_amm);
 
             if (arg->va_kind != VA_Kind_Not_VA) vararg_count += 1;
@@ -1974,12 +1946,12 @@ EMIT_FUNC(struct_lval, AstTyped* lval) {
 
     u64 offset = 0;
     emit_location_return_offset(mod, &code, lval, &offset);
-    emit_struct_store(mod, &code, lval->type, offset);
+    emit_struct_store(mod, &code, lval->type, offset, 1);
 
     *pcode = code;
 }
 
-EMIT_FUNC(struct_store, Type* type, u64 offset) {
+EMIT_FUNC(struct_store, Type* type, u64 offset, b32 location_first) {
     // NOTE: Expects the stack to look like:
     //      mem_1
     //      mem_2
@@ -1990,14 +1962,13 @@ EMIT_FUNC(struct_store, Type* type, u64 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
     assert(type_is_structlike_strict(type));
-
-    u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    WIL(WI_LOCAL_SET, loc_idx);
-
     bh_arr(u64) temp_locals = NULL;
     bh_arr_new(global_heap_allocator, temp_locals, 4);
 
     TypeWithOffset two;
+
+    u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    if (location_first) WIL(WI_LOCAL_SET, loc_idx);
 
     u32 elem_count = type_linear_member_count(type);
     forir (i, elem_count - 1, 0) {
@@ -2009,6 +1980,8 @@ EMIT_FUNC(struct_store, Type* type, u64 offset) {
         bh_arr_push(temp_locals, tmp_idx);
         WIL(WI_LOCAL_SET, tmp_idx);
     }
+
+    if (!location_first) WIL(WI_LOCAL_SET, loc_idx);
 
     fori (i, 0, elem_count) {
         type_linear_member_lookup(type, i, &two);
@@ -2060,8 +2033,7 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     // greater than like 16 we output a loop that copies them?
     //                                               - brendanfh 2020/12/16
     fori (i, 0, elem_count) {
-        if (!type_is_compound(elem_type))
-            WIL(WI_LOCAL_GET, lptr_local);
+        WIL(WI_LOCAL_GET, lptr_local);
 
         if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == rptr_local)
             bh_arr_last(code).type = WI_LOCAL_TEE;
@@ -2069,12 +2041,7 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
             WIL(WI_LOCAL_GET, rptr_local);
         emit_load_instruction(mod, &code, elem_type, i * elem_size);
 
-        if (!type_is_compound(elem_type)) {
-            emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
-        } else {
-            WIL(WI_LOCAL_GET, lptr_local);
-            emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
-        }
+        emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
@@ -2095,17 +2062,9 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     u32 elem_size = type_size_of(al->type->Array.elem);
 
     fori (i, 0, al->type->Array.count) {
-        if (!type_is_compound(al->type->Array.elem))
-            WIL(WI_LOCAL_GET, mod->stack_base_idx);
-
+        WIL(WI_LOCAL_GET, mod->stack_base_idx);
         emit_expression(mod, &code, al->values[i]);
-
-        if (!type_is_compound(al->type->Array.elem)) {
-            emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
-        } else {
-            WIL(WI_LOCAL_GET, mod->stack_base_idx);
-            emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
-        }
+        emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
     }
 
     WIL(WI_LOCAL_GET, mod->stack_base_idx);
@@ -2545,23 +2504,12 @@ EMIT_FUNC(return, AstReturn* ret) {
 
     if (ret->expr) {
         if (mod->curr_cc == CC_Return_Stack) {
-            if (type_is_compound(ret->expr->type)) {
-                emit_expression(mod, &code, ret->expr);
+            WIL(WI_LOCAL_GET, mod->stack_base_idx);
+            WID(WI_I32_CONST, type_size_of(ret->expr->type));
+            WI(WI_I32_SUB);
 
-                WIL(WI_LOCAL_GET, mod->stack_base_idx);
-                WID(WI_I32_CONST, type_size_of(ret->expr->type));
-                WI(WI_I32_SUB);
-
-                emit_store_instruction(mod, &code, ret->expr->type, 0);
-
-            } else {
-                WIL(WI_LOCAL_GET, mod->stack_base_idx);
-                WID(WI_I32_CONST, type_size_of(ret->expr->type));
-                WI(WI_I32_SUB);
-
-                emit_expression(mod, &code, ret->expr);
-                emit_store_instruction(mod, &code, ret->expr->type, 0);
-            }
+            emit_expression(mod, &code, ret->expr);
+            emit_store_instruction(mod, &code, ret->expr->type, 0);
 
         } else {
             emit_expression(mod, &code, ret->expr);
