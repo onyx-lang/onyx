@@ -238,8 +238,8 @@ EMIT_FUNC(location_return_offset,        AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                      AstTyped* expr);
 EMIT_FUNC(struct_load,                   Type* type, u64 offset);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
-EMIT_FUNC(struct_store,                  Type* type, u64 offset, b32 location_first);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
+EMIT_FUNC(compound_store,                Type* type, u64 offset, b32 location_first);
 EMIT_FUNC(array_store,                   Type* type, u32 offset);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                 AstRangeLiteral* range);
@@ -514,8 +514,8 @@ EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
 EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (type_is_structlike_strict(type)) {
-        emit_struct_store(mod, pcode, type, offset, 0);
+    if (type_is_compound(type)) {
+        emit_compound_store(mod, pcode, type, offset, 0);
         return;
     }
 
@@ -524,54 +524,8 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
         return;
     }
 
-    if (type->kind == Type_Kind_Compound) {
-        // CLEANUP: This is copy of struct_store
-        bh_arr(u64) temp_locals = NULL;
-        bh_arr_new(global_heap_allocator, temp_locals, 4);
-
-        TypeWithOffset two;
-
-        u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-
-        u32 elem_count = type_linear_member_count(type);
-        forir (i, elem_count - 1, 0) {
-            type_linear_member_lookup(type, i, &two);
-
-            WasmType wt = onyx_type_to_wasm_type(two.type);
-            u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
-
-            bh_arr_push(temp_locals, tmp_idx);
-            WIL(WI_LOCAL_SET, tmp_idx);
-        }
-
-        WIL(WI_LOCAL_SET, loc_idx);
-
-        fori (i, 0, elem_count) {
-            type_linear_member_lookup(type, i, &two);
-
-            u64 tmp_idx = bh_arr_pop(temp_locals); 
-            WIL(WI_LOCAL_GET, loc_idx);
-            WIL(WI_LOCAL_GET, tmp_idx);
-            emit_store_instruction(mod, &code, two.type, offset + two.offset);
-
-            WasmType wt = onyx_type_to_wasm_type(two.type);
-            local_raw_free(mod->local_alloc, wt);
-        }
-
-        bh_arr_free(temp_locals);
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-
-        *pcode = code;
-        return;
-    }
-
-    if (type->kind == Type_Kind_Enum) {
-        type = type->Enum.backing;
-    }
-
-    if (type->kind == Type_Kind_Function) {
-        type = &basic_types[Basic_Kind_U32];
-    }
+    if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
+    if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
 
     u32 alignment = type_get_alignment_log2(type);
 
@@ -1920,12 +1874,12 @@ EMIT_FUNC(struct_lval, AstTyped* lval) {
 
     u64 offset = 0;
     emit_location_return_offset(mod, &code, lval, &offset);
-    emit_struct_store(mod, &code, lval->type, offset, 1);
+    emit_compound_store(mod, &code, lval->type, offset, 1);
 
     *pcode = code;
 }
 
-EMIT_FUNC(struct_store, Type* type, u64 offset, b32 location_first) {
+EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     // NOTE: Expects the stack to look like:
     //      mem_1
     //      mem_2
@@ -1934,8 +1888,6 @@ EMIT_FUNC(struct_store, Type* type, u64 offset, b32 location_first) {
     //      loc
 
     bh_arr(WasmInstruction) code = *pcode;
-
-    assert(type_is_structlike_strict(type));
     bh_arr(u64) temp_locals = NULL;
     bh_arr_new(global_heap_allocator, temp_locals, 4);
 
