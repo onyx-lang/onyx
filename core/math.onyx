@@ -85,7 +85,7 @@ pow_int :: proc (base: $T, p: i32) -> T {
     if base == 0 do return 0;
     if p == 0    do return 1;
 
-    a := 1;
+    a: T = 1;
     while p > 0 {
         if p % 2 == 1 do a *= base;
         p = p >> 1;
