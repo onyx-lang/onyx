@@ -461,6 +461,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             size = bh_max(s_node->min_size, size);
             s_type->Struct.size = size;
 
+            s_type->Struct.linear_members = NULL;
+            bh_arr_new(global_heap_allocator, s_type->Struct.linear_members, s_type->Struct.mem_count);
+            build_linear_types_with_offset(s_type, &s_type->Struct.linear_members, 0);
+
             return s_type;
         }
 
@@ -560,6 +564,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             bh_align(comp_type->Compound.size, 4);
 
+            comp_type->Compound.linear_members = NULL;
+            bh_arr_new(global_heap_allocator, comp_type->Compound.linear_members, comp_type->Compound.count);
+            build_linear_types_with_offset(comp_type, &comp_type->Compound.linear_members, 0);
+
             return comp_type;
         }
 
@@ -611,6 +619,10 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
     }
     
     bh_align(comp_type->Compound.size, 4);
+    
+    comp_type->Compound.linear_members = NULL;
+    bh_arr_new(global_heap_allocator, comp_type->Compound.linear_members, comp_type->Compound.count);
+    build_linear_types_with_offset(comp_type, &comp_type->Compound.linear_members, 0);
 
     return comp_type;
 }
@@ -659,6 +671,34 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
     va_type->VarArgs.ptr_to_data = type_make_pointer(alloc, of);
 
     return va_type;
+}
+
+void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset) {
+    if (type_is_structlike_strict(type)) {
+        u32 mem_count = type_structlike_mem_count(type);
+        StructMember smem;
+        fori (i, 0, mem_count) {
+            type_lookup_member_by_idx(type, i, &smem);
+            build_linear_types_with_offset(smem.type, pdest, offset + smem.offset);
+        }
+
+    } else if (type->kind == Type_Kind_Compound) {
+        u32 elem_offset = 0;
+        fori (i, 0, type->Compound.count) {
+            build_linear_types_with_offset(type->Compound.types[i], pdest, offset + elem_offset);
+            elem_offset += bh_max(type_size_of(type->Compound.types[i]), 4);
+        }
+
+    } else {
+        bh_arr(TypeWithOffset) dest = *pdest;
+
+        TypeWithOffset two;
+        two.type = type;
+        two.offset = offset;
+        bh_arr_push(dest, two);
+
+        *pdest = dest;
+    }
 }
 
 const char* type_get_unique_name(Type* type) {
@@ -894,6 +934,54 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
         }
 
         default: return 0;
+    }
+}
+
+i32 type_linear_member_count(Type* type) {
+    switch (type->kind) {
+        case Type_Kind_Slice:
+        case Type_Kind_VarArgs:  return 2;
+        case Type_Kind_DynArray: return 3;
+        case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
+        case Type_Kind_Struct:   return bh_arr_length(type->Struct.linear_members);
+        default: return 0; 
+    }
+}
+
+b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
+    switch (type->kind) {
+        case Type_Kind_Slice:
+        case Type_Kind_VarArgs: {
+            if (idx == 0) { 
+                two->type = type->Slice.ptr_to_data;
+                two->offset = 0;
+            }
+            if (idx == 1) {
+                two->type = &basic_types[Basic_Kind_U32];
+                two->offset = 8;
+            }
+
+            return 1;
+        }
+        case Type_Kind_DynArray: {
+            if (idx == 0) { 
+                two->type = type->DynArray.ptr_to_data;
+                two->offset = 0;
+            }
+            if (idx == 1) {
+                two->type = &basic_types[Basic_Kind_U32];
+                two->offset = 8;
+            }
+            if (idx == 2) {
+                two->type = &basic_types[Basic_Kind_U32];
+                two->offset = 12;
+            }
+
+            return 1;
+        }
+        case Type_Kind_Compound: *two = type->Compound.linear_members[idx]; return 1;
+        case Type_Kind_Struct:   *two = type->Struct.linear_members[idx];   return 1;
+        default: return 0; 
     }
 }
 

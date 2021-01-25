@@ -485,7 +485,7 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
 
             case Ast_Kind_Type_Compound: {
                 if (elem.actual->kind != Type_Kind_Compound) break;
-                if (bh_arr_length(elem.actual->Compound.types) != bh_arr_length(((AstCompoundType *) elem.type_expr)->types)) break;
+                if (elem.actual->Compound.count != (u32) bh_arr_length(((AstCompoundType *) elem.type_expr)->types)) break;
 
                 AstCompoundType* ct = (AstCompoundType *) elem.type_expr;
 

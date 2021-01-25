@@ -73,6 +73,12 @@ typedef struct StructMember {
     b32 used : 1;
 } StructMember;
 
+typedef struct TypeWithOffset TypeWithOffset;
+struct TypeWithOffset {
+    Type* type;
+    u32   offset;
+};
+
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                                   \
     TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })    \
@@ -90,10 +96,12 @@ typedef struct StructMember {
         bh_table(StructMember) members;                           \
         bh_arr(StructMember *) memarr;                            \
         bh_arr(struct AstPolySolution) poly_sln;                  \
+        bh_arr(TypeWithOffset) linear_members;                    \
     })                                                            \
     TYPE_KIND(Compound, struct {                                  \
         u32 count;                                                \
         u32 size;                                                 \
+        bh_arr(TypeWithOffset) linear_members;                    \
         Type* types[];                                            \
     })                                                            \
     TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
@@ -158,12 +166,17 @@ Type* type_make_slice(bh_allocator alloc, Type* of);
 Type* type_make_dynarray(bh_allocator alloc, Type* of);
 Type* type_make_varargs(bh_allocator alloc, Type* of);
 
+void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset);
+
 const char* type_get_unique_name(Type* type);
 const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem);
 b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem);
+
+i32 type_linear_member_count(Type* type);
+b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two);
 
 b32 type_struct_is_simple(Type* type);
 

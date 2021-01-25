@@ -1994,35 +1994,35 @@ EMIT_FUNC(struct_store, Type* type, u64 offset) {
     u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     WIL(WI_LOCAL_SET, loc_idx);
 
-    StructMember smem;
+    bh_arr(u64) temp_locals = NULL;
+    bh_arr_new(global_heap_allocator, temp_locals, 4);
 
-    u32 mem_count = type_structlike_mem_count(type);
-    forir (i, mem_count - 1, 0) {
-        type_lookup_member_by_idx(type, i, &smem);
+    TypeWithOffset two;
 
-        if (type_is_structlike_strict(smem.type)) {
-            if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == loc_idx) {
-                bh_arr_last(code).type = WI_LOCAL_TEE;
-            } else {
-                WIL(WI_LOCAL_GET, loc_idx);
-            }
+    u32 elem_count = type_linear_member_count(type);
+    forir (i, elem_count - 1, 0) {
+        type_linear_member_lookup(type, i, &two);
 
-            emit_struct_store(mod, &code, smem.type, offset + smem.offset);
+        WasmType wt = onyx_type_to_wasm_type(two.type);
+        u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
 
-        } else {
-            WasmType wt = onyx_type_to_wasm_type(smem.type);
-            u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
-
-            WIL(WI_LOCAL_SET, tmp_idx);
-            WIL(WI_LOCAL_GET, loc_idx);
-            WIL(WI_LOCAL_GET, tmp_idx);
-
-            emit_store_instruction(mod, &code, smem.type, offset + smem.offset);
-
-            local_raw_free(mod->local_alloc, wt);
-        }
+        bh_arr_push(temp_locals, tmp_idx);
+        WIL(WI_LOCAL_SET, tmp_idx);
     }
 
+    fori (i, 0, elem_count) {
+        type_linear_member_lookup(type, i, &two);
+
+        u64 tmp_idx = bh_arr_pop(temp_locals); 
+        WIL(WI_LOCAL_GET, loc_idx);
+        WIL(WI_LOCAL_GET, tmp_idx);
+        emit_store_instruction(mod, &code, two.type, offset + two.offset);
+
+        WasmType wt = onyx_type_to_wasm_type(two.type);
+        local_raw_free(mod->local_alloc, wt);
+    }
+
+    bh_arr_free(temp_locals);
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     *pcode = code;
