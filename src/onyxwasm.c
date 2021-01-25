@@ -236,7 +236,7 @@ EMIT_FUNC(local_location,                AstLocal* local, u64* offset_return);
 EMIT_FUNC(memory_reservation_location,   AstMemRes* memres);
 EMIT_FUNC(location_return_offset,        AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                      AstTyped* expr);
-EMIT_FUNC(struct_load,                   Type* type, u64 offset);
+EMIT_FUNC(compound_load,                   Type* type, u64 offset);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
 EMIT_FUNC(compound_store,                Type* type, u64 offset, b32 location_first);
@@ -531,22 +531,18 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
 
     i32 store_size  = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
-    i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
-    i32 is_integer  = is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean));
-    i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
-    i32 is_simd     = is_basic && (type->Basic.flags & Basic_Flag_SIMD);
 
-    if (is_pointer) {
+    if (is_basic && (type->Basic.flags & Basic_Flag_Pointer)) {
         WID(WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
-    } else if (is_integer) {
+    } else if (is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean))) {
         if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { alignment, offset }));
-    } else if (is_float) {
+    } else if (is_basic && (type->Basic.flags & Basic_Flag_Float)) {
         if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
         else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
-    } else if (is_simd) {
+    } else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
         WID(WI_V128_STORE, ((WasmInstructionData) { alignment, offset }));
     } else {
         onyx_report_error((OnyxFilePos) { 0 },
@@ -560,8 +556,8 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
 EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (type_is_structlike_strict(type)) {
-        emit_struct_load(mod, pcode, type, offset);
+    if (type_is_compound(type)) {
+        emit_compound_load(mod, pcode, type, offset);
         return;
     }
 
@@ -575,59 +571,32 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
         return;
     }
 
-    if (type->kind == Type_Kind_Compound) {
-        u64 loc_tmp = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        WIL(WI_LOCAL_TEE, loc_tmp);
-
-        u32 accum_offset = offset;
-        fori (i, 0, type->Compound.count) {
-            if (i != 0) WIL(WI_LOCAL_GET, loc_tmp);
-
-            emit_load_instruction(mod, &code, type->Compound.types[i], accum_offset);
-            accum_offset += bh_max(type_size_of(type->Compound.types[i]), 4);
-        }
-
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-        *pcode = code;
-        return;
-    }
-
-    if (type->kind == Type_Kind_Enum) {
-        type = type->Enum.backing;
-    }
-
-    if (type->kind == Type_Kind_Function) {
-        type = &basic_types[Basic_Kind_U32];
-    }
+    if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
+    if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
 
     i32 load_size   = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
-    i32 is_pointer  = is_basic && (type->Basic.flags & Basic_Flag_Pointer);
-    i32 is_integer  = is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean));
-    i32 is_float    = is_basic && (type->Basic.flags & Basic_Flag_Float);
-    i32 is_unsigned = is_basic && (type->Basic.flags & Basic_Flag_Unsigned);
-    i32 is_simd     = is_basic && (type->Basic.flags & Basic_Flag_SIMD);
 
     WasmInstructionType instr = WI_NOP;
     i32 alignment = type_get_alignment_log2(type);
 
-    if (is_pointer) {
+    if (is_basic && (type->Basic.flags & Basic_Flag_Pointer)) {
         instr = WI_I32_LOAD;
         alignment = 2;
     }
-    else if (is_integer) {
+    else if (is_basic && ((type->Basic.flags & Basic_Flag_Integer) || (type->Basic.flags & Basic_Flag_Boolean))) {
         if      (load_size == 1) instr = WI_I32_LOAD_8_S;
         else if (load_size == 2) instr = WI_I32_LOAD_16_S;
         else if (load_size == 4) instr = WI_I32_LOAD;
         else if (load_size == 8) instr = WI_I64_LOAD;
 
-        if (load_size < 4 && is_unsigned) instr += 1;
+        if (load_size < 4 && (type->Basic.flags & Basic_Flag_Unsigned)) instr += 1;
     }
-    else if (is_float) {
+    else if (is_basic && (type->Basic.flags & Basic_Flag_Float)) {
         if      (load_size == 4) instr = WI_F32_LOAD;
         else if (load_size == 8) instr = WI_F64_LOAD;
     }
-    else if (is_simd) {
+    else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
         instr = WI_V128_LOAD;
     }
 
@@ -784,11 +753,6 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
 EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    // NOTE: This implementation is only for loops by value, not by pointer.
-
-    // At this point the stack will look like:
-    //      data
-
     u64 end_ptr_local, ptr_local;
     end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
 
@@ -821,18 +785,13 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
-        if (!it_is_local) {
-            emit_local_location(mod, &code, var, &offset);
-        }
+        if (!it_is_local) emit_local_location(mod, &code, var, &offset);
 
         WIL(WI_LOCAL_GET, ptr_local);
         emit_load_instruction(mod, &code, var->type, 0);
 
-        if (!it_is_local) {
-            emit_store_instruction(mod, &code, var->type, offset);
-        } else {
-            WIL(WI_LOCAL_SET, iter_local);
-        }
+        if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
+        else              WIL(WI_LOCAL_SET, iter_local);
     }
 
     emit_block(mod, &code, for_node->stmt, 0);
@@ -840,10 +799,8 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     emit_leave_structured_block(mod, &code);
 
     WIL(WI_LOCAL_GET, ptr_local);
-    if (elem_size != 0) {
-        WIL(WI_I32_CONST, elem_size);
-        WI(WI_I32_ADD);
-    }
+    WIL(WI_I32_CONST, elem_size);
+    WI(WI_I32_ADD);
     WIL(WI_LOCAL_SET, ptr_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
@@ -860,12 +817,6 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
 
 EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
-
-    // NOTE: This implementation is only for loops by value, not by pointer.
-
-    // At this point the stack will look like:
-    //      data
-    //      count
 
     u64 end_ptr_local, ptr_local;
     end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
@@ -904,18 +855,13 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
-        if (!it_is_local) {
-            emit_local_location(mod, &code, var, &offset);
-        }
+        if (!it_is_local) emit_local_location(mod, &code, var, &offset);
 
         WIL(WI_LOCAL_GET, ptr_local);
         emit_load_instruction(mod, &code, var->type, 0);
 
-        if (!it_is_local) {
-            emit_store_instruction(mod, &code, var->type, offset);
-        } else {
-            WIL(WI_LOCAL_SET, iter_local);
-        }
+        if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
+        else              WIL(WI_LOCAL_SET, iter_local);
     }
 
     emit_block(mod, &code, for_node->stmt, 0);
@@ -923,10 +869,8 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     emit_leave_structured_block(mod, &code);
 
     WIL(WI_LOCAL_GET, ptr_local);
-    if (elem_size != 0) {
-        WIL(WI_I32_CONST, elem_size);
-        WI(WI_I32_ADD);
-    }
+    WIL(WI_I32_CONST, elem_size);
+    WI(WI_I32_ADD);
     WIL(WI_LOCAL_SET, ptr_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
@@ -1829,45 +1773,7 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
     *pcode = code;
 }
 
-EMIT_FUNC(struct_load, Type* type, u64 offset) {
-    // NOTE: Expects the stack to look like:
-    //      <location>
-
-    bh_arr(WasmInstruction) code = *pcode;
-
-    assert(type_is_structlike_strict(type));
-
-    u32 mem_count = type_structlike_mem_count(type);
-    StructMember smem;
-
-    if (mem_count == 1) {
-        type_lookup_member_by_idx(type, 0, &smem);
-        emit_load_instruction(mod, &code, smem.type, offset);
-        *pcode = code;
-        return;
-    }
-
-    u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    WIL(WI_LOCAL_TEE, tmp_idx);
-
-    fori (i, 0, mem_count) {
-        type_lookup_member_by_idx(type, i, &smem);
-        if (i != 0) WIL(WI_LOCAL_GET, tmp_idx);
-        emit_load_instruction(mod, &code, smem.type, offset + smem.offset);
-    }
-
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-
-    *pcode = code;
-}
-
 EMIT_FUNC(struct_lval, AstTyped* lval) {
-    // NOTE: Expects the stack to look like:
-    //      mem_1
-    //      mem_2
-    //      ...
-    //      mem_n
-
     bh_arr(WasmInstruction) code = *pcode;
 
     assert(type_is_structlike_strict(lval->type));
@@ -1879,14 +1785,32 @@ EMIT_FUNC(struct_lval, AstTyped* lval) {
     *pcode = code;
 }
 
-EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
-    // NOTE: Expects the stack to look like:
-    //      mem_1
-    //      mem_2
-    //      ...
-    //      mem_n
-    //      loc
+EMIT_FUNC(compound_load, Type* type, u64 offset) {
+    bh_arr(WasmInstruction) code = *pcode;
+    u32 mem_count = type_linear_member_count(type);
+    TypeWithOffset two;
 
+    if (mem_count == 1) {
+        type_linear_member_lookup(type, 0, &two);
+        emit_load_instruction(mod, &code, two.type, offset + two.offset); // two.offset should be 0
+    } else {
+        u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(WI_LOCAL_TEE, tmp_idx);
+
+        fori (i, 0, mem_count) {
+            type_linear_member_lookup(type, i, &two);
+            if (i != 0) WIL(WI_LOCAL_GET, tmp_idx);
+            emit_load_instruction(mod, &code, two.type, offset + two.offset);
+        }
+
+        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    }
+
+    *pcode = code;
+    return;
+}
+
+EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     bh_arr(WasmInstruction) code = *pcode;
     bh_arr(u64) temp_locals = NULL;
     bh_arr_new(global_heap_allocator, temp_locals, 4);
