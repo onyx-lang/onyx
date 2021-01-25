@@ -406,58 +406,30 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
 
     if (lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param) {
         if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
-            u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
             emit_expression(mod, &code, assign->right);
+
+            u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
             WIL(WI_LOCAL_SET, localidx);
 
-        } else {
-            u64 offset = 0;
-            emit_local_location(mod, &code, (AstLocal *) lval, &offset);
-            emit_expression(mod, &code, assign->right);
-            emit_store_instruction(mod, &code, lval->type, offset);
+            *pcode = code;
+            return;
         }
+    }
 
-    } else if (lval->kind == Ast_Kind_Global) {
-        i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) lval);
-
+    if (lval->kind == Ast_Kind_Global) {
         emit_expression(mod, &code, assign->right);
+
+        i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) lval);
         WID(WI_GLOBAL_SET, globalidx);
 
-    } else if (lval->kind == Ast_Kind_Dereference) {
-        AstDereference* deref = (AstDereference *) lval;
-        emit_expression(mod, &code, deref->expr);
-        emit_expression(mod, &code, assign->right);
-
-        emit_store_instruction(mod, &code, deref->type, 0);
-
-    } else if (lval->kind == Ast_Kind_Array_Access) {
-        AstArrayAccess* aa = (AstArrayAccess *) lval;
-
-        u64 offset = 0;
-        emit_array_access_location(mod, &code, aa, &offset);
-        emit_expression(mod, &code, assign->right);
-
-        emit_store_instruction(mod, &code, aa->type, offset);
-
-    } else if (lval->kind == Ast_Kind_Field_Access) {
-        AstFieldAccess* field = (AstFieldAccess *) lval;
-
-        u64 offset = 0;
-        emit_field_access_location(mod, &code, field, &offset);
-        emit_expression(mod, &code, assign->right);
-
-        emit_store_instruction(mod, &code, field->type, offset);
-
-    } else if (lval->kind == Ast_Kind_Memres) {
-        AstMemRes* memres = (AstMemRes *) lval;
-
-        emit_memory_reservation_location(mod, &code, memres);
-        emit_expression(mod, &code, assign->right);
-        emit_store_instruction(mod, &code, memres->type, 0);
-
-    } else {
-        assert(("Invalid lval", 0));
+        *pcode = code;
+        return;
     }
+
+    u64 offset = 0;
+    emit_location_return_offset(mod, &code, lval, &offset);
+    emit_expression(mod, &code, assign->right);
+    emit_store_instruction(mod, &code, lval->type, offset);
 
     *pcode = code;
 }
@@ -492,9 +464,10 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
         local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     } else {
-        emit_location(mod, &code, left);
+        u64 offset = 0;
+        emit_location_return_offset(mod, &code, left, &offset);
         emit_expression(mod, &code, right);
-        emit_array_store(mod, &code, rtype, 0);
+        emit_array_store(mod, &code, rtype, offset);
     }
 
     *pcode = code;
@@ -523,13 +496,14 @@ EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
             }
         }
 
-        u64 expr_tmp = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WasmType wt = onyx_type_to_wasm_type(lval->type);
+        u64 expr_tmp = local_raw_allocate(mod->local_alloc, wt);
         WIL(WI_LOCAL_SET, expr_tmp);
         u64 offset = 0;
         emit_location_return_offset(mod, &code, lval, &offset);
         WIL(WI_LOCAL_GET, expr_tmp);
         
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        local_raw_free(mod->local_alloc, wt);
         emit_store_instruction(mod, &code, lval->type, offset);
     }
 
