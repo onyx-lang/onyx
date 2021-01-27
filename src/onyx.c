@@ -397,7 +397,6 @@ static CompilerProgress process_source_file(char* filename) {
     bh_file file;
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
-        // bh_printf_err("Failed to open file %s\n", filename);
         onyx_report_error((OnyxFilePos) { 0 }, "Failed to open file %s\n", filename);
         return ONYX_COMPILER_PROGRESS_FAILED_READ;
     }
@@ -405,17 +404,6 @@ static CompilerProgress process_source_file(char* filename) {
     bh_file_contents fc = bh_file_read_contents(context.token_alloc, &file);
     bh_file_close(&file);
 
-    // POTENTIAL BUG: If there are too many files and too many collisions in the table,
-    // there is a chance that the inner arrays of the table will be repositioned. That
-    // would completely break the pointer taken here, which would break all references
-    // to file contents anywhere else in the program.
-    //
-    // A good solution would be to not use a table and just use a array of char* and
-    // ensure that the filename is not in that list.
-    //                                                      - brendanfh 2020/09/03
-
-
-    // NOTE: Need to reget the value out of the table so token references work
     bh_arr_push(context.loaded_files, fc);
 
     if (context.options->verbose_output == 2) {

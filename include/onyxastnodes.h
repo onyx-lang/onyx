@@ -179,10 +179,10 @@ typedef enum AstFlags {
     Ast_Flag_Private_File          = BH_BIT(6),
 
     // Global flags
-    Ast_Flag_Global_Stack_Top      = BH_BIT(7), // These can go away for something better,
-    Ast_Flag_Global_Stack_Base     = BH_BIT(8), // like just checking the pointers since they will be unique.
+    Ast_Flag_Global_Stack_Top      = BH_BIT(7),
 
     // Function flags
+    Ast_Flag_Already_Checked       = BH_BIT(8),
     Ast_Flag_Intrinsic             = BH_BIT(10),
     Ast_Flag_Function_Used         = BH_BIT(11),
 

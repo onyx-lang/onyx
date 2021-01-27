@@ -457,29 +457,24 @@ CheckStatus check_call(AstCall* call) {
     //      9. Check types of formal and actual params against each other, handling varargs
 
     CHECK(expression, &call->callee);
-    AstFunction* callee = (AstFunction *) call->callee;
-
     check_arguments(&call->args);
 
-    if (callee->kind == Ast_Kind_Overloaded_Function) {
-        call->callee = match_overloaded_function(&call->args, ((AstOverloadedFunction *) callee)->overloads);
-
+    if (call->callee->kind == Ast_Kind_Overloaded_Function) {
+        call->callee = match_overloaded_function(&call->args, ((AstOverloadedFunction *) call->callee)->overloads);
         if (call->callee == NULL) {
             report_unable_to_match_overload(call);
             return Check_Error;
         }
-
-        callee = (AstFunction *) call->callee;
     }
 
-    if (callee->kind == Ast_Kind_Polymorphic_Proc) {
+    if (call->callee->kind == Ast_Kind_Polymorphic_Proc) {
         call->callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Arguments, &call->args, call->token);
-
         if (call->callee == NULL) return Check_Error;
 
-        callee = (AstFunction *) call->callee;
         arguments_remove_baked(&call->args);
     }
+
+    AstFunction* callee = (AstFunction *) call->callee;
 
     // NOTE: Build callee's type
     fill_in_type((AstTyped *) callee);
@@ -1454,6 +1449,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Polymorphic_Proc: break;
         case Ast_Kind_Package: break;
         case Ast_Kind_Error: break;
+        
+        // NOTE: The only way to have an Intrinsic_Call node is to have gone through the
+        // checking of a call node at least once.
+        case Ast_Kind_Intrinsic_Call: break;
 
         default:
             retval = Check_Error;
@@ -1533,6 +1532,8 @@ CheckStatus check_block(AstBlock* block) {
 }
 
 CheckStatus check_function(AstFunction* func) {
+    if (func->flags & Ast_Flag_Already_Checked) return Check_Success;
+    
     expected_return_type = func->type->Function.return_type;
     if (func->body) {
         CheckStatus status = check_block(func->body);
@@ -1541,6 +1542,8 @@ CheckStatus check_function(AstFunction* func) {
 
         return status;
     }
+    
+    func->flags |= Ast_Flag_Already_Checked;
 
     return Check_Success;
 }

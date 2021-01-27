@@ -236,7 +236,7 @@ EMIT_FUNC(local_location,                AstLocal* local, u64* offset_return);
 EMIT_FUNC(memory_reservation_location,   AstMemRes* memres);
 EMIT_FUNC(location_return_offset,        AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                      AstTyped* expr);
-EMIT_FUNC(compound_load,                   Type* type, u64 offset);
+EMIT_FUNC(compound_load,                 Type* type, u64 offset);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
 EMIT_FUNC(compound_store,                Type* type, u64 offset, b32 location_first);

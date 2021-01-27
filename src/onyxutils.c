@@ -1107,7 +1107,10 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
     b32 success = 1;
     fori (idx, 0, bh_arr_length(args->values)) {
         if (args->values[idx] == NULL) args->values[idx] = (AstTyped *) lookup_default_value_by_idx(provider, idx);
-        if (args->values[idx] == NULL) success = 0;
+        if (args->values[idx] == NULL) {
+            *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
+            success = 0;
+        }
     }
 
     return success;

@@ -160,3 +160,25 @@ fold_slice :: proc (arr: [] $T, init: $R, f: proc (T, R) -> R) -> R {
 map :: proc (arr: ^[..] $T, data: $R, f: proc (T, R) -> T) {
     for ^it: *arr do *it = f(*it, data);
 }
+
+#private_file
+greatest_impl :: (arr: ^$T, count: i32) -> (i32, T) {
+    greatest_idx := 0;
+    greatest     := arr[0];
+    
+    for i: 1 .. count {
+        if arr[i] > greatest {
+            greatest_idx = i;
+            greatest     = arr[i];
+        }
+    }
+    
+    return greatest_idx, greatest;
+}
+
+// This pattern should be expanded on to make all kinds of folding functions.
+greatest :: proc {
+    (arr: [..] $T) -> (i32, T) { return greatest_impl(arr.data, arr.count); },
+    (arr: [] $T)   -> (i32, T) { return greatest_impl(arr.data, arr.count); },
+    (arr: [$N] $T) -> (i32, T) { return greatest_impl(cast(^T) arr, N); },
+}

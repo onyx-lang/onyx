@@ -1,0 +1,45 @@
+version(1);
+project_name = "Onyx";
+
+patterns = {
+"*.c",
+"*.cpp",
+"*.h",
+"*.onyx",
+"*.js",
+"*.bat",
+"*.sh",
+"*.4coder",
+"*.txt",
+};
+blacklist_patterns = {
+".*",
+};
+load_paths_custom = {
+ {"."},
+};
+load_paths = {
+ { load_paths_custom, .os = "win"  },
+ { load_paths_custom, .os = "linux"},
+ { load_paths_custom, .os = "mac"  },
+};
+
+build_debug_win32   = "build.bat";
+build_release_win32 = "build.bat 1";
+build_debug_linux   = "./build.sh debug";
+build_release_linux = "./build.sh";
+
+command_list = {
+ { .name = "Build Debug",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { {build_debug_win32, .os ="win"  },
+            {build_debug_linux, .os ="linux"}, }, },
+ 
+ { .name = "Build Release",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { {build_release_win32, .os ="win" },
+            {build_release_linux, .os ="linux" }, }, },
+};
+
+fkey_command[1] = "Build Debug";
+fkey_command[2] = "Build Release";
