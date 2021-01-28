@@ -136,7 +136,7 @@ AstType* symres_type(AstType* type) {
                         used = ((AstTypeAlias *) used)->to;
                     }
 
-                    b32 use_works = (used->kind == Ast_Kind_Struct_Type);
+                    b32 use_works = (used->kind == Ast_Kind_Struct_Type || used->kind == Ast_Kind_Poly_Call_Type);
 
                     if (used->kind == Ast_Kind_Type_Raw_Alias) {
                         AstTypeRawAlias* alias = (AstTypeRawAlias *) used;
