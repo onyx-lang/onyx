@@ -1829,31 +1829,53 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     expect_token(parser, '{');
+    b32 member_is_used = 0;
     while (parser->curr->type != '}') {
         if (parser->hit_unexpected_token) return s_node;
-
-        AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);
+        
+        OnyxToken* member_name;
 
         if (parser->curr->type == Token_Type_Keyword_Use) {
             consume_token(parser);
-            mem->flags |= Ast_Flag_Struct_Mem_Used;
+            member_is_used = 1;
         }
 
-        mem->token = expect_token(parser, Token_Type_Symbol);
+        member_name = expect_token(parser, Token_Type_Symbol);
 
         expect_token(parser, ':');
-        if (parser->curr->type != '=') {
-            mem->type_node = parse_type(parser);
-        }
-
-        if (parser->curr->type == '=') {
+        
+        if (parser->curr->type == ':' && !member_is_used) {
             consume_token(parser);
-            mem->initial_value = parse_expression(parser, 0);
+            
+            if (!s_node->scope) {
+                // NOTE: The parent scope will be filled out during symbol resolution.
+                s_node->scope = scope_create(context.ast_alloc, NULL, s_node->token->pos);
+            }
+            
+            AstTyped* expression = parse_top_level_expression(parser);
+            symbol_introduce(s_node->scope, member_name, (AstNode *) expression);
+            
+        } else {
+            AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);    
+            mem->token = member_name;
+            
+            if (member_is_used) {
+                mem->flags |= Ast_Flag_Struct_Mem_Used;
+                member_is_used = 0;
+            }
+            
+            if (parser->curr->type != '=') {
+                mem->type_node = parse_type(parser);
+            }
+
+            if (parser->curr->type == '=') {
+                consume_token(parser);
+                mem->initial_value = parse_expression(parser, 0);
+            }
+            
+            expect_token(parser, ';');
+            bh_arr_push(s_node->members, mem);
         }
-
-        expect_token(parser, ';');
-
-        bh_arr_push(s_node->members, mem);
     }
 
     expect_token(parser, '}');

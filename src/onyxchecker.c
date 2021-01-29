@@ -1314,12 +1314,23 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     }
 
     if (!type_lookup_member(field->expr->type, field->field, &smem)) {
-        onyx_report_error(field->token->pos,
-            "Field '%s' does not exists on '%s'.",
-            field->field,
-            node_get_type_name(field->expr));
-
-        return Check_Error;
+        AstStructType* struct_node = (AstStructType *) field->expr->type->ast_type;
+        assert(struct_node);
+        assert(struct_node->kind == Ast_Kind_Struct_Type);
+        
+        AstNode* n = symbol_raw_resolve(struct_node->scope, field->field);
+        if (n) {
+            *pfield = (AstFieldAccess *) n;
+            return Check_Success;
+            
+        } else {
+            onyx_report_error(field->token->pos,
+                "Field '%s' does not exists on '%s'.",
+                field->field,
+                node_get_type_name(field->expr));
+            
+            return Check_Error;   
+        }
     }
 
     field->offset = smem.offset;

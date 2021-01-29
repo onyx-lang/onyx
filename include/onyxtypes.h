@@ -137,6 +137,11 @@ struct Type {
     TypeKind kind;
 
     u32 flags;
+    
+    // NOTE(Brendan Hansen): The abstract syntax tree node used to create
+    // the type. Primarily used to look up symbols in scopes that are embedded
+    // in the type.
+    struct AstType* ast_type;
 
     union {
 #define TYPE_KIND(k, ...) Type##k k;

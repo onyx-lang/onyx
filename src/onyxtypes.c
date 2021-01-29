@@ -8,33 +8,33 @@ static u32 next_unique_id = 1;
 
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
-    { Type_Kind_Basic, 0, { Basic_Kind_Void,                    0,                       0,  1, "void"   } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_void, { Basic_Kind_Void,                    0,                       0,  1, "void"   } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1,  1, "bool"   } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_bool, { Basic_Kind_Bool,   Basic_Flag_Boolean,                       1,  1, "bool"   } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Int_Unsized, Basic_Flag_Integer,                  0,  0, "unsized int" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I8,     Basic_Flag_Integer,                       1,  1, "i8"     } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1,  1, "u8"     } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I16,    Basic_Flag_Integer,                       2,  2, "i16"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2,  2, "u16"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I32,    Basic_Flag_Integer,                       4,  4, "i32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4,  4, "u32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I64,    Basic_Flag_Integer,                       8,  8, "i64"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8,  8, "u64"    } },
+    { Type_Kind_Basic, 0, NULL,                        { Basic_Kind_Int_Unsized, Basic_Flag_Integer,                  0,  0, "unsized int" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i8,  { Basic_Kind_I8,     Basic_Flag_Integer,                       1,  1, "i8"     } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_u8,  { Basic_Kind_U8,     Basic_Flag_Integer | Basic_Flag_Unsigned, 1,  1, "u8"     } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i16, { Basic_Kind_I16,    Basic_Flag_Integer,                       2,  2, "i16"    } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_u16, { Basic_Kind_U16,    Basic_Flag_Integer | Basic_Flag_Unsigned, 2,  2, "u16"    } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i32, { Basic_Kind_I32,    Basic_Flag_Integer,                       4,  4, "i32"    } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_u32, { Basic_Kind_U32,    Basic_Flag_Integer | Basic_Flag_Unsigned, 4,  4, "u32"    } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i64, { Basic_Kind_I64,    Basic_Flag_Integer,                       8,  8, "i64"    } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_u64, { Basic_Kind_U64,    Basic_Flag_Integer | Basic_Flag_Unsigned, 8,  8, "u64"    } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Float_Unsized, Basic_Flag_Float,                  0,  0, "unsized float" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } },
-    { Type_Kind_Basic, 0, { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } },
+    { Type_Kind_Basic, 0, NULL,                        { Basic_Kind_Float_Unsized, Basic_Flag_Float,                  0,  0, "unsized float" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_f32, { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_f64, { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                       8,  8, "rawptr" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_rawptr, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                    8,  8, "rawptr" } },
 
-    { Type_Kind_Basic, 0, { Basic_Kind_I8X16,  Basic_Flag_SIMD,                          16, 16, "i8x16" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I16X8,  Basic_Flag_SIMD,                          16, 16, "i16x8" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I32X4,  Basic_Flag_SIMD,                          16, 16, "i32x4" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_I64X2,  Basic_Flag_SIMD,                          16, 16, "i64x2" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_F32X4,  Basic_Flag_SIMD,                          16, 16, "f32x4" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                          16, 16, "f64x2" } },
-    { Type_Kind_Basic, 0, { Basic_Kind_V128,   Basic_Flag_SIMD,                          16, 16, "v128"  } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i8x16, { Basic_Kind_I8X16,  Basic_Flag_SIMD,                        16, 16, "i8x16" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i16x8, { Basic_Kind_I16X8,  Basic_Flag_SIMD,                        16, 16, "i16x8" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i32x4, { Basic_Kind_I32X4,  Basic_Flag_SIMD,                        16, 16, "i32x4" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_i64x2, { Basic_Kind_I64X2,  Basic_Flag_SIMD,                        16, 16, "i64x2" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_f32x4, { Basic_Kind_F32X4,  Basic_Flag_SIMD,                        16, 16, "f32x4" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_f64x2, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                        16, 16, "f64x2" } },
+    { Type_Kind_Basic, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
 };
 
 b32 types_are_surface_compatible(Type* t1, Type* t2) {
@@ -300,7 +300,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
     switch (type_node->kind) {
         case Ast_Kind_Pointer_Type: {
-            return type_make_pointer(alloc, type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem));
+            Type* ptr_type = type_make_pointer(alloc, type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem));
+            ptr_type->ast_type = type_node;
+            return ptr_type;
         }
 
         case Ast_Kind_Function_Type: {
@@ -310,6 +312,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
 
             func_type->kind = Type_Kind_Function;
+            func_type->ast_type = type_node;
             func_type->Function.param_count = param_count;
             func_type->Function.needed_param_count = param_count;
             func_type->Function.return_type = type_build_from_ast(alloc, ftype_node->return_type);
@@ -327,6 +330,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             Type* a_type = bh_alloc(alloc, sizeof(Type));
             a_type->kind = Type_Kind_Array;
+            a_type->ast_type = type_node;
             a_type->Array.elem = type_build_from_ast(alloc, a_node->elem);
 
             u32 count = 0;
@@ -364,6 +368,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             Type* s_type = bh_alloc(alloc, sizeof(Type));
             s_node->stcache = s_type;
             s_type->kind = Type_Kind_Struct;
+            s_type->ast_type = type_node;
 
             s_type->Struct.unique_id = next_unique_id++;
             s_type->Struct.name = s_node->name;
@@ -476,6 +481,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             enum_node->etcache = enum_type;
 
             enum_type->kind = Type_Kind_Enum;
+            enum_type->ast_type = type_node;
             enum_type->Enum.unique_id = next_unique_id++;
             enum_type->Enum.backing = enum_node->backing_type;
             enum_type->Enum.name = enum_node->name;
@@ -484,18 +490,26 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         }
 
         case Ast_Kind_Slice_Type: {
-            return type_make_slice(alloc, type_build_from_ast(alloc, ((AstSliceType *) type_node)->elem));
+            Type* slice_type = type_make_slice(alloc, type_build_from_ast(alloc, ((AstSliceType *) type_node)->elem));
+            slice_type->ast_type = type_node;
+            return slice_type;
         }
 
         case Ast_Kind_DynArr_Type: {
-            return type_make_dynarray(alloc, type_build_from_ast(alloc, ((AstDynArrType *) type_node)->elem));
+            Type* dynarr_type = type_make_dynarray(alloc, type_build_from_ast(alloc, ((AstDynArrType *) type_node)->elem));
+            dynarr_type->ast_type = type_node;
+            return dynarr_type;
         }
 
-        case Ast_Kind_VarArg_Type:
-            return type_make_varargs(alloc, type_build_from_ast(alloc, ((AstVarArgType *) type_node)->elem));
+        case Ast_Kind_VarArg_Type: {
+            Type* va_type = type_make_varargs(alloc, type_build_from_ast(alloc, ((AstVarArgType *) type_node)->elem));   
+            va_type->ast_type = type_node;
+            return va_type;
+        }
 
-        case Ast_Kind_Basic_Type:
+        case Ast_Kind_Basic_Type: {
             return ((AstBasicType *) type_node)->type;
+        }
 
         case Ast_Kind_Type_Alias:
             return type_build_from_ast(alloc, ((AstTypeAlias *) type_node)->to);
@@ -504,7 +518,6 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return ((AstTypeRawAlias *) type_node)->to;
 
         case Ast_Kind_Poly_Struct_Type:
-            // @Cleanup: Replace this with a proper onyx_report_error. - brendanfh 2020/09/14
             onyx_report_error(type_node->token->pos,
                 "This structure is polymorphic, which means you need to provide arguments to it to make it a concrete structure. "
                 "This error message is probably in the wrong place, so look through your code for uses of this struct.");

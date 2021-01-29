@@ -95,6 +95,9 @@ AstType* symres_type(AstType* type) {
 
         s_node->flags |= Ast_Flag_Type_Is_Resolved;
         
+        // FIX: This is probably wrong for the long term.
+        if (s_node->scope) s_node->scope->parent = curr_scope;
+        
         {
             bh_table(i32) mem_set;
             bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
@@ -292,6 +295,16 @@ static void symres_field_access(AstFieldAccess** fa) {
         AstNode* n = symbol_resolve(etype->scope, (*fa)->token);
         if (n) {
             // NOTE: not field access
+            *fa = (AstFieldAccess *) n;
+            return;
+        }
+    }
+    
+    if ((*fa)->expr->kind == Ast_Kind_Struct_Type) {
+        AstStructType* stype = (AstStructType *) (*fa)->expr;
+        AstNode* n = symbol_resolve(stype->scope, (*fa)->token);
+        if (n) {
+            // Note: not field access
             *fa = (AstFieldAccess *) n;
             return;
         }
@@ -880,11 +893,15 @@ static void symres_struct_defaults(AstType* t) {
     if (t->kind != Ast_Kind_Struct_Type) return;
     
     AstStructType* st = (AstStructType *) t;
+    if (st->scope) scope_enter(st->scope);
+    
     bh_arr_each(AstStructMember *, smem, st->members) {
         if ((*smem)->initial_value != NULL) {
             symres_expression(&(*smem)->initial_value);
         }
     }
+    
+    if (st->scope) scope_leave();
 }
 
 static void symres_polyproc(AstPolyProc* pp) {

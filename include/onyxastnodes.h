@@ -641,6 +641,9 @@ struct AstStructType {
     // a struct type is kind of complicated and should
     // only happen once.
     Type *stcache;
+    
+    // NOTE: Used to store statically bound expressions in the struct.
+    Scope* scope;
 };
 struct AstStructMember {
     AstTyped_base;
@@ -998,6 +1001,15 @@ extern AstBasicType basic_type_rawptr;
 
 extern AstBasicType basic_type_int_unsized;
 extern AstBasicType basic_type_float_unsized;
+
+extern AstBasicType basic_type_i8x16;
+extern AstBasicType basic_type_i16x8;
+extern AstBasicType basic_type_i32x4;
+extern AstBasicType basic_type_i64x2;
+extern AstBasicType basic_type_f32x4;
+extern AstBasicType basic_type_f64x2;
+extern AstBasicType basic_type_v128;
+
 
 // :TypeExprHack
 extern AstNode type_expr_symbol;
