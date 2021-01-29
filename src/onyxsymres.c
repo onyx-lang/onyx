@@ -280,6 +280,11 @@ static void symres_field_access(AstFieldAccess** fa) {
     symres_expression(&(*fa)->expr);
     if ((*fa)->expr == NULL) return;
 
+    // CLEANUP: There are way to many cases here that a too similar.
+    // It should be easy to clean all of these up. Also, I think that when
+    // that happens, it might be even easier to allow for 'use'ing members
+    // that are pointers to structures.
+    
     if ((*fa)->expr->kind == Ast_Kind_Package) {
         AstPackage* package = (AstPackage *) (*fa)->expr;
         AstNode* n = symbol_resolve(package->package->scope, (*fa)->token);
@@ -302,6 +307,16 @@ static void symres_field_access(AstFieldAccess** fa) {
     
     if ((*fa)->expr->kind == Ast_Kind_Struct_Type) {
         AstStructType* stype = (AstStructType *) (*fa)->expr;
+        AstNode* n = symbol_resolve(stype->scope, (*fa)->token);
+        if (n) {
+            // Note: not field access
+            *fa = (AstFieldAccess *) n;
+            return;
+        }
+    }
+
+    if ((*fa)->expr->kind == Ast_Kind_Poly_Struct_Type) {
+        AstStructType* stype = ((AstPolyStructType *) (*fa)->expr)->base_struct;
         AstNode* n = symbol_resolve(stype->scope, (*fa)->token);
         if (n) {
             // Note: not field access
