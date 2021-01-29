@@ -898,6 +898,10 @@ static void symres_struct_defaults(AstType* t) {
     bh_arr_each(AstStructMember *, smem, st->members) {
         if ((*smem)->initial_value != NULL) {
             symres_expression(&(*smem)->initial_value);
+            
+            if ((*smem)->type_node == NULL && (*smem)->initial_value->type_node != NULL) {
+                (*smem)->type_node = (*smem)->initial_value->type_node;
+            }
         }
     }
     
