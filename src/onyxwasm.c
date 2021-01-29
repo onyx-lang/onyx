@@ -1805,7 +1805,7 @@ EMIT_FUNC(struct_lval, AstTyped* lval) {
 
 EMIT_FUNC(compound_load, Type* type, u64 offset) {
     bh_arr(WasmInstruction) code = *pcode;
-    u32 mem_count = type_linear_member_count(type);
+    i32 mem_count = type_linear_member_count(type);
     TypeWithOffset two;
 
     if (mem_count == 1) {
@@ -1838,7 +1838,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     if (location_first) WIL(WI_LOCAL_SET, loc_idx);
 
-    u32 elem_count = type_linear_member_count(type);
+    i32 elem_count = type_linear_member_count(type);
     forir (i, elem_count - 1, 0) {
         type_linear_member_lookup(type, i, &two);
 

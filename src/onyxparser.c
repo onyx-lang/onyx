@@ -1845,15 +1845,16 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         expect_token(parser, ':');
         
         if (parser->curr->type == ':' && !member_is_used) {
-            consume_token(parser);
             
             if (!s_node->scope) {
                 // NOTE: The parent scope will be filled out during symbol resolution.
                 s_node->scope = scope_create(context.ast_alloc, NULL, s_node->token->pos);
             }
             
-            AstTyped* expression = parse_top_level_expression(parser);
-            symbol_introduce(s_node->scope, member_name, (AstNode *) expression);
+            AstBinding* binding = parse_top_level_binding(parser, member_name);
+            symbol_introduce(s_node->scope, binding->token, binding->node);
+            
+            if (parser->curr->type == ';') consume_token(parser);
             
         } else {
             AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);    
