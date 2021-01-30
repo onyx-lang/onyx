@@ -1829,6 +1829,13 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     expect_token(parser, '{');
+
+    // HACK: There should be a better way to change which scope symbols will
+    // be placed in when converted to entities. Right now, you have to mess
+    // with parser->file_scope to change that. There is the block stack mechanism,
+    // but that feels very limited for this purpose.
+    Scope* parent_scope = parser->file_scope;
+
     b32 member_is_used = 0;
     while (parser->curr->type != '}') {
         if (parser->hit_unexpected_token) return s_node;
@@ -1848,7 +1855,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             
             if (!s_node->scope) {
                 // NOTE: The parent scope will be filled out during symbol resolution.
-                s_node->scope = scope_create(context.ast_alloc, NULL, s_node->token->pos);
+                s_node->scope = scope_create(context.ast_alloc, parent_scope, s_node->token->pos);
+                parser->file_scope = s_node->scope;
             }
             
             AstBinding* binding = parse_top_level_binding(parser, member_name);
@@ -1880,6 +1888,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     expect_token(parser, '}');
+
+    parser->file_scope = parent_scope;
 
     if (poly_struct != NULL) {
         // NOTE: Not a StructType

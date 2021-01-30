@@ -548,13 +548,22 @@ static void symres_switch(AstSwitch* switchnode) {
 
 static void symres_use(AstUse* use) {
     symres_expression(&use->expr);
-    if (use->expr == NULL) return;
+    if (use->expr == NULL || use->expr->kind == Ast_Kind_Error) return;
 
     if (use->expr->kind == Ast_Kind_Enum_Type) {
         AstEnumType* et = (AstEnumType *) use->expr;
 
         bh_arr_each(AstEnumValue *, ev, et->values)
             symbol_introduce(curr_scope, (*ev)->token, (AstNode *) *ev);
+
+        return;
+    }
+
+    if (use->expr->kind == Ast_Kind_Struct_Type) {
+        AstStructType* st = (AstStructType *) use->expr;
+
+        if (st->scope)
+            scope_include(curr_scope, st->scope, use->token->pos);
 
         return;
     }
