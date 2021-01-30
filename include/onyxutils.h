@@ -21,4 +21,7 @@ void symbol_subpackage_introduce(Scope* scope, OnyxToken* sym, AstPackage *node)
 AstNode* symbol_raw_resolve(Scope* start_scope, char* sym);
 AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn);
 
-void onyx_ast_print(AstNode* program, i32 indent);
+u32 char_to_base16_value(char x);
+
+// Returns the length after processing the string.
+i32 string_process_escape_seqs(char* dest, char* src, i32 len);

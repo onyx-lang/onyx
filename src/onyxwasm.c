@@ -2731,42 +2731,7 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     // in a string literal that create more bytes than already
     // existed. You can create less however ('\n' => 0x0a).
     i8* strdata = bh_alloc_array(global_heap_allocator, i8, strlit->token->length + 1);
-
-    i8* src = (i8 *) strlit->token->text;
-    i8* des = strdata;
-    for (i32 i = 0, len = strlit->token->length; i < len; i++) {
-        if (src[i] == '\\') {
-            i++;
-            switch (src[i]) {
-            case '0': *des++ = '\0'; break;
-            case 'a': *des++ = '\a'; break;
-            case 'b': *des++ = '\b'; break;
-            case 'f': *des++ = '\f'; break;
-            case 'n': *des++ = '\n'; break;
-            case 't': *des++ = '\t'; break;
-            case 'r': *des++ = '\r'; break;
-            case 'v': *des++ = '\v'; break;
-            case 'e': *des++ = '\e'; break;
-            case '"': *des++ = '"';  break;
-            case '\\': *des++ = '\\'; break;
-            case 'x': {
-                // HACK: This whole way of doing this
-                i++;
-                u8 buf[3];
-                buf[0] = src[i + 0];
-                buf[1] = src[i + 1];
-                buf[2] = 0;
-                *des++ = strtol((const char *) buf, NULL, 16);
-                i++;
-                break;
-            }
-            default:  *des++ = '\\';
-                      *des++ = src[i];
-            }
-        } else {
-            *des++ = src[i];
-        }
-    }
+    i32 length =string_process_escape_seqs(strdata, strlit->token->text, strlit->token->length);
 
     if (bh_table_has(StrLitInfo, mod->string_literals, (char *) strdata)) {
         StrLitInfo sti = bh_table_get(StrLitInfo, mod->string_literals, (char *) strdata);
@@ -2774,8 +2739,6 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
         strlit->length = sti.len;
         return;
     }
-
-    u32 length = (u32) (des - strdata);
 
     WasmDatum datum = {
         .offset = mod->next_datum_offset,

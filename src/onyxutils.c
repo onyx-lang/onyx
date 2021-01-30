@@ -1115,3 +1115,54 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
 
     return success;
 }
+
+//
+// String parsing helpers
+//
+u32 char_to_base16_value(char x) {
+    if (x >= '0' && x <= '9') return (u32) (x - '0');
+    if (x >= 'A' && x <= 'F') return (u32) (x - 'A');
+    if (x >= 'a' && x <= 'f') return (u32) (x - 'f');
+    return 0xffffffff;
+}
+
+i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
+    i32 total_len = 0;
+    for (i32 i = 0; i < len; i++) {
+        if (src[i] == '\\') {
+            i++;
+            switch (src[i]) {
+            case '0':  *dest++ = '\0'; total_len++; break;
+            case 'a':  *dest++ = '\a'; total_len++; break;
+            case 'b':  *dest++ = '\b'; total_len++; break;
+            case 'f':  *dest++ = '\f'; total_len++; break;
+            case 'n':  *dest++ = '\n'; total_len++; break;
+            case 't':  *dest++ = '\t'; total_len++; break;
+            case 'r':  *dest++ = '\r'; total_len++; break;
+            case 'v':  *dest++ = '\v'; total_len++; break;
+            case 'e':  *dest++ = '\e'; total_len++; break;
+            case '"':  *dest++ = '"';  total_len++; break;
+            case '\\': *dest++ = '\\'; total_len++; break;
+            case 'x': {
+                u8 ch1 = src[i + 1];
+                u8 ch2 = src[i + 2];
+                *dest++ = (char_to_base16_value(ch1) << 4 | char_to_base16_value(ch2));
+                total_len++;
+                i += 2;
+                break;
+            }
+            default:  *dest++ = '\\';
+                      *dest++ = src[i];
+                      total_len += 2;
+            }
+        } else {
+            *dest++ = src[i];
+            total_len += 1;
+        }
+    }
+
+    // NOTE: Gotta null terminate
+    *dest = 0;
+
+    return total_len;
+}
