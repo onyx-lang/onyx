@@ -9,7 +9,7 @@
 #include "onyxwasm.h"
 #include "onyxdoc.h"
 
-#define VERSION "v0.0.5"
+#define VERSION "v0.1.0-beta"
 
 
 #ifndef CORE_INSTALLATION

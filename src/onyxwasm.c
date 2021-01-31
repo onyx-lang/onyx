@@ -183,11 +183,11 @@ enum StructuredBlockType {
     SBT_Continue_Block,    // Targeted using continue
     SBT_Fallthrough_Block, // Targeted using fallthrough
 
-    SBT_Basic_If,        // Cannot be targeted using jump
-    SBT_Breakable_If,    // Targeted using break
+    SBT_Basic_If,          // Cannot be targeted using jump
+    SBT_Breakable_If,      // Targeted using break
 
-    SBT_Basic_Loop,      // Cannot be targeted using jump
-    SBT_Continue_Loop, // Targeted using continue
+    SBT_Basic_Loop,        // Cannot be targeted using jump
+    SBT_Continue_Loop,     // Targeted using continue
 
     SBT_Count,
 };
@@ -295,7 +295,7 @@ EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
         /* SBT_Breakable_If */      1,
 
         /* SBT_Basic_Loop */        0,
-        /* SBT_Continue_Loop */   2,
+        /* SBT_Continue_Loop */     2,
     };
     
     static const WasmInstructionType block_instrs[SBT_Count] = {
@@ -308,7 +308,7 @@ EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
         /* SBT_Breakable_If */      WI_IF_START,
 
         /* SBT_Basic_Loop */        WI_LOOP_START,
-        /* SBT_Continue_Loop */   WI_LOOP_START,
+        /* SBT_Continue_Loop */     WI_LOOP_START,
     };
 
 

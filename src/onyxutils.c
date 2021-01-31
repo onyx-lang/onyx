@@ -1121,8 +1121,8 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
 //
 u32 char_to_base16_value(char x) {
     if (x >= '0' && x <= '9') return (u32) (x - '0');
-    if (x >= 'A' && x <= 'F') return (u32) (x - 'A');
-    if (x >= 'a' && x <= 'f') return (u32) (x - 'f');
+    if (x >= 'A' && x <= 'F') return (u32) (x - 'A' + 10);
+    if (x >= 'a' && x <= 'f') return (u32) (x - 'a' + 10);
     return 0xffffffff;
 }
 
@@ -1146,7 +1146,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
             case 'x': {
                 u8 ch1 = src[i + 1];
                 u8 ch2 = src[i + 2];
-                *dest++ = (char_to_base16_value(ch1) << 4 | char_to_base16_value(ch2));
+                *dest++ = (i8) (char_to_base16_value(ch1) << 4 | char_to_base16_value(ch2));
                 total_len++;
                 i += 2;
                 break;
