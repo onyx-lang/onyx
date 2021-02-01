@@ -16,7 +16,7 @@ vararg :: #type ^struct {
     count: i32;
 }
 
-vararg_get :: proc (va: vararg, ret: ^$T) -> bool {
+vararg_get :: (va: vararg, ret: ^$T) -> bool {
     if va.count <= 0 do return false;
     *ret = *cast(^T) va.data;
     va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
@@ -32,12 +32,12 @@ OnyxContext :: struct {
     allocator      : Allocator;
     temp_allocator : Allocator;
 
-    assert_handler : proc (msg: str, file: str);
+    assert_handler : (msg: str, file: str) -> void;
 }
 
 context : OnyxContext;
 
-assert :: proc (cond: bool, msg: str, file: str = str.{ null, 0 }) {
+assert :: (cond: bool, msg: str, file: str = str.{ null, 0 }) {
     if !cond do context.assert_handler(msg, file);
 }
 
@@ -55,32 +55,32 @@ AllocationAction :: enum {
     Resize;
 }
 
-allocator_proc :: #type proc (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
+allocator_proc :: #type (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
 
 Allocator :: struct {
     data: rawptr;
     func: allocator_proc;
 }
 
-raw_alloc :: proc (use a: Allocator, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
+raw_alloc :: (use a: Allocator, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
     return func(data, AllocationAction.Alloc, size, alignment, null);
 }
 
-raw_resize :: proc (use a: Allocator, ptr: rawptr, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
+raw_resize :: (use a: Allocator, ptr: rawptr, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
     return func(data, AllocationAction.Resize, size, alignment, ptr);
 }
 
-raw_free :: proc (use a: Allocator, ptr: rawptr) {
+raw_free :: (use a: Allocator, ptr: rawptr) {
     func(data, AllocationAction.Free, 0, 0, ptr);
 }
 
 // Allocators using the context structure.
-calloc  :: proc (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
-cresize :: proc (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
-cfree   :: proc (ptr: rawptr) do raw_free(context.allocator, ptr);
+calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
+cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
+cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
 
 // @CLEANUP: These need to move to somewhere else eventually
-cmp_asc :: proc (a: $T, b: T) -> i32 do return cast(i32) (a - b);
-cmp_dec :: proc (a: $T, b: T) -> i32 do return cast(i32) (b - a);
+cmp_asc :: (a: $T, b: T) -> i32 do return cast(i32) (a - b);
+cmp_dec :: (a: $T, b: T) -> i32 do return cast(i32) (b - a);
 

@@ -4,13 +4,13 @@ Reader :: struct {
     stream : ^Stream;
 }
 
-reader_make :: proc (s: ^Stream) -> Reader {
+reader_make :: (s: ^Stream) -> Reader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
     
     return Reader.{ s };
 }
 
-read_u32 :: proc (use reader: ^Reader) -> u32 {
+read_u32 :: (use reader: ^Reader) -> u32 {
     n: u32 = 0;
 
     skip_whitespace(reader);
@@ -29,7 +29,7 @@ read_u32 :: proc (use reader: ^Reader) -> u32 {
     return n;
 }
 
-read_u64 :: proc (use reader: ^Reader) -> u64 {
+read_u64 :: (use reader: ^Reader) -> u64 {
     n: u64 = 0;
 
     skip_whitespace(reader);
@@ -48,7 +48,7 @@ read_u64 :: proc (use reader: ^Reader) -> u64 {
     return n;
 }
 
-read_line :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
+read_line :: (use reader: ^Reader, allocator := context.allocator) -> str {
     _, curr_pos := stream_tell(stream);
 
     count := 0;
@@ -71,7 +71,7 @@ read_line :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
     return out;
 }
 
-read_word :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
+read_word :: (use reader: ^Reader, allocator := context.allocator) -> str {
     skip_whitespace(reader);
 
     _, curr_pos := stream_tell(stream);
@@ -103,7 +103,7 @@ read_word :: proc (use reader: ^Reader, allocator := context.allocator) -> str {
     return out;
 }
 
-advance_line :: proc (use reader: ^Reader) {
+advance_line :: (use reader: ^Reader) {
     err, curr := stream_read_byte(stream);
     if err != Error.None do return;
     
@@ -115,7 +115,7 @@ advance_line :: proc (use reader: ^Reader) {
     err, curr = stream_read_byte(stream);
 }
 
-skip_whitespace :: proc (use reader: ^Reader) {
+skip_whitespace :: (use reader: ^Reader) {
     while true {
         err, byte := stream_peek_byte(stream);
         if err == Error.EOF do break;

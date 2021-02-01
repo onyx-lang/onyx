@@ -14,34 +14,34 @@ use package system as system
 #private_file print_stream : io.DynamicStringStream;
 #private_file print_writer : io.Writer;
 
-stdio_init :: proc () {
+stdio_init :: () {
     print_stream = io.dynamic_string_stream_make(2048, context.allocator);
     print_writer = io.writer_make(^print_stream);
 }
 
 print :: proc {
-    proc (x: str) {
+    (x: str) {
         io.write(^print_writer, x);
         if x[x.count - 1] == #char "\n" do print_stream_flush();
     },
 
-    proc (x: $T)        { io.write(^print_writer, x); },
-    proc (x: $T, y: $R) { io.write(^print_writer, x, y); },
+    (x: $T)        { io.write(^print_writer, x); },
+    (x: $T, y: $R) { io.write(^print_writer, x, y); },
 }
 
-println :: proc (x: $T) {
+println :: (x: $T) {
     print(x);
     print("\n");
 }
 
-printf :: proc (format: str, va: ...) {
+printf :: (format: str, va: ...) {
     buffer: [2048] u8;
     print(conv.str_format_va(format, buffer[0 .. 2048], va));
 }
 
 // This works on both slices and arrays
 print_array :: proc {
-    proc (arr: [$N] $T, sep := " ") {
+    (arr: [$N] $T, sep := " ") {
         for i: 0 .. N {
             print(arr[i]);
             if i != N - 1 do print(sep);
@@ -50,7 +50,7 @@ print_array :: proc {
         print("\n");
     },
 
-    proc (arr: $T, sep := " ") {
+    (arr: $T, sep := " ") {
         for i: 0 .. arr.count {
             print(arr.data[i]);
             if i != arr.count - 1 do print(sep);
@@ -60,7 +60,7 @@ print_array :: proc {
     }
 }
 
-print_stream_flush :: proc () {
+print_stream_flush :: () {
     if print_stream.data.count == 0 do return;
 
     ^print_stream

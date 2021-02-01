@@ -6,15 +6,15 @@ package core.random
 #private_file RANDOM_INCREMENT  :: 1013904223
 // #private_file RANDOM_MODULUS    :: 1 << 32
 
-set_seed :: proc (s: u32) do seed = s;
+set_seed :: (s: u32) do seed = s;
 
-int :: proc (s := ^seed) -> u32 {
+int :: (s := ^seed) -> u32 {
     *s = *s * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
     return *s;
 }
 
-between :: proc (lo: i32, hi: i32) -> i32 do return int () % (hi + 1 - lo) + lo;
+between :: (lo: i32, hi: i32) -> i32 do return int () % (hi + 1 - lo) + lo;
 
-float :: proc (lo := 0.0f, hi := 1.0f) -> f32 {
+float :: (lo := 0.0f, hi := 1.0f) -> f32 {
     return (cast(f32) (int() % (1 << 20)) / cast(f32) (1 << 20)) * (hi - lo) + lo;
 }

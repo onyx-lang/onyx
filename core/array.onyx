@@ -3,19 +3,19 @@ package core.array
 // ---------------------------------
 //           Dynamic Arrays
 // ---------------------------------
-make :: proc ($T: type_expr, initial_cap := 4) -> [..] T {
+make :: ($T: type_expr, initial_cap := 4) -> [..] T {
     arr : [..] T;
     init(^arr, initial_cap);
     return arr;
 }
 
-init :: proc (arr: ^[..] $T, initial_cap := 4) {
+init :: (arr: ^[..] $T, initial_cap := 4) {
     arr.count = 0;
     arr.capacity = initial_cap;
     arr.data = calloc(sizeof T * arr.capacity);
 }
 
-free :: proc (arr: ^[..] $T) {
+free :: (arr: ^[..] $T) {
     arr.count = 0;
     arr.capacity = 0;
 
@@ -23,7 +23,7 @@ free :: proc (arr: ^[..] $T) {
     arr.data = null;
 }
 
-copy :: proc (arr: ^[..] $T) -> [..] T {
+copy :: (arr: ^[..] $T) -> [..] T {
     new_arr : [..] T;
     init(^new_arr, arr.count);
     new_arr.count = arr.count;
@@ -32,7 +32,7 @@ copy :: proc (arr: ^[..] $T) -> [..] T {
     return new_arr;
 }
 
-copy_range :: proc (arr: ^[..] $T, r: range) -> [..] T {
+copy_range :: (arr: ^[..] $T, r: range) -> [..] T {
     new_arr : [..] T;
     init(^new_arr, r.high - r.low);
     new_arr.count = r.high - r.low;
@@ -41,11 +41,11 @@ copy_range :: proc (arr: ^[..] $T, r: range) -> [..] T {
     return new_arr;
 }
 
-clear :: proc (arr: ^[..] $T) {
+clear :: (arr: ^[..] $T) {
     arr.count = 0;
 }
 
-ensure_capacity :: proc (arr: ^[..] $T, cap: u32) -> bool {
+ensure_capacity :: (arr: ^[..] $T, cap: u32) -> bool {
     if arr.capacity >= cap do return true;
 
     while cap > arr.capacity do arr.capacity <<= 1;
@@ -55,14 +55,14 @@ ensure_capacity :: proc (arr: ^[..] $T, cap: u32) -> bool {
     return true;
 }
 
-push :: proc (arr: ^[..] $T, x: T) -> bool {
+push :: (arr: ^[..] $T, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
     arr.data[arr.count] = x;
     arr.count += 1;
     return true;
 }
 
-insert :: proc (arr: ^[..] $T, idx: u32, x: T) -> bool {
+insert :: (arr: ^[..] $T, idx: u32, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
 
     arr.count += 1;
@@ -75,7 +75,7 @@ insert :: proc (arr: ^[..] $T, idx: u32, x: T) -> bool {
     return true;
 }
 
-remove :: proc (arr: ^[..] $T, elem: T) {
+remove :: (arr: ^[..] $T, elem: T) {
     move := 0;
 
     while i := 0; i < arr.count - move {
@@ -88,7 +88,7 @@ remove :: proc (arr: ^[..] $T, elem: T) {
     arr.count -= move;
 }
 
-delete :: proc (arr: ^[..] $T, idx: u32) {
+delete :: (arr: ^[..] $T, idx: u32) {
     if idx >= arr.count do return;
 
     for i: idx .. arr.count - 1 {
@@ -98,31 +98,31 @@ delete :: proc (arr: ^[..] $T, idx: u32) {
     arr.count -= 1;
 }
 
-fast_delete :: proc (arr: ^[..] $T, idx: u32) {
+fast_delete :: (arr: ^[..] $T, idx: u32) {
     if idx >= arr.count do return;
 
     arr.data[idx] = arr.data[arr.count - 1];
     arr.count -= 1;
 }
 
-contains :: proc (arr: ^[..] $T, x: T) -> bool {
+contains :: (arr: ^[..] $T, x: T) -> bool {
     for it: *arr do if it == x do return true;
     return false;
 }
 
-pop :: proc (arr: ^[..] $T) -> T {
+pop :: (arr: ^[..] $T) -> T {
     arr.count -= 1;
     return arr.data[arr.count];
 }
 
-average :: proc (arr: ^[..] $T) -> T {
+average :: (arr: ^[..] $T) -> T {
     sum := cast(T) 0;
     for it: *arr do sum += it;
 
     return sum / cast(T) arr.count;
 }
 
-to_slice :: proc (arr: ^[..] $T) -> [] T {
+to_slice :: (arr: ^[..] $T) -> [] T {
     return arr.data[0 .. arr.count];
 }
 
@@ -130,7 +130,7 @@ to_slice :: proc (arr: ^[..] $T) -> [] T {
 ** Simple insertion sort
 **    cmp should return >0 if left > right
 */
-sort :: proc (arr: ^[..] $T, cmp: proc (T, T) -> i32) {
+sort :: (arr: ^[..] $T, cmp: (T, T) -> i32) {
     for i: 1 .. arr.count {
         x := arr.data[i];
         j := i - 1;
@@ -144,20 +144,20 @@ sort :: proc (arr: ^[..] $T, cmp: proc (T, T) -> i32) {
     }
 }
 
-fold :: proc (arr: ^[..] $T, init: $R, f: proc (T, R) -> R) -> R {
+fold :: (arr: ^[..] $T, init: $R, f: (T, R) -> R) -> R {
     val := init;
     for it: *arr do val = f(it, val);
     return val;
 }
 
 // CLEANUP: :slice Move this elsewhere when more slice functionality is added
-fold_slice :: proc (arr: [] $T, init: $R, f: proc (T, R) -> R) -> R {
+fold_slice :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
     val := init;
     for it: arr do val = f(it, val);
     return val;
 }
 
-map :: proc (arr: ^[..] $T, data: $R, f: proc (T, R) -> T) {
+map :: (arr: ^[..] $T, data: $R, f: (T, R) -> T) {
     for ^it: *arr do *it = f(*it, data);
 }
 

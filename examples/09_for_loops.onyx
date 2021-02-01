@@ -8,7 +8,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     // Currently, for loops can iterate over four kinds of data structures in Onyx:
     //      * Ranges
     //      * Fixed arrays

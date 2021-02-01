@@ -1,6 +1,6 @@
 package core.conv
 
-i64_to_str :: proc (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
+i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
     is_neg := false;
     if n < 0 && base == 10 {
         is_neg = true;
@@ -64,7 +64,7 @@ i64_to_str :: proc (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
 }
 
 // NOTE: This is a big hack but it will work for now
-f64_to_str :: proc (f: f64, buf: [] u8) -> str {
+f64_to_str :: (f: f64, buf: [] u8) -> str {
     f *= 10000.0;
     v := cast(i64) f;
 
@@ -83,11 +83,11 @@ f64_to_str :: proc (f: f64, buf: [] u8) -> str {
     return str.{ buf.data, len };
 }
 
-str_format :: proc (format: str, buffer: [] u8, va: ...) -> str {
+str_format :: (format: str, buffer: [] u8, va: ...) -> str {
 	return str_format_va(format, buffer, va);
 }
 
-str_format_va :: proc (format: str, buffer: [] u8, va: vararg) -> str {
+str_format_va :: (format: str, buffer: [] u8, va: vararg) -> str {
     len := 0;
     state := 0;
 

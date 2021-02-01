@@ -2,7 +2,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     x := 10 + 3 * 5;
 
     // The basic syntax of a switch statement:

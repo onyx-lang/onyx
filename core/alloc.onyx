@@ -17,7 +17,7 @@ heap_allocator : Allocator;
 temp_state     : ring.RingState;
 temp_allocator : Allocator;
 
-init :: proc () {
+init :: () {
     heap.init();
 
     temp_buffer := raw_alloc(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);

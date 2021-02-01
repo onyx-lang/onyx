@@ -5,7 +5,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     // To declare a simple, use the enum keyword.
     SimpleEnum :: enum {
         Value1; Value2; Value3;

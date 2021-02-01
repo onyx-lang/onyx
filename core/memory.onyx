@@ -1,22 +1,22 @@
 package core.memory
 
-copy :: proc (dst_: rawptr, src_: rawptr, len: u32) {
+copy :: (dst_: rawptr, src_: rawptr, len: u32) {
     dst := cast(^u8) dst_;
     src := cast(^u8) src_;
     for i: 0 .. len do dst[i] = src[i];
 }
 
-set :: proc (start: rawptr, length: u32, value: u8) {
+set :: (start: rawptr, length: u32, value: u8) {
     s := cast(^u8) start;
     for i: 0 .. length do s[i] = value;
 }
 
-alloc_slice :: proc (sl: ^[] $T, count: i32, allocator := context.allocator) {
+alloc_slice :: (sl: ^[] $T, count: i32, allocator := context.allocator) {
     sl.data  = raw_alloc(allocator, sizeof T * count);
     sl.count = count;
 }
 
-make_slice :: proc ($T: type_expr, count: i32, allocator := context.allocator) -> [] T {
+make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] T {
     return <[] T>.{
         data = raw_alloc(allocator, sizeof T * count),
         count = count

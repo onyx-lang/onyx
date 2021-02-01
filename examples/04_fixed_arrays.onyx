@@ -19,7 +19,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     // The following declares a fixed-size array of 10 i32s on the stack. Currently,
     // it is not guaranteed that `arr` will be zero initialized, so we will do that
     // with a for loop. Note, the `^` after the for keyword means we are iterating by
@@ -42,7 +42,7 @@ main :: proc (args: [] cstr) {
     // Fixed-size arrays are passed to procedures by reference. In the following example,
     // the array `arr` is passed by reference so when the for loop changes the
     // contents of `array_param`, the contents of `arr` are changed as well.
-    array_proc :: proc (array_param: [10] i32) {
+    array_proc :: (array_param: [10] i32) {
         for i: 0 .. 10 {
             array_param[i] = 1000 + i;
         }

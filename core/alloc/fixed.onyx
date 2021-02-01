@@ -16,7 +16,7 @@ FixedAllocatorData :: struct {
 }
 
 #private_file
-fixed_allocator_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+fixed_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     fa_data := cast(^FixedAllocatorData) data;  
 
     if aa != AllocationAction.Alloc do return null;
@@ -25,14 +25,14 @@ fixed_allocator_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, ali
     return fa_data.ptr;
 }
 
-make :: proc (ptr: rawptr, size: u32) -> FixedAllocatorData {
+make :: (ptr: rawptr, size: u32) -> FixedAllocatorData {
     return FixedAllocatorData.{
         ptr  = ptr,
         size = size,
     };
 }
 
-make_allocator :: proc (fa_data: ^FixedAllocatorData) -> Allocator {
+make_allocator :: (fa_data: ^FixedAllocatorData) -> Allocator {
     return Allocator.{
         func = fixed_allocator_proc,
         data = fa_data,

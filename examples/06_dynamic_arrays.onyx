@@ -11,7 +11,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     // Declaring dynamic arrays in Onyx looks like this. The
     // '..' makes it a dynamic array, as opposed to a slice
     // or fixed size array.

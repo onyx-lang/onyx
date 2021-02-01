@@ -364,44 +364,43 @@ IOVecArray :: struct {
 
 
 // FUNCTIONS
-args_get       :: proc (argv: ^^u8, argv_buf: ^u8) -> Errno #foreign "wasi_unstable" "args_get"---
-args_sizes_get :: proc (argc: ^Size, argv_buf_size: ^Size) -> Errno #foreign "wasi_unstable" "args_sizes_get" ---
+args_get       :: (argv: ^^u8, argv_buf: ^u8) -> Errno #foreign "wasi_unstable" "args_get"---
+args_sizes_get :: (argc: ^Size, argv_buf_size: ^Size) -> Errno #foreign "wasi_unstable" "args_sizes_get" ---
 
-environ_get       :: proc (environ: ^^u8, environ_buf: ^u8) -> Errno #foreign "wasi_unstable" "environ_get" ---
-environ_sizes_get :: proc (environc: ^Size, environ_buf_size: ^Size) -> Errno #foreign "wasi_unstable" "environ_sizes_get" ---
+environ_get       :: (environ: ^^u8, environ_buf: ^u8) -> Errno #foreign "wasi_unstable" "environ_get" ---
+environ_sizes_get :: (environc: ^Size, environ_buf_size: ^Size) -> Errno #foreign "wasi_unstable" "environ_sizes_get" ---
 
-clock_res_get  :: proc (id: ClockID, resolution: ^Timestamp) -> Errno #foreign "wasi_unstable" "clock_res_get" ---
-clock_time_get :: proc (id: ClockID, precision: Timestamp, time: ^Timestamp) -> Errno #foreign "wasi_unstable" "clock_time_get" ---
+clock_res_get  :: (id: ClockID, resolution: ^Timestamp) -> Errno #foreign "wasi_unstable" "clock_res_get" ---
+clock_time_get :: (id: ClockID, precision: Timestamp, time: ^Timestamp) -> Errno #foreign "wasi_unstable" "clock_time_get" ---
 
-fd_advise             :: proc (fd: FileDescriptor, offset: Filesize, len: Filesize, advice: Advice) -> Errno #foreign "wasi_unstable" "fd_advise" ---
-fd_allocate           :: proc (fd: FileDescriptor, offset: Filesize, len: Filesize) -> Errno #foreign "wasi_unstable" "fd_allocate" ---
-fd_close              :: proc (fd: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_close" ---
-fd_datasync           :: proc (fd: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_datasync" ---
-fd_fdstat_get         :: proc (fd: FileDescriptor, stat: ^FDStat) -> Errno #foreign "wasi_unstable" "fd_fdstat_get" ---
-fd_fdstat_set_flags   :: proc (fd: FileDescriptor, flags: FDFlags) -> Errno #foreign "wasi_unstable" "fd_fdstat_set_flags" ---
-fd_fdstat_set_rights  :: proc (fd: FileDescriptor, rights_base: Rights, rights_inheriting: Rights) -> Errno #foreign "wasi_unstable" "fd_fdstat_set_rights" ---
-fd_filestat_get       :: proc (fd: FileDescriptor, buf: ^FileStat) -> Errno #foreign "wasi_unstable" "fd_filestat_get" ---
-fd_filestat_set_size  :: proc (fd: FileDescriptor, size: Filesize) -> Errno #foreign "wasi_unstable" "fd_filestat_set_size" ---
-fd_filestat_set_times :: proc (fd: FileDescriptor, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_unstable" "fd_filestat_set_times" ---
-fd_pread              :: proc (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nread: ^Size) -> Errno #foreign "wasi_unstable" "fd_pread" ---
-fd_prestat_get        :: proc (fd: FileDescriptor, buf: ^PrestatTagged) -> Errno #foreign "wasi_unstable" "fd_prestat_get" ---
-fd_prestat_dir_name   :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "fd_prestat_dir_name" ---
-fd_pwrite             :: proc (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nwritten: ^Size) -> Errno #foreign "wasi_unstable" "fd_pwrite" ---
-fd_read               :: proc (fd: FileDescriptor, iovs: IOVecArray, nread: ^Size) -> Errno #foreign "wasi_unstable" "fd_read" ---
-fd_readdir            :: proc (fd: FileDescriptor, buf: ^u8, buf_len: Size, cookie: DirCookie, bufused: ^Size) -> Errno #foreign "wasi_unstable" "fd_readdir" ---
-fd_renumber           :: proc (fd: FileDescriptor, to: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_renumber" ---
-fd_seek               :: proc (fd: FileDescriptor, offset: FileDelta, whence: Whence, newoffset: ^Filesize) -> Errno #foreign "wasi_unstable" "fd_seek" ---
-fd_sync               :: proc (fd: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_sync" ---
-fd_tell               :: proc (fd: FileDescriptor, offset: ^Filesize) -> Errno #foreign "wasi_unstable" "fd_tell" ---
-fd_write              :: proc (fd: FileDescriptor, iovs: IOVecArray, nwritten: ^Size) -> Errno #foreign "wasi_unstable" "fd_write" ---
+fd_advise             :: (fd: FileDescriptor, offset: Filesize, len: Filesize, advice: Advice) -> Errno #foreign "wasi_unstable" "fd_advise" ---
+fd_allocate           :: (fd: FileDescriptor, offset: Filesize, len: Filesize) -> Errno #foreign "wasi_unstable" "fd_allocate" ---
+fd_close              :: (fd: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_close" ---
+fd_datasync           :: (fd: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_datasync" ---
+fd_fdstat_get         :: (fd: FileDescriptor, stat: ^FDStat) -> Errno #foreign "wasi_unstable" "fd_fdstat_get" ---
+fd_fdstat_set_flags   :: (fd: FileDescriptor, flags: FDFlags) -> Errno #foreign "wasi_unstable" "fd_fdstat_set_flags" ---
+fd_fdstat_set_rights  :: (fd: FileDescriptor, rights_base: Rights, rights_inheriting: Rights) -> Errno #foreign "wasi_unstable" "fd_fdstat_set_rights" ---
+fd_filestat_get       :: (fd: FileDescriptor, buf: ^FileStat) -> Errno #foreign "wasi_unstable" "fd_filestat_get" ---
+fd_filestat_set_size  :: (fd: FileDescriptor, size: Filesize) -> Errno #foreign "wasi_unstable" "fd_filestat_set_size" ---
+fd_filestat_set_times :: (fd: FileDescriptor, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_unstable" "fd_filestat_set_times" ---
+fd_pread              :: (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nread: ^Size) -> Errno #foreign "wasi_unstable" "fd_pread" ---
+fd_prestat_get        :: (fd: FileDescriptor, buf: ^PrestatTagged) -> Errno #foreign "wasi_unstable" "fd_prestat_get" ---
+fd_prestat_dir_name   :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "fd_prestat_dir_name" ---
+fd_pwrite             :: (fd: FileDescriptor, iovs: IOVecArray, offset: Filesize, nwritten: ^Size) -> Errno #foreign "wasi_unstable" "fd_pwrite" ---
+fd_read               :: (fd: FileDescriptor, iovs: IOVecArray, nread: ^Size) -> Errno #foreign "wasi_unstable" "fd_read" ---
+fd_readdir            :: (fd: FileDescriptor, buf: ^u8, buf_len: Size, cookie: DirCookie, bufused: ^Size) -> Errno #foreign "wasi_unstable" "fd_readdir" ---
+fd_renumber           :: (fd: FileDescriptor, to: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_renumber" ---
+fd_seek               :: (fd: FileDescriptor, offset: FileDelta, whence: Whence, newoffset: ^Filesize) -> Errno #foreign "wasi_unstable" "fd_seek" ---
+fd_sync               :: (fd: FileDescriptor) -> Errno #foreign "wasi_unstable" "fd_sync" ---
+fd_tell               :: (fd: FileDescriptor, offset: ^Filesize) -> Errno #foreign "wasi_unstable" "fd_tell" ---
+fd_write              :: (fd: FileDescriptor, iovs: IOVecArray, nwritten: ^Size) -> Errno #foreign "wasi_unstable" "fd_write" ---
 
-path_create_directory   :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_create_directory" ---
-path_filestat_get       :: proc (fd: FileDescriptor, flags: LookupFlags, path: str, buf: ^FileStat) -> Errno #foreign "wasi_unstable" "path_filestat_get" ---
-path_filestat_set_times :: proc (fd: FileDescriptor, flags: LookupFlags, path: str, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_unstable" "path_filestat_set_times" ---
+path_create_directory   :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_create_directory" ---
+path_filestat_get       :: (fd: FileDescriptor, flags: LookupFlags, path: str, buf: ^FileStat) -> Errno #foreign "wasi_unstable" "path_filestat_get" ---
+path_filestat_set_times :: (fd: FileDescriptor, flags: LookupFlags, path: str, atim: Timestamp, mtim: Timestamp, fst_flags: FSTFlags) -> Errno #foreign "wasi_unstable" "path_filestat_set_times" ---
 
-path_link :: proc (fd: FileDescriptor, old_flags: LookupFlags, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_link" ---
-path_open :: proc
-    ( fd: FileDescriptor
+path_link :: (fd: FileDescriptor, old_flags: LookupFlags, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_link" ---
+path_open :: (fd: FileDescriptor
     , dirflags: LookupFlags
     , path: str
     , oflags: OFlags
@@ -412,24 +411,24 @@ path_open :: proc
     ) -> Errno
      #foreign "wasi_unstable" "path_open" ---
 
-path_readlink :: proc (fd: FileDescriptor, path: str, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno #foreign "wasi_unstable" "path_readlink" ---
-path_remove_directory :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_remove_directory" ---
-path_rename  :: proc (fd: FileDescriptor, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_rename" ---
-path_symlink :: proc (old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_symlink" ---
-path_unlink_file :: proc (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_unlink_file" ---
+path_readlink :: (fd: FileDescriptor, path: str, buf: ^u8, buf_len: Size, bufused: ^Size) -> Errno #foreign "wasi_unstable" "path_readlink" ---
+path_remove_directory :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_remove_directory" ---
+path_rename  :: (fd: FileDescriptor, old_path: str, new_fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_rename" ---
+path_symlink :: (old_path: ^u8, old_path_len: Size, fd: FileDescriptor, new_path: str) -> Errno #foreign "wasi_unstable" "path_symlink" ---
+path_unlink_file :: (fd: FileDescriptor, path: str) -> Errno #foreign "wasi_unstable" "path_unlink_file" ---
 
-poll_oneoff :: proc (in: ^Subscription, out: ^Event, nsubscriptions: Size, nevents: ^Size) -> Errno #foreign "wasi_unstable" "poll_oneoff" ---
+poll_oneoff :: (in: ^Subscription, out: ^Event, nsubscriptions: Size, nevents: ^Size) -> Errno #foreign "wasi_unstable" "poll_oneoff" ---
 
-proc_exit  :: proc (rval: ExitCode) #foreign "wasi_unstable" "proc_exit" ---
-proc_raise :: proc (sig: Signal) -> Errno #foreign "wasi_unstable" "proc_raise" ---
+proc_exit  :: (rval: ExitCode) -> void #foreign "wasi_unstable" "proc_exit" ---
+proc_raise :: (sig: Signal) -> Errno #foreign "wasi_unstable" "proc_raise" ---
 
-sched_yield :: proc () -> Errno #foreign "wasi_unstable" "sched_yield" ---
+sched_yield :: () -> Errno #foreign "wasi_unstable" "sched_yield" ---
 
-random_get :: proc (buf: ^u8, buf_len: Size) -> Errno #foreign "wasi_unstable" "random_get" ---
+random_get :: (buf: ^u8, buf_len: Size) -> Errno #foreign "wasi_unstable" "random_get" ---
 
-sock_recv     :: proc (fd: FileDescriptor, ri_data: IOVecArray, ri_flags: RIFlags, ro_datalen: ^Size, ro_flags: ^ROFlags) -> Errno #foreign "wasi_unstable" "sock_recv" ---
-sock_send     :: proc (fd: FileDescriptor, si_data: IOVecArray, si_flags: SIFlags, so_datalen: ^Size) -> Errno #foreign "wasi_unstable" "sock_send" ---
-sock_shutdown :: proc (fd: FileDescriptor, how: SDFlags) -> Errno #foreign "wasi_unstable" "sock_shutdown" ---
+sock_recv     :: (fd: FileDescriptor, ri_data: IOVecArray, ri_flags: RIFlags, ro_datalen: ^Size, ro_flags: ^ROFlags) -> Errno #foreign "wasi_unstable" "sock_recv" ---
+sock_send     :: (fd: FileDescriptor, si_data: IOVecArray, si_flags: SIFlags, so_datalen: ^Size) -> Errno #foreign "wasi_unstable" "sock_send" ---
+sock_shutdown :: (fd: FileDescriptor, how: SDFlags) -> Errno #foreign "wasi_unstable" "sock_shutdown" ---
 
 
 

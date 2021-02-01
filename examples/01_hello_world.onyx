@@ -51,7 +51,7 @@ use package core
 // end it simply calls main.main, which is this procedure. By convention, main takes a slice
 // of cstr's, which were the arguments passed from the command line. We will talk about
 // slices later.
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 
     // This is the actual call to print, which will print the message 'Hello World!\n' onto the screen.
     // It is not too important to know how this works, but if you are interested you can find the

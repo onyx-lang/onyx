@@ -9,7 +9,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 
     // This is the basic struct syntax. Members are declared just like
     // local variables in procedures.
@@ -20,7 +20,7 @@ main :: proc (args: [] cstr) {
     }
 
     // Structs can be passed by value to procedures.
-    print_person :: proc (person: Person) {
+    print_person :: (person: Person) {
         printf("Person(%s, %i, %i)\n", person.name, person.age, person.height);
     }
 
@@ -59,7 +59,7 @@ main :: proc (args: [] cstr) {
         y : f32 = 34;
     }
 
-    print_vector2f :: proc (vec: Vector2f) {
+    print_vector2f :: (vec: Vector2f) {
         printf("Vector2f(%f, %f)", vec.x, vec.y);
     }
 

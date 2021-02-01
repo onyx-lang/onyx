@@ -17,7 +17,7 @@ RingState :: struct {
 }
 
 #private_file
-ring_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     ss := cast(^RingState) data;
 
     if aa == AllocationAction.Alloc {
@@ -38,7 +38,7 @@ ring_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u
     return null;
 }
 
-make :: proc (buffer: rawptr, length: u32) -> RingState {
+make :: (buffer: rawptr, length: u32) -> RingState {
     return RingState.{
         base_ptr = buffer,
         curr_ptr = buffer,
@@ -46,7 +46,7 @@ make :: proc (buffer: rawptr, length: u32) -> RingState {
     };
 }
 
-make_allocator :: proc (rs: ^RingState) -> Allocator {
+make_allocator :: (rs: ^RingState) -> Allocator {
     return Allocator.{
         func = ring_alloc_proc,
         data = rs,

@@ -26,7 +26,7 @@ ArenaState :: struct {
 Arena :: struct { next : ^Arena; }
 
 #private_file
-arena_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     alloc_arena := cast(^ArenaState) data;
 
     if aa == AllocationAction.Alloc {
@@ -60,7 +60,7 @@ arena_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: 
 }
 
 // NOTE: `arena_size` must be at least 4
-make :: proc (backing: Allocator, arena_size: u32) -> ArenaState {
+make :: (backing: Allocator, arena_size: u32) -> ArenaState {
     initial_arena := cast(^Arena) raw_alloc(backing, arena_size);
     initial_arena.next = null;
 
@@ -74,14 +74,14 @@ make :: proc (backing: Allocator, arena_size: u32) -> ArenaState {
     };
 }
 
-make_allocator :: proc (rs: ^ArenaState) -> Allocator {
+make_allocator :: (rs: ^ArenaState) -> Allocator {
     return Allocator.{
         func = arena_alloc_proc,
         data = rs,
     };
 }
 
-free :: proc (arena: ^ArenaState) {
+free :: (arena: ^ArenaState) {
     walker := arena.first_arena;
     trailer := walker;
     while walker != null {

@@ -12,7 +12,6 @@ Command Line Interface:
     [X] Remove old code from CLI logic
     [X] Add statistic printing
     [ ] Fix documentation generation (broken since compiler architecture change) 
-    [ ] Fix AST printing (broken for a long time)
     [ ] Add automated running component
         - Store to temporary file (OS independent)
         - Detect / choose WASM backend
@@ -145,8 +144,10 @@ API Expansion:
           it conflicts with 'builtin.string'. These two should be switched. Type
           name should be 'str' and package name should be 'string'
 
-    [ ] Expand capabilities of file api on WASI.
+    [X] Expand capabilities of file api on WASI.
+    [ ] Add file capabilities to JS backend
     [ ] Add clock / time api for both backends
+    [ ] Environment variables for both backends
     [ ] Better random number api
     [ ] Better string formatting and parsing api
 

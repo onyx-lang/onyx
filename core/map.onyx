@@ -18,13 +18,13 @@ MapEntry :: struct (K: type_expr, V: type_expr) {
     value : V;
 }
 
-make :: proc ($Key: type_expr, $Value: type_expr, default: Value = 0, hash_count: i32 = 16) -> Map(Key, Value) {
+make :: ($Key: type_expr, $Value: type_expr, default: Value = 0, hash_count: i32 = 16) -> Map(Key, Value) {
     map : Map(Key, Value);
     init(^map, default = default, hash_count = hash_count);
     return map;
 }
 
-init :: proc (use map: ^Map($K, $V), default: V = ~~0, hash_count: i32 = 16) {
+init :: (use map: ^Map($K, $V), default: V = ~~0, hash_count: i32 = 16) {
     array.init(^hashes, hash_count);
     array.init(^entries, 4);
 
@@ -33,12 +33,12 @@ init :: proc (use map: ^Map($K, $V), default: V = ~~0, hash_count: i32 = 16) {
     for i: 0 .. hash_count do array.push(^hashes, -1);
 }
 
-free :: proc (use map: ^Map($K, $V)) {
+free :: (use map: ^Map($K, $V)) {
     array.free(^hashes);
     array.free(^entries);
 }
 
-put :: proc (use map: ^Map($K, $V), key: K, value: V) {
+put :: (use map: ^Map($K, $V), key: K, value: V) {
     lr := lookup(map, key);
 
     if lr.entry_index >= 0 {
@@ -56,19 +56,19 @@ put :: proc (use map: ^Map($K, $V), key: K, value: V) {
     hashes[lr.hash_index] = entries.count - 1;
 }
 
-has :: proc (use map: ^Map($K, $V), key: K) -> bool {
+has :: (use map: ^Map($K, $V), key: K) -> bool {
     lr := lookup(map, key);
     return lr.entry_index >= 0;
 }
 
-get :: proc (use map: ^Map($K, $V), key: K) -> V {
+get :: (use map: ^Map($K, $V), key: K) -> V {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
     return default_value;
 }
 
-delete :: proc (use map: ^Map($K, $V), key: K) {
+delete :: (use map: ^Map($K, $V), key: K) {
     lr := lookup(map, key);
     if lr.entry_index < 0 do return;
 
@@ -86,38 +86,39 @@ delete :: proc (use map: ^Map($K, $V), key: K) {
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-update :: proc (use map: ^Map($K, $V), key: K, f: proc (^V)) {
+update :: (use map: ^Map($K, $V), key: K, f: (^V) -> void) {
     lr := lookup(map, key);
     if lr.entry_index < 0 do return;
 
     f(^entries[lr.entry_index].value);
 }
 
-clear :: proc (use map: ^Map($K, $V)) {
+clear :: (use map: ^Map($K, $V)) {
     for i: 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;
 }
 
-empty :: proc (use map: ^Map($K, $V)) -> bool {
+empty :: (use map: ^Map($K, $V)) -> bool {
     return entries.count == 0;
 }
 
 hash_function :: proc {
-    proc (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-    proc (key: i32) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-    proc (key: i64) -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
+    (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+    (key: i32) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+    (key: i64) -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
 
-    proc (key: str) -> u32 {
+    (key: str) -> u32 {
         hash: u32 = 5381;
         for ch: key do hash += (hash << 5) + ~~ch;
         return hash;
     },
 }
 
+// CLEANUP: This could be replaced with operator overloading of '=='
 cmp_function :: proc {
-    proc (a: rawptr, b: rawptr) -> bool { return a == b; },
-    proc (a: i32, b: i32) -> bool       { return a == b; },
-    proc (a: i64, b: i64) -> bool       { return a == b; },
+    (a: rawptr, b: rawptr) -> bool { return a == b; },
+    (a: i32, b: i32) -> bool       { return a == b; },
+    (a: i64, b: i64) -> bool       { return a == b; },
 
     string.equal,
 }
@@ -134,7 +135,7 @@ MapLookupResult :: struct {
 }
 
 #private_file
-lookup :: proc (use map: ^Map($K, $V), key: K) -> MapLookupResult {
+lookup :: (use map: ^Map($K, $V), key: K) -> MapLookupResult {
     lr := MapLookupResult.{};
 
     hash: u32 = hash_function(key); // You cannot use this type for the key, unless you add an overload.

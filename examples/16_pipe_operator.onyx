@@ -2,12 +2,12 @@
 
 use package core { println }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     // These functions will be used to demo the pipe operator.
     Num    :: #type i32;
-    double :: proc (v: Num)         -> Num do return v * 2;
-    add    :: proc (a: Num, b: Num) -> Num do return a + b;
-    square :: proc (v: Num)         -> Num do return v * v;
+    double :: (v: Num)         -> Num do return v * 2;
+    add    :: (a: Num, b: Num) -> Num do return a + b;
+    square :: (v: Num)         -> Num do return v * v;
 
     // Something you may find yourself doing often is changing function
     // calls together likes this:

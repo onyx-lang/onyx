@@ -722,128 +722,128 @@ GLMat2 :: #type [4] GLfloat
 GLMat3 :: #type [9] GLfloat
 GLMat4 :: #type [16] GLfloat
 
-activeTexture                  :: proc (texture: GLenum) #foreign "gl" "activeTexture" ---
-attachShader                   :: proc (program: GLProgram, shader: GLShader) -> GLProgram #foreign "gl" "attachShader" ---
-bindAttribLocation             :: proc (program: GLProgram, index: GLuint, name: str) #foreign "gl" "bindAttribLocation" ---
-bindBuffer                     :: proc (target: GLenum, buffer: GLBuffer) #foreign "gl" "bindBuffer" ---
-bindFramebuffer                :: proc (target: GLenum, framebuffer: GLFramebuffer) #foreign "gl" "bindFramebuffer" ---
-bindRenderbuffer               :: proc (target: GLenum, renderbuffer: GLRenderbuffer) #foreign "gl" "bindRenderbuffer" ---
-bindTexture                    :: proc (target: GLenum, texture: GLTexture) #foreign "gl" "bindTexture" ---
-bindVertexArray                :: proc (vertexArray: GLVertexArrayObject) #foreign "gl" "bindVertexArray" ---
-blendColor                     :: proc (red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) #foreign "gl" "blendColor" ---
-blendEquation                  :: proc (mode: GLenum) #foreign "gl" "blendEquation" ---
-blendEquationSeparate          :: proc (modeRGB: GLenum, modeAlpha: GLenum) #foreign "gl" "blendEquationSeparate" ---
-blendFunc                      :: proc (sfactor: GLenum, dfactor: GLenum) #foreign "gl" "blendFunc" ---
-blendFuncSeparate              :: proc (srcRGB: GLenum, dstRGB: GLenum, srcAlpha: GLenum, dstAlpha: GLenum) #foreign "gl" "blendFuncSeparate" ---
-blitFramebuffer                :: proc (sx0: GLint, sy0: GLint, sx1: GLint, sy1: GLint, dx0: GLint, dy0: GLint, dx1: GLint, dy1: GLint, mask: GLbitfield, filter: GLenum) #foreign "gl" "blitFramebuffer" ---
-bufferDataWithData             :: proc (target: GLenum, buffer: [] void, usage: GLenum) #foreign "gl" "bufferDataWithData" ---
-bufferDataNoData               :: proc (target: GLenum, size: GLsizeiptr, usage: GLenum) #foreign "gl" "bufferDataNoData" ---
-bufferData                     :: proc { bufferDataWithData, bufferDataNoData }
-bufferSubData                  :: proc (target: GLenum, offset: GLsizei, data: [] void) #foreign "gl" "bufferSubData" ---
-canvasSize                     :: proc (width: GLsizei, height: GLsizei) #foreign "gl" "canvasSize" ---
-checkFrameBufferStatus         :: proc (target: GLenum) -> GLenum #foreign "gl" "checkFrameBufferStatus" ---
-clear                          :: proc (mask: GLbitfield) #foreign "gl" "clear" ---
-clearColor                     :: proc (red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) #foreign "gl" "clearColor" ---
-clearDepth                     :: proc (depth: GLclampf) #foreign "gl" "clearDepth" ---
-clearStencil                   :: proc (s: GLint) #foreign "gl" "clearStencil" ---
-colorMask                      :: proc (red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean) #foreign "gl" "colorMask" ---
-compileShader                  :: proc (shader: GLShader) #foreign "gl" "compileShader" ---
-compressedTexImage2D           :: proc (target: GLenum, level: GLint, internalformat: GLenum, width: GLsizei, height: GLsizei, border: GLint, data: str) #foreign "gl" "compressedTexImage2D" ---
-compressedTexSubImage2D        :: proc (target: GLenum, level: GLint, internalformat: GLenum, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, data: str) #foreign "gl" "compressedTexSubImage2D" ---
-copyBufferSubData              :: proc (readTarget: GLenum, writeTarget: GLenum, readOffset: GLintptr, writeOffset: GLintptr, size: GLsizeiptr) #foreign "gl" "copyBufferSubData" ---
-copyTexImage2D                 :: proc (target: GLenum, level: GLint, internalformat: GLenum, x: GLint, y: GLint, width: GLsizei, height: GLsizei, border: GLint) #foreign "gl" "copyTexImage2D" ---
-copyTexSubImage2D              :: proc (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "copyTexSubImage2D" ---
-createBuffer                   :: proc () -> GLBuffer #foreign "gl" "createBuffer" ---
-createFramebuffer              :: proc () -> GLFramebuffer #foreign "gl" "createFramebuffer" ---
-createProgram                  :: proc () -> GLProgram #foreign "gl" "createProgram" ---
-createRenderbuffer             :: proc () -> GLRenderbuffer #foreign "gl" "createRenderbuffer" ---
-createShader                   :: proc (type: GLenum) -> GLShader #foreign "gl" "createShader" ---
-createTexture                  :: proc () -> GLTexture #foreign "gl" "createTexture" ---
-createVertexArray              :: proc () -> GLVertexArrayObject #foreign "gl" "createVertexArray" ---
-cullFace                       :: proc (mode: GLenum) #foreign "gl" "cullFace" ---
-deleteBuffer                   :: proc (buffer: GLBuffer) #foreign "gl" "deleteBuffer" ---
-deleteFramebuffer              :: proc (framebuffer: GLFramebuffer) #foreign "gl" "deleteFramebuffer" ---
-deleteProgram                  :: proc (program: GLProgram) #foreign "gl" "deleteProgram" ---
-deleteRenderbuffer             :: proc (renderbuffer: GLRenderbuffer) #foreign "gl" "deleteRenderbuffer" ---
-deleteShader                   :: proc (shader: GLShader) #foreign "gl" "deleteShader" ---
-deleteTexture                  :: proc (texture: GLTexture) #foreign "gl" "deleteTexture" ---
-deleteVertexArray              :: proc (vertexArray: GLVertexArrayObject) #foreign "gl" "deleteVertexArray" ---
-depthFunc                      :: proc (func: GLenum) #foreign "gl" "depthFunc" ---
-depthMask                      :: proc (flag: GLboolean) #foreign "gl" "depthMask" ---
-depthRange                     :: proc (zNear: GLclampf, zFar: GLclampf) #foreign "gl" "depthRange" ---
-detachShader                   :: proc (program: GLProgram, shader: GLShader) #foreign "gl" "detachShader" ---
-disable                        :: proc (cap: GLenum) #foreign "gl" "disable" ---
-disableVertexAttribArray       :: proc (index: GLuint) #foreign "gl" "disableVertexAttribArray" ---
-drawArrays                     :: proc (mode: GLenum, first: GLint, count: GLsizei) #foreign "gl" "drawArrays" ---
-drawArraysInstanced            :: proc (mode: GLenum, first: GLint, count: GLsizei, instanceCount: GLsizei) #foreign "gl" "drawArraysInstanced" ---
-drawElements                   :: proc (mode: GLenum, count: GLsizei, type: GLenum, offset: GLint) #foreign "gl" "drawElements" ---
-drawElementsInstanced          :: proc (mode: GLenum, count: GLsizei, type: GLenum, offset: GLint, instanceCount: GLsizei) #foreign "gl" "drawElementsInstanced" ---
-enable                         :: proc (cap: GLenum) #foreign "gl" "enable" ---
-enableVertexAttribArray        :: proc (index: GLuint) #foreign "gl" "enableVertexAttribArray" ---
-finish                         :: proc () #foreign "gl" "finish" ---
-flush                          :: proc () #foreign "gl" "flush" ---
-framebufferRenderbuffer        :: proc (target: GLenum, attachment: GLenum, renderbuffertarget: GLenum, renderbuffer: GLRenderbuffer) #foreign "gl" "framebufferRenderbuffer" ---
-framebufferTexture2D           :: proc (target: GLenum, attachment: GLenum, textarget: GLenum, texture: GLTexture, level: GLint) #foreign "gl" "framebufferTexture2D" ---
-framebufferTextureLayer        :: proc (target: GLenum, attachment: GLenum, texture: GLTexture, level: GLint, layer: GLint) #foreign "gl" "framebufferTextureLayer" ---
-frontFace                      :: proc (mode: GLenum) #foreign "gl" "frontFace" ---
-generateMipmap                 :: proc (target: GLenum) #foreign "gl" "generateMipmap" ---
-getActiveAttrib                :: proc (program: GLProgram, index: GLuint, out: ^GLActiveInfo) #foreign "gl" "getActiveAttrib" ---
-getActiveUniform               :: proc (program: GLProgram, index: GLuint, out: ^GLActiveInfo) #foreign "gl" "getActiveUniform" ---
+activeTexture                  :: (texture: GLenum) -> void #foreign "gl" "activeTexture" ---
+attachShader                   :: (program: GLProgram, shader: GLShader) -> GLProgram #foreign "gl" "attachShader" ---
+bindAttribLocation             :: (program: GLProgram, index: GLuint, name: str) -> void #foreign "gl" "bindAttribLocation" ---
+bindBuffer                     :: (target: GLenum, buffer: GLBuffer) -> void #foreign "gl" "bindBuffer" ---
+bindFramebuffer                :: (target: GLenum, framebuffer: GLFramebuffer) -> void #foreign "gl" "bindFramebuffer" ---
+bindRenderbuffer               :: (target: GLenum, renderbuffer: GLRenderbuffer) -> void #foreign "gl" "bindRenderbuffer" ---
+bindTexture                    :: (target: GLenum, texture: GLTexture) -> void #foreign "gl" "bindTexture" ---
+bindVertexArray                :: (vertexArray: GLVertexArrayObject) -> void #foreign "gl" "bindVertexArray" ---
+blendColor                     :: (red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) -> void #foreign "gl" "blendColor" ---
+blendEquation                  :: (mode: GLenum) -> void #foreign "gl" "blendEquation" ---
+blendEquationSeparate          :: (modeRGB: GLenum, modeAlpha: GLenum) -> void #foreign "gl" "blendEquationSeparate" ---
+blendFunc                      :: (sfactor: GLenum, dfactor: GLenum) -> void #foreign "gl" "blendFunc" ---
+blendFuncSeparate              :: (srcRGB: GLenum, dstRGB: GLenum, srcAlpha: GLenum, dstAlpha: GLenum) -> void #foreign "gl" "blendFuncSeparate" ---
+blitFramebuffer                :: (sx0: GLint, sy0: GLint, sx1: GLint, sy1: GLint, dx0: GLint, dy0: GLint, dx1: GLint, dy1: GLint, mask: GLbitfield, filter: GLenum) -> void #foreign "gl" "blitFramebuffer" ---
+bufferDataWithData             :: (target: GLenum, buffer: [] void, usage: GLenum) -> void #foreign "gl" "bufferDataWithData" ---
+bufferDataNoData               :: (target: GLenum, size: GLsizeiptr, usage: GLenum) -> void #foreign "gl" "bufferDataNoData" ---
+bufferData                     :: { bufferDataWithData, bufferDataNoData }
+bufferSubData                  :: (target: GLenum, offset: GLsizei, data: [] void) -> void #foreign "gl" "bufferSubData" ---
+canvasSize                     :: (width: GLsizei, height: GLsizei) -> void #foreign "gl" "canvasSize" ---
+checkFrameBufferStatus         :: (target: GLenum) -> GLenum #foreign "gl" "checkFrameBufferStatus" ---
+clear                          :: (mask: GLbitfield) -> void #foreign "gl" "clear" ---
+clearColor                     :: (red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) -> void #foreign "gl" "clearColor" ---
+clearDepth                     :: (depth: GLclampf) -> void #foreign "gl" "clearDepth" ---
+clearStencil                   :: (s: GLint) -> void #foreign "gl" "clearStencil" ---
+colorMask                      :: (red: GLboolean, green: GLboolean, blue: GLboolean, alpha: GLboolean) -> void #foreign "gl" "colorMask" ---
+compileShader                  :: (shader: GLShader) -> void #foreign "gl" "compileShader" ---
+compressedTexImage2D           :: (target: GLenum, level: GLint, internalformat: GLenum, width: GLsizei, height: GLsizei, border: GLint, data: str) -> void #foreign "gl" "compressedTexImage2D" ---
+compressedTexSubImage2D        :: (target: GLenum, level: GLint, internalformat: GLenum, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, data: str) -> void #foreign "gl" "compressedTexSubImage2D" ---
+copyBufferSubData              :: (readTarget: GLenum, writeTarget: GLenum, readOffset: GLintptr, writeOffset: GLintptr, size: GLsizeiptr) -> void #foreign "gl" "copyBufferSubData" ---
+copyTexImage2D                 :: (target: GLenum, level: GLint, internalformat: GLenum, x: GLint, y: GLint, width: GLsizei, height: GLsizei, border: GLint) -> void #foreign "gl" "copyTexImage2D" ---
+copyTexSubImage2D              :: (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void #foreign "gl" "copyTexSubImage2D" ---
+createBuffer                   :: () -> GLBuffer #foreign "gl" "createBuffer" ---
+createFramebuffer              :: () -> GLFramebuffer #foreign "gl" "createFramebuffer" ---
+createProgram                  :: () -> GLProgram #foreign "gl" "createProgram" ---
+createRenderbuffer             :: () -> GLRenderbuffer #foreign "gl" "createRenderbuffer" ---
+createShader                   :: (type: GLenum) -> GLShader #foreign "gl" "createShader" ---
+createTexture                  :: () -> GLTexture #foreign "gl" "createTexture" ---
+createVertexArray              :: () -> GLVertexArrayObject #foreign "gl" "createVertexArray" ---
+cullFace                       :: (mode: GLenum) -> void #foreign "gl" "cullFace" ---
+deleteBuffer                   :: (buffer: GLBuffer) -> void #foreign "gl" "deleteBuffer" ---
+deleteFramebuffer              :: (framebuffer: GLFramebuffer) -> void #foreign "gl" "deleteFramebuffer" ---
+deleteProgram                  :: (program: GLProgram) -> void #foreign "gl" "deleteProgram" ---
+deleteRenderbuffer             :: (renderbuffer: GLRenderbuffer) -> void #foreign "gl" "deleteRenderbuffer" ---
+deleteShader                   :: (shader: GLShader) -> void #foreign "gl" "deleteShader" ---
+deleteTexture                  :: (texture: GLTexture) -> void #foreign "gl" "deleteTexture" ---
+deleteVertexArray              :: (vertexArray: GLVertexArrayObject) -> void #foreign "gl" "deleteVertexArray" ---
+depthFunc                      :: (func: GLenum) -> void #foreign "gl" "depthFunc" ---
+depthMask                      :: (flag: GLboolean) -> void #foreign "gl" "depthMask" ---
+depthRange                     :: (zNear: GLclampf, zFar: GLclampf) -> void #foreign "gl" "depthRange" ---
+detachShader                   :: (program: GLProgram, shader: GLShader) -> void #foreign "gl" "detachShader" ---
+disable                        :: (cap: GLenum) -> void #foreign "gl" "disable" ---
+disableVertexAttribArray       :: (index: GLuint) -> void #foreign "gl" "disableVertexAttribArray" ---
+drawArrays                     :: (mode: GLenum, first: GLint, count: GLsizei) -> void #foreign "gl" "drawArrays" ---
+drawArraysInstanced            :: (mode: GLenum, first: GLint, count: GLsizei, instanceCount: GLsizei) -> void #foreign "gl" "drawArraysInstanced" ---
+drawElements                   :: (mode: GLenum, count: GLsizei, type: GLenum, offset: GLint) -> void #foreign "gl" "drawElements" ---
+drawElementsInstanced          :: (mode: GLenum, count: GLsizei, type: GLenum, offset: GLint, instanceCount: GLsizei) -> void #foreign "gl" "drawElementsInstanced" ---
+enable                         :: (cap: GLenum) -> void #foreign "gl" "enable" ---
+enableVertexAttribArray        :: (index: GLuint) -> void #foreign "gl" "enableVertexAttribArray" ---
+finish                         :: () -> void #foreign "gl" "finish" ---
+flush                          :: () -> void #foreign "gl" "flush" ---
+framebufferRenderbuffer        :: (target: GLenum, attachment: GLenum, renderbuffertarget: GLenum, renderbuffer: GLRenderbuffer) -> void #foreign "gl" "framebufferRenderbuffer" ---
+framebufferTexture2D           :: (target: GLenum, attachment: GLenum, textarget: GLenum, texture: GLTexture, level: GLint) -> void #foreign "gl" "framebufferTexture2D" ---
+framebufferTextureLayer        :: (target: GLenum, attachment: GLenum, texture: GLTexture, level: GLint, layer: GLint) -> void #foreign "gl" "framebufferTextureLayer" ---
+frontFace                      :: (mode: GLenum) -> void #foreign "gl" "frontFace" ---
+generateMipmap                 :: (target: GLenum) -> void #foreign "gl" "generateMipmap" ---
+getActiveAttrib                :: (program: GLProgram, index: GLuint, out: ^GLActiveInfo) -> void #foreign "gl" "getActiveAttrib" ---
+getActiveUniform               :: (program: GLProgram, index: GLuint, out: ^GLActiveInfo) -> void #foreign "gl" "getActiveUniform" ---
 // getAttachedShaders does not work yet because we can't return a list of things
-getAttribLocation              :: proc (program: GLProgram, name: str) -> GLint #foreign "gl" "getAttribLocation" ---
-getBufferSubData               :: proc (target: GLenum, srcByteOffset: GLintptr, dstBuffer: str, dstOffset: GLuint, length: GLuint) #foreign "gl" "getBufferSubData" ---
+getAttribLocation              :: (program: GLProgram, name: str) -> GLint #foreign "gl" "getAttribLocation" ---
+getBufferSubData               :: (target: GLenum, srcByteOffset: GLintptr, dstBuffer: str, dstOffset: GLuint, length: GLuint) -> void #foreign "gl" "getBufferSubData" ---
 // getBufferParameter and getParameter do not work
-getError                       :: proc () -> GLenum #foreign "gl" "getError" ---
-getInternalformatParameter     :: proc (target: GLenum, internalFormat: GLenum, pname: GLenum) -> GLenum #foreign "gl" "getInternalformatParameter" ---
+getError                       :: () -> GLenum #foreign "gl" "getError" ---
+getInternalformatParameter     :: (target: GLenum, internalFormat: GLenum, pname: GLenum) -> GLenum #foreign "gl" "getInternalformatParameter" ---
 // many of the 'gets' don't work yet because they return very javascripty things
-getProgramParameter            :: proc (program: GLProgram, pname: GLenum) -> GLenum #foreign "gl" "getProgramParameter" ---
-getShaderParameter             :: proc (shader: GLShader, pname: GLenum) -> GLenum #foreign "gl" "getShaderParameter" ---
-getUniformLocation             :: proc (program: GLProgram, name: str) -> GLUniformLocation #foreign "gl" "getUniformLocation" ---
-getVertexAttribOffset          :: proc (index: GLuint, pname: GLenum) #foreign "gl" "getVertexAttribOffset" ---
-hint                           :: proc (target: GLenum, mode: GLenum) #foreign "gl" "hint" ---
-init                           :: proc (canvasname: str) -> GLboolean #foreign "gl" "init" ---
-invalidateFramebuffer          :: proc (target: GLenum, attachments: str) #foreign "gl" "invalidateFramebuffer" ---
-invalidateSubFramebuffer       :: proc (target: GLenum, attachments: str, x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "invalidateSubFramebuffer" ---
-isEnabled                      :: proc (cap: GLenum) -> GLboolean #foreign "gl" "isEnabled" ---
-lineWidth                      :: proc (width: GLfloat) #foreign "gl" "lineWidth" ---
-linkProgram                    :: proc (program: GLProgram) #foreign "gl" "linkProgram" ---
-pixelStorei                    :: proc (pname: GLenum, param: GLenum) #foreign "gl" "pixelStorei" ---
-polygonOffset                  :: proc (factor: GLfloat, units: GLfloat) #foreign "gl" "polygonOffset" ---
-printProgramInfoLog            :: proc (program: GLProgram) #foreign "gl" "printProgramInfoLog" ---
-printShaderInfoLog             :: proc (shader: GLShader) #foreign "gl" "printShaderInfoLog" ---
-readBuffer                     :: proc (src: GLenum) #foreign "gl" "readBuffer" ---
-readPixels                     :: proc (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) #foreign "gl" "readPixels" ---
-renderbufferStorageMultisample :: proc (target: GLenum, samples: GLsizei, internalforamt: GLenum, width: GLsizei, height: GLsizei) #foreign "gl" "renderbufferStorageMultisample" ---
-sampleCoverage                 :: proc (value: GLclampf, invert: GLboolean) #foreign "gl" "sampleCoverage" ---
-scissor                        :: proc (x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "scissor" ---
-shaderSource                   :: proc (shader: GLShader, source: str) #foreign "gl" "shaderSource" ---
-stencilFunc                    :: proc (func: GLenum, ref: GLint, mask: GLuint) #foreign "gl" "stencilFunc" ---
-stencilFuncSeparate            :: proc (face: GLenum, func: GLenum, ref: GLint, mask: GLuint) #foreign "gl" "stencilFuncSeparate" ---
-stencilMask                    :: proc (mask: GLuint) #foreign "gl" "stencilMask" ---
-stencilMaskSeparate            :: proc (face: GLenum, mask: GLenum) #foreign "gl" "stencilMaskSeparate" ---
-stencilOp                      :: proc (fail: GLenum, zfail: GLenum, zpass: GLenum) #foreign "gl" "stencilOp" ---
-stencilOpSeparate              :: proc (face: GLenum, fail: GLenum, zfail: GLenum, zpass: GLenum) #foreign "gl" "stencilOpSeparate" ---
-texImage2D                     :: proc (target: GLenum, level: GLint, internalFormat: GLenum, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, type: GLenum, pixels: str) #foreign "gl" "texImage2D" ---
-texParameterf                  :: proc (target: GLenum, pname: GLenum, param: GLfloat) #foreign "gl" "texParameterf" ---
-texParameteri                  :: proc (target: GLenum, pname: GLenum, param: GLint) #foreign "gl" "texParameteri" ---
-texSubImage2D                  :: proc (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) #foreign "gl" "texSubImage2D" ---
-uniform1f                      :: proc (loc: GLUniformLocation, x: GLfloat) #foreign "gl" "uniform1f" ---
-uniform1i                      :: proc (loc: GLUniformLocation, x: GLint) #foreign "gl" "uniform1i" ---
-uniform2f                      :: proc (loc: GLUniformLocation, x: GLfloat, y: GLfloat) #foreign "gl" "uniform2f" ---
-uniform2i                      :: proc (loc: GLUniformLocation, x: GLint, y: GLint) #foreign "gl" "uniform2i" ---
-uniform3f                      :: proc (loc: GLUniformLocation, x: GLfloat, y: GLfloat, z: GLfloat) #foreign "gl" "uniform3f" ---
-uniform3i                      :: proc (loc: GLUniformLocation, x: GLint, y: GLint, z: GLint) #foreign "gl" "uniform3i" ---
-uniform4f                      :: proc (loc: GLUniformLocation, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) #foreign "gl" "uniform4f" ---
-uniform4i                      :: proc (loc: GLUniformLocation, x: GLint, y: GLint, z: GLint, w: GLint) #foreign "gl" "uniform4i" ---
-uniformMatrix2                 :: proc (loc: GLUniformLocation, transpose: GLboolean, value: GLMat2) #foreign "gl" "uniformMatrix2" ---
-uniformMatrix3                 :: proc (loc: GLUniformLocation, transpose: GLboolean, value: GLMat3) #foreign "gl" "uniformMatrix3" ---
-uniformMatrix4                 :: proc (loc: GLUniformLocation, transpose: GLboolean, value: GLMat4) #foreign "gl" "uniformMatrix4" ---
-useProgram                     :: proc (program: GLProgram) #foreign "gl" "useProgram" ---
-validateProgram                :: proc (program: GLProgram) #foreign "gl" "validateProgram" ---
-vertexAttrib1f                 :: proc (idx: GLuint, x: GLfloat) #foreign "gl" "vertexAttrib1f" ---
-vertexAttrib2f                 :: proc (idx: GLuint, x: GLfloat, y: GLfloat) #foreign "gl" "vertexAttrib2f" ---
-vertexAttrib3f                 :: proc (idx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) #foreign "gl" "vertexAttrib3f" ---
-vertexAttrib4f                 :: proc (idx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) #foreign "gl" "vertexAttrib4f" ---
-vertexAttribPointer            :: proc (idx: GLuint, size: GLint, type: GLenum, normalized: GLboolean, stride: GLsizei, offset: GLint) #foreign "gl" "vertexAttribPointer" ---
-vertexAttribDivisor            :: proc (idx: GLuint, divisor: GLuint) #foreign "gl" "vertexAttribDivisor" ---
-viewport                       :: proc (x: GLint, y: GLint, width: GLsizei, height: GLsizei) #foreign "gl" "viewport" ---      
+getProgramParameter            :: (program: GLProgram, pname: GLenum) -> GLenum #foreign "gl" "getProgramParameter" ---
+getShaderParameter             :: (shader: GLShader, pname: GLenum) -> GLenum #foreign "gl" "getShaderParameter" ---
+getUniformLocation             :: (program: GLProgram, name: str) -> GLUniformLocation #foreign "gl" "getUniformLocation" ---
+getVertexAttribOffset          :: (index: GLuint, pname: GLenum) -> void #foreign "gl" "getVertexAttribOffset" ---
+hint                           :: (target: GLenum, mode: GLenum) -> void #foreign "gl" "hint" ---
+init                           :: (canvasname: str) -> GLboolean #foreign "gl" "init" ---
+invalidateFramebuffer          :: (target: GLenum, attachments: str) -> void #foreign "gl" "invalidateFramebuffer" ---
+invalidateSubFramebuffer       :: (target: GLenum, attachments: str, x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void #foreign "gl" "invalidateSubFramebuffer" ---
+isEnabled                      :: (cap: GLenum) -> GLboolean #foreign "gl" "isEnabled" ---
+lineWidth                      :: (width: GLfloat) -> void #foreign "gl" "lineWidth" ---
+linkProgram                    :: (program: GLProgram) -> void #foreign "gl" "linkProgram" ---
+pixelStorei                    :: (pname: GLenum, param: GLenum) -> void #foreign "gl" "pixelStorei" ---
+polygonOffset                  :: (factor: GLfloat, units: GLfloat) -> void #foreign "gl" "polygonOffset" ---
+printProgramInfoLog            :: (program: GLProgram) -> void #foreign "gl" "printProgramInfoLog" ---
+printShaderInfoLog             :: (shader: GLShader) -> void #foreign "gl" "printShaderInfoLog" ---
+readBuffer                     :: (src: GLenum) -> void #foreign "gl" "readBuffer" ---
+readPixels                     :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) -> void #foreign "gl" "readPixels" ---
+renderbufferStorageMultisample :: (target: GLenum, samples: GLsizei, internalforamt: GLenum, width: GLsizei, height: GLsizei) -> void #foreign "gl" "renderbufferStorageMultisample" ---
+sampleCoverage                 :: (value: GLclampf, invert: GLboolean) -> void #foreign "gl" "sampleCoverage" ---
+scissor                        :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void #foreign "gl" "scissor" ---
+shaderSource                   :: (shader: GLShader, source: str) -> void #foreign "gl" "shaderSource" ---
+stencilFunc                    :: (func: GLenum, ref: GLint, mask: GLuint) -> void #foreign "gl" "stencilFunc" ---
+stencilFuncSeparate            :: (face: GLenum, func: GLenum, ref: GLint, mask: GLuint) -> void #foreign "gl" "stencilFuncSeparate" ---
+stencilMask                    :: (mask: GLuint) -> void #foreign "gl" "stencilMask" ---
+stencilMaskSeparate            :: (face: GLenum, mask: GLenum) -> void #foreign "gl" "stencilMaskSeparate" ---
+stencilOp                      :: (fail: GLenum, zfail: GLenum, zpass: GLenum) -> void #foreign "gl" "stencilOp" ---
+stencilOpSeparate              :: (face: GLenum, fail: GLenum, zfail: GLenum, zpass: GLenum) -> void #foreign "gl" "stencilOpSeparate" ---
+texImage2D                     :: (target: GLenum, level: GLint, internalFormat: GLenum, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, type: GLenum, pixels: str) -> void #foreign "gl" "texImage2D" ---
+texParameterf                  :: (target: GLenum, pname: GLenum, param: GLfloat) -> void #foreign "gl" "texParameterf" ---
+texParameteri                  :: (target: GLenum, pname: GLenum, param: GLint) -> void #foreign "gl" "texParameteri" ---
+texSubImage2D                  :: (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) -> void #foreign "gl" "texSubImage2D" ---
+uniform1f                      :: (loc: GLUniformLocation, x: GLfloat) -> void #foreign "gl" "uniform1f" ---
+uniform1i                      :: (loc: GLUniformLocation, x: GLint) -> void #foreign "gl" "uniform1i" ---
+uniform2f                      :: (loc: GLUniformLocation, x: GLfloat, y: GLfloat) -> void #foreign "gl" "uniform2f" ---
+uniform2i                      :: (loc: GLUniformLocation, x: GLint, y: GLint) -> void #foreign "gl" "uniform2i" ---
+uniform3f                      :: (loc: GLUniformLocation, x: GLfloat, y: GLfloat, z: GLfloat) -> void #foreign "gl" "uniform3f" ---
+uniform3i                      :: (loc: GLUniformLocation, x: GLint, y: GLint, z: GLint) -> void #foreign "gl" "uniform3i" ---
+uniform4f                      :: (loc: GLUniformLocation, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) -> void #foreign "gl" "uniform4f" ---
+uniform4i                      :: (loc: GLUniformLocation, x: GLint, y: GLint, z: GLint, w: GLint) -> void #foreign "gl" "uniform4i" ---
+uniformMatrix2                 :: (loc: GLUniformLocation, transpose: GLboolean, value: GLMat2) -> void #foreign "gl" "uniformMatrix2" ---
+uniformMatrix3                 :: (loc: GLUniformLocation, transpose: GLboolean, value: GLMat3) -> void #foreign "gl" "uniformMatrix3" ---
+uniformMatrix4                 :: (loc: GLUniformLocation, transpose: GLboolean, value: GLMat4) -> void #foreign "gl" "uniformMatrix4" ---
+useProgram                     :: (program: GLProgram) -> void #foreign "gl" "useProgram" ---
+validateProgram                :: (program: GLProgram) -> void #foreign "gl" "validateProgram" ---
+vertexAttrib1f                 :: (idx: GLuint, x: GLfloat) -> void #foreign "gl" "vertexAttrib1f" ---
+vertexAttrib2f                 :: (idx: GLuint, x: GLfloat, y: GLfloat) -> void #foreign "gl" "vertexAttrib2f" ---
+vertexAttrib3f                 :: (idx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) -> void #foreign "gl" "vertexAttrib3f" ---
+vertexAttrib4f                 :: (idx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) -> void #foreign "gl" "vertexAttrib4f" ---
+vertexAttribPointer            :: (idx: GLuint, size: GLint, type: GLenum, normalized: GLboolean, stride: GLsizei, offset: GLint) -> void #foreign "gl" "vertexAttribPointer" ---
+vertexAttribDivisor            :: (idx: GLuint, divisor: GLuint) -> void #foreign "gl" "vertexAttribDivisor" ---
+viewport                       :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void #foreign "gl" "viewport" ---      

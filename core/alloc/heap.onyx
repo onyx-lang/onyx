@@ -27,7 +27,7 @@ heap_block :: struct {
 }
 
 #private_file
-heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
+heap_alloc :: (size_: u32, align: u32) -> rawptr {
     if size_ == 0 do return null;
 
     size := size_ + sizeof heap_block;
@@ -78,7 +78,7 @@ heap_alloc :: proc (size_: u32, align: u32) -> rawptr {
 }
 
 #private_file
-heap_free :: proc (ptr: rawptr) {
+heap_free :: (ptr: rawptr) {
     hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
 
     // DEBUGGING: Fills freed memory with 0's
@@ -89,7 +89,7 @@ heap_free :: proc (ptr: rawptr) {
 }
 
 #private_file
-heap_resize :: proc (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
+heap_resize :: (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
     if ptr == null do return null;
     
     hb_ptr := cast(^heap_block) (cast(u32) ptr - sizeof heap_block);
@@ -123,7 +123,7 @@ heap_resize :: proc (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
 }
 
 #private_file
-heap_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+heap_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     if aa == AllocationAction.Alloc do return heap_alloc(size, align);
     if aa == AllocationAction.Resize do return heap_resize(oldptr, size, align);
     if aa == AllocationAction.Free {
@@ -134,7 +134,7 @@ heap_alloc_proc :: proc (data: rawptr, aa: AllocationAction, size: u32, align: u
     return null;
 }
 
-init :: proc () {
+init :: () {
     heap_state.free_list = null;
     heap_state.next_alloc = __heap_start;
     heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
