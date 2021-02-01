@@ -8,7 +8,6 @@
 // having to allocate the temporary array for the parse results.
 
 // Things that need to be cleaned up in the parser:
-//  - add_node_to_process
 //  - control block local variables should be more extensible and reuse more code
 
 #include "onyxlex.h"
@@ -18,7 +17,8 @@
 
 // NOTE: The one weird define you need to know before read the code below
 #define make_node(nclass, kind) onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
-#define peek_token(ahead) (parser->curr + ahead)
+#define peek_token(ahead)       (parser->curr + ahead)
+#define ENTITY_SUBMIT(node)     (add_entities_for_node((AstNode *) (node), bh_arr_last(parser->scope_stack), parser->package))
 
 static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 
@@ -128,19 +128,6 @@ static b32 consume_token_if_next(OnyxParser* parser, TokenType token_type) {
     }
 }
 
-// CLEANUP: Currently, this procedure uses 'parser->file_scope' as the scope for the Entity.
-// Except when there is a block stack; in that case, it uses the top of the block stack. I
-// think there should just be a scope stack that is automatically handled.
-static void add_node_to_process(OnyxParser* parser, AstNode* node) {
-    Scope* scope = bh_arr_last(parser->scope_stack);
-    assert(scope);
-
-    bh_arr_push(parser->results.nodes_to_process, ((NodeToProcess) {
-        .package = parser->package,
-        .scope = scope,
-        .node = node,
-    }));
-}
 
 
 // TODO: Make parsing numeric literals not rely on the C standard libary.
@@ -402,9 +389,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             str_node->token     = expect_token(parser, Token_Type_Literal_String);
             str_node->addr      = 0;
             str_node->flags    |= Ast_Flag_Comptime;
-
-            add_node_to_process(parser, (AstNode *) str_node);
-
+            
+            ENTITY_SUBMIT(str_node);
+            
             retval = (AstTyped *) str_node;
             break;
         }
@@ -452,9 +439,9 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 fc->token = parser->prev - 1;
                 fc->filename = expect_token(parser, Token_Type_Literal_String);
                 fc->type = type_make_slice(parser->allocator, &basic_types[Basic_Kind_U8]);
-
-                add_node_to_process(parser, (AstNode *) fc);
-
+                
+                ENTITY_SUBMIT(fc);
+                
                 retval = (AstTyped *) fc;
                 break;
             }
@@ -470,8 +457,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 AstStrLit* filename = make_node(AstStrLit, Ast_Kind_StrLit);
                 filename->token = str_token;
                 filename->addr  = 0;
-
-                add_node_to_process(parser, (AstNode *) filename);
+                
+                ENTITY_SUBMIT(filename);
                 retval = (AstTyped *) filename;
                 break;
             }
@@ -1832,8 +1819,8 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
             if (parser->curr->type != '}')
                 expect_token(parser, ',');
         }
-
-        add_node_to_process(parser, (AstNode *) ofunc);
+        
+        ENTITY_SUBMIT(ofunc);
         return (AstFunction *) ofunc;
     }
 
@@ -1920,14 +1907,13 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         pp->token = func_def->token;
         pp->poly_params = polymorphic_vars;
         pp->base_func = func_def;
-
-        add_node_to_process(parser, (AstNode *) pp);
-
+        
+        ENTITY_SUBMIT(pp);
         return (AstFunction *) pp;
     } else {
         bh_arr_free(polymorphic_vars);
-
-        add_node_to_process(parser, (AstNode *) func_def);
+        
+        ENTITY_SUBMIT(func_def);
         return func_def;
     }
 }
@@ -1999,8 +1985,8 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
     }
 
     global_node->type_node = parse_type(parser);
-
-    add_node_to_process(parser, (AstNode *) global_node);
+    
+    ENTITY_SUBMIT(global_node);
 
     return (AstTyped *) global_node;
 }
@@ -2127,8 +2113,8 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             node->token = symbol;
         }
 
-        // HACK
-        add_node_to_process(parser, (AstNode *) node);
+        // HACK: This should maybe be entered elsewhere?
+        ENTITY_SUBMIT(node);
     }
 
     AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
@@ -2151,7 +2137,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             AstNode* use_node = parse_use_stmt(parser);
-            add_node_to_process(parser, use_node);
+            ENTITY_SUBMIT(use_node);
             return NULL;
         }
 
@@ -2183,9 +2169,9 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                     memres->initial_value = parse_expression(parser, 1);
 
                 memres->flags |= private_kind;
-
-                add_node_to_process(parser, (AstNode *) memres);
-
+                
+                ENTITY_SUBMIT(memres);
+                
                 AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
                 binding->token = symbol;
                 binding->node = (AstNode *) memres;
@@ -2208,8 +2194,9 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                         include->name = bh_strdup(parser->allocator, str_token->text);
                         token_toggle_end(str_token);
                     }
-
-                    return (AstNode *) include;
+                    
+                    ENTITY_SUBMIT(include);
+                    return NULL;
                 }
                 else if (parse_possible_directive(parser, "load_path")) {
                     AstInclude* include = make_node(AstInclude, Ast_Kind_Load_Path);
@@ -2221,8 +2208,9 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                         include->name = bh_strdup(parser->allocator, str_token->text);
                         token_toggle_end(str_token);
                     }
-
-                    return (AstNode *) include;
+                    
+                    ENTITY_SUBMIT(include);
+                    return NULL;
                 }
                 else {
                     OnyxToken* directive_token = expect_token(parser, '#');
@@ -2312,19 +2300,12 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.hit_unexpected_token = 0;
     parser.scope_stack = NULL;
 
-    parser.results = (ParseResults) {
-        .allocator = global_heap_allocator,
-
-        .nodes_to_process = NULL,
-    };
-
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,
         .poly_params = NULL,
     };
 
     bh_arr_new(global_heap_allocator, parser.scope_stack, 4);
-    bh_arr_new(parser.results.allocator, parser.results.nodes_to_process, 4);
 
     return parser;
 }
@@ -2333,7 +2314,7 @@ void onyx_parser_free(OnyxParser* parser) {
     bh_arr_free(parser->scope_stack);
 }
 
-ParseResults onyx_parse(OnyxParser *parser) {
+void onyx_parse(OnyxParser *parser) {
     // NOTE: Skip comments at the beginning of the file
     while (consume_token_if_next(parser, Token_Type_Comment));
 
@@ -2343,23 +2324,18 @@ ParseResults onyx_parse(OnyxParser *parser) {
 
     AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);
     implicit_use_builtin->package = (AstPackage *) &builtin_package_node;
-    add_node_to_process(parser, (AstNode *) implicit_use_builtin);
-
+    ENTITY_SUBMIT(implicit_use_builtin);
+    
     while (parser->curr->type != Token_Type_End_Stream) {
-        if (parser->hit_unexpected_token) return parser->results;
+        if (parser->hit_unexpected_token) return;
 
         AstNode* curr_stmt = parse_top_level_statement(parser);
 
         if (curr_stmt != NULL && curr_stmt != &error_node) {
             while (curr_stmt != NULL) {
-                if (parser->hit_unexpected_token) return parser->results;
+                if (parser->hit_unexpected_token) return;
 
                 switch (curr_stmt->kind) {
-                    case Ast_Kind_Load_File:
-                    case Ast_Kind_Load_Path:
-                        add_node_to_process(parser, curr_stmt);
-                        break;
-
                     case Ast_Kind_Binding: {
                         Scope* target_scope = parser->package->scope;
 
@@ -2383,5 +2359,4 @@ ParseResults onyx_parse(OnyxParser *parser) {
     }
 
     bh_arr_pop(parser->scope_stack);
-    return parser->results;
 }

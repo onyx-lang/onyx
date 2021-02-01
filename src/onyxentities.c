@@ -78,3 +78,149 @@ void entity_heap_remove_top(EntityHeap* entities) {
 	bh_arr_pop(entities->entities);
 	eh_shift_down(entities, 0);
 }
+
+// NOTE(Brendan Hansen): Uses the entity heap in the context structure
+void add_entities_for_node(AstNode* node, Scope* scope, Package* package) {
+    EntityHeap* entities = &context.entities;
+    
+    Entity ent;
+    ent.state = Entity_State_Resolve_Symbols;
+    ent.package = package;
+    ent.scope   = scope;
+    
+    switch (node->kind) {
+        case Ast_Kind_Load_File: {
+            ent.state = Entity_State_Parse;
+            ent.type = Entity_Type_Load_File;
+            ent.include = (AstInclude *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Load_Path: {
+            ent.state = Entity_State_Parse;
+            ent.type = Entity_Type_Load_Path;
+            ent.include = (AstInclude *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Function: {
+            if ((node->flags & Ast_Flag_Foreign) != 0) {
+                ent.type     = Entity_Type_Foreign_Function_Header;
+                ent.function = (AstFunction *) node;
+                entity_heap_insert(entities, ent);
+                
+            } else {
+                ent.type     = Entity_Type_Function_Header;
+                ent.function = (AstFunction *) node;
+                entity_heap_insert(entities, ent);
+                
+                ent.type     = Entity_Type_Function;
+                ent.function = (AstFunction *) node;
+                entity_heap_insert(entities, ent);
+            }
+            break;
+        }
+        
+        case Ast_Kind_Overloaded_Function: {
+            ent.type                = Entity_Type_Overloaded_Function;
+            ent.overloaded_function = (AstOverloadedFunction *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Global: {
+            if ((node->flags & Ast_Flag_Foreign) != 0) {
+                ent.type   = Entity_Type_Foreign_Global_Header;
+                ent.global = (AstGlobal *) node;
+                entity_heap_insert(entities, ent);
+                
+            } else {
+                ent.type   = Entity_Type_Global_Header;
+                ent.global = (AstGlobal *) node;
+                entity_heap_insert(entities, ent);
+                
+                ent.type   = Entity_Type_Global;
+                ent.global = (AstGlobal *) node;
+                entity_heap_insert(entities, ent);
+            }
+            break;
+        }
+        
+        case Ast_Kind_StrLit: {
+            ent.type   = Entity_Type_String_Literal;
+            ent.strlit = (AstStrLit *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_File_Contents: {
+            ent.type = Entity_Type_File_Contents;
+            ent.file_contents = (AstFileContents *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Struct_Type: {
+            ent.type = Entity_Type_Struct_Member_Default;
+            ent.type_alias = (AstType *) node;
+            entity_heap_insert(entities, ent);
+            // fallthrough
+        }
+        
+        case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Type_Alias: {
+            ent.type = Entity_Type_Type_Alias;
+            ent.type_alias = (AstType *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Enum_Type: {
+            ent.type = Entity_Type_Enum;
+            ent.enum_type = (AstEnumType *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Use_Package: {
+            ent.type = Entity_Type_Use_Package;
+            ent.use_package = (AstUsePackage *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Use: {
+            ent.type = Entity_Type_Use;
+            ent.use = (AstUse *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Memres: {
+            ent.type = Entity_Type_Memory_Reservation_Type;
+            ent.mem_res = (AstMemRes *) node;
+            entity_heap_insert(entities, ent);
+            
+            ent.type = Entity_Type_Memory_Reservation;
+            ent.mem_res = (AstMemRes *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        case Ast_Kind_Polymorphic_Proc: {
+            ent.type = Entity_Type_Polymorphic_Proc;
+            ent.poly_proc = (AstPolyProc *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
+        default: {
+            ent.type = Entity_Type_Expression;
+            ent.expr = (AstTyped *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+    }
+}

@@ -930,6 +930,7 @@ void entity_heap_insert(EntityHeap* entities, Entity e);
 Entity entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity new_top);
 void entity_heap_remove_top(EntityHeap* entities);
+void add_entities_for_node(AstNode* node, Scope* scope, Package* package);
 
 void entity_bring_to_state(Entity* ent, EntityState state);
 void symres_entity(Entity* ent);

@@ -225,161 +225,14 @@ static char* lookup_included_file(char* filename) {
 #undef DIR_SEPARATOR
 }
 
-static ParseResults parse_source_file(bh_file_contents* file_contents) {
+static void parse_source_file(bh_file_contents* file_contents) {
     // :Remove passing the allocators as parameters
     OnyxTokenizer tokenizer = onyx_tokenizer_create(context.token_alloc, file_contents);
     onyx_lex_tokens(&tokenizer);
 
     OnyxParser parser = onyx_parser_create(context.ast_alloc, &tokenizer);
-    return onyx_parse(&parser);
-}
-
-static void merge_parse_results(ParseResults* results) {
-    Entity ent;
-    bh_arr_each(NodeToProcess, n, results->nodes_to_process) {
-        AstNode* node = n->node;
-        AstKind nkind = node->kind;
-
-        ent.state = Entity_State_Resolve_Symbols;
-        ent.package = n->package;
-        ent.scope   = n->scope;
-
-        switch (nkind) {
-            case Ast_Kind_Load_File: {
-                ent.state = Entity_State_Parse;
-                ent.type = Entity_Type_Load_File;
-                ent.include = (AstInclude *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-                                   
-            case Ast_Kind_Load_Path: {
-                ent.state = Entity_State_Parse;
-                ent.type = Entity_Type_Load_Path;
-                ent.include = (AstInclude *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Function: {
-                if ((node->flags & Ast_Flag_Foreign) != 0) {
-                    ent.type     = Entity_Type_Foreign_Function_Header;
-                    ent.function = (AstFunction *) node;
-                    entity_heap_insert(&context.entities, ent);
-
-                } else {
-                    ent.type     = Entity_Type_Function_Header;
-                    ent.function = (AstFunction *) node;
-                    entity_heap_insert(&context.entities, ent);
-
-                    ent.type     = Entity_Type_Function;
-                    ent.function = (AstFunction *) node;
-                    entity_heap_insert(&context.entities, ent);
-                }
-                break;
-            }
-
-            case Ast_Kind_Overloaded_Function: {
-                ent.type                = Entity_Type_Overloaded_Function;
-                ent.overloaded_function = (AstOverloadedFunction *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Global: {
-                if ((node->flags & Ast_Flag_Foreign) != 0) {
-                    ent.type   = Entity_Type_Foreign_Global_Header;
-                    ent.global = (AstGlobal *) node;
-                    entity_heap_insert(&context.entities, ent);
-
-                } else {
-                    ent.type   = Entity_Type_Global_Header;
-                    ent.global = (AstGlobal *) node;
-                    entity_heap_insert(&context.entities, ent);
-
-                    ent.type   = Entity_Type_Global;
-                    ent.global = (AstGlobal *) node;
-                    entity_heap_insert(&context.entities, ent);
-                }
-                break;
-            }
-
-            case Ast_Kind_StrLit: {
-                ent.type   = Entity_Type_String_Literal;
-                ent.strlit = (AstStrLit *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_File_Contents: {
-                ent.type = Entity_Type_File_Contents;
-                ent.file_contents = (AstFileContents *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Struct_Type: {
-                ent.type = Entity_Type_Struct_Member_Default;
-                ent.type_alias = (AstType *) node;
-                entity_heap_insert(&context.entities, ent);
-                // fallthrough
-            }
-
-            case Ast_Kind_Poly_Struct_Type:
-            case Ast_Kind_Type_Alias: {
-                ent.type = Entity_Type_Type_Alias;
-                ent.type_alias = (AstType *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Enum_Type: {
-                ent.type = Entity_Type_Enum;
-                ent.enum_type = (AstEnumType *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Use_Package: {
-                ent.type = Entity_Type_Use_Package;
-                ent.use_package = (AstUsePackage *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Use: {
-                ent.type = Entity_Type_Use;
-                ent.use = (AstUse *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Memres: {
-                ent.type = Entity_Type_Memory_Reservation_Type;
-                ent.mem_res = (AstMemRes *) node;
-                entity_heap_insert(&context.entities, ent);
-
-                ent.type = Entity_Type_Memory_Reservation;
-                ent.mem_res = (AstMemRes *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            case Ast_Kind_Polymorphic_Proc: {
-                ent.type = Entity_Type_Polymorphic_Proc;
-                ent.poly_proc = (AstPolyProc *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-
-            default: {
-                ent.type = Entity_Type_Expression;
-                ent.expr = (AstTyped *) node;
-                entity_heap_insert(&context.entities, ent);
-                break;
-            }
-        }
-    }
+    onyx_parse(&parser);
+    onyx_parser_free(&parser);
 }
 
 static CompilerProgress process_source_file(char* filename) {
@@ -408,9 +261,8 @@ static CompilerProgress process_source_file(char* filename) {
         bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
     }
 
-    ParseResults results = parse_source_file(&fc);
-    merge_parse_results(&results);
-
+    parse_source_file(&fc);
+    
     if (onyx_has_errors()) {
         return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
     } else {
