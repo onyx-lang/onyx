@@ -9,6 +9,8 @@
 
 // Things that need to be cleaned up in the parser:
 //  - control block local variables should be more extensible and reuse more code
+//  - outermost loops that parse the top level elements
+//  - package name parsing
 
 #include "onyxlex.h"
 #include "onyxerrors.h"

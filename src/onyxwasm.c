@@ -2731,12 +2731,14 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     // in a string literal that create more bytes than already
     // existed. You can create less however ('\n' => 0x0a).
     i8* strdata = bh_alloc_array(global_heap_allocator, i8, strlit->token->length + 1);
-    i32 length =string_process_escape_seqs(strdata, strlit->token->text, strlit->token->length);
+    i32 length  = string_process_escape_seqs(strdata, strlit->token->text, strlit->token->length);
 
     if (bh_table_has(StrLitInfo, mod->string_literals, (char *) strdata)) {
         StrLitInfo sti = bh_table_get(StrLitInfo, mod->string_literals, (char *) strdata);
         strlit->addr   = sti.addr;
         strlit->length = sti.len;
+        
+        bh_free(global_heap_allocator, strdata);
         return;
     }
 

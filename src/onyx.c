@@ -86,15 +86,20 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "-VVV")) {
                 options.verbose_output = 3;
             }
-            else if (!strcmp(argv[i], "--fun") || !strcmp(argv[i], "-F")) {
-                options.fun_output = 1;
-            }
             else if (!strcmp(argv[i], "--print-function-mappings")) {
                 options.print_function_mappings = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
             }
+#if defined(_BH_LINUX)
+            // NOTE: Fun output is only enabled for Linux because Windows command line
+            // is not ANSI compatible and for a silly feature, I don't want to learn
+            // how to properly do arbitrary graphics in it.
+            else if (!strcmp(argv[i], "--fun") || !strcmp(argv[i], "-F")) {
+                options.fun_output = 1;
+            }
+#endif
             else {
                 bh_arr_push(options.files, argv[i]);
             }
@@ -156,27 +161,13 @@ static void context_init(CompileOptions* opts) {
         .package = NULL,
         .include = create_load(context.ast_alloc, "core/builtin"),
     }));
-
-    entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Resolve_Symbols,
-        .type = Entity_Type_Global_Header,
-        .global = &builtin_stack_top
-    }));
     
-    entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Resolve_Symbols,
-        .type = Entity_Type_Global,
-        .global = &builtin_stack_top
-    }));
+    add_entities_for_node((AstNode *) &builtin_stack_top, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
-        entity_heap_insert(&context.entities, ((Entity) {
-            .state = Entity_State_Parse,
-            .type = Entity_Type_Load_File,
-            .package = NULL,
-            .include = create_load(context.ast_alloc, (char *) *filename),
-        }));
+        AstInclude* load_node = create_load(context.ast_alloc, (char *) *filename);
+        add_entities_for_node((AstNode *) load_node, context.global_scope, NULL);
     }
 }
 
@@ -270,7 +261,7 @@ static CompilerProgress process_source_file(char* filename) {
     }
 }
 
-static b32 process_load_entity(Entity* ent) {
+static void process_load_entity(Entity* ent) {
     assert(ent->type == Entity_Type_Load_File || ent->type == Entity_Type_Load_Path);
     AstInclude* include = ent->include;
 
@@ -283,8 +274,6 @@ static b32 process_load_entity(Entity* ent) {
     } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(context.options->included_folders, include->name);
     }
-
-    return 1;
 }
 
 static b32 process_entity(Entity* ent) {
@@ -327,6 +316,7 @@ static b32 process_entity(Entity* ent) {
 }
 
 // Just having fun with some visual output - brendanfh 2020/12/14
+#if defined(_BH_LINUX)
 static void output_dummy_progress_bar() {
     EntityHeap* eh = &context.entities;
 
@@ -339,6 +329,7 @@ static void output_dummy_progress_bar() {
         printf("\n");
     }
 }
+#endif
 
 static i32 onyx_compile() {
     u64 start_time = bh_time_curr();
@@ -351,22 +342,20 @@ static i32 onyx_compile() {
         entity_heap_remove_top(&context.entities);
         if (ent.state == Entity_State_Finalized) continue;
 
-        if (context.options->fun_output) {
+#if defined(_BH_LINUX)
+            if (context.options->fun_output) {
             output_dummy_progress_bar();
-
-            // Slowing things down for the effect
-#if defined(_BH_WINDOWS)
-            Sleep(1);
-#elif defined(_BH_LINUX)
-            usleep(1000);
-#endif
-
+            
             if (ent.expr->token) {
                 OnyxFilePos pos = ent.expr->token->pos;
                 printf("\e[0K%s on %s in %s:%d:%d\n", entity_state_strings[ent.state], entity_type_strings[ent.type], pos.filename, pos.line, pos.column);
             }
+            
+            // Slowing things down for the effect
+            usleep(1000);
         }
-
+#endif
+        
         b32 changed = process_entity(&ent);
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
