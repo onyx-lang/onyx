@@ -731,9 +731,8 @@ static AstTyped* parse_compound_expression(OnyxParser* parser, b32 assignment_al
         bh_arr_new(global_heap_allocator, compound->exprs, 2);
         bh_arr_push(compound->exprs, first);
 
-        while (parser->curr->type == ',') {
+        while (consume_token_if_next(parser, ',')) {
             if (parser->hit_unexpected_token) return (AstTyped *) compound;
-            consume_token(parser);
 
             AstTyped* expr = parse_expression(parser, 0);
             bh_arr_push(compound->exprs, expr);
@@ -841,10 +840,9 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
     if (true_stmt != NULL)
         if_node->true_stmt = true_stmt;
 
-    while (parser->curr->type == Token_Type_Keyword_Elseif) {
+    while (consume_token_if_next(parser, Token_Type_Keyword_Elseif)) {
         if (parser->hit_unexpected_token) return root_if;
 
-        consume_token(parser);
         AstIfWhile* elseif_node = make_node(AstIfWhile, Ast_Kind_If);
 
         cond = parse_expression(parser, 1);
@@ -945,12 +943,11 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
     switch_node->expr = parse_expression(parser, 1);
     expect_token(parser, '{');
 
-    while (parser->curr->type == Token_Type_Keyword_Case) {
+    while (consume_token_if_next(parser, Token_Type_Keyword_Case)) {
+        if (parser->hit_unexpected_token) return switch_node;
+
         bh_arr(AstTyped *) case_values = NULL;
         bh_arr_new(global_heap_allocator, case_values, 1);
-
-        expect_token(parser, Token_Type_Keyword_Case);
-        if (parser->hit_unexpected_token) return switch_node;
 
         if (parse_possible_directive(parser, "default")) {
             switch_node->default_case = parse_block(parser);
@@ -1191,10 +1188,7 @@ static AstNode* parse_jump_stmt(OnyxParser* parser, TokenType token_type, JumpTy
     jnode->jump  = jump_type;
 
     u64 count = 1;
-    while (parser->curr->type == token_type) {
-        consume_token(parser);
-        count++;
-    }
+    while (consume_token_if_next(parser, token_type)) count++;
     jnode->count = count;
 
     return (AstNode *) jnode;
@@ -1522,8 +1516,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
                 *next_insertion = (AstType *) symbol_node;
 
-                while (parser->curr->type == '.') {
-                    consume_token(parser);
+                while (consume_token_if_next(parser, '.')) {
                     AstFieldAccess* field = make_node(AstFieldAccess, Ast_Kind_Field_Access);
                     field->token = expect_token(parser, Token_Type_Symbol);
                     field->expr  = (AstTyped *) *next_insertion;
@@ -2342,8 +2335,7 @@ void onyx_parser_free(OnyxParser* parser) {
 
 ParseResults onyx_parse(OnyxParser *parser) {
     // NOTE: Skip comments at the beginning of the file
-    while (parser->curr->type == Token_Type_Comment)
-        consume_token(parser);
+    while (consume_token_if_next(parser, Token_Type_Comment));
 
     parser->package = parse_package_name(parser)->package;
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
