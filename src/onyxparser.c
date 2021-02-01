@@ -1,11 +1,10 @@
-// CLEANUP: With all the changes that have happened to the language over time,
-// the focus of the parser has kind of been lost. Originally the parser's job
-// was to collect everything that had to be processed later into an array, and
-// then return that array. And for the most part, that is how it still works.
-// But now, there is an entity system that supports dropping in new entities
-// at any point, so I think it should be easy to drop out the middle man and
-// directly add the entities during parse time. This would also get rid of
-// having to allocate the temporary array for the parse results.
+// The job of the parser for Onyx is to do two things:
+//  1. Submit nodes to the entity heap for further processing.
+//     Nodes such as procedure defintions, string literals, etc.
+//
+//  2. Insert static symbols into scopes.
+//     Things defined at top level or inside of static scopes such
+//     as bindings in procedures or in struct scopes.
 
 // Things that need to be cleaned up in the parser:
 //  - control block local variables should be more extensible and reuse more code
@@ -787,10 +786,9 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
         right = parse_factor(parser);
         bin_op->right = right;
     }
-
-    bh_arr_free(tree_stack);
-
+    
 expression_done:
+    bh_arr_free(tree_stack);
     return root;
 }
 
@@ -1046,11 +1044,10 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
     expect_token(parser, ':');
 
     if (parser->curr->type == ':') {
-        Scope* insertion_scope = bh_arr_last(parser->scope_stack);
-
         AstBinding* binding = parse_top_level_binding(parser, symbol);
         if (parser->hit_unexpected_token) return 2;
-
+        
+        Scope* insertion_scope = bh_arr_last(parser->scope_stack);
         symbol_introduce(insertion_scope, symbol, binding->node);
         return 2;
     }

@@ -405,9 +405,6 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Binary_Op:
             symres_expression(&((AstBinaryOp *)(*expr))->left);
             symres_expression(&((AstBinaryOp *)(*expr))->right);
-
-            if (((AstBinaryOp *) (*expr))->left)
-                (*expr)->type_node = ((AstBinaryOp *)(*expr))->left->type_node;
             break;
 
         case Ast_Kind_Unary_Op:     symres_unaryop((AstUnaryOp **) expr); break;

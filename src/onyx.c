@@ -32,7 +32,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
     "Usage:\n"
     "\tonyx [-o <target file>] [--verbose] <input files>\n"
-    "\tonyx doc <input files>\n"
+    // "\tonyx doc <input files>\n"
     "\tonyx help\n"
     "\n"
     "Flags:\n"
@@ -62,15 +62,11 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     if (argc == 1) return options;
 
-    if (!strcmp(argv[1], "doc")) {
-        options.action = ONYX_COMPILE_ACTION_DOCUMENT;
-    }
-    else if (!strcmp(argv[1], "help")) {
-        options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
-    }
-    else {
-        options.action = ONYX_COMPILE_ACTION_COMPILE;
-    }
+    if (!strcmp(argv[1], "help")) options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+    // else if (!strcmp(argv[1], "doc")) {
+    //     options.action = ONYX_COMPILE_ACTION_DOCUMENT;
+    // }
+    else options.action = ONYX_COMPILE_ACTION_COMPILE;
 
     if (options.action == ONYX_COMPILE_ACTION_COMPILE) {
         fori(i, 1, argc) {
@@ -119,8 +115,6 @@ static void compile_opts_free(CompileOptions* opts) {
 
 
 typedef enum CompilerProgress {
-    ONYX_COMPILER_PROGRESS_FAILED_READ,
-    ONYX_COMPILER_PROGRESS_FAILED_PARSE,
     ONYX_COMPILER_PROGRESS_ERROR,
     ONYX_COMPILER_PROGRESS_FAILED_OUTPUT,
     ONYX_COMPILER_PROGRESS_SUCCESS
@@ -226,21 +220,19 @@ static void parse_source_file(bh_file_contents* file_contents) {
     onyx_parser_free(&parser);
 }
 
-static CompilerProgress process_source_file(char* filename) {
+static void process_source_file(char* filename) {
     bh_arr_each(bh_file_contents, fc, context.loaded_files) {
         // CLEANUP: Add duplicate resolutions, such as
         //          ./foo and ./test/../foo
         // should be the same thing.
-        if (!strcmp(fc->filename, filename)) {
-            return ONYX_COMPILER_PROGRESS_SUCCESS;
-        }
+        if (!strcmp(fc->filename, filename)) return;
     }
 
     bh_file file;
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
         onyx_report_error((OnyxFilePos) { 0 }, "Failed to open file %s\n", filename);
-        return ONYX_COMPILER_PROGRESS_FAILED_READ;
+        return;
     }
 
     bh_file_contents fc = bh_file_read_contents(context.token_alloc, &file);
@@ -248,17 +240,10 @@ static CompilerProgress process_source_file(char* filename) {
 
     bh_arr_push(context.loaded_files, fc);
 
-    if (context.options->verbose_output == 2) {
+    if (context.options->verbose_output == 2)
         bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
-    }
 
     parse_source_file(&fc);
-    
-    if (onyx_has_errors()) {
-        return ONYX_COMPILER_PROGRESS_FAILED_PARSE;
-    } else {
-        return ONYX_COMPILER_PROGRESS_SUCCESS;
-    }
 }
 
 static void process_load_entity(Entity* ent) {
@@ -340,7 +325,6 @@ static i32 onyx_compile() {
     while (!bh_arr_is_empty(context.entities.entities)) {
         Entity ent = entity_heap_top(&context.entities);
         entity_heap_remove_top(&context.entities);
-        if (ent.state == Entity_State_Finalized) continue;
 
 #if defined(_BH_LINUX)
             if (context.options->fun_output) {
@@ -360,19 +344,14 @@ static i32 onyx_compile() {
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
-        // SPEED: Not checking if the entity is already finalized does diminish speeds
-        // a little bit, but it makes the fun visualization look better... so... I'm
-        // gonna keep this how it is for now.                - brendanfh 2020/12/15
-
-        // if (changed && ent.state != Entity_State_Finalized)
-        entity_heap_insert(&context.entities, ent);
+        if (changed && ent.state != Entity_State_Finalized)
+            entity_heap_insert(&context.entities, ent);
     }
 
     // NOTE: Output to file
     bh_file output_file;
-    if (bh_file_create(&output_file, context.options->target_file) != BH_FILE_ERROR_NONE) {
+    if (bh_file_create(&output_file, context.options->target_file) != BH_FILE_ERROR_NONE)
         return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
-    }
 
     if (context.options->verbose_output)
         bh_printf("Outputting to WASM file:   %s\n", output_file.filename);
@@ -404,31 +383,18 @@ int main(int argc, char *argv[]) {
     CompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
     context_init(&compile_opts);
 
-    CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_FAILED_READ;
+    CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
     switch (compile_opts.action) {
-        case ONYX_COMPILE_ACTION_PRINT_HELP:
-            // NOTE: This could probably be made better
-            bh_printf(docstring);
-            return 1;
+        case ONYX_COMPILE_ACTION_PRINT_HELP: bh_printf(docstring); return 1;
 
         case ONYX_COMPILE_ACTION_COMPILE:
             compiler_progress = onyx_compile();
-            break;
-
-        case ONYX_COMPILE_ACTION_DOCUMENT:
-            bh_printf("Documentation has not been fully implemented yet.\n");
-            exit(EXIT_FAILURE);
             break;
 
         default: break;
     }
 
     switch (compiler_progress) {
-        case ONYX_COMPILER_PROGRESS_FAILED_READ:
-            // NOTE: Do nothing since it was already printed above
-            break;
-
-        case ONYX_COMPILER_PROGRESS_FAILED_PARSE:
         case ONYX_COMPILER_PROGRESS_ERROR:
             onyx_errors_print();
             break;
