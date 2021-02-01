@@ -121,8 +121,6 @@ typedef enum CompilerProgress {
     ONYX_COMPILER_PROGRESS_SUCCESS
 } CompilerProgress;
 
-static char* lookup_included_file(char* filename);
-
 static AstInclude* create_load(bh_allocator alloc, char* filename) {
     AstInclude* include_node = onyx_ast_node_new(alloc, sizeof(AstInclude), Ast_Kind_Load_File);
     include_node->name = filename;

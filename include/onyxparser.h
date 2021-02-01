@@ -41,7 +41,7 @@ typedef struct OnyxParser {
 
     PolymorphicContext polymorph_context;
 
-    bh_arr(AstBlock *) block_stack;
+    bh_arr(Scope *) scope_stack;
 
     b32 hit_unexpected_token : 1;
 } OnyxParser;
