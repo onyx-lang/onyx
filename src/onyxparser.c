@@ -196,8 +196,7 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
 }
 
 static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret) {
-    if (parser->curr->type != '.'
-        || peek_token(1)->type != '{') return 0;
+    if (parser->curr->type != '.' || peek_token(1)->type != '{') return 0;
 
     AstStructLiteral* sl = make_node(AstStructLiteral, Ast_Kind_Struct_Literal);
     sl->token = parser->curr;
@@ -593,6 +592,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     (*named_value)->value = (AstTyped *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
 
                 retval = (AstTyped *) call_node;
+                break;
+            }
+
+            case Token_Type_Right_Arrow: {
+                AstBinaryOp* method_call = make_node(AstBinaryOp, Ast_Kind_Method_Call);
+                method_call->token = expect_token(parser, Token_Type_Right_Arrow);  
+                method_call->left = retval;
+                method_call->right = parse_factor(parser);
+
+                retval = (AstTyped *) method_call;
                 break;
             }
 
@@ -2073,7 +2082,8 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
     AstTyped* node = parse_top_level_expression(parser);
     if (parser->hit_unexpected_token || node == NULL)
         return NULL;
-
+    
+    // CLEANUP
     if (node->kind == Ast_Kind_Function) {
         AstFunction* func = (AstFunction *) node;
 
@@ -2132,7 +2142,8 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
     else if (parse_possible_directive(parser, "private_file")) {
         private_kind = Ast_Flag_Private_File;
     }
-
+    
+    // CLEANUP
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             AstNode* use_node = parse_use_stmt(parser);
@@ -2145,9 +2156,7 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
             return NULL;
 
         case Token_Type_Symbol: {
-            OnyxToken* symbol = parser->curr;
-            consume_token(parser);
-
+            OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
             expect_token(parser, ':');
 
             if (parser->curr->type == ':') {
@@ -2156,27 +2165,26 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
                 if (binding != NULL) binding->node->flags |= private_kind;
 
                 return (AstNode *) binding;
-
-            } else {
-                AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
-                memres->token = symbol;
-
-                if (parser->curr->type != '=')
-                    memres->type_node = parse_type(parser);
-
-                if (consume_token_if_next(parser, '='))
-                    memres->initial_value = parse_expression(parser, 1);
-
-                memres->flags |= private_kind;
-                
-                ENTITY_SUBMIT(memres);
-                
-                AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
-                binding->token = symbol;
-                binding->node = (AstNode *) memres;
-
-                return (AstNode *) binding;
             }
+            
+            AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
+            memres->token = symbol;
+
+            if (parser->curr->type != '=')
+                memres->type_node = parse_type(parser);
+            
+            if (consume_token_if_next(parser, '='))
+                memres->initial_value = parse_expression(parser, 1);
+            
+            memres->flags |= private_kind;
+            
+            ENTITY_SUBMIT(memres);
+            
+            AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+            binding->token = symbol;
+            binding->node = (AstNode *) memres;
+
+            return (AstNode *) binding;
         }
 
         case '#': {
@@ -2238,7 +2246,8 @@ static AstPackage* parse_package_name(OnyxParser* parser) {
         package_node->package = package;
         return package_node;
     }
-
+    
+    // CLEANUP
     char package_name[1024]; // CLEANUP: This could overflow, if someone decides to be dumb
                              // with their package names  - brendanfh   2020/12/06
     package_name[0] = 0;

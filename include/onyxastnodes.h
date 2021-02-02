@@ -146,6 +146,7 @@ typedef enum AstKind {
     Ast_Kind_Slice,
     Ast_Kind_Field_Access,
     Ast_Kind_Pipe,
+    Ast_Kind_Method_Call,
     Ast_Kind_Range_Literal,
     Ast_Kind_Size_Of,
     Ast_Kind_Align_Of,
@@ -263,6 +264,7 @@ typedef enum BinaryOp {
 
     Binary_Op_Pipe            = 33,
     Binary_Op_Range           = 34,
+    Binary_Op_Method_Call     = 35,
 
     Binary_Op_Count
 } BinaryOp;
@@ -1067,6 +1069,7 @@ AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* hig
 AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
 AstArgument* make_argument(bh_allocator a, AstTyped* value);
 AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);
+AstAddressOf* make_address_of(bh_allocator a, AstTyped* node);
 AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
 AstNode* make_symbol(bh_allocator a, OnyxToken* sym);
 

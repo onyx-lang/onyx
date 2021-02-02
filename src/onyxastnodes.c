@@ -64,6 +64,7 @@ static const char* ast_node_names[] = {
     "SLICE",
     "FIELD_ACCESS",
     "PIPE",
+    "METHOD_CALL",
     "RANGE",
     "SIZE OF",
     "ALIGN OF",
@@ -686,6 +687,14 @@ AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field) {
     fa->expr = node;
 
     return fa;
+}
+
+AstAddressOf* make_address_of(bh_allocator a, AstTyped* node) {
+    AstAddressOf* ao = onyx_ast_node_new(a, sizeof(AstAddressOf), Ast_Kind_Address_Of);
+    if (node->token) ao->token = node->token;
+    ao->expr = node;
+
+    return ao; 
 }
 
 AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node) {

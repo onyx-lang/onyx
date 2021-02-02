@@ -352,6 +352,43 @@ static void symres_pipe(AstBinaryOp** pipe) {
     *pipe = (AstBinaryOp *) call_node;
 }
 
+// nocheckin
+// CLEANUP: This is an experimental feature and might be removed in the future.
+// I noticed a common pattern when writing in Onyx is something that looks like this:
+//
+//     foo.member_function(^foo, ...)
+//
+// I decided it would be worth adding a bit of syntactic sugar for such as call. I
+// decided to use the '->' operator for this purpose. The snippet below is the exact
+// same as the snippet above (after the nodes have been processed by the function below)
+//
+//     foo->member_function(...)
+static void symres_method_call(AstBinaryOp** mcall) {
+    AstCall* call_node = (AstCall *) (*mcall)->right;
+    if (call_node->kind != Ast_Kind_Call) {
+        onyx_report_error((*mcall)->token->pos, "'->' expected procedure call on right side.");
+        return;
+    }
+
+    symres_expression(&(*mcall)->left);
+    if ((*mcall)->left == NULL) return;
+
+    bh_arr_insertn(call_node->args.values, 0, 1);
+
+    AstTyped* implicit_pointer = (AstTyped *) make_address_of(context.ast_alloc, (*mcall)->left);
+    call_node->args.values[0] = (AstTyped *) make_argument(context.ast_alloc, implicit_pointer);
+    
+    AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
+    implicit_field_access->token = call_node->callee->token;
+    call_node->callee = (AstTyped *) implicit_field_access;
+    symres_expression((AstTyped **) &call_node);
+
+    call_node->next = (*mcall)->next;
+
+    // NOTE: Not a BinaryOp node
+    *mcall = (AstBinaryOp *) call_node;
+}
+
 static void symres_unaryop(AstUnaryOp** unaryop) {
     if ((*unaryop)->operation == Unary_Op_Cast) {
         (*unaryop)->type_node = symres_type((*unaryop)->type_node);
@@ -415,6 +452,7 @@ static void symres_expression(AstTyped** expr) {
         case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
         case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
         case Ast_Kind_Pipe:         symres_pipe((AstBinaryOp **) expr); break;
+        case Ast_Kind_Method_Call:  symres_method_call((AstBinaryOp **) expr); break;
         case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
         case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
 

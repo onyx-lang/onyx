@@ -327,7 +327,7 @@ static i32 onyx_compile() {
         entity_heap_remove_top(&context.entities);
 
 #if defined(_BH_LINUX)
-            if (context.options->fun_output) {
+        if (context.options->fun_output) {
             output_dummy_progress_bar();
             
             if (ent.expr->token) {
