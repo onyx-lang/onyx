@@ -78,6 +78,7 @@ typedef struct AstPackage AstPackage;
 typedef struct Package Package;
 
 typedef struct Scope {
+    u64 id;
     struct Scope *parent;
     OnyxFilePos created_at;
     bh_table(AstNode *) symbols;

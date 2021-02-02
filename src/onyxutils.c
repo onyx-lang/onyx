@@ -48,12 +48,15 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
 //
 // Scoping
 //
+static u64 next_scope_id = 1;
+
 Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     Scope* scope = bh_alloc_item(a, Scope);
+    scope->id = next_scope_id++;
     scope->parent = parent;
     scope->created_at = created_at;
-    scope->symbols = NULL;
 
+    scope->symbols = NULL;
     bh_table_init(global_heap_allocator, scope->symbols, 64);
 
     return scope;

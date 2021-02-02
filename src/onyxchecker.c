@@ -1372,6 +1372,12 @@ CheckStatus check_expression(AstTyped** pexpr) {
         return Check_Success;
     }
 
+    if (expr->kind == Ast_Kind_Polymorphic_Proc) {
+        // Polymoprhic procedures do not need to be checked. Their concrete instantiations
+        // will be checked when they are created.
+        return Check_Success;
+    }
+
     fill_in_type(expr);
 
     CheckStatus retval = Check_Success;

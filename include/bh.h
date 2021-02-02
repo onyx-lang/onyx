@@ -1001,11 +1001,9 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
     switch (action) {
     case bh_allocator_action_alloc: {
-
+        bh_align(size, alignment);
         bh_align(alloc_arena->size, alignment);
 
-        // TODO: Do this better because right now bh__align is bad
-        // size = bh__align(size, alignment);
         if (size > alloc_arena->arena_size - size_of(ptr)) {
             // Size too large for the arena
             return NULL;
