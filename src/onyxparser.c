@@ -217,7 +217,7 @@ static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
 }
 
 static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret) {
-    if (parser->curr->type != '.' || peek_token(1)->type != '{') return 0;
+    if (!next_tokens_are(parser, 2, '.', '{')) return 0;
 
     AstStructLiteral* sl = make_node(AstStructLiteral, Ast_Kind_Struct_Literal);
     sl->token = parser->curr;
@@ -235,7 +235,7 @@ static b32 parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, Ast
 }
 
 static b32 parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret) {
-    if (parser->curr->type != '.' || peek_token(1)->type != '[') return 0;
+    if (!next_tokens_are(parser, 2, '.', '[')) return 0;
     
     AstArrayLiteral* al = make_node(AstArrayLiteral, Ast_Kind_Array_Literal);
     al->token = parser->curr;
@@ -262,7 +262,7 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
     while (!consume_token_if_next(parser, end_token)) {
         if (parser->hit_unexpected_token) return;
 
-        if (peek_token(0)->type == Token_Type_Symbol && peek_token(1)->type == '=') {
+        if (next_tokens_are(parser, 2, Token_Type_Symbol, '=')) {
             OnyxToken* name = expect_token(parser, Token_Type_Symbol);
             expect_token(parser, '=');
 
@@ -1435,10 +1435,7 @@ static AstType* parse_function_type(OnyxParser* parser, OnyxToken* proc_token) {
         if (parser->hit_unexpected_token) return NULL;
 
         // NOTE: Allows for names to be put in the function types, just for readability.
-        if (peek_token(1)->type == ':') {
-            expect_token(parser, Token_Type_Symbol);
-            expect_token(parser, ':');
-        }
+        if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) consume_tokens(parser, 2);
 
         AstType* param_type = parse_type(parser);
         bh_arr_push(params, param_type);
