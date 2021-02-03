@@ -123,10 +123,6 @@ AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
 
     if (res == NULL) return NULL;
 
-    if (res->kind == Ast_Kind_Symbol) {
-        return symbol_resolve(start_scope, res->token);
-    }
-
     return res;
 }
 

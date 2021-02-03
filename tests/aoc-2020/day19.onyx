@@ -84,7 +84,7 @@ cyk_algorithm :: proc (use grammar: ^Grammar, input: str) -> bool {
     mem_size := sizeof bool * input.count * input.count * max_terminal;
     T := cast(^bool) calloc(mem_size);
     defer cfree(T);
-    memory.set(T, mem_size, ~~false);
+    memory.set(T, ~~false, mem_size);
 
     for s: 0 .. input.count {
         for ^term: terminate_rules {

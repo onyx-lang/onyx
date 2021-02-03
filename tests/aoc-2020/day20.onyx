@@ -327,7 +327,7 @@ main :: proc (args: [] cstr) {
 	printf("Corner product: %l\n", prod);
 
     grid : [12 * 12] u32;
-    memory.set(^grid, sizeof [12 * 12] u32, 0);
+    memory.set(^grid, 0, sizeof [12 * 12] u32);
 
     to_process : [..] tile_pos_state;
     array.init(^to_process);

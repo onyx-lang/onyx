@@ -84,6 +84,8 @@ bh_table(OnyxIntrinsic) intrinsic_table;
 static IntrinsicMap builtin_intrinsics[] = {
     { "memory_size",  ONYX_INTRINSIC_MEMORY_SIZE },
     { "memory_grow",  ONYX_INTRINSIC_MEMORY_GROW },
+    { "memory_copy",  ONYX_INTRINSIC_MEMORY_COPY },
+    { "memory_fill",  ONYX_INTRINSIC_MEMORY_FILL },
 
     { "clz_i32",      ONYX_INTRINSIC_I32_CLZ },
     { "ctz_i32",      ONYX_INTRINSIC_I32_CTZ },

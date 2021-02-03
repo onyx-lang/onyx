@@ -1398,6 +1398,8 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
     switch (call->intrinsic) {
         case ONYX_INTRINSIC_MEMORY_SIZE:  WID(WI_MEMORY_SIZE, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_GROW:  WID(WI_MEMORY_GROW, 0x00); break;
+        case ONYX_INTRINSIC_MEMORY_COPY:  WIL(WI_MEMORY_COPY, 0x00); break;
+        case ONYX_INTRINSIC_MEMORY_FILL:  WID(WI_MEMORY_FILL, 0x00); break;
 
         case ONYX_INTRINSIC_I32_CLZ:      WI(WI_I32_CLZ); break;
         case ONYX_INTRINSIC_I32_CTZ:      WI(WI_I32_CTZ); break;
@@ -3502,6 +3504,11 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
         bh_buffer_write_byte(buff, 0xFD);
         leb = uint_to_uleb128((u64) (instr->type &~ SIMD_INSTR_MASK), &leb_len);
         bh_buffer_append(buff, leb, leb_len);
+        
+    } else if (instr->type & EXT_INSTR_MASK) {
+        bh_buffer_write_byte(buff, 0xFC);
+        leb = uint_to_uleb128((u64) (instr->type &~ EXT_INSTR_MASK), &leb_len);
+        bh_buffer_append(buff, leb, leb_len);
 
     } else {
         bh_buffer_write_byte(buff, (u8) instr->type);
@@ -3527,7 +3534,16 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
         case WI_IF_START:
         case WI_MEMORY_SIZE:
         case WI_MEMORY_GROW:
+        case WI_MEMORY_FILL:
             leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+            break;
+        
+        case WI_MEMORY_COPY:
+            leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
+            bh_buffer_append(buff, leb, leb_len);
+        
+            leb = uint_to_uleb128((u64) instr->data.i2, &leb_len);
             bh_buffer_append(buff, leb, leb_len);
             break;
 

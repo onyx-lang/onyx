@@ -618,7 +618,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             case Token_Type_Right_Arrow: {
                 AstBinaryOp* method_call = make_node(AstBinaryOp, Ast_Kind_Method_Call);
-                method_call->token = expect_token(parser, Token_Type_Right_Arrow);  
+                method_call->token = expect_token(parser, Token_Type_Right_Arrow);
                 method_call->left = retval;
                 method_call->right = parse_factor(parser);
 
@@ -829,7 +829,7 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
     AstIfWhile* root_if = if_node;
 
     // CLEANUP: All of the control blocks use this same kind of logic, and it
-    // is underpowered for what I think should be possible. Factor it out and 
+    // is underpowered for what I think should be possible. Factor it out and
     // make it better?
     if (peek_token(1)->type == ':') {
         OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
@@ -1265,7 +1265,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             retval = parse_jump_stmt(parser, Token_Type_Keyword_Break, Jump_Type_Break);
             break;
 
-        case Token_Type_Keyword_Continue: 
+        case Token_Type_Keyword_Continue:
             retval = parse_jump_stmt(parser, Token_Type_Keyword_Continue, Jump_Type_Continue);
             break;
 
@@ -1640,7 +1640,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             bh_arr_push(poly_params, ((AstPolyStructParam) {
                 .token = sym_token,
                 .type_node = param_type,
-                .type = NULL, 
+                .type = NULL,
             }));
 
             if (parser->curr->type != ')')
@@ -1742,7 +1742,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             }
 
             bh_arr_each(OnyxToken *, member_name, member_list_temp) {
-                AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);    
+                AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);
                 mem->token = *member_name;
                 mem->type_node = member_type;
                 mem->initial_value = initial_value;
@@ -1833,7 +1833,7 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
             curr_param.default_value = parse_expression(parser, 0);
 
         if (param_is_baked) {
-            param_is_baked = 0;    
+            param_is_baked = 0;
 
             bh_arr(AstPolyParam) pv = *parser->polymorph_context.poly_params;
             bh_arr_push(pv, ((AstPolyParam) {
@@ -2171,7 +2171,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
         // HACK: This should maybe be entered elsewhere?
         ENTITY_SUBMIT(node);
     }
-
+    
     AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
     binding->token = symbol;
     binding->node = (AstNode *) node;

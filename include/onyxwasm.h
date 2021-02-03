@@ -17,6 +17,7 @@ typedef struct WasmFuncType {
 } WasmFuncType;
 
 #define SIMD_INSTR_MASK 0x10000
+#define EXT_INSTR_MASK  0x20000
 
 typedef enum WasmInstructionType {
     WI_UNREACHABLE                   = 0x00,
@@ -410,6 +411,10 @@ typedef enum WasmInstructionType {
     WI_I32X4_TRUNC_SAT_F32X4_U       = SIMD_INSTR_MASK | 249,
     WI_F32X4_CONVERT_I32X4_S         = SIMD_INSTR_MASK | 250,
     WI_F32X4_CONVERT_I32X4_U         = SIMD_INSTR_MASK | 251,
+    
+    
+    WI_MEMORY_COPY                   = EXT_INSTR_MASK | 0x0a,
+    WI_MEMORY_FILL                   = EXT_INSTR_MASK | 0x0b,
 } WasmInstructionType;
 
 typedef union {

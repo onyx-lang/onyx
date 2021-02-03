@@ -8,14 +8,26 @@ package core.memory
 // However, it might be worth switching to an intrinsic completely
 // and having the intrinsic know whether or not to output the instruction
 // or an inlined version of this procedure.
-copy :: (dst_: rawptr, src_: rawptr, len: u32) {
+use package core.intrinsics.wasm { memory_copy, memory_fill }
+
+// Even though I thought this would work, this method of aliases functions
+// does not currently work. There needs to be a second level of indirection
+// on entities to allow for this case to work, which may not be hard to change
+// but still needs to happen.
+// copy :: memory_copy
+// set  :: memory_fill
+
+copy :: (dest: rawptr, src: rawptr, count: i32) do memory_copy(dest, src, count);
+set  :: (dest: rawptr, byte: u8, count: i32)    do memory_fill(dest, byte, count);
+
+// Old and slow copy and set
+copy_ :: (dst_: rawptr, src_: rawptr, len: u32) {
     dst := cast(^u8) dst_;
     src := cast(^u8) src_;
     for i: 0 .. len do dst[i] = src[i];
 }
 
-// The same thing goes for this procedure too.
-set :: (start: rawptr, length: u32, value: u8) {
+set_ :: (start: rawptr, value: u8, length: u32) {
     s := cast(^u8) start;
     for i: 0 .. length do s[i] = value;
 }
