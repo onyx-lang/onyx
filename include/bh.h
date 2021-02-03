@@ -2391,7 +2391,9 @@ void bh_imap_clear(bh_imap* imap) {
 
 u64 bh_time_curr() {
 #if defined(_BH_WINDOWS)
-    return clock();
+    LARGE_INTEGER result;
+    QueryPerformanceCounter(&result);
+    return (u64) result.QuadPart;
 
 #elif defined(_BH_LINUX)
     struct timespec spec;
@@ -2411,7 +2413,13 @@ u64 bh_time_curr() {
 u64 bh_time_duration(u64 old) {
 #if defined(_BH_WINDOWS)
     u64 curr = bh_time_curr();
-    return (u64) (((f64) (curr - old)) / CLOCKS_PER_SEC);
+    u64 duration = curr - old;
+    
+    LARGE_INTEGER freq;
+    QueryPerformanceFrequency(&freq);
+    duration *= 1000;
+    duration /= freq.QuadPart;
+    return duration;
 
 #elif defined(_BH_LINUX)
     u64 curr = bh_time_curr();

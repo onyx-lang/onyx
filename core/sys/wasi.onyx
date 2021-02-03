@@ -25,6 +25,8 @@ assert_handler :: (msg: str, file: str) {
         output_str(file);
     }
 
+    output_str("\n");
+
     proc_exit(1);
 }
 

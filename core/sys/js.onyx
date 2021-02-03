@@ -14,6 +14,8 @@ assert_handler :: (msg: str, file: str) {
         output_str(file);
     }
 
+    output_str("\n");
+
     process_exit :: proc (status: i32) #foreign "host" "exit" ---
     process_exit(1);
 }

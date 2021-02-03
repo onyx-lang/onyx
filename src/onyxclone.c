@@ -76,6 +76,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
         case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
         case Ast_Kind_Range_Literal: return sizeof(AstRangeLiteral);
+        case Ast_Kind_Method_Call: return sizeof(AstBinaryOp);
         case Ast_Kind_Size_Of: return sizeof(AstSizeOf);
         case Ast_Kind_Align_Of: return sizeof(AstAlignOf);
         case Ast_Kind_File_Contents: return sizeof(AstFileContents);
@@ -131,6 +132,8 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 	switch ((u16) node->kind) {
 		case Ast_Kind_Binary_Op:
+        case Ast_Kind_Pipe:
+        case Ast_Kind_Method_Call:
 			((AstBinaryOp *) nn)->left  = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->left);
 			((AstBinaryOp *) nn)->right = (AstTyped *) ast_clone(a, ((AstBinaryOp *) node)->right);
 			break;

@@ -1,11 +1,20 @@
 package core.memory
 
+// This will be replaced / augmented with a memory_copy intrinsic
+// when that is added to the compiler. There would be an easy flag
+// to control if this implementation is used, or the intrinsic. The
+// only case where this implementation should be used is in legacy
+// systems where the memory_copy instruction is not available.
+// However, it might be worth switching to an intrinsic completely
+// and having the intrinsic know whether or not to output the instruction
+// or an inlined version of this procedure.
 copy :: (dst_: rawptr, src_: rawptr, len: u32) {
     dst := cast(^u8) dst_;
     src := cast(^u8) src_;
     for i: 0 .. len do dst[i] = src[i];
 }
 
+// The same thing goes for this procedure too.
 set :: (start: rawptr, length: u32, value: u8) {
     s := cast(^u8) start;
     for i: 0 .. length do s[i] = value;
