@@ -129,6 +129,27 @@ static b32 consume_token_if_next(OnyxParser* parser, TokenType token_type) {
     }
 }
 
+static void consume_tokens(OnyxParser* parser, i32 n) {
+    fori (i, 0, n) consume_token(parser);
+}
+
+static b32 next_tokens_are(OnyxParser* parser, i32 n, ...) {
+    va_list va;
+    va_start(va, n);
+
+    i32 matched = 1;
+
+    fori (i, 0, n) {
+        TokenType expected_type = va_arg(va, TokenType);
+        if (peek_token(i)->type != expected_type) {
+            matched = 0;
+            break;
+        }
+    }
+
+    va_end(va);
+    return matched;
+}
 
 
 // TODO: Make parsing numeric literals not rely on the C standard libary.
@@ -1669,50 +1690,78 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     expect_token(parser, '{');
 
     b32 member_is_used = 0;
+    bh_arr(OnyxToken *) member_list_temp = NULL;
+    bh_arr_new(global_heap_allocator, member_list_temp, 4);
+
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return s_node;
         
-        OnyxToken* member_name;
+        member_is_used = consume_token_if_next(parser, Token_Type_Keyword_Use);
 
-        if (consume_token_if_next(parser, Token_Type_Keyword_Use)) member_is_used = 1;
-
-        member_name = expect_token(parser, Token_Type_Symbol);
-
-        expect_token(parser, ':');
-        
-        if (parser->curr->type == ':' && !member_is_used) {
+        if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
             if (!s_node->scope) {
                 s_node->scope = scope_create(context.ast_alloc, bh_arr_last(parser->scope_stack), s_node->token->pos);
                 bh_arr_push(parser->scope_stack, s_node->scope);
             }
-            
-            AstBinding* binding = parse_top_level_binding(parser, member_name);
+
+            OnyxToken* binding_name = expect_token(parser, Token_Type_Symbol);
+            consume_token(parser);
+
+            AstBinding* binding = parse_top_level_binding(parser, binding_name);
             symbol_introduce(s_node->scope, binding->token, binding->node);
             
             consume_token_if_next(parser, ';');
-            
+
         } else {
-            AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);    
-            mem->token = member_name;
-            
-            if (member_is_used) {
-                mem->flags |= Ast_Flag_Struct_Mem_Used;
-                member_is_used = 0;
-            }
-            
-            if (parser->curr->type != '=') {
-                mem->type_node = parse_type(parser);
+            bh_arr_clear(member_list_temp);
+            while (!consume_token_if_next(parser, ':')) {
+                bh_arr_push(member_list_temp, expect_token(parser, Token_Type_Symbol));
+
+                if (parser->curr->type != ':')
+                    expect_token(parser, ',');
             }
 
+            AstType* member_type = NULL;
+            if (parser->curr->type != '=')
+                member_type = parse_type(parser);
+
+            AstTyped* initial_value = NULL;
             if (consume_token_if_next(parser, '='))
-                mem->initial_value = parse_expression(parser, 0);
-            
+                initial_value = parse_expression(parser, 0);
+
+            // RECONSIDER: There are seamingly arbitrary limitations put in place here which do two things:
+            //   1. Prevent multiple struct members being used in the same declaration.
+            //      This makes sense because the members will be of the same type, which means
+            //      they have the same members. Using both of the members would immediately result
+            //      in name collisions.
+            //
+            //   2. Prevent multiple struct members having an initializer set for them.
+            //      I think the semantics could be confusing either way, so I'm deciding to leave
+            //      them out of discussion for now. Initialized members should be treated special and
+            //      deserve their own line.
+            if (bh_arr_length(member_list_temp) > 1) {
+                if (member_is_used) onyx_report_error((member_list_temp[0] - 1)->pos, "'use' is only allowed for a single struct member declaration. Try splitting this compound declaration into multiple lines.");
+                if (initial_value)  onyx_report_error(initial_value->token->pos, "Intialized values are only allowed on single struct member declarations. Try splitting this compound initializer into multiple lines.");
+            }
+
+            bh_arr_each(OnyxToken *, member_name, member_list_temp) {
+                AstStructMember* mem = make_node(AstStructMember, Ast_Kind_Struct_Member);    
+                mem->token = *member_name;
+                mem->type_node = member_type;
+                mem->initial_value = initial_value;
+
+                if (member_is_used) mem->flags |= Ast_Flag_Struct_Mem_Used;
+
+                bh_arr_push(s_node->members, mem);
+            }
+
             expect_token(parser, ';');
-            bh_arr_push(s_node->members, mem);
         }
     }
 
     if (s_node->scope) bh_arr_pop(parser->scope_stack);
+
+    bh_arr_free(member_list_temp);
 
     if (poly_struct != NULL) {
         // NOTE: Not a StructType
