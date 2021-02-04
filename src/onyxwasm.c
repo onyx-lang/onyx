@@ -252,6 +252,8 @@ EMIT_FUNC(stack_leave,                   u32 unused);
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
 
+#include "onyxwasm_intrinsics.c"
+
 EMIT_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
 
@@ -1398,8 +1400,20 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
     switch (call->intrinsic) {
         case ONYX_INTRINSIC_MEMORY_SIZE:  WID(WI_MEMORY_SIZE, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_GROW:  WID(WI_MEMORY_GROW, 0x00); break;
-        case ONYX_INTRINSIC_MEMORY_COPY:  WIL(WI_MEMORY_COPY, 0x00); break;
-        case ONYX_INTRINSIC_MEMORY_FILL:  WID(WI_MEMORY_FILL, 0x00); break;
+        case ONYX_INTRINSIC_MEMORY_COPY:
+            if (context.options->use_post_mvp_features) {
+                WIL(WI_MEMORY_COPY, 0x00);
+            } else {
+                emit_intrinsic_memory_copy(mod, &code);
+            }
+            break;
+        case ONYX_INTRINSIC_MEMORY_FILL:        
+            if (context.options->use_post_mvp_features) {
+                WIL(WI_MEMORY_FILL, 0x00);
+            } else {
+                emit_intrinsic_memory_fill(mod, &code);
+            }
+            break;
 
         case ONYX_INTRINSIC_I32_CLZ:      WI(WI_I32_CLZ); break;
         case ONYX_INTRINSIC_I32_CTZ:      WI(WI_I32_CTZ); break;
