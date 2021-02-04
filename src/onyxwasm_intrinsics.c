@@ -1,9 +1,9 @@
-// This file is directly included in onxywasm.
+// This file is directly included in src/onxywasm.c
 // It is here purely to decrease the amount of clutter in the main file.
 
 
 // IMPROVE: This implementation assumes that the source and destination buffers do not overlap.
-// The specification for memory.copy in WASM does work even in the buffers overlap.
+// The specification for memory.copy in WASM does work even if the buffers overlap.
 // Also, this implementation copies byte-by-byte, which is terrible. It should copy
 // quad word by quad word, and then the additional bytes if the count was not divisible by 8.
 // :32BitPointers
