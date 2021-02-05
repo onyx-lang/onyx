@@ -139,6 +139,8 @@ atanh :: (t: $T) -> T {
 //      ln(x) = ln(2^n * v) = n * ln(2) + ln(v),   v is in [1, 2]
 //
 
+// FIX: This definition is very wrong. It casts E to be whatever the type of the argument is,
+// which if it is an integer, will be 2! This should always return a floating point number!
 exp :: (p: $T) -> T do return pow(base = cast(T) E, p = p);
 
 pow :: proc {
@@ -224,10 +226,10 @@ log :: (a: $T, base: $R) -> T {
 // operation first, and then default to a polymoprhic function that works on any type.
 // The clunky part about these at the moment is that, if you wanted to pass 'max' to
 // a procedure, you would have to pass 'max_poly' instead, because overloaded functions
-// are not resolved when used by value, i.e. foo : (f32) -> f32 = math.max; Even if they
-// would be however, the fact that these overloads are intrinsic means they cannot be
-// reference from the element section and therefore cannot be passed around or used as
-// values.
+// are not resolved when used by value, i.e. foo : (f32, f32) -> f32 = math.max; Even if
+// they would be however, the fact that these overloads are intrinsic means they cannot
+// be reference from the element section and therefore cannot be passed around or used
+// as values.
 max :: proc { wasm.max_f32, wasm.max_f64, max_poly }
 max_poly :: (a: $T, b: T) -> T {
     if a >= b do return a;

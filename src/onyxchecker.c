@@ -17,8 +17,8 @@ typedef enum CheckStatus {
 } CheckStatus;
 
 CheckStatus check_block(AstBlock* block);
-CheckStatus check_statement_chain(AstNode* start);
-CheckStatus check_statement(AstNode* stmt);
+CheckStatus check_statement_chain(AstNode** start);
+CheckStatus check_statement(AstNode** pstmt);
 CheckStatus check_return(AstReturn* retnode);
 CheckStatus check_if(AstIfWhile* ifnode);
 CheckStatus check_while(AstIfWhile* whilenode);
@@ -36,6 +36,7 @@ CheckStatus check_address_of(AstAddressOf* aof);
 CheckStatus check_dereference(AstDereference* deref);
 CheckStatus check_array_access(AstArrayAccess* expr);
 CheckStatus check_field_access(AstFieldAccess** pfield);
+CheckStatus check_method_call(AstBinaryOp** mcall);
 CheckStatus check_size_of(AstSizeOf* so);
 CheckStatus check_align_of(AstAlignOf* ao);
 CheckStatus check_global(AstGlobal* global);
@@ -115,7 +116,7 @@ CheckStatus check_return(AstReturn* retnode) {
 }
 
 CheckStatus check_if(AstIfWhile* ifnode) {
-    if (ifnode->assignment != NULL) CHECK(statement, (AstNode *) ifnode->assignment);
+    if (ifnode->assignment != NULL) CHECK(statement, (AstNode **) &ifnode->assignment);
 
     CHECK(expression, &ifnode->cond);
 
@@ -124,14 +125,14 @@ CheckStatus check_if(AstIfWhile* ifnode) {
         return Check_Error;
     }
 
-    if (ifnode->true_stmt)  CHECK(statement, (AstNode *) ifnode->true_stmt);
-    if (ifnode->false_stmt) CHECK(statement, (AstNode *) ifnode->false_stmt);
+    if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt);
+    if (ifnode->false_stmt) CHECK(statement, (AstNode **) &ifnode->false_stmt);
 
     return Check_Success;
 }
 
 CheckStatus check_while(AstIfWhile* whilenode) {
-    if (whilenode->assignment != NULL) CHECK(statement, (AstNode *) whilenode->assignment);
+    if (whilenode->assignment != NULL) CHECK(statement, (AstNode **) &whilenode->assignment);
 
     CHECK(expression, &whilenode->cond);
 
@@ -140,8 +141,8 @@ CheckStatus check_while(AstIfWhile* whilenode) {
         return Check_Error;
     }
 
-    if (whilenode->true_stmt)  CHECK(statement, (AstNode *) whilenode->true_stmt);
-    if (whilenode->false_stmt) CHECK(statement, (AstNode *) whilenode->false_stmt);
+    if (whilenode->true_stmt)  CHECK(statement, (AstNode **) &whilenode->true_stmt);
+    if (whilenode->false_stmt) CHECK(statement, (AstNode **) &whilenode->false_stmt);
 
     return Check_Success;
 }
@@ -240,7 +241,7 @@ static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, A
 }
 
 CheckStatus check_switch(AstSwitch* switchnode) {
-    if (switchnode->assignment != NULL) CHECK(statement, (AstNode *) switchnode->assignment);
+    if (switchnode->assignment != NULL) CHECK(statement, (AstNode **) &switchnode->assignment);
 
     CHECK(expression, &switchnode->expr);
     resolve_expression_type(switchnode->expr);
@@ -1255,10 +1256,8 @@ CheckStatus check_array_access(AstArrayAccess* aa) {
             || aa->addr->type->kind == Type_Kind_DynArray
             || aa->addr->type->kind == Type_Kind_VarArgs) {
         // If we are accessing on a slice or a dynamic array, implicitly add a field access for the data member
-
         StructMember smem;
         type_lookup_member(aa->addr->type, "data", &smem);
-
 
         AstFieldAccess* fa = make_field_access(context.ast_alloc, aa->addr, "data");
         fa->type   = smem.type;
@@ -1314,29 +1313,51 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     }
 
     if (!type_lookup_member(field->expr->type, field->field, &smem)) {
-        AstStructType* struct_node = (AstStructType *) field->expr->type->ast_type;
-        assert(struct_node);
-        assert(struct_node->kind == Ast_Kind_Struct_Type);
-        
-        AstNode* n = symbol_raw_resolve(struct_node->scope, field->field);
+        AstType* type_node = field->expr->type->ast_type;
+        AstNode* n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
         if (n) {
             *pfield = (AstFieldAccess *) n;
             return Check_Success;
-            
-        } else {
-            onyx_report_error(field->token->pos,
-                "Field '%s' does not exists on '%s'.",
-                field->field,
-                node_get_type_name(field->expr));
-            
-            return Check_Error;   
         }
+
+        onyx_report_error(field->token->pos,
+            "Field '%s' does not exists on '%s'.",
+            field->field,
+            node_get_type_name(field->expr));
+        return Check_Error;   
     }
 
     field->offset = smem.offset;
     field->idx = smem.idx;
     field->type = smem.type;
 
+    return Check_Success;
+}
+
+CheckStatus check_method_call(AstBinaryOp** mcall) {
+    CHECK(expression, &(*mcall)->left);
+
+    AstTyped* implicit_argument = (*mcall)->left;
+    
+    // Implicitly take the address of the value if it is not already a pointer type.
+    // This could be weird to think about semantically so some testing with real code
+    // would be good.                                      - brendanfh 2020/02/05
+    if (implicit_argument->type->kind != Type_Kind_Pointer)
+        implicit_argument = (AstTyped *) make_address_of(context.ast_alloc, implicit_argument);
+    
+    implicit_argument = (AstTyped *) make_argument(context.ast_alloc, implicit_argument);
+
+    // Symbol resolution should have ensured that this is call node.
+    AstCall* call_node = (AstCall *) (*mcall)->right;
+    assert(call_node->kind == Ast_Kind_Call);
+
+    bh_arr_insertn(call_node->args.values, 0, 1);
+    call_node->args.values[0] = implicit_argument;
+
+    CHECK(call, call_node);
+    call_node->next = (*mcall)->next;
+
+    *mcall = (AstBinaryOp *) call_node;
     return Check_Success;
 }
 
@@ -1410,6 +1431,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Slice:
         case Ast_Kind_Array_Access:  retval = check_array_access((AstArrayAccess *) expr); break;
         case Ast_Kind_Field_Access:  retval = check_field_access((AstFieldAccess **) pexpr); break;
+        case Ast_Kind_Method_Call:   retval = check_method_call((AstBinaryOp **) pexpr); break;
         case Ast_Kind_Size_Of:       retval = check_size_of((AstSizeOf *) expr); break;
         case Ast_Kind_Align_Of:      retval = check_align_of((AstAlignOf *) expr); break;
         case Ast_Kind_Range_Literal: retval = check_range_literal((AstRangeLiteral **) pexpr); break;
@@ -1495,7 +1517,9 @@ CheckStatus check_global(AstGlobal* global) {
     return Check_Success;
 }
 
-CheckStatus check_statement(AstNode* stmt) {
+CheckStatus check_statement(AstNode** pstmt) {
+    AstNode* stmt = *pstmt;
+
     switch (stmt->kind) {
         case Ast_Kind_Jump:       return Check_Success;
 
@@ -1505,29 +1529,29 @@ CheckStatus check_statement(AstNode* stmt) {
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
         case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
-        case Ast_Kind_Defer:      return check_statement(((AstDefer *) stmt)->stmt);
+        case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
 
         case Ast_Kind_Binary_Op:
             stmt->flags |= Ast_Flag_Expr_Ignored;
-            return check_binaryop((AstBinaryOp **) &stmt, 1);
+            return check_binaryop((AstBinaryOp **) pstmt, 1);
 
         default:
             stmt->flags |= Ast_Flag_Expr_Ignored;
-            return check_expression((AstTyped **) &stmt);
+            return check_expression((AstTyped **) pstmt);
     }
 }
 
-CheckStatus check_statement_chain(AstNode* start) {
-    while (start) {
+CheckStatus check_statement_chain(AstNode** start) {
+    while (*start) {
         CHECK(statement, start);
-        start = start->next;
+        start = &(*start)->next;
     }
 
     return Check_Success;
 }
 
 CheckStatus check_block(AstBlock* block) {
-    CHECK(statement_chain, block->body);
+    CHECK(statement_chain, &block->body);
 
     bh_arr_each(AstTyped *, value, block->allocate_exprs) {
         fill_in_type(*value);

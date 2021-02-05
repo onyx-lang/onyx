@@ -140,12 +140,19 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     return res;
 }
 
-AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
+AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol) {
+    // CLEANUP: So many checks for null....
+    if (!node) return NULL;
+
     if (node->kind == Ast_Kind_Type_Raw_Alias)
         node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type;
 
+    if (!node) return NULL;
+
     if (node->kind == Ast_Kind_Type_Alias)
         node = (AstNode *) ((AstTypeAlias *) node)->to;
+
+    if (!node) return NULL;
 
     // A single pointer can be dereferenced to lookup symbols in struct.
     if (node->kind == Ast_Kind_Pointer_Type)
@@ -156,26 +163,34 @@ AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
     switch (node->kind) {
         case Ast_Kind_Package: {
             AstPackage* package = (AstPackage *) node;
-            return symbol_resolve(package->package->scope, token);
+            return symbol_raw_resolve(package->package->scope, symbol);
         } 
 
         case Ast_Kind_Enum_Type: {
             AstEnumType* etype = (AstEnumType *) node;
-            return symbol_resolve(etype->scope, token);
+            return symbol_raw_resolve(etype->scope, symbol);
         }
 
         case Ast_Kind_Struct_Type: {
             AstStructType* stype = (AstStructType *) node;
-            return symbol_resolve(stype->scope, token);
+            return symbol_raw_resolve(stype->scope, symbol);
         }
 
         case Ast_Kind_Poly_Struct_Type: {
             AstStructType* stype = ((AstPolyStructType *) node)->base_struct;
-            return symbol_resolve(stype->scope, token);
+            return symbol_raw_resolve(stype->scope, symbol);
         }
     }
 
     return NULL;
+}
+
+AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
+    token_toggle_end(token);
+    AstNode* result = try_symbol_raw_resolve_from_node(node, token->text);
+    token_toggle_end(token);
+
+    return result;
 }
 
 void scope_clear(Scope* scope) {

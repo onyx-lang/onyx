@@ -315,7 +315,6 @@ static void symres_pipe(AstBinaryOp** pipe) {
     *pipe = (AstBinaryOp *) call_node;
 }
 
-// nocheckin
 // CLEANUP: This is an experimental feature and might be removed in the future.
 // I noticed a common pattern when writing in Onyx is something that looks like this:
 //
@@ -336,20 +335,10 @@ static void symres_method_call(AstBinaryOp** mcall) {
     symres_expression(&(*mcall)->left);
     if ((*mcall)->left == NULL) return;
 
-    bh_arr_insertn(call_node->args.values, 0, 1);
-
-    AstTyped* implicit_pointer = (AstTyped *) make_address_of(context.ast_alloc, (*mcall)->left);
-    call_node->args.values[0] = (AstTyped *) make_argument(context.ast_alloc, implicit_pointer);
-    
     AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
     implicit_field_access->token = call_node->callee->token;
     call_node->callee = (AstTyped *) implicit_field_access;
     symres_expression((AstTyped **) &call_node);
-
-    call_node->next = (*mcall)->next;
-
-    // NOTE: Not a BinaryOp node
-    *mcall = (AstBinaryOp *) call_node;
 }
 
 static void symres_unaryop(AstUnaryOp** unaryop) {
