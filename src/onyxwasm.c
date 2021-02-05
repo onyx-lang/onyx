@@ -2923,8 +2923,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     }
 
     u32 offset = mod->next_datum_offset;
-    if (offset % 16 != 0)
-        offset += 16 - (offset % 16);
+    bh_align(offset, 16);
 
     if (!bh_file_exists(fc->filename->text)) {
         onyx_report_error(fc->filename->pos,
