@@ -957,6 +957,12 @@ void symres_entity(Entity* ent) {
     EntityState next_state = Entity_State_Check_Types;
 
     switch (ent->type) {
+        case Entity_Type_Binding: {
+            symbol_introduce(curr_scope, ent->binding->token, ent->binding->node);
+            next_state = Entity_State_Finalized;
+            break;
+        }
+        
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function_Header:         symres_function_header(ent->function); break;
         case Entity_Type_Function:                symres_function(ent->function);        break;

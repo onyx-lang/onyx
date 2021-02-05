@@ -1,10 +1,7 @@
-// The job of the parser for Onyx is to do two things:
-//  1. Submit nodes to the entity heap for further processing.
-//     Nodes such as procedure defintions, string literals, etc.
-//
-//  2. Insert static symbols into scopes.
-//     Things defined at top level or inside of static scopes such
-//     as bindings in procedures or in struct scopes.
+// The sole job of the parser for Onyx is to submit nodes to the
+// entity heap for further processing. These nodes include things
+// such as procedure definitions, string literals, struct definitions
+// and declarations to be introduced into scopes.
 
 // Things that need to be cleaned up in the parser:
 //  - control block local variables should be more extensible and reuse more code
@@ -17,9 +14,10 @@
 #include "onyxutils.h"
 
 // NOTE: The one weird define you need to know before read the code below
-#define make_node(nclass, kind) onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
-#define peek_token(ahead)       (parser->curr + ahead)
-#define ENTITY_SUBMIT(node)     (add_entities_for_node((AstNode *) (node), bh_arr_last(parser->scope_stack), parser->package))
+#define make_node(nclass, kind)             onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
+#define peek_token(ahead)                   (parser->curr + ahead)
+#define ENTITY_SUBMIT(node)                 (add_entities_for_node((AstNode *) (node), bh_arr_last(parser->scope_stack), parser->package))
+#define ENTITY_SUBMIT_IN_SCOPE(node, scope) (add_entities_for_node((AstNode *) (node), scope, parser->package))
 
 static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 
@@ -1077,8 +1075,7 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
         AstBinding* binding = parse_top_level_binding(parser, symbol);
         if (parser->hit_unexpected_token) return 2;
         
-        Scope* insertion_scope = bh_arr_last(parser->scope_stack);
-        symbol_introduce(insertion_scope, symbol, binding->node);
+        ENTITY_SUBMIT(binding);
         return 2;
     }
 
@@ -1705,7 +1702,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             consume_token(parser);
 
             AstBinding* binding = parse_top_level_binding(parser, binding_name);
-            symbol_introduce(s_node->scope, binding->token, binding->node);
+            ENTITY_SUBMIT(binding);
             
             consume_token_if_next(parser, ';');
 
@@ -2397,10 +2394,8 @@ void onyx_parse(OnyxParser *parser) {
                             target_scope = parser->package->private_scope;
                         if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_File)
                             target_scope = parser->file_scope;
-
-                        symbol_introduce(target_scope,
-                            ((AstBinding *) curr_stmt)->token,
-                            ((AstBinding *) curr_stmt)->node);
+                        
+                        ENTITY_SUBMIT_IN_SCOPE(curr_stmt, target_scope);
                         break;
                     }
 

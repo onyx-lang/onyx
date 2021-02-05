@@ -859,6 +859,7 @@ typedef enum EntityState {
     Entity_State_Error,
     
     Entity_State_Parse_Builtin,
+    Entity_State_Introduce_Symbols,
     Entity_State_Parse,
     Entity_State_Resolve_Symbols,
     Entity_State_Check_Types,
@@ -877,6 +878,7 @@ typedef enum EntityType {
 
     Entity_Type_Load_Path,
     Entity_Type_Load_File,
+    Entity_Type_Binding,
     Entity_Type_Use_Package,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
@@ -910,6 +912,7 @@ typedef struct Entity {
     union {
         AstInclude            *include;
         AstUsePackage         *use_package;
+        AstBinding            *binding;
         AstFunction           *function;
         AstOverloadedFunction *overloaded_function;
         AstGlobal             *global;

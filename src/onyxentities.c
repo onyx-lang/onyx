@@ -105,6 +105,14 @@ void add_entities_for_node(AstNode* node, Scope* scope, Package* package) {
             break;
         }
         
+        case Ast_Kind_Binding: {
+            ent.state   = Entity_State_Introduce_Symbols;
+            ent.type    = Entity_Type_Binding;
+            ent.binding = (AstBinding *) node;
+            entity_heap_insert(entities, ent);
+            break;
+        }
+        
         case Ast_Kind_Function: {
             if ((node->flags & Ast_Flag_Foreign) != 0) {
                 ent.type     = Entity_Type_Foreign_Function_Header;

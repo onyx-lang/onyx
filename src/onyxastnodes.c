@@ -105,10 +105,11 @@ const char *binaryop_string[Binary_Op_Count] = {
 const char* entity_state_strings[Entity_State_Count] = {
     "Error",
     "Parse Builtin",
+    "Introduce Symbols",
     "Parse",
-    "Resolve_Symbols",
-    "Check_Types",
-    "Code_Gen",
+    "Resolve Symbols",
+    "Check Types",
+    "Code Gen",
     "Finalized",
 };
 
@@ -116,6 +117,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Unknown",
     "Add to Load Path",
     "Load File",
+    "Binding (Declaration)",
     "Use Package",
     "String Literal",
     "File Contents",

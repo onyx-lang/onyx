@@ -271,24 +271,39 @@ static b32 process_entity(Entity* ent) {
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             printf("%s | %s | %s:%i:%i\n",
-                entity_state_strings[ent->state],
-                entity_type_strings[ent->type],
-                ent->expr->token->pos.filename,
-                ent->expr->token->pos.line,
-                ent->expr->token->pos.column);
+                   entity_state_strings[ent->state],
+                   entity_type_strings[ent->type],
+                   ent->expr->token->pos.filename,
+                   ent->expr->token->pos.line,
+                   ent->expr->token->pos.column);
+        
+        else if (ent->expr)
+            printf("%s | %s\n",
+                   entity_state_strings[ent->state],
+                   entity_type_strings[ent->type]);
     }
+    
+    // CLEANUP: There should be a nicer way to track if the builtins have
+    // already been initialized.
+    static b32 builtins_initialized = 0;
 
     switch (ent->state) {
         case Entity_State_Parse_Builtin:
             process_load_entity(ent);
             ent->state = Entity_State_Finalized;
 
-            if (onyx_has_errors()) return 0;
-
-            initialize_builtins(context.ast_alloc);
+        case Entity_State_Introduce_Symbols:
+            // Currently, introducing symbols is handled in the symbol resolution
+            // function. Maybe there should be a different place where that happens?
+            symres_entity(ent);
             break;
-
+        
         case Entity_State_Parse:
+            if (!builtins_initialized) {
+                builtins_initialized = 1;
+                initialize_builtins(context.ast_alloc);
+            }
+         
             process_load_entity(ent);
             ent->state = Entity_State_Finalized;
             break;
@@ -308,6 +323,7 @@ static b32 process_entity(Entity* ent) {
 #if defined(_BH_LINUX)
 static void output_dummy_progress_bar() {
     EntityHeap* eh = &context.entities;
+    if (bh_arr_length(eh->entities) == 0) return;
 
     printf("\e[2;1H");
     for (i32 i = 0; i < Entity_State_Count - 1; i++) {
