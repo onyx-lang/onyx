@@ -20,6 +20,7 @@ void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node);
 void symbol_subpackage_introduce(Scope* scope, OnyxToken* sym, AstPackage *node);
 AstNode* symbol_raw_resolve(Scope* start_scope, char* sym);
 AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn);
+AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token);
 
 u32 char_to_base16_value(char x);
 

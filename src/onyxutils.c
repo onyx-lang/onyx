@@ -140,6 +140,44 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     return res;
 }
 
+AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
+    if (node->kind == Ast_Kind_Type_Raw_Alias)
+        node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type;
+
+    if (node->kind == Ast_Kind_Type_Alias)
+        node = (AstNode *) ((AstTypeAlias *) node)->to;
+
+    // A single pointer can be dereferenced to lookup symbols in struct.
+    if (node->kind == Ast_Kind_Pointer_Type)
+        node = (AstNode *) ((AstPointerType *) node)->elem;
+
+    if (!node) return NULL;
+
+    switch (node->kind) {
+        case Ast_Kind_Package: {
+            AstPackage* package = (AstPackage *) node;
+            return symbol_resolve(package->package->scope, token);
+        } 
+
+        case Ast_Kind_Enum_Type: {
+            AstEnumType* etype = (AstEnumType *) node;
+            return symbol_resolve(etype->scope, token);
+        }
+
+        case Ast_Kind_Struct_Type: {
+            AstStructType* stype = (AstStructType *) node;
+            return symbol_resolve(stype->scope, token);
+        }
+
+        case Ast_Kind_Poly_Struct_Type: {
+            AstStructType* stype = ((AstPolyStructType *) node)->base_struct;
+            return symbol_resolve(stype->scope, token);
+        }
+    }
+
+    return NULL;
+}
+
 void scope_clear(Scope* scope) {
     bh_table_clear(scope->symbols);
 }

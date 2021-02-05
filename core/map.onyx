@@ -6,16 +6,16 @@ use package core.string as string
 
 Map :: struct (K: type_expr, V: type_expr) {
     hashes  : [..] i32;
-    entries : [..] MapEntry(K, V);
+    entries : [..] Entry(K, V);
 
     // The value provided by `map.get`, if nothing was found.
     default_value : V;
-}
 
-MapEntry :: struct (K: type_expr, V: type_expr) {
-    next  : i32;
-    key   : K;
-    value : V;
+    Entry :: struct (K: type_expr, V: type_expr) {
+        next  : i32;
+        key   : K;
+        value : V;
+    }
 }
 
 make :: ($Key: type_expr, $Value: type_expr, default: Value = 0, hash_count: i32 = 16) -> Map(Key, Value) {
@@ -46,7 +46,7 @@ put :: (use map: ^Map($K, $V), key: K, value: V) {
         return;
     }
 
-    entry : MapEntry(K, V);
+    entry : Map.Entry(K, V);
     entry.key = key;
     entry.value = value;
     entry.next = hashes[lr.hash_index];

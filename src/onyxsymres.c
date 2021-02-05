@@ -95,9 +95,6 @@ AstType* symres_type(AstType* type) {
 
         s_node->flags |= Ast_Flag_Type_Is_Resolved;
         
-        // FIX: This is probably wrong for the long term.
-        if (s_node->scope) s_node->scope->parent = curr_scope;
-        
         {
             bh_table(i32) mem_set;
             bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
@@ -121,6 +118,13 @@ AstType* symres_type(AstType* type) {
             bh_table_free(mem_set);
         }
 
+        if (s_node->scope) {
+            // FIX: This is probably wrong for the long term.
+            s_node->scope->parent = curr_scope;
+
+            scope_enter(s_node->scope);
+        }
+
         fori (i, 0, bh_arr_length(s_node->members)) {
             AstStructMember *member = s_node->members[i];
 
@@ -129,7 +133,7 @@ AstType* symres_type(AstType* type) {
 
                 if (!node_is_type((AstNode *) member->type_node)) {
                     onyx_report_error(member->token->pos, "Member type is not a type.");
-                    return type;
+                    goto struct_symres_done;
                 }
 
                 if (member->flags & Ast_Flag_Struct_Mem_Used) {
@@ -150,13 +154,14 @@ AstType* symres_type(AstType* type) {
                         onyx_report_error(member->token->pos,
                                 "Can only 'use' members of struct type, got '%s'.",
                                 onyx_ast_node_kind_string(used->kind));
-
-                        return type;
+                        goto struct_symres_done;
                     }
                 }
             }
         }
 
+struct_symres_done:
+        if (s_node->scope) scope_leave();
         return type;
     }
 
@@ -280,50 +285,8 @@ static void symres_field_access(AstFieldAccess** fa) {
     symres_expression(&(*fa)->expr);
     if ((*fa)->expr == NULL) return;
 
-    // CLEANUP: There are way to many cases here that a too similar.
-    // It should be easy to clean all of these up. Also, I think that when
-    // that happens, it might be even easier to allow for 'use'ing members
-    // that are pointers to structures.
-    
-    if ((*fa)->expr->kind == Ast_Kind_Package) {
-        AstPackage* package = (AstPackage *) (*fa)->expr;
-        AstNode* n = symbol_resolve(package->package->scope, (*fa)->token);
-        if (n) {
-            // NOTE: not field access
-            *fa = (AstFieldAccess *) n;
-            return;
-        }
-    }
-
-    if ((*fa)->expr->kind == Ast_Kind_Enum_Type) {
-        AstEnumType* etype = (AstEnumType *) (*fa)->expr;
-        AstNode* n = symbol_resolve(etype->scope, (*fa)->token);
-        if (n) {
-            // NOTE: not field access
-            *fa = (AstFieldAccess *) n;
-            return;
-        }
-    }
-    
-    if ((*fa)->expr->kind == Ast_Kind_Struct_Type) {
-        AstStructType* stype = (AstStructType *) (*fa)->expr;
-        AstNode* n = symbol_resolve(stype->scope, (*fa)->token);
-        if (n) {
-            // Note: not field access
-            *fa = (AstFieldAccess *) n;
-            return;
-        }
-    }
-
-    if ((*fa)->expr->kind == Ast_Kind_Poly_Struct_Type) {
-        AstStructType* stype = ((AstPolyStructType *) (*fa)->expr)->base_struct;
-        AstNode* n = symbol_resolve(stype->scope, (*fa)->token);
-        if (n) {
-            // Note: not field access
-            *fa = (AstFieldAccess *) n;
-            return;
-        }
-    }
+    AstNode* resolution = try_symbol_resolve_from_node((AstNode *) (*fa)->expr, (*fa)->token);
+    if (resolution) *((AstNode **) fa) = resolution;
 }
 
 static void symres_compound(AstCompound* compound) {
