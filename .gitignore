@@ -10,3 +10,4 @@ session.vim
 *.ilk
 *.obj
 *.rdbg
+tmp/

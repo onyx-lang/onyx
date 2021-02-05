@@ -1,0 +1,97 @@
+// This is a needlessly complicated test of some of the newer features with structs.
+
+#load "core/std/js"
+
+use package core
+
+
+Vec3 :: struct {
+    x, y, z: f32;
+}
+
+get_a_value :: ($T: type_expr) -> T {
+    println("Got a value!");
+    return cast(T) 1234;
+}
+
+Foo :: struct {
+    member1 := get_a_value(f32);
+    member2 := get_a_value(i32);
+    
+    get_member2_plus_three :: (foo: ^Foo) -> i32 {
+        return foo.member2 + 3;
+    }
+    
+    some_constant :: cast(i32) (10 + 209);
+}
+
+
+Foo2 :: struct {
+    member1: i32;
+    member2: f32;
+    
+    SubStruct :: struct {
+        name : str;
+        age  : i32;
+    }
+    
+    get_member2_plus_three :: (foo: ^$T) -> f32 {
+        return foo.member2 + 3;
+    }
+    
+    some_constant :: cast(i32) (10 + 40 * 20);
+}
+
+PolyStruct :: struct (T: type_expr) {
+    member : T;
+    works  : (T) -> T = member_function;
+    
+    // NOTE(Brendan Hansen): Currently, these functions are just scoped to the
+    // struct body, and they do not have access to the struct parameters.
+    member_function :: (t: $T) -> T {
+        return t + 1;
+    }
+}
+
+main :: (args: [] cstr) {
+    foo := Foo.{};
+    println(foo->get_member2_plus_three());
+    
+    ps := <PolyStruct(i32)>.{ 1234 };
+    println(ps.works(ps.member));
+
+    plus_one : (i32) -> i32 = PolyStruct.member_function;
+    println(plus_one(10));
+    
+    println(foo.some_constant);
+    
+    person := Foo2.SubStruct.{ name = "Joe", age = 30 };
+    printf("%s is %i.\n", person.name, person.age);
+
+    {
+        BasicallyANamespace.function_3();
+
+        use BasicallyANamespace;
+        function_2();
+
+        use SubNamespace;
+        function_4();
+    }
+
+
+    v := Vec3.{ 4, 9, 16 };
+    printf("V3(%f, %f, %f)\n", v.x, v.y, v.z);
+}
+
+BasicallyANamespace :: struct {
+    function_1 :: () { println("Function 1"); }
+    function_2 :: () { println("Function 2"); }
+    function_3 :: () { println("Function 3"); }
+
+    SubNamespace :: struct {
+        function_4 :: () {
+            function_1();
+            println("Function 4");
+        }
+    }
+}
