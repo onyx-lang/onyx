@@ -2,12 +2,26 @@
 #include "onyxastnodes.h"
 #include "onyxutils.h"
 
+static inline i32 entity_phase(Entity* e1) {
+    if (e1->state <= Entity_State_Parse) return 1;
+    if (e1->state <= Entity_State_Comptime_Check_Types) return 2;
+    return 3;
+}
+
 // NOTE: Returns >0 if e1 should be processed after e2.
 static i32 entity_compare(Entity* e1, Entity* e2) {
-    if (e1->state != e2->state)
-        return (i32) e1->state - (i32) e2->state;
-    else
-        return (i32) e1->type - (i32) e2->type;
+    i32 phase1 = entity_phase(e1);
+    i32 phase2 = entity_phase(e2);
+
+    if (phase1 != phase2 || phase1 != 2) {
+        if (e1->state != e2->state)
+            return (i32) e1->state - (i32) e2->state;
+        else
+            return (i32) e1->type - (i32) e2->type;
+
+    } else {
+        return (i32) e1->attempts - (i32) e2->attempts;
+    }
 }
 
 #define eh_parent(index) (((index) - 1) / 2)
@@ -58,6 +72,7 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     bh_allocator alloc = bh_arena_allocator(&entities->entity_arena);
     Entity* entity = bh_alloc_item(alloc, Entity);
     *entity = e;
+    entity->attempts = 0;
 
     return entity;
 }
@@ -71,6 +86,7 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
 	eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
 
 	entities->state_count[e->state]++;
+    entities->type_count[e->type]++;
 }
 
 // nocheckin
@@ -87,6 +103,10 @@ Entity* entity_heap_top(EntityHeap* entities) {
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
 	entities->state_count[entities->entities[0]->state]--;
 	entities->state_count[new_top->state]--;
+
+    // CLEANUP: I don't think both of these should be --?
+    entities->type_count[entities->entities[0]->type]--;
+    entities->type_count[new_top->type]--;
 	
 	entities->entities[0] = new_top;
 	eh_shift_down(entities, 0);
@@ -94,6 +114,7 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
 
 void entity_heap_remove_top(EntityHeap* entities) {
     entities->state_count[entities->entities[0]->state]--;
+    entities->type_count[entities->entities[0]->type]--;
 
 	entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
 	bh_arr_pop(entities->entities);
@@ -226,7 +247,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         
         case Ast_Kind_Use_Package: {
             // nocheckin
-            // ent.state = Entity_State_Comptime_Resolve_Symbols;
+            ent.state = Entity_State_Comptime_Resolve_Symbols;
             ent.type = Entity_Type_Use_Package;
             ent.use_package = (AstUsePackage *) node;
             ENTITY_INSERT(ent);

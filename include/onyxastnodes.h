@@ -924,6 +924,8 @@ extern const char* entity_type_strings[Entity_Type_Count];
 typedef struct Entity {
     EntityType type;
     EntityState state;
+    u64 attempts;
+
     Package *package;
     Scope *scope;
 
@@ -951,6 +953,7 @@ typedef struct EntityHeap {
     bh_arr(Entity *) entities;
 
     i32 state_count[Entity_State_Count];
+    i32 type_count[Entity_Type_Count];
 } EntityHeap;
 
 void entity_heap_init(EntityHeap* entities);

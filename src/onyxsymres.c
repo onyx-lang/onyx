@@ -25,34 +25,34 @@ typedef enum SymresStatus {
     Symres_Error,
 } SymresStatus;
 
-static void symres_type(AstType** type);
-static void symres_local(AstLocal** local, b32 add_to_block_locals);
-static void symres_call(AstCall* call);
-static void symres_size_of(AstSizeOf* so);
-static void symres_align_of(AstAlignOf* so);
-static void symres_field_access(AstFieldAccess** fa);
-static void symres_compound(AstCompound* compound);
-static void symres_expression(AstTyped** expr);
-static void symres_return(AstReturn* ret);
-static void symres_if(AstIfWhile* ifnode);
-static void symres_while(AstIfWhile* whilenode);
-static void symres_for(AstFor* fornode);
-static void symres_switch(AstSwitch* switchnode);
-static void symres_use(AstUse* use);
-static void symres_directive_solidify(AstDirectiveSolidify** psolid);
-static void symres_statement_chain(AstNode** walker);
-static b32  symres_statement(AstNode** stmt);
-static void symres_block(AstBlock* block);
-static void symres_function_header(AstFunction* func);
-static void symres_function(AstFunction* func);
-static void symres_global(AstGlobal* global);
-static void symres_overloaded_function(AstOverloadedFunction* ofunc);
-static void symres_use_package(AstUsePackage* package);
-static void symres_enum(AstEnumType* enum_node);
-static void symres_memres_type(AstMemRes** memres);
-static void symres_memres(AstMemRes** memres);
-static void symres_struct_defaults(AstType* st);
-static void symres_static_if(AstStaticIf* static_if);
+static SymresStatus symres_type(AstType** type);
+static SymresStatus symres_local(AstLocal** local, b32 add_to_block_locals);
+static SymresStatus symres_call(AstCall* call);
+static SymresStatus symres_size_of(AstSizeOf* so);
+static SymresStatus symres_align_of(AstAlignOf* so);
+static SymresStatus symres_field_access(AstFieldAccess** fa);
+static SymresStatus symres_compound(AstCompound* compound);
+static SymresStatus symres_expression(AstTyped** expr);
+static SymresStatus symres_return(AstReturn* ret);
+static SymresStatus symres_if(AstIfWhile* ifnode);
+static SymresStatus symres_while(AstIfWhile* whilenode);
+static SymresStatus symres_for(AstFor* fornode);
+static SymresStatus symres_switch(AstSwitch* switchnode);
+static SymresStatus symres_use(AstUse* use);
+static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid);
+static SymresStatus symres_statement_chain(AstNode** walker);
+static SymresStatus symres_statement(AstNode** stmt, b32 *remove);
+static SymresStatus symres_block(AstBlock* block);
+static SymresStatus symres_function_header(AstFunction* func);
+static SymresStatus symres_function(AstFunction* func);
+static SymresStatus symres_global(AstGlobal* global);
+static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc);
+static SymresStatus symres_use_package(AstUsePackage* package);
+static SymresStatus symres_enum(AstEnumType* enum_node);
+static SymresStatus symres_memres_type(AstMemRes** memres);
+static SymresStatus symres_memres(AstMemRes** memres);
+static SymresStatus symres_struct_defaults(AstType* st);
+static SymresStatus symres_static_if(AstStaticIf* static_if);
 
 static void scope_enter(Scope* new_scope) {
     curr_scope = new_scope;
@@ -62,22 +62,31 @@ static void scope_leave() {
     curr_scope = curr_scope->parent;
 }
 
-static void symres_symbol(AstNode** symbol_node) {
+static SymresStatus symres_symbol(AstNode** symbol_node) {
     OnyxToken* token = (*symbol_node)->token;
     AstNode* res = symbol_resolve(curr_scope, token);    
 
     if (!res) { // :SymresStall
-        onyx_report_error(token->pos,
-            "Unable to resolve symbol '%b'",
-            token->text,
-            token->length);
+        if (report_unresolved_symbols) {
+            onyx_report_error(token->pos,
+                "Unable to resolve symbol '%b'",
+                token->text,
+                token->length);
+
+            return Symres_Error;
+        } else {
+            return Symres_Yield;
+        }
+
     } else {
         *symbol_node = res;
     }
+
+    return Symres_Success;
 }
 
-static void symres_struct_type(AstStructType* s_node) {
-    if (s_node->flags & Ast_Flag_Type_Is_Resolved) return;
+static SymresStatus symres_struct_type(AstStructType* s_node) {
+    if (s_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
 
     s_node->flags |= Ast_Flag_Type_Is_Resolved;
     
@@ -94,7 +103,7 @@ static void symres_struct_type(AstStructType* s_node) {
                         (*member)->token->text);
 
                 token_toggle_end((*member)->token);
-                return;
+                return Symres_Error;
             }
 
             bh_table_put(i32, mem_set, (*member)->token->text, 1);
@@ -115,7 +124,7 @@ static void symres_struct_type(AstStructType* s_node) {
         AstStructMember *member = s_node->members[i];
 
         if (member->type_node) {
-            symres_type(&member->type_node);
+            SYMRES(type, &member->type_node);
 
             if (!node_is_type((AstNode *) member->type_node)) {
                 onyx_report_error(member->token->pos, "Member type is not a type.");
@@ -148,47 +157,49 @@ static void symres_struct_type(AstStructType* s_node) {
 
 struct_symres_done:
     if (s_node->scope) scope_leave();
+    return Symres_Success;
 }
 
-static void symres_type(AstType** type) {
-    if (!type || !*type) return;
+static SymresStatus symres_type(AstType** type) {
+    // Don't make this kill all symbol resolution if the type is null.
+    if (!type || !*type) return Symres_Success;
 
     switch ((*type)->kind) {
-        case Ast_Kind_Symbol:     symres_symbol((AstNode **) type); break;
+        case Ast_Kind_Symbol:     SYMRES(symbol, (AstNode **) type); break;
         case Ast_Kind_Basic_Type: break;
-        case Ast_Kind_Type_Alias: symres_type(&((AstTypeAlias *) *type)->to); break;
+        case Ast_Kind_Type_Alias: SYMRES(type, &((AstTypeAlias *) *type)->to); break;
         case Ast_Kind_Field_Access: {
-            symres_field_access((AstFieldAccess **) type);
+            SYMRES(field_access, (AstFieldAccess **) type);
 
             if (!node_is_type((AstNode *) *type))
                 onyx_report_error((*type)->token->pos, "Field access did not result in a type.");
             break;
         }
 
-        case Ast_Kind_Pointer_Type: symres_type(&((AstPointerType *) *type)->elem); break;
-        case Ast_Kind_Slice_Type:   symres_type(&((AstSliceType *) *type)->elem); break;
-        case Ast_Kind_DynArr_Type:  symres_type(&((AstDynArrType *) *type)->elem); break;
-        case Ast_Kind_VarArg_Type:  symres_type(&((AstVarArgType *) *type)->elem); break;
+        case Ast_Kind_Pointer_Type: SYMRES(type, &((AstPointerType *) *type)->elem); break;
+        case Ast_Kind_Slice_Type:   SYMRES(type, &((AstSliceType *) *type)->elem); break;
+        case Ast_Kind_DynArr_Type:  SYMRES(type, &((AstDynArrType *) *type)->elem); break;
+        case Ast_Kind_VarArg_Type:  SYMRES(type, &((AstVarArgType *) *type)->elem); break;
 
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) *type;
 
-            symres_type(&ftype->return_type);
+            SYMRES(type, &ftype->return_type);
 
             if (ftype->param_count > 0) {
                 fori (i, 0, (i64) ftype->param_count) {
-                    symres_type(&ftype->params[i]);
+                    SYMRES(type, &ftype->params[i]);
                 }
             }
             break;
         }
 
-        case Ast_Kind_Struct_Type: symres_struct_type((AstStructType *) *type); break;
+        case Ast_Kind_Struct_Type: SYMRES(struct_type, (AstStructType *) *type); break;
         case Ast_Kind_Array_Type: {
             AstArrayType* a_node = (AstArrayType *) *type;
 
-            if (a_node->count_expr) symres_expression(&a_node->count_expr);
-            symres_type(&a_node->elem);
+            if (a_node->count_expr) SYMRES(expression, &a_node->count_expr);
+            SYMRES(type, &a_node->elem);
             break;
         }
 
@@ -199,7 +210,7 @@ static void symres_type(AstType** type) {
             pst_node->scope = scope_create(context.ast_alloc, curr_scope, pst_node->token->pos);
 
             bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
-                symres_type(&param->type_node);
+                SYMRES(type, &param->type_node);
                 param->type = type_build_from_ast(context.ast_alloc, param->type_node);
             }
             break;
@@ -208,13 +219,13 @@ static void symres_type(AstType** type) {
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_node = (AstPolyCallType *) *type;
 
-            symres_type(&pc_node->callee);
+            SYMRES(type, &pc_node->callee);
 
             bh_arr_each(AstNode *, param, pc_node->params) {
                 if (node_is_type(*param)) {
-                    symres_type((AstType **) param);
+                    SYMRES(type, (AstType **) param);
                 } else {
-                    symres_expression((AstTyped **) param);
+                    SYMRES(expression, (AstTyped **) param);
                 }
             }
             break;
@@ -223,13 +234,15 @@ static void symres_type(AstType** type) {
         case Ast_Kind_Type_Compound: {
             AstCompoundType* ctype = (AstCompoundType *) *type;
 
-            bh_arr_each(AstType *, type, ctype->types) symres_type(type);
+            bh_arr_each(AstType *, type, ctype->types) SYMRES(type, type);
         }
     }
+
+    return Symres_Success;
 }
 
-static void symres_local(AstLocal** local, b32 add_to_block_locals) {
-    symres_type(&(*local)->type_node);
+static SymresStatus symres_local(AstLocal** local, b32 add_to_block_locals) {
+    SYMRES(type, &(*local)->type_node);
 
     // NOTE: This is a little gross, but it is allows for finer control
     // over when locals are in scope in a block, which reduces the number
@@ -242,59 +255,71 @@ static void symres_local(AstLocal** local, b32 add_to_block_locals) {
 
     if ((*local)->token != NULL)
         symbol_introduce(curr_scope, (*local)->token, (AstNode *) *local);
+
+    return Symres_Success;
 }
 
-static void symres_arguments(Arguments* args) {
+static SymresStatus symres_arguments(Arguments* args) {
     bh_arr_each(AstTyped *, arg, args->values)
-        symres_expression(arg);
+        SYMRES(expression, arg);
 
     bh_arr_each(AstNamedValue *, named_arg, args->named_values)
-        symres_expression(&(*named_arg)->value);
+        SYMRES(expression, &(*named_arg)->value);
+
+    return Symres_Success;
 }
 
-static void symres_call(AstCall* call) {
-    symres_expression((AstTyped **) &call->callee);
-    if (call->callee == NULL) return;
+static SymresStatus symres_call(AstCall* call) {
+    SYMRES(expression, (AstTyped **) &call->callee);
+    SYMRES(arguments, &call->args);
 
-    symres_arguments(&call->args);
+    return Symres_Success;
 }
 
-static void symres_size_of(AstSizeOf* so) {
-    symres_type(&so->type_node);
-    symres_type(&so->so_ast_type);
+static SymresStatus symres_size_of(AstSizeOf* so) {
+    SYMRES(type, &so->type_node);
+    SYMRES(type, &so->so_ast_type);
+
+    return Symres_Success;
 }
 
-static void symres_align_of(AstAlignOf* ao) {
-    symres_type(&ao->type_node);
-    symres_type(&ao->ao_ast_type);
+static SymresStatus symres_align_of(AstAlignOf* ao) {
+    SYMRES(type, &ao->type_node);
+    SYMRES(type, &ao->ao_ast_type);
+
+    return Symres_Success;
 }
 
-static void symres_field_access(AstFieldAccess** fa) {
-    if ((*fa)->expr == NULL) return;
-    symres_expression(&(*fa)->expr);
-    if ((*fa)->expr == NULL) return;
+static SymresStatus symres_field_access(AstFieldAccess** fa) {
+    if ((*fa)->expr == NULL) return Symres_Error;
+    SYMRES(expression, &(*fa)->expr);
+    if ((*fa)->expr == NULL) return Symres_Error;
 
     AstNode* resolution = try_symbol_resolve_from_node((AstNode *) (*fa)->expr, (*fa)->token);
     if (resolution) *((AstNode **) fa) = resolution;
+
+    return Symres_Success;
 }
 
-static void symres_compound(AstCompound* compound) {
+static SymresStatus symres_compound(AstCompound* compound) {
     bh_arr_each(AstTyped *, expr, compound->exprs) {
-        symres_expression(expr);
+        SYMRES(expression, expr);
     }
+
+    return Symres_Success;
 }
 
-static void symres_pipe(AstBinaryOp** pipe) {
+static SymresStatus symres_pipe(AstBinaryOp** pipe) {
     AstCall* call_node = (AstCall *) (*pipe)->right;
-    symres_expression((AstTyped **) &call_node);
-    symres_expression(&(*pipe)->left);
+    SYMRES(expression, (AstTyped **) &call_node);
+    SYMRES(expression, &(*pipe)->left);
 
     if (call_node->kind != Ast_Kind_Call) {
         onyx_report_error((*pipe)->token->pos, "Pipe operator expected call on right side.");
-        return;
+        return Symres_Error;
     }
 
-    if ((*pipe)->left == NULL) return;
+    if ((*pipe)->left == NULL) return Symres_Error;
 
     bh_arr_insertn(call_node->args.values, 0, 1);
     call_node->args.values[0] = (AstTyped *) make_argument(context.ast_alloc, (*pipe)->left);
@@ -302,6 +327,8 @@ static void symres_pipe(AstBinaryOp** pipe) {
 
     // NOTE: Not a BinaryOp node
     *pipe = (AstBinaryOp *) call_node;
+
+    return Symres_Success;
 }
 
 // CLEANUP: This is an experimental feature and might be removed in the future.
@@ -314,92 +341,97 @@ static void symres_pipe(AstBinaryOp** pipe) {
 // same as the snippet above (after the nodes have been processed by the function below)
 //
 //     foo->member_function(...)
-static void symres_method_call(AstBinaryOp** mcall) {
+static SymresStatus symres_method_call(AstBinaryOp** mcall) {
     AstCall* call_node = (AstCall *) (*mcall)->right;
     if (call_node->kind != Ast_Kind_Call) {
         onyx_report_error((*mcall)->token->pos, "'->' expected procedure call on right side.");
-        return;
+        return Symres_Error;
     }
 
-    symres_expression(&(*mcall)->left);
-    if ((*mcall)->left == NULL) return;
+    SYMRES(expression, &(*mcall)->left);
+    if ((*mcall)->left == NULL) return Symres_Error;
 
     AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
     implicit_field_access->token = call_node->callee->token;
     call_node->callee = (AstTyped *) implicit_field_access;
-    symres_expression((AstTyped **) &call_node);
+    SYMRES(expression, (AstTyped **) &call_node);
+
+    return Symres_Success;
 }
 
-static void symres_unaryop(AstUnaryOp** unaryop) {
+static SymresStatus symres_unaryop(AstUnaryOp** unaryop) {
     if ((*unaryop)->operation == Unary_Op_Cast) {
-        symres_type(&(*unaryop)->type_node);
+        SYMRES(type, &(*unaryop)->type_node);
     }
 
-    symres_expression(&(*unaryop)->expr);
+    SYMRES(expression, &(*unaryop)->expr);
+
+    return Symres_Success;
 }
 
-static void symres_struct_literal(AstStructLiteral* sl) {
-    if (sl->stnode != NULL) symres_expression(&sl->stnode);
-    symres_type((AstType **) &sl->stnode);
-    if (sl->stnode == NULL || sl->stnode->kind == Ast_Kind_Error || sl->stnode->kind == Ast_Kind_Symbol) return;
+static SymresStatus symres_struct_literal(AstStructLiteral* sl) {
+    if (sl->stnode != NULL) SYMRES(expression, &sl->stnode);
+    SYMRES(type, (AstType **) &sl->stnode);
 
     sl->type_node = (AstType *) sl->stnode;
     while (sl->type_node->kind == Ast_Kind_Type_Alias)
         sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
 
-    symres_arguments(&sl->args);
+    SYMRES(arguments, &sl->args);
+
+    return Symres_Success;
 }
 
-static void symres_array_literal(AstArrayLiteral* al) {
-    if (al->atnode != NULL) symres_expression(&al->atnode);
-
-    symres_type((AstType **) &al->atnode);
-    if (al->atnode == NULL || al->atnode->kind == Ast_Kind_Error || al->atnode->kind == Ast_Kind_Symbol) return;
+static SymresStatus symres_array_literal(AstArrayLiteral* al) {
+    if (al->atnode != NULL) SYMRES(expression, &al->atnode);
+    SYMRES(type, (AstType **) &al->atnode);
 
     al->type_node = (AstType *) al->atnode;
     while (al->type_node->kind == Ast_Kind_Type_Alias)
         al->type_node = ((AstTypeAlias *) al->type_node)->to;
 
     bh_arr_each(AstTyped *, expr, al->values)
-        symres_expression(expr);
+        SYMRES(expression, expr);
 
     if (bh_arr_length(block_stack) > 0) {
         bh_arr_push(bh_arr_last(block_stack)->allocate_exprs, (AstTyped *) al);
         bh_arr_push(curr_function->allocate_exprs, (AstTyped *) al);
     }
+
+    return Symres_Success;
 }
 
-static void symres_expression(AstTyped** expr) {
+static SymresStatus symres_expression(AstTyped** expr) {
     if (node_is_type((AstNode *) *expr)) {
-        symres_type((AstType **) expr);
-        return;
+        SYMRES(type, (AstType **) expr);
+        return Symres_Success;
     }
 
     switch ((*expr)->kind) {
-        case Ast_Kind_Symbol: symres_symbol((AstNode **) expr); break;
+        case Ast_Kind_Symbol: SYMRES(symbol, (AstNode **) expr); break;
 
         case Ast_Kind_Binary_Op:
-            symres_expression(&((AstBinaryOp *)(*expr))->left);
-            symres_expression(&((AstBinaryOp *)(*expr))->right);
+            SYMRES(expression, &((AstBinaryOp *)(*expr))->left);
+            SYMRES(expression, &((AstBinaryOp *)(*expr))->right);
             break;
 
-        case Ast_Kind_Unary_Op:     symres_unaryop((AstUnaryOp **) expr); break;
-        case Ast_Kind_Call:         symres_call((AstCall *) *expr); break;
-        case Ast_Kind_Argument:     symres_expression(&((AstArgument *) *expr)->value); break;
-        case Ast_Kind_Block:        symres_block((AstBlock *) *expr); break;
-        case Ast_Kind_Address_Of:   symres_expression(&((AstAddressOf *)(*expr))->expr); break;
-        case Ast_Kind_Dereference:  symres_expression(&((AstDereference *)(*expr))->expr); break;
-        case Ast_Kind_Field_Access: symres_field_access((AstFieldAccess **) expr); break;
-        case Ast_Kind_Pipe:         symres_pipe((AstBinaryOp **) expr); break;
-        case Ast_Kind_Method_Call:  symres_method_call((AstBinaryOp **) expr); break;
-        case Ast_Kind_Size_Of:      symres_size_of((AstSizeOf *)*expr); break;
-        case Ast_Kind_Align_Of:     symres_align_of((AstAlignOf *)*expr); break;
+        case Ast_Kind_Unary_Op:     SYMRES(unaryop, (AstUnaryOp **) expr); break;
+        case Ast_Kind_Call:         SYMRES(call, (AstCall *) *expr); break;
+        case Ast_Kind_Argument:     SYMRES(expression, &((AstArgument *) *expr)->value); break;
+        case Ast_Kind_Block:        SYMRES(block, (AstBlock *) *expr); break;
+        case Ast_Kind_Address_Of:   SYMRES(expression, &((AstAddressOf *)(*expr))->expr); break;
+        case Ast_Kind_Dereference:  SYMRES(expression, &((AstDereference *)(*expr))->expr); break;
+        case Ast_Kind_Field_Access: SYMRES(field_access, (AstFieldAccess **) expr); break;
+        case Ast_Kind_Pipe:         SYMRES(pipe, (AstBinaryOp **) expr); break;
+        case Ast_Kind_Method_Call:  SYMRES(method_call, (AstBinaryOp **) expr); break;
+        case Ast_Kind_Size_Of:      SYMRES(size_of, (AstSizeOf *)*expr); break;
+        case Ast_Kind_Align_Of:     SYMRES(align_of, (AstAlignOf *)*expr); break;
 
         case Ast_Kind_Range_Literal:
-            symres_expression(&((AstRangeLiteral *)(*expr))->low);
-            symres_expression(&((AstRangeLiteral *)(*expr))->high);
+            SYMRES(expression, &((AstRangeLiteral *)(*expr))->low);
+            SYMRES(expression, &((AstRangeLiteral *)(*expr))->high);
 
-            symres_type(&builtin_range_type);
+            SYMRES(type, &builtin_range_type);
             (*expr)->type_node = builtin_range_type;
 
             // NOTE: This is a weird place to put this so maybe put it somewhere else eventually
@@ -409,122 +441,128 @@ static void symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Function:
         case Ast_Kind_NumLit:
-            symres_type(&(*expr)->type_node);
+            SYMRES(type, &(*expr)->type_node);
             break;
 
         case Ast_Kind_StrLit:
-            symres_type(&builtin_string_type);
+            SYMRES(type, &builtin_string_type);
             (*expr)->type_node = builtin_string_type;
             break;
 
         case Ast_Kind_Slice:
         case Ast_Kind_Array_Access:
-            symres_expression(&((AstArrayAccess *)(*expr))->addr);
-            symres_expression(&((AstArrayAccess *)(*expr))->expr);
+            SYMRES(expression, &((AstArrayAccess *)(*expr))->addr);
+            SYMRES(expression, &((AstArrayAccess *)(*expr))->expr);
             break;
 
         case Ast_Kind_Struct_Literal:
-            symres_struct_literal((AstStructLiteral *)(*expr));
+            SYMRES(struct_literal, (AstStructLiteral *)(*expr));
             break;
 
         case Ast_Kind_Array_Literal:
-            symres_array_literal((AstArrayLiteral *)(*expr));
+            SYMRES(array_literal, (AstArrayLiteral *)(*expr));
             break;
 
         case Ast_Kind_Directive_Solidify:
-            symres_directive_solidify((AstDirectiveSolidify **) expr);
+            SYMRES(directive_solidify, (AstDirectiveSolidify **) expr);
             break;
 
         case Ast_Kind_Compound:
-            symres_compound((AstCompound *) *expr);
+            SYMRES(compound, (AstCompound *) *expr);
             break;
 
         default: break;
     }
+
+    return Symres_Success;
 }
 
-static void symres_return(AstReturn* ret) {
+static SymresStatus symres_return(AstReturn* ret) {
     if (ret->expr)
-        symres_expression(&ret->expr);
+        SYMRES(expression, &ret->expr);
+
+    return Symres_Success;
 }
 
-static void symres_if(AstIfWhile* ifnode) {
+static SymresStatus symres_if(AstIfWhile* ifnode) {
     if (ifnode->assignment != NULL) {
         ifnode->scope = scope_create(context.ast_alloc, curr_scope, ifnode->token->pos);
         scope_enter(ifnode->scope);
 
-        symres_local(&ifnode->local, 0);
+        SYMRES(local, &ifnode->local, 0);
 
-        symres_statement((AstNode **) &ifnode->assignment);
+        SYMRES(statement, (AstNode **) &ifnode->assignment, NULL);
     }
 
-    symres_expression(&ifnode->cond);
+    SYMRES(expression, &ifnode->cond);
 
-    if (ifnode->true_stmt != NULL)  symres_statement((AstNode **) &ifnode->true_stmt);
-    if (ifnode->false_stmt != NULL) symres_statement((AstNode **) &ifnode->false_stmt);
+    if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
+    if (ifnode->false_stmt != NULL) SYMRES(statement, (AstNode **) &ifnode->false_stmt, NULL);
 
     if (ifnode->assignment != NULL) scope_leave();
+
+    return Symres_Success;
 }
 
-static void symres_while(AstIfWhile* whilenode) {
+static SymresStatus symres_while(AstIfWhile* whilenode) {
     if (whilenode->assignment != NULL) {
         whilenode->scope = scope_create(context.ast_alloc, curr_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
-        symres_local(&whilenode->local, 0);
+        SYMRES(local, &whilenode->local, 0);
 
-        symres_statement((AstNode **) &whilenode->assignment);
+        SYMRES(statement, (AstNode **) &whilenode->assignment, NULL);
     }
 
-    symres_expression(&whilenode->cond);
+    SYMRES(expression, &whilenode->cond);
 
-    if (whilenode->true_stmt)  symres_block(whilenode->true_stmt);
-    if (whilenode->false_stmt) symres_block(whilenode->false_stmt);
+    if (whilenode->true_stmt)  SYMRES(block, whilenode->true_stmt);
+    if (whilenode->false_stmt) SYMRES(block, whilenode->false_stmt);
 
     if (whilenode->assignment != NULL) scope_leave();
+
+    return Symres_Success;
 }
 
-static void symres_for(AstFor* fornode) {
+static SymresStatus symres_for(AstFor* fornode) {
     fornode->scope = scope_create(context.ast_alloc, curr_scope, fornode->token->pos);
     scope_enter(fornode->scope);
-
-    symres_expression(&fornode->iter);
-
-    symres_local(&fornode->var, 0);
-
-    symres_block(fornode->stmt);
-
+    SYMRES(expression, &fornode->iter);
+    SYMRES(local, &fornode->var, 0);
+    SYMRES(block, fornode->stmt);
     scope_leave();
+
+    return Symres_Success;
 }
 
-static void symres_switch(AstSwitch* switchnode) {
+static SymresStatus symres_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) {
         switchnode->scope = scope_create(context.ast_alloc, curr_scope, switchnode->token->pos);
         scope_enter(switchnode->scope);
 
         symbol_introduce(curr_scope, switchnode->local->token, (AstNode *) switchnode->local);
 
-        symres_statement((AstNode **) &switchnode->assignment);
+        SYMRES(statement, (AstNode **) &switchnode->assignment, NULL);
     }
 
-    symres_expression(&switchnode->expr);
+    SYMRES(expression, &switchnode->expr);
 
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
         bh_arr_each(AstTyped *, value, sc->values)
-            symres_expression(value);
+            SYMRES(expression, value);
             
-        symres_block(sc->block);
+        SYMRES(block, sc->block);
     }
 
     if (switchnode->default_case)
-        symres_block(switchnode->default_case);
+        SYMRES(block, switchnode->default_case);
 
     if (switchnode->assignment != NULL) scope_leave();
+    return Symres_Success;
 }
 
-static void symres_use(AstUse* use) {
-    symres_expression(&use->expr);
-    if (use->expr == NULL || use->expr->kind == Ast_Kind_Error) return;
+static SymresStatus symres_use(AstUse* use) {
+    SYMRES(expression, &use->expr);
 
     if (use->expr->kind == Ast_Kind_Enum_Type) {
         AstEnumType* et = (AstEnumType *) use->expr;
@@ -532,7 +570,7 @@ static void symres_use(AstUse* use) {
         bh_arr_each(AstEnumValue *, ev, et->values)
             symbol_introduce(curr_scope, (*ev)->token, (AstNode *) *ev);
 
-        return;
+        return Symres_Success;
     }
 
     if (use->expr->kind == Ast_Kind_Struct_Type) {
@@ -541,7 +579,7 @@ static void symres_use(AstUse* use) {
         if (st->scope)
             scope_include(curr_scope, st->scope, use->token->pos);
 
-        return;
+        return Symres_Success;
     }
 
     if (use->expr->type_node == NULL && use->expr->type == NULL) goto cannot_use;
@@ -566,32 +604,33 @@ static void symres_use(AstUse* use) {
             symbol_raw_introduce(curr_scope, value.name, use->token->pos, (AstNode *) fa);
         bh_table_each_end;
 
-        return;
+        return Symres_Success;
     }
 
 cannot_use:
     onyx_report_error(use->token->pos, "Cannot use this because its type is unknown.");
+    return Symres_Error;
 }
 
-static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
+static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
     AstDirectiveSolidify* solid = *psolid;
     if (solid->resolved_proc != NULL)
         *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
 
-    symres_expression((AstTyped **) &solid->poly_proc);
+    SYMRES(expression, (AstTyped **) &solid->poly_proc);
     if (solid->poly_proc && solid->poly_proc->kind == Ast_Kind_Directive_Solidify) {
         solid->poly_proc = (AstPolyProc *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
     }
     
     if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
         onyx_report_error(solid->token->pos, "Expected polymorphic procedure in #solidify directive.");
-        return;
+        return Symres_Error;
     }
 
     bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
         // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
-        symres_expression(&sln->value);
-        if (onyx_has_errors()) return;
+        SYMRES(expression, &sln->value);
+        if (onyx_has_errors()) return Symres_Error;
 
         if (node_is_type((AstNode *) sln->value)) {
             sln->type = type_build_from_ast(context.ast_alloc, sln->ast_type);
@@ -600,51 +639,71 @@ static void symres_directive_solidify(AstDirectiveSolidify** psolid) {
             sln->kind = PSK_Value;
         }
 
-        if (onyx_has_errors()) return;
+        if (onyx_has_errors()) return Symres_Error;
     }
 
     solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token);
 
     // NOTE: Not a DirectiveSolidify.
     *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
-    return;
+    return Symres_Success;
 }
 
-// NOTE: Returns 1 if the statment should be removed
-static b32 symres_statement(AstNode** stmt) {
+static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
+    if (remove) *remove = 0;
+
     switch ((*stmt)->kind) {
-        case Ast_Kind_Local:       symres_local((AstLocal **) stmt, 1);               return 1;
-        case Ast_Kind_Return:      symres_return((AstReturn *) *stmt);                return 0;
-        case Ast_Kind_If:          symres_if((AstIfWhile *) *stmt);                   return 0;
-        case Ast_Kind_While:       symres_while((AstIfWhile *) *stmt);                return 0;
-        case Ast_Kind_For:         symres_for((AstFor *) *stmt);                      return 0;
-        case Ast_Kind_Switch:      symres_switch((AstSwitch *) *stmt);                return 0;
-        case Ast_Kind_Call:        symres_call((AstCall *) *stmt);                    return 0;
-        case Ast_Kind_Argument:    symres_expression((AstTyped **) &((AstArgument *) *stmt)->value); return 0;
-        case Ast_Kind_Block:       symres_block((AstBlock *) *stmt);                  return 0;
-        case Ast_Kind_Defer:       symres_statement(&((AstDefer *) *stmt)->stmt);     return 0;
-        case Ast_Kind_Use:         symres_use((AstUse *) *stmt);                      return 1;
-        case Ast_Kind_Use_Package: symres_use_package((AstUsePackage *) *stmt);       return 1;
+        case Ast_Kind_Return:      SYMRES(return, (AstReturn *) *stmt);                  break;
+        case Ast_Kind_If:          SYMRES(if, (AstIfWhile *) *stmt);                     break;
+        case Ast_Kind_While:       SYMRES(while, (AstIfWhile *) *stmt);                  break;
+        case Ast_Kind_For:         SYMRES(for, (AstFor *) *stmt);                        break;
+        case Ast_Kind_Switch:      SYMRES(switch, (AstSwitch *) *stmt);                  break;
+        case Ast_Kind_Call:        SYMRES(call, (AstCall *) *stmt);                      break;
+        case Ast_Kind_Argument:    SYMRES(expression, (AstTyped **) &((AstArgument *) *stmt)->value); break;
+        case Ast_Kind_Block:       SYMRES(block, (AstBlock *) *stmt);                    break;
+        case Ast_Kind_Defer:       SYMRES(statement, &((AstDefer *) *stmt)->stmt, NULL); break;
+        case Ast_Kind_Jump:        break;
 
-        case Ast_Kind_Jump:      return 0;
+        case Ast_Kind_Local:
+            if (remove) *remove = 1;
+            SYMRES(local, (AstLocal **) stmt, 1);
+            break;
 
-        default:                  symres_expression((AstTyped **) stmt);           return 0;
+        case Ast_Kind_Use:
+            if (remove) *remove = 1;
+            SYMRES(use, (AstUse *) *stmt);
+            break;
+
+        case Ast_Kind_Use_Package:
+            if (remove) *remove = 1;
+            SYMRES(use_package, (AstUsePackage *) *stmt);
+            break;
+
+        default: SYMRES(expression, (AstTyped **) stmt); break;
     }
+
+    return Symres_Success;
 }
 
-static void symres_statement_chain(AstNode** walker) {
+static SymresStatus symres_statement_chain(AstNode** walker) {
+    b32 remove = 0;
+
     while (*walker) {
-        if (symres_statement(walker)) {
+        SYMRES(statement, walker, &remove);
+        if (remove) {
+            remove = 0;
             AstNode* tmp = (*walker)->next;
             (*walker)->next = NULL;
             (*walker) = tmp;
+
         } else {
             walker = &(*walker)->next;
         }
     }
+    return Symres_Success;
 }
 
-static void symres_block(AstBlock* block) {
+static SymresStatus symres_block(AstBlock* block) {
     if (block->scope == NULL)
         block->scope = scope_create(context.ast_alloc, curr_scope, block->token->pos);
 
@@ -655,37 +714,37 @@ static void symres_block(AstBlock* block) {
         scope_include(block->scope, block->binding_scope, block->token->pos);
 
     if (block->body)
-        symres_statement_chain(&block->body);
+        SYMRES(statement_chain, &block->body);
 
     bh_arr_pop(block_stack);
     scope_leave();
+    return Symres_Success;
 }
 
-void symres_function_header(AstFunction* func) {
+SymresStatus symres_function_header(AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
-            symres_expression(&param->default_value);
-            if (onyx_has_errors()) return;
+            SYMRES(expression, &param->default_value);
+            if (onyx_has_errors()) return Symres_Error;
 
             // HACK: It shouldn't be necessary to do this twice, but right now
             // if `null` is the default parameter and it hasn't been used anywhere in
             // code yet, it doesn't resolve properly. So for now I am just checking symbols twice.
             //                                                      -brendanfh 2020/12/24
-            symres_expression(&param->default_value);
-            if (onyx_has_errors()) return;
+            SYMRES(expression, &param->default_value);
+            if (onyx_has_errors()) return Symres_Error;
         }
     }
     
     if ((func->flags & Ast_Flag_From_Polymorphism) == 0) {
         if (func->overloaded_function != NULL) {
-            symres_expression((AstTyped **) &func->overloaded_function);
-            if (func->overloaded_function == NULL) return; // NOTE: Error message will already be generated
+            SYMRES(expression, (AstTyped **) &func->overloaded_function);
+            if (func->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
 
             if (func->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
                 onyx_report_error(func->token->pos, "#add_overload directive did not resolve to an overloaded function.");
-                return;
 
             } else {
                 AstOverloadedFunction* ofunc = (AstOverloadedFunction *) func->overloaded_function;
@@ -706,19 +765,20 @@ void symres_function_header(AstFunction* func) {
         }
     }
 
-    symres_type(&func->return_type);
+    SYMRES(type, &func->return_type);
     if (!node_is_type((AstNode *) func->return_type)) {
         onyx_report_error(func->token->pos, "Return type is not a type.");
     }
 
     bh_arr_each(AstParam, param, func->params) {
         if (param->local->type_node != NULL) {
-            symres_type(&param->local->type_node);
+            SYMRES(type, &param->local->type_node);
         }
     }
+    return Symres_Success;
 }
 
-void symres_function(AstFunction* func) {
+SymresStatus symres_function(AstFunction* func) {
     if (func->scope == NULL)
         func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
 
@@ -775,32 +835,39 @@ void symres_function(AstFunction* func) {
     }
 
     curr_function = func;
-    symres_block(func->body);
+    SYMRES(block, func->body);
 
     scope_leave();
+    return Symres_Success;
 }
 
-static void symres_global(AstGlobal* global) {
-    symres_type(&global->type_node);
+static SymresStatus symres_global(AstGlobal* global) {
+    SYMRES(type, &global->type_node);
+    return Symres_Success;
 }
 
-static void symres_overloaded_function(AstOverloadedFunction* ofunc) {
+static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc) {
     bh_arr_each(AstTyped *, node, ofunc->overloads) {
-        symres_expression(node);
+        SYMRES(expression, node);
     }
+    return Symres_Success;
 }
 
-static void symres_use_package(AstUsePackage* package) {
+static SymresStatus symres_use_package(AstUsePackage* package) {
     token_toggle_end(package->package->token);
     Package* p = package_lookup(package->package->token->text);
     token_toggle_end(package->package->token);
 
-    if (p == NULL) {
-        onyx_report_error(package->token->pos, "package not found in included source files");
-        return;
+    if (p == NULL) { // :SymresStall
+        if (report_unresolved_symbols) {
+            onyx_report_error(package->token->pos, "package not found in included source files");
+            return Symres_Error;
+        } else {
+            return Symres_Yield;
+        }
     }
 
-    if (p->scope == curr_scope) return;
+    if (p->scope == curr_scope) return Symres_Success;
 
     if (package->alias != NULL) {
         AstPackage *pac_node = onyx_ast_node_new(context.ast_alloc, sizeof(AstPackage), Ast_Kind_Package);
@@ -815,8 +882,12 @@ static void symres_use_package(AstUsePackage* package) {
 
             AstNode* thing = symbol_resolve(p->scope, (*alias)->token);
             if (thing == NULL) { // :SymresStall
-                onyx_report_error((*alias)->token->pos, "This symbol was not found in this package.");
-                return;
+                if (report_unresolved_symbols) {
+                    onyx_report_error((*alias)->token->pos, "This symbol was not found in this package.");
+                    return Symres_Error;
+                } else {
+                    return Symres_Yield;
+                }
             }
 
             symbol_introduce(curr_scope, (*alias)->alias, thing);
@@ -830,11 +901,12 @@ static void symres_use_package(AstUsePackage* package) {
 
         scope_include(curr_scope, p->scope, pos);
     }
+    return Symres_Success;
 }
 
-static void symres_enum(AstEnumType* enum_node) {
-    if (enum_node->backing->kind == Ast_Kind_Symbol) symres_symbol((AstNode **) &enum_node->backing);
-    if (enum_node->backing == NULL) return;
+static SymresStatus symres_enum(AstEnumType* enum_node) {
+    if (enum_node->backing->kind == Ast_Kind_Symbol) SYMRES(symbol, (AstNode **) &enum_node->backing);
+    if (enum_node->backing == NULL) return Symres_Error;
 
     enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
     enum_node->scope = scope_create(context.ast_alloc, NULL, enum_node->token->pos);
@@ -855,7 +927,7 @@ static void symres_enum(AstEnumType* enum_node) {
                 next_assign_value = (*value)->value->value.l;
             } else {
                 onyx_report_error((*value)->token->pos, "expected numeric integer literal for enum initialization");
-                return;
+                return Symres_Error;
             }
 
             (*value)->value->type = enum_node->etcache;
@@ -875,27 +947,30 @@ static void symres_enum(AstEnumType* enum_node) {
             next_assign_value++;
         }
     }
+    return Symres_Success;
 }
 
-static void symres_memres_type(AstMemRes** memres) {
-    symres_type(&(*memres)->type_node);
+static SymresStatus symres_memres_type(AstMemRes** memres) {
+    SYMRES(type, &(*memres)->type_node);
+    return Symres_Success;
 }
 
-static void symres_memres(AstMemRes** memres) {
+static SymresStatus symres_memres(AstMemRes** memres) {
     if ((*memres)->initial_value != NULL) {
-        symres_expression(&(*memres)->initial_value);
+        SYMRES(expression, &(*memres)->initial_value);
     }
+    return Symres_Success;
 }
 
-static void symres_struct_defaults(AstType* t) {
-    if (t->kind != Ast_Kind_Struct_Type) return;
+static SymresStatus symres_struct_defaults(AstType* t) {
+    if (t->kind != Ast_Kind_Struct_Type) return Symres_Error;
     
     AstStructType* st = (AstStructType *) t;
     if (st->scope) scope_enter(st->scope);
     
     bh_arr_each(AstStructMember *, smem, st->members) {
         if ((*smem)->initial_value != NULL) {
-            symres_expression(&(*smem)->initial_value);
+            SYMRES(expression, &(*smem)->initial_value);
             
             if ((*smem)->type_node == NULL && (*smem)->initial_value->type_node != NULL) {
                 (*smem)->type_node = (*smem)->initial_value->type_node;
@@ -904,15 +979,16 @@ static void symres_struct_defaults(AstType* t) {
     }
     
     if (st->scope) scope_leave();
+    return Symres_Success;
 }
 
-static void symres_polyproc(AstPolyProc* pp) {
+static SymresStatus symres_polyproc(AstPolyProc* pp) {
     pp->poly_scope = curr_scope;
 
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
         if (param->kind != PPK_Baked_Value) continue;
 
-        symres_type(&param->type_expr);
+        SYMRES(type, &param->type_expr);
     }
 
     // CLEANUP: This was copied from symres_function_header.
@@ -927,15 +1003,16 @@ static void symres_polyproc(AstPolyProc* pp) {
 
         bh_arr_push(operator_overloads[pp->base_func->operator_overload], (AstTyped *) pp);
     }
+    return Symres_Success;
 }
 
-static void symres_static_if(AstStaticIf* static_if) {
-    symres_expression(&static_if->cond);
+static SymresStatus symres_static_if(AstStaticIf* static_if) {
+    SYMRES(expression, &static_if->cond);
+    return Symres_Success;
 }
 
 void symres_entity(Entity* ent) {
-    if (block_stack == NULL)
-        bh_arr_new(global_heap_allocator, block_stack, 16);
+    if (block_stack == NULL) bh_arr_new(global_heap_allocator, block_stack, 16);
 
     if (ent->package) curr_package = ent->package;
 
@@ -945,6 +1022,10 @@ void symres_entity(Entity* ent) {
         scope_enter(ent->scope);
     }
 
+    report_unresolved_symbols = (context.entities.type_count[Entity_Type_Static_If] == 0 &&
+                                 context.entities.type_count[Entity_Type_Use_Package] == 0);
+
+    SymresStatus ss = Symres_Success;
     EntityState next_state = Entity_State_Check_Types;
 
     switch (ent->type) {
@@ -955,39 +1036,41 @@ void symres_entity(Entity* ent) {
         }
 
         case Entity_Type_Static_If: {
-            symres_static_if(ent->static_if);
+            ss = symres_static_if(ent->static_if);
             next_state = Entity_State_Comptime_Check_Types;
             break;
         }
         
         case Entity_Type_Foreign_Function_Header:
-        case Entity_Type_Function_Header:         symres_function_header(ent->function); break;
-        case Entity_Type_Function:                symres_function(ent->function);        break;
+        case Entity_Type_Function_Header:         ss = symres_function_header(ent->function); break;
+        case Entity_Type_Function:                ss = symres_function(ent->function);        break;
 
         case Entity_Type_Foreign_Global_Header:
-        case Entity_Type_Global_Header:       symres_global(ent->global); break;
+        case Entity_Type_Global_Header:       ss = symres_global(ent->global); break;
 
-        case Entity_Type_Use_Package:         symres_use_package(ent->use_package); break;
-        case Entity_Type_Use:                 symres_use(ent->use);
+        case Entity_Type_Use_Package:         ss = symres_use_package(ent->use_package);
                                               next_state = Entity_State_Finalized;
                                               break;
 
-        case Entity_Type_Overloaded_Function:     symres_overloaded_function(ent->overloaded_function); break;
-        case Entity_Type_Expression:              symres_expression(&ent->expr); break;
-        case Entity_Type_Type_Alias:              symres_type(&ent->type_alias); break;
-        case Entity_Type_Enum:                    symres_enum(ent->enum_type); break;
-        case Entity_Type_Memory_Reservation_Type: symres_memres_type(&ent->mem_res); break;
-        case Entity_Type_Memory_Reservation:      symres_memres(&ent->mem_res); break;
-        case Entity_Type_Polymorphic_Proc:        symres_polyproc(ent->poly_proc); break;
-        case Entity_Type_String_Literal:          symres_expression(&ent->expr); break;
-        case Entity_Type_Struct_Member_Default:   symres_struct_defaults((AstType *) ent->type_alias); break;
+        case Entity_Type_Use:                 ss = symres_use(ent->use);
+                                              next_state = Entity_State_Finalized;
+                                              break;
+
+        case Entity_Type_Overloaded_Function:     ss = symres_overloaded_function(ent->overloaded_function); break;
+        case Entity_Type_Expression:              ss = symres_expression(&ent->expr); break;
+        case Entity_Type_Type_Alias:              ss = symres_type(&ent->type_alias); break;
+        case Entity_Type_Enum:                    ss = symres_enum(ent->enum_type); break;
+        case Entity_Type_Memory_Reservation_Type: ss = symres_memres_type(&ent->mem_res); break;
+        case Entity_Type_Memory_Reservation:      ss = symres_memres(&ent->mem_res); break;
+        case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc); break;
+        case Entity_Type_String_Literal:          ss = symres_expression(&ent->expr); break;
+        case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults((AstType *) ent->type_alias); break;
 
         default: break;
     }
 
-    ent->state = next_state;
+    if (ss == Symres_Success) ent->state = next_state;
+    if (ss == Symres_Yield)   ent->attempts++;
 
-    if (ent->scope) {
-        curr_scope = old_scope;
-    }
+    if (ent->scope) curr_scope = old_scope;
 }
