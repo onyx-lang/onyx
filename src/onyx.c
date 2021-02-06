@@ -136,6 +136,7 @@ static AstInclude* create_load(bh_allocator alloc, char* filename) {
 
 static void context_init(CompileOptions* opts) {
     context.options = opts;
+    context.cycle_detected = 0;
 
     context.global_scope = scope_create(global_heap_allocator, NULL, (OnyxFilePos) { 0 });
     bh_table_init(global_heap_allocator, context.packages, 16);
@@ -271,8 +272,6 @@ static void process_load_entity(Entity* ent) {
 }
 
 static b32 process_entity(Entity* ent) {
-    i32 changed = 1;
-
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             printf("%s | %s (%d) | %s:%i:%i\n",
@@ -294,10 +293,12 @@ static b32 process_entity(Entity* ent) {
     // already been initialized.
     static b32 builtins_initialized = 0;
 
-    switch (ent->state) {
+    EntityState before_state = ent->state;
+    switch (before_state) {
         case Entity_State_Parse_Builtin:
             process_load_entity(ent);
             ent->state = Entity_State_Finalized;
+            break;
 
         case Entity_State_Introduce_Symbols:
             // Currently, introducing symbols is handled in the symbol resolution
@@ -322,12 +323,9 @@ static b32 process_entity(Entity* ent) {
         case Entity_State_Check_Types:     check_entity(ent);  break;
         
         case Entity_State_Code_Gen:        emit_entity(ent);   break;
-
-        default:
-            changed = 0;
     }
 
-    return changed;
+    return ent->state != before_state;
 }
 
 // Just having fun with some visual output - brendanfh 2020/12/14
@@ -373,9 +371,22 @@ static i32 onyx_compile() {
         
         b32 changed = process_entity(ent);
 
+        // NOTE: VERY VERY dumb cycle breaking. Basically, remember the first entity that did
+        // not change (i.e. did not make any progress). Then everytime an entity doesn't change,
+        // check if it is the same entity. If it is, it means all other entities that were processed
+        // between the two occurences didn't make any progress either, and there must be a cycle.
+        //                                                              - brendanfh 2021/02/06
+        static Entity* first_no_change = NULL;
+        if (!changed) {
+            if (!first_no_change) first_no_change = ent;
+            else if (first_no_change == ent) context.cycle_detected = 1;
+        } else {
+            first_no_change = NULL;
+        }
+
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
-        if (changed && ent->state != Entity_State_Finalized)
+        if (ent->state != Entity_State_Finalized)
             entity_heap_insert_existing(&context.entities, ent);
     }
 

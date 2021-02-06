@@ -1023,7 +1023,8 @@ void symres_entity(Entity* ent) {
     }
 
     report_unresolved_symbols = (context.entities.type_count[Entity_Type_Static_If] == 0 &&
-                                 context.entities.type_count[Entity_Type_Use_Package] == 0);
+                                 context.entities.type_count[Entity_Type_Use_Package] == 0)
+                                || context.cycle_detected;
 
     SymresStatus ss = Symres_Success;
     EntityState next_state = Entity_State_Check_Types;
