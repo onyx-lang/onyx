@@ -28,6 +28,7 @@ typedef struct AstRangeLiteral AstRangeLiteral;
 typedef struct AstCompound AstCompound;
 
 typedef struct AstDirectiveSolidify AstDirectiveSolidify;
+typedef struct AstStaticIf AstStaticIf;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstJump AstJump;
@@ -165,6 +166,7 @@ typedef enum AstKind {
     Ast_Kind_Switch_Case,
 
     Ast_Kind_Directive_Solidify,
+    Ast_Kind_Static_If,
 
     Ast_Kind_Count
 } AstKind;
@@ -853,6 +855,19 @@ struct AstPolyProc {
     bh_table(AstSolidifiedFunction) concrete_funcs;
 };
 
+
+struct AstStaticIf {
+    AstNode_base;
+
+    AstTyped* cond;
+
+    bh_arr(struct Entity *) true_entities;
+    bh_arr(struct Entity *) false_entities;
+};
+
+
+
+
 extern AstNode empty_node;
 
 typedef enum EntityState {
@@ -861,6 +876,8 @@ typedef enum EntityState {
     Entity_State_Parse_Builtin,
     Entity_State_Introduce_Symbols,
     Entity_State_Parse,
+    Entity_State_Comptime_Resolve_Symbols,
+    Entity_State_Comptime_Check_Types,
     Entity_State_Resolve_Symbols,
     Entity_State_Check_Types,
     Entity_State_Code_Gen,
@@ -928,14 +945,17 @@ typedef struct Entity {
 } Entity;
 
 typedef struct EntityHeap {
-    bh_arr(Entity) entities;
+    bh_arena entity_arena;
+    bh_arr(Entity *) entities;
 
     i32 state_count[Entity_State_Count];
 } EntityHeap;
 
+void entity_heap_init(EntityHeap* entities);
+void entity_heap_insert_existing(EntityHeap* entities, Entity* e);
 void entity_heap_insert(EntityHeap* entities, Entity e);
-Entity entity_heap_top(EntityHeap* entities);
-void entity_heap_change_top(EntityHeap* entities, Entity new_top);
+Entity* entity_heap_top(EntityHeap* entities);
+void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
 void add_entities_for_node(AstNode* node, Scope* scope, Package* package);
 

@@ -1281,7 +1281,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     CHECK(expression, &field->expr);
     if (field->expr->type == NULL) {
-        onyx_report_error(field->token->pos, "Unable able to deduce type of expression for accessing field.");
+        onyx_report_error(field->token->pos, "Unable to deduce type of expression for accessing field.");
         return Check_Error;
     }
 

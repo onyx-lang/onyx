@@ -81,6 +81,9 @@ static const char* ast_node_names[] = {
     "SWITCH",
     "SWITCH CASE",
 
+    "SOLIDIFY",
+    "STATIC IF",
+
     "AST_NODE_KIND_COUNT",
 };
 
@@ -107,6 +110,8 @@ const char* entity_state_strings[Entity_State_Count] = {
     "Parse Builtin",
     "Introduce Symbols",
     "Parse",
+    "Resolve Static Symbols",
+    "Check Static Types",
     "Resolve Symbols",
     "Check Types",
     "Code Gen",

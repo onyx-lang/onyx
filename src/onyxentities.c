@@ -15,8 +15,8 @@ static i32 entity_compare(Entity* e1, Entity* e2) {
 #define eh_rchild(index) (((index) * 2) + 2)
 
 static void eh_shift_up(EntityHeap* entities, i32 index) {
-	while (index > 0 && entity_compare(&entities->entities[eh_parent(index)], &entities->entities[index]) > 0) {
-		Entity tmp = entities->entities[eh_parent(index)];
+	while (index > 0 && entity_compare(entities->entities[eh_parent(index)], entities->entities[index]) > 0) {
+		Entity* tmp = entities->entities[eh_parent(index)];
 		entities->entities[eh_parent(index)] = entities->entities[index];			
 		entities->entities[index] = tmp;
 
@@ -29,18 +29,18 @@ static void eh_shift_down(EntityHeap* entities, i32 index) {
 
 	i32 l = eh_lchild(index);	
 	if (l < bh_arr_length(entities->entities)
-		&& entity_compare(&entities->entities[l], &entities->entities[min_index]) < 0) {
+		&& entity_compare(entities->entities[l], entities->entities[min_index]) < 0) {
 		min_index = l;
 	}
 
 	i32 r = eh_rchild(index);	
 	if (r < bh_arr_length(entities->entities)
-		&& entity_compare(&entities->entities[r], &entities->entities[min_index]) < 0) {
+		&& entity_compare(entities->entities[r], entities->entities[min_index]) < 0) {
 		min_index = r;
 	}
 
 	if (index != min_index) {
-		Entity tmp = entities->entities[min_index];
+		Entity* tmp = entities->entities[min_index];
 		entities->entities[min_index] = entities->entities[index];
 		entities->entities[index] = tmp;
 
@@ -48,7 +48,21 @@ static void eh_shift_down(EntityHeap* entities, i32 index) {
 	}
 }
 
-void entity_heap_insert(EntityHeap* entities, Entity e) {
+void entity_heap_init(EntityHeap* entities) {
+    bh_arena_init(&entities->entity_arena, global_heap_allocator, 32 * 1024);
+}
+
+// nocheckin
+// Allocates the entity in the entity heap. Don't quite feel this is necessary...
+Entity* entity_heap_register(EntityHeap* entities, Entity e) {
+    bh_allocator alloc = bh_arena_allocator(&entities->entity_arena);
+    Entity* entity = bh_alloc_item(alloc, Entity);
+    *entity = e;
+
+    return entity;
+}
+
+void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
 	if (entities->entities == NULL) {
 		bh_arr_new(global_heap_allocator, entities->entities, 128);
 	}	
@@ -56,23 +70,30 @@ void entity_heap_insert(EntityHeap* entities, Entity e) {
 	bh_arr_push(entities->entities, e);
 	eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
 
-	entities->state_count[e.state]++;
+	entities->state_count[e->state]++;
 }
 
-Entity entity_heap_top(EntityHeap* entities) {
+// nocheckin
+// Temporary wrapper
+void entity_heap_insert(EntityHeap* entities, Entity e) {
+    Entity* entity = entity_heap_register(entities, e);
+    entity_heap_insert_existing(entities, entity);
+}
+
+Entity* entity_heap_top(EntityHeap* entities) {
 	return entities->entities[0];
 }
 
-void entity_heap_change_top(EntityHeap* entities, Entity new_top) {
-	entities->state_count[entities->entities[0].state]--;
-	entities->state_count[new_top.state]--;
+void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
+	entities->state_count[entities->entities[0]->state]--;
+	entities->state_count[new_top->state]--;
 	
 	entities->entities[0] = new_top;
 	eh_shift_down(entities, 0);
 }
 
 void entity_heap_remove_top(EntityHeap* entities) {
-    entities->state_count[entities->entities[0].state]--;
+    entities->state_count[entities->entities[0]->state]--;
 
 	entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
 	bh_arr_pop(entities->entities);

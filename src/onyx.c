@@ -152,6 +152,8 @@ static void context_init(CompileOptions* opts) {
     context.wasm_module = bh_alloc_item(global_heap_allocator, OnyxWasmModule);
     *context.wasm_module = onyx_wasm_module_create(global_heap_allocator);
 
+    entity_heap_init(&context.entities);
+
     // NOTE: Add builtin entities to pipeline.
     entity_heap_insert(&context.entities, ((Entity) {
         .state = Entity_State_Parse_Builtin,
@@ -327,7 +329,7 @@ static void output_dummy_progress_bar() {
 
     printf("\e[2;1H");
     for (i32 i = 0; i < Entity_State_Count - 1; i++) {
-        printf("%20s (%4d) | ", entity_state_strings[i], eh->state_count[i]);
+        printf("%25s (%4d) | ", entity_state_strings[i], eh->state_count[i]);
         
         printf("\e[0K");
         for (i32 c = 0; c < eh->state_count[i] * 50 / bh_arr_length(eh->entities); c++) printf("\xe2\x96\x88");
@@ -343,16 +345,16 @@ static i32 onyx_compile() {
         printf("\e[2J");
 
     while (!bh_arr_is_empty(context.entities.entities)) {
-        Entity ent = entity_heap_top(&context.entities);
+        Entity* ent = entity_heap_top(&context.entities);
         entity_heap_remove_top(&context.entities);
 
 #if defined(_BH_LINUX)
         if (context.options->fun_output) {
             output_dummy_progress_bar();
             
-            if (ent.expr->token) {
-                OnyxFilePos pos = ent.expr->token->pos;
-                printf("\e[0K%s on %s in %s:%d:%d\n", entity_state_strings[ent.state], entity_type_strings[ent.type], pos.filename, pos.line, pos.column);
+            if (ent->expr->token) {
+                OnyxFilePos pos = ent->expr->token->pos;
+                printf("\e[0K%s on %s in %s:%d:%d\n", entity_state_strings[ent->state], entity_type_strings[ent->type], pos.filename, pos.line, pos.column);
             }
             
             // Slowing things down for the effect
@@ -360,12 +362,12 @@ static i32 onyx_compile() {
         }
 #endif
         
-        b32 changed = process_entity(&ent);
+        b32 changed = process_entity(ent);
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
-        if (changed && ent.state != Entity_State_Finalized)
-            entity_heap_insert(&context.entities, ent);
+        if (changed && ent->state != Entity_State_Finalized)
+            entity_heap_insert_existing(&context.entities, ent);
     }
 
     // NOTE: Output to file
