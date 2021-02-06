@@ -8,12 +8,15 @@
 
 #define CHECK(kind, ...) do { \
     CheckStatus cs = check_ ## kind (__VA_ARGS__); \
-    if (cs != Check_Success) return cs; \
+    if (cs > Check_Errors_Start) return cs; \
     } while (0)
 
 typedef enum CheckStatus {
-    Check_Success,
-    Check_Error,
+    Check_Success,  // The node was successfully checked with out errors
+    Check_Complete, // The node is done processing
+
+    Check_Errors_Start,
+    Check_Error,    // There was an error when checking the node
 } CheckStatus;
 
 CheckStatus check_block(AstBlock* block);
@@ -1794,6 +1797,27 @@ CheckStatus check_type(AstType* type) {
     return Check_Success;
 }
 
+CheckStatus check_static_if(AstStaticIf* static_if) {
+    CHECK(expression, &static_if->cond);
+
+    if (static_if->cond->flags & Ast_Flag_Comptime) {
+        AstNumLit* condition_value = (AstNumLit *) static_if->cond;
+        assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
+
+        if (condition_value->value.i) {
+            bh_arr_each(Entity *, ent, static_if->true_entities) {
+                entity_heap_insert_existing(&context.entities, *ent);
+            }
+        }
+
+    } else {
+        onyx_report_error(static_if->token->pos, "Expected this condition to be compile time known.");
+        return Check_Error;
+    }
+
+    return Check_Complete;
+}
+
 CheckStatus check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -1838,7 +1862,7 @@ void check_entity(Entity* ent) {
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 cs = check_struct((AstStructType *) ent->type_alias);
             else
-                check_type(ent->type_alias);
+                cs = check_type(ent->type_alias);
             break;
 
         case Entity_Type_Memory_Reservation_Type:
@@ -1849,12 +1873,15 @@ void check_entity(Entity* ent) {
             cs = check_memres(ent->mem_res);
             break;
 
+        case Entity_Type_Static_If:
+            cs = check_static_if(ent->static_if);
+            break;
+
         default: break;
     }
 
-    if (cs == Check_Success) {
-        ent->state = Entity_State_Code_Gen;
-    }
+    if (cs == Check_Success)  ent->state = Entity_State_Code_Gen;
+    if (cs == Check_Complete) ent->state = Entity_State_Finalized;
     // else if (cs == Check_Yield) {
     //     ent->attempts++;
     // }

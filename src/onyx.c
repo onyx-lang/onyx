@@ -124,9 +124,12 @@ typedef enum CompilerProgress {
     ONYX_COMPILER_PROGRESS_SUCCESS
 } CompilerProgress;
 
+static OnyxToken implicit_load_token = { '#', 1, 0, { 0, 0, 0, 0, 0 } };
 static AstInclude* create_load(bh_allocator alloc, char* filename) {
+
     AstInclude* include_node = onyx_ast_node_new(alloc, sizeof(AstInclude), Ast_Kind_Load_File);
     include_node->name = filename;
+    include_node->token = &implicit_load_token;
 
     return include_node;
 }
@@ -162,12 +165,12 @@ static void context_init(CompileOptions* opts) {
         .include = create_load(context.ast_alloc, "core/builtin"),
     }));
     
-    add_entities_for_node((AstNode *) &builtin_stack_top, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {
         AstInclude* load_node = create_load(context.ast_alloc, (char *) *filename);
-        add_entities_for_node((AstNode *) load_node, context.global_scope, NULL);
+        add_entities_for_node(NULL, (AstNode *) load_node, context.global_scope, NULL);
     }
 }
 
@@ -226,7 +229,7 @@ static void parse_source_file(bh_file_contents* file_contents) {
     onyx_parser_free(&parser);
 }
 
-static void process_source_file(char* filename) {
+static void process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_arr_each(bh_file_contents, fc, context.loaded_files) {
         // CLEANUP: Add duplicate resolutions, such as
         //          ./foo and ./test/../foo
@@ -237,7 +240,7 @@ static void process_source_file(char* filename) {
     bh_file file;
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
-        onyx_report_error((OnyxFilePos) { 0 }, "Failed to open file %s\n", filename);
+        onyx_report_error(error_pos, "Failed to open file %s", filename);
         return;
     }
 
@@ -260,7 +263,7 @@ static void process_load_entity(Entity* ent) {
         char* filename = lookup_included_file(include->name);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
-        process_source_file(formatted_name);
+        process_source_file(formatted_name, include->token->pos);
 
     } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(context.options->included_folders, include->name);
@@ -310,8 +313,12 @@ static b32 process_entity(Entity* ent) {
             ent->state = Entity_State_Finalized;
             break;
 
+        case Entity_State_Comptime_Resolve_Symbols:
         case Entity_State_Resolve_Symbols: symres_entity(ent); break;
+
+        case Entity_State_Comptime_Check_Types:
         case Entity_State_Check_Types:     check_entity(ent);  break;
+        
         case Entity_State_Code_Gen:        emit_entity(ent);   break;
 
         default:

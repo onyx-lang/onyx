@@ -129,14 +129,8 @@ AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
 AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     token_toggle_end(tkn);
     AstNode* res = symbol_raw_resolve(start_scope, tkn->text);
-
-    if (res == NULL) {
-        onyx_report_error(tkn->pos, "Unable to resolve symbol '%s'.", tkn->text);
-        token_toggle_end(tkn);
-        return &empty_node;
-    }
-
     token_toggle_end(tkn);
+    
     return res;
 }
 

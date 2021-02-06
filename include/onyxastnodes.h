@@ -897,6 +897,7 @@ typedef enum EntityType {
     Entity_Type_Load_File,
     Entity_Type_Binding,
     Entity_Type_Use_Package,
+    Entity_Type_Static_If,
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
     Entity_Type_Enum,
@@ -930,6 +931,7 @@ typedef struct Entity {
         AstInclude            *include;
         AstUsePackage         *use_package;
         AstBinding            *binding;
+        AstStaticIf           *static_if;
         AstFunction           *function;
         AstOverloadedFunction *overloaded_function;
         AstGlobal             *global;
@@ -957,7 +959,9 @@ void entity_heap_insert(EntityHeap* entities, Entity e);
 Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
-void add_entities_for_node(AstNode* node, Scope* scope, Package* package);
+
+// If target_arr is null, the entities will be placed directly in the heap.
+void add_entities_for_node(bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
 
 void entity_bring_to_state(Entity* ent, EntityState state);
 void symres_entity(Entity* ent);

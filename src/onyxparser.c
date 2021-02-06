@@ -13,18 +13,33 @@
 #include "onyxparser.h"
 #include "onyxutils.h"
 
-// NOTE: The one weird define you need to know before read the code below
 #define make_node(nclass, kind)             onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
 #define peek_token(ahead)                   (parser->curr + ahead)
-#define ENTITY_SUBMIT(node)                 (add_entities_for_node((AstNode *) (node), bh_arr_last(parser->scope_stack), parser->package))
-#define ENTITY_SUBMIT_IN_SCOPE(node, scope) (add_entities_for_node((AstNode *) (node), scope, parser->package))
 
 static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 
+#define ENTITY_SUBMIT(node)                 (submit_entity_in_scope(parser, (AstNode *) (node), bh_arr_last(parser->scope_stack), parser->package))
+#define ENTITY_SUBMIT_IN_SCOPE(node, scope) (submit_entity_in_scope(parser, (AstNode *) (node), scope, parser->package))
+
+void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Package* package) {
+    if (bh_arr_length(parser->static_if_stack) == 0) {
+        add_entities_for_node(NULL, node, scope, package);
+
+    } else {
+        AstStaticIf* static_if = bh_arr_last(parser->static_if_stack);
+
+        // nocheckin This should also be able to place them in the false entities
+        add_entities_for_node(&static_if->true_entities, node, scope, package);
+    }
+}
+
+// Parsing Utilities
 static void consume_token(OnyxParser* parser);
 static void unconsume_token(OnyxParser* parser);
 static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type);
 static b32 consume_token_if_next(OnyxParser* parser, TokenType token_type);
+static b32 next_tokens_are(OnyxParser* parser, i32 n, ...);
+static OnyxToken* find_matching_paren(OnyxToken* paren);
 
 static AstNumLit*     parse_int_literal(OnyxParser* parser);
 static AstNumLit*     parse_float_literal(OnyxParser* parser);
@@ -54,7 +69,7 @@ static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
-static AstNode*       parse_top_level_statement(OnyxParser* parser);
+static void           parse_top_level_statement(OnyxParser* parser);
 static AstPackage*    parse_package_name(OnyxParser* parser);
 
 static void consume_token(OnyxParser* parser) {
@@ -201,7 +216,7 @@ static AstNumLit* parse_float_literal(OnyxParser* parser) {
 }
 
 static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
-    if (parser->curr->type != '#') return 0;
+    if (peek_token(0)->type != '#' || peek_token(1)->type != Token_Type_Symbol) return 0;
 
     expect_token(parser, '#');
     OnyxToken* sym = expect_token(parser, Token_Type_Symbol);
@@ -2093,6 +2108,29 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
     return enum_node;
 }
 
+static AstStaticIf* parse_static_if_stmt(OnyxParser* parser) {
+    AstStaticIf* static_if_node = make_node(AstStaticIf, Ast_Kind_Static_If);
+    static_if_node->token = expect_token(parser, '#');
+    expect_token(parser, Token_Type_Keyword_If);
+
+    static_if_node->cond = parse_expression(parser, 0);
+
+    // TODO: Add else statements to static ifs
+    bh_arr_new(global_heap_allocator, static_if_node->true_entities, 4);
+    bh_arr_push(parser->static_if_stack, static_if_node);
+
+    expect_token(parser, '{');
+    while (!consume_token_if_next(parser, '}')) {
+        if (parser->hit_unexpected_token) return static_if_node;
+
+        parse_top_level_statement(parser);
+    }
+
+    bh_arr_pop(parser->static_if_stack);
+
+    return static_if_node;
+}
+
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Proc) {
         OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
@@ -2176,38 +2214,33 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
     return binding;
 }
 
-static AstNode* parse_top_level_statement(OnyxParser* parser) {
+static void parse_top_level_statement(OnyxParser* parser) {
     AstFlags private_kind = 0;
-    if (parse_possible_directive(parser, "private")) {
-        private_kind = Ast_Flag_Private_Package;
-    }
+    if      (parse_possible_directive(parser, "private"))      private_kind = Ast_Flag_Private_Package;
+    else if (parse_possible_directive(parser, "private_file")) private_kind = Ast_Flag_Private_File;
 
-    else if (parse_possible_directive(parser, "private_file")) {
-        private_kind = Ast_Flag_Private_File;
-    }
+    AstBinding* binding = NULL;
     
-    // CLEANUP
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             AstNode* use_node = parse_use_stmt(parser);
             ENTITY_SUBMIT(use_node);
-            return NULL;
+            return;
         }
 
         case Token_Type_Keyword_Proc:
             parse_top_level_expression(parser);
-            return NULL;
+            return;
 
         case Token_Type_Symbol: {
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
             expect_token(parser, ':');
 
             if (parser->curr->type == ':') {
-                AstBinding* binding = parse_top_level_binding(parser, symbol);
-
+                binding = parse_top_level_binding(parser, symbol);
                 if (binding != NULL) binding->node->flags |= private_kind;
 
-                return (AstNode *) binding;
+                goto submit_binding_to_entities;
             }
             
             AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
@@ -2223,52 +2256,56 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
             
             ENTITY_SUBMIT(memres);
             
-            AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+            binding = make_node(AstBinding, Ast_Kind_Binding);
             binding->token = symbol;
             binding->node = (AstNode *) memres;
 
-            return (AstNode *) binding;
+            goto submit_binding_to_entities;
         }
 
         case '#': {
-            while (parser->curr->type == '#') {
-                OnyxToken* dir_token = parser->curr;
+            if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_If)) {
+                AstStaticIf* static_if = parse_static_if_stmt(parser);
+                ENTITY_SUBMIT(static_if);
+                return;
+            }
 
-                if (parse_possible_directive(parser, "load")) {
-                    AstInclude* include = make_node(AstInclude, Ast_Kind_Load_File);
-                    include->token = dir_token;
+            OnyxToken* dir_token = parser->curr;
 
-                    OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
-                    if (str_token != NULL) {
-                        token_toggle_end(str_token);
-                        include->name = bh_strdup(parser->allocator, str_token->text);
-                        token_toggle_end(str_token);
-                    }
-                    
-                    ENTITY_SUBMIT(include);
-                    return NULL;
-                }
-                else if (parse_possible_directive(parser, "load_path")) {
-                    AstInclude* include = make_node(AstInclude, Ast_Kind_Load_Path);
-                    include->token = dir_token;
-                    
-                    OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
-                    if (str_token != NULL) {
-                        token_toggle_end(str_token);
-                        include->name = bh_strdup(parser->allocator, str_token->text);
-                        token_toggle_end(str_token);
-                    }
-                    
-                    ENTITY_SUBMIT(include);
-                    return NULL;
-                }
-                else {
-                    OnyxToken* directive_token = expect_token(parser, '#');
-                    OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
+            if (parse_possible_directive(parser, "load")) {
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_File);
+                include->token = dir_token;
 
-                    onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
-                    return NULL;
+                OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
+                if (str_token != NULL) {
+                    token_toggle_end(str_token);
+                    include->name = bh_strdup(parser->allocator, str_token->text);
+                    token_toggle_end(str_token);
                 }
+                
+                ENTITY_SUBMIT(include);
+                return;
+            }
+            else if (parse_possible_directive(parser, "load_path")) {
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_Path);
+                include->token = dir_token;
+                
+                OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
+                if (str_token != NULL) {
+                    token_toggle_end(str_token);
+                    include->name = bh_strdup(parser->allocator, str_token->text);
+                    token_toggle_end(str_token);
+                }
+                
+                ENTITY_SUBMIT(include);
+                return;
+            }
+            else {
+                OnyxToken* directive_token = expect_token(parser, '#');
+                OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
+
+                onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+                return;
             }
         }
 
@@ -2276,7 +2313,21 @@ static AstNode* parse_top_level_statement(OnyxParser* parser) {
     }
 
     expect_token(parser, ';');
-    return NULL;
+    return;
+
+submit_binding_to_entities:
+    {
+        if (!binding) return;
+
+        Scope* target_scope = parser->package->scope;
+
+        if (binding->node->flags & Ast_Flag_Private_Package)
+            target_scope = parser->package->private_scope;
+        if (binding->node->flags & Ast_Flag_Private_File)
+            target_scope = parser->file_scope;
+        
+        ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);
+    }
 }
 
 static AstPackage* parse_package_name(OnyxParser* parser) {
@@ -2350,6 +2401,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.prev = NULL;
     parser.hit_unexpected_token = 0;
     parser.scope_stack = NULL;
+    parser.static_if_stack = NULL;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,
@@ -2357,6 +2409,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     };
 
     bh_arr_new(global_heap_allocator, parser.scope_stack, 4);
+    bh_arr_new(global_heap_allocator, parser.static_if_stack, 4);
 
     return parser;
 }
@@ -2378,33 +2431,9 @@ void onyx_parse(OnyxParser *parser) {
     ENTITY_SUBMIT(implicit_use_builtin);
     
     while (parser->curr->type != Token_Type_End_Stream) {
-        if (parser->hit_unexpected_token) return;
-
-        AstNode* curr_stmt = parse_top_level_statement(parser);
-
-        if (curr_stmt != NULL && curr_stmt != &error_node) {
-            while (curr_stmt != NULL) {
-                if (parser->hit_unexpected_token) return;
-
-                switch (curr_stmt->kind) {
-                    case Ast_Kind_Binding: {
-                        Scope* target_scope = parser->package->scope;
-
-                        if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_Package)
-                            target_scope = parser->package->private_scope;
-                        if (((AstBinding *) curr_stmt)->node->flags & Ast_Flag_Private_File)
-                            target_scope = parser->file_scope;
-                        
-                        ENTITY_SUBMIT_IN_SCOPE(curr_stmt, target_scope);
-                        break;
-                    }
-
-                    default: assert(("Invalid top level node", 0));
-                }
-
-                curr_stmt = curr_stmt->next;
-            }
-        }
+        if (parser->hit_unexpected_token) break;
+        if (onyx_has_errors()) break;
+        parse_top_level_statement(parser);
     }
 
     bh_arr_pop(parser->scope_stack);

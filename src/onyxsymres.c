@@ -9,6 +9,7 @@ static Scope*       curr_scope    = NULL;
 static Package*     curr_package  = NULL;
 static AstFunction* curr_function = NULL;
 bh_arr(AstBlock *)  block_stack   = NULL;
+static b32 report_unresolved_symbols = 1;
 
 AstType* symres_type(AstType* type);
 static void symres_local(AstLocal** local, b32 add_to_block_locals);
@@ -37,6 +38,7 @@ static void symres_enum(AstEnumType* enum_node);
 static void symres_memres_type(AstMemRes** memres);
 static void symres_memres(AstMemRes** memres);
 static void symres_struct_defaults(AstType* st);
+static void symres_static_if(AstStaticIf* static_if);
 
 static void scope_enter(Scope* new_scope) {
     curr_scope = new_scope;
@@ -44,6 +46,20 @@ static void scope_enter(Scope* new_scope) {
 
 static void scope_leave() {
     curr_scope = curr_scope->parent;
+}
+
+static void symres_symbol(AstNode** symbol_node) {
+    OnyxToken* token = (*symbol_node)->token;
+    AstNode* res = symbol_resolve(curr_scope, token);    
+
+    if (!res) { // :SymresStall
+        onyx_report_error(token->pos,
+            "Unable to resolve symbol '%b'",
+            token->text,
+            token->length);
+    } else {
+        *symbol_node = res;
+    }
 }
 
 AstType* symres_type(AstType* type) {
@@ -55,7 +71,8 @@ AstType* symres_type(AstType* type) {
     }
 
     if (type->kind == Ast_Kind_Symbol) {
-        return (AstType *) symbol_resolve(curr_scope, ((AstNode *) type)->token);
+        symres_symbol((AstNode **) &type);
+        return type;
     }
 
     if (type->kind == Ast_Kind_Field_Access) {
@@ -387,9 +404,7 @@ static void symres_expression(AstTyped** expr) {
     }
 
     switch ((*expr)->kind) {
-        case Ast_Kind_Symbol:
-            *expr = (AstTyped *) symbol_resolve(curr_scope, ((AstNode *) *expr)->token);
-            break;
+        case Ast_Kind_Symbol: symres_symbol((AstNode **) expr); break;
 
         case Ast_Kind_Binary_Op:
             symres_expression(&((AstBinaryOp *)(*expr))->left);
@@ -825,8 +840,8 @@ static void symres_use_package(AstUsePackage* package) {
         bh_arr_each(AstAlias *, alias, package->only) {
 
             AstNode* thing = symbol_resolve(p->scope, (*alias)->token);
-            if (thing == NULL) {
-                onyx_report_error((*alias)->token->pos, "not found in package");
+            if (thing == NULL) { // :SymresStall
+                onyx_report_error((*alias)->token->pos, "This symbol was not found in this package.");
                 return;
             }
 
@@ -844,9 +859,7 @@ static void symres_use_package(AstUsePackage* package) {
 }
 
 static void symres_enum(AstEnumType* enum_node) {
-    if (enum_node->backing->kind == Ast_Kind_Symbol) {
-        enum_node->backing = (AstType *) symbol_resolve(curr_scope, enum_node->backing->token);
-    }
+    if (enum_node->backing->kind == Ast_Kind_Symbol) symres_symbol((AstNode **) &enum_node->backing);
     if (enum_node->backing == NULL) return;
 
     enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
@@ -942,6 +955,10 @@ static void symres_polyproc(AstPolyProc* pp) {
     }
 }
 
+static void symres_static_if(AstStaticIf* static_if) {
+    symres_expression(&static_if->cond);
+}
+
 void symres_entity(Entity* ent) {
     if (block_stack == NULL)
         bh_arr_new(global_heap_allocator, block_stack, 16);
@@ -960,6 +977,12 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Binding: {
             symbol_introduce(curr_scope, ent->binding->token, ent->binding->node);
             next_state = Entity_State_Finalized;
+            break;
+        }
+
+        case Entity_Type_Static_If: {
+            symres_static_if(ent->static_if);
+            next_state = Entity_State_Comptime_Check_Types;
             break;
         }
         
