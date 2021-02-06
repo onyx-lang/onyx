@@ -225,7 +225,8 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         }
         
         case Ast_Kind_Use_Package: {
-            ent.state = Entity_State_Comptime_Resolve_Symbols;
+            // nocheckin
+            // ent.state = Entity_State_Comptime_Resolve_Symbols;
             ent.type = Entity_Type_Use_Package;
             ent.use_package = (AstUsePackage *) node;
             ENTITY_INSERT(ent);

@@ -11,7 +11,21 @@ static AstFunction* curr_function = NULL;
 bh_arr(AstBlock *)  block_stack   = NULL;
 static b32 report_unresolved_symbols = 1;
 
-AstType* symres_type(AstType* type);
+#define SYMRES(kind, ...) do { \
+    SymresStatus ss = symres_ ## kind (__VA_ARGS__); \
+    if (ss > Symres_Errors_Start) return ss;         \
+    } while (0)
+
+typedef enum SymresStatus {
+    Symres_Success,
+    Symres_Complete,
+
+    Symres_Errors_Start,
+    Symres_Yield,
+    Symres_Error,
+} SymresStatus;
+
+static void symres_type(AstType** type);
 static void symres_local(AstLocal** local, b32 add_to_block_locals);
 static void symres_call(AstCall* call);
 static void symres_size_of(AstSizeOf* so);
@@ -62,202 +76,160 @@ static void symres_symbol(AstNode** symbol_node) {
     }
 }
 
-AstType* symres_type(AstType* type) {
-    if (type == NULL) return NULL;
+static void symres_struct_type(AstStructType* s_node) {
+    if (s_node->flags & Ast_Flag_Type_Is_Resolved) return;
 
-    if (type->kind == Ast_Kind_Type_Alias) {
-        ((AstTypeAlias *) type)->to = symres_type(((AstTypeAlias *) type)->to);
-        return type;
-    }
+    s_node->flags |= Ast_Flag_Type_Is_Resolved;
+    
+    {
+        bh_table(i32) mem_set;
+        bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
 
-    if (type->kind == Ast_Kind_Symbol) {
-        symres_symbol((AstNode **) &type);
-        return type;
-    }
+        bh_arr_each(AstStructMember *, member, s_node->members) {
+            token_toggle_end((*member)->token);
 
-    if (type->kind == Ast_Kind_Field_Access) {
-        AstFieldAccess* field = (AstFieldAccess *) type;
-        symres_field_access(&field);
+            if (bh_table_has(i32, mem_set, (*member)->token->text)) {
+                onyx_report_error((*member)->token->pos,
+                        "Duplicate struct member '%s'.",
+                        (*member)->token->text);
 
-        if (!node_is_type((AstNode *) field))
-            onyx_report_error(type->token->pos, "field access did not result in a type");
-
-        return (AstType *) field;
-    }
-
-    // NOTE: Already resolved
-    if (type->kind == Ast_Kind_Basic_Type) return type;
-
-    if (type->kind == Ast_Kind_Pointer_Type) {
-        ((AstPointerType *) type)->elem = symres_type(((AstPointerType *) type)->elem);
-        return type;
-    }
-
-    if (type->kind == Ast_Kind_Function_Type) {
-        AstFunctionType* ftype = (AstFunctionType *) type;
-
-        ftype->return_type = symres_type(ftype->return_type);
-
-        if (ftype->param_count > 0)
-            fori (i, 0, (i64) ftype->param_count) {
-                ftype->params[i] = symres_type(ftype->params[i]);
+                token_toggle_end((*member)->token);
+                return;
             }
 
-        return type;
+            bh_table_put(i32, mem_set, (*member)->token->text, 1);
+            token_toggle_end((*member)->token);
+        }
+
+        bh_table_free(mem_set);
     }
 
-    if (type->kind == Ast_Kind_Struct_Type) {
-        AstStructType* s_node = (AstStructType *) type;
-        if (s_node->flags & Ast_Flag_Type_Is_Resolved) return type;
+    if (s_node->scope) {
+        // FIX: This is probably wrong for the long term.
+        s_node->scope->parent = curr_scope;
 
-        s_node->flags |= Ast_Flag_Type_Is_Resolved;
-        
-        {
-            bh_table(i32) mem_set;
-            bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
+        scope_enter(s_node->scope);
+    }
 
-            bh_arr_each(AstStructMember *, member, s_node->members) {
-                token_toggle_end((*member)->token);
+    fori (i, 0, bh_arr_length(s_node->members)) {
+        AstStructMember *member = s_node->members[i];
 
-                if (bh_table_has(i32, mem_set, (*member)->token->text)) {
-                    onyx_report_error((*member)->token->pos,
-                            "Duplicate struct member '%s'.",
-                            (*member)->token->text);
+        if (member->type_node) {
+            symres_type(&member->type_node);
 
-                    token_toggle_end((*member)->token);
-                    return type;
+            if (!node_is_type((AstNode *) member->type_node)) {
+                onyx_report_error(member->token->pos, "Member type is not a type.");
+                goto struct_symres_done;
+            }
+
+            if (member->flags & Ast_Flag_Struct_Mem_Used) {
+                AstType *used = (AstType *) member->type_node;
+
+                while (used->kind == Ast_Kind_Type_Alias) {
+                    used = ((AstTypeAlias *) used)->to;
                 }
 
-                bh_table_put(i32, mem_set, (*member)->token->text, 1);
-                token_toggle_end((*member)->token);
-            }
+                b32 use_works = (used->kind == Ast_Kind_Struct_Type || used->kind == Ast_Kind_Poly_Call_Type);
 
-            bh_table_free(mem_set);
-        }
+                if (used->kind == Ast_Kind_Type_Raw_Alias) {
+                    AstTypeRawAlias* alias = (AstTypeRawAlias *) used;
+                    use_works = (alias->to->kind == Type_Kind_Struct);
+                }
 
-        if (s_node->scope) {
-            // FIX: This is probably wrong for the long term.
-            s_node->scope->parent = curr_scope;
-
-            scope_enter(s_node->scope);
-        }
-
-        fori (i, 0, bh_arr_length(s_node->members)) {
-            AstStructMember *member = s_node->members[i];
-
-            if (member->type_node) {
-                member->type_node = symres_type(member->type_node);
-
-                if (!node_is_type((AstNode *) member->type_node)) {
-                    onyx_report_error(member->token->pos, "Member type is not a type.");
+                if (!use_works) {
+                    onyx_report_error(member->token->pos,
+                            "Can only 'use' members of struct type, got '%s'.",
+                            onyx_ast_node_kind_string(used->kind));
                     goto struct_symres_done;
                 }
-
-                if (member->flags & Ast_Flag_Struct_Mem_Used) {
-                    AstType *used = (AstType *) member->type_node;
-
-                    while (used->kind == Ast_Kind_Type_Alias) {
-                        used = ((AstTypeAlias *) used)->to;
-                    }
-
-                    b32 use_works = (used->kind == Ast_Kind_Struct_Type || used->kind == Ast_Kind_Poly_Call_Type);
-
-                    if (used->kind == Ast_Kind_Type_Raw_Alias) {
-                        AstTypeRawAlias* alias = (AstTypeRawAlias *) used;
-                        use_works = (alias->to->kind == Type_Kind_Struct);
-                    }
-
-                    if (!use_works) {
-                        onyx_report_error(member->token->pos,
-                                "Can only 'use' members of struct type, got '%s'.",
-                                onyx_ast_node_kind_string(used->kind));
-                        goto struct_symres_done;
-                    }
-                }
             }
         }
+    }
 
 struct_symres_done:
-        if (s_node->scope) scope_leave();
-        return type;
-    }
+    if (s_node->scope) scope_leave();
+}
 
-    if (type->kind == Ast_Kind_Array_Type) {
-        AstArrayType* a_node = (AstArrayType *) type;
+static void symres_type(AstType** type) {
+    if (!type || !*type) return;
 
-        if (a_node->count_expr) symres_expression(&a_node->count_expr);
-        a_node->elem = symres_type(a_node->elem);
+    switch ((*type)->kind) {
+        case Ast_Kind_Symbol:     symres_symbol((AstNode **) type); break;
+        case Ast_Kind_Basic_Type: break;
+        case Ast_Kind_Type_Alias: symres_type(&((AstTypeAlias *) *type)->to); break;
+        case Ast_Kind_Field_Access: {
+            symres_field_access((AstFieldAccess **) type);
 
-        return type;
-    }
-
-    if (type->kind == Ast_Kind_Enum_Type) {
-       // symres_enum((AstEnumType *) type);
-       return type;
-    }
-
-    if (type->kind == Ast_Kind_Slice_Type) {
-        AstSliceType* s_node = (AstSliceType *) type;
-        s_node->elem = symres_type(s_node->elem);
-
-        return type;
-    }
-
-    if (type->kind == Ast_Kind_DynArr_Type) {
-        AstDynArrType* da_node = (AstDynArrType *) type;
-        da_node->elem = symres_type(da_node->elem);
-
-        return type;
-    }
-
-    if (type->kind == Ast_Kind_VarArg_Type) {
-        AstVarArgType* va_node = (AstVarArgType *) type;
-        va_node->elem = symres_type(va_node->elem);
-
-        return type;
-    }
-
-    if (type->kind == Ast_Kind_Poly_Struct_Type) {
-        AstPolyStructType* pst_node = (AstPolyStructType *) type;
-        pst_node->scope = scope_create(context.ast_alloc, curr_scope, pst_node->token->pos);
-
-        bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
-            param->type_node = symres_type(param->type_node);
-            param->type      = type_build_from_ast(context.ast_alloc, param->type_node);
+            if (!node_is_type((AstNode *) *type))
+                onyx_report_error((*type)->token->pos, "Field access did not result in a type.");
+            break;
         }
 
-        return type;
-    }
+        case Ast_Kind_Pointer_Type: symres_type(&((AstPointerType *) *type)->elem); break;
+        case Ast_Kind_Slice_Type:   symres_type(&((AstSliceType *) *type)->elem); break;
+        case Ast_Kind_DynArr_Type:  symres_type(&((AstDynArrType *) *type)->elem); break;
+        case Ast_Kind_VarArg_Type:  symres_type(&((AstVarArgType *) *type)->elem); break;
 
-    if (type->kind == Ast_Kind_Poly_Call_Type) {
-        AstPolyCallType* pc_node = (AstPolyCallType *) type;
+        case Ast_Kind_Function_Type: {
+            AstFunctionType* ftype = (AstFunctionType *) *type;
 
-        pc_node->callee = symres_type(pc_node->callee);
+            symres_type(&ftype->return_type);
 
-        bh_arr_each(AstNode *, param, pc_node->params) {
-            if (node_is_type(*param)) {
-                *param = (AstNode *) symres_type((AstType *) *param);
-            } else {
-                symres_expression((AstTyped **) param);
+            if (ftype->param_count > 0) {
+                fori (i, 0, (i64) ftype->param_count) {
+                    symres_type(&ftype->params[i]);
+                }
             }
+            break;
         }
 
-        return type;
-    }
+        case Ast_Kind_Struct_Type: symres_struct_type((AstStructType *) *type); break;
+        case Ast_Kind_Array_Type: {
+            AstArrayType* a_node = (AstArrayType *) *type;
 
-    if (type->kind == Ast_Kind_Type_Compound) {
-        AstCompoundType* ctype = (AstCompoundType *) type;
+            if (a_node->count_expr) symres_expression(&a_node->count_expr);
+            symres_type(&a_node->elem);
+            break;
+        }
 
-        bh_arr_each(AstType *, type, ctype->types) {
-            *type = symres_type(*type);
+        case Ast_Kind_Enum_Type: break;
+
+        case Ast_Kind_Poly_Struct_Type: {
+            AstPolyStructType* pst_node = (AstPolyStructType *) *type;
+            pst_node->scope = scope_create(context.ast_alloc, curr_scope, pst_node->token->pos);
+
+            bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
+                symres_type(&param->type_node);
+                param->type = type_build_from_ast(context.ast_alloc, param->type_node);
+            }
+            break;
+        }
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType* pc_node = (AstPolyCallType *) *type;
+
+            symres_type(&pc_node->callee);
+
+            bh_arr_each(AstNode *, param, pc_node->params) {
+                if (node_is_type(*param)) {
+                    symres_type((AstType **) param);
+                } else {
+                    symres_expression((AstTyped **) param);
+                }
+            }
+            break;
+        }
+
+        case Ast_Kind_Type_Compound: {
+            AstCompoundType* ctype = (AstCompoundType *) *type;
+
+            bh_arr_each(AstType *, type, ctype->types) symres_type(type);
         }
     }
-
-    return type;
 }
 
 static void symres_local(AstLocal** local, b32 add_to_block_locals) {
-    (*local)->type_node = symres_type((*local)->type_node);
+    symres_type(&(*local)->type_node);
 
     // NOTE: This is a little gross, but it is allows for finer control
     // over when locals are in scope in a block, which reduces the number
@@ -288,13 +260,13 @@ static void symres_call(AstCall* call) {
 }
 
 static void symres_size_of(AstSizeOf* so) {
-    so->type_node = symres_type(so->type_node);
-    so->so_ast_type = symres_type(so->so_ast_type);
+    symres_type(&so->type_node);
+    symres_type(&so->so_ast_type);
 }
 
 static void symres_align_of(AstAlignOf* ao) {
-    ao->type_node = symres_type(ao->type_node);
-    ao->ao_ast_type = symres_type(ao->ao_ast_type);
+    symres_type(&ao->type_node);
+    symres_type(&ao->ao_ast_type);
 }
 
 static void symres_field_access(AstFieldAccess** fa) {
@@ -360,7 +332,7 @@ static void symres_method_call(AstBinaryOp** mcall) {
 
 static void symres_unaryop(AstUnaryOp** unaryop) {
     if ((*unaryop)->operation == Unary_Op_Cast) {
-        (*unaryop)->type_node = symres_type((*unaryop)->type_node);
+        symres_type(&(*unaryop)->type_node);
     }
 
     symres_expression(&(*unaryop)->expr);
@@ -368,7 +340,7 @@ static void symres_unaryop(AstUnaryOp** unaryop) {
 
 static void symres_struct_literal(AstStructLiteral* sl) {
     if (sl->stnode != NULL) symres_expression(&sl->stnode);
-    sl->stnode = (AstTyped *) symres_type((AstType *) sl->stnode);
+    symres_type((AstType **) &sl->stnode);
     if (sl->stnode == NULL || sl->stnode->kind == Ast_Kind_Error || sl->stnode->kind == Ast_Kind_Symbol) return;
 
     sl->type_node = (AstType *) sl->stnode;
@@ -381,7 +353,7 @@ static void symres_struct_literal(AstStructLiteral* sl) {
 static void symres_array_literal(AstArrayLiteral* al) {
     if (al->atnode != NULL) symres_expression(&al->atnode);
 
-    al->atnode = (AstTyped *) symres_type((AstType *) al->atnode);
+    symres_type((AstType **) &al->atnode);
     if (al->atnode == NULL || al->atnode->kind == Ast_Kind_Error || al->atnode->kind == Ast_Kind_Symbol) return;
 
     al->type_node = (AstType *) al->atnode;
@@ -399,7 +371,7 @@ static void symres_array_literal(AstArrayLiteral* al) {
 
 static void symres_expression(AstTyped** expr) {
     if (node_is_type((AstNode *) *expr)) {
-        *((AstType **) expr) = symres_type((AstType *) *expr);
+        symres_type((AstType **) expr);
         return;
     }
 
@@ -427,7 +399,8 @@ static void symres_expression(AstTyped** expr) {
             symres_expression(&((AstRangeLiteral *)(*expr))->low);
             symres_expression(&((AstRangeLiteral *)(*expr))->high);
 
-            (*expr)->type_node = symres_type(builtin_range_type);
+            symres_type(&builtin_range_type);
+            (*expr)->type_node = builtin_range_type;
 
             // NOTE: This is a weird place to put this so maybe put it somewhere else eventually
             //                                                  - brendanfh   2020/09/04
@@ -436,11 +409,12 @@ static void symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Function:
         case Ast_Kind_NumLit:
-            (*expr)->type_node = symres_type((*expr)->type_node);
+            symres_type(&(*expr)->type_node);
             break;
 
         case Ast_Kind_StrLit:
-            (*expr)->type_node = symres_type(builtin_string_type);
+            symres_type(&builtin_string_type);
+            (*expr)->type_node = builtin_string_type;
             break;
 
         case Ast_Kind_Slice:
@@ -732,14 +706,14 @@ void symres_function_header(AstFunction* func) {
         }
     }
 
-    func->return_type = symres_type(func->return_type);
+    symres_type(&func->return_type);
     if (!node_is_type((AstNode *) func->return_type)) {
         onyx_report_error(func->token->pos, "Return type is not a type.");
     }
 
     bh_arr_each(AstParam, param, func->params) {
         if (param->local->type_node != NULL) {
-            param->local->type_node = symres_type(param->local->type_node);
+            symres_type(&param->local->type_node);
         }
     }
 }
@@ -807,7 +781,7 @@ void symres_function(AstFunction* func) {
 }
 
 static void symres_global(AstGlobal* global) {
-    global->type_node = symres_type(global->type_node);
+    symres_type(&global->type_node);
 }
 
 static void symres_overloaded_function(AstOverloadedFunction* ofunc) {
@@ -904,7 +878,7 @@ static void symres_enum(AstEnumType* enum_node) {
 }
 
 static void symres_memres_type(AstMemRes** memres) {
-    (*memres)->type_node = symres_type((*memres)->type_node);
+    symres_type(&(*memres)->type_node);
 }
 
 static void symres_memres(AstMemRes** memres) {
@@ -938,7 +912,7 @@ static void symres_polyproc(AstPolyProc* pp) {
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
         if (param->kind != PPK_Baked_Value) continue;
 
-        param->type_expr = symres_type(param->type_expr);
+        symres_type(&param->type_expr);
     }
 
     // CLEANUP: This was copied from symres_function_header.
@@ -1000,7 +974,7 @@ void symres_entity(Entity* ent) {
 
         case Entity_Type_Overloaded_Function:     symres_overloaded_function(ent->overloaded_function); break;
         case Entity_Type_Expression:              symres_expression(&ent->expr); break;
-        case Entity_Type_Type_Alias:              ent->type_alias = symres_type(ent->type_alias); break;
+        case Entity_Type_Type_Alias:              symres_type(&ent->type_alias); break;
         case Entity_Type_Enum:                    symres_enum(ent->enum_type); break;
         case Entity_Type_Memory_Reservation_Type: symres_memres_type(&ent->mem_res); break;
         case Entity_Type_Memory_Reservation:      symres_memres(&ent->mem_res); break;

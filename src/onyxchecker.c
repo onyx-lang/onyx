@@ -655,9 +655,10 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     }
 
     if (binop->right->type == NULL) {
-        onyx_report_error(binop->token->pos,
-                "Unable to resolve type for symbol '%b'.",
-                binop->right->token->text, binop->right->token->length);
+        // nocheckin
+        // onyx_report_error(binop->token->pos,
+        //         "Unable to resolve type for symbol '%b'.",
+        //         binop->right->token->text, binop->right->token->length);
         return Check_Error;
     }
 
@@ -829,16 +830,18 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     if (binop_is_assignment(binop->operation)) return check_binop_assignment(binop, assignment_is_ok);
     
     if (binop->left->type == NULL) {
-        onyx_report_error(binop->left->token->pos,
-                "Unable to resolve type for symbol '%b'.",
-                binop->left->token->text, binop->left->token->length);
+        // nocheckin
+        // onyx_report_error(binop->left->token->pos,
+        //         "Unable to resolve type for symbol '%b'.",
+        //         binop->left->token->text, binop->left->token->length);
         return Check_Error;
     }
 
     if (binop->right->type == NULL) {
-        onyx_report_error(binop->right->token->pos,
-                "Unable to resolve type for symbol '%b'.",
-                binop->right->token->text, binop->right->token->length);
+        // nocheckin
+        // onyx_report_error(binop->right->token->pos,
+        //         "Unable to resolve type for symbol '%b'.",
+        //         binop->right->token->text, binop->right->token->length);
         return Check_Error;
     }
 
@@ -1798,21 +1801,20 @@ CheckStatus check_type(AstType* type) {
 }
 
 CheckStatus check_static_if(AstStaticIf* static_if) {
-    CHECK(expression, &static_if->cond);
+    CheckStatus result = check_expression(&static_if->cond);
 
-    if (static_if->cond->flags & Ast_Flag_Comptime) {
-        AstNumLit* condition_value = (AstNumLit *) static_if->cond;
-        assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
-
-        if (condition_value->value.i) {
-            bh_arr_each(Entity *, ent, static_if->true_entities) {
-                entity_heap_insert_existing(&context.entities, *ent);
-            }
-        }
-
-    } else {
+    if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
         onyx_report_error(static_if->token->pos, "Expected this condition to be compile time known.");
         return Check_Error;
+    }
+
+    AstNumLit* condition_value = (AstNumLit *) static_if->cond;
+    assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
+
+    if (condition_value->value.i) {
+        bh_arr_each(Entity *, ent, static_if->true_entities) {
+            entity_heap_insert_existing(&context.entities, *ent);
+        }
     }
 
     return Check_Complete;
