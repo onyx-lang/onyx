@@ -30,8 +30,7 @@ AstBasicType basic_type_f32x4 = { Ast_Kind_Basic_Type, 0, &simd_token, "f32x4", 
 AstBasicType basic_type_f64x2 = { Ast_Kind_Basic_Type, 0, &simd_token, "f64x2", &basic_types[Basic_Kind_F64X2] };
 AstBasicType basic_type_v128  = { Ast_Kind_Basic_Type, 0, &simd_token, "v128",  &basic_types[Basic_Kind_V128]  };
 
-static OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
-AstNode   builtin_package_node  = { Ast_Kind_Symbol, Ast_Flag_No_Clone, &builtin_package_token, NULL };
+OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
 
 static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
 static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };

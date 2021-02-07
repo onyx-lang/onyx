@@ -1501,6 +1501,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         default:
             retval = Check_Error;
+            onyx_report_error(expr->token->pos, "UNEXPECTED INTERNAL COMPILER ERROR");
             DEBUG_HERE;
             break;
     }
@@ -1805,6 +1806,11 @@ CheckStatus check_static_if(AstStaticIf* static_if) {
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
         onyx_report_error(static_if->token->pos, "Expected this condition to be compile time known.");
+        return Check_Error;
+    }
+
+    if (!type_is_bool(static_if->cond->type)) {
+        onyx_report_error(static_if->token->pos, "Expected this condition to be a boolean value.");
         return Check_Error;
     }
 

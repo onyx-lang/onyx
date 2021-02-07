@@ -73,17 +73,21 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     Entity* entity = bh_alloc_item(alloc, Entity);
     *entity = e;
     entity->attempts = 0;
+    entity->entered_in_queue = 0;
 
     return entity;
 }
 
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
+    if (e->entered_in_queue) return;
+
 	if (entities->entities == NULL) {
 		bh_arr_new(global_heap_allocator, entities->entities, 128);
-	}	
+	}
 
 	bh_arr_push(entities->entities, e);
 	eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
+    e->entered_in_queue = 1;
 
 	entities->state_count[e->state]++;
     entities->type_count[e->type]++;
@@ -115,6 +119,7 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
 void entity_heap_remove_top(EntityHeap* entities) {
     entities->state_count[entities->entities[0]->state]--;
     entities->type_count[entities->entities[0]->type]--;
+    entities->entities[0]->entered_in_queue = 0;
 
 	entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];
 	bh_arr_pop(entities->entities);

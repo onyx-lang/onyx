@@ -1156,25 +1156,24 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
         AstUsePackage* upack = make_node(AstUsePackage, Ast_Kind_Use_Package);
         upack->token = use_token;
 
-        AstNode* pack_symbol = make_node(AstNode, Ast_Kind_Symbol);
-        pack_symbol->token = expect_token(parser, Token_Type_Symbol);
+        OnyxToken* package_name = expect_token(parser, Token_Type_Symbol);
 
         // CLEANUP: This is just gross.
         if (consume_token_if_next(parser, '.')) {
-            pack_symbol->token->length += 1;
+            package_name->length += 1;
 
             while (1) {
                 if (parser->hit_unexpected_token) break;
 
                 OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-                pack_symbol->token->length += symbol->length;
+                package_name->length += symbol->length;
 
-                if (consume_token_if_next(parser, '.')) pack_symbol->token->length += 1;
+                if (consume_token_if_next(parser, '.')) package_name->length += 1;
                 else break;
             }
         }
 
-        upack->package = (AstPackage *) pack_symbol;
+        upack->package_name = package_name;
 
         if (consume_token_if_next(parser, Token_Type_Keyword_As))
             upack->alias = expect_token(parser, Token_Type_Symbol);
@@ -2427,7 +2426,7 @@ void onyx_parse(OnyxParser *parser) {
     bh_arr_push(parser->scope_stack, parser->file_scope);
 
     AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);
-    implicit_use_builtin->package = (AstPackage *) &builtin_package_node;
+    implicit_use_builtin->package_name = &builtin_package_token;
     ENTITY_SUBMIT(implicit_use_builtin);
     
     while (parser->curr->type != Token_Type_End_Stream) {

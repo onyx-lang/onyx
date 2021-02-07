@@ -854,13 +854,17 @@ static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc) {
 }
 
 static SymresStatus symres_use_package(AstUsePackage* package) {
-    token_toggle_end(package->package->token);
-    Package* p = package_lookup(package->package->token->text);
-    token_toggle_end(package->package->token);
+    if (package->package == NULL) {
+        token_toggle_end(package->package_name);
+        package->package = package_lookup(package->package_name->text);
+        token_toggle_end(package->package_name);
+    }
+
+    Package* p = package->package;
 
     if (p == NULL) { // :SymresStall
         if (report_unresolved_symbols) {
-            onyx_report_error(package->token->pos, "package not found in included source files");
+            onyx_report_error(package->package_name->pos, "package not found in included source files");
             return Symres_Error;
         } else {
             return Symres_Yield;
@@ -870,11 +874,13 @@ static SymresStatus symres_use_package(AstUsePackage* package) {
     if (p->scope == curr_scope) return Symres_Success;
 
     if (package->alias != NULL) {
-        AstPackage *pac_node = onyx_ast_node_new(context.ast_alloc, sizeof(AstPackage), Ast_Kind_Package);
-        pac_node->package = p;
-        pac_node->token = package->alias;
+        if (!package->alias_node) {
+            package->alias_node = onyx_ast_node_new(context.ast_alloc, sizeof(AstPackage), Ast_Kind_Package);
+            package->alias_node->package = p;
+            package->alias_node->token = package->alias;
+        }
 
-        symbol_introduce(curr_scope, package->alias, (AstNode *) pac_node);
+        symbol_introduce(curr_scope, package->alias, (AstNode *) package->alias_node);
     }
 
     if (package->only != NULL) {
@@ -901,6 +907,7 @@ static SymresStatus symres_use_package(AstUsePackage* package) {
 
         scope_include(curr_scope, p->scope, pos);
     }
+
     return Symres_Success;
 }
 
@@ -1032,6 +1039,7 @@ void symres_entity(Entity* ent) {
     switch (ent->type) {
         case Entity_Type_Binding: {
             symbol_introduce(curr_scope, ent->binding->token, ent->binding->node);
+            package_reinsert_use_packages(curr_package);
             next_state = Entity_State_Finalized;
             break;
         }
@@ -1050,6 +1058,7 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Global_Header:       ss = symres_global(ent->global); break;
 
         case Entity_Type_Use_Package:         ss = symres_use_package(ent->use_package);
+                                              if (ent->use_package->package) package_track_use_package(ent->use_package->package, ent);
                                               next_state = Entity_State_Finalized;
                                               break;
 
@@ -1074,4 +1083,5 @@ void symres_entity(Entity* ent) {
     if (ss == Symres_Yield)   ent->attempts++;
 
     if (ent->scope) curr_scope = old_scope;
+    curr_package = NULL;
 }

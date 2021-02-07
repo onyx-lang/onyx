@@ -37,11 +37,31 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         package->name = pac_name;
         package->scope = scope_create(alloc, parent_scope, (OnyxFilePos) { 0 });
         package->private_scope = scope_create(alloc, package->scope, (OnyxFilePos) { 0 });
+        package->use_package_entities = NULL;
 
         bh_table_put(Package *, context.packages, pac_name, package);
 
         return package;
     }
+}
+
+void package_track_use_package(Package* package, Entity* entity) {
+    if (package->use_package_entities == NULL) {
+        bh_arr_new(global_heap_allocator, package->use_package_entities, 4);
+    }
+
+    bh_arr_push(package->use_package_entities, entity);
+}
+
+void package_reinsert_use_packages(Package* package) {
+    if (!package->use_package_entities) return;
+
+    bh_arr_each(Entity *, use_package, package->use_package_entities) {
+        (*use_package)->state = Entity_State_Comptime_Resolve_Symbols;
+        entity_heap_insert_existing(&context.entities, *use_package);
+    } 
+
+    bh_arr_set_length(package->use_package_entities, 0);
 }
 
 
@@ -130,7 +150,7 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
     token_toggle_end(tkn);
     AstNode* res = symbol_raw_resolve(start_scope, tkn->text);
     token_toggle_end(tkn);
-    
+
     return res;
 }
 

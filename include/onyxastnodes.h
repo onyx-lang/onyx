@@ -703,8 +703,12 @@ struct AstInclude       { AstNode_base; char* name; };
 struct AstUsePackage    {
     AstNode_base;
 
-    AstPackage *package;
+    OnyxToken *package_name;
+    Package *package;
+
     OnyxToken *alias;
+    AstPackage *alias_node;
+
     bh_arr(AstAlias *) only;
 };
 struct AstAlias         {
@@ -924,7 +928,9 @@ extern const char* entity_type_strings[Entity_Type_Count];
 typedef struct Entity {
     EntityType type;
     EntityState state;
-    u64 attempts;
+    u32 attempts;
+
+    b32 entered_in_queue : 1;
 
     Package *package;
     Scope *scope;
@@ -976,6 +982,11 @@ struct Package {
 
     Scope *scope;
     Scope *private_scope;
+
+    // NOTE: This tracks all of the 'use package' statements of this package throughout
+    // the code base. This is used when a static if clears and new symbols are introduced.
+    // 'use package' statements have to be reevaluated to pull in the new symbols.
+    bh_arr(Entity *) use_package_entities;
 };
 
 typedef enum CompileAction CompileAction;
@@ -1053,7 +1064,7 @@ extern AstBasicType basic_type_v128;
 // :TypeExprHack
 extern AstNode type_expr_symbol;
 
-extern AstNode   builtin_package_node;
+extern OnyxToken builtin_package_token;
 extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstType  *builtin_string_type;
