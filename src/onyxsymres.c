@@ -676,7 +676,8 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
 
         case Ast_Kind_Use_Package:
             if (remove) *remove = 1;
-            SYMRES(use_package, (AstUsePackage *) *stmt);
+            // This is handled by an entity now.
+            // SYMRES(use_package, (AstUsePackage *) *stmt);
             break;
 
         default: SYMRES(expression, (AstTyped **) stmt); break;

@@ -5,7 +5,6 @@
 
 // Things that need to be cleaned up in the parser:
 //  - control block local variables should be more extensible and reuse more code
-//  - outermost loops that parse the top level elements
 //  - package name parsing
 
 #include "onyxlex.h"
@@ -874,6 +873,7 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return root_if;
 
         AstIfWhile* elseif_node = make_node(AstIfWhile, Ast_Kind_If);
+        elseif_node->token = parser->curr - 1;
 
         cond = parse_expression(parser, 1);
         true_stmt = parse_block(parser);
@@ -1198,7 +1198,8 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
                     expect_token(parser, ',');
             }
         }
-
+        
+        ENTITY_SUBMIT(upack);
         return (AstNode *) upack;
 
     } else {
@@ -1817,13 +1818,12 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
                 else                                    curr_param.vararg_kind = VA_Kind_Typed;
             }
 
-            i32 old_len = 0, new_len = 0;
             if (curr_param.vararg_kind != VA_Kind_Untyped) {
                 // CLEANUP: This is mess and it is hard to follow what is going on here.
                 // I think with recent rewrites, this should be easier to do.
-                old_len = bh_arr_length(*parser->polymorph_context.poly_params);
+                i32 old_len = bh_arr_length(*parser->polymorph_context.poly_params);
                 curr_param.local->type_node = parse_type(parser);
-                new_len = bh_arr_length(*parser->polymorph_context.poly_params);
+                i32 new_len = bh_arr_length(*parser->polymorph_context.poly_params);
 
                 if (curr_param.vararg_kind == VA_Kind_Typed) {
                     AstVarArgType* va_type = make_node(AstVarArgType, Ast_Kind_VarArg_Type);
@@ -1831,12 +1831,11 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
                     va_type->token = curr_param.local->type_node->token;
                     curr_param.local->type_node = (AstType *) va_type;
                 }
-            }
 
-            i32 new_poly_params = new_len - old_len;
-            fori (i, 0, new_poly_params) {
-                (*parser->polymorph_context.poly_params)[old_len + i].type_expr = curr_param.local->type_node;
-                (*parser->polymorph_context.poly_params)[old_len + i].idx = param_idx;
+                fori (i, 0, new_len - old_len) {
+                    (*parser->polymorph_context.poly_params)[old_len + i].type_expr = curr_param.local->type_node;
+                    (*parser->polymorph_context.poly_params)[old_len + i].idx = param_idx;
+                }
             }
         }
 
@@ -2137,23 +2136,18 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
 
         return (AstTyped *) func_node;
     }
-    else if (parser->curr->type == Token_Type_Keyword_Global) {
-        return parse_global_declaration(parser);
-    }
-    else if (parser->curr->type == Token_Type_Keyword_Struct) {
-        return (AstTyped *) parse_struct(parser);
-    }
-    else if (parse_possible_directive(parser, "type")) {
+    
+    if (parser->curr->type == Token_Type_Keyword_Global) return parse_global_declaration(parser);
+    if (parser->curr->type == Token_Type_Keyword_Struct) return (AstTyped *) parse_struct(parser);
+    if (parser->curr->type == Token_Type_Keyword_Enum)   return (AstTyped *) parse_enum_declaration(parser);
+    
+    if (parse_possible_directive(parser, "type")) {
         AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
         alias->to = parse_type(parser);
         return (AstTyped *) alias;
     }
-    else if (parser->curr->type == Token_Type_Keyword_Enum) {
-        return (AstTyped *) parse_enum_declaration(parser);
-    }
-    else {
-        return parse_expression(parser, 1);
-    }
+    
+    return parse_expression(parser, 1);
 }
 
 static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol) {
@@ -2428,7 +2422,7 @@ void onyx_parse(OnyxParser *parser) {
     AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);
     implicit_use_builtin->package_name = &builtin_package_token;
     ENTITY_SUBMIT(implicit_use_builtin);
-    
+
     while (parser->curr->type != Token_Type_End_Stream) {
         if (parser->hit_unexpected_token) break;
         if (onyx_has_errors()) break;

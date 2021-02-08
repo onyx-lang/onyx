@@ -1,0 +1,14 @@
+With the recent addition of compile time if statements, there should be a set of variables
+that give information about the current compilation. These would include things such as:
+	- Chosen backend (JS, WASI, others in the future)
+	- 32-Bit pointers are enabled
+
+The standard library will be rewritten to use these variables to conditionally include file
+that are only supported on a particular system.
+
+For the moment, I think that the choice of backend will be given by compiler flags. It will
+set the variables described below to their value.
+
+There should be an #error directive that when hit just produces a compile time error and prevents
+compilation. It would be useful to ensure certain files that are only for a particular
+backend will not compile with the wrong one, such as webgl.onyx.
