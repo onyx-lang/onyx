@@ -86,6 +86,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "--print-function-mappings")) {
                 options.print_function_mappings = 1;
             }
+            else if (!strcmp(argv[i], "--print-static-if-results")) {
+                options.print_static_if_results = 1;
+            }
             else if (!strcmp(argv[i], "--use-post-mvp-features")) {
                 options.use_post_mvp_features = 1;
             }

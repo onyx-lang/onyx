@@ -21,14 +21,14 @@ static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
 #define ENTITY_SUBMIT_IN_SCOPE(node, scope) (submit_entity_in_scope(parser, (AstNode *) (node), scope, parser->package))
 
 void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Package* package) {
-    if (bh_arr_length(parser->static_if_stack) == 0) {
+    if (bh_arr_length(parser->alternate_entity_placement_stack) == 0) {
         add_entities_for_node(NULL, node, scope, package);
 
     } else {
-        AstStaticIf* static_if = bh_arr_last(parser->static_if_stack);
+        bh_arr(Entity *) *entity_array = bh_arr_last(parser->alternate_entity_placement_stack);
 
         // nocheckin This should also be able to place them in the false entities
-        add_entities_for_node(&static_if->true_entities, node, scope, package);
+        add_entities_for_node(entity_array, node, scope, package);
     }
 }
 
@@ -2114,8 +2114,8 @@ static AstStaticIf* parse_static_if_stmt(OnyxParser* parser) {
     static_if_node->cond = parse_expression(parser, 0);
 
     // TODO: Add else statements to static ifs
-    bh_arr_new(global_heap_allocator, static_if_node->true_entities, 4);
-    bh_arr_push(parser->static_if_stack, static_if_node);
+    bh_arr_new(global_heap_allocator, static_if_node->true_entities, 2);
+    bh_arr_push(parser->alternate_entity_placement_stack, &static_if_node->true_entities);
 
     expect_token(parser, '{');
     while (!consume_token_if_next(parser, '}')) {
@@ -2124,7 +2124,21 @@ static AstStaticIf* parse_static_if_stmt(OnyxParser* parser) {
         parse_top_level_statement(parser);
     }
 
-    bh_arr_pop(parser->static_if_stack);
+    bh_arr_pop(parser->alternate_entity_placement_stack);
+
+    if (consume_token_if_next(parser, Token_Type_Keyword_Else)) {
+        bh_arr_new(global_heap_allocator, static_if_node->false_entities, 2);
+        bh_arr_push(parser->alternate_entity_placement_stack, &static_if_node->false_entities);
+
+        expect_token(parser, '{');
+        while (!consume_token_if_next(parser, '}')) {
+            if (parser->hit_unexpected_token) return static_if_node;
+
+            parse_top_level_statement(parser);
+        }
+
+        bh_arr_pop(parser->alternate_entity_placement_stack);
+    }
 
     return static_if_node;
 }
@@ -2394,7 +2408,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.prev = NULL;
     parser.hit_unexpected_token = 0;
     parser.scope_stack = NULL;
-    parser.static_if_stack = NULL;
+    parser.alternate_entity_placement_stack = NULL;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,
@@ -2402,7 +2416,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     };
 
     bh_arr_new(global_heap_allocator, parser.scope_stack, 4);
-    bh_arr_new(global_heap_allocator, parser.static_if_stack, 4);
+    bh_arr_new(global_heap_allocator, parser.alternate_entity_placement_stack, 4);
 
     return parser;
 }

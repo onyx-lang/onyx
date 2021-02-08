@@ -1817,8 +1817,20 @@ CheckStatus check_static_if(AstStaticIf* static_if) {
     AstNumLit* condition_value = (AstNumLit *) static_if->cond;
     assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
 
+    if (context.options->print_static_if_results)
+        bh_printf("Static if statement at %s:%d:%d resulted in %s\n",
+            static_if->token->pos.filename,
+            static_if->token->pos.line,
+            static_if->token->pos.column,
+            condition_value->value.i ? "true" : "false");
+
     if (condition_value->value.i) {
         bh_arr_each(Entity *, ent, static_if->true_entities) {
+            entity_heap_insert_existing(&context.entities, *ent);
+        }
+
+    } else {
+        bh_arr_each(Entity *, ent, static_if->false_entities) {
             entity_heap_insert_existing(&context.entities, *ent);
         }
     }

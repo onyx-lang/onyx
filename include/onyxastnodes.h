@@ -1001,9 +1001,10 @@ struct CompileOptions {
     bh_allocator allocator;
     CompileAction action;
 
-    u32 verbose_output          : 29;
+    u32 verbose_output          : 28;
     b32 fun_output              : 1;
     b32 print_function_mappings : 1;
+    b32 print_static_if_results : 1;
     
     b32 use_post_mvp_features : 1;
 
