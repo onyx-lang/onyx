@@ -291,6 +291,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ENTITY_INSERT(ent);
             break;
         }
+
+        case Ast_Kind_Directive_Error: {
+            ent.state = Entity_State_Error;
+            ent.type = Entity_Type_Error;
+            ent.error = (AstDirectiveError *) node;
+            ENTITY_INSERT(ent);
+            break;   
+        }
         
         default: {
             ent.type = Entity_Type_Expression;

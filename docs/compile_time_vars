@@ -1,6 +1,6 @@
 With the recent addition of compile time if statements, there should be a set of variables
 that give information about the current compilation. These would include things such as:
-	- Chosen backend (JS, WASI, others in the future)
+	- Chosen runtime (JS, WASI, others in the future)
 	- 32-Bit pointers are enabled
 
 The standard library will be rewritten to use these variables to conditionally include file

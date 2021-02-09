@@ -2113,7 +2113,6 @@ static AstStaticIf* parse_static_if_stmt(OnyxParser* parser) {
 
     static_if_node->cond = parse_expression(parser, 0);
 
-    // TODO: Add else statements to static ifs
     bh_arr_new(global_heap_allocator, static_if_node->true_entities, 2);
     bh_arr_push(parser->alternate_entity_placement_stack, &static_if_node->true_entities);
 
@@ -2305,6 +2304,14 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 }
                 
                 ENTITY_SUBMIT(include);
+                return;
+            }
+            else if (parse_possible_directive(parser, "error")) {
+                AstDirectiveError *error = make_node(AstDirectiveError, Ast_Kind_Directive_Error);
+                error->token = dir_token;
+                error->error_msg = expect_token(parser, Token_Type_Literal_String); 
+
+                ENTITY_SUBMIT(error);
                 return;
             }
             else {

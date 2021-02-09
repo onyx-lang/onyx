@@ -298,6 +298,14 @@ static b32 process_entity(Entity* ent) {
 
     EntityState before_state = ent->state;
     switch (before_state) {
+        case Entity_State_Error:
+            if (ent->type != Entity_Type_Error) {
+                onyx_report_error(ent->expr->token->pos, "Error entity unexpected. This is definitely a compiler bug");
+            } else {
+                onyx_report_error(ent->error->token->pos, "Static error occured: '%b'", ent->error->error_msg->text, ent->error->error_msg->length);
+            }
+            break;
+
         case Entity_State_Parse_Builtin:
             process_load_entity(ent);
             ent->state = Entity_State_Finalized;

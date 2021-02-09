@@ -29,6 +29,7 @@ typedef struct AstCompound AstCompound;
 
 typedef struct AstDirectiveSolidify AstDirectiveSolidify;
 typedef struct AstStaticIf AstStaticIf;
+typedef struct AstDirectiveError AstDirectiveError;
 
 typedef struct AstReturn AstReturn;
 typedef struct AstJump AstJump;
@@ -167,6 +168,7 @@ typedef enum AstKind {
 
     Ast_Kind_Directive_Solidify,
     Ast_Kind_Static_If,
+    Ast_Kind_Directive_Error,
 
     Ast_Kind_Count
 } AstKind;
@@ -869,7 +871,11 @@ struct AstStaticIf {
     bh_arr(struct Entity *) false_entities;
 };
 
+struct AstDirectiveError {
+    AstNode_base;
 
+    OnyxToken* error_msg;
+};
 
 
 extern AstNode empty_node;
@@ -897,6 +903,7 @@ extern const char* entity_state_strings[Entity_State_Count];
 typedef enum EntityType {
     Entity_Type_Unknown,
 
+    Entity_Type_Error,
     Entity_Type_Load_Path,
     Entity_Type_Load_File,
     Entity_Type_Binding,
@@ -936,6 +943,7 @@ typedef struct Entity {
     Scope *scope;
 
     union {
+        AstDirectiveError     *error;
         AstInclude            *include;
         AstUsePackage         *use_package;
         AstBinding            *binding;

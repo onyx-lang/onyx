@@ -83,6 +83,7 @@ static const char* ast_node_names[] = {
 
     "SOLIDIFY",
     "STATIC IF",
+    "STATIC ERROR",
 
     "AST_NODE_KIND_COUNT",
 };
