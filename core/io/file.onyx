@@ -1,5 +1,10 @@
 package core.io
 
+use package build_opts as build_opts
+#if build_opts.Runtime != build_opts.Runtime_Wasi {
+    #error "The file system library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
+}
+
 use package core
 use package wasi as wasi
 use package wasi {

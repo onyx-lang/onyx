@@ -237,7 +237,7 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
 #define REDUCE_UNOP_INT(op) \
     if (type_is_small_integer(unop->type) || type_is_bool(unop->type)) { \
         res->value.i = op ((AstNumLit *) unop->expr)->value.i; \
-    } else if (type_is_integer(unop->type)) { \
+    } else if (type_is_integer(unop->type) || res->type->Basic.kind == Basic_Kind_Int_Unsized) { \
         res->value.l = op ((AstNumLit *) unop->expr)->value.l; \
     }
 

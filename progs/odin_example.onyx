@@ -1,4 +1,4 @@
-#load "core/std/wasi"
+#load "core/std"
 #load "progs/foo_test"
 
 use package core

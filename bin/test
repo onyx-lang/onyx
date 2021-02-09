@@ -16,7 +16,7 @@ for test_file in $(find tests/ -name '*.onyx'); do
 
     print_check "$name"
 
-    if ! ./bin/onyx --use-post-mvp-features "$test_file" -o "./tests/$name.wasm" >/dev/null; then
+    if ! ./bin/onyx -r js --use-post-mvp-features "$test_file" -o "./tests/$name.wasm" >/dev/null; then
         print "\n❌ Failed to compile $name.onyx.\n"
         failed=1
         continue

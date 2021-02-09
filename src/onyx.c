@@ -38,6 +38,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "Flags:\n"
     "\t<input files>           List of initial files\n"
     "\t-o <target_file>        Specify the target file (default: out.wasm)\n"
+    "\t-r <runtime>            Specifies a runtime. Can be: wasi, js, custom.\n"
     "\t--verbose               Verbose output\n";
 
 static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *argv[]) {
@@ -49,6 +50,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .fun_output              = 0,
         .print_function_mappings = 0,
         .use_post_mvp_features   = 0,
+
+        .runtime = Runtime_Wasi,
 
         .files = NULL,
         .target_file = "out.wasm",
@@ -94,6 +97,16 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
+            }
+            else if (!strcmp(argv[i], "-r")) {
+                i += 1;
+                if      (!strcmp(argv[i], "wasi"))   options.runtime = Runtime_Wasi;
+                else if (!strcmp(argv[i], "js"))     options.runtime = Runtime_Js;
+                else if (!strcmp(argv[i], "custom")) options.runtime = Runtime_Custom;
+                else {
+                    bh_printf("WARNING: '%s' is not a valid runtime. Defaulting to 'wasi'.\n", argv[i]);
+                    options.runtime = Runtime_Wasi;
+                }
             }
 #if defined(_BH_LINUX)
             // NOTE: Fun output is only enabled for Linux because Windows command line

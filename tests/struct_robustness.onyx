@@ -1,3 +1,5 @@
+#load "core/std"
+
 use package core
 
 main :: proc (args: [] cstr) {
@@ -191,5 +193,3 @@ main :: proc (args: [] cstr) {
         printf("PolyUnion(%i)\n", pu.r_data);
     }
 }
-
-#load "core/std/js"

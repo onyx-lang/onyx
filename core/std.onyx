@@ -1,0 +1,41 @@
+package core
+
+
+#load "core/build_opts"
+
+#load "core/alloc"
+#load "core/memory"
+
+#load "core/array"
+#load "core/map"
+
+#load "core/conv"
+#load "core/math"
+#load "core/random"
+
+#load "core/string"
+#load "core/string/builder"
+#load "core/string/reader"
+
+#load "core/intrinsics/wasm"
+
+#load "core/io/io"
+#load "core/io/stream"
+#load "core/io/reader"
+#load "core/io/writer"
+#load "core/io/binary"
+
+use package build_opts as build_opts
+#if build_opts.Runtime == build_opts.Runtime_Wasi {
+    #load "core/sys/wasi"
+    #load "core/wasi"
+    #load "core/io/file"
+}
+
+#if build_opts.Runtime == build_opts.Runtime_Js {
+    #load "core/sys/js"
+}
+
+#if build_opts.Runtime != build_opts.Runtime_Custom {
+    #load "core/stdio"
+}

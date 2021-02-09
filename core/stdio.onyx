@@ -9,7 +9,13 @@ package core
 
 // It is expected that a file will be included that will be part
 // of the system package
-use package system as system
+
+use package build_opts as build_opts
+#if build_opts.Runtime != build_opts.Runtime_Custom {
+    use package system as system
+} else {
+    #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
+}
 
 #private_file print_stream : io.DynamicStringStream;
 #private_file print_writer : io.Writer;

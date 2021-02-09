@@ -1,4 +1,4 @@
-#load "core/std/js"
+#load "core/std"
 
 use package core
 use package core.string.reader as reader

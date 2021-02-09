@@ -1,7 +1,7 @@
 // Enumerations (or enums for short) in Onyx work very similar to how they do
 // in C and C++.
 
-#load "core/std/wasi"
+#load "core/std"
 
 use package core
 

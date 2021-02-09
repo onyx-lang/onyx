@@ -5,7 +5,7 @@
 // is a powerful construct to have. In fact, strings in Onyx, i.e.
 // the 'str' type, is actually just a slice of u8.
 
-#load "core/std/wasi"
+#load "core/std"
 
 use package core
 

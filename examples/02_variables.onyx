@@ -1,7 +1,7 @@
 // This time, we are not adding, 'package main' to the top of the file, since
 // every file is automatically part of the main package unless specified otherwise.
 
-#load "core/std/wasi"
+#load "core/std"
 
 use package core
 

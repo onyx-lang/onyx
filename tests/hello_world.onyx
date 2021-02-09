@@ -1,6 +1,6 @@
 package main
 
-#load "core/std/js"
+#load "core/std"
 
 use package core
 

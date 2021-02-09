@@ -1,6 +1,6 @@
 // Now, lets go over the basic types and control flow mechanisms in Onyx.
 
-#load "core/std/wasi"
+#load "core/std"
 
 use package core
 

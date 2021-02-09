@@ -1,6 +1,6 @@
 package main
 
-#load "core/std/wasi"
+#load "core/std"
 
 // NOTE: Didn't realize this would work so easily
 use package core { string_builder_append as sba }

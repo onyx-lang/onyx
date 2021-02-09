@@ -15,7 +15,7 @@ package main
 // added to the queue of files to load. When all files in the queue have been parsed,
 // the compiler can continue with the compilation process. You can also include the
 // same file as many times as you want. The redudant copies will be discarded.
-#load "core/std/wasi"
+#load "core/std"
 
 // All of the functionality we need is in the 'core' package. Unlike other package systems,
 // there is no way to reference symbols in a package without specifically 'using' it. This

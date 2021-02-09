@@ -4,7 +4,7 @@
 // in Onyx are extremely simple to use by design and should make programming very
 // enjoyable. But I digress, let's look at some examples.
 
-#load "core/std/wasi"
+#load "core/std"
 
 use package core
 

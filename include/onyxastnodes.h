@@ -1007,6 +1007,17 @@ enum CompileAction {
     ONYX_COMPILE_ACTION_PRINT_HELP,
 };
 
+
+// ROBUSTNESS: The Runtime definitions here must match those in build_opts.onyx!!
+typedef enum Runtime Runtime;
+enum Runtime {
+    Runtime_Unknown = 0,
+    Runtime_Wasi    = 1,
+    Runtime_Js      = 2,
+    Runtime_Custom  = 3,
+};
+
+
 typedef struct CompileOptions CompileOptions;
 struct CompileOptions {
     bh_allocator allocator;
@@ -1018,6 +1029,8 @@ struct CompileOptions {
     b32 print_static_if_results : 1;
     
     b32 use_post_mvp_features : 1;
+
+    Runtime runtime;
 
     bh_arr(const char *) included_folders;
     bh_arr(const char *) files;
