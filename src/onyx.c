@@ -276,19 +276,21 @@ static void process_load_entity(Entity* ent) {
 static b32 process_entity(Entity* ent) {
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
-            printf("%s | %s (%d) | %s:%i:%i\n",
+            printf("%s | %s (%d, %d) | %s:%i:%i\n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
-                   (u32) ent->attempts,
+                   (u32) ent->macro_attempts,
+                   (u32) ent->micro_attempts,
                    ent->expr->token->pos.filename,
                    ent->expr->token->pos.line,
                    ent->expr->token->pos.column);
         
         else if (ent->expr)
-            printf("%s | %s (%d) \n",
+            printf("%s | %s (%d, %d) \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
-                   (u32) ent->attempts);
+                   (u32) ent->macro_attempts,
+                   (u32) ent->micro_attempts);
     }
     
     // CLEANUP: There should be a nicer way to track if the builtins have

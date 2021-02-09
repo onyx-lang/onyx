@@ -6,8 +6,8 @@ max_f32 :: #solidify math.max_poly { T = f32 };
 
 compose :: proc (a: $A, f: proc (A) -> $B, g: proc (B) -> $C) -> C do return g(f(a));
 
-specific_compose_1 :: #solidify specific_compose_0 { A = f32 };
 specific_compose_0 :: #solidify compose { B = f32 };
+specific_compose_1 :: #solidify specific_compose_0 { A = f32 };
 specific_compose_2 :: #solidify specific_compose_1 { C = f64 };
 
 main :: proc (args: [] cstr) {

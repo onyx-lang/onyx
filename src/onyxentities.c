@@ -16,11 +16,13 @@ static i32 entity_compare(Entity* e1, Entity* e2) {
     if (phase1 != phase2 || phase1 != 2) {
         if (e1->state != e2->state)
             return (i32) e1->state - (i32) e2->state;
-        else
+        else if (e1->type != e2->type)
             return (i32) e1->type - (i32) e2->type;
+        else
+            return (i32) (e1->micro_attempts - e2->micro_attempts);
 
     } else {
-        return (i32) e1->attempts - (i32) e2->attempts;
+        return (i32) e1->macro_attempts - (i32) e2->macro_attempts;
     }
 }
 
@@ -72,7 +74,8 @@ Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     bh_allocator alloc = bh_arena_allocator(&entities->entity_arena);
     Entity* entity = bh_alloc_item(alloc, Entity);
     *entity = e;
-    entity->attempts = 0;
+    entity->macro_attempts = 0;
+    entity->micro_attempts = 0;
     entity->entered_in_queue = 0;
 
     return entity;

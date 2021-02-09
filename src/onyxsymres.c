@@ -16,12 +16,17 @@ static b32 report_unresolved_symbols = 1;
     if (ss > Symres_Errors_Start) return ss;         \
     } while (0)
 
+#define SYMRES_IF_SYMBOL(node_ptr) do { \
+    if ((*(node_ptr))->kind == Ast_Kind_Symbol) SYMRES(expression, node_ptr); \
+    } while (0);
+
 typedef enum SymresStatus {
     Symres_Success,
     Symres_Complete,
 
     Symres_Errors_Start,
-    Symres_Yield,
+    Symres_Yield_Macro,
+    Symres_Yield_Micro,
     Symres_Error,
 } SymresStatus;
 
@@ -75,7 +80,7 @@ static SymresStatus symres_symbol(AstNode** symbol_node) {
 
             return Symres_Error;
         } else {
-            return Symres_Yield;
+            return Symres_Yield_Macro;
         }
 
     } else {
@@ -614,12 +619,17 @@ cannot_use:
 
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
     AstDirectiveSolidify* solid = *psolid;
-    if (solid->resolved_proc != NULL)
+    if (solid->resolved_proc != NULL) {
         *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
+        return Symres_Success;
+    }
 
     SYMRES(expression, (AstTyped **) &solid->poly_proc);
     if (solid->poly_proc && solid->poly_proc->kind == Ast_Kind_Directive_Solidify) {
-        solid->poly_proc = (AstPolyProc *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
+        AstPolyProc* potentially_resolved_proc = (AstPolyProc *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
+        if (!potentially_resolved_proc) return Symres_Yield_Micro;
+
+        solid->poly_proc = potentially_resolved_proc;
     }
     
     if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
@@ -868,7 +878,7 @@ static SymresStatus symres_use_package(AstUsePackage* package) {
             onyx_report_error(package->package_name->pos, "package not found in included source files");
             return Symres_Error;
         } else {
-            return Symres_Yield;
+            return Symres_Yield_Macro;
         }
     }
 
@@ -893,7 +903,7 @@ static SymresStatus symres_use_package(AstUsePackage* package) {
                     onyx_report_error((*alias)->token->pos, "This symbol was not found in this package.");
                     return Symres_Error;
                 } else {
-                    return Symres_Yield;
+                    return Symres_Yield_Macro;
                 }
             }
 
@@ -1080,8 +1090,9 @@ void symres_entity(Entity* ent) {
         default: break;
     }
 
-    if (ss == Symres_Success) ent->state = next_state;
-    if (ss == Symres_Yield)   ent->attempts++;
+    if (ss == Symres_Success)     ent->state = next_state;
+    if (ss == Symres_Yield_Macro) ent->macro_attempts++;
+    if (ss == Symres_Yield_Micro) ent->micro_attempts++;
 
     if (ent->scope) curr_scope = old_scope;
     curr_package = NULL;

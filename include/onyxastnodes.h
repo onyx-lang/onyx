@@ -935,7 +935,10 @@ extern const char* entity_type_strings[Entity_Type_Count];
 typedef struct Entity {
     EntityType type;
     EntityState state;
-    u32 attempts;
+
+    // TODO: Document this!
+    u16 macro_attempts;
+    u16 micro_attempts;
 
     b32 entered_in_queue : 1;
 
