@@ -1,0 +1,17 @@
+// This following sybmols are  not meant to be included in any compilation.
+// Instead, all of the commented out symbols are defined automatically by the compiler
+// and can be used in compile time #if statements.
+
+// Runtime :: Runtime_Wasi   OR   Runtime_Js   OR   Runtime_Custom
+
+package build_opts
+
+
+// At some point, these will become an enum. The problem at the moment is that
+// compile-time if statements are not well integrated into other language features
+// such as enums. They can only really handle compile time number math and boolean
+// logic.                                               - brendanfh 2020/02/08
+
+Runtime_Wasi   :: 1
+Runtime_Js     :: 2
+Runtime_Custom :: 3
