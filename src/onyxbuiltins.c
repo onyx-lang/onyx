@@ -379,3 +379,10 @@ void initialize_builtins(bh_allocator a) {
         intrinsic++;
     }
 }
+
+void introduce_build_options(bh_allocator a) {
+    Package* p = package_lookup_or_create("build_opts", context.global_scope, a);
+
+    AstNumLit* runtime_type = make_int_literal(a, 1);
+    symbol_builtin_introduce(p->scope, "Runtime", (AstNode *) runtime_type);
+}

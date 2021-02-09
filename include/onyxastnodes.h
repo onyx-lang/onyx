@@ -1101,6 +1101,7 @@ extern bh_table(OnyxIntrinsic) intrinsic_table;
 extern bh_arr(AstTyped *) operator_overloads[Binary_Op_Count];
 
 void initialize_builtins(bh_allocator a);
+void introduce_build_options(bh_allocator a);
 
 
 // NOTE: Useful not inlined functions

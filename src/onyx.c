@@ -129,7 +129,6 @@ typedef enum CompilerProgress {
 
 static OnyxToken implicit_load_token = { '#', 1, 0, { 0, 0, 0, 0, 0 } };
 static AstInclude* create_load(bh_allocator alloc, char* filename) {
-
     AstInclude* include_node = onyx_ast_node_new(alloc, sizeof(AstInclude), Ast_Kind_Load_File);
     include_node->name = filename;
     include_node->token = &implicit_load_token;
@@ -321,6 +320,7 @@ static b32 process_entity(Entity* ent) {
             if (!builtins_initialized) {
                 builtins_initialized = 1;
                 initialize_builtins(context.ast_alloc);
+                introduce_build_options(context.ast_alloc);
             }
          
             process_load_entity(ent);
