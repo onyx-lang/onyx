@@ -145,9 +145,8 @@ main :: (args: [] cstr) {
         array_of_T : [N] T;
     }
 
-    // This struct takes in two parameters: A type expression T (which is only valid for struct parameters,
-    // not procedure parameters at the moment), and an integer N. It has two members. The first being of
-    // type T, and the second being an N dimensional array of type T.
+    // This struct takes in two parameters: A type expression T, and an integer N. It has two members.
+    // The first being of type T, and the second being an N dimensional array of type T.
 
     // To use a struct with parameters, simply pass them in the type.
     param_struct_instance : ParamStruct(f32, 10);

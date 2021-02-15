@@ -302,6 +302,17 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
 
     AstNode* resolution = try_symbol_resolve_from_node((AstNode *) (*fa)->expr, (*fa)->token);
     if (resolution) *((AstNode **) fa) = resolution;
+    else if ((*fa)->expr->kind == Ast_Kind_Package) {
+        if (report_unresolved_symbols) {
+            onyx_report_error((*fa)->token->pos, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
+                (*fa)->token->text,
+                (*fa)->token->length,
+                ((AstPackage *) (*fa)->expr)->package->name);
+            return Symres_Error;
+        } else {
+            return Symres_Yield_Macro;
+        }
+    }
 
     return Symres_Success;
 }

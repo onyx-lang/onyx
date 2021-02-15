@@ -1,5 +1,8 @@
 // Enumerations (or enums for short) in Onyx work very similar to how they do
-// in C and C++.
+// in C and C++. Currently, they are the most underpowered feature of Onyx.
+// When you define enum values explicitly, they must be numeric literals, not
+// expressions. This is going to improve in the future, but for the moment,
+// enums are rather limited.
 
 #load "core/std"
 

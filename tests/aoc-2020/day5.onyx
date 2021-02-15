@@ -35,3 +35,5 @@ main :: proc (args: [] cstr) {
     printf("Max val: %i\n", max_val);
     printf("Your seat: %i\n", missing);
 }
+
+cmp_asc :: proc (a: $T, b: T) -> i32 do return ~~(a - b);

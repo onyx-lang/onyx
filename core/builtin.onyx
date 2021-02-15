@@ -28,6 +28,11 @@ vararg_get :: (va: vararg, ret: ^$T) -> bool {
 null_proc :: proc () #null ---
 null      :: cast(rawptr) 0;
 
+// I find myself wanting to return a completely nullified string like the
+// one below that I decided to added a builtin binding for it. This might
+// go away at some point and would just need to be defined in every file.
+null_str  :: str.{ null, 0 }
+
 OnyxContext :: struct {
     allocator      : Allocator;
     temp_allocator : Allocator;
@@ -35,9 +40,16 @@ OnyxContext :: struct {
     assert_handler : (msg: str, file: str) -> void;
 }
 
+// @Robustness
+// Currently, because the only compilation target is WebAssembly, which is only
+// single threaded for the moment, it is safe to store the context in a global
+// variable. If other compilations targets are added, or if WebAssembly standardizes
+// a multi-threading proposal, this context will need to be changed. Either it will
+// need to be a thread-local variable, or it needs to be implicitly passed as the
+// first parameter to ALL procedures in a compilation unit.
 context : OnyxContext;
 
-assert :: (cond: bool, msg: str, file: str = str.{ null, 0 }) {
+assert :: (cond: bool, msg: str, file: str = null_str) {
     if !cond do context.assert_handler(msg, file);
 }
 
@@ -47,7 +59,8 @@ assert :: (cond: bool, msg: str, file: str = str.{ null, 0 }) {
 // The implementations of all of the allocators can be found in core/alloc/.
 // These need to be here so the context structure has the types and enum values.
 //
-__DEFAULT_ALLOCATION_ALIGNMENT :: 16
+#private_file
+Default_Allocation_Alignment :: 16
 
 AllocationAction :: enum {
     Alloc;
@@ -62,11 +75,11 @@ Allocator :: struct {
     func: allocator_proc;
 }
 
-raw_alloc :: (use a: Allocator, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
+raw_alloc :: (use a: Allocator, size: u32, alignment := Default_Allocation_Alignment) -> rawptr {
     return func(data, AllocationAction.Alloc, size, alignment, null);
 }
 
-raw_resize :: (use a: Allocator, ptr: rawptr, size: u32, alignment := __DEFAULT_ALLOCATION_ALIGNMENT) -> rawptr {
+raw_resize :: (use a: Allocator, ptr: rawptr, size: u32, alignment := Default_Allocation_Alignment) -> rawptr {
     return func(data, AllocationAction.Resize, size, alignment, ptr);
 }
 
@@ -78,9 +91,4 @@ raw_free :: (use a: Allocator, ptr: rawptr) {
 calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
 cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
-
-
-// @CLEANUP: These need to move to somewhere else eventually
-cmp_asc :: (a: $T, b: T) -> i32 do return cast(i32) (a - b);
-cmp_dec :: (a: $T, b: T) -> i32 do return cast(i32) (b - a);
 
