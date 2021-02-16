@@ -955,7 +955,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         WID(WI_I32_CONST, switch_node->min_case);
         WI(WI_I32_SUB);
     }
-    WIL(WI_JUMP_TABLE, (u64) bt);
+    WIP(WI_JUMP_TABLE, bt);
     WI(WI_BLOCK_END);
 
     bh_arr_each(AstSwitchCase, sc, switch_node->cases) {

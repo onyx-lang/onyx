@@ -580,6 +580,12 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
 static SymresStatus symres_use(AstUse* use) {
     SYMRES(expression, &use->expr);
 
+    if (use->expr->kind == Ast_Kind_Package) {
+        AstPackage* package = (AstPackage *) use->expr;
+        scope_include(curr_scope, package->package->scope, use->token->pos);
+        return Symres_Success;
+    }
+
     if (use->expr->kind == Ast_Kind_Enum_Type) {
         AstEnumType* et = (AstEnumType *) use->expr;
 
