@@ -887,20 +887,15 @@ EMIT_FUNC(for, AstFor* for_node) {
 
     emit_expression(mod, &code, for_node->iter);
 
-    if (for_node->loop_type == For_Loop_Range) {
-        emit_for_range(mod, &code, for_node, iter_local);
-    } else if (for_node->loop_type == For_Loop_Array) {
-        emit_for_array(mod, &code, for_node, iter_local);
-    } else if (for_node->loop_type == For_Loop_Slice) {
-        emit_for_slice(mod, &code, for_node, iter_local);
-    } else if (for_node->loop_type == For_Loop_DynArr) {
+    switch (for_node->loop_type) {
+        case For_Loop_Range:  emit_for_range(mod, &code, for_node, iter_local); break;
+        case For_Loop_Array:  emit_for_array(mod, &code, for_node, iter_local); break;
         // NOTE: A dynamic array is just a slice with an extra capacity field on the end.
         // Just dropping the capacity field will mean we can just use the slice implementation.
         //                                                  - brendanfh   2020/09/04
-        WI(WI_DROP);
-        emit_for_slice(mod, &code, for_node, iter_local);
-    } else {
-        onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
+        case For_Loop_DynArr: WI(WI_DROP);
+        case For_Loop_Slice:  emit_for_slice(mod, &code, for_node, iter_local); break;
+        default: onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
     }
 
     local_free(mod->local_alloc, (AstTyped *) var);
@@ -1051,17 +1046,11 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
     }
 
     b32 is_sign_significant = 0;
-
     switch (binop->operation) {
-        case Binary_Op_Divide:
-        case Binary_Op_Modulus:
-        case Binary_Op_Less:
-        case Binary_Op_Less_Equal:
-        case Binary_Op_Greater:
-        case Binary_Op_Greater_Equal:
+        case Binary_Op_Divide:  case Binary_Op_Modulus:
+        case Binary_Op_Less:    case Binary_Op_Less_Equal:
+        case Binary_Op_Greater: case Binary_Op_Greater_Equal:
             is_sign_significant = 1;
-
-        default: break;
     }
 
     WasmType operator_type = onyx_type_to_wasm_type(binop->left->type);
@@ -1116,11 +1105,8 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
             else {
                 emit_expression(mod, &code, unop->expr);
 
-                if (type->kind == Basic_Kind_F32)
-                    WI(WI_F32_NEG);
-
-                if (type->kind == Basic_Kind_F64)
-                    WI(WI_F64_NEG);
+                if (type->kind == Basic_Kind_F32) WI(WI_F32_NEG);
+                if (type->kind == Basic_Kind_F64) WI(WI_F64_NEG);
             }
 
             break;
@@ -1693,6 +1679,7 @@ EMIT_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
         WI(WI_PTR_MUL);
     }
 
+    // CLEANUP: This is one dense clusterf**k of code...
     u64 offset = 0;
     if (aa->addr->kind == Ast_Kind_Array_Access
         && aa->addr->type->kind == Type_Kind_Array) {
@@ -1755,9 +1742,7 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
 
 EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
     bh_arr(WasmInstruction) code = *pcode;
-
     WID(WI_PTR_CONST, memres->addr);
-
     *pcode = code;
 }
 
@@ -1767,7 +1752,6 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
     u64 local_offset = (u64) bh_imap_get(&mod->local_map, (u64) local);
 
     if (local_offset & LOCAL_IS_WASM) {
-        // CLEANUP structs-by-value
         // This is a weird condition but it is relied on in a couple places including
         // passing non-simple structs by value.             -brendanfh 2020/09/18
         WIL(WI_LOCAL_GET, local_offset);
@@ -2145,7 +2129,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess* ) expr;
 
-            // CLEANUP structs-by-value
             if (field->expr->kind == Ast_Kind_Param) {
                 if (type_get_param_pass(field->expr->type) == Param_Pass_By_Value && !type_is_pointer(field->expr->type)) {
                     u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
@@ -2274,15 +2257,10 @@ EMIT_FUNC(expression, AstTyped* expr) {
             assert(0);
     }
 
-    // FIX: This is going to be wrong for struct types.
-    if (expr->flags & Ast_Flag_Expr_Ignored &&
-        !type_results_in_void(expr->type)) {
-         if (expr->type->kind == Type_Kind_Compound) {
-             fori (i, 0, expr->type->Compound.count)
-                 WI(WI_DROP);
-         } else {
-            WI(WI_DROP);
-        }
+    if (expr->flags & Ast_Flag_Expr_Ignored && !type_results_in_void(expr->type)) {
+        i32 mem_count = 1;
+        if (type_is_compound(expr->type)) mem_count = type_linear_member_count(expr->type);
+        fori (i, 0, mem_count) WI(WI_DROP);
     }
 
     *pcode = code;
