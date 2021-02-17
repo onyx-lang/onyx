@@ -92,3 +92,11 @@ calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
 cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
+new :: ($T: type_expr, allocator := context.allocator) -> ^T {
+    res := cast(^T) calloc(sizeof T);
+    
+    // At some point, it would be nice to initialize the resulting memory, i.e.
+    // *res = T.{};
+
+    return res;
+}
