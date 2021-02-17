@@ -224,7 +224,15 @@ typedef enum WasmInstructionType {
     WI_I64_EXTEND_16_S               = 0xC3,
     WI_I64_EXTEND_32_S               = 0xC4,
 
-
+    // Pointer stuff; this will make it easier to switch to 64-bit
+    // pointers, whenever WebAssembly standarizes that.
+    WI_PTR_CONST                     = WI_I32_CONST,
+    WI_PTR_LOAD                      = WI_I32_LOAD,
+    WI_PTR_STORE                     = WI_I32_STORE,
+    WI_PTR_ADD                       = WI_I32_ADD,
+    WI_PTR_SUB                       = WI_I32_SUB,
+    WI_PTR_MUL                       = WI_I32_MUL,
+    WI_PTR_GE                        = WI_I32_GE_U,
 
     WI_V128_LOAD                     = SIMD_INSTR_MASK | 0,
     WI_V128_STORE                    = SIMD_INSTR_MASK | 11,

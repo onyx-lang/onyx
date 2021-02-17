@@ -38,8 +38,17 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "Flags:\n"
     "\t<input files>           List of initial files\n"
     "\t-o <target_file>        Specify the target file (default: out.wasm)\n"
-    "\t-r <runtime>            Specifies a runtime. Can be: wasi, js, custom.\n"
-    "\t--verbose               Verbose output\n";
+    "\t--runtime, -r <runtime> Specifies a runtime. Can be: wasi, js, custom.\n"
+    "\t--verbose, -V           Verbose output\n"
+    "\t           -VV          Very verbose output\n"
+    "\t           -VVV         Very very verbose output (to be used by compiler developers)\n"
+    "\t--use-post-mvp-features Enables post MVP WASM features such as memory.copy and memory.fill\n"
+    "\n"
+    "Developer flags:\n"
+    "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
+    "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
+    "\n";
+
 
 static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *argv[]) {
     CompileOptions options = {
@@ -98,7 +107,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
             }
-            else if (!strcmp(argv[i], "-r")) {
+            else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--runtime")) {
                 i += 1;
                 if      (!strcmp(argv[i], "wasi"))   options.runtime = Runtime_Wasi;
                 else if (!strcmp(argv[i], "js"))     options.runtime = Runtime_Js;

@@ -16,8 +16,8 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_copy) {
     //     <dest>
     
     u64 count_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    u64 source_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    u64 dest_local   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 source_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    u64 dest_local   = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     
     WIL(WI_LOCAL_SET, count_local);
     WIL(WI_LOCAL_SET, source_local);
@@ -38,11 +38,11 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_copy) {
     
     WIL(WI_LOCAL_GET, dest_local);
     WIL(WI_LOCAL_GET, count_local);
-    WI(WI_I32_ADD);
+    WI(WI_PTR_ADD);
     
     WIL(WI_LOCAL_GET, source_local);
     WIL(WI_LOCAL_GET, count_local);
-    WI(WI_I32_ADD);
+    WI(WI_PTR_ADD);
     
     WID(WI_I32_LOAD_8_U, ((WasmInstructionData) { 0, 0 }));
     WID(WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
@@ -56,8 +56,8 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_copy) {
     WI(WI_IF_END);
     
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     
     *pcode = code;
 }
@@ -72,7 +72,7 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_fill) {
     
     u64 count_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     u64 byte_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    u64 dest_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 dest_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     
     WIL(WI_LOCAL_SET, count_local);
     WIL(WI_LOCAL_SET, byte_local);
@@ -93,7 +93,7 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_fill) {
     
     WIL(WI_LOCAL_GET, dest_local);
     WIL(WI_LOCAL_GET, count_local);
-    WI(WI_I32_ADD);
+    WI(WI_PTR_ADD);
     
     WIL(WI_LOCAL_GET, byte_local);
     WID(WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
@@ -108,7 +108,7 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_fill) {
     
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     
     *pcode = code;
 }

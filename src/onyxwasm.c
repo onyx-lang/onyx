@@ -2,22 +2,13 @@
 #include "onyxwasm.h"
 #include "onyxutils.h"
 
-// NOTE: Allows easier testing of types since most of the characters
-// corresponding to these values are not printable
-#if 1
 #define WASM_TYPE_INT32   0x7F
 #define WASM_TYPE_INT64   0x7E
 #define WASM_TYPE_FLOAT32 0x7D
 #define WASM_TYPE_FLOAT64 0x7C
 #define WASM_TYPE_VAR128  0x7B
+#define WASM_TYPE_PTR     WASM_TYPE_INT32
 #define WASM_TYPE_VOID    0x00
-#else
-#define WASM_TYPE_INT32   'A'
-#define WASM_TYPE_INT64   'B'
-#define WASM_TYPE_FLOAT32 'C'
-#define WASM_TYPE_FLOAT64 'D'
-#define WASM_TYPE_VOID    'E'
-#endif
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
     if (type->kind == Type_Kind_Struct) {
@@ -33,11 +24,11 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
     }
 
     if (type->kind == Type_Kind_Pointer) {
-        return WASM_TYPE_INT32;
+        return WASM_TYPE_PTR;
     }
 
     if (type->kind == Type_Kind_Array) {
-        return WASM_TYPE_INT32;
+        return WASM_TYPE_PTR;
     }
 
     if (type->kind == Type_Kind_Function) {
@@ -451,8 +442,7 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
         }
         u32 elem_size = type_size_of(elem_type);
 
-        // :32BitPointers
-        u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
         emit_location(mod, &code, left);
         WIL(WI_LOCAL_SET, lptr_local);
@@ -464,7 +454,7 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
             emit_store_instruction(mod, &code, elem_type, i * elem_size);
         }
         
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     } else {
         u64 offset = 0;
@@ -566,9 +556,8 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
 
     if (type->kind == Type_Kind_Array) {
         if (offset != 0) {
-            // :32BitPointers
-            WID(WI_I32_CONST, offset);
-            WI(WI_I32_ADD);
+            WID(WI_PTR_CONST, offset);
+            WI(WI_PTR_ADD);
         }
 
         *pcode = code;
@@ -758,12 +747,12 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     u64 end_ptr_local, ptr_local;
-    end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
     if (for_node->by_pointer) {
         ptr_local = iter_local;
     } else {
-        ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     }
 
     AstLocal* var = for_node->var;
@@ -774,20 +763,18 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     if (for_node->by_pointer) elem_size = type_size_of(var->type->Pointer.elem);
     else                      elem_size = type_size_of(var->type);
 
-    // :32BitPointers
     WIL(WI_LOCAL_TEE, ptr_local);
-    WIL(WI_I32_CONST, for_node->iter->type->Array.count * elem_size);
-    WI(WI_I32_ADD);
+    WIL(WI_PTR_CONST, for_node->iter->type->Array.count * elem_size);
+    WI(WI_PTR_ADD);
     WIL(WI_LOCAL_SET, end_ptr_local);
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block);
 
-    // :32BitPointers
     WIL(WI_LOCAL_GET, ptr_local);
     WIL(WI_LOCAL_GET, end_ptr_local);
-    WI(WI_I32_GE_U);
+    WI(WI_PTR_GE);
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
@@ -804,10 +791,9 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
 
     emit_leave_structured_block(mod, &code);
 
-    // :32BitPointers
     WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_I32_CONST, elem_size);
-    WI(WI_I32_ADD);
+    WIL(WI_PTR_CONST, elem_size);
+    WI(WI_PTR_ADD);
     WIL(WI_LOCAL_SET, ptr_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
@@ -816,8 +802,8 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
 
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     *pcode = code;
 }
@@ -826,12 +812,12 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     u64 end_ptr_local, ptr_local;
-    end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
     if (for_node->by_pointer) {
         ptr_local = iter_local;
     } else {
-        ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     }
 
     AstLocal* var = for_node->var;
@@ -842,25 +828,23 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     if (for_node->by_pointer) elem_size = type_size_of(var->type->Pointer.elem);
     else                      elem_size = type_size_of(var->type);
 
-    // :32BitPointers
     WIL(WI_LOCAL_SET, end_ptr_local);
     WIL(WI_LOCAL_TEE, ptr_local);
     WIL(WI_LOCAL_GET, end_ptr_local);
     if (elem_size != 1) {
-        WID(WI_I32_CONST, elem_size);
-        WI(WI_I32_MUL);
+        WID(WI_PTR_CONST, elem_size);
+        WI(WI_PTR_MUL);
     }
-    WI(WI_I32_ADD);
+    WI(WI_PTR_ADD);
     WIL(WI_LOCAL_SET, end_ptr_local);
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block);
 
-    // :32BitPointers
     WIL(WI_LOCAL_GET, ptr_local);
     WIL(WI_LOCAL_GET, end_ptr_local);
-    WI(WI_I32_GE_U);
+    WI(WI_PTR_GE);
     WID(WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
@@ -877,10 +861,9 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
 
     emit_leave_structured_block(mod, &code);
 
-    // :32BitPointers
     WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_I32_CONST, elem_size);
-    WI(WI_I32_ADD);
+    WIL(WI_PTR_CONST, elem_size);
+    WI(WI_PTR_ADD);
     WIL(WI_LOCAL_SET, ptr_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
@@ -889,8 +872,8 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
 
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     *pcode = code;
 }
@@ -904,20 +887,15 @@ EMIT_FUNC(for, AstFor* for_node) {
 
     emit_expression(mod, &code, for_node->iter);
 
-    if (for_node->loop_type == For_Loop_Range) {
-        emit_for_range(mod, &code, for_node, iter_local);
-    } else if (for_node->loop_type == For_Loop_Array) {
-        emit_for_array(mod, &code, for_node, iter_local);
-    } else if (for_node->loop_type == For_Loop_Slice) {
-        emit_for_slice(mod, &code, for_node, iter_local);
-    } else if (for_node->loop_type == For_Loop_DynArr) {
+    switch (for_node->loop_type) {
+        case For_Loop_Range:  emit_for_range(mod, &code, for_node, iter_local); break;
+        case For_Loop_Array:  emit_for_array(mod, &code, for_node, iter_local); break;
         // NOTE: A dynamic array is just a slice with an extra capacity field on the end.
         // Just dropping the capacity field will mean we can just use the slice implementation.
         //                                                  - brendanfh   2020/09/04
-        WI(WI_DROP);
-        emit_for_slice(mod, &code, for_node, iter_local);
-    } else {
-        onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
+        case For_Loop_DynArr: WI(WI_DROP);
+        case For_Loop_Slice:  emit_for_slice(mod, &code, for_node, iter_local); break;
+        default: onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
     }
 
     local_free(mod->local_alloc, (AstTyped *) var);
@@ -977,7 +955,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         WID(WI_I32_CONST, switch_node->min_case);
         WI(WI_I32_SUB);
     }
-    WIL(WI_JUMP_TABLE, (u64) bt);
+    WIP(WI_JUMP_TABLE, bt);
     WI(WI_BLOCK_END);
 
     bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
@@ -1068,17 +1046,11 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
     }
 
     b32 is_sign_significant = 0;
-
     switch (binop->operation) {
-        case Binary_Op_Divide:
-        case Binary_Op_Modulus:
-        case Binary_Op_Less:
-        case Binary_Op_Less_Equal:
-        case Binary_Op_Greater:
-        case Binary_Op_Greater_Equal:
+        case Binary_Op_Divide:  case Binary_Op_Modulus:
+        case Binary_Op_Less:    case Binary_Op_Less_Equal:
+        case Binary_Op_Greater: case Binary_Op_Greater_Equal:
             is_sign_significant = 1;
-
-        default: break;
     }
 
     WasmType operator_type = onyx_type_to_wasm_type(binop->left->type);
@@ -1133,11 +1105,8 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
             else {
                 emit_expression(mod, &code, unop->expr);
 
-                if (type->kind == Basic_Kind_F32)
-                    WI(WI_F32_NEG);
-
-                if (type->kind == Basic_Kind_F64)
-                    WI(WI_F64_NEG);
+                if (type->kind == Basic_Kind_F32) WI(WI_F32_NEG);
+                if (type->kind == Basic_Kind_F64) WI(WI_F64_NEG);
             }
 
             break;
@@ -1206,14 +1175,13 @@ EMIT_FUNC(call, AstCall* call) {
         if (place_on_stack) WID(WI_GLOBAL_GET, stack_top_idx);
 
         if (stack_grow_amm != 0) {
-            stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+            stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
             WID(WI_GLOBAL_GET, stack_top_idx);
             WIL(WI_LOCAL_SET, stack_top_store_local);
 
-            // :32BitPointers
             WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_I32_CONST, stack_grow_amm);
-            WI(WI_I32_ADD);
+            WID(WI_PTR_CONST, stack_grow_amm);
+            WI(WI_PTR_ADD);
             WID(WI_GLOBAL_SET, stack_top_idx);
         }
 
@@ -1223,7 +1191,7 @@ EMIT_FUNC(call, AstCall* call) {
             WIL(WI_LOCAL_GET, stack_top_store_local);
             WID(WI_GLOBAL_SET, stack_top_idx);
 
-            local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+            local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
         }
 
         if (place_on_stack) {
@@ -1231,10 +1199,9 @@ EMIT_FUNC(call, AstCall* call) {
 
             if (arg->va_kind != VA_Kind_Not_VA) vararg_count += 1;
             else {
-                // :32BitPointers
                 WID(WI_GLOBAL_GET, stack_top_idx);
-                WID(WI_I32_CONST, stack_grow_amm);
-                WI(WI_I32_ADD);
+                WID(WI_PTR_CONST, stack_grow_amm);
+                WI(WI_PTR_ADD);
             }
 
             stack_grow_amm += type_size_of(arg->value->type);
@@ -1243,20 +1210,18 @@ EMIT_FUNC(call, AstCall* call) {
 
     switch (call->va_kind) {
         case VA_Kind_Typed: {
-            // :32BitPointers
             WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_I32_CONST, vararg_offset);
-            WI(WI_I32_ADD);
+            WID(WI_PTR_CONST, vararg_offset);
+            WI(WI_PTR_ADD);
             WID(WI_I32_CONST, vararg_count);
             break;
         }
 
         case VA_Kind_Untyped: {
-            // :32BitPointers
             WID(WI_GLOBAL_GET, stack_top_idx);
             WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_I32_CONST, vararg_offset);
-            WI(WI_I32_ADD);
+            WID(WI_PTR_CONST, vararg_offset);
+            WI(WI_PTR_ADD);
             emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], stack_grow_amm);
 
             // NOTE: There will be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
@@ -1266,8 +1231,8 @@ EMIT_FUNC(call, AstCall* call) {
             emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm + 8);
 
             WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_I32_CONST, stack_grow_amm);
-            WI(WI_I32_ADD);
+            WID(WI_PTR_CONST, stack_grow_amm);
+            WI(WI_PTR_ADD);
 
             stack_grow_amm += 12;
             break;
@@ -1294,10 +1259,9 @@ EMIT_FUNC(call, AstCall* call) {
     bh_align(stack_grow_amm, 16);
 
     if (needs_stack) {
-        // :32BitPointers
         WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_I32_CONST, stack_grow_amm);
-        WI(WI_I32_ADD);
+        WID(WI_PTR_CONST, stack_grow_amm);
+        WI(WI_PTR_ADD);
         WID(WI_GLOBAL_SET, stack_top_idx);
     }
 
@@ -1313,10 +1277,9 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
     if (needs_stack) {
-        // :32BitPointers
         WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_I32_CONST, stack_grow_amm);
-        WI(WI_I32_SUB);
+        WID(WI_PTR_CONST, stack_grow_amm);
+        WI(WI_PTR_SUB);
         WID(WI_GLOBAL_SET, stack_top_idx);
     }
 
@@ -1712,11 +1675,11 @@ EMIT_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
 
     emit_expression(mod, &code, aa->expr);
     if (aa->elem_size != 1) {
-        // :32BitPointers
-        WID(WI_I32_CONST, aa->elem_size);
-        WI(WI_I32_MUL);
+        WID(WI_PTR_CONST, aa->elem_size);
+        WI(WI_PTR_MUL);
     }
 
+    // CLEANUP: This is one dense clusterf**k of code...
     u64 offset = 0;
     if (aa->addr->kind == Ast_Kind_Array_Access
         && aa->addr->type->kind == Type_Kind_Array) {
@@ -1734,8 +1697,7 @@ EMIT_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
         emit_expression(mod, &code, aa->addr);
     }
 
-    // :32BitPointers
-    WI(WI_I32_ADD);
+    WI(WI_PTR_ADD);
 
     *offset_return += offset;
 
@@ -1780,10 +1742,7 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
 
 EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
     bh_arr(WasmInstruction) code = *pcode;
-
-    // :32BitPointers
-    WID(WI_I32_CONST, memres->addr);
-
+    WID(WI_PTR_CONST, memres->addr);
     *pcode = code;
 }
 
@@ -1793,7 +1752,6 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
     u64 local_offset = (u64) bh_imap_get(&mod->local_map, (u64) local);
 
     if (local_offset & LOCAL_IS_WASM) {
-        // CLEANUP structs-by-value
         // This is a weird condition but it is relied on in a couple places including
         // passing non-simple structs by value.             -brendanfh 2020/09/18
         WIL(WI_LOCAL_GET, local_offset);
@@ -1828,7 +1786,7 @@ EMIT_FUNC(compound_load, Type* type, u64 offset) {
         type_linear_member_lookup(type, 0, &two);
         emit_load_instruction(mod, &code, two.type, offset + two.offset); // two.offset should be 0
     } else {
-        u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         WIL(WI_LOCAL_TEE, tmp_idx);
 
         fori (i, 0, mem_count) {
@@ -1837,7 +1795,7 @@ EMIT_FUNC(compound_load, Type* type, u64 offset) {
             emit_load_instruction(mod, &code, two.type, offset + two.offset);
         }
 
-        local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+        local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     }
 
     *pcode = code;
@@ -1851,7 +1809,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
 
     TypeWithOffset two;
 
-    u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     if (location_first) WIL(WI_LOCAL_SET, loc_idx);
 
     i32 elem_count = type_linear_member_count(type);
@@ -1880,7 +1838,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     }
 
     bh_arr_free(temp_locals);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     *pcode = code;
 }
@@ -1907,8 +1865,8 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     }
     u32 elem_size = type_size_of(elem_type);
 
-    u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     WIL(WI_LOCAL_SET, rptr_local);
     WIL(WI_LOCAL_SET, lptr_local);
 
@@ -1928,8 +1886,8 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
         emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
     }
 
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     *pcode = code;
     return;
@@ -1952,9 +1910,8 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     }
 
     WIL(WI_LOCAL_GET, mod->stack_base_idx);
-    // :32BitPointers
-    WIL(WI_I32_CONST, local_offset);
-    WI(WI_I32_ADD);
+    WIL(WI_PTR_CONST, local_offset);
+    WI(WI_PTR_ADD);
 
     *pcode = code;
 }
@@ -1999,8 +1956,7 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
 
         case Ast_Kind_Memres: {
             AstMemRes* memres = (AstMemRes *) expr;
-            // :32BitPointers
-            WID(WI_I32_CONST, memres->addr);
+            WID(WI_PTR_CONST, memres->addr);
             *offset_return = 0;
             break;
         }
@@ -2020,9 +1976,8 @@ EMIT_FUNC(location, AstTyped* expr) {
     u64 offset = 0;
     emit_location_return_offset(mod, &code, expr, &offset);
     if (offset != 0) {
-        // :32BitPointers
-        WID(WI_I32_CONST, offset);
-        WI(WI_I32_ADD);
+        WID(WI_PTR_CONST, offset);
+        WI(WI_PTR_ADD);
     } 
 
     *pcode = code;
@@ -2077,9 +2032,8 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 if (expr->type->kind != Type_Kind_Array) {
                     emit_load_instruction(mod, &code, expr->type, offset);
                 } else if (offset != 0) {
-                    // :32BitPointers
-                    WID(WI_I32_CONST, offset);
-                    WI(WI_I32_ADD);
+                    WID(WI_PTR_CONST, offset);
+                    WI(WI_PTR_ADD);
                 }
             }
 
@@ -2117,8 +2071,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_StrLit: {
-            // :32BitPointers
-            WID(WI_I32_CONST, ((AstStrLit *) expr)->addr);
+            WID(WI_PTR_CONST, ((AstStrLit *) expr)->addr);
             WID(WI_I32_CONST, ((AstStrLit *) expr)->length);
             break;
         }
@@ -2141,7 +2094,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Function: {
             i32 elemidx = get_element_idx(mod, (AstFunction *) expr);
 
-            // :32BitPointers
             WID(WI_I32_CONST, elemidx);
             break;
         }
@@ -2177,7 +2129,6 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess* ) expr;
 
-            // CLEANUP structs-by-value
             if (field->expr->kind == Ast_Kind_Param) {
                 if (type_get_param_pass(field->expr->type) == Param_Pass_By_Value && !type_is_pointer(field->expr->type)) {
                     u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
@@ -2286,8 +2237,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_File_Contents: {
             AstFileContents* fc = (AstFileContents *) expr;
 
-            // :32BitPointers
-            WID(WI_I32_CONST, fc->addr);
+            WID(WI_PTR_CONST, fc->addr);
             WID(WI_I32_CONST, fc->size);
             break;
         }
@@ -2307,15 +2257,10 @@ EMIT_FUNC(expression, AstTyped* expr) {
             assert(0);
     }
 
-    // FIX: This is going to be wrong for struct types.
-    if (expr->flags & Ast_Flag_Expr_Ignored &&
-        !type_results_in_void(expr->type)) {
-         if (expr->type->kind == Type_Kind_Compound) {
-             fori (i, 0, expr->type->Compound.count)
-                 WI(WI_DROP);
-         } else {
-            WI(WI_DROP);
-        }
+    if (expr->flags & Ast_Flag_Expr_Ignored && !type_results_in_void(expr->type)) {
+        i32 mem_count = 1;
+        if (type_is_compound(expr->type)) mem_count = type_linear_member_count(expr->type);
+        fori (i, 0, mem_count) WI(WI_DROP);
     }
 
     *pcode = code;
@@ -2644,7 +2589,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             // NOTE: '5' needs to match the number of instructions it takes
             // to setup a stack frame
             bh_arr_insert_end(wasm_func.code, 5);
-            mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+            mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         }
 
         // Generate code
