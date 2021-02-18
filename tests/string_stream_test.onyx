@@ -9,7 +9,7 @@ main :: proc (args: [] cstr) {
     sreader := io.reader_make(^sstream);
 
     for i: 0 .. 2 {
-        word := io.read_word(^sreader, context.temp_allocator);
+        word := io.read_word(^sreader, allocator=context.temp_allocator);
         println(word);
     }
 
