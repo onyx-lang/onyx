@@ -126,6 +126,11 @@ stream_peek_byte :: (use s: ^Stream) -> (Error, u8) {
     return Error.None, out;
 }
 
+stream_end_of_file :: (use s: ^Stream) -> bool {
+    err, _ := stream_peek_byte(s);
+    return err == Error.EOF;
+}
+
 
 
 //

@@ -10,6 +10,11 @@ reader_make :: (s: ^Stream) -> Reader {
     return Reader.{ s };
 }
 
+read_byte :: (use reader: ^Reader) -> u8 {
+    err, byte := stream_read_byte(stream);
+    return byte;
+}
+
 read_u32 :: (use reader: ^Reader) -> u32 {
     n: u32 = 0;
 
@@ -71,7 +76,7 @@ read_line :: (use reader: ^Reader, allocator := context.allocator) -> str {
     return out;
 }
 
-read_word :: (use reader: ^Reader, allocator := context.allocator) -> str {
+read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := context.allocator) -> str {
     skip_whitespace(reader);
 
     _, curr_pos := stream_tell(stream);
@@ -83,6 +88,8 @@ read_word :: (use reader: ^Reader, allocator := context.allocator) -> str {
         if     (curr >= #char "a" && curr <= #char "z")
             || (curr >= #char "A" && curr <= #char "Z")
             || curr == #char "_" {
+            count += 1;
+        } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
             count += 1;
         } else {
             break;
@@ -101,6 +108,41 @@ read_word :: (use reader: ^Reader, allocator := context.allocator) -> str {
 
     stream_read(stream, out);
     return out;
+}
+
+read_until :: (use reader: ^Reader, until: u8, allocator := context.allocator, consume_end := false) -> str {
+    _, curr_pos := stream_tell(stream);
+
+    count := 0;
+    err, curr := stream_read_byte(stream);
+
+    while true {
+        if curr != until {
+            count += 1;
+        } else {
+            break;
+        }
+
+        err, curr = stream_read_byte(stream);
+        if err != Error.None do break;
+    }
+
+    if consume_end do count += 1;
+
+    stream_seek(stream, curr_pos, SeekFrom.Start);
+
+    out := str.{
+        data  = raw_alloc(allocator, count * sizeof(u8)),
+        count = count,
+    };
+
+    stream_read(stream, out);
+    return out;
+}
+
+peek_byte :: (use reader: ^Reader) -> u8 {
+    err, byte := stream_peek_byte(stream);
+    return byte;
 }
 
 advance_line :: (use reader: ^Reader) {
