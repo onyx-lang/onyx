@@ -23,14 +23,15 @@ length :: proc {
     },
 }
 
-alloc_copy :: (orig: str) -> str {
+alloc_copy :: (orig: str, allocator := context.allocator) -> str {
     new_str : str;
-    new_str.data = calloc(sizeof u8 * orig.count);
+    new_str.data = raw_alloc(allocator, sizeof u8 * orig.count);
     new_str.count = orig.count;
     copy(orig, new_str);
     return new_str;
 }
 
+// @Speed: This should use memory.copy?
 copy :: (orig: str, dest: str) {
     len := orig.count;
     if dest.count < len do len = dest.count;
