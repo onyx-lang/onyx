@@ -402,7 +402,14 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
             emit_expression(mod, &code, assign->right);
 
             u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
-            WIL(WI_LOCAL_SET, localidx);
+
+            if (lval->kind == Ast_Kind_Param && type_is_structlike_strict(lval->type)) {
+                u32 mem_count = type_structlike_mem_count(lval->type);
+                fori (i, 0, mem_count) WIL(WI_LOCAL_SET, localidx + i);
+
+            } else {
+                WIL(WI_LOCAL_SET, localidx);
+            }
 
             *pcode = code;
             return;

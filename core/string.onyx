@@ -1,5 +1,7 @@
 package core.string
 
+use package core
+
 make :: (s: cstr) -> str {
     len := length(s);
 
@@ -143,6 +145,26 @@ strip_trailing_whitespace :: (s: ^str) {
     }
 }
 
+advance :: proc {
+    // Inplace version
+    (s: ^str, chars := 1) {
+        chars = math.min(chars, s.count);
+
+        s.data += chars;
+        s.count -= chars;
+    },
+
+    // Out of place version
+    (s: str, chars := 1) -> str {
+        chars = math.min(chars, s.count);
+        out := s;
+
+        out.data += chars;
+        out.count -= chars;
+
+        return out;
+    }
+}
 
 read_u32 :: (s: ^str, out: ^u32) {
     n := 0;

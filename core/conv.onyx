@@ -1,5 +1,28 @@
 package core.conv
 
+str_to_i64 :: (s: str) -> i64 {
+    use package core
+
+    value: i64 = 0;
+    mul := 1;
+
+    if s[0] == #char "-" {
+        mul = -1;
+        s = string.advance(s, 1);
+    }
+
+    for c: s do switch c {
+        case #char "0" .. #char "9" {
+            value *= 10;
+            value += ~~(c - #char "0");
+        }
+
+        case #default do break break;
+    }
+
+    return value * ~~mul;
+}
+
 i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
     is_neg := false;
     if n < 0 && base == 10 {
