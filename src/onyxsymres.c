@@ -403,7 +403,7 @@ static SymresStatus symres_array_literal(AstArrayLiteral* al) {
     SYMRES(type, (AstType **) &al->atnode);
 
     al->type_node = (AstType *) al->atnode;
-    while (al->type_node->kind == Ast_Kind_Type_Alias)
+    while (al->type_node && al->type_node->kind == Ast_Kind_Type_Alias)
         al->type_node = ((AstTypeAlias *) al->type_node)->to;
 
     bh_arr_each(AstTyped *, expr, al->values)

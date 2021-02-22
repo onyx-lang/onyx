@@ -218,6 +218,8 @@ typedef enum AstFlags {
     Ast_Flag_From_Polymorphism     = BH_BIT(23),
 
     Ast_Flag_Incomplete_Body       = BH_BIT(24),
+
+    Ast_Flag_Array_Literal_Typed   = BH_BIT(25),
 } AstFlags;
 
 typedef enum UnaryOp {

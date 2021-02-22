@@ -1102,17 +1102,24 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
 }
 
 CheckStatus check_array_literal(AstArrayLiteral* al) {
-    if (!node_is_type((AstNode *) al->atnode)) {
-        onyx_report_error(al->token->pos, "Array type is not a type.");
-        return Check_Error;
-    }
+    if ((al->flags & Ast_Flag_Array_Literal_Typed) == 0) {
+        if (al->atnode == NULL) return Check_Success;
 
-    fill_in_type((AstTyped *) al);
+        if (!node_is_type((AstNode *) al->atnode)) {
+            onyx_report_error(al->token->pos, "Array type is not a type.");
+            return Check_Error;
+        }
 
-    al->type = type_make_array(context.ast_alloc, al->type, bh_arr_length(al->values));
-    if (al->type == NULL || al->type->kind != Type_Kind_Array) {
-        onyx_report_error(al->token->pos, "Expected array type for array literal. This is a compiler bug.");
-        return Check_Error;
+        fill_in_type((AstTyped *) al);
+        if (al->type == NULL) return Check_Error;
+
+        al->type = type_make_array(context.ast_alloc, al->type, bh_arr_length(al->values));
+        if (al->type == NULL || al->type->kind != Type_Kind_Array) {
+            onyx_report_error(al->token->pos, "Expected array type for array literal. This is a compiler bug.");
+            return Check_Error;
+        }
+
+        al->flags |= Ast_Flag_Array_Literal_Typed;
     }
 
     if (al->type->Array.count != (u32) bh_arr_length(al->values)) {
