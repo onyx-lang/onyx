@@ -654,14 +654,6 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         return Check_Error;
     }
 
-    if (binop->right->type == NULL) {
-        // nocheckin
-        // onyx_report_error(binop->token->pos,
-        //         "Unable to resolve type for symbol '%b'.",
-        //         binop->right->token->text, binop->right->token->length);
-        return Check_Error;
-    }
-
     if (binop->operation == Binary_Op_Assign) {
         // NOTE: Raw assignment
 
@@ -670,6 +662,11 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         // the right hand side.
         if (binop->left->type == NULL) {
             resolve_expression_type(binop->right);
+
+            if (binop->right->type == NULL) {
+                onyx_report_error(binop->token->pos, "Could not resolve type of right hand side to infer.");
+                return Check_Error;
+            }
 
             if (binop->right->type->kind == Type_Kind_Compound) {
                 AstCompound* lhs = (AstCompound *) binop->left;
@@ -718,6 +715,13 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
                 node_get_type_name(binop->left));
         return Check_Error;
     }
+
+    // CLEANUP: This seems like it should be here. But I don't know where
+    // or what the right place is for it.
+    // if (binop->right->type == NULL) {
+    //     onyx_report_error(binop->right->token->pos, "Unable to resolve type for this expression.");
+    //     return Check_Error;
+    // }
 
     binop->type = &basic_types[Basic_Kind_Void];
 
@@ -1028,13 +1032,17 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
 }
 
 CheckStatus check_struct_literal(AstStructLiteral* sl) {
-    if (!node_is_type((AstNode *) sl->stnode)) {
-        onyx_report_error(sl->token->pos, "Struct type is not a type.");
-        return Check_Error;
-    }
+    if (sl->type == NULL) {
+        if (sl->stnode == NULL) return Check_Success;
 
-    fill_in_type((AstTyped *) sl);
-    if (sl->type == NULL) return Check_Error;
+        if (!node_is_type((AstNode *) sl->stnode)) {
+            onyx_report_error(sl->token->pos, "Type used for struct literal is not a type.");
+            return Check_Error;
+        }
+
+        fill_in_type((AstTyped *) sl);
+        if (sl->type == NULL) return Check_Error;
+    }
 
     if (!type_is_structlike_strict(sl->type)) {
         onyx_report_error(sl->token->pos, "Type is not a constructable using a struct literal.");

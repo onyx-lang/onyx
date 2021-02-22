@@ -426,6 +426,13 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
 
     if (node_is_type((AstNode *) node)) return 0;
 
+    if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
+        node->type = type;
+
+        add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
+        return 1;
+    }
+
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return 0;

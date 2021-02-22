@@ -6,7 +6,6 @@ List of known bugs:
 
 [ ] Aliasing in many cases does not work. For example:
     
-    arr.data[idx] = x;
     SomeNamespace :: struct {
         foo :: () { ... }
         bar :: ...
@@ -17,3 +16,23 @@ List of known bugs:
 
         SN.foo()
     }
+
+List of things to change:
+[ ] Currently, there is no way to use the initialized members of a structure without using a struct literal.
+    There should be a initialize intrinsic procedure that takes a pointer to anything and initializes it.
+    For example:
+
+    initialize :: (x: ^$T) -> void #intrinsic ---
+
+    Foo :: struct {
+        x := 1;
+        y : f32;
+    }
+
+    x : Foo;
+    initialize(^x);
+
+    // x.x = 1
+    // x.y = <uninitialized>
+
+[ ] Anonymous struct, enum and array literals.

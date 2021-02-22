@@ -390,7 +390,7 @@ static SymresStatus symres_struct_literal(AstStructLiteral* sl) {
     SYMRES(type, (AstType **) &sl->stnode);
 
     sl->type_node = (AstType *) sl->stnode;
-    while (sl->type_node->kind == Ast_Kind_Type_Alias)
+    while (sl->type_node && sl->type_node->kind == Ast_Kind_Type_Alias)
         sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
 
     SYMRES(arguments, &sl->args);

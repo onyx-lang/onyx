@@ -5,10 +5,10 @@
             "configuration": {
                 "type": "cppdbg",
                 "request": "launch",
-                "program": "/mnt/c/dev/onyx/bin/onyx",
-                "args": ["-VVV", "test/basic"],
+                "program": "${workspaceFolder}/bin/onyx",
+                "args": ["-VVV", "tmp/a"],
                 "stopAtEntry": true,
-                "cwd": "/mnt/c/dev/onyx-imgui",
+                "cwd": "${workspaceFolder}",
                 "environment": [],
                 "externalConsole": false,
                 "MIMode": "gdb",

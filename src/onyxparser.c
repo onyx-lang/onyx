@@ -355,6 +355,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '.': {
+            if (parse_possible_struct_literal(parser, NULL, &retval)) return retval;
+            if (parse_possible_array_literal(parser, NULL, &retval))  return retval;
+            goto no_match;
+        }
+
         case Token_Type_Tilde_Tilde: {
             AstUnaryOp* ac_node = make_node(AstUnaryOp, Ast_Kind_Unary_Op);
             ac_node->operation = Unary_Op_Auto_Cast;
@@ -566,12 +572,13 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
-            onyx_report_error(parser->curr->pos, "invalid directive in expression.");
+            onyx_report_error(parser->curr->pos, "Invalid directive in expression.");
             return NULL;
         }
 
         default:
-            onyx_report_error(parser->curr->pos, "unexpected token '%s'.", token_name(parser->curr->type));
+        no_match:
+            onyx_report_error(parser->curr->pos, "Unexpected token '%s'.", token_name(parser->curr->type));
             return NULL;
     }
 
