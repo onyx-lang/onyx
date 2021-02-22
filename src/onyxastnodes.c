@@ -434,8 +434,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     }
 
     if (node->kind == Ast_Kind_Array_Literal && node->type_node == NULL) {
-        i32 value_count = bh_arr_length(((AstArrayLiteral *) node)->values);
-        node->type = type; // type_make_array(context.ast_alloc, type, value_count);
+        node->type = type;
         node->flags |= Ast_Flag_Array_Literal_Typed;
 
         add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);

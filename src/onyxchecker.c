@@ -1045,7 +1045,9 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     }
 
     if (!type_is_structlike_strict(sl->type)) {
-        onyx_report_error(sl->token->pos, "Type is not a constructable using a struct literal.");
+        onyx_report_error(sl->token->pos,
+                "'%s' is not a constructable using a struct literal.",
+                type_get_name(sl->type));
         return Check_Error;
     }
 
@@ -1200,7 +1202,7 @@ CheckStatus check_address_of(AstAddressOf* aof) {
             && aof->expr->kind != Ast_Kind_Memres
             && aof->expr->kind != Ast_Kind_Local)
             || (aof->expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
-        onyx_report_error(aof->token->pos, "Cannot take the address of value.");
+        onyx_report_error(aof->token->pos, "Cannot take the address of something that is not an l-value.");
         return Check_Error;
     }
 
