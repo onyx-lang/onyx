@@ -2608,6 +2608,21 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         }
     }
 
+    {    
+        WasmFuncType* ft = mod->types[type_idx];
+        switch (ft->return_type) {
+            case WASM_TYPE_INT32:   bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_I32_CONST, 0x00 })); break;
+            case WASM_TYPE_INT64:   bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_I64_CONST, 0x00 })); break;
+            case WASM_TYPE_FLOAT32: bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_F32_CONST, 0x00 })); break;
+            case WASM_TYPE_FLOAT64: bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_F64_CONST, 0x00 })); break;
+            case WASM_TYPE_VAR128:  {
+                static u8 zero_v128[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+                bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_V128_CONST, { .p = &zero_v128 } }));
+                break;
+            }
+        }
+    }
+
     bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
 
     // HACK: This is gross

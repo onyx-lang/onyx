@@ -233,13 +233,13 @@ log :: (a: $T, base: $R) -> T {
 max :: proc { wasm.max_f32, wasm.max_f64, max_poly }
 max_poly :: (a: $T, b: T) -> T {
     if a >= b do return a;
-    return b;
+    else      do return b;
 }
 
 min :: proc { wasm.min_f32, wasm.min_f64, min_poly }
 min_poly :: (a: $T, b: T) -> T {
     if a <= b do return a;
-    return b;
+    else      do return b;
 }
 
 clamp :: (v: $T, lo: T, hi: T) -> T {
@@ -256,7 +256,7 @@ sqrt_poly :: proc (x: $T) -> T {
 abs :: proc { wasm.abs_f32, wasm.abs_f64, abs_poly }
 abs_poly :: (x: $T) -> T {
     if x >= 0 do return x;
-    return -x;
+    else      do return -x;
 }
 
 sign :: (x: $T) -> T {
