@@ -192,6 +192,7 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
     res->flags |= Ast_Flag_Comptime;
     res->type_node = node->type_node;
     res->type = node->type;
+    res->next = node->next;
 
     switch (node->operation) {
     case Binary_Op_Add:           REDUCE_BINOP_ALL(+);
@@ -254,6 +255,7 @@ AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
     res->flags |= Ast_Flag_Comptime;
     res->type_node = unop->type_node;
     res->type = unop->type;
+    res->next = unop->next;
 
     switch (unop->operation) {
         case Unary_Op_Negate: REDUCE_UNOP(-);
