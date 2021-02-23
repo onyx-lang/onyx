@@ -2264,7 +2264,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             assert(0);
     }
 
-    if (expr->flags & Ast_Flag_Expr_Ignored && !type_results_in_void(expr->type)) {
+    if ((expr->flags & Ast_Flag_Expr_Ignored) != 0 && !type_results_in_void(expr->type)) {
         i32 mem_count = 1;
         if (type_is_compound(expr->type)) mem_count = type_linear_member_count(expr->type);
         fori (i, 0, mem_count) WI(WI_DROP);

@@ -1096,7 +1096,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             return Check_Error;
         }
 
-        sl->flags &= ((*actual)->flags & Ast_Flag_Comptime);
+        sl->flags &= ((*actual)->flags & Ast_Flag_Comptime) | (sl->flags &~ Ast_Flag_Comptime);
         actual++;
     }
 
@@ -1136,7 +1136,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
     bh_arr_each(AstTyped *, expr, al->values) {
         CHECK(expression, expr);
 
-        al->flags &= ((*expr)->flags & Ast_Flag_Comptime);
+        al->flags &= ((*expr)->flags & Ast_Flag_Comptime) | (al->flags &~ Ast_Flag_Comptime);
 
         if (!type_check_or_auto_cast(expr, elem_type)) {
             onyx_report_error((*expr)->token->pos, "Mismatched types for value of in array, expected '%s', got '%s'.",
@@ -1579,17 +1579,20 @@ CheckStatus check_block(AstBlock* block) {
 
     bh_arr_each(AstTyped *, value, block->allocate_exprs) {
         fill_in_type(*value);
-        if ((*value)->type == NULL) {
-            onyx_report_error((*value)->token->pos,
-                    "Unable to resolve type for local '%b'.",
-                    (*value)->token->text, (*value)->token->length);
-            return Check_Error;
-        }
 
-        if ((*value)->type->kind == Type_Kind_Compound) {
-            onyx_report_error((*value)->token->pos,
-                    "Compound type not allowed as local variable type. Try splitting this into multiple variables.");
-            return Check_Error;
+        if ((*value)->kind == Ast_Kind_Local) {
+            if ((*value)->type == NULL) {
+                onyx_report_error((*value)->token->pos,
+                        "Unable to resolve type for local '%b'.",
+                        (*value)->token->text, (*value)->token->length);
+                return Check_Error;
+            }
+
+            if ((*value)->type->kind == Type_Kind_Compound) {
+                onyx_report_error((*value)->token->pos,
+                        "Compound type not allowed as local variable type. Try splitting this into multiple variables.");
+                return Check_Error;
+            }
         }
     }
 

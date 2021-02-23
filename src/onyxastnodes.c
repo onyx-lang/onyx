@@ -188,6 +188,7 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
 
     AstNumLit* res = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
     res->token = node->token;
+    res->flags |= node->flags;
     res->flags |= Ast_Flag_Comptime;
     res->type_node = node->type_node;
     res->type = node->type;
