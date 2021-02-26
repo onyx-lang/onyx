@@ -35,4 +35,24 @@ List of things to change:
     // x.x = 1
     // x.y = <uninitialized>
 
-[ ] Anonymous struct, enum and array literals.
+[ ] Add functionality to #solidify that resolves to a procedure given a set of types. For example:
+    overloaded :: proc {
+        (x: str) { println("String function!"); },
+        (x: i32) { println("Int function!"); },
+        (x: f32) { println("Float function!"); },
+        (x: $T)  { println("Other function!"); },
+        (z: $T)  { println("Other function ZZZ!"); },
+    }
+
+    int_function :: #solidify overloaded(i32);
+    int_function(); // Int function!
+
+    other_function :: #solidify overloaded(range);
+    other_function(); // Other function!
+
+    wont_work :: #solidify overloaded(y = i32); // This won't work because overloaded doesn't have a 'y'
+    will_work :: #solidify overloaded(z = range); // This will work because overloaded does have a 'z'
+
+    Obviously this will also work on a non-overloaded, only polymorphic procedure.
+
+[X] Anonymous struct, enum and array literals.

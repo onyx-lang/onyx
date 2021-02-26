@@ -6,7 +6,6 @@ AstNode empty_node = { Ast_Kind_Error, 0, NULL, NULL };
 
 static const char* ast_node_names[] = {
     "ERROR",
-    "PROGRAM",
     "PACKAGE",
     "INCLUDE FILE",
     "INCLUDE FOLDER",

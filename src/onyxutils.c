@@ -116,17 +116,15 @@ void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
     bh_table_put(AstNode *, scope->symbols, sym, node);
 }
 
-void symbol_subpackage_introduce(Scope* scope, OnyxToken* sym, AstPackage* package) {
-    token_toggle_end(sym);
-
-    if (bh_table_has(AstNode *, scope->symbols, sym->text)) {
-        AstNode* maybe_package = bh_table_get(AstNode *, scope->symbols, sym->text);
+void symbol_subpackage_introduce(Scope* scope, char* sym, AstPackage* package) {
+    if (bh_table_has(AstNode *, scope->symbols, sym)) {
+        AstNode* maybe_package = bh_table_get(AstNode *, scope->symbols, sym);
+        
+        // CLEANUP: Make this assertion an actual error message.
         assert(maybe_package->kind == Ast_Kind_Package);
     } else {
-        bh_table_put(AstNode *, scope->symbols, sym->text, (AstNode *) package);
+        bh_table_put(AstNode *, scope->symbols, sym, (AstNode *) package);
     }
-
-    token_toggle_end(sym);
 }
 
 AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {

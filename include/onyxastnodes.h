@@ -4,79 +4,85 @@
 #include "onyxlex.h"
 #include "onyxtypes.h"
 
-typedef struct AstNode AstNode;
-typedef struct AstTyped AstTyped;
+#define AST_NODES            \
+    NODE(Node)               \
+    NODE(Typed)              \
+                             \
+    NODE(NamedValue)         \
+    NODE(BinaryOp)           \
+    NODE(UnaryOp)            \
+    NODE(NumLit)             \
+    NODE(StrLit)             \
+    NODE(Local)              \
+    NODE(Call)               \
+    NODE(Argument)           \
+    NODE(AddressOf)          \
+    NODE(Dereference)        \
+    NODE(ArrayAccess)        \
+    NODE(FieldAccess)        \
+    NODE(SizeOf)             \
+    NODE(AlignOf)            \
+    NODE(FileContents)       \
+    NODE(StructLiteral)      \
+    NODE(ArrayLiteral)       \
+    NODE(RangeLiteral)       \
+    NODE(Compound)           \
+                             \
+    NODE(DirectiveSolidify)  \
+    NODE(StaticIf)           \
+    NODE(DirectiveError)     \
+                             \
+    NODE(Return)             \
+    NODE(Jump)               \
+    NODE(Use)                \
+                             \
+    NODE(Block)              \
+    NODE(IfWhile)            \
+    NODE(For)                \
+    NODE(Defer)              \
+    NODE(SwitchCase)         \
+    NODE(Switch)             \
+                             \
+    NODE(Type)               \
+    NODE(BasicType)          \
+    NODE(PointerType)        \
+    NODE(FunctionType)       \
+    NODE(ArrayType)          \
+    NODE(SliceType)          \
+    NODE(DynArrType)         \
+    NODE(VarArgType)         \
+    NODE(StructType)         \
+    NODE(StructMember)       \
+    NODE(PolyStructType)     \
+    NODE(PolyStructParam)    \
+    NODE(PolyCallType)       \
+    NODE(EnumType)           \
+    NODE(EnumValue)          \
+    NODE(TypeAlias)          \
+    NODE(TypeRawAlias)       \
+    NODE(CompoundType)       \
+                             \
+    NODE(Binding)            \
+    NODE(MemRes)             \
+    NODE(Include)            \
+    NODE(UsePackage)         \
+    NODE(Alias)              \
+    NODE(Global)             \
+    NODE(Param)              \
+    NODE(Function)           \
+    NODE(OverloadedFunction) \
+                             \
+    NODE(PolyParam)          \
+    NODE(PolySolution)       \
+    NODE(SolidifiedFunction) \
+    NODE(PolyProc)           \
+                             \
+    NODE(Package)          
 
-typedef struct AstNamedValue AstNamedValue;
-typedef struct AstBinaryOp AstBinaryOp;
-typedef struct AstUnaryOp AstUnaryOp;
-typedef struct AstNumLit AstNumLit;
-typedef struct AstStrLit AstStrLit;
-typedef struct AstLocal AstLocal;
-typedef struct AstCall AstCall;
-typedef struct AstArgument AstArgument;
-typedef struct AstAddressOf AstAddressOf;
-typedef struct AstDereference AstDereference;
-typedef struct AstArrayAccess AstArrayAccess;
-typedef struct AstFieldAccess AstFieldAccess;
-typedef struct AstSizeOf AstSizeOf;
-typedef struct AstAlignOf AstAlignOf;
-typedef struct AstFileContents AstFileContents;
-typedef struct AstStructLiteral AstStructLiteral;
-typedef struct AstArrayLiteral AstArrayLiteral;
-typedef struct AstRangeLiteral AstRangeLiteral;
-typedef struct AstCompound AstCompound;
+#define NODE(name) typedef struct Ast ## name Ast ## name;
+AST_NODES
+#undef NODE
 
-typedef struct AstDirectiveSolidify AstDirectiveSolidify;
-typedef struct AstStaticIf AstStaticIf;
-typedef struct AstDirectiveError AstDirectiveError;
-
-typedef struct AstReturn AstReturn;
-typedef struct AstJump AstJump;
-typedef struct AstUse AstUse;
-
-typedef struct AstBlock AstBlock;
-typedef struct AstIfWhile AstIfWhile;
-typedef struct AstFor AstFor;
-typedef struct AstDefer AstDefer;
-typedef struct AstSwitchCase AstSwitchCase;
-typedef struct AstSwitch AstSwitch;
-
-typedef struct AstType AstType;
-typedef struct AstBasicType AstBasicType;
-typedef struct AstPointerType AstPointerType;
-typedef struct AstFunctionType AstFunctionType;
-typedef struct AstArrayType AstArrayType;
-typedef struct AstSliceType AstSliceType;
-typedef struct AstDynArrType AstDynArrType;
-typedef struct AstVarArgType AstVarArgType;
-typedef struct AstStructType AstStructType;
-typedef struct AstStructMember AstStructMember;
-typedef struct AstPolyStructType AstPolyStructType;
-typedef struct AstPolyStructParam AstPolyStructParam;
-typedef struct AstPolyCallType AstPolyCallType;
-typedef struct AstEnumType AstEnumType;
-typedef struct AstEnumValue AstEnumValue;
-typedef struct AstTypeAlias AstTypeAlias;
-typedef struct AstTypeRawAlias AstTypeRawAlias;
-typedef struct AstCompoundType AstCompoundType;
-
-typedef struct AstBinding AstBinding;
-typedef struct AstMemRes AstMemRes;
-typedef struct AstInclude AstInclude;
-typedef struct AstUsePackage AstUsePackage;
-typedef struct AstAlias AstAlias;
-typedef struct AstGlobal AstGlobal;
-typedef struct AstParam AstParam;
-typedef struct AstFunction AstFunction;
-typedef struct AstOverloadedFunction AstOverloadedFunction;
-
-typedef struct AstPolyParam AstPolyParam;
-typedef struct AstPolySolution AstPolySolution;
-typedef struct AstSolidifiedFunction AstSolidifiedFunction;
-typedef struct AstPolyProc AstPolyProc;
-
-typedef struct AstPackage AstPackage;
 typedef struct Package Package;
 
 typedef struct Scope {
@@ -86,12 +92,9 @@ typedef struct Scope {
     bh_table(AstNode *) symbols;
 } Scope;
 
-extern Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at);
-
 
 typedef enum AstKind {
     Ast_Kind_Error,
-    Ast_Kind_Program,
     Ast_Kind_Package,
     Ast_Kind_Load_File,
     Ast_Kind_Load_Path,
@@ -792,6 +795,9 @@ struct AstOverloadedFunction {
 struct AstPackage {
     AstNode_base;
 
+    // Allocated in the ast arena
+    char* package_name;
+
     Package* package;
 };
 
@@ -1138,15 +1144,15 @@ i64 get_expression_integer_value(AstTyped* node);
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
 
-AstNumLit* make_int_literal(bh_allocator a, i64 value);
-AstNumLit* make_float_literal(bh_allocator a, f64 value);
+AstNumLit*       make_int_literal(bh_allocator a, i64 value);
+AstNumLit*       make_float_literal(bh_allocator a, f64 value);
 AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);
-AstBinaryOp* make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
-AstArgument* make_argument(bh_allocator a, AstTyped* value);
-AstFieldAccess* make_field_access(bh_allocator a, AstTyped* node, char* field);
-AstAddressOf* make_address_of(bh_allocator a, AstTyped* node);
-AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
-AstNode* make_symbol(bh_allocator a, OnyxToken* sym);
+AstBinaryOp*     make_binary_op(bh_allocator a, BinaryOp operation, AstTyped* left, AstTyped* right);
+AstArgument*     make_argument(bh_allocator a, AstTyped* value);
+AstFieldAccess*  make_field_access(bh_allocator a, AstTyped* node, char* field);
+AstAddressOf*    make_address_of(bh_allocator a, AstTyped* node);
+AstLocal*        make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
+AstNode*         make_symbol(bh_allocator a, OnyxToken* sym);
 
 void arguments_initialize(Arguments* args);
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg);
@@ -1209,10 +1215,7 @@ static inline b32 node_is_auto_cast(AstNode* node) {
 static inline CallingConvention type_function_get_cc(Type* type) {
     if (type == NULL) return CC_Undefined;
     if (type->kind != Type_Kind_Function) return CC_Undefined;
-    if (type->Function.return_type->kind == Type_Kind_Struct) return CC_Return_Stack;
-    if (type->Function.return_type->kind == Type_Kind_Slice) return CC_Return_Stack;
-    if (type->Function.return_type->kind == Type_Kind_DynArray) return CC_Return_Stack;
-    if (type->Function.return_type->kind == Type_Kind_Compound) return CC_Return_Stack;
+    if (type_is_compound(type->Function.return_type)) return CC_Return_Stack;
     return CC_Return_Wasm;
 }
 

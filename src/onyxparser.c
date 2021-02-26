@@ -461,6 +461,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        // case Token_Type_Keyword_Package: {
+        //     AstPackage* package_node = make_node(AstPackage, Ast_Kind_Package);
+        //     package_node->token
+        //     break;
+        // }
+
         // :TypeValueInterchange
         case '<': {
             AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
@@ -1166,18 +1172,12 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
         OnyxToken* package_name = expect_token(parser, Token_Type_Symbol);
 
         // CLEANUP: This is just gross.
-        if (consume_token_if_next(parser, '.')) {
+        while (consume_token_if_next(parser, '.')) {
+            if (parser->hit_unexpected_token) break;
             package_name->length += 1;
 
-            while (1) {
-                if (parser->hit_unexpected_token) break;
-
-                OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-                package_name->length += symbol->length;
-
-                if (consume_token_if_next(parser, '.')) package_name->length += 1;
-                else break;
-            }
+            OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+            package_name->length += symbol->length;
         }
 
         upack->package_name = package_name;
@@ -2387,7 +2387,9 @@ static AstPackage* parse_package_name(OnyxParser* parser) {
             pnode->token = symbol;
             pnode->package = newpackage;
 
-            symbol_subpackage_introduce(package->scope, symbol, pnode);
+            token_toggle_end(symbol);
+            symbol_subpackage_introduce(package->scope, symbol->text, pnode);
+            token_toggle_end(symbol);
         }
 
         package = newpackage;
