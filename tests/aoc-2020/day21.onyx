@@ -12,15 +12,15 @@ use package core.string.reader as reader
 
 Ingredient :: struct {
     // This will just be a pointer into the file contents.
-    name       : str      = str.{ null, 0 };
-    appears_on : [..] u32 = (#type [..] u32).{ null, 0, 0 };
+    name       : str      = .{ null, 0 };
+    appears_on : [..] u32 = .{ null, 0, 0 };
 
-    allergen   : str      = str.{ null, 0 };
+    allergen   : str      = .{ null, 0 };
 }
 
 Allergen :: struct {
-	name       : str      = str.{ null, 0 };
-    appears_on : [..] u32 = (#type [..] u32).{ null, 0, 0 };
+	name       : str      = .{ null, 0 };
+    appears_on : [..] u32 = .{ null, 0, 0 };
 }
 
 Food :: struct {
@@ -31,20 +31,19 @@ Food :: struct {
 ingredient_map : map.Map(str, Ingredient);
 allergen_map   : map.Map(str, Allergen);
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day21.txt";
 
 	file := reader.make(contents);
 
-    map.init(^ingredient_map, Ingredient.{}, 127);
-    map.init(^allergen_map, Allergen.{});
+    map.init(^ingredient_map, .{}, 127);
+    map.init(^allergen_map, .{});
     defer {
         map.free(^ingredient_map);
         map.free(^allergen_map);
     }
 
-    foods : [..] Food;
-    array.init(^foods);
+    foods := array.make(Food);
     defer array.free(^foods);
 
     line_num := 0;
@@ -95,13 +94,11 @@ main :: proc (args: [] cstr) {
         line_num += 1;
 	}
 
-    definitely_safe : [..] str;
-    array.init(^definitely_safe);
+    definitely_safe := array.make(str);
     defer array.free(^definitely_safe);
 
     for ^ingredient_entry: ingredient_map.entries {
-        potential_allergens : [..] str;
-        array.init(^potential_allergens);
+        potential_allergens := array.make(str);
         defer array.free(^potential_allergens);
 
         for food_num: ingredient_entry.value.appears_on {
@@ -134,8 +131,7 @@ main :: proc (args: [] cstr) {
 
     printf("Total safe: %i\n", total_safe);
 
-    matched_ingredients : [..] Ingredient;
-    array.init(^matched_ingredients);
+    matched_ingredients := array.make(Ingredient);
     defer array.free(^matched_ingredients);
 
     while !map.empty(^ingredient_map) {
@@ -166,7 +162,7 @@ main :: proc (args: [] cstr) {
         }
     }
 
-    array.sort(^matched_ingredients, proc (i1: Ingredient, i2: Ingredient) -> i32 {
+    array.sort(^matched_ingredients, (i1: Ingredient, i2: Ingredient) -> i32 {
         return string.compare(i1.allergen, i2.allergen);
     });
 
@@ -175,7 +171,7 @@ main :: proc (args: [] cstr) {
     println("\n(Don't copy the last ','!)");
 }
 
-array_count_contains :: proc (arr: ^[..] $T, x: T, equal: proc (T, T) -> bool) -> u32 {
+array_count_contains :: (arr: ^[..] $T, x: T, equal: (T, T) -> bool) -> u32 {
     count := 0;
     for ^it: *arr do if equal(*it, x) do count += 1;
     return count;

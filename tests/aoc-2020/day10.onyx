@@ -3,9 +3,8 @@
 use package core
 use package core.string.reader as reader
 
-count_ending_paths :: proc (nums: [..] u32) -> u64 {
-    tally: [..] u64;
-    array.init(^tally, nums.count);
+count_ending_paths :: (nums: [..] u32) -> u64 {
+    tally := array.make(u64, nums.count);
     defer array.free(^tally);
 
     for ^t: tally do *t = 0;
@@ -24,13 +23,12 @@ count_ending_paths :: proc (nums: [..] u32) -> u64 {
     return tally[0];
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day10.txt";
 
     file := reader.make(contents);
 
-    nums: [..] u32;
-    array.init(^nums);
+    nums := array.make(u32);
     defer array.free(^nums);
 
     while !reader.empty(^file) {

@@ -2,13 +2,12 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day1.txt";
     contents_orig := contents;
     defer cfree(contents_orig.data);
 
-    nums: [..] u32;
-    array.init(^nums, 128);
+    nums := array.make(u32, 128);
     defer array.free(^nums);
 
     while num := 1; num > 0 {

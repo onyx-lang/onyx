@@ -20,14 +20,14 @@ Tile :: struct {
 	pos_x       : u32 = 0;
 	pos_y       : u32 = 0;
     
-    edges_match : Sides = Sides.{};
+    edges_match : Sides = .{};
 }
 
 Sides :: struct {
-    top    : SideRelation = SideRelation.{};
-    right  : SideRelation = SideRelation.{};
-    bottom : SideRelation = SideRelation.{};
-    left   : SideRelation = SideRelation.{};
+    top    : SideRelation = .{};
+    right  : SideRelation = .{};
+    bottom : SideRelation = .{};
+    left   : SideRelation = .{};
 }
 
 SideRelation :: struct {
@@ -42,7 +42,7 @@ TO :: enum (u8) {
 
 // TOT[t0][t1] = t1 * t0;    t1 after t0
 tile_orientation_table := (#type [8] TO).[
-    //                  N         R90       R180      R270      F         FR90      FR180     FR270
+    //                N         R90       R180      R270      F         FR90      FR180     FR270
     /* N     */ TO.[ TO.N,     TO.R90,   TO.R180,  TO.R270,  TO.F,     TO.FR90,  TO.FR180, TO.FR270 ],
     /* R90   */ TO.[ TO.R90,   TO.R180,  TO.R270,  TO.N,     TO.FR270, TO.F,     TO.FR90,  TO.FR180,],
     /* R180  */ TO.[ TO.R180,  TO.R270,  TO.N,     TO.R90,   TO.FR180, TO.FR270, TO.F,     TO.FR90, ],
@@ -53,7 +53,7 @@ tile_orientation_table := (#type [8] TO).[
     /* FR270 */ TO.[ TO.FR270, TO.F,     TO.FR90,  TO.FR180, TO.R90,   TO.R180,  TO.R270,  TO.N     ],
 ];
 
-reverse_binary :: proc (n_: u32, digits := TILE_DATA_WIDTH) -> u32 {
+reverse_binary :: (n_: u32, digits := TILE_DATA_WIDTH) -> u32 {
 	res := 0;	
 	n := n_;
 	for _: 0 .. digits {
@@ -65,7 +65,7 @@ reverse_binary :: proc (n_: u32, digits := TILE_DATA_WIDTH) -> u32 {
 	return res;
 }
 
-build_edges :: proc (tile: [] bool, a := context.allocator) -> [] u32 {
+build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
 	edges : [..] u32;
 	#context_scope {
 		context.allocator = a;
@@ -110,7 +110,7 @@ side_relations := (#type [4] TO).[
     TO.[ TO.R90,   TO.FR270, TO.F,     TO.R180,   ],
 ];
 
-has_matching_edges :: proc (t1: ^Tile, t2: ^Tile) -> bool {
+has_matching_edges :: (t1: ^Tile, t2: ^Tile) -> bool {
     match := false;
 
 	for e_idx: 0 .. t1.edges.count / 2 do for e2_idx: 0 .. t2.edges.count {
@@ -118,10 +118,10 @@ has_matching_edges :: proc (t1: ^Tile, t2: ^Tile) -> bool {
             match = true;
 
             switch e_idx {
-                case 0 do t1.edges_match.top    = SideRelation.{ t2.id, side_relations[e2_idx][0] };
-                case 1 do t1.edges_match.bottom = SideRelation.{ t2.id, side_relations[e2_idx][1] };
-                case 2 do t1.edges_match.left   = SideRelation.{ t2.id, side_relations[e2_idx][2] };
-                case 3 do t1.edges_match.right  = SideRelation.{ t2.id, side_relations[e2_idx][3] };
+                case 0 do t1.edges_match.top    = .{ t2.id, side_relations[e2_idx][0] };
+                case 1 do t1.edges_match.bottom = .{ t2.id, side_relations[e2_idx][1] };
+                case 2 do t1.edges_match.left   = .{ t2.id, side_relations[e2_idx][2] };
+                case 3 do t1.edges_match.right  = .{ t2.id, side_relations[e2_idx][3] };
             }
         }
     }
@@ -130,8 +130,8 @@ has_matching_edges :: proc (t1: ^Tile, t2: ^Tile) -> bool {
 }
 
 // This assumes the `t` was in NORMAL orientation to begin with.
-apply_orientation :: proc (t: ^Tile, ori: TO) {
-    new_sides := t.edges_match;    
+apply_orientation :: (t: ^Tile, ori: TO) {
+    new_sides := t.edges_match;
 
     switch ori {
         case TO.R90 {
@@ -183,7 +183,7 @@ apply_orientation :: proc (t: ^Tile, ori: TO) {
     t.orientation = ori;
 }
 
-index_square_with_orientation :: proc (data: ^$T, ori: TO, size: i32, x: i32, y: i32) -> ^T {
+index_square_with_orientation :: (data: ^$T, ori: TO, size: i32, x: i32, y: i32) -> ^T {
     switch ori {
         case TO.N     do return ^data[x + y * size];
         case TO.R90   do return ^data[y + (size - 1 - x) * size];
@@ -206,7 +206,7 @@ sea_monster := u8.[
     #char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char"#",#char" ",#char" ",#char" ",
 ];
 
-scan_for_monsters :: proc (forest: ^u8, ori: TO, width: u32, height: u32) -> bool {
+scan_for_monsters :: (forest: ^u8, ori: TO, width: u32, height: u32) -> bool {
     found_monsters := false;
 
     for y: 0 .. height - sea_monster_height {
@@ -241,23 +241,15 @@ scan_for_monsters :: proc (forest: ^u8, ori: TO, width: u32, height: u32) -> boo
     return found_monsters;
 }
 
-tile_pos_state :: struct {
-    match   : SideRelation;
-    pos_x   : i32;
-    pos_y   : i32;
-}
-
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day20.txt";
 
 	file := reader.make(contents);	
 
-	tiles : [..] Tile;
-	array.init(^tiles);
+	tiles := array.make(Tile);
 	defer array.free(^tiles);
 
-    tile_map : map.Map(u32, ^Tile);
-    map.init(^tile_map, null, 67);
+    tile_map := map.make(u32, #type ^Tile, null, 67);
     defer map.free(^tile_map);
 
 	tile_data := calloc(200 * sizeof TileData);
@@ -289,7 +281,7 @@ main :: proc (args: [] cstr) {
 		tile_data := td[0 .. TILE_DATA_HEIGHT * TILE_DATA_WIDTH];
 		edges := build_edges(tile_data, tile_allocator);
 
-		array.push(^tiles, Tile.{
+		array.push(^tiles, .{
 			id = id,
 			orientation = TO.N,
 			data = tile_data,
@@ -329,11 +321,15 @@ main :: proc (args: [] cstr) {
     grid : [12 * 12] u32;
     memory.set(^grid, 0, sizeof [12 * 12] u32);
 
-    to_process : [..] tile_pos_state;
-    array.init(^to_process);
+    tile_pos_state :: struct {
+        match   : SideRelation;
+        pos_x   : i32;
+        pos_y   : i32;
+    }
+    to_process := array.make(tile_pos_state);
     defer array.free(^to_process);
     
-    array.push(^to_process, tile_pos_state.{ SideRelation.{ top_left_id, TO.F }, 0, 0 });
+    array.push(^to_process, .{ .{ top_left_id, TO.F }, 0, 0 });
     while to_process.count > 0 {
         tid := to_process[0];
         array.delete(^to_process, 0);
@@ -347,10 +343,10 @@ main :: proc (args: [] cstr) {
 
         apply_orientation(tile_ptr, tid.match.ori);
 
-        if tile_ptr.edges_match.top.tile    != 0 do array.push(^to_process, tile_pos_state.{ tile_ptr.edges_match.top,    tid.pos_x, tid.pos_y - 1 });
-        if tile_ptr.edges_match.bottom.tile != 0 do array.push(^to_process, tile_pos_state.{ tile_ptr.edges_match.bottom, tid.pos_x, tid.pos_y + 1 });
-        if tile_ptr.edges_match.left.tile   != 0 do array.push(^to_process, tile_pos_state.{ tile_ptr.edges_match.left,   tid.pos_x - 1, tid.pos_y });
-        if tile_ptr.edges_match.right.tile  != 0 do array.push(^to_process, tile_pos_state.{ tile_ptr.edges_match.right,  tid.pos_x + 1, tid.pos_y });
+        if tile_ptr.edges_match.top.tile    != 0 do array.push(^to_process, .{ tile_ptr.edges_match.top,    tid.pos_x, tid.pos_y - 1 });
+        if tile_ptr.edges_match.bottom.tile != 0 do array.push(^to_process, .{ tile_ptr.edges_match.bottom, tid.pos_x, tid.pos_y + 1 });
+        if tile_ptr.edges_match.left.tile   != 0 do array.push(^to_process, .{ tile_ptr.edges_match.left,   tid.pos_x - 1, tid.pos_y });
+        if tile_ptr.edges_match.right.tile  != 0 do array.push(^to_process, .{ tile_ptr.edges_match.right,  tid.pos_x + 1, tid.pos_y });
     }
 
     forest : [12 * 8 * 12 * 8] u8;

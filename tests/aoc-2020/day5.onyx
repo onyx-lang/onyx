@@ -2,11 +2,10 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day5.txt";
 
-    vals: [..] u32;
-    array.init(^vals);
+    vals := array.make(u32);
     defer array.free(^vals);
 
     max_val := 0;

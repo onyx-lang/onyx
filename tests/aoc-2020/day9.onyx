@@ -3,9 +3,7 @@
 use package core
 use package core.string.reader as reader
 
-StartEnd :: struct { start: i32; end: i32; }
-
-find_contiguous_subarray_with_sum :: proc (nums: [..] u64, sum: u64) -> StartEnd {
+find_contiguous_subarray_with_sum :: (nums: [..] u64, sum: u64) -> (i32, i32) {
     start := 0;
     end   := 0;
     con_sum: u64 = nums[0];
@@ -24,16 +22,15 @@ find_contiguous_subarray_with_sum :: proc (nums: [..] u64, sum: u64) -> StartEnd
         }
     }
 
-    return StartEnd.{ start, end };
+    return start, end;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day9.txt";
 
     file := reader.make(contents);
 
-    nums: [..] u64;
-    array.init(^nums, 32);
+    nums := array.make(u64, 32);
     defer array.free(^nums);
 
     while !reader.empty(^file) {
@@ -65,10 +62,10 @@ main :: proc (args: [] cstr) {
 
     printf("Invalid number: %l\n", invalid);
 
-    se := find_contiguous_subarray_with_sum(nums, invalid);
+    start, end := find_contiguous_subarray_with_sum(nums, invalid);
 
-    max := array.fold_slice(nums.data[se.start .. se.end + 1], cast(u64) 0, math.max_poly);
-    min := array.fold_slice(nums.data[se.start .. se.end + 1], cast(u64) max, math.min_poly);
+    max := array.fold_slice(nums.data[start .. end + 1], cast(u64) 0, math.max_poly);
+    min := array.fold_slice(nums.data[start .. end + 1], cast(u64) max, math.min_poly);
 
     printf("Extrema sum: %l\n", min + max);
 }

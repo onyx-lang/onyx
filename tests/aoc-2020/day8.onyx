@@ -13,9 +13,8 @@ Instruction :: struct {
 }
 
 // Returns if the program successfully exited.
-get_acc_value :: proc (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
-    already_been: map.Map(i32, bool);
-    map.init(^already_been, false);
+get_acc_value :: (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
+    already_been := map.make(i32, bool, false);
     defer map.free(^already_been);
 
     ip   := 0;
@@ -44,13 +43,12 @@ get_acc_value :: proc (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
     return succ;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day8.txt";
 
     file := reader.make(contents);
 
-    instrs: [..] Instruction;
-    array.init(^instrs, 32);
+    instrs := array.make(Instruction, 32);
     defer array.free(^instrs);
 
     while !reader.empty(^file) {
@@ -69,10 +67,7 @@ main :: proc (args: [] cstr) {
         elseif string.equal(word, "acc") do opcode = OpCode.Acc;
         elseif string.equal(word, "jmp") do opcode = OpCode.Jmp;
 
-        array.push(^instrs, Instruction.{
-            opcode  = opcode,
-            operand = ~~val,
-        });
+        array.push(^instrs, .{ opcode, ~~val });
     }
 
     acc: i32;

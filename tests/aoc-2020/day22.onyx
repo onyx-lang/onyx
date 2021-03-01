@@ -6,7 +6,7 @@ use package core.string.reader as reader
 key_arena : alloc.arena.ArenaState;
 key_alloc : Allocator;
 
-score_player :: proc (p: ^[..] u32) -> u32 {
+score_player :: (p: ^[..] u32) -> u32 {
     count := 0;
     mul := p.count;
     for c: *p {
@@ -16,7 +16,7 @@ score_player :: proc (p: ^[..] u32) -> u32 {
     return count;
 }
 
-combat :: proc (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
+combat :: (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
     while player1.count > 0 && player2.count > 0 {
         p1 := player1.data[0];
         p2 := player2.data[0];
@@ -42,7 +42,7 @@ combat :: proc (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
 // into:
 //   4,5,2,8,|1,3,9,7,
 // Larger numbers are encoded in base 64.
-encode_hands :: proc (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
+encode_hands :: (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
     use package core.string.builder as b
 
     builder := b.make(256, alloc);
@@ -59,9 +59,8 @@ encode_hands :: proc (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
     return b.to_str(^builder);
 }
 
-recursive_combat :: proc (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
-    hand_seen : map.Map(str, bool);
-    map.init(^hand_seen, false, 31);
+recursive_combat :: (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
+    hand_seen := map.make(str, bool, false, 31);
     defer map.free(^hand_seen);
 
     while player1.count > 0 && player2.count > 0 {
@@ -101,15 +100,13 @@ recursive_combat :: proc (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
     return 1;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day22.txt";
 
     file := reader.make(contents);
 
-    player1: [..] u32;
-    player2: [..] u32;
-    array.init(^player1);
-    array.init(^player2);
+    player1 := array.make(u32);
+    player2 := array.make(u32);
     defer array.free(^player1);
     defer array.free(^player2);
 

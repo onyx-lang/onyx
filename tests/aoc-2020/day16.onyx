@@ -14,13 +14,13 @@ Field :: struct {
 	upper1 : u32 = 0;
 }
 
-field_valid :: proc (use field: ^Field, n: u32) -> bool {
+field_valid :: (use field: ^Field, n: u32) -> bool {
 	return (lower0 <= n && n <= upper0) || (lower1 <= n && n <= upper1);
 }
 
 total_scanning_error := 0;
 
-read_ticket_and_validate :: proc (file: ^reader.StringReader, fields: [..] Field, ticket_store: ^u32) -> bool {
+read_ticket_and_validate :: (file: ^reader.StringReader, fields: [..] Field, ticket_store: ^u32) -> bool {
 	retval := true;
 
 	for i: 0 .. fields.count {
@@ -44,13 +44,12 @@ read_ticket_and_validate :: proc (file: ^reader.StringReader, fields: [..] Field
 	return retval;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day16.txt";
 
 	file := reader.make(contents);
 
-	fields : [..] Field;
-	array.init(^fields, 20);
+	fields := array.make(Field, 20);
 	defer array.free(^fields);
 
 	// Read until the first empty line
@@ -77,15 +76,13 @@ main :: proc (args: [] cstr) {
 
 	for i: 0 .. 2 do reader.advance_line(^file);
 
-	my_ticket : [..] u32;
-	array.init(^my_ticket, fields.count);
+	my_ticket := array.make(u32, fields.count);
 	defer array.free(^my_ticket);
 	read_ticket_and_validate(^file, fields, my_ticket.data);
 
 	for i: 0 .. 2 do reader.advance_line(^file);
 
-	ticket_data : [..] u32;
-	array.init(^ticket_data, 1024);
+	ticket_data := array.make(u32, 1024);
 	defer array.free(^ticket_data);
 
 	while !reader.empty(^file) {
@@ -97,8 +94,7 @@ main :: proc (args: [] cstr) {
 
 	printf("Scanning error: %i\n", total_scanning_error);
 
-	cols_to_assign : [..] u32;
-	array.init(^cols_to_assign, fields.count);
+	cols_to_assign := array.make(u32, fields.count);
 	defer array.free(^cols_to_assign);
 
 	for i: 0 .. fields.count do array.push(^cols_to_assign, i);

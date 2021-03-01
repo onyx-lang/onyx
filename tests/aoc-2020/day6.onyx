@@ -2,7 +2,7 @@
 
 use package core
 
-part_1 :: proc (contents: ^str) -> u32 {
+part_1 :: (contents: ^str) -> u32 {
     chars : [26] bool;
     for ^ch: chars do *ch = false;
 
@@ -20,7 +20,7 @@ part_1 :: proc (contents: ^str) -> u32 {
     return sum;
 }
 
-part_2 :: proc (contents: ^str) -> u32 {
+part_2 :: (contents: ^str) -> u32 {
     chars : [26] u32;
     for ^ch: chars do *ch = 0;
 
@@ -40,7 +40,7 @@ part_2 :: proc (contents: ^str) -> u32 {
     return sum;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day6.txt";
 
     unique_sum := 0;

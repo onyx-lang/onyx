@@ -3,7 +3,7 @@
 use package core
 
 // Returns the number of fields
-process_passport :: proc (contents: ^str) -> u32 {
+process_passport :: (contents: ^str) -> u32 {
     field_count := 0;
 
     while true {
@@ -29,7 +29,7 @@ process_passport :: proc (contents: ^str) -> u32 {
 
 // This does not include part 2 because it is gross and
 // not worth the effort to implement it.
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day4.txt";
 
     valid_passports := 0;

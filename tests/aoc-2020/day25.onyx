@@ -3,7 +3,7 @@
 use package core
 use package core.string.reader as reader
 
-power_mod :: proc (base: u32, exp: u32, mod: u32) -> u32 {
+power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
     t: u64 = 1;
     e: u64 = ~~exp;
     b: u64 = ~~base;
@@ -19,13 +19,11 @@ power_mod :: proc (base: u32, exp: u32, mod: u32) -> u32 {
     return ~~(t % m);
 }
 
-dlp_bsgs :: proc (n: u32, a: u32, b: u32) -> u32 {
+dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     use package core.intrinsics.wasm { ceil_f64, sqrt_f64 }
-
     m := cast(u32) ceil_f64(sqrt_f64(~~n));
 
-    t : map.Map(u32, u32);
-    map.init(^t, 0, m / 2);
+    t := map.make(u32, u32, default=0, hash_count=m/2);
     defer map.free(^t);
 
     tmp: u64 = 1;
@@ -49,13 +47,13 @@ dlp_bsgs :: proc (n: u32, a: u32, b: u32) -> u32 {
     return 0;
 }
 
-transform_subject :: proc (subject: u32, loop_size: u32) -> u32 {
+transform_subject :: (subject: u32, loop_size: u32) -> u32 {
     value: u64 = 1;
     for i: 0 .. loop_size do value = (value * ~~subject) % 20201227;
     return cast(u32) value;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day25.txt";
 
     file := reader.make(contents);

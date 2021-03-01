@@ -7,7 +7,7 @@ MASK_SIZE :: 36
 Bitmask :: #type [MASK_SIZE] u8;
 
 // Part 1
-bitmask_p1 :: proc (mask: Bitmask, val: u64) -> u64 {
+bitmask_p1 :: (mask: Bitmask, val: u64) -> u64 {
 	res: u64 = 0;
 	bit: u64 = 1;
 	for m: mask {
@@ -29,7 +29,7 @@ BitmaskIter :: struct {
 	done              : bool;
 }
 
-bitmask_iter_make :: proc (mask: Bitmask, val: u64) -> BitmaskIter {
+bitmask_iter_make :: (mask: Bitmask, val: u64) -> BitmaskIter {
 	bmi : BitmaskIter;
 	bmi.done = false;
 
@@ -52,13 +52,13 @@ bitmask_iter_make :: proc (mask: Bitmask, val: u64) -> BitmaskIter {
 	return bmi;
 }
 
-bitmask_iter_free :: proc (use bmi: ^BitmaskIter) {
+bitmask_iter_free :: (use bmi: ^BitmaskIter) {
 	array.free(^floating_indicies);
 }
 
-bitmask_iter_done :: proc (use bmi: ^BitmaskIter) -> bool do return done;
+bitmask_iter_done :: (use bmi: ^BitmaskIter) -> bool do return done;
 
-bitmask_iter_next :: proc (use bmi: ^BitmaskIter) -> u64 {
+bitmask_iter_next :: (use bmi: ^BitmaskIter) -> u64 {
 	{
 		for ind: floating_indicies {
 			is_set := (val & (1 << cast(u64) ind)) != 0;
@@ -74,13 +74,12 @@ bitmask_iter_next :: proc (use bmi: ^BitmaskIter) -> u64 {
 	return val;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day14.txt";
 
 	file := reader.make(contents);
 
-	mem : map.Map(u64, u64);
-	map.init(^mem, 0, 257);
+	mem := map.make(u64, u64, default=0, hash_count=257);
 	defer map.free(^mem);
 
 	mask : Bitmask;

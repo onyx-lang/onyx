@@ -10,19 +10,18 @@ spoken_times :: struct {
     previous : u32 = 0;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     // The current implementation of Map is rather slow at a large scale.
     // Any changes to the implementation of Map should be tested on this
     // file to validate if they 1) work and 2) are faster.
-    nums : map.Map(u32, spoken_times);
-    map.init(^nums, spoken_times.{}, 32767);
+    nums := map.make(u32, spoken_times, .{}, 32767);
     defer map.free(^nums);
 
     turn := 1;
     last_num := 0;
 
     for n: initial_numbers {
-        map.put(^nums, n, spoken_times.{ recent = turn });
+        map.put(^nums, n, .{ recent = turn });
         turn += 1;
         last_num = n;
     }

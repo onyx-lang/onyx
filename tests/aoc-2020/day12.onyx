@@ -11,7 +11,7 @@ Ship :: struct {
     fy : i32 = 0;
 }
 
-rotate_left :: proc (ship: ^Ship) {
+rotate_left :: (ship: ^Ship) {
     ofx := ship.fx;
     ofy := ship.fy;
 
@@ -19,7 +19,7 @@ rotate_left :: proc (ship: ^Ship) {
     ship.fy = -ofx;
 }
 
-rotate_right :: proc (ship: ^Ship) {
+rotate_right :: (ship: ^Ship) {
     ofx := ship.fx;
     ofy := ship.fy;
 
@@ -27,12 +27,12 @@ rotate_right :: proc (ship: ^Ship) {
     ship.fy = ofx;
 }
 
-turn_around :: proc (ship: ^Ship) {
+turn_around :: (ship: ^Ship) {
     ship.fx = -ship.fx;
     ship.fy = -ship.fy;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day12.txt";
 
     file := reader.make(contents);

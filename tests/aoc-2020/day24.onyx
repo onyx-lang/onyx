@@ -27,13 +27,12 @@ Cell :: struct {
 	next  : bool = false;	
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day24.txt";
 
 	file := reader.make(contents);
 
-	grid : map.Map(Vec2, Cell); // `true` is black
-	map.init(^grid, Cell.{}, 1021);
+	grid := map.make(Vec2, Cell, .{}, 1021); // `true` is black
 	defer map.free(^grid);
 
 	while !reader.empty(^file) {
@@ -68,7 +67,7 @@ main :: proc (args: [] cstr) {
 
 
 		curr := map.get(^grid, loc);
-		map.put(^grid, loc, Cell.{ alive = !curr.alive });
+		map.put(^grid, loc, .{ alive = !curr.alive });
 	}
 
 	// Part 1
@@ -79,8 +78,7 @@ main :: proc (args: [] cstr) {
 	printf("Black count: %i\n", black_count);
 
 	// Part 2
-	cells_to_consider : [..] Vec2;
-	array.init(^cells_to_consider);
+	cells_to_consider := array.make(Vec2);
 	defer array.free(^cells_to_consider);
 
 	for i: 0 .. 100 {
@@ -89,7 +87,7 @@ main :: proc (args: [] cstr) {
 				array.push(^cells_to_consider, cell.key);
 
 				for ^dir: Hex_Directions {
-					array.push(^cells_to_consider, Vec2.{
+					array.push(^cells_to_consider, .{
 						x = cell.key.x + dir.x,
 						y = cell.key.y + dir.y,
 					});
@@ -111,7 +109,7 @@ main :: proc (args: [] cstr) {
 		}
 
 		for ^cell: cells_to_consider {
-			map.update(^grid, *cell, proc (state: ^Cell) { state.alive = state.next; });
+			map.update(^grid, *cell, (state: ^Cell) { state.alive = state.next; });
 		}
 
 		array.clear(^cells_to_consider);
@@ -124,7 +122,7 @@ main :: proc (args: [] cstr) {
 	printf("GOL black count: %i\n", black_count);
 }
 
-get_neighbor_count :: proc (grid: ^map.Map(Vec2, Cell), pos: Vec2) -> u32 {
+get_neighbor_count :: (grid: ^map.Map(Vec2, Cell), pos: Vec2) -> u32 {
 	count := 0;
 
 	for ^dir: Hex_Directions {

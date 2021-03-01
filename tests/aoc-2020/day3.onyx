@@ -3,26 +3,22 @@
 use package core
 
 Point :: struct {
-    x : i32;
-    y : i32;
-};
+    x, y : i32;
+}
 
 LineInterp :: struct {
-    ox : i32;
-    oy : i32;
-    dx : i32;
-    dy : i32;
+    ox, oy : i32;
+    dx, dy : i32;
 }
 
-line_interp_at :: proc (use li: LineInterp, t: i32) -> Point {
-    return Point.{ ox + dx * t, oy + dy * t };
+line_interp_at :: (use li: LineInterp, t: i32) -> Point {
+    return .{ ox + dx * t, oy + dy * t };
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day3.txt";
 
-    forest: [..] u8;
-    array.init(^forest, 1024);
+    forest := array.make(u8, 1024);
     defer array.free(^forest);
 
     width := 0;
@@ -39,11 +35,11 @@ main :: proc (args: [] cstr) {
     }
 
     lis : [5] LineInterp;
-    lis[0] = LineInterp.{ 0, 0, 1, 1 };
-    lis[1] = LineInterp.{ 0, 0, 3, 1 };
-    lis[2] = LineInterp.{ 0, 0, 5, 1 };
-    lis[3] = LineInterp.{ 0, 0, 7, 1 };
-    lis[4] = LineInterp.{ 0, 0, 1, 2 };
+    lis[0] = .{ 0, 0, 1, 1 };
+    lis[1] = .{ 0, 0, 3, 1 };
+    lis[2] = .{ 0, 0, 5, 1 };
+    lis[3] = .{ 0, 0, 7, 1 };
+    lis[4] = .{ 0, 0, 1, 2 };
 
     tree_prod: u64 = 1;
 

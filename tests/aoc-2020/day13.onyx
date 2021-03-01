@@ -3,7 +3,7 @@
 use package core
 use package core.string.reader as reader
 
-inv_mod :: proc (a_: i64, m_: i64) -> i64 {
+inv_mod :: (a_: i64, m_: i64) -> i64 {
     if m_ <= 1 do return 0;
 
     a := a_; m := m_;
@@ -23,7 +23,7 @@ inv_mod :: proc (a_: i64, m_: i64) -> i64 {
     return y;
 }
 
-chinese_remainder_theorem :: proc (mods: [..] i64, rems: [..] i64) -> i64 {
+chinese_remainder_theorem :: (mods: [..] i64, rems: [..] i64) -> i64 {
     N: i64 = 1;
     for n: mods do N *= n;
     
@@ -36,7 +36,7 @@ chinese_remainder_theorem :: proc (mods: [..] i64, rems: [..] i64) -> i64 {
     return res % N;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day13.txt";
 
     file := reader.make(contents);
@@ -44,12 +44,10 @@ main :: proc (args: [] cstr) {
     est := reader.read_u32(^file);
     reader.advance_line(^file);
 
-    buses: [..] i64;
-    array.init(^buses);
+    buses := array.make(i64);
     defer array.free(^buses);
 
-    rems: [..] i64;
-    array.init(^rems);
+    rems := array.make(i64);
     defer array.free(^rems);
 
     offset: i64 = 0;

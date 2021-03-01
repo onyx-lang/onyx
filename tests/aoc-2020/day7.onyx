@@ -4,7 +4,7 @@ use package core
 use package core.string.reader as reader
 
 BagGraph :: struct {
-    nodes : [..] ^BagNode;
+    nodes    : [..] ^BagNode;
     node_map : map.Map(str, ^BagNode);
 }
 
@@ -22,17 +22,17 @@ BagContainment :: struct {
     count : u32;
 }
 
-bg_init :: proc (use graph: ^BagGraph) {
+bg_init :: (use graph: ^BagGraph) {
     array.init(^nodes, 16);
     map.init(^node_map, null);
 }
 
-bg_free :: proc (use graph: ^BagGraph) {
+bg_free :: (use graph: ^BagGraph) {
     array.free(^nodes);
     map.free(^node_map);
 }
 
-bg_get_node :: proc (use graph: ^BagGraph, name: str) -> ^BagNode {
+bg_get_node :: (use graph: ^BagGraph, name: str) -> ^BagNode {
     node := map.get(^node_map, name);
 
     if node == null {
@@ -50,7 +50,7 @@ bg_get_node :: proc (use graph: ^BagGraph, name: str) -> ^BagNode {
     return node;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day7.txt";
 
     file := reader.make(contents);
@@ -83,10 +83,7 @@ main :: proc (args: [] cstr) {
             // });
 
             // Part 2
-            array.push(^container.contain, BagContainment.{
-                bag = contained,
-                count = count
-            });
+            array.push(^container.contain, .{ bag = contained, count = count });
 
             bag_word := reader.read_until(^file, 1, #char " ", #char "\n");
             if bag_word[bag_word.count - 1] == #char "." do break;
@@ -118,11 +115,8 @@ main :: proc (args: [] cstr) {
     // printf("Count: %i\n", processed_bags.count - 1);
     
     // Part 2
-    to_process : [..] ^BagNode;
-    multiplier : [..] u32;
-
-    array.init(^to_process);
-    array.init(^multiplier);
+    to_process := array.make(#type ^BagNode);
+    multiplier := array.make(u32);
     array.push(^to_process, bg_get_node(^graph, "shiny gold"));
     array.push(^multiplier, 1);
 

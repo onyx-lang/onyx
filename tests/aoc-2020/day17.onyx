@@ -4,15 +4,12 @@ use package core
 use package core.string.reader as reader
 
 CubePos :: struct {
-    x : i32;
-    y : i32;
-    z : i32;
-    w : i32;
+    x, y, z, w : i32;
 }
 
 CubeState :: struct {
-    alive : bool = false;
-    next  : bool = false;
+    alive := false;
+    next  := false;
 }
 
 proc (c: CubePos) -> u32 #add_overload map.hash_function {
@@ -26,7 +23,7 @@ proc (a: CubePos, b: CubePos) -> bool #add_overload map.cmp_function {
         && (a.w == b.w);
 }
 
-get_neighbor_count :: proc (cubes: ^map.Map(CubePos, CubeState), pos: CubePos) -> u32 {
+get_neighbor_count :: (cubes: ^map.Map(CubePos, CubeState), pos: CubePos) -> u32 {
     count := 0;
 
     for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
@@ -44,8 +41,7 @@ main :: proc (args: [] cstr) {
 
     file := reader.make(contents);
 
-    cubes : map.Map(CubePos, CubeState);
-    map.init(^cubes, CubeState.{}, 1021);
+    cubes := map.make(CubePos, CubeState, .{}, 1021);
     defer map.free(^cubes);
 
     z := 0;
@@ -54,7 +50,7 @@ main :: proc (args: [] cstr) {
 
         x := 0;
         for ch: line {
-            if ch == #char "#" do map.put(^cubes, CubePos.{ x, 0, z, 0 }, CubeState.{ alive = true });
+            if ch == #char "#" do map.put(^cubes, .{ x, 0, z, 0 }, .{ alive = true });
 
             x += 1;
         }
@@ -62,15 +58,14 @@ main :: proc (args: [] cstr) {
         z += 1;
     }
 
-    cubes_to_consider : [..] CubePos;
-    array.init(^cubes_to_consider);
+    cubes_to_consider := array.make(CubePos);
     defer array.free(^cubes_to_consider);
 
     for i: 0 .. 6 {
         for ^cube_entry: cubes.entries {
             if cube_entry.value.alive {
                 for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {
-                    array.push(^cubes_to_consider, CubePos.{
+                    array.push(^cubes_to_consider, .{
                         cube_entry.key.x + x,
                         cube_entry.key.y + y,
                         cube_entry.key.z + z,

@@ -33,7 +33,7 @@ Grammar :: struct {
     max_terminal     : u32;
 }
 
-grammar_init :: proc (use g: ^Grammar) {
+grammar_init :: (use g: ^Grammar) {
     array.init(^terminate_rules);
     array.init(^unit_rules);
     array.init(^production_rules);
@@ -41,13 +41,13 @@ grammar_init :: proc (use g: ^Grammar) {
     max_terminal = 0;
 }
 
-grammar_free :: proc (use g: ^Grammar) {
+grammar_free :: (use g: ^Grammar) {
     array.free(^terminate_rules);
     array.free(^unit_rules);
     array.free(^production_rules);
 }
 
-grammar_prepare :: proc (use g: ^Grammar) {
+grammar_prepare :: (use g: ^Grammar) {
     // Not full-proof, but good enough for AOC.
     for ^solo: unit_rules {
         for ^prod: production_rules {
@@ -63,11 +63,11 @@ grammar_prepare :: proc (use g: ^Grammar) {
         }
     }
 
-    array.sort(^terminate_rules, proc (a: Term, b: Term) -> i32 {
+    array.sort(^terminate_rules, (a: Term, b: Term) -> i32 {
         return (cast(i32) a.nt) - (cast(i32) b.nt);
     });
 
-    array.sort(^production_rules, proc (a: Prod, b: Prod) -> i32 {
+    array.sort(^production_rules, (a: Prod, b: Prod) -> i32 {
         return (cast(i32) a.nt0) - (cast(i32) b.nt0);
     });
 
@@ -76,7 +76,7 @@ grammar_prepare :: proc (use g: ^Grammar) {
         terminate_rules[terminate_rules.count - 1].nt) + 1;
 }
 
-cyk_algorithm :: proc (use grammar: ^Grammar, input: str) -> bool {
+cyk_algorithm :: (use grammar: ^Grammar, input: str) -> bool {
     dim_0 := input.count * max_terminal;
     dim_1 := max_terminal;
     dim_2 := 1;
@@ -110,7 +110,7 @@ cyk_algorithm :: proc (use grammar: ^Grammar, input: str) -> bool {
     return T[(input.count - 1) * dim_0];
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day19.txt";
 
     file := reader.make(contents);

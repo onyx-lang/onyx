@@ -4,14 +4,14 @@ package main
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day2.txt";
 
     valid := 0;
     lo : u32;
     hi : u32;
     ch : u8;
-    pw : str = "";
+    pw := "";
 
     while true {
         string.read_u32(^contents, ^lo);

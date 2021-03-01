@@ -12,12 +12,12 @@ GameOfSeats :: struct {
 
 SeatState :: enum (u8) { OOB; Floor; Empty; Occupied; }
 
-gos_get_seat :: proc (use gos: ^GameOfSeats, x: i32, y: i32) -> SeatState {
+gos_get_seat :: (use gos: ^GameOfSeats, x: i32, y: i32) -> SeatState {
     if x < 0 || y < 0 || x >= width || y >= height do return SeatState.OOB;
     return seats[x + y * width];
 }
 
-gos_neighbors :: proc (use gos: ^GameOfSeats, x: i32, y: i32, state := SeatState.Occupied) -> u32 {
+gos_neighbors :: (use gos: ^GameOfSeats, x: i32, y: i32, state := SeatState.Occupied) -> u32 {
     count := 0;
 
     for dy: -1 .. 2 {
@@ -38,7 +38,7 @@ gos_neighbors :: proc (use gos: ^GameOfSeats, x: i32, y: i32, state := SeatState
     return count;
 }
 
-gos_iter :: proc (use gos: ^GameOfSeats) -> bool {
+gos_iter :: (use gos: ^GameOfSeats) -> bool {
     for i: 0 .. seats.count do temp[i] = seats[i];
 
     changed := false;
