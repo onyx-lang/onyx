@@ -228,6 +228,7 @@ WebGl_Wasm = {
     },
     sampleCoverage(value, invert) { this.gl.sampleCoverage(value, invert); },
     scissor(x, y, width, height) { this.gl.scissor(x, y, width, height); },
+    setSize(width, height) { this.canvas.width = width; this.canvas.height = height; },
     shaderSource(shader, source, sourcelen) {
         const decoder = new TextDecoder();
         const str = new Int8Array(WASM_MEMORY.buffer, source, sourcelen);

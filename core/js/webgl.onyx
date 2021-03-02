@@ -743,7 +743,7 @@ blendFunc                      :: (sfactor: GLenum, dfactor: GLenum) -> void #fo
 blendFuncSeparate              :: (srcRGB: GLenum, dstRGB: GLenum, srcAlpha: GLenum, dstAlpha: GLenum) -> void #foreign "gl" "blendFuncSeparate" ---
 blitFramebuffer                :: (sx0: GLint, sy0: GLint, sx1: GLint, sy1: GLint, dx0: GLint, dy0: GLint, dx1: GLint, dy1: GLint, mask: GLbitfield, filter: GLenum) -> void #foreign "gl" "blitFramebuffer" ---
 bufferDataWithData             :: (target: GLenum, buffer: [] void, usage: GLenum) -> void #foreign "gl" "bufferDataWithData" ---
-bufferDataNoData               :: (target: GLenum, size: GLsizeiptr, usage: GLenum) -> void #foreign "gl" "bufferDataNoData" ---
+bufferDataNoData               :: (target: GLenum, size: GLsizei, usage: GLenum) -> void #foreign "gl" "bufferDataNoData" ---
 bufferData                     :: proc { bufferDataWithData, bufferDataNoData }
 bufferSubData                  :: (target: GLenum, offset: GLsizei, data: [] void) -> void #foreign "gl" "bufferSubData" ---
 canvasSize                     :: (width: GLsizei, height: GLsizei) -> void #foreign "gl" "canvasSize" ---
@@ -822,6 +822,7 @@ readPixels                     :: (x: GLint, y: GLint, width: GLsizei, height: G
 renderbufferStorageMultisample :: (target: GLenum, samples: GLsizei, internalforamt: GLenum, width: GLsizei, height: GLsizei) -> void #foreign "gl" "renderbufferStorageMultisample" ---
 sampleCoverage                 :: (value: GLclampf, invert: GLboolean) -> void #foreign "gl" "sampleCoverage" ---
 scissor                        :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void #foreign "gl" "scissor" ---
+setSize                        :: (width: GLint, y: GLint) -> void #foreign "gl" "setSize" ---
 shaderSource                   :: (shader: GLShader, source: str) -> void #foreign "gl" "shaderSource" ---
 stencilFunc                    :: (func: GLenum, ref: GLint, mask: GLuint) -> void #foreign "gl" "stencilFunc" ---
 stencilFuncSeparate            :: (face: GLenum, func: GLenum, ref: GLint, mask: GLuint) -> void #foreign "gl" "stencilFuncSeparate" ---
