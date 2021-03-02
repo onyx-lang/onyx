@@ -1,6 +1,6 @@
 List of known bugs:
 
-[ ] Enum parsing causes segfaults if the syntax is not EXACTLY what is expected. Some cases that break:
+[X] Enum parsing causes segfaults if the syntax is not EXACTLY what is expected. Some cases that break:
     enum { Foo, Bar, Baz };
     enum { Foo; Bar; Baz };
 

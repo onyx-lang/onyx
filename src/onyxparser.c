@@ -1724,7 +1724,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             consume_token(parser);
 
             AstBinding* binding = parse_top_level_binding(parser, binding_name);
-            ENTITY_SUBMIT(binding);
+            if (binding) ENTITY_SUBMIT(binding);
             
             consume_token_if_next(parser, ';');
 
