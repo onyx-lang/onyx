@@ -490,6 +490,8 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
 }
 
 Type* resolve_expression_type(AstTyped* node) {
+    if (node == NULL) return NULL;
+
     if (node->kind == Ast_Kind_Compound) {
         bh_arr_each(AstTyped *, expr, ((AstCompound *) node)->exprs) {
             resolve_expression_type(*expr);

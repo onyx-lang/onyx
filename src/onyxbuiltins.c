@@ -86,6 +86,8 @@ static IntrinsicMap builtin_intrinsics[] = {
     { "memory_copy",  ONYX_INTRINSIC_MEMORY_COPY },
     { "memory_fill",  ONYX_INTRINSIC_MEMORY_FILL },
 
+    { "__initialize", ONYX_INTRINSIC_INITIALIZE },
+
     { "clz_i32",      ONYX_INTRINSIC_I32_CLZ },
     { "ctz_i32",      ONYX_INTRINSIC_I32_CTZ },
     { "popcnt_i32",   ONYX_INTRINSIC_I32_POPCNT },

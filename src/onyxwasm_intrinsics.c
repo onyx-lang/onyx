@@ -112,3 +112,42 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_fill) {
     
     *pcode = code;
 }
+
+EMIT_FUNC(initialize_type, Type* type, OnyxToken* where) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->kind) {
+        case Type_Kind_Pointer:
+        case Type_Kind_Basic: {
+            WasmType basic_type = onyx_type_to_wasm_type(type);
+            emit_zero_value(mod, &code, basic_type);
+            emit_store_instruction(mod, &code, type, 0);
+            break;
+        }
+
+        case Type_Kind_Struct: {
+            u64 value_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+            WIL(WI_LOCAL_SET, value_ptr);
+
+            bh_arr_each(StructMember *, psmem, type->Struct.memarr) {
+                StructMember* smem = *psmem;
+                if (smem->initial_value == NULL || *smem->initial_value == NULL) continue;
+
+                WIL(WI_LOCAL_GET, value_ptr);
+                emit_expression(mod, &code, *smem->initial_value);
+                emit_store_instruction(mod, &code, smem->type, smem->offset);
+            }
+            
+            local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+            break;
+        }
+
+        default:
+            onyx_report_error(where->pos,
+                    "Unable to initialize type, '%s'. The reason for this is largely due to the compiler not knowing what the initial value should be.",
+                    type_get_name(type)); 
+            break;
+    }
+    
+    *pcode = code;
+}

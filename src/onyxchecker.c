@@ -1638,9 +1638,14 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 CheckStatus check_struct(AstStructType* s_node) {
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node == NULL && (*smem)->initial_value != NULL) {
-            check_expression(&(*smem)->initial_value);
+            CHECK(expression, &(*smem)->initial_value);
             fill_in_type((*smem)->initial_value);
             (*smem)->type = resolve_expression_type((*smem)->initial_value);
+
+            if ((*smem)->type == NULL) {
+                onyx_report_error((*smem)->initial_value->token->pos, "Unable to deduce type of initial value. This is probably a compiler bug.");
+                return Check_Error;
+            }
         }
     }
 
@@ -1652,6 +1657,26 @@ CheckStatus check_struct(AstStructType* s_node) {
         if ((*smem)->type->kind == Type_Kind_Compound) {
             onyx_report_error(s_node->token->pos, "Compound types are not allowed as struct member types.");
             return Check_Error;
+        }
+    }
+
+    return Check_Success;
+}
+
+CheckStatus check_struct_defaults(AstStructType* s_node) {
+    bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
+        if ((*smem)->initial_value && *(*smem)->initial_value) {
+            CHECK(expression, (*smem)->initial_value);
+
+            if (!type_check_or_auto_cast((*smem)->initial_value, (*smem)->type)) {
+                onyx_report_error((*(*smem)->initial_value)->token->pos,
+                        "Mismatched type for initial value, expected '%s', got '%s'.",
+                        type_get_name((*smem)->type),
+                        type_get_name((*(*smem)->initial_value)->type));
+                return Check_Error;
+            }
+
+            resolve_expression_type(*(*smem)->initial_value);
         }
     }
 
@@ -1903,6 +1928,10 @@ void check_entity(Entity* ent) {
                 cs = check_struct((AstStructType *) ent->type_alias);
             else
                 cs = check_type(ent->type_alias);
+            break;
+
+        case Entity_Type_Struct_Member_Default:
+            cs = check_struct_defaults((AstStructType *) ent->type_alias);
             break;
 
         case Entity_Type_Memory_Reservation_Type:

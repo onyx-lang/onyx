@@ -239,6 +239,7 @@ EMIT_FUNC(cast,                          AstUnaryOp* cast);
 EMIT_FUNC(return,                        AstReturn* ret);
 EMIT_FUNC(stack_enter,                   u64 stacksize);
 EMIT_FUNC(stack_leave,                   u32 unused);
+EMIT_FUNC(zero_value,                    WasmType wt);
 
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
@@ -1385,6 +1386,12 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             }
             break;
 
+        case ONYX_INTRINSIC_INITIALIZE: {
+            Type* type_to_initialize = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_initialize_type(mod, &code, type_to_initialize, call->token);
+            break;
+        }
+
         case ONYX_INTRINSIC_I32_CLZ:      WI(WI_I32_CLZ); break;
         case ONYX_INTRINSIC_I32_CTZ:      WI(WI_I32_CTZ); break;
         case ONYX_INTRINSIC_I32_POPCNT:   WI(WI_I32_POPCNT); break;
@@ -2424,6 +2431,24 @@ EMIT_FUNC(stack_leave, u32 unused) {
     *pcode = code;
 }
 
+EMIT_FUNC(zero_value, WasmType wt) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (wt) {
+        case WASM_TYPE_INT32:   WIL(WI_I32_CONST, 0); break;
+        case WASM_TYPE_INT64:   WIL(WI_I64_CONST, 0); break;
+        case WASM_TYPE_FLOAT32: WIL(WI_F32_CONST, 0); break;
+        case WASM_TYPE_FLOAT64: WIL(WI_F64_CONST, 0); break;
+        case WASM_TYPE_VAR128:  {
+            static u8 zero_v128[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+            WIP(WI_V128_CONST, &zero_v128);
+            break;
+        }
+    }
+
+    *pcode = code;
+}
+
 static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     if (ft->kind != Type_Kind_Function) return -1;
 
@@ -2608,20 +2633,8 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         }
     }
 
-    {    
-        WasmFuncType* ft = mod->types[type_idx];
-        switch (ft->return_type) {
-            case WASM_TYPE_INT32:   bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_I32_CONST, 0x00 })); break;
-            case WASM_TYPE_INT64:   bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_I64_CONST, 0x00 })); break;
-            case WASM_TYPE_FLOAT32: bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_F32_CONST, 0x00 })); break;
-            case WASM_TYPE_FLOAT64: bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_F64_CONST, 0x00 })); break;
-            case WASM_TYPE_VAR128:  {
-                static u8 zero_v128[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-                bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_V128_CONST, { .p = &zero_v128 } }));
-                break;
-            }
-        }
-    }
+    WasmFuncType* ft = mod->types[type_idx];
+    emit_zero_value(mod, &wasm_func.code, ft->return_type);
 
     bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
 
