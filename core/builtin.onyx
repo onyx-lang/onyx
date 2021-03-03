@@ -26,9 +26,9 @@ vararg_get :: proc {
     },
 
     (va: vararg, $T: type_expr, default: T = 0) -> T {
-        if va.count <= 0 do return false;
+        if va.count <= 0 do return default;
         ret := *cast(^T) va.data;
-        va.data = cast(rawptR) (cast(^u8) va.data + sizeof T);
+        va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
         va.count -= 1;
         return res;
     }
