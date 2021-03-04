@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: Build on Windows
 
 # Controls when the action will run. 
 on:
@@ -27,4 +27,4 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Build a release build
-        run: build.bat 1
+        run: cmd.exe /c 'build.bat 1'
