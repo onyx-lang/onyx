@@ -56,7 +56,7 @@ main :: (args: [] cstr) {
         reader.skip_bytes(^file, 1);
 
         sign := reader.read_byte(^file);
-        val := reader.read_u32(^file);
+        val := cast(i32) reader.read_u32(^file);
 
         reader.advance_line(^file);
 
