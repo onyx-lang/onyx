@@ -107,7 +107,7 @@ use package build_opts as build_opts
     use package core.intrinsics.wasm { __initialize }
 
     new :: ($T: type_expr, allocator := context.allocator, initialize := true) -> ^T {
-        res := cast(^T) calloc(sizeof T);
+        res := cast(^T) raw_alloc(allocator, sizeof T);
 
         // @Robustness: This should be a '#if' when those are added in procedures because
         // otherwise the __initialize intrinsic is going to be generated no matter what.

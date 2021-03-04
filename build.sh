@@ -1,5 +1,12 @@
 #!/bin/sh
 
+echo "Installing core libs"
+CORE_DIR='/usr/share/onyx'
+sudo mkdir -p "$CORE_DIR"
+sudo cp -r ./core/ "$CORE_DIR"
+
+[ "$1" = "libs_only" ] && exit 0
+
 C_FILES="onyx onyxastnodes onyxbuiltins onyxchecker onyxclone onyxdoc onyxentities onyxerrors onyxlex onyxparser onyxsymres onyxtypes onyxutils onyxwasm"
 TARGET='./bin/onyx'
 CC='gcc'
@@ -29,11 +36,6 @@ for file in $C_FILES ; do rm -f "$BUILD_DIR/$file".o 2>/dev/null ; done
 echo "Installing onyx executable"
 BIN_DIR='/usr/bin'
 sudo cp ./bin/onyx "$BIN_DIR/onyx"
-
-echo "Installing core libs"
-CORE_DIR='/usr/share/onyx'
-sudo mkdir -p "$CORE_DIR"
-sudo cp -r ./core/ "$CORE_DIR"
 
 # Otherwise the prompt ends on the same line
 printf "\n"
