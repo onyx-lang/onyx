@@ -511,7 +511,7 @@ Type* resolve_expression_type(AstTyped* node) {
 
     if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
-            if ((((u64) ((AstNumLit *) node)->value.l) >> 32) > 0)
+            if (bh_abs(((AstNumLit *) node)->value.l) >= (1ull << 32))
                 convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);
             else
                 convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
