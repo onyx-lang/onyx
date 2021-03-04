@@ -991,7 +991,10 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
     AstUnaryOp* unaryop = *punop;
 
     CHECK(expression, &unaryop->expr);
-    resolve_expression_type(unaryop->expr);
+
+    if (unaryop->operation != Unary_Op_Negate) {
+        resolve_expression_type(unaryop->expr);
+    }
 
     if (unaryop->operation == Unary_Op_Cast) {
         char* err;
@@ -999,7 +1002,6 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
             onyx_report_error(unaryop->token->pos, "Cast Error: %s", err);
             return Check_Error;
         }
-        
     } else {
         unaryop->type = unaryop->expr->type;
     }

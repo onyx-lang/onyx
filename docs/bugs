@@ -29,7 +29,7 @@ List of known bugs:
     }
 
 List of things to change:
-[ ] Currently, there is no way to use the initialized members of a structure without using a struct literal.
+[X] Currently, there is no way to use the initialized members of a structure without using a struct literal.
     There should be a initialize intrinsic procedure that takes a pointer to anything and initializes it.
     For example:
 
