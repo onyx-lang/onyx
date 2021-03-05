@@ -9,5 +9,6 @@ session.vim
 *.pdb
 *.ilk
 *.obj
+*.exe
 *.rdbg
 tmp/
