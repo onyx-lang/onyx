@@ -5,6 +5,7 @@ package system
 use package wasi
 use package core
 use package main as main
+use package core.intrinsics.wasm { __initialize }
 
 STDOUT_FILENO :: 1
 
@@ -35,6 +36,7 @@ assert_handler :: (msg: str, file: str) {
 proc () #export "_start" {
     alloc.init();
 
+    __initialize(^context);
     context.allocator = alloc.heap_allocator;
     context.temp_allocator = alloc.temp_allocator;
     context.assert_handler = assert_handler;

@@ -12,3 +12,20 @@ set the variables described below to their value.
 There should be an #error directive that when hit just produces a compile time error and prevents
 compilation. It would be useful to ensure certain files that are only for a particular
 backend will not compile with the wrong one, such as webgl.onyx.
+
+Another thing to think about is having things like 'defined(...)' in C. In other words, a
+method for knowing whether or not a symbol exists. Other things similar to this idea:
+    - defined(...)         if the symbol is defined as anything
+    - is_procedure(...)    if the symbol is a procedure
+    - argument_count(...)  the number of required arguments the procedure has
+        
+        main :: () {
+            ....
+        }
+
+        #if argument_count(main) > 0 {
+            main(args);
+        } else {
+            main();
+        }
+

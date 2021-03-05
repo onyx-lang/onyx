@@ -2,6 +2,7 @@ package system
 
 use package core
 use package main as main
+use package core.intrinsics.wasm { __initialize }
 
 output_str :: (s: str) -> u32 #foreign "host" "print_str" ---
 
@@ -25,6 +26,7 @@ assert_handler :: (msg: str, file: str) {
 proc () #export "_start" {
     alloc.init();
 
+    __initialize(^context);
     context.allocator = alloc.heap_allocator;
     context.temp_allocator = alloc.temp_allocator;
     context.assert_handler = assert_handler;

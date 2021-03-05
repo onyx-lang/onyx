@@ -1325,14 +1325,15 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 assignment2->left = builtin_context_variable;
                 assignment2->right = (AstTyped *) context_tmp;
 
+                AstBlock* context_block = parse_block(parser);
+                assignment->next = (AstNode *) context_block;
+
                 AstDefer* defer_node = make_node(AstDefer, Ast_Kind_Defer);
                 defer_node->stmt = (AstNode *) assignment2;
-                assignment->next = (AstNode *) defer_node;
+                defer_node->next = context_block->body;
+                context_block->body = (AstNode *) defer_node;
 
-                AstBlock* context_block = parse_block(parser);
                 needs_semicolon = 0;
-                defer_node->next = (AstNode *) context_block;
-
                 retval = (AstNode *) context_tmp;
                 break;
             }

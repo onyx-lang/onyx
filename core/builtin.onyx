@@ -1,4 +1,5 @@
 package builtin
+use package build_opts as build_opts
 
 str  :: #type []u8;
 cstr :: #type ^u8;
@@ -47,7 +48,21 @@ OnyxContext :: struct {
     allocator      : Allocator;
     temp_allocator : Allocator;
 
+    logger         : Logger = .{ default_logger, null };
+
     assert_handler : (msg: str, file: str) -> void;
+}
+
+#if build_opts.Runtime != build_opts.Runtime_Custom {
+    #private_file default_logger :: (data: rawptr, msg: str) {
+        use package core
+        println(msg);
+    }
+
+} else {
+    #private_file default_logger :: (data: rawptr, msg: str) {
+        // In a custom runtime, there is no way to know how to log something.
+    }
 }
 
 // @Robustness
@@ -65,6 +80,20 @@ assert :: (cond: bool, msg: str, file: str = null_str) {
 
 
 //
+// Basic logging
+//
+
+Logger :: struct {
+    func : (data: rawptr, msg: str) -> void;
+    data : rawptr;
+}
+
+log :: (msg: str, use logger: Logger = context.logger) {
+    func(data, msg);
+}
+
+
+//
 // Basic allocation structures.
 // The implementations of all of the allocators can be found in core/alloc/.
 // These need to be here so the context structure has the types and enum values.
@@ -78,6 +107,7 @@ AllocationAction :: enum {
     Resize;
 }
 
+#private_file
 allocator_proc :: #type (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
 
 Allocator :: struct {
@@ -102,7 +132,6 @@ calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
 cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
-use package build_opts as build_opts
 #if build_opts.Runtime != build_opts.Runtime_Custom {
     use package core.intrinsics.wasm { __initialize }
 

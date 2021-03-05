@@ -279,3 +279,29 @@ file_stream_vtable := Stream_Vtable.{
         return ~~ file_stat.size;
     },
 }
+
+
+
+
+file_logger_open :: (filename: str, allocator := context.allocator) -> Logger {
+    file := new(File, allocator);
+    success := false;
+
+    *file, success = file_open(filename, mode=OpenMode.Append);
+    assert(success, "Unable to open file for logging.");
+
+    return .{ file_logger_proc, file };
+}
+
+file_logger_close :: (logger := context.logger) {
+    file_close(*cast(^File) logger.data);
+
+    // @Robustness: this could be the wrong allocator if the context allocator wasn't used.    
+    cfree(logger.data);
+}
+
+#private_file
+file_logger_proc :: (data: ^File, msg: str) {
+    file_write(*data, msg);
+    file_write(*data, "\n");
+}
