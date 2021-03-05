@@ -133,14 +133,13 @@ cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.alloc
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
 #if build_opts.Runtime != build_opts.Runtime_Custom {
-    use package core.intrinsics.wasm { __initialize }
-
     new :: ($T: type_expr, allocator := context.allocator, initialize := true) -> ^T {
         res := cast(^T) raw_alloc(allocator, sizeof T);
 
         // @Robustness: This should be a '#if' when those are added in procedures because
         // otherwise the __initialize intrinsic is going to be generated no matter what.
         // This could be a problem if the type is not something that can be initialized.
+        use package core.intrinsics.wasm { __initialize }
         if initialize do __initialize(res);
         
         return res;

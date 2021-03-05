@@ -4,7 +4,7 @@ List of known bugs:
     enum { Foo, Bar, Baz };
     enum { Foo; Bar; Baz };
 
-[ ] Using a package in the middle of a procedures removes all remaining statements in the procedure.
+[X] Using a package in the middle of a procedures removes all remaining statements in the procedure.
     This is mostly likely due to the changes made with use package statements being treated as entities now.
     
     use_package_breaking :: () {

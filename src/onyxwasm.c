@@ -1318,7 +1318,7 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
 #define SIMD_EXTRACT_LANE_INSTR(instr, arg_arr) \
-    emit_expression(mod, &code, arg_arr[1]->value);\
+    emit_expression(mod, &code, arg_arr[0]->value);\
     if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
         onyx_report_error(arg_arr[1]->token->pos, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
@@ -1327,16 +1327,16 @@ EMIT_FUNC(call, AstCall* call) {
     WID(instr, (u8) ((AstNumLit *) arg_arr[1]->value)->value.i);
 
 #define SIMD_REPLACE_LANE_INSTR(instr, arg_arr) { \
-        emit_expression(mod, &code, arg_arr[1]->value);\
-        if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
-            onyx_report_error(arg_arr[1]->token->pos, "SIMD lane instructions expect a compile time lane number."); \
-            *pcode = code; \
-            return; \
-        } \
-        u8 lane = (u8) ((AstNumLit *) arg_arr[1]->value)->value.i; \
-        emit_expression(mod, &code, arg_arr[2]->value); \
-        WID(instr, lane); \
-    }
+    emit_expression(mod, &code, arg_arr[0]->value);\
+    if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
+        onyx_report_error(arg_arr[1]->token->pos, "SIMD lane instructions expect a compile time lane number."); \
+        *pcode = code; \
+        return; \
+    } \
+    u8 lane = (u8) ((AstNumLit *) arg_arr[1]->value)->value.i; \
+    emit_expression(mod, &code, arg_arr[2]->value); \
+    WID(instr, lane); \
+}
 
 
 EMIT_FUNC(intrinsic_call, AstCall* call) {

@@ -1207,7 +1207,7 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
         }
         
         ENTITY_SUBMIT(upack);
-        return (AstNode *) upack;
+        return NULL;
 
     } else {
         AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
@@ -2238,7 +2238,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
     switch ((u16) parser->curr->type) {
         case Token_Type_Keyword_Use: {
             AstNode* use_node = parse_use_stmt(parser);
-            ENTITY_SUBMIT(use_node);
+            if (use_node) ENTITY_SUBMIT(use_node);
             return;
         }
 
