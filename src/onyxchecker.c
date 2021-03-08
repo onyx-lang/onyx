@@ -307,99 +307,6 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     return 0;
 }
 
-static AstTyped* match_overloaded_function(Arguments* args, bh_arr(AstTyped *) overloads) {
-    bh_arr_each(AstTyped *, node, overloads) {
-        AstFunction* overload = NULL;
-        if ((*node)->kind == Ast_Kind_Function) {
-            overload = (AstFunction *) *node;
-        }
-        else if ((*node)->kind == Ast_Kind_Polymorphic_Proc) {
-            overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Arguments, args);
-        }
-
-        if (overload == NULL) continue;
-
-        Arguments* args_to_use = args;
-        if (args->named_values != NULL && bh_arr_length(args->named_values) > 0) {
-            args_to_use = bh_alloc_item(global_scratch_allocator, Arguments);
-
-            arguments_clone(args_to_use, args);
-            arguments_ensure_length(args_to_use, bh_arr_length(args->values) + bh_arr_length(args->named_values));
-
-            b32 values_place_correctly = fill_in_arguments(args_to_use, (AstNode *) overload, NULL);
-
-            if (!values_place_correctly) goto no_match;
-        }
-
-        fill_in_type((AstTyped *) overload);
-
-        TypeFunction* ol_type = &overload->type->Function;
-        if (bh_arr_length(args_to_use->values) < (i32) ol_type->needed_param_count) continue;
-
-        i32 param_left = ol_type->param_count;
-        Type** param_type = ol_type->params;
-        bh_arr_each(AstTyped*, arg, args_to_use->values) {
-            if (param_left == 0) goto no_match;
-            param_left--;
-
-            fill_in_type(*arg);
-
-            Type* type_to_match = *param_type;
-            if ((*param_type)->kind == Type_Kind_VarArgs)
-                type_to_match = (*param_type)->VarArgs.ptr_to_data->Pointer.elem;
-
-            AstTyped** value = arg;
-            if ((*arg)->kind == Ast_Kind_Argument)
-                value = &((AstArgument *) *arg)->value;
-
-            if (!type_check_or_auto_cast(value, type_to_match)) goto no_match;
-
-            param_type++;
-        }
-
-        return (AstTyped *) *node;
-
-no_match:
-        if (args->named_values != NULL && bh_arr_length(args->named_values) > 0) {
-            bh_arr_free(args_to_use->values);
-        }
-
-        continue;
-    }
-
-    return NULL;
-}
-
-static void report_unable_to_match_overload(AstCall* call) {
-    char* arg_str = bh_alloc(global_scratch_allocator, 1024);
-    arg_str[0] = '\0';
-
-    bh_arr_each(AstTyped *, arg, call->args.values) {
-        strncat(arg_str, node_get_type_name(*arg), 1023);
-
-        if (arg != &bh_arr_last(call->args.values))
-            strncat(arg_str, ", ", 1023);
-    }
-
-    if (bh_arr_length(call->args.named_values) > 0) {
-        bh_arr_each(AstNamedValue *, named_value, call->args.named_values) { 
-            token_toggle_end((*named_value)->token);
-            strncat(arg_str, (*named_value)->token->text, 1023);
-            token_toggle_end((*named_value)->token);
-
-            strncat(arg_str, "=", 1023);
-            strncat(arg_str, node_get_type_name((*named_value)->value), 1023); // CHECK: this might say 'unknown'.
-
-            if (named_value != &bh_arr_last(call->args.named_values))
-                strncat(arg_str, ", ", 1023);
-        }
-    }
-
-    onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
-
-    bh_free(global_scratch_allocator, arg_str);
-}
-
 CheckStatus check_arguments(Arguments* args) {
     bh_arr_each(AstTyped *, actual, args->values)
         CHECK(expression, actual);
@@ -451,12 +358,10 @@ CheckStatus check_call(AstCall* call) {
     //      1. Ensure the callee is not a symbol
     //      2. Check the callee expression (since it could be a variable or a field access, etc)
     //      3. Check all arguments
-    //          * Cannot pass overloaded functions
-    //          * Cannot pass a non-simple struct
+    //          * Cannot pass overloaded functions (ROBUSTNESS)
     //      4. If callee is an overloaded function, use the argument types to determine which overload is used.
     //      5. If callee is polymorphic, use the arguments type to generate a polymorphic function.
-    //      6. If an argument is polymorphic, generate the correct polymorphic function.
-    //      7. Fill in default arguments
+    //      7. Fill in arguments
     //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
     //      9. Check types of formal and actual params against each other, handling varargs
 
@@ -464,7 +369,7 @@ CheckStatus check_call(AstCall* call) {
     check_arguments(&call->args);
 
     if (call->callee->kind == Ast_Kind_Overloaded_Function) {
-        call->callee = match_overloaded_function(&call->args, ((AstOverloadedFunction *) call->callee)->overloads);
+        call->callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args);
         if (call->callee == NULL) {
             report_unable_to_match_overload(call);
             return Check_Error;
@@ -716,13 +621,6 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
         return Check_Error;
     }
 
-    // CLEANUP: This seems like it should be here. But I don't know where
-    // or what the right place is for it.
-    // if (binop->right->type == NULL) {
-    //     onyx_report_error(binop->right->token->pos, "Unable to resolve type for this expression.");
-    //     return Check_Error;
-    // }
-
     binop->type = &basic_types[Basic_Kind_Void];
 
     return Check_Success;
@@ -803,7 +701,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     bh_arr_push(args.values, binop->left);
     bh_arr_push(args.values, binop->right);
 
-    AstTyped* overload = match_overloaded_function(&args, operator_overloads[binop->operation]);
+    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args);
     if (overload == NULL) {
         bh_arr_free(args.values);
         return NULL;

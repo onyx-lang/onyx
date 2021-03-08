@@ -1159,6 +1159,7 @@ AstNode*         make_symbol(bh_allocator a, OnyxToken* sym);
 void arguments_initialize(Arguments* args);
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg);
 void arguments_ensure_length(Arguments* args, u32 count);
+void arguments_copy(Arguments* dest, Arguments* src);
 void arguments_clone(Arguments* dest, Arguments* src);
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
 void arguments_remove_baked(Arguments* args);
@@ -1175,6 +1176,8 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
 
+AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Arguments* args);
+void report_unable_to_match_overload(AstCall* call);
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
 

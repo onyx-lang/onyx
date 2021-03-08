@@ -68,7 +68,6 @@ void entity_heap_init(EntityHeap* entities) {
     bh_arena_init(&entities->entity_arena, global_heap_allocator, 32 * 1024);
 }
 
-// nocheckin
 // Allocates the entity in the entity heap. Don't quite feel this is necessary...
 Entity* entity_heap_register(EntityHeap* entities, Entity e) {
     bh_allocator alloc = bh_arena_allocator(&entities->entity_arena);
@@ -254,7 +253,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         }
         
         case Ast_Kind_Use_Package: {
-            // nocheckin
             ent.state = Entity_State_Comptime_Resolve_Symbols;
             ent.type = Entity_Type_Use_Package;
             ent.use_package = (AstUsePackage *) node;

@@ -211,7 +211,7 @@ void scope_clear(Scope* scope) {
 
 
 //
-// Polymorphic things
+// Polymorphic Procedures
 //
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
     if (pp->concrete_funcs == NULL) {
@@ -913,6 +913,123 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
     return solidified_func.func;
 }
 
+//
+// Overloaded Procedures
+//
+
+//
+// @Cleanup: Everything having to do with overload resolving!
+// Things that need to be available:
+//  * A copy of the arguments list that can be mutated
+//      - The named_values do not need to be copied, because they are not modified when fill_in_arguments happens.
+//      - Only values needs to have a copy available
+//      - This copy needs to be reset after checking every option
+//
+// Steps needed to check if an overload option is "the one":
+//  1. Figure out what the overload is
+//      a. If polymorphic, generate the header for the procedure only
+//  2. Place the arguments in the copy, according to the overload option
+//  3. Ensure the option has a type filled out
+//  4. For each argument
+//      a. Ensure it has a place to go (not too many arguments)
+//      b. Ensure it has a type
+//      c. Ensure the types match (currently there could be a problem if an option is attempted and doesn't work all the way that polymorphic procedures as arguments could still be solidified)
+//
+// Additional features that this needs to account for:
+//  * Resolving an overload from a list of parameter types
+//  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
+//
+
+AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Arguments* param_args) {
+    Arguments args;
+    arguments_clone(&args, param_args);
+    arguments_ensure_length(&args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
+
+    AstTyped *matched_overload = NULL;
+
+    bh_arr_each(AstTyped *, node, overloads) {
+        arguments_copy(&args, param_args);
+
+        AstFunction* overload = NULL;
+        switch ((*node)->kind) {
+            case Ast_Kind_Function:         overload = (AstFunction *) *node; break;
+            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Arguments, param_args); break;
+        }
+
+        // NOTE: Overload is not something that is known to be overloadable.
+        if (overload == NULL) continue;
+        if (overload->kind != Ast_Kind_Function) continue;
+
+        // NOTE: If the arguments cannot be placed successfully in the parameters list
+        if (!fill_in_arguments(&args, (AstNode *) overload, NULL)) continue;
+
+        TypeFunction* ol_type = &overload->type->Function;
+        if (bh_arr_length(args.values) < (i32) ol_type->needed_param_count) continue;
+
+        b32 all_arguments_work = 1;
+        fori (i, 0, bh_arr_length(args.values)) {
+            if (i >= ol_type->param_count) {
+                all_arguments_work = 0;
+                break;
+            }
+
+            Type* type_to_match = ol_type->params[i];
+            AstTyped** value    = &args.values[i];
+
+            if (type_to_match->kind == Type_Kind_VarArgs) type_to_match = type_to_match->VarArgs.ptr_to_data->Pointer.elem;
+            if ((*value)->kind == Ast_Kind_Argument)      value = &((AstArgument *) *value)->value;
+
+            if (!type_check_or_auto_cast(value, type_to_match)) {
+                all_arguments_work = 0;
+                break;
+            }
+        }
+
+        if (all_arguments_work) {
+            matched_overload = *node;
+            break;
+        }
+    }
+
+    bh_arr_free(args.values);
+    return matched_overload;
+}
+
+void report_unable_to_match_overload(AstCall* call) {
+    char* arg_str = bh_alloc(global_scratch_allocator, 1024);
+    arg_str[0] = '\0';
+
+    bh_arr_each(AstTyped *, arg, call->args.values) {
+        strncat(arg_str, node_get_type_name(*arg), 1023);
+
+        if (arg != &bh_arr_last(call->args.values))
+            strncat(arg_str, ", ", 1023);
+    }
+
+    if (bh_arr_length(call->args.named_values) > 0) {
+        bh_arr_each(AstNamedValue *, named_value, call->args.named_values) { 
+            token_toggle_end((*named_value)->token);
+            strncat(arg_str, (*named_value)->token->text, 1023);
+            token_toggle_end((*named_value)->token);
+
+            strncat(arg_str, "=", 1023);
+            strncat(arg_str, node_get_type_name((*named_value)->value), 1023); // CHECK: this might say 'unknown'.
+
+            if (named_value != &bh_arr_last(call->args.named_values))
+                strncat(arg_str, ", ", 1023);
+        }
+    }
+
+    onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
+
+    bh_free(global_scratch_allocator, arg_str);
+}
+
+
+
+//
+// Polymorphic Structures
+//
 char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
     char name_buf[256];
     fori (i, 0, 256) name_buf[i] = 0;
@@ -1042,7 +1159,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
     entity_bring_to_state(&struct_default_entity, Entity_State_Code_Gen);
  
     if (onyx_has_errors()) {
-        onyx_report_error(pos, "Error in creating polymoprhic struct instantiation here.");
+        onyx_report_error(pos, "Error in creating polymorphic struct instantiation here.");
         bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, NULL);
         return NULL;
     }

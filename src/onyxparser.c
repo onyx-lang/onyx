@@ -26,8 +26,6 @@ void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Pac
 
     } else {
         bh_arr(Entity *) *entity_array = bh_arr_last(parser->alternate_entity_placement_stack);
-
-        // nocheckin This should also be able to place them in the false entities
         add_entities_for_node(entity_array, node, scope, package);
     }
 }
