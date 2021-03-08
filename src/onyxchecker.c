@@ -730,22 +730,6 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     }
 
     if (binop_is_assignment(binop->operation)) return check_binop_assignment(binop, assignment_is_ok);
-    
-    if (binop->left->type == NULL) {
-        // nocheckin
-        // onyx_report_error(binop->left->token->pos,
-        //         "Unable to resolve type for symbol '%b'.",
-        //         binop->left->token->text, binop->left->token->length);
-        return Check_Error;
-    }
-
-    if (binop->right->type == NULL) {
-        // nocheckin
-        // onyx_report_error(binop->right->token->pos,
-        //         "Unable to resolve type for symbol '%b'.",
-        //         binop->right->token->text, binop->right->token->length);
-        return Check_Error;
-    }
 
     // NOTE: Try operator overloading before checking everything else.
     if (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic) {
