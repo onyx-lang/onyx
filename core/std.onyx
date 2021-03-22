@@ -30,6 +30,7 @@ use package build_opts as build_opts
     #load "core/sys/wasi"
     #load "core/wasi"
     #load "core/io/file"
+    #load "core/env"
 }
 
 #if build_opts.Runtime == build_opts.Runtime_Js {

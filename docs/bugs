@@ -36,6 +36,24 @@ List of known bugs:
         SN.foo()
     }
 
+[ ] There is a segfault when passing an anonymous struct literal to an untyped vararg.
+    
+    vararg_proc :: (va: ...) {
+        ...
+    }
+
+    vararg_proc(.{ 1, 2 });
+
+[ ] This currently does not work but I think it should:
+
+    baked_proc :: (x: $T, $func: (T) -> T) -> T {
+        return func(x);
+    }
+
+    The problem is that 'T' is an unresolved symbol because the context of the function type
+    does not have the solved value of T in it.
+
+
 List of things to change:
 [X] Currently, there is no way to use the initialized members of a structure without using a struct literal.
     There should be a initialize intrinsic procedure that takes a pointer to anything and initializes it.

@@ -429,6 +429,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     if (node_is_type((AstNode *) node)) return 0;
 
     if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
+        if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.ptr_to_data->Pointer.elem;
         node->type = type;
 
         add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);

@@ -2389,6 +2389,8 @@ static AstPackage* parse_package_name(OnyxParser* parser) {
             token_toggle_end(symbol);
             symbol_subpackage_introduce(package->scope, symbol->text, pnode);
             token_toggle_end(symbol);
+
+            package_reinsert_use_packages(package);
         }
 
         package = newpackage;

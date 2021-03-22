@@ -111,10 +111,9 @@ empty :: (use map: ^Map($K, $V)) -> bool {
 
 hash_function :: proc {
     (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-    (key: i32) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-    (key: i64) -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
-
-    (key: str) -> u32 {
+    (key: i32)    -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+    (key: i64)    -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
+    (key: str)    -> u32 {
         hash: u32 = 5381;
         for ch: key do hash += (hash << 5) + ~~ch;
         return hash;

@@ -1018,6 +1018,7 @@ static SymresStatus symres_struct_defaults(AstType* t) {
 }
 
 static SymresStatus symres_polyproc(AstPolyProc* pp) {
+    pp->flags |= Ast_Flag_Comptime;
     pp->poly_scope = curr_scope;
 
     bh_arr_each(AstPolyParam, param, pp->poly_params) {

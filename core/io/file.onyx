@@ -117,7 +117,7 @@ file_close :: (file: File) -> bool {
 file_write :: (file: File, data: str) {
     vec := IOVec.{ buf = cast(u32) data.data, len = data.count };
     tmp : Size;
-    wasi.fd_write(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^tmp);
+    wasi.fd_write(file.fd, .{ cast(u32) ^vec, 1 }, ^tmp);
     wasi.fd_datasync(file.fd);
 }
 
@@ -141,7 +141,7 @@ get_contents_from_file :: (file: File) -> str {
 
     dummy2: u32;
     buf := IOVec.{ cast(u32) data, size };
-    wasi.fd_pread(file.fd, IOVecArray.{ cast(u32) ^buf, 1 }, 0, ^dummy2);
+    wasi.fd_pread(file.fd, .{ cast(u32) ^buf, 1 }, 0, ^dummy2);
 
     wasi.fd_seek(file.fd, prev_loc, Whence.Set, ^dummy);
 
@@ -153,7 +153,7 @@ get_contents :: proc {
 
     proc (path: str) -> str {
         tmp_file, success := file_open(path, OpenMode.Read);
-        if !success do return str.{ null, 0 };
+        if !success do return .{ null, 0 };
         defer file_close(tmp_file);
 
         return get_contents(tmp_file);
@@ -167,8 +167,8 @@ FileStream :: struct {
 
 open :: (path: str, mode := OpenMode.Read) -> (Error, FileStream) {
     fs := FileStream.{
-        stream = Stream.{ vtable = null },
-        file   = File.{ fd = -1 },
+        stream = .{ vtable = null },
+        file   = .{ fd = -1 },
     };
 
     file, success := file_open(path, mode);
