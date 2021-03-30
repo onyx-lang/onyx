@@ -38,7 +38,7 @@ copy :: (orig: str, dest: str) {
     len := orig.count;
     if dest.count < len do len = dest.count;
 
-    for i: 0 .. len do dest.data[i] = orig.data[i];
+    memory.copy(dest.data, orig.data, len);
 }
 
 concat :: (s1: str, s2: str) -> str {
@@ -46,8 +46,8 @@ concat :: (s1: str, s2: str) -> str {
     len2 := length(s2);
 
     data := cast(^u8) calloc(len1 + len2);
-    for i: 0 .. len1 do data[i]        = s1[i];
-    for i: 0 .. len2 do data[i + len1] = s2[i];
+    memory.copy(data, s1.data, len1);
+    memory.copy(data + len1, s2.data, len2);
 
     return str.{ data, len1 + len2 };
 }

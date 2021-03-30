@@ -1084,16 +1084,16 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Function:                ss = symres_function(ent->function);        break;
 
         case Entity_Type_Foreign_Global_Header:
-        case Entity_Type_Global_Header:       ss = symres_global(ent->global); break;
+        case Entity_Type_Global_Header:           ss = symres_global(ent->global); break;
 
-        case Entity_Type_Use_Package:         ss = symres_use_package(ent->use_package);
-                                              if (ent->use_package->package) package_track_use_package(ent->use_package->package, ent);
-                                              next_state = Entity_State_Finalized;
-                                              break;
+        case Entity_Type_Use_Package:             ss = symres_use_package(ent->use_package);
+                                                  if (ent->use_package->package) package_track_use_package(ent->use_package->package, ent);
+                                                  next_state = Entity_State_Finalized;
+                                                  break;
 
-        case Entity_Type_Use:                 ss = symres_use(ent->use);
-                                              next_state = Entity_State_Finalized;
-                                              break;
+        case Entity_Type_Use:                     ss = symres_use(ent->use);
+                                                  next_state = Entity_State_Finalized;
+                                                  break;
 
         case Entity_Type_Overloaded_Function:     ss = symres_overloaded_function(ent->overloaded_function); break;
         case Entity_Type_Expression:              ss = symres_expression(&ent->expr); break;

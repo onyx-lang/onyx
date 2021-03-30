@@ -37,95 +37,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
 };
 
-b32 types_are_surface_compatible(Type* t1, Type* t2) {
-    // NOTE: If they are pointing to the same thing,
-    // it is safe to assume they are the same type
-    if (t1 == t2) return 1;
-    if (t1 == NULL || t2 == NULL) return 0;
-
-    switch (t1->kind) {
-        case Type_Kind_Basic:
-            if (t2->kind == Type_Kind_Basic) {
-                // HACK: Not sure if this is right way to check this?
-                if (t1 == t2) return 1;
-
-                if ((t1->Basic.flags & Basic_Flag_Integer) && (t2->Basic.flags & Basic_Flag_Integer)) {
-                    return t1->Basic.size == t2->Basic.size;
-                }
-
-                if (t1->Basic.kind == Basic_Kind_Rawptr && type_is_pointer(t2)) {
-                    return 1;
-                }
-            }
-            break;
-
-        case Type_Kind_Pointer:
-            if (t2->kind != Type_Kind_Pointer) return 0;
-
-            if (t1->Pointer.elem->kind == Type_Kind_Basic && t2->Pointer.elem->kind == Type_Kind_Basic)
-                return types_are_compatible(t1->Pointer.elem, t2->Pointer.elem);
-
-            return 1;
-
-        case Type_Kind_Array: {
-            if (t2->kind != Type_Kind_Array) return 0;
-
-            if (t1->Array.count != 0)
-                if (t1->Array.count != t2->Array.count) return 0;
-
-            return types_are_compatible(t1->Array.elem, t2->Array.elem);
-        }
-
-        case Type_Kind_Struct: {
-            if (t2->kind != Type_Kind_Struct) return 0;
-            if (t1->Struct.mem_count != t2->Struct.mem_count) return 0;
-            if (t1->Struct.name && t2->Struct.name)
-                if (strcmp(t1->Struct.name, t2->Struct.name) == 0) return 1;
-
-            b32 works = 1;
-            bh_table_each_start(StructMember, t1->Struct.members);
-                if (!bh_table_has(StructMember, t2->Struct.members, (char *) key)) return 0;
-                StructMember other = bh_table_get(StructMember, t2->Struct.members, (char *) key);
-                if (other.offset != value.offset) return 0;
-
-                if (!types_are_compatible(value.type, other.type)) {
-                    works = 0;
-                    break;
-                }
-            bh_table_each_end;
-
-            return works;
-        }
-
-        case Type_Kind_Enum: {
-            if (t2->kind != Type_Kind_Enum) return 0;
-            return t1 == t2;
-        }
-
-        case Type_Kind_Slice: {
-            if (t2->kind != Type_Kind_Slice) return 0;
-            return types_are_compatible(t1->Slice.ptr_to_data->Pointer.elem, t2->Slice.ptr_to_data->Pointer.elem);
-        }
-
-        case Type_Kind_VarArgs: {
-            if (t2->kind != Type_Kind_VarArgs) return 0;
-            return types_are_compatible(t1->VarArgs.ptr_to_data->Pointer.elem, t2->VarArgs.ptr_to_data->Pointer.elem);
-        }
-
-        case Type_Kind_DynArray: {
-            if (t2->kind != Type_Kind_DynArray) return 0;
-            return types_are_compatible(t1->DynArray.ptr_to_data->Pointer.elem, t2->DynArray.ptr_to_data->Pointer.elem);
-        }
-
-        default:
-            assert(("Invalid type", 0));
-            break;
-    }
-
-    return 0;
-}
-
-b32 types_are_compatible(Type* t1, Type* t2) {
+b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
     // NOTE: If they are pointing to the same thing,
     // it is safe to assume they are the same type
     if (t1 == t2) return 1;
@@ -151,6 +63,8 @@ b32 types_are_compatible(Type* t1, Type* t2) {
 
         case Type_Kind_Pointer: {
             if (t2->kind == Type_Kind_Pointer) {
+                if (!recurse_pointers) return 1;
+
                 if (types_are_compatible(t1->Pointer.elem, t2->Pointer.elem)) return 1;
 
                 if (t1->Pointer.elem->kind == Type_Kind_Struct && t2->Pointer.elem->kind == Type_Kind_Struct) {
@@ -178,6 +92,7 @@ b32 types_are_compatible(Type* t1, Type* t2) {
 
         case Type_Kind_Struct: {
             if (t2->kind != Type_Kind_Struct) return 0;
+            if (t1->Struct.unique_id != t2->Struct.unique_id) return 0;
             if (t1->Struct.mem_count != t2->Struct.mem_count) return 0;
 
             b32 works = 1;
@@ -186,7 +101,9 @@ b32 types_are_compatible(Type* t1, Type* t2) {
                 StructMember other = bh_table_get(StructMember, t2->Struct.members, (char *) key);
                 if (other.offset != value.offset) return 0;
 
-                if (!types_are_surface_compatible(value.type, other.type)) {
+                // NOTE: Don't recurse down pointers; This could be a problem, but it is a quick
+                // fix for the problem that occurs when using a linked-list style data structure.
+                if (!types_are_compatible_(value.type, other.type, 0)) {
                     works = 0;
                     break;
                 }
@@ -196,9 +113,8 @@ b32 types_are_compatible(Type* t1, Type* t2) {
         }
 
         case Type_Kind_Enum: {
+            // NOTE: The check above for t1 == t2 would already catch this.
             return 0;
-            // if (t2->kind != Type_Kind_Enum) return 0;
-            // return t1 == t2;
         }
 
         case Type_Kind_Function: {
@@ -248,6 +164,10 @@ b32 types_are_compatible(Type* t1, Type* t2) {
     }
 
     return 0;
+}
+
+b32 types_are_compatible(Type* t1, Type* t2) {
+    return types_are_compatible_(t1, t2, 1);
 }
 
 u32 type_size_of(Type* type) {

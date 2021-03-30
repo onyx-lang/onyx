@@ -31,6 +31,17 @@ assert_handler :: (msg: str, file: str) {
     proc_exit(1);
 }
 
+proc () #export "_initialize" {
+    alloc.init();
+
+    __initialize(^context);
+    context.allocator = alloc.heap_allocator;
+    context.temp_allocator = alloc.temp_allocator;
+    context.assert_handler = assert_handler;
+
+    stdio_init();
+}
+
 // The builtin _start proc.
 // Sets up everything needed for execution.
 proc () #export "_start" {
@@ -40,6 +51,8 @@ proc () #export "_start" {
     context.allocator = alloc.heap_allocator;
     context.temp_allocator = alloc.temp_allocator;
     context.assert_handler = assert_handler;
+
+    stdio_init();
 
     args : [] cstr;
     argv_buf_size : Size;
@@ -62,10 +75,6 @@ proc () #export "_start" {
 
         args[i] = cast(cstr) (cast(^u32) args.data)[i];
     }
-
-
-
-    stdio_init();
 
     main.main(args);
 
