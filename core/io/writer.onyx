@@ -19,7 +19,7 @@ write_str :: (use writer: ^Writer, s: str) {
 write_cstr :: (use writer: ^Writer, cs: cstr) {
     use package core
 
-    s := string.make(cs);
+    s := string.from_cstr(cs);
     write_str(writer, s);
 }
 

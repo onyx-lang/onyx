@@ -43,7 +43,7 @@ add_str :: proc (use sb: ^Builder, s: str) -> ^Builder {
 }
 
 add_cstr :: proc (use sb: ^Builder, cstring: cstr) -> ^Builder {
-    s := string.make(cstring);
+    s := string.from_cstr(cstring);
     return add_str(sb, s);
 }
 

@@ -2,13 +2,33 @@ package core.string
 
 use package core
 
-make :: (s: cstr) -> str {
-    len := length(s);
 
-    return str.{ count = len, data = s };
+alloc_copy :: (original: str, allocator := context.allocator) -> str {
+    new_str : str;
+    new_str.data = raw_alloc(allocator, sizeof u8 * original.count);
+    new_str.count = original.count;
+    copy(original, new_str);
+    return new_str;
 }
 
+copy :: (orig: str, dest: str) {
+    len := orig.count;
+    if dest.count < len do len = dest.count;
+
+    memory.copy(dest.data, orig.data, len);
+}
+
+from_cstr :: (s: cstr) -> str {
+    return .{ data = s, count = length(s) };
+}
+
+free :: (s: str, allocator := context.allocator) do raw_free(allocator, s.data);
+
 length :: proc {
+    (s: str) -> u32 {
+        return s.count;
+    },
+
     (s: cstr) -> u32 {
         len := 0;
         c := s;
@@ -19,49 +39,29 @@ length :: proc {
 
         return len;
     },
-
-    (s: str) -> u32 {
-        return s.count;
-    },
 }
 
-alloc_copy :: (orig: str, allocator := context.allocator) -> str {
-    new_str : str;
-    new_str.data = raw_alloc(allocator, sizeof u8 * orig.count);
-    new_str.count = orig.count;
-    copy(orig, new_str);
-    return new_str;
-}
+// trim_start  :: (s: str, ch := #char " ") -> str
+// trim_start  :: (s: ^str, ch := #char " ")
+// trim_end    :: (s: str, ch := #char " ") -> str
+// trim_end    :: (s: ^str, ch := #char " ")
 
-// @Speed: This should use memory.copy?
-copy :: (orig: str, dest: str) {
-    len := orig.count;
-    if dest.count < len do len = dest.count;
-
-    memory.copy(dest.data, orig.data, len);
-}
-
-concat :: (s1: str, s2: str) -> str {
+concat :: (s1: str, s2: str, allocator := context.allocator) -> str {
     len1 := length(s1);
     len2 := length(s2);
 
-    data := cast(^u8) calloc(len1 + len2);
+    data := cast(^u8) raw_alloc(allocator, len1 + len2);
     memory.copy(data, s1.data, len1);
     memory.copy(data + len1, s2.data, len2);
 
     return str.{ data, len1 + len2 };
 }
 
-free :: (s: str) do cfree(s.data);
-
-// This is an example doc str
-// You can have as many comments as you want
-// It documents the split function
-split :: (s: str, delim: u8) -> []str {
+split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
     delim_count := 0;
     for i: 0 .. s.count do if s[i] == delim do delim_count += 1;
 
-    strarr := cast(^str) calloc(sizeof str * (delim_count + 1));
+    strarr := cast(^str) raw_alloc(allocator, sizeof str * (delim_count + 1));
 
     curr_str := 0;
     begin := 0;
@@ -79,21 +79,28 @@ split :: (s: str, delim: u8) -> []str {
     return strarr[0 .. delim_count + 1];
 }
 
-// substr :: proc (s: str, sub: str) -> str {
-//     for i: 0 .. str.count {
-//         while j := 0; j < sub.count && str[i + j] == sub[j] {
-//             j += 1;
-// 
-//             if j == sub.count do return str.data[i .. i + j];
-//         }
-//     }
-// 
-//     return str.data[0 .. 0];
-// }
+contains :: proc {
+    (s: str, c: u8) -> bool {
+        for ch: s do if ch == c do return true;
+        return false;
+    },
 
-contains :: (s: str, c: u8) -> bool {
-    for ch: s do if ch == c do return true;
-    return false;
+    (s: str, substr: str) -> bool #export "ASDFASDFASDF" {
+        while i := 0; i < s.count {
+            while j := 0; j < substr.count {
+                if s[i + j] != substr[j] {
+                    i += j + 1;
+                    continue continue;
+                }
+
+                j += 1;
+            }
+
+            return true;
+        }
+
+        return false;
+    },
 }
 
 // TODO: Check this for edge cases and other bugs. I'm not confident
@@ -115,38 +122,92 @@ equal :: (str1: str, str2: str) -> bool #operator== {
     return true;
 }
 
-starts_with :: (str1: str, str2: str) -> bool {
-    if str1.count < str2.count do return false;
-    while i := 0; i < str2.count {
-        if str1[i] != str2[i] do return false;
+starts_with :: (s: str, prefix: str) -> bool {
+    if s.count < prefix.count do return false;
+    while i := 0; i < prefix.count {
+        if s[i] != prefix[i] do return false;
         i += 1;
     }
     return true;
 }
 
-strip_leading_whitespace :: (s: ^str) {
-    while true do switch s.data[0] {
-        case #char " ", #char "\t", #char "\n", #char "\r" {
+ends_with :: (s: str, suffix: str) -> bool {
+    if s.count < suffix.count do return false;
+    while i := s.count - 1; i >= s.count - suffix.count {
+        if s[i] != suffix[i] do return false;
+        i -= 1;
+    }
+    return true;
+}
+
+
+strip_leading_whitespace :: proc {
+    (s: ^str) {
+        while true do switch s.data[0] {
+            case #char " ", #char "\t", #char "\n", #char "\r" {
+                s.data += 1;
+                s.count -= 1;
+            }
+
+            case #default do return;
+        }
+    },
+    
+    (s: str) -> str {
+        out := s;
+        strip_leading_whitespace(^out);
+        return out;
+    },
+}
+
+strip_trailing_whitespace :: proc {
+    (s: ^str) {
+        while true do switch s.data[s.count - 1] {
+            case #char " ", #char "\t", #char "\n", #char "\r" {
+                s.count -= 1;
+            }
+
+            case #default do return;
+        }
+    },
+
+    (s: str) -> str {
+        out := s;
+        strip_trailing_whitespace(^out);
+        return out;
+    },
+}
+
+trim_start :: proc {
+    (s: ^str, char: u8) {
+        while s.data[0] == char {
             s.data += 1;
             s.count -= 1;
         }
+    },
 
-        case #default do return;
+    (s: str, char: u8) -> str {
+        out := s;
+        trim_start(^out, char);
+        return out;
     }
 }
 
-strip_trailing_whitespace :: (s: ^str) {
-    while true do switch s.data[s.count - 1] {
-        case #char " ", #char "\t", #char "\n", #char "\r" {
+trim_end :: proc {
+    (s: ^str, char: u8) {
+        while s.data[s.count - 1] == char {
             s.count -= 1;
         }
+    },
 
-        case #default do return;
+    (s: str, char: u8) -> str {
+        out := s;
+        trim_end(^out, char);
+        return out;
     }
 }
 
 advance :: proc {
-    // Inplace version
     (s: ^str, chars := 1) {
         chars = math.min(chars, s.count);
 
@@ -154,7 +215,6 @@ advance :: proc {
         s.count -= chars;
     },
 
-    // Out of place version
     (s: str, chars := 1) -> str {
         chars = math.min(chars, s.count);
         out := s;
@@ -166,6 +226,10 @@ advance :: proc {
     }
 }
 
+
+
+// DEPRECATED
+// Everything below this point is deprecated
 read_u32 :: (s: ^str, out: ^u32) {
     n := 0;
 
