@@ -1,7 +1,5 @@
 package core.string.reader
 
-use package core { printf }
-
 StringReader :: struct {
     // Think of this as `use s : str`;
     data : ^u8;

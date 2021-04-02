@@ -17,19 +17,19 @@ for test_file in $(find tests/ -name '*.onyx'); do
     print_check "$name"
 
     if ! ./bin/onyx -r js --use-post-mvp-features "$test_file" -o "./tests/$name.wasm" >/dev/null; then
-        print "\n❌ Failed to compile $name.onyx.\n"
+        printf "\n❌ Failed to compile $name.onyx.\n"
         failed=1
         continue
     fi
     
     if ! ./bin/onyx-js "./tests/$name.wasm" > ./tmpoutput; then
-        print "\n❌ Failed to run $name.onyx.\n"
+        printf "\n❌ Failed to run $name.onyx.\n"
         failed=1
         continue
     fi
 
     if ! diff ./tmpoutput "$dirname/$name" >/dev/null; then
-        print "\n❌ Test output did not match.\n"
+        printf "\n❌ Test output did not match.\n"
         diff ./tmpoutput "$dirname/$name"
         # failed=0
         continue

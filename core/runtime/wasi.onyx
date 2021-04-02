@@ -1,15 +1,15 @@
-package system
+package runtime
 
 #load "core/wasi"
+#load "core/runtime/common"
 
 use package wasi
 use package core
 use package main as main
-use package core.intrinsics.wasm { __initialize }
 
-STDOUT_FILENO :: 1
+__output_string :: (s: str) -> u32 {
+    STDOUT_FILENO :: 1
 
-output_str :: (s: str) -> u32 {
     vec := IOVec.{ buf = cast(u32) s.data, len = s.count };
     tmp : Size;
     fd_write(STDOUT_FILENO, IOVecArray.{ cast(u32) ^vec, 1 }, ^tmp);
@@ -17,42 +17,12 @@ output_str :: (s: str) -> u32 {
     return tmp;
 }
 
-assert_handler :: (msg: str, file: str) {
-    output_str("Assert failed: ");
-    output_str(msg);
-
-    if file.data != null {
-        output_str(" in ");
-        output_str(file);
-    }
-
-    output_str("\n");
-
-    proc_exit(1);
-}
-
-proc () #export "_initialize" {
-    alloc.init();
-
-    __initialize(^context);
-    context.allocator = alloc.heap_allocator;
-    context.temp_allocator = alloc.temp_allocator;
-    context.assert_handler = assert_handler;
-
-    stdio_init();
-}
+__exit :: (status: i32) do proc_exit(status);
 
 // The builtin _start proc.
 // Sets up everything needed for execution.
 proc () #export "_start" {
-    alloc.init();
-
-    __initialize(^context);
-    context.allocator = alloc.heap_allocator;
-    context.temp_allocator = alloc.temp_allocator;
-    context.assert_handler = assert_handler;
-
-    stdio_init();
+    __runtime_initialize();
 
     args : [] cstr;
     argv_buf_size : Size;
@@ -78,5 +48,5 @@ proc () #export "_start" {
 
     main.main(args);
 
-    print_stream_flush();
+    __flush_stdio();
 }

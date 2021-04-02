@@ -1,0 +1,34 @@
+package runtime
+
+use package core
+use package core.intrinsics.onyx { __initialize }
+
+// The default assert handler. This assumes that __output_string
+// and __exit are defined in the 'runtime' package.
+__assert_handler :: (msg: str, file: str) {
+    __output_string("Assert failed: ");
+    __output_string(msg);
+
+    if file.data != null {
+        __output_string(" in ");
+        __output_string(file);
+    }
+
+    __output_string("\n");
+
+    __exit(1);
+}
+
+// Use this procedure to initialize everything needed in the
+// standard library when you are dropped directly into a function.
+__runtime_initialize :: () {
+    alloc.init();
+
+    __initialize(^context);
+    context.allocator = alloc.heap_allocator;
+    context.temp_allocator = alloc.temp_allocator;
+    context.assert_handler = __assert_handler;
+
+    __stdio_init();
+}
+

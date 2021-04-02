@@ -10,25 +10,15 @@ package core
 // It is expected that a file will be included that will be part
 // of the system package
 
-use package build_opts as build_opts
-#if build_opts.Runtime != build_opts.Runtime_Custom {
-    use package system as system
-} else {
+use package runtime as runtime
+#if runtime.Runtime == runtime.Runtime_Custom {
     #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
-}
-
-#private_file print_stream : io.DynamicStringStream;
-#private_file print_writer : io.Writer;
-
-stdio_init :: () {
-    print_stream = io.dynamic_string_stream_make(2048, context.allocator);
-    print_writer = io.writer_make(^print_stream);
 }
 
 print :: proc {
     (x: str) {
         io.write(^print_writer, x);
-        if x[x.count - 1] == #char "\n" do print_stream_flush();
+        if x[x.count - 1] == #char "\n" do __flush_stdio();
     },
 
     (x: $T)        { io.write(^print_writer, x); },
@@ -66,12 +56,26 @@ print_array :: proc {
     }
 }
 
-print_stream_flush :: () {
+
+//
+// Private and internal things
+//
+
+#private_file print_stream : io.DynamicStringStream;
+#private_file print_writer : io.Writer;
+
+__stdio_init :: () {
+    print_stream = io.dynamic_string_stream_make(2048, context.allocator);
+    print_writer = io.writer_make(^print_stream);
+}
+
+
+__flush_stdio :: () {
     if print_stream.data.count == 0 do return;
 
     ^print_stream
         |> io.dynamic_string_stream_to_str()
-        |> system.output_str();
+        |> runtime.__output_string();
 
     ^print_stream |> io.stream_flush();
 }

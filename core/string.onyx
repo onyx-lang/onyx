@@ -41,20 +41,24 @@ length :: proc {
     },
 }
 
-// trim_start  :: (s: str, ch := #char " ") -> str
-// trim_start  :: (s: ^str, ch := #char " ")
-// trim_end    :: (s: str, ch := #char " ") -> str
-// trim_end    :: (s: ^str, ch := #char " ")
+concat :: proc {
+    (s1: str, s2: str, allocator := context.allocator) -> str {
+        len1 := length(s1);
+        len2 := length(s2);
 
-concat :: (s1: str, s2: str, allocator := context.allocator) -> str {
-    len1 := length(s1);
-    len2 := length(s2);
+        data := cast(^u8) raw_alloc(allocator, len1 + len2);
+        memory.copy(data, s1.data, len1);
+        memory.copy(data + len1, s2.data, len2);
 
-    data := cast(^u8) raw_alloc(allocator, len1 + len2);
-    memory.copy(data, s1.data, len1);
-    memory.copy(data + len1, s2.data, len2);
+        return str.{ data, len1 + len2 };
+    },
 
-    return str.{ data, len1 + len2 };
+    (into: ^[..] u8, s: str) -> str {
+        array.ensure_capacity(into, into.count + s.count);
+        memory.copy(into.data, s.data, into.count);
+        into.count += s.count;
+        return .{ into.data, into.count };
+    }
 }
 
 split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
@@ -85,7 +89,7 @@ contains :: proc {
         return false;
     },
 
-    (s: str, substr: str) -> bool #export "ASDFASDFASDF" {
+    (s: str, substr: str) -> bool {
         while i := 0; i < s.count {
             while j := 0; j < substr.count {
                 if s[i + j] != substr[j] {

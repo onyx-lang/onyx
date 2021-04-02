@@ -11,7 +11,7 @@ specific_compose_1 :: #solidify specific_compose_0 { A = f32 };
 specific_compose_2 :: #solidify specific_compose_1 { C = f64 };
 
 main :: proc (args: [] cstr) {
-    use package build_opts
+    use package runtime
     println(Runtime);
     println("==================================================");
 

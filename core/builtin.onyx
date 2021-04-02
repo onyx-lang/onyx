@@ -1,5 +1,9 @@
 package builtin
-use package build_opts as build_opts
+
+// CLEANUP: Should builtin.onyx really be including other files in the compilation?
+// Does that complicate things too much?
+#load "core/runtime/build_opts"
+use package runtime as runtime
 
 str  :: #type []u8;
 cstr :: #type ^u8;
@@ -31,7 +35,7 @@ vararg_get :: proc {
         ret := *cast(^T) va.data;
         va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
         va.count -= 1;
-        return res;
+        return ret;
     }
 }
 
@@ -53,7 +57,7 @@ OnyxContext :: struct {
     assert_handler : (msg: str, file: str) -> void;
 }
 
-#if build_opts.Runtime != build_opts.Runtime_Custom {
+#if runtime.Runtime != runtime.Runtime_Custom {
     #private_file default_logger :: (data: rawptr, msg: str) {
         use package core
         println(msg);
@@ -132,14 +136,14 @@ calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
 cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
-#if build_opts.Runtime != build_opts.Runtime_Custom {
+#if runtime.Runtime != runtime.Runtime_Custom {
     new :: ($T: type_expr, allocator := context.allocator, initialize := true) -> ^T {
         res := cast(^T) raw_alloc(allocator, sizeof T);
 
         // @Robustness: This should be a '#if' when those are added in procedures because
         // otherwise the __initialize intrinsic is going to be generated no matter what.
         // This could be a problem if the type is not something that can be initialized.
-        use package core.intrinsics.wasm { __initialize }
+        use package core.intrinsics.onyx { __initialize }
         if initialize do __initialize(res);
         
         return res;

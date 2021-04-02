@@ -5,8 +5,6 @@ memory_grow  :: (val: i32) -> i32 #intrinsic ---
 memory_copy  :: (dst: rawptr, src: rawptr, count: i32) -> void #intrinsic ---
 memory_fill  :: (dst: rawptr, byte: u8, count: i32) -> void #intrinsic ---
 
-__initialize :: (val: ^$T) -> void #intrinsic ---
-
 clz_i32      :: (val: i32) -> i32 #intrinsic ---
 ctz_i32      :: (val: i32) -> i32 #intrinsic ---
 popcnt_i32   :: (val: i32) -> i32 #intrinsic ---

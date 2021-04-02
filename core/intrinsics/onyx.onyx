@@ -1,0 +1,3 @@
+package core.intrinsics.onyx
+
+__initialize :: (val: ^$T) -> void #intrinsic ---

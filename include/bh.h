@@ -1221,7 +1221,7 @@ b32 bh_str_ends_with(char* str, char* end) {
 
     while (*e == *s && e != end && s != str) e--, s--;
 
-    return e == end;
+    return *e == *s;
 }
 
 char* bh_strdup(bh_allocator a, char* str) {
