@@ -53,7 +53,7 @@ read_u64 :: (use reader: ^Reader) -> u64 {
     return n;
 }
 
-read_line :: (use reader: ^Reader, allocator := context.allocator) -> str {
+read_line :: (use reader: ^Reader, consume_newline := true, allocator := context.allocator) -> str {
     _, curr_pos := stream_tell(stream);
 
     count := 0;
@@ -64,6 +64,8 @@ read_line :: (use reader: ^Reader, allocator := context.allocator) -> str {
         err, curr = stream_read_byte(stream);
         if err != Error.None do break;
     }
+
+    if consume_newline do count += 1;
 
     stream_seek(stream, curr_pos, SeekFrom.Start);
 

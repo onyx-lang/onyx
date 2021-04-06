@@ -13,7 +13,7 @@ main :: proc (args: [] cstr) {
         println(word);
     }
 
-    println(io.read_line(^sreader, context.temp_allocator));
+    println(io.read_line(^sreader, consume_newline=false, allocator=context.temp_allocator));
 
     a := io.read_u32(^sreader);
     b := io.read_u32(^sreader);

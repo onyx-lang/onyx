@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-use package core.string.reader as reader
 
 Vec2 :: struct {
 	x: i32 = 0;
@@ -30,13 +29,14 @@ Cell :: struct {
 main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day24.txt";
 
-	file := reader.make(contents);
+    file_stream := io.string_stream_make(contents);
+	file := io.reader_make(^file_stream);
 
 	grid := map.make(Vec2, Cell, .{}, 1021); // `true` is black
 	defer map.free(^grid);
 
-	while !reader.empty(^file) {
-		line := reader.read_line(^file);	
+	while !io.stream_end_of_file(^file_stream) {
+		line := io.read_line(^file);
 
 		loc := Vec2.{ 0, 0 };
 		s := 0;
