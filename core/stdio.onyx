@@ -7,9 +7,6 @@ package core
 // in anyway.
 
 
-// It is expected that a file will be included that will be part
-// of the system package
-
 use package runtime as runtime
 #if runtime.Runtime == runtime.Runtime_Custom {
     #error "'stdio' can only be included in the 'wasi' or 'js' runtime."

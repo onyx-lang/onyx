@@ -26,7 +26,7 @@ main :: (args: [] cstr) {
     for elem: slice do printf("%i ", elem);
     print("\n");
 
-    // Another equivalent way of writing lines 21 and 22 is to
+    // Another equivalent way of writing lines 22 and 23 is to
     // use the array subscript notation, but provide a range for
     // the index as so. This is generally called the slice literal
     // notation.

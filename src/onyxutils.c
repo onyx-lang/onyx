@@ -458,6 +458,9 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = (AstType*) ((AstArrayType *) elem.type_expr)->count_expr,
                     .kind = PSK_Value,
+
+                    // CLEANUP: Making an integer literal every time is very very very gross. This should
+                    // at least be cached or something.
                     .value = (AstTyped *) make_int_literal(context.ast_alloc, elem.actual->Array.count)
                 }));
 
