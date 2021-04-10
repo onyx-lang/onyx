@@ -4,7 +4,7 @@ package main
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     imap : map.Map(i32, str);
     map.init(^imap, "");
     defer {

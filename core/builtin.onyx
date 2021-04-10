@@ -136,6 +136,7 @@ calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
 cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
+// CLEANUP: Does this really need to be limited to a non-custom runtime?
 #if runtime.Runtime != runtime.Runtime_Custom {
     new :: ($T: type_expr, allocator := context.allocator, initialize := true) -> ^T {
         res := cast(^T) raw_alloc(allocator, sizeof T);

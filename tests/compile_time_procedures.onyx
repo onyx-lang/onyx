@@ -3,20 +3,20 @@
 use package core
 
 Test_VTable :: struct {
-    first  : proc (i32) -> i32;
-    second : proc (i32) -> i32;
+    first  : (i32) -> i32;
+    second : (i32) -> i32;
 
-    third  : proc (i32, i32) -> i32 = null_proc;
+    third  : (i32, i32) -> i32 = null_proc;
 }
 
 test_vtable1 := Test_VTable.{
-    first  = proc (a: i32) -> i32 { return a * 2; },
-    second = proc (a: i32) -> i32 { return a + 2; },
+    first  = (a: i32) -> i32 { return a * 2; },
+    second = (a: i32) -> i32 { return a + 2; },
 }
 
 test_vtable2 := Test_VTable.{
-    first  = proc (a: i32) -> i32 { return a / 2; },
-    second = proc (a: i32) -> i32 { return a - 2; },
+    first  = (a: i32) -> i32 { return a / 2; },
+    second = (a: i32) -> i32 { return a - 2; },
 }
 
 
@@ -27,10 +27,10 @@ Test_Thing :: struct {
 }
 
 // because of the work i did above, this also works now.
-dummy := proc () { println("hello world!"); }
+dummy := () { println("hello world!"); }
 
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     dummy();
 
     t := Test_Thing.{ ^test_vtable1, 10 };
@@ -45,7 +45,7 @@ main :: proc (args: [] cstr) {
 
     println(t.vt.first == test_vtable1.second);
 
-    do_a_thing :: proc (use t: ^Test_Thing) -> i32 {
+    do_a_thing :: (use t: ^Test_Thing) -> i32 {
         if vt.second == null_proc || vt.first == null_proc do return data;
 
         res := data |> vt.second() |> vt.first();

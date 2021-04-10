@@ -2,7 +2,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     NewPolyStruct :: struct (T: type_expr, N: i32) {
         x : [N] T; 
         y : [N] f32;
@@ -29,5 +29,5 @@ main :: proc (args: [] cstr) {
     println(swd.str_member);
     poly_match(swd);
 
-    poly_match :: proc (swd: SimpleWithDefault($T, $D)) do println(D);
+    poly_match :: (swd: SimpleWithDefault($T, $D)) do println(D);
 }

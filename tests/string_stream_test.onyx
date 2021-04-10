@@ -2,7 +2,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     some_string := "This is a test string that can be read.\n\n\n\n\n\n1234 4567";
 
     sstream := io.string_stream_make(some_string);

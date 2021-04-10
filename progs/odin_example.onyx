@@ -30,7 +30,7 @@ Bar :: struct {
 // asdf :: proc (f: Foo) -> ...
 // asdf(bar.foo);
 
-print_foo :: proc (f: ^Foo) {
+print_foo :: (f: ^Foo) {
     print("Foo: \n");
     print(f.data1);
     print("\n");
@@ -38,7 +38,7 @@ print_foo :: proc (f: ^Foo) {
     print("\n");
 }
 
-print_bar :: proc (bar: ^Bar) {
+print_bar :: (bar: ^Bar) {
     print(bar.data1);
     print("\n");
     print(cast(i32) bar.data2);
@@ -47,7 +47,7 @@ print_bar :: proc (bar: ^Bar) {
     print("\n");
 }
 
-make_bar :: proc () -> Bar {
+make_bar :: () -> Bar {
     bar : Bar;
     bar.data1 = 1234;
     bar.data2 = 12.34f;
@@ -56,7 +56,7 @@ make_bar :: proc () -> Bar {
     return bar;
 }
 
-f :: proc () -> [5] [2] u32 #export "IAMTHEFUNCTION" {
+f :: () -> [5] [2] u32 #export "IAMTHEFUNCTION" {
     // This method of returning an array will leak memory, since this is never freed.
     // mem := cast(^u32) calloc(sizeof [5] [2] u32);
     // for i: 0 .. 10 do mem[i] = 1234 + i;
@@ -69,7 +69,7 @@ f :: proc () -> [5] [2] u32 #export "IAMTHEFUNCTION" {
     return mem;
 }
 
-compress :: proc (arr: [$N] $T, f : proc (T, T) -> T) -> T {
+compress :: (arr: [$N] $T, f : proc (T, T) -> T) -> T {
     val := arr[0];
     for i: 1..N do val = f(val, arr[i]);
     return val;
@@ -85,14 +85,14 @@ BadUnion :: struct {
 Vec2   :: struct { x: i32; y: i32; }
 Entity :: struct { use pos: Vec2; }
 
-array_literal_optim :: proc () #export {
+array_literal_optim :: () -> void #export {
     bar : [5] u32;
     bar = u32.[ 1, 2, 3, 4, 5 ];
     bar[2] = 1234;
     for b: bar do printf("b: %i\n", b);
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     a : BadUnion;
     a.int = 1234;
     a.float = 0.5;
@@ -112,7 +112,7 @@ main :: proc (args: [] cstr) {
         printf("%p == %p\n", cast(^u32) foo, ^foo);
         for ^thing: foo do for t: *thing do printf("%p %i\n", thing, t);
 
-        println(compress(f32.[ 1, 2, 3, 4, 5 ], proc (a: $T, b: T) -> T { return a + b; }));
+        println(compress(f32.[ 1, 2, 3, 4, 5 ], (a: $T, b: T) -> T { return a + b; }));
     }
 
     use package test { foo as foo_pkg }

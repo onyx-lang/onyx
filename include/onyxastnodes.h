@@ -981,6 +981,8 @@ typedef struct EntityHeap {
 
     i32 state_count[Entity_State_Count];
     i32 type_count[Entity_Type_Count];
+
+    i32 all_count[Entity_State_Count][Entity_Type_Count];
 } EntityHeap;
 
 void entity_heap_init(EntityHeap* entities);

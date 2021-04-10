@@ -4,7 +4,7 @@ package main
 
 use package core;
 
-old_va_test :: proc (fix: Fixes, va: ..i32) {
+old_va_test :: (fix: Fixes, va: ..i32) {
     println(fix.prefix);
     for v: va do println(v);
     println(fix.suffix);
@@ -12,7 +12,7 @@ old_va_test :: proc (fix: Fixes, va: ..i32) {
 
 Fixes :: struct { prefix: str; suffix: str; }
 
-new_va_test :: proc (fix: Fixes, va: ...) {
+new_va_test :: (fix: Fixes, va: ...) {
     println(fix.prefix);
 
     for i: 0 .. va.count {
@@ -24,7 +24,7 @@ new_va_test :: proc (fix: Fixes, va: ...) {
     println(fix.suffix);
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     new_va_test(Fixes.{ "foo", "foozle" }, 1, 2, 3.0f, 5.0f);
     old_va_test(Fixes.{ "bar", "barzle" }, 1);
 

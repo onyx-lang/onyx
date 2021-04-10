@@ -6,7 +6,7 @@ package main
 use package core
 use package core.intrinsics.simd
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     init_positions();
     init_velocities();
 
@@ -24,7 +24,7 @@ OBJECT_COUNT :: 10000
 positions  : [OBJECT_COUNT] f32x4
 velocities : [OBJECT_COUNT] f32x4
 
-init_positions :: proc () {
+init_positions :: () {
     for ^p: positions {
         *p = f32x4_replace_lane(*p, 0, random.float(-127.0f, 127.0f));
         *p = f32x4_replace_lane(*p, 1, random.float(-127.0f, 127.0f));
@@ -33,23 +33,23 @@ init_positions :: proc () {
     }
 }
 
-init_velocities :: proc () {
+init_velocities :: () {
     for ^v: velocities do *v = f32x4_splat(0.0f);
 }
 
-horizontal_add :: proc (f: f32x4) -> f32 {
+horizontal_add :: (f: f32x4) -> f32 {
     return f32x4_extract_lane(f, 0)
          + f32x4_extract_lane(f, 1)
          + f32x4_extract_lane(f, 2)
          + f32x4_extract_lane(f, 3);
 }
 
-distance :: proc (x: f32x4, y: f32x4) -> f32 {
+distance :: (x: f32x4, y: f32x4) -> f32 {
     d := f32x4_sub(x, y);
     return horizontal_add(f32x4_mul(d, d));
 }
 
-update :: proc () {
+update :: () {
     for i: 0 .. OBJECT_COUNT {
         for j: 0 .. OBJECT_COUNT {
             dist := distance(positions[i], positions[j]);
@@ -64,7 +64,7 @@ update :: proc () {
     }
 }
 
-avg_motion :: proc () -> f32 {
+avg_motion :: () -> f32 {
     avg_motion := f32x4_splat(0.0f);
     obj_vec := f32x4_splat(cast(f32) OBJECT_COUNT);
     for v: velocities {

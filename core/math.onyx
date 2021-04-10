@@ -249,7 +249,7 @@ clamp :: (v: $T, lo: T, hi: T) -> T {
 }
 
 sqrt :: proc { wasm.sqrt_f32, wasm.sqrt_f64, sqrt_poly }
-sqrt_poly :: proc (x: $T) -> T {
+sqrt_poly :: (x: $T) -> T {
     return ~~ sqrt_f64(~~ x);
 }
 

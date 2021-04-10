@@ -1023,7 +1023,7 @@ void report_unable_to_match_overload(AstCall* call) {
         }
     }
 
-    onyx_report_error(call->token->pos, "unable to match overloaded function with provided argument types: (%s)", arg_str);
+    onyx_report_error(call->token->pos, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
 
     bh_free(global_scratch_allocator, arg_str);
 }

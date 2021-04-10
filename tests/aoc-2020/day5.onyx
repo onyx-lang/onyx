@@ -35,4 +35,4 @@ main :: (args: [] cstr) {
     printf("Your seat: %i\n", missing);
 }
 
-cmp_asc :: proc (a: $T, b: T) -> i32 do return ~~(a - b);
+cmp_asc :: (a: $T, b: T) -> i32 do return ~~(a - b);

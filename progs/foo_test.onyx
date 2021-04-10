@@ -4,6 +4,6 @@ use package core
 
 TestFoo :: struct { a: i32; }
 
-print_foo :: proc () do println("Foo!");
+print_foo :: () do println("Foo!");
 
 SomeEnum :: enum #flags { Val1; Val2; Val3; }

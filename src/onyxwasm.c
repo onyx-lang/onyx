@@ -2165,7 +2165,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             //
             // I think a more general case of accessing fields on r-values is better. For example,
             //
-            //     returns_foo :: proc () -> Foo { ... }
+            //     returns_foo :: () -> Foo { ... }
             //
             //     value := returns_foo().foo_member;
             //

@@ -25,7 +25,7 @@ static char* node_to_doc_def(const char* sym, AstNode *node, bh_allocator a) {
 
     switch (node->kind) {
         case Ast_Kind_Function: {
-            strncat(buf, "proc (", 1023);
+            strncat(buf, "(", 1023);
 
             AstFunction *func = (AstFunction *) node;
             bh_arr_each(AstParam, param, func->params) {

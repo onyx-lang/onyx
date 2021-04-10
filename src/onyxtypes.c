@@ -46,9 +46,7 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
     switch (t1->kind) {
         case Type_Kind_Basic:
             if (t2->kind == Type_Kind_Basic) {
-                // HACK: Not sure if this is right way to check this?
-                if (t1 == t2) return 1;
-
+                // Signedness of an integer doesn't matter.
                 if ((t1->Basic.flags & Basic_Flag_Integer) && (t2->Basic.flags & Basic_Flag_Integer)) {
                     return t1->Basic.size == t2->Basic.size;
                 }
@@ -660,7 +658,7 @@ const char* type_get_unique_name(Type* type) {
             char buf[512];
             fori (i, 0, 512) buf[i] = 0;
 
-            strncat(buf, "proc (", 511);
+            strncat(buf, "(", 511);
             fori (i, 0, type->Function.param_count) {
                 strncat(buf, type_get_unique_name(type->Function.params[i]), 511);
                 if (i != type->Function.param_count - 1)
@@ -703,7 +701,7 @@ const char* type_get_name(Type* type) {
             char buf[512];
             fori (i, 0, 512) buf[i] = 0;
 
-            strncat(buf, "proc (", 511);
+            strncat(buf, "(", 511);
             fori (i, 0, type->Function.param_count) {
                 strncat(buf, type_get_name(type->Function.params[i]), 511);
                 if (i != type->Function.param_count - 1)

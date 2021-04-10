@@ -64,8 +64,8 @@ main :: (args: [] cstr) {
 
     start, end := find_contiguous_subarray_with_sum(nums, invalid);
 
-    max := array.fold_slice(nums.data[start .. end + 1], cast(u64) 0, math.max_poly);
-    min := array.fold_slice(nums.data[start .. end + 1], cast(u64) max, math.min_poly);
+    max := array.fold(nums.data[start .. end + 1], cast(u64) 0, math.max_poly);
+    min := array.fold(nums.data[start .. end + 1], cast(u64) max, math.min_poly);
 
     printf("Extrema sum: %l\n", min + max);
 }

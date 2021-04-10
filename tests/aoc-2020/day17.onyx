@@ -36,7 +36,7 @@ get_neighbor_count :: (cubes: ^map.Map(CubePos, CubeState), pos: CubePos) -> u32
     return count;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day17.txt";
 
     file := reader.make(contents);

@@ -2,7 +2,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     defer println("At the end!");
     i := 0;
     while i < 10 {

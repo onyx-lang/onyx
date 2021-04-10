@@ -2,7 +2,7 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
 
     test_simple_struct();
     test_simple_union();
@@ -14,7 +14,7 @@ main :: proc (args: [] cstr) {
     test_polymorphic_union();
     test_polymorphic_union_with_use();
 
-    test_simple_struct :: proc () {
+    test_simple_struct :: () {
         println("Testing a simple structure.");
         
         SimpleStruct :: struct {
@@ -33,7 +33,7 @@ main :: proc (args: [] cstr) {
             cast(u32) age, height, name);
     }
 
-    test_simple_union :: proc () {
+    test_simple_union :: () {
         println("\n\nTesting a simple union.");
 
         SimpleUnion :: struct #union {
@@ -47,7 +47,7 @@ main :: proc (args: [] cstr) {
         printf("%p == 0x3F000000\n", u.int_val);
     }
 
-    test_default_values :: proc () {
+    test_default_values :: () {
         println("\n\nTesting a struct with default values.");
 
         DefaultedStruct :: struct {
@@ -63,12 +63,12 @@ main :: proc (args: [] cstr) {
         ds2 := DefaultedStruct.{ i = 3, d = 0 };
         print_defaulted(ds2);
 
-        print_defaulted :: proc (use ds: DefaultedStruct) {
+        print_defaulted :: (use ds: DefaultedStruct) {
             printf("DefaultedStruct(%i, %f, %l, %d)\n", i, f, l, d);
         }
     }
 
-    test_simple_use :: proc () {
+    test_simple_use :: () {
         println("\n\nTesting a struct with `use`.");
 
         StructWithUse :: struct {
@@ -95,7 +95,7 @@ main :: proc (args: [] cstr) {
         // This will not work. `use`d members cannot be set directly.
         // swu3 := StructWithUse.{ 1234, 1, 2, 5678 };
 
-        print_swu :: proc (use swu: StructWithUse) {
+        print_swu :: (use swu: StructWithUse) {
             printf("StructWithUse(%i, (%f, %f), %i)\n",
                 first_member, x, y, last_member);
         }
@@ -104,7 +104,7 @@ main :: proc (args: [] cstr) {
         print_swu(swu2);
     }
 
-    test_polymorphic :: proc () {
+    test_polymorphic :: () {
         println("\n\nTesting a polymorphic struct.");
 
         PolyStruct :: struct (T: type_expr, R: type_expr) {
@@ -123,7 +123,7 @@ main :: proc (args: [] cstr) {
         printf("PolyStruct<f32, i32>(%f, %i)\n", ps2.t_data, ps2.r_data);
     }
 
-    test_polymorphic_with_defaults :: proc () {
+    test_polymorphic_with_defaults :: () {
         println("\n\nTesting a polymorphic struct with default values.");
 
         PolyStruct :: struct (T: type_expr, R: type_expr) {
@@ -137,7 +137,7 @@ main :: proc (args: [] cstr) {
         printf("PolyStruct<i32, f32>(%i, %f)\n", ps.t_data, ps.r_data);
     }
 
-    test_polymorphic_union_with_use :: proc () {
+    test_polymorphic_union_with_use :: () {
         println("\n\nTesting a polymorphic union with use.");
 
         PolyStruct :: struct (T: type_expr, R: type_expr) {
@@ -155,7 +155,7 @@ main :: proc (args: [] cstr) {
         printf("%i, %d\n", ps.t_data, ps.r_data);
     }
 
-    test_union_with_use :: proc () {
+    test_union_with_use :: () {
         println("\n\nTesting a union with use.");
 
         Vec2 :: struct {
@@ -177,7 +177,7 @@ main :: proc (args: [] cstr) {
         printf("Union(%s)\n", u.name);
     }
 
-    test_polymorphic_union :: proc () {
+    test_polymorphic_union :: () {
         println("\n\nTesting a polymorphic union.");
 
         PolyUnion :: struct (T: type_expr, R: type_expr) #union {

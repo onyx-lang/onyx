@@ -151,7 +151,7 @@ get_contents_from_file :: (file: File) -> str {
 get_contents :: proc {
     get_contents_from_file,
 
-    proc (path: str) -> str {
+    (path: str) -> str {
         tmp_file, success := file_open(path, OpenMode.Read);
         if !success do return .{ null, 0 };
         defer file_close(tmp_file);

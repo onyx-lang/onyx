@@ -21,7 +21,7 @@ __exit :: (status: i32) do proc_exit(status);
 
 // The builtin _start proc.
 // Sets up everything needed for execution.
-proc () #export "_start" {
+_start :: () -> void #export "_start" {
     __runtime_initialize();
 
     args : [] cstr;

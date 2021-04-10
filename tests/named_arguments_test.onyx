@@ -2,8 +2,8 @@
 
 use package core
 
-main :: proc (args: [] cstr) {
-    foo :: proc (x: i32, y: f32) {
+main :: (args: [] cstr) {
+    foo :: (x: i32, y: f32) {
         printf("x is %i\n", x);
         printf("y is %f\n", y);
     }
@@ -14,7 +14,7 @@ main :: proc (args: [] cstr) {
 
     println("\n\n=========================");
 
-    poly_named :: proc (x: $T, y: [$N] T) {
+    poly_named :: (x: $T, y: [$N] T) {
         println(x);
         print_array(y);
     }
@@ -26,9 +26,9 @@ main :: proc (args: [] cstr) {
     println("\n\n=========================");
 
     poly_overloaded :: proc {
-        proc (y: [$N] $T) { print("MATCHED Y: "); print_array(y); },
-        proc (x: $T)      { print("MATCHED X: "); println(x); },
-        proc (z: $T)      { print("MATCHED Z: "); println(z); },
+        (y: [$N] $T) { print("MATCHED Y: "); print_array(y); },
+        (x: $T)      { print("MATCHED X: "); println(x); },
+        (z: $T)      { print("MATCHED Z: "); println(z); },
     }
 
     poly_overloaded(u32.[ 10, 20 ]);
@@ -38,7 +38,7 @@ main :: proc (args: [] cstr) {
 
     println("\n\n=========================");
 
-    overload_with_varargs :: proc (x: i32, y: i32, z: ..f32) {
+    overload_with_varargs :: (x: i32, y: i32, z: ..f32) {
         println(x);
         println(y);
 
@@ -52,7 +52,7 @@ main :: proc (args: [] cstr) {
 
     println("\n\n=========================");
 
-    lotza_options :: proc (
+    lotza_options :: (
         options_a : bool,
         options_b := false,
         options_c := true,
@@ -74,9 +74,9 @@ main :: proc (args: [] cstr) {
 
     // This currently does not work and would require a lot of rewriting of compiler internals to make work.
     // named_baked_overloaded_parameters :: proc {
-    //     proc ($T: type_expr, x: T)      do { println("MATCHED X"); },
-    //     proc ($T: type_expr, y: [$N] T) do { println("MATCHED X"); },
-    //     proc ($T: type_expr, z: T)      do { println("MATCHED X"); },
+    //     ($T: type_expr, x: T)      do { println("MATCHED X"); },
+    //     ($T: type_expr, y: [$N] T) do { println("MATCHED X"); },
+    //     ($T: type_expr, z: T)      do { println("MATCHED X"); },
     // }
 
     // named_baked_overloaded_parameters(i32, 10);

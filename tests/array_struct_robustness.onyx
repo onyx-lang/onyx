@@ -14,7 +14,7 @@ EntityStore :: struct {
     velocities : [4] Vec2;
 }
 
-calc_vecs :: proc (n := 0) -> [4] Vec2 {
+calc_vecs :: (n := 0) -> [4] Vec2 {
     vecs : [4] Vec2;
 
     i := n;
@@ -27,7 +27,7 @@ calc_vecs :: proc (n := 0) -> [4] Vec2 {
     return vecs;
 }
 
-main :: proc (args: [] cstr) #export "MAIN" {
+main :: (args: [] cstr) {
     // Array of structs on stack
     {
         println("Array of structs on the stack.");

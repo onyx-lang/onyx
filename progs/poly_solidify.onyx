@@ -4,13 +4,13 @@ use package core
 
 max_f32 :: #solidify math.max_poly { T = f32 };
 
-compose :: proc (a: $A, f: proc (A) -> $B, g: proc (B) -> $C) -> C do return g(f(a));
+compose :: (a: $A, f: (A) -> $B, g: (B) -> $C) -> C do return g(f(a));
 
 specific_compose_0 :: #solidify compose { B = f32 };
 specific_compose_1 :: #solidify specific_compose_0 { A = f32 };
 specific_compose_2 :: #solidify specific_compose_1 { C = f64 };
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     use package runtime
     println(Runtime);
     println("==================================================");
@@ -22,8 +22,8 @@ main :: proc (args: [] cstr) {
 
     println(specific_compose_2(
         2,
-        proc (a: f32) -> f32 { return ~~(a * 2); },
-        proc (b: f32) -> f64 { return ~~(b + 6); }));
+        (a: f32) -> f32 { return ~~(a * 2); },
+        (b: f32) -> f64 { return ~~(b + 6); }));
 
 
     arr1 := array.make(f32);
@@ -42,7 +42,7 @@ main :: proc (args: [] cstr) {
 
     print_arrays(arr1, arr2);
 
-    print_arrays :: proc (arr1: [..] $T, arr2: [..] $R) {
+    print_arrays :: (arr1: [..] $T, arr2: [..] $R) {
         println("==================================================");
         print_array(arr1);
         print_array(arr2);
@@ -50,7 +50,7 @@ main :: proc (args: [] cstr) {
     }
 }
 
-array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
+array_map :: (arr: [..] $T, f: (T) -> T) {
     foo := #solidify math.max_poly { T = T };
     is := (#type InternalStruct(T)).{ foo = foo(6, 2) };
     printf("%i\n", is.foo);
@@ -60,7 +60,7 @@ array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
     {
         test2();
 
-        test2 :: proc () {
+        test2 :: () {
             test();
 
             is : InternalStruct([] u32);
@@ -68,7 +68,7 @@ array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
             println("WORLD!!!!");
         }
 
-        test  :: proc () {
+        test  :: () {
             println("HELLO!!!");
         }
     }
@@ -78,4 +78,4 @@ array_map :: proc (arr: [..] $T, f: proc (T) -> T) {
     }
 }
 
-double :: proc (v: $V) -> V do return v * 2;
+double :: (v: $V) -> V do return v * 2;

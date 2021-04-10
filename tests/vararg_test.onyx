@@ -4,12 +4,12 @@ package main
 
 use package core;
 
-old_va_test :: proc (prefix: str, va: ..i32) {
+old_va_test :: (prefix: str, va: ..i32) {
     println(prefix);
     for v: va do println(v);
 }
 
-new_va_test :: proc (prefix: str, va: ...) {
+new_va_test :: (prefix: str, va: ...) {
     println(prefix);
 
     for i: 0 .. va.count {
@@ -19,7 +19,7 @@ new_va_test :: proc (prefix: str, va: ...) {
     }
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     new_va_test("foo", 1, 2, 3.0f, 5.0f);
     old_va_test("bar", 1);
 

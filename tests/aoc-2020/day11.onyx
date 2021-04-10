@@ -65,7 +65,7 @@ gos_iter :: (use gos: ^GameOfSeats) -> bool {
     return changed;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day11.txt";
 
     file := reader.make(contents);

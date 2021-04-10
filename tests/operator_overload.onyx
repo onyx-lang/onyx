@@ -19,7 +19,7 @@ proc (a: Complex, b: Complex) -> Complex #operator* {
     return Complex.{ a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re };
 }
 
-C :: proc (re: f32, im: f32) -> Complex do return Complex.{ re, im };
+C :: (re: f32, im: f32) -> Complex do return Complex.{ re, im };
 
 
 
@@ -52,18 +52,18 @@ proc (a: Vec($T, $N), b: Vec(T, N)) -> T #operator* {
     return res;
 }
 
-join :: proc (a: Vec($T, $N), b: Vec(T, $M)) -> Vec(T, #value N + M) {
+join :: (a: Vec($T, $N), b: Vec(T, $M)) -> Vec(T, #value N + M) {
     out : Vec(T, #value N + M);
     for i: 0 .. N do out.data[i]     = a.data[i]; 
     for i: 0 .. M do out.data[i + N] = b.data[i]; 
     return out;
 }
 
-make_vec :: proc (data: [$N] $T) -> Vec(T, N) {
+make_vec :: (data: [$N] $T) -> Vec(T, N) {
     return <Vec(T, N)>.{ data };
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     {
         a := C(2, 3);
         b := C(0, 1);
@@ -101,6 +101,6 @@ main :: proc (args: [] cstr) {
 }
 
 test_overload :: proc {
-    proc (x: $T, y: T)  -> T { return x; },
-    proc (x: $T, y: $R) -> R { return y; },
+    (x: $T, y: T)  -> T { return x; },
+    (x: $T, y: $R) -> R { return y; },
 }

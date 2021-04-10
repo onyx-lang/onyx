@@ -8,7 +8,7 @@ use package core
 use package core_file
 use package wasi
 
-// print_rights :: proc (rights: Rights) {
+// print_rights :: (rights: Rights) {
 //     print(cast(u32) rights, 2);
 //     print("\n");
 //
@@ -43,7 +43,7 @@ use package wasi
 //     if rights & Rights.SockShutdown != cast(Rights) 0 do print("SockShutdown\n");
 // }
 
-readline :: proc (buf: ^u8, bufsize: u32) -> u32 {
+readline :: (buf: ^u8, bufsize: u32) -> u32 {
     iov := IOVec.{ buf, bufsize };
     nread : Size;
     fd_pread(0, IOVecArray.{ ^iov, 1 }, 0, ^nread);
@@ -51,7 +51,7 @@ readline :: proc (buf: ^u8, bufsize: u32) -> u32 {
     return nread;
 }
 
-readdir :: proc (fd: FileDescriptor) {
+readdir :: (fd: FileDescriptor) {
     buf : [1024] u8;
     bufused : Size;
 
@@ -79,19 +79,19 @@ readdir :: proc (fd: FileDescriptor) {
     }
 }
 
-timer_start :: proc () -> Timestamp {
+timer_start :: () -> Timestamp {
     curr_time: Timestamp;
     clock_time_get(ClockID.Realtime, cast(Timestamp) 1, ^curr_time);
     return curr_time;
 }
 
-timer_end :: proc (start_time: Timestamp) -> Timestamp {
+timer_end :: (start_time: Timestamp) -> Timestamp {
     curr_time: Timestamp;
     clock_time_get(ClockID.Realtime, cast(Timestamp) 1, ^curr_time);
     return (curr_time - start_time) / 1000000;
 }
 
-is_prime :: proc (n := 0) -> bool {
+is_prime :: (n := 0) -> bool {
     sqrt :: cast(i32) (sqrt_f32(cast(f32) n));
     for i: 2 .. sqrt + 1 do if n % i == 0 do return false;
     return true;
@@ -109,7 +109,7 @@ S :: struct {
     pos:  Vec3;
 }
 
-output_s :: proc (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
+output_s :: (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
     sb  |> sba("Hello, I'm ")
         |> sba(s.name)
         |> sba(". I am ")
@@ -122,7 +122,7 @@ output_s :: proc (sb: ^StringBuilder, s: ^S) -> ^StringBuilder {
     return sb;
 }
 
-print_arr :: proc (sb: ^StringBuilder, arr: [] $T) {
+print_arr :: (sb: ^StringBuilder, arr: [] $T) {
     sb |> string_builder_clear();
 
     for i: 0 .. arr.count {
@@ -132,12 +132,12 @@ print_arr :: proc (sb: ^StringBuilder, arr: [] $T) {
     sb |> sba("\n") |> string_builder_to_string() |> print();
 }
 
-make_i32_arr :: proc (a := context.allocator, len := 10) -> [] i32 {
+make_i32_arr :: (a := context.allocator, len := 10) -> [] i32 {
     arr := cast(^i32) alloc(a, sizeof i32 * len);
     return arr[0 .. len];
 }
 
-main :: proc (args: []cstring) {
+main :: (args: []cstring) {
     now : Timestamp;
     clock_time_get(ClockID.Realtime, cast(Timestamp) 1, ^now);
 
@@ -297,7 +297,7 @@ main :: proc (args: []cstring) {
     print(dynarr.count, 10);
 }
 
-foobar :: proc (a: i32, b := 1, c: i64 = 5) {
+foobar :: (a: i32, b := 1, c: i64 = 5) {
     print_i64(cast(u64) a);
     print("\n");
     print_i64(cast(u64) b, 16);
@@ -306,7 +306,7 @@ foobar :: proc (a: i32, b := 1, c: i64 = 5) {
     print("\n");
 }
 
-fib :: proc (n: i32) -> i32 {
+fib :: (n: i32) -> i32 {
     switch n {
         case 0 do return 1;
         case 1 do return 1;
@@ -318,16 +318,16 @@ fib :: proc (n: i32) -> i32 {
     return 0;
 }
 
-add :: proc (a: $T, b: T) -> T {
+add :: (a: $T, b: T) -> T {
     return a + b;
 }
 
-multi_poly :: proc (a: $T, b: $R) -> R {
+multi_poly :: (a: $T, b: $R) -> R {
     return cast(R) (a + cast(T) b);
 }
 
-make_slice :: proc (ptr: ^$T, count: u32) -> [] T {
+make_slice :: (ptr: ^$T, count: u32) -> [] T {
     return ptr[4 .. count];
 }
 
-get_slice_length :: proc (s: ^[] $T) -> u32 do return s.count;
+get_slice_length :: (s: ^[] $T) -> u32 do return s.count;

@@ -91,8 +91,9 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
 	eh_shift_up(entities, bh_arr_length(entities->entities) - 1);
     e->entered_in_queue = 1;
 
-	entities->state_count[e->state]++;
+    entities->state_count[e->state]++;
     entities->type_count[e->type]++;
+    entities->all_count[e->state][e->type]++;
 }
 
 // nocheckin
@@ -107,12 +108,14 @@ Entity* entity_heap_top(EntityHeap* entities) {
 }
 
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
-	entities->state_count[entities->entities[0]->state]--;
-	entities->state_count[new_top->state]--;
+    entities->state_count[entities->entities[0]->state]--;
+    entities->state_count[new_top->state]++;
 
-    // CLEANUP: I don't think both of these should be --?
     entities->type_count[entities->entities[0]->type]--;
-    entities->type_count[new_top->type]--;
+    entities->type_count[new_top->type]++;
+
+    entities->all_count[entities->entities[0]->state][entities->entities[0]->type]--;
+    entities->all_count[new_top->state][new_top->type]++;
 	
 	entities->entities[0] = new_top;
 	eh_shift_down(entities, 0);
@@ -121,6 +124,7 @@ void entity_heap_change_top(EntityHeap* entities, Entity* new_top) {
 void entity_heap_remove_top(EntityHeap* entities) {
     entities->state_count[entities->entities[0]->state]--;
     entities->type_count[entities->entities[0]->type]--;
+    entities->all_count[entities->entities[0]->state][entities->entities[0]->type]--;
     entities->entities[0]->entered_in_queue = 0;
 
 	entities->entities[0] = entities->entities[bh_arr_length(entities->entities) - 1];

@@ -2,16 +2,16 @@
 
 use package core
 
-foo :: proc () -> (i32, i32) {
+foo :: () -> (i32, i32) {
     return 50, 60;
 }
 
-something :: proc (f: proc () -> ($T, T)) -> T {
+something :: (f: () -> ($T, T)) -> T {
     a, b := f();
     return a + b;
 }
 
-get_extrema :: proc (arr: [$N] $T) -> (T, T) {
+get_extrema :: (arr: [$N] $T) -> (T, T) {
     min := arr[0];
     max := arr[0];
 
@@ -23,13 +23,13 @@ get_extrema :: proc (arr: [$N] $T) -> (T, T) {
     return min, max;
 }
 
-return_multiple_arrays :: proc () -> ([3] i32, [3] f32) {
+return_multiple_arrays :: () -> ([3] i32, [3] f32) {
     iarr := i32.[ 0, 1, 2 ];
     farr := f32.[ 3, 4, 5 ];
     return iarr, farr;
 }
 
-main :: proc (args: [] cstr) {
+main :: (args: [] cstr) {
     a, b := foo();
     a, b = b, a;
 
@@ -47,7 +47,7 @@ main :: proc (args: [] cstr) {
     array_print(iarr);
     array_print(farr);
 
-    array_print :: proc (arr: [$N] $T) {
+    array_print :: (arr: [$N] $T) {
         for ^e: arr {
             print(*e);
             print(" ");
