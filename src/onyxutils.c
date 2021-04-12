@@ -943,20 +943,40 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 //  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
 //
 
+static void build_all_overload_options(bh_arr(AstTyped *) overloads, bh_imap* all_overloads) {
+    bh_arr_each(AstTyped *, node, overloads) {
+        if (bh_imap_has(all_overloads, (u64) *node)) continue;
+
+        bh_imap_put(all_overloads, (u64) *node, 1);
+
+        if ((*node)->kind == Ast_Kind_Overloaded_Function) {
+            AstOverloadedFunction* sub_overload = (AstOverloadedFunction *) *node;
+            build_all_overload_options(sub_overload->overloads, all_overloads);
+        }
+    }
+}
+
 AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Arguments* param_args) {
     Arguments args;
     arguments_clone(&args, param_args);
     arguments_ensure_length(&args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
 
+    // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
+    // This should be cached in the AstOverloadedFunction or somewhere like that.
+    bh_imap all_overloads;
+    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    build_all_overload_options(overloads, &all_overloads);
+
     AstTyped *matched_overload = NULL;
 
-    bh_arr_each(AstTyped *, node, overloads) {
+    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+        AstTyped* node = (AstTyped *) entry->key;
         arguments_copy(&args, param_args);
 
         AstFunction* overload = NULL;
-        switch ((*node)->kind) {
-            case Ast_Kind_Function:         overload = (AstFunction *) *node; break;
-            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstPolyProc *) *node, PPLM_By_Arguments, param_args); break;
+        switch (node->kind) {
+            case Ast_Kind_Function:         overload = (AstFunction *) node; break;
+            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstPolyProc *) node, PPLM_By_Arguments, param_args); break;
         }
 
         // NOTE: Overload is not something that is known to be overloadable.
@@ -989,11 +1009,12 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Argu
         }
 
         if (all_arguments_work) {
-            matched_overload = *node;
+            matched_overload = node;
             break;
         }
     }
 
+    bh_imap_free(&all_overloads);
     bh_arr_free(args.values);
     return matched_overload;
 }
@@ -1010,6 +1031,10 @@ void report_unable_to_match_overload(AstCall* call) {
     }
 
     if (bh_arr_length(call->args.named_values) > 0) {
+        if (bh_arr_length(call->args.values) > 0) {
+            strncat(arg_str, ", ", 1023);
+        }
+
         bh_arr_each(AstNamedValue *, named_value, call->args.named_values) { 
             token_toggle_end((*named_value)->token);
             strncat(arg_str, (*named_value)->token->text, 1023);

@@ -6,7 +6,7 @@
                 "type": "cppdbg",
                 "request": "launch",
                 "program": "${workspaceFolder}/bin/onyx",
-                "args": ["-VVV", "tmp/a"],
+                "args": ["-VVV", "tmp/better_overloads.onyx"],
                 "stopAtEntry": true,
                 "cwd": "${workspaceFolder}",
                 "environment": [],

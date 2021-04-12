@@ -1502,13 +1502,9 @@ CheckStatus check_function(AstFunction* func) {
 
 CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
     bh_arr_each(AstTyped *, node, func->overloads) {
-        if ((*node)->kind == Ast_Kind_Overloaded_Function) {
-            onyx_report_error((*node)->token->pos, "Overload option can not be another overloaded function.");
-
-            return Check_Error;
-        }
-
-        if ((*node)->kind != Ast_Kind_Function && (*node)->kind != Ast_Kind_Polymorphic_Proc) {
+        if (   (*node)->kind != Ast_Kind_Function
+            && (*node)->kind != Ast_Kind_Polymorphic_Proc
+            && (*node)->kind != Ast_Kind_Overloaded_Function) {
             onyx_report_error((*node)->token->pos, "Overload option not procedure. Got '%s'",
                 onyx_ast_node_kind_string((*node)->kind));
 

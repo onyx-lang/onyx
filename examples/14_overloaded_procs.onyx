@@ -1,3 +1,27 @@
+// CLEANUP: FINISH THIS EXAMPLE WHEN OVERLOADS ARE BETTER
+
+
+// Overloaded procedures, if you're not familiar with the concept, means that a
+// given procedure has multiple implementations and which one is used depends on
+// the arguments provided. For the sake of simplicity, both for the internal
+// compiler architecture, and for the programmer, Onyx does not support implicitly
+// overloaded procedures. This means that if you write,
+//
+//    foo :: (x: i32) { ... }
+//    foo :: (x: str) { ... }
+//
+// you will get a compile time error saying that the symbol 'foo' was defined
+// multiple times. Instead, to do the above in Onyx, you create a explicitly
+// overloaded procedure,
+//
+//    foo :: proc {
+//        (x: i32) { ... },
+//        (y: str) { ... },
+//    }
+//
+
+
+
 #load "core/std"
 
 use package core
