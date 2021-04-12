@@ -1019,6 +1019,29 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Argu
     return matched_overload;
 }
 
+AstTyped* find_matching_overload_by_type(bh_arr(AstTyped *) overloads, Type* type) {
+    if (type->kind != Type_Kind_Function) return NULL;
+
+    bh_imap all_overloads;
+    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    build_all_overload_options(overloads, &all_overloads);
+
+    AstTyped *matched_overload = NULL;
+
+    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+        AstTyped* node = (AstTyped *) entry->key;
+        if (node->kind == Ast_Kind_Overloaded_Function) continue;
+
+        if (type_check_or_auto_cast(&node, type)) {
+            matched_overload = node;
+            break;
+        }
+    }
+    
+    bh_imap_free(&all_overloads);
+    return matched_overload;
+}
+
 void report_unable_to_match_overload(AstCall* call) {
     char* arg_str = bh_alloc(global_scratch_allocator, 1024);
     arg_str[0] = '\0';

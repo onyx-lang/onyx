@@ -1876,6 +1876,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     if (consume_token_if_next(parser, '{')) {
         AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
         ofunc->token = token;
+        ofunc->flags |= Ast_Flag_Comptime;
 
         bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
 

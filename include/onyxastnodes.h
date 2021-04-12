@@ -1184,6 +1184,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
 
 AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Arguments* args);
+AstTyped* find_matching_overload_by_type(bh_arr(AstTyped *) overloads, Type* type);
 void report_unable_to_match_overload(AstCall* call);
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);

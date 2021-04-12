@@ -444,6 +444,18 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
         return 1;
     }
 
+    if (node->kind == Ast_Kind_Overloaded_Function) {
+        AstTyped* func = find_matching_overload_by_type(((AstOverloadedFunction *) node)->overloads, type);
+        if (func == NULL) return 0;
+
+        // HACK: It feels like there should be a better place to flag that a procedure was definitely used.
+        if (func->kind == Ast_Kind_Function)
+            func->flags |= Ast_Flag_Function_Used;
+
+        *pnode = func;
+        node = *pnode;
+    }
+
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return 0;
@@ -646,6 +658,8 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 }
 
 char* get_function_name(AstFunction* func) {
+    if (func->kind != Ast_Kind_Function) return "<procedure>";
+
     if (func->name != NULL) {
         return bh_aprintf(global_scratch_allocator, "%b", func->name->text, func->name->length);
     }

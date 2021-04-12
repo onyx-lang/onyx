@@ -321,13 +321,6 @@ CheckStatus check_argument(AstArgument** parg) {
     CHECK(expression, &(*parg)->value);
     (*parg)->type = (*parg)->value->type;
 
-    if ((*parg)->value->kind == Ast_Kind_Overloaded_Function) {
-        onyx_report_error((*parg)->token->pos,
-            "Cannot pass overloaded function '%b' as argument.",
-            (*parg)->value->token->text, (*parg)->value->token->length);
-        return Check_Error;
-    }
-
     return Check_Success;
 }
 
