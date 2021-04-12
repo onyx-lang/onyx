@@ -862,7 +862,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         AstPolyProc* new_pp = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyProc), Ast_Kind_Polymorphic_Proc);
         new_pp->token = pp->token;                            // TODO: Change this to be the solidify->token
         new_pp->base_func = pp->base_func;
-        new_pp->poly_scope = new_pp->poly_scope;
+        new_pp->poly_scope = new_pp->poly_scope; // CLEANUP: This doesn't seem correct??
         new_pp->flags = pp->flags;
         new_pp->poly_params = pp->poly_params;
 
@@ -1033,6 +1033,15 @@ void report_unable_to_match_overload(AstCall* call) {
 //
 // Polymorphic Structures
 //
+//
+// Currently, I am not very happy about how polymorphic structure generation works. My biggest problem
+// with it is that it is very different from the polymorhic procedure generation. Also, it needs to
+// completely generate and check the structure right away, which means there is a lot of up-front work
+// done here that could probably be done elsewhere. This really relates to a large problem in the compiler
+// that types need to be known completely by the time symbol resolution is done, even though that
+// information shouldn't need to be known until right before the types are checked.
+//
+
 char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
     char name_buf[256];
     fori (i, 0, 256) name_buf[i] = 0;

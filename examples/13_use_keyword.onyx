@@ -1,6 +1,99 @@
+// Controlling the symbols in scope is important to maintaining well structured
+// and factored code. In Onyx, the most powerful feature available to do this is
+// the 'use' keyword. It allows you to bring in symbols from another namespace into
+// the currently scope. In Onyx, a "namespace" simply referers to something contains
+// names, generally something you can use the "." operator on. Some of the examples
+// include:
+//   - structs with static (::) members
+//   - struct members
+//   - variables with a struct or pointer to a struct type
+//   - packages
+//   - enums
+
+// Please note, 'use' is a rather "alpha-tier" feature at the moment, meaning it works in
+// most cases, but can easily break and require you to write the code without it. This
+// is being address and hopefully in the next couple months it will be much more robust.
+
 #load "core/std"
 
 use package core
 
 main :: (args: [] cstr) {
+    // Here are the uses of 'use' currently.
+
+    {
+        // You can 'use' a package. You hopefully already knew this.
+        // This brings in all the symbols from the core.alloc package into
+        // this scope.
+        use package core.alloc
+
+        // You can also restrict and partially rename the symbols that collide
+        use package core.string { free as string_free }
+    }
+
+    {
+        // You can also 'use' a package that is a subpackage of another package. Here, 'string'
+        // is a subpackage of 'core' and the above 'use package core' makes this package
+        // available for you to write code like 'string.equal(...)'. However, because it is
+        // a namespace, you can 'use' it.
+        use string
+
+        s := "   Some string ...";
+        t := strip_leading_whitespace(s); // This would have to be 'string.strip_leading_whitespace' otherwise.
+        println(t);
+    }
+    
+    {
+        // You can 'use' parameters to a function. This effectively makes this
+        // procedure behave like a 'method' for Dummy. You can access all members
+        // of dummy with having to say 'dummy.' everywhere. Note, this is one of the
+        // most alpha-tier parts of 'use', so if you are running into error, report
+        // an issue and (sadly) go back to writing without the 'use'.
+        //
+        // One side note, you can 'use' more than one parameter, and it doesn't have to
+        // be the first parameter. This can create decent self-documenting code because
+        // a procedure with two used parameters implies that it is a 'cross-cutting'
+        // procedure between two areas of concern.
+
+        basically_a_method :: (use dummy: ^Dummy) {
+            printf("Dummy with name '%s', and age '%i'.\n", name, age);
+        }
+
+        dummy := Dummy.{ "Phil", 15 };
+        basically_a_method(^dummy);
+
+        Dummy :: struct {
+            name : str;
+            age  : i32;
+        }
+    }
+    
+    {
+        // You can 'use' an enum. This is great if you have a burried enum in some other namespace
+        // and want to do a switch over that enum.
+
+        Player :: struct {
+            Color :: enum {
+                Undefined;
+                Red; Green; Blue;
+            }
+
+            color := Color.Red;
+        }
+
+        value := Player.{};
+
+        use Player.Color;
+        switch value.color {
+            case Red      do println("The color is red!");
+            case Green    do println("The color is green!");
+            case Blue     do println("The color is blue!");
+            case #default do println("The color is unknown...");
+        }
+    }
+
+    {
+        // You can 'use' struct members that are structures.
+        // This is already explained in the struct example.    
+    }
 }

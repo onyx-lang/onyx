@@ -1,6 +1,79 @@
+// Variadic procedures are a very useful feature in a lot of programming languages
+// today so you have probably come across them at some point. If you haven't,
+// "variadic" just means that the number of arguments the procedure takes varies.
+// This is a slightly different concept from overloaded procedures, where there are
+// multiple versions of a procedure and which one is chosen depends on the arguments
+// given. Variadic procedures can consume as many arguments as they want.
+
+// In Onyx, there are two kinds of variadic procedures: fixed type, and untyped. In
+// fixed type variadic procedures, all variadic procedures need to be of a specified type.
+// In untyped variadic procedures, each of the variadic arguments can be of any type,
+// similar to how they work in C.
+
+// Some little things to note about the current implementation of variadic arguments:
+//   - There can be at most 1 variadic argument
+//   - 'variadic argument' is shortened to 'vararg' in many situtations
+
+
 #load "core/std"
 
 use package core
 
 main :: (args: [] cstr) {
+    
+    // This is how you specify a fixed type variadic procedure. 'args' can be thought
+    // of as a slice of integers, with data and count fields. You can iterate over the
+    // varargs using a for-loop like any other array-like structure. Note, do not
+    // take a pointer to anything in the varargs because they are placed on the stack
+    // and will "disappear" when the procedure returns.
+    typed_varargs :: (args: ..i32) {
+        print("Typed variadic arguments: ");
+        for x: args {
+            printf("%i ", x);
+        }
+        print("\n");
+    }
+
+    typed_varargs(1, 2, 3, 4);
+
+    // This is how you specify an untyped variadic procedure. Notice the extra '.'
+    // in the type. The access the arguments, you need to use the builtin procedure,
+    // 'vararg_get'. This procedure has two overloads that you can use:
+    //
+    //   vararg_get :: (va: vararg, res: ^$T) -> bool
+    //   vararg_get :: (va: vararg, $T: type_expr, default: T) -> (bool, T)
+    //
+    // The 'bool' returned is whether or not retrieving the vararg was successful. This
+    // can be achieved because in Onyx, untyped varargs know how many varargs are passed
+    // through a runtime count. This means if you call vararg_get more times than there
+    // are varargs, you will get empty or default results back.
+    untyped_varargs :: (args: ...) {
+        print("Untyped variadic arguments: ");
+
+        x: i32;
+        while vararg_get(args, ^x) {
+            printf("%p ", x);
+        }
+
+        print("\n");
+    }
+
+    untyped_varargs(1.0f, 2.0f, 3.0f, 4.0f);
+
+
+
+
+    // Most of the time with untyped varargs, you will have some kind of format
+    // specifier to indicate how many and of what type the varargs are. For example
+    // 'printf' uses this:
+    //
+    //   printf :: (format: str, va: ...) -> void
+    //   printf("%i %f %l %d", int, float, long, double);
+    //
+    // There are plans for the future to have better runtime type information available,
+    // which would allow you to introspect the types of each vararg at runtime. This
+    // would mean that instead of using '%i' style specifiers in printf, you could use
+    // '{}' to indicate the next variadic argument, whose type is automatically determined.
+    // If I'm not explaining this very well I apologize and hope that when the feature
+    // is implemented, it will make sense why it is a good idea.
 }

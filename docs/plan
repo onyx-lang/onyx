@@ -69,7 +69,7 @@ HOW:
             - This means identifiers can be compared using ptr comparison, instead of string comparison
             - This mean no more token_toggle_end!! Woo!!
 
-        [ ] 'when' statements
+        [X] 'when' statements
             - Compile time conditions
             - Only evalutate code blocks that evaluate to be true
 

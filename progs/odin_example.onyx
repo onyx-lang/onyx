@@ -69,7 +69,7 @@ f :: () -> [5] [2] u32 #export "IAMTHEFUNCTION" {
     return mem;
 }
 
-compress :: (arr: [$N] $T, f : proc (T, T) -> T) -> T {
+compress :: (arr: [$N] $T, f: (T, T) -> T) -> T {
     val := arr[0];
     for i: 1..N do val = f(val, arr[i]);
     return val;

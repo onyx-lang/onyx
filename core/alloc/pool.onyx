@@ -54,6 +54,10 @@ pool_free :: (pool: ^PoolAllocator($Elem), elem: ^Elem) {
 
 // This could become: proc (buffer: [] u8, $Elem: type_expr) -> PoolAllocator(Elem)
 // when that feature is implemented.
+//
+// I think I'm going to veto that idea because when the buffer is a slice of Elem
+// its guaranteed that the size allocated for the buffer is a multiple of the size
+// of Elem.
 make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
     assert(sizeof Elem >= sizeof rawptr, "Cannot have a pool allocator of a type less than a rawptr in size.");
 

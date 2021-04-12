@@ -37,6 +37,8 @@ List of known bugs:
     }
 
 [ ] There is a segfault when passing an anonymous struct literal to an untyped vararg.
+    Should just need to detect this case and provide an error message since this doesn't
+    make any sense semantically.
     
     vararg_proc :: (va: ...) {
         ...
@@ -52,6 +54,15 @@ List of known bugs:
 
     The problem is that 'T' is an unresolved symbol because the context of the function type
     does not have the solved value of T in it.
+
+[ ] Top level implicit typed arrays/struct literals are not correctly being marked as compile-time.
+
+    Vec2 :: struct { x, y: i32; }
+    
+    Hex_Directions := Vec2.[
+        .{  1, 0 }, .{  1, -1 }, .{ 0, -1 }, 
+        .{ -1, 0 }, .{ -1,  1 }, .{ 0,  1 }, 
+    ];
 
 
 List of things to change:

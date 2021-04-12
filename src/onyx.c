@@ -370,33 +370,23 @@ static void output_dummy_progress_bar() {
     if (bh_arr_length(eh->entities) == 0) return;
 
     static const char* state_colors[] = {
-        "\e[91m",
-        "\e[93m",
-        "\e[97m",
-        "\e[93m",
-        "\e[94m",
-        "\e[95m",
-        "\e[94m",
-        "\e[95m",
-        "\e[96m",
-        "\e[92m",
+        "\e[91m", "\e[93m", "\e[97m", "\e[93m", "\e[94m",
+        "\e[95m", "\e[94m", "\e[95m", "\e[96m", "\e[92m",
     };
 
     printf("\e[2;1H");
 
     for (i32 i = 0; i < Entity_State_Count - 1; i++) {
-        if (i % 4 == 0) printf("\n");
-        printf("%s \xe2\x96\x88 %s", state_colors[i], entity_state_strings[i]);
+        if (i % 2 == 0) printf("\n");
+        printf("%s %25s \xe2\x96\x88 ", state_colors[i], entity_state_strings[i]);
     }
 
     printf("\n\n");
     
     for (i32 i = 0; i < Entity_Type_Count; i++) {
-        if (eh->type_count[i] == 0) {
-            printf("\e[90m");
-        } else {
-            printf("\e[97m");
-        }
+        if      (eh->type_count[i] == 0)           printf("\e[90m");
+        else if ((i32) eh->entities[0]->type == i) printf("\e[92m");
+        else                                       printf("\e[97m");
 
         printf("%25s (%4d) | ", entity_type_strings[i], eh->type_count[i]);
 
@@ -407,9 +397,7 @@ static void output_dummy_progress_bar() {
             printf(state_colors[j]);
 
             i32 count = (eh->all_count[j][i] >> 5) + 1;
-            for (i32 c = 0; c < count * 2; c++) {
-                printf("\xe2\x96\x88");
-            }
+            for (i32 c = 0; c < count * 2; c++) printf("\xe2\x96\x88");
 
             printf("\e[0m");
         }
@@ -426,7 +414,6 @@ static i32 onyx_compile() {
 
     while (!bh_arr_is_empty(context.entities.entities)) {
         Entity* ent = entity_heap_top(&context.entities);
-        entity_heap_remove_top(&context.entities);
 
 #if defined(_BH_LINUX)
         if (context.options->fun_output) {
@@ -441,7 +428,8 @@ static i32 onyx_compile() {
             usleep(1000);
         }
 #endif
-        
+
+        entity_heap_remove_top(&context.entities);
         b32 changed = process_entity(ent);
 
         // NOTE: VERY VERY dumb cycle breaking. Basically, remember the first entity that did

@@ -13,3 +13,12 @@ Vec2(25, 125)
 Vec2(100, 1000)
 Array of u32.
 63001
+2D-array from an allocation to a function.
+Vec2(1000, 2000)
+Vec2(1001, 2001)
+Vec2(1002, 2004)
+Vec2(1003, 2009)
+Vec2(1004, 2016)
+Vec2(1005, 2025)
+Vec2(1006, 2036)
+Vec2(1007, 2049)

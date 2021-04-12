@@ -95,4 +95,30 @@ main :: (args: [] cstr) {
 
         println(nums[50]);
     }
+
+    {
+        println("2D-array from an allocation to a function.");
+
+        vecs_data: [2][4] Vec2;
+        vecs := ^vecs_data; // equivalent of heap allocating it
+
+        set_vecs :: (vecs: ^[2][4] Vec2) {
+            i := 0;
+            for ^row: *vecs {
+                for ^v: *row {
+                    *v = .{ 1000 + i, 2000 + i * i };
+                    i += 1;
+                }
+            }
+        }
+
+        set_vecs(vecs);
+
+        print_vecs :: (vecs: ^[4] Vec2) {
+            for ^v: *vecs do println(*v);
+        }
+
+        print_vecs(^(*vecs)[0]);
+        print_vecs(^(*vecs)[1]);
+    }
 }
