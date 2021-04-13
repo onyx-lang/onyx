@@ -180,7 +180,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
         case Type_Kind_Slice:    return 16; // HACK: These should not have to be 16 bytes in size, they should only have to be 12,
         case Type_Kind_VarArgs:  return 16; // but there are alignment issues right now with that so I decided to not fight it and just make them 16 bytes in size.
-        case Type_Kind_DynArray: return 16;
+        case Type_Kind_DynArray: return 32; // data (8), count (4), capacity (4), allocator { func (4), ---(4), data (8) }
         case Type_Kind_Compound: return type->Compound.size;
         default:                 return 0;
     }
@@ -743,11 +743,20 @@ u32 type_get_alignment_log2(Type* type) {
     return 2;
 }
 
+static const StructMember slice_members[] = {
+    { 0, 0, NULL,                         "data",  NULL, 0, 0 },
+    { 8, 1, &basic_types[Basic_Kind_U32], "count", NULL, 0, 0 },
+};
+
+static const StructMember array_members[] = {
+    { 0,  0, NULL,                         "data",      NULL, 0, 0 },
+    { 8,  1, &basic_types[Basic_Kind_U32], "count",     NULL, 0, 0 },
+    { 12, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, 0, 0 },
+    { 16, 3, NULL,                         "allocator", NULL, 0, 0 },
+};
+
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
     if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
-
-    smem->initial_value = NULL;
-    smem->included_through_use = 0;
 
     switch (type->kind) {
         case Type_Kind_Struct: {
@@ -760,46 +769,28 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
 
         case Type_Kind_VarArgs:
         case Type_Kind_Slice: {
-            if (strcmp(member, "data") == 0) {
-                smem->idx = 0;
-                smem->offset = 0;
-                smem->type = type->Slice.ptr_to_data;
-                smem->name = "data";
-                return 1;
-            }
-            if (strcmp(member, "count") == 0) {
-                smem->idx = 1;
-                smem->offset = 8;
-                smem->type = &basic_types[Basic_Kind_U32];
-                smem->name = "count";
-                return 1;
-            }
+            fori (i, 0, (i64) (sizeof(slice_members) / sizeof(StructMember))) {
+                if (strcmp(slice_members[i].name, member) == 0) {
+                    *smem = slice_members[i];
+                    if (smem->idx == 0) smem->type = type->Slice.ptr_to_data;
 
+                    return 1;
+                }
+            }
             return 0;
         }
 
         case Type_Kind_DynArray: {
-            if (strcmp(member, "data") == 0) {
-                smem->idx = 0;
-                smem->offset = 0;
-                smem->type = type->DynArray.ptr_to_data;
-                smem->name = "data";
-                return 1;
+            fori (i, 0, (i64) (sizeof(array_members) / sizeof(StructMember))) {
+                if (strcmp(array_members[i].name, member) == 0) {
+                    *smem = array_members[i];
+                    if (smem->idx == 0) smem->type = type->DynArray.ptr_to_data;
+                    if (smem->idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
+
+                    return 1;
+                }
             }
-            if (strcmp(member, "count") == 0) {
-                smem->idx = 1;
-                smem->offset = 8;
-                smem->type = &basic_types[Basic_Kind_U32];
-                smem->name = "count";
-                return 1;
-            }
-            if (strcmp(member, "capacity") == 0) {
-                smem->idx = 2;
-                smem->offset = 12;
-                smem->type = &basic_types[Basic_Kind_U32];
-                smem->name = "capacity";
-                return 1;
-            }
+            return 0;
         }
 
         default: return 0;
@@ -822,46 +813,22 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
         // are identical.                       - brendanfh   2020/09/07
         case Type_Kind_VarArgs:
         case Type_Kind_Slice: {
-            if (idx == 0) {
-                smem->idx = 0;
-                smem->offset = 0;
-                smem->type = type->Slice.ptr_to_data;
-                smem->name = "data";
-                return 1;
-            }
-            if (idx == 1) {
-                smem->idx = 1;
-                smem->offset = 8;
-                smem->type = &basic_types[Basic_Kind_U32];
-                smem->name = "count";
-                return 1;
-            }
+            if (idx > 2) return 0;
 
-            return 0;
+            *smem = slice_members[idx];
+            if (smem->idx == 0) smem->type = type->Slice.ptr_to_data;
+
+            return 1;
         }
 
         case Type_Kind_DynArray: {
-            if (idx == 0) {
-                smem->idx = 0;
-                smem->offset = 0;
-                smem->type = type->DynArray.ptr_to_data;
-                smem->name = "data";
-                return 1;
-            }
-            if (idx == 1) {
-                smem->idx = 1;
-                smem->offset = 8;
-                smem->type = &basic_types[Basic_Kind_U32];
-                smem->name = "count";
-                return 1;
-            }
-            if (idx == 2) {
-                smem->idx = 2;
-                smem->offset = 12;
-                smem->type = &basic_types[Basic_Kind_U32];
-                smem->name = "capacity";
-                return 1;
-            }
+            if (idx > 4) return 0;
+
+            *smem = array_members[idx];
+            if (idx == 0) smem->type = type->DynArray.ptr_to_data;
+            if (idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
+
+            return 1;
         }
 
         default: return 0;
@@ -872,7 +839,7 @@ i32 type_linear_member_count(Type* type) {
     switch (type->kind) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs:  return 2;
-        case Type_Kind_DynArray: return 3;
+        case Type_Kind_DynArray: return 5;
         case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
         case Type_Kind_Struct:   return bh_arr_length(type->Struct.linear_members);
         default: return 0; 
@@ -906,6 +873,11 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
             if (idx == 2) {
                 two->type = &basic_types[Basic_Kind_U32];
                 two->offset = 12;
+            }
+            if (idx == 3 || idx == 4) {
+                Type* allocator_type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
+                type_linear_member_lookup(allocator_type, idx - 3, two);
+                two->offset += 16;
             }
 
             return 1;
@@ -1029,7 +1001,7 @@ u32 type_structlike_mem_count(Type* type) {
         case Type_Kind_Struct:   return type->Struct.mem_count;
         case Type_Kind_Slice:    return 2;
         case Type_Kind_VarArgs:  return 2;
-        case Type_Kind_DynArray: return 3;
+        case Type_Kind_DynArray: return 4;
         default: return 0;
     }
 }
@@ -1039,7 +1011,7 @@ u32 type_structlike_is_simple(Type* type) {
         case Type_Kind_Struct:   return type_struct_is_simple(type);
         case Type_Kind_Slice:    return 1;
         case Type_Kind_VarArgs:  return 1;
-        case Type_Kind_DynArray: return 1;
+        case Type_Kind_DynArray: return 0;
         default: return 0;
     }
 }

@@ -250,12 +250,11 @@ DynamicStringStream :: struct {
 
     curr_pos : i32;
     data  : [..] u8;
-    alloc : Allocator;
 }
 
 dynamic_string_stream_make :: (init_size := 128, a := context.allocator) -> DynamicStringStream {
     data : [..] u8;
-    array.init(^data, init_size);
+    array.init(^data, init_size, allocator=a);
 
     return DynamicStringStream.{
         stream = Stream.{
@@ -264,7 +263,6 @@ dynamic_string_stream_make :: (init_size := 128, a := context.allocator) -> Dyna
 
         curr_pos = 0,
         data = data,
-        alloc = a,
     };
 }
 
@@ -283,10 +281,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         }
 
         if dest >= data.count {
-            #context_scope {
-                context.allocator = alloc;
-                if !array.ensure_capacity(^data, dest) do return Error.OutOfBounds;
-            }
+            if !array.ensure_capacity(^data, dest) do return Error.OutOfBounds;
         }
 
         curr_pos = dest;
@@ -332,10 +327,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
 
     write = (use dss: ^DynamicStringStream, buffer: [] u8) -> (Error, u32) {
         if curr_pos + buffer.count >= data.capacity {
-            #context_scope {
-                context.allocator = alloc;
-                if !array.ensure_capacity(^data, curr_pos + buffer.count) do return Error.EOF, 0;
-            }
+            if !array.ensure_capacity(^data, curr_pos + buffer.count) do return Error.EOF, 0;
         }
 
         memory.copy(^data.data[curr_pos], buffer.data, buffer.count);
@@ -347,10 +339,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
 
     write_at = (use dss: ^DynamicStringStream, at: u32, buffer: [] u8) -> (Error, u32) {
         if at + buffer.count >= data.capacity {
-            #context_scope {
-                context.allocator = alloc;
-                if !array.ensure_capacity(^data, at + buffer.count) do return Error.EOF, 0;
-            }
+            if !array.ensure_capacity(^data, at + buffer.count) do return Error.EOF, 0;
         }
 
         memory.copy(^data.data[at], buffer.data, buffer.count);
@@ -360,10 +349,7 @@ dynamic_string_stream_vtable := Stream_Vtable.{
     },
 
     write_byte = (use dss: ^DynamicStringStream, byte: u8) -> Error {
-        #context_scope {
-            context.allocator = alloc;
-            if !array.ensure_capacity(^data, data.count + 1) do return Error.EOF;
-        }
+        if !array.ensure_capacity(^data, data.count + 1) do return Error.EOF;
 
         data[curr_pos] = byte;
         curr_pos   += 1;

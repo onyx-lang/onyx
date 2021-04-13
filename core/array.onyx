@@ -3,38 +3,39 @@ package core.array
 // ---------------------------------
 //           Dynamic Arrays
 // ---------------------------------
-make :: ($T: type_expr, initial_cap := 4) -> [..] T {
+make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
     arr : [..] T;
-    init(^arr, initial_cap);
+    init(^arr, capacity, allocator);
     return arr;
 }
 
-init :: (arr: ^[..] $T, initial_cap := 4) {
+init :: (arr: ^[..] $T, capacity := 4, allocator := context.allocator) {
     arr.count = 0;
-    arr.capacity = initial_cap;
-    arr.data = calloc(sizeof T * arr.capacity);
+    arr.capacity = capacity;
+    arr.allocator = allocator;
+    arr.data = raw_alloc(allocator, sizeof T * arr.capacity);
 }
 
 free :: (arr: ^[..] $T) {
     arr.count = 0;
     arr.capacity = 0;
 
-    cfree(arr.data);
+    raw_free(arr.allocator, arr.data);
     arr.data = null;
 }
 
-copy :: (arr: ^[..] $T) -> [..] T {
+copy :: (arr: ^[..] $T, allocator := context.allocator) -> [..] T {
     new_arr : [..] T;
-    init(^new_arr, arr.count);
+    init(^new_arr, arr.count, allocator);
     new_arr.count = arr.count;
 
     for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
     return new_arr;
 }
 
-copy_range :: (arr: ^[..] $T, r: range) -> [..] T {
+copy_range :: (arr: ^[..] $T, r: range, allocator := context.allocator) -> [..] T {
     new_arr : [..] T;
-    init(^new_arr, r.high - r.low);
+    init(^new_arr, r.high - r.low, allocator);
     new_arr.count = r.high - r.low;
 
     for i: r do new_arr.data[i] = arr.data[i];
@@ -45,11 +46,11 @@ clear :: (arr: ^[..] $T) {
     arr.count = 0;
 }
 
-ensure_capacity :: (arr: ^[..] $T, cap: u32) -> bool {
-    if arr.capacity >= cap do return true;
+ensure_capacity :: (arr: ^[..] $T, capacity: u32) -> bool {
+    if arr.capacity >= capacity do return true;
 
-    while cap > arr.capacity do arr.capacity <<= 1;
-    new_data := cresize(arr.data, sizeof T * arr.capacity);
+    while capacity > arr.capacity do arr.capacity <<= 1;
+    new_data := raw_resize(arr.allocator, arr.data, sizeof T * arr.capacity);
     if new_data == null do return false;
     arr.data = new_data;
     return true;

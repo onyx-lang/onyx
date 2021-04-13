@@ -898,10 +898,11 @@ EMIT_FUNC(for, AstFor* for_node) {
     switch (for_node->loop_type) {
         case For_Loop_Range:  emit_for_range(mod, &code, for_node, iter_local); break;
         case For_Loop_Array:  emit_for_array(mod, &code, for_node, iter_local); break;
-        // NOTE: A dynamic array is just a slice with an extra capacity field on the end.
-        // Just dropping the capacity field will mean we can just use the slice implementation.
+        // NOTE: A dynamic array is just a slice with a capacity and allocator on the end.
+        // Just dropping the extra fields will mean we can just use the slice implementation.
         //                                                  - brendanfh   2020/09/04
-        case For_Loop_DynArr: WI(WI_DROP);
+        //                                                  - brendanfh   2021/04/13
+        case For_Loop_DynArr: WI(WI_DROP); WI(WI_DROP); WI(WI_DROP);
         case For_Loop_Slice:  emit_for_slice(mod, &code, for_node, iter_local); break;
         default: onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
     }

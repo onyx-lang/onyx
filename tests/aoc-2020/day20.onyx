@@ -67,10 +67,7 @@ reverse_binary :: (n_: u32, digits := TILE_DATA_WIDTH) -> u32 {
 
 build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
 	edges : [..] u32;
-	#context_scope {
-		context.allocator = a;
-		array.init(^edges, 8);
-	}
+    array.init(^edges, 8, allocator=a);
 
 	for y: u32.[0, 9] {
 		edge := 0;

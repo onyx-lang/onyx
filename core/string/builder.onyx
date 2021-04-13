@@ -8,18 +8,12 @@ use package core.string as string
 use package core.conv as conv
 
 Builder :: struct {
-    alloc : Allocator;
     data  : [..] u8;
 }
 
 make :: proc (initial_cap := 4, alloc := context.allocator) -> Builder {
     builder : Builder;
-    builder.alloc = alloc;
-
-    #context_scope {
-        context.allocator = alloc;
-        array.init(^builder.data, initial_cap);
-    }
+    array.init(^builder.data, initial_cap, allocator = alloc);
 
     return builder;
 }
@@ -32,8 +26,7 @@ clear :: proc (use sb: ^Builder) -> ^Builder {
 add_str :: proc (use sb: ^Builder, s: str) -> ^Builder {
     len_total := data.count + s.count;
 
-    if data.capacity < len_total do #context_scope {
-        context.allocator = alloc;
+    if data.capacity < len_total {
         if !array.ensure_capacity(^data, len_total) do return sb;
     }
 

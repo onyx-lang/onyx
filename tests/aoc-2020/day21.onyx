@@ -13,14 +13,14 @@ use package core.string.reader as reader
 Ingredient :: struct {
     // This will just be a pointer into the file contents.
     name       : str      = .{ null, 0 };
-    appears_on : [..] u32 = .{ null, 0, 0 };
+    appears_on : [..] u32 = .{ null, 0, 0, .{ null, null_proc } };
 
     allergen   : str      = .{ null, 0 };
 }
 
 Allergen :: struct {
 	name       : str      = .{ null, 0 };
-    appears_on : [..] u32 = .{ null, 0, 0 };
+    appears_on : [..] u32 = .{ null, 0, 0, .{ null, null_proc } };
 }
 
 Food :: struct {
