@@ -938,11 +938,13 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         bh_arr_each(AstTyped *, value, sl->args.values) {
             if (*value == NULL) {
                 i32 member_idx = value - sl->args.values; // Pointer subtraction hack
+                StructMember smem;
+                type_lookup_member_by_idx(sl->type, member_idx, &smem);
 
                 onyx_report_error(sl->token->pos,
-                    "Value not given for %d%s member, '%s'.",
+                    "Value not given for %d%s member, '%s', for type '%s'.",
                     member_idx + 1, bh_num_suffix(member_idx + 1),
-                    sl->type->Struct.memarr[member_idx]->name);
+                    smem.name, type_get_name(sl->type));
             }
         }
 

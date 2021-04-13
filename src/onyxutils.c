@@ -943,6 +943,24 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 //  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
 //
 
+// NOTE: The job of this function is to take a set of overloads, and traverse it to add all possible
+// overloads that are reachable. This is slightly more difficult than it may seem. In this language,
+// overloaded procedures have a strict ordering to their overloads, which determines how the correct
+// match will be found. This was not very complicated until overloaded procedures could be used as
+// overload options. This means that you could create an "infinite loop" of overloads like so:
+// 
+//  o1 :: {                 o2 :: {
+//      (...) { ... },          (...) { ... },
+//      o2                      o1
+//  }                       }
+//
+// Obviously, this is not really an infinite loop. It just means that all options are available if
+// o1 or o2 are called. The difference between o1 and o2 is the order that the overloads will be
+// searched. To build the the list of overloads, a hashmap is used to prevent the problem from being
+// O(n^2), even though n would (probably) be small. bh_imap has the useful property that it maintains
+// an "entries" array that, so long as nothing is ever removed from it, will maintain the order in
+// which entries were put into the map. This is useful because a simple recursive algorithm can
+// collect all the overloads into the map, and also use the map to provide a base case.
 static void build_all_overload_options(bh_arr(AstTyped *) overloads, bh_imap* all_overloads) {
     bh_arr_each(AstTyped *, node, overloads) {
         if (bh_imap_has(all_overloads, (u64) *node)) continue;

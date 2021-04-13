@@ -201,5 +201,6 @@ b32 type_is_structlike(Type* type);
 b32 type_is_structlike_strict(Type* type);
 u32 type_structlike_mem_count(Type* type);
 u32 type_structlike_is_simple(Type* type);
+b32 type_is_sl_constructable(Type* type);
 
 #endif // #ifndef ONYX_TYPES
