@@ -6,7 +6,8 @@ use package runtime as runtime
 }
 
 use package core
-use package wasi as wasi
+
+#private_file wasi :: package wasi
 use package wasi {
     FileDescriptor,
     FDFlags, OFlags, Rights,

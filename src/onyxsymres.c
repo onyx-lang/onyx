@@ -53,6 +53,7 @@ static SymresStatus symres_function(AstFunction* func);
 static SymresStatus symres_global(AstGlobal* global);
 static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc);
 static SymresStatus symres_use_package(AstUsePackage* package);
+static SymresStatus symres_package(AstPackage* package);
 static SymresStatus symres_enum(AstEnumType* enum_node);
 static SymresStatus symres_memres_type(AstMemRes** memres);
 static SymresStatus symres_memres(AstMemRes** memres);
@@ -487,6 +488,10 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(compound, (AstCompound *) *expr);
             break;
 
+        case Ast_Kind_Package:
+            SYMRES(package, (AstPackage *) *expr);
+            break;
+
         default: break;
     }
 
@@ -882,22 +887,10 @@ static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc) {
 }
 
 static SymresStatus symres_use_package(AstUsePackage* package) {
-    if (package->package == NULL) {
-        token_toggle_end(package->package_name);
-        package->package = package_lookup(package->package_name->text);
-        token_toggle_end(package->package_name);
-    }
+    SYMRES(package, package->package);
 
-    Package* p = package->package;
-
-    if (p == NULL) { // :SymresStall
-        if (report_unresolved_symbols) {
-            onyx_report_error(package->package_name->pos, "package not found in included source files");
-            return Symres_Error;
-        } else {
-            return Symres_Yield_Macro;
-        }
-    }
+    // CLEANUP: Oofta that name
+    Package* p = package->package->package;
 
     if (p->scope == curr_scope) return Symres_Success;
 
@@ -937,6 +930,27 @@ static SymresStatus symres_use_package(AstUsePackage* package) {
     }
 
     return Symres_Success;
+}
+
+static SymresStatus symres_package(AstPackage* package) {
+    if (package->package == NULL) {
+        if (!package->package_name) return Symres_Error;
+
+        package->package = package_lookup(package->package_name);
+    }
+
+    if (package->package) {
+        return Symres_Success;
+    } else {
+        if (report_unresolved_symbols) {
+            onyx_report_error(package->token->pos,
+                    "Package '%s' not found in included source files.",
+                    package->package_name);
+            return Symres_Error;
+        } else {
+            return Symres_Yield_Macro;
+        }
+    }
 }
 
 static SymresStatus symres_enum(AstEnumType* enum_node) {
@@ -1087,7 +1101,8 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Global_Header:           ss = symres_global(ent->global); break;
 
         case Entity_Type_Use_Package:             ss = symres_use_package(ent->use_package);
-                                                  if (ent->use_package->package) package_track_use_package(ent->use_package->package, ent);
+                                                  if (ent->use_package->package && ent->use_package->package->package)
+                                                      package_track_use_package(ent->use_package->package->package, ent);
                                                   next_state = Entity_State_Finalized;
                                                   break;
 

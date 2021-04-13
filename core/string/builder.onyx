@@ -3,9 +3,9 @@ package core.string.builder
 // DEPRECATED: This package is deprecated in favor of using
 // an io.DynamicStringStream with an io.Writer.
 
-use package core.array as array
-use package core.string as string
-use package core.conv as conv
+#private_file array  :: package core.array
+#private_file string :: package core.string
+#private_file conv   :: package core.conv
 
 Builder :: struct {
     data  : [..] u8;

@@ -27,7 +27,7 @@ package core
 #load "core/runtime/build_opts"
 #load "core/runtime/common"
 
-use package runtime as runtime
+#private_file runtime :: package runtime
 #if runtime.Runtime == runtime.Runtime_Wasi {
     #load "core/runtime/wasi"
     #load "core/wasi"

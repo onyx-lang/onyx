@@ -712,8 +712,7 @@ struct AstInclude       { AstNode_base; char* name; };
 struct AstUsePackage    {
     AstNode_base;
 
-    OnyxToken *package_name;
-    Package *package;
+    AstPackage *package;
 
     OnyxToken *alias;
     AstPackage *alias_node;
@@ -803,7 +802,10 @@ struct AstPackage {
     AstNode_base;
 
     // Allocated in the ast arena
-    char* package_name;
+    char * package_name;
+
+    // NOTE: Symbol nodes
+    bh_arr(OnyxToken *) path;
 
     Package* package;
 };

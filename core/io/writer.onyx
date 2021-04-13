@@ -1,6 +1,6 @@
 package core.io
 
-use package core.conv as conv
+#private_file conv :: package core.conv
 
 Writer :: struct {
     stream : ^Stream;

@@ -5,7 +5,6 @@ package runtime
 
 use package wasi
 use package core
-use package main as main
 
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1
@@ -46,7 +45,7 @@ _start :: () -> void #export "_start" {
         args[i] = cast(cstr) (cast(^u32) args.data)[i];
     }
 
-    main.main(args);
+    (package main).main(args);
 
     __flush_stdio();
 }

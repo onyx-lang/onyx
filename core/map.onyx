@@ -1,7 +1,7 @@
 package core.map
 
-use package core.array as array
-use package core.string as string
+#private_file array  :: package core.array
+#private_file string :: package core.string
 
 Map :: struct (K: type_expr, V: type_expr) {
     hashes  : [..] i32;
