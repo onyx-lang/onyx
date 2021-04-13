@@ -267,7 +267,11 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
                 resolve_expression_type(rl->low);
                 resolve_expression_type(rl->high);
-                assert(rl->low->kind == Ast_Kind_NumLit && rl->high->kind == Ast_Kind_NumLit);
+
+                if (rl->low->kind != Ast_Kind_NumLit || rl->high->kind != Ast_Kind_NumLit) {
+                    onyx_report_error(rl->token->pos, "case statement expected compile time known range.");
+                    return Check_Error;
+                }
 
                 promote_numlit_to_larger((AstNumLit *) rl->low);
                 promote_numlit_to_larger((AstNumLit *) rl->high);
@@ -568,9 +572,21 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
 
             if (binop->right->type->kind == Type_Kind_Compound) {
                 AstCompound* lhs = (AstCompound *) binop->left;
-                assert(lhs->kind == Ast_Kind_Compound);
+                if (lhs->kind != Ast_Kind_Compound) {
+                    onyx_report_error(binop->token->pos,
+                            "Expected left hand side to have %d expressions.",
+                            binop->right->type->Compound.count);
+                    return Check_Error;
+                }
 
                 i32 expr_count = binop->right->type->Compound.count;
+                if (bh_arr_length(lhs->exprs) != expr_count) {
+                    onyx_report_error(binop->token->pos,
+                            "Expected left hand side to have %d expressions.",
+                            binop->right->type->Compound.count);
+                    return Check_Error;
+                }
+
                 fori (i, 0, expr_count) {
                     lhs->exprs[i]->type = binop->right->type->Compound.types[i];
                 }
@@ -1346,7 +1362,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
             break;
 
         case Ast_Kind_NumLit:
-            // NOTE: Literal types should have been decided in the parser (for now).
             assert(expr->type != NULL);
             break;
 
