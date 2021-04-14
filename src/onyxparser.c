@@ -80,7 +80,6 @@ static void consume_token(OnyxParser* parser) {
 static void unconsume_token(OnyxParser* parser) {
     if (parser->hit_unexpected_token) return;
 
-    // TODO: This is probably wrong
     while (parser->prev->type == Token_Type_Comment) parser->prev--;
     parser->curr = parser->prev;
     parser->prev--;
@@ -1154,43 +1153,36 @@ static AstReturn* parse_return_stmt(OnyxParser* parser) {
 
 static AstNode* parse_use_stmt(OnyxParser* parser) {
     OnyxToken* use_token = expect_token(parser, Token_Type_Keyword_Use);
+    AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
+    use_node->token = use_token;
+    use_node->expr = parse_expression(parser, 1);
 
-    if (parser->curr->type == Token_Type_Keyword_Package) {
-        AstUsePackage* upack = make_node(AstUsePackage, Ast_Kind_Use_Package);
-        upack->token = use_token;
-        upack->package = parse_package_expression(parser);
+    if (consume_token_if_next(parser, '{')) {
+        bh_arr_new(global_heap_allocator, use_node->only, 4);
 
-        if (consume_token_if_next(parser, Token_Type_Keyword_As))
-            upack->alias = expect_token(parser, Token_Type_Symbol);
+        while (!consume_token_if_next(parser, '}')) {
+            if (parser->hit_unexpected_token) return NULL;
 
-        if (consume_token_if_next(parser, '{')) {
-            bh_arr_new(global_heap_allocator, upack->only, 4);
+            AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
+            alias->token = expect_token(parser, Token_Type_Symbol);
 
-            while (!consume_token_if_next(parser, '}')) {
-                if (parser->hit_unexpected_token) return NULL;
+            if (consume_token_if_next(parser, Token_Type_Keyword_As))
+                alias->alias = expect_token(parser, Token_Type_Symbol);
+            else
+                alias->alias = alias->token;
 
-                AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
-                alias->token = expect_token(parser, Token_Type_Symbol);
+            bh_arr_push(use_node->only, alias);
 
-                if (consume_token_if_next(parser, Token_Type_Keyword_As))
-                    alias->alias = expect_token(parser, Token_Type_Symbol);
-                else
-                    alias->alias = alias->token;
-
-                bh_arr_push(upack->only, alias);
-
-                if (parser->curr->type != '}')
-                    expect_token(parser, ',');
-            }
+            if (parser->curr->type != '}')
+                expect_token(parser, ',');
         }
-        
-        ENTITY_SUBMIT(upack);
+    }
+
+    if (use_node->expr->kind == Ast_Kind_Package) {
+        ENTITY_SUBMIT(use_node);
         return NULL;
 
     } else {
-        AstUse* use_node = make_node(AstUse, Ast_Kind_Use);
-        use_node->token = use_token;
-        use_node->expr = parse_expression(parser, 1);
         return (AstNode *) use_node;
     }
 }
@@ -2456,10 +2448,10 @@ void onyx_parse(OnyxParser *parser) {
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
     bh_arr_push(parser->scope_stack, parser->file_scope);
 
-    AstUsePackage* implicit_use_builtin = make_node(AstUsePackage, Ast_Kind_Use_Package);
+    AstUse* implicit_use_builtin = make_node(AstUse, Ast_Kind_Use);
     AstPackage* implicit_builtin_package = make_node(AstPackage, Ast_Kind_Package);
     implicit_builtin_package->package_name = "builtin";
-    implicit_use_builtin->package = implicit_builtin_package;
+    implicit_use_builtin->expr = (AstTyped *) implicit_builtin_package;
     ENTITY_SUBMIT(implicit_use_builtin);
 
     while (parser->curr->type != Token_Type_End_Stream) {

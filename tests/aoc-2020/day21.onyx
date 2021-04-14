@@ -1,7 +1,7 @@
 #load "core/std"
 
 use package core
-use package core.string.reader as reader
+reader :: package core.string.reader
 
 /*
 	What questions the data layout needs to answer easily:

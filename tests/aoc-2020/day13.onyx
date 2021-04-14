@@ -1,7 +1,7 @@
 #load "core/std"
 
 use package core
-use package core.string.reader as reader
+reader :: package core.string.reader
 
 inv_mod :: (a_: i64, m_: i64) -> i64 {
     if m_ <= 1 do return 0;

@@ -2495,7 +2495,6 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
         type_idx = bh_table_get(i32, mod->type_map, type_repr_buf);
     } else {
         // NOTE: Make a new type
-        // TODO: Ensure that this isn't going to break things because of alignment
         WasmFuncType* type = (WasmFuncType*) bh_alloc(mod->allocator, sizeof(WasmFuncType) + sizeof(WasmType) * param_count);
         type->return_type = return_type;
         type->param_count = param_count;

@@ -568,7 +568,7 @@ void bh__arr_deleten(void **arr, i32 elemsize, i32 index, i32 numelems);
 u64 bh__table_hash_function(const char* str, i32 len, i32 mod) {
     u64 hash = 5381;
     i32 c, l = 0;
-    if (len == 0) len = ((u32) 1 << 31) - 1; // TODO: Verify this is right
+    if (len == 0) len = ((u32) 1 << 31) - 1;
 
     while ((c = *str++) && l++ < len) {
         hash = (hash << 5) + hash + c;

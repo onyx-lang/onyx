@@ -1,7 +1,7 @@
 #load "core/std"
 
 use package core
-use package core.string.reader as reader
+reader :: package core.string.reader
 
 OpCode :: enum (u16) {
     Nop; Acc; Jmp;

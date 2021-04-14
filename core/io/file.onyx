@@ -1,6 +1,6 @@
 package core.io
 
-use package runtime as runtime
+#private_file runtime :: package runtime
 #if runtime.Runtime != runtime.Runtime_Wasi {
     #error "The file system library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
 }

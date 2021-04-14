@@ -1,7 +1,7 @@
 #load "core/std"
 
 use package core
-use package core.string.reader as reader
+reader :: package core.string.reader
 
 TILE_DATA_WIDTH  :: 10
 TILE_DATA_HEIGHT :: 10

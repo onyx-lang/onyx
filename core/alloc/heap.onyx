@@ -10,7 +10,7 @@ package core.alloc.heap
 #load "core/intrinsics/wasm"
 
 use package core.intrinsics.wasm { memory_size, memory_grow }
-use package core.memory as memory
+#private_file memory :: package core.memory
 
 // The global heap state
 #private_file

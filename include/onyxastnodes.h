@@ -98,7 +98,6 @@ typedef enum AstKind {
     Ast_Kind_Package,
     Ast_Kind_Load_File,
     Ast_Kind_Load_Path,
-    Ast_Kind_Use_Package,
     Ast_Kind_Alias,
     Ast_Kind_Memres,
 
@@ -557,7 +556,12 @@ struct AstDirectiveSolidify {
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
-struct AstUse           { AstNode_base; AstTyped* expr; };
+struct AstUse           {
+    AstNode_base;
+
+    AstTyped* expr;
+    bh_arr(AstAlias *) only;
+};
 
 // Structure Nodes
 struct AstBlock         {
@@ -709,16 +713,6 @@ struct AstCompoundType {
 struct AstBinding       { AstTyped_base; AstNode* node; };
 struct AstMemRes        { AstTyped_base; u64 addr; AstTyped *initial_value; };
 struct AstInclude       { AstNode_base; char* name; };
-struct AstUsePackage    {
-    AstNode_base;
-
-    AstPackage *package;
-
-    OnyxToken *alias;
-    AstPackage *alias_node;
-
-    bh_arr(AstAlias *) only;
-};
 struct AstAlias         {
     AstNode_base;
     OnyxToken *alias;
@@ -965,7 +959,6 @@ typedef struct Entity {
     union {
         AstDirectiveError     *error;
         AstInclude            *include;
-        AstUsePackage         *use_package;
         AstBinding            *binding;
         AstStaticIf           *static_if;
         AstFunction           *function;

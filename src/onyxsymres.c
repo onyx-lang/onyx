@@ -52,7 +52,6 @@ static SymresStatus symres_function_header(AstFunction* func);
 static SymresStatus symres_function(AstFunction* func);
 static SymresStatus symres_global(AstGlobal* global);
 static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc);
-static SymresStatus symres_use_package(AstUsePackage* package);
 static SymresStatus symres_package(AstPackage* package);
 static SymresStatus symres_enum(AstEnumType* enum_node);
 static SymresStatus symres_memres_type(AstMemRes** memres);
@@ -582,12 +581,44 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
     return Symres_Success;
 }
 
+// CLEANUP: A lot of duplication going on in this function. A proper
+// "namespace" concept would be useful to remove a lot of the fluff
+// code here. There already is try_resolve_symbol_from_node which
+// may be able to do what is needed here?
 static SymresStatus symres_use(AstUse* use) {
     SYMRES(expression, &use->expr);
 
     if (use->expr->kind == Ast_Kind_Package) {
         AstPackage* package = (AstPackage *) use->expr;
-        scope_include(curr_scope, package->package->scope, use->token->pos);
+        SYMRES(package, package);
+
+        if (package->package->scope == curr_scope) return Symres_Success;
+
+        if (use->only == NULL) {
+            OnyxFilePos pos = { 0 };
+            if (use->token != NULL)
+                pos = use->token->pos;
+
+            scope_include(curr_scope, package->package->scope, pos);
+
+        } else {
+            bh_arr_each(AstAlias *, alias, use->only) {
+                AstNode* thing = symbol_resolve(package->package->scope, (*alias)->token);
+                if (thing == NULL) { // :SymresStall
+                    if (report_unresolved_symbols) {
+                        onyx_report_error((*alias)->token->pos,
+                                "The symbol '%b' was not found in this package.",
+                                (*alias)->token->text, (*alias)->token->length);
+                        return Symres_Error;
+                    } else {
+                        return Symres_Yield_Macro;
+                    }
+                }
+
+                symbol_introduce(curr_scope, (*alias)->alias, thing);
+            }
+        }
+
         return Symres_Success;
     }
 
@@ -602,9 +633,24 @@ static SymresStatus symres_use(AstUse* use) {
 
     if (use->expr->kind == Ast_Kind_Struct_Type) {
         AstStructType* st = (AstStructType *) use->expr;
+        if (!st->scope) return Symres_Success;
 
-        if (st->scope)
+        if (use->only == NULL) {
             scope_include(curr_scope, st->scope, use->token->pos);
+
+        } else {
+            bh_arr_each(AstAlias *, alias, use->only) {
+                AstNode* thing = symbol_resolve(st->scope, (*alias)->token);
+                if (thing == NULL) {
+                    onyx_report_error((*alias)->token->pos,
+                            "The symbol '%b' was not found in this scope.",
+                            (*alias)->token->text, (*alias)->token->length);
+                    return Symres_Error;
+                }
+
+                symbol_introduce(curr_scope, (*alias)->alias, thing);
+            }
+        }
 
         return Symres_Success;
     }
@@ -704,12 +750,6 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
         case Ast_Kind_Use:
             if (remove) *remove = 1;
             SYMRES(use, (AstUse *) *stmt);
-            break;
-
-        case Ast_Kind_Use_Package:
-            if (remove) *remove = 1;
-            // This is handled by an entity now.
-            // SYMRES(use_package, (AstUsePackage *) *stmt);
             break;
 
         default: SYMRES(expression, (AstTyped **) stmt); break;
@@ -886,52 +926,6 @@ static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc) {
     return Symres_Success;
 }
 
-static SymresStatus symres_use_package(AstUsePackage* package) {
-    SYMRES(package, package->package);
-
-    // CLEANUP: Oofta that name
-    Package* p = package->package->package;
-
-    if (p->scope == curr_scope) return Symres_Success;
-
-    if (package->alias != NULL) {
-        if (!package->alias_node) {
-            package->alias_node = onyx_ast_node_new(context.ast_alloc, sizeof(AstPackage), Ast_Kind_Package);
-            package->alias_node->package = p;
-            package->alias_node->token = package->alias;
-        }
-
-        symbol_introduce(curr_scope, package->alias, (AstNode *) package->alias_node);
-    }
-
-    if (package->only != NULL) {
-        bh_arr_each(AstAlias *, alias, package->only) {
-
-            AstNode* thing = symbol_resolve(p->scope, (*alias)->token);
-            if (thing == NULL) { // :SymresStall
-                if (report_unresolved_symbols) {
-                    onyx_report_error((*alias)->token->pos, "This symbol was not found in this package.");
-                    return Symres_Error;
-                } else {
-                    return Symres_Yield_Macro;
-                }
-            }
-
-            symbol_introduce(curr_scope, (*alias)->alias, thing);
-        }
-    }
-
-    if (package->alias == NULL && package->only == NULL) {
-        OnyxFilePos pos = { 0 };
-        if (package->token != NULL)
-            pos = package->token->pos;
-
-        scope_include(curr_scope, p->scope, pos);
-    }
-
-    return Symres_Success;
-}
-
 static SymresStatus symres_package(AstPackage* package) {
     if (package->package == NULL) {
         if (!package->package_name) return Symres_Error;
@@ -1100,9 +1094,9 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Foreign_Global_Header:
         case Entity_Type_Global_Header:           ss = symres_global(ent->global); break;
 
-        case Entity_Type_Use_Package:             ss = symres_use_package(ent->use_package);
-                                                  if (ent->use_package->package && ent->use_package->package->package)
-                                                      package_track_use_package(ent->use_package->package->package, ent);
+        case Entity_Type_Use_Package:             ss = symres_use(ent->use);
+                                                  if (ent->use->expr && ((AstPackage *) ent->use->expr)->package)
+                                                      package_track_use_package(((AstPackage *) ent->use->expr)->package, ent);
                                                   next_state = Entity_State_Finalized;
                                                   break;
 

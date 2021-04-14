@@ -1,7 +1,7 @@
 #load "core/std"
 
 use package core
-use package core.string.reader as reader
+reader :: package core.string.reader
 
 count_ending_paths :: (nums: [..] u32) -> u64 {
     tally := array.make(u64, nums.count);

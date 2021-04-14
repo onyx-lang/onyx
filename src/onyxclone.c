@@ -15,7 +15,6 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_Enum_Value:
 		case Ast_Kind_Overloaded_Function:
 		case Ast_Kind_Polymorphic_Proc:
-		case Ast_Kind_Use_Package:
 			return 0;
 
 		default: return 1;
@@ -28,7 +27,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Package: return sizeof(AstPackage);
         case Ast_Kind_Load_File: return sizeof(AstInclude);
         case Ast_Kind_Load_Path: return sizeof(AstInclude);
-        case Ast_Kind_Use_Package: return sizeof(AstUsePackage);
         case Ast_Kind_Alias: return sizeof(AstAlias);
         case Ast_Kind_Memres: return sizeof(AstMemRes);
         case Ast_Kind_Binding: return sizeof(AstBinding);
