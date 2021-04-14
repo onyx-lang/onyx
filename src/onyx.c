@@ -480,8 +480,11 @@ int main(int argc, char *argv[]) {
     bh_scratch_init(&global_scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
     global_scratch_allocator = bh_scratch_allocator(&global_scratch);
 
-    bh_managed_heap_init(&global_heap);
-    global_heap_allocator = bh_managed_heap_allocator(&global_heap);
+    // SPEED: This used to be a managed heap allocator where all allocations
+    // were tracked and would be automatically freed at the end of execution.
+    // I don't know why I ever did that because that is the job of the operating
+    // system when a process exits.
+    global_heap_allocator = bh_heap_allocator();
 
     CompileOptions compile_opts = compile_opts_parse(global_heap_allocator, argc, argv);
     context_init(&compile_opts);
@@ -513,7 +516,7 @@ int main(int argc, char *argv[]) {
     context_free();
 
     bh_scratch_free(&global_scratch);
-    bh_managed_heap_free(&global_heap);
+    // bh_managed_heap_free(&global_heap);
 
     return compiler_progress != ONYX_COMPILER_PROGRESS_SUCCESS;
 }

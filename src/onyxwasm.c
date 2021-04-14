@@ -1009,7 +1009,7 @@ EMIT_FUNC(deferred_stmts, AstNode* node) {
 
     u64 depth = bh_arr_length(mod->structured_jump_target);
 
-    while (bh_arr_last(mod->deferred_stmts).depth == depth) {
+    while (bh_arr_length(mod->deferred_stmts) > 0 && bh_arr_last(mod->deferred_stmts).depth == depth) {
         emit_statement(mod, &code, bh_arr_last(mod->deferred_stmts).stmt);
         bh_arr_pop(mod->deferred_stmts);
     }
