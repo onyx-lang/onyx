@@ -939,7 +939,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
 
     if (!type_is_structlike_strict(sl->type)) {
         onyx_report_error(sl->token->pos,
-                "'%s' is not a constructable using a struct literal.",
+                "'%s' is not constructable using a struct literal.",
                 type_get_name(sl->type));
         return Check_Error;
     }

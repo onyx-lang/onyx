@@ -810,33 +810,6 @@ SymresStatus symres_function_header(AstFunction* func) {
             if (onyx_has_errors()) return Symres_Error;
         }
     }
-    
-    if ((func->flags & Ast_Flag_From_Polymorphism) == 0) {
-        if (func->overloaded_function != NULL) {
-            SYMRES(expression, (AstTyped **) &func->overloaded_function);
-            if (func->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
-
-            if (func->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
-                onyx_report_error(func->token->pos, "#add_overload directive did not resolve to an overloaded function.");
-
-            } else {
-                AstOverloadedFunction* ofunc = (AstOverloadedFunction *) func->overloaded_function;
-                bh_arr_push(ofunc->overloads, (AstTyped *) func);
-            }
-        }
-
-        if (func->operator_overload != (BinaryOp) -1) {
-            if (bh_arr_length(func->params) != 2) {
-                onyx_report_error(func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
-            }
-
-            if (binop_is_assignment(func->operator_overload)) {
-                onyx_report_error(func->token->pos, "'%s' is not currently overloadable.", binaryop_string[func->operator_overload]);
-            }
-
-            bh_arr_push(operator_overloads[func->operator_overload], (AstTyped *) func);
-        }
-    }
 
     SYMRES(type, &func->return_type);
     if (!node_is_type((AstNode *) func->return_type)) {
@@ -1035,23 +1008,59 @@ static SymresStatus symres_polyproc(AstPolyProc* pp) {
         SYMRES(type, &param->type_expr);
     }
 
-    // CLEANUP: This was copied from symres_function_header.
-    if (pp->base_func->operator_overload != (BinaryOp) -1) {
-        if (bh_arr_length(pp->base_func->params) != 2) {
-            onyx_report_error(pp->base_func->token->pos, "Expected 2 exactly arguments for binary operator overload.");
-        }
-
-        if (binop_is_assignment(pp->base_func->operator_overload)) {
-            onyx_report_error(pp->base_func->token->pos, "'%s' is not currently overloadable.", binaryop_string[pp->base_func->operator_overload]);
-        }
-
-        bh_arr_push(operator_overloads[pp->base_func->operator_overload], (AstTyped *) pp);
-    }
     return Symres_Success;
 }
 
 static SymresStatus symres_static_if(AstStaticIf* static_if) {
     SYMRES(expression, &static_if->cond);
+    return Symres_Success;
+}
+
+static SymresStatus symres_process_directive(AstNode* directive) {
+    switch (directive->kind) {
+        case Ast_Kind_Directive_Add_Overload: {
+            AstDirectiveAddOverload *add_overload = (AstDirectiveAddOverload *) directive;
+
+            SYMRES(expression, (AstTyped **) &add_overload->overloaded_function);
+            if (add_overload->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
+
+            if (add_overload->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
+                onyx_report_error(add_overload->token->pos, "#add_overload directive did not resolve to an overloaded function.");
+
+            } else {
+                AstOverloadedFunction* ofunc = (AstOverloadedFunction *) add_overload->overloaded_function;
+                bh_arr_push(ofunc->overloads, (AstTyped *) add_overload->overload);
+            }
+
+            break;
+        }
+
+        case Ast_Kind_Directive_Operator: {
+            AstDirectiveOperator *operator = (AstDirectiveOperator *) directive;
+            SYMRES(expression, &operator->overload);
+            if (!operator->overload) return Symres_Error;
+
+            AstFunction* overload = get_function_from_node((AstNode *) operator->overload);
+            if (overload == NULL) {
+                onyx_report_error(operator->token->pos, "This cannot be used as an operator overload.");
+                return Symres_Error;
+            }
+
+            if (bh_arr_length(overload->params) != 2) {
+                onyx_report_error(operator->token->pos, "Expected 2 exactly arguments for binary operator overload.");
+                return Symres_Error;
+            }
+
+            if (binop_is_assignment(operator->operator)) {
+                onyx_report_error(overload->token->pos, "'%s' is not currently overloadable.", binaryop_string[operator->operator]);
+                return Symres_Error;
+            }
+
+            bh_arr_push(operator_overloads[operator->operator], operator->overload);
+            break;
+        }
+    }
+
     return Symres_Success;
 }
 
@@ -1113,6 +1122,9 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc); break;
         case Entity_Type_String_Literal:          ss = symres_expression(&ent->expr); break;
         case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults((AstType *) ent->type_alias); break;
+        case Entity_Type_Process_Directive:       ss = symres_process_directive((AstNode *) ent->expr);
+                                                  next_state = Entity_State_Finalized;
+                                                  break;
 
         default: break;
     }

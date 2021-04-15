@@ -7,15 +7,15 @@ Complex :: struct {
     im : f32 = 0;
 }
 
-proc (a: Complex, b: Complex) -> Complex #operator+ {
+#operator+ (a: Complex, b: Complex) -> Complex {
     return Complex.{ a.re + b.re, a.im + b.im };
 }
 
-proc (a: Complex, b: Complex) -> Complex #operator- {
+#operator- (a: Complex, b: Complex) -> Complex {
     return Complex.{ a.re - b.re, a.im - b.im };
 }
 
-proc (a: Complex, b: Complex) -> Complex #operator* {
+#operator* (a: Complex, b: Complex) -> Complex {
     return Complex.{ a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re };
 }
 
@@ -23,30 +23,29 @@ C :: (re: f32, im: f32) -> Complex do return Complex.{ re, im };
 
 
 
-
 Vec :: struct (T: type_expr, N: i32) {
     data: [N] T;
 }
 
-proc (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) #operator+ {
+#operator+ (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) {
     out : Vec(T, N);
     for i: 0 .. N do out.data[i] = a.data[i] + b.data[i];
     return out;
 }
 
-proc (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) #operator- {
+#operator- (a: Vec($T, $N), b: Vec(T, N)) -> Vec(T, N) {
     out : Vec(T, N);
     for i: 0 .. N do out.data[i] = a.data[i] - b.data[i];
     return out;
 }
 
-proc (a: Vec($T, $N), s: T) -> Vec(T, N) #operator* {
+#operator* (a: Vec($T, $N), s: T) -> Vec(T, N) {
     out : Vec(T, N);
     for i: 0 .. N do out.data[i] = a.data[i] * s;
     return out;
 }
 
-proc (a: Vec($T, $N), b: Vec(T, N)) -> T #operator* {
+#operator* (a: Vec($T, $N), b: Vec(T, N)) -> T {
     res := T.{};
     for i: 0 .. N do res += a.data[i] * b.data[i];
     return res;

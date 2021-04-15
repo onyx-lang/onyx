@@ -7,13 +7,12 @@ Vec2 :: struct {
 	y: i32 = 0;
 }
 
-proc (v: Vec2) -> u32 #add_overload map.hash_function {
+#add_overload map.hash_function, (v: Vec2) -> u32 {
 	return v.x * 11 + v.y * 17;
 }
 
-proc (v1: Vec2, v2: Vec2) -> bool #add_overload map.cmp_function {
-	return v1.x == v2.x
-		&& v1.y == v2.y;
+#add_overload map.cmp_function, (v1: Vec2, v2: Vec2) -> bool {
+	return v1.x == v2.x && v1.y == v2.y;
 }
 
 Hex_Directions := Vec2.[

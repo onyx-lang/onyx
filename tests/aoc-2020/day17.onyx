@@ -12,11 +12,11 @@ CubeState :: struct {
     next  := false;
 }
 
-proc (c: CubePos) -> u32 #add_overload map.hash_function {
+#add_overload map.hash_function, (c: CubePos) -> u32 {
     return 17 * c.x + 13 * c.y + 11 * c.z + 19 * c.w;
 }
 
-proc (a: CubePos, b: CubePos) -> bool #add_overload map.cmp_function {
+#add_overload map.cmp_function, (a: CubePos, b: CubePos) -> bool {
     return (a.x == b.x)
         && (a.y == b.y)
         && (a.z == b.z)

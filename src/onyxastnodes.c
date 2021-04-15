@@ -82,6 +82,8 @@ static const char* ast_node_names[] = {
     "SOLIDIFY",
     "STATIC IF",
     "STATIC ERROR",
+    "ADD OVERLOAD",
+    "OPERATOR OVERLOAD",
 
     "AST_NODE_KIND_COUNT",
 };
@@ -136,6 +138,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Foreign_Global Header",
     "Function Header",
     "Global Header",
+    "Process Directive",
     "Struct Member Default",
     "Memory Reservation",
     "Expression",

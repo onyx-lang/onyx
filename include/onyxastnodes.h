@@ -4,79 +4,81 @@
 #include "onyxlex.h"
 #include "onyxtypes.h"
 
-#define AST_NODES            \
-    NODE(Node)               \
-    NODE(Typed)              \
-                             \
-    NODE(NamedValue)         \
-    NODE(BinaryOp)           \
-    NODE(UnaryOp)            \
-    NODE(NumLit)             \
-    NODE(StrLit)             \
-    NODE(Local)              \
-    NODE(Call)               \
-    NODE(Argument)           \
-    NODE(AddressOf)          \
-    NODE(Dereference)        \
-    NODE(ArrayAccess)        \
-    NODE(FieldAccess)        \
-    NODE(SizeOf)             \
-    NODE(AlignOf)            \
-    NODE(FileContents)       \
-    NODE(StructLiteral)      \
-    NODE(ArrayLiteral)       \
-    NODE(RangeLiteral)       \
-    NODE(Compound)           \
-                             \
-    NODE(DirectiveSolidify)  \
-    NODE(StaticIf)           \
-    NODE(DirectiveError)     \
-                             \
-    NODE(Return)             \
-    NODE(Jump)               \
-    NODE(Use)                \
-                             \
-    NODE(Block)              \
-    NODE(IfWhile)            \
-    NODE(For)                \
-    NODE(Defer)              \
-    NODE(SwitchCase)         \
-    NODE(Switch)             \
-                             \
-    NODE(Type)               \
-    NODE(BasicType)          \
-    NODE(PointerType)        \
-    NODE(FunctionType)       \
-    NODE(ArrayType)          \
-    NODE(SliceType)          \
-    NODE(DynArrType)         \
-    NODE(VarArgType)         \
-    NODE(StructType)         \
-    NODE(StructMember)       \
-    NODE(PolyStructType)     \
-    NODE(PolyStructParam)    \
-    NODE(PolyCallType)       \
-    NODE(EnumType)           \
-    NODE(EnumValue)          \
-    NODE(TypeAlias)          \
-    NODE(TypeRawAlias)       \
-    NODE(CompoundType)       \
-                             \
-    NODE(Binding)            \
-    NODE(MemRes)             \
-    NODE(Include)            \
-    NODE(UsePackage)         \
-    NODE(Alias)              \
-    NODE(Global)             \
-    NODE(Param)              \
-    NODE(Function)           \
-    NODE(OverloadedFunction) \
-                             \
-    NODE(PolyParam)          \
-    NODE(PolySolution)       \
-    NODE(SolidifiedFunction) \
-    NODE(PolyProc)           \
-                             \
+#define AST_NODES              \
+    NODE(Node)                 \
+    NODE(Typed)                \
+                               \
+    NODE(NamedValue)           \
+    NODE(BinaryOp)             \
+    NODE(UnaryOp)              \
+    NODE(NumLit)               \
+    NODE(StrLit)               \
+    NODE(Local)                \
+    NODE(Call)                 \
+    NODE(Argument)             \
+    NODE(AddressOf)            \
+    NODE(Dereference)          \
+    NODE(ArrayAccess)          \
+    NODE(FieldAccess)          \
+    NODE(SizeOf)               \
+    NODE(AlignOf)              \
+    NODE(FileContents)         \
+    NODE(StructLiteral)        \
+    NODE(ArrayLiteral)         \
+    NODE(RangeLiteral)         \
+    NODE(Compound)             \
+                               \
+    NODE(DirectiveSolidify)    \
+    NODE(StaticIf)             \
+    NODE(DirectiveError)       \
+    NODE(DirectiveAddOverload) \
+    NODE(DirectiveOperator)    \
+                               \
+    NODE(Return)               \
+    NODE(Jump)                 \
+    NODE(Use)                  \
+                               \
+    NODE(Block)                \
+    NODE(IfWhile)              \
+    NODE(For)                  \
+    NODE(Defer)                \
+    NODE(SwitchCase)           \
+    NODE(Switch)               \
+                               \
+    NODE(Type)                 \
+    NODE(BasicType)            \
+    NODE(PointerType)          \
+    NODE(FunctionType)         \
+    NODE(ArrayType)            \
+    NODE(SliceType)            \
+    NODE(DynArrType)           \
+    NODE(VarArgType)           \
+    NODE(StructType)           \
+    NODE(StructMember)         \
+    NODE(PolyStructType)       \
+    NODE(PolyStructParam)      \
+    NODE(PolyCallType)         \
+    NODE(EnumType)             \
+    NODE(EnumValue)            \
+    NODE(TypeAlias)            \
+    NODE(TypeRawAlias)         \
+    NODE(CompoundType)         \
+                               \
+    NODE(Binding)              \
+    NODE(MemRes)               \
+    NODE(Include)              \
+    NODE(UsePackage)           \
+    NODE(Alias)                \
+    NODE(Global)               \
+    NODE(Param)                \
+    NODE(Function)             \
+    NODE(OverloadedFunction)   \
+                               \
+    NODE(PolyParam)            \
+    NODE(PolySolution)         \
+    NODE(SolidifiedFunction)   \
+    NODE(PolyProc)             \
+                               \
     NODE(Package)          
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
@@ -171,6 +173,8 @@ typedef enum AstKind {
     Ast_Kind_Directive_Solidify,
     Ast_Kind_Static_If,
     Ast_Kind_Directive_Error,
+    Ast_Kind_Directive_Add_Overload,
+    Ast_Kind_Directive_Operator,
 
     Ast_Kind_Count
 } AstKind;
@@ -753,14 +757,6 @@ struct AstFunction {
     AstBlock *body;
     bh_arr(AstTyped *) allocate_exprs;
 
-    // NOTE: used by the #add_overload directive. Initially set to a symbol,
-    // then resolved to an overloaded function.
-    AstNode *overloaded_function;
-
-    // NOTE: set to -1 if the function is not an operator overload;
-    // set to a BinaryOp value if it is.
-    BinaryOp operator_overload;
-
     OnyxToken* name;
 
 
@@ -888,6 +884,23 @@ struct AstDirectiveError {
     OnyxToken* error_msg;
 };
 
+struct AstDirectiveAddOverload {
+    AstNode_base;
+
+    // NOTE: used by the #add_overload directive. Initially set to a symbol,
+    // then resolved to an overloaded function.
+    AstNode *overloaded_function;
+
+    AstTyped *overload;
+};
+
+struct AstDirectiveOperator {
+    AstNode_base;
+
+    BinaryOp operator;
+    AstTyped *overload;
+};
+
 
 extern AstNode empty_node;
 
@@ -931,6 +944,7 @@ typedef enum EntityType {
     Entity_Type_Foreign_Global_Header,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
+    Entity_Type_Process_Directive,
     Entity_Type_Struct_Member_Default,
     Entity_Type_Memory_Reservation,
     Entity_Type_Expression,
@@ -1231,6 +1245,12 @@ static inline CallingConvention type_function_get_cc(Type* type) {
 static inline ParamPassType type_get_param_pass(Type* type) {
     if (type_is_structlike_strict(type) && !type_structlike_is_simple(type)) return Param_Pass_By_Implicit_Pointer;
     return Param_Pass_By_Value;
+}
+
+static inline AstFunction* get_function_from_node(AstNode* node) {
+    if (node->kind == Ast_Kind_Function) return (AstFunction *) node;
+    if (node->kind == Ast_Kind_Polymorphic_Proc) return ((AstPolyProc *) node)->base_func;
+    return NULL;
 }
 
 #endif // #ifndef ONYXASTNODES_H

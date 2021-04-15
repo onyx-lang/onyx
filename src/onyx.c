@@ -394,7 +394,7 @@ static void output_dummy_progress_bar() {
         for (i32 j = 0; j < Entity_State_Count; j++) {
             if (eh->all_count[j][i] == 0) continue;
 
-            printf(state_colors[j]);
+            printf("%s", state_colors[j]);
 
             i32 count = (eh->all_count[j][i] >> 5) + 1;
             for (i32 c = 0; c < count * 2; c++) printf("\xe2\x96\x88");

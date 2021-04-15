@@ -117,7 +117,8 @@ compare :: (str1: str, str2: str) -> i32 {
     return ~~(str1[i] - str2[i]);
 }
 
-equal :: (str1: str, str2: str) -> bool #operator== {
+#operator == equal
+equal :: (str1: str, str2: str) -> bool {
     if str1.count != str2.count do return false;
     while i := 0; i < str1.count {
         if str1[i] != str2[i] do return false;

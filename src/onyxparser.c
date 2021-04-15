@@ -1869,7 +1869,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = token;
-    func_def->operator_overload = -1;
 
     bh_arr_new(global_heap_allocator, func_def->allocate_exprs, 4);
     bh_arr_new(global_heap_allocator, func_def->params, 4);
@@ -1886,28 +1885,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         func_def->return_type = parse_type(parser);
 
     while (parser->curr->type == '#') {
-        if (parse_possible_directive(parser, "add_overload")) {
-            if (func_def->overloaded_function != NULL) {
-                onyx_report_error(parser->curr->pos, "cannot have multiple #add_overload directives on a single procedure.");
-                expect_token(parser, Token_Type_Symbol);
-
-            } else {
-                func_def->overloaded_function = (AstNode *) parse_expression(parser, 0);
-            }
-        }
-
-        else if (parse_possible_directive(parser, "operator")) {
-            BinaryOp op = binary_op_from_token_type(parser->curr->type);
-            consume_token(parser);
-            
-            if (op == Binary_Op_Count) {
-                onyx_report_error(parser->curr->pos, "Invalid binary operator.");
-            } else {
-                func_def->operator_overload = op;
-            }
-        }
-
-        else if (parse_possible_directive(parser, "intrinsic")) {
+        if (parse_possible_directive(parser, "intrinsic")) {
             func_def->flags |= Ast_Flag_Intrinsic;
 
             if (parser->curr->type == Token_Type_Literal_String) {
@@ -2291,6 +2269,35 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 error->error_msg = expect_token(parser, Token_Type_Literal_String); 
 
                 ENTITY_SUBMIT(error);
+                return;
+            }
+            else if (parse_possible_directive(parser, "operator")) {
+                AstDirectiveOperator *operator = make_node(AstDirectiveOperator, Ast_Kind_Directive_Operator);
+                operator->token = dir_token;
+
+                BinaryOp op = binary_op_from_token_type(parser->curr->type);
+                consume_token(parser);
+                
+                if (op == Binary_Op_Count) {
+                    onyx_report_error(parser->curr->pos, "Invalid binary operator.");
+                } else {
+                    operator->operator = op;
+                }
+
+                operator->overload = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(operator);
+                return;
+            }
+            else if (parse_possible_directive(parser, "add_overload")) {
+                AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
+                add_overload->token = dir_token;
+                add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);
+
+                expect_token(parser, ',');
+                add_overload->overload = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(add_overload);
                 return;
             }
             else {
