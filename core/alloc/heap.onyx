@@ -9,8 +9,10 @@ package core.alloc.heap
 #load "core/memory"
 #load "core/intrinsics/wasm"
 
-use package core.intrinsics.wasm { memory_size, memory_grow }
-#private_file memory :: package core.memory
+use package core.intrinsics.wasm {
+    memory_size, memory_grow,
+    memory_copy,
+}
 
 // The global heap state
 #private_file
@@ -117,7 +119,7 @@ heap_resize :: (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
     }
 
     new_ptr := heap_alloc(new_size, align);
-    memory.copy(new_ptr, ptr, old_size);
+    memory_copy(new_ptr, ptr, old_size);
     heap_free(ptr);
     return new_ptr;
 }

@@ -536,6 +536,13 @@ type_checking_done:
     return Check_Success;
 }
 
+static void report_bad_binaryop(AstBinaryOp* binop) {
+    onyx_report_error(binop->token->pos, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
+            binaryop_string[binop->operation],
+            node_get_type_name(binop->left),
+            node_get_type_name(binop->right));
+}
+
 CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     if (!assignment_is_ok) {
         onyx_report_error(binop->token->pos, "Assignment not valid in expression.");
@@ -638,13 +645,9 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
 CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
-    if (type_is_structlike_strict(binop->left->type)) {
-        onyx_report_error(binop->token->pos, "Invalid type for left side of comparison operator.");
-        return Check_Error;
-    }
-
-    if (type_is_structlike_strict(binop->right->type)) {
-        onyx_report_error(binop->token->pos, "Invalid type for right side of comparison operator.");
+    if (   type_is_structlike_strict(binop->left->type)
+        || type_is_structlike_strict(binop->right->type)) {
+        report_bad_binaryop(binop);
         return Check_Error;
     }
 
@@ -689,7 +692,7 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
     if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
-        onyx_report_error(binop->token->pos, "Boolean operator expects boolean types for both operands.");
+        report_bad_binaryop(binop);
         return Check_Error;
     }
 
@@ -870,10 +873,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     return Check_Success;
 
 bad_binaryop:
-    onyx_report_error(binop->token->pos, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
-            binaryop_string[binop->operation],
-            node_get_type_name(binop->left),
-            node_get_type_name(binop->right));
+    report_bad_binaryop(binop);
 
     return Check_Error;
 }

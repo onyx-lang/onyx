@@ -370,8 +370,8 @@ static void output_dummy_progress_bar() {
     if (bh_arr_length(eh->entities) == 0) return;
 
     static const char* state_colors[] = {
-        "\e[91m", "\e[93m", "\e[97m", "\e[93m", "\e[94m",
-        "\e[95m", "\e[94m", "\e[95m", "\e[96m", "\e[92m",
+        "\e[91m", "\e[93m", "\e[94m", "\e[93m", "\e[97m",
+        "\e[95m", "\e[97m", "\e[95m", "\e[96m", "\e[92m",
     };
 
     printf("\e[2;1H");
