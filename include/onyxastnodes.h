@@ -793,7 +793,7 @@ struct AstOverloadedFunction {
 };
 
 struct AstPackage {
-    AstNode_base;
+    AstTyped_base;
 
     // Allocated in the ast arena
     char * package_name;
