@@ -8,6 +8,7 @@
 #define WASM_TYPE_FLOAT64 0x7C
 #define WASM_TYPE_VAR128  0x7B
 #define WASM_TYPE_PTR     WASM_TYPE_INT32
+#define WASM_TYPE_FUNC    WASM_TYPE_INT32
 #define WASM_TYPE_VOID    0x00
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
@@ -32,7 +33,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
     }
 
     if (type->kind == Type_Kind_Function) {
-        return WASM_TYPE_INT32;
+        return WASM_TYPE_FUNC;
     }
 
     if (type->kind == Type_Kind_Basic) {
@@ -240,7 +241,7 @@ EMIT_FUNC(return,                        AstReturn* ret);
 EMIT_FUNC(stack_enter,                   u64 stacksize);
 EMIT_FUNC(stack_leave,                   u32 unused);
 EMIT_FUNC(zero_value,                    WasmType wt);
-EMIT_FUNC(zero_value_for_type,           Type* type);
+EMIT_FUNC(zero_value_for_type,           Type* type, OnyxToken* where);
 
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
@@ -887,6 +888,87 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     *pcode = code;
 }
 
+EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    // Allocate temporaries for iterator contents
+    u64 iterator_data_ptr   = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    u64 iterator_next_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
+    u64 iterator_close_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
+    u64 iterator_done_bool  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WIL(WI_LOCAL_SET, iterator_close_func);
+    WIL(WI_LOCAL_SET, iterator_next_func);
+    WIL(WI_LOCAL_SET, iterator_data_ptr);
+
+    AstLocal* var = for_node->var;
+    b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
+    u64 offset = 0;
+
+    // Enter a deferred statement for the auto-close
+    
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
+
+    if (!it_is_local) emit_local_location(mod, &code, var, &offset);
+
+    {
+        WIL(WI_LOCAL_GET, iterator_data_ptr);
+        WIL(WI_LOCAL_GET, iterator_next_func);
+
+        // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
+        u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+        
+        TypeWithOffset next_func_type;
+        type_linear_member_lookup(for_node->iter->type, 1, &next_func_type);
+        Type* return_type = next_func_type.type->Function.return_type;
+
+        u32 return_size = type_size_of(return_type);
+        u32 return_align = type_alignment_of(return_type);
+        bh_align(return_size, return_align);
+
+        u64 stack_grow_amm = return_size;
+        bh_align(stack_grow_amm, 16);
+        
+        WID(WI_GLOBAL_GET, stack_top_idx);
+        WID(WI_PTR_CONST, stack_grow_amm);
+        WI(WI_PTR_ADD);
+        WID(WI_GLOBAL_SET, stack_top_idx);
+
+        i32 type_idx = generate_type_idx(mod, next_func_type.type);
+        WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
+
+        WID(WI_GLOBAL_GET, stack_top_idx);
+        WID(WI_PTR_CONST, stack_grow_amm);
+        WI(WI_PTR_SUB);
+        WID(WI_GLOBAL_SET, stack_top_idx);
+
+        WID(WI_GLOBAL_GET, stack_top_idx);
+        emit_load_instruction(mod, &code, return_type, stack_grow_amm - return_size);
+    }
+
+    WIL(WI_LOCAL_SET, iterator_done_bool);
+
+    if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
+    else              WIL(WI_LOCAL_SET, iter_local);
+
+    WIL(WI_LOCAL_GET, iterator_done_bool);
+    WI(WI_I32_EQZ);
+    WID(WI_COND_JUMP, 0x01);
+
+    emit_block(mod, &code, for_node->stmt, 0);
+    WID(WI_JUMP, 0x00); 
+
+    emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code);
+
+    // Flush deferred statements
+    
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
+    local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
+    *pcode = code;
+}
+
 EMIT_FUNC(for, AstFor* for_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -897,14 +979,15 @@ EMIT_FUNC(for, AstFor* for_node) {
     emit_expression(mod, &code, for_node->iter);
 
     switch (for_node->loop_type) {
-        case For_Loop_Range:  emit_for_range(mod, &code, for_node, iter_local); break;
-        case For_Loop_Array:  emit_for_array(mod, &code, for_node, iter_local); break;
+        case For_Loop_Range:    emit_for_range(mod, &code, for_node, iter_local); break;
+        case For_Loop_Array:    emit_for_array(mod, &code, for_node, iter_local); break;
         // NOTE: A dynamic array is just a slice with a capacity and allocator on the end.
         // Just dropping the extra fields will mean we can just use the slice implementation.
         //                                                  - brendanfh   2020/09/04
         //                                                  - brendanfh   2021/04/13
-        case For_Loop_DynArr: WI(WI_DROP); WI(WI_DROP); WI(WI_DROP);
-        case For_Loop_Slice:  emit_for_slice(mod, &code, for_node, iter_local); break;
+        case For_Loop_DynArr:   WI(WI_DROP); WI(WI_DROP); WI(WI_DROP);
+        case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local); break;
+        case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local); break;
         default: onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
     }
 
@@ -1396,8 +1479,8 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
 
         case ONYX_INTRINSIC_ZERO_VALUE: {
             // NOTE: This probably will not have to make an allocation.
-            Type* zero_type = type_build_from_ast(context.ast_alloc, (AstType *) ((AstArgument *) call->args.values[0])->value);
-            emit_zero_value_for_type(mod, &code, zero_type);
+            Type* zero_type = type_build_from_ast(context.ast_alloc, (AstType *) ((AstArgument *) call->original_args.values[0])->value);
+            emit_zero_value_for_type(mod, &code, zero_type, call->token);
             break;
         }
 
@@ -2458,7 +2541,7 @@ EMIT_FUNC(zero_value, WasmType wt) {
     *pcode = code;
 }
 
-EMIT_FUNC(zero_value_for_type, Type* type) {
+EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
     
     if (type_is_structlike_strict(type)) {
@@ -2467,11 +2550,20 @@ EMIT_FUNC(zero_value_for_type, Type* type) {
 
         fori (i, 0, mem_count) {
             type_linear_member_lookup(type, i, &two);
-            emit_zero_value_for_type(mod, &code, two.type);
+            emit_zero_value_for_type(mod, &code, two.type, where);
         }
 
-    } else {
+    }
+    else if (type->kind == Type_Kind_Function) {
+        // CLEANUP ROBUSTNESS: This should use the 'null_proc' instead of whatever is at
+        // function index 0.
+        WID(WI_I32_CONST, 0);
+    }
+    else {
         WasmType wt = onyx_type_to_wasm_type(type);
+        if (wt == WASM_TYPE_VOID) {
+            onyx_report_error(where->pos, "Cannot produce a zero-value for this type.");
+        }
         emit_zero_value(mod, &code, wt);
     }
 

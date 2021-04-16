@@ -214,6 +214,16 @@ CheckStatus check_for(AstFor* fornode) {
 
         fornode->loop_type = For_Loop_DynArr;
     }
+    else if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
+        if (fornode->by_pointer) {
+            onyx_report_error(fornode->var->token->pos, "Cannot iterate by pointer over an iterator.");
+            return Check_Error;
+        }
+
+        // HACK: This assumes the Iterator type only has a single type argument.
+        fornode->var->type = iter_type->Struct.poly_sln[0].type;
+        fornode->loop_type = For_Loop_Iterator;
+    }
 
     if (fornode->by_pointer)
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;

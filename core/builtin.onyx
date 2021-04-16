@@ -150,3 +150,10 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
         return res;
     }
 }
+
+
+Iterator :: struct (T: type_expr) {
+    data:  rawptr;
+    next:  (data: rawptr) -> (T, bool);
+    close: (data: rawptr) -> void;
+}

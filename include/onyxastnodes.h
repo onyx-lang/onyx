@@ -438,6 +438,7 @@ typedef enum ForLoopType {
     For_Loop_Array,
     For_Loop_Slice,
     For_Loop_DynArr,
+    For_Loop_Iterator,
 } ForLoopType;
 
 typedef enum ParamPassType {
@@ -1126,6 +1127,7 @@ extern AstType  *builtin_vararg_type;
 extern Type     *builtin_vararg_type_type;
 extern AstTyped *builtin_context_variable;
 extern AstType  *builtin_allocator_type;
+extern AstType  *builtin_iterator_type;
 
 typedef struct BuiltinSymbol {
     char*    package;

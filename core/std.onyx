@@ -6,6 +6,7 @@ package core
 
 #load "core/array"
 #load "core/map"
+#load "core/list"
 
 #load "core/conv"
 #load "core/math"

@@ -636,6 +636,9 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         if      (from->Basic.size == 4) fromidx = 8;
         else if (from->Basic.size == 8) fromidx = 9;
     }
+    else if (from->Basic.flags & Basic_Flag_Boolean) {
+        fromidx = 0;
+    }
 
     if (to->Basic.flags & Basic_Flag_Pointer || to->kind == Type_Kind_Array) {
         toidx = 10;
@@ -649,12 +652,18 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         if      (to->Basic.size == 4) toidx = 8;
         else if (to->Basic.size == 8) toidx = 9;
     }
+    else if (to->Basic.flags & Basic_Flag_Boolean) {
+        toidx = 0;
+    }
 
     if (fromidx != -1 && toidx != -1) {
         if (!cast_legality[fromidx][toidx]) {
             *err_msg = bh_aprintf(global_heap_allocator, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
             return 0;
         }
+    } else {
+        *err_msg = bh_aprintf(global_heap_allocator, "Cast from '%s' to '%s' is not allowed.", type_get_name(from_), type_get_name(to_));
+        return 0;
     }
 
     *err_msg = NULL;

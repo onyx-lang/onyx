@@ -48,6 +48,7 @@ AstType  *builtin_vararg_type;
 Type     *builtin_vararg_type_type;
 AstTyped *builtin_context_variable;
 AstType  *builtin_allocator_type;
+AstType  *builtin_iterator_type;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -377,6 +378,13 @@ void initialize_builtins(bh_allocator a) {
         onyx_report_error((OnyxFilePos) { 0 }, "'Allocator' struct not found in builtin package.");
         return;
     }
+
+    builtin_iterator_type = (AstType *) symbol_raw_resolve(p->scope, "Iterator");
+    if (builtin_iterator_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'Iterator' struct not found in builtin package.");
+        return;
+    }
+
 
     fori (i, 0, Binary_Op_Count) {
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 

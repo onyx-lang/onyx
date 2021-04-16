@@ -1,0 +1,96 @@
+package core.list
+
+ListElem :: struct (T: type_expr) {
+    next: ^ListElem(T) = null;
+    prev: ^ListElem(T) = null;
+    data: T;
+}
+
+List :: struct (T: type_expr) {
+    allocator: Allocator;
+
+    first: ^ListElem(T) = null;
+    last:  ^ListElem(T) = null;
+}
+
+make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
+    return .{ allocator = allocator };
+}
+
+push_end :: (list: ^List($T), x: T) { 
+    new_elem := allocate_elem(list);
+    new_elem.data = x;
+
+    new_elem.prev = list.last;
+    list.last.next = new_elem;
+    list.last = new_elem;
+
+    if list.first == null do list.first = new_elem;
+}
+
+push_begin :: (list: ^List($T), x: T) {
+    new_elem := allocate_elem(list);
+    new_elem.data = x;
+
+    new_elem.next = list.first;
+    list.first.prev = new_elem;
+    list.first = new_elem;
+
+    if list.last == null do list.last = new_elem;
+}
+
+pop_end :: (list: ^List($T), default: T = 0) -> T {
+    if list.last == null do return default;
+
+    end := list.last;
+    list.last = list.last.prev;
+    list.last.next = null;
+
+    defer raw_free(list.allocator, end);
+    return end.data;
+}
+
+pop_begin :: (list: ^List($T), default: T = 0) -> T {
+    if list.last == null do return default;
+
+    begin := list.first;
+    list.first = list.first.next;
+    list.first.prev = null;
+
+    defer raw_free(list.allocator, begin);
+    return begin.data;
+}
+
+contains :: (list: ^List($T), x: T) -> bool {
+    elem := list.first;
+    while elem != null {
+        if elem.data == x do return true;
+        elem = elem.next;
+    }
+
+    return false;
+}
+
+get_iterator :: (list: ^List($T)) -> Iterator(T) {
+    iterator_impl :: ($T: type_expr, data: rawptr) -> (T, bool) {
+        elem_ptr := cast(^^ListElem(T)) data;
+        elem := *elem_ptr;
+
+        use package core.intrinsics.onyx { __zero_value }
+        if elem == null do return __zero_value(T), false;
+
+        *elem_ptr = elem.next;
+        return elem.data, true;
+    }
+
+    return .{
+        data = ^list.first,
+        next = #solidify iterator_impl { T = T },
+        close = null_proc,
+    };
+}
+
+#private_file
+allocate_elem :: (list: ^List($T)) -> ^ListElem(T) {
+    return new(#type ListElem(T), allocator=list.allocator);
+}
