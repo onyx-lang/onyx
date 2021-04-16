@@ -966,6 +966,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
+    local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     *pcode = code;
 }
 
