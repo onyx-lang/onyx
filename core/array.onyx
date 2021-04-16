@@ -127,14 +127,37 @@ fast_delete :: (arr: ^[..] $T, idx: u32) {
     arr.count -= 1;
 }
 
-contains :: (arr: ^[..] $T, x: T) -> bool {
-    for it: *arr do if it == x do return true;
-    return false;
-}
-
 pop :: (arr: ^[..] $T) -> T {
     arr.count -= 1;
     return arr.data[arr.count];
+}
+
+// Uses '==' to compare for equality.
+contains :: proc {
+    (arr: ^[..] $T, x: T) -> bool {
+        for it: *arr do if it == x do return true;
+        return false;
+    },
+
+    (arr: [] $T, x: T) -> bool {
+        for it: arr do if it == x do return true;
+        return false;
+    }
+}
+
+// Uses '+' to sum.
+sum :: proc {
+    (arr: ^[..] $T, start: T = 0) -> T {
+        sum := start;
+        for it: *arr do sum += it;
+        return sum;
+    },
+
+    (arr: [] $T, start: T = 0) -> T {
+        sum := start;
+        for it: arr do sum += it;
+        return sum;
+    }
 }
 
 average :: (arr: ^[..] $T) -> T {
@@ -181,17 +204,12 @@ fold :: proc {
 }
 
 map :: proc {
-    (arr: ^[..] $T, f: (T) -> T) {
-        for ^it: *arr do *it = f(*it);
-    },
-
-    (arr: ^[..] $T, f: (^T) -> void) {
-        for ^it: *arr do f(it);
-    },
-
-    (arr: ^[..] $T, data: $R, f: (T, R) -> T) {
-        for ^it: *arr do *it = f(*it, data);
-    },
+    (arr: ^[..] $T, f: (^T) -> void)          do for ^it: *arr do f(it);,
+    (arr: ^[..] $T, f: (T) -> T)              do for ^it: *arr do *it = f(*it);,
+    (arr: ^[..] $T, data: $R, f: (T, R) -> T) do for ^it: *arr do *it = f(*it, data);,
+    (arr: [] $T, f: (^T) -> void)             do for ^it:  arr do f(it);,
+    (arr: [] $T, f: (T) -> T)                 do for ^it:  arr do *it = f(*it);,
+    (arr: [] $T, data: $R, f: (T, R) -> T)    do for ^it:  arr do *it = f(*it, data);,
 }
 
 #private_file

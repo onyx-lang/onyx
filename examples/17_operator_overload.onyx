@@ -1,0 +1,44 @@
+#load "core/std"
+use package core
+
+// Operator overloading allows you to define what it means to perform
+// a binary operation between two types. In Onyx, they are defined in
+// the following way:
+//
+// #operator <op> <overload>
+//
+// where <op> is the binary operator, and <overload> is an expression
+// that should be a procedure that will be used for the overload.
+//
+
+// Take this example. Note, DO NOT actually use this exact implementation
+// because it leaks memory all over the place. Especially because with
+// a binary operator, you cannot pass a custom allocator.
+
+#operator + (x: str, y: str) -> str {
+    return string.concat(x, y); 
+}
+
+main :: (args: [] cstr) {
+    // Now we can say "+" between two strings. Also, we can use it
+    // to give us access to more features like array.sum which adds
+    // everything in the array together using the '+' operator.
+    // Since '+' is concatenate, array.sum will join all the strings
+    // into one, in one of the most inefficient ways possible.
+
+    test := "Hello, " + "World!";
+    println(test);
+
+    strings := str.[ "This ", "is ", "a ", "test." ];
+    result  := array.sum(cast([] str) strings, start="");
+    println(result);
+
+    // As a side note, '==' is already overloaded for strings in the
+    // standard library, so you can do this:
+    
+    if array.contains(cast([] str) strings, "is ") {
+        println("The array contains 'is '.");
+    } else {
+        println("The array does NOT contain 'is '.");
+    }
+}
