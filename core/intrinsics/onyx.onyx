@@ -1,3 +1,4 @@
 package core.intrinsics.onyx
 
-__initialize :: (val: ^$T) -> void #intrinsic ---
+__initialize :: (val: ^$T)      -> void #intrinsic ---
+__zero_value :: ($T: type_expr) -> T    #intrinsic ---

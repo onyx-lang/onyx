@@ -240,6 +240,7 @@ EMIT_FUNC(return,                        AstReturn* ret);
 EMIT_FUNC(stack_enter,                   u64 stacksize);
 EMIT_FUNC(stack_leave,                   u32 unused);
 EMIT_FUNC(zero_value,                    WasmType wt);
+EMIT_FUNC(zero_value_for_type,           Type* type);
 
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
@@ -1393,6 +1394,13 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             break;
         }
 
+        case ONYX_INTRINSIC_ZERO_VALUE: {
+            // NOTE: This probably will not have to make an allocation.
+            Type* zero_type = type_build_from_ast(context.ast_alloc, (AstType *) ((AstArgument *) call->args.values[0])->value);
+            emit_zero_value_for_type(mod, &code, zero_type);
+            break;
+        }
+
         case ONYX_INTRINSIC_I32_CLZ:      WI(WI_I32_CLZ); break;
         case ONYX_INTRINSIC_I32_CTZ:      WI(WI_I32_CTZ); break;
         case ONYX_INTRINSIC_I32_POPCNT:   WI(WI_I32_POPCNT); break;
@@ -2445,6 +2453,26 @@ EMIT_FUNC(zero_value, WasmType wt) {
             WIP(WI_V128_CONST, &zero_v128);
             break;
         }
+    }
+
+    *pcode = code;
+}
+
+EMIT_FUNC(zero_value_for_type, Type* type) {
+    bh_arr(WasmInstruction) code = *pcode;
+    
+    if (type_is_structlike_strict(type)) {
+        i32 mem_count = type_linear_member_count(type);
+        TypeWithOffset two;
+
+        fori (i, 0, mem_count) {
+            type_linear_member_lookup(type, i, &two);
+            emit_zero_value_for_type(mod, &code, two.type);
+        }
+
+    } else {
+        WasmType wt = onyx_type_to_wasm_type(type);
+        emit_zero_value(mod, &code, wt);
     }
 
     *pcode = code;

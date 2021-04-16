@@ -365,6 +365,10 @@ CheckStatus check_call(AstCall* call) {
     CHECK(expression, &call->callee);
     check_arguments(&call->args);
 
+    // SPEED CLEANUP: Keeping an original copy for basically no reason except that sometimes you
+    // need to know the baked argument values in code generation.
+    arguments_clone(&call->original_args, &call->args);
+
     if (call->callee->kind == Ast_Kind_Overloaded_Function) {
         call->callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args);
         if (call->callee == NULL) {

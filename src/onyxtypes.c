@@ -474,7 +474,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_arr_free(slns);
 
             if (!concrete) return NULL;
-            return type_build_from_ast(alloc, (AstType *) concrete);
+            Type* struct_type = type_build_from_ast(alloc, (AstType *) concrete);
+            struct_type->Struct.constructed_from = (AstType *) ps_type;
+            return struct_type;
         }
 
         case Ast_Kind_Type_Compound: {
@@ -1023,4 +1025,11 @@ b32 type_is_sl_constructable(Type* type) {
         case Type_Kind_DynArray: return 1;
         default: return 0;
     }
+}
+
+b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from) {
+    DEBUG_HERE;
+    if (struct_type->kind != Type_Kind_Struct) return 0;
+
+    return struct_type->Struct.constructed_from == from;
 }
