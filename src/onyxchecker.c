@@ -1467,6 +1467,13 @@ CheckStatus check_statement(AstNode** pstmt) {
             stmt->flags |= Ast_Flag_Expr_Ignored;
             return check_binaryop((AstBinaryOp **) pstmt, 1);
 
+        // NOTE: Local variable declarations used to be removed after the symbol
+        // resolution phase because long long ago, all locals needed to be known
+        // in a block in order to efficiently allocate enough space and registers
+        // for them all. Now with LocalAllocator, this is no longer necessary.
+        // Therefore, locals stay in the tree and need to be passed along.
+        case Ast_Kind_Local: return Check_Success;
+
         default:
             stmt->flags |= Ast_Flag_Expr_Ignored;
             return check_expression((AstTyped **) pstmt);
@@ -1485,24 +1492,24 @@ CheckStatus check_statement_chain(AstNode** start) {
 CheckStatus check_block(AstBlock* block) {
     CHECK(statement_chain, &block->body);
 
-    bh_arr_each(AstTyped *, value, block->allocate_exprs) {
-        fill_in_type(*value);
+    // bh_arr_each(AstTyped *, value, block->allocate_exprs) {
+    //     fill_in_type(*value);
 
-        if ((*value)->kind == Ast_Kind_Local) {
-            if ((*value)->type == NULL) {
-                onyx_report_error((*value)->token->pos,
-                        "Unable to resolve type for local '%b'.",
-                        (*value)->token->text, (*value)->token->length);
-                return Check_Error;
-            }
+    //     if ((*value)->kind == Ast_Kind_Local) {
+    //         if ((*value)->type == NULL) {
+    //             onyx_report_error((*value)->token->pos,
+    //                     "Unable to resolve type for local '%b'.",
+    //                     (*value)->token->text, (*value)->token->length);
+    //             return Check_Error;
+    //         }
 
-            if ((*value)->type->kind == Type_Kind_Compound) {
-                onyx_report_error((*value)->token->pos,
-                        "Compound type not allowed as local variable type. Try splitting this into multiple variables.");
-                return Check_Error;
-            }
-        }
-    }
+    //         if ((*value)->type->kind == Type_Kind_Compound) {
+    //             onyx_report_error((*value)->token->pos,
+    //                     "Compound type not allowed as local variable type. Try splitting this into multiple variables.");
+    //             return Check_Error;
+    //         }
+    //     }
+    // }
 
     return Check_Success;
 }

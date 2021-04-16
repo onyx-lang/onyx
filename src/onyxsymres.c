@@ -31,7 +31,7 @@ typedef enum SymresStatus {
 } SymresStatus;
 
 static SymresStatus symres_type(AstType** type);
-static SymresStatus symres_local(AstLocal** local, b32 add_to_block_locals);
+static SymresStatus symres_local(AstLocal** local);
 static SymresStatus symres_call(AstCall* call);
 static SymresStatus symres_size_of(AstSizeOf* so);
 static SymresStatus symres_align_of(AstAlignOf* so);
@@ -246,15 +246,8 @@ static SymresStatus symres_type(AstType** type) {
     return Symres_Success;
 }
 
-static SymresStatus symres_local(AstLocal** local, b32 add_to_block_locals) {
+static SymresStatus symres_local(AstLocal** local) {
     SYMRES(type, &(*local)->type_node);
-
-    // NOTE: This is a little gross, but it is allows for finer control
-    // over when locals are in scope in a block, which reduces the number
-    // of unique WASM locals and stack space needed.
-    //                                            - brendanfh 2020/12/16
-    if (add_to_block_locals)
-        bh_arr_push(bh_arr_last(block_stack)->allocate_exprs, (AstTyped *) *local);
 
     bh_arr_push(curr_function->allocate_exprs, (AstTyped *) *local);
 
@@ -409,10 +402,8 @@ static SymresStatus symres_array_literal(AstArrayLiteral* al) {
     bh_arr_each(AstTyped *, expr, al->values)
         SYMRES(expression, expr);
 
-    if (bh_arr_length(block_stack) > 0) {
-        bh_arr_push(bh_arr_last(block_stack)->allocate_exprs, (AstTyped *) al);
+    if (curr_function != NULL)
         bh_arr_push(curr_function->allocate_exprs, (AstTyped *) al);
-    }
 
     return Symres_Success;
 }
@@ -509,7 +500,7 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
         ifnode->scope = scope_create(context.ast_alloc, curr_scope, ifnode->token->pos);
         scope_enter(ifnode->scope);
 
-        SYMRES(local, &ifnode->local, 0);
+        SYMRES(local, &ifnode->local);
 
         SYMRES(statement, (AstNode **) &ifnode->assignment, NULL);
     }
@@ -529,7 +520,7 @@ static SymresStatus symres_while(AstIfWhile* whilenode) {
         whilenode->scope = scope_create(context.ast_alloc, curr_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
-        SYMRES(local, &whilenode->local, 0);
+        SYMRES(local, &whilenode->local);
 
         SYMRES(statement, (AstNode **) &whilenode->assignment, NULL);
     }
@@ -548,7 +539,7 @@ static SymresStatus symres_for(AstFor* fornode) {
     fornode->scope = scope_create(context.ast_alloc, curr_scope, fornode->token->pos);
     scope_enter(fornode->scope);
     SYMRES(expression, &fornode->iter);
-    SYMRES(local, &fornode->var, 0);
+    SYMRES(local, &fornode->var);
     SYMRES(block, fornode->stmt);
     scope_leave();
 
@@ -743,8 +734,8 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
         case Ast_Kind_Jump:        break;
 
         case Ast_Kind_Local:
-            if (remove) *remove = 1;
-            SYMRES(local, (AstLocal **) stmt, 1);
+            // if (remove) *remove = 1;
+            SYMRES(local, (AstLocal **) stmt);
             break;
 
         case Ast_Kind_Use:

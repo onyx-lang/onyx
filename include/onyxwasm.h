@@ -497,6 +497,11 @@ typedef struct DeferredStmt {
     AstNode *stmt;
 } DeferredStmt;
 
+typedef struct AllocatedSpace {
+    u64 depth;
+    AstTyped *expr;
+} AllocatedSpace;
+
 typedef struct StrLitInfo {
     u32 addr;
     u32 len;
@@ -519,7 +524,8 @@ typedef struct OnyxWasmModule {
     // NOTE: Mapping ptrs to elements
     bh_imap elem_map;
 
-    bh_arr(DeferredStmt) deferred_stmts;
+    bh_arr(DeferredStmt)   deferred_stmts;
+    bh_arr(AllocatedSpace) local_allocations; 
 
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )

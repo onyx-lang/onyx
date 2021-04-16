@@ -215,8 +215,6 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
 		case Ast_Kind_Block:
 			((AstBlock *) nn)->body = ast_clone_list(a, ((AstBlock *) node)->body);
-			((AstBlock *) nn)->allocate_exprs = NULL;
-			bh_arr_new(global_heap_allocator, ((AstBlock *) nn)->allocate_exprs, 4);
 			break;
 
 		case Ast_Kind_Defer:

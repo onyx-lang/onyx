@@ -575,8 +575,6 @@ struct AstBlock         {
     AstNode *body;
     Scope *scope;
 
-    bh_arr(AstTyped *)   allocate_exprs;
-
     Scope *binding_scope;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };

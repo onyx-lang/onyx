@@ -1,3 +1,17 @@
+//
+// There are several things I'm seeing in this file that I want to clean up.
+// They are:
+//  [ ] remove the need to know if the stack is needed before generating the function.
+//      Just leave 5 nops at the beginning because they will be automatically removed
+//      by the WASM outputter.
+//  [ ] remove the need to have "allocate_exprs" on blocks and in functions. This will
+//      be easy once the above is done.
+//  [ ] there should be a better way to emit pending deferred statements because there
+//      is some code duplication between emit_return and emit_structured_jump.
+
+
+
+
 #define BH_DEBUG
 #include "onyxwasm.h"
 #include "onyxutils.h"
@@ -207,6 +221,8 @@ enum StructuredBlockType {
 EMIT_FUNC(function_body,                 AstFunction* fd);
 EMIT_FUNC(block,                         AstBlock* block, b32 generate_block_headers);
 EMIT_FUNC(statement,                     AstNode* stmt);
+EMIT_FUNC(local_allocation,              AstTyped* stmt);
+EMIT_FUNC_NO_ARGS(free_local_allocations);
 EMIT_FUNC(assignment,                    AstBinaryOp* assign);
 EMIT_FUNC(assignment_of_array,           AstTyped* left, AstTyped* right);
 EMIT_FUNC(compound_assignment,           AstBinaryOp* assign);
@@ -260,17 +276,12 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     if (generate_block_headers)
         emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
 
-    bh_arr_each(AstTyped *, expr, block->allocate_exprs)
-        bh_imap_put(&mod->local_map, (u64) *expr, local_allocate(mod->local_alloc, *expr));
-
     forll (AstNode, stmt, block->body, next) {
         emit_statement(mod, &code, stmt);
     }
 
     emit_deferred_stmts(mod, &code, (AstNode *) block);
-
-    bh_arr_each(AstTyped *, expr, block->allocate_exprs)
-        local_free(mod->local_alloc, *expr);
+    emit_free_local_allocations(mod, &code);
 
     if (generate_block_headers)
         emit_leave_structured_block(mod, &code);
@@ -377,10 +388,33 @@ EMIT_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_Jump:       emit_structured_jump(mod, &code, (AstJump *) stmt); break;
         case Ast_Kind_Block:      emit_block(mod, &code, (AstBlock *) stmt, 1); break;
         case Ast_Kind_Defer:      emit_defer(mod, &code, (AstDefer *) stmt); break;
+        case Ast_Kind_Local:      emit_local_allocation(mod, &code, (AstTyped *) stmt); break;
         default:                  emit_expression(mod, &code, (AstTyped *) stmt); break;
     }
 
     *pcode = code;
+}
+
+EMIT_FUNC(local_allocation, AstTyped* stmt) {
+    bh_imap_put(&mod->local_map, (u64) stmt, local_allocate(mod->local_alloc, stmt));
+
+    bh_arr_push(mod->local_allocations, ((AllocatedSpace) {
+        .depth = bh_arr_length(mod->structured_jump_target),
+        .expr  = stmt,
+    }));
+}
+
+EMIT_FUNC_NO_ARGS(free_local_allocations) {
+    if (bh_arr_length(mod->local_allocations) == 0) return;
+
+    u64 depth = bh_arr_length(mod->structured_jump_target);
+    while (bh_arr_length(mod->local_allocations) > 0 && bh_arr_last(mod->local_allocations).depth == depth) {
+        // CHECK: Not sure this next line is okay to be here...
+        bh_imap_delete(&mod->local_map, (u64) bh_arr_last(mod->local_allocations).expr);
+
+        local_free(mod->local_alloc, bh_arr_last(mod->local_allocations).expr);
+        bh_arr_pop(mod->local_allocations);
+    }
 }
 
 EMIT_FUNC(assignment, AstBinaryOp* assign) {
@@ -2189,6 +2223,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Array_Literal: {
+            emit_local_allocation(mod, &code, expr);
             emit_array_literal(mod, &code, (AstArrayLiteral *) expr);
             break;
         }
@@ -2585,21 +2620,20 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
         if (type_get_param_pass(*param_type) == Param_Pass_By_Implicit_Pointer) {
             *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]);
 
-        } else {
-            if (type_is_structlike_strict(*param_type)) {
-                u32 mem_count = type_structlike_mem_count(*param_type);
-                StructMember smem;
+        }
+        else if (type_is_structlike_strict(*param_type)) {
+            u32 mem_count = type_structlike_mem_count(*param_type);
+            StructMember smem;
 
-                fori (i, 0, mem_count) {
-                    type_lookup_member_by_idx(*param_type, i, &smem);
-                    *(t++) = (char) onyx_type_to_wasm_type(smem.type);
-                }
-
-                param_count += mem_count - 1;
-
-            } else {
-                *(t++) = (char) onyx_type_to_wasm_type(*param_type);
+            fori (i, 0, mem_count) {
+                type_lookup_member_by_idx(*param_type, i, &smem);
+                *(t++) = (char) onyx_type_to_wasm_type(smem.type);
             }
+
+            param_count += mem_count - 1;
+
+        } else {
+            *(t++) = (char) onyx_type_to_wasm_type(*param_type);
         }
 
         param_type++;
@@ -3124,6 +3158,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_imap_init(&module.elem_map,  global_heap_allocator, 16);
 
     bh_arr_new(global_heap_allocator, module.deferred_stmts, 4);
+    bh_arr_new(global_heap_allocator, module.local_allocations, 4);
 
     WasmExport mem_export = {
         .kind = WASM_FOREIGN_MEMORY,
