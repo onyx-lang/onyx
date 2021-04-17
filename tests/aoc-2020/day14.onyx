@@ -23,55 +23,54 @@ bitmask_p1 :: (mask: Bitmask, val: u64) -> u64 {
 }
 
 // Part 2
+
 BitmaskIter :: struct {
 	floating_indicies : [..] u8;
 	val               : u64;
 	done              : bool;
 }
 
-bitmask_iter_make :: (mask: Bitmask, val: u64) -> BitmaskIter {
-	bmi : BitmaskIter;
-	bmi.done = false;
+bitmask_p2 :: (mask: Bitmask, val: u64) -> Iterator(u64) {
+    iterator_next :: (data: rawptr) -> (u64, bool) {
+        bmi := cast(^BitmaskIter) data;
+        if bmi.done do return 0, false;
 
-	array.init(^bmi.floating_indicies, 8);
+		for ind: bmi.floating_indicies {
+			is_set := (bmi.val & (1 << cast(u64) ind)) != 0;
+
+			bmi.val ^= 1 << cast(u64) ind;
+
+			if !is_set do return bmi.val, true;
+		}
+
+        bmi.done = true;
+        return bmi.val, true;
+    }
+
+    iterator_close :: (data: rawptr) {
+        bmi := cast(^BitmaskIter) data;
+        array.free(^bmi.floating_indicies);
+        cfree(bmi);
+    }
+
+    bmi := new(BitmaskIter);
+    bmi.done = false;
+
+    array.init(^bmi.floating_indicies, 8);
 
 	v := val;
 	for i: 0 .. MASK_SIZE {
-		if mask[i] == 1 {
-			v |= 1 << cast(u64) i;
-		}
+		if mask[i] == 1 do v |= 1 << cast(u64) i;
 
 		if mask[i] == 2 {
-			v &= ~(1 << cast(u64) i);
-
+            v &= ~(1 << cast(u64) i);
 			array.push(^bmi.floating_indicies, cast(u8) i);
 		}
 	}
 
 	bmi.val = v;
-	return bmi;
-}
 
-bitmask_iter_free :: (use bmi: ^BitmaskIter) {
-	array.free(^floating_indicies);
-}
-
-bitmask_iter_done :: (use bmi: ^BitmaskIter) -> bool do return done;
-
-bitmask_iter_next :: (use bmi: ^BitmaskIter) -> u64 {
-	{
-		for ind: floating_indicies {
-			is_set := (val & (1 << cast(u64) ind)) != 0;
-
-			val ^= 1 << cast(u64) ind;
-
-			if !is_set do break break;
-		}
-
-		done = true;
-	}
-
-	return val;
+    return .{ bmi, iterator_next, iterator_close };
 }
 
 main :: (args: [] cstr) {
@@ -115,13 +114,9 @@ main :: (args: [] cstr) {
 			// map.put(^mem, addr, bitmask_p1(mask, val));
 
 			// Part 2
-			bmi := bitmask_iter_make(mask, addr);
-			while !bitmask_iter_done(^bmi) {
-				real_addr := bitmask_iter_next(^bmi);
-				map.put(^mem, real_addr, val);
-			}
-
-			bitmask_iter_free(^bmi);
+            for real_addr: bitmask_p2(mask, addr) {
+                map.put(^mem, real_addr, val);
+            }
 
 			reader.advance_line(^file);
 		}	
