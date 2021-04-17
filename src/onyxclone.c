@@ -365,9 +365,6 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			df->return_type = (AstType *) ast_clone(a, sf->return_type);
 			df->body = (AstBlock *) ast_clone(a, sf->body);
 
-			df->allocate_exprs = NULL;
-		    bh_arr_new(global_heap_allocator, df->allocate_exprs, 4);
-
 			df->params = NULL;
 			bh_arr_new(global_heap_allocator, df->params, bh_arr_length(sf->params));
 
@@ -460,7 +457,4 @@ void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source)
     if (source->kind != Ast_Kind_Function) return;
 
     dest->body = (AstBlock *) ast_clone(a, source->body);
-
-    dest->allocate_exprs = NULL;
-    bh_arr_new(global_heap_allocator, dest->allocate_exprs, 4);
 }

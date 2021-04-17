@@ -1869,7 +1869,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = token;
 
-    bh_arr_new(global_heap_allocator, func_def->allocate_exprs, 4);
     bh_arr_new(global_heap_allocator, func_def->params, 4);
 
     bh_arr(AstPolyParam) polymorphic_vars = NULL;

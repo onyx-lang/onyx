@@ -755,7 +755,6 @@ struct AstFunction {
     AstType* return_type;
 
     AstBlock *body;
-    bh_arr(AstTyped *) allocate_exprs;
 
     OnyxToken* name;
 

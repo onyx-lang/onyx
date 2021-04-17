@@ -1492,6 +1492,9 @@ CheckStatus check_statement_chain(AstNode** start) {
 CheckStatus check_block(AstBlock* block) {
     CHECK(statement_chain, &block->body);
 
+    // CLEANUP: There will need to be some other method of 
+    // checking the following conditions.
+    //
     // bh_arr_each(AstTyped *, value, block->allocate_exprs) {
     //     fill_in_type(*value);
 

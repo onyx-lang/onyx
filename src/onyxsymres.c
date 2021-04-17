@@ -249,8 +249,6 @@ static SymresStatus symres_type(AstType** type) {
 static SymresStatus symres_local(AstLocal** local) {
     SYMRES(type, &(*local)->type_node);
 
-    bh_arr_push(curr_function->allocate_exprs, (AstTyped *) *local);
-
     if ((*local)->token != NULL)
         symbol_introduce(curr_scope, (*local)->token, (AstNode *) *local);
 
@@ -401,9 +399,6 @@ static SymresStatus symres_array_literal(AstArrayLiteral* al) {
 
     bh_arr_each(AstTyped *, expr, al->values)
         SYMRES(expression, expr);
-
-    if (curr_function != NULL)
-        bh_arr_push(curr_function->allocate_exprs, (AstTyped *) al);
 
     return Symres_Success;
 }

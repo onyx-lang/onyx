@@ -1,13 +1,15 @@
 //
 // There are several things I'm seeing in this file that I want to clean up.
 // They are:
-//  [ ] remove the need to know if the stack is needed before generating the function.
+//  [x] remove the need to know if the stack is needed before generating the function.
 //      Just leave 5 nops at the beginning because they will be automatically removed
 //      by the WASM outputter.
-//  [ ] remove the need to have "allocate_exprs" on blocks and in functions. This will
+//  [x] remove the need to have "allocate_exprs" on blocks and in functions. This will
 //      be easy once the above is done.
 //  [ ] there should be a better way to emit pending deferred statements because there
 //      is some code duplication between emit_return and emit_structured_jump.
+//
+//  [ ] Change the calling convention so it is easier to use from both JS and in the compiler.
 
 
 
@@ -217,6 +219,7 @@ enum StructuredBlockType {
     local_raw_free(mod->local_alloc, type1);              \
     local_raw_free(mod->local_alloc, type2);              \
     }
+#define SUBMIT_PATCH(patch_arr, offset) bh_arr_push((patch_arr), ((PatchInfo) { bh_arr_length(code) - offset }))
 
 EMIT_FUNC(function_body,                 AstFunction* fd);
 EMIT_FUNC(block,                         AstBlock* block, b32 generate_block_headers);
@@ -255,7 +258,6 @@ EMIT_FUNC(expression,                    AstTyped* expr);
 EMIT_FUNC(cast,                          AstUnaryOp* cast);
 EMIT_FUNC(return,                        AstReturn* ret);
 EMIT_FUNC(stack_enter,                   u64 stacksize);
-EMIT_FUNC(stack_leave,                   u32 unused);
 EMIT_FUNC(zero_value,                    WasmType wt);
 EMIT_FUNC(zero_value_for_type,           Type* type, OnyxToken* where);
 
@@ -2516,8 +2518,9 @@ EMIT_FUNC(return, AstReturn* ret) {
         }
     }
 
-    if (mod->has_stack_locals)
-        emit_stack_leave(mod, &code, 0);
+    SUBMIT_PATCH(mod->stack_leave_patches, 0);
+    WI(WI_NOP);
+    WI(WI_NOP);
 
     WI(WI_RETURN);
 
@@ -2545,16 +2548,6 @@ EMIT_FUNC(stack_enter, u64 stacksize) {
         code[3] = (WasmInstruction) { WI_I32_ADD,    0 };
         code[4] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
     }
-    *pcode = code;
-}
-
-EMIT_FUNC(stack_leave, u32 unused) {
-    bh_arr(WasmInstruction) code = *pcode;
-
-    u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
-
-    WIL(WI_LOCAL_GET, mod->stack_base_idx);
-    WID(WI_GLOBAL_SET, stack_top_idx);
 
     *pcode = code;
 }
@@ -2768,23 +2761,29 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         mod->curr_cc = type_function_get_cc(fd->type);
         assert(mod->curr_cc != CC_Undefined);
 
-        mod->has_stack_locals = (mod->curr_cc == CC_Return_Stack);
-        bh_arr_each(AstTyped *, expr, fd->allocate_exprs)
-            mod->has_stack_locals |= !local_is_wasm_local(*expr);
+        bh_arr_clear(mod->stack_leave_patches);
 
-        if (mod->has_stack_locals) {
-            // NOTE: '5' needs to match the number of instructions it takes
-            // to setup a stack frame
-            bh_arr_insert_end(wasm_func.code, 5);
-            mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-        }
+        bh_arr_insert_end(wasm_func.code, 5);
+        fori (i, 0, 5) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
+        
+        mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
         // Generate code
         emit_function_body(mod, &wasm_func.code, fd);
 
-        if (mod->has_stack_locals) {
+        if (mod->local_alloc->max_stack > 0 || mod->curr_cc == CC_Return_Stack) {
             emit_stack_enter(mod, &wasm_func.code, mod->local_alloc->max_stack);
-            emit_stack_leave(mod, &wasm_func.code, 0);
+
+            // Place all stack leaves in patch locations. These will (probably) all be
+            // right before a "return" instruction.
+            u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_base_idx } }));
+            bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } }));
+
+            bh_arr_each(PatchInfo, patch, mod->stack_leave_patches) {
+                wasm_func.code[patch->instruction_index + 0] = (WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_base_idx } };
+                wasm_func.code[patch->instruction_index + 1] = (WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } };
+            }
         }
     }
 
@@ -3124,6 +3123,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .next_elem_idx = 0,
 
         .structured_jump_target = NULL,
+        .local_allocations = NULL,
+        .stack_leave_patches = NULL,
 
         .stack_top_ptr = NULL,
         .stack_base_idx = 0,
@@ -3159,11 +3160,13 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
     bh_arr_new(global_heap_allocator, module.deferred_stmts, 4);
     bh_arr_new(global_heap_allocator, module.local_allocations, 4);
+    bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
 
     WasmExport mem_export = {
         .kind = WASM_FOREIGN_MEMORY,
         .idx = 0,
     };
+    // :ArbitraryConstant
     bh_table_put(WasmExport, module.exports, "memory", mem_export);
     module.export_count++;
 
