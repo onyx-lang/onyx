@@ -2792,10 +2792,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
 
-    // HACK: This is gross
-    bh_arr_grow(mod->funcs, func_idx - mod->foreign_function_count + 1);
-    mod->funcs[func_idx - mod->foreign_function_count] = wasm_func;
-    bh_arr_set_length(mod->funcs, bh_max((u32) bh_arr_length(mod->funcs), func_idx - mod->foreign_function_count + 1));
+    bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
 
     // NOTE: Clear the local map on exit of generating this function
     bh_imap_clear(&mod->local_map);
@@ -2852,9 +2849,7 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         default: assert(("Invalid global type", 0)); break;
     }
 
-    bh_arr_grow(module->globals, global_idx - module->foreign_global_count + 1);
-    module->globals[global_idx - module->foreign_global_count] = glob;
-    bh_arr_set_length(module->globals, bh_max((u32) bh_arr_length(module->globals), global_idx - module->foreign_global_count + 1));
+    bh_arr_set_at(module->globals, global_idx - module->foreign_global_count, glob);
 
     if (global->flags & Ast_Flag_Global_Stack_Top)
         module->stack_top_ptr = &module->globals[global_idx - module->foreign_global_count].initial_value[0].data.i1;

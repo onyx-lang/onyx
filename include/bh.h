@@ -528,6 +528,11 @@ typedef struct bh__arr {
     bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1), \
     arr[bh__arrhead(arr)->length++] = value)
 
+#define bh_arr_set_at(arr, n, value) ( \
+    bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), (n) + 1), \
+    bh_arr_set_length((arr), bh_max(bh_arr_length(arr), (i32) (n) + 1)), \
+    arr[n] = value)
+
 #define bh_arr_is_empty(arr)          (arr ? bh__arrhead(arr)->length == 0 : 1)
 #define bh_arr_clear(arr)             (arr ? (bh__arrhead(arr)->length = 0) : 0)
 
