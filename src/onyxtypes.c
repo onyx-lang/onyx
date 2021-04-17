@@ -1028,7 +1028,6 @@ b32 type_is_sl_constructable(Type* type) {
 }
 
 b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from) {
-    DEBUG_HERE;
     if (struct_type->kind != Type_Kind_Struct) return 0;
 
     return struct_type->Struct.constructed_from == from;
