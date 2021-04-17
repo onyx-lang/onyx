@@ -72,20 +72,31 @@ contains :: (list: ^List($T), x: T) -> bool {
 }
 
 get_iterator :: (list: ^List($T)) -> Iterator(T) {
-    iterator_impl :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        elem_ptr := cast(^^ListElem(T)) data;
-        elem := *elem_ptr;
+    iterator_next :: ($T: type_expr, data: rawptr) -> (T, bool) {
+        list_iter := cast(^ListIterator(T)) data;
 
         use package core.intrinsics.onyx { __zero_value }
-        if elem == null do return __zero_value(T), false;
+        if list_iter.current == null do return __zero_value(T), false;
 
-        *elem_ptr = elem.next;
-        return elem.data, true;
+        defer list_iter.current = list_iter.current.next;
+        return list_iter.current.data, true;
     }
 
+    iterator_close :: (data: rawptr) {
+        cfree(data);
+    }
+
+    ListIterator :: struct (T: type_expr) {
+        current: ^ListElem(T);
+    }
+
+    list_iterator := new(#type ListIterator(T));
+    list_iterator.current = list.first;
+
     return .{
-        data = ^list.first,
-        next = #solidify iterator_impl { T = T },
+        data = list_iterator,
+        next = #solidify iterator_next { T = T },
+        close = iterator_close,
     };
 }
 

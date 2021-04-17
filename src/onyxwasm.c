@@ -6,9 +6,8 @@
 //      by the WASM outputter.
 //  [x] remove the need to have "allocate_exprs" on blocks and in functions. This will
 //      be easy once the above is done.
-//  [ ] there should be a better way to emit pending deferred statements because there
+//  [x] there should be a better way to emit pending deferred statements because there
 //      is some code duplication between emit_return and emit_structured_jump.
-//
 //  [ ] Change the calling convention so it is easier to use from both JS and in the compiler.
 
 
