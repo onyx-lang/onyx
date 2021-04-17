@@ -492,9 +492,22 @@ typedef struct WasmDatum {
     ptr data;
 } WasmDatum;
 
+typedef enum DeferredStmtType {
+    Deferred_Stmt_Node,
+    Deferred_Stmt_Code,
+} DeferredStmtType;
+
 typedef struct DeferredStmt {
-    u64 depth;
-    AstNode *stmt;
+    DeferredStmtType type;
+    u32 depth;
+
+    union {
+        AstNode *stmt;
+        struct {
+            WasmInstruction* instructions;
+            u32 instruction_count;
+        };
+    };
 } DeferredStmt;
 
 typedef struct AllocatedSpace {
@@ -564,6 +577,7 @@ typedef struct OnyxWasmModule {
     i32 *stack_top_ptr;
     u64 stack_base_idx;
     CallingConvention curr_cc;
+    i32 null_proc_func_idx;
 
     b32 has_stack_locals : 1;
 } OnyxWasmModule;

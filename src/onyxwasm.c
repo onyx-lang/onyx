@@ -236,7 +236,9 @@ EMIT_FUNC(while,                         AstIfWhile* while_node);
 EMIT_FUNC(for,                           AstFor* for_node);
 EMIT_FUNC(switch,                        AstSwitch* switch_node);
 EMIT_FUNC(defer,                         AstDefer* defer);
-EMIT_FUNC(deferred_stmts,                AstNode* node);
+EMIT_FUNC(defer_code,                    WasmInstruction* deferred_code, u32 code_count);
+EMIT_FUNC(deferred_stmt,                 DeferredStmt deferred_stmt);
+EMIT_FUNC_NO_ARGS(deferred_stmts);
 EMIT_FUNC(binop,                         AstBinaryOp* binop);
 EMIT_FUNC(unaryop,                       AstUnaryOp* unop);
 EMIT_FUNC(call,                          AstCall* call);
@@ -282,7 +284,7 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
         emit_statement(mod, &code, stmt);
     }
 
-    emit_deferred_stmts(mod, &code, (AstNode *) block);
+    emit_deferred_stmts(mod, &code);
     emit_free_local_allocations(mod, &code);
 
     if (generate_block_headers)
@@ -361,7 +363,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
     if (bh_arr_length(mod->deferred_stmts) != 0) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
         while (i >= 0 && mod->deferred_stmts[i].depth >= labelidx) {
-            emit_statement(mod, &code, mod->deferred_stmts[i].stmt);
+            emit_deferred_stmt(mod, &code, mod->deferred_stmts[i]);
             i--;
         }
     }
@@ -941,6 +943,23 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     u64 offset = 0;
 
     // Enter a deferred statement for the auto-close
+    emit_enter_structured_block(mod, &code, SBT_Basic_Block);
+
+    TypeWithOffset close_func_type;
+    type_linear_member_lookup(for_node->iter->type, 2, &close_func_type);
+    i32 close_type_idx = generate_type_idx(mod, close_func_type.type);
+
+    WasmInstruction* close_instructions = bh_alloc_array(global_heap_allocator, WasmInstruction, 8);
+    close_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
+    close_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = mod->null_proc_func_idx } };
+    close_instructions[2] = (WasmInstruction) { WI_I32_NE,        { .l = 0x00 } };
+    close_instructions[3] = (WasmInstruction) { WI_IF_START,      { .l = 0x40 } };
+    close_instructions[4] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_data_ptr } };
+    close_instructions[5] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
+    close_instructions[6] = (WasmInstruction) { WI_CALL_INDIRECT, { .l = close_type_idx } };
+    close_instructions[7] = (WasmInstruction) { WI_IF_END,        { .l = 0x00 } };
+
+    emit_defer_code(mod, &code, close_instructions, 8);
     
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
     emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
@@ -995,6 +1014,9 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     WID(WI_JUMP, 0x00); 
 
     emit_leave_structured_block(mod, &code);
+    emit_leave_structured_block(mod, &code);
+
+    emit_deferred_stmts(mod, &code);
     emit_leave_structured_block(mod, &code);
 
     // Flush deferred statements
@@ -1118,24 +1140,46 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
 
 EMIT_FUNC(defer, AstDefer* defer) {
     bh_arr_push(mod->deferred_stmts, ((DeferredStmt) {
+        .type = Deferred_Stmt_Node,
         .depth = bh_arr_length(mod->structured_jump_target),
         .stmt = defer->stmt,
     }));
 }
 
-EMIT_FUNC(deferred_stmts, AstNode* node) {
-    if (bh_arr_length(mod->deferred_stmts) == 0) return;
+EMIT_FUNC(defer_code, WasmInstruction* deferred_code, u32 code_count) {
+    bh_arr_push(mod->deferred_stmts, ((DeferredStmt) {
+        .type = Deferred_Stmt_Code,
+        .depth = bh_arr_length(mod->structured_jump_target),
+        .instructions = deferred_code,
+        .instruction_count = code_count,
+    }));
+}
 
+EMIT_FUNC(deferred_stmt, DeferredStmt deferred_stmt) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    switch (deferred_stmt.type) {
+        case Deferred_Stmt_Node: emit_statement(mod, &code, deferred_stmt.stmt); break;
+        case Deferred_Stmt_Code: {
+            fori (i, 0, deferred_stmt.instruction_count) {
+                bh_arr_push(code, deferred_stmt.instructions[i]);
+            }
+            break;
+        }
+    }
+    
+    *pcode = code;
+}
+
+EMIT_FUNC_NO_ARGS(deferred_stmts) {
+    if (bh_arr_length(mod->deferred_stmts) == 0) return;
 
     u64 depth = bh_arr_length(mod->structured_jump_target);
 
     while (bh_arr_length(mod->deferred_stmts) > 0 && bh_arr_last(mod->deferred_stmts).depth == depth) {
-        emit_statement(mod, &code, bh_arr_last(mod->deferred_stmts).stmt);
+        emit_deferred_stmt(mod, pcode, bh_arr_last(mod->deferred_stmts));
         bh_arr_pop(mod->deferred_stmts);
     }
-
-    *pcode = code;
 }
 
 // NOTE: These need to be in the same order as
@@ -2508,12 +2552,12 @@ EMIT_FUNC(return, AstReturn* ret) {
         }
     }
 
-    emit_deferred_stmts(mod, &code, (AstNode *) ret);
+    emit_deferred_stmts(mod, &code);
 
     if (bh_arr_length(mod->deferred_stmts) != 0) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
         while (i >= 0) {
-            emit_statement(mod, &code, mod->deferred_stmts[i].stmt);
+            emit_deferred_stmt(mod, &code, mod->deferred_stmts[i]);
             i--;
         }
     }
@@ -3126,6 +3170,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .foreign_function_count = 0,
         .foreign_global_count = 0,
+
+        .null_proc_func_idx = -1,
     };
 
     bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
@@ -3204,6 +3250,10 @@ void emit_entity(Entity* ent) {
             }
             
             bh_imap_put(&module->index_map, (u64) ent->function, module->next_func_idx++);
+
+            if (ent->function->flags & Ast_Flag_Proc_Is_Null) {
+                if (module->null_proc_func_idx == -1) module->null_proc_func_idx = get_element_idx(module, ent->function);
+            }
             break;
 
         case Entity_Type_Foreign_Global_Header:

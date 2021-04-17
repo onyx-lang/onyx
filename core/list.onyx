@@ -86,7 +86,6 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
     return .{
         data = ^list.first,
         next = #solidify iterator_impl { T = T },
-        close = null_proc,
     };
 }
 
