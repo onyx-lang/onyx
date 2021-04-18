@@ -24,6 +24,7 @@ package core
 #load "core/io/reader"
 #load "core/io/writer"
 #load "core/io/binary"
+#load "core/io/binary_reader"
 
 #load "core/runtime/build_opts"
 #load "core/runtime/common"

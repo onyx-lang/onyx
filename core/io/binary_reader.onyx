@@ -1,0 +1,82 @@
+package core.io.binary
+
+// NOTE: This is a very experimental and not well put together package.
+// The primary reason it exists is because I was working on reading TTF
+// files which requires a big-endian binary reader, so that's what I made.
+// There will "soon" be an option to put this in little endian mode and
+// the goal will be to make this useful for serialization.
+
+// After sleeping on it, everything here shouldn't need to exist. The already
+// existing BinaryReader from binary.onyx should be able to do all of this
+// when big endian integers are added to the language.
+
+BinaryReader :: struct {
+    data : [] u8;
+    pos  : u32;
+}
+
+create_reader :: (data: [] u8, initial_pos := 0) -> BinaryReader {
+    return BinaryReader.{ data = data, pos = initial_pos };
+}
+
+seek :: (use br: ^BinaryReader, new_pos: u32) -> u32 {
+    old_pos := pos;
+    pos = new_pos;
+    return old_pos;
+}
+
+tell :: (use br: ^BinaryReader) -> u32 do return pos;
+
+read_u8 :: (use br: ^BinaryReader) -> u8 {
+    ret := data[pos];
+    pos += 1;
+    return ret;
+}
+
+read_u16 :: (use br: ^BinaryReader) -> u16 do return ~~(read_u8(br) << ~~8  | read_u8(br));
+
+read_u32 :: (use br: ^BinaryReader) -> u32 {
+    // Encoding is big endian
+    ret: u32 = 0;
+    ret |= cast(u32) read_u8(br) << 24;
+    ret |= cast(u32) read_u8(br) << 16;
+    ret |= cast(u32) read_u8(br) << 8;
+    ret |= cast(u32) read_u8(br);
+    return ret;
+}
+
+read_i16 :: (use br: ^BinaryReader) -> i16 {
+    ret := read_u16(br);
+    if ret & ~~0x8000 != ~~0 do ret -= ~~(1 << 16);
+    return ret;
+}
+
+read_i32 :: (use br: ^BinaryReader) -> i32 {
+    return ~~read_u32(br);
+}
+
+read_fword :: (use br: ^BinaryReader) -> i16 do return read_i16(br);
+
+read_2dot14 :: (use br: ^BinaryReader) -> f32 {
+    val := cast(i32) read_i16(br);
+    return ~~val / cast(f32) (1 << 14);
+}
+
+read_fixed :: (use br: ^BinaryReader) -> f32 {
+    val := read_i32(br);
+    return ~~val / cast(f32) (1 << 16);
+}
+
+read_string :: (use br: ^BinaryReader, len: i32) -> str {
+    ret := data.data[pos .. pos + len];
+    pos += len;
+    return ret;
+}
+
+read_date :: (use br: ^BinaryReader) -> u64 {
+    mac_time := (cast(u64) (read_u32(br))) << 32 |
+                (cast(u64) (read_u32(br)));
+    utf_time := mac_time - 2082844800;
+    return utf_time;
+}
+
