@@ -1464,8 +1464,9 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
 
         case Ast_Kind_Binary_Op:
-            stmt->flags |= Ast_Flag_Expr_Ignored;
-            return check_binaryop((AstBinaryOp **) pstmt, 1);
+            CHECK(binaryop, (AstBinaryOp **) pstmt, 1);
+            (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
+            return Check_Success;
 
         // NOTE: Local variable declarations used to be removed after the symbol
         // resolution phase because long long ago, all locals needed to be known
@@ -1475,8 +1476,9 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Local: return Check_Success;
 
         default:
-            stmt->flags |= Ast_Flag_Expr_Ignored;
-            return check_expression((AstTyped **) pstmt);
+            CHECK(expression, (AstTyped **) pstmt);
+            (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
+            return Check_Success;
     }
 }
 
