@@ -1412,9 +1412,9 @@ b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, is
 b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote) {
     isize res;
     i64 current_offset = 0;
+    bh__file_seek_wrapper(file->fd, 0, BH_FILE_WHENCE_CURRENT, &current_offset);
 
 #if defined(_BH_WINDOWS)
-    bh__file_seek_wrapper(file->fd, 0, BH_FILE_WHENCE_CURRENT, &current_offset);
     res = (isize) WriteFile(file->fd, buffer, buff_size, (i32 *) bytes_wrote, NULL);
     return res;
 
