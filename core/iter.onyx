@@ -3,17 +3,17 @@ package core.iter
 use package core.intrinsics.onyx { __zero_value }
 
 filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
-    FoldIterator :: struct (T: type_expr) {
+    FilterIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         predicate: (T) -> bool;
     }
 
-    fold_iterator := new(#type FoldIterator(T));
-    fold_iterator.iterator = it;
-    fold_iterator.predicate = predicate;
+    filter_iterator := new(#type FilterIterator(T));
+    filter_iterator.iterator = it;
+    filter_iterator.predicate = predicate;
 
     next :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        fi := cast(^FoldIterator(T)) data;
+        fi := cast(^FilterIterator(T)) data;
 
         value, cont := fi.iterator.next(fi.iterator.data);
         if cont {
@@ -29,13 +29,13 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     }
 
     close :: ($T: type_expr, data: rawptr) {
-        fi := cast(^FoldIterator(T)) data;
+        fi := cast(^FilterIterator(T)) data;
         fi.iterator.close(fi.iterator.data);
         cfree(data);
     }
 
     return .{
-        data  = fold_iterator,
+        data  = filter_iterator,
         next  = #solidify next  { T=T },
         close = #solidify close { T=T },
     };
