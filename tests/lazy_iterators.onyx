@@ -37,20 +37,18 @@ count_iterator :: (lo: i32, hi: i32, step := 1) -> Iterator(i32) {
 main :: (args: [] cstr) {
 
     iterator := count_iterator(1, 10)
-                |> iter.map((x: i32) -> i32 do return x * 2;)
-                |> iter.filter((x: i32) -> bool do return x > 10;)
-                |> iter.map((x: i32) -> i32 do return x + 42;);
+                |> iter.map((x: i32) -> i32     { return x * 2; })
+                |> iter.filter((x: i32) -> bool { return x > 10; })
+                |> iter.map((x: i32) -> i32     { return x + 42; });
 
     println("Starting the iteration...");
-    for i: iterator {
-        println(i);
-    }
+    for i: iterator do println(i);
 
     arr := count_iterator(1, 10)
-                |> iter.map((x: i32) -> i32 do return x * 2;)
-                |> iter.filter((x: i32) -> bool do return x > 10;)
-                |> iter.map((x: i32) -> i32 do return x + 42;)
-                |> iter.to_array();
+            |> iter.map((x: i32) -> i32     { return x * 2; })
+            |> iter.filter((x: i32) -> bool { return x > 10; })
+            |> iter.map((x: i32) -> i32     { return x + 42; })
+            |> iter.to_array();
 
     println(arr[2]);
 }

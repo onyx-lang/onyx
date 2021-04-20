@@ -73,8 +73,42 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
     };
 }
 
-fold :: (it: Iterator($T), initial_value: R = __zero_value(R), combine: (T, $R) -> R) -> R {
-    assert(false, "Not implemented yet");
+take :: (it: Iterator($T), count: u32) -> Iterator(T) {
+    TakeIterator :: struct (T: type_expr) {
+        iterator:  Iterator(T);
+        remaining: u32;
+    }
+
+    take_iterator := new(#type TakeIterator(T));
+    take_iterator.iterator = it;
+    take_iterator.remaining = count;
+
+    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
+        ti := cast(^TakeIterator(T)) data;
+        if ti.remaining == 0 do return __zero_value(T), false;
+
+        ti.remaining -= 1;
+        return ti.iterator.next(ti.iterator.data);
+    }
+
+    close :: ($T: type_expr, data: rawptr) {
+        ti := cast(^TakeIterator(T)) data;
+        ti.iterator.close(ti.iterator.data);
+        cfree(data);
+    }
+
+    return .{
+        data  = take_iterator,
+        next  = #solidify next  { T=T },
+        close = #solidify close { T=T },
+    };
+}
+
+fold :: (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
+    for value: it {
+        initial_value = combine(value, initial_value);
+    }
+    
     return initial_value;
 }
 
