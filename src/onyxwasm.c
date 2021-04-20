@@ -135,17 +135,16 @@ static u64 local_allocate(LocalAllocator* la, AstTyped* local) {
         u32 size = type_size_of(local->type);
         u32 alignment = type_alignment_of(local->type);
 
-        if (la->curr_stack % alignment != 0)
-            la->curr_stack += alignment - (la->curr_stack % alignment);
+        bh_align(la->curr_stack, alignment);
 
         if (la->max_stack < la->curr_stack)
             la->max_stack = la->curr_stack;
 
-        if (size % alignment != 0)
-            size += alignment - (size % alignment);
+        bh_align(size, alignment);
 
         if (la->max_stack - la->curr_stack >= (i32) size) {
             la->curr_stack += size;
+
         } else {
             la->max_stack += size - (la->max_stack - la->curr_stack);
             la->curr_stack = la->max_stack;
@@ -163,8 +162,7 @@ static void local_free(LocalAllocator* la, AstTyped* local) {
     } else {
         u32 size = type_size_of(local->type);
         u32 alignment = type_alignment_of(local->type);
-        if (size % alignment != 0)
-            size += alignment - (size % alignment);
+        bh_align(size, alignment);
 
         la->curr_stack -= size;
     }
@@ -2629,7 +2627,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
     else if (type->kind == Type_Kind_Function) {
         // CLEANUP ROBUSTNESS: This should use the 'null_proc' instead of whatever is at
         // function index 0.
-        WID(WI_I32_CONST, 0);
+        WID(WI_I32_CONST, mod->null_proc_func_idx);
     }
     else {
         WasmType wt = onyx_type_to_wasm_type(type);
@@ -3061,9 +3059,7 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     u64 size = type_size_of(effective_type);
 
     u32 offset = mod->next_datum_offset;
-    if (offset % alignment != 0) {
-        offset += alignment - (offset % alignment);
-    }
+    bh_align(offset, alignment);
 
     if (memres->initial_value != NULL) {
         u8* data = bh_alloc(global_heap_allocator, size);
