@@ -1,0 +1,56 @@
+#load "core/std"
+
+use package core
+
+count_iterator :: (lo: i32, hi: i32, step := 1) -> Iterator(i32) {
+    next :: (data: rawptr) -> (i32, bool) {
+        ci := cast(^CountIterator) data;
+        if ci.current > ci.high do return 0, false;
+
+        defer ci.current += ci.step;
+        return ci.current, true;
+    }
+
+    close :: (data: rawptr) {
+        println("Closing the count iterator...");
+        cfree(data);
+    }
+
+    CountIterator :: struct {
+        low, high, step: i32;
+        current: i32;
+    }
+
+    count_iterator := new(CountIterator);
+    count_iterator.low = lo;
+    count_iterator.high = hi;
+    count_iterator.step = step;
+    count_iterator.current = lo;
+
+    return .{
+        data = count_iterator,
+        next = next,
+        close = close,
+    };
+}
+
+main :: (args: [] cstr) {
+
+    iterator := count_iterator(1, 10)
+                |> iter.map((x: i32) -> i32 do return x * 2;)
+                |> iter.filter((x: i32) -> bool do return x > 10;)
+                |> iter.map((x: i32) -> i32 do return x + 42;);
+
+    println("Starting the iteration...");
+    for i: iterator {
+        println(i);
+    }
+
+    arr := count_iterator(1, 10)
+                |> iter.map((x: i32) -> i32 do return x * 2;)
+                |> iter.filter((x: i32) -> bool do return x > 10;)
+                |> iter.map((x: i32) -> i32 do return x + 42;)
+                |> iter.to_array();
+
+    println(arr[2]);
+}
