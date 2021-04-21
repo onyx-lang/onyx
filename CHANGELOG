@@ -1,3 +1,43 @@
+Release v0.0.7
+--------------
+This release contains MANY CHANGES because I am terrible at keeping up to date with a
+proper changelog and release schedule. Basically, this is the first release where I
+feel like the language is at a good place. Many "gotcha" bugs have been resolved and
+the language is much more powerful now for it. There are still plenty of things that
+are going to be changed and added in the future, but first I want to get this better
+version out there in a packaged format.
+
+Additions:
+* overloaded procedures can have polymorphic and overloaded procedures as overloads.  This makes them MUCH more powerful.
+* types are not required on struct members that have default values. This is still very experimental so there are some
+    noticable bugs with it. You can always specify the type explicitly if you have issues.
+* structure definitions act like name spaces and can have top-level expressions defined within them, such as procedures
+    or other structures.
+* structures can be "used" to bring in the aforementioned top-level expressions into the current scope.
+* experimental method call syntax using ->.
+* compound declarations for procedure locals and struct members that are of the same type.
+* custom iterators using the builtin structure, Iterator(T). This the semantics will be written out elsewhere but long
+    story short, you can have custom iterators using the language's 'for' statement.
+* '--print-function-mappings' to see where a wasm function comes from in the source text.
+* logging allocator. Wraps any allocator and prints what kind of allocations are happening.
+* many math functions.
+* basics of reading environment variables
+
+Removals:
+
+Changes:
+* the "proc" keyword is now optional in a lot of cases. There are inevitably some bugs with this change,
+    but you can always add it in when it may be necessary. Note, that for overloaded procedures, "proc"
+    is still required.
+* operator overloading is now done as a top level declaration handled through the entity
+    system, instead of relying on creating a procedure. This lets you use an existing
+    procedure as an operator overload. Take a look at '#operator ==' in string.onyx.
+* Tons of internal code cleanup relating to structures and code generation.
+
+Bug fixes:
+* Too many more to even start listing them all.
+
+
 Release v0.0.6
 --------------
 Additions:
