@@ -104,6 +104,78 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
     };
 }
 
+take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
+    TakeIterator :: struct (T: type_expr) {
+        iterator:  Iterator(T);
+        predicate: (T) -> bool;
+    }
+
+    take_iterator := new(#type TakeIterator(T));
+    take_iterator.iterator = it;
+    take_iterator.predicate = predicate;
+
+    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
+        ti := cast(^TakeIterator(T)) data;
+
+        value, cont := ti.iterator.next(ti.iterator.data);
+        if !cont do return value, false;
+
+        return value, ti.predicate(value);
+    }
+
+    close :: ($T: type_expr, data: rawptr) {
+        ti := cast(^TakeIterator(T)) data;
+        ti.iterator.close(ti.iterator.data);
+        cfree(data);
+    }
+
+    return .{
+        data  = take_iterator,
+        next  = #solidify next  { T=T },
+        close = #solidify close { T=T },
+    };
+}
+
+skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
+    SkipIterator :: struct (T: type_expr) {
+        iterator: Iterator(T);
+        to_skip:  i32;
+        skipped:  bool = false;
+    }
+
+    skip_iterator := new(#type SkipIterator(T));
+    skip_iterator.iterator = it;
+    skip_iterator.to_skip = count;
+
+    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
+        si := cast(^SkipIterator(T)) data;
+
+        while !si.skipped && si.to_skip > 0 {
+            si.to_skip -= 1;
+            value, cont := si.iterator.next(si.iterator.data);
+
+            if !cont {
+                si.skipped = true;
+                return value, false;
+            }
+        }
+
+        return si.iterator.next(si.iterator.data);
+    }
+
+    close :: ($T: type_expr, data: rawptr) {
+        si := cast(^SkipIterator(T)) data;
+        si.iterator.close(si.iterator.data);
+        cfree(data);
+    }
+
+    return .{
+        data  = skip_iterator,
+        next  = #solidify next  { T=T },
+        close = #solidify close { T=T },
+    };
+}
+
 fold :: (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
     for value: it {
         initial_value = combine(value, initial_value);

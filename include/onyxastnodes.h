@@ -856,7 +856,9 @@ struct AstSolidifiedFunction {
 };
 
 struct AstPolyProc {
-    AstNode_base;
+    // While the "type" of a polymorphic procedure will never be set, it is necessary
+    // for contexts where it used in an expression.
+    AstTyped_base;
 
     Scope *poly_scope;
     bh_arr(AstPolyParam) poly_params;
