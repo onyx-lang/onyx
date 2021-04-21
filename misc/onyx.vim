@@ -14,7 +14,8 @@ syn keyword onyxKeyword package struct enum proc use global
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword switch case
-syn keyword onyxKeyword break continue return defer fallthrough syn keyword onyxKeyword as cast sizeof alignof
+syn keyword onyxKeyword break continue return defer fallthrough
+syn keyword onyxKeyword as cast sizeof alignof
 syn keyword onyxType bool void
 syn keyword onyxType i8 u8
 syn keyword onyxType i16 u16
