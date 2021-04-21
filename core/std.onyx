@@ -4,10 +4,10 @@ package core
 #load "core/alloc"
 #load "core/memory"
 
-#load "core/array"
-#load "core/map"
-#load "core/list"
-#load "core/iter"
+#load "core/container/array"
+#load "core/container/map"
+#load "core/container/list"
+#load "core/container/iter"
 
 #load "core/conv"
 #load "core/math"
