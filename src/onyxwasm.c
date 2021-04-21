@@ -1016,8 +1016,6 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     emit_deferred_stmts(mod, &code);
     emit_leave_structured_block(mod, &code);
 
-    // Flush deferred statements
-    
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
@@ -3203,6 +3201,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .idx = 0,
     };
     // :ArbitraryConstant
+    // :WasmMemory
     bh_table_put(WasmExport, module.exports, "memory", mem_export);
     module.export_count++;
 

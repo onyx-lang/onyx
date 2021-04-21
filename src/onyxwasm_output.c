@@ -170,6 +170,9 @@ static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
     u8* leb = uint_to_uleb128((u64) 1, &leb_len);
     bh_buffer_append(&vec_buff, leb, leb_len);
     
+    // FIXME: This needs to be dynamically chosen depending on the size of
+    // the data section and stack size pre-requeseted.
+    // :WasmMemory
     output_limits(1024, -1, &vec_buff);
     
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);

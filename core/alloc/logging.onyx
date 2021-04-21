@@ -1,5 +1,7 @@
 package core.alloc.log
 
+// FIXME: This should use context.logger instead of printf.
+
 Allocation_Action_Strings := str.[
     " alloc",
     "  free",

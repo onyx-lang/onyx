@@ -15,7 +15,7 @@ List of known bugs:
         println("Test 2");
     }
 
-[ ] Array literals used as default values for struct members can break things.
+[X] Array literals used as default values for struct members can break things.
     
     Foo :: struct {
         arr : [5] u32 = u32.[ 2, 3, 5, 7, 11 ];

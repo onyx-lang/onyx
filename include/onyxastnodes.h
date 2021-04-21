@@ -903,8 +903,6 @@ struct AstDirectiveOperator {
 };
 
 
-extern AstNode empty_node;
-
 typedef enum EntityState {
     Entity_State_Error,
     

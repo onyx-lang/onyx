@@ -43,3 +43,18 @@ make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] 
         count = count
     };
 }
+
+align :: proc {
+    (size: ^u64, align: u64) {
+        if *size % align != 0 {
+            *size += align - (*size % align);
+        }
+    },
+
+    (size: u64, align: u64) -> u64 {
+        if size % align != 0 {
+            size += align - (size % align);
+        }
+        return size;
+    }        
+}

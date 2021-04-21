@@ -176,6 +176,60 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     };
 }
 
+#private_file Zipped :: struct (T: type_expr, R: type_expr) {
+    first: T;
+    second: R;
+}
+
+zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Zipped(T, R)) {
+    ZippedIterator :: struct (T: type_expr, R: type_expr) {
+        iterator1: Iterator(T);
+        iterator2: Iterator(R);
+    }
+
+    zipped_iterator := new(#type ZippedIterator(T, R));
+    zipped_iterator.iterator1 = left_iterator;
+    zipped_iterator.iterator2 = right_iterator;
+
+    next :: ($T: type_expr, $R: type_expr, data: rawptr) -> (Zipped(T, R), bool) {
+        zi := cast(^ZippedIterator(T, R)) data;
+
+        v1, cont1 := zi.iterator1.next(zi.iterator1.data);
+        v2, cont2 := zi.iterator2.next(zi.iterator2.data);
+
+        return .{ v1, v2 }, cont1 && cont2;
+    }
+
+    close :: ($T: type_expr, $R: type_expr, data: rawptr) {
+        zi := cast(^ZippedIterator(T, R)) data;
+        zi.iterator1.close(zi.iterator1.data);
+        zi.iterator2.close(zi.iterator2.data);
+        cfree(data);
+    }
+
+    return .{
+        data  = zipped_iterator,
+        next  = #solidify next  { T=T, R=R },
+        close = #solidify close { T=T, R=R },
+    };
+}
+
+const :: (value: $T) -> Iterator(T) {
+    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
+        value := *(cast(^T) data);
+        return value, true;
+    }
+
+    allocated := cast(^T) calloc(sizeof T);
+    *allocated = value;
+
+    return .{
+        data = allocated,
+        next = #solidify next { T=T },
+        close = cfree,
+    };
+}
+
 fold :: (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
     for value: it {
         initial_value = combine(value, initial_value);

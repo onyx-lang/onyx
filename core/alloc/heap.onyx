@@ -6,13 +6,13 @@ package core.alloc.heap
 // of the language. You will not make your own instance of the heap
 // allocator, since it controls WASM intrinsics such as memory_grow.
 
-#load "core/memory"
 #load "core/intrinsics/wasm"
 
 use package core.intrinsics.wasm {
     memory_size, memory_grow,
     memory_copy,
 }
+#private_file memory :: package core.memory
 
 // The global heap state
 #private_file
@@ -28,14 +28,13 @@ heap_block :: struct {
     next : ^heap_block;
 }
 
+// FIX: This does not respect the choice of alignment
 #private_file
 heap_alloc :: (size_: u32, align: u32) -> rawptr {
     if size_ == 0 do return null;
 
     size := size_ + sizeof heap_block;
-    if size % align != 0 {
-        size += align - (size % align);
-    }
+    memory.align(~~^size, ~~align);
 
     prev := ^heap_state.free_list;
     hb := heap_state.free_list;

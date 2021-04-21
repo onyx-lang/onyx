@@ -35,6 +35,13 @@ count_iterator :: (lo: i32, hi: i32, step := 1) -> Iterator(i32) {
 }
 
 main :: (args: [] cstr) {
+    // Hopefully soon, the following will be possible.
+    // iterator := count_iterator(1, 10)
+    //             |> iter.map(x => x * 2)
+    //             |> iter.filter(x => x > 10)
+    //             |> iter.map(x => x + 42)
+    //             |> iter.take(5)
+    //             |> iter.to_array();
 
     iterator := count_iterator(1, 10)
                 |> iter.map((x: i32) -> i32     { return x * 2; })
@@ -51,4 +58,15 @@ main :: (args: [] cstr) {
             |> iter.to_array();
 
     println(arr[2]);
+
+    println("\nStarting the zipped iteration...");
+    zipped_iterator := count_iterator(1, 10)
+                |> iter.map((x: i32) -> i32     { return x * 2; })
+                |> iter.filter((x: i32) -> bool { return x > 10; })
+                |> iter.map((x: i32) -> i32     { return x + 42; })
+                |> iter.zip(iter.const(42.0f));
+
+    for value: zipped_iterator {
+        printf("%i   %f\n", value.first, value.second);
+    }
 }
