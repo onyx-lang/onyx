@@ -64,6 +64,7 @@ List of known bugs:
         .{ -1, 0 }, .{ -1,  1 }, .{ 0,  1 }, 
     ];
 
+[ ] :UnaryFieldAccessIsGross
 
 List of things to change:
 [X] Currently, there is no way to use the initialized members of a structure without using a struct literal.

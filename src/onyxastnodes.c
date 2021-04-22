@@ -56,9 +56,10 @@ static const char* ast_node_names[] = {
     "RETURN",
     "ADDRESS OF",
     "DEREFERENCE",
-    "ARRAY_ACCESS",
+    "ARRAY ACCESS",
     "SLICE",
-    "FIELD_ACCESS",
+    "FIELD ACCESS",
+    "UNARY FIELD ACCESS"
     "PIPE",
     "METHOD_CALL",
     "RANGE",
@@ -423,8 +424,8 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
 // NOTE: Returns 0 if it was not possible to make the types compatible.
 b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     AstTyped* node = *pnode;
-    assert(type != NULL);
-    assert(node != NULL);
+    if (type == NULL) return 0;
+    if (node == NULL) return 0;
 
     if (node_is_type((AstNode *) node)) return 0;
 
@@ -443,6 +444,15 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
         node->flags |= Ast_Flag_Array_Literal_Typed;
 
         add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
+        return 1;
+    }
+
+    if (node->kind == Ast_Kind_Unary_Field_Access) {
+        AstType* ast_type = type->ast_type;
+        AstNode* resolved = try_symbol_resolve_from_node((AstNode *) ast_type, node->token);
+        if (resolved == NULL) return 0;
+
+        *pnode = (AstTyped *) resolved;
         return 1;
     }
 

@@ -257,7 +257,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     if (switchnode->assignment != NULL) CHECK(statement, (AstNode **) &switchnode->assignment);
 
     CHECK(expression, &switchnode->expr);
-    resolve_expression_type(switchnode->expr);
+    Type* resolved_expr_type = resolve_expression_type(switchnode->expr);
     if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
         onyx_report_error(switchnode->expr->token->pos, "expected integer or enum type for switch expression");
         return Check_Error;
@@ -272,6 +272,11 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
         bh_arr_each(AstTyped *, value, sc->values) {
             CHECK(expression, value);
+
+            // :UnaryFieldAccessIsGross
+            if ((*value)->kind == Ast_Kind_Unary_Field_Access) {
+                type_check_or_auto_cast(value, resolved_expr_type);
+            }
 
             if ((*value)->kind == Ast_Kind_Range_Literal) {
                 AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
@@ -659,6 +664,19 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
 CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
+    // :UnaryFieldAccessIsGross
+    if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
+        if      (type_check_or_auto_cast(&binop->left, binop->right->type));
+        else if (type_check_or_auto_cast(&binop->right, binop->left->type));
+        else {
+            report_bad_binaryop(binop);
+            return Check_Error;
+        }
+
+        binop->type = &basic_types[Basic_Kind_Bool];
+        return Check_Success;
+    }
+
     if (   type_is_structlike_strict(binop->left->type)
         || type_is_structlike_strict(binop->right->type)) {
         report_bad_binaryop(binop);
@@ -672,7 +690,6 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
 
     if (ltype->kind == Type_Kind_Pointer) ltype = &basic_types[Basic_Kind_Rawptr];
     if (rtype->kind == Type_Kind_Pointer) rtype = &basic_types[Basic_Kind_Rawptr];
-
 
     if (!types_are_compatible(ltype, rtype)) {
         b32 left_ac  = node_is_auto_cast((AstNode *) binop->left);
@@ -1419,6 +1436,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Polymorphic_Proc: break;
         case Ast_Kind_Package: break;
         case Ast_Kind_Error: break;
+        case Ast_Kind_Unary_Field_Access: break;
         
         // NOTE: The only way to have an Intrinsic_Call node is to have gone through the
         // checking of a call node at least once.

@@ -249,7 +249,7 @@ window.ONYX_MODULES.push({
     stencilOp(fail, zfail, mask) { gl.stencilOp(fail, zfail, mask); },
     stencilOpSeparate(face, fail, zfail, zpass) { gl.stencilOpSeparate(face, fail, zfail, zpass); },
     texImage2D(target, level, internalforamt, width, height, border, format, type, pixels, pixelslen) {
-        const data = new DataView(window.ONYX_MEMORY.buffer, pixels, pixelslen);
+        const data = new Uint8Array(window.ONYX_MEMORY.buffer, pixels, pixelslen);
         gl.texImage2D(target, level, internalforamt, width, height, border, format, type, data);
     },
     texParameterf(target, pname, param) { gl.texParameterf(target, pname, param); },

@@ -5,7 +5,6 @@
 
 // Things that need to be cleaned up in the parser:
 //  - control block local variables should be more extensible and reuse more code
-//  - package name parsing
 
 #include "onyxlex.h"
 #include "onyxerrors.h"
@@ -42,6 +41,7 @@ static AstNumLit*     parse_int_literal(OnyxParser* parser);
 static AstNumLit*     parse_float_literal(OnyxParser* parser);
 static b32            parse_possible_struct_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
 static b32            parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstTyped** ret);
+static b32            parse_possible_unary_field_access(OnyxParser* parser, AstTyped** ret);
 static void           parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* args);
 static AstTyped*      parse_factor(OnyxParser* parser);
 static AstTyped*      parse_compound_assignment(OnyxParser* parser, AstTyped* lhs);
@@ -267,6 +267,17 @@ static b32 parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstT
     return 1;
 }
 
+static b32 parse_possible_unary_field_access(OnyxParser* parser, AstTyped** ret) {
+    if (!next_tokens_are(parser, 2, '.', Token_Type_Symbol)) return 0;
+
+    AstUnaryFieldAccess* ufl = make_node(AstUnaryFieldAccess, Ast_Kind_Unary_Field_Access);
+    expect_token(parser, '.');
+    ufl->token = expect_token(parser, Token_Type_Symbol);
+
+    *ret = (AstTyped *) ufl;
+    return 1;
+}
+
 static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* args) {
     while (!consume_token_if_next(parser, end_token)) {
         if (parser->hit_unexpected_token) return;
@@ -355,6 +366,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case '.': {
             if (parse_possible_struct_literal(parser, NULL, &retval)) return retval;
             if (parse_possible_array_literal(parser, NULL, &retval))  return retval;
+            if (parse_possible_unary_field_access(parser, &retval))   return retval;
             goto no_match;
         }
 
