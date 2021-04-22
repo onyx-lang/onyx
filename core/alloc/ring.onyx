@@ -20,7 +20,7 @@ RingState :: struct {
 ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     ss := cast(^RingState) data;
 
-    if aa == AllocationAction.Alloc {
+    if aa == .Alloc {
         retval := null;
         rem := ss.size - cast(u32) ss.curr_ptr + cast(u32) ss.base_ptr;
 
@@ -39,7 +39,7 @@ ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, o
 }
 
 make :: (buffer: rawptr, length: u32) -> RingState {
-    return RingState.{
+    return .{
         base_ptr = buffer,
         curr_ptr = buffer,
         size     = length,
@@ -47,7 +47,7 @@ make :: (buffer: rawptr, length: u32) -> RingState {
 }
 
 make_allocator :: (rs: ^RingState) -> Allocator {
-    return Allocator.{
+    return .{
         func = ring_alloc_proc,
         data = rs,
     };

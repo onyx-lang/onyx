@@ -125,9 +125,9 @@ heap_resize :: (ptr: rawptr, new_size: u32, align: u32) -> rawptr {
 
 #private_file
 heap_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    if aa == AllocationAction.Alloc do return heap_alloc(size, align);
-    if aa == AllocationAction.Resize do return heap_resize(oldptr, size, align);
-    if aa == AllocationAction.Free {
+    if aa == .Alloc do return heap_alloc(size, align);
+    if aa == .Resize do return heap_resize(oldptr, size, align);
+    if aa == .Free {
         heap_free(oldptr);
         return null;
     }

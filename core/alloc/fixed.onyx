@@ -19,7 +19,7 @@ FixedAllocatorData :: struct {
 fixed_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     fa_data := cast(^FixedAllocatorData) data;  
 
-    if aa != AllocationAction.Alloc do return null;
+    if aa != .Alloc do return null;
     if size > fa_data.size do return null;
     
     return fa_data.ptr;

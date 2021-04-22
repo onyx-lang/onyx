@@ -19,17 +19,17 @@ PoolAllocator :: struct (Elem: type_expr) {
 #private_file
 pool_allocator_proc :: (pool: ^PoolAllocator($Elem), aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     switch aa {
-        case AllocationAction.Alloc {
+        case .Alloc {
             assert(size == sizeof Elem, "Allocating wrong size from pool allocator.");
             return pool_alloc(pool);
         }
 
-        case AllocationAction.Resize {
+        case .Resize {
             assert(false, "Cannot resize in a pool allocator!");
             return null;
         }
 
-        case AllocationAction.Free {
+        case .Free {
             pool_free(pool, ~~ oldptr);
             return null;
         }
@@ -67,7 +67,7 @@ make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
 
     *(cast(^rawptr) ^buffer[buffer.count - 1]) = null;
 
-    return <PoolAllocator(Elem)>.{
+    return .{
         buffer     = buffer,
         first_free = ^buffer[0],
     };
