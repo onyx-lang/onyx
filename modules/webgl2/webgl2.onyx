@@ -851,6 +851,7 @@ vertexAttrib1f                 :: (idx: GLuint, x: GLfloat) -> void #foreign "gl
 vertexAttrib2f                 :: (idx: GLuint, x: GLfloat, y: GLfloat) -> void #foreign "gl" "vertexAttrib2f" ---
 vertexAttrib3f                 :: (idx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) -> void #foreign "gl" "vertexAttrib3f" ---
 vertexAttrib4f                 :: (idx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) -> void #foreign "gl" "vertexAttrib4f" ---
+vertexAttribIPointer           :: (idx: GLuint, size: GLint, type: GLenum, stride: GLsizei, offset: GLint) -> void #foreign "gl" "vertexAttribIPointer" ---
 vertexAttribPointer            :: (idx: GLuint, size: GLint, type: GLenum, normalized: GLboolean, stride: GLsizei, offset: GLint) -> void #foreign "gl" "vertexAttribPointer" ---
 vertexAttribDivisor            :: (idx: GLuint, divisor: GLuint) -> void #foreign "gl" "vertexAttribDivisor" ---
 viewport                       :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void #foreign "gl" "viewport" ---      

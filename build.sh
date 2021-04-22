@@ -8,15 +8,16 @@ sudo cp -r ./core/ "$CORE_DIR"
 [ "$1" = "libs_only" ] && exit 0
 
 C_FILES="onyx onyxastnodes onyxbuiltins onyxchecker onyxclone onyxdoc onyxentities onyxerrors onyxlex onyxparser onyxsymres onyxtypes onyxutils onyxwasm"
-TARGET='./bin/onyx'
 CC='gcc'
 
 WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
 
 if [ "$1" = "debug" ]; then
     FLAGS="$WARNINGS -g3 -I./include"
+    TARGET="./bin/onyx-debug"
 else
     FLAGS="$WARNINGS -O3 -I./include"
+    TARGET='./bin/onyx'
 fi
 
 BUILD_DIR='.'
