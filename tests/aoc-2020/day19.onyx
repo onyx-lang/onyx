@@ -169,7 +169,7 @@ main :: (args: [] cstr) {
     while !reader.empty(^file) {
         line := reader.read_line(^file);
         if cyk_algorithm(^grammar, line) do valid_count += 1;
-    }   
+    }
 
     printf("Valid count: %i\n", valid_count);
 }

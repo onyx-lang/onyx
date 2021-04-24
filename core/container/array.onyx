@@ -1,5 +1,7 @@
 package core.array
 
+use package core.intrinsics.onyx { __zero_value }
+
 // [..] T == Array(T)
 //   where
 // Array :: struct (T: type_expr) {
@@ -128,6 +130,8 @@ fast_delete :: (arr: ^[..] $T, idx: u32) {
 }
 
 pop :: (arr: ^[..] $T) -> T {
+    if arr.count == 0 do return __zero_value(T);
+
     arr.count -= 1;
     return arr.data[arr.count];
 }
@@ -180,12 +184,32 @@ sort :: (arr: ^[..] $T, cmp: (T, T) -> i32) {
         x := arr.data[i];
         j := i - 1;
 
-        while j >= 0 && cmp(arr.data[j], x) > 0 {
-            arr.data[j + 1] = arr.data[j];
-            j -= 1;
+        // NOTE: This is written this way because '&&' does not short circuit right now.
+        while j >= 0 {
+            if cmp(arr.data[j], x) > 0 {
+                arr.data[j + 1] = arr.data[j];
+                j -= 1;
+            } else {
+                break;
+            }
         }
 
         arr.data[j + 1] = x;
+    }
+}
+
+sort_ptr :: (arr: ^[..] $T, cmp: (^T, ^T) -> i32) {
+    for i: 1 .. arr.count {
+        j := i;
+
+        while j > 0 {
+            if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
+                arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
+                j -= 1;
+            } else {
+                break;
+            }
+        }
     }
 }
 

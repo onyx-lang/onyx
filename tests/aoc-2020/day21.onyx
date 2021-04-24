@@ -162,7 +162,7 @@ main :: (args: [] cstr) {
         }
     }
 
-    array.sort(^matched_ingredients, (i1: Ingredient, i2: Ingredient) -> i32 {
+    array.sort_ptr(^matched_ingredients, (i1: ^Ingredient, i2: ^Ingredient) -> i32 {
         return string.compare(i1.allergen, i2.allergen);
     });
 

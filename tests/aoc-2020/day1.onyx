@@ -4,8 +4,6 @@ use package core
 
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day1.txt";
-    contents_orig := contents;
-    defer cfree(contents_orig.data);
 
     nums := array.make(u32, 128);
     defer array.free(^nums);
