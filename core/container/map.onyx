@@ -45,12 +45,11 @@ put :: (use map: ^Map($K, $V), key: K, value: V) {
         return;
     }
 
-    entry : Map.Entry(K, V);
-    entry.key = key;
-    entry.value = value;
-    entry.next = hashes[lr.hash_index];
-
-    array.push(^entries, entry);
+    array.push(^entries, .{
+        key = key,
+        value = value,
+        hashes[lr.hash_index],
+    });
 
     hashes[lr.hash_index] = entries.count - 1;
 }
