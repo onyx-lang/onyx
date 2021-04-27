@@ -12,6 +12,7 @@
 #include "onyxutils.h"
 
 #define make_node(nclass, kind)             onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
+// :LinearTokenDependent
 #define peek_token(ahead)                   (parser->curr + ahead)
 
 static AstNode error_node = { Ast_Kind_Error, 0, NULL, NULL };
@@ -31,7 +32,6 @@ void submit_entity_in_scope(OnyxParser* parser, AstNode* node, Scope* scope, Pac
 
 // Parsing Utilities
 static void consume_token(OnyxParser* parser);
-static void unconsume_token(OnyxParser* parser);
 static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type);
 static b32 consume_token_if_next(OnyxParser* parser, TokenType token_type);
 static b32 next_tokens_are(OnyxParser* parser, i32 n, ...);
@@ -73,16 +73,9 @@ static void consume_token(OnyxParser* parser) {
     if (parser->hit_unexpected_token) return;
 
     parser->prev = parser->curr;
+    // :LinearTokenDependent
     parser->curr++;
     while (parser->curr->type == Token_Type_Comment) parser->curr++;
-}
-
-static void unconsume_token(OnyxParser* parser) {
-    if (parser->hit_unexpected_token) return;
-
-    while (parser->prev->type == Token_Type_Comment) parser->prev--;
-    parser->curr = parser->prev;
-    parser->prev--;
 }
 
 static OnyxToken* find_matching_paren(OnyxToken* paren) {
@@ -98,6 +91,7 @@ static OnyxToken* find_matching_paren(OnyxToken* paren) {
     i32 paren_count = 1;
     i32 i = 1;
     while (paren_count > 0) {
+        // :LinearTokenDependent
         TokenType type = (paren + i)->type;
         if (type == Token_Type_End_Stream) return NULL;
 
@@ -107,6 +101,7 @@ static OnyxToken* find_matching_paren(OnyxToken* paren) {
         i++;
     }
 
+    // :LinearTokenDependent
     return paren + (i - 1);
 }
 
@@ -120,6 +115,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     if (token->type != token_type) {
         onyx_report_error(token->pos, "expected token '%s', got '%s'.", token_name(token_type), token_name(token->type));
         parser->hit_unexpected_token = 1;
+        // :LinearTokenDependent
         parser->curr = &parser->tokenizer->tokens[bh_arr_length(parser->tokenizer->tokens) - 1];
         return NULL;
     }
@@ -212,16 +208,13 @@ static AstNumLit* parse_float_literal(OnyxParser* parser) {
 }
 
 static b32 parse_possible_directive(OnyxParser* parser, const char* dir) {
-    if (peek_token(0)->type != '#' || peek_token(1)->type != Token_Type_Symbol) return 0;
+    if (!next_tokens_are(parser, 2, '#', Token_Type_Symbol)) return 0;
 
-    expect_token(parser, '#');
-    OnyxToken* sym = expect_token(parser, Token_Type_Symbol);
+    OnyxToken* sym = peek_token(1);
 
     b32 match = (strlen(dir) == (u64) sym->length) && (strncmp(dir, sym->text, sym->length) == 0);
-    if (!match) {
-        unconsume_token(parser);
-        unconsume_token(parser);
-    }
+    if (match) consume_tokens(parser, 2);
+
     return match;
 }
 
@@ -1592,6 +1585,7 @@ static AstType* parse_type(OnyxParser* parser) {
             case '(': {
                 OnyxToken* matching = find_matching_paren(parser->curr);
 
+                // :LinearTokenDependent
                 if ((matching + 1)->type == Token_Type_Right_Arrow) {
                     *next_insertion = parse_function_type(parser, parser->curr);
 
@@ -1961,6 +1955,7 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
         OnyxToken* matching_paren = find_matching_paren(parser->curr);
         if (matching_paren == NULL) return 0;
 
+        // :LinearTokenDependent
         OnyxToken* token_after_paren = matching_paren + 1;
         if (token_after_paren->type != Token_Type_Right_Arrow
             && token_after_paren->type != '{'
@@ -1968,6 +1963,7 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
             && token_after_paren->type != Token_Type_Empty_Block)
             return 0;
 
+        // :LinearTokenDependent
         b32 is_params = (parser->curr + 1) == matching_paren;
         OnyxToken* tmp_token = parser->curr;
         while (!is_params && tmp_token < matching_paren) {
