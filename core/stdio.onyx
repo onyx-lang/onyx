@@ -55,7 +55,7 @@ print_array :: proc {
     }
 }
 
-byte_dump :: (ptr: rawptr, byte_count: u32) {
+byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     temp: [3] u8;
 
     u8_ptr := cast(^u8) ptr;
@@ -68,7 +68,7 @@ byte_dump :: (ptr: rawptr, byte_count: u32) {
 
         runtime.__output_string(.{ ~~temp, 3 }); 
 
-        if i % 8 == 7 do runtime.__output_string("\n");
+        if i % bytes_per_line == (bytes_per_line - 1) do runtime.__output_string("\n");
     }
 
 

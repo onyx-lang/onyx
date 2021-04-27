@@ -48,4 +48,18 @@ main :: (args: [] cstr) {
     println(cast(i32) FlaggedEnum.Value3);
     println(cast(i32) FlaggedEnum.Value4);
     print("\n");
+
+    {
+        // As a convenience, if the type of the enum can be determined from context,
+        // you can leave out the enum name from the lookup and just use a unary '.'.
+        // For example,
+        //
+        
+        val := SimpleEnum.Value2;
+
+        // Here .Value2 can be resolved from the context of "val".
+        if val == .Value2 {
+            println("val is Value2");
+        }
+    }
 }

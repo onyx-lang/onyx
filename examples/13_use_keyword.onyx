@@ -94,6 +94,6 @@ main :: (args: [] cstr) {
 
     {
         // You can 'use' struct members that are structures.
-        // This is already explained in the struct example.    
+        // This is already explained in the struct example.
     }
 }
