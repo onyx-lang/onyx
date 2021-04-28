@@ -2756,19 +2756,6 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) fd);
 
-    if (fd->flags & Ast_Flag_Exported) {
-        token_toggle_end(fd->exported_name);
-
-        WasmExport wasm_export = {
-            .kind = WASM_FOREIGN_FUNCTION,
-            .idx = func_idx,
-        };
-        bh_table_put(WasmExport, mod->exports, fd->exported_name->text, wasm_export);
-        mod->export_count++;
-
-        token_toggle_end(fd->exported_name);
-    }
-
     // If there is no body then don't process the code
     if (fd->body != NULL) {
         // NOTE: Generate the local map
@@ -2853,6 +2840,32 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     return;
 }
 
+static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* export) {
+    assert(export->export_name);
+    assert(export->export);
+
+    token_toggle_end(export->export_name);
+
+    i64 idx = bh_imap_get(&mod->index_map, (u64) export->export);
+
+    WasmExport wasm_export;
+    wasm_export.idx = (i32) idx;
+
+    switch (export->export->kind) {
+        case Ast_Kind_Function: wasm_export.kind = WASM_FOREIGN_FUNCTION;
+                                break;
+
+        case Ast_Kind_Global:   wasm_export.kind = WASM_FOREIGN_GLOBAL;
+                                break;
+    }
+
+    bh_table_put(WasmExport, mod->exports, export->export_name->text, wasm_export);
+    mod->export_count++;
+    
+    token_toggle_end(export->export_name);
+    return;
+}
+
 static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
     WasmType global_type = onyx_type_to_wasm_type(global->type);
 
@@ -2863,19 +2876,6 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
     };
 
     i32 global_idx = (i32) bh_imap_get(&module->index_map, (u64) global);
-
-    if ((global->flags & Ast_Flag_Exported) != 0) {
-        token_toggle_end(global->exported_name);
-
-        WasmExport wasm_export = {
-            .kind = WASM_FOREIGN_GLOBAL,
-            .idx = global_idx,
-        };
-        bh_table_put(WasmExport, module->exports, global->exported_name->text, wasm_export);
-        module->export_count++;
-
-        token_toggle_end(global->exported_name);
-    }
 
     bh_arr_new(global_heap_allocator, glob.initial_value, 1);
 
@@ -3271,6 +3271,13 @@ void emit_entity(Entity* ent) {
 
         case Entity_Type_Memory_Reservation: {
             emit_memory_reservation(module, (AstMemRes *) ent->mem_res);
+            break;
+        }
+
+        case Entity_Type_Process_Directive: {
+            if (ent->expr->kind == Ast_Kind_Directive_Export) {
+                emit_export_directive(module, (AstDirectiveExport *) ent->expr);
+            }
             break;
         }
 

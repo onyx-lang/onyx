@@ -1904,14 +1904,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
             func_def->flags |= Ast_Flag_Foreign;
         }
 
-        else if (parse_possible_directive(parser, "export")) {
-            func_def->flags |= Ast_Flag_Exported;
-
-            if (parser->curr->type == Token_Type_Literal_String) {
-                func_def->exported_name = expect_token(parser, Token_Type_Literal_String);
-            }
-        }
-
         // HACK: NullProcHack
         else if (parse_possible_directive(parser, "null")) {
             func_def->flags |= Ast_Flag_Proc_Is_Null;
@@ -1993,14 +1985,6 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
             global_node->foreign_name   = expect_token(parser, Token_Type_Literal_String);
 
             global_node->flags |= Ast_Flag_Foreign;
-        }
-
-        else if (parse_possible_directive(parser, "export")) {
-            global_node->flags |= Ast_Flag_Exported;
-
-            if (parser->curr->type == Token_Type_Literal_String) {
-                global_node->exported_name = expect_token(parser, Token_Type_Literal_String);
-            }
         }
 
         else {
@@ -2137,24 +2121,21 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
     if (node->kind == Ast_Kind_Function) {
         AstFunction* func = (AstFunction *) node;
 
-        if (func->exported_name == NULL)
-            func->exported_name = symbol;
+        if (func->intrinsic_name == NULL)
+            func->intrinsic_name = symbol;
 
         func->name = symbol;
 
     } else if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstPolyProc* proc = (AstPolyProc *) node;
 
-        if (proc->base_func->exported_name == NULL)
-            proc->base_func->exported_name = symbol;
+        if (proc->base_func->intrinsic_name == NULL)
+            proc->base_func->intrinsic_name = symbol;
 
         proc->base_func->name = symbol;
 
     } else if (node->kind == Ast_Kind_Global) {
         AstGlobal* global = (AstGlobal *) node;
-
-        if (global->exported_name == NULL)
-            global->exported_name = symbol;
 
         global->name = symbol;
 
@@ -2304,6 +2285,16 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 add_overload->overload = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(add_overload);
+                return;
+            }
+            else if (parse_possible_directive(parser, "export")) {
+                AstDirectiveExport *export = make_node(AstDirectiveExport, Ast_Kind_Directive_Export);
+                export->token = dir_token;
+                export->export_name = expect_token(parser, Token_Type_Literal_String);
+
+                export->export = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(export);
                 return;
             }
             else {

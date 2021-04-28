@@ -34,6 +34,7 @@
     NODE(DirectiveError)       \
     NODE(DirectiveAddOverload) \
     NODE(DirectiveOperator)    \
+    NODE(DirectiveExport)      \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -177,6 +178,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Error,
     Ast_Kind_Directive_Add_Overload,
     Ast_Kind_Directive_Operator,
+    Ast_Kind_Directive_Export,
 
     Ast_Kind_Count
 } AstKind;
@@ -734,16 +736,8 @@ struct AstGlobal        {
 
     OnyxToken* name;
 
-    union {
-        // NOTE: Used when a global is exported with a specific name
-        OnyxToken* exported_name;
-
-        // NOTE: Used when the global is declared as foreign
-        struct {
-            OnyxToken* foreign_module;
-            OnyxToken* foreign_name;
-        };
-    };
+    OnyxToken* foreign_module;
+    OnyxToken* foreign_name;
 };
 struct AstParam {
     // HACK CLEANUP: This does not need to have a local buried inside of it.
@@ -771,9 +765,12 @@ struct AstFunction {
     // procedure call. Then it is set to the token of the call node.
     OnyxToken* generated_from;
 
+    // NOTE: This is NULL, unless this function is used in a "#export" directive.
+    // It is undefined which name it will have if there are multiple export directives
+    // for this particular function.
+    OnyxToken* exported_name;
+
     union {
-        // NOTE: Used when a function is exported with a specific name
-        OnyxToken* exported_name;
         OnyxToken* intrinsic_name;
 
         // NOTE: Used when the function is declared as foreign
@@ -910,6 +907,12 @@ struct AstDirectiveOperator {
     AstTyped *overload;
 };
 
+struct AstDirectiveExport {
+    AstNode_base;
+
+    OnyxToken* export_name;
+    AstTyped* export;
+};
 
 typedef enum EntityState {
     Entity_State_Error,

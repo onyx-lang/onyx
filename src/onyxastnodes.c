@@ -83,6 +83,7 @@ static const char* ast_node_names[] = {
     "STATIC ERROR",
     "ADD OVERLOAD",
     "OPERATOR OVERLOAD",
+    "EXPORT",
 
     "AST_NODE_KIND_COUNT",
 };

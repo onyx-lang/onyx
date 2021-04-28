@@ -1456,10 +1456,7 @@ CheckStatus check_global(AstGlobal* global) {
     fill_in_type((AstTyped *) global);
 
     if (global->type == NULL) {
-        onyx_report_error(global->token->pos,
-                "Unable to resolve type for global '%b'.",
-                global->exported_name->text,
-                global->exported_name->length);
+        onyx_report_error(global->token->pos, "Unable to resolve type for global.");
 
         return Check_Error;
     }
@@ -1709,6 +1706,8 @@ CheckStatus check_function_header(AstFunction* func) {
 
     func->type = type_build_function_type(context.ast_alloc, func);
 
+    /*
+    CLEANUP: These checks need to be ported to a process directive check.
     if ((func->flags & Ast_Flag_Exported) != 0) {
         if ((func->flags & Ast_Flag_Foreign) != 0) {
             onyx_report_error(func->token->pos, "exporting a foreign function");
@@ -1725,6 +1724,7 @@ CheckStatus check_function_header(AstFunction* func) {
             return Check_Error;
         }
     }
+    */
 
     return Check_Success;
 }

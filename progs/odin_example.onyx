@@ -56,7 +56,7 @@ make_bar :: () -> Bar {
     return bar;
 }
 
-f :: () -> [5] [2] u32 #export "IAMTHEFUNCTION" {
+f :: () -> [5] [2] u32 {
     // This method of returning an array will leak memory, since this is never freed.
     // mem := cast(^u32) calloc(sizeof [5] [2] u32);
     // for i: 0 .. 10 do mem[i] = 1234 + i;
@@ -85,7 +85,7 @@ BadUnion :: struct {
 Vec2   :: struct { x: i32; y: i32; }
 Entity :: struct { use pos: Vec2; }
 
-array_literal_optim :: () -> void #export {
+array_literal_optim :: () -> void {
     bar : [5] u32;
     bar = u32.[ 1, 2, 3, 4, 5 ];
     bar[2] = 1234;

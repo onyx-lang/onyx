@@ -1045,6 +1045,20 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             bh_arr_push(operator_overloads[operator->operator], operator->overload);
             break;
         }
+
+        case Ast_Kind_Directive_Export: {
+            AstDirectiveExport *export = (AstDirectiveExport *) directive;
+            SYMRES(expression, &export->export);
+
+            export->export->flags |= Ast_Flag_Exported;
+
+            if (export->export->kind == Ast_Kind_Function) {
+                AstFunction *func = (AstFunction *) export->export;
+                func->exported_name = export->export_name;
+            }
+
+            break;
+        }
     }
 
     return Symres_Success;
@@ -1109,7 +1123,6 @@ void symres_entity(Entity* ent) {
         case Entity_Type_String_Literal:          ss = symres_expression(&ent->expr); break;
         case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults((AstType *) ent->type_alias); break;
         case Entity_Type_Process_Directive:       ss = symres_process_directive((AstNode *) ent->expr);
-                                                  next_state = Entity_State_Finalized;
                                                   break;
 
         default: break;
