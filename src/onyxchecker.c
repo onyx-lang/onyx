@@ -530,6 +530,11 @@ CheckStatus check_call(AstCall* call) {
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 resolve_expression_type(arg_arr[arg_pos]->value);
+                if (arg_arr[arg_pos]->value->type == NULL) {
+                    onyx_report_error(arg_arr[arg_pos]->token->pos, "Unable to resolve type for argument.");
+                    return Check_Error;
+                }
+
                 arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
                 break;
             }

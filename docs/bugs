@@ -36,7 +36,7 @@ List of known bugs:
         SN.foo()
     }
 
-[ ] There is a segfault when passing an anonymous struct literal to an untyped vararg.
+[X] There is a segfault when passing an anonymous struct literal to an untyped vararg.
     Should just need to detect this case and provide an error message since this doesn't
     make any sense semantically.
     
