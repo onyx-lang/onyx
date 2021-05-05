@@ -991,6 +991,12 @@ static SymresStatus symres_polyproc(AstPolyProc* pp) {
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
         if (param->kind != PPK_Baked_Value) continue;
 
+        // FIX: Looking up symbols immediately in the type of the baked value does not always work
+        // because I think the following should be possible:
+        //
+        //     baked_proc :: (x: $T, $f: (T) -> T) -> T ...
+        // 
+        // The type of 'f' depends on resolving the value for the polyvar 'T'.
         SYMRES(type, &param->type_expr);
     }
 

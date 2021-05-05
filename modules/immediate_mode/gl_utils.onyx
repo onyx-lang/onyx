@@ -1,0 +1,84 @@
+package immediate_mode
+
+use package core
+#private_file gl :: package gl
+
+// This Shader represents an OpenGL program, not a shader. The name
+// is confusing but conceptually for most people, shaders are a bundled
+// version of the vertex and fragment shader.
+Shader :: struct {
+    program : gl.GLProgram;
+
+    position_loc   : gl.GLint;
+    color_loc      : gl.GLint;
+    texture_loc    : gl.GLint;
+    
+    texture_uniform : gl.GLUniformLocation;
+    view_uniform    : gl.GLUniformLocation;
+    world_uniform   : gl.GLUniformLocation;
+
+    make_from_source :: (vertex_source: str, fragment_source: str) -> Shader {
+        shader: Shader;
+        init_from_source(^shader, vertex_source, fragment_source);
+        return shader;
+    }
+
+    init_from_source :: (use shader: ^Shader, vertex_source: str, fragment_source: str) {
+        vertex_shader, vertex_compiled     := compile_shader(vertex_source,   gl.VERTEX_SHADER);
+        fragment_shader, fragment_compiled := compile_shader(fragment_source, gl.FRAGMENT_SHADER);
+        assert(vertex_compiled, "Vertex shader failed to compile");
+        assert(fragment_compiled, "Fragment shader failed to compile");
+        defer {
+            gl.deleteShader(vertex_shader);
+            gl.deleteShader(fragment_shader);
+        }
+
+        shader_program, program_linked := link_program(vertex_shader, fragment_shader);
+        assert(program_linked, "Program failed to link");
+        program = shader_program;
+
+        position_loc   = gl.getAttribLocation(program, "a_position");
+        color_loc      = gl.getAttribLocation(program, "a_color");
+        texture_loc    = gl.getAttribLocation(program, "a_texture");
+
+        texture_uniform = gl.getUniformLocation(program, "u_texture");
+        view_uniform    = gl.getUniformLocation(program, "u_view");
+        world_uniform   = gl.getUniformLocation(program, "u_world");
+
+        compile_shader :: (source: str, shader_type: gl.GLenum) -> (gl.GLShader, bool) {
+            shader := gl.createShader(shader_type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            success := true;
+            if gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0 {
+                printf("Error compiling shader.");
+                gl.printShaderInfoLog(shader);
+                success = false;
+            }
+
+            return shader, success;
+        }
+
+        link_program :: (vertex_shader: gl.GLShader, fragment_shader: gl.GLShader) -> (gl.GLProgram, bool) {
+            program := gl.createProgram();
+            gl.attachShader(program, vertex_shader);
+            gl.attachShader(program, fragment_shader);
+            gl.linkProgram(program);
+
+            success := true;
+            if gl.getProgramParameter(program, gl.LINK_STATUS) == 0 {
+                printf("Error linking program.");
+                gl.printProgramInfoLog(program);
+                success = false;
+            }
+
+            return program, success;
+        }
+    }
+
+    free :: (use shader: ^Shader) {
+        gl.deleteProgram(program);
+    }
+}
+

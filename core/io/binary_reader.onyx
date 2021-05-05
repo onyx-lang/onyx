@@ -8,7 +8,8 @@ package core.io.binary
 
 // After sleeping on it, everything here shouldn't need to exist. The already
 // existing BinaryReader from binary.onyx should be able to do all of this
-// when big endian integers are added to the language.
+// when big endian integers are added to the language. This will be moved to
+// the ttf library when that is added to the core modules folder.
 
 BinaryReader :: struct {
     data : [] u8;

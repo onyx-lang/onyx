@@ -116,7 +116,7 @@ main :: (args: [] cstr) {
     }
 
     use package test { foo as foo_pkg }
-    use package test as test
+    test :: package test
     use test.foo.SomeEnum
 
     printf("Val2: %i\n", cast(i32) Val2);

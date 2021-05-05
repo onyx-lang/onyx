@@ -5,8 +5,8 @@
             "configuration": {
                 "type": "cppdbg",
                 "request": "launch",
-                "program": "${workspaceFolder}/bin/onyx",
-                "args": ["-VVV", "tmp/iter_test.onyx"],
+                "program": "${workspaceFolder}/bin/onyx-debug",
+                "args": ["-VVV", "tmp/a.onyx"],
                 "stopAtEntry": true,
                 "cwd": "${workspaceFolder}",
                 "environment": [],

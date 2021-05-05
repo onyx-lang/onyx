@@ -1,0 +1,276 @@
+package immediate_mode
+
+use package core
+#private_file gl :: package gl
+
+// CLEANUP: Proper multi-line strings need to be added...
+// This is a gross abuse of the lexer.
+IMMEDIATE_VERTEX_SHADER :: "#version 300 es
+
+layout(location = 0) in vec2 a_vertex;
+layout(location = 1) in vec4 a_color;
+layout(location = 2) in vec2 a_texture;
+
+uniform mat4 u_view;
+uniform mat4 u_world;
+
+out vec4 v_color;
+out vec2 v_texture;
+
+void main() {
+    gl_Position = u_view * u_world * vec4(a_vertex, 0, 1);
+
+    v_color = a_color;
+    v_texture = a_texture;
+}
+"
+
+IMMEDIATE_FRAGMENT_SHADER :: "#version 300 es
+
+precision mediump float;
+
+uniform sampler2D u_texture;
+
+in vec4 v_color;
+in vec2 v_texture;
+
+out vec4 fragColor;
+
+void main() {
+    fragColor = v_color;
+}
+"
+
+IMMEDIATE_FRAGMENT_SHADER_TEXTURED :: "#version 300 es
+
+precision mediump float;
+
+uniform sampler2D u_texture;
+
+in vec4 v_color;
+in vec2 v_texture;
+
+out vec4 fragColor;
+
+void main() {
+    fragColor = v_color * texture(u_texture, v_texture);
+}
+"
+
+
+
+Vector2 :: struct {
+    x, y: f32;
+}
+
+Color4 :: struct {
+    r, g, b: f32;
+    a: f32 = 1;
+}
+
+Immediate_Vertex :: struct {
+    position   : Vector2;
+    color      : Color4;
+    texture    : Vector2;
+}
+
+Immediate_Renderer :: struct {
+    // Will point to either the simple_shader or the textured_shader.
+    active_shader : ^Shader;
+
+    simple_shader, textured_shader : Shader;
+
+    // 'verticies' contains the vertex data and the maximum number of verticies
+    // that can be rendered at a given time. 'vertex_count' is used to store how
+    // many verticies will be rendered in the next draw call. 'vertex_count' is
+    // expected to be a multiple of 3, given that triangles are being rendered.
+    verticies : [] Immediate_Vertex;
+    vertex_count : u32;
+
+    clear_color : Color4;
+
+    vertex_array  : gl.GLVertexArrayObject;
+    vertex_buffer : gl.GLBuffer;
+
+    // Needs to be a multiple of 3!!
+    Default_Max_Verticies :: 1023;
+
+    make :: (max_verticies := Default_Max_Verticies) -> Immediate_Renderer {
+        ir : Immediate_Renderer;
+        init(^ir, max_verticies);
+
+        return ir;
+    }
+
+    init :: (use ir: ^Immediate_Renderer, max_verticies := Default_Max_Verticies) {
+        simple_shader   = Shader.make_from_source(IMMEDIATE_VERTEX_SHADER, IMMEDIATE_FRAGMENT_SHADER);
+        textured_shader = Shader.make_from_source(IMMEDIATE_VERTEX_SHADER, IMMEDIATE_FRAGMENT_SHADER_TEXTURED);
+        active_shader   = ^simple_shader;
+
+        verticies = memory.make_slice(Immediate_Vertex, max_verticies);
+        memory.set(verticies.data, 0, verticies.count * sizeof Immediate_Vertex);
+
+        vertex_array = gl.createVertexArray();
+
+        vertex_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, cast(gl.GLsizei) (max_verticies * sizeof Immediate_Vertex), gl.STREAM_DRAW);
+        
+        ir->init_shader_params(^simple_shader);
+        ir->init_shader_params(^textured_shader);
+
+        gl.useProgram(active_shader.program);
+    }
+
+    init_shader_params :: (use ir: ^Immediate_Renderer, shader: ^Shader) {
+        gl.useProgram(shader.program);
+
+        gl.bindVertexArray(vertex_array);
+        defer gl.bindVertexArray(-1);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+
+        // Position
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, sizeof Immediate_Vertex, 0);
+
+        // Color
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 4, gl.FLOAT, false, sizeof Immediate_Vertex, 2 * sizeof f32);
+
+        // Texture
+        gl.enableVertexAttribArray(2);
+        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, sizeof Immediate_Vertex, 6 * sizeof f32);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, -1);
+
+        // TEMPORARY
+        gl.uniformMatrix4(shader.world_uniform, false,
+                          f32.[ 1, 0, 0, 0,
+                                0, 1, 0, 0,
+                                0, 0, 1, 0,
+                                0, 0, 0, 1 ]);
+    }
+
+    free :: (use ir: ^Immediate_Renderer) {
+        simple_shader->free();
+        textured_shader->free();
+
+        gl.deleteVertexArray(vertex_array);
+        gl.deleteBuffer(vertex_buffer);
+    }
+
+    flush :: (use ir: ^Immediate_Renderer) {
+        if vertex_count == 0 do return;
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, .{ count = vertex_count * sizeof Immediate_Vertex, data = ~~verticies.data });
+        gl.bindBuffer(gl.ARRAY_BUFFER, -1);
+
+        gl.useProgram(active_shader.program);
+        gl.bindVertexArray(vertex_array);
+        gl.drawArrays(gl.TRIANGLES, 0, vertex_count);
+        gl.bindVertexArray(-1);
+
+        vertex_count = 0;
+    }
+
+    push_vertex :: proc {
+        // If a color is not provided, the previous color is used.
+        (use ir: ^Immediate_Renderer, position: Vector2) {
+            push_vertex(ir, position, color = verticies[vertex_count - 1].color);
+        },
+
+        (use ir: ^Immediate_Renderer, position: Vector2, color: Color4, texture: Vector2 = .{0,0}) {
+            if vertex_count >= verticies.count do ir->flush();
+
+            vertex_ptr := ^verticies[vertex_count];
+            defer vertex_count += 1;
+
+            vertex_ptr.position = position;
+            vertex_ptr.color = color;
+            vertex_ptr.texture = texture;
+        },
+    }
+
+    quad :: (use ir: ^Immediate_Renderer, position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
+        push_vertex(ir, .{ position.x,          position.y          }, color);
+        push_vertex(ir, .{ position.x + size.x, position.y          });
+        push_vertex(ir, .{ position.x + size.x, position.y + size.y });
+
+        push_vertex(ir, .{ position.x,          position.y          });
+        push_vertex(ir, .{ position.x + size.x, position.y + size.y });
+        push_vertex(ir, .{ position.x,          position.y + size.y });
+    }
+
+    textured_quad :: (use ir: ^Immediate_Renderer, position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
+        push_vertex(ir, .{ position.x,          position.y          }, color, .{ texture_position.x,                   texture_position.y                  });
+        push_vertex(ir, .{ position.x + size.x, position.y          }, color, .{ texture_position.x + texture_size.x,  texture_position.y                  });
+        push_vertex(ir, .{ position.x + size.x, position.y + size.y }, color, .{ texture_position.x + texture_size.x,  texture_position.y + texture_size.y });
+
+        push_vertex(ir, .{ position.x,          position.y          }, color, .{ texture_position.x,                   texture_position.y                  });
+        push_vertex(ir, .{ position.x + size.x, position.y + size.y }, color, .{ texture_position.x + texture_size.x,  texture_position.y + texture_size.y });
+        push_vertex(ir, .{ position.x,          position.y + size.y }, color, .{ texture_position.x,                   texture_position.y + texture_size.y });
+    }
+
+    // NOTE: Calling set_texture without a parameter will disable textured rendering.
+    set_texture :: (use ir: ^Immediate_Renderer, texture_id: i32 = -1) {
+        if vertex_count > 0 do flush(ir);
+
+        if texture_id >= 0 do active_shader = ^textured_shader;
+        else               do active_shader = ^simple_shader;
+
+        gl.useProgram(active_shader.program);
+        gl.uniform1i(active_shader.texture_uniform, math.max(texture_id, 0));
+    }
+
+    use_ortho_projection :: (use ir: ^Immediate_Renderer, left: f32, right: f32, top: f32, bottom: f32) {
+        projection_matrix := f32.[
+            2 / (right - left), 0, 0, -(right + left) / (right - left),
+            0, 2 / (top - bottom), 0, -(top + bottom) / (top - bottom),
+            0, 0, -2, -1,
+            0, 0, 0, 1
+        ];
+
+        gl.uniformMatrix4(active_shader.view_uniform, true, projection_matrix);
+    }
+}
+
+
+
+
+// While the immediate renderer can be used on its own, below is a set of wrapping functions
+// that operate on a global immediate renderer. This is probably the most common way that 
+// it will be used.
+
+#private
+immediate_renderer : Immediate_Renderer;
+
+immediate_renderer_init :: () {
+    Immediate_Renderer.init(^immediate_renderer);
+}
+
+immediate_renderer_free :: () {
+    Immediate_Renderer.free(^immediate_renderer);
+}
+
+vertex :: proc {
+    (position: Vector2)                { immediate_renderer->push_vertex(position); },
+    (position: Vector2, color: Color4) { immediate_renderer->push_vertex(position, color); },
+}
+
+quad :: (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
+    immediate_renderer->quad(position, size, color);
+}
+
+textured_quad :: (position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
+    immediate_renderer->textured_quad(position, size, texture_position, texture_size, color);
+}
+
+flush :: () do immediate_renderer->flush();
+
+set_texture :: (texture_id: i32 = -1) do immediate_renderer->set_texture(texture_id);
+
+use_ortho_projection :: (left: f32, right: f32, top: f32, bottom: f32) {
+    immediate_renderer->use_ortho_projection(left, right, top, bottom);
+}

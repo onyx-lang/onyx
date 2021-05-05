@@ -1,6 +1,7 @@
 #include "bh.h"
 #include "onyxlex.h"
 #include "onyxutils.h"
+#include "onyxerrors.h"
 
 u64 lexer_lines_processed = 0;
 u64 lexer_tokens_processed = 0;
@@ -209,6 +210,10 @@ whitespace_skipped:
 
         while (!(*tokenizer->curr == '"' && slash_count == 0)) {
             len++;
+
+            // if (*tokenizer->curr == '\n') {
+            //     onyx_report_error(tk.pos, "String literal not terminated by end of line.");
+            // }
 
             if (*tokenizer->curr == '\\') {
                 slash_count += 1;
