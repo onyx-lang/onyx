@@ -1707,6 +1707,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         } else {
             bh_arr_clear(member_list_temp);
             while (!consume_token_if_next(parser, ':')) {
+                if (parser->hit_unexpected_token) return NULL;
                 bh_arr_push(member_list_temp, expect_token(parser, Token_Type_Symbol));
 
                 if (parser->curr->type != ':')

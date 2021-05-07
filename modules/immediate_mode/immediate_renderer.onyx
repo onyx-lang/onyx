@@ -194,6 +194,7 @@ Immediate_Renderer :: struct {
     }
 
     quad :: (use ir: ^Immediate_Renderer, position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
+        // SPEED: Would inlining these function calls be a little bit faster?
         push_vertex(ir, .{ position.x,          position.y          }, color);
         push_vertex(ir, .{ position.x + size.x, position.y          });
         push_vertex(ir, .{ position.x + size.x, position.y + size.y });
