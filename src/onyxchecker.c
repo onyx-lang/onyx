@@ -962,6 +962,10 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
 
 CheckStatus check_struct_literal(AstStructLiteral* sl) {
     if (sl->type == NULL) {
+        // NOTE: This is used for automatically typed struct literals. If there is no provided
+        // type for the struct literal, assume that it is passes successfully. When it is used
+        // elsewhere, it will be added as an expression entity that will be processed once the
+        // stnode is filled out.
         if (sl->stnode == NULL) return Check_Success;
 
         if (!node_is_type((AstNode *) sl->stnode)) {
@@ -1493,7 +1497,9 @@ CheckStatus check_statement(AstNode** pstmt) {
         // in a block in order to efficiently allocate enough space and registers
         // for them all. Now with LocalAllocator, this is no longer necessary.
         // Therefore, locals stay in the tree and need to be passed along.
-        case Ast_Kind_Local: return Check_Success;
+        case Ast_Kind_Local:
+            fill_in_type((AstTyped *) stmt);
+            return Check_Success;
 
         default:
             CHECK(expression, (AstTyped **) pstmt);
