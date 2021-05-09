@@ -193,24 +193,34 @@ Immediate_Renderer :: struct {
         },
     }
 
-    quad :: (use ir: ^Immediate_Renderer, position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
-        push_vertex(ir, .{ position.x,          position.y          }, color);
-        push_vertex(ir, .{ position.x + size.x, position.y          });
-        push_vertex(ir, .{ position.x + size.x, position.y + size.y });
+    rect :: (use ir: ^Immediate_Renderer, position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
+        if vertex_count >= verticies.count - 6 do ir->flush();
 
-        push_vertex(ir, .{ position.x,          position.y          });
-        push_vertex(ir, .{ position.x + size.x, position.y + size.y });
-        push_vertex(ir, .{ position.x,          position.y + size.y });
+        vertex_ptr := ^verticies[vertex_count];
+        defer vertex_count += 6;
+
+        vertex_ptr[0] = .{ .{ position.x,          position.y          }, color, .{ 0, 0 } };
+        vertex_ptr[1] = .{ .{ position.x + size.x, position.y          }, color, .{ 0, 0 } };
+        vertex_ptr[2] = .{ .{ position.x + size.x, position.y + size.y }, color, .{ 0, 0 } };
+
+        vertex_ptr[3] = .{ .{ position.x,          position.y          }, color, .{ 0, 0 } };
+        vertex_ptr[4] = .{ .{ position.x + size.x, position.y + size.y }, color, .{ 0, 0 } };
+        vertex_ptr[5] = .{ .{ position.x,          position.y + size.y }, color, .{ 0, 0 } };
     }
 
-    textured_quad :: (use ir: ^Immediate_Renderer, position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
-        push_vertex(ir, .{ position.x,          position.y          }, color, .{ texture_position.x,                   texture_position.y                  });
-        push_vertex(ir, .{ position.x + size.x, position.y          }, color, .{ texture_position.x + texture_size.x,  texture_position.y                  });
-        push_vertex(ir, .{ position.x + size.x, position.y + size.y }, color, .{ texture_position.x + texture_size.x,  texture_position.y + texture_size.y });
+    textured_rect :: (use ir: ^Immediate_Renderer, position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
+        if vertex_count >= verticies.count - 6 do ir->flush();
 
-        push_vertex(ir, .{ position.x,          position.y          }, color, .{ texture_position.x,                   texture_position.y                  });
-        push_vertex(ir, .{ position.x + size.x, position.y + size.y }, color, .{ texture_position.x + texture_size.x,  texture_position.y + texture_size.y });
-        push_vertex(ir, .{ position.x,          position.y + size.y }, color, .{ texture_position.x,                   texture_position.y + texture_size.y });
+        vertex_ptr := ^verticies[vertex_count];
+        defer vertex_count += 6;
+
+        vertex_ptr[0] = .{ .{ position.x,          position.y          }, color, .{ texture_position.x,                   texture_position.y                  } };
+        vertex_ptr[1] = .{ .{ position.x + size.x, position.y          }, color, .{ texture_position.x + texture_size.x,  texture_position.y                  } };
+        vertex_ptr[2] = .{ .{ position.x + size.x, position.y + size.y }, color, .{ texture_position.x + texture_size.x,  texture_position.y + texture_size.y } };
+
+        vertex_ptr[3] = .{ .{ position.x,          position.y          }, color, .{ texture_position.x,                   texture_position.y                  } };
+        vertex_ptr[4] = .{ .{ position.x + size.x, position.y + size.y }, color, .{ texture_position.x + texture_size.x,  texture_position.y + texture_size.y } };
+        vertex_ptr[5] = .{ .{ position.x,          position.y + size.y }, color, .{ texture_position.x,                   texture_position.y + texture_size.y } };
     }
 
     // NOTE: Calling set_texture without a parameter will disable textured rendering.
@@ -232,7 +242,12 @@ Immediate_Renderer :: struct {
             0, 0, 0, 1
         ];
 
-        gl.uniformMatrix4(active_shader.view_uniform, true, projection_matrix);
+        gl.useProgram(simple_shader.program);
+        gl.uniformMatrix4(simple_shader.view_uniform, true, projection_matrix);
+        gl.useProgram(textured_shader.program);
+        gl.uniformMatrix4(textured_shader.view_uniform, true, projection_matrix);
+
+        gl.useProgram(active_shader.program);
     }
 }
 
@@ -259,12 +274,12 @@ vertex :: proc {
     (position: Vector2, color: Color4) { immediate_renderer->push_vertex(position, color); },
 }
 
-quad :: (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
-    immediate_renderer->quad(position, size, color);
+rect :: (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
+    immediate_renderer->rect(position, size, color);
 }
 
-textured_quad :: (position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
-    immediate_renderer->textured_quad(position, size, texture_position, texture_size, color);
+textured_rect :: (position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
+    immediate_renderer->textured_rect(position, size, texture_position, texture_size, color);
 }
 
 flush :: () do immediate_renderer->flush();

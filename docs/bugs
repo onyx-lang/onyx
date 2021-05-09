@@ -66,6 +66,11 @@ List of known bugs:
 
 [ ] :UnaryFieldAccessIsGross
 
+[ ] Segfault when trying to immediately access type inferred array literal.
+    println( (.[ 1, 2, 3, 4, 5 ])[0] );
+
+[ ] Why are character literals signed????
+
 List of things to change:
 [X] Currently, there is no way to use the initialized members of a structure without using a struct literal.
     There should be a initialize intrinsic procedure that takes a pointer to anything and initializes it.

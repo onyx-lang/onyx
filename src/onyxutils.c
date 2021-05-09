@@ -1341,6 +1341,21 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
     }
 }
 
+static i32 maximum_argument_count(AstNode* provider) {
+    switch (provider->kind) {
+        case Ast_Kind_Struct_Literal: {
+            AstStructLiteral* sl = (AstStructLiteral *) provider;
+            assert(sl->type);
+
+            return type_structlike_mem_count(sl->type);
+        }
+    }
+
+    // NOTE: This returns int_max for anything other than struct literals because the
+    // bounds checking on the arguments will be done elsewhere.
+    return 0x7fffffff;
+}
+
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
@@ -1376,6 +1391,12 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
             *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
             success = 0;
         }
+    }
+
+    i32 maximum_arguments = maximum_argument_count(provider);
+    if (bh_arr_length(args->values) > maximum_arguments) {
+        *err_msg = bh_aprintf(global_scratch_allocator, "Too many values provided. Expected at most %d.", maximum_arguments);
+        success = 0;
     }
 
     return success;
