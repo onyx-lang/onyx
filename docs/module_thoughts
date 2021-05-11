@@ -1,0 +1,27 @@
+Modules in Onyx
+---------------
+
+Modules are going to be the form of reusable code in Onyx. They should be a
+self-contained (maybe dependent on other modules), collection of Onyx files
+with a module.onyx in the root folder that loads all relevant files to the
+module. Modules can then easily be included by loading the module.onyx file
+of any module.
+
+Things that need to be decided about modules:
+    - How should modules be searched for in the filesystem?
+    - How should javascript code in modules be easily maintained?
+        Current solutions just copy the relevant javascript on build.
+
+Things that need to be done in the compiler:
+    - Rename 'package' to 'namespace'
+        I think 'namespace' better reflects the way I think about 'packages'.
+        I don't want it to feel too 'C++-y' but I think the nomenclature change is worthwhile.
+
+        'package' was orginally inspired by Java, but there the folder structure must match
+        the package structure. In Onyx, that is not the case because it allows for packages
+        to be extended on without needing to modify the source of the original package.
+
+    - Add relative file loads and relative #file_contents.
+        If the string starts with './', it should be considered relative.
+        This will make it easier for modules to include their files, regardless of
+        how the project is set up.

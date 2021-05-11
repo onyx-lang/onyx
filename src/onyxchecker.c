@@ -1010,6 +1010,9 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     AstTyped** actual = sl->args.values;
     StructMember smem;
 
+    // BUG: There are problems setting the comptime flag this late in the checking because
+    // if the struct literal was type inferred, then the literal won't be correctly determined
+    // to be comptime on the first pass, which is needed for top level expressions.
     sl->flags |= Ast_Flag_Comptime;
 
     fori (i, 0, mem_count) {
