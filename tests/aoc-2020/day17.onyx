@@ -16,7 +16,7 @@ CubeState :: struct {
     return 17 * c.x + 13 * c.y + 11 * c.z + 19 * c.w;
 }
 
-#add_overload map.cmp_function, (a: CubePos, b: CubePos) -> bool {
+#operator == (a: CubePos, b: CubePos) -> bool {
     return (a.x == b.x)
         && (a.y == b.y)
         && (a.z == b.z)
