@@ -3104,6 +3104,10 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         return;
     }
 
+    // :RelativeFiles This should be relative to the current directory by default; However,
+    // if the filename is prefixed with a './' or '.\\' then it should be relative to the
+    // file in which is was inclded. The loaded file info above should probably use the full
+    // file path in order to avoid duplicates.
     bh_file_contents contents = bh_file_read_contents(global_heap_allocator, fc->filename->text);
     u8* actual_data = bh_alloc(global_heap_allocator, contents.length + 1);
     u32 length = contents.length + 1;

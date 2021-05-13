@@ -209,6 +209,7 @@ static void context_free() {
 // NOTE: This should not be called until immediately before using the return value.
 // This function can return a static variable which will change if this is called
 // another time.                                        -brendanfh 2020/10/09
+// :RelativeFiles This should lookup for the file relative to "relative_to"
 static char* lookup_included_file(char* filename, char* relative_to) {
     static char path[256];
     fori (i, 0, 256) path[i] = 0;
