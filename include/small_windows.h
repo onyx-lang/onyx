@@ -358,6 +358,8 @@ GB_DLL_IMPORT BOOL   WINAPI GetFileAttributesExW(wchar_t const *path, GET_FILEEX
 GB_DLL_IMPORT BOOL   WINAPI CopyFileW(wchar_t const *old_f, wchar_t const *new_f, BOOL fail_if_exists);
 GB_DLL_IMPORT BOOL   WINAPI MoveFileW(wchar_t const *old_f, wchar_t const *new_f);
 
+GB_DLL_IMPORT DWORD  WINAPI GetFullPathNameA(char const *lpFileName, DWORD nBufferLength, char *lpBuffer, char **lpFilePart);
+
 GB_DLL_IMPORT HMODULE WINAPI LoadLibraryA  (char const *filename);
 GB_DLL_IMPORT BOOL    WINAPI FreeLibrary   (HMODULE module);
 GB_DLL_IMPORT FARPROC WINAPI GetProcAddress(HMODULE module, char const *name);

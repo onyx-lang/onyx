@@ -372,6 +372,7 @@ i32 bh_file_read(bh_file* file, void* buffer, isize buff_size);
 i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
 i64 bh_file_size(bh_file* file);
 b32 bh_file_exists(char const* filename);
+char* bh_path_get_full_name(char const* filename, bh_allocator a);
 
 #define bh_file_read_contents(allocator_, x) _Generic((x), \
     bh_file*: bh_file_read_contents_bh_file, \
@@ -1546,6 +1547,27 @@ b32 bh_file_contents_free(bh_file_contents* contents) {
 b32 bh_file_exists(char const* filename) {
     struct stat s;
     return stat(filename, &s) != -1;
+}
+
+char* bh_path_get_full_name(char const* filename, bh_allocator a) {
+#if defined(_BH_WINDOWS)
+    #error "Not supported."
+#elif defined(_BH_LINUX)
+    char* p = realpath(filename, NULL);    
+
+    // Check if the file did not exists.
+    // :Cleanup should this return NULL?
+    if (p == NULL) return (char *) filename;
+    
+    i32 len = strlen(p);
+    char* result = bh_alloc_array(a, char, len + 1);
+    memmove(result, p, len);
+    result[len] = 0;
+
+    free(p);
+
+    return result;
+#endif
 }
 
 #endif // ifndef BH_NO_FILE

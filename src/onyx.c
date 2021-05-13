@@ -237,7 +237,7 @@ static char* lookup_included_file(char* filename, char* relative_to) {
         else
             bh_snprintf(path, 256, "%s%s", *folder, fn);
 
-        if (bh_file_exists(path)) return path;
+        if (bh_file_exists(path)) return bh_path_get_full_name(path, global_scratch_allocator);
     }
 
     return fn;
