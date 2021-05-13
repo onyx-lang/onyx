@@ -1,0 +1,44 @@
+#load "core/std"
+
+use package core
+
+custom_iterator :: () -> Iterator(i32) {
+
+    next :: (data: rawptr) -> (i32, bool) {
+        return 1234, true;
+    }
+
+    close :: (data: rawptr) {
+        println("Closing the iterator");
+    }
+
+    return .{
+        data = null,
+        next = next,
+        close = close,
+    };
+}
+
+main :: (args: [] cstr) {
+
+    switch 10 {
+        case 5 do println("Never");
+
+        case 10 {
+            count := 5;
+            for i: custom_iterator() {
+                println(i);
+                defer println("World");
+
+                count -= 1;
+
+                // :FIXEDBUG This was were it was breaking; the iterator close didn't run here.
+                if count == 0 do fallthrough;
+            }
+        }
+
+        case #default {
+            println("Default case");
+        }
+    }
+}

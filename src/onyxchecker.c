@@ -62,7 +62,9 @@ static inline void fill_in_array_count(AstType* type_node) {
 
     if (type_node->kind == Ast_Kind_Array_Type) {
         if (((AstArrayType *) type_node)->count_expr) {
+            // CLEANUP: The return value is not checked on this call.
             check_expression(&((AstArrayType *) type_node)->count_expr);
+
             resolve_expression_type(((AstArrayType *) type_node)->count_expr);
         }
     }
@@ -76,7 +78,9 @@ static inline void fill_in_poly_call_args(AstType* type_node) {
 
     bh_arr_each(AstNode *, param, pctype->params) {
         if (!node_is_type(*param)) {
+            // CLEANUP: The return value is not checked on this call.
             check_expression((AstTyped **) param);
+            
             resolve_expression_type((AstTyped *) *param);
             fill_in_type((AstTyped *) *param);
         }

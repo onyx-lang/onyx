@@ -209,7 +209,7 @@ static void context_free() {
 // NOTE: This should not be called until immediately before using the return value.
 // This function can return a static variable which will change if this is called
 // another time.                                        -brendanfh 2020/10/09
-static char* lookup_included_file(char* filename) {
+static char* lookup_included_file(char* filename, char* relative_to) {
     static char path[256];
     fori (i, 0, 256) path[i] = 0;
 
@@ -285,7 +285,7 @@ static void process_load_entity(Entity* ent) {
     AstInclude* include = ent->include;
 
     if (include->kind == Ast_Kind_Load_File) {
-        char* filename = lookup_included_file(include->name);
+        char* filename = lookup_included_file(include->name, NULL);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         process_source_file(formatted_name, include->token->pos);

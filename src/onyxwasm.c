@@ -338,6 +338,8 @@ EMIT_FUNC_NO_ARGS(leave_structured_block) {
 EMIT_FUNC(structured_jump, AstJump* jump) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    // :CLEANUP These numbers should become constants because they are shared with
+    // enter_structured_block's definitions.
     static const u8 wants[Jump_Type_Count] = { 1, 2, 3 };
 
     u64 labelidx = 0;
@@ -359,7 +361,9 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
 
     if (bh_arr_length(mod->deferred_stmts) != 0) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
-        while (i >= 0 && mod->deferred_stmts[i].depth >= labelidx) {
+        i32 d = bh_arr_length(mod->structured_jump_target) - (labelidx + 1);
+
+        while (i >= 0 && mod->deferred_stmts[i].depth > d) {
             emit_deferred_stmt(mod, &code, mod->deferred_stmts[i]);
             i--;
         }

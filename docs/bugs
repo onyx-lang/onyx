@@ -71,6 +71,8 @@ List of known bugs:
 
 [ ] Why are character literals signed????
 
+[X] `fallthrough` in a for loop does not emit deferred statments correctly.
+
 List of things to change:
 [X] Currently, there is no way to use the initialized members of a structure without using a struct literal.
     There should be a initialize intrinsic procedure that takes a pointer to anything and initializes it.
