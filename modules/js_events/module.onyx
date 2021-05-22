@@ -1,2 +1,2 @@
 
-#load "modules/js_events/js_events"
+#load "./js_events"

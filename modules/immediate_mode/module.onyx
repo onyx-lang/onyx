@@ -1,5 +1,5 @@
 
 package immediate_mode
 
-#load "modules/immediate_mode/immediate_renderer"
-#load "modules/immediate_mode/gl_utils"
+#load "./immediate_renderer"
+#load "./gl_utils"

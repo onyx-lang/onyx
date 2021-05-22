@@ -363,7 +363,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
         i32 d = bh_arr_length(mod->structured_jump_target) - (labelidx + 1);
 
-        while (i >= 0 && mod->deferred_stmts[i].depth > d) {
+        while (i >= 0 && (i32) mod->deferred_stmts[i].depth > d) {
             emit_deferred_stmt(mod, &code, mod->deferred_stmts[i]);
             i--;
         }

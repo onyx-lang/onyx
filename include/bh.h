@@ -290,6 +290,7 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc);
 // Allocator based string functions
 //-------------------------------------------------------------------------------------
 
+b32 bh_str_starts_with(char* str, char* start);
 b32 bh_str_ends_with(char* str, char* end);
 char* bh_strdup(bh_allocator a, char* str);
 
@@ -373,6 +374,7 @@ i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
 i64 bh_file_size(bh_file* file);
 b32 bh_file_exists(char const* filename);
 char* bh_path_get_full_name(char const* filename, bh_allocator a);
+char* bh_path_get_parent(char const* filename, bh_allocator a);
 
 #define bh_file_read_contents(allocator_, x) _Generic((x), \
     bh_file*: bh_file_read_contents_bh_file, \
@@ -1218,6 +1220,15 @@ u8* double_to_ieee754(f64 f, b32 reverse) {
 //-------------------------------------------------------------------------------------
 // STRING IMPLEMENTATION
 //-------------------------------------------------------------------------------------
+b32 bh_str_starts_with(char* str, char* start) {
+    char* s = str;
+    char* p = start;
+
+    while (*s != '\0' && *p != '\0' && *s == *p) s++, p++;
+
+    return *p == '\0';
+}
+
 b32 bh_str_ends_with(char* str, char* end) {
     i32 slen = strlen(str);
     i32 elen = strlen(end);
@@ -1551,7 +1562,16 @@ b32 bh_file_exists(char const* filename) {
 
 char* bh_path_get_full_name(char const* filename, bh_allocator a) {
 #if defined(_BH_WINDOWS)
-    #error "Not supported."
+    char buffer[4096];
+    GetFullPathNameA(filename, 4096, buffer, NULL);
+
+    i32 len = strlen(buffer);
+    char* result = bh_alloc_array(a, char, len + 1);
+    memmove(result, buffer, len);
+    result[len] = 0;
+
+    return result;
+
 #elif defined(_BH_LINUX)
     char* p = realpath(filename, NULL);    
 
@@ -1568,6 +1588,23 @@ char* bh_path_get_full_name(char const* filename, bh_allocator a) {
 
     return result;
 #endif
+}
+
+// NOTE: This assumes the filename is the full path, not relative to anything else.
+char* bh_path_get_parent(char const* filename, bh_allocator a) {
+#if defined(_BH_LINUX)
+    #define DIR_SEPARATOR '/'
+#elif defined(_BH_WINDOWS)
+    #define DIR_SEPARATOR '\\'
+#endif
+
+    char* result = bh_strdup(a, (char *) filename);
+    char* end = result + strlen(result);
+    while (*end != DIR_SEPARATOR && end != result) *end-- = '\0';
+
+    return result;
+
+#undef DIR_SEPARATOR
 }
 
 #endif // ifndef BH_NO_FILE

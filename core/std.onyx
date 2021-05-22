@@ -1,47 +1,47 @@
 package core
 
 
-#load "core/alloc"
-#load "core/memory"
+#load "./alloc"
+#load "./memory"
 
-#load "core/container/array"
-#load "core/container/map"
-#load "core/container/list"
-#load "core/container/iter"
+#load "./container/array"
+#load "./container/map"
+#load "./container/list"
+#load "./container/iter"
 
-#load "core/conv"
-#load "core/math"
-#load "core/random"
+#load "./conv"
+#load "./math"
+#load "./random"
 
-#load "core/string"
-#load "core/string/builder"
-#load "core/string/reader"
+#load "./string"
+#load "./string/builder"
+#load "./string/reader"
 
-#load "core/intrinsics/onyx"
-#load "core/intrinsics/wasm"
+#load "./intrinsics/onyx"
+#load "./intrinsics/wasm"
 
-#load "core/io/io"
-#load "core/io/stream"
-#load "core/io/reader"
-#load "core/io/writer"
-#load "core/io/binary"
-#load "core/io/binary_reader"
+#load "./io/io"
+#load "./io/stream"
+#load "./io/reader"
+#load "./io/writer"
+#load "./io/binary"
+#load "./io/binary_reader"
 
-#load "core/runtime/build_opts"
-#load "core/runtime/common"
+#load "./runtime/build_opts"
+#load "./runtime/common"
 
 #private_file runtime :: package runtime
 #if runtime.Runtime == runtime.Runtime_Wasi {
-    #load "core/runtime/wasi"
-    #load "core/wasi"
-    #load "core/io/file"
-    #load "core/env"
+    #load "./runtime/wasi"
+    #load "./wasi"
+    #load "./io/file"
+    #load "./env"
 }
 
 #if runtime.Runtime == runtime.Runtime_Js {
-    #load "core/runtime/js"
+    #load "./runtime/js"
 }
 
 #if runtime.Runtime != runtime.Runtime_Custom {
-    #load "core/stdio"
+    #load "./stdio"
 }

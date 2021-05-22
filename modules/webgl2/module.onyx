@@ -1,2 +1,2 @@
 
-#load "modules/webgl2/webgl2"
+#load "./webgl2"

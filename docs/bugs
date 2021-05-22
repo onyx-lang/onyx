@@ -1,50 +1,9 @@
 List of known bugs:
 
-[X] Enum parsing causes segfaults if the syntax is not EXACTLY what is expected. Some cases that break:
-    enum { Foo, Bar, Baz };
-    enum { Foo; Bar; Baz };
-
-[X] Using a package in the middle of a procedures removes all remaining statements in the procedure.
-    This is mostly likely due to the changes made with use package statements being treated as entities now.
-    
-    use_package_breaking :: () {
-        println("Test 1");
-
-        use package foo
-
-        println("Test 2");
-    }
-
-[X] Array literals used as default values for struct members can break things.
-    
-    Foo :: struct {
-        arr : [5] u32 = u32.[ 2, 3, 5, 7, 11 ];
-    }
-
-    foo := Foo.{};        OR          foo := new(Foo);
-
-[ ] Aliasing in many cases does not work. For example:
-    
-    SomeNamespace :: struct {
-        foo :: () { ... }
-        bar :: ...
-    }
-
-    {
-        SN :: SomeNamespace
-
-        SN.foo()
-    }
-
-[X] There is a segfault when passing an anonymous struct literal to an untyped vararg.
-    Should just need to detect this case and provide an error message since this doesn't
-    make any sense semantically.
-    
-    vararg_proc :: (va: ...) {
-        ...
-    }
-
-    vararg_proc(.{ 1, 2 });
+[ ] Compound assignment operators such as += evaluate the location of their left-value twice.
+    Not only is this bad for efficiency, if the value requires calling a function, that
+    function will be called twice instead of once. This is a simple code generation fix,
+    but will require not destroying this information in the checking phase of the compiler.
 
 [ ] This currently does not work but I think it should:
 
@@ -70,6 +29,53 @@ List of known bugs:
     println( (.[ 1, 2, 3, 4, 5 ])[0] );
 
 [ ] Why are character literals signed????
+
+[ ] Aliasing in many cases does not work. For example:
+    
+    SomeNamespace :: struct {
+        foo :: () { ... }
+        bar :: ...
+    }
+
+    {
+        SN :: SomeNamespace
+
+        SN.foo()
+    }
+
+[X] Enum parsing causes segfaults if the syntax is not EXACTLY what is expected. Some cases that break:
+    enum { Foo, Bar, Baz };
+    enum { Foo; Bar; Baz };
+
+[X] Using a package in the middle of a procedures removes all remaining statements in the procedure.
+    This is mostly likely due to the changes made with use package statements being treated as entities now.
+    
+    use_package_breaking :: () {
+        println("Test 1");
+
+        use package foo
+
+        println("Test 2");
+    }
+
+[X] Array literals used as default values for struct members can break things.
+    
+    Foo :: struct {
+        arr : [5] u32 = u32.[ 2, 3, 5, 7, 11 ];
+    }
+
+    foo := Foo.{};        OR          foo := new(Foo);
+
+[X] There is a segfault when passing an anonymous struct literal to an untyped vararg.
+    Should just need to detect this case and provide an error message since this doesn't
+    make any sense semantically.
+    
+    vararg_proc :: (va: ...) {
+        ...
+    }
+
+    vararg_proc(.{ 1, 2 });
+
 
 [X] `fallthrough` in a for loop does not emit deferred statments correctly.
 

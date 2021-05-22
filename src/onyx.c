@@ -211,6 +211,8 @@ static void context_free() {
 // another time.                                        -brendanfh 2020/10/09
 // :RelativeFiles This should lookup for the file relative to "relative_to"
 static char* lookup_included_file(char* filename, char* relative_to) {
+    assert(relative_to != NULL);
+
     static char path[256];
     fori (i, 0, 256) path[i] = 0;
 
@@ -230,6 +232,17 @@ static char* lookup_included_file(char* filename, char* relative_to) {
 #endif
 
     fori (i, 0, 128) if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
+
+    if (bh_str_starts_with(filename, "./")) {
+        if (relative_to[strlen(relative_to) - 1] != DIR_SEPARATOR)
+            bh_snprintf(path, 256, "%s%c%s", relative_to, DIR_SEPARATOR, fn);
+        else
+            bh_snprintf(path, 256, "%s%s", relative_to, fn);
+
+        if (bh_file_exists(path)) return bh_path_get_full_name(path, global_scratch_allocator);
+
+        return fn;
+    }
 
     bh_arr_each(const char *, folder, context.options->included_folders) {
         if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
@@ -257,9 +270,8 @@ static void parse_source_file(bh_file_contents* file_contents) {
 
 static void process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_arr_each(bh_file_contents, fc, context.loaded_files) {
-        // CLEANUP: Add duplicate resolutions, such as
-        //          ./foo and ./test/../foo
-        // should be the same thing.
+        // Duplicates are detected here and since these filenames will be the full path,
+        // string comparing them should be all that is necessary.
         if (!strcmp(fc->filename, filename)) return;
     }
 
@@ -286,7 +298,13 @@ static void process_load_entity(Entity* ent) {
     AstInclude* include = ent->include;
 
     if (include->kind == Ast_Kind_Load_File) {
-        char* filename = lookup_included_file(include->name, NULL);
+        // :RelativeFiles
+        const char* parent_file = include->token->pos.filename;
+        if (parent_file == NULL) parent_file = ".";
+
+        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        
+        char* filename = lookup_included_file(include->name, parent_folder);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         process_source_file(formatted_name, include->token->pos);

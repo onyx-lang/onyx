@@ -1,11 +1,11 @@
 package core.alloc
 
-#load "core/alloc/arena"
-#load "core/alloc/fixed"
-#load "core/alloc/heap"
-#load "core/alloc/ring"
-#load "core/alloc/pool"
-#load "core/alloc/logging"
+#load "./alloc/arena"
+#load "./alloc/fixed"
+#load "./alloc/heap"
+#load "./alloc/ring"
+#load "./alloc/pool"
+#load "./alloc/logging"
 
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
 
