@@ -483,7 +483,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             if (parse_possible_directive(parser, "file_contents")) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
                 fc->token = parser->prev - 1;
-                fc->filename = expect_token(parser, Token_Type_Literal_String);
+                fc->filename_token = expect_token(parser, Token_Type_Literal_String);
                 fc->type = type_make_slice(parser->allocator, &basic_types[Basic_Kind_U8]);
                 
                 ENTITY_SUBMIT(fc);

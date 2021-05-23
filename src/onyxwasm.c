@@ -3081,26 +3081,40 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
 }
 
 static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
-    token_toggle_end(fc->filename);
+    token_toggle_end(fc->filename_token);
 
-    if (bh_table_has(StrLitInfo, mod->loaded_file_info, fc->filename->text)) {
-        StrLitInfo info = bh_table_get(StrLitInfo, mod->loaded_file_info, fc->filename->text);
+    // INVESTIGATE: I think that filename should always be NULL when this function starts because
+    // a file contents entity is only processed once and therefore should only go through this step
+    // once. But somehow filename isn't NULL occasionally so I have to check for that...
+    //                                                                      - brendanfh  2021/05/23
+    if (fc->filename == NULL) {
+        const char* parent_file = fc->token->pos.filename;
+        if (parent_file == NULL) parent_file = ".";
+
+        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+
+        char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, fc->filename_token->length);
+        i32   temp_fn_len = string_process_escape_seqs(temp_fn, fc->filename_token->text, fc->filename_token->length);
+        char* filename    = lookup_included_file(temp_fn, parent_folder, 0, 0);
+        fc->filename      = bh_strdup(global_heap_allocator, filename);
+    }
+
+    token_toggle_end(fc->filename_token);
+
+    if (bh_table_has(StrLitInfo, mod->loaded_file_info, fc->filename)) {
+        StrLitInfo info = bh_table_get(StrLitInfo, mod->loaded_file_info, fc->filename);
         fc->addr = info.addr;
         fc->size = info.len;
-
-        token_toggle_end(fc->filename);
         return;
     }
 
     u32 offset = mod->next_datum_offset;
     bh_align(offset, 16);
 
-    if (!bh_file_exists(fc->filename->text)) {
-        onyx_report_error(fc->filename->pos,
+    if (!bh_file_exists(fc->filename)) {
+        onyx_report_error(fc->filename_token->pos,
                 "Unable to open file for reading, '%s'.",
-                fc->filename->text);
-
-        token_toggle_end(fc->filename);
+                fc->filename);
         return;
     }
 
@@ -3108,14 +3122,14 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     // if the filename is prefixed with a './' or '.\\' then it should be relative to the
     // file in which is was inclded. The loaded file info above should probably use the full
     // file path in order to avoid duplicates.
-    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, fc->filename->text);
+    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, fc->filename);
     u8* actual_data = bh_alloc(global_heap_allocator, contents.length + 1);
     u32 length = contents.length + 1;
     memcpy(actual_data, contents.data, contents.length);
     actual_data[contents.length] = 0;
     bh_file_contents_free(&contents);
 
-    bh_table_put(StrLitInfo, mod->loaded_file_info, fc->filename->text, ((StrLitInfo) {
+    bh_table_put(StrLitInfo, mod->loaded_file_info, fc->filename, ((StrLitInfo) {
         .addr = offset,
         .len  = length - 1,
     }));
@@ -3132,8 +3146,6 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     bh_arr_push(mod->data, datum);
 
     mod->next_datum_offset = offset + length;
-
-    token_toggle_end(fc->filename);
 }
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {

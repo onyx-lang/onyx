@@ -206,58 +206,6 @@ static void context_free() {
     compile_opts_free(context.options);
 }
 
-// NOTE: This should not be called until immediately before using the return value.
-// This function can return a static variable which will change if this is called
-// another time.                                        -brendanfh 2020/10/09
-// :RelativeFiles This should lookup for the file relative to "relative_to"
-static char* lookup_included_file(char* filename, char* relative_to) {
-    assert(relative_to != NULL);
-
-    static char path[256];
-    fori (i, 0, 256) path[i] = 0;
-
-    static char fn[128];
-    fori (i, 0, 128) fn[i] = 0;
-
-    if (!bh_str_ends_with(filename, ".onyx")) {
-        bh_snprintf(fn, 128, "%s.onyx", filename);
-    } else {
-        bh_snprintf(fn, 128, "%s", filename);
-    }
-
-#if defined(_BH_LINUX)
-    #define DIR_SEPARATOR '/'
-#elif defined(_BH_WINDOWS)
-    #define DIR_SEPARATOR '\\'
-#endif
-
-    fori (i, 0, 128) if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
-
-    if (bh_str_starts_with(filename, "./")) {
-        if (relative_to[strlen(relative_to) - 1] != DIR_SEPARATOR)
-            bh_snprintf(path, 256, "%s%c%s", relative_to, DIR_SEPARATOR, fn);
-        else
-            bh_snprintf(path, 256, "%s%s", relative_to, fn);
-
-        if (bh_file_exists(path)) return bh_path_get_full_name(path, global_scratch_allocator);
-
-        return fn;
-    }
-
-    bh_arr_each(const char *, folder, context.options->included_folders) {
-        if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
-            bh_snprintf(path, 256, "%s%c%s", *folder, DIR_SEPARATOR, fn);
-        else
-            bh_snprintf(path, 256, "%s%s", *folder, fn);
-
-        if (bh_file_exists(path)) return bh_path_get_full_name(path, global_scratch_allocator);
-    }
-
-    return fn;
-
-#undef DIR_SEPARATOR
-}
-
 static void parse_source_file(bh_file_contents* file_contents) {
     // :Remove passing the allocators as parameters
     OnyxTokenizer tokenizer = onyx_tokenizer_create(context.token_alloc, file_contents);
@@ -304,7 +252,7 @@ static void process_load_entity(Entity* ent) {
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
         
-        char* filename = lookup_included_file(include->name, parent_folder);
+        char* filename = lookup_included_file(include->name, parent_folder, 1, 1);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         process_source_file(formatted_name, include->token->pos);

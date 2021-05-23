@@ -3,62 +3,6 @@ package immediate_mode
 use package core
 #private_file gl :: package gl
 
-// CLEANUP: Proper multi-line strings need to be added...
-// This is a gross abuse of the lexer.
-IMMEDIATE_VERTEX_SHADER :: "#version 300 es
-
-layout(location = 0) in vec2 a_vertex;
-layout(location = 1) in vec4 a_color;
-layout(location = 2) in vec2 a_texture;
-
-uniform mat4 u_view;
-uniform mat4 u_world;
-
-out vec4 v_color;
-out vec2 v_texture;
-
-void main() {
-    gl_Position = u_view * u_world * vec4(a_vertex, 0, 1);
-
-    v_color = a_color;
-    v_texture = a_texture;
-}
-"
-
-IMMEDIATE_FRAGMENT_SHADER :: "#version 300 es
-
-precision mediump float;
-
-uniform sampler2D u_texture;
-
-in vec4 v_color;
-in vec2 v_texture;
-
-out vec4 fragColor;
-
-void main() {
-    fragColor = v_color;
-}
-"
-
-IMMEDIATE_FRAGMENT_SHADER_TEXTURED :: "#version 300 es
-
-precision mediump float;
-
-uniform sampler2D u_texture;
-
-in vec4 v_color;
-in vec2 v_texture;
-
-out vec4 fragColor;
-
-void main() {
-    fragColor = v_color * texture(u_texture, v_texture);
-}
-"
-
-
-
 Vector2 :: struct {
     x, y: f32;
 }
@@ -103,6 +47,10 @@ Immediate_Renderer :: struct {
     }
 
     init :: (use ir: ^Immediate_Renderer, max_verticies := Default_Max_Verticies) {
+        IMMEDIATE_VERTEX_SHADER            :: #file_contents "./shaders/basic_vertex.glsl"
+        IMMEDIATE_FRAGMENT_SHADER          :: #file_contents "./shaders/basic_fragment.glsl"
+        IMMEDIATE_FRAGMENT_SHADER_TEXTURED :: #file_contents "./shaders/textured_fragment.glsl"
+
         simple_shader   = Shader.make_from_source(IMMEDIATE_VERTEX_SHADER, IMMEDIATE_FRAGMENT_SHADER);
         textured_shader = Shader.make_from_source(IMMEDIATE_VERTEX_SHADER, IMMEDIATE_FRAGMENT_SHADER_TEXTURED);
         active_shader   = ^simple_shader;

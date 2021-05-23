@@ -504,7 +504,14 @@ struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 ele
 struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u32 offset; u32 idx; char* field; }; // If token is null, defer to field
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_ast_type; Type *ao_type; u64 alignment; };
-struct AstFileContents  { AstTyped_base; OnyxToken *filename; u32 addr, size; };
+struct AstFileContents  {
+    AstTyped_base;
+
+    OnyxToken *filename_token;
+    char *filename; // The parsed file name, with '\' sequences removed and resolved to a particular file if possible.
+
+    u32 addr, size;
+};
 struct AstUnaryFieldAccess {
     AstTyped_base;
 
