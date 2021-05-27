@@ -25,3 +25,5 @@ Things that need to be done in the compiler:
         If the string starts with './', it should be considered relative.
         This will make it easier for modules to include their files, regardless of
         how the project is set up.
+
+        ✔ This has been done

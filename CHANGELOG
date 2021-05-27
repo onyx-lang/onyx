@@ -22,6 +22,10 @@ Additions:
 * logging allocator. Wraps any allocator and prints what kind of allocations are happening.
 * many math functions.
 * basics of reading environment variables
+* Relative file inclusion using "./" at the start of the path
+* Basics of "notes" in the code. Basically special comments that allow you to easily search in the code.
+    Currently this is not something very useful in the language, but I wanted a way to write searchable
+    notes without having to parse comments. The syntax is "@Note".
 
 Removals:
 

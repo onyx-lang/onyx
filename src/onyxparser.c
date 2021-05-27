@@ -75,7 +75,8 @@ static void consume_token(OnyxParser* parser) {
     parser->prev = parser->curr;
     // :LinearTokenDependent
     parser->curr++;
-    while (parser->curr->type == Token_Type_Comment) parser->curr++;
+    while (parser->curr->type == Token_Type_Comment || parser->curr->type == Token_Type_Note)
+        parser->curr++;
 }
 
 static OnyxToken* find_matching_paren(OnyxToken* paren) {
@@ -144,6 +145,7 @@ static b32 next_tokens_are(OnyxParser* parser, i32 n, ...) {
 
     i32 matched = 1;
 
+    // BUG: This does not take into consideration comments and notes that can occur between any tokens.
     fori (i, 0, n) {
         TokenType expected_type = va_arg(va, TokenType);
         if (peek_token(i)->type != expected_type) {
