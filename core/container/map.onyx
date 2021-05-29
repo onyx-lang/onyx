@@ -1,7 +1,7 @@
 package core.map
 
 #private_file array  :: package core.array
-#private_file string :: package core.string
+#private_file hash   :: package core.hash
 use package core.intrinsics.onyx { __zero_value }
 
 Map :: struct (K: type_expr, V: type_expr) {
@@ -108,17 +108,6 @@ empty :: (use map: ^Map($K, $V)) -> bool {
     return entries.count == 0;
 }
 
-hash_function :: proc {
-    (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-    (key: i32)    -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
-    (key: i64)    -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },
-    (key: str)    -> u32 {
-        hash: u32 = 5381;
-        for ch: key do hash += (hash << 5) + ~~ch;
-        return hash;
-    },
-}
-
 //
 // Private symbols
 //
@@ -134,9 +123,9 @@ MapLookupResult :: struct {
 lookup :: (use map: ^Map($K, $V), key: K) -> MapLookupResult {
     lr := MapLookupResult.{};
 
-    hash: u32 = hash_function(key); // You cannot use this type for the key, unless you add an overload.
+    hash_value: u32 = hash.to_u32(key); // You cannot use this type for the key, unless you add an overload.
 
-    lr.hash_index = hash % hashes.count;
+    lr.hash_index = hash_value % hashes.count;
     lr.entry_index = hashes[lr.hash_index];
 
     while lr.entry_index >= 0 {

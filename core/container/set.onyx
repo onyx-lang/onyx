@@ -1,0 +1,113 @@
+package core.set
+
+#private_file array :: package core.array
+#private_file hash  :: package core.hash
+use package core.intrinsics.onyx { __zero_value }
+
+Set :: struct (T: type_expr) {
+    hashes  : [..] i32;
+    entries : [..] Entry(T);
+
+    default_value: T;
+
+    Entry :: struct (T: type_expr) {
+        next  : i32;
+        value : T;
+    }
+}
+
+make :: ($T: type_expr, default := __zero_value(T), hash_count: i32 = 16) -> Set(T) {
+    set : Set(T);
+    init(^set, default=default, hash_count=hash_count);
+    return set;
+}
+
+init :: (use set: ^Set($T), default := __zero_value(T), hash_count: i32 = 16) {
+    array.init(^hashes, hash_count);
+    hashes.count = hash_count;
+    array.fill(^hashes, -1);
+
+    array.init(^entries, 4); 
+
+    default_value = default;
+}
+
+free :: (use set: ^Set($T)) {
+    array.free(^hashes);
+    array.free(^entries);
+}
+
+insert :: (use set: ^Set($T), value: T) {
+    lr := lookup(set, value);
+
+    if lr.entry_index >= 0 do return;
+
+    array.push(^entries, .{
+        value = value,
+        hashes[lr.hash_index],
+    });
+
+    hashes[lr.hash_index] = entries.count - 1;
+}
+
+has :: (use set: ^Set($T), value: T) -> bool {
+    lr := lookup(set, value);
+    return lr.entry_index >= 0;
+}
+
+remove :: (use set: ^Set($T), value: T) {
+    lr := lookup(set, value);
+    if lr.entry_index < 0 do return;
+
+    if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next;
+    else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
+
+    if lr.entry_index == entries.count - 1 {
+        array.pop(^entries);
+        return;
+    }
+
+    array.fast_delete(^entries, lr.entry_index);
+    last := lookup(set, entries[lr.entry_index].value);
+    if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
+    else                       do hashes[last.hash_index] = lr.entry_index;
+}
+
+clear :: (use set: ^Set($T)) {
+    array.fill(^hashes, -1);
+    array.clear(^entries);
+}
+
+empty :: (use set: ^Set($T)) -> bool {
+    return entries.count == 0;
+}
+
+//
+// Private symbols
+//
+
+#private_file
+SetLookupResult :: struct {
+    hash_index  : i32 = -1;
+    entry_index : i32 = -1;
+    entry_prev  : i32 = -1;
+}
+
+#private_file
+lookup :: (use set: ^Set($T), value: T) -> SetLookupResult {
+    lr := SetLookupResult.{};
+
+    hash_value: u32 = hash.to_u32(value); // You cannot have a set of this type without defining a to_u32 hash.
+
+    lr.hash_index = hash_value % hashes.count;
+    lr.entry_index = hashes[lr.hash_index];
+
+    while lr.entry_index >= 0 {
+        if entries[lr.entry_index].value == value do return lr;
+
+        lr.entry_prev = lr.entry_index;
+        lr.entry_index = entries[lr.entry_index].next;
+    }
+
+    return lr;
+}
