@@ -1,0 +1,40 @@
+package core.clock
+
+#if (package runtime).Runtime != (package runtime).Runtime_Wasi {
+    #error "'core.clock' is only available with the 'wasi' runtime.";
+}
+
+use package wasi
+
+time :: () -> u64 {
+    output_time: Timestamp;
+    clock_time_get(.Realtime, 500000, ^output_time);
+    return ~~(output_time / 1000000);
+}
+
+time_ns :: () -> u64 {
+    output_time: Timestamp;
+    clock_time_get(.Realtime, 1, ^output_time);
+    return ~~output_time;
+}
+
+sleep :: (milliseconds: u32) {
+    tagged: SubscriptionTagged;
+    tagged.tag = .Clock;
+    tagged.clock = .{
+        id = .Realtime,
+        timeout = cast(u64) milliseconds * 1000000,
+        precision = 1000,
+        flags = .ClockAbsTime,
+    };
+
+    subscription := Subscription.{
+        userdata = 0,
+        u = tagged,
+    };
+
+    event: Event;
+    number_of_events: u32;
+
+    error_code := poll_oneoff(^subscription, ^event, 1, ^number_of_events);
+}

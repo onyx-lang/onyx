@@ -1,0 +1,1 @@
+These files are only available on the 'wasi' runtime. In a C compilation, other files will be included, and the API between them will have to remain the same.

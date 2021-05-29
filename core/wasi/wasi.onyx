@@ -277,7 +277,7 @@ SubscriptionFDReadWrite :: struct {
 SubscriptionTagged :: struct {
     tag : EventType;
 
-    u : struct #union {
+    use u : struct #union {
         clock    : SubscriptionClock;
         fd_read  : SubscriptionFDReadWrite;
         fd_write : SubscriptionFDReadWrite;

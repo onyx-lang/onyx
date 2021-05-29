@@ -35,9 +35,10 @@ package core
 #private_file runtime :: package runtime
 #if runtime.Runtime == runtime.Runtime_Wasi {
     #load "./runtime/wasi"
-    #load "./wasi"
+    #load "./wasi/wasi"
+    #load "./wasi/env"
+    #load "./wasi/clock"
     #load "./io/file"
-    #load "./env"
 }
 
 #if runtime.Runtime == runtime.Runtime_Js {

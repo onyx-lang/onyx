@@ -17,5 +17,4 @@ main :: (args: [] cstr) {
     set.remove(^S, 5);
     for entry: S.entries do println(entry.value);
     println(set.has(^S, 5));
-
 }

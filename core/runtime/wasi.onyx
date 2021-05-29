@@ -1,6 +1,6 @@
 package runtime
 
-#load "core/wasi"
+#load "core/wasi/wasi"
 #load "core/runtime/common"
 
 use package wasi
