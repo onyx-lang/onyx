@@ -30,7 +30,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
     alloc_arena := cast(^ArenaState) data;
 
     if aa == AllocationAction.Alloc {
-        // NOTE: An allocation of this size does not fit into a single arena.
+        // An allocation of this size does not fit into a single arena.
         if size > alloc_arena.arena_size - sizeof rawptr {
             return null;
         }
@@ -59,8 +59,10 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
     return null;
 }
 
-// NOTE: `arena_size` must be at least 4
+@Note // `arena_size` must be at least 4
 make :: (backing: Allocator, arena_size: u32) -> ArenaState {
+    assert(arena_size >= 4, "Arena size was expected to be at least 4 bytes.");
+    
     initial_arena := cast(^Arena) raw_alloc(backing, arena_size);
     initial_arena.next = null;
 

@@ -88,7 +88,6 @@ read_line :: proc (use reader: ^StringReader) -> str {
     out.data = data;
     out.count = 0;
 
-    // HACK(Brendan): I want to use a for loop, but I don't know why.
     for ch: *(cast(^str) reader) {
         if ch == #char "\n" do break;
         out.count += 1;
@@ -114,7 +113,6 @@ read_until :: proc (use reader: ^StringReader, skip: u32, uptos: ..u8) -> str {
 
     s := skip;
     
-    // HACK(Brendan): See above.
     for ch: *(cast(^str) reader) {
         for upto: uptos do if ch == upto {
             if s == 0 do break break;

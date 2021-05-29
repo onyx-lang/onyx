@@ -73,7 +73,7 @@ main :: (args: [] cstr) {
 
     print_spacer();
 
-    // Structs in Onyx can behave like C unions, simply by usings the '#union' directive.
+    // Structs in Onyx can behave like C unions, simply by using the '#union' directive.
     FloatIntUnion :: struct #union {
         i : i32;
         f : f32;

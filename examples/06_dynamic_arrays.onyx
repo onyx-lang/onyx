@@ -20,7 +20,7 @@ main :: (args: [] cstr) {
     // Currently, there are no implicit procedure calls anywhere
     // in the language because I find explicitly specifying
     // everything to be less bug prone in the long run, at the
-    // trade off of being mildly tedious. Since there are implicit
+    // trade off of being mildly tedious. Since there aren't implicit
     // procedure calls, we have to initialize and free the dynamic
     // array explicitly. The 'defer' simply runs array.free at the
     // end of this procedure scope. We will talk more about how to

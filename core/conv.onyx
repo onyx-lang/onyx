@@ -86,7 +86,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
     return str.{ data = c + 1, count = len };
 }
 
-// NOTE: This is a big hack but it will work for now
+@Hack @Cleanup // This is a big hack but it will work for now
 f64_to_str :: (f: f64, buf: [] u8) -> str {
     f *= 10000.0;
     v := cast(i64) f;

@@ -4,13 +4,14 @@ use package core
 
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day1.txt";
+    reader := io.reader_from_string(contents);
 
     nums := array.make(u32, 128);
     defer array.free(^nums);
 
     while num := 1; num > 0 {
         // This sets num to be 0 if there is no number
-        string.read_u32(^contents, ^num); 
+        num = io.read_u32(^reader);
         if num != 0 do array.push(^nums, num);
     }
 

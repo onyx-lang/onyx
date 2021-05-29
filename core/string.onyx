@@ -53,6 +53,25 @@ concat :: proc {
         return str.{ data, len1 + len2 };
     },
 
+    @Cleanup // Don't love that the allocator is necessary here,
+    // but it is impossible to specify a default value for the
+    // allocator while having a variadic number of strings. This
+    // is only due to the languages constraints however. This
+    // could easily be changed since there is no ambiguity.
+    (allocator: Allocator, strings: ..str) -> str {
+        total_length := 0;
+        for s: strings do total_length += s.count;
+
+        data := cast(^u8) raw_alloc(allocator, total_length);
+        offset := 0;
+        for s: strings {
+            memory.copy(data + offset, s.data, s.count);
+            offset += s.count;
+        }
+
+        return str.{ data, total_length };
+    },
+
     (into: ^[..] u8, s: str) -> str {
         array.ensure_capacity(into, into.count + s.count);
         memory.copy(into.data, s.data, into.count);
@@ -60,6 +79,7 @@ concat :: proc {
         return .{ into.data, into.count };
     }
 }
+
 
 split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
     delim_count := 0;
@@ -107,7 +127,8 @@ contains :: proc {
     },
 }
 
-// TODO: Check this for edge cases and other bugs. I'm not confident
+@TODO
+// Check this for edge cases and other bugs. I'm not confident
 // it will work perfectly yet.                   - brendanfh 2020/12/21
 compare :: (str1: str, str2: str) -> i32 {
     i := 0;
@@ -238,38 +259,6 @@ advance :: proc {
 
 // DEPRECATED
 // Everything below this point is deprecated
-read_u32 :: (s: ^str, out: ^u32) {
-    n := 0;
-
-    strip_leading_whitespace(s);
-    while s.data[0] >= #char "0" && s.data[0] <= #char "9" {
-        n *= 10;
-        n += cast(u32) (s.data[0] - #char "0");
-
-        s.data += 1;
-        s.count -= 1;
-    }
-
-    *out = n;
-}
-
-read_char :: (s: ^str, out: ^u8) {
-    *out = s.data[0];
-    s.data += 1;
-    s.count -= 1;
-}
-
-read_chars :: (s: ^str, out: ^str, char_count := 1) {
-    out.data = s.data;
-    out.count = char_count;
-    s.data += char_count;
-    s.count -= char_count;
-}
-
-discard_chars :: (s: ^str, char_count := 1) {
-    s.data += char_count;
-    s.count -= char_count;
-}
 
 // Goes up to but not including the closest newline or EOF
 read_line :: (s: ^str, out: ^str) {
@@ -313,7 +302,7 @@ read_until :: (s: ^str, upto: u8, skip := 0) -> str {
     return out;
 }
 
-read_until_either :: (s: ^str, skip: u32, uptos: ..u8) -> str {
+read_until_any :: (s: ^str, skip: u32, uptos: ..u8) -> str {
     if s.count == 0 do return "";
 
     out : str;
@@ -346,8 +335,4 @@ advance_line :: (s: ^str) {
 
     s.data += adv + 1;
     s.count -= adv + 1;
-}
-
-read :: proc {
-    read_u32, read_char
 }

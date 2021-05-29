@@ -8,7 +8,8 @@ package builtin
 str  :: #type []u8;
 cstr :: #type ^u8;
 
-// NOTE: Because of many implementation details, all fields of this
+@Note
+// Because of many implementation details, all fields of this
 // struct are required to be i32's.
 range :: struct {
     low  : i32;
@@ -39,7 +40,7 @@ vararg_get :: proc {
     }
 }
 
-// HACK: NullProcHack
+@NullProcHack
 null_proc :: proc () #null ---
 null      :: cast(rawptr) 0;
 

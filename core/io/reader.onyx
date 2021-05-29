@@ -1,5 +1,7 @@
 package core.io
 
+memory :: package core.memory
+
 Reader :: struct {
     stream : ^Stream;
 }
@@ -10,9 +12,22 @@ reader_make :: (s: ^Stream) -> Reader {
     return Reader.{ s };
 }
 
+reader_from_string :: (s: str) -> Reader {
+    stream_ptr := new(StringStream);     @Leak
+    *stream_ptr = string_stream_make(s);
+
+    return Reader.{ stream_ptr };
+}
+
 read_byte :: (use reader: ^Reader) -> u8 {
     err, byte := stream_read_byte(stream);
     return byte;
+}
+
+read_bytes :: (use reader: ^Reader, bytes := 1, allocator := context.allocator) -> str {
+    buffer := memory.make_slice(u8, bytes, allocator);
+    stream_read(stream, buffer);
+    return buffer;
 }
 
 read_u32 :: (use reader: ^Reader) -> u32 {
@@ -112,7 +127,7 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
     return out;
 }
 
-read_until :: (use reader: ^Reader, until: u8, allocator := context.allocator, consume_end := false) -> str {
+read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false) -> str {
     _, curr_pos := stream_tell(stream);
 
     count := 0;
@@ -122,7 +137,8 @@ read_until :: (use reader: ^Reader, until: u8, allocator := context.allocator, c
         if curr != until {
             count += 1;
         } else {
-            break;
+            if skip == 0 do break;
+            else do skip -= 1;
         }
 
         err, curr = stream_read_byte(stream);
@@ -172,4 +188,8 @@ skip_whitespace :: (use reader: ^Reader) {
             case #default do return;
         }
     }
+}
+
+skip_bytes :: (use reader: ^Reader, bytes: u32) {
+    for _: bytes do stream_read_byte(stream);
 }

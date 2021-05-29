@@ -6,22 +6,22 @@ use package core
 
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day2.txt";
+    reader := io.reader_from_string(contents);
 
     valid := 0;
-    lo : u32;
-    hi : u32;
-    ch : u8;
-    pw := "";
 
     while true {
-        string.read_u32(^contents, ^lo);
+        lo := io.read_u32(^reader);
         if lo == 0 do break;
-        string.discard_chars(^contents);
-        string.read_u32(^contents, ^hi);
-        string.discard_chars(^contents);
-        string.read_char(^contents, ^ch);
-        string.discard_chars(^contents, 2);
-        string.read_line(^contents, ^pw);
+
+        io.read_byte(^reader);
+        hi := io.read_u32(^reader);
+
+        io.read_byte(^reader);
+        ch := io.read_byte(^reader);
+
+        io.skip_bytes(^reader, 2);
+        pw := io.read_line(^reader);
 
         // Part 1
         // count := 0;
