@@ -255,30 +255,6 @@ advance :: proc {
     }
 }
 
-
-
-// DEPRECATED
-// Everything below this point is deprecated
-
-// Goes up to but not including the closest newline or EOF
-read_line :: (s: ^str, out: ^str) {
-    out.data = s.data;
-    out.count = 0;
-
-    for ch: *s {
-        if ch == #char "\n" do break;
-        out.count += 1;
-    }
-
-    s.data += out.count;
-    s.count -= out.count;
-
-    if s.count > 0 {
-        s.data += 1;
-        s.count -= 1;
-    }
-}
-
 read_until :: (s: ^str, upto: u8, skip := 0) -> str {
     if s.count == 0 do return "";
 

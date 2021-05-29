@@ -24,8 +24,8 @@ main :: (args: [] cstr) {
     width := 0;
     height := 0;
     while true {
-        line := "";
-        string.read_line(^contents, ^line);
+        line := string.read_until(^contents, #char "\n");
+        string.advance(^contents, 1);
         if line.count == 0 do break;
 
         width = line.count;

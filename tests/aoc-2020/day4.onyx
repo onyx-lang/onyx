@@ -7,8 +7,8 @@ process_passport :: (contents: ^str) -> u32 {
     field_count := 0;
 
     while true {
-        line: str;
-        string.read_line(contents, ^line);
+        line := string.read_until(contents, #char "\n");
+        string.advance(contents, 1);
         if line.count == 0 do break;
 
         fields := string.split(line, #char " ");

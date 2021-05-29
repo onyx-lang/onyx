@@ -11,8 +11,8 @@ main :: (args: [] cstr) {
     max_val := 0;
 
     while true {
-        line: str;
-        string.read_line(^contents, ^line);
+        line := string.read_until(^contents, #char "\n");
+        string.advance(^contents);
         if line.count == 0 do break;
 
         val := 0;
