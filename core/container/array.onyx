@@ -136,6 +136,28 @@ pop :: (arr: ^[..] $T) -> T {
     return arr.data[arr.count];
 }
 
+get :: (arr: ^[..] $T, idx: i32) -> T {
+    if arr.count == 0 do return __zero_value(T);
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    return arr.data[idx];
+}
+
+set :: (arr: ^[..] $T, idx: i32, value: T) {
+    if arr.count == 0 do return;
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    arr.data[idx] = value;
+}
+
+concat :: (arr: ^[..] $T, other: [..] T) {
+    for ^o: other do push(arr, *o);
+}
+
 // Uses '==' to compare for equality.
 contains :: proc {
     (arr: ^[..] $T, x: T) -> bool {
@@ -160,6 +182,20 @@ sum :: proc {
     (arr: [] $T, start: T = 0) -> T {
         sum := start;
         for it: arr do sum += it;
+        return sum;
+    }
+}
+
+product :: proc {
+    (arr: ^[..] $T, start: T = 1) -> T {
+        sum := start;
+        for it: *arr do sum *= it;
+        return sum;
+    },
+
+    (arr: [] $T, start: T = 1) -> T {
+        sum := start;
+        for it: arr do sum *= it;
         return sum;
     }
 }
@@ -234,6 +270,74 @@ map :: proc {
     (arr: [] $T, f: (^T) -> void)             do for ^it:  arr do f(it);,
     (arr: [] $T, f: (T) -> T)                 do for ^it:  arr do *it = f(*it);,
     (arr: [] $T, data: $R, f: (T, R) -> T)    do for ^it:  arr do *it = f(*it, data);,
+}
+
+every :: (arr: ^[..] $T, predicate: (T) -> bool) -> bool {
+    val := true;
+    for ^it: *arr do val = val && predicate(*it);
+    return val;
+}
+
+some :: (arr: ^[..] $T, predicate: (T) -> bool) -> bool {
+    val := false;
+    for ^it: *arr {
+        val = val || predicate(*it);
+        if val do break;
+    }
+    return val;
+}
+
+fill :: (arr: ^[..] $T, value: T) {
+    for i: arr.count {
+        arr.data[i] = value;
+    }
+}
+
+fill_range :: (arr: ^[..] $T, r: range, value: T) {
+    for i: r {
+        if i >= arr.count || i < 0 do continue;
+        arr.data[i] = value;
+    }
+}
+
+to_list :: (arr: ^[..] $T, allocator := context.allocator) -> List(T) {
+    new_list := list.make(T, allocator);
+
+    for ^it: *arr {
+        list.push_end(^new_list, *it);
+    }
+
+    return new_list;
+}
+
+find :: (arr: ^[..] $T, value: T) -> i32 {
+    for i: arr.count {
+        if value == arr.data[i] do return i;
+    }
+
+    return -1;
+}
+
+find_ptr :: (arr: ^[..] $T, value: T) -> ^T {
+    for ^it: *arr {
+        if value == *it do return it;
+    }
+
+    return null;
+}
+
+count_where :: proc {
+    (arr: ^[..] $T, predicate: (T) -> bool) -> u32 {
+        count: u32 = 0;
+        for ^it: *arr do if predicate(*it) do count += 1;
+        return count;
+    },
+
+    (arr: ^[..] $T, predicate: (^T) -> bool) -> u32 {
+        count: u32 = 0;
+        for ^it: *arr do if predicate(it) do count += 1;
+        return count;
+    },
 }
 
 #private_file
