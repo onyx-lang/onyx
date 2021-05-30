@@ -18,23 +18,28 @@ time_ns :: () -> u64 {
     return ~~output_time;
 }
 
-sleep :: (milliseconds: u32) {
-    tagged: SubscriptionTagged;
-    tagged.tag = .Clock;
-    tagged.clock = .{
-        id = .Realtime,
-        timeout = cast(u64) milliseconds * 1000000,
-        precision = 1000,
-        flags = .ClockAbsTime,
-    };
+sleep :: proc {
+    (seconds: u64)      { sleep(nanoseconds=seconds * 1000000000); },
+    (milliseconds: u64) { sleep(nanoseconds=milliseconds * 1000000); },
 
-    subscription := Subscription.{
-        userdata = 0,
-        u = tagged,
-    };
+    (nanoseconds: u64) {
+        tagged: SubscriptionTagged;
+        tagged.tag = .Clock;
+        tagged.clock = .{
+            id = .Realtime,
+            timeout = cast(u64) nanoseconds,
+            precision = 1,
+            flags = ~~0,
+        };
 
-    event: Event;
-    number_of_events: u32;
+        subscription := Subscription.{
+            userdata = 0,
+            u = tagged,
+        };
 
-    error_code := poll_oneoff(^subscription, ^event, 1, ^number_of_events);
+        event: Event;
+        number_of_events: u32;
+
+        error_code := poll_oneoff(^subscription, ^event, 1, ^number_of_events);
+    }
 }

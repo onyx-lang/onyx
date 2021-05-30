@@ -64,6 +64,7 @@ static b32            parse_possible_function_definition(OnyxParser* parser, Ast
 static AstFunction*   parse_function_definition(OnyxParser* parser, OnyxToken* token);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
+static AstStaticIf*   parse_static_if_stmt(OnyxParser* parser);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
 static void           parse_top_level_statement(OnyxParser* parser);
@@ -1314,6 +1315,21 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 retval = (AstNode *) context_tmp;
                 break;
             }
+
+            /*
+            This is in theory where the static if in procedures will be parsed. However,
+            this breaks many things because static if statements currently only parse top
+            level expressions in them, not general statements.
+
+            if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_If)) {
+                AstStaticIf* static_if = parse_static_if_stmt(parser);
+                ENTITY_SUBMIT(static_if);
+
+                needs_semicolon = 0;
+                retval = (AstNode *) static_if;
+                break;
+            }
+            */
         }
 
         default:
