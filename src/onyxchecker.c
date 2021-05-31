@@ -1724,26 +1724,6 @@ CheckStatus check_function_header(AstFunction* func) {
 
     func->type = type_build_function_type(context.ast_alloc, func);
 
-    /*
-    CLEANUP: These checks need to be ported to a process directive check.
-    if ((func->flags & Ast_Flag_Exported) != 0) {
-        if ((func->flags & Ast_Flag_Foreign) != 0) {
-            onyx_report_error(func->token->pos, "exporting a foreign function");
-            return Check_Error;
-        }
-
-        if ((func->flags & Ast_Flag_Intrinsic) != 0) {
-            onyx_report_error(func->token->pos, "exporting a intrinsic function");
-            return Check_Error;
-        }
-
-        if (func->exported_name == NULL) {
-            onyx_report_error(func->token->pos, "exporting function without a name");
-            return Check_Error;
-        }
-    }
-    */
-
     return Check_Success;
 }
 

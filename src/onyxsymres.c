@@ -6,8 +6,6 @@
 
 // Variables used during the symbol resolution phase.
 static Scope*       curr_scope    = NULL;
-static Package*     curr_package  = NULL;
-static AstFunction* curr_function = NULL;
 bh_arr(AstBlock *)  block_stack   = NULL;
 static b32 report_unresolved_symbols = 1;
 
@@ -787,13 +785,6 @@ SymresStatus symres_function_header(AstFunction* func) {
         if (param->default_value != NULL) {
             SYMRES(expression, &param->default_value);
             if (onyx_has_errors()) return Symres_Error;
-
-            // HACK: It shouldn't be necessary to do this twice, but right now
-            // if `null` is the default parameter and it hasn't been used anywhere in
-            // code yet, it doesn't resolve properly. So for now I am just checking symbols twice.
-            //                                                      -brendanfh 2020/12/24
-            SYMRES(expression, &param->default_value);
-            if (onyx_has_errors()) return Symres_Error;
         }
     }
 
@@ -866,7 +857,6 @@ SymresStatus symres_function(AstFunction* func) {
         }
     }
 
-    curr_function = func;
     SYMRES(block, func->body);
 
     scope_leave();
@@ -1061,6 +1051,24 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             if (export->export->kind == Ast_Kind_Function) {
                 AstFunction *func = (AstFunction *) export->export;
                 func->exported_name = export->export_name;
+
+                if ((func->flags & Ast_Flag_Exported) != 0) {
+                    if ((func->flags & Ast_Flag_Foreign) != 0) {
+                        onyx_report_error(export->token->pos, "exporting a foreign function");
+                        return Symres_Error;
+                    }
+
+                    if ((func->flags & Ast_Flag_Intrinsic) != 0) {
+                        onyx_report_error(export->token->pos, "exporting a intrinsic function");
+                        return Symres_Error;
+                    }
+
+                    // NOTE: This should never happen
+                    if (func->exported_name == NULL) {
+                        onyx_report_error(export->token->pos, "exporting function without a name");
+                        return Symres_Error;
+                    }
+                }
             }
 
             break;
@@ -1072,8 +1080,6 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
 void symres_entity(Entity* ent) {
     if (block_stack == NULL) bh_arr_new(global_heap_allocator, block_stack, 16);
-
-    if (ent->package) curr_package = ent->package;
 
     Scope* old_scope = NULL;
     if (ent->scope) {
@@ -1091,7 +1097,7 @@ void symres_entity(Entity* ent) {
     switch (ent->type) {
         case Entity_Type_Binding: {
             symbol_introduce(curr_scope, ent->binding->token, ent->binding->node);
-            package_reinsert_use_packages(curr_package);
+            package_reinsert_use_packages(ent->package);
             next_state = Entity_State_Finalized;
             break;
         }
@@ -1139,5 +1145,4 @@ void symres_entity(Entity* ent) {
     if (ss == Symres_Yield_Micro) ent->micro_attempts++;
 
     if (ent->scope) curr_scope = old_scope;
-    curr_package = NULL;
 }

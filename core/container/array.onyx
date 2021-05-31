@@ -215,35 +215,37 @@ to_slice :: (arr: ^[..] $T) -> [] T {
 ** Simple insertion sort
 **    cmp should return >0 if left > right
 */
-sort :: (arr: ^[..] $T, cmp: (T, T) -> i32) {
-    for i: 1 .. arr.count {
-        x := arr.data[i];
-        j := i - 1;
+sort :: proc {
+    (arr: ^[..] $T, cmp: (T, T) -> i32) {
+        for i: 1 .. arr.count {
+            x := arr.data[i];
+            j := i - 1;
 
-        @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
-        while j >= 0 {
-            if cmp(arr.data[j], x) > 0 {
-                arr.data[j + 1] = arr.data[j];
-                j -= 1;
-            } else {
-                break;
+            @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
+            while j >= 0 {
+                if cmp(arr.data[j], x) > 0 {
+                    arr.data[j + 1] = arr.data[j];
+                    j -= 1;
+                } else {
+                    break;
+                }
             }
+
+            arr.data[j + 1] = x;
         }
+    },
 
-        arr.data[j + 1] = x;
-    }
-}
+    (arr: ^[..] $T, cmp: (^T, ^T) -> i32) {
+        for i: 1 .. arr.count {
+            j := i;
 
-sort_ptr :: (arr: ^[..] $T, cmp: (^T, ^T) -> i32) {
-    for i: 1 .. arr.count {
-        j := i;
-
-        while j > 0 {
-            if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
-                arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
-                j -= 1;
-            } else {
-                break;
+            while j > 0 {
+                if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
+                    arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
+                    j -= 1;
+                } else {
+                    break;
+                }
             }
         }
     }
