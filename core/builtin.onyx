@@ -145,10 +145,20 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
         // @Robustness: This should be a '#if' when those are added in procedures because
         // otherwise the __initialize intrinsic is going to be generated no matter what.
         // This could be a problem if the type is not something that can be initialized.
+        //
+        // Static ifs in procedures are added now, however, much like nested procedures,
+        // static ifs cannot "see" polymorphic variables. They are only evaluated once
+        // NOT in the context of the polymorphic procedure they are instatiated in.
+        // This will be changed eventually. 'make' can be used for the time being or
+        // for forever.
         use package core.intrinsics.onyx { __initialize }
         if initialize do __initialize(res);
         
         return res;
+    }
+
+    make :: ($T: type_expr, allocator := context.allocator) -> ^T {
+        return cast(^T) raw_alloc(allocator, sizeof T);
     }
 }
 

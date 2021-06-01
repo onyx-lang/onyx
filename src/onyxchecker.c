@@ -51,6 +51,10 @@ CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
 CheckStatus check_type(AstType* type);
 
+
+// HACK HACK HACK
+b32 expression_types_must_be_known = 0;
+
 static inline void fill_in_type(AstTyped* node);
 
 static inline void fill_in_array_count(AstType* type_node) {
@@ -793,8 +797,16 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
 
     if (binop_is_assignment(binop->operation)) return check_binop_assignment(binop, assignment_is_ok);
 
+    if (expression_types_must_be_known) {
+        if (binop->left->type == NULL || binop->right->type == NULL) {
+            onyx_report_error(binop->token->pos, "Internal compiler error: one of the operands types is unknown here.");
+            return Check_Error;
+        }
+    }
+
     // NOTE: Try operator overloading before checking everything else.
-    if (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic) {
+    if ((binop->left->type != NULL && binop->right->type != NULL) &&
+        (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic)) {
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
         if (implicit_call != NULL) {
@@ -1790,7 +1802,9 @@ CheckStatus check_type(AstType* type) {
 }
 
 CheckStatus check_static_if(AstIf* static_if) {
+    expression_types_must_be_known = 1;
     CheckStatus result = check_expression(&static_if->cond);
+    expression_types_must_be_known = 0;
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
         onyx_report_error(static_if->token->pos, "Expected this condition to be compile time known.");
