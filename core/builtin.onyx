@@ -41,7 +41,7 @@ vararg_get :: proc {
 }
 
 @NullProcHack
-null_proc :: proc () #null ---
+null_proc :: () -> void #null ---
 null      :: cast(rawptr) 0;
 
 // I find myself wanting to return a completely nullified string like the
