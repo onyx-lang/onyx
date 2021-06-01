@@ -674,7 +674,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
 
     if (param->type_expr == (AstType *) &type_expr_symbol) {
         if (!node_is_type((AstNode *) value)) {
-            *err_msg = "Expected type expression.";
+            if (err_msg) *err_msg = "Expected type expression.";
             return;
         }
 
@@ -683,7 +683,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
 
     } else {
         if ((value->flags & Ast_Flag_Comptime) == 0) {
-            *err_msg = "Expected compile-time known argument.";
+            if (err_msg) *err_msg = "Expected compile-time known argument.";
             return;
         }
 
@@ -691,7 +691,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
             param->type = type_build_from_ast(context.ast_alloc, param->type_expr);
 
         if (!type_check_or_auto_cast(&value, param->type)) {
-            *err_msg = bh_aprintf(global_scratch_allocator,
+            if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
                     "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
                     get_function_name(pp->base_func),
                     type_get_name(param->type),
@@ -1028,6 +1028,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Argu
 
             if (type_to_match->kind == Type_Kind_VarArgs) type_to_match = type_to_match->VarArgs.ptr_to_data->Pointer.elem;
             if ((*value)->kind == Ast_Kind_Argument) {
+                // :ArgumentResolvingIsComplicated
                 if (((AstArgument *) (*value))->is_baked) continue;
                 value = &((AstArgument *) *value)->value;
             }
@@ -1365,9 +1366,35 @@ static i32 maximum_argument_count(AstNode* provider) {
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
+
+    { // Delete baked arguments
+        // :ArgumentResolvingIsComplicated
+        i32 max = bh_arr_length(args->values);
+        fori (i, 0, max) {
+            AstTyped* value = args->values[i];
+            if (value == NULL) continue;
+
+            if (value->kind == Ast_Kind_Argument) {
+                if (((AstArgument *) value)->is_baked) {
+                    i--;
+                    max--;
+                    bh_arr_deleten(args->values, i, 1);
+                }
+            }
+        }
+    }
+
     if (args->named_values != NULL) {
         bh_arr_each(AstNamedValue *, p_named_value, args->named_values) {
             AstNamedValue* named_value = *p_named_value;
+
+            if (named_value->value->kind == Ast_Kind_Argument) {
+                if (((AstArgument *) named_value->value)->is_baked) {
+                    // :ArgumentResolvingIsComplicated
+                    bh_arr_set_length(args->values, bh_arr_length(args->values) - 1);
+                    continue;
+                }
+            }
 
             token_toggle_end(named_value->token);
             i32 idx = lookup_idx_by_name(provider, named_value->token->text);
