@@ -30,7 +30,6 @@
     NODE(Compound)             \
                                \
     NODE(DirectiveSolidify)    \
-    NODE(StaticIf)             \
     NODE(DirectiveError)       \
     NODE(DirectiveAddOverload) \
     NODE(DirectiveOperator)    \
@@ -626,7 +625,14 @@ struct AstIfWhile {
 
     AstBlock *true_stmt;
     AstBlock *false_stmt;
+
+    // Used by Static_If
+    bh_arr(struct Entity *) true_entities;
+    bh_arr(struct Entity *) false_entities;
 };
+typedef struct AstIfWhile AstIf;
+typedef struct AstIfWhile AstWhile;
+
 struct AstSwitchCase {
     // NOTE: All expressions that end up in this block
     bh_arr(AstTyped *) values;
@@ -882,15 +888,6 @@ struct AstPolyProc {
 };
 
 
-struct AstStaticIf {
-    AstNode_base;
-
-    AstTyped* cond;
-
-    bh_arr(struct Entity *) true_entities;
-    bh_arr(struct Entity *) false_entities;
-};
-
 struct AstDirectiveError {
     AstNode_base;
 
@@ -991,7 +988,7 @@ typedef struct Entity {
         AstDirectiveError     *error;
         AstInclude            *include;
         AstBinding            *binding;
-        AstStaticIf           *static_if;
+        AstIf                 *static_if;
         AstFunction           *function;
         AstOverloadedFunction *overloaded_function;
         AstGlobal             *global;
@@ -1201,6 +1198,8 @@ void arguments_remove_baked(Arguments* args);
 
 // GROSS: Using void* to avoid having to cast everything.
 const char* node_get_type_name(void* node);
+
+b32 static_if_resolution(AstIf* static_if);
 
 typedef enum PolyProcLookupMethod {
     PPLM_By_Arguments,

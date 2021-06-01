@@ -64,7 +64,7 @@ static b32            parse_possible_function_definition(OnyxParser* parser, Ast
 static AstFunction*   parse_function_definition(OnyxParser* parser, OnyxToken* token);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
-static AstStaticIf*   parse_static_if_stmt(OnyxParser* parser);
+static AstIf*         parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statements);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
 static void           parse_top_level_statement(OnyxParser* parser);
@@ -1320,16 +1320,16 @@ static AstNode* parse_statement(OnyxParser* parser) {
             This is in theory where the static if in procedures will be parsed. However,
             this breaks many things because static if statements currently only parse top
             level expressions in them, not general statements.
+            */
 
             if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_If)) {
-                AstStaticIf* static_if = parse_static_if_stmt(parser);
+                AstIf* static_if = parse_static_if_stmt(parser, 1);
                 ENTITY_SUBMIT(static_if);
 
                 needs_semicolon = 0;
                 retval = (AstNode *) static_if;
                 break;
             }
-            */
         }
 
         default:
@@ -2072,8 +2072,8 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
     return enum_node;
 }
 
-static AstStaticIf* parse_static_if_stmt(OnyxParser* parser) {
-    AstStaticIf* static_if_node = make_node(AstStaticIf, Ast_Kind_Static_If);
+static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statements) {
+    AstIf* static_if_node = make_node(AstIf, Ast_Kind_Static_If);
     static_if_node->token = expect_token(parser, '#');
     expect_token(parser, Token_Type_Keyword_If);
 
@@ -2082,11 +2082,16 @@ static AstStaticIf* parse_static_if_stmt(OnyxParser* parser) {
     bh_arr_new(global_heap_allocator, static_if_node->true_entities, 2);
     bh_arr_push(parser->alternate_entity_placement_stack, &static_if_node->true_entities);
 
-    expect_token(parser, '{');
-    while (!consume_token_if_next(parser, '}')) {
-        if (parser->hit_unexpected_token) return static_if_node;
+    if (parse_block_as_statements) {
+        static_if_node->true_stmt = parse_block(parser);
 
-        parse_top_level_statement(parser);
+    } else {
+        expect_token(parser, '{');
+        while (!consume_token_if_next(parser, '}')) {
+            if (parser->hit_unexpected_token) return static_if_node;
+
+            parse_top_level_statement(parser);
+        }
     }
 
     bh_arr_pop(parser->alternate_entity_placement_stack);
@@ -2095,11 +2100,16 @@ static AstStaticIf* parse_static_if_stmt(OnyxParser* parser) {
         bh_arr_new(global_heap_allocator, static_if_node->false_entities, 2);
         bh_arr_push(parser->alternate_entity_placement_stack, &static_if_node->false_entities);
 
-        expect_token(parser, '{');
-        while (!consume_token_if_next(parser, '}')) {
-            if (parser->hit_unexpected_token) return static_if_node;
+        if (parse_block_as_statements) {
+            static_if_node->false_stmt = parse_block(parser);
 
-            parse_top_level_statement(parser);
+        } else {
+            expect_token(parser, '{');
+            while (!consume_token_if_next(parser, '}')) {
+                if (parser->hit_unexpected_token) return static_if_node;
+
+                parse_top_level_statement(parser);
+            }
         }
 
         bh_arr_pop(parser->alternate_entity_placement_stack);
@@ -2234,7 +2244,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
         case '#': {
             if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_If)) {
-                AstStaticIf* static_if = parse_static_if_stmt(parser);
+                AstIf* static_if = parse_static_if_stmt(parser, 0);
                 ENTITY_SUBMIT(static_if);
                 return;
             }

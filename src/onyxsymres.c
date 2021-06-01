@@ -55,7 +55,7 @@ static SymresStatus symres_enum(AstEnumType* enum_node);
 static SymresStatus symres_memres_type(AstMemRes** memres);
 static SymresStatus symres_memres(AstMemRes** memres);
 static SymresStatus symres_struct_defaults(AstType* st);
-static SymresStatus symres_static_if(AstStaticIf* static_if);
+static SymresStatus symres_static_if(AstIf* static_if);
 
 static void scope_enter(Scope* new_scope) {
     curr_scope = new_scope;
@@ -498,12 +498,22 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
         SYMRES(statement, (AstNode **) &ifnode->assignment, NULL);
     }
 
-    SYMRES(expression, &ifnode->cond);
+    if (ifnode->kind == Ast_Kind_Static_If) {
+        if (static_if_resolution(ifnode)) {
+            if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
+            
+        } else {
+            if (ifnode->false_stmt != NULL) SYMRES(statement, (AstNode **) &ifnode->false_stmt, NULL);
+        }
 
-    if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
-    if (ifnode->false_stmt != NULL) SYMRES(statement, (AstNode **) &ifnode->false_stmt, NULL);
+    } else {
+        SYMRES(expression, &ifnode->cond);
 
-    if (ifnode->assignment != NULL) scope_leave();
+        if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
+        if (ifnode->false_stmt != NULL) SYMRES(statement, (AstNode **) &ifnode->false_stmt, NULL);
+
+        if (ifnode->assignment != NULL) scope_leave();
+    }
 
     return Symres_Success;
 }
@@ -717,6 +727,7 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
     switch ((*stmt)->kind) {
         case Ast_Kind_Return:      SYMRES(return, (AstReturn *) *stmt);                  break;
         case Ast_Kind_If:          SYMRES(if, (AstIfWhile *) *stmt);                     break;
+        case Ast_Kind_Static_If:   SYMRES(if, (AstIfWhile *) *stmt);                     break;
         case Ast_Kind_While:       SYMRES(while, (AstIfWhile *) *stmt);                  break;
         case Ast_Kind_For:         SYMRES(for, (AstFor *) *stmt);                        break;
         case Ast_Kind_Switch:      SYMRES(switch, (AstSwitch *) *stmt);                  break;
@@ -993,7 +1004,7 @@ static SymresStatus symres_polyproc(AstPolyProc* pp) {
     return Symres_Success;
 }
 
-static SymresStatus symres_static_if(AstStaticIf* static_if) {
+static SymresStatus symres_static_if(AstIf* static_if) {
     SYMRES(expression, &static_if->cond);
     return Symres_Success;
 }

@@ -125,15 +125,25 @@ CheckStatus check_return(AstReturn* retnode) {
 CheckStatus check_if(AstIfWhile* ifnode) {
     if (ifnode->assignment != NULL) CHECK(statement, (AstNode **) &ifnode->assignment);
 
-    CHECK(expression, &ifnode->cond);
+    if (ifnode->kind == Ast_Kind_Static_If) {
+        if (static_if_resolution(ifnode)) {
+            if (ifnode->true_stmt != NULL) CHECK(statement, (AstNode **) &ifnode->true_stmt);
+            
+        } else {
+            if (ifnode->false_stmt != NULL) CHECK(statement, (AstNode **) &ifnode->false_stmt);
+        }
 
-    if (!type_is_bool(ifnode->cond->type)) {
-        onyx_report_error(ifnode->cond->token->pos, "expected boolean type for condition");
-        return Check_Error;
+    } else {
+        CHECK(expression, &ifnode->cond);
+
+        if (!type_is_bool(ifnode->cond->type)) {
+            onyx_report_error(ifnode->cond->token->pos, "expected boolean type for condition");
+            return Check_Error;
+        }
+
+        if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt);
+        if (ifnode->false_stmt) CHECK(statement, (AstNode **) &ifnode->false_stmt);
     }
-
-    if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt);
-    if (ifnode->false_stmt) CHECK(statement, (AstNode **) &ifnode->false_stmt);
 
     return Check_Success;
 }
@@ -1488,6 +1498,7 @@ CheckStatus check_statement(AstNode** pstmt) {
 
         case Ast_Kind_Return:     return check_return((AstReturn *) stmt);
         case Ast_Kind_If:         return check_if((AstIfWhile *) stmt);
+        case Ast_Kind_Static_If:  return check_if((AstIfWhile *) stmt);
         case Ast_Kind_While:      return check_while((AstIfWhile *) stmt);
         case Ast_Kind_For:        return check_for((AstFor *) stmt);
         case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
@@ -1778,7 +1789,7 @@ CheckStatus check_type(AstType* type) {
     return Check_Success;
 }
 
-CheckStatus check_static_if(AstStaticIf* static_if) {
+CheckStatus check_static_if(AstIf* static_if) {
     CheckStatus result = check_expression(&static_if->cond);
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
@@ -1791,17 +1802,16 @@ CheckStatus check_static_if(AstStaticIf* static_if) {
         return Check_Error;
     }
 
-    AstNumLit* condition_value = (AstNumLit *) static_if->cond;
-    assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
+    b32 resolution = static_if_resolution(static_if);
 
     if (context.options->print_static_if_results)
         bh_printf("Static if statement at %s:%d:%d resulted in %s\n",
             static_if->token->pos.filename,
             static_if->token->pos.line,
             static_if->token->pos.column,
-            condition_value->value.i ? "true" : "false");
+            resolution ? "true" : "false");
 
-    if (condition_value->value.i) {
+    if (resolution) {
         bh_arr_each(Entity *, ent, static_if->true_entities) {
             entity_heap_insert_existing(&context.entities, *ent);
         }
@@ -1822,6 +1832,7 @@ CheckStatus check_node(AstNode* node) {
         case Ast_Kind_Block:                return check_block((AstBlock *) node);
         case Ast_Kind_Return:               return check_return((AstReturn *) node);
         case Ast_Kind_If:                   return check_if((AstIfWhile *) node);
+        case Ast_Kind_Static_If:            return check_if((AstIfWhile *) node);
         case Ast_Kind_While:                return check_while((AstIfWhile *) node);
         case Ast_Kind_Call:                 return check_call((AstCall *) node);
         case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp **) &node, 1);

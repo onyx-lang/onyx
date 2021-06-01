@@ -859,3 +859,12 @@ const char* node_get_type_name(void* node) {
 
     return type_get_name(((AstTyped *) node)->type);
 }
+
+b32 static_if_resolution(AstIf* static_if) {
+    if (static_if->kind != Ast_Kind_Static_If) return 0;
+
+    AstNumLit* condition_value = (AstNumLit *) static_if->cond;
+    assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
+
+    return condition_value->value.i != 0;
+}

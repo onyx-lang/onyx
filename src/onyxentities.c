@@ -290,7 +290,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Static_If: {
             ent.state = Entity_State_Comptime_Resolve_Symbols;
             ent.type = Entity_Type_Static_If;
-            ent.static_if = (AstStaticIf *) node;
+            ent.static_if = (AstIf *) node;
             ENTITY_INSERT(ent);
             break;
         }

@@ -387,6 +387,7 @@ EMIT_FUNC(statement, AstNode* stmt) {
     switch (stmt->kind) {
         case Ast_Kind_Return:     emit_return(mod, &code, (AstReturn *) stmt); break;
         case Ast_Kind_If:         emit_if(mod, &code, (AstIfWhile *) stmt); break;
+        case Ast_Kind_Static_If:  emit_if(mod, &code, (AstIfWhile *) stmt); break;
         case Ast_Kind_While:      emit_while(mod, &code, (AstIfWhile *) stmt); break;
         case Ast_Kind_For:        emit_for(mod, &code, (AstFor *) stmt); break;
         case Ast_Kind_Switch:     emit_switch(mod, &code, (AstSwitch *) stmt); break;
@@ -660,6 +661,17 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
         bh_imap_put(&mod->local_map, (u64) if_node->local, local_allocate(mod->local_alloc, (AstTyped *) if_node->local));
 
         emit_assignment(mod, &code, if_node->assignment);
+    }
+
+    if (if_node->kind == Ast_Kind_Static_If) {
+        if (static_if_resolution(if_node)) {
+            if (if_node->true_stmt) emit_block(mod, &code, if_node->true_stmt, 1);
+        } else {
+            if (if_node->false_stmt) emit_block(mod, &code, if_node->false_stmt, 1);
+        }
+
+        *pcode = code;
+        return;
     }
 
     emit_expression(mod, &code, if_node->cond);
