@@ -667,7 +667,10 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
     // HACK: Storing the original value because if this was an AstArgument, we need to flag
     // it as baked if it is determined that the argument is of the correct kind and type.
     AstTyped* orig_value = value;
-    if (value->kind == Ast_Kind_Argument) value = ((AstArgument *) value)->value;
+    if (value->kind == Ast_Kind_Argument) {
+        ((AstArgument *) orig_value)->is_baked = 0;
+        value = ((AstArgument *) value)->value;
+    }
 
     if (param->type_expr == (AstType *) &type_expr_symbol) {
         if (!node_is_type((AstNode *) value)) {
@@ -1024,7 +1027,10 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Argu
             AstTyped** value    = &args.values[i];
 
             if (type_to_match->kind == Type_Kind_VarArgs) type_to_match = type_to_match->VarArgs.ptr_to_data->Pointer.elem;
-            if ((*value)->kind == Ast_Kind_Argument)      value = &((AstArgument *) *value)->value;
+            if ((*value)->kind == Ast_Kind_Argument) {
+                if (((AstArgument *) (*value))->is_baked) continue;
+                value = &((AstArgument *) *value)->value;
+            }
 
             if (!type_check_or_auto_cast(value, type_to_match)) {
                 all_arguments_work = 0;
