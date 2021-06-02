@@ -229,6 +229,10 @@ typedef enum AstFlags {
     Ast_Flag_Incomplete_Body       = BH_BIT(24),
 
     Ast_Flag_Array_Literal_Typed   = BH_BIT(25),
+
+    Ast_Flag_Has_Been_Symres       = BH_BIT(26),
+
+    Ast_Flag_Static_If_Resolved    = BH_BIT(27),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -924,8 +928,6 @@ typedef enum EntityState {
     Entity_State_Parse_Builtin,
     Entity_State_Introduce_Symbols,
     Entity_State_Parse,
-    Entity_State_Comptime_Resolve_Symbols,
-    Entity_State_Comptime_Check_Types,
     Entity_State_Resolve_Symbols,
     Entity_State_Check_Types,
     Entity_State_Code_Gen,

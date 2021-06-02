@@ -499,6 +499,10 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
     }
 
     if (ifnode->kind == Ast_Kind_Static_If) {
+        if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
+            return Symres_Yield_Macro;
+        }
+
         if (static_if_resolution(ifnode)) {
             if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
             
@@ -818,52 +822,56 @@ SymresStatus symres_function(AstFunction* func) {
 
     scope_enter(func->scope);
 
-    bh_arr_each(AstParam, param, func->params) {
-        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+    if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
+        func->flags |= Ast_Flag_Has_Been_Symres;
 
-        // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
-        // resolved and built. This is excessive because all that should need to be known
-        // is the names of the members, since all that happens is implicit field accesses
-        // are placed in the scope. So instead, there should be a way to just query all the
-        // member names in the structure, without needing to know their type. This would be
-        // easy if it were not for 'use' statements in structs. It is made even more complicated
-        // by this situtation:
-        //
-        //     Foo :: struct (T: type_expr) {
-        //         use t : T;
-        // 
-        //         something_else := 5 + 6 * 8;
-        //     }
-        //
-        // The 'use t : T' member requires completely knowing the type of T, to know which
-        // members should be brought in. At the moment, that requires completely building the
-        // type of Foo($T).
-        if (param->local->flags & Ast_Flag_Param_Use) {
-            if (param->local->type_node != NULL && param->local->type == NULL) {
-                param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
-            }
+        bh_arr_each(AstParam, param, func->params) {
+            symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
 
-            if (type_is_struct(param->local->type)) {
-                Type* st;
-                if (param->local->type->kind == Type_Kind_Struct) {
-                    st = param->local->type;
-                } else {
-                    st = param->local->type->Pointer.elem;
+            // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
+            // resolved and built. This is excessive because all that should need to be known
+            // is the names of the members, since all that happens is implicit field accesses
+            // are placed in the scope. So instead, there should be a way to just query all the
+            // member names in the structure, without needing to know their type. This would be
+            // easy if it were not for 'use' statements in structs. It is made even more complicated
+            // by this situtation:
+            //
+            //     Foo :: struct (T: type_expr) {
+            //         use t : T;
+            // 
+            //         something_else := 5 + 6 * 8;
+            //     }
+            //
+            // The 'use t : T' member requires completely knowing the type of T, to know which
+            // members should be brought in. At the moment, that requires completely building the
+            // type of Foo($T).
+            if (param->local->flags & Ast_Flag_Param_Use) {
+                if (param->local->type_node != NULL && param->local->type == NULL) {
+                    param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
                 }
 
-                bh_table_each_start(StructMember, st->Struct.members);
-                    AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value.name);
-                    symbol_raw_introduce(curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
-                bh_table_each_end;
+                if (type_is_struct(param->local->type)) {
+                    Type* st;
+                    if (param->local->type->kind == Type_Kind_Struct) {
+                        st = param->local->type;
+                    } else {
+                        st = param->local->type->Pointer.elem;
+                    }
 
-            } else if (param->local->type != NULL) {
-                onyx_report_error(param->local->token->pos, "Can only 'use' structures or pointers to structures.");
+                    bh_table_each_start(StructMember, st->Struct.members);
+                        AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value.name);
+                        symbol_raw_introduce(curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
+                    bh_table_each_end;
 
-            } else {
-                // :ExplicitTyping
-                onyx_report_error(param->local->token->pos, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
-                    param->local->token->text,
-                    param->local->token->length);
+                } else if (param->local->type != NULL) {
+                    onyx_report_error(param->local->token->pos, "Can only 'use' structures or pointers to structures.");
+
+                } else {
+                    // :ExplicitTyping
+                    onyx_report_error(param->local->token->pos, "Cannot deduce type of parameter '%b'; Try adding it explicitly.",
+                        param->local->token->text,
+                        param->local->token->length);
+                }
             }
         }
     }
@@ -1113,11 +1121,7 @@ void symres_entity(Entity* ent) {
             break;
         }
 
-        case Entity_Type_Static_If: {
-            ss = symres_static_if(ent->static_if);
-            next_state = Entity_State_Comptime_Check_Types;
-            break;
-        }
+        case Entity_Type_Static_If:               ss = symres_static_if(ent->static_if); break;
         
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function_Header:         ss = symres_function_header(ent->function); break;
@@ -1151,9 +1155,13 @@ void symres_entity(Entity* ent) {
         default: break;
     }
 
-    if (ss == Symres_Success)     ent->state = next_state;
     if (ss == Symres_Yield_Macro) ent->macro_attempts++;
     if (ss == Symres_Yield_Micro) ent->micro_attempts++;
+    if (ss == Symres_Success) {
+        ent->macro_attempts = 0;
+        ent->micro_attempts = 0;
+        ent->state = next_state;
+    }
 
     if (ent->scope) curr_scope = old_scope;
 }

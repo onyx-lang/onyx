@@ -111,8 +111,6 @@ const char* entity_state_strings[Entity_State_Count] = {
     "Parse Builtin",
     "Introduce Symbols",
     "Parse",
-    "Resolve Static Symbols",
-    "Check Static Types",
     "Resolve Symbols",
     "Check Types",
     "Code Gen",

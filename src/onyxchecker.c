@@ -16,6 +16,7 @@ typedef enum CheckStatus {
     Check_Complete, // The node is done processing
 
     Check_Errors_Start,
+    Check_Yield_Macro,
     Check_Error,    // There was an error when checking the node
 } CheckStatus;
 
@@ -130,6 +131,10 @@ CheckStatus check_if(AstIfWhile* ifnode) {
     if (ifnode->assignment != NULL) CHECK(statement, (AstNode **) &ifnode->assignment);
 
     if (ifnode->kind == Ast_Kind_Static_If) {
+        if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
+            return Check_Yield_Macro;
+        }
+
         if (static_if_resolution(ifnode)) {
             if (ifnode->true_stmt != NULL) CHECK(statement, (AstNode **) &ifnode->true_stmt);
             
@@ -1816,6 +1821,8 @@ CheckStatus check_static_if(AstIf* static_if) {
         return Check_Error;
     }
 
+    static_if->flags |= Ast_Flag_Static_If_Resolved;
+
     b32 resolution = static_if_resolution(static_if);
 
     if (context.options->print_static_if_results)
@@ -1908,7 +1915,7 @@ void check_entity(Entity* ent) {
 
     if (cs == Check_Success)  ent->state = Entity_State_Code_Gen;
     if (cs == Check_Complete) ent->state = Entity_State_Finalized;
-    // else if (cs == Check_Yield) {
-    //     ent->attempts++;
-    // }
+    else if (cs == Check_Yield_Macro) {
+         ent->macro_attempts++;
+    }
 }

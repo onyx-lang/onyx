@@ -4,7 +4,7 @@
 
 static inline i32 entity_phase(Entity* e1) {
     if (e1->state <= Entity_State_Parse) return 1;
-    if (e1->state <= Entity_State_Comptime_Check_Types) return 2;
+    if (e1->state <  Entity_State_Code_Gen) return 2;
     return 3;
 }
 
@@ -13,17 +13,17 @@ static i32 entity_compare(Entity* e1, Entity* e2) {
     i32 phase1 = entity_phase(e1);
     i32 phase2 = entity_phase(e2);
 
-    if (phase1 != phase2 || phase1 != 2) {
-        if (e1->state != e2->state)
-            return (i32) e1->state - (i32) e2->state;
-        else if (e1->type != e2->type)
-            return (i32) e1->type - (i32) e2->type;
-        else
-            return (i32) (e1->micro_attempts - e2->micro_attempts);
-
-    } else {
+    if (phase1 != phase2)
+        return phase1 - phase2;
+    else if (e1->macro_attempts != e2->macro_attempts)
         return (i32) e1->macro_attempts - (i32) e2->macro_attempts;
-    }
+    else if (e1->state != e2->state)
+        return (i32) e1->state - (i32) e2->state;
+    else if (e1->type != e2->type)
+        return (i32) e1->type - (i32) e2->type;
+    else
+        return (i32) (e1->micro_attempts - e2->micro_attempts);
+
 }
 
 #define eh_parent(index) (((index) - 1) / 2)
@@ -258,7 +258,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         
         case Ast_Kind_Use: {
             if (((AstUse *) node)->expr->kind == Ast_Kind_Package) {
-                ent.state = Entity_State_Comptime_Resolve_Symbols;
+                ent.state = Entity_State_Resolve_Symbols;
                 ent.type = Entity_Type_Use_Package;
             } else {
                 ent.type = Entity_Type_Use;
@@ -288,7 +288,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         }
 
         case Ast_Kind_Static_If: {
-            ent.state = Entity_State_Comptime_Resolve_Symbols;
+            ent.state = Entity_State_Resolve_Symbols;
             ent.type = Entity_Type_Static_If;
             ent.static_if = (AstIf *) node;
             ENTITY_INSERT(ent);

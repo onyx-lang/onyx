@@ -318,12 +318,8 @@ static b32 process_entity(Entity* ent) {
             ent->state = Entity_State_Finalized;
             break;
 
-        case Entity_State_Comptime_Resolve_Symbols:
         case Entity_State_Resolve_Symbols: symres_entity(ent); break;
-
-        case Entity_State_Comptime_Check_Types:
         case Entity_State_Check_Types:     check_entity(ent);  break;
-        
         case Entity_State_Code_Gen:        emit_entity(ent);   break;
     }
 
