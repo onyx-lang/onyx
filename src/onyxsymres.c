@@ -819,6 +819,7 @@ SymresStatus symres_function_header(AstFunction* func) {
 SymresStatus symres_function(AstFunction* func) {
     if (func->scope == NULL)
         func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
+    if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
 
     scope_enter(func->scope);
 

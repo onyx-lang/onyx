@@ -146,7 +146,7 @@ CheckStatus check_if(AstIfWhile* ifnode) {
         CHECK(expression, &ifnode->cond);
 
         if (!type_is_bool(ifnode->cond->type)) {
-            onyx_report_error(ifnode->cond->token->pos, "expected boolean type for condition");
+            onyx_report_error(ifnode->cond->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(ifnode->cond->type));
             return Check_Error;
         }
 
@@ -163,7 +163,7 @@ CheckStatus check_while(AstIfWhile* whilenode) {
     CHECK(expression, &whilenode->cond);
 
     if (!type_is_bool(whilenode->cond->type)) {
-        onyx_report_error(whilenode->cond->token->pos, "expected boolean type for condition");
+        onyx_report_error(whilenode->cond->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(whilenode->cond->type));
         return Check_Error;
     }
 
@@ -405,6 +405,8 @@ CheckStatus check_call(AstCall* call) {
 
     // SPEED CLEANUP: Keeping an original copy for basically no reason except that sometimes you
     // need to know the baked argument values in code generation.
+    // This should only be done once, but right now it is being done everytime this is checked,
+    // which can be multiple if we have to yield on a callee's type.
     arguments_clone(&call->original_args, &call->args);
 
     if (call->callee->kind == Ast_Kind_Overloaded_Function) {
@@ -426,10 +428,7 @@ CheckStatus check_call(AstCall* call) {
 
     // NOTE: Build callee's type
     fill_in_type((AstTyped *) callee);
-    if (callee->type == NULL) {
-        onyx_report_error(call->token->pos, "There was an error with looking up the type of this function.");
-        return Check_Error;
-    }
+    if (callee->type == NULL) return Check_Yield_Macro;
 
     if (callee->type->kind != Type_Kind_Function) {
         onyx_report_error(call->token->pos,
@@ -1582,6 +1581,7 @@ CheckStatus check_block(AstBlock* block) {
 
 CheckStatus check_function(AstFunction* func) {
     if (func->flags & Ast_Flag_Already_Checked) return Check_Success;
+    if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen) return Check_Yield_Macro;
     
     expected_return_type = func->type->Function.return_type;
     if (func->body) {
@@ -1809,6 +1809,7 @@ CheckStatus check_type(AstType* type) {
 CheckStatus check_static_if(AstIf* static_if) {
     expression_types_must_be_known = 1;
     CheckStatus result = check_expression(&static_if->cond);
+    if (result == Check_Yield_Macro) return Check_Yield_Macro;
     expression_types_must_be_known = 0;
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
@@ -1866,21 +1867,14 @@ void check_entity(Entity* ent) {
 
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
-        case Entity_Type_Function_Header:
-            cs = check_function_header(ent->function);
-            break;
-
-        case Entity_Type_Function:
-            cs = check_function(ent->function);
-            break;
-
-        case Entity_Type_Overloaded_Function:
-            cs = check_overloaded_function(ent->overloaded_function);
-            break;
-
-        case Entity_Type_Global:
-            cs = check_global(ent->global);
-            break;
+        case Entity_Type_Function_Header:          cs = check_function_header(ent->function); break;
+        case Entity_Type_Function:                 cs = check_function(ent->function); break;
+        case Entity_Type_Overloaded_Function:      cs = check_overloaded_function(ent->overloaded_function); break;
+        case Entity_Type_Global:                   cs = check_global(ent->global); break;
+        case Entity_Type_Struct_Member_Default:    cs = check_struct_defaults((AstStructType *) ent->type_alias); break;
+        case Entity_Type_Memory_Reservation_Type:  cs = check_memres_type(ent->mem_res); break;
+        case Entity_Type_Memory_Reservation:       cs = check_memres(ent->mem_res); break;
+        case Entity_Type_Static_If:                cs = check_static_if(ent->static_if); break;
 
         case Entity_Type_Expression:
             cs = check_expression(&ent->expr);
@@ -1894,28 +1888,10 @@ void check_entity(Entity* ent) {
                 cs = check_type(ent->type_alias);
             break;
 
-        case Entity_Type_Struct_Member_Default:
-            cs = check_struct_defaults((AstStructType *) ent->type_alias);
-            break;
-
-        case Entity_Type_Memory_Reservation_Type:
-            cs = check_memres_type(ent->mem_res);
-            break;
-
-        case Entity_Type_Memory_Reservation:
-            cs = check_memres(ent->mem_res);
-            break;
-
-        case Entity_Type_Static_If:
-            cs = check_static_if(ent->static_if);
-            break;
-
         default: break;
     }
 
-    if (cs == Check_Success)  ent->state = Entity_State_Code_Gen;
-    if (cs == Check_Complete) ent->state = Entity_State_Finalized;
-    else if (cs == Check_Yield_Macro) {
-         ent->macro_attempts++;
-    }
+    if (cs == Check_Success)     ent->state = Entity_State_Code_Gen;
+    if (cs == Check_Complete)    ent->state = Entity_State_Finalized;
+    if (cs == Check_Yield_Macro) ent->macro_attempts++;
 }

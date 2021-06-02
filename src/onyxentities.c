@@ -4,8 +4,8 @@
 
 static inline i32 entity_phase(Entity* e1) {
     if (e1->state <= Entity_State_Parse) return 1;
-    if (e1->state <  Entity_State_Code_Gen) return 2;
-    return 3;
+    if (e1->state <  Entity_State_Code_Gen) return 3;
+    return 4;
 }
 
 // NOTE: Returns >0 if e1 should be processed after e2.
@@ -96,11 +96,10 @@ void entity_heap_insert_existing(EntityHeap* entities, Entity* e) {
     entities->all_count[e->state][e->type]++;
 }
 
-// nocheckin
-// Temporary wrapper
-void entity_heap_insert(EntityHeap* entities, Entity e) {
+Entity* entity_heap_insert(EntityHeap* entities, Entity e) {
     Entity* entity = entity_heap_register(entities, e);
     entity_heap_insert_existing(entities, entity);
+    return entity;
 }
 
 Entity* entity_heap_top(EntityHeap* entities) {
@@ -134,8 +133,8 @@ void entity_heap_remove_top(EntityHeap* entities) {
 
 // NOTE(Brendan Hansen): Uses the entity heap in the context structure
 void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* scope, Package* package) {
-#define ENTITY_INSERT(_ent) {                                   \
-    Entity* entity = entity_heap_register(entities, _ent);       \
+#define ENTITY_INSERT(_ent)                                     \
+    entity = entity_heap_register(entities, _ent);              \
     if (target_arr) {                                           \
         bh_arr(Entity *) __tmp_arr = *target_arr;               \
         bh_arr_push(__tmp_arr, entity);                         \
@@ -143,9 +142,10 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
     } else {                                                    \
         entity_heap_insert_existing(entities, entity);          \
     }                                                           \
-    }
+    
 
     EntityHeap* entities = &context.entities;
+    Entity* entity;
     
     Entity ent;
     ent.state = Entity_State_Resolve_Symbols;
@@ -187,10 +187,12 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
                 ent.type     = Entity_Type_Function_Header;
                 ent.function = (AstFunction *) node;
                 ENTITY_INSERT(ent);
+                ((AstFunction *) node)->entity_header = entity;
                 
                 ent.type     = Entity_Type_Function;
                 ent.function = (AstFunction *) node;
                 ENTITY_INSERT(ent);
+                ((AstFunction *) node)->entity_body = entity;
             }
             break;
         }

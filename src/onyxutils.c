@@ -324,8 +324,11 @@ static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_fun
         .scope = solidified_func.poly_scope,
     };
 
-    entity_heap_insert(&context.entities, func_header_entity);
-    entity_heap_insert(&context.entities, func_entity);
+    Entity* entity_header = entity_heap_insert(&context.entities, func_header_entity);
+    Entity* entity_body   = entity_heap_insert(&context.entities, func_entity);
+
+    solidified_func.func->entity_header = entity_header;
+    solidified_func.func->entity_body   = entity_body;
 
     return 1;
 }
@@ -1268,6 +1271,8 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
 }
 
 void entity_bring_to_state(Entity* ent, EntityState state) {
+    EntityState last_state = ent->state;
+
     while (ent->state != state) {
         switch (ent->state) {
             case Entity_State_Resolve_Symbols: symres_entity(ent); break;
@@ -1276,6 +1281,9 @@ void entity_bring_to_state(Entity* ent, EntityState state) {
 
             default: return;
         }
+
+        if (ent->state == last_state) break;
+        last_state = ent->state;
 
         if (onyx_has_errors()) return;
     }

@@ -232,7 +232,9 @@ typedef enum AstFlags {
 
     Ast_Flag_Has_Been_Symres       = BH_BIT(26),
 
-    Ast_Flag_Static_If_Resolved    = BH_BIT(27),
+    Ast_Flag_Has_Been_Checked      = BH_BIT(27),
+
+    Ast_Flag_Static_If_Resolved    = BH_BIT(28),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -796,6 +798,9 @@ struct AstFunction {
             OnyxToken* foreign_name;
         };
     };
+
+    struct Entity* entity_header;
+    struct Entity* entity_body;
 };
 
 struct AstOverloadedFunction {
@@ -1017,7 +1022,7 @@ typedef struct EntityHeap {
 
 void entity_heap_init(EntityHeap* entities);
 void entity_heap_insert_existing(EntityHeap* entities, Entity* e);
-void entity_heap_insert(EntityHeap* entities, Entity e);
+Entity* entity_heap_insert(EntityHeap* entities, Entity e);
 Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
