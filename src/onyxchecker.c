@@ -1062,7 +1062,9 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         CHECK(expression, actual);
 
         // HACK HACK HACK
-        if ((*actual)->type == NULL && (*actual)->kind == Ast_Kind_Function) {
+        if ((*actual)->type == NULL &&
+            (*actual)->entity != NULL &&
+            (*actual)->entity->state <= Entity_State_Check_Types) {
             return Check_Yield_Macro;
         }
 
@@ -1618,22 +1620,29 @@ CheckStatus check_function(AstFunction* func) {
 CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
     b32 done = 1;
 
-    bh_arr_each(AstTyped *, node, func->overloads) {
-        if (   (*node)->kind != Ast_Kind_Function
-            && (*node)->kind != Ast_Kind_Polymorphic_Proc
-            && (*node)->kind != Ast_Kind_Overloaded_Function) {
-            onyx_report_error((*node)->token->pos, "Overload option not procedure. Got '%s'",
-                onyx_ast_node_kind_string((*node)->kind));
+    bh_imap all_overloads;
+    bh_imap_init(&all_overloads, global_heap_allocator, 4);
+    build_all_overload_options(func->overloads, &all_overloads);
 
+    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+        AstTyped* node = (AstTyped *) entry->key;
+        if (node->kind == Ast_Kind_Overloaded_Function) continue;
+
+        if (   node->kind != Ast_Kind_Function
+            && node->kind != Ast_Kind_Polymorphic_Proc) {
+            onyx_report_error(node->token->pos, "Overload option not procedure. Got '%s'",
+                onyx_ast_node_kind_string(node->kind));
+
+            bh_imap_free(&all_overloads);
             return Check_Error;
         }
 
-        if ((*node)->entity &&
-            (*node)->entity->type != Entity_Type_Overloaded_Function &&
-            (*node)->entity->state <= Entity_State_Check_Types) {
+        if (node->entity && node->entity->state <= Entity_State_Check_Types) {
             done = 0;
         }
     }
+
+    bh_imap_free(&all_overloads);
 
     if (done) return Check_Success;
     else      return Check_Yield_Macro;

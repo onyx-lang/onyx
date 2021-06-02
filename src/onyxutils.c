@@ -974,7 +974,7 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 // an "entries" array that, so long as nothing is ever removed from it, will maintain the order in
 // which entries were put into the map. This is useful because a simple recursive algorithm can
 // collect all the overloads into the map, and also use the map to provide a base case.
-static void build_all_overload_options(bh_arr(AstTyped *) overloads, bh_imap* all_overloads) {
+void build_all_overload_options(bh_arr(AstTyped *) overloads, bh_imap* all_overloads) {
     bh_arr_each(AstTyped *, node, overloads) {
         if (bh_imap_has(all_overloads, (u64) *node)) continue;
 
