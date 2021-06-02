@@ -263,9 +263,11 @@ static void process_load_entity(Entity* ent) {
 }
 
 static b32 process_entity(Entity* ent) {
+    static char verbose_output_buffer[512];
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
-            printf("%s | %s (%d, %d) | %s:%i:%i\n",
+            snprintf(verbose_output_buffer, 511,
+                    "%15s | %20s (%d, %d) | %s:%i:%i \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
                    (u32) ent->macro_attempts,
@@ -275,7 +277,8 @@ static b32 process_entity(Entity* ent) {
                    ent->expr->token->pos.column);
         
         else if (ent->expr)
-            printf("%s | %s (%d, %d) \n",
+            snprintf(verbose_output_buffer, 511,
+                    "%15s | %20s (%d, %d) \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
                    (u32) ent->macro_attempts,
@@ -323,7 +326,13 @@ static b32 process_entity(Entity* ent) {
         case Entity_State_Code_Gen:        emit_entity(ent);   break;
     }
 
-    return ent->state != before_state;
+    b32 changed = ent->state != before_state;
+    if (context.options->verbose_output == 3) {
+        if (changed) printf("SUCCESS | %s", verbose_output_buffer);
+        else         printf("YIELD   | %s", verbose_output_buffer);
+    }
+
+    return changed;
 }
 
 // Just having fun with some visual output - brendanfh 2020/12/14

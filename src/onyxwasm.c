@@ -2639,8 +2639,6 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
 
     }
     else if (type->kind == Type_Kind_Function) {
-        // CLEANUP ROBUSTNESS: This should use the 'null_proc' instead of whatever is at
-        // function index 0.
         WID(WI_I32_CONST, mod->null_proc_func_idx);
     }
     else {

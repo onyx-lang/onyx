@@ -1013,6 +1013,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Argu
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
         if (overload->kind != Ast_Kind_Function) continue;
+        if (overload->type == NULL) continue;
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list
         if (!fill_in_arguments(&args, (AstNode *) overload, NULL)) continue;

@@ -475,6 +475,7 @@ struct Arguments {
     AstKind kind;             \
     u32 flags;                \
     OnyxToken *token;         \
+    struct Entity* entity;    \
     AstNode *next
 struct AstNode { AstNode_base; };
 
@@ -668,10 +669,11 @@ struct AstSwitch {
 // without the 'next' member. This is because types
 // can't be in expressions so a 'next' thing
 // doesn't make sense.
-#define AstType_base    \
-    AstKind kind;       \
-    u32 flags;          \
-    OnyxToken* token;   \
+#define AstType_base       \
+    AstKind kind;          \
+    u32 flags;             \
+    OnyxToken* token;      \
+    struct Entity* entity; \
     char* name
 struct AstType { AstType_base; };
 
@@ -696,6 +698,9 @@ struct AstStructType {
     
     // NOTE: Used to store statically bound expressions in the struct.
     Scope* scope;
+
+    struct Entity* entity_type;
+    struct Entity* entity_defaults;
 };
 struct AstStructMember {
     AstTyped_base;

@@ -127,7 +127,11 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
         AstStructMember *member = s_node->members[i];
 
         if (member->type_node) {
-            SYMRES(type, &member->type_node);
+            SymresStatus ss = symres_type(&member->type_node);
+            if (ss != Symres_Success) {
+                s_node->flags &= ~Ast_Flag_Type_Is_Resolved;
+                return ss;
+            }
 
             if (!node_is_type((AstNode *) member->type_node)) {
                 onyx_report_error(member->token->pos, "Member type is not a type.");
@@ -824,8 +828,6 @@ SymresStatus symres_function(AstFunction* func) {
     scope_enter(func->scope);
 
     if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
-        func->flags |= Ast_Flag_Has_Been_Symres;
-
         bh_arr_each(AstParam, param, func->params) {
             symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
 
@@ -849,6 +851,11 @@ SymresStatus symres_function(AstFunction* func) {
             if (param->local->flags & Ast_Flag_Param_Use) {
                 if (param->local->type_node != NULL && param->local->type == NULL) {
                     param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
+
+                    if (param->local->type == NULL) {
+                        // HACK HACK HACK
+                        return Symres_Yield_Macro;
+                    }
                 }
 
                 if (type_is_struct(param->local->type)) {
@@ -875,6 +882,8 @@ SymresStatus symres_function(AstFunction* func) {
                 }
             }
         }
+
+        func->flags |= Ast_Flag_Has_Been_Symres;
     }
 
     SYMRES(block, func->body);

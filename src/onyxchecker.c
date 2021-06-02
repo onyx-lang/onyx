@@ -410,18 +410,26 @@ CheckStatus check_call(AstCall* call) {
     arguments_clone(&call->original_args, &call->args);
 
     if (call->callee->kind == Ast_Kind_Overloaded_Function) {
-        call->callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args);
-        if (call->callee == NULL) {
-            report_unable_to_match_overload(call);
-            return Check_Error;
+        AstTyped* new_callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args);
+        if (new_callee == NULL) {
+            if (call->callee->entity->state > Entity_State_Check_Types) {
+                report_unable_to_match_overload(call);
+                return Check_Error;
+
+            } else {
+                return Check_Yield_Macro;
+            }
         }
+
+        call->callee = new_callee;
     }
 
     if (call->callee->kind == Ast_Kind_Polymorphic_Proc) {
-        call->callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Arguments, &call->args, call->token);
-        if (call->callee == NULL) return Check_Error;
+        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Arguments, &call->args, call->token);
+        if (new_callee == NULL) return Check_Error;
 
         arguments_remove_baked(&call->args);
+        call->callee = new_callee;
     }
 
     AstFunction* callee = (AstFunction *) call->callee;
@@ -619,8 +627,13 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
             resolve_expression_type(binop->right);
 
             if (binop->right->type == NULL) {
-                onyx_report_error(binop->token->pos, "Could not resolve type of right hand side to infer.");
-                return Check_Error;
+                if (binop->right->entity == NULL || binop->right->entity->state > Entity_State_Check_Types) {
+                    onyx_report_error(binop->token->pos, "Could not resolve type of right hand side to infer.");
+                    return Check_Error;
+
+                } else {
+                    return Check_Yield_Macro;
+                }
             }
 
             if (binop->right->type->kind == Type_Kind_Compound) {
@@ -1048,6 +1061,11 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     fori (i, 0, mem_count) {
         CHECK(expression, actual);
 
+        // HACK HACK HACK
+        if ((*actual)->type == NULL && (*actual)->kind == Ast_Kind_Function) {
+            return Check_Yield_Macro;
+        }
+
         // NOTE: Not checking the return on this function because
         // this for loop is bounded by the number of members in the
         // type.
@@ -1272,8 +1290,8 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
     CHECK(expression, &field->expr);
     if (field->expr->type == NULL) {
-        onyx_report_error(field->token->pos, "Unable to deduce type of expression for accessing field.");
-        return Check_Error;
+        // onyx_report_error(field->token->pos, "Unable to deduce type of expression for accessing field.");
+        return Check_Yield_Macro;
     }
 
     if (!type_is_structlike(field->expr->type)) {
@@ -1598,6 +1616,8 @@ CheckStatus check_function(AstFunction* func) {
 }
 
 CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
+    b32 done = 1;
+
     bh_arr_each(AstTyped *, node, func->overloads) {
         if (   (*node)->kind != Ast_Kind_Function
             && (*node)->kind != Ast_Kind_Polymorphic_Proc
@@ -1607,12 +1627,19 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 
             return Check_Error;
         }
+
+        if ((*node)->entity && (*node)->entity->state <= Entity_State_Check_Types) {
+            done = 0;
+        }
     }
 
-    return Check_Success;
+    if (done) return Check_Success;
+    else      return Check_Yield_Macro;
 }
 
 CheckStatus check_struct(AstStructType* s_node) {
+    if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types) return Check_Yield_Macro;
+
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node == NULL && (*smem)->initial_value != NULL) {
             CHECK(expression, &(*smem)->initial_value);
@@ -1628,7 +1655,7 @@ CheckStatus check_struct(AstStructType* s_node) {
 
     // NOTE: fills in the stcache
     type_build_from_ast(context.ast_alloc, (AstType *) s_node);
-    if (s_node->stcache == NULL) return Check_Error;
+    if (s_node->stcache == NULL) return Check_Yield_Macro;
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->type->kind == Type_Kind_Compound) {
@@ -1641,6 +1668,8 @@ CheckStatus check_struct(AstStructType* s_node) {
 }
 
 CheckStatus check_struct_defaults(AstStructType* s_node) {
+    if (s_node->entity_type && s_node->entity_type->state < Entity_State_Code_Gen) return Check_Yield_Macro;
+
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->initial_value && *(*smem)->initial_value) {
             CHECK(expression, (*smem)->initial_value);
@@ -1661,6 +1690,8 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 }
 
 CheckStatus check_function_header(AstFunction* func) {
+    if (func->entity_body && func->entity_body->state < Entity_State_Check_Types) return Check_Yield_Macro;
+
     b32 expect_default_param = 0;
     b32 has_had_varargs = 0;
 
@@ -1714,7 +1745,7 @@ CheckStatus check_function_header(AstFunction* func) {
 
         if (local->type == NULL) {
             onyx_report_error(param->local->token->pos,
-                    "Unable to resolve type for parameter, '%b'.\n",
+                    "Unable to resolve type for parameter, '%b'",
                     local->token->text,
                     local->token->length);
             return Check_Error;
@@ -1781,6 +1812,9 @@ CheckStatus check_memres(AstMemRes* memres) {
             }
 
         } else {
+            if (memres->initial_value->type == NULL && memres->initial_value->entity != NULL && memres->initial_value->entity->state <= Entity_State_Check_Types) {
+                return Check_Yield_Macro;
+            }
             memres->type = memres->initial_value->type;
         }
     }
@@ -1847,6 +1881,15 @@ CheckStatus check_static_if(AstIf* static_if) {
     return Check_Complete;
 }
 
+CheckStatus check_process_directive(AstNode* directive) {
+    if (directive->kind == Ast_Kind_Directive_Export) {
+        AstTyped* export = ((AstDirectiveExport *) directive)->export;
+        if (export->entity && export->entity->state <= Entity_State_Check_Types) return Check_Yield_Macro;
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -1888,10 +1931,16 @@ void check_entity(Entity* ent) {
                 cs = check_type(ent->type_alias);
             break;
 
+        case Entity_Type_Process_Directive:        cs = check_process_directive((AstNode *) ent->expr); break;
+
         default: break;
     }
 
     if (cs == Check_Success)     ent->state = Entity_State_Code_Gen;
     if (cs == Check_Complete)    ent->state = Entity_State_Finalized;
     if (cs == Check_Yield_Macro) ent->macro_attempts++;
+    else {
+        ent->macro_attempts = 0;
+        ent->micro_attempts = 0;
+    }
 }

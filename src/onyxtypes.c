@@ -219,7 +219,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
     switch (type_node->kind) {
         case Ast_Kind_Pointer_Type: {
             Type* ptr_type = type_make_pointer(alloc, type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem));
-            ptr_type->ast_type = type_node;
+            if (ptr_type) ptr_type->ast_type = type_node;
             return ptr_type;
         }
 
@@ -308,7 +308,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 if ((*member)->type == NULL) {
                     // :ExplicitTyping
-                    onyx_report_error((*member)->token->pos, "Unable to resolve member type. Try adding it explicitly."); 
+                    // onyx_report_error((*member)->token->pos, "Unable to resolve member type. Try adding it explicitly."); 
                     s_node->stcache = NULL;
                     return NULL;
                 }
@@ -409,19 +409,19 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
         case Ast_Kind_Slice_Type: {
             Type* slice_type = type_make_slice(alloc, type_build_from_ast(alloc, ((AstSliceType *) type_node)->elem));
-            slice_type->ast_type = type_node;
+            if (slice_type) slice_type->ast_type = type_node;
             return slice_type;
         }
 
         case Ast_Kind_DynArr_Type: {
             Type* dynarr_type = type_make_dynarray(alloc, type_build_from_ast(alloc, ((AstDynArrType *) type_node)->elem));
-            dynarr_type->ast_type = type_node;
+            if (dynarr_type) dynarr_type->ast_type = type_node;
             return dynarr_type;
         }
 
         case Ast_Kind_VarArg_Type: {
             Type* va_type = type_make_varargs(alloc, type_build_from_ast(alloc, ((AstVarArgType *) type_node)->elem));   
-            va_type->ast_type = type_node;
+            if (va_type) va_type->ast_type = type_node;
             return va_type;
         }
 
@@ -561,6 +561,8 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
 }
 
 Type* type_make_pointer(bh_allocator alloc, Type* to) {
+    if (to == NULL) return NULL;
+
     Type* ptr_type = bh_alloc_item(alloc, Type);
 
     ptr_type->kind = Type_Kind_Pointer;
@@ -572,6 +574,8 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
 }
 
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
+    if (to == NULL) return NULL;
+
     Type* arr_type = bh_alloc_item(alloc, Type);
 
     arr_type->kind = Type_Kind_Array;
@@ -583,6 +587,8 @@ Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
 }
 
 Type* type_make_slice(bh_allocator alloc, Type* of) {
+    if (of == NULL) return NULL;
+
     Type* slice_type = bh_alloc(alloc, sizeof(Type));
     slice_type->kind = Type_Kind_Slice;
     slice_type->Slice.ptr_to_data = type_make_pointer(alloc, of);
@@ -591,6 +597,8 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
 }
 
 Type* type_make_dynarray(bh_allocator alloc, Type* of) {
+    if (of == NULL) return NULL;
+
     Type* dynarr = bh_alloc(alloc, sizeof(Type));
     dynarr->kind = Type_Kind_DynArray;
     dynarr->DynArray.ptr_to_data = type_make_pointer(alloc, of);
@@ -599,6 +607,8 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
 }
 
 Type* type_make_varargs(bh_allocator alloc, Type* of) {
+    if (of == NULL) return NULL;
+    
     Type* va_type = bh_alloc(alloc, sizeof(Type));
     va_type->kind = Type_Kind_VarArgs;
     va_type->VarArgs.ptr_to_data = type_make_pointer(alloc, of);

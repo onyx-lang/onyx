@@ -4,8 +4,8 @@
 
 static inline i32 entity_phase(Entity* e1) {
     if (e1->state <= Entity_State_Parse) return 1;
-    if (e1->state <  Entity_State_Code_Gen) return 3;
-    return 4;
+    if (e1->state <  Entity_State_Code_Gen) return 2;
+    return 3;
 }
 
 // NOTE: Returns >0 if e1 should be processed after e2.
@@ -240,6 +240,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ent.type = Entity_Type_Struct_Member_Default;
             ent.type_alias = (AstType *) node;
             ENTITY_INSERT(ent);
+            ((AstStructType *) node)->entity_defaults = entity;
             // fallthrough
         }
         
@@ -248,6 +249,11 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ent.type = Entity_Type_Type_Alias;
             ent.type_alias = (AstType *) node;
             ENTITY_INSERT(ent);
+
+            if (node->kind == Ast_Kind_Struct_Type) {
+                ((AstStructType *) node)->entity_type = entity;
+            }
+
             break;
         }
         
@@ -321,4 +327,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
     }
+    
+    node->entity = entity;
 }
