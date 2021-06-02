@@ -1628,7 +1628,9 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
             return Check_Error;
         }
 
-        if ((*node)->entity && (*node)->entity->state <= Entity_State_Check_Types) {
+        if ((*node)->entity &&
+            (*node)->entity->type != Entity_Type_Overloaded_Function &&
+            (*node)->entity->state <= Entity_State_Check_Types) {
             done = 0;
         }
     }

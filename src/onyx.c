@@ -267,7 +267,7 @@ static b32 process_entity(Entity* ent) {
     if (context.options->verbose_output == 3) {
         if (ent->expr && ent->expr->token)
             snprintf(verbose_output_buffer, 511,
-                    "%15s | %20s (%d, %d) | %s:%i:%i \n",
+                    "%20s | %24s (%d, %d) | %s:%i:%i \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
                    (u32) ent->macro_attempts,
@@ -278,7 +278,7 @@ static b32 process_entity(Entity* ent) {
         
         else if (ent->expr)
             snprintf(verbose_output_buffer, 511,
-                    "%15s | %20s (%d, %d) \n",
+                    "%20s | %24s (%d, %d) \n",
                    entity_state_strings[ent->state],
                    entity_type_strings[ent->type],
                    (u32) ent->macro_attempts,
@@ -409,6 +409,12 @@ static i32 onyx_compile() {
         // check if it is the same entity. If it is, it means all other entities that were processed
         // between the two occurences didn't make any progress either, and there must be a cycle.
         //                                                              - brendanfh 2021/02/06
+        //
+        // Because of the recent changes to the compiler architecture (again), this condition
+        // does not always hold anymore. There can be nodes that get scheduled multiple times
+        // before the "key" node that will unblock the progress. This means a more sophisticated
+        // cycle detection algorithm must be used.
+        //
         static Entity* first_no_change = NULL;
         if (!changed) {
             if (!first_no_change) first_no_change = ent;
