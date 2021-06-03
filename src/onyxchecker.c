@@ -1680,7 +1680,8 @@ CheckStatus check_struct(AstStructType* s_node) {
             fill_in_type((*smem)->initial_value);
             if ((*smem)->initial_value->type == NULL) return Check_Yield_Macro;
 
-            (*smem)->type = resolve_expression_type((*smem)->initial_value);
+            resolve_expression_type((*smem)->initial_value);
+            if ((*smem)->type == NULL) (*smem)->type = (*smem)->initial_value->type;
 
             if ((*smem)->type == NULL) {
                 onyx_report_error((*smem)->initial_value->token->pos, "Unable to deduce type of initial value. This is probably a compiler bug.");

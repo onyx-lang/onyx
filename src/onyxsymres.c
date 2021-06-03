@@ -993,6 +993,9 @@ static SymresStatus symres_struct_defaults(AstType* t) {
         if ((*smem)->initial_value != NULL) {
             SYMRES(expression, &(*smem)->initial_value);
             
+            // CLEANUP: I hate that this is here. The type inference for a struct member should happen once the actual type is known.
+            // There seems to be a problem with setting it in the checker however, because whenever I disable this code, somehow
+            // the compiler gets to the code generation without all the types figured out???
             if ((*smem)->type_node == NULL && (*smem)->initial_value->type_node != NULL) {
                 (*smem)->type_node = (*smem)->initial_value->type_node;
             }

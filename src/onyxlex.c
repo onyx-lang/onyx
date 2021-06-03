@@ -71,7 +71,7 @@ static const char* token_type_names[] = {
     "true",
     "false",
 
-    "NOTE"
+    "NOTE",
 
     "TOKEN_TYPE_COUNT"
 };
