@@ -400,8 +400,10 @@ CheckStatus check_call(AstCall* call) {
     //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
     //      9. Check types of formal and actual params against each other, handling varargs
 
+    if (call->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
+
     CHECK(expression, &call->callee);
-    check_arguments(&call->args);
+    CHECK(arguments, &call->args);
 
     // SPEED CLEANUP: Keeping an original copy for basically no reason except that sometimes you
     // need to know the baked argument values in code generation.
@@ -574,6 +576,8 @@ CheckStatus check_call(AstCall* call) {
     }
 
 type_checking_done:
+
+    call->flags |= Ast_Flag_Has_Been_Checked;
 
     if (arg_pos < callee->type->Function.needed_param_count) {
         onyx_report_error(call->token->pos, "Too few arguments to function call.");
