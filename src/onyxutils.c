@@ -1225,50 +1225,29 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
 
     char* unique_key = build_poly_slns_unique_key(slns);
     if (bh_table_has(AstStructType *, ps_type->concrete_structs, unique_key)) {
-        return bh_table_get(AstStructType *, ps_type->concrete_structs, unique_key);
+        AstStructType* concrete_struct = bh_table_get(AstStructType *, ps_type->concrete_structs, unique_key);
+
+        if (concrete_struct->entity_type->state < Entity_State_Check_Types) {
+            return NULL;
+        }
+
+        Type* cs_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_struct);
+        if (!cs_type) return NULL;
+
+        if (cs_type->Struct.poly_sln == NULL) cs_type->Struct.poly_sln = bh_arr_copy(global_heap_allocator, slns);
+        if (cs_type->Struct.name == NULL)     cs_type->Struct.name = build_poly_struct_name(ps_type, cs_type);
+
+        return concrete_struct;
     }
 
-    scope_clear(ps_type->scope);
-    insert_poly_slns_into_scope(ps_type->scope, slns);
+    Scope* sln_scope = scope_create(context.ast_alloc, ps_type->scope, ps_type->token->pos);
+    insert_poly_slns_into_scope(sln_scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
     bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
 
-    Entity struct_entity = {
-        .state = Entity_State_Resolve_Symbols,
-        .type = Entity_Type_Type_Alias,
-        .type_alias = (AstType *) concrete_struct,
-        .package = NULL,
-        .scope = ps_type->scope,
-    };
-    Entity struct_default_entity = {
-        .state = Entity_State_Resolve_Symbols,
-        .type = Entity_Type_Struct_Member_Default,
-        .type_alias = (AstType *) concrete_struct,
-        .package = NULL,
-        .scope = ps_type->scope,
-    };
-
-    entity_bring_to_state(&struct_entity, Entity_State_Check_Types);
-    entity_bring_to_state(&struct_default_entity, Entity_State_Check_Types);
-    entity_bring_to_state(&struct_entity, Entity_State_Code_Gen);
-    entity_bring_to_state(&struct_default_entity, Entity_State_Code_Gen);
- 
-    if (onyx_has_errors()) {
-        onyx_report_error(pos, "Error in creating polymorphic struct instantiation here.");
-        bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, NULL);
-        return NULL;
-    }
-
-    Type* cs_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_struct);
-
-    // CLEANUP: This should not be necessary since the only place this function can be
-    // called from is type_build_from_ast in the Ast_Kind_Poly_Call_Type case, which
-    // allocates the 'slns' array on the heap. So, duplicating it should not be necessary.
-    cs_type->Struct.poly_sln = bh_arr_copy(global_heap_allocator, slns);
-
-    cs_type->Struct.name = build_poly_struct_name(ps_type, cs_type);
-    return concrete_struct;
+    add_entities_for_node(NULL, (AstNode *) concrete_struct, sln_scope, NULL);
+    return NULL;
 }
 
 void entity_bring_to_state(Entity* ent, EntityState state) {

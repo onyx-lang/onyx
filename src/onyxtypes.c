@@ -227,17 +227,23 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             AstFunctionType* ftype_node = (AstFunctionType *) type_node;
             u64 param_count = ftype_node->param_count;
 
+            Type* return_type = type_build_from_ast(alloc, ftype_node->return_type);
+            if (return_type == NULL) return NULL;
+
             Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
 
             func_type->kind = Type_Kind_Function;
             func_type->ast_type = type_node;
             func_type->Function.param_count = param_count;
             func_type->Function.needed_param_count = param_count;
-            func_type->Function.return_type = type_build_from_ast(alloc, ftype_node->return_type);
+            func_type->Function.return_type = return_type;
 
             if (param_count > 0)
                 fori (i, 0, (i64) param_count) {
                     func_type->Function.params[i] = type_build_from_ast(alloc, ftype_node->params[i]);
+
+                    // LEAK LEAK LEAK
+                    if (func_type->Function.params[i] == NULL) return NULL;
                 }
 
             return func_type;
@@ -281,21 +287,30 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
         case Ast_Kind_Struct_Type: {
             AstStructType* s_node = (AstStructType *) type_node;
-            if (s_node->stcache != NULL) return s_node->stcache;
+            if (s_node->stcache != NULL && s_node->stcache_is_valid) return s_node->stcache;
 
-            Type* s_type = bh_alloc(alloc, sizeof(Type));
-            s_node->stcache = s_type;
-            s_type->kind = Type_Kind_Struct;
-            s_type->ast_type = type_node;
+            Type* s_type;
+            if (s_node->stcache == NULL) {
+                s_type = bh_alloc(alloc, sizeof(Type));
+                s_node->stcache = s_type;
 
-            s_type->Struct.unique_id = next_unique_id++;
-            s_type->Struct.name = s_node->name;
-            s_type->Struct.mem_count = bh_arr_length(s_node->members);
+                s_type->kind = Type_Kind_Struct;
+                s_type->ast_type = type_node;
+                s_type->Struct.name = s_node->name;
+                s_type->Struct.unique_id = next_unique_id++;
+                s_type->Struct.mem_count = bh_arr_length(s_node->members);
+
+            } else {
+                s_type = s_node->stcache;
+            }
+
             s_type->Struct.memarr = NULL;
             s_type->Struct.poly_sln = NULL;
 
             bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count + 1);
             bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
+
+            s_node->stcache_is_valid = 1;
 
             b32 is_union = (s_node->flags & Ast_Flag_Struct_Is_Union) != 0;
             u32 size = 0;
@@ -307,16 +322,15 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 if ((*member)->type == NULL) {
-                    // :ExplicitTyping
-                    // onyx_report_error((*member)->token->pos, "Unable to resolve member type. Try adding it explicitly."); 
-                    s_node->stcache = NULL;
+                    // LEAK LEAK LEAK
+                    s_node->stcache_is_valid = 0;
                     return NULL;
                 }
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
                     onyx_report_error((*member)->token->pos, "Invalid member type: %s", type_get_name((*member)->type)); 
-                    return s_type;
+                    return NULL;
                 }
 
                 if (mem_alignment > alignment) alignment = mem_alignment;
@@ -455,9 +469,14 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_arr_new(global_heap_allocator, slns, bh_arr_length(pc_type->params));
             bh_arr_each(AstNode *, given, pc_type->params) {
                 if (node_is_type(*given)) {
+                    Type* param_type = type_build_from_ast(alloc, (AstType *) *given);
+
+                    // LEAK LEAK LEAK
+                    if (param_type == NULL) return NULL;
+
                     bh_arr_push(slns, ((AstPolySolution) {
                         .kind     = PSK_Type,
-                        .type     = type_build_from_ast(alloc, (AstType *) *given),
+                        .type     = param_type,
                     }));
                 } else {
                     bh_arr_push(slns, ((AstPolySolution) {
@@ -492,6 +511,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             fori (i, 0, type_count) {
                 assert(ctype->types[i] != NULL);
                 comp_type->Compound.types[i] = type_build_from_ast(alloc, ctype->types[i]);
+
+                // LEAK LEAK LEAK
+                if (comp_type->Compound.types[i] == NULL) return NULL;
+
                 comp_type->Compound.size += bh_max(type_size_of(comp_type->Compound.types[i]), 4);
             }
 
@@ -512,15 +535,19 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
     return NULL;
 }
 
+// CLEANUP: This needs to be merged with the very similar code from up above.
 Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
     u64 param_count = bh_arr_length(func->params);
+
+    Type* return_type = type_build_from_ast(alloc, func->return_type);
+    if (return_type == NULL) return NULL;
 
     Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
 
     func_type->kind = Type_Kind_Function;
     func_type->Function.param_count = param_count;
     func_type->Function.needed_param_count = 0;
-    func_type->Function.return_type = type_build_from_ast(alloc, func->return_type);
+    func_type->Function.return_type = return_type;
 
     if (param_count > 0) {
         i32 i = 0;

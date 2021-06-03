@@ -701,6 +701,8 @@ struct AstStructType {
 
     struct Entity* entity_type;
     struct Entity* entity_defaults;
+
+    b32 stcache_is_valid : 1;
 };
 struct AstStructMember {
     AstTyped_base;
@@ -988,8 +990,8 @@ typedef struct Entity {
     EntityState state;
 
     // TODO: Document this!
-    u16 macro_attempts;
-    u16 micro_attempts;
+    u32 macro_attempts;
+    u32 micro_attempts;
 
     b32 entered_in_queue : 1;
 
