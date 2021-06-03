@@ -220,6 +220,9 @@ void scope_clear(Scope* scope) {
 //
 // Polymorphic Procedures
 //
+
+AstNode node_that_signals_a_yield = {};
+
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
     if (pp->concrete_funcs == NULL) {
         bh_table_init(global_heap_allocator, pp->concrete_funcs, 16);
@@ -652,6 +655,9 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstPolyP
     *resolved = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
 }
 
+// HACK HACK HACK nocheckin
+static b32 flag_to_yield = 0;
+
 // NOTE: The job of this function is to look through the arguments provided and find a matching
 // value that is to be baked into the polymorphic procedures poly-scope. It expected that param
 // will be of kind PPK_Baked_Value.
@@ -683,6 +689,8 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
         }
 
         Type* resolved_type = type_build_from_ast(context.ast_alloc, (AstType *) value);
+        if (resolved_type == NULL) flag_to_yield = 1;
+
         *resolved = ((PolySolveResult) { PSK_Type, .actual = resolved_type });
 
     } else {
@@ -746,6 +754,11 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
 
             default: if (err_msg) *err_msg = "Invalid polymorphic parameter kind. This is a compiler bug.";
         }
+
+        if (flag_to_yield) {
+            bh_arr_free(slns);
+            return NULL;
+        }
         
         switch (resolved.kind) {
             case PSK_Undefined:
@@ -793,6 +806,11 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
     char *err_msg = NULL;
     bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, &err_msg);
     if (slns == NULL) {
+        if (flag_to_yield) {
+            flag_to_yield = 0;
+            return (AstFunction *) &node_that_signals_a_yield;
+        }
+
         if (err_msg != NULL) onyx_report_error(tkn->pos, err_msg);
         else                 onyx_report_error(tkn->pos, "Some kind of error occured when generating a polymorphic procedure. You hopefully will not see this");
 

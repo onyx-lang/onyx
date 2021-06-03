@@ -428,6 +428,7 @@ CheckStatus check_call(AstCall* call) {
 
     if (call->callee->kind == Ast_Kind_Polymorphic_Proc) {
         AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Arguments, &call->args, call->token);
+        if (new_callee == (AstTyped *) &node_that_signals_a_yield) return Check_Yield_Macro;
         if (new_callee == NULL) return Check_Error;
 
         arguments_remove_baked(&call->args);

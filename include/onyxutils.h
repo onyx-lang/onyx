@@ -38,3 +38,5 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len);
 // another time.                                        -brendanfh 2020/10/09
 // :RelativeFiles This should lookup for the file relative to "relative_to"
 char* lookup_included_file(char* filename, char* relative_to, b32 add_onyx_suffix, b32 search_included_folders);
+
+extern AstNode node_that_signals_a_yield;
