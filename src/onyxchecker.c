@@ -1692,7 +1692,7 @@ CheckStatus check_struct(AstStructType* s_node) {
 
     // NOTE: fills in the stcache
     type_build_from_ast(context.ast_alloc, (AstType *) s_node);
-    if (s_node->stcache == NULL) return Check_Yield_Macro;
+    if (s_node->stcache == NULL || !s_node->stcache_is_valid) return Check_Yield_Macro;
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->type->kind == Type_Kind_Compound) {

@@ -1,6 +1,9 @@
 package core.alloc.heap
 
-enable_debug := false
+// Enable this to enable checking for invalid blocks and other corruptions
+// that may happen on the heap, with the added overhead of checking that
+// on every alloc/resize/free.
+Enable_Debug :: false
 
 // This is the implementation for the general purpose heap allocator.
 // It is a simple bump allocator, with a free list. It is not very good
@@ -62,7 +65,7 @@ heap_alloc :: (size_: u32, align: u32) -> rawptr {
     hb := heap_state.free_list;
     while hb != null {
         if hb.size >= size {
-            if enable_debug {
+            #if Enable_Debug {
                 assert(hb.size & Allocated_Flag == 0, "Allocated block in free list.");
                 assert(hb.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.");
             }
@@ -125,15 +128,15 @@ heap_alloc :: (size_: u32, align: u32) -> rawptr {
 
 #private_file
 heap_free :: (ptr: rawptr) {
-    if enable_debug do assert(ptr != null, "Trying to free a null pointer.");
+    #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
 
     hb_ptr := cast(^heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
-    if enable_debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
+    #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
 
     hb_ptr.size &= ~Allocated_Flag;
     orig_size := hb_ptr.size - sizeof heap_allocated_block;
 
-    if enable_debug do memory_fill(ptr, ~~0xcc, orig_size);
+    #if Enable_Debug do memory_fill(ptr, ~~0xcc, orig_size);
 
     // CLEANUP: This is not complete. This only checks if the block after the freed block is also free.
     // There are three other cases related to the block before this one that need to be handled for
@@ -170,7 +173,7 @@ heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
     new_size = ~~memory.align(cast(u64) new_size, ~~align);
     
     hb_ptr := cast(^heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
-    if enable_debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
+    #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
     hb_ptr.size &= ~Allocated_Flag;
 
     old_size := hb_ptr.size;
