@@ -1417,6 +1417,14 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
 }
 
 static AstType* parse_compound_type(OnyxParser* parser) {
+    // CLEANUP this is little weird having this here because it means that this parses:
+    //
+    //      foo :: (x: (something_here: i32)) -> void ---
+    //
+    if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) {
+        consume_tokens(parser, 2);
+    }
+
     AstType* first = parse_type(parser);
 
     if (parser->curr->type == ',') {
@@ -1428,6 +1436,11 @@ static AstType* parse_compound_type(OnyxParser* parser) {
 
         while (consume_token_if_next(parser, ',')) {
             if (parser->hit_unexpected_token) return (AstType *) ctype;
+
+            if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) {
+                consume_tokens(parser, 2);
+            }
+
             bh_arr_push(ctype->types, parse_type(parser));
         }
 

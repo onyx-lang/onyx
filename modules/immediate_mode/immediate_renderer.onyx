@@ -175,8 +175,12 @@ Immediate_Renderer :: struct {
     set_texture :: (use ir: ^Immediate_Renderer, texture_id: i32 = -1) {
         if vertex_count > 0 do flush(ir);
 
+        previous_active := active_shader;
         if texture_id >= 0 do active_shader = ^textured_shader;
         else               do active_shader = ^simple_shader;
+
+        // Skip the GL calls if the texture didn't change.
+        if previous_active == active_shader do return;
 
         gl.useProgram(active_shader.program);
         gl.uniform1i(active_shader.texture_uniform, math.max(texture_id, 0));
@@ -184,16 +188,16 @@ Immediate_Renderer :: struct {
 
     use_ortho_projection :: (use ir: ^Immediate_Renderer, left: f32, right: f32, top: f32, bottom: f32) {
         projection_matrix := f32.[
-            2 / (right - left), 0, 0, -(right + left) / (right - left),
-            0, 2 / (top - bottom), 0, -(top + bottom) / (top - bottom),
-            0, 0, -2, -1,
-            0, 0, 0, 1
+            2 / (right - left), 0, 0, 0,
+            0, 2 / (top - bottom), 0, 0,
+            0, 0, -2, 0,
+            -(right + left) / (right - left), -(top + bottom) / (top - bottom), -1, 1
         ];
 
         gl.useProgram(simple_shader.program);
-        gl.uniformMatrix4(simple_shader.view_uniform, true, projection_matrix);
+        gl.uniformMatrix4(simple_shader.view_uniform, false, projection_matrix);
         gl.useProgram(textured_shader.program);
-        gl.uniformMatrix4(textured_shader.view_uniform, true, projection_matrix);
+        gl.uniformMatrix4(textured_shader.view_uniform, false, projection_matrix);
 
         gl.useProgram(active_shader.program);
     }

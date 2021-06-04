@@ -1659,8 +1659,12 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
             return Check_Error;
         }
 
-        if (node->entity && node->entity->state <= Entity_State_Check_Types) {
-            done = 0;
+        if (node->kind == Ast_Kind_Function) {
+            AstFunction* func = (AstFunction *) node;
+            
+            if (func->entity_header && func->entity_header->state <= Entity_State_Check_Types) {
+                done = 0;
+            }
         }
     }
 
