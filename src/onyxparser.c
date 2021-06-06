@@ -76,8 +76,15 @@ static void consume_token(OnyxParser* parser) {
     parser->prev = parser->curr;
     // :LinearTokenDependent
     parser->curr++;
-    while (parser->curr->type == Token_Type_Comment || parser->curr->type == Token_Type_Note)
+    while (parser->curr->type == Token_Type_Comment || parser->curr->type == Token_Type_Note) {
+        if (parser->curr->type == Token_Type_Note) {
+            AstNote* note = make_node(AstNode, Ast_Kind_Note);
+            note->token = parser->curr;
+            ENTITY_SUBMIT(note);
+        }
+
         parser->curr++;
+    }
 }
 
 static OnyxToken* find_matching_paren(OnyxToken* paren) {
@@ -2487,7 +2494,7 @@ void onyx_parser_free(OnyxParser* parser) {
 
 void onyx_parse(OnyxParser *parser) {
     // NOTE: Skip comments at the beginning of the file
-    while (consume_token_if_next(parser, Token_Type_Comment));
+    while (consume_token_if_next(parser, Token_Type_Comment) || consume_token_if_next(parser, Token_Type_Note));
 
     parser->package = parse_file_package(parser);
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);

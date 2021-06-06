@@ -3314,6 +3314,18 @@ void emit_entity(Entity* ent) {
         case Entity_Type_Function: emit_function(module, ent->function); break;
         case Entity_Type_Global:   emit_global(module,   ent->global); break;
 
+        // Cleanup: Maybe these should be printed elsewhere?
+        case Entity_Type_Note: {
+            if (!context.options->print_notes) break;
+
+            AstNote* note = (AstNote *) ent->expr;
+            OnyxFilePos pos = note->token->pos;
+
+            bh_printf("Note: %b %s:%d:%d\n", note->token->text, note->token->length, pos.filename, pos.line, pos.column);
+
+            break;
+        }
+
         default: break;
     }
 

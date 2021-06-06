@@ -80,6 +80,8 @@
     NODE(SolidifiedFunction)   \
     NODE(PolyProc)             \
                                \
+    NODE(Note)                 \
+                               \
     NODE(Package)          
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
@@ -178,6 +180,8 @@ typedef enum AstKind {
     Ast_Kind_Directive_Add_Overload,
     Ast_Kind_Directive_Operator,
     Ast_Kind_Directive_Export,
+
+    Ast_Kind_Note,
 
     Ast_Kind_Count
 } AstKind;
@@ -934,6 +938,10 @@ struct AstDirectiveExport {
     AstTyped* export;
 };
 
+struct AstNote {
+    AstNode_base;
+};
+
 typedef enum EntityState {
     Entity_State_Error,
     
@@ -956,6 +964,7 @@ typedef enum EntityType {
     Entity_Type_Unknown,
 
     Entity_Type_Error,
+    Entity_Type_Note,
     Entity_Type_Load_Path,
     Entity_Type_Load_File,
     Entity_Type_Binding,
@@ -1077,10 +1086,11 @@ struct CompileOptions {
     bh_allocator allocator;
     CompileAction action;
 
-    u32 verbose_output          : 28;
+    u32 verbose_output          : 2;
     b32 fun_output              : 1;
     b32 print_function_mappings : 1;
     b32 print_static_if_results : 1;
+    b32 print_notes             : 1;
     
     b32 use_post_mvp_features : 1;
 

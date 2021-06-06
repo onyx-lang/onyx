@@ -118,7 +118,7 @@ CheckStatus check_return(AstReturn* retnode) {
     } else {
         if (expected_return_type->Basic.size > 0) {
             onyx_report_error(retnode->token->pos,
-                "Returning from non-void function without value. Expected a value of type '%s'.",
+                "Returning from non-void function without a value. Expected a value of type '%s'.",
                 type_get_name(expected_return_type));
             return Check_Error;
         }

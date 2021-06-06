@@ -85,6 +85,8 @@ static const char* ast_node_names[] = {
     "OPERATOR OVERLOAD",
     "EXPORT",
 
+    "NOTE",
+
     "AST_NODE_KIND_COUNT",
 };
 
@@ -120,6 +122,7 @@ const char* entity_state_strings[Entity_State_Count] = {
 const char* entity_type_strings[Entity_Type_Count] = {
     "Unknown",
     "Error",
+    "Note",
     "Add to Load Path",
     "Load File",
     "Binding (Declaration)",

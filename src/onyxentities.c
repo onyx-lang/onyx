@@ -319,6 +319,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ENTITY_INSERT(ent);
             break;
         }
+
+        case Ast_Kind_Note: {
+            ent.type = Entity_Type_Note;
+            ent.expr = (AstTyped *) node;
+            ent.state = Entity_State_Code_Gen;
+            ENTITY_INSERT(ent);
+            break;
+        }
         
         default: {
             ent.type = Entity_Type_Expression;

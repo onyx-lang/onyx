@@ -1,0 +1,138 @@
+package ui
+
+#private_file gfx :: package immediate_mode
+#private_file bitmap_font :: package bitmap_font
+#private_file gl :: package gl
+#private_file math :: package core.math
+
+#private font : bitmap_font.Bitmap_Font;
+#private font_texture : gl.GLTexture;
+
+@Temporary
+DEFAULT_TEXT_SIZE :: 32.0f
+
+
+
+init_ui :: () {
+    init_font();
+}
+
+#private init_font :: () {
+    font_data := #file_contents "./resources/font_2.data";
+
+    bft := bitmap_font.Bitmap_Font_Texture.{
+        data = font_data,
+        width = 256,
+        height = 256,
+    };
+
+    font = bitmap_font.bitmap_font_create(bft, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 \xff:");
+
+    font_texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, font_texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, font_data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, -1);
+}
+
+get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
+    return font->get_width(text, size);
+}
+
+// 'x' and 'y' are the top-left coordinates of the text. 'y' is NOT the baseline.
+draw_text :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, font_texture);
+    gfx.set_texture(0);
+
+    for char: text {
+        glyph := font->get_glyph(char);
+        
+        if glyph == null {
+            glyph = font->get_glyph(255);
+            assert(glyph != null, "NO NULL GLYPH");
+        }
+
+        // Round to the nearest pixel
+        tx, ty := math.floor(x + .5), math.floor(y + .5);
+        w      := math.floor(glyph.w * size * font.em + .5);
+        h      := math.floor(glyph.h * size * font.em + .5);
+
+        gfx.textured_rect(
+            .{ tx, ty },
+            .{ w, h },
+            .{ glyph.x0, glyph.y0 },
+            .{ glyph.x1 - glyph.x0, glyph.y1 - glyph.y0 },
+            color = color);
+
+        x += glyph.w * size * font.em;
+    }
+    
+    gfx.flush();
+    gl.bindTexture(gl.TEXTURE_2D, -1);
+}
+
+draw_rect :: proc {
+    (use r: Rectangle, color := gfx.Color4.{1,1,1}) {
+        gfx.set_texture();
+
+        width, height := Rectangle.dimensions(r);
+        gfx.rect(.{ x0, y0 }, .{ width, height }, color);
+    },
+
+    (x: f32, y: f32, w: f32, h: f32, color := gfx.Color4.{1,1,1}) {
+        gfx.set_texture();
+        gfx.rect(.{ x, y }, .{ w, h }, color);
+    }
+}
+
+@Themeing
+draw_button :: (use r: Rectangle, text: str) -> bool {
+    gfx.set_texture();
+
+    padding :: 10.0f    @RawPixels
+
+    width, height := Rectangle.dimensions(r);
+
+    gfx.rect(.{ x0, y0 }, .{ width, height }, .{ 0.2, 0.2, 0.2 });
+    gfx.rect(.{ x0 + padding, y0 + padding }, .{ width - padding * 2, height - padding * 2 }, .{ 0.1, 0.1, 0.1 });
+
+    font_size := height * .4;
+    text_width := font->get_width(text, font_size);
+    text_height := font->get_height(text, font_size);
+
+    draw_text(text, x0 + (width - text_width) / 2, y0 + (height - text_height) / 2, font_size, .{ 1, 1, 1 });
+    return false;
+}
+
+
+
+Rectangle :: struct {
+    //
+    // x0,y0 ------------+
+    //   |               |
+    //   |               |
+    //   +------------ x1, y1
+    //
+
+    x0: f32 = 0;
+    y0: f32 = 0;
+    x1: f32 = 0;
+    y1: f32 = 0;
+
+    width  :: (use r: Rectangle) -> f32 do return math.abs(x1 - x0);
+    height :: (use r: Rectangle) -> f32 do return math.abs(y1 - y0);
+
+    dimensions :: (use r: Rectangle) -> (width: f32, height: f32) {
+        return math.abs(x1 - x0), math.abs(y1 - y0);
+    }
+
+    top_left     :: (use r: Rectangle) -> (x: f32, y: f32) do return math.min(x0, x1), math.min(y0, y1);
+    bottom_right :: (use r: Rectangle) -> (x: f32, y: f32) do return math.max(x0, x1), math.max(y0, y1);
+}
+
+
+
