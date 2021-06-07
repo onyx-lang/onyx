@@ -90,6 +90,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Directive_Solidify: return sizeof(AstDirectiveSolidify);
         case Ast_Kind_Compound: return sizeof(AstCompound);
         case Ast_Kind_Named_Value: return sizeof(AstNamedValue);
+        case Ast_Kind_Call_Site: return sizeof(AstCallSite);
         case Ast_Kind_Count: return 0;
 	}
 

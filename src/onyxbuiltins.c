@@ -49,6 +49,7 @@ Type     *builtin_vararg_type_type;
 AstTyped *builtin_context_variable;
 AstType  *builtin_allocator_type;
 AstType  *builtin_iterator_type;
+AstType  *builtin_callsite_type;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -382,6 +383,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_iterator_type = (AstType *) symbol_raw_resolve(p->scope, "Iterator");
     if (builtin_iterator_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, "'Iterator' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_callsite_type = (AstType *) symbol_raw_resolve(p->scope, "CallSite");
+    if (builtin_callsite_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'CallSite' struct not found in builtin package.");
         return;
     }
 

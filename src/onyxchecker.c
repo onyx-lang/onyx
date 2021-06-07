@@ -473,6 +473,41 @@ CheckStatus check_call(AstCall* call) {
         return Check_Error;
     }
 
+    // HACK HACK HACK
+    // :CallSiteIsGross
+    bh_arr_each(AstArgument *, arg, arg_arr) {
+        AstTyped** arg_value = &(*arg)->value;
+
+        if ((*arg_value)->kind == Ast_Kind_Call_Site) {
+            AstCallSite* callsite = (AstCallSite *) ast_clone(context.ast_alloc, *arg_value);
+            callsite->callsite_token = call->token;
+
+            // HACK CLEANUP
+            OnyxToken* str_token = bh_alloc(context.ast_alloc, sizeof(OnyxToken));
+            str_token->text  = bh_strdup(global_heap_allocator, (char *) call->token->pos.filename);
+            str_token->length = strlen(call->token->pos.filename);
+            str_token->pos = call->token->pos;
+            str_token->type = Token_Type_Literal_String;
+
+            AstStrLit* filename = bh_alloc_item(context.ast_alloc, AstStrLit);
+            memset(filename, 0, sizeof(AstStrLit));
+            filename->kind  = Ast_Kind_StrLit;
+            filename->token = str_token;
+            filename->addr  = 0;
+            
+            add_entities_for_node(NULL, (AstNode *) filename, NULL, NULL);
+            callsite->filename = filename;
+
+            callsite->line   = make_int_literal(context.ast_alloc, call->token->pos.line);
+            callsite->column = make_int_literal(context.ast_alloc, call->token->pos.column);
+
+            convert_numlit_to_type(callsite->line,   &basic_types[Basic_Kind_U32]);
+            convert_numlit_to_type(callsite->column, &basic_types[Basic_Kind_U32]);
+
+            *arg_value = (AstTyped *) callsite;
+        }
+    }
+
     // NOTE: If we are calling an intrinsic function, translate the
     // call into an intrinsic call node.
     if (callee->flags & Ast_Flag_Intrinsic) {
@@ -1509,6 +1544,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
             CHECK(compound, (AstCompound *) expr);
             break;
 
+        case Ast_Kind_Call_Site: break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -1573,7 +1610,14 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Local: {
             AstTyped* typed_stmt = (AstTyped *) stmt;
             fill_in_type(typed_stmt);
-            if (typed_stmt->type_node != NULL && typed_stmt->type == NULL) return Check_Yield_Macro;
+            if (typed_stmt->type_node != NULL && typed_stmt->type == NULL) {
+                if (!node_is_type((AstNode *) typed_stmt->type_node)) {
+                    onyx_report_error(stmt->token->pos, "Local's type is not a type.");
+                    return Check_Error;
+                }
+                
+                return Check_Yield_Macro;
+            }
             return Check_Success;
         }
 
@@ -1781,6 +1825,12 @@ CheckStatus check_function_header(AstFunction* func) {
         }
 
         if (local->type_node != NULL) CHECK(type, local->type_node);
+        if (local->type_node != NULL) {
+            if (!node_is_type((AstNode *) local->type_node)) {
+                onyx_report_error(local->token->pos, "Parameter type is not a type.");
+                return Check_Error;
+            }
+        }
 
         fill_in_type((AstTyped *) local);
         if (local->type == NULL) {

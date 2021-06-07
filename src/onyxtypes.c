@@ -349,6 +349,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .used = (((*member)->flags & Ast_Flag_Struct_Mem_Used) != 0),
                 };
 
+                if (bh_table_has(StructMember, s_type->Struct.members, (*member)->token->text)) {
+                    onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*member)->token->text);
+                    return NULL;
+                }
                 bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
                 token_toggle_end((*member)->token);
 
@@ -366,6 +370,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                             .used = 0,
                         };
 
+                        if (bh_table_has(StructMember, s_type->Struct.members, (*psmem)->name)) {
+                            onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*psmem)->name);
+                            return NULL;
+                        }
                         bh_table_put(StructMember, s_type->Struct.members, (*psmem)->name, new_smem);
                     }
                 }

@@ -92,29 +92,6 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
     if (s_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
 
     s_node->flags |= Ast_Flag_Type_Is_Resolved;
-    
-    {
-        bh_table(i32) mem_set;
-        bh_table_init(global_heap_allocator, mem_set, bh_arr_length(s_node->members));
-
-        bh_arr_each(AstStructMember *, member, s_node->members) {
-            token_toggle_end((*member)->token);
-
-            if (bh_table_has(i32, mem_set, (*member)->token->text)) {
-                onyx_report_error((*member)->token->pos,
-                        "Duplicate struct member '%s'.",
-                        (*member)->token->text);
-
-                token_toggle_end((*member)->token);
-                return Symres_Error;
-            }
-
-            bh_table_put(i32, mem_set, (*member)->token->text, 1);
-            token_toggle_end((*member)->token);
-        }
-
-        bh_table_free(mem_set);
-    }
 
     if (s_node->scope) {
         // FIX: This is probably wrong for the long term.

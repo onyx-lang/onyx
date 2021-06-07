@@ -43,7 +43,7 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
 }
 
 // 'x' and 'y' are the top-left coordinates of the text. 'y' is NOT the baseline.
-draw_text :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
+draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
     gfx.set_texture(0);
@@ -90,21 +90,26 @@ draw_rect :: proc {
 }
 
 @Themeing
-draw_button :: (use r: Rectangle, text: str) -> bool {
+draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme) -> bool {
+    height := Rectangle.height(r);
+    draw_text_raw(text, x0, y0, theme.font_size * height, theme.text_color);
+}
+
+@Themeing
+draw_button :: (use r: Rectangle, text: str, theme := ^default_button_theme) -> bool {
     gfx.set_texture();
 
-    padding :: 10.0f    @RawPixels
-
+    border_width  := theme.border_width;
     width, height := Rectangle.dimensions(r);
 
-    gfx.rect(.{ x0, y0 }, .{ width, height }, .{ 0.2, 0.2, 0.2 });
-    gfx.rect(.{ x0 + padding, y0 + padding }, .{ width - padding * 2, height - padding * 2 }, .{ 0.1, 0.1, 0.1 });
+    gfx.rect(.{ x0, y0 }, .{ width, height }, theme.border_color);
+    gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, theme.background_color);
 
-    font_size := height * .4;
+    font_size := height * theme.font_size;
     text_width := font->get_width(text, font_size);
     text_height := font->get_height(text, font_size);
 
-    draw_text(text, x0 + (width - text_width) / 2, y0 + (height - text_height) / 2, font_size, .{ 1, 1, 1 });
+    draw_text_raw(text, x0 + (width - text_width) / 2, y0 + (height - text_height) / 2, font_size, theme.text_color);
     return false;
 }
 
@@ -115,7 +120,7 @@ Rectangle :: struct {
     // x0,y0 ------------+
     //   |               |
     //   |               |
-    //   +------------ x1, y1
+    //   +------------ x1,y1
     //
 
     x0: f32 = 0;
@@ -127,7 +132,7 @@ Rectangle :: struct {
     height :: (use r: Rectangle) -> f32 do return math.abs(y1 - y0);
 
     dimensions :: (use r: Rectangle) -> (width: f32, height: f32) {
-        return math.abs(x1 - x0), math.abs(y1 - y0);
+        return width(r), height(r);
     }
 
     top_left     :: (use r: Rectangle) -> (x: f32, y: f32) do return math.min(x0, x1), math.min(y0, y1);
@@ -136,3 +141,27 @@ Rectangle :: struct {
 
 
 
+ 
+@Relocate
+Text_Theme :: struct {
+    text_color := gfx.Color4.{ 1, 1, 1 };
+    font_size  := .4f; // Percentage of height of button
+}
+
+@Relocate
+Button_Theme :: struct {
+    @Bug
+    // I accidentally left this as 'text_color', and there was not a compiler error, even through there
+    // should have been. Instead it looked like the wrong offset was being used for the members and that
+    // was affecting the generated code.
+    use text_theme := Text_Theme.{};
+
+    background_color := gfx.Color4.{ 0.1, 0.1, 0.1 };
+
+    border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
+    border_width := 10.0f; @InPixels
+}
+
+@Bug // there is a compile-time known bug if either of the 'Button_Theme's below are omitted.
+default_button_theme: Button_Theme = Button_Theme.{};
+default_text_theme:   Text_Theme   = Text_Theme.{};

@@ -642,11 +642,15 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 parse_arguments(parser, ')', &call_node->args);
 
                 // Wrap expressions in AstArgument
-                bh_arr_each(AstTyped *, arg, call_node->args.values)
+                bh_arr_each(AstTyped *, arg, call_node->args.values) {
+                    if ((*arg) == NULL) continue;
                     *arg = (AstTyped *) make_argument(parser->allocator, *arg);
+                }
 
-                bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values)
+                bh_arr_each(AstNamedValue *, named_value, call_node->args.named_values) {
+                    if ((*named_value)->value == NULL) continue;
                     (*named_value)->value = (AstTyped *) make_argument(parser->allocator, (AstTyped *) (*named_value)->value);
+                }
 
                 retval = (AstTyped *) call_node;
                 break;
@@ -1862,8 +1866,20 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
             }
         }
 
-        if (curr_param.vararg_kind == VA_Kind_Not_VA && consume_token_if_next(parser, '='))
-            curr_param.default_value = parse_expression(parser, 0);
+        if (curr_param.vararg_kind == VA_Kind_Not_VA && consume_token_if_next(parser, '=')) {
+            OnyxToken* directive_token = parser->curr;
+
+            // :Callsite  currently #callsite is only valid as a default value for a funciton parameter.
+            if (parse_possible_directive(parser, "callsite")) {
+                AstCallSite* cs = make_node(AstCallSite, Ast_Kind_Call_Site);
+                cs->token = directive_token;
+                cs->type_node = builtin_callsite_type;
+                curr_param.default_value = (AstTyped *) cs;
+
+            } else {
+                curr_param.default_value = parse_expression(parser, 0);
+            }
+        }
 
         if (param_is_baked) {
             param_is_baked = 0;

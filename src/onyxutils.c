@@ -182,6 +182,10 @@ AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol) {
                 package->package = package_lookup(package->package_name);
             }
 
+            if (package->package == NULL) {
+                return NULL;
+            }
+
             return symbol_raw_resolve(package->package->scope, symbol);
         } 
 

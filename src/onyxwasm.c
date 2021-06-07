@@ -2450,6 +2450,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Call_Site: {
+            AstCallSite* callsite = (AstCallSite *) expr;
+
+            emit_expression(mod, &code, (AstTyped *) callsite->filename);
+            emit_expression(mod, &code, (AstTyped *) callsite->line);
+            emit_expression(mod, &code, (AstTyped *) callsite->column);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;

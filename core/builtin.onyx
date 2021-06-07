@@ -168,3 +168,10 @@ Iterator :: struct (T: type_expr) {
     next:  (data: rawptr) -> (T, bool);
     close: (data: rawptr) -> void = null_proc;
 }
+
+
+CallSite :: struct {
+    file   : str;
+    line   : u32;
+    column : u32;
+}

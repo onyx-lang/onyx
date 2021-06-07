@@ -81,6 +81,7 @@
     NODE(PolyProc)             \
                                \
     NODE(Note)                 \
+    NODE(CallSite)             \
                                \
     NODE(Package)          
 
@@ -180,6 +181,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Add_Overload,
     Ast_Kind_Directive_Operator,
     Ast_Kind_Directive_Export,
+    Ast_Kind_Call_Site,
 
     Ast_Kind_Note,
 
@@ -942,6 +944,16 @@ struct AstNote {
     AstNode_base;
 };
 
+struct AstCallSite {
+    AstTyped_base;
+
+    OnyxToken* callsite_token;
+
+    AstStrLit* filename;
+    AstNumLit* line;
+    AstNumLit* column;
+};
+
 typedef enum EntityState {
     Entity_State_Error,
     
@@ -1164,6 +1176,7 @@ extern Type     *builtin_vararg_type_type;
 extern AstTyped *builtin_context_variable;
 extern AstType  *builtin_allocator_type;
 extern AstType  *builtin_iterator_type;
+extern AstType  *builtin_callsite_type;
 
 typedef struct BuiltinSymbol {
     char*    package;
