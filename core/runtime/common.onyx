@@ -5,13 +5,13 @@ use package core.intrinsics.onyx { __initialize }
 
 // The default assert handler. This assumes that __output_string
 // and __exit are defined in the 'runtime' package.
-__assert_handler :: (msg: str, file: str) {
+__assert_handler :: (msg: str, site: CallSite) {
     __output_string("Assert failed: ");
     __output_string(msg);
 
-    if file.data != null {
+    if site.file.data != null {
         __output_string(" in ");
-        __output_string(file);
+        __output_string(site.file);
     }
 
     __output_string("\n");

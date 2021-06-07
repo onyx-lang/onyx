@@ -55,7 +55,7 @@ OnyxContext :: struct {
 
     logger         : Logger = .{ default_logger, null };
 
-    assert_handler : (msg: str, file: str) -> void;
+    assert_handler : (msg: str, site: CallSite) -> void;
 }
 
 #if runtime.Runtime != runtime.Runtime_Custom {
@@ -79,8 +79,8 @@ OnyxContext :: struct {
 // first parameter to ALL procedures in a compilation unit.
 context : OnyxContext;
 
-assert :: (cond: bool, msg: str, file: str = null_str) {
-    if !cond do context.assert_handler(msg, file);
+assert :: (cond: bool, msg: str, site := #callsite) {
+    if !cond do context.assert_handler(msg, site);
 }
 
 
@@ -170,6 +170,11 @@ Iterator :: struct (T: type_expr) {
 }
 
 
+
+// This structure represents the result of a '#callsite' expression. Currently,
+// #callsite is only valid (and parsed) as a default value for a procedure parameter.
+// It allows the function to get the address of the calling site, which can be
+// used for error printing, unique hashes, and much more.
 CallSite :: struct {
     file   : str;
     line   : u32;
