@@ -1544,7 +1544,11 @@ CheckStatus check_expression(AstTyped** pexpr) {
             CHECK(compound, (AstCompound *) expr);
             break;
 
-        case Ast_Kind_Call_Site: break;
+        case Ast_Kind_Call_Site:
+            // NOTE: This has to be set here because if it were to be set in the parser,
+            // builtin_callsite_type wouldn't be known when parsing the builtin.onyx file.
+            expr->type_node = builtin_callsite_type;
+            break;
 
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;

@@ -12,34 +12,91 @@ package ui
 DEFAULT_TEXT_SIZE :: 32.0f
 
 
+UI_Id :: #type u32
+
+#private hot_item    : UI_Id = 0
+#private active_item : UI_Id = 0
+#private hot_item_was_set := false
+
+MouseState :: struct {
+    left_button_down    := false;
+    left_button_just_up := false;
+
+    right_button_down    := false;
+    right_button_just_up := false;
+
+    x: f32 = 0;
+    y: f32 = 0;
+}
+
+mouse_state: MouseState = MouseState.{};
+
 
 init_ui :: () {
     init_font();
 }
 
-#private init_font :: () {
-    font_data := #file_contents "./resources/font_2.data";
+clear_buttons :: () {
+    mouse_state.left_button_just_up = false;
+    mouse_state.right_button_just_up = false;
 
-    bft := bitmap_font.Bitmap_Font_Texture.{
-        data = font_data,
-        width = 256,
-        height = 256,
-    };
-
-    font = bitmap_font.bitmap_font_create(bft, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 \xff:");
-
-    font_texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, font_texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, font_data);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.bindTexture(gl.TEXTURE_2D, -1);
+    if !hot_item_was_set do set_hot_item(0);
+    hot_item_was_set = false;
 }
 
-get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
-    return font->get_width(text, size);
+//
+// Telling the UI system about hardware updates
+//
+
+update_mouse_position :: (new_x: f32, new_y: f32) {
+    mouse_state.x = new_x;
+    mouse_state.y = new_y;
+}
+
+#private_file ButtonKind :: enum { Left; Right; Middle; }
+
+button_pressed :: (kind: ButtonKind) {
+    switch kind {
+        case .Left  do mouse_state.left_button_down  = true;
+        case .Right do mouse_state.right_button_down = true;
+    }
+}
+
+button_released :: (kind: ButtonKind) {
+    switch kind {
+        case .Left {
+            mouse_state.left_button_down    = false;
+            mouse_state.left_button_just_up = true;
+        }
+
+        case .Right {
+            mouse_state.right_button_down    = false;
+            mouse_state.right_button_just_up = true;
+        }
+    }
+}
+
+
+set_active_item :: (id: UI_Id) -> bool {
+    active_item = id;
+    return true;
+}
+
+set_hot_item :: (id: UI_Id) -> bool {
+    if active_item != 0 do return false;
+
+    hot_item_was_set = true;
+
+    hot_item = id;
+    return true;
+}
+
+is_active_item :: (id: UI_Id) -> bool {
+    return active_item == id;
+}
+
+is_hot_item :: (id: UI_Id) -> bool {
+    return hot_item == id;
 }
 
 // 'x' and 'y' are the top-left coordinates of the text. 'y' is NOT the baseline.
@@ -90,27 +147,56 @@ draw_rect :: proc {
 }
 
 @Themeing
-draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme) -> bool {
+draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme, site := #callsite) -> bool {
     height := Rectangle.height(r);
     draw_text_raw(text, x0, y0, theme.font_size * height, theme.text_color);
 }
 
 @Themeing
-draw_button :: (use r: Rectangle, text: str, theme := ^default_button_theme) -> bool {
+draw_button :: (use r: Rectangle, text: str, theme := ^default_button_theme, site := #callsite) -> bool {
     gfx.set_texture();
+
+    result := false;
+
+    hash := get_site_hash(site);
+    if is_active_item(hash) {
+        if mouse_state.left_button_just_up {
+            if is_hot_item(hash) && Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+                result = true;
+            }
+
+            set_active_item(0);
+        }
+
+    } elseif is_hot_item(hash) {
+        if mouse_state.left_button_down {
+            set_active_item(hash);
+        }
+    }
+
+    if Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+        set_hot_item(hash);
+    }
 
     border_width  := theme.border_width;
     width, height := Rectangle.dimensions(r);
 
     gfx.rect(.{ x0, y0 }, .{ width, height }, theme.border_color);
-    gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, theme.background_color);
+
+    @Lerp
+    if is_hot_item(hash) {
+        gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, theme.hover_color);
+
+    } else {
+        gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, theme.background_color);
+    }
 
     font_size := height * theme.font_size;
     text_width := font->get_width(text, font_size);
     text_height := font->get_height(text, font_size);
 
     draw_text_raw(text, x0 + (width - text_width) / 2, y0 + (height - text_height) / 2, font_size, theme.text_color);
-    return false;
+    return result;
 }
 
 
@@ -137,6 +223,11 @@ Rectangle :: struct {
 
     top_left     :: (use r: Rectangle) -> (x: f32, y: f32) do return math.min(x0, x1), math.min(y0, y1);
     bottom_right :: (use r: Rectangle) -> (x: f32, y: f32) do return math.max(x0, x1), math.max(y0, y1);
+
+    contains :: (use r: Rectangle, x: f32, y: f32) -> bool {
+        return math.min(x0, x1) <= x && x <= math.max(x0, x1) &&
+               math.min(y0, y1) <= y && y <= math.max(y0, y1);
+    }
 }
 
 
@@ -157,6 +248,7 @@ Button_Theme :: struct {
     use text_theme := Text_Theme.{};
 
     background_color := gfx.Color4.{ 0.1, 0.1, 0.1 };
+    hover_color      := gfx.Color4.{ 0.2, 0.2, 0.2 };
 
     border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
     border_width := 10.0f; @InPixels
@@ -165,3 +257,45 @@ Button_Theme :: struct {
 @Bug // there is a compile-time known bug if either of the 'Button_Theme's below are omitted.
 default_button_theme: Button_Theme = Button_Theme.{};
 default_text_theme:   Text_Theme   = Text_Theme.{};
+
+
+
+
+
+
+// Utilities
+get_site_hash :: (site: CallSite) -> u32 {
+    hash :: package core.hash
+
+    file_hash   := hash.to_u32(site.file);
+    line_hash   := hash.to_u32(site.line);
+    column_hash := hash.to_u32(site.column);
+
+    return file_hash * 0x472839 + line_hash * 0x6849210 + column_hash * 0x1248382;
+}
+
+get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
+    return font->get_width(text, size);
+}
+
+
+#private init_font :: () {
+    font_data := #file_contents "./resources/font_2.data";
+
+    bft := bitmap_font.Bitmap_Font_Texture.{
+        data = font_data,
+        width = 256,
+        height = 256,
+    };
+
+    font = bitmap_font.bitmap_font_create(bft, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 \xff:");
+
+    font_texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, font_texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, font_data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, -1);
+}

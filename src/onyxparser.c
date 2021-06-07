@@ -1873,7 +1873,6 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
             if (parse_possible_directive(parser, "callsite")) {
                 AstCallSite* cs = make_node(AstCallSite, Ast_Kind_Call_Site);
                 cs->token = directive_token;
-                cs->type_node = builtin_callsite_type;
                 curr_param.default_value = (AstTyped *) cs;
 
             } else {
