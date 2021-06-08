@@ -24,7 +24,7 @@ make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value), has
     return map;
 }
 
-init :: (use map: ^Map($K, $V), default: V = ~~0, hash_count: i32 = 16) {
+init :: (use map: ^Map($K, $V), default := __zero_value(V), hash_count: i32 = 16) {
     array.init(^hashes, hash_count);
     array.init(^entries, 4);
 

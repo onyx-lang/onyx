@@ -881,6 +881,16 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
     if (binop->operation == Binary_Op_Bool_And || binop->operation == Binary_Op_Bool_Or)
         return check_binaryop_bool(pbinop);
 
+    // :UnaryFieldAccessIsGross
+    if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
+        if      (type_check_or_auto_cast(&binop->left, binop->right->type));
+        else if (type_check_or_auto_cast(&binop->right, binop->left->type));
+        else {
+            report_bad_binaryop(binop);
+            return Check_Error;
+        }
+    }
+
     // NOTE: The left side cannot be compound.
     //       The right side always is numeric.
     //       The left side cannot be rawptr.
@@ -1401,6 +1411,9 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
 
 CheckStatus check_method_call(AstBinaryOp** mcall) {
     CHECK(expression, &(*mcall)->left);
+    if ((*mcall)->left->type == NULL) {
+        return Check_Yield_Macro;
+    }
 
     AstTyped* implicit_argument = (*mcall)->left;
 
