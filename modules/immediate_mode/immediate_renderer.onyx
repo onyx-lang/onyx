@@ -23,6 +23,7 @@ Immediate_Renderer :: struct {
     active_shader : ^Shader;
 
     simple_shader, textured_shader : Shader;
+    alpha_shader : Shader;
 
     // 'verticies' contains the vertex data and the maximum number of verticies
     // that can be rendered at a given time. 'vertex_count' is used to store how
@@ -50,9 +51,11 @@ Immediate_Renderer :: struct {
         IMMEDIATE_VERTEX_SHADER            :: #file_contents "./shaders/basic_vertex.glsl"
         IMMEDIATE_FRAGMENT_SHADER          :: #file_contents "./shaders/basic_fragment.glsl"
         IMMEDIATE_FRAGMENT_SHADER_TEXTURED :: #file_contents "./shaders/textured_fragment.glsl"
+        IMMEDIATE_ALPHA_SHADER             :: #file_contents "./shaders/alpha_fragment.glsl"
 
         simple_shader   = Shader.make_from_source(IMMEDIATE_VERTEX_SHADER, IMMEDIATE_FRAGMENT_SHADER);
         textured_shader = Shader.make_from_source(IMMEDIATE_VERTEX_SHADER, IMMEDIATE_FRAGMENT_SHADER_TEXTURED);
+        alpha_shader    = Shader.make_from_source(IMMEDIATE_VERTEX_SHADER, IMMEDIATE_ALPHA_SHADER);
         active_shader   = ^simple_shader;
 
         verticies = memory.make_slice(Immediate_Vertex, max_verticies);
@@ -66,6 +69,7 @@ Immediate_Renderer :: struct {
         
         ir->init_shader_params(^simple_shader);
         ir->init_shader_params(^textured_shader);
+        ir->init_shader_params(^alpha_shader);
 
         gl.useProgram(active_shader.program);
     }
@@ -103,6 +107,7 @@ Immediate_Renderer :: struct {
     free :: (use ir: ^Immediate_Renderer) {
         simple_shader->free();
         textured_shader->free();
+        alpha_shader->free();
 
         gl.deleteVertexArray(vertex_array);
         gl.deleteBuffer(vertex_buffer);
@@ -186,6 +191,16 @@ Immediate_Renderer :: struct {
         gl.uniform1i(active_shader.texture_uniform, math.max(texture_id, 0));
     }
 
+    use_alpha_shader :: (use ir: ^Immediate_Renderer, texture_id: i32 = -1) {
+        if active_shader != ^alpha_shader {
+            if vertex_count > 0 do flush(ir);
+            active_shader = ^alpha_shader;
+        }
+
+        gl.useProgram(active_shader.program);
+        gl.uniform1i(active_shader.texture_uniform, math.max(texture_id, 0));
+    }
+
     use_ortho_projection :: (use ir: ^Immediate_Renderer, left: f32, right: f32, top: f32, bottom: f32) {
         projection_matrix := f32.[
             2 / (right - left), 0, 0, 0,
@@ -198,6 +213,8 @@ Immediate_Renderer :: struct {
         gl.uniformMatrix4(simple_shader.view_uniform, false, projection_matrix);
         gl.useProgram(textured_shader.program);
         gl.uniformMatrix4(textured_shader.view_uniform, false, projection_matrix);
+        gl.useProgram(alpha_shader.program);
+        gl.uniformMatrix4(alpha_shader.view_uniform, false, projection_matrix);
 
         gl.useProgram(active_shader.program);
     }
@@ -240,4 +257,8 @@ set_texture :: (texture_id: i32 = -1) do immediate_renderer->set_texture(texture
 
 use_ortho_projection :: (left: f32, right: f32, top: f32, bottom: f32) {
     immediate_renderer->use_ortho_projection(left, right, top, bottom);
+}
+
+use_alpha_shader :: (texture_id: i32 = -1) {
+    immediate_renderer->use_alpha_shader(texture_id);
 }
