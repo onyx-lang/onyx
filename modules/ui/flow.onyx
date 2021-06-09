@@ -4,54 +4,54 @@ package ui
 
 Flow :: struct {
     split_vertical :: proc {
-        (r: Rectangle, left_percent: f32) -> (left: Rectangle, right: Rectangle) {
-            return split_vertical(r, left_width=left_percent * Rectangle.width(r));
+        (r: Rectangle, left_percent: f32, padding := 0.0f) -> (left: Rectangle, right: Rectangle) {
+            return split_vertical(r, left_width=left_percent * Rectangle.width(r), padding=padding);
         },
 
-        (r: Rectangle, right_percent: f32) -> (left: Rectangle, right: Rectangle) {
-            return split_vertical(r, right_width=right_percent * Rectangle.width(r));
+        (r: Rectangle, right_percent: f32, padding := 0.0f) -> (left: Rectangle, right: Rectangle) {
+            return split_vertical(r, right_width=right_percent * Rectangle.width(r), padding=padding);
         },
 
-        (r: Rectangle, left_width: f32) -> (left: Rectangle, right: Rectangle) {
+        (r: Rectangle, left_width: f32, padding := 0.0f) -> (left: Rectangle, right: Rectangle) {
             x0, y0 := Rectangle.top_left(r);
             x1, y1 := Rectangle.bottom_right(r);
 
             return .{ x0=x0, x1=x0+left_width, y0=y0, y1=y1 },
-                   .{ x0=x0+left_width, x1=x1, y0=y0, y1=y1 };
+                   .{ x0=x0+left_width+padding, x1=x1, y0=y0, y1=y1 };
         },
 
-        (r: Rectangle, right_width: f32) -> (left: Rectangle, right: Rectangle) {
+        (r: Rectangle, right_width: f32, padding := 0.0f) -> (left: Rectangle, right: Rectangle) {
             x0, y0 := Rectangle.top_left(r);
             x1, y1 := Rectangle.bottom_right(r);
 
-            return .{ x0=x0, x1=x1-right_width, y0=y0, y1=y1 },
+            return .{ x0=x0, x1=x1-right_width-padding, y0=y0, y1=y1 },
                    .{ x0=x1-right_width, x1=x1, y0=y0, y1=y1 };
         }
     }
 
 
     split_horizontal :: proc {
-        (r: Rectangle, top_percent: f32) -> (top: Rectangle, bottom: Rectangle) {
-            return split_horizontal(r, top_height=top_percent * Rectangle.height(r));
+        (r: Rectangle, top_percent: f32, padding := 0.0f) -> (top: Rectangle, bottom: Rectangle) {
+            return split_horizontal(r, top_height=top_percent * Rectangle.height(r), padding=padding);
         },
 
-        (r: Rectangle, bottom_percent: f32) -> (top: Rectangle, bottom: Rectangle) {
-            return split_horizontal(r, bottom_height=bottom_percent * Rectangle.height(r));
+        (r: Rectangle, bottom_percent: f32, padding := 0.0f) -> (top: Rectangle, bottom: Rectangle) {
+            return split_horizontal(r, bottom_height=bottom_percent * Rectangle.height(r), padding=padding);
         },
 
-        (r: Rectangle, top_height: f32) -> (top: Rectangle, bottom: Rectangle) {
+        (r: Rectangle, top_height: f32, padding := 0.0f) -> (top: Rectangle, bottom: Rectangle) {
             x0, y0 := Rectangle.top_left(r);
             x1, y1 := Rectangle.bottom_right(r);
 
             return .{ x0=x0, x1=x1, y0=y0, y1=y0+top_height },
-                   .{ x0=x0, x1=x1, y0=y0+top_height, y1=y1 };
+                   .{ x0=x0, x1=x1, y0=y0+top_height+padding, y1=y1 };
         },
 
-        (r: Rectangle, bottom_height: f32) -> (top: Rectangle, bottom: Rectangle) {
+        (r: Rectangle, bottom_height: f32, padding := 0.0f) -> (top: Rectangle, bottom: Rectangle) {
             x0, y0 := Rectangle.top_left(r);
             x1, y1 := Rectangle.bottom_right(r);
 
-            return .{ x0=x0, x1=x1, y0=y0, y1=y1-bottom_height },
+            return .{ x0=x0, x1=x1, y0=y0, y1=y1-bottom_height-padding },
                    .{ x0=x0, x1=x1, y0=y1-bottom_height, y1=y1 };
         }
     }

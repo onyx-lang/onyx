@@ -1,0 +1,73 @@
+package ttf
+
+
+// A simple big-endian binary reader out of a byte buffer
+TTF_Reader :: struct {
+    data     : [] u8;
+    position : u32 = 0;
+
+    seek :: (use br: ^TTF_Reader, pos: u32) -> u32 {
+        assert(pos >= 0 && pos < data.count, "Trying to seek outside of buffer.");
+        defer position = pos;
+        return position;
+    }
+
+    tell :: (use br: ^TTF_Reader) -> u32 do return position;
+
+    get_u8 :: (use br: ^TTF_Reader) -> u8 {
+        defer position += 1;
+        return data[position];
+    }
+
+    get_u16 :: (use br: ^TTF_Reader) -> u16 {
+        byte1 := cast(u16) get_u8(br);
+        byte2 := cast(u16) get_u8(br);
+        return byte1 << 8 | byte2;
+    }
+
+    get_u32 :: (use br: ^TTF_Reader) -> u32 {
+        byte1 := cast(u32) get_u8(br);
+        byte2 := cast(u32) get_u8(br);
+        byte3 := cast(u32) get_u8(br);
+        byte4 := cast(u32) get_u8(br);
+        return byte1 << 24 | byte2 << 16 | byte3 << 8 | byte4; 
+    }
+
+    get_i16 :: (use br: ^TTF_Reader) -> i16 {
+        result := get_u16(br);
+        if result & ~~ 0x8000 != 0 {
+            result -= (1 << 16);
+        }
+    }
+
+    get_i32 :: (use br: ^TTF_Reader) -> i32 {
+        return ~~ get_u32(br);
+    }
+
+    get_fword :: (use br: ^TTF_Reader) -> i16 {
+        return get_i16(br);
+    }
+
+    get_2dot14 :: (use br: ^TTF_Reader) -> f32 {
+        numerator := cast(i32) get_i16(br);
+        return ~~ numerator / cast(f32) (1 << 14);
+    }
+
+    get_fixed :: (use br: ^TTF_Reader) -> f32 {
+        numerator := get_i32(br);
+        return ~~ numerator / cast(f32) (1 << 16);
+    }
+
+    @Note // does not allocate a new string.
+    get_string :: (use br: ^TTF_Reader, length: u32) -> str {
+        defer position += length;
+        return data.data[position .. position + length];
+    }
+
+    @Fix // this is not correct at all.
+    get_date :: (use br: ^TTF_Reader) -> u64 {
+        mac_time := ~~get_u32(br) * 0x100000000 + cast(u64) get_u32(br);
+        utc_time := mac_time * 1000;
+        return utc_time;
+    }
+}

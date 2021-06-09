@@ -1,0 +1,19 @@
+/*
+TODO:
+
+
+
+
+A simple package for reading BMFont files. A good source of documentation can be found here: https://www.angelcode.com/products/bmfont/
+
+This pacakge is responible for:
+    - Reading *.fnt files to parse their contents into glyphs
+
+*/
+
+
+package bmfont
+
+#load "./types"
+#load "./bmfont_loader"
+

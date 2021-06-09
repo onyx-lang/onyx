@@ -266,12 +266,14 @@ fold :: proc {
 }
 
 map :: proc {
-    (arr: ^[..] $T, f: (^T) -> void)          do for ^it: *arr do f(it);,
-    (arr: ^[..] $T, f: (T) -> T)              do for ^it: *arr do *it = f(*it);,
-    (arr: ^[..] $T, data: $R, f: (T, R) -> T) do for ^it: *arr do *it = f(*it, data);,
-    (arr: [] $T, f: (^T) -> void)             do for ^it:  arr do f(it);,
-    (arr: [] $T, f: (T) -> T)                 do for ^it:  arr do *it = f(*it);,
-    (arr: [] $T, data: $R, f: (T, R) -> T)    do for ^it:  arr do *it = f(*it, data);,
+    (arr: ^[..] $T, f: (^T) -> void)              do for ^it: *arr do f(it);,
+    (arr: ^[..] $T, f: (T) -> T)                  do for ^it: *arr do *it = f(*it);,
+    (arr: ^[..] $T, data: $R, f: (^T, R) -> void) do for ^it: *arr do f(it, data);,
+    (arr: ^[..] $T, data: $R, f: (T, R) -> T)     do for ^it: *arr do *it = f(*it, data);,
+    (arr: [] $T, f: (^T) -> void)                 do for ^it:  arr do f(it);,
+    (arr: [] $T, f: (T) -> T)                     do for ^it:  arr do *it = f(*it);,
+    (arr: [] $T, data: $R, f: (^T, R) -> void)    do for ^it:  arr do f(it, data);,
+    (arr: [] $T, data: $R, f: (T, R) -> T)        do for ^it:  arr do *it = f(*it, data);,
 }
 
 every :: (arr: ^[..] $T, predicate: (T) -> bool) -> bool {

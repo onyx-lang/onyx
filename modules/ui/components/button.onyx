@@ -1,0 +1,85 @@
+package ui
+use package core
+
+// Button states are stored globally as there is not much to the state of a button.
+// Forcing the end user to store a structure for each button that is just the animation
+// state of the button feels very wrong.
+#private button_states : map.Map(UI_Id, Button_State);
+#private Button_State :: struct {
+    hover_time := 0.0f;
+    click_time := 0.0f;
+}
+
+Button_Theme :: struct {
+    use text_theme := Text_Theme.{};
+
+    background_color := gfx.Color4.{ 0.1, 0.1, 0.1 };
+    hover_color      := gfx.Color4.{ 0.3, 0.3, 0.3 };
+    click_color      := gfx.Color4.{ 0.5, 0.5, 0.7 };
+
+    border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
+    border_width := 6.0f;    @InPixels
+}
+
+@Bug // there is a compile-time known bug if either of the 'Button_Theme's below are omitted.
+default_button_theme: Button_Theme = Button_Theme.{};
+
+@Themeing
+button :: (use r: Rectangle, text: str, theme := ^default_button_theme, site := #callsite, increment := 0) -> bool {
+    gfx.set_texture();
+
+    result := false;
+
+    hash := get_site_hash(site, increment);
+    button_state := map.get(^button_states, hash);
+
+    if is_active_item(hash) {
+        if mouse_state.left_button_just_up {
+            if is_hot_item(hash) && Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+                result = true;
+                button_state.click_time = 1.0f;
+            }
+
+            set_active_item(0);
+        }
+
+    } elseif is_hot_item(hash) {
+        if mouse_state.left_button_down {
+            set_active_item(hash);
+        }
+    }
+
+    if Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+        set_hot_item(hash);
+    }
+
+    if is_hot_item(hash) {
+        move_towards(^button_state.hover_time, 1.0f, 0.1f);
+    } else {
+        move_towards(^button_state.hover_time, 0.0f, 0.1f);
+    }
+
+    move_towards(^button_state.click_time, 0.0f, 0.08f);
+
+    border_width  := theme.border_width;
+    width, height := Rectangle.dimensions(r);
+
+    gfx.rect(.{ x0, y0 }, .{ width, height }, theme.border_color);
+
+    surface_color := color_lerp(button_state.hover_time, theme.background_color, theme.hover_color);
+    surface_color  = color_lerp(button_state.click_time, surface_color, theme.click_color);
+    gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, surface_color);
+
+    text_width  := 0.0f; @Cleanup // font->get_width(text, theme.font_size);
+    text_height := 0.0f; @Cleanup // font->get_height(text, theme.font_size);
+
+    draw_text_raw(text, x0 + (width - text_width) / 2, y0 + (height - text_height) / 2, theme.font_size, theme.text_color);
+
+    if button_state.click_time > 0 || button_state.hover_time > 0 {
+        map.put(^button_states, hash, button_state);
+    } else {
+        map.delete(^button_states, hash);
+    }
+
+    return result;
+}

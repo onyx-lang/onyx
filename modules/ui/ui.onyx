@@ -1,15 +1,14 @@
 package ui
 
-#private_file gfx :: package immediate_mode
-#private_file bitmap_font :: package bitmap_font
-#private_file gl :: package gl
-#private_file math :: package core.math
+use package core
 
-#private font : bitmap_font.Bitmap_Font;
+@Cleanup // Move these to the theme?
+// Or create a cache of fonts and put pointers/string in the themes?
+#private font : bmfont.BMFont;
 #private font_texture : gl.GLTexture;
 
 @Temporary
-DEFAULT_TEXT_SIZE :: 32.0f
+DEFAULT_TEXT_SIZE :: 40.0f
 
 
 UI_Id :: #type u32
@@ -34,6 +33,8 @@ mouse_state: MouseState = MouseState.{};
 
 init_ui :: () {
     init_font();
+
+    map.init(^button_states, default=.{});
 }
 
 clear_buttons :: () {
@@ -99,33 +100,41 @@ is_hot_item :: (id: UI_Id) -> bool {
     return hot_item == id;
 }
 
-// 'x' and 'y' are the top-left coordinates of the text. 'y' is NOT the baseline.
-draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
+draw_text_raw :: (text: str, x: f32, y: f32, line_height := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
     gfx.set_texture(0);
 
+    original_x := x;
+    baseline := cast(f32) font.common.baseline;
+
     for char: text {
+        if char == #char "\n" {
+            y += line_height + .5;
+            x = original_x;
+            continue;
+        }
+
         glyph := font->get_glyph(char);
         
         if glyph == null {
-            glyph = font->get_glyph(255);
+            glyph = font->get_glyph(0);
             assert(glyph != null, "NO NULL GLYPH");
         }
 
         // Round to the nearest pixel
-        tx, ty := math.floor(x + .5), math.floor(y + .5);
-        w      := math.floor(glyph.w * size * font.em + .5);
-        h      := math.floor(glyph.h * size * font.em + .5);
+        tx, ty := math.floor(x + ~~glyph.xoffset + .5), math.floor(y + ~~glyph.yoffset + baseline + .5);
+        w      := math.floor(cast(f32) glyph.w + .5);
+        h      := math.floor(cast(f32) glyph.h + .5);
 
         gfx.textured_rect(
             .{ tx, ty },
             .{ w, h },
-            .{ glyph.x0, glyph.y0 },
-            .{ glyph.x1 - glyph.x0, glyph.y1 - glyph.y0 },
+            .{ glyph.tex_x, glyph.tex_y },
+            .{ glyph.tex_w, glyph.tex_h },
             color = color);
 
-        x += glyph.w * size * font.em;
+        x += ~~glyph.xadvance;
     }
     
     gfx.flush();
@@ -148,58 +157,8 @@ draw_rect :: proc {
 
 @Themeing
 draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme, site := #callsite) -> bool {
-    height := Rectangle.height(r);
-    draw_text_raw(text, x0, y0, theme.font_size * height, theme.text_color);
+    draw_text_raw(text, x0, y0, theme.font_size, theme.text_color);
 }
-
-@Themeing
-draw_button :: (use r: Rectangle, text: str, theme := ^default_button_theme, site := #callsite) -> bool {
-    gfx.set_texture();
-
-    result := false;
-
-    hash := get_site_hash(site);
-    if is_active_item(hash) {
-        if mouse_state.left_button_just_up {
-            if is_hot_item(hash) && Rectangle.contains(r, mouse_state.x, mouse_state.y) {
-                result = true;
-            }
-
-            set_active_item(0);
-        }
-
-    } elseif is_hot_item(hash) {
-        if mouse_state.left_button_down {
-            set_active_item(hash);
-        }
-    }
-
-    if Rectangle.contains(r, mouse_state.x, mouse_state.y) {
-        set_hot_item(hash);
-    }
-
-    border_width  := theme.border_width;
-    width, height := Rectangle.dimensions(r);
-
-    gfx.rect(.{ x0, y0 }, .{ width, height }, theme.border_color);
-
-    @Lerp
-    if is_hot_item(hash) {
-        gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, theme.hover_color);
-
-    } else {
-        gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, theme.background_color);
-    }
-
-    font_size := height * theme.font_size;
-    text_width := font->get_width(text, font_size);
-    text_height := font->get_height(text, font_size);
-
-    draw_text_raw(text, x0 + (width - text_width) / 2, y0 + (height - text_height) / 2, font_size, theme.text_color);
-    return result;
-}
-
-
 
 Rectangle :: struct {
     //
@@ -236,26 +195,9 @@ Rectangle :: struct {
 @Relocate
 Text_Theme :: struct {
     text_color := gfx.Color4.{ 1, 1, 1 };
-    font_size  := .4f; // Percentage of height of button
+    font_size  := 18.0f;
 }
 
-@Relocate
-Button_Theme :: struct {
-    @Bug
-    // I accidentally left this as 'text_color', and there was not a compiler error, even through there
-    // should have been. Instead it looked like the wrong offset was being used for the members and that
-    // was affecting the generated code.
-    use text_theme := Text_Theme.{};
-
-    background_color := gfx.Color4.{ 0.1, 0.1, 0.1 };
-    hover_color      := gfx.Color4.{ 0.2, 0.2, 0.2 };
-
-    border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
-    border_width := 10.0f; @InPixels
-}
-
-@Bug // there is a compile-time known bug if either of the 'Button_Theme's below are omitted.
-default_button_theme: Button_Theme = Button_Theme.{};
 default_text_theme:   Text_Theme   = Text_Theme.{};
 
 
@@ -264,38 +206,55 @@ default_text_theme:   Text_Theme   = Text_Theme.{};
 
 
 // Utilities
-get_site_hash :: (site: CallSite) -> u32 {
+get_site_hash :: (site: CallSite, increment := 0) -> UI_Id {
     hash :: package core.hash
 
     file_hash   := hash.to_u32(site.file);
     line_hash   := hash.to_u32(site.line);
     column_hash := hash.to_u32(site.column);
 
-    return file_hash * 0x472839 + line_hash * 0x6849210 + column_hash * 0x1248382;
+    return file_hash * 0x472839 + line_hash * 0x6849210 + column_hash * 0x1248382 + increment;
 }
 
 get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
-    return font->get_width(text, size);
+    @Cleanup
+    return 0; // font->get_width(text, size);
 }
 
 
 #private init_font :: () {
-    font_data := #file_contents "./resources/font_2.data";
+    fnt_file_data := #file_contents "./resources/fonts/FiraCode.fnt";
+    texture_data := #file_contents "./resources/fonts/FiraCode.data";
 
-    bft := bitmap_font.Bitmap_Font_Texture.{
-        data = font_data,
-        width = 256,
-        height = 256,
-    };
+    font = bmfont.load_bmfont(fnt_file_data);
 
-    font = bitmap_font.bitmap_font_create(bft, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 \xff:");
+    tex_width, tex_height := font.common.scale_width, font.common.scale_height;
 
     font_texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, font_data);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tex_width, tex_height, 0, gl.RGBA, gl.UNSIGNED_BYTE, texture_data);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.bindTexture(gl.TEXTURE_2D, -1);
+}
+
+
+
+
+
+#private move_towards :: (value: ^$T, target: T, step: T) {
+    if *value < target do *value += step;
+    if *value > target do *value -= step;
+    if *value > target - step && *value < target + step do *value = target;
+}
+
+#private color_lerp :: (t: f32, c1: gfx.Color4, c2: gfx.Color4) -> gfx.Color4 {
+    return .{
+        r = c1.r * (1 - t) + c2.r * t,
+        g = c1.g * (1 - t) + c2.g * t,
+        b = c1.b * (1 - t) + c2.b * t,
+        a = c1.a + c2.a,
+    };
 }

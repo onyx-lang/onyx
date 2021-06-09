@@ -1,0 +1,81 @@
+package bmfont
+
+use package core
+
+
+BMFont :: struct {
+    info   : BMFont_Info;
+    common : BMFont_Common;
+
+    pages  : map.Map(i32, str);
+    glyphs : map.Map(i32, BMFont_Glyph);
+
+    em : f32;
+
+    get_glyph :: (use bmfont: ^BMFont, char: u8) -> ^BMFont_Glyph {
+        return map.get_ptr(^glyphs, ~~char);
+    }
+}
+
+BMFont_Info :: struct {
+    face_name     : str;
+    size          : u32;
+    bold          : bool;
+    italic        : bool;
+    charset       : str;
+    unicode       : bool;
+    stretchH      : u32;
+    smooth        : bool;
+    supersampling : u32;
+
+    padding: struct {
+        top, right, bottom, left: i32;
+    };
+
+    spacing: struct {
+        horizontal, vertical: i32;
+    };
+
+    outline: u32;
+}
+
+BMFont_Common :: struct {
+
+    @Cleanup // I made a lot of these fields 32-bits in size, even though most of them could be probably be 16-bit if not 8-bit.
+    line_height  : i32;
+    baseline     : i32; // From absolute top of the line to the base of the characaters
+    scale_width  : u32;
+    scale_height : u32;
+    page_count   : u32;
+    packed       : bool;
+
+    alpha_channel : Channel;
+    red_channel   : Channel;
+    green_channel : Channel;
+    blue_channel  : Channel;
+
+    Channel :: enum {
+        Glyph             :: 0x00;
+        Outline           :: 0x01;
+        Glyph_And_Outline :: 0x02;
+        Zero              :: 0x03;
+        One               :: 0x04;
+    }
+}
+
+BMFont_Glyph :: struct {
+    id   : i32;
+    x, y : u32;
+    w, h : u32;
+
+    xoffset, yoffset : i32;
+    xadvance         : i32;
+
+    page    : u8;
+    channel : u8;
+
+    tex_x: f32 = 0;
+    tex_y: f32 = 0;
+    tex_w: f32 = 0;
+    tex_h: f32 = 0;
+}
