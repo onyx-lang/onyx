@@ -225,7 +225,7 @@ void scope_clear(Scope* scope) {
 // Polymorphic Procedures
 //
 
-AstNode node_that_signals_a_yield = {};
+AstNode node_that_signals_a_yield = { 0 };
 
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
     if (pp->concrete_funcs == NULL) {

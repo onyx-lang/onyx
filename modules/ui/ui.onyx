@@ -8,7 +8,7 @@ use package core
 #private font_texture : gl.GLTexture;
 
 @Temporary
-DEFAULT_TEXT_SIZE :: 40.0f
+DEFAULT_TEXT_SIZE :: 1.0f
 
 
 UI_Id :: #type u32
@@ -34,7 +34,7 @@ mouse_state: MouseState = MouseState.{};
 init_ui :: () {
     init_font();
 
-    map.init(^button_states, default=.{});
+    map.init(^button_states, default=.{}, hash_count=4);
 }
 
 clear_buttons :: () {
@@ -100,13 +100,15 @@ is_hot_item :: (id: UI_Id) -> bool {
     return hot_item == id;
 }
 
-draw_text_raw :: (text: str, x: f32, y: f32, line_height := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
+draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
-    gfx.set_texture(0);
+    gfx.use_alpha_shader(0);
 
     original_x := x;
-    baseline := cast(f32) font.common.baseline;
+    baseline := cast(f32) font.common.baseline * size;
+
+    line_height := cast(f32) font.common.line_height * size;
 
     for char: text {
         if char == #char "\n" {
@@ -122,19 +124,14 @@ draw_text_raw :: (text: str, x: f32, y: f32, line_height := DEFAULT_TEXT_SIZE, c
             assert(glyph != null, "NO NULL GLYPH");
         }
 
-        // Round to the nearest pixel
-        tx, ty := math.floor(x + ~~glyph.xoffset + .5), math.floor(y + ~~glyph.yoffset + baseline + .5);
-        w      := math.floor(cast(f32) glyph.w + .5);
-        h      := math.floor(cast(f32) glyph.h + .5);
+        // Round to the nearest pixel to avoid bleeding to the next glyph
+        tx, ty := math.floor(x + ~~glyph.xoffset * size + .5), math.floor(y + ~~glyph.yoffset * size - baseline + .5);
+        w      := math.floor(cast(f32) glyph.w * size + .5);
+        h      := math.floor(cast(f32) glyph.h * size + .5);
 
-        gfx.textured_rect(
-            .{ tx, ty },
-            .{ w, h },
-            .{ glyph.tex_x, glyph.tex_y },
-            .{ glyph.tex_w, glyph.tex_h },
-            color = color);
+        gfx.textured_rect(.{ tx, ty }, .{ w, h }, .{ glyph.tex_x, glyph.tex_y }, .{ glyph.tex_w, glyph.tex_h }, color = color);
 
-        x += ~~glyph.xadvance;
+        x += ~~glyph.xadvance * size;
     }
     
     gfx.flush();
@@ -157,7 +154,7 @@ draw_rect :: proc {
 
 @Themeing
 draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme, site := #callsite) -> bool {
-    draw_text_raw(text, x0, y0, theme.font_size, theme.text_color);
+    draw_text_raw(text, x0, y0 + ~~font.common.baseline * theme.font_size, theme.font_size, theme.text_color);
 }
 
 Rectangle :: struct {
@@ -195,7 +192,7 @@ Rectangle :: struct {
 @Relocate
 Text_Theme :: struct {
     text_color := gfx.Color4.{ 1, 1, 1 };
-    font_size  := 18.0f;
+    font_size  := 1.0f;
 }
 
 default_text_theme:   Text_Theme   = Text_Theme.{};
@@ -217,14 +214,18 @@ get_site_hash :: (site: CallSite, increment := 0) -> UI_Id {
 }
 
 get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
-    @Cleanup
-    return 0; // font->get_width(text, size);
+    return font->get_width(text, size);
 }
 
 
+@Cleanup
+// There should be a way to load multiple fonts and have a font cache.
+// The font cache pointers should be stable so you can take a pointer
+// to a font and it will remain valid. Probably want some kind of arena
+// with a map from i32 -> ^BMFont.
 #private init_font :: () {
-    fnt_file_data := #file_contents "./resources/fonts/FiraCode.fnt";
-    texture_data := #file_contents "./resources/fonts/FiraCode.data";
+    fnt_file_data := #file_contents "./resources/fonts/test.fnt";
+    texture_data := #file_contents "./resources/fonts/test_0.data";
 
     font = bmfont.load_bmfont(fnt_file_data);
 
@@ -232,7 +233,7 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
 
     font_texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tex_width, tex_height, 0, gl.RGBA, gl.UNSIGNED_BYTE, texture_data);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, tex_width, tex_height, 0, gl.ALPHA, gl.UNSIGNED_BYTE, texture_data);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
