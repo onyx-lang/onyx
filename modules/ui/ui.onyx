@@ -35,6 +35,7 @@ init_ui :: () {
     init_font();
 
     map.init(^button_states, default=.{}, hash_count=4);
+    map.init(^checkbox_states, default=.{}, hash_count=4);
 }
 
 clear_buttons :: () {
@@ -100,6 +101,7 @@ is_hot_item :: (id: UI_Id) -> bool {
     return hot_item == id;
 }
 
+@FontSizing // Currently, `size` is just a multipler for the baked font size. This should be changed to be height in pixels, or 'em's.
 draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
@@ -188,7 +190,7 @@ Rectangle :: struct {
 
 
 
- 
+
 @Relocate
 Text_Theme :: struct {
     text_color := gfx.Color4.{ 1, 1, 1 };
@@ -196,7 +198,7 @@ Text_Theme :: struct {
 }
 
 default_text_theme:   Text_Theme   = Text_Theme.{};
-
+    
 
 
 
@@ -234,8 +236,8 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
     font_texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, tex_width, tex_height, 0, gl.ALPHA, gl.UNSIGNED_BYTE, texture_data);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.bindTexture(gl.TEXTURE_2D, -1);
@@ -256,6 +258,6 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
         r = c1.r * (1 - t) + c2.r * t,
         g = c1.g * (1 - t) + c2.g * t,
         b = c1.b * (1 - t) + c2.b * t,
-        a = c1.a + c2.a,
+        a = c1.a * (1 - t) + c2.a * t,   @Cleanup // should this be interpolating alphas?
     };
 }

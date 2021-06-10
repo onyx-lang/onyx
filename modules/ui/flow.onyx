@@ -55,4 +55,12 @@ Flow :: struct {
                    .{ x0=x0, x1=x1, y0=y1-bottom_height, y1=y1 };
         }
     }
+
+
+    padding :: (r: Rectangle, top := 0.0f, bottom := 0.0f, left := 0.0f, right := 0.0f) -> Rectangle {
+        x0, y0 := Rectangle.top_left(r);
+        x1, y1 := Rectangle.bottom_right(r);
+
+        return .{ x0=x0 + left, x1=x1 - right, y0=y0 + top, y1=y1 - bottom };
+    }
 }

@@ -18,9 +18,6 @@ load_bmfont :: (fnt_data: [] u8) -> BMFont {
         glyph.value.tex_h = ~~ glyph.value.h / cast(f32) font.common.scale_width;        
     });
 
-    m_glyph := map.get_ptr(^bmf.glyphs, #char "M");
-    bmf.em = ~~m_glyph.h / cast(f32) bmf.common.line_height;
-
     return bmf;
 }
 

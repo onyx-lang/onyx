@@ -20,6 +20,7 @@ package ui
 #load "./ui"
 #load "./flow"
 #load "./components/button"
+#load "./components/checkbox"
 
 
 // Package inclusions that are part of all files in the "ui" package.

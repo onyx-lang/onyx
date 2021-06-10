@@ -10,8 +10,6 @@ BMFont :: struct {
     pages  : map.Map(i32, str);
     glyphs : map.Map(i32, BMFont_Glyph);
 
-    em : f32;
-
     get_glyph :: (use bmfont: ^BMFont, char: u8) -> ^BMFont_Glyph {
         return map.get_ptr(^glyphs, ~~char);
     }
