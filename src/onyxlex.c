@@ -92,6 +92,8 @@ static const char* token_type_names[] = {
 #endif
 
 #define char_is_alphanum(c) (((c) >= 'a' && (c) <= 'z') || ((c) >= 'A' && (c) <= 'Z') || ((c) >= '0' && (c) <= '9'))
+#define char_is_num(c)      ((c) >= '0' && (c) <= '9')
+#define char_is_alpha(c)    (((c) >= 'a' && (c) <= 'z') || ((c) >= 'A' && (c) <= 'Z'))
 
 static inline b32 token_lit(OnyxTokenizer* tokenizer, OnyxToken* tk, char* lit, b32 is_word, TokenType type) {
     i64 len = 0;

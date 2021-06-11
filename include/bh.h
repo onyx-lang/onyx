@@ -528,7 +528,7 @@ typedef struct bh__arr {
     bh__arrhead(arr)->length += n)
 
 #define bh_arr_push(arr, value)       ( \
-    bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1), \
+    bh_arr_length(arr) + 1 > bh_arr_capacity(arr) ? bh__arr_grow(bh_arr_allocator(arr), (void **) &(arr), sizeof(*(arr)), bh_arr_length(arr) + 1) : 0, \
     arr[bh__arrhead(arr)->length++] = value)
 
 #define bh_arr_set_at(arr, n, value) ( \
