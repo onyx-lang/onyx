@@ -34,8 +34,7 @@ mouse_state: MouseState = MouseState.{};
 init_ui :: () {
     init_font();
 
-    map.init(^button_states, default=.{}, hash_count=4);
-    map.init(^checkbox_states, default=.{}, hash_count=4);
+    map.init(^animation_states, default=.{}, hash_count=4);
 }
 
 clear_buttons :: () {
@@ -107,33 +106,11 @@ draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color :=
     gl.bindTexture(gl.TEXTURE_2D, font_texture);
     gfx.use_alpha_shader(0);
 
-    original_x := x;
-    baseline := cast(f32) font.common.baseline * size;
-
-    line_height := cast(f32) font.common.line_height * size;
-
-    for char: text {
-        if char == #char "\n" {
-            y += line_height + .5;
-            x = original_x;
-            continue;
-        }
-
-        glyph := font->get_glyph(char);
-        
-        if glyph == null {
-            glyph = font->get_glyph(0);
-            assert(glyph != null, "NO NULL GLYPH");
-        }
-
-        // Round to the nearest pixel to avoid bleeding to the next glyph
-        tx, ty := math.floor(x + ~~glyph.xoffset * size + .5), math.floor(y + ~~glyph.yoffset * size - baseline + .5);
-        w      := math.floor(cast(f32) glyph.w * size + .5);
-        h      := math.floor(cast(f32) glyph.h * size + .5);
-
-        gfx.textured_rect(.{ tx, ty }, .{ w, h }, .{ glyph.tex_x, glyph.tex_y }, .{ glyph.tex_w, glyph.tex_h }, color = color);
-
-        x += ~~glyph.xadvance * size;
+    for glyph: bmfont.get_character_positions(^font, size, text, x, y) {
+        gfx.textured_rect(
+            .{ glyph.pos_x, glyph.pos_y }, .{ glyph.pos_w, glyph.pos_h },
+            .{ glyph.tex_x, glyph.tex_y }, .{ glyph.tex_w, glyph.tex_h },
+            color = color);
     }
     
     gfx.flush();
@@ -180,6 +157,8 @@ Rectangle :: struct {
     }
 
     top_left     :: (use r: Rectangle) -> (x: f32, y: f32) do return math.min(x0, x1), math.min(y0, y1);
+    top_right    :: (use r: Rectangle) -> (x: f32, y: f32) do return math.max(x0, x1), math.min(y0, y1);
+    bottom_left  :: (use r: Rectangle) -> (x: f32, y: f32) do return math.min(x0, x1), math.max(y0, y1);
     bottom_right :: (use r: Rectangle) -> (x: f32, y: f32) do return math.max(x0, x1), math.max(y0, y1);
 
     contains :: (use r: Rectangle, x: f32, y: f32) -> bool {
@@ -197,9 +176,21 @@ Text_Theme :: struct {
     font_size  := 1.0f;
 }
 
-default_text_theme:   Text_Theme   = Text_Theme.{};
+default_text_theme := Text_Theme.{};
     
 
+
+
+
+// Animation states are stored globally as there is not much to the state of a button.
+// Forcing the end user to store a structure for each button that is just the animation
+// state of the component feels very wrong.
+#private animation_states : map.Map(UI_Id, Animation_State);
+
+Animation_State :: struct {
+    hover_time := 0.0f;
+    click_time := 0.0f;
+}
 
 
 

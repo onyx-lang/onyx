@@ -218,6 +218,24 @@ Immediate_Renderer :: struct {
 
         gl.useProgram(active_shader.program);
     }
+
+    @Cleanup // right now, these are raw screen coordinates, with x and y being the bottom left of the screen.
+    // This is backwards from what use_ortho_projections does, so it's not great to work with.
+    scissor :: (use ir: ^Immediate_Renderer, x: f32, y: f32, w: f32, h: f32) {
+        if !gl.isEnabled(gl.SCISSOR_TEST) {
+            ir->flush();
+            gl.enable(gl.SCISSOR_TEST);
+        }
+
+        gl.scissor(~~x, ~~y, ~~w, ~~h);
+    }
+
+    scissor_disable :: (use ir: ^Immediate_Renderer) {
+        if gl.isEnabled(gl.SCISSOR_TEST) {
+            ir->flush();
+            gl.disable(gl.SCISSOR_TEST);
+        }
+    }
 }
 
 
@@ -261,4 +279,12 @@ use_ortho_projection :: (left: f32, right: f32, top: f32, bottom: f32) {
 
 use_alpha_shader :: (texture_id: i32 = -1) {
     immediate_renderer->use_alpha_shader(texture_id);
+}
+
+scissor :: (x: f32, y: f32, w: f32, h: f32) {
+    immediate_renderer->scissor(x, y, w, h);
+}
+
+scissor_disable :: () {
+    immediate_renderer->scissor_disable();
 }

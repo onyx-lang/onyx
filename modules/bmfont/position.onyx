@@ -1,0 +1,95 @@
+package bmfont
+
+#private_file math :: package core.math
+
+#private_file Renderable_Glyph :: struct {
+    pos_x, pos_y : f32;
+    pos_w, pos_h : f32;
+
+    tex_x, tex_y : f32;
+    tex_w, tex_h : f32;
+}
+#private_file renderable_glyph: Renderable_Glyph;
+
+#private_file Rendering_Context :: struct {
+    font : ^BMFont;
+    size : f32;
+
+    x, y : f32;
+
+    original_x  : f32;
+    baseline    : f32;
+    line_height : f32;
+
+    text : str;
+    text_position : u32;
+}
+#private_file rendering_context: Rendering_Context;
+
+@FontSizing // Currently, `size` is just a multipler for the baked font size. This should be changed to be height in pixels, or 'em's.
+@Rename
+get_character_positions :: (font: ^BMFont, size: f32, text: str, x: f32, y: f32) -> Iterator(^Renderable_Glyph) {
+    rendering_context.font = font;
+    rendering_context.size = size;
+
+    rendering_context.x, rendering_context.y = x, y;
+
+    rendering_context.original_x = x;
+    rendering_context.baseline = ~~font.common.baseline * size;
+    rendering_context.line_height = ~~font.common.line_height * size;
+
+    rendering_context.text = text;
+    rendering_context.text_position = 0;
+
+    next :: (data: rawptr) -> (^Renderable_Glyph, bool) {
+        rc := cast(^Rendering_Context) data;
+        char: u8;
+
+        while true {
+            if rc.text_position >= rc.text.count {
+                return null, false;
+            }
+
+            char = rc.text[rc.text_position];
+            defer rc.text_position += 1;
+
+            if char == #char "\n" {
+                rc.y += rc.line_height;
+                rc.x = rc.original_x;
+                continue;
+            }
+
+            glyph := rc.font->get_glyph(char);
+
+            if glyph == null {
+                glyph = rc.font->get_glyph(255);
+                assert(glyph != null, "NO NULL GLYPH");
+            }
+
+            renderable_glyph.pos_x = math.floor(rc.x + ~~glyph.xoffset * rc.size + .5);
+            renderable_glyph.pos_y = math.floor(rc.y + ~~glyph.yoffset * rc.size - rc.baseline + .5);
+            renderable_glyph.pos_w = math.floor(~~glyph.w * rc.size + .5);
+            renderable_glyph.pos_h = math.floor(~~glyph.h * rc.size + .5);
+
+            renderable_glyph.tex_x = glyph.tex_x;
+            renderable_glyph.tex_y = glyph.tex_y;
+            renderable_glyph.tex_w = glyph.tex_w;
+            renderable_glyph.tex_h = glyph.tex_h;
+
+            rc.x += ~~glyph.xadvance * rc.size;
+
+            return ^renderable_glyph, true;
+        }
+    }
+
+    close :: (data: rawptr) {
+        rc := cast(^Rendering_Context) data;
+        rc.text = null_str;
+    }
+
+    return .{
+        next = next,
+        close = close,
+        data = ^rendering_context,
+    };
+}

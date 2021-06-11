@@ -293,3 +293,9 @@ ctz          :: proc { wasm.ctz_i32,    wasm.ctz_i64    }
 popcnt       :: proc { wasm.popcnt_i32, wasm.popcnt_i64 }
 rotate_left  :: proc { wasm.rotl_i32,   wasm.rotl_i64   }
 rotate_right :: proc { wasm.rotr_i32,   wasm.rotr_i64   }
+
+
+
+lerp :: (t: f32, a: $T, b: T) -> T {
+    return ~~(~~a * (1 - t) + ~~b * t);
+}

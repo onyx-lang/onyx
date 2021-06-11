@@ -26,7 +26,6 @@ get_width :: (use font: ^BMFont, text: str, size: f32) -> f32 {
     return math.max(max_x, x);
 }
 
-@Incomplete // does not use the size parameter
 get_height :: (use font: ^BMFont, text: str, size: f32) -> f32 {
     line_count := 0;
 

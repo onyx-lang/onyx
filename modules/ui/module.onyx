@@ -1,11 +1,26 @@
-@Todo // document this module better
+@Todo
+/*
+Document this module better
+
+Add a font cache and more preloaded fonts
+
+Add proper font texture decoding to make the WebGL texture depending on how the BMFont was encoded into the image.
+
+Add textboxes
+*/
 
 
 /*
-
 The goal of this module is to provide a low-friction method of producing simple
 user interfaces in WebGL (and OpenGL when Onyx compiles to C).
 
+This module provides several common UI components such as:
+    - Buttons
+    - Checkbox
+    - Sliders
+    - Textboxes
+
+This module also provides a simple rectangle division scheme for laying out UI components.
 */
 
 
@@ -19,8 +34,10 @@ package ui
 
 #load "./ui"
 #load "./flow"
+
 #load "./components/button"
 #load "./components/checkbox"
+#load "./components/slider"
 
 
 // Package inclusions that are part of all files in the "ui" package.

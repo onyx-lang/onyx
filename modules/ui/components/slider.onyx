@@ -1,0 +1,91 @@
+package ui
+
+use package core
+
+Slider_Theme :: struct {
+    use text_theme := Text_Theme.{};
+
+    box_color        := gfx.Color4.{ 0.1, 0.1, 0.1 };
+    box_border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
+    box_border_width := 4.0f;   @InPixels
+
+    bar_color       := gfx.Color4.{ 0.4, 0.4, 0.4 };
+    bar_hover_color := gfx.Color4.{ 1, 0, 0 };
+}
+
+default_slider_theme := Slider_Theme.{};
+
+slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, theme := ^default_slider_theme, site := #callsite, increment := 0) -> bool {
+    result := false;
+
+    hash := get_site_hash(site, increment);
+    animation_state := map.get(^animation_states, hash);
+    width, height := Rectangle.dimensions(r);
+
+    if is_hot_item(hash) {
+        if mouse_state.left_button_down {
+            set_active_item(hash);
+            result = true;
+
+            // Animate this?
+            adjust_slider_value(value, mouse_state.x - x0, width, min_value, max_value, 0);
+        } else {
+            set_active_item(0);
+        }
+    }
+
+    if Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+        set_hot_item(hash);
+    }
+
+    if is_hot_item(hash) {
+        move_towards(^animation_state.hover_time, 1.0f, 0.1f);  @ThemeConfiguration
+    } else {
+        move_towards(^animation_state.hover_time, 0.0f, 0.1f);  @ThemeConfiguration
+    }
+
+    box_border_width := theme.box_border_width;
+
+    bar_color := color_lerp(animation_state.hover_time, theme.bar_color, theme.bar_hover_color);
+
+    gfx.set_texture();
+    gfx.rect(.{ x0, y0 }, .{ width, height }, theme.box_border_color);
+    gfx.rect(
+        .{ x0 + box_border_width, y0 + box_border_width },
+        .{ width - box_border_width * 2, height - box_border_width * 2 },
+        theme.box_border_color);
+
+    box_width := (width - box_border_width * 2) * ~~(*value - min_value) / cast(f32) (max_value - min_value);
+    box_width  = math.clamp(box_width, 0, width - box_border_width * 2);
+    gfx.rect(
+        .{ x0 + box_border_width, y0 + box_border_width },
+        .{ box_width, height - box_border_width * 2 },
+        bar_color);
+
+    if animation_state.click_time > 0 || animation_state.hover_time > 0 {
+        map.put(^animation_states, hash, animation_state);
+    } else {
+        map.delete(^animation_states, hash);
+    }
+
+    return result;
+}
+
+#private_file
+adjust_slider_value :: proc {
+    @Incomplete // the step parameter is ignored.
+    // Integers need to be 
+    (value: ^i32, x: f32, width: f32, min_value: i32, max_value: i32, step: i32) {
+        step_width := width / ~~math.abs(max_value - min_value);
+        percent := (x + step_width / 2) / width;
+        *value = math.lerp(percent, min_value, max_value);
+        *value = math.clamp(*value, min_value, max_value);
+    }, 
+
+    @Incomplete // the step parameter is ignored.
+    (value: ^$T, x: f32, width: f32, min_value: T, max_value: T, step: T) {
+        percent := x / width;
+        *value = math.lerp(percent, min_value, max_value);
+        *value = math.clamp(*value, min_value, max_value);
+    }, 
+}

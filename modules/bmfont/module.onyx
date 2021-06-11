@@ -17,4 +17,5 @@ package bmfont
 #load "./types"
 #load "./bmfont_loader"
 #load "./utils"
+#load "./position"
 
