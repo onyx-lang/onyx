@@ -1,0 +1,3 @@
+package vecmath
+
+#load "./vector2.onyx"
