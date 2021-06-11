@@ -28,7 +28,7 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
             result = true;
 
             // Animate this?
-            adjust_slider_value(value, mouse_state.x - x0, width, min_value, max_value, 0);
+            adjust_slider_value(value, mouse_state.x - x0, width, min_value, max_value);
         } else {
             set_active_item(0);
         }
@@ -75,7 +75,7 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
 adjust_slider_value :: proc {
     @Incomplete // the step parameter is ignored.
     // Integers need to be 
-    (value: ^i32, x: f32, width: f32, min_value: i32, max_value: i32, step: i32) {
+    (value: ^i32, x: f32, width: f32, min_value: i32, max_value: i32) {
         step_width := width / ~~math.abs(max_value - min_value);
         percent := (x + step_width / 2) / width;
         *value = math.lerp(percent, min_value, max_value);
@@ -83,7 +83,7 @@ adjust_slider_value :: proc {
     }, 
 
     @Incomplete // the step parameter is ignored.
-    (value: ^$T, x: f32, width: f32, min_value: T, max_value: T, step: T) {
+    (value: ^$T, x: f32, width: f32, min_value: T, max_value: T) {
         percent := x / width;
         *value = math.lerp(percent, min_value, max_value);
         *value = math.clamp(*value, min_value, max_value);

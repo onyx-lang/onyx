@@ -107,6 +107,7 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
             SymresStatus ss = symres_type(&member->type_node);
             if (ss != Symres_Success) {
                 s_node->flags &= ~Ast_Flag_Type_Is_Resolved;
+                if (s_node->scope) scope_leave();
                 return ss;
             }
 
@@ -191,7 +192,7 @@ static SymresStatus symres_type(AstType** type) {
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
-            pst_node->scope = scope_create(context.ast_alloc, curr_scope, pst_node->token->pos);
+            pst_node->scope = scope_create(context.ast_alloc, pst_node->entity->scope, pst_node->token->pos);
 
             bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
                 SYMRES(type, &param->type_node);
@@ -470,15 +471,6 @@ static SymresStatus symres_return(AstReturn* ret) {
 }
 
 static SymresStatus symres_if(AstIfWhile* ifnode) {
-    if (ifnode->assignment != NULL) {
-        ifnode->scope = scope_create(context.ast_alloc, curr_scope, ifnode->token->pos);
-        scope_enter(ifnode->scope);
-
-        SYMRES(local, &ifnode->local);
-
-        SYMRES(statement, (AstNode **) &ifnode->assignment, NULL);
-    }
-
     if (ifnode->kind == Ast_Kind_Static_If) {
         if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
             return Symres_Yield_Macro;
@@ -492,6 +484,15 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
         }
 
     } else {
+        if (ifnode->assignment != NULL) {
+            ifnode->scope = scope_create(context.ast_alloc, curr_scope, ifnode->token->pos);
+            scope_enter(ifnode->scope);
+
+            SYMRES(local, &ifnode->local);
+
+            SYMRES(statement, (AstNode **) &ifnode->assignment, NULL);
+        }
+
         SYMRES(expression, &ifnode->cond);
 
         if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
@@ -831,6 +832,7 @@ SymresStatus symres_function(AstFunction* func) {
 
                     if (param->local->type == NULL) {
                         // HACK HACK HACK
+                        scope_leave();
                         return Symres_Yield_Macro;
                     }
                 }
@@ -1020,6 +1022,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
             } else {
                 AstOverloadedFunction* ofunc = (AstOverloadedFunction *) add_overload->overloaded_function;
+                SYMRES(expression, (AstTyped **) &add_overload->overload);
                 bh_arr_push(ofunc->overloads, (AstTyped *) add_overload->overload);
             }
 
