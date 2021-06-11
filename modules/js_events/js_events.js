@@ -29,12 +29,16 @@ window.ONYX_MODULES.push({
 
         document.addEventListener("keydown", function (ev) {
             if (ev.isComposing || ev.keyCode === 229) return;
+            ev.preventDefault();
             push_event_to_buffer(esp, event_size, 0x04, [ ev.keyCode ]);
+            return false;
         });
 
         document.addEventListener("keyup", function (ev) {
             if (ev.isComposing || ev.keyCode === 229) return;
+            ev.preventDefault();
             push_event_to_buffer(esp, event_size, 0x05, [ ev.keyCode ]);
+            return false;
         });
 
         document.addEventListener("mousedown", function (ev) {

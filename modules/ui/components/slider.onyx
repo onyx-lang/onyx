@@ -55,7 +55,8 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
         .{ width - box_border_width * 2, height - box_border_width * 2 },
         theme.box_border_color);
 
-    box_width := (width - box_border_width * 2) * ~~(*value - min_value) / cast(f32) (max_value - min_value);
+    box_width := cast(f32) (*value - min_value) / ~~(max_value - min_value);
+    box_width *= width - box_border_width * 2;
     box_width  = math.clamp(box_width, 0, width - box_border_width * 2);
     gfx.rect(
         .{ x0 + box_border_width, y0 + box_border_width },
