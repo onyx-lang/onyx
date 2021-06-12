@@ -14,10 +14,7 @@ Button_Theme :: struct {
 
 default_button_theme := Button_Theme.{};
 
-@Themeing
 button :: (use r: Rectangle, text: str, theme := ^default_button_theme, site := #callsite, increment := 0) -> bool {
-    gfx.set_texture();
-
     result := false;
 
     hash := get_site_hash(site, increment);
@@ -52,6 +49,7 @@ button :: (use r: Rectangle, text: str, theme := ^default_button_theme, site := 
     border_width  := theme.border_width;
     width, height := Rectangle.dimensions(r);
 
+    gfx.set_texture();
     gfx.rect(.{ x0, y0 }, .{ width, height }, theme.border_color);
 
     surface_color := color_lerp(animation_state.hover_time, theme.background_color, theme.hover_color);

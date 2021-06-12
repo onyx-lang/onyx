@@ -995,6 +995,11 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
 
     if ((binop_allowed[binop->operation] & effective_flags) == 0) goto bad_binaryop;
 
+    // NOTE: Enum flags with '&' result in a boolean value
+    if (binop->type->kind == Type_Kind_Enum && binop->type->Enum.is_flags && binop->operation == Binary_Op_And) {
+         binop->type = &basic_types[Basic_Kind_Bool];
+    }
+
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
         *pbinop = (AstBinaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) binop);

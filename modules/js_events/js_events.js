@@ -30,14 +30,55 @@ window.ONYX_MODULES.push({
         document.addEventListener("keydown", function (ev) {
             if (ev.isComposing || ev.keyCode === 229) return;
             ev.preventDefault();
-            push_event_to_buffer(esp, event_size, 0x04, [ ev.keyCode ]);
+
+            // NOTE: These modifiers need to match in js_events.onyx.
+            var modifiers = 0x0000;
+            if (ev.ctrlKey)  modifiers |= 0x01;
+            if (ev.altKey)   modifiers |= 0x02;
+            if (ev.metaKey)  modifiers |= 0x04;
+            if (ev.shiftKey) modifiers |= 0x08;
+
+            push_event_to_buffer(esp, event_size, 0x04, [ ev.keyCode, modifiers ]);
+
+            var keyname = ev.code;
+            let WASM_U32 = new Uint32Array(ONYX_MEMORY.buffer);
+            let event_idx = esp + (WASM_U32[esp] - 1) * (event_size / 4) + 2;
+
+            let WASM_U8 = new Uint8Array(ONYX_MEMORY.buffer);
+
+            for (var i = 0; i < keyname.length; i++) {
+                WASM_U8[event_idx * 4 + (4 * 4) + i] = keyname.charCodeAt(i);
+            }
+
+            WASM_U8[event_idx * 4 + (4 * 4) + 15] = keyname.length;
             return false;
         });
 
         document.addEventListener("keyup", function (ev) {
             if (ev.isComposing || ev.keyCode === 229) return;
             ev.preventDefault();
-            push_event_to_buffer(esp, event_size, 0x05, [ ev.keyCode ]);
+
+            // NOTE: These modifiers need to match in js_events.onyx.
+            var modifiers = 0x0000;
+            if (ev.ctrlKey)  modifiers |= 0x01;
+            if (ev.altKey)   modifiers |= 0x02;
+            if (ev.metaKey)  modifiers |= 0x04;
+            if (ev.shiftKey) modifiers |= 0x08;
+            
+            push_event_to_buffer(esp, event_size, 0x05, [ ev.keyCode, modifiers ]);
+
+            var keyname = ev.code;
+            let WASM_U32 = new Uint32Array(ONYX_MEMORY.buffer);
+            let event_idx = esp + (WASM_U32[esp] - 1) * (event_size / 4) + 2;
+
+            let WASM_U8 = new Uint8Array(ONYX_MEMORY.buffer);
+
+            for (var i = 0; i < keyname.length; i++) {
+                WASM_U8[event_idx * 4 + (4 * 4) + i] = keyname.charCodeAt(i);
+            }
+
+            WASM_U8[event_idx * 4 + (4 * 4) + 15] = keyname.length;
+
             return false;
         });
 

@@ -30,24 +30,40 @@ DomEvent :: struct {
 KeyboardEvent :: struct {
     use event : DomEvent;
 
-    keycode : u32;
-}
+    keycode   : u32;      // Apparently, keyCode is deprecated on browsers now??? Stupid web standards that aren't "standards" at all.
+    modifiers : Modifiers;
 
-MouseButton :: enum {
-    Left :: 0x00;
-    Middle :: 0x01;
-    Right :: 0x02;
+    // This is assuming that no single keyname is greater than 15 characters in length.
+    // A quick look at https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code/code_values makes
+    // me think that that isn't possible, but it's the web so anything is possible. 🙄
+    keyname       : [15] u8;
+    keyname_count : u8;
 
-    WheelUp :: 0x03;
-    WheelDown :: 0x04;
+    Modifiers :: enum #flags {
+        CTRL  :: 0x01;
+        ALT   :: 0x02;
+        META  :: 0x04;
+        SHIFT :: 0x08;
+    }
+
+    get_name :: (use e: ^KeyboardEvent) -> str do return str.{ ~~keyname, ~~keyname_count };
 }
 
 MouseEvent :: struct {
     use event : DomEvent;
 
+    Button :: enum {
+        Left :: 0x00;
+        Middle :: 0x01;
+        Right :: 0x02;
+
+        WheelUp :: 0x03;
+        WheelDown :: 0x04;
+    }
+
     pos_x  : u32;
     pos_y  : u32;
-    button : MouseButton;
+    button : Button;
 }
 
 ResizeEvent :: struct {
@@ -84,6 +100,7 @@ consume :: () -> Iterator(Event) {
         use package core.intrinsics.onyx { __zero_value }
         if event_storage.event_count == 0 do return __zero_value(Event), false;
 
+        @CodeGeneration // This instruction (and all instructions involving Event) generate a TON of instructions because Event is a union.
         event := event_storage.event_buffer[0];
 
         for i: 0 .. Num_Buffered_Events - 2 {

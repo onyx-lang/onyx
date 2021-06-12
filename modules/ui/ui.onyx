@@ -28,7 +28,7 @@ MouseState :: struct {
     y: f32 = 0;
 }
 
-mouse_state: MouseState = MouseState.{};
+mouse_state := MouseState.{};
 
 
 init_ui :: () {
@@ -131,7 +131,6 @@ draw_rect :: proc {
     }
 }
 
-@Themeing
 draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme, site := #callsite) -> bool {
     draw_text_raw(text, x0, y0 + ~~font.common.baseline * theme.font_size, theme.font_size, theme.text_color);
 }

@@ -18,7 +18,6 @@ Radio_Theme :: struct {
 
 default_radio_theme := Radio_Theme.{};
 
-@Themeing
 radio :: (use r: Rectangle, selected: ^$T, value: T, text: str, theme := ^default_radio_theme, site := #callsite, increment := 0) -> bool {
     result := false;
 

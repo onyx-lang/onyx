@@ -1,6 +1,60 @@
 package ui
+use package core
 
+Textbox_Theme :: struct {
+    use text_theme := Text_Theme.{
+        text_color = .{ 0, 0, 0 }
+    };
 
-textbox :: (use r: Rectangle) -> bool {
-    
+    background_color := gfx.Color4.{ 0.8, 0.8, 0.8 };
+    hover_color      := gfx.Color4.{ 1.0, 1.0, 1.0 };
+    click_color      := gfx.Color4.{ 0.5, 0.5, 0.7 };
+
+    border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
+    border_width := 6.0f;   @InPixels
+}
+
+default_textbox_theme := Textbox_Theme.{};
+
+textbox :: (use r: Rectangle, text: str, theme := ^default_textbox_theme, site := #callsite, increment := 0) -> bool {
+    result := false;
+
+    hash := get_site_hash(site, increment);
+    animation_state := map.get(^animation_states, hash);
+
+    if Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+        set_hot_item(hash);
+    }
+
+    if is_hot_item(hash) {
+        move_towards(^animation_state.hover_time, 1.0f, 0.1f);  @ThemeConfiguration
+    } else {
+        move_towards(^animation_state.hover_time, 0.0f, 0.1f);  @ThemeConfiguration
+    }
+
+    border_width  := theme.border_width;
+    width, height := Rectangle.dimensions(r);
+
+    gfx.set_texture();
+    gfx.rect(.{ x0, y0 }, .{ width, height }, theme.border_color);
+
+    surface_color := color_lerp(animation_state.hover_time, theme.background_color, theme.hover_color);
+    surface_color  = color_lerp(animation_state.click_time, surface_color, theme.click_color);
+    gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, surface_color);
+
+    text_width  := bmfont.get_width(^font, text, theme.font_size);
+    text_height := bmfont.get_height(^font, text, theme.font_size);
+
+    draw_text_raw(text,
+            x0 + border_width,
+            y0 + ~~ font.common.baseline * theme.font_size + (height - text_height) / 2,
+            theme.font_size, theme.text_color);
+
+    move_towards(^animation_state.click_time, 0.0f, 0.08f);     @ThemeConfiguration
+
+    if animation_state.click_time > 0 || animation_state.hover_time > 0 {
+        map.put(^animation_states, hash, animation_state);
+    } else {
+        map.delete(^animation_states, hash);
+    }
 }

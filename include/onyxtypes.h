@@ -113,6 +113,7 @@ struct TypeWithOffset {
         u64 unique_id;                                            \
         char* name;                                               \
         Type* backing;                                            \
+        b32   is_flags;                                           \
     })
 
 

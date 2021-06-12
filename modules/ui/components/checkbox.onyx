@@ -18,7 +18,6 @@ Checkbox_Theme :: struct {
 
 default_checkbox_theme := Checkbox_Theme.{};
 
-@Themeing
 checkbox :: (use r: Rectangle, value: ^bool, text: str, theme := ^default_checkbox_theme, site := #callsite, increment := 0) -> bool {
     result := false;
 

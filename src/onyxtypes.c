@@ -425,6 +425,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             enum_type->Enum.unique_id = next_unique_id++;
             enum_type->Enum.backing = enum_node->backing_type;
             enum_type->Enum.name = enum_node->name;
+            enum_type->Enum.is_flags = enum_node->flags & Ast_Flag_Enum_Is_Flags;
 
             return enum_type;
         }
