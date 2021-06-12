@@ -38,6 +38,7 @@ package ui
 #load "./components/button"
 #load "./components/checkbox"
 #load "./components/slider"
+#load "./components/radio"
 
 
 // Package inclusions that are part of all files in the "ui" package.
