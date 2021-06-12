@@ -176,6 +176,37 @@ Immediate_Renderer :: struct {
         vertex_ptr[5] = .{ .{ position.x,          position.y + size.y }, color, .{ texture_position.x,                   texture_position.y + texture_size.y } };
     }
 
+    circle :: (use ir: ^Immediate_Renderer, center: Vector2, radius: f32, color := Color4.{ 1, 1, 1 }, segments := 12) {
+        if vertex_count >= verticies.count - segments * 3 do ir->flush();
+
+        assert(verticies.count >= segments * 3, "[Immediate Renderer] Too many segments to draw in a single call.");
+
+        vertex_ptr := ^verticies[vertex_count];
+        defer vertex_count += segments * 3;
+
+        cx := center.x;
+        cy := center.y;
+
+        px := radius + cx;
+        py := cy;
+
+        ptr_offset := 0;
+
+        for s: 1 .. segments + 1 {
+            angle := math.PI * 2 * cast(f32) s / ~~segments;
+            x     := math.cos(angle) * radius + cx;
+            y     := math.sin(angle) * radius + cy;
+
+            vertex_ptr[ptr_offset + 0] = .{ .{ cx, cy }, color, .{ 0, 0 } };
+            vertex_ptr[ptr_offset + 1] = .{ .{ px, py }, color, .{ 0, 0 } };
+            vertex_ptr[ptr_offset + 2] = .{ .{  x,  y }, color, .{ 0, 0 } };
+
+            px = x;
+            py = y;
+            ptr_offset += 3;
+        }
+    }
+
     // NOTE: Calling set_texture without a parameter will disable textured rendering.
     set_texture :: (use ir: ^Immediate_Renderer, texture_id: i32 = -1) {
         if vertex_count > 0 do flush(ir);
@@ -267,6 +298,10 @@ rect :: (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
 
 textured_rect :: (position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
     immediate_renderer->textured_rect(position, size, texture_position, texture_size, color);
+}
+
+circle :: (center: Vector2, radius: f32, color: Color4 = .{1,1,1}, segments := 12) {
+    immediate_renderer->circle(center, radius, color, segments);
 }
 
 flush :: () do immediate_renderer->flush();
