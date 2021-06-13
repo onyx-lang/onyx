@@ -17,18 +17,42 @@ UI_Id :: #type u32
 #private active_item : UI_Id = 0
 #private hot_item_was_set := false
 
-MouseState :: struct {
-    left_button_down    := false;
-    left_button_just_up := false;
+Mouse_State :: struct {
+    left_button_down      := false;
+    left_button_just_down := false;
+    left_button_just_up   := false;
 
-    right_button_down    := false;
-    right_button_just_up := false;
+    right_button_down      := false;
+    right_button_just_down := false;
+    right_button_just_up   := false;
 
     x: f32 = 0;
     y: f32 = 0;
 }
 
-mouse_state := MouseState.{};
+mouse_state := Mouse_State.{};
+
+Keyboard_State :: struct {
+    Max_Keys_Per_Frame :: 4;
+
+    Key_State :: struct {
+        code: u32 = 0;
+        modifiers: Modifiers = ~~0;
+
+        Modifiers :: enum #flags {
+            CTRL; ALT; SHIFT; META;
+        }
+    }
+
+    keycodes_down_this_frame  : [Max_Keys_Per_Frame] Key_State;
+    keys_down_this_frame      : u32;
+
+    keycodes_up_this_frame    : [Max_Keys_Per_Frame] Key_State;
+    keys_up_this_frame        : u32;
+}
+
+@Note // This assumes that this gets zero intialized.
+keyboard_state: Keyboard_State;
 
 
 init_ui :: () {
@@ -38,8 +62,16 @@ init_ui :: () {
 }
 
 clear_buttons :: () {
-    mouse_state.left_button_just_up = false;
-    mouse_state.right_button_just_up = false;
+    mouse_state.left_button_just_up    = false;
+    mouse_state.left_button_just_down  = false;
+    mouse_state.right_button_just_up   = false;
+    mouse_state.right_button_just_down = false;
+
+    for ^key: keyboard_state.keycodes_down_this_frame do *key = .{};
+    keyboard_state.keys_down_this_frame = 0;
+
+    for ^key: keyboard_state.keycodes_up_this_frame do *key = .{};
+    keyboard_state.keys_up_this_frame = 0;
 
     if !hot_item_was_set do set_hot_item(0);
     hot_item_was_set = false;
@@ -54,16 +86,22 @@ update_mouse_position :: (new_x: f32, new_y: f32) {
     mouse_state.y = new_y;
 }
 
-#private_file ButtonKind :: enum { Left; Right; Middle; }
+#private_file Mouse_Button_Kind :: enum { Left; Right; Middle; }
 
-button_pressed :: (kind: ButtonKind) {
+button_pressed :: (kind: Mouse_Button_Kind) {
     switch kind {
-        case .Left  do mouse_state.left_button_down  = true;
-        case .Right do mouse_state.right_button_down = true;
+        case .Left {
+            mouse_state.left_button_down      = true;
+            mouse_state.left_button_just_down = true;
+        }
+        case .Right {
+            mouse_state.right_button_down      = true;
+            mouse_state.right_button_just_down = true;
+        }
     }
 }
 
-button_released :: (kind: ButtonKind) {
+button_released :: (kind: Mouse_Button_Kind) {
     switch kind {
         case .Left {
             mouse_state.left_button_down    = false;
@@ -77,6 +115,23 @@ button_released :: (kind: ButtonKind) {
     }
 }
 
+key_down :: (keycode: u32, modifiers: Keyboard_State.Key_State.Modifiers) {
+    keyboard_state.keycodes_down_this_frame[keyboard_state.keys_down_this_frame] = .{
+        keycode,
+        modifiers
+    };
+
+    keyboard_state.keys_down_this_frame += 1;
+}
+
+key_up :: (keycode: u32, modifiers: Keyboard_State.Key_State.Modifiers) {
+    keyboard_state.keycodes_up_this_frame[keyboard_state.keys_up_this_frame] = .{
+        keycode,
+        modifiers
+    };
+    
+    keyboard_state.keys_up_this_frame += 1;
+}
 
 set_active_item :: (id: UI_Id) -> bool {
     active_item = id;

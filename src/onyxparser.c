@@ -259,6 +259,8 @@ static b32 parse_possible_array_literal(OnyxParser* parser, AstTyped* left, AstT
     expect_token(parser, '.');
     expect_token(parser, '[');
     while (!consume_token_if_next(parser, ']')) {
+        if (parser->hit_unexpected_token) return 1;
+        
         AstTyped* value = parse_expression(parser, 0);
         bh_arr_push(al->values, value);
 

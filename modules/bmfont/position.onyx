@@ -8,6 +8,8 @@ package bmfont
 
     tex_x, tex_y : f32;
     tex_w, tex_h : f32;
+
+    x_advance : f32;
 }
 #private_file renderable_glyph: Renderable_Glyph;
 
@@ -62,8 +64,7 @@ get_character_positions :: (font: ^BMFont, size: f32, text: str, x: f32, y: f32)
             glyph := rc.font->get_glyph(char);
 
             if glyph == null {
-                glyph = rc.font->get_glyph(255);
-                assert(glyph != null, "NO NULL GLYPH");
+                continue;
             }
 
             renderable_glyph.pos_x = math.floor(rc.x + ~~glyph.xoffset * rc.size + .5);
@@ -76,6 +77,7 @@ get_character_positions :: (font: ^BMFont, size: f32, text: str, x: f32, y: f32)
             renderable_glyph.tex_w = glyph.tex_w;
             renderable_glyph.tex_h = glyph.tex_h;
 
+            renderable_glyph.x_advance = ~~glyph.xadvance * rc.size;
             rc.x += ~~glyph.xadvance * rc.size;
 
             return ^renderable_glyph, true;
