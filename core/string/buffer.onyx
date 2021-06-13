@@ -1,0 +1,66 @@
+// String_Buffer was originally made to support the UI library's textbox buffer,
+// where single character editing was the only operation that was needed. Therefore,
+// this is very barebones and does not contain a lot of functionality at the moment.
+// It basically just represents a string stored in a non-resizable buffer, but the
+// string can be resized within the buffer.
+
+package core.string
+
+#private_file math :: package core.math
+
+String_Buffer :: struct {
+    data     : ^u8;
+    count    : u32;
+    capacity : u32;
+}
+
+buffer_make :: (buffer_memory: [] u8, initial_str := null_str) -> String_Buffer {
+    buffer : String_Buffer;
+    buffer.data = buffer_memory.data;
+    buffer.capacity = buffer_memory.count;
+    buffer.count = 0;
+
+    if initial_str.count > 0 {
+        initial_length := math.min(initial_str.count, buffer.capacity);
+        buffer.count += initial_length;
+
+        for i: initial_length { 
+            buffer.data[i] = initial_str.data[i];
+        }
+    }
+
+    return buffer;
+}
+
+buffer_insert :: (use buffer: ^String_Buffer, position: i32, ch: u8) -> bool {
+    if position >= capacity do return false;
+    if count >= capacity do return false;
+
+    while i := cast(i32) count; i > position {
+        defer i -= 1;
+
+        data[i] = data[i - 1];
+    }        
+
+    data[position] = ch;
+    count += 1;
+    return true;
+}
+
+buffer_delete :: (use buffer: ^String_Buffer, position: i32) -> bool {
+    if position > capacity do return false;
+    if position > count do return false;
+    if count == 0 do return false;
+    if position == 0 do return false;
+
+    while i := position - 1; i < cast(i32) count - 1 {
+        defer i += 1;
+
+        data[i] = data[i + 1];
+    }
+
+    count -= 1;
+    return true;
+}
+
+buffer_to_str :: (use buffer: ^String_Buffer) -> str do return .{data, count};

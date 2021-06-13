@@ -18,6 +18,7 @@ package core
 #load "./string"
 #load "./string/builder"
 #load "./string/reader"
+#load "./string/buffer"
 
 #load "./intrinsics/onyx"
 #load "./intrinsics/wasm"

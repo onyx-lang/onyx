@@ -61,16 +61,20 @@ init_ui :: () {
     map.init(^animation_states, default=.{}, hash_count=4);
 }
 
+// This function should be called at the end of drawing a frame, after all of the UI elements
+// had a chance to interact with the hardware events.
 clear_buttons :: () {
     mouse_state.left_button_just_up    = false;
     mouse_state.left_button_just_down  = false;
     mouse_state.right_button_just_up   = false;
     mouse_state.right_button_just_down = false;
 
-    for ^key: keyboard_state.keycodes_down_this_frame do *key = .{};
-    keyboard_state.keys_down_this_frame = 0;
+    // I don't think these need to be cleared every frame, so long as you don't try
+    // to use them without checking keys_down_this_frame first.
+    // for ^key: keyboard_state.keycodes_down_this_frame do *key = .{};
+    // for ^key: keyboard_state.keycodes_up_this_frame do *key = .{};
 
-    for ^key: keyboard_state.keycodes_up_this_frame do *key = .{};
+    keyboard_state.keys_down_this_frame = 0;
     keyboard_state.keys_up_this_frame = 0;
 
     if !hot_item_was_set do set_hot_item(0);
@@ -129,7 +133,7 @@ key_up :: (keycode: u32, modifiers: Keyboard_State.Key_State.Modifiers) {
         keycode,
         modifiers
     };
-    
+
     keyboard_state.keys_up_this_frame += 1;
 }
 

@@ -20,7 +20,7 @@ field_valid :: (use field: ^Field, n: u32) -> bool {
 
 total_scanning_error := 0;
 
-read_ticket_and_validate :: (file: ^reader.StringReader, fields: [..] Field, ticket_store: ^u32) -> bool {
+read_ticket_and_validate :: (file: ^reader.String_Reader, fields: [..] Field, ticket_store: ^u32) -> bool {
 	retval := true;
 
 	for i: 0 .. fields.count {

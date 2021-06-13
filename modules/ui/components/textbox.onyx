@@ -4,7 +4,12 @@ use package core
 Textbox_Theme :: struct {
     use text_theme := Text_Theme.{
         text_color = .{ 0, 0, 0 }
+        // text_color = .{1, 1, 1}
     };
+
+    // background_color := gfx.Color4.{ 0.1, 0.1, 0.1 };
+    // hover_color      := gfx.Color4.{ 0.3, 0.3, 0.3 };
+    // click_color      := gfx.Color4.{ 0.5, 0.5, 0.7 };
 
     background_color := gfx.Color4.{ 0.8, 0.8, 0.8 };
     hover_color      := gfx.Color4.{ 1.0, 1.0, 1.0 };
@@ -13,7 +18,7 @@ Textbox_Theme :: struct {
     border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
     border_width := 6.0f;   @InPixels
 
-    cursor_color     := gfx.Color4.{ 0, 0, 0 };
+    cursor_color     := gfx.Color4.{ 0.5, 0.5, 0.5 };
 }
 
 default_textbox_theme := Textbox_Theme.{};
@@ -28,9 +33,10 @@ Textbox_Editing_State :: struct {
     cursor_animation_speed := 0.02f;
 }
 
+#private
 textbox_editing_state := Textbox_Editing_State.{};
 
-textbox :: (use r: Rectangle, text_buffer: ^String_Buffer, theme := ^default_textbox_theme, site := #callsite, increment := 0) -> bool {
+textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^default_textbox_theme, site := #callsite, increment := 0) -> bool {
     result := false;
 
     hash := get_site_hash(site, increment);
@@ -39,7 +45,7 @@ textbox :: (use r: Rectangle, text_buffer: ^String_Buffer, theme := ^default_tex
     border_width  := theme.border_width;
     width, height := Rectangle.dimensions(r);
 
-    text := text_buffer.buffer;
+    text := string.buffer_to_str(text_buffer);
     text_width  := bmfont.get_width(^font, text, theme.font_size);
     text_height := bmfont.get_height(^font, text, theme.font_size);
 
@@ -50,6 +56,8 @@ textbox :: (use r: Rectangle, text_buffer: ^String_Buffer, theme := ^default_tex
         if mouse_state.left_button_down && Rectangle.contains(r, mouse_state.x, mouse_state.y) {
             set_active_item(hash);
             textbox_editing_state.hash = hash;
+
+            // animation_state.click_time = 1.0f;
         }
     }
 
@@ -82,19 +90,19 @@ textbox :: (use r: Rectangle, text_buffer: ^String_Buffer, theme := ^default_tex
                 switch key.code {
                     case 0x25 do textbox_editing_state.cursor_position -= 1;
                     case 0x27 do textbox_editing_state.cursor_position += 1;
-                    case 0x23 do textbox_editing_state.cursor_position = text_buffer.buffer.count;
+                    case 0x23 do textbox_editing_state.cursor_position = text_buffer.count;
                     case 0x24 do textbox_editing_state.cursor_position = 0;
 
                     case 0x08 {
                         // Backspace
-                        if text_buffer->delete(textbox_editing_state.cursor_position) {
+                        if string.buffer_delete(text_buffer, textbox_editing_state.cursor_position) {
                             textbox_editing_state.cursor_position -= 1;
                         }
                     }
 
                     case 0x2E {
                         // Delete
-                        text_buffer->delete(textbox_editing_state.cursor_position + 1);
+                        string.buffer_delete(text_buffer, textbox_editing_state.cursor_position + 1);
                     }
 
                     case #default {
@@ -104,14 +112,14 @@ textbox :: (use r: Rectangle, text_buffer: ^String_Buffer, theme := ^default_tex
 
                         char := key_map[index];
                         if char != #char "\0" {
-                            if text_buffer->insert(textbox_editing_state.cursor_position, char) {
+                            if string.buffer_insert(text_buffer, textbox_editing_state.cursor_position, char) {
                                 textbox_editing_state.cursor_position += 1;
                             }
                         }
                     }
                 }
 
-                textbox_editing_state.cursor_position = math.clamp(textbox_editing_state.cursor_position, 0, text_buffer.buffer.count);
+                textbox_editing_state.cursor_position = math.clamp(textbox_editing_state.cursor_position, 0, text_buffer.count);
                 textbox_editing_state.cursor_animation = 1.0f;
             }
         }
@@ -157,12 +165,14 @@ textbox :: (use r: Rectangle, text_buffer: ^String_Buffer, theme := ^default_tex
 }
 
 #private_file
-get_cursor_location :: (text_buffer: ^String_Buffer, text_x: f32, text_y: f32, text_size: f32, cursor_position: i32) -> f32 {
+get_cursor_location :: (text_buffer: ^string.String_Buffer, text_x: f32, text_y: f32, text_size: f32, cursor_position: i32) -> f32 {
     countdown := cursor_position + 1;
     last_x : f32 = text_x;
     last_w : f32;
 
-    for glyph: bmfont.get_character_positions(^font, text_size, text_buffer.buffer, text_x, text_y) {
+    text := string.buffer_to_str(text_buffer);
+
+    for glyph: bmfont.get_character_positions(^font, text_size, text, text_x, text_y) {
         if countdown == 0 do return last_x;
 
         last_x = glyph.pos_x;
@@ -177,12 +187,13 @@ get_cursor_location :: (text_buffer: ^String_Buffer, text_x: f32, text_y: f32, t
 }
 
 #private_file
-get_cursor_position :: (text_buffer: ^String_Buffer, text_x: f32, text_y: f32, text_size: f32, mouse_x: f32, mouse_y: f32) -> i32 {
+get_cursor_position :: (text_buffer: ^string.String_Buffer, text_x: f32, text_y: f32, text_size: f32, mouse_x: f32, mouse_y: f32) -> i32 {
     cursor_position := 0;
 
     last_x: f32 = text_x;
+    text := string.buffer_to_str(text_buffer);
 
-    for glyph: bmfont.get_character_positions(^font, text_size, text_buffer.buffer, text_x, text_y) {
+    for glyph: bmfont.get_character_positions(^font, text_size, text, text_x, text_y) {
         cursor_position += 1;
         if cursor_position == 1 do continue;
 
@@ -194,46 +205,8 @@ get_cursor_position :: (text_buffer: ^String_Buffer, text_x: f32, text_y: f32, t
         last_x = glyph.pos_x + glyph.pos_w / 2;
     }
 
-    return text_buffer.buffer.count;
+    return text_buffer.count;
 }
-
-@Relocate // I think this should be part of the standard library? Or something similar to it?
-String_Buffer :: struct {
-    @Todo // make 'use buffer : [] u8' work here
-    buffer   : [] u8;
-    capacity : u32;
-
-    insert :: (use sb: ^String_Buffer, position: i32, ch: u8) -> bool {
-        if position >= capacity do return false;
-        if buffer.count >= capacity do return false;
-
-        while i := cast(i32) buffer.count; i > position {
-            defer i -= 1;
-
-            buffer.data[i] = buffer.data[i - 1];
-        }        
-
-        buffer.data[position] = ch;
-        buffer.count += 1;
-        return true;
-    }
-
-    delete :: (use sb: ^String_Buffer, position: i32) -> bool {
-        if position > capacity do return false;
-        if buffer.count == 0 do return false;
-        if position == 0 do return false;
-
-        while i := position - 1; i < cast(i32) buffer.count - 1{
-            defer i += 1;
-
-            buffer.data[i] = buffer.data[i + 1];
-        }
-
-        buffer.count -= 1;
-        return true;
-    }
-}
-
 
 @Relocate @Cleanup
 // This keymap is very wrong in a lot of ways. It works for my standard US keyboard, but will break horribly

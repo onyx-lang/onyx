@@ -1,6 +1,6 @@
 package core.string.reader
 
-StringReader :: struct {
+String_Reader :: struct {
     // Think of this as `use s : str`;
     data : ^u8;
     count : u32;
@@ -9,26 +9,26 @@ StringReader :: struct {
     original_str : str;
 }
 
-make :: proc (s: str) -> StringReader {
-    reader : StringReader;
+make :: proc (s: str) -> String_Reader {
+    reader : String_Reader;
     init(^reader, s);
     return reader;
 }
 
-init :: proc (use reader: ^StringReader, orig_str: str) {
+init :: proc (use reader: ^String_Reader, orig_str: str) {
     original_str = orig_str;
     data  = original_str.data;
     count = original_str.count;
 }
 
-reset :: proc (use reader: ^StringReader) {
+reset :: proc (use reader: ^String_Reader) {
     data  = original_str.data;
     count = original_str.count;
 }
 
-empty :: proc (use reader: ^StringReader) -> bool do return count == 0;
+empty :: proc (use reader: ^String_Reader) -> bool do return count == 0;
 
-read_u32 :: proc (use reader: ^StringReader) -> u32 {
+read_u32 :: proc (use reader: ^String_Reader) -> u32 {
     n: u32 = 0;
 
     skip_whitespace(reader);
@@ -44,7 +44,7 @@ read_u32 :: proc (use reader: ^StringReader) -> u32 {
     return n;
 }
 
-read_u64 :: proc (use reader: ^StringReader) -> u64 {
+read_u64 :: proc (use reader: ^String_Reader) -> u64 {
     n: u64 = 0;
 
     skip_whitespace(reader);
@@ -60,7 +60,7 @@ read_u64 :: proc (use reader: ^StringReader) -> u64 {
     return n;
 }
 
-read_byte :: proc (use reader: ^StringReader) -> u8 {
+read_byte :: proc (use reader: ^String_Reader) -> u8 {
     if count == 0 do return #char "\0";
 
     defer {
@@ -71,7 +71,7 @@ read_byte :: proc (use reader: ^StringReader) -> u8 {
     return data[0];
 }
 
-read_bytes :: proc (use reader: ^StringReader, byte_count := 1) -> str {
+read_bytes :: proc (use reader: ^String_Reader, byte_count := 1) -> str {
     bc := byte_count;
     if count < bc do bc = count;
 
@@ -83,7 +83,7 @@ read_bytes :: proc (use reader: ^StringReader, byte_count := 1) -> str {
     return str.{ data, bc };
 }
 
-read_line :: proc (use reader: ^StringReader) -> str {
+read_line :: proc (use reader: ^String_Reader) -> str {
     out : str;
     out.data = data;
     out.count = 0;
@@ -104,7 +104,7 @@ read_line :: proc (use reader: ^StringReader) -> str {
     return out;
 }
 
-read_until :: proc (use reader: ^StringReader, skip: u32, uptos: ..u8) -> str {
+read_until :: proc (use reader: ^String_Reader, skip: u32, uptos: ..u8) -> str {
     if count == 0 do return str.{ null, 0 };
 
     out : str;
@@ -131,7 +131,7 @@ read_until :: proc (use reader: ^StringReader, skip: u32, uptos: ..u8) -> str {
 }
 
 // Reads a continuous string of alphabetic chars along with underscores '_'
-read_word :: proc (use reader: ^StringReader) -> str {
+read_word :: proc (use reader: ^String_Reader) -> str {
     if count == 0 do return str.{ null, 0 };
 
     out := str.{ data, 0 };
@@ -150,7 +150,7 @@ read_word :: proc (use reader: ^StringReader) -> str {
     return out;
 }
 
-advance_line :: proc (use reader: ^StringReader) {
+advance_line :: proc (use reader: ^String_Reader) {
     if count == 0 do return;
 
     adv := 0;
@@ -161,7 +161,7 @@ advance_line :: proc (use reader: ^StringReader) {
 }
 
 
-skip_whitespace :: proc (use reader: ^StringReader) {
+skip_whitespace :: proc (use reader: ^String_Reader) {
     while count > 0 do switch data[0] {
         case #char " ", #char "\t", #char "\n", #char "\r" {
             data += 1;
@@ -172,7 +172,7 @@ skip_whitespace :: proc (use reader: ^StringReader) {
     }
 }
 
-skip_bytes :: proc (use reader: ^StringReader, byte_count := 1) {
+skip_bytes :: proc (use reader: ^String_Reader, byte_count := 1) {
     bc := byte_count;
     if count < bc do bc = count;
 
@@ -182,7 +182,7 @@ skip_bytes :: proc (use reader: ^StringReader, byte_count := 1) {
 
 
 
-starts_with :: proc (use reader: ^StringReader, s: str) -> bool {
+starts_with :: proc (use reader: ^String_Reader, s: str) -> bool {
     if count < s.count do return false;
     while i := 0; i < s.count {
         if data[i] != s[i] do return false;

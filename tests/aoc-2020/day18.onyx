@@ -3,7 +3,7 @@
 use package core
 reader :: package core.string.reader
 
-parse_factor :: (file: ^reader.StringReader) -> u64 {
+parse_factor :: (file: ^reader.String_Reader) -> u64 {
 	reader.skip_whitespace(file);
 
 	switch *file.data {
@@ -27,7 +27,7 @@ parse_factor :: (file: ^reader.StringReader) -> u64 {
 	return 0;
 }
 
-parse_expression_add :: (file: ^reader.StringReader) -> u64 {
+parse_expression_add :: (file: ^reader.String_Reader) -> u64 {
 	reader.skip_whitespace(file);
 
 	left := parse_factor(file);
@@ -45,7 +45,7 @@ parse_expression_add :: (file: ^reader.StringReader) -> u64 {
 	return left;
 }
 
-parse_expression_mul :: (file: ^reader.StringReader) -> u64 {
+parse_expression_mul :: (file: ^reader.String_Reader) -> u64 {
 	reader.skip_whitespace(file);
 
 	left := parse_expression_add(file);
