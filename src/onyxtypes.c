@@ -536,9 +536,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return comp_type;
         }
 
-        case Ast_Kind_Symbol:
-            assert(("symbol node in type expression", 0));
-            return NULL;
+        // case Ast_Kind_Symbol:
+        //     assert(("symbol node in type expression", 0));
+        //     return NULL;
     }
 
     return NULL;
