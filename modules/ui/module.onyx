@@ -5,8 +5,6 @@ Document this module better
 Add a font cache and more preloaded fonts
 
 Add proper font texture decoding to make the WebGL texture depending on how the BMFont was encoded into the image.
-
-Add textboxes
 */
 
 

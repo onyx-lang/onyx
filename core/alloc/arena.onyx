@@ -29,7 +29,7 @@ Arena :: struct { next : ^Arena; }
 arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     alloc_arena := cast(^ArenaState) data;
 
-    if aa == AllocationAction.Alloc {
+    if aa == .Alloc {
         // An allocation of this size does not fit into a single arena.
         if size > alloc_arena.arena_size - sizeof rawptr {
             return null;

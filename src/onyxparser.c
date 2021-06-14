@@ -2255,7 +2255,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
             if (parser->curr->type == ':') {
                 binding = parse_top_level_binding(parser, symbol);
-                if (binding != NULL) binding->node->flags |= private_kind;
+                if (binding != NULL) binding->flags |= private_kind;
 
                 goto submit_binding_to_entities;
             }
@@ -2269,12 +2269,12 @@ static void parse_top_level_statement(OnyxParser* parser) {
             if (consume_token_if_next(parser, '='))
                 memres->initial_value = parse_expression(parser, 1);
             
-            memres->flags |= private_kind;
             
             ENTITY_SUBMIT(memres);
             
             binding = make_node(AstBinding, Ast_Kind_Binding);
             binding->token = symbol;
+            binding->flags |= private_kind;
             binding->node = (AstNode *) memres;
 
             goto submit_binding_to_entities;
@@ -2385,9 +2385,9 @@ submit_binding_to_entities:
 
         Scope* target_scope = parser->package->scope;
 
-        if (binding->node->flags & Ast_Flag_Private_Package)
+        if (binding->flags & Ast_Flag_Private_Package)
             target_scope = parser->package->private_scope;
-        if (binding->node->flags & Ast_Flag_Private_File)
+        if (binding->flags & Ast_Flag_Private_File)
             target_scope = parser->file_scope;
         
         ENTITY_SUBMIT_IN_SCOPE(binding, target_scope);

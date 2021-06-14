@@ -18,7 +18,9 @@ Textbox_Theme :: struct {
     border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
     border_width := 6.0f;   @InPixels
 
-    cursor_color     := gfx.Color4.{ 0.5, 0.5, 0.5 };
+    cursor_color := gfx.Color4.{ 0.5, 0.5, 0.5 };
+    cursor_width := 4.0f;   @InPixels
+    cursor_blink_speed := 0.04f;   // Bigger is faster
 }
 
 default_textbox_theme := Textbox_Theme.{};
@@ -34,6 +36,7 @@ Textbox_Editing_State :: struct {
 }
 
 #private
+// There is only one 'Textbox_Editing_State', not a map of them because there can only be one textbox being edited at once.
 textbox_editing_state := Textbox_Editing_State.{};
 
 textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^default_textbox_theme, site := #callsite, increment := 0) -> bool {
@@ -56,6 +59,7 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^defa
         if mouse_state.left_button_down && Rectangle.contains(r, mouse_state.x, mouse_state.y) {
             set_active_item(hash);
             textbox_editing_state.hash = hash;
+            textbox_editing_state.cursor_animation_speed = theme.cursor_blink_speed;
 
             // animation_state.click_time = 1.0f;
         }
@@ -87,6 +91,7 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^defa
             for key_index: keyboard_state.keys_down_this_frame {
                 key := keyboard_state.keycodes_down_this_frame[key_index];
 
+                @KeycodeIsWrong
                 switch key.code {
                     case 0x25 do textbox_editing_state.cursor_position -= 1;
                     case 0x27 do textbox_editing_state.cursor_position += 1;
@@ -143,14 +148,15 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^defa
     if textbox_editing_state.hash == hash {
         cursor_x := get_cursor_location(text_buffer, text_x, text_y, theme.font_size, textbox_editing_state.cursor_position);
         cursor_y := y0 + theme.border_width;
+        cursor_w := theme.cursor_width;
         cursor_h := height - theme.border_width * 2;
 
         cursor_color := theme.cursor_color;
         cursor_color.a = textbox_editing_state.cursor_animation;
 
         draw_rect(
-            .{ cursor_x, cursor_y, cursor_x + 4, cursor_y + cursor_h },
-            color=cursor_color); @ThemeConfiguration
+            .{ cursor_x, cursor_y, cursor_x + cursor_w, cursor_y + cursor_h },
+            color=cursor_color);
     }
 
     move_towards(^animation_state.click_time, 0.0f, 0.08f);     @ThemeConfiguration
