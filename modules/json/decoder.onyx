@@ -1,0 +1,11 @@
+package json
+use package core
+
+decode_string :: (data: str, allocator := context.allocator) -> Value {
+    stream := io.string_stream_make(data);
+    return decode(^stream, allocator);
+}
+
+decode :: (stream: ^io.Stream, allocator := context.allocator) -> Value {
+
+}

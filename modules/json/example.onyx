@@ -1,0 +1,17 @@
+
+#load "core/std"
+#load "modules/json/module"
+
+use package core
+json :: package json
+
+json_string := "{ \"test\": \"Hello, World!\", \"array\": [1,2,3,4,5], }";
+
+main :: (args: [] cstr) {
+    decoded_json := json.decode_string(json_string);
+    defer json.free(decoded_json);
+
+    test_str := decoded_json |> json.get("test")
+                             |> json.to_str();
+    println(test_str);
+}

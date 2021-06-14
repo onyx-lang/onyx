@@ -1,0 +1,25 @@
+package json
+
+use package core.map { Map }
+
+Value :: struct {
+    Type :: enum {
+        Null;
+        Bool;
+        Integer;
+        Float;
+        String;
+        Array;
+        Object;
+    }
+
+    type  : Type;
+    value : struct #union {
+        bool_   : bool;
+        int_    : i64;
+        float_  : f64;
+        str_    : str;
+        array_  : [..] Value;
+        object_ : Map(str, Value);
+    }
+}
