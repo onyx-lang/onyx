@@ -332,6 +332,14 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
+                    if ((*member)->type->kind == Type_Kind_Struct) {
+                        AstStructType* member_node = (AstStructType *) (*member)->type->ast_type;
+                        if (member_node->stcache_is_valid) {
+                            s_node->stcache_is_valid = 0;
+                            return NULL;
+                        }
+                    }
+
                     onyx_report_error((*member)->token->pos, "Invalid member type: %s", type_get_name((*member)->type)); 
                     return NULL;
                 }

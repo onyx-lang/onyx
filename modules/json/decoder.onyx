@@ -7,5 +7,5 @@ decode_string :: (data: str, allocator := context.allocator) -> ^Value {
 }
 
 decode :: (stream: ^io.Stream, allocator := context.allocator) -> ^Value {
-    
+
 }
