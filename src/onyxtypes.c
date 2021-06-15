@@ -300,15 +300,18 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 s_type->Struct.unique_id = next_unique_id++;
                 s_type->Struct.mem_count = bh_arr_length(s_node->members);
 
+                s_type->Struct.memarr = NULL;
+                bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count + 1);
+                bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
+
             } else {
                 s_type = s_node->stcache;
             }
 
-            s_type->Struct.memarr = NULL;
             s_type->Struct.poly_sln = NULL;
 
-            bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count + 1);
-            bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
+            bh_arr_clear(s_type->Struct.memarr);
+            bh_table_clear(s_type->Struct.members);
 
             s_node->stcache_is_valid = 1;
 

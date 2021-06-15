@@ -1,10 +1,11 @@
 package json
+use package core
 
-use package core.map { Map }
+null_value : Value
 
 Value :: struct {
     Type :: enum {
-        Null;
+        Null :: 0x00;
         Bool;
         Integer;
         Float;
@@ -13,13 +14,55 @@ Value :: struct {
         Object;
     }
 
-    type  : Type;
-    value : struct #union {
+    KeyValue :: struct {
+        key : str;
+        value : ^Value;
+    }
+
+    type : Type;
+    allocator : Allocator;
+    use value : struct #union {
         bool_   : bool;
         int_    : i64;
         float_  : f64;
         str_    : str;
-        array_  : [..] Value;
-        object_ : Map(str, Value);
+
+        @CompilerBug @Cleanup // I don't want these to be pointers in the long run. In theory, they should be
+        // able to be normal values, but there is a compiler bug that prevents the size and alignment of Value
+        // being known.
+        array_  : [..] ^Value;
+        object_ : [..] KeyValue;
+    };
+}
+
+is_null :: (v: ^Value) -> bool {
+    if v == null do return true;
+    return v == ^null_value || v.type == .Null;
+}
+
+to_str :: (v: ^Value) -> str do return null_str;
+
+get :: (v: ^Value, key: str) -> ^Value {
+    if v.type != .Object do return ^null_value;
+
+    for ^entry: v.object_ {
+        if entry.key == key do return entry.value;
+    }
+    return ^null_value;
+}
+
+free :: (v: ^Value) do switch v.type {
+    case .Array {
+        for elem: v.array_ {
+            free(elem);
+        }
+        array.free(^v.array_);
+    }
+
+    case .Object {
+        for ^entry: v.object_ {
+            free(entry.value);
+        }
+        array.free(^v.object_);
     }
 }
