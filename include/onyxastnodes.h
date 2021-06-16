@@ -294,6 +294,8 @@ typedef enum BinaryOp {
     Binary_Op_Range           = 34,
     Binary_Op_Method_Call     = 35,
 
+    Binary_Op_Subscript       = 36,
+
     Binary_Op_Count
 } BinaryOp;
 
@@ -512,10 +514,22 @@ struct AstLocal         { AstTyped_base; };
 struct AstArgument      { AstTyped_base; AstTyped *value; VarArgKind va_kind; b32 is_baked : 1; };
 struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
-struct AstArrayAccess   { AstTyped_base; AstTyped *addr; AstTyped *expr; u64 elem_size; };
-struct AstFieldAccess   { AstTyped_base; AstTyped *expr; u32 offset; u32 idx; char* field; }; // If token is null, defer to field
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_ast_type; Type *ao_type; u64 alignment; };
+struct AstArrayAccess   {
+    AstTyped_base;
+    BinaryOp __unused_operation; // This will be set to Binary_Op_Subscript
+    AstTyped *addr;
+    AstTyped *expr;
+    u64 elem_size;
+};
+struct AstFieldAccess   {
+    AstTyped_base;
+    AstTyped *expr;
+    u32 offset;
+    u32 idx;
+    char* field; // If token is null, defer to field
+};
 struct AstFileContents  {
     AstTyped_base;
 

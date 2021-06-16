@@ -38,7 +38,7 @@ CheckStatus check_compound(AstCompound* compound);
 CheckStatus check_expression(AstTyped** expr);
 CheckStatus check_address_of(AstAddressOf* aof);
 CheckStatus check_dereference(AstDereference* deref);
-CheckStatus check_array_access(AstArrayAccess* expr);
+CheckStatus check_array_access(AstArrayAccess** paa);
 CheckStatus check_field_access(AstFieldAccess** pfield);
 CheckStatus check_method_call(AstBinaryOp** mcall);
 CheckStatus check_size_of(AstSizeOf* so);
@@ -1288,9 +1288,26 @@ CheckStatus check_dereference(AstDereference* deref) {
     return Check_Success;
 }
 
-CheckStatus check_array_access(AstArrayAccess* aa) {
+CheckStatus check_array_access(AstArrayAccess** paa) {
+    AstArrayAccess* aa = *paa;
     CHECK(expression, &aa->addr);
     CHECK(expression, &aa->expr);
+
+    // NOTE: Try operator overloading before checking everything else.
+    if ((aa->addr->type != NULL && aa->expr->type != NULL) &&
+        (aa->addr->type->kind != Type_Kind_Basic || aa->expr->type->kind != Type_Kind_Basic)) {
+        // AstArrayAccess is the same as AstBinaryOp for the first sizeof(AstBinaryOp) bytes
+        AstBinaryOp* binop = (AstBinaryOp *) aa;
+        AstCall *implicit_call = binaryop_try_operator_overload(binop);
+
+        if (implicit_call != NULL) {
+            CHECK(call, implicit_call);
+
+            // NOTE: Not an array access
+            *paa = (AstArrayAccess *) implicit_call;
+            return Check_Success;
+        }
+    }
 
     if (!type_is_array_accessible(aa->addr->type)) {
         onyx_report_error(aa->token->pos,
@@ -1374,12 +1391,17 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         return Check_Error;
     }
 
-    if (!is_lval((AstNode *) field->expr)) {
+    if (field->expr->type->kind != Type_Kind_Pointer && !is_lval((AstNode *) field->expr)) {
         onyx_report_error(field->token->pos,
             "Cannot access field '%b'. Expression is not an lval.",
             field->token->text,
             field->token->length);
         return Check_Error;
+    }
+
+    // HACK: (*foo).bar does not work without this.
+    if (field->expr->kind == Ast_Kind_Dereference) {
+        field->expr = ((AstDereference *) field->expr)->expr;
     }
 
     StructMember smem;
@@ -1512,7 +1534,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Address_Of:    retval = check_address_of((AstAddressOf *) expr); break;
         case Ast_Kind_Dereference:   retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Slice:
-        case Ast_Kind_Array_Access:  retval = check_array_access((AstArrayAccess *) expr); break;
+        case Ast_Kind_Array_Access:  retval = check_array_access((AstArrayAccess **) pexpr); break;
         case Ast_Kind_Field_Access:  retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Method_Call:   retval = check_method_call((AstBinaryOp **) pexpr); break;
         case Ast_Kind_Size_Of:       retval = check_size_of((AstSizeOf *) expr); break;

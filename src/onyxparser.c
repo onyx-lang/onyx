@@ -615,6 +615,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 aa_node->token = open_bracket;
                 aa_node->addr = retval;
                 aa_node->expr = expr;
+                aa_node->__unused_operation = Binary_Op_Subscript;
 
                 retval = (AstTyped *) aa_node;
                 expect_token(parser, ']');
@@ -765,6 +766,7 @@ static BinaryOp binary_op_from_token_type(TokenType t) {
 
         case Token_Type_Pipe:              return Binary_Op_Pipe;
         case Token_Type_Dot_Dot:           return Binary_Op_Range;
+        case '[':                          return Binary_Op_Subscript;
         default: return Binary_Op_Count;
     }
 }
@@ -827,6 +829,7 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
         bin_op_kind = binary_op_from_token_type(parser->curr->type);
         if (bin_op_kind == Binary_Op_Count) goto expression_done;
         if (binop_is_assignment(bin_op_kind) && !assignment_allowed) goto expression_done;
+        if (bin_op_kind == Binary_Op_Subscript) goto expression_done;
 
         bin_op_tok = parser->curr;
         consume_token(parser);
@@ -2331,6 +2334,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                 BinaryOp op = binary_op_from_token_type(parser->curr->type);
                 consume_token(parser);
+                if (op == Binary_Op_Subscript) expect_token(parser, ']');    // #operator [] ... needs to consume the other ']'
                 
                 if (op == Binary_Op_Count) {
                     onyx_report_error(parser->curr->pos, "Invalid binary operator.");

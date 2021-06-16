@@ -332,13 +332,13 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
-                    if ((*member)->type->kind == Type_Kind_Struct) {
-                        AstStructType* member_node = (AstStructType *) (*member)->type->ast_type;
-                        if (member_node->stcache_is_valid) {
-                            s_node->stcache_is_valid = 0;
-                            return NULL;
-                        }
-                    }
+                    // if ((*member)->type->kind == Type_Kind_Struct) {
+                    //     AstStructType* member_node = (AstStructType *) (*member)->type->ast_type;
+                    //     if (member_node->stcache_is_valid) {
+                    //         s_node->stcache_is_valid = 0;
+                    //         return NULL;
+                    //     }
+                    // }
 
                     onyx_report_error((*member)->token->pos, "Invalid member type: %s", type_get_name((*member)->type)); 
                     return NULL;
@@ -427,6 +427,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Enum_Type: {
             AstEnumType* enum_node = (AstEnumType *) type_node;
             if (enum_node->etcache) return enum_node->etcache;
+            if (enum_node->backing_type == NULL) return NULL;
 
             Type* enum_type = bh_alloc(alloc, sizeof(Type));
             enum_node->etcache = enum_type;
