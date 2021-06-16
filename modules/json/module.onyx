@@ -1,4 +1,6 @@
 
+// The structure for this JSON module is largely based on the structure of Odin's
+// JSON parsing module found here: https://github.com/odin-lang/Odin/blob/master/core/encoding/json/
 
 
 package json
@@ -6,3 +8,4 @@ package json
 #load "./encoder"
 #load "./decoder"
 #load "./types"
+#load "./tokenizer"

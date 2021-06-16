@@ -1,7 +1,17 @@
 package json
 use package core
 
-null_value : Value
+null_value := Value.{}
+
+Json :: struct {
+    // This is the allocator for all of the values in the JSON tree.
+    // It is not the allocator the arrays and objects however. Those
+    // have their own allocator, which I'm assuming will always be
+    // the general purpose heap allocator.
+    allocator: Allocator;
+
+    root: ^Value;
+}
 
 Value :: struct {
     Type :: enum {
@@ -14,25 +24,39 @@ Value :: struct {
         Object;
     }
 
-    type : Type;
-    allocator : Allocator;
-    use value : struct #union {
-        bool_   : bool;
-        int_    : i64;
-        float_  : f64;
-        str_    : str;   // This is allocated out of the allocator above.
+    type := Type.Null;
+}
 
-        @CompilerBug @Cleanup // I don't want these to be pointers in the long run. In theory, they should be
-        // able to be normal values, but there is a compiler bug that prevents the size and alignment of Value
-        // being known.
-        //
-        // Thinking about it a little more, I think having these be pointers will be better from a performance
-        // point of view, because the overhead of copying the return/parameter values would be significant.
-        array_  : [..] ^Value;
-        object_ : [..] struct {
-            key : str;        // This is allocated out of the allocator on the Value.
-            value : ^Value;
-        };
+Value_Bool :: struct {
+    use base := Value.{ type = .Bool };
+    bool_: bool;
+}
+
+Value_Integer :: struct {
+    use base := Value.{ type = .Integer };
+    int_: i64;
+}
+
+Value_Float :: struct {
+    use base := Value.{ type = .Float };
+    float_: f64;
+}
+
+Value_String :: struct {
+    use base := Value.{ type = .String };
+    str_: str;
+}
+
+Value_Array :: struct {
+    use base := Value.{ type = .Array };
+    array_: [..] ^Value;
+}
+
+Value_Object :: struct {
+    use base := Value.{ type = .Object };
+    object_: [..] struct {
+        key   : str;
+        value : ^Value;
     };
 }
 
@@ -41,34 +65,53 @@ is_null :: (v: ^Value) -> bool {
     return v == ^null_value || v.type == .Null;
 }
 
-to_str :: (v: ^Value) -> str do return null_str;
+to_str :: (v: ^Value) -> str {
+    if v == null do return null_str;
 
+    switch v.type {
+        case .String do return (cast(^Value_String) v).str_;
+        case #default do return "";
+    }
+}
+
+#operator [] get
 get :: (v: ^Value, key: str) -> ^Value {
     if v.type != .Object do return ^null_value;
 
-    for ^entry: v.object_ {
+    v_obj := cast(^Value_Object) v;
+
+    for ^entry: v_obj.object_ {
         if entry.key == key do return entry.value;
     }
     return ^null_value;
 }
 
-free :: (v: ^Value) do switch v.type {
-    case .String {
-        raw_free(v.allocator, v.str_.data);
-    }
-
-    case .Array {
-        for elem: v.array_ {
-            free(elem);
+free :: proc {
+    (v: ^Value, allocator: Allocator) do switch v.type {
+        case .String {
+            v_str := cast(^Value_String) v;
+            raw_free(allocator, v_str.str_.data);
         }
-        array.free(^v.array_);
-    }
 
-    case .Object {
-        for ^entry: v.object_ {
-            raw_free(v.allocator, entry.key.data);
-            free(entry.value);
+        case .Array {
+            v_arr := cast(^Value_Array) v;
+            for elem: v_arr.array_ {
+                free(elem, allocator);
+            }
+            array.free(^v_arr.array_);
         }
-        array.free(^v.object_);
-    }
+
+        case .Object {
+            v_obj := cast(^Value_Object) v;
+            for ^entry: v_obj.object_ {
+                raw_free(allocator, entry.key.data);
+                free(entry.value, allocator);
+            }
+            array.free(^v_obj.object_);
+        }
+    },
+
+    (use j: Json) {
+        free(root, allocator);
+    },
 }

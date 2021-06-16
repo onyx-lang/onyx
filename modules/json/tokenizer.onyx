@@ -1,0 +1,229 @@
+// Everything in this file is marked #private because I do not think
+// that this code will be needed outside of this module. I do not see
+// the value of having access to the tokenizer and parser of JSON directly.
+
+
+package json
+use package core
+
+#private
+Tokenizer :: struct {
+    data: [] u8;
+    use position := Position.{ 0, 1, 1 };
+}
+
+#private
+Token :: struct {
+    Kind :: enum {
+        Invalid;
+
+        Open_Brace;    // {
+        Close_Brace;   // }
+
+        Open_Bracket;  // [
+        Close_Bracket; // ]
+
+        Comma;
+        Colon;
+
+        Null;
+        True;
+        False;
+
+        Integer;
+        Float;
+        String;
+    }
+
+    kind: Kind = .Invalid;
+    text: str  = null_str;
+    use position: Position = .{ 0, 1, 1 };
+}
+
+#private
+Position :: struct {
+    offset       : u32;  // Offset into the stream
+    line, column : u32;  // Line and column number
+}
+
+#private
+Tokenizer_Error :: enum {
+    None;
+    EOF;
+    Illegal_Character;
+    String_Unterminated;
+}
+
+
+#private
+token_get :: (use tkn: ^Tokenizer) -> (Token, Tokenizer_Error) {
+    err := Tokenizer_Error.None;
+
+    skip_whitespace(tkn);
+    token := Token.{};
+    token.position = tkn.position;
+
+    curr_char := data[offset];
+    next_char, has_next := next_character(tkn);
+    if !has_next do return .{}, .EOF;
+
+    switch curr_char {
+        case #char "{" do token.kind = .Open_Brace;
+        case #char "}" do token.kind = .Close_Brace;
+        case #char "[" do token.kind = .Open_Bracket;
+        case #char "]" do token.kind = .Close_Bracket;
+        case #char "," do token.kind = .Comma;
+        case #char ":" do token.kind = .Colon;
+
+        case #char "a" .. #char "z" {
+            token.kind = .Invalid;
+            skip_alpha_numeric(tkn);
+
+            identifier := data.data[token.offset .. offset];
+            if identifier == "null"  do token.kind = .Null;
+            if identifier == "true"  do token.kind = .True;
+            if identifier == "false" do token.kind = .False;
+        }
+
+        case #char "-" {
+            next_character(tkn);
+            switch data[offset] {
+                case #char "0" .. #char "9" ---
+                case #default {
+                    err = .Illegal_Character;
+                    break break;
+                }
+            }
+
+            fallthrough;
+        }
+
+        case #char "0" .. #char "9" {
+            token.kind = .Integer;
+            skip_numeric(tkn);
+
+            if data[offset] == #char "." {
+                token.kind = .Float;
+                next_character(tkn);
+                skip_numeric(tkn);
+            }
+
+            if data[offset] == #char "e" || data[offset] == #char "E" {
+                next_character(tkn);
+                if data[offset] == #char "-" || data[offset] == #char "+" {
+                    next_character(tkn);
+                }
+                skip_numeric(tkn);
+            }
+        }
+
+        case #char "\"" {
+            token.kind = .String;
+
+            while offset < data.count {
+                ch := data[offset];
+                if ch == #char "\n" {
+                    err = .String_Unterminated;
+                    break break;
+                }
+
+                next_character(tkn);
+                if ch == #char "\"" {
+                    break;
+                }
+
+                if ch == #char "\\" {
+                    skip_escape(tkn);
+                }
+            }
+        }
+    }
+
+    token.text = data.data[token.offset .. offset];
+
+    if token.kind == .Invalid do err = .Illegal_Character;
+
+    return token, err;
+}
+
+#private_file
+next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
+    if offset >= data.count do return 0, false;
+
+    retval := data[offset];
+    offset += 1;
+    column += offset;
+
+    return retval, true;
+}
+
+#private_file
+skip_whitespace :: (use tkn: ^Tokenizer) {
+    while offset < data.count {
+        switch data[offset] {
+            case #char "\t", #char " ", #char "\r", #char "\v" {
+                next_character(tkn);
+            }
+
+            case #char "\n" {
+                line += 1;
+                column = 1;
+                offset += 1;
+            }
+
+            case #default {
+                break break;
+            }
+        }
+    }
+}
+
+#private_file
+skip_alpha_numeric :: (use tkn: ^Tokenizer) {
+    while offset < data.count {
+        switch data[offset] {
+            case #char "A" .. #char "Z", #char "a" .. #char "z", #char "0" .. #char "9", #char "_" {
+                next_character(tkn);
+                continue;
+            }
+        }
+
+        break;
+    }
+}
+
+#private_file
+skip_numeric :: (use tkn: ^Tokenizer) {
+    while offset < data.count {
+        switch data[offset] {
+            case #char "0" .. #char "9" {
+                next_character(tkn);
+                continue;
+            }
+        }
+
+        break;
+    }
+}
+
+#private_file
+skip_escape :: (use tkn: ^Tokenizer) {
+    switch data[offset] {
+        case #char "u" {
+            for i: 4 {
+                ch, _ := next_character(tkn);
+                switch ch {
+                    case #char "0" .. #char "9",
+                         #char "A" .. #char "F",
+                         #char "a" .. #char "f" ---
+
+                    case #default do return;
+                }
+            }
+        }
+
+        case #default {
+            next_character(tkn);
+        }
+    }
+}
