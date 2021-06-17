@@ -90,8 +90,7 @@ parse_value :: (use parser: ^Parser) -> (^Value, Error) {
 
         case .String {
             value := new(Value_String, allocator);
-            @Todo // parse escaped strings
-            value.str_ = string.alloc_copy(current.text.data[1 .. current.text.count - 1], allocator);
+            value.str_ = unescape_string(current, allocator);
 
             consume_token(parser);
             return_value = value;
@@ -182,7 +181,7 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
             return value, err;
         }
 
-        key := string.alloc_copy(key_token.text.data[1 .. key_token.text.count - 1], allocator);
+        key := unescape_string(key_token, allocator);
 
         _, colon_err := expect_token(parser, .Colon);
         if colon_err != .None {
@@ -224,4 +223,102 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
     }
 
     return value, err;
+}
+
+
+#private_file
+unescape_string :: (token: Token, allocator: Allocator) -> str {
+    if token.kind != .String do return "";
+
+    s := token.text;
+    if s.count <= 2 do return "";
+
+    s = s.data[1 .. s.count - 1];
+
+    i := 0;
+    for c: s {
+        if c == #char "\\" || c == #char "\"" || c < #char " " {
+            break;
+        }
+
+        i += 1;
+    }
+
+    if i == s.count {
+        return string.alloc_copy(s, allocator);
+    }
+
+    buffer := memory.make_slice(u8, s.count, allocator=allocator);
+    string.copy(s.data[0 .. i], buffer);
+    buffer_write := i;
+
+    while i < s.count {
+        c := s[i];
+
+        switch c {
+            case #char "\\" {
+                i += 1;
+                if i >= s.count do break break;
+
+                switch s[i] {
+                    case #char "\"", #char "'", #char "\\",  #char "/" {
+                        buffer[buffer_write] = s[i];
+                        i += 1;
+                        buffer_write += 1;
+                    }
+
+                    case #char "n" {
+                        buffer[buffer_write] = #char "\n";
+                        i += 1;
+                        buffer_write += 1;
+                    }
+
+                    case #char "t" {
+                        buffer[buffer_write] = #char "\t";
+                        i += 1;
+                        buffer_write += 1;
+                    }
+
+                    case #char "r" {
+                        buffer[buffer_write] = #char "\r";
+                        i += 1;
+                        buffer_write += 1;
+                    }
+
+                    case #char "b" {
+                        buffer[buffer_write] = #char "\b";
+                        i += 1;
+                        buffer_write += 1;
+                    }
+
+                    case #char "f" {
+                        buffer[buffer_write] = #char "\f";
+                        i += 1;
+                        buffer_write += 1;
+                    }
+
+                    case #char "v" {
+                        buffer[buffer_write] = #char "\v";
+                        i += 1;
+                        buffer_write += 1;
+                    }
+
+                    case #char "0" {
+                        buffer[buffer_write] = #char "\0";
+                        i += 1;
+                        buffer_write += 1;
+                    }
+                }
+            }
+
+            case #default {
+                buffer[buffer_write] = c;
+                i += 1;
+                buffer_write += 1;
+            }
+        }
+    }
+
+    buffer.count = buffer_write;
+    return buffer;
 }

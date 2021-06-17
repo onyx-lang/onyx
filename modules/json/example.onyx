@@ -5,28 +5,30 @@
 use package core
 json :: package json
 
-json_string := "{ \"test\": \"Hello, World!\", \"array\": [1,2,3,4,5,1423], \"sub\": { \"mem\": true } }";
+json_string := "{ \"test\": \"\\tHello,\\nWorld!\", \"array\": [1,2,3,4,5,1423], \"sub\": { \"mem\": true } }";
 
 main :: (args: [] cstr) {
     arena := alloc.arena.make(context.allocator, 4096);
     defer alloc.arena.free(^arena);
 
-    decoded_json := json.decode(#file_contents "./dummy.json", alloc.arena.make_allocator(^arena));
-    // decoded_json := json.decode(json_string, alloc.arena.make_allocator(^arena));
+    // decoded_json := json.decode(#file_contents "./dummy.json", alloc.arena.make_allocator(^arena));
+    decoded_json := json.decode(json_string, alloc.arena.make_allocator(^arena));
     defer json.free(decoded_json);
 
-    root := decoded_json.root;
-    for v: root->as_array() {
-        println(v["friends"][1]["name"]->as_str());
-    }
+    // root := decoded_json.root;
+    // for v: root->as_array() {
+    //     println(v["friends"][1]["name"]->as_str());
+    // }
 
-    #if false {
+    #if true {
         value := decoded_json.root["array"];
         for v: value->as_array() {
             println(v->as_int());
         }
         test_str := decoded_json.root["sub"]["mem"]->as_bool();
         println(test_str);
+
+        decoded_json.root["test"]->as_str() |> println();
     }
 }
     
