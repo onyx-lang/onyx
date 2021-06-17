@@ -432,9 +432,9 @@ static SymresStatus symres_expression(AstTyped** expr) {
             break;
 
         case Ast_Kind_Slice:
-        case Ast_Kind_Array_Access:
-            SYMRES(expression, &((AstArrayAccess *)(*expr))->addr);
-            SYMRES(expression, &((AstArrayAccess *)(*expr))->expr);
+        case Ast_Kind_Subscript:
+            SYMRES(expression, &((AstSubscript *)(*expr))->addr);
+            SYMRES(expression, &((AstSubscript *)(*expr))->expr);
             break;
 
         case Ast_Kind_Struct_Literal:

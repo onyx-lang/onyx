@@ -68,8 +68,8 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Return: return sizeof(AstReturn);
         case Ast_Kind_Address_Of: return sizeof(AstAddressOf);
         case Ast_Kind_Dereference: return sizeof(AstDereference);
-        case Ast_Kind_Array_Access: return sizeof(AstArrayAccess);
-        case Ast_Kind_Slice: return sizeof(AstArrayAccess);
+        case Ast_Kind_Subscript: return sizeof(AstSubscript);
+        case Ast_Kind_Slice: return sizeof(AstSubscript);
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
         case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
         case Ast_Kind_Range_Literal: return sizeof(AstRangeLiteral);
@@ -163,9 +163,9 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			break;
 
 		case Ast_Kind_Slice:
-		case Ast_Kind_Array_Access:
-			((AstArrayAccess *) nn)->addr = (AstTyped *) ast_clone(a, ((AstArrayAccess *) node)->addr);
-			((AstArrayAccess *) nn)->expr = (AstTyped *) ast_clone(a, ((AstArrayAccess *) node)->expr);
+		case Ast_Kind_Subscript:
+			((AstSubscript *) nn)->addr = (AstTyped *) ast_clone(a, ((AstSubscript *) node)->addr);
+			((AstSubscript *) nn)->expr = (AstTyped *) ast_clone(a, ((AstSubscript *) node)->expr);
 			break;
 
 		case Ast_Kind_Field_Access:

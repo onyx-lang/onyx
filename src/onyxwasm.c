@@ -240,7 +240,7 @@ EMIT_FUNC(binop,                         AstBinaryOp* binop);
 EMIT_FUNC(unaryop,                       AstUnaryOp* unop);
 EMIT_FUNC(call,                          AstCall* call);
 EMIT_FUNC(intrinsic_call,                AstCall* call);
-EMIT_FUNC(array_access_location,         AstArrayAccess* aa, u64* offset_return);
+EMIT_FUNC(subscript_location,            AstSubscript* sub, u64* offset_return);
 EMIT_FUNC(field_access_location,         AstFieldAccess* field, u64* offset_return);
 EMIT_FUNC(local_location,                AstLocal* local, u64* offset_return);
 EMIT_FUNC(memory_reservation_location,   AstMemRes* memres);
@@ -1868,31 +1868,31 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
     *pcode = code;
 }
 
-EMIT_FUNC(array_access_location, AstArrayAccess* aa, u64* offset_return) {
+EMIT_FUNC(subscript_location, AstSubscript* sub, u64* offset_return) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    emit_expression(mod, &code, aa->expr);
-    if (aa->elem_size != 1) {
-        WID(WI_PTR_CONST, aa->elem_size);
+    emit_expression(mod, &code, sub->expr);
+    if (sub->elem_size != 1) {
+        WID(WI_PTR_CONST, sub->elem_size);
         WI(WI_PTR_MUL);
     }
 
     // CLEANUP: This is one dense clusterf**k of code...
     u64 offset = 0;
-    if (aa->addr->kind == Ast_Kind_Array_Access
-        && aa->addr->type->kind == Type_Kind_Array) {
-        emit_array_access_location(mod, &code, (AstArrayAccess *) aa->addr, &offset);
-    } else if (aa->addr->kind == Ast_Kind_Field_Access
-        && aa->addr->type->kind == Type_Kind_Array) {
-        emit_field_access_location(mod, &code, (AstFieldAccess *) aa->addr, &offset);
-    } else if ((aa->addr->kind == Ast_Kind_Local || aa->addr->kind == Ast_Kind_Param)
-        && aa->addr->type->kind == Type_Kind_Array) {
-        emit_local_location(mod, &code, (AstLocal *) aa->addr, &offset);
-    } else if (aa->addr->kind == Ast_Kind_Memres
-        && aa->addr->type->kind != Type_Kind_Array) {
-        emit_memory_reservation_location(mod, &code, (AstMemRes *) aa->addr);
+    if (sub->addr->kind == Ast_Kind_Subscript
+        && sub->addr->type->kind == Type_Kind_Array) {
+        emit_subscript_location(mod, &code, (AstSubscript *) sub->addr, &offset);
+    } else if (sub->addr->kind == Ast_Kind_Field_Access
+        && sub->addr->type->kind == Type_Kind_Array) {
+        emit_field_access_location(mod, &code, (AstFieldAccess *) sub->addr, &offset);
+    } else if ((sub->addr->kind == Ast_Kind_Local || sub->addr->kind == Ast_Kind_Param)
+        && sub->addr->type->kind == Type_Kind_Array) {
+        emit_local_location(mod, &code, (AstLocal *) sub->addr, &offset);
+    } else if (sub->addr->kind == Ast_Kind_Memres
+        && sub->addr->type->kind != Type_Kind_Array) {
+        emit_memory_reservation_location(mod, &code, (AstMemRes *) sub->addr);
     } else {
-        emit_expression(mod, &code, aa->addr);
+        emit_expression(mod, &code, sub->addr);
     }
 
     WI(WI_PTR_ADD);
@@ -1913,10 +1913,10 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
         source_expr = (AstTyped *) ((AstFieldAccess *) source_expr)->expr;
     }
 
-    if (source_expr->kind == Ast_Kind_Array_Access
+    if (source_expr->kind == Ast_Kind_Subscript
         && source_expr->type->kind != Type_Kind_Pointer) {
         u64 o2 = 0;
-        emit_array_access_location(mod, &code, (AstArrayAccess *) source_expr, &o2);
+        emit_subscript_location(mod, &code, (AstSubscript *) source_expr, &o2);
         offset += o2;
 
     } else if ((source_expr->kind == Ast_Kind_Local || source_expr->kind == Ast_Kind_Param)
@@ -2140,9 +2140,9 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
             break;
         }
 
-        case Ast_Kind_Array_Access: {
-            AstArrayAccess* aa = (AstArrayAccess *) expr;
-            emit_array_access_location(mod, &code, aa, offset_return);
+        case Ast_Kind_Subscript: {
+            AstSubscript* sub = (AstSubscript *) expr;
+            emit_subscript_location(mod, &code, sub, offset_return);
             break;
         }
 
@@ -2317,11 +2317,11 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
-        case Ast_Kind_Array_Access: {
-            AstArrayAccess* aa = (AstArrayAccess *) expr;
+        case Ast_Kind_Subscript: {
+            AstSubscript* sub = (AstSubscript *) expr;
             u64 offset = 0;
-            emit_array_access_location(mod, &code, aa, &offset);
-            emit_load_instruction(mod, &code, aa->type, offset);
+            emit_subscript_location(mod, &code, sub, &offset);
+            emit_load_instruction(mod, &code, sub->type, offset);
             break;
         }
 
@@ -2380,7 +2380,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Slice: {
-            AstArrayAccess* sl = (AstArrayAccess *) expr;
+            AstSubscript* sl = (AstSubscript *) expr;
 
             emit_expression(mod, &code, sl->expr);
 

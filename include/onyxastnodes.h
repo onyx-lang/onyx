@@ -18,7 +18,7 @@
     NODE(Argument)             \
     NODE(AddressOf)            \
     NODE(Dereference)          \
-    NODE(ArrayAccess)          \
+    NODE(Subscript)            \
     NODE(FieldAccess)          \
     NODE(UnaryFieldAccess)     \
     NODE(SizeOf)               \
@@ -153,7 +153,7 @@ typedef enum AstKind {
     Ast_Kind_Return,
     Ast_Kind_Address_Of,
     Ast_Kind_Dereference,
-    Ast_Kind_Array_Access,
+    Ast_Kind_Subscript,
     Ast_Kind_Slice,
     Ast_Kind_Field_Access,
     Ast_Kind_Unary_Field_Access,
@@ -516,7 +516,7 @@ struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_ast_type; Type *ao_type; u64 alignment; };
-struct AstArrayAccess   {
+struct AstSubscript   {
     AstTyped_base;
     BinaryOp __unused_operation; // This will be set to Binary_Op_Subscript
     AstTyped *addr;
@@ -1273,7 +1273,7 @@ static inline b32 is_lval(AstNode* node) {
         || (node->kind == Ast_Kind_Param)
         || (node->kind == Ast_Kind_Global)
         || (node->kind == Ast_Kind_Dereference)
-        || (node->kind == Ast_Kind_Array_Access)
+        || (node->kind == Ast_Kind_Subscript)
         || (node->kind == Ast_Kind_Field_Access)
         || (node->kind == Ast_Kind_Memres))
         return 1;

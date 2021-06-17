@@ -610,15 +610,13 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 OnyxToken *open_bracket = expect_token(parser, '[');
                 AstTyped *expr = parse_compound_expression(parser, 0);
 
-                AstKind kind = Ast_Kind_Array_Access;
+                AstSubscript *sub_node = make_node(AstSubscript, Ast_Kind_Subscript);
+                sub_node->token = open_bracket;
+                sub_node->addr = retval;
+                sub_node->expr = expr;
+                sub_node->__unused_operation = Binary_Op_Subscript;
 
-                AstArrayAccess *aa_node = make_node(AstArrayAccess, kind);
-                aa_node->token = open_bracket;
-                aa_node->addr = retval;
-                aa_node->expr = expr;
-                aa_node->__unused_operation = Binary_Op_Subscript;
-
-                retval = (AstTyped *) aa_node;
+                retval = (AstTyped *) sub_node;
                 expect_token(parser, ']');
                 break;
             }

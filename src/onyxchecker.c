@@ -38,7 +38,7 @@ CheckStatus check_compound(AstCompound* compound);
 CheckStatus check_expression(AstTyped** expr);
 CheckStatus check_address_of(AstAddressOf* aof);
 CheckStatus check_dereference(AstDereference* deref);
-CheckStatus check_array_access(AstArrayAccess** paa);
+CheckStatus check_subscript(AstSubscript** paa);
 CheckStatus check_field_access(AstFieldAccess** pfield);
 CheckStatus check_method_call(AstBinaryOp** mcall);
 CheckStatus check_size_of(AstSizeOf* so);
@@ -1253,7 +1253,7 @@ CheckStatus check_compound(AstCompound* compound) {
 CheckStatus check_address_of(AstAddressOf* aof) {
     CHECK(expression, &aof->expr);
 
-    if ((aof->expr->kind != Ast_Kind_Array_Access
+    if ((aof->expr->kind != Ast_Kind_Subscript
             && aof->expr->kind != Ast_Kind_Dereference
             && aof->expr->kind != Ast_Kind_Field_Access
             && aof->expr->kind != Ast_Kind_Memres
@@ -1288,88 +1288,88 @@ CheckStatus check_dereference(AstDereference* deref) {
     return Check_Success;
 }
 
-CheckStatus check_array_access(AstArrayAccess** paa) {
-    AstArrayAccess* aa = *paa;
-    CHECK(expression, &aa->addr);
-    CHECK(expression, &aa->expr);
+CheckStatus check_subscript(AstSubscript** psub) {
+    AstSubscript* sub = *psub;
+    CHECK(expression, &sub->addr);
+    CHECK(expression, &sub->expr);
 
     // NOTE: Try operator overloading before checking everything else.
-    if ((aa->addr->type != NULL && aa->expr->type != NULL) &&
-        (aa->addr->type->kind != Type_Kind_Basic || aa->expr->type->kind != Type_Kind_Basic)) {
-        // AstArrayAccess is the same as AstBinaryOp for the first sizeof(AstBinaryOp) bytes
-        AstBinaryOp* binop = (AstBinaryOp *) aa;
+    if ((sub->addr->type != NULL && sub->expr->type != NULL) &&
+        (sub->addr->type->kind != Type_Kind_Basic || sub->expr->type->kind != Type_Kind_Basic)) {
+        // AstSubscript is the same as AstBinaryOp for the first sizeof(AstBinaryOp) bytes
+        AstBinaryOp* binop = (AstBinaryOp *) sub;
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
         if (implicit_call != NULL) {
             CHECK(call, implicit_call);
 
             // NOTE: Not an array access
-            *paa = (AstArrayAccess *) implicit_call;
+            *psub = (AstSubscript *) implicit_call;
             return Check_Success;
         }
     }
 
-    if (!type_is_array_accessible(aa->addr->type)) {
-        onyx_report_error(aa->token->pos,
+    if (!type_is_array_accessible(sub->addr->type)) {
+        onyx_report_error(sub->token->pos,
                 "Expected pointer or array type for left of array access, got '%s'.",
-                node_get_type_name(aa->addr));
+                node_get_type_name(sub->addr));
         return Check_Error;
     }
 
-    if (types_are_compatible(aa->expr->type, builtin_range_type_type)) {
+    if (types_are_compatible(sub->expr->type, builtin_range_type_type)) {
         Type *of = NULL;
-        if (aa->addr->type->kind == Type_Kind_Pointer)
-            of = aa->addr->type->Pointer.elem;
-        else if (aa->addr->type->kind == Type_Kind_Array)
-            of = aa->addr->type->Array.elem;
+        if (sub->addr->type->kind == Type_Kind_Pointer)
+            of = sub->addr->type->Pointer.elem;
+        else if (sub->addr->type->kind == Type_Kind_Array)
+            of = sub->addr->type->Array.elem;
         else {
             // FIXME: Slice creation should be allowed for slice types and dynamic array types, like it
             // is below, but this code doesn't look at that.
-            onyx_report_error(aa->token->pos, "Invalid type for left of slice creation.");
+            onyx_report_error(sub->token->pos, "Invalid type for left of slice creation.");
             return Check_Error;
         }
 
-        aa->kind = Ast_Kind_Slice;
-        aa->type = type_make_slice(context.ast_alloc, of);
-        aa->elem_size = type_size_of(of);
+        sub->kind = Ast_Kind_Slice;
+        sub->type = type_make_slice(context.ast_alloc, of);
+        sub->elem_size = type_size_of(of);
 
         return Check_Success;
     }
 
-    resolve_expression_type(aa->expr);
-    if (aa->expr->type->kind != Type_Kind_Basic
-            || (aa->expr->type->Basic.kind != Basic_Kind_I32 && aa->expr->type->Basic.kind != Basic_Kind_U32)) {
-        onyx_report_error(aa->token->pos,
+    resolve_expression_type(sub->expr);
+    if (sub->expr->type->kind != Type_Kind_Basic
+            || (sub->expr->type->Basic.kind != Basic_Kind_I32 && sub->expr->type->Basic.kind != Basic_Kind_U32)) {
+        onyx_report_error(sub->token->pos,
             "Expected type u32 or i32 for index, got '%s'.",
-            node_get_type_name(aa->expr));
+            node_get_type_name(sub->expr));
         return Check_Error;
     }
 
-    if (aa->addr->type->kind == Type_Kind_Pointer)
-        aa->type = aa->addr->type->Pointer.elem;
-    else if (aa->addr->type->kind == Type_Kind_Array)
-        aa->type = aa->addr->type->Array.elem;
-    else if (aa->addr->type->kind == Type_Kind_Slice
-            || aa->addr->type->kind == Type_Kind_DynArray
-            || aa->addr->type->kind == Type_Kind_VarArgs) {
+    if (sub->addr->type->kind == Type_Kind_Pointer)
+        sub->type = sub->addr->type->Pointer.elem;
+    else if (sub->addr->type->kind == Type_Kind_Array)
+        sub->type = sub->addr->type->Array.elem;
+    else if (sub->addr->type->kind == Type_Kind_Slice
+            || sub->addr->type->kind == Type_Kind_DynArray
+            || sub->addr->type->kind == Type_Kind_VarArgs) {
         // If we are accessing on a slice or a dynamic array, implicitly add a field access for the data member
         StructMember smem;
-        type_lookup_member(aa->addr->type, "data", &smem);
+        type_lookup_member(sub->addr->type, "data", &smem);
 
-        AstFieldAccess* fa = make_field_access(context.ast_alloc, aa->addr, "data");
+        AstFieldAccess* fa = make_field_access(context.ast_alloc, sub->addr, "data");
         fa->type   = smem.type;
         fa->offset = smem.offset;
         fa->idx    = smem.idx;
 
-        aa->addr = (AstTyped *) fa;
-        aa->type = aa->addr->type->Pointer.elem;
+        sub->addr = (AstTyped *) fa;
+        sub->type = sub->addr->type->Pointer.elem;
     }
     else {
-        onyx_report_error(aa->token->pos, "Invalid type for left of array access.");
+        onyx_report_error(sub->token->pos, "Invalid type for left of array access.");
         return Check_Error;
     }
 
-    aa->elem_size = type_size_of(aa->type);
+    sub->elem_size = type_size_of(sub->type);
 
     return Check_Success;
 }
@@ -1534,7 +1534,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Address_Of:    retval = check_address_of((AstAddressOf *) expr); break;
         case Ast_Kind_Dereference:   retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Slice:
-        case Ast_Kind_Array_Access:  retval = check_array_access((AstArrayAccess **) pexpr); break;
+        case Ast_Kind_Subscript:     retval = check_subscript((AstSubscript **) pexpr); break;
         case Ast_Kind_Field_Access:  retval = check_field_access((AstFieldAccess **) pexpr); break;
         case Ast_Kind_Method_Call:   retval = check_method_call((AstBinaryOp **) pexpr); break;
         case Ast_Kind_Size_Of:       retval = check_size_of((AstSizeOf *) expr); break;

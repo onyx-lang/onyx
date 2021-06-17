@@ -11,7 +11,7 @@ print_check() {
 if command -v wasmer >/dev/null; then
     printf "Using $(wasmer --version)\n"
 else
-    printf "Using $(node --verison)\n"
+    printf "Using node $(node -v)\n"
 fi
 
 failed=0
