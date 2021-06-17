@@ -99,7 +99,7 @@ main :: (args: [] cstr) {
     println(test_overload("World!", "Hello!"));
 }
 
-test_overload :: proc {
+test_overload :: #match {
     (x: $T, y: T)  -> T { return x; },
     (x: $T, y: $R) -> R { return y; },
 }

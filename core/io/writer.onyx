@@ -77,7 +77,7 @@ write_format :: (use writer: ^Writer, format: str, va: ...) {
     write_str(writer, conv.str_format_va(format, buffer[0 .. 2048], va));
 }
 
-write :: proc {
+write :: #match {
     write_str, write_cstr, 
     write_i32, write_f32,
     write_i64, write_f64,

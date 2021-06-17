@@ -133,7 +133,7 @@ get_idx :: (v: ^Value, idx: i32) -> ^Value {
     return v_arr.array_[idx];
 }
 
-free :: proc {
+free :: #match {
     (v: ^Value, allocator: Allocator) do switch v.type {
         case .String {
             v_str := cast(^Value_String) v;

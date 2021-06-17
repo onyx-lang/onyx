@@ -744,7 +744,7 @@ blendFuncSeparate              :: (srcRGB: GLenum, dstRGB: GLenum, srcAlpha: GLe
 blitFramebuffer                :: (sx0: GLint, sy0: GLint, sx1: GLint, sy1: GLint, dx0: GLint, dy0: GLint, dx1: GLint, dy1: GLint, mask: GLbitfield, filter: GLenum) -> void #foreign "gl" "blitFramebuffer" ---
 bufferDataWithData             :: (target: GLenum, buffer: [] void, usage: GLenum) -> void #foreign "gl" "bufferDataWithData" ---
 bufferDataNoData               :: (target: GLenum, size: GLsizei, usage: GLenum) -> void #foreign "gl" "bufferDataNoData" ---
-bufferData                     :: proc { bufferDataWithData, bufferDataNoData }
+bufferData                     :: #match { bufferDataWithData, bufferDataNoData }
 bufferSubData                  :: (target: GLenum, offset: GLsizei, data: [] void) -> void #foreign "gl" "bufferSubData" ---
 canvasSize                     :: (width: GLsizei, height: GLsizei) -> void #foreign "gl" "canvasSize" ---
 checkFrameBufferStatus         :: (target: GLenum) -> GLenum #foreign "gl" "checkFrameBufferStatus" ---

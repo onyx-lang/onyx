@@ -73,7 +73,7 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
 }
 
 #private_file
-adjust_slider_value :: proc {
+adjust_slider_value :: #match {
     @Incomplete // the step parameter is ignored.
     // Integers need to be 
     (value: ^i32, x: f32, width: f32, min_value: i32, max_value: i32) {

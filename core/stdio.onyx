@@ -14,7 +14,7 @@ package core
 
 auto_flush_stdio := true
 
-print :: proc {
+print :: #match {
     (x: str) {
         io.write(^print_writer, x);
         if x[x.count - 1] == #char "\n" && auto_flush_stdio do __flush_stdio();
@@ -35,7 +35,7 @@ printf :: (format: str, va: ...) {
 }
 
 // This works on both slices and arrays
-print_array :: proc {
+print_array :: #match {
     (arr: [$N] $T, sep := " ") {
         for i: 0 .. N {
             print(arr[i]);

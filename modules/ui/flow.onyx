@@ -3,7 +3,7 @@ package ui
 // UI Flow
 
 Flow :: struct {
-    split_vertical :: proc {
+    split_vertical :: #match {
         (r: Rectangle, left_percent: f32, padding := 0.0f) -> (left: Rectangle, right: Rectangle) {
             return split_vertical(r, left_width=left_percent * Rectangle.width(r), padding=padding);
         },
@@ -30,7 +30,7 @@ Flow :: struct {
     }
 
 
-    split_horizontal :: proc {
+    split_horizontal :: #match {
         (r: Rectangle, top_percent: f32, padding := 0.0f) -> (top: Rectangle, bottom: Rectangle) {
             return split_horizontal(r, top_height=top_percent * Rectangle.height(r), padding=padding);
         },

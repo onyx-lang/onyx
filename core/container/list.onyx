@@ -85,10 +85,10 @@ fold :: (list: ^List($T), init: $R, f: (T, R) -> R) -> R {
     return val;
 }
 
-map :: proc {
-    (list: ^List($T), f: (^T) -> void) {
-    }
-}
+// map :: #match {
+//     (list: ^List($T), f: (^T) -> void) {
+//     }
+// }
 
 get_iterator :: (list: ^List($T)) -> Iterator(T) {
     iterator_next :: ($T: type_expr, data: rawptr) -> (T, bool) {

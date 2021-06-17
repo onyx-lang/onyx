@@ -128,7 +128,7 @@ Immediate_Renderer :: struct {
         vertex_count = 0;
     }
 
-    push_vertex :: proc {
+    push_vertex :: #match {
         // If a color is not provided, the previous color is used.
         (use ir: ^Immediate_Renderer, position: Vector2) {
             push_vertex(ir, position, color = verticies[vertex_count - 1].color);
@@ -287,7 +287,7 @@ immediate_renderer_free :: () {
     Immediate_Renderer.free(^immediate_renderer);
 }
 
-vertex :: proc {
+vertex :: #match {
     (position: Vector2)                { immediate_renderer->push_vertex(position); },
     (position: Vector2, color: Color4) { immediate_renderer->push_vertex(position, color); },
 }

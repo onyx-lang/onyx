@@ -24,7 +24,7 @@ from_cstr :: (s: cstr) -> str {
 
 free :: (s: str, allocator := context.allocator) do raw_free(allocator, s.data);
 
-length :: proc {
+length :: #match {
     (s: str) -> u32 {
         return s.count;
     },
@@ -41,7 +41,7 @@ length :: proc {
     },
 }
 
-concat :: proc {
+concat :: #match {
     (s1: str, s2: str, allocator := context.allocator) -> str {
         len1 := length(s1);
         len2 := length(s2);
@@ -103,7 +103,7 @@ split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
     return strarr[0 .. delim_count + 1];
 }
 
-contains :: proc {
+contains :: #match {
     (s: str, c: u8) -> bool {
         for ch: s do if ch == c do return true;
         return false;
@@ -170,7 +170,7 @@ ends_with :: (s: str, suffix: str) -> bool {
 }
 
 
-strip_leading_whitespace :: proc {
+strip_leading_whitespace :: #match {
     (s: ^str) {
         while true do switch s.data[0] {
             case #char " ", #char "\t", #char "\n", #char "\r" {
@@ -189,7 +189,7 @@ strip_leading_whitespace :: proc {
     },
 }
 
-strip_trailing_whitespace :: proc {
+strip_trailing_whitespace :: #match {
     (s: ^str) {
         while true do switch s.data[s.count - 1] {
             case #char " ", #char "\t", #char "\n", #char "\r" {
@@ -207,7 +207,7 @@ strip_trailing_whitespace :: proc {
     },
 }
 
-trim_start :: proc {
+trim_start :: #match {
     (s: ^str, char: u8) {
         while s.data[0] == char {
             s.data += 1;
@@ -222,7 +222,7 @@ trim_start :: proc {
     }
 }
 
-trim_end :: proc {
+trim_end :: #match {
     (s: ^str, char: u8) {
         while s.data[s.count - 1] == char {
             s.count -= 1;
@@ -236,7 +236,7 @@ trim_end :: proc {
     }
 }
 
-advance :: proc {
+advance :: #match {
     (s: ^str, chars := 1) {
         chars = math.min(chars, s.count);
 

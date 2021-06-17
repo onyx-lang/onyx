@@ -12,21 +12,6 @@ void onyx_errors_init(bh_arr(bh_file_contents)* files) {
     bh_arr_new(global_heap_allocator, errors.errors, 4);
 }
 
-void onyx_report_error(OnyxFilePos pos, char * format, ...) {
-
-    va_list vargs;
-    va_start(vargs, format);
-    char* msg = bh_bprintf_va(format, vargs);
-    va_end(vargs);
-
-    OnyxError err = {
-        .pos = pos,
-        .text = bh_strdup(errors.msg_alloc, msg),
-    };
-
-    bh_arr_push(errors.errors, err);
-}
-
 static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     bh_printf("(%s:%l,%l) %s\n", err->pos.filename, err->pos.line, err->pos.column, err->text);
 
@@ -79,4 +64,41 @@ b32 onyx_has_errors() {
 void onyx_clear_errors() {
     bh_printf("ERRORS WERE CLEARED!!!\n");
     bh_arr_set_length(errors.errors, 0);
+}
+
+void onyx_report_error(OnyxFilePos pos, char * format, ...) {
+
+    va_list vargs;
+    va_start(vargs, format);
+    char* msg = bh_bprintf_va(format, vargs);
+    va_end(vargs);
+
+    OnyxError err = {
+        .pos = pos,
+        .text = bh_strdup(errors.msg_alloc, msg),
+    };
+
+    bh_arr_push(errors.errors, err);
+}
+
+void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
+    va_list vargs;
+    va_start(vargs, format);
+    char* msg = bh_bprintf_va(format, vargs);
+    va_end(vargs);
+
+    OnyxError err = {
+        .pos = pos,
+        .text = msg,
+    };
+
+    bh_file_contents file_contents = { 0 };
+    bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
+        if (!strcmp(fc->filename, pos.filename)) {
+            file_contents = *fc;
+            break;
+        }
+    }
+
+    print_detailed_message(&err, &file_contents);
 }

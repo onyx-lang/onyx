@@ -149,7 +149,7 @@ get_contents_from_file :: (file: File) -> str {
     return data[0 .. size];
 }
 
-get_contents :: proc {
+get_contents :: #match {
     get_contents_from_file,
 
     (path: str) -> str {

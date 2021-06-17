@@ -18,7 +18,7 @@ time_ns :: () -> u64 {
     return ~~output_time;
 }
 
-sleep :: proc {
+sleep :: #match {
     (seconds: u64)      { sleep(nanoseconds=seconds * 1000000000); },
     (milliseconds: u64) { sleep(nanoseconds=milliseconds * 1000000); },
 

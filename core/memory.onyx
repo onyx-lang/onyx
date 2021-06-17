@@ -44,7 +44,7 @@ make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] 
     };
 }
 
-align :: proc {
+align :: #match {
     (size: ^u64, align: u64) {
         if *size % align != 0 {
             *size += align - (*size % align);

@@ -25,7 +25,7 @@ main :: (args: [] cstr) {
 
     println("\n\n=========================");
 
-    poly_overloaded :: proc {
+    poly_overloaded :: #match {
         (y: [$N] $T) { print("MATCHED Y: "); print_array(y); },
         (x: $T)      { print("MATCHED X: "); println(x); },
         (z: $T)      { print("MATCHED Z: "); println(z); },

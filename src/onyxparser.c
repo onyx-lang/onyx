@@ -471,6 +471,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         case Token_Type_Keyword_Proc: {
             OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
+            onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
             retval = (AstTyped *) parse_function_definition(parser, proc_token);
             break;
         }
@@ -1555,6 +1556,7 @@ static AstType* parse_type(OnyxParser* parser) {
 
             case Token_Type_Keyword_Proc: {
                 OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
+                onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
                 *next_insertion = parse_function_type(parser, proc_token);
                 next_insertion = NULL;
                 break;
@@ -1909,27 +1911,34 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
     return;
 }
 
+static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, OnyxToken* token) {
+    expect_token(parser, '{');
+
+    AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
+    ofunc->token = token;
+    ofunc->flags |= Ast_Flag_Comptime;
+
+    bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
+
+    while (!consume_token_if_next(parser, '}')) {
+        if (parser->hit_unexpected_token) return ofunc;
+
+        AstTyped* o_node = parse_expression(parser, 0);
+
+        bh_arr_push(ofunc->overloads, o_node);
+
+        if (parser->curr->type != '}')
+            expect_token(parser, ',');
+    }
+    
+    ENTITY_SUBMIT(ofunc);
+    return ofunc;
+}
+
 static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* token) {
-    if (consume_token_if_next(parser, '{')) {
-        AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
-        ofunc->token = token;
-        ofunc->flags |= Ast_Flag_Comptime;
-
-        bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
-
-        while (!consume_token_if_next(parser, '}')) {
-            if (parser->hit_unexpected_token) return (AstFunction *) ofunc;
-
-            AstTyped* o_node = parse_expression(parser, 0);
-
-            bh_arr_push(ofunc->overloads, o_node);
-
-            if (parser->curr->type != '}')
-                expect_token(parser, ',');
-        }
-        
-        ENTITY_SUBMIT(ofunc);
-        return (AstFunction *) ofunc;
+    // :TemporaryForProcRemoval
+    if (parser->curr->type == '{') {
+        return (AstFunction *) parse_overloaded_function(parser, token);
     }
 
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
@@ -1998,6 +2007,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret) {
     if (parser->curr->type == Token_Type_Keyword_Proc) {
         OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
+        onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
         AstFunction* func_node = parse_function_definition(parser, proc_token);
         *ret = (AstTyped *) func_node;
         return 1;
@@ -2162,6 +2172,7 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Proc) {
         OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
+        onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
         AstFunction* func_node = parse_function_definition(parser, proc_token);
 
         return (AstTyped *) func_node;
@@ -2175,6 +2186,13 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
         alias->to = parse_type(parser);
         return (AstTyped *) alias;
+    }
+
+    if (parse_possible_directive(parser, "match")) {
+        // :LinearTokenDependent
+        OnyxToken* directive_token = parser->curr - 2;
+        AstOverloadedFunction* ofunc = parse_overloaded_function(parser, directive_token);
+        return (AstTyped *) ofunc;
     }
     
     return parse_expression(parser, 1);
@@ -2248,9 +2266,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
             return;
         }
 
-        case Token_Type_Keyword_Proc:
-            parse_top_level_expression(parser);
-            return;
+        // case Token_Type_Keyword_Proc:
+        //     onyx_report_warning(parser->curr->pos, "Warning: 'proc' is a deprecated keyword.");
+        //     parse_top_level_expression(parser);
+        //     return;
 
         case Token_Type_Symbol: {
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
@@ -2347,7 +2366,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(operator);
                 return;
             }
-            else if (parse_possible_directive(parser, "add_overload")) {
+            else if (parse_possible_directive(parser, "add_overload") || parse_possible_directive(parser, "add_match")) {
                 AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
                 add_overload->token = dir_token;
                 add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);

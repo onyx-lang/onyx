@@ -13,19 +13,19 @@ Builder :: struct {
     data  : [..] u8;
 }
 
-make :: proc (initial_cap := 4, alloc := context.allocator) -> Builder {
+make :: (initial_cap := 4, alloc := context.allocator) -> Builder {
     builder : Builder;
     array.init(^builder.data, initial_cap, allocator = alloc);
 
     return builder;
 }
 
-clear :: proc (use sb: ^Builder) -> ^Builder {
+clear :: (use sb: ^Builder) -> ^Builder {
     data.count = 0;
     return sb;
 }
 
-add_str :: proc (use sb: ^Builder, s: str) -> ^Builder {
+add_str :: (use sb: ^Builder, s: str) -> ^Builder {
     len_total := data.count + s.count;
 
     if data.capacity < len_total {
@@ -37,31 +37,31 @@ add_str :: proc (use sb: ^Builder, s: str) -> ^Builder {
     return sb;
 }
 
-add_cstr :: proc (use sb: ^Builder, cstring: cstr) -> ^Builder {
+add_cstr :: (use sb: ^Builder, cstring: cstr) -> ^Builder {
     s := string.from_cstr(cstring);
     return add_str(sb, s);
 }
 
-add_i64 :: proc (use sb: ^Builder, n: i64, base: u64 = 10) -> ^Builder {
+add_i64 :: (use sb: ^Builder, n: i64, base: u64 = 10) -> ^Builder {
     buf : [256] u8;
     s := conv.i64_to_str(n, base, buf[0 .. 256]);
     return add_str(sb, s);
 }
 
-add_f64 :: proc (use sb: ^Builder, f: f64) -> ^Builder {
+add_f64 :: (use sb: ^Builder, f: f64) -> ^Builder {
     buf : [256] u8;
     s := conv.f64_to_str(f, buf[0 .. 256]);
     return add_str(sb, s);
 }
 
-add_bool :: proc (use sb: ^Builder, b: bool) -> ^Builder {
+add_bool :: (use sb: ^Builder, b: bool) -> ^Builder {
     if b do return add_str(sb, "true");
     else do return add_str(sb, "false");
 
     return sb;
 }
 
-append :: proc {
+append :: #match {
     add_str,
     add_cstr,
     add_i64,
@@ -69,7 +69,7 @@ append :: proc {
     add_bool,
 }
 
-to_str :: proc (use sb: ^Builder) -> str {
+to_str :: (use sb: ^Builder) -> str {
     return str.{ data.data, data.count };
 }
 

@@ -2,7 +2,7 @@
 
 use package core
 
-overloaded :: proc {
+overloaded :: #match {
     (x: str, y: i32) do println("Called str, i32"); ,
     (x: f32, y: str) do println("Called f32, str"); ,
     (x: i32, y: i32) do println("Called i32, i32"); ,

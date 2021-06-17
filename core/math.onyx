@@ -143,7 +143,7 @@ atanh :: (t: $T) -> T {
 // which if it is an integer, will be 2! This should always return a floating point number!
 exp :: (p: $T) -> T do return pow(base = cast(T) E, p = p);
 
-pow :: proc {
+pow :: #match {
     // Fast implementation of power when raising to an integer power.
     (base: $T, p: i32) -> T {
         if base == 0 do return 0;
@@ -230,13 +230,13 @@ log :: (a: $T, base: $R) -> T {
 // they would be however, the fact that these overloads are intrinsic means they cannot
 // be reference from the element section and therefore cannot be passed around or used
 // as values.
-max :: proc { wasm.max_f32, wasm.max_f64, max_poly }
+max :: #match { wasm.max_f32, wasm.max_f64, max_poly }
 max_poly :: (a: $T, b: T) -> T {
     if a >= b do return a;
     else      do return b;
 }
 
-min :: proc { wasm.min_f32, wasm.min_f64, min_poly }
+min :: #match { wasm.min_f32, wasm.min_f64, min_poly }
 min_poly :: (a: $T, b: T) -> T {
     if a <= b do return a;
     else      do return b;
@@ -248,12 +248,12 @@ clamp :: (v: $T, lo: T, hi: T) -> T {
     return v;
 }
 
-sqrt :: proc { wasm.sqrt_f32, wasm.sqrt_f64, sqrt_poly }
+sqrt :: #match { wasm.sqrt_f32, wasm.sqrt_f64, sqrt_poly }
 sqrt_poly :: (x: $T) -> T {
     return ~~ wasm.sqrt_f64(~~ x);
 }
 
-abs :: proc { wasm.abs_f32, wasm.abs_f64, abs_poly }
+abs :: #match { wasm.abs_f32, wasm.abs_f64, abs_poly }
 abs_poly :: (x: $T) -> T {
     if x >= 0 do return x;
     else      do return -x;
@@ -265,7 +265,7 @@ sign :: (x: $T) -> T {
     return 0;
 }
 
-copysign :: proc { wasm.copysign_f32, wasm.copysign_f64, copysign_poly }
+copysign :: #match { wasm.copysign_f32, wasm.copysign_f64, copysign_poly }
 copysign_poly :: (x: $T, y: T) -> T {
     return abs(x) * sign(y);
 }
@@ -277,10 +277,10 @@ copysign_poly :: (x: $T, y: T) -> T {
 // Floating point rounding
 //
 
-ceil    :: proc { wasm.ceil_f32,    wasm.ceil_f64    }
-floor   :: proc { wasm.floor_f32,   wasm.floor_f64   }
-trunc   :: proc { wasm.trunc_f32,   wasm.trunc_f64   }
-nearest :: proc { wasm.nearest_f32, wasm.nearest_f64 }
+ceil    :: #match { wasm.ceil_f32,    wasm.ceil_f64    }
+floor   :: #match { wasm.floor_f32,   wasm.floor_f64   }
+trunc   :: #match { wasm.trunc_f32,   wasm.trunc_f64   }
+nearest :: #match { wasm.nearest_f32, wasm.nearest_f64 }
 
 
 
@@ -288,11 +288,11 @@ nearest :: proc { wasm.nearest_f32, wasm.nearest_f64 }
 // Integer operations
 //
 
-clz          :: proc { wasm.clz_i32,    wasm.clz_i64    }
-ctz          :: proc { wasm.ctz_i32,    wasm.ctz_i64    }
-popcnt       :: proc { wasm.popcnt_i32, wasm.popcnt_i64 }
-rotate_left  :: proc { wasm.rotl_i32,   wasm.rotl_i64   }
-rotate_right :: proc { wasm.rotr_i32,   wasm.rotr_i64   }
+clz          :: #match { wasm.clz_i32,    wasm.clz_i64    }
+ctz          :: #match { wasm.ctz_i32,    wasm.ctz_i64    }
+popcnt       :: #match { wasm.popcnt_i32, wasm.popcnt_i64 }
+rotate_left  :: #match { wasm.rotl_i32,   wasm.rotl_i64   }
+rotate_right :: #match { wasm.rotr_i32,   wasm.rotr_i64   }
 
 
 

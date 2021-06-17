@@ -1,6 +1,6 @@
 package core.hash
 
-to_u32 :: proc {
+to_u32 :: #match {
     (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
     (key: i32)    -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
     (key: i64)    -> u32 { return cast(u32) (cast(u64) 0xcbf29ce7 ^ cast(u64) key); },

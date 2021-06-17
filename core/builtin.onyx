@@ -22,7 +22,7 @@ vararg :: #type ^struct {
     count: i32;
 }
 
-vararg_get :: proc {
+vararg_get :: #match {
     (va: vararg, ret: ^$T) -> bool {
         if va.count <= 0 do return false;
         *ret = *cast(^T) va.data;

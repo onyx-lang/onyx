@@ -176,7 +176,7 @@ draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color :=
     gl.bindTexture(gl.TEXTURE_2D, -1);
 }
 
-draw_rect :: proc {
+draw_rect :: #match {
     (use r: Rectangle, color := gfx.Color4.{1,1,1}) {
         gfx.set_texture();
 

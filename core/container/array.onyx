@@ -159,7 +159,7 @@ concat :: (arr: ^[..] $T, other: [..] T) {
 }
 
 // Uses '==' to compare for equality.
-contains :: proc {
+contains :: #match {
     (arr: ^[..] $T, x: T) -> bool {
         for it: *arr do if it == x do return true;
         return false;
@@ -172,7 +172,7 @@ contains :: proc {
 }
 
 // Uses '+' to sum.
-sum :: proc {
+sum :: #match {
     (arr: ^[..] $T, start: T = 0) -> T {
         sum := start;
         for it: *arr do sum += it;
@@ -186,7 +186,7 @@ sum :: proc {
     }
 }
 
-product :: proc {
+product :: #match {
     (arr: ^[..] $T, start: T = 1) -> T {
         sum := start;
         for it: *arr do sum *= it;
@@ -215,7 +215,7 @@ to_slice :: (arr: ^[..] $T) -> [] T {
 ** Simple insertion sort
 **    cmp should return >0 if left > right
 */
-sort :: proc {
+sort :: #match {
     (arr: ^[..] $T, cmp: (T, T) -> i32) {
         for i: 1 .. arr.count {
             x := arr.data[i];
@@ -251,7 +251,7 @@ sort :: proc {
     }
 }
 
-fold :: proc {
+fold :: #match {
     (arr: ^[..] $T, init: $R, f: (T, R) -> R) -> R {
         val := init;
         for it: *arr do val = f(it, val);
@@ -265,7 +265,7 @@ fold :: proc {
     }
 }
 
-map :: proc {
+map :: #match {
     (arr: ^[..] $T, f: (^T) -> void)              do for ^it: *arr do f(it);,
     (arr: ^[..] $T, f: (T) -> T)                  do for ^it: *arr do *it = f(*it);,
     (arr: ^[..] $T, data: $R, f: (^T, R) -> void) do for ^it: *arr do f(it, data);,
@@ -330,7 +330,7 @@ find_ptr :: (arr: ^[..] $T, value: T) -> ^T {
     return null;
 }
 
-count_where :: proc {
+count_where :: #match {
     (arr: ^[..] $T, predicate: (T) -> bool) -> u32 {
         count: u32 = 0;
         for ^it: *arr do if predicate(*it) do count += 1;
@@ -362,13 +362,13 @@ fold_idx_elem :: (arr: ^$T, count: i32, cmp: (T, T) -> bool) -> (i32, T) {
 #private_file cmp_greater :: (x: $T, y: T) -> bool do return x > y;
 #private_file cmp_less    :: (x: $T, y: T) -> bool do return x < y;
 
-greatest :: proc {
+greatest :: #match {
     (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_greater); },
     (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_greater); },
     (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(cast(^T) arr, N,     cmp_greater); },
 }
 
-least :: proc {
+least :: #match {
     (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_less); },
     (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_less); },
     (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(cast(^T) arr, N,     cmp_less); },

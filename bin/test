@@ -8,6 +8,12 @@ print_check() {
     fi
 }
 
+if command -v wasmer >/dev/null; then
+    printf "Using $(wasmer --version)\n"
+else
+    printf "Using $(node --verison)\n"
+fi
+
 failed=0
 for test_file in $(find tests/ -name '*.onyx'); do
     filename=$(basename -- "$test_file")
@@ -16,16 +22,30 @@ for test_file in $(find tests/ -name '*.onyx'); do
 
     print_check "$name"
 
-    if ! ./bin/onyx -r js --use-post-mvp-features "$test_file" -o "./tests/$name.wasm" >/dev/null; then
-        printf "\n❌ Failed to compile $name.onyx.\n"
-        failed=1
-        continue
-    fi
-    
-    if ! ./bin/onyx-js "./tests/$name.wasm" > ./tmpoutput; then
-        printf "\n❌ Failed to run $name.onyx.\n"
-        failed=1
-        continue
+    if command -v wasmer >/dev/null; then
+        if ! ./bin/onyx --use-post-mvp-features "$test_file" -o "./tests/$name.wasm" >/dev/null; then
+            printf "\n❌ Failed to compile $name.onyx.\n"
+            failed=1
+            continue
+        fi
+        
+        if ! wasmer "./tests/$name.wasm" > ./tmpoutput; then
+            printf "\n❌ Failed to run $name.onyx.\n"
+            failed=1
+            continue
+        fi
+    else
+        if ! ./bin/onyx -r js --use-post-mvp-features "$test_file" -o "./tests/$name.wasm" >/dev/null; then
+            printf "\n❌ Failed to compile $name.onyx.\n"
+            failed=1
+            continue
+        fi
+        
+        if ! ./bin/onyx-js "./tests/$name.wasm" > ./tmpoutput; then
+            printf "\n❌ Failed to run $name.onyx.\n"
+            failed=1
+            continue
+        fi
     fi
 
     if ! diff ./tmpoutput "$dirname/$name" >/dev/null; then
