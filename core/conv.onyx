@@ -11,6 +11,10 @@ str_to_i64 :: (s: str) -> i64 {
         s = string.advance(s, 1);
     }
 
+    if s[0] == #char "+" {
+        s = string.advance(s, 1);
+    }
+
     for c: s do switch c {
         case #char "0" .. #char "9" {
             value *= 10;
@@ -21,6 +25,73 @@ str_to_i64 :: (s: str) -> i64 {
     }
 
     return value * ~~mul;
+}
+
+str_to_f64 :: (s_: str) -> f64 {
+    use package core
+
+    // 's' needs to live on the stack to take its address. Stupid optimization
+    // that simple structs turn into registers for parameters.
+    s := s_;
+    string.strip_leading_whitespace(^s);
+
+    sign := parse_sign(^s);
+    value, _ := parse_digits(^s);    
+
+    if s[0] == #char "." {
+        string.advance(^s, 1);
+        fraction, fraction_digits := parse_digits(^s);
+        while fraction_digits > 0 {
+            fraction_digits -= 1;
+            fraction /= 10;
+        }
+        value += fraction;
+    }
+
+    value *= sign;
+
+    if s[0] != #char "e" && s[0] != #char "E" do return value;
+    string.advance(^s, 1);
+
+    exponent_sign := parse_sign(^s);
+    exponent, _   := parse_digits(^s);
+    if exponent_sign > 0 {
+        while exponent > 0 {
+            value *= 10;
+            exponent -= 1;
+        }
+    } else {
+        while exponent > 0 {
+            value /= 10;
+            exponent -= 1;
+        }
+    }
+
+    return value;
+
+
+    parse_sign :: (s: ^str) -> f64 {
+        switch s.data[0] {
+            case #char "-" { string.advance(s, 1); return -1; }
+            case #char "+" { string.advance(s, 1); return  1; }
+            case #default  { return 1; }
+        }
+    }
+
+    parse_digits :: (s: ^str) -> (f64, digit_count: i32) {
+        value: f64 = 0;
+        count := 0;
+        while s.count > 0 do switch s.data[0] {
+            case #char "0" .. #char "9" {
+                value = value * 10 + ~~cast(i32)(s.data[0] - #char "0");
+                string.advance(s, 1);
+                count += 1;
+            }
+
+            case #default do break break;
+        }
+        return value, count;
+    }
 }
 
 i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
@@ -92,15 +163,20 @@ f64_to_str :: (f: f64, buf: [] u8) -> str {
     v := cast(i64) f;
 
     len := 0;
+    if v < ~~0 {
+        v = -v;
+
+        buf[0] = #char "-";
+        len += 1;
+    }
 
     s1 := i64_to_str(v / 10000, 10, buf);
-    for i: 0 .. s1.count do buf.data[i] = s1.data[i];
-    buf.data[s1.count] = #char ".";
-    len = s1.count + 1;
+    for i: 0 .. s1.count do buf.data[i + len] = s1.data[i];
+    buf.data[s1.count + len] = #char ".";
+    len += s1.count + 1;
 
-    if v < ~~0 do v = -v;
     s2 := i64_to_str(v % 10000, 10, buf, min_length = 4);
-    for i: 0 .. s2.count do buf.data[s1.count + 1 + i] = s2.data[i];
+    for i: 0 .. s2.count do buf.data[len + i] = s2.data[i];
     len += s2.count;
 
     return str.{ buf.data, len };

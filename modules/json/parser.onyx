@@ -1,1 +1,227 @@
 package json
+use package core
+
+#private
+Parser :: struct {
+    tokenizer : Tokenizer;
+    allocator : Allocator;
+
+    current_token  : Token;
+    previous_token : Token;
+}
+
+#private
+make_parser :: (data: [] u8, allocator := context.allocator) -> Parser {
+    parser: Parser;
+    parser.tokenizer = Tokenizer.{ data = data };
+    parser.allocator = allocator;
+    consume_token(^parser);
+    return parser;
+}
+
+#private
+parse :: (data: [] u8, allocator := context.allocator) -> (^Value, Error) {
+    parser := make_parser(data, allocator);
+    return parse_value(^parser);
+}
+
+#private_file
+consume_token :: (use parser: ^Parser) -> (Token, Error) {
+    error: Error;
+    previous_token = current_token;
+    current_token, error = token_get(^tokenizer);
+    return previous_token, error;
+}
+
+#private_file
+consume_token_if_next :: (use parser: ^Parser, kind: Token.Kind) -> bool {
+    if current_token.kind == kind {
+        consume_token(parser);
+        return true;
+    }
+
+    return false;
+}
+
+#private_file
+expect_token :: (use parser: ^Parser, kind: Token.Kind) -> (Token, Error) {
+    previous :=  current_token;
+    consume_token(parser);
+    if previous.kind == kind do return previous, .None;
+    else                     do return previous, .Unexpected_Token;
+}
+
+#private
+parse_value :: (use parser: ^Parser) -> (^Value, Error) {
+    return_value: ^Value = null;
+
+    current := current_token;
+    switch current.kind {
+        case .Null {
+            value := new(Value, allocator);
+
+            consume_token(parser);
+            return_value = value;
+        }
+
+        case .False, .True {
+            value := new(Value_Bool, allocator);
+            value.bool_ = current.kind == .True;
+
+            consume_token(parser);
+            return_value = value;
+        }
+
+        case .Integer {
+            value := new(Value_Integer, allocator);
+            value.int_ = conv.str_to_i64(current.text);
+
+            consume_token(parser);
+            return_value = value;
+        }
+
+        case .Float {
+            value := new(Value_Float, allocator);
+            value.float_ = conv.str_to_f64(current.text);
+
+            consume_token(parser);
+            return_value = value;
+        }
+
+        case .String {
+            value := new(Value_String, allocator);
+            @Todo // parse escaped strings
+            value.str_ = string.alloc_copy(current.text.data[1 .. current.text.count - 1], allocator);
+
+            consume_token(parser);
+            return_value = value;
+        }
+
+        case .Open_Bracket {
+            value, err := parse_array(parser);
+            if err != .None do return value, err;
+            
+            return_value = value;
+        }
+
+        case .Open_Brace {
+            value, err := parse_object(parser);
+            if err != .None do return value, err;
+
+            return_value = value;
+        }
+
+        case #default {
+            consume_token(parser);
+            return return_value, .Unexpected_Token;
+        }
+    }
+
+    return return_value, .None;
+}
+
+#private_file
+parse_array :: (use parser: ^Parser) -> (^Value_Array, Error) {
+    value := new(Value_Array, allocator);
+
+    _, err := expect_token(parser, .Open_Bracket);
+    if err != .None do return value, err;
+
+    // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
+    arr := array.make(#type ^Value, allocator=context.allocator);
+    defer if err != .None {
+        for elem: arr {
+            free(elem, allocator);
+        } 
+
+        array.free(^arr);
+    }
+
+    while current_token.kind != .Close_Bracket {
+        elem, elem_err := parse_value(parser);
+        if elem_err != .None {
+            err = elem_err;
+            return value, err;
+        }
+
+        array.push(^arr, elem);
+
+        if !consume_token_if_next(parser, .Comma) {
+            break;
+        }
+    }
+
+    _, close_err := expect_token(parser, .Close_Bracket);
+    if close_err != .None {
+        err = close_err;
+        return value, err;
+    }
+
+    value.array_ = arr;
+    return value, err;
+}
+
+
+#private_file
+parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
+    value := new(Value_Object, allocator);
+
+    _, err := expect_token(parser, .Open_Brace);
+    if err != .None do return value, err;
+
+    // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
+    array.init(^value.object_, allocator=context.allocator);
+    defer if err != .None {
+        free(value, allocator);
+    }
+
+    while current_token.kind != .Close_Brace {
+        key_token, key_err := expect_token(parser, .String);
+        if key_err != .None {
+            err = key_err;
+            return value, err;
+        }
+
+        key := string.alloc_copy(key_token.text.data[1 .. key_token.text.count - 1], allocator);
+
+        _, colon_err := expect_token(parser, .Colon);
+        if colon_err != .None {
+            err = colon_err;
+            return value, err;
+        }
+
+        elem, elem_err := parse_value(parser);
+        if elem_err != .None {
+            err = elem_err;
+            return value, err;
+        }
+
+        // Checking for duplicate keys. I have it disabled for the moment.
+        #if false {
+            for elem: value.object_ {
+                if elem.key == key {
+                    err = .Duplicate_Keys;
+                    string.free(key, allocator);
+                    return value, err;
+                }
+            }
+        }
+
+        array.push(^value.object_, .{
+            key = key,
+            value = elem            
+        });
+
+        if !consume_token_if_next(parser, .Comma) {
+            break;
+        }
+    } 
+
+    _, close_err := expect_token(parser, .Close_Brace);
+    if close_err != .None {
+        err = close_err;
+        return value, err;
+    }
+
+    return value, err;
+}

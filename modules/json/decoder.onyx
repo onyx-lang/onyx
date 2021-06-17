@@ -1,17 +1,42 @@
 package json
 use package core
 
-decode_string :: (data: str, allocator := context.allocator) -> Json {
-    tokenizer := Tokenizer.{ data = data };
+decode :: (data: str, allocator := context.allocator) -> Json {
 
-    err: Tokenizer_Error = .None;
-    tkn: Token;
+    json: Json;
+    json.allocator = allocator;
+    json.root = null;
 
-    while err == .None {
-        tkn, err = token_get(^tokenizer);
+    root, err := parse(data, allocator);
+    if err != .None {
+        switch err {
+            case .EOF do println("Reached EOF");
+            case .Illegal_Character do println("Illegal Character");
+            case .String_Unterminated do println("Unterminated String");
+            case .Unexpected_Token do println("Unexpected Token");
+        }
 
-        buf: [10] u8;
-        printf("%s  %s\n", conv.i64_to_str(~~tkn.kind, 10, ~~buf, 2), tkn.text);
+        return json;
+    }
+
+    json.root = root;
+    return json;
+
+
+    // Old testing code
+    #if false {
+        tokenizer := Tokenizer.{ data = data };
+
+        err : = Error.None;
+        tkn: Token;
+
+        while err == .None {
+            tkn, err = token_get(^tokenizer);
+
+            buf: [10] u8;
+            printf("%s  %s\n", conv.i64_to_str(~~tkn.kind, 10, ~~buf, 2), tkn.text);
+        }
+
+        return .{ allocator, null };
     }
 }
-

@@ -8,4 +8,6 @@ package json
 #load "./encoder"
 #load "./decoder"
 #load "./types"
+
 #load "./tokenizer"
+#load "./parser"

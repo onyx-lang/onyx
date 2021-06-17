@@ -37,7 +37,7 @@ Token :: struct {
 
     kind: Kind = .Invalid;
     text: str  = null_str;
-    use position: Position = .{ 0, 1, 1 };
+    use position := Position.{ 0, 1, 1 };
 }
 
 #private
@@ -47,17 +47,8 @@ Position :: struct {
 }
 
 #private
-Tokenizer_Error :: enum {
-    None;
-    EOF;
-    Illegal_Character;
-    String_Unterminated;
-}
-
-
-#private
-token_get :: (use tkn: ^Tokenizer) -> (Token, Tokenizer_Error) {
-    err := Tokenizer_Error.None;
+token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
+    err := Error.None;
 
     skip_whitespace(tkn);
     token := Token.{};

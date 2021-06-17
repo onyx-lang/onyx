@@ -1,0 +1,52 @@
+#load "core/std"
+
+use package core
+
+main :: (args: [] cstr) {
+
+    @CoreLibraries // The commented out cases can be re-enabled when f64_to_str is better.
+    // Right now there is an integer overflow because it converts the float to an i64.
+    strings := str.[
+        /* these should parse fully */
+        "12",
+        "12.0",
+        "08",                   /* not octal! */
+        "+12.34",
+        ".34",
+        "\t \n2.",
+        "1e0",
+        "1e+0",
+        "1e-0",
+        "1.e4",
+        ".1e-2",
+        "2e-4",
+        "-5e006",
+        //"-5e+16",
+        "-.05",
+        "-.0",
+        "-1e6",
+        /* these should parse only the initial part */
+        "5c5",
+        "10ee5",
+        "0x06",                 /* not hex! */
+        "--1" ,
+        "-+1" ,
+        "1e--4" ,
+        "-1e.4",
+        "1e 4",
+        "1e-g",
+        "", "foobar",           /* both 0 */
+        " e5",                  /* also 0 */
+        "-1e6",
+        /* overflow/underflow */
+        // "1e500000",
+        // "1e-500000",
+        // "-1e500000",
+        // "-1e-500000",
+    ];
+
+    for s: strings {
+        value := conv.str_to_f64(s);
+        println(value);
+    }
+}
