@@ -26,7 +26,7 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn);
 AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol);
 AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token);
 
-void build_all_overload_options(bh_arr(AstTyped *) overloads, bh_imap* all_overloads);
+void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_overloads);
 
 u32 char_to_base16_value(char x);
 

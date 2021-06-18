@@ -266,6 +266,10 @@ dynamic_string_stream_make :: (init_size := 128, a := context.allocator) -> Dyna
     };
 }
 
+dynamic_string_stream_free :: (use dds: ^DynamicStringStream) {
+    array.free(^data);
+}
+
 dynamic_string_stream_to_str :: (use dds: ^DynamicStringStream) -> str {
     return data.data[0 .. curr_pos];
 }

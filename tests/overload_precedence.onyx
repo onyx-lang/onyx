@@ -1,0 +1,20 @@
+#load "core/std"
+
+use package core
+
+overloaded :: #match {
+    #precedence 10 (x: i32) { println("Option X"); },
+    #precedence 5  (y: i32) { println("Option Y"); },
+    #precedence 4  (z: i32) { println("Option Z"); },
+}
+
+main :: (args: [] cstr) {
+    overloaded(10);
+    overloaded(x=10);
+    overloaded(r=10);
+    overloaded(z=10);
+}
+
+#add_match overloaded, #precedence 3 (q: i32) { println("Option Q"); }
+#add_match overloaded, #precedence 2 (r: i32) { println("Option R"); }
+#add_match overloaded, #precedence 1 (m: i32) { println("Option M"); }

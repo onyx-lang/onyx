@@ -1918,12 +1918,19 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
 
     bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
 
+    u64 precedence = 0;
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return ofunc;
 
-        AstTyped* o_node = parse_expression(parser, 0);
+        if (parse_possible_directive(parser, "precedence")) {
+            AstNumLit* pre = parse_int_literal(parser);
+            if (parser->hit_unexpected_token) return ofunc;
 
-        bh_arr_push(ofunc->overloads, o_node);
+            precedence = bh_max(pre->value.l, 0);
+        }
+
+        AstTyped* option = parse_expression(parser, 0);
+        add_overload_option(&ofunc->overloads, precedence++, option);
 
         if (parser->curr->type != '}')
             expect_token(parser, ',');
@@ -2370,6 +2377,16 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);
 
                 expect_token(parser, ',');
+
+                if (parse_possible_directive(parser, "precedence")) {
+                    AstNumLit* pre = parse_int_literal(parser);
+                    if (parser->hit_unexpected_token) return;
+
+                    add_overload->precedence = bh_max(pre->value.l, 0);
+                } else {
+                    add_overload->precedence = 0;
+                }
+
                 add_overload->overload = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(add_overload);

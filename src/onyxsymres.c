@@ -877,8 +877,8 @@ static SymresStatus symres_global(AstGlobal* global) {
 }
 
 static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc) {
-    bh_arr_each(AstTyped *, node, ofunc->overloads) {
-        SYMRES(expression, node);
+    bh_arr_each(OverloadOption, overload, ofunc->overloads) {
+        SYMRES(expression, &overload->option);
     }
     return Symres_Success;
 }
@@ -1023,7 +1023,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             } else {
                 AstOverloadedFunction* ofunc = (AstOverloadedFunction *) add_overload->overloaded_function;
                 SYMRES(expression, (AstTyped **) &add_overload->overload);
-                bh_arr_push(ofunc->overloads, (AstTyped *) add_overload->overload);
+                add_overload_option(&ofunc->overloads, add_overload->precedence, add_overload->overload);
             }
 
             break;
@@ -1050,7 +1050,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            bh_arr_push(operator_overloads[operator->operator], operator->overload);
+            add_overload_option(&operator_overloads[operator->operator], 0, operator->overload);
             break;
         }
 

@@ -830,10 +830,20 @@ struct AstFunction {
     struct Entity* entity_body;
 };
 
+typedef struct OverloadOption OverloadOption;
+struct OverloadOption {
+    // This is u64 because padding will make it that anyway.
+    // Consider: would there be any practical benefit to having the precedence setting
+    // be a compile-time known value? as opposed to a hardcoded value?
+    u64 precedence;
+
+    AstTyped* option;
+};
+
 struct AstOverloadedFunction {
     AstTyped_base;
 
-    bh_arr(AstTyped *) overloads;
+    bh_arr(OverloadOption) overloads;
     
     // CLEANUP: This is unused right now, but should be used to cache
     // the complete set of overloads that can be used by an overloaded
@@ -937,6 +947,8 @@ struct AstDirectiveAddOverload {
     // then resolved to an overloaded function.
     AstNode *overloaded_function;
 
+    // See note in OverloadOption. This could be refactored into an OverloadOption?
+    u64 precedence;
     AstTyped *overload;
 };
 
@@ -1207,7 +1219,7 @@ typedef struct IntrinsicMap {
 
 extern bh_table(OnyxIntrinsic) intrinsic_table;
 
-extern bh_arr(AstTyped *) operator_overloads[Binary_Op_Count];
+extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
 
 void initialize_builtins(bh_allocator a);
 void introduce_build_options(bh_allocator a);
@@ -1261,8 +1273,9 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
 
-AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Arguments* args);
-AstTyped* find_matching_overload_by_type(bh_arr(AstTyped *) overloads, Type* type);
+void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
+AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
+AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type);
 void report_unable_to_match_overload(AstCall* call);
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);

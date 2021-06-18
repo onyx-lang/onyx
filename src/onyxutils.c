@@ -978,6 +978,32 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 //  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
 //
 
+void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload) {
+    bh_arr(OverloadOption) overloads = *poverloads;
+
+    i32 index = -1;
+    fori (i, 0, bh_arr_length(overloads)) {
+        if (overloads[i].precedence > precedence) {
+            index = i;
+            break;
+        }
+    }
+
+    if (index < 0) {
+        bh_arr_push(overloads, ((OverloadOption) {
+            .precedence = precedence,
+            .option     = overload,
+        }));
+
+    } else {
+        bh_arr_insertn(overloads, index, 1);
+        overloads[index].precedence = precedence;
+        overloads[index].option     = overload;
+    }
+
+    *poverloads = overloads;
+}
+
 // NOTE: The job of this function is to take a set of overloads, and traverse it to add all possible
 // overloads that are reachable. This is slightly more difficult than it may seem. In this language,
 // overloaded procedures have a strict ordering to their overloads, which determines how the correct
@@ -996,20 +1022,20 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 // an "entries" array that, so long as nothing is ever removed from it, will maintain the order in
 // which entries were put into the map. This is useful because a simple recursive algorithm can
 // collect all the overloads into the map, and also use the map to provide a base case.
-void build_all_overload_options(bh_arr(AstTyped *) overloads, bh_imap* all_overloads) {
-    bh_arr_each(AstTyped *, node, overloads) {
-        if (bh_imap_has(all_overloads, (u64) *node)) continue;
+void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_overloads) {
+    bh_arr_each(OverloadOption, overload, overloads) {
+        if (bh_imap_has(all_overloads, (u64) overload->option)) continue;
 
-        bh_imap_put(all_overloads, (u64) *node, 1);
+        bh_imap_put(all_overloads, (u64) overload->option, 1);
 
-        if ((*node)->kind == Ast_Kind_Overloaded_Function) {
-            AstOverloadedFunction* sub_overload = (AstOverloadedFunction *) *node;
+        if (overload->option->kind == Ast_Kind_Overloaded_Function) {
+            AstOverloadedFunction* sub_overload = (AstOverloadedFunction *) overload->option;
             build_all_overload_options(sub_overload->overloads, all_overloads);
         }
     }
 }
 
-AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Arguments* param_args) {
+AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* param_args) {
     Arguments args;
     arguments_clone(&args, param_args);
     arguments_ensure_length(&args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
@@ -1077,7 +1103,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(AstTyped *) overloads, Argu
     return matched_overload;
 }
 
-AstTyped* find_matching_overload_by_type(bh_arr(AstTyped *) overloads, Type* type) {
+AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type) {
     if (type->kind != Type_Kind_Function) return NULL;
 
     bh_imap all_overloads;

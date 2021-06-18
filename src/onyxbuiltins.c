@@ -329,7 +329,7 @@ static IntrinsicMap builtin_intrinsics[] = {
     { NULL, ONYX_INTRINSIC_UNDEFINED },
 };
 
-bh_arr(AstTyped *) operator_overloads[Binary_Op_Count] = { 0 };
+bh_arr(OverloadOption) operator_overloads[Binary_Op_Count] = { 0 };
 
 void initialize_builtins(bh_allocator a) {
     // HACK
