@@ -637,7 +637,7 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
             node_get_type_name(binop->right));
 }
 
-CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
+CheckStatus check_binaryop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
     if (!assignment_is_ok) {
         onyx_report_error(binop->token->pos, "Assignment not valid in expression.");
         return Check_Error;
@@ -744,19 +744,6 @@ CheckStatus check_binop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
 CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
-    // :UnaryFieldAccessIsGross
-    if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
-        if      (type_check_or_auto_cast(&binop->left, binop->right->type));
-        else if (type_check_or_auto_cast(&binop->right, binop->left->type));
-        else {
-            report_bad_binaryop(binop);
-            return Check_Error;
-        }
-
-        binop->type = &basic_types[Basic_Kind_Bool];
-        return Check_Success;
-    }
-
     if (   type_is_structlike_strict(binop->left->type)
         || type_is_structlike_strict(binop->right->type)) {
         report_bad_binaryop(binop);
@@ -852,11 +839,21 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         binop->flags |= Ast_Flag_Comptime;
     }
 
-    if (binop_is_assignment(binop->operation)) return check_binop_assignment(binop, assignment_is_ok);
+    if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(binop, assignment_is_ok);
 
     if (expression_types_must_be_known) {
         if (binop->left->type == NULL || binop->right->type == NULL) {
             onyx_report_error(binop->token->pos, "Internal compiler error: one of the operands types is unknown here.");
+            return Check_Error;
+        }
+    }
+
+    // :UnaryFieldAccessIsGross
+    if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
+        if      (type_check_or_auto_cast(&binop->left, binop->right->type));
+        else if (type_check_or_auto_cast(&binop->right, binop->left->type));
+        else {
+            report_bad_binaryop(binop);
             return Check_Error;
         }
     }
@@ -880,16 +877,6 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         return check_binaryop_compare(pbinop);
     if (binop->operation == Binary_Op_Bool_And || binop->operation == Binary_Op_Bool_Or)
         return check_binaryop_bool(pbinop);
-
-    // :UnaryFieldAccessIsGross
-    if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
-        if      (type_check_or_auto_cast(&binop->left, binop->right->type));
-        else if (type_check_or_auto_cast(&binop->right, binop->left->type));
-        else {
-            report_bad_binaryop(binop);
-            return Check_Error;
-        }
-    }
 
     // NOTE: The left side cannot be compound.
     //       The right side always is numeric.

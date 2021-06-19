@@ -12,6 +12,10 @@ writer_make :: (s: ^Stream) -> Writer {
     return Writer.{ s };
 }
 
+write_byte :: (use writer: ^Writer, byte: u8) {
+    stream_write_byte(stream, byte);
+}
+
 write_str :: (use writer: ^Writer, s: str) {
     stream_write(stream, s);
 }
@@ -27,7 +31,7 @@ write_i32 :: (use writer: ^Writer, n: i32, base: u32 = 10) {
     use package core
 
     buf : [256] u8;
-    s := conv.i64_to_str(cast(i64) n, cast(u64) base, buf[0 .. 256]);
+    s := conv.i64_to_str(cast(i64) n, cast(u64) base, ~~buf);
     write_str(writer, s);
 }
 
@@ -35,7 +39,7 @@ write_i64 :: (use writer: ^Writer, n: i64, base: u64 = 10) {
     use package core
 
     buf : [256] u8;
-    s := conv.i64_to_str(n, base, buf[0 .. 256]);
+    s := conv.i64_to_str(n, base, ~~buf);
     write_str(writer, s);
 }
 
@@ -43,7 +47,7 @@ write_f32 :: (use writer: ^Writer, f: f32) {
     use package core
 
     buf : [256] u8;
-    s := conv.f64_to_str(cast(f64) f, buf[0 .. 256]);
+    s := conv.f64_to_str(cast(f64) f, ~~buf);
     write_str(writer, s);
 }
 
@@ -51,7 +55,7 @@ write_f64 :: (use writer: ^Writer, f: f64) {
     use package core
 
     buf : [256] u8;
-    s := conv.f64_to_str(f, buf[0 .. 256]);
+    s := conv.f64_to_str(f, ~~buf);
     write_str(writer, s);
 }
 
@@ -74,7 +78,35 @@ write_range :: (use writer: ^Writer, r: range, sep := " ") {
 write_format :: (use writer: ^Writer, format: str, va: ...) {
     // POTENTIAL BUG: this buffer will need to be bigger (or dynamic).
     buffer: [2048] u8;
-    write_str(writer, conv.str_format_va(format, buffer[0 .. 2048], va));
+    write_str(writer, conv.str_format_va(format, ~~buffer, va));
+}
+
+write_escaped_str :: (use writer: ^Writer, s: str) {
+    write_byte(writer, #char "\"");
+
+    while i := 0; i < s.count {
+        defer i += 1;
+        ch := s[i];
+
+        @Incomplete
+        switch ch {
+            case #char "\n" { write_byte(writer, #char "\\"); write_byte(writer, #char "n");  }
+            case #char "\r" { write_byte(writer, #char "\\"); write_byte(writer, #char "r");  }
+            case #char "\t" { write_byte(writer, #char "\\"); write_byte(writer, #char "t");  }
+            case #char "\v" { write_byte(writer, #char "\\"); write_byte(writer, #char "v");  }
+            case #char "\b" { write_byte(writer, #char "\\"); write_byte(writer, #char "b");  }
+            case #char "\f" { write_byte(writer, #char "\\"); write_byte(writer, #char "f");  }
+            case #char "\0" { write_byte(writer, #char "\\"); write_byte(writer, #char "0");  }
+            case #char "\"" { write_byte(writer, #char "\\"); write_byte(writer, #char "\""); }
+
+            case #default {
+                @Speed
+                write_byte(writer, ch);
+            }
+        } 
+    }
+
+    write_byte(writer, #char "\"");
 }
 
 write :: #match {

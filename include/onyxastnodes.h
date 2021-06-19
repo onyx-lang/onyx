@@ -112,7 +112,6 @@ typedef enum AstKind {
     Ast_Kind_Overloaded_Function,
     Ast_Kind_Polymorphic_Proc,
     Ast_Kind_Block,
-    Ast_Kind_Local_Group,
     Ast_Kind_Local,
     Ast_Kind_Global,
     Ast_Kind_Symbol,

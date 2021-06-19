@@ -34,7 +34,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Overloaded_Function: return sizeof(AstOverloadedFunction);
         case Ast_Kind_Polymorphic_Proc: return sizeof(AstPolyProc);
         case Ast_Kind_Block: return sizeof(AstBlock);
-        case Ast_Kind_Local_Group: return sizeof(AstNode);
         case Ast_Kind_Local: return sizeof(AstLocal);
         case Ast_Kind_Global: return sizeof(AstGlobal);
         case Ast_Kind_Symbol: return sizeof(AstNode);
@@ -71,6 +70,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Subscript: return sizeof(AstSubscript);
         case Ast_Kind_Slice: return sizeof(AstSubscript);
         case Ast_Kind_Field_Access: return sizeof(AstFieldAccess);
+        case Ast_Kind_Unary_Field_Access: return sizeof(AstUnaryFieldAccess);
         case Ast_Kind_Pipe: return sizeof(AstBinaryOp);
         case Ast_Kind_Range_Literal: return sizeof(AstRangeLiteral);
         case Ast_Kind_Method_Call: return sizeof(AstBinaryOp);
@@ -91,6 +91,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Compound: return sizeof(AstCompound);
         case Ast_Kind_Named_Value: return sizeof(AstNamedValue);
         case Ast_Kind_Call_Site: return sizeof(AstCallSite);
+        case Ast_Kind_Static_If: return sizeof(AstIfWhile);
         case Ast_Kind_Count: return 0;
 	}
 

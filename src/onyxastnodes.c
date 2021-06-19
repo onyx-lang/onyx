@@ -15,7 +15,6 @@ static const char* ast_node_names[] = {
     "OVERLOADED_FUNCTION",
     "POLYMORPHIC PROC",
     "BLOCK",
-    "LOCAL GROUP",
     "LOCAL",
     "GLOBAL",
     "SYMBOL",

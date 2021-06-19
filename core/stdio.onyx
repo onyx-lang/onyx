@@ -16,12 +16,12 @@ auto_flush_stdio := true
 
 print :: #match {
     (x: str) {
-        io.write(^print_writer, x);
+        io.write(^stdio.print_writer, x);
         if x[x.count - 1] == #char "\n" && auto_flush_stdio do __flush_stdio();
     },
 
-    (x: $T)        { io.write(^print_writer, x); },
-    (x: $T, y: $R) { io.write(^print_writer, x, y); },
+    (x: $T)        { io.write(^stdio.print_writer, x); },
+    (x: $T, y: $R) { io.write(^stdio.print_writer, x, y); },
 }
 
 println :: (x: $T) {
@@ -100,22 +100,24 @@ byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 // Private and internal things
 //
 
-#private_file print_stream : io.DynamicStringStream;
-#private_file print_writer : io.Writer;
+stdio : struct {
+    print_stream : io.DynamicStringStream;
+    print_writer : io.Writer;
+}
 
 __stdio_init :: () {
-    print_stream = io.dynamic_string_stream_make(2048, context.allocator);
-    print_writer = io.writer_make(^print_stream);
+    stdio.print_stream = io.dynamic_string_stream_make(2048, context.allocator);
+    stdio.print_writer = io.writer_make(^stdio.print_stream);
 }
 
 
 __flush_stdio :: () {
-    if print_stream.data.count == 0 do return;
+    if stdio.print_stream.data.count == 0 do return;
 
-    ^print_stream
+    ^stdio.print_stream
         |> io.dynamic_string_stream_to_str()
         |> runtime.__output_string();
 
-    ^print_stream |> io.stream_flush();
+    ^stdio.print_stream |> io.stream_flush();
 }
 

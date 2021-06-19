@@ -1018,7 +1018,6 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
         }
 
         if (alloc_arena->size + size >= alloc_arena->arena_size) {
-            alloc_arena->size = sizeof(ptr);
             bh__arena_internal* new_arena = (bh__arena_internal *) bh_alloc(alloc_arena->backing, alloc_arena->arena_size);
 
             if (new_arena == NULL) {
@@ -1029,6 +1028,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
             new_arena->next_arena = NULL;
             ((bh__arena_internal *)(alloc_arena->current_arena))->next_arena = new_arena;
             alloc_arena->current_arena = new_arena;
+            alloc_arena->size = sizeof(ptr);
         }
 
         retval = bh_pointer_add(alloc_arena->current_arena, alloc_arena->size);
