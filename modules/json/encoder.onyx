@@ -66,7 +66,7 @@ encode :: #match {
 
         for i: v.entries.count {
             if i > 0 do io.write_byte(w, #char ",");
-            entry := v.entries[i];
+            entry := ^v.entries[i];
 
             io.write_escaped_str(w, entry.key);
             io.write_byte(w, #char ":");
@@ -113,7 +113,9 @@ encode :: #match {
         return .None;
     },
 
-
+    // This is disabled because I would prefer to have a compile time error for an unsupported type,
+    // as opposed to a error to check programatically.
+    //
     // // Inserted after any of the #add_match directives
     // #precedence 1000 (w: ^io.Writer, v: $T) -> Encoding_Error {
     //     return .Unsupported_Type;
