@@ -1,1 +1,121 @@
 package json
+
+use package core
+
+Encoding_Error :: enum {
+    None;
+    Unsupported_Type;
+}
+
+encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error) {
+    stream := io.dynamic_string_stream_make(256);
+    writer := io.writer_make(^stream);
+    defer io.dynamic_string_stream_free(^stream);
+
+    err := encode(^writer, v);
+    if err != .None {
+        return "", err;
+    }
+
+    s := string.alloc_copy(io.dynamic_string_stream_to_str(^stream), allocator);
+    return s, .None;
+}
+
+encode :: #match {
+    (w: ^io.Writer, v: i32) -> Encoding_Error {
+        io.write_i32(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: i64) -> Encoding_Error {
+        io.write_i64(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: f32) -> Encoding_Error {
+        io.write_f32(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: f64) -> Encoding_Error {
+        io.write_f64(w, ~~v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: str) -> Encoding_Error {
+        io.write_escaped_str(w, v);
+        return .None;
+    },
+
+    (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
+        io.write_byte(w, #char "[");
+
+        for i: v.count {
+            if i > 0 do io.write_byte(w, #char ",");
+
+            err := encode(w, v[i]);
+            if err != .None do return err;
+        }
+
+        io.write_byte(w, #char "]");
+        return .None;
+    },
+
+    (w: ^io.Writer, v: map.Map(str, $T)) -> Encoding_Error {
+        io.write_byte(w, #char "{");
+
+        for i: v.entries.count {
+            if i > 0 do io.write_byte(w, #char ",");
+            entry := v.entries[i];
+
+            io.write_escaped_str(w, entry.key);
+            io.write_byte(w, #char ":");
+
+            err := encode(w, entry.value);
+            if err != .None do return err;
+        }
+
+        io.write_byte(w, #char "}");
+        return .None;
+    },
+
+    (w: ^io.Writer, v: ^Value) -> Encoding_Error {
+        switch v.type {
+            case .Null    do io.write_str(w, "null");
+            case .Bool    do io.write(w, v->as_bool());
+            case .Integer do io.write(w, v->as_int());
+            case .Float   do io.write(w, v->as_float());
+            case .String  do   encode(w, v->as_str());
+            case .Array   do   encode(w, v->as_array());
+
+            case .Object {
+                io.write_byte(w, #char "{");
+                obj := cast(^Value_Object) v;
+
+                for i: obj.object_.count {
+                    if i > 0 do io.write_byte(w, #char ",");
+
+                    io.write_escaped_str(w, obj.object_[i].key);
+                    io.write_byte(w, #char ":");
+
+                    err := encode(w, obj.object_[i].value);
+                    if err != .None do return err;
+                }
+
+                io.write_byte(w, #char "}");
+            }
+
+            case #default {
+                return .Unsupported_Type;
+            }
+        }
+
+        return .None;
+    },
+
+
+    // Inserted after any of the #add_match directives
+    #precedence 1000 (w: ^io.Writer, v: $T) -> Encoding_Error {
+        return .Unsupported_Type;
+    }
+}

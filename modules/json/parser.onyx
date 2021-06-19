@@ -208,7 +208,7 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
 
         array.push(^value.object_, .{
             key = key,
-            value = elem            
+            value = elem
         });
 
         if !consume_token_if_next(parser, .Comma) {
