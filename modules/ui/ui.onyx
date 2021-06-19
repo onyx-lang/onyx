@@ -275,8 +275,8 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
 // to a font and it will remain valid. Probably want some kind of arena
 // with a map from i32 -> ^BMFont.
 #private init_font :: () {
-    fnt_file_data := #file_contents "./resources/fonts/test.fnt";
-    texture_data := #file_contents "./resources/fonts/test_0.data";
+    fnt_file_data := #file_contents "./resources/fonts/Calibri.fnt";
+    texture_data := #file_contents "./resources/fonts/Calibri_0.data";
 
     font = bmfont.load_bmfont(fnt_file_data);
 

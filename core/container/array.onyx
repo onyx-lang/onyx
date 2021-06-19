@@ -207,8 +207,14 @@ average :: (arr: ^[..] $T) -> T {
     return sum / cast(T) arr.count;
 }
 
-to_slice :: (arr: ^[..] $T) -> [] T {
-    return arr.data[0 .. arr.count];
+to_slice :: #match {
+    (arr: [..] $T) -> [] T {
+        return arr.data[0 .. arr.count];
+    },
+
+    (arr: ^[..] $T) -> [] T {
+        return arr.data[0 .. arr.count];
+    },
 }
 
 /*

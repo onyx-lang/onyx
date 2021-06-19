@@ -47,6 +47,20 @@ encode :: #match {
         return .None;
     },
 
+    (w: ^io.Writer, v: [] $T) -> Encoding_Error {
+        io.write_byte(w, #char "[");
+
+        for i: v.count {
+            if i > 0 do io.write_byte(w, #char ",");
+
+            err := encode(w, v[i]);
+            if err != .None do return err;
+        }
+
+        io.write_byte(w, #char "]");
+        return .None;
+    },
+
     (w: ^io.Writer, v: [..] $T) -> Encoding_Error {
         io.write_byte(w, #char "[");
 
