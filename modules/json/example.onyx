@@ -31,7 +31,28 @@ main :: (args: [] cstr) {
         decoded_json.root["test"]->as_str() |> println();
     }
 
-    json.encode(^stdio.print_writer, decoded_json.root);
+    json.encode(^stdio.print_writer, decoded_json.root["sub"]);
+    print("\n");
+
+    v_arr := array.make(Vector2);
+    defer array.free(^v_arr);
+
+    array.push(^v_arr, .{ 10, 20 });
+    array.push(^v_arr, .{ 12.34, 45.67 });
+    array.push(^v_arr, .{ 0, -10 });
+
+    if err := json.encode(^stdio.print_writer, v_arr); err != .None {
+        printf("Error formatting json %i", cast(i32) err);
+    }
     print("\n");
 }
-    
+
+Vector2 :: struct {
+    x, y: f32;
+}
+
+#add_match json.encode, (w: ^io.Writer, v: Vector2) -> json.Encoding_Error {
+    io.write_format(w, "{\"x\":%f,\"y\":%f}", v.x, v.y);
+
+    return .None;
+}

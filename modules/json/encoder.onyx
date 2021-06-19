@@ -114,8 +114,8 @@ encode :: #match {
     },
 
 
-    // Inserted after any of the #add_match directives
-    #precedence 1000 (w: ^io.Writer, v: $T) -> Encoding_Error {
-        return .Unsupported_Type;
-    }
+    // // Inserted after any of the #add_match directives
+    // #precedence 1000 (w: ^io.Writer, v: $T) -> Encoding_Error {
+    //     return .Unsupported_Type;
+    // }
 }
