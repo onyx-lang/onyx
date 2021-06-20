@@ -902,7 +902,7 @@ i32 type_linear_member_count(Type* type) {
         case Type_Kind_DynArray: return 5;
         case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
         case Type_Kind_Struct:   return bh_arr_length(type->Struct.linear_members);
-        default: return 0; 
+        default: return 1; 
     }
 }
 
@@ -944,7 +944,50 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
         }
         case Type_Kind_Compound: *two = type->Compound.linear_members[idx]; return 1;
         case Type_Kind_Struct:   *two = type->Struct.linear_members[idx];   return 1;
-        default: return 0; 
+        default: {
+            if (idx > 0) return 0;
+            two->offset = 0;
+            two->type = type;
+            return 1;
+        }
+    }
+}
+
+i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset) {
+    switch (type->kind) {
+        case Type_Kind_Slice:
+        case Type_Kind_VarArgs: {
+            if (offset == 0) return 0;
+            if (offset == 8) return 1;
+            return -1;
+        }
+        case Type_Kind_DynArray: {
+            if (offset == 0)   return 0;
+            if (offset == 8)   return 1;
+            if (offset == 12)  return 2;
+            if (offset == 16)  return 3;
+            if (offset == 24)  return 4;
+            return -1;
+        }
+        case Type_Kind_Compound: {
+            i32 idx = 0;
+            bh_arr_each(TypeWithOffset, two, type->Compound.linear_members) {
+                if (two->offset == offset) return idx;
+                idx++;
+            }
+
+            return -1;
+        }
+        case Type_Kind_Struct: {
+            i32 idx = 0;
+            bh_arr_each(TypeWithOffset, two, type->Struct.linear_members) {
+                if (two->offset == offset) return idx;
+                idx++;
+            }
+
+            return -1;
+        }
+        default: return -1;
     }
 }
 

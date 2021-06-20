@@ -1426,8 +1426,10 @@ EMIT_FUNC(call, AstCall* call) {
     switch (call->va_kind) {
         case VA_Kind_Typed: {
             WIL(WI_LOCAL_GET, stack_top_store_local);
-            WID(WI_PTR_CONST, (u32) vararg_offset);
-            WI(WI_PTR_ADD);
+            if (vararg_offset > 0) {
+                WID(WI_PTR_CONST, vararg_offset);
+                WI(WI_PTR_ADD);
+            }
             WID(WI_I32_CONST, vararg_count);
             break;
         }
@@ -1435,8 +1437,10 @@ EMIT_FUNC(call, AstCall* call) {
         case VA_Kind_Untyped: {
             WIL(WI_LOCAL_GET, stack_top_store_local);
             WIL(WI_LOCAL_GET, stack_top_store_local);
-            WID(WI_PTR_CONST, vararg_offset);
-            WI(WI_PTR_ADD);
+            if (vararg_offset > 0) {
+                WID(WI_PTR_CONST, vararg_offset);
+                WI(WI_PTR_ADD);
+            }
             emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
 
             // NOTE: There will be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
@@ -1446,8 +1450,10 @@ EMIT_FUNC(call, AstCall* call) {
             emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], reserve_size + 8);
 
             WIL(WI_LOCAL_GET, stack_top_store_local);
-            WID(WI_PTR_CONST, reserve_size);
-            WI(WI_PTR_ADD);
+            if (reserve_size > 0) {
+                WID(WI_PTR_CONST, reserve_size);
+                WI(WI_PTR_ADD);
+            }
 
             reserve_size += 12;
             break;
@@ -2020,8 +2026,6 @@ EMIT_FUNC(compound_load, Type* type, u64 offset) {
 
 EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     bh_arr(WasmInstruction) code = *pcode;
-    bh_arr(u64) temp_locals = NULL;
-    bh_arr_new(global_heap_allocator, temp_locals, 4);
 
     TypeWithOffset two;
 
@@ -2029,14 +2033,14 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     if (location_first) WIL(WI_LOCAL_SET, loc_idx);
 
     i32 elem_count = type_linear_member_count(type);
+    u64 *temp_locals = bh_alloc_array(global_scratch_allocator, u64, elem_count);
+
     forir (i, elem_count - 1, 0) {
         type_linear_member_lookup(type, i, &two);
 
         WasmType wt = onyx_type_to_wasm_type(two.type);
-        u64 tmp_idx = local_raw_allocate(mod->local_alloc, wt);
-
-        bh_arr_push(temp_locals, tmp_idx);
-        WIL(WI_LOCAL_SET, tmp_idx);
+        temp_locals[i] = local_raw_allocate(mod->local_alloc, wt);
+        WIL(WI_LOCAL_SET, temp_locals[i]);
     }
 
     if (!location_first) WIL(WI_LOCAL_SET, loc_idx);
@@ -2044,7 +2048,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     fori (i, 0, elem_count) {
         type_linear_member_lookup(type, i, &two);
 
-        u64 tmp_idx = bh_arr_pop(temp_locals); 
+        u64 tmp_idx = temp_locals[i]; 
         WIL(WI_LOCAL_GET, loc_idx);
         WIL(WI_LOCAL_GET, tmp_idx);
         emit_store_instruction(mod, &code, two.type, offset + two.offset);
@@ -2053,8 +2057,10 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
         local_raw_free(mod->local_alloc, wt);
     }
 
-    bh_arr_free(temp_locals);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+
+    // This shouldn't be necessary because the scratch allocator doesn't free.
+    bh_free(global_scratch_allocator, temp_locals);
 
     *pcode = code;
 }
@@ -2404,46 +2410,55 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 }
             }
 
+            if (is_lval((AstNode *) field->expr)) {
+                u64 offset = 0;
+                emit_field_access_location(mod, &code, field, &offset);
+                emit_load_instruction(mod, &code, field->type, offset);
 
-            // HACK
-            // This is only used in the weird case where you write something like this:
-            //
-            //    data_ptr := "Test string".data;
-            //    string_count := "Some other string".count;
-            //
-            // I don't think this is every used in the core libraries or anything written in
-            // Onyx yet, so this might go away at some point. Actually, thinking about it,
-            // I think accessing fields on r-values is completely disabled currently, so this
-            // is never possible.
-            //
-            // I think a more general case of accessing fields on r-values is better. For example,
-            //
-            //     returns_foo :: () -> Foo { ... }
-            //
-            //     value := returns_foo().foo_member;
-            //
-            // This does not work in the language at the moment, but maybe should?
-            /*
-            else if (field->expr->kind == Ast_Kind_StrLit) {
-                StructMember smem;
+            } else {
+                emit_expression(mod, &code, field->expr);
 
-                token_toggle_end(field->token);
-                type_lookup_member(field->expr->type, field->token->text, &smem);
-                token_toggle_end(field->token);
+                i32 idx = type_get_idx_of_linear_member_with_offset(field->expr->type, field->offset);
+                i32 field_linear_members = type_linear_member_count(field->type);
+                i32 total_linear_members = type_linear_member_count(field->expr->type);
 
-                if (smem.idx == 0)
-                    WID(WI_I32_CONST, ((AstStrLit *) field->expr)->addr);
+                if (idx == 0) {
+                    // Easy case: the member is the first one and all other members just have to be dropped.
+                    fori (i, 0, total_linear_members - field_linear_members) WI(WI_DROP);
 
-                if (smem.idx == 1)
-                    WID(WI_I32_CONST, ((AstStrLit *) field->expr)->length);
+                } else {
+                    // Tough case: Stack shuffling to make the member the only thing on the stack.
+                    // This is very similar to the compound_load/compound_store procedures but it is different enough
+                    // that I cannot find a good way to factor them all without just introducing a ton of complexity.
+                    fori (i, 0, total_linear_members - idx - field_linear_members) WI(WI_DROP);
 
-                break;
+                    u64 *temporaries = bh_alloc_array(global_scratch_allocator, u64, field_linear_members);
+                    fori (i, 0, field_linear_members) temporaries[i] = 0;
+
+                    TypeWithOffset two = { 0 };
+                    forir (i, field_linear_members - 1, 0) {
+                        type_linear_member_lookup(field->type, i, &two);
+
+                        WasmType wt = onyx_type_to_wasm_type(two.type);
+                        temporaries[i] = local_raw_allocate(mod->local_alloc, wt);
+                        WIL(WI_LOCAL_SET, temporaries[i]);
+                    }
+
+                    fori (i, 0, idx) WI(WI_DROP);
+
+                    fori (i, 0, field_linear_members) {
+                        type_linear_member_lookup(field->type, i, &two);
+
+                        WIL(WI_LOCAL_GET, temporaries[i]);
+
+                        WasmType wt = onyx_type_to_wasm_type(two.type);
+                        local_raw_free(mod->local_alloc, wt);
+                    }
+
+                    bh_free(global_scratch_allocator, temporaries);
+                }
             }
-            */
 
-            u64 offset = 0;
-            emit_field_access_location(mod, &code, field, &offset);
-            emit_load_instruction(mod, &code, field->type, offset);
             break;
         }
 

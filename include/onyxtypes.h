@@ -184,6 +184,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem);
 
 i32 type_linear_member_count(Type* type);
 b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two);
+i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset);
 
 b32 type_struct_is_simple(Type* type);
 

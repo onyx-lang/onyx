@@ -1,0 +1,27 @@
+#load "core/std"
+
+use package core
+
+Foo :: struct {
+    x, y: i32;
+    name: str;
+    age: i32;
+}
+
+get_foo :: () -> Foo {
+    return .{
+        x = 10, y = 20,
+        name = "Foo bar",
+        age = 42,
+    };
+}
+
+main :: (args: [] cstr) {
+    printf("%p\n", "Hello World!".data);
+
+    println(get_foo().name);
+    println(get_foo().x);
+    println(get_foo().age);
+
+    println((Foo.{ 0, 0, "Worked!", 0 }).name);
+}

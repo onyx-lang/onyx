@@ -1378,15 +1378,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         return Check_Error;
     }
 
-    if (field->expr->type->kind != Type_Kind_Pointer && !is_lval((AstNode *) field->expr)) {
-        onyx_report_error(field->token->pos,
-            "Cannot access field '%b'. Expression is not an lval.",
-            field->token->text,
-            field->token->length);
-        return Check_Error;
-    }
-
-    // HACK: (*foo).bar does not work without this.
+    // Optimization for (*foo).member.
     if (field->expr->kind == Ast_Kind_Dereference) {
         field->expr = ((AstDereference *) field->expr)->expr;
     }
