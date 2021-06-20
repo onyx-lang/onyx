@@ -2410,7 +2410,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 }
             }
 
-            if (is_lval((AstNode *) field->expr)) {
+            if (is_lval((AstNode *) field->expr) || type_is_pointer(field->expr->type)) {
                 u64 offset = 0;
                 emit_field_access_location(mod, &code, field, &offset);
                 emit_load_instruction(mod, &code, field->type, offset);
@@ -3301,7 +3301,6 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.data, 4);
     bh_arr_new(alloc, module.elems, 4);
 
-    // NOTE: 16 is probably needlessly large
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
     bh_arr_set_length(module.structured_jump_target, 0);
 
@@ -3407,6 +3406,7 @@ void emit_entity(Entity* ent) {
         case Entity_Type_Global:   emit_global(module,   ent->global); break;
 
         // Cleanup: Maybe these should be printed elsewhere?
+        // Also, they should be sorted? Or have that ability?
         case Entity_Type_Note: {
             if (!context.options->print_notes) break;
 

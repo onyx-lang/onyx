@@ -7,6 +7,8 @@ Textbox_Theme :: struct {
         // text_color = .{1, 1, 1}
     };
 
+    use animation_theme := Animation_Theme.{};
+
     // background_color := gfx.Color4.{ 0.1, 0.1, 0.1 };
     // hover_color      := gfx.Color4.{ 0.3, 0.3, 0.3 };
     // click_color      := gfx.Color4.{ 0.5, 0.5, 0.7 };
@@ -131,9 +133,9 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^defa
     }
 
     if is_hot_item(hash) {
-        move_towards(^animation_state.hover_time, 1.0f, 0.1f);  @ThemeConfiguration
+        move_towards(^animation_state.hover_time, 1.0f, theme.hover_speed);
     } else {
-        move_towards(^animation_state.hover_time, 0.0f, 0.1f);  @ThemeConfiguration
+        move_towards(^animation_state.hover_time, 0.0f, theme.hover_speed);
     }
 
     gfx.set_texture();
@@ -159,7 +161,7 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^defa
             color=cursor_color);
     }
 
-    move_towards(^animation_state.click_time, 0.0f, 0.08f);     @ThemeConfiguration
+    move_towards(^animation_state.click_time, 0.0f, theme.click_decay_speed);
 
     if animation_state.click_time > 0 || animation_state.hover_time > 0 {
         map.put(^animation_states, hash, animation_state);

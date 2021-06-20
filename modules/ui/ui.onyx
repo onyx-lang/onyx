@@ -235,8 +235,12 @@ Text_Theme :: struct {
 }
 
 default_text_theme := Text_Theme.{};
-    
 
+
+Animation_Theme :: struct {
+    hover_speed       := 0.1f;
+    click_decay_speed := 0.08f;
+}
 
 
 

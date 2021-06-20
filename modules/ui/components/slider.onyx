@@ -4,6 +4,7 @@ use package core
 
 Slider_Theme :: struct {
     use text_theme := Text_Theme.{};
+    use animation_theme := Animation_Theme.{};
 
     box_color        := gfx.Color4.{ 0.1, 0.1, 0.1 };
     box_border_color := gfx.Color4.{ 0.2, 0.2, 0.2 };
@@ -39,9 +40,9 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
     }
 
     if is_hot_item(hash) {
-        move_towards(^animation_state.hover_time, 1.0f, 0.1f);  @ThemeConfiguration
+        move_towards(^animation_state.hover_time, 1.0f, theme.hover_speed);
     } else {
-        move_towards(^animation_state.hover_time, 0.0f, 0.1f);  @ThemeConfiguration
+        move_towards(^animation_state.hover_time, 0.0f, theme.hover_speed);
     }
 
     box_border_width := theme.box_border_width;
