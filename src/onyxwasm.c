@@ -994,11 +994,11 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
         u32 return_align = type_alignment_of(return_type);
         bh_align(return_size, return_align);
 
-        u64 stack_grow_amm = return_size;
-        bh_align(stack_grow_amm, 16);
+        u64 reserve_size = return_size;
+        bh_align(reserve_size, 16);
         
         WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_PTR_CONST, stack_grow_amm);
+        WID(WI_PTR_CONST, reserve_size);
         WI(WI_PTR_ADD);
         WID(WI_GLOBAL_SET, stack_top_idx);
 
@@ -1006,12 +1006,12 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
         WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
 
         WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_PTR_CONST, stack_grow_amm);
+        WID(WI_PTR_CONST, reserve_size);
         WI(WI_PTR_SUB);
         WID(WI_GLOBAL_SET, stack_top_idx);
 
         WID(WI_GLOBAL_GET, stack_top_idx);
-        emit_load_instruction(mod, &code, return_type, stack_grow_amm - return_size);
+        emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
     }
 
     WIL(WI_LOCAL_SET, iterator_done_bool);
@@ -1335,120 +1335,133 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
     *pcode = code;
 }
 
+// Calling a procedure in Onyx.
+//
+// This documentation should be placed elsewhere, but for right now I'm going to write it in the relevant
+// piece of code. Calling a procedure is relatively simple, at least compared to other calling conventions
+// out there, mostly due the fact that this is WebAssembly, where registers are "infinite" and there's no
+// really need to use stack canaries for security.
+//
+// The biggest piece to understand is how the stack gets laid out for the called procedure. To be confusing,
+// there are two stacks at play: the WASM expression stack, and the linear memory stack. Here is the general
+// lay out for calling a procedure with the following signature.
+//
+//    foo :: (x: i32, y: str, z: [..] i32, va: ..i32) -> (i32, i32)
+//
+// WASM stack: top is last pushed
+//
+//    vararg count
+//    vararg pointer to variadic arguments in the linear memory
+//    pointer to struct-like arguments (z)
+//    simple structs/primitives (y, x)
+//
+// Linear memory stack:
+//  
+//     ... | struct-like arguments (z) | variadic arguments (va) | return space | ...
+//
+// The interesting part from above is the fact that 'y' gets passed on the WASM stack, not the linear memory
+// stack, even though a 'str' in Onyx is 2-component structure. This is because so-called "simple" structures,
+// i.e. structures that are completely flat, with no sub-structures, are passed as multiple primitives. I do
+// this because many times for interoperability, it is nicer to get two primitive values for the pointer and
+// count of a slice, instead of a pointer.
 EMIT_FUNC(call, AstCall* call) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    u32 stack_grow_amm = 0;
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
+    u64 stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
-    u32 vararg_count = 0;
-    u32 vararg_offset = 0xffffffff;
-    u64 stack_top_store_local;
+    // Because it would be inefficient to increment and decrement the global stack pointer for every argument,
+    // a simple set of instructions increments it once to the size it will need to be. However, because it is
+    // impossible to know what size the reserved memory will be, a location patch is taken in order to fill it
+    // in later.
+    u32 reserve_space_patch = bh_arr_length(code);
+    WID(WI_GLOBAL_GET, stack_top_idx);
+    WIL(WI_LOCAL_TEE, stack_top_store_local);
+    WID(WI_PTR_CONST, 0);                           // This will be filled in later.
+    WI(WI_PTR_ADD);
+    WID(WI_GLOBAL_SET, stack_top_idx);
+
+    u32 reserve_size  = 0;
+    u32 vararg_count  = 0;
+    i32 vararg_offset = -1;
 
     bh_arr_each(AstTyped *, parg, call->args.values) {
         AstArgument* arg = (AstArgument *) *parg;
         if (arg->is_baked) continue;
 
-        b32 place_on_stack  = 0;
+        b32 place_on_stack = 0;
 
-        if (arg->va_kind != VA_Kind_Not_VA) {
-            if (vararg_offset == 0xffffffff) vararg_offset = stack_grow_amm;
+        if (type_get_param_pass(arg->value->type) == Param_Pass_By_Implicit_Pointer) {
+            // This arguments needs to be written to the stack because it is not a simple structure.
             place_on_stack = 1;
         }
-        if (type_get_param_pass(arg->value->type) == Param_Pass_By_Implicit_Pointer) place_on_stack = 1;
 
-        if (place_on_stack) WID(WI_GLOBAL_GET, stack_top_idx);
+        if (arg->va_kind != VA_Kind_Not_VA) {
+            // This is a variadic argument and needs to be written to the stack. If the starting
+            // location of the vararg array hasn't been noted, note it.
+            if (vararg_offset < 0) vararg_offset = reserve_size;
 
-        if (stack_grow_amm != 0) {
-            stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-            WID(WI_GLOBAL_GET, stack_top_idx);
-            WIL(WI_LOCAL_SET, stack_top_store_local);
-
-            WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_PTR_CONST, stack_grow_amm);
-            WI(WI_PTR_ADD);
-            WID(WI_GLOBAL_SET, stack_top_idx);
+            place_on_stack = 1;
+            vararg_count += 1;
         }
+
+        if (place_on_stack) WIL(WI_LOCAL_GET, stack_top_store_local);
 
         emit_expression(mod, &code, arg->value);
 
-        if (stack_grow_amm != 0) {
-            WIL(WI_LOCAL_GET, stack_top_store_local);
-            WID(WI_GLOBAL_SET, stack_top_idx);
-
-            local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-        }
-
         if (place_on_stack) {
-            emit_store_instruction(mod, &code, arg->value->type, stack_grow_amm);
+            emit_store_instruction(mod, &code, arg->value->type, reserve_size);
 
-            if (arg->va_kind != VA_Kind_Not_VA) vararg_count += 1;
-            else {
-                WID(WI_GLOBAL_GET, stack_top_idx);
-                WID(WI_PTR_CONST, stack_grow_amm);
+            if (arg->va_kind == VA_Kind_Not_VA) {
+                // Non-variadic arguments on the stack need a pointer to them placed on the WASM stack.
+                WIL(WI_LOCAL_GET, stack_top_store_local);
+                WID(WI_PTR_CONST, reserve_size);
                 WI(WI_PTR_ADD);
             }
 
-            stack_grow_amm += type_size_of(arg->value->type);
+            reserve_size += type_size_of(arg->value->type);
         }
     }
 
     switch (call->va_kind) {
         case VA_Kind_Typed: {
-            WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_PTR_CONST, vararg_offset);
+            WIL(WI_LOCAL_GET, stack_top_store_local);
+            WID(WI_PTR_CONST, (u32) vararg_offset);
             WI(WI_PTR_ADD);
             WID(WI_I32_CONST, vararg_count);
             break;
         }
 
         case VA_Kind_Untyped: {
-            WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_GLOBAL_GET, stack_top_idx);
+            WIL(WI_LOCAL_GET, stack_top_store_local);
+            WIL(WI_LOCAL_GET, stack_top_store_local);
             WID(WI_PTR_CONST, vararg_offset);
             WI(WI_PTR_ADD);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], stack_grow_amm);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
 
             // NOTE: There will be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
 
-            WID(WI_GLOBAL_GET, stack_top_idx);
+            WIL(WI_LOCAL_GET, stack_top_store_local);
             WID(WI_I32_CONST, vararg_count);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], stack_grow_amm + 8);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], reserve_size + 8);
 
-            WID(WI_GLOBAL_GET, stack_top_idx);
-            WID(WI_PTR_CONST, stack_grow_amm);
+            WIL(WI_LOCAL_GET, stack_top_store_local);
+            WID(WI_PTR_CONST, reserve_size);
             WI(WI_PTR_ADD);
 
-            stack_grow_amm += 12;
+            reserve_size += 12;
             break;
         }
-
-        default: break;
     }
 
     CallingConvention cc = type_function_get_cc(call->callee->type);
     assert(cc != CC_Undefined);
 
-    b32 needs_stack = (cc == CC_Return_Stack) || (stack_grow_amm > 0);
-
     Type* return_type = call->callee->type->Function.return_type;
     u32 return_size = type_size_of(return_type);
-    u32 return_align = type_alignment_of(return_type);
-    bh_align(return_size, return_align);
+    assert(return_size % type_alignment_of(return_type) == 0);
 
-    if (cc == CC_Return_Stack) {
-        bh_align(stack_grow_amm, return_align);
-        stack_grow_amm += return_size;
-    }
-
-    bh_align(stack_grow_amm, 16);
-
-    if (needs_stack) {
-        WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_PTR_CONST, stack_grow_amm);
-        WI(WI_PTR_ADD);
-        WID(WI_GLOBAL_SET, stack_top_idx);
-    }
+    if (cc == CC_Return_Stack) reserve_size += return_size;
 
     if (call->callee->kind == Ast_Kind_Function) {
         i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) call->callee);
@@ -1461,18 +1474,23 @@ EMIT_FUNC(call, AstCall* call) {
         WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
     }
 
-    if (needs_stack) {
-        WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_PTR_CONST, stack_grow_amm);
-        WI(WI_PTR_SUB);
+    if (reserve_size > 0) {
+        WIL(WI_LOCAL_GET,  stack_top_store_local);
         WID(WI_GLOBAL_SET, stack_top_idx);
+
+        bh_align(reserve_size, 16);
+        code[reserve_space_patch + 2].data.l = reserve_size;
+
+    } else {
+        fori (i, 0, 5) code[reserve_space_patch + i].type = WI_NOP;
     }
 
     if (cc == CC_Return_Stack) {
         WID(WI_GLOBAL_GET, stack_top_idx);
-        emit_load_instruction(mod, &code, return_type, stack_grow_amm - return_size);
+        emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
     }
 
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     *pcode = code;
 }
 
