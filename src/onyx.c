@@ -48,6 +48,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
     "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
     "\t--print-notes             Prints the location of notes throughout the loaded code.\n"
+    "\t--no-colors               Disables colors in the error message\n"
     "\n";
 
 
@@ -104,6 +105,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--print-notes")) {
                 options.print_notes = 1;
+            }
+            else if (!strcmp(argv[i], "--no-colors")) {
+                options.no_colors = 1;
             }
             else if (!strcmp(argv[i], "--use-post-mvp-features")) {
                 options.use_post_mvp_features = 1;
