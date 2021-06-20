@@ -2086,20 +2086,70 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     WIL(WI_LOCAL_SET, rptr_local);
     WIL(WI_LOCAL_SET, lptr_local);
 
-    // NOTE: Currently, we inline the copying of the array; But if the array has
-    // many elements, this could result in a LOT of instructions. Maybe for lengths
-    // greater than like 16 we output a loop that copies them?
-    //                                               - brendanfh 2020/12/16
-    fori (i, 0, elem_count) {
-        WIL(WI_LOCAL_GET, lptr_local);
+    if (elem_count <= 2) {
+        // Inline copying for a small number of elements. It still may be faster to do this in a tight loop.
 
-        if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == rptr_local)
+        fori (i, 0, elem_count) {
+            if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == lptr_local)
+                bh_arr_last(code).type = WI_LOCAL_TEE;
+            else
+                WIL(WI_LOCAL_GET, lptr_local);
+
+            WIL(WI_LOCAL_GET, rptr_local);
+            emit_load_instruction(mod, &code, elem_type, i * elem_size);
+
+            emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
+        }
+
+    } else if (context.options->use_post_mvp_features) {
+        // Use a simple memory copy if it is available. This may be what happens in the case below too at a later time.
+
+        if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == lptr_local)
             bh_arr_last(code).type = WI_LOCAL_TEE;
         else
-            WIL(WI_LOCAL_GET, rptr_local);
-        emit_load_instruction(mod, &code, elem_type, i * elem_size);
+            WIL(WI_LOCAL_GET, lptr_local);
+        WIL(WI_PTR_CONST, offset);
+        WI(WI_PTR_ADD);
 
-        emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
+        WIL(WI_LOCAL_GET, rptr_local);
+        WIL(WI_I32_CONST, elem_count * elem_size);
+        WI(WI_MEMORY_COPY);
+
+    } else {
+        // Emit a loop that copies the memory. This could be switched to a tight loop that just copies word per word.
+
+        u64 offset_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+        WIL(WI_PTR_CONST, 0);
+        WIL(WI_LOCAL_SET, offset_local);
+
+        WID(WI_BLOCK_START, 0x40);
+        WID(WI_LOOP_START, 0x40);
+            WIL(WI_LOCAL_GET, offset_local);
+            WIL(WI_LOCAL_GET, lptr_local);
+            WI(WI_PTR_ADD);
+
+            WIL(WI_LOCAL_GET, offset_local);
+            WIL(WI_LOCAL_GET, rptr_local);
+            WI(WI_PTR_ADD);
+
+            emit_load_instruction(mod, &code, elem_type, 0);
+            emit_store_instruction(mod, &code, elem_type, offset);
+
+            WIL(WI_LOCAL_GET, offset_local);
+            WIL(WI_PTR_CONST, elem_size);
+            WI(WI_PTR_ADD);
+            WIL(WI_LOCAL_TEE, offset_local);
+
+            WIL(WI_PTR_CONST, elem_count * elem_size);
+            WI(WI_PTR_GE);
+            WID(WI_COND_JUMP, 0x01);
+
+            WID(WI_JUMP, 0x00);
+
+        WI(WI_LOOP_END);
+        WI(WI_BLOCK_END);
+
+        local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);

@@ -233,6 +233,8 @@ typedef enum WasmInstructionType {
     WI_PTR_SUB                       = WI_I32_SUB,
     WI_PTR_MUL                       = WI_I32_MUL,
     WI_PTR_GE                        = WI_I32_GE_U,
+    WI_PTR_GT                        = WI_I32_GT_U,
+    WI_PTR_EQ                        = WI_I32_EQ,
 
     WI_V128_LOAD                     = SIMD_INSTR_MASK | 0,
     WI_V128_STORE                    = SIMD_INSTR_MASK | 11,
