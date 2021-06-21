@@ -31,8 +31,8 @@ Removals:
 
 Changes:
 * the "proc" keyword is now optional in a lot of cases. There are inevitably some bugs with this change,
-    but you can always add it in when it may be necessary. Note, that for overloaded procedures, "proc"
-    is still required.
+    but you can always add it in when it may be necessary. Note, that for overloaded procedures, "#match"
+    is now used.
 * operator overloading is now done as a top level declaration handled through the entity
     system, instead of relying on creating a procedure. This lets you use an existing
     procedure as an operator overload. Take a look at '#operator ==' in string.onyx.

@@ -45,12 +45,8 @@ static char* node_to_doc_def(const char* sym, AstNode *node, bh_allocator a) {
                 }
             }
 
-            strncat(buf, ")", 1023);
-
-            if (func->type->Function.return_type != &basic_types[Basic_Kind_Void]) {
-                strncat(buf, " -> ", 1023);
-                strncat(buf, type_get_name(func->type->Function.return_type), 1023);
-            }
+            strncat(buf, ") -> ", 1023);
+            strncat(buf, type_get_name(func->type->Function.return_type), 1023);
 
             break;
         }
@@ -104,7 +100,7 @@ static DocPackage doc_package_create(Package* p, bh_allocator a) {
 
     bh_table_each_start(AstNode *, p->scope->symbols)
         DocEntry de;
-        de.pos = value->token->pos;
+        if (value->token) de.pos = value->token->pos;
         de.def = node_to_doc_def(key, value, a);
         de.sym = (char *) key;
         de.additional = NULL;
@@ -114,7 +110,7 @@ static DocPackage doc_package_create(Package* p, bh_allocator a) {
 
     bh_table_each_start(AstNode *, p->private_scope->symbols)
         DocEntry de;
-        de.pos = value->token->pos;
+        if (value->token) de.pos = value->token->pos;
         de.def = node_to_doc_def(key, value, a);
         de.sym = (char *) key;
         de.additional = NULL;
@@ -147,7 +143,7 @@ OnyxDocumentation onyx_docs_generate() {
     return doc;
 }
 
-static void onyx_docs_emit_human(OnyxDocumentation* doc) {
+static void onyx_docs_emit_human(OnyxDocumentation* doc, bh_file* file) {
     // NOTE: Disabling fancy line printing until I can make it better
     #if 0
     bh_arr_each(DocPackage, dp, doc->package_docs) {
@@ -184,35 +180,35 @@ static void onyx_docs_emit_human(OnyxDocumentation* doc) {
     }
     #else
     bh_arr_each(DocPackage, dp, doc->package_docs) {
-        bh_printf("Package '%s'\n", dp->name);
+        bh_fprintf(file, "Package '%s'\n", dp->name);
 
         if (bh_arr_length(dp->public_entries) > 0) {
-            bh_printf("   Public symbols\n");
+            bh_fprintf(file, "   Public symbols\n");
             bh_arr_each(DocEntry, de, dp->public_entries) {
-                bh_printf("     %s\n", de->def);
+                bh_fprintf(file, "     %s\n", de->def);
 
                 if (de->pos.filename != NULL)
-                    bh_printf("        at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
+                    bh_fprintf(file, "        at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
                 else
-                    bh_printf("        compiler built-in\n");
+                    bh_fprintf(file, "        compiler built-in\n");
 
-                bh_printf("    \n");
+                bh_fprintf(file, "    \n");
             }
         }
 
         if (bh_arr_length(dp->private_entries) > 0) {
-            bh_printf("   Private symbols\n");
+            bh_fprintf(file, "   Private symbols\n");
             bh_arr_each(DocEntry, de, dp->private_entries) {
-                bh_printf("      %s\n", de->def);
+                bh_fprintf(file, "      %s\n", de->def);
                 if (de->pos.filename != NULL)
-                    bh_printf("        at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
+                    bh_fprintf(file, "        at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
                 else
-                    bh_printf("        compiler built-in\n");
+                    bh_fprintf(file, "        compiler built-in\n");
 
-                bh_printf("    \n");
+                bh_fprintf(file, "    \n");
             }
 
-            bh_printf("\n");
+            bh_fprintf(file, "\n");
         }
     }
     #endif
@@ -267,16 +263,24 @@ static void onyx_docs_emit_tags(OnyxDocumentation* doc) {
     bh_file_close(&tags_file);
 }
 
-static void onyx_docs_emit_html(OnyxDocumentation* doc) {
-    bh_printf("HTML documentation output not supported yet.\n");
+static void onyx_docs_emit_html(OnyxDocumentation* doc, bh_file* file) {
+    bh_fprintf(file, "HTML documentation output not supported yet.\n");
     return;
 }
 
-void onyx_docs_emit(OnyxDocumentation* doc) {
-    switch (doc->format) {
-        case Doc_Format_Human: onyx_docs_emit_human(doc); break;
-        case Doc_Format_Tags: onyx_docs_emit_tags(doc); break;
-        case Doc_Format_Html: onyx_docs_emit_html(doc); break;
+void onyx_docs_emit(OnyxDocumentation* doc, const char* filename) {
+    bh_file file;
+    if (bh_file_create(&file, filename) != BH_FILE_ERROR_NONE) {
+        bh_printf("ERROR: Failed to open file '%s' for writing documentation.\n", filename);
+        return;
     }
+
+    switch (doc->format) {
+        case Doc_Format_Human: onyx_docs_emit_human(doc, &file); break;
+        case Doc_Format_Html: onyx_docs_emit_html(doc, &file); break;
+        case Doc_Format_Tags: onyx_docs_emit_tags(doc); break;
+    }
+
+    bh_file_close(&file);
 }
 

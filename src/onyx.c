@@ -43,6 +43,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\t           -VV          Very verbose output\n"
     "\t           -VVV         Very very verbose output (to be used by compiler developers)\n"
     "\t--use-post-mvp-features Enables post MVP WASM features such as memory.copy and memory.fill\n"
+    "\t--doc <doc_file>"
     "\n"
     "Developer flags:\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
@@ -66,6 +67,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .files = NULL,
         .target_file = "out.wasm",
+
+        .documentation_file = NULL,
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -77,13 +80,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     if (argc == 1) return options;
 
-    if (!strcmp(argv[1], "help")) options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
-    // else if (!strcmp(argv[1], "doc")) {
-    //     options.action = ONYX_COMPILE_ACTION_DOCUMENT;
-    // }
+    if (!strcmp(argv[1], "help"))     options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
     else options.action = ONYX_COMPILE_ACTION_COMPILE;
 
-    if (options.action == ONYX_COMPILE_ACTION_COMPILE) {
+    if (options.action != ONYX_COMPILE_ACTION_PRINT_HELP) {
         fori(i, 1, argc) {
             if (!strcmp(argv[i], "-o")) {
                 options.target_file = argv[++i];
@@ -124,6 +124,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
                     bh_printf("WARNING: '%s' is not a valid runtime. Defaulting to 'wasi'.\n", argv[i]);
                     options.runtime = Runtime_Wasi;
                 }
+            }
+            else if (!strcmp(argv[i], "--doc")) {
+                options.documentation_file = argv[++i];
             }
 #if defined(_BH_LINUX)
             // NOTE: Fun output is only enabled for Linux because Windows command line
@@ -456,6 +459,12 @@ static i32 onyx_compile() {
         printf("    Processed %ld lines (%f lines/second).\n", lexer_lines_processed, ((f32) 1000 * lexer_lines_processed) / (duration));
         printf("    Processed %ld tokens (%f tokens/second).\n", lexer_tokens_processed, ((f32) 1000 * lexer_tokens_processed) / (duration));
         printf("\n");
+    }
+
+    if (context.options->documentation_file != NULL) {
+        OnyxDocumentation docs = onyx_docs_generate();
+        docs.format = Doc_Format_Human;
+        onyx_docs_emit(&docs, context.options->documentation_file);
     }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;

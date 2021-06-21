@@ -1137,6 +1137,7 @@ struct CompileOptions {
     bh_arr(const char *) included_folders;
     bh_arr(const char *) files;
     const char* target_file;
+    const char* documentation_file;
 };
 
 typedef struct Context Context;

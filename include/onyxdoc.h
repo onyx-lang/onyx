@@ -33,6 +33,6 @@ typedef struct OnyxDocumentation {
 } OnyxDocumentation;
 
 OnyxDocumentation onyx_docs_generate();
-void onyx_docs_emit(OnyxDocumentation* doc);
+void onyx_docs_emit(OnyxDocumentation* doc, const char* filename);
 
 #endif
