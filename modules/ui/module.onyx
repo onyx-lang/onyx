@@ -2,6 +2,14 @@
 /*
 Document this module better
 
+Add selection to textbox
+
+Add dropdowns
+
+Add scrollable areas
+
+Add proper scissoring for intersecting elements (events get scissored too)
+
 Add a font cache and more preloaded fonts
 
 Add proper font texture decoding to make the WebGL texture depending on how the BMFont was encoded into the image.
