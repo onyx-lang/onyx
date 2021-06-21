@@ -552,7 +552,7 @@ CheckStatus check_call(AstCall* call) {
                 }
 
                 // CLEANUP POTENTIAL BUG if the builtin_vararg_type_type is ever rebuilt
-                if (formal_params[arg_pos] == builtin_vararg_type_type) {
+                if ((i16) arg_pos == callee->type->Function.vararg_arg_pos) {
                     arg_state = AS_Expecting_Untyped_VA;
                     continue;
                 }
@@ -726,6 +726,12 @@ CheckStatus check_binaryop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) 
 
         binop->right = (AstTyped *) new_right;
         binop->operation = Binary_Op_Assign;
+    }
+
+    if (binop->right->type == NULL) {
+        if (binop->right->entity != NULL && binop->right->entity->state <= Entity_State_Check_Types) {
+            return Check_Yield_Macro;
+        }
     }
 
     if (!type_check_or_auto_cast(&binop->right, binop->left->type)) {
@@ -1239,6 +1245,9 @@ CheckStatus check_compound(AstCompound* compound) {
 
 CheckStatus check_address_of(AstAddressOf* aof) {
     CHECK(expression, &aof->expr);
+    if (aof->expr->type == NULL) {
+        return Check_Yield_Macro;
+    }
 
     if ((aof->expr->kind != Ast_Kind_Subscript
             && aof->expr->kind != Ast_Kind_Dereference

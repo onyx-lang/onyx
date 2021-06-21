@@ -31,6 +31,8 @@ enum BasicKind {
     Basic_Kind_F32X4,
     Basic_Kind_F64X2,
     Basic_Kind_V128,
+
+    Basic_Kind_Count,
 };
 
 enum BasicFlag {
@@ -84,12 +86,12 @@ struct TypeWithOffset {
     TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })    \
     TYPE_KIND(Function, struct {                                  \
         Type *return_type;                                        \
-        u32 param_count;                                          \
-        u32 needed_param_count;                                   \
+        u16 param_count;                                          \
+        u16 needed_param_count;                                   \
+        i16 vararg_arg_pos;                                       \
         Type* params[];                                           \
     })                                                            \
     TYPE_KIND(Struct, struct {                                    \
-        u64 unique_id;                                            \
         char* name;                                               \
         u32 size;                                                 \
         u16 alignment, mem_count;                                 \
@@ -110,7 +112,6 @@ struct TypeWithOffset {
     TYPE_KIND(DynArray, struct { Type *ptr_to_data; })            \
     TYPE_KIND(VarArgs, struct { Type *ptr_to_data; })             \
     TYPE_KIND(Enum, struct {                                      \
-        u64 unique_id;                                            \
         char* name;                                               \
         Type* backing;                                            \
         b32   is_flags;                                           \
@@ -138,8 +139,9 @@ enum TypeFlag {
 struct Type {
     TypeKind kind;
 
+    u32 id;
     u32 flags;
-    
+
     // NOTE(Brendan Hansen): The abstract syntax tree node used to create
     // the type. Primarily used to look up symbols in scopes that are embedded
     // in the type.
@@ -158,10 +160,12 @@ struct AstType;
 struct AstFunction;
 struct AstCompound;
 
+void types_init();
+void types_dump_type_info();
+
 b32 types_are_compatible(Type* t1, Type* t2);
 u32 type_size_of(Type* type);
 u32 type_alignment_of(Type* type);
-u32 type_aligned_size_of(Type* type);
 Type* type_build_from_ast(bh_allocator alloc, struct AstType* type_node);
 
 Type* type_build_function_type(bh_allocator alloc, struct AstFunction* func);

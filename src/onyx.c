@@ -170,6 +170,8 @@ static AstInclude* create_load(bh_allocator alloc, char* filename) {
 }
 
 static void context_init(CompileOptions* opts) {
+    types_init();
+
     context.options = opts;
     context.cycle_detected = 0;
 
@@ -466,6 +468,10 @@ static i32 onyx_compile() {
         docs.format = Doc_Format_Human;
         onyx_docs_emit(&docs, context.options->documentation_file);
     }
+
+#if 0
+    types_dump_type_info();
+#endif
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
