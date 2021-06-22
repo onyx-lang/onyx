@@ -1963,7 +1963,7 @@ void bh_buffer_write_u32(bh_buffer* buffer, u32 i) {
 
 void bh_buffer_write_u64(bh_buffer* buffer, u64 i) {
     bh_buffer_grow(buffer, buffer->length + 8);
-    *((u8 *) bh_pointer_add(buffer->data, buffer->length)) = i;
+    *((u64 *) bh_pointer_add(buffer->data, buffer->length)) = i;
     buffer->length += 8;
 }
 

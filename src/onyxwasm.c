@@ -3163,6 +3163,13 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
     u64 alignment = type_alignment_of(effective_type);
     u64 size = type_size_of(effective_type);
 
+    if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
+        u64 table_location = build_type_table(mod);
+        memres->addr = table_location;
+
+        return;
+    }
+
     u32 offset = mod->next_datum_offset;
     bh_align(offset, alignment);
 

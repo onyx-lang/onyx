@@ -51,6 +51,8 @@ AstType  *builtin_allocator_type;
 AstType  *builtin_iterator_type;
 AstType  *builtin_callsite_type;
 
+AstTyped *type_table_node = NULL;
+
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
     { NULL, "bool",       (AstNode *) &basic_type_bool },
@@ -392,6 +394,10 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
+    p = package_lookup("core.type_info");
+    if (p != NULL) {
+        type_table_node = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
+    }
 
     fori (i, 0, Binary_Op_Count) {
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 

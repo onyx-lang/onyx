@@ -1204,6 +1204,7 @@ extern AstTyped *builtin_context_variable;
 extern AstType  *builtin_allocator_type;
 extern AstType  *builtin_iterator_type;
 extern AstType  *builtin_callsite_type;
+extern AstTyped *type_table_node;
 
 typedef struct BuiltinSymbol {
     char*    package;
