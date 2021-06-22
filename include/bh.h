@@ -470,7 +470,9 @@ void bh_buffer_grow(bh_buffer* buffer, i32 length);
 void bh_buffer_append(bh_buffer* buffer, const void * data, i32 length);
 void bh_buffer_concat(bh_buffer* buffer, bh_buffer other);
 void bh_buffer_write_byte(bh_buffer* buffer, u8 byte);
-
+void bh_buffer_write_u32(bh_buffer* buffer, u32 i);
+void bh_buffer_write_u64(bh_buffer* buffer, u64 i);
+void bh_buffer_align(bh_buffer* buffer, u32 alignment);
 
 
 
@@ -1953,7 +1955,26 @@ void bh_buffer_write_byte(bh_buffer* buffer, u8 byte) {
     buffer->data[buffer->length++] = byte;
 }
 
+void bh_buffer_write_u32(bh_buffer* buffer, u32 i) {
+    bh_buffer_grow(buffer, buffer->length + 4);
+    *((u32 *) bh_pointer_add(buffer->data, buffer->length)) = i;
+    buffer->length += 4;
+}
 
+void bh_buffer_write_u64(bh_buffer* buffer, u64 i) {
+    bh_buffer_grow(buffer, buffer->length + 8);
+    *((u8 *) bh_pointer_add(buffer->data, buffer->length)) = i;
+    buffer->length += 8;
+}
+
+void bh_buffer_align(bh_buffer* buffer, u32 alignment) {
+    if (buffer->length % alignment != 0) {
+        u32 difference = alignment - (buffer->length % alignment);
+        buffer->length += difference;
+
+        bh_buffer_grow(buffer, buffer->length);
+    }
+}
 
 
 #endif

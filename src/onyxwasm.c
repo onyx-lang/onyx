@@ -264,6 +264,7 @@ EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
 
 #include "onyxwasm_intrinsics.c"
+#include "onyxwasm_type_table.c"
 
 EMIT_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;

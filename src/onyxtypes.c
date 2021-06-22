@@ -37,7 +37,8 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
 };
 
-static bh_imap type_map;
+// TODO: Document this!!
+       bh_imap type_map;
 static bh_imap type_pointer_map;
 static bh_imap type_slice_map;
 static bh_imap type_dynarr_map;

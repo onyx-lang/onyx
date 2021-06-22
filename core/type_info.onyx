@@ -115,8 +115,9 @@ Type_Info_Enum :: struct {
         value: u64; // This assumes enums are always represented as ints.
     }
 
-    name: str;
+    // This is first for better alignment
     backing_type: Type_Index;
+    name: str;
     members: [] Member;
 
     is_flags: bool;
@@ -142,4 +143,10 @@ Type_Info_Compound :: struct {
     use base : Type_Info;
 
     components : [] Type_Index;
+}
+
+get_type_info :: (t: Type_Index) -> ^Type_Info {
+    if t < 0 || t >= type_table.count do return null;
+
+    return type_table[t];
 }

@@ -154,6 +154,8 @@ struct Type {
     };
 };
 
+extern bh_imap type_map;
+
 extern Type basic_types[];
 
 struct AstType;
