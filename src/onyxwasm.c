@@ -2259,6 +2259,14 @@ EMIT_FUNC(location, AstTyped* expr) {
 EMIT_FUNC(expression, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    if (node_is_type((AstNode *) expr)) {
+        Type* type = type_build_from_ast(context.ast_alloc, (AstType *) expr);
+        WID(WI_I32_CONST, type->id);
+
+        *pcode = code;
+        return;
+    }
+
     switch (expr->kind) {
         case Ast_Kind_Param: {
             AstLocal* param = (AstLocal *) expr;

@@ -693,10 +693,12 @@ struct AstSwitch {
     u32 flags;             \
     OnyxToken* token;      \
     struct Entity* entity; \
-    char* name
+    char* name;            \
+    void* __unused;        \
+    Type* type
 struct AstType { AstType_base; };
 
-struct AstBasicType     { AstType_base; Type* type; };
+struct AstBasicType     { AstType_base; Type* basic_type; };
 struct AstPointerType   { AstType_base; AstType* elem; };
 struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; AstType* params[]; };
 struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };

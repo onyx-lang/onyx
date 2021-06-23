@@ -57,6 +57,8 @@ Type_Info_Basic :: struct {
         F32X4 :: 0x13;
         F64X2 :: 0x14;
         V128  :: 0x15;
+
+        Type_Index :: 0x16;
     }
 
     basic_kind: Kind;

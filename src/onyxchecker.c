@@ -747,6 +747,60 @@ CheckStatus check_binaryop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) 
     return Check_Success;
 }
 
+static b32 binary_op_is_allowed(BinaryOp operation, Type* type) {
+    static const u8 binop_allowed[Binary_Op_Count] = {
+        /* Add */             Basic_Flag_Numeric | Basic_Flag_Pointer,
+        /* Minus */           Basic_Flag_Numeric | Basic_Flag_Pointer,
+        /* Multiply */        Basic_Flag_Numeric,
+        /* Divide */          Basic_Flag_Numeric,
+        /* Modulus */         Basic_Flag_Integer,
+
+        /* Equal */           Basic_Flag_Equality,
+        /* Not_Equal */       Basic_Flag_Equality,
+        /* Less */            Basic_Flag_Ordered,
+        /* Less_Equal */      Basic_Flag_Ordered,
+        /* Greater */         Basic_Flag_Ordered,
+        /* Greater_Equal */   Basic_Flag_Ordered,
+
+        /* And */             Basic_Flag_Integer,
+        /* Or */              Basic_Flag_Integer,
+        /* Xor */             Basic_Flag_Integer,
+        /* Shl */             Basic_Flag_Integer,
+        /* Shr */             Basic_Flag_Integer,
+        /* Sar */             Basic_Flag_Integer,
+
+        /* Bool_And */        Basic_Flag_Boolean,
+        /* Bool_Or */         Basic_Flag_Boolean,
+
+        /* Assign_Start */    0,
+        /* Assign */          0,
+        /* Assign_Add */      0,
+        /* Assign_Minus */    0,
+        /* Assign_Multiply */ 0,
+        /* Assign_Divide */   0,
+        /* Assign_Modulus */  0,
+        /* Assign_And */      0,
+        /* Assign_Or */       0,
+        /* Assign_Xor */      0,
+        /* Assign_Shl */      0,
+        /* Assign_Shr */      0,
+        /* Assign_Sar */      0,
+        /* Assign_End */      0,
+
+        /* Pipe */            0,
+        /* Range */           0,
+    };
+
+    enum BasicFlag effective_flags = 0;
+    switch (type->kind) {
+        case Type_Kind_Basic:   effective_flags = binop->type->Basic.flags; break;
+        case Type_Kind_Pointer: effective_flags = Basic_Flag_Pointer;       break;
+        case Type_Kind_Enum:    effective_flags = Basic_Flag_Integer;       break;
+    }
+
+    return (binop_allowed[binop->operation] & effective_flags) == 0;
+}
+
 CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
@@ -934,59 +988,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
         }
     }
 
-    static const u8 binop_allowed[Binary_Op_Count] = {
-        /* Add */             Basic_Flag_Numeric | Basic_Flag_Pointer,
-        /* Minus */           Basic_Flag_Numeric | Basic_Flag_Pointer,
-        /* Multiply */        Basic_Flag_Numeric,
-        /* Divide */          Basic_Flag_Numeric,
-        /* Modulus */         Basic_Flag_Integer,
-
-        /* Equal */           Basic_Flag_Ordered,
-        /* Not_Equal */       Basic_Flag_Ordered,
-        /* Less */            Basic_Flag_Ordered,
-        /* Less_Equal */      Basic_Flag_Ordered,
-        /* Greater */         Basic_Flag_Ordered,
-        /* Greater_Equal */   Basic_Flag_Ordered,
-
-        /* And */             Basic_Flag_Integer,
-        /* Or */              Basic_Flag_Integer,
-        /* Xor */             Basic_Flag_Integer,
-        /* Shl */             Basic_Flag_Integer,
-        /* Shr */             Basic_Flag_Integer,
-        /* Sar */             Basic_Flag_Integer,
-
-        /* Bool_And */        Basic_Flag_Boolean,
-        /* Bool_Or */         Basic_Flag_Boolean,
-
-        /* Assign_Start */    0,
-        /* Assign */          0,
-        /* Assign_Add */      0,
-        /* Assign_Minus */    0,
-        /* Assign_Multiply */ 0,
-        /* Assign_Divide */   0,
-        /* Assign_Modulus */  0,
-        /* Assign_And */      0,
-        /* Assign_Or */       0,
-        /* Assign_Xor */      0,
-        /* Assign_Shl */      0,
-        /* Assign_Shr */      0,
-        /* Assign_Sar */      0,
-        /* Assign_End */      0,
-
-        /* Pipe */            0,
-        /* Range */           0,
-    };
-
     binop->type = binop->left->type;
-
-    enum BasicFlag effective_flags = 0;
-    switch (binop->type->kind) {
-        case Type_Kind_Basic:   effective_flags = binop->type->Basic.flags; break;
-        case Type_Kind_Pointer: effective_flags = Basic_Flag_Pointer;       break;
-        case Type_Kind_Enum:    effective_flags = Basic_Flag_Integer;       break;
-    }
-
-    if ((binop_allowed[binop->operation] & effective_flags) == 0) goto bad_binaryop;
+    if (!binary_op_is_allowed(binop->operation, binop->type)) goto bad_binaryop;
 
     // NOTE: Enum flags with '&' result in a boolean value
     if (binop->type->kind == Type_Kind_Enum && binop->type->Enum.is_flags && binop->operation == Binary_Op_And) {
@@ -1274,7 +1277,7 @@ CheckStatus check_dereference(AstDereference* deref) {
         return Check_Error;
     }
 
-    if (deref->expr->type == basic_type_rawptr.type) {
+    if (deref->expr->type == basic_type_rawptr.basic_type) {
         onyx_report_error(deref->token->pos, "Cannot dereference 'rawptr'. Cast to another pointer type first.");
         return Check_Error;
     }
@@ -1483,6 +1486,7 @@ CheckStatus check_align_of(AstAlignOf* ao) {
 CheckStatus check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
+        expr->type = &basic_types[Basic_Kind_Type_Index];
         return Check_Success;
     }
 

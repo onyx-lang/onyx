@@ -35,6 +35,8 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f32x4, { Basic_Kind_F32X4,  Basic_Flag_SIMD,                        16, 16, "f32x4" } },
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f64x2, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                        16, 16, "f64x2" } },
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
+
+    { Type_Kind_Basic, 0, 0, NULL,                          { Basic_Kind_Type_Index, Basic_Flag_Type_Index,              4,  4, "Type_Index" } },
 };
 
 // TODO: Document this!!
@@ -463,7 +465,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         }
 
         case Ast_Kind_Basic_Type: {
-            return ((AstBasicType *) type_node)->type;
+            return ((AstBasicType *) type_node)->basic_type;
         }
 
         case Ast_Kind_Type_Alias:

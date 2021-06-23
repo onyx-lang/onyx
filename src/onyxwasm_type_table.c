@@ -138,6 +138,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u64(&table_buffer, 0);                   // TODO: Add member info here. Also, Patching
                 bh_buffer_write_u64(&table_buffer, 0);
                 bh_buffer_write_u32(&table_buffer, type->Enum.is_flags ? 1 : 0);
+                break;
             }
 
             case Type_Kind_Struct: {
