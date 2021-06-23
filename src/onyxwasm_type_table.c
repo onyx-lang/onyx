@@ -121,13 +121,34 @@ u64 build_type_table(OnyxWasmModule* module) {
             }
 
             case Type_Kind_Enum: {
+                AstEnumType* ast_enum = (AstEnumType *) type->ast_type;
+                u32 member_count = bh_arr_length(ast_enum->values);
+                u32* name_locations = bh_alloc_array(global_scratch_allocator, u32, member_count);
+
+                u32 i = 0;
+                bh_arr_each(AstEnumValue *, value, ast_enum->values) {
+                    name_locations[i++] = table_buffer.length;
+
+                    bh_buffer_append(&table_buffer, (*value)->token->text, (*value)->token->length);
+                }
+                bh_buffer_align(&table_buffer, 8);
+
+                u32 member_base = table_buffer.length;
+                i = 0;
+                bh_arr_each(AstEnumValue *, value, ast_enum->values) {
+                    u32 name_loc = name_locations[i++];
+
+                    bh_buffer_align(&table_buffer, 8);
+                    PATCH;
+                    bh_buffer_write_u64(&table_buffer, name_loc);
+                    bh_buffer_write_u64(&table_buffer, (*value)->token->length);
+                    bh_buffer_write_u64(&table_buffer, (*value)->value->value.l);
+                }
 
                 u32 name_base = table_buffer.length;
                 u32 name_length = strlen(type->Enum.name);
                 bh_buffer_append(&table_buffer, type->Enum.name, name_length);
                 bh_buffer_align(&table_buffer, 8);
-
-                // u32 member_base = table_buffer.length;
 
                 table_info[type_idx] = table_buffer.length;
                 bh_buffer_write_u32(&table_buffer, type->kind);
@@ -137,8 +158,9 @@ u64 build_type_table(OnyxWasmModule* module) {
                 PATCH;
                 bh_buffer_write_u64(&table_buffer, name_base);
                 bh_buffer_write_u64(&table_buffer, name_length);
-                bh_buffer_write_u64(&table_buffer, 0);                   // TODO: Add member info here. Also, Patching
-                bh_buffer_write_u64(&table_buffer, 0);
+                PATCH;
+                bh_buffer_write_u64(&table_buffer, member_base);
+                bh_buffer_write_u64(&table_buffer, member_count);
                 bh_buffer_write_u32(&table_buffer, type->Enum.is_flags ? 1 : 0);
                 break;
             }
