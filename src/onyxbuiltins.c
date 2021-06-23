@@ -391,7 +391,7 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
-    p = package_lookup("core.type_info");
+    p = package_lookup("builtin.type_info");
     if (p != NULL) {
         type_table_node = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
     }

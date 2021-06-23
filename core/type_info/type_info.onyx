@@ -1,7 +1,7 @@
 // A lot of these names have been copied from JAI's introspection system. This is just because
 // I don't want to mentally bike-shed about the names; I just want to get something working.
 
-package core.type_info
+package builtin.type_info
 
 type_table : [] ^Type_Info;
 

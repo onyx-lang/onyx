@@ -41,7 +41,7 @@ package core
     #load "./wasi/clock"
     #load "./io/file"
 
-    #load "./type_info_helper"
+    #load "./type_info/helper"
 }
 
 #if runtime.Runtime == runtime.Runtime_Js {

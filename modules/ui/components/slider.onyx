@@ -17,7 +17,7 @@ Slider_Theme :: struct {
 
 default_slider_theme := Slider_Theme.{};
 
-slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, theme := ^default_slider_theme, site := #callsite, increment := 0) -> bool {
+slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, theme := ^default_slider_theme, site := #callsite, increment := 0) -> bool {
     result := false;
 
     hash := get_site_hash(site, increment);
@@ -30,8 +30,6 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
             result = true;
 
             // Animate this?
-            // adjust_slider_value(value, mouse_state.x - x0, width, min_value, max_value);
-
             x := mouse_state.x - x0;
 
             if T == i32 || T == i64 || T == u32 || T == u64 {

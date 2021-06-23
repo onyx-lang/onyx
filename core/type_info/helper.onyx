@@ -1,4 +1,4 @@
-package core.type_info
+package builtin.type_info
 
 #private_file io :: package core.io
 
