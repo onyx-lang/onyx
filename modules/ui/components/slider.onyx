@@ -29,7 +29,22 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
             result = true;
 
             // Animate this?
-            adjust_slider_value(value, mouse_state.x - x0, width, min_value, max_value);
+            // adjust_slider_value(value, mouse_state.x - x0, width, min_value, max_value);
+
+            x := mouse_state.x - x0;
+
+            if T == i32 || T == i64 || T == u32 || T == u64 {
+                step_width := width / ~~math.abs(max_value - min_value);
+                percent := (x + step_width / 2) / width;
+                *value = math.lerp(percent, min_value, max_value);
+                *value = math.clamp(*value, min_value, max_value);
+
+            } else {
+                percent := x / width;
+                *value = math.lerp(percent, min_value, max_value);
+                *value = math.clamp(*value, min_value, max_value);
+            }
+
         } else {
             set_active_item(0);
         }
@@ -71,20 +86,4 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, text: str, 
     }
 
     return result;
-}
-
-#private_file
-adjust_slider_value :: #match {
-    (value: ^i32, x: f32, width: f32, min_value: i32, max_value: i32) {
-        step_width := width / ~~math.abs(max_value - min_value);
-        percent := (x + step_width / 2) / width;
-        *value = math.lerp(percent, min_value, max_value);
-        *value = math.clamp(*value, min_value, max_value);
-    }, 
-
-    (value: ^$T, x: f32, width: f32, min_value: T, max_value: T) {
-        percent := x / width;
-        *value = math.lerp(percent, min_value, max_value);
-        *value = math.clamp(*value, min_value, max_value);
-    }, 
 }
