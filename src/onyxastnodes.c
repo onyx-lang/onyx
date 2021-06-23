@@ -430,7 +430,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     if (type == NULL) return 0;
     if (node == NULL) return 0;
 
-    if (node_is_type((AstNode *) node)) return 0;
+    // if (node_is_type((AstNode *) node)) return 0;
 
     if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
         if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.ptr_to_data->Pointer.elem;
@@ -531,7 +531,7 @@ Type* resolve_expression_type(AstTyped* node) {
     }
 
     if (node_is_type((AstNode *) node)) {
-        return NULL;
+        return &basic_types[Basic_Kind_Type_Index];
     }
 
     if (node->type == NULL)
@@ -571,21 +571,27 @@ i64 get_expression_integer_value(AstTyped* node) {
         return ((AstAlignOf *) node)->alignment;
     }
 
+    if (node_is_type((AstNode*) node)) {
+        Type* type = type_build_from_ast(context.ast_alloc, (AstType *) node);
+        return type->id;
+    }
+
     return 0;
 }
 
-static const b32 cast_legality[][11] = {
-    /* I8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
-    /* U8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
-    /* I16 */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
-    /* U16 */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 },
-    /* I32 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-    /* U32 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-    /* I64 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-    /* U64 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-    /* F32 */ { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0 },
-    /* F64 */ { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0 },
-    /* PTR */ { 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1 },
+static const b32 cast_legality[][12] = {
+    /* I8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },
+    /* U8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },
+    /* I16 */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },
+    /* U16 */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },
+    /* I32 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+    /* U32 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+    /* I64 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0 },
+    /* U64 */ { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0 },
+    /* F32 */ { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0 },
+    /* F64 */ { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0 },
+    /* PTR */ { 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0 },
+    /* TYP */ { 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1,}
 };
 
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
@@ -650,6 +656,9 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     else if (from->Basic.flags & Basic_Flag_Boolean) {
         fromidx = 0;
     }
+    else if (from->Basic.flags & Basic_Flag_Type_Index) {
+        fromidx = 11;
+    }
 
     if (to->Basic.flags & Basic_Flag_Pointer || to->kind == Type_Kind_Array) {
         toidx = 10;
@@ -665,6 +674,9 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
     else if (to->Basic.flags & Basic_Flag_Boolean) {
         toidx = 0;
+    }
+    else if (to->Basic.flags & Basic_Flag_Type_Index) {
+        toidx = 11;
     }
 
     if (fromidx != -1 && toidx != -1) {

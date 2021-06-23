@@ -3,7 +3,6 @@
 
 package core.type_info
 
-Type_Index :: #type u32
 type_table : [] ^Type_Info;
 
 Type_Info :: struct {
@@ -68,14 +67,14 @@ Type_Info_Pointer :: struct {
     use base : Type_Info;
 
     @Rename
-    to: Type_Index;
+    to: type_expr;
 }
 
 Type_Info_Function :: struct {
     use base : Type_Info;
 
-    return_type:        Type_Index;
-    parameter_types: [] Type_Index;
+    return_type:        type_expr;
+    parameter_types: [] type_expr;
 
     is_variadic: bool;
 }
@@ -84,7 +83,7 @@ Type_Info_Array :: struct {
     use base : Type_Info;
 
     @Rename
-    of: Type_Index;
+    of: type_expr;
     count: u32;
 }
 
@@ -92,21 +91,21 @@ Type_Info_Slice :: struct {
     use base : Type_Info;
 
     @Rename
-    of: Type_Index;
+    of: type_expr;
 }
 
 Type_Info_Dynamic_Array :: struct {
     use base : Type_Info;
 
     @Rename
-    of: Type_Index;
+    of: type_expr;
 }
 
 Type_Info_Variadic_Argument :: struct {
     use base : Type_Info;
 
     @Rename
-    of: Type_Index;
+    of: type_expr;
 }
 
 Type_Info_Enum :: struct {
@@ -118,7 +117,7 @@ Type_Info_Enum :: struct {
     }
 
     // This is first for better alignment
-    backing_type: Type_Index;
+    backing_type: type_expr;
     name: str;
     members: [] Member;
 
@@ -131,7 +130,7 @@ Type_Info_Struct :: struct {
     Member :: struct {
         name: str;
         offset: u32;
-        type_index: Type_Index;
+        type_index: type_expr;
 
         used: bool;
         has_default: bool;
@@ -144,11 +143,11 @@ Type_Info_Struct :: struct {
 Type_Info_Compound :: struct {
     use base : Type_Info;
 
-    components : [] Type_Index;
+    components : [] type_expr;
 }
 
-get_type_info :: (t: Type_Index) -> ^Type_Info {
-    if t < 0 || t >= type_table.count do return null;
+get_type_info :: (t: type_expr) -> ^Type_Info {
+    if t < ~~0 || t >= ~~type_table.count do return null;
 
-    return type_table[t];
+    return type_table[cast(i32) t];
 }

@@ -1178,6 +1178,7 @@ extern AstBasicType basic_type_u64;
 extern AstBasicType basic_type_f32;
 extern AstBasicType basic_type_f64;
 extern AstBasicType basic_type_rawptr;
+extern AstBasicType basic_type_type_expr; // :TypeExprHack
 
 extern AstBasicType basic_type_int_unsized;
 extern AstBasicType basic_type_float_unsized;
@@ -1190,9 +1191,6 @@ extern AstBasicType basic_type_f32x4;
 extern AstBasicType basic_type_f64x2;
 extern AstBasicType basic_type_v128;
 
-
-// :TypeExprHack
-extern AstNode type_expr_symbol;
 
 extern OnyxToken builtin_package_token;
 extern AstNumLit builtin_heap_start;

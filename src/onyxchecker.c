@@ -286,10 +286,12 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         return Check_Error;
     }
 
+    // LEAK if this has to be yielded
     bh_imap_init(&switchnode->case_map, global_heap_allocator, bh_arr_length(switchnode->cases) * 2);
 
     switchnode->min_case = 0xffffffffffffffff;
 
+    // Umm, this doesn't check the type of the case expression to the type of the expression
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
         CHECK(block, sc->block);
 
@@ -297,10 +299,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
             CHECK(expression, value);
 
             // :UnaryFieldAccessIsGross
-            if ((*value)->kind == Ast_Kind_Unary_Field_Access) {
-                type_check_or_auto_cast(value, resolved_expr_type);
-            }
-
+            // if ((*value)->kind == Ast_Kind_Unary_Field_Access) {
             if ((*value)->kind == Ast_Kind_Range_Literal) {
                 AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
                 resolve_expression_type(rl->low);
@@ -322,6 +321,25 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                     if (add_case_to_switch_statement(switchnode, case_value, sc->block, rl->token->pos))
                         return Check_Error;
                 }
+
+                continue;
+            }
+
+            if (!type_check_or_auto_cast(value, resolved_expr_type)) {
+                OnyxToken* tkn = sc->block->token;
+                if ((*value)->token) tkn = (*value)->token;
+
+                onyx_report_error(tkn->pos, "Mismatched types in switch-case. Expected '%s', got '%s'.",
+                    type_get_name(resolved_expr_type), type_get_name((*value)->type));
+                
+                return Check_Error;
+            }
+
+            if (node_is_type((AstNode*) (*value))) {
+                Type* type = type_build_from_ast(context.ast_alloc, (AstType*) (*value));
+
+                if (add_case_to_switch_statement(switchnode, type->id, sc->block, sc->block->token->pos))
+                    return Check_Error;
 
                 continue;
             }
@@ -793,12 +811,12 @@ static b32 binary_op_is_allowed(BinaryOp operation, Type* type) {
 
     enum BasicFlag effective_flags = 0;
     switch (type->kind) {
-        case Type_Kind_Basic:   effective_flags = binop->type->Basic.flags; break;
-        case Type_Kind_Pointer: effective_flags = Basic_Flag_Pointer;       break;
-        case Type_Kind_Enum:    effective_flags = Basic_Flag_Integer;       break;
+        case Type_Kind_Basic:   effective_flags = type->Basic.flags;  break;
+        case Type_Kind_Pointer: effective_flags = Basic_Flag_Pointer; break;
+        case Type_Kind_Enum:    effective_flags = Basic_Flag_Integer; break;
     }
 
-    return (binop_allowed[binop->operation] & effective_flags) == 0;
+    return (binop_allowed[operation] & effective_flags) != 0;
 }
 
 CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
@@ -1486,6 +1504,13 @@ CheckStatus check_align_of(AstAlignOf* ao) {
 CheckStatus check_expression(AstTyped** pexpr) {
     AstTyped* expr = *pexpr;
     if (expr->kind > Ast_Kind_Type_Start && expr->kind < Ast_Kind_Type_End) {
+        // This is to ensure that the type will exist when compiling. For example, a poly-call type
+        // would have to wait for the entity to pass through, which the code generation does not know
+        // about.
+        if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
+            return Check_Yield_Macro;
+        }
+
         expr->type = &basic_types[Basic_Kind_Type_Index];
         return Check_Success;
     }

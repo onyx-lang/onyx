@@ -36,7 +36,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f64x2, { Basic_Kind_F64X2,  Basic_Flag_SIMD,                        16, 16, "f64x2" } },
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_v128,  { Basic_Kind_V128,   Basic_Flag_SIMD,                        16, 16, "v128"  } },
 
-    { Type_Kind_Basic, 0, 0, NULL,                          { Basic_Kind_Type_Index, Basic_Flag_Type_Index,              4,  4, "Type_Index" } },
+    { Type_Kind_Basic, 0, 0, NULL,                          { Basic_Kind_Type_Index, Basic_Flag_Type_Index,              4,  4, "type_expr" } },
 };
 
 // TODO: Document this!!
@@ -1092,7 +1092,8 @@ b32 type_is_small_integer(Type* type) {
 b32 type_is_integer(Type* type) {
     if (type->kind != Type_Kind_Basic) return 0;
 
-    return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U64;
+    return (type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U64)
+        || type->Basic.kind == Basic_Kind_Type_Index;
 }
 
 b32 type_is_numeric(Type* type) {

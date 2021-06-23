@@ -686,7 +686,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
         value = ((AstArgument *) value)->value;
     }
 
-    if (param->type_expr == (AstType *) &type_expr_symbol) {
+    if (param->type_expr == (AstType *) &basic_type_type_expr) {
         if (!node_is_type((AstNode *) value)) {
             if (err_msg) *err_msg = "Expected type expression.";
             return;
@@ -1233,7 +1233,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
         sln->poly_sym = (AstNode *) &ps_type->poly_params[i];
         
         PolySolutionKind expected_kind = PSK_Undefined;
-        if ((AstNode *) ps_type->poly_params[i].type_node == &type_expr_symbol) {
+        if ((AstNode *) ps_type->poly_params[i].type_node == (AstNode *) &basic_type_type_expr) {
             expected_kind = PSK_Type;
         } else {
             expected_kind = PSK_Value;
