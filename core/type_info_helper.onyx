@@ -1,0 +1,112 @@
+package core.type_info
+
+#private_file io :: package core.io
+
+write_type_name :: (writer: ^io.Writer, t: type_expr) {
+    info := get_type_info(t);
+    if info == null do return;
+
+    switch info.kind {
+        case .Basic {
+            basic := cast(^Type_Info_Basic) info;
+
+            switch basic.basic_kind {
+                case .Void do io.write_str(writer, "void");
+                case .Bool do io.write_str(writer, "bool");
+                case .U8   do io.write_str(writer, "u8");
+                case .I8   do io.write_str(writer, "i8");
+                case .U16  do io.write_str(writer, "u16");
+                case .I16  do io.write_str(writer, "i16");
+                case .U32  do io.write_str(writer, "u32");
+                case .I32  do io.write_str(writer, "i32");
+                case .U64  do io.write_str(writer, "u64");
+                case .I64  do io.write_str(writer, "i64");
+
+                case .F32  do io.write_str(writer, "f32");
+                case .F64  do io.write_str(writer, "f64");
+
+                case .Rawptr do return io.write_str(writer, "rawptr");
+
+                case .I8X16 do return io.write_str(writer, "i8x16");
+                case .I16X8 do return io.write_str(writer, "i16x8");
+                case .I32X4 do return io.write_str(writer, "i32x4");
+                case .I64X2 do return io.write_str(writer, "i64x2");
+                case .F32X4 do return io.write_str(writer, "f32x4");
+                case .F64X2 do return io.write_str(writer, "f64x2");
+                case .V128  do return io.write_str(writer, "v128");
+
+                case .Type_Index do return io.write_str(writer, "type_expr");
+            }
+        }
+
+        case .Pointer {
+            pointer := cast(^Type_Info_Pointer) info;
+            io.write_str(writer, "^");
+            write_type_name(writer, pointer.to);
+        }
+
+        case .Array {
+            arr := cast(^Type_Info_Array) info;
+            io.write_format(writer, "[%i] ", arr.count);
+            write_type_name(writer, arr.of);
+        }
+
+        case .Slice {
+            slice := cast(^Type_Info_Slice) info;
+            io.write_str(writer, "[] ");
+            write_type_name(writer, slice.of);
+        }
+
+        case .Dynamic_Array {
+            dyn := cast(^Type_Info_Dynamic_Array) info;
+            io.write_str(writer, "[..] ");
+            write_type_name(writer, dyn.of);
+        }
+
+        case .Variadic_Argument {
+            va := cast(^Type_Info_Variadic_Argument) info;
+            io.write_str(writer, "..");
+            write_type_name(writer, va.of);
+        }
+
+        case .Enum {
+            e := cast(^Type_Info_Enum) info;
+            io.write_str(writer, e.name);
+        }
+
+        case .Struct {
+            s := cast(^Type_Info_Struct) info;
+            io.write_str(writer, s.name);
+        }
+
+        case .Compound {
+            comp := cast(^Type_Info_Compound) info;
+            io.write_str(writer, "(");
+
+            i := 0;
+            for type: comp.components {
+                if i != 0 do io.write_str(writer, ", ");
+
+                write_type_name(writer, type);
+                i += 1;
+            }
+            io.write_str(writer, ")");
+        }
+
+        case .Function {
+            f := cast(^Type_Info_Function) info;
+            io.write_str(writer, "(");
+
+            i := 0;
+            for type: f.parameter_types {
+                if i != 0 do io.write_str(writer, ", ");
+
+                write_type_name(writer, type);
+                i += 1;
+            }
+            io.write_str(writer, ") -> ");
+
+            write_type_name(writer, f.return_type);
+        }            
+    }
+}

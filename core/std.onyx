@@ -40,6 +40,8 @@ package core
     #load "./wasi/env"
     #load "./wasi/clock"
     #load "./io/file"
+
+    #load "./type_info_helper"
 }
 
 #if runtime.Runtime == runtime.Runtime_Js {

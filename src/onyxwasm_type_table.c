@@ -85,10 +85,12 @@ u64 build_type_table(OnyxWasmModule* module) {
                     bh_buffer_write_u32(&table_buffer, type_idx);
                 }
 
+                bh_buffer_align(&table_buffer, 8);
                 table_info[type_idx] = table_buffer.length;
                 bh_buffer_write_u32(&table_buffer, type->kind);
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
+                bh_buffer_align(&table_buffer, 8);
                 PATCH;
                 bh_buffer_write_u64(&table_buffer, components_base);
                 bh_buffer_write_u64(&table_buffer, components_count);
