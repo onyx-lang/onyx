@@ -811,9 +811,10 @@ static b32 binary_op_is_allowed(BinaryOp operation, Type* type) {
 
     enum BasicFlag effective_flags = 0;
     switch (type->kind) {
-        case Type_Kind_Basic:   effective_flags = type->Basic.flags;  break;
-        case Type_Kind_Pointer: effective_flags = Basic_Flag_Pointer; break;
-        case Type_Kind_Enum:    effective_flags = Basic_Flag_Integer; break;
+        case Type_Kind_Basic:    effective_flags = type->Basic.flags;  break;
+        case Type_Kind_Pointer:  effective_flags = Basic_Flag_Pointer; break;
+        case Type_Kind_Enum:     effective_flags = Basic_Flag_Integer; break;
+        case Type_Kind_Function: effective_flags = Basic_Flag_Equality; break;
     }
 
     return (binop_allowed[operation] & effective_flags) != 0;
@@ -821,12 +822,6 @@ static b32 binary_op_is_allowed(BinaryOp operation, Type* type) {
 
 CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
-
-    if (   type_is_structlike_strict(binop->left->type)
-        || type_is_structlike_strict(binop->right->type)) {
-        report_bad_binaryop(binop);
-        return Check_Error;
-    }
 
     // HACK: Since ^... to rawptr is a one way conversion, strip any pointers
     // away so they can be compared as expected
@@ -853,6 +848,11 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
                     type_get_name(rtype));
             return Check_Error;
         }
+    }
+
+    if (!binary_op_is_allowed(binop->operation, binop->left->type)) {
+        report_bad_binaryop(binop);
+        return Check_Error;
     }
 
     binop->type = &basic_types[Basic_Kind_Bool];

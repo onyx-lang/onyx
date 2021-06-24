@@ -35,6 +35,8 @@ Type_Info_Basic :: struct {
     Kind :: enum {
         Void  :: 0x00;
         Bool  :: 0x01;
+
+        Unsized_Int :: 0x02;
         I8    :: 0x03;
         U8    :: 0x04;
         I16   :: 0x05;
@@ -44,6 +46,7 @@ Type_Info_Basic :: struct {
         I64   :: 0x09;
         U64   :: 0x0a;
 
+        Unsized_Float :: 0x0b;
         F32   :: 0x0c;
         F64   :: 0x0d;
 
@@ -147,7 +150,9 @@ Type_Info_Compound :: struct {
 }
 
 get_type_info :: (t: type_expr) -> ^Type_Info {
-    if t < ~~0 || t >= ~~type_table.count do return null;
+    // Grossness to get around the fact that type_exprs are not technically comparable, because in most
+    // cases you should not compare them as the number assigned to them is arbitrary.
+    if ~~t < cast(i32) 0 || ~~t >= cast(i32) type_table.count do return null;
 
     return type_table[cast(i32) t];
 }

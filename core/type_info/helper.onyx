@@ -35,7 +35,9 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
                 case .F64X2 do return io.write_str(writer, "f64x2");
                 case .V128  do return io.write_str(writer, "v128");
 
-                case .Type_Index do return io.write_str(writer, "type_expr");
+                case .Type_Index do io.write_str(writer, "type_expr");
+                case .Unsized_Int do io.write_str(writer, "<unsized int>");
+                case .Unsized_Float do io.write_str(writer, "<unsized float>");
             }
         }
 
