@@ -76,7 +76,8 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
 
         case .Struct {
             s := cast(^Type_Info_Struct) info;
-            io.write_str(writer, s.name);
+            if s.name.count > 0 do io.write_str(writer, s.name);
+            else                do io.write_str(writer, "<anonymous struct>");
         }
 
         case .Compound {

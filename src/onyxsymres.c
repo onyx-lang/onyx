@@ -599,6 +599,8 @@ static SymresStatus symres_use(AstUse* use) {
             }
         }
 
+        package_track_use_package(package->package, use->entity);
+
         return Symres_Success;
     }
 
@@ -1123,12 +1125,7 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Foreign_Global_Header:
         case Entity_Type_Global_Header:           ss = symres_global(ent->global); break;
 
-        case Entity_Type_Use_Package:             ss = symres_use(ent->use);
-                                                  if (ent->use->expr && ((AstPackage *) ent->use->expr)->package)
-                                                      package_track_use_package(((AstPackage *) ent->use->expr)->package, ent);
-                                                  next_state = Entity_State_Finalized;
-                                                  break;
-
+        case Entity_Type_Use_Package:
         case Entity_Type_Use:                     ss = symres_use(ent->use);
                                                   next_state = Entity_State_Finalized;
                                                   break;
