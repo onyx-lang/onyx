@@ -555,6 +555,9 @@ CheckStatus check_call(AstCall* call) {
     Type* variadic_type = NULL;
     AstParam* variadic_param = NULL;
 
+    // SPEED CLEANUP: Caching the any type here.
+    Type* any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+
     ArgState arg_state = AS_Expecting_Exact;
     u32 arg_pos = 0;
     while (1) {
@@ -592,9 +595,18 @@ CheckStatus check_call(AstCall* call) {
             }
 
             case AS_Expecting_Typed_VA: {
+                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
+
+                if (variadic_type->id == any_type->id) {
+                    call->va_kind = VA_Kind_Any;
+
+                    resolve_expression_type(arg_arr[arg_pos]->value);
+                    arg_arr[arg_pos]->va_kind = VA_Kind_Any; 
+                    break;
+                }
+
                 call->va_kind = VA_Kind_Typed;
 
-                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
                 if (!type_check_or_auto_cast(&arg_arr[arg_pos]->value, variadic_type)) {
                     onyx_report_error(arg_arr[arg_pos]->token->pos,
                             "The procedure '%s' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",

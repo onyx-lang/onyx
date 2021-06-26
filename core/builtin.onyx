@@ -180,3 +180,10 @@ CallSite :: struct {
     line   : u32;
     column : u32;
 }
+
+
+
+Any :: struct {
+    data: rawptr;
+    type: type_expr;
+}

@@ -1391,6 +1391,13 @@ EMIT_FUNC(call, AstCall* call) {
     u32 vararg_count  = 0;
     i32 vararg_offset = -1;
 
+    u32* vararg_any_offsets=NULL;
+    u32* vararg_any_types=NULL;
+    if (call->va_kind == VA_Kind_Any) {
+        vararg_any_offsets = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(call->args.values));
+        vararg_any_types   = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(call->args.values));
+    }
+
     bh_arr_each(AstTyped *, parg, call->args.values) {
         AstArgument* arg = (AstArgument *) *parg;
         if (arg->is_baked) continue;
@@ -1425,11 +1432,38 @@ EMIT_FUNC(call, AstCall* call) {
                 WI(WI_PTR_ADD);
             }
 
+            if (arg->va_kind == VA_Kind_Any) {
+                vararg_any_offsets[vararg_count - 1] = reserve_size;
+                vararg_any_types[vararg_count - 1] = arg->value->type->id;
+            }
+
             reserve_size += type_size_of(arg->value->type);
         }
     }
 
     switch (call->va_kind) {
+        case VA_Kind_Any: {
+            vararg_offset = reserve_size;
+
+            i32 any_size = type_size_of(type_build_from_ast(context.ast_alloc, builtin_any_type));
+
+            fori (i, 0, vararg_count) {
+                WIL(WI_LOCAL_GET, stack_top_store_local);
+                WIL(WI_LOCAL_GET, stack_top_store_local);
+                WID(WI_PTR_CONST, vararg_any_offsets[i]);
+                WI(WI_PTR_ADD);
+                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], vararg_offset + i * any_size);
+
+                WIL(WI_LOCAL_GET, stack_top_store_local);
+                WID(WI_I32_CONST, vararg_any_types[i]);
+                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], vararg_offset + i * any_size + 8);
+
+                reserve_size += any_size;
+            }
+            
+            // fallthrough
+        }
+
         case VA_Kind_Typed: {
             WIL(WI_LOCAL_GET, stack_top_store_local);
             if (vararg_offset > 0) {

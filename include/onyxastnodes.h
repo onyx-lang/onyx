@@ -467,6 +467,7 @@ typedef enum ParamPassType {
 typedef enum VarArgKind {
     VA_Kind_Not_VA,
     VA_Kind_Typed,
+    VA_Kind_Any,
     VA_Kind_Untyped,
 } VarArgKind;
 
@@ -1204,6 +1205,7 @@ extern AstTyped *builtin_context_variable;
 extern AstType  *builtin_allocator_type;
 extern AstType  *builtin_iterator_type;
 extern AstType  *builtin_callsite_type;
+extern AstType  *builtin_any_type;
 extern AstTyped *type_table_node;
 
 typedef struct BuiltinSymbol {
