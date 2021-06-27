@@ -379,3 +379,13 @@ least :: #match {
     (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_less); },
     (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(cast(^T) arr, N,     cmp_less); },
 }
+
+
+// Useful structure when talking about dynamic arrays where you don't know of what
+// type they store. For example, when passing a dynamic array as an 'any' argument.
+Untyped_Array :: struct {
+    data: rawptr;
+    count: u32;
+    capacity: u32;
+    allocator: Allocator;
+}

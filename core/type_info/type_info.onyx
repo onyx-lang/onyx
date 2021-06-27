@@ -133,7 +133,7 @@ Type_Info_Struct :: struct {
     Member :: struct {
         name: str;
         offset: u32;
-        type_index: type_expr;
+        type: type_expr;
 
         used: bool;
         has_default: bool;
