@@ -21,6 +21,11 @@ encode_string :: (v: $T, allocator := context.allocator) -> (str, Encoding_Error
     return s, .None;
 }
 
+//
+// This could be changed to use the "any" type now, which would allow for any type to be
+// represented as a json value. However, this eliminates the control that you get from
+// this way.
+//
 encode :: #match {
     (w: ^io.Writer, v: i32) -> Encoding_Error {
         io.write_i32(w, ~~v);

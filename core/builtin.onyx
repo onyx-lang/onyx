@@ -183,7 +183,7 @@ CallSite :: struct {
 
 
 
-Any :: struct {
+any :: struct {
     data: rawptr;
     type: type_expr;
 }

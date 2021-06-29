@@ -392,9 +392,9 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
-    builtin_any_type = (AstType *) symbol_raw_resolve(p->scope, "Any");
+    builtin_any_type = (AstType *) symbol_raw_resolve(p->scope, "any");
     if (builtin_any_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'Any' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, "'any' struct not found in builtin package.");
         return;
     }
 

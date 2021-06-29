@@ -615,6 +615,15 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         }
     }
 
+    if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_VarArgs) {
+        if (!types_are_compatible(to->Slice.ptr_to_data->Pointer.elem, from->VarArgs.ptr_to_data->Pointer.elem)) {
+            *err_msg = "Variadic argument to slice cast is not valid here because the types are different.";
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+
     if (from->kind == Type_Kind_Slice || to->kind == Type_Kind_Slice) {
         *err_msg = "Cannot cast to or from a slice.";
         return 0;

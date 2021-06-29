@@ -2648,6 +2648,11 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_VarArgs) {
+        // Nothing needs to be done because they are identical
+        return;
+    }
+
     i32 fromidx = -1, toidx = -1;
     if (from->Basic.flags & Basic_Flag_Pointer || from->kind == Type_Kind_Array) {
         fromidx = 10;
