@@ -27,7 +27,7 @@ main :: (args: [] cstr) {
         ss: SimpleStruct = SimpleStruct.{ 41, 67, "Steve" };
 
         use ss;
-        printf("SimpleStruct<%i, %i>(%i, %i, %s)\n",
+        printf("SimpleStruct<{}, {}>({}, {}, {})\n",
             sizeof SimpleStruct,
             alignof SimpleStruct,
             cast(u32) age, height, name);
@@ -44,7 +44,7 @@ main :: (args: [] cstr) {
         u : SimpleUnion;
         u.float_val = 0.5;
 
-        printf("%p == 0x3F000000\n", u.int_val);
+        printf("{} == 0x3F000000\n", cast(rawptr) u.int_val);
     }
 
     test_default_values :: () {
@@ -64,7 +64,7 @@ main :: (args: [] cstr) {
         print_defaulted(ds2);
 
         print_defaulted :: (use ds: DefaultedStruct) {
-            printf("DefaultedStruct(%i, %f, %l, %d)\n", i, f, l, d);
+            printf("DefaultedStruct({}, {}, {}, {})\n", i, f, l, d);
         }
     }
 
@@ -96,7 +96,7 @@ main :: (args: [] cstr) {
         // swu3 := StructWithUse.{ 1234, 1, 2, 5678 };
 
         print_swu :: (use swu: StructWithUse) {
-            printf("StructWithUse(%i, (%f, %f), %i)\n",
+            printf("StructWithUse({}, ({}, {}), {})\n",
                 first_member, x, y, last_member);
         }
 
@@ -116,11 +116,11 @@ main :: (args: [] cstr) {
         ps1.t_data = 1234;
         ps1.r_data = 5678;
 
-        printf("PolyStruct<i32, f32>(%i, %f)\n", ps1.t_data, ps1.r_data);
+        printf("PolyStruct<i32, f32>({}, {})\n", ps1.t_data, ps1.r_data);
 
         // Currently, this is how you have to do this.
         ps2 := <PolyStruct(f32, i32)>.{ 1234, 5678 };
-        printf("PolyStruct<f32, i32>(%f, %i)\n", ps2.t_data, ps2.r_data);
+        printf("PolyStruct<f32, i32>({}, {})\n", ps2.t_data, ps2.r_data);
     }
 
     test_polymorphic_with_defaults :: () {
@@ -134,7 +134,7 @@ main :: (args: [] cstr) {
         PolyStructTyped :: <PolyStruct(i32, f32)>;
 
         ps := PolyStructTyped.{};
-        printf("PolyStruct<i32, f32>(%i, %f)\n", ps.t_data, ps.r_data);
+        printf("PolyStruct<i32, f32>({}, {})\n", ps.t_data, ps.r_data);
     }
 
     test_polymorphic_union_with_use :: () {
@@ -147,12 +147,12 @@ main :: (args: [] cstr) {
             };
         }
 
-        printf("%i == 16\n", sizeof PolyStruct(i32, [] u32));
+        printf("{} == 16\n", sizeof PolyStruct(i32, [] u32));
 
         ps : PolyStruct(i32, f64);
         ps.t_data = 1234;
         ps.r_data = 5678;
-        printf("%i, %d\n", ps.t_data, ps.r_data);
+        printf("{}, {}\n", ps.t_data, ps.r_data);
     }
 
     test_union_with_use :: () {
@@ -171,10 +171,10 @@ main :: (args: [] cstr) {
         u : Union;
         u.x = 10;
         u.y = 20;
-        printf("Union(%i, %i)\n", u.x, u.y);
+        printf("Union({}, {})\n", u.x, u.y);
 
         u.name = "Joe";
-        printf("Union(%s)\n", u.name);
+        printf("Union({})\n", u.name);
     }
 
     test_polymorphic_union :: () {
@@ -187,9 +187,9 @@ main :: (args: [] cstr) {
 
         pu : PolyUnion(str, i32);
         pu.t_data = "Hello World.";
-        printf("PolyUnion(%s)\n", pu.t_data);
+        printf("PolyUnion({})\n", pu.t_data);
 
         pu.r_data = 0x4D2;
-        printf("PolyUnion(%i)\n", pu.r_data);
+        printf("PolyUnion({})\n", pu.r_data);
     }
 }

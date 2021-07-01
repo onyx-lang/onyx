@@ -40,5 +40,5 @@ main :: (args: [] cstr) {
         if field_count == 7 do valid_passports += 1;
     }
 
-    printf("Valid passports: %i\n", valid_passports);
+    printf("Valid passports: {}\n", valid_passports);
 }

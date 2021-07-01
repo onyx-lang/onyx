@@ -52,5 +52,5 @@ main :: (args: [] cstr) {
         unique_sum += unique;
     }
 
-    printf("Unique sum: %i\n", unique_sum);
+    printf("Unique sum: {}\n", unique_sum);
 }

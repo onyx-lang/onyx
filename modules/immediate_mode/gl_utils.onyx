@@ -52,7 +52,7 @@ Shader :: struct {
 
             success := true;
             if gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0 {
-                printf("Error compiling shader.");
+                println("Error compiling shader.");
                 gl.printShaderInfoLog(shader);
                 success = false;
             }
@@ -68,7 +68,7 @@ Shader :: struct {
 
             success := true;
             if gl.getProgramParameter(program, gl.LINK_STATUS) == 0 {
-                printf("Error linking program.");
+                println("Error linking program.");
                 gl.printProgramInfoLog(program);
                 success = false;
             }

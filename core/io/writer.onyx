@@ -75,10 +75,10 @@ write_range :: (use writer: ^Writer, r: range, sep := " ") {
     }
 }
 
-write_format :: (use writer: ^Writer, format: str, va: ...) {
+write_format :: (use writer: ^Writer, format: str, va: ..any) {
     // POTENTIAL BUG: this buffer will need to be bigger (or dynamic).
     buffer: [2048] u8;
-    write_str(writer, conv.str_format_va(format, ~~buffer, va));
+    write_str(writer, conv.str_format_va(format, ~~buffer, ~~va));
 }
 
 write_escaped_str :: (use writer: ^Writer, s: str) {

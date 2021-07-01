@@ -49,7 +49,7 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
 
         case .Array {
             arr := cast(^Type_Info_Array) info;
-            io.write_format(writer, "[%i] ", arr.count);
+            io.write_format(writer, "[{}] ", arr.count);
             write_type_name(writer, arr.of);
         }
 

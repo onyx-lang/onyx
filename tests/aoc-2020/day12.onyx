@@ -67,5 +67,5 @@ main :: (args: [] cstr) {
         }
     }
 
-    printf("Ship distance: %i\n", math.abs(ship.x) + math.abs(ship.y));
+    printf("Ship distance: {}\n", math.abs(ship.x) + math.abs(ship.y));
 }

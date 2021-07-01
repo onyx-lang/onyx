@@ -23,5 +23,5 @@ main :: (args: [] cstr) {
     new_va_test("foo", 1, 2, 3.0f, 5.0f);
     old_va_test("bar", 1);
 
-    printf("Hello, %i, %s!\n", 1234, "World");
+    printf("Hello, {}, {}!\n", 1234, "World");
 }

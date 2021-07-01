@@ -33,6 +33,8 @@ package core
 #load "./runtime/build_opts"
 #load "./runtime/common"
 
+#load "./type_info/helper"
+
 #private_file runtime :: package runtime
 #if runtime.Runtime == runtime.Runtime_Wasi {
     #load "./runtime/wasi"
@@ -40,8 +42,6 @@ package core
     #load "./wasi/env"
     #load "./wasi/clock"
     #load "./io/file"
-
-    #load "./type_info/helper"
 }
 
 #if runtime.Runtime == runtime.Runtime_Js {

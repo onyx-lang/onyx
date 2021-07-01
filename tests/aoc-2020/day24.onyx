@@ -74,7 +74,7 @@ main :: (args: [] cstr) {
 	for ^cell: grid.entries {
 		if cell.value.alive do black_count += 1;
 	}	
-	printf("Black count: %i\n", black_count);
+	printf("Black count: {}\n", black_count);
 
 	// Part 2
 	cells_to_consider := array.make(Vec2);
@@ -118,7 +118,7 @@ main :: (args: [] cstr) {
 	for ^cell: grid.entries {
 		if cell.value.alive do black_count += 1;
 	}	
-	printf("GOL black count: %i\n", black_count);
+	printf("GOL black count: {}\n", black_count);
 }
 
 get_neighbor_count :: (grid: ^map.Map(Vec2, Cell), pos: Vec2) -> u32 {

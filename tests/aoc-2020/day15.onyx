@@ -40,5 +40,5 @@ main :: (args: [] cstr) {
         turn += 1;
     }
 
-    printf("2020th: %i\n", last_num);
+    printf("2020th: {}\n", last_num);
 }

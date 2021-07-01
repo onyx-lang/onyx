@@ -3089,6 +3089,13 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     i8* strdata = bh_alloc_array(global_heap_allocator, i8, strlit->token->length + 1);
     i32 length  = string_process_escape_seqs(strdata, strlit->token->text, strlit->token->length);
 
+    // Warning for having '%' in a string literal (because that probably is being used for a old print format)
+    /*
+    if (charset_contains((const char *) strdata, '%')) {
+        onyx_report_warning(strlit->token->pos, "Found string literal with '%%'");
+    }
+    */
+
     if (bh_table_has(StrLitInfo, mod->string_literals, (char *) strdata)) {
         StrLitInfo sti = bh_table_get(StrLitInfo, mod->string_literals, (char *) strdata);
         strlit->addr   = sti.addr;

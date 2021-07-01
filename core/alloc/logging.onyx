@@ -14,7 +14,7 @@ logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align:
     res := allocator.func(allocator.data, aa, size, align, oldptr);
 
     use package core { printf }
-    printf("%s with size %i, align %i, oldptr %p returns %p\n",
+    printf("{} with size {}, align {}, oldptr {} returns {}\n",
         Allocation_Action_Strings[cast(u32) aa], size, align, oldptr, res);
 
     return res;

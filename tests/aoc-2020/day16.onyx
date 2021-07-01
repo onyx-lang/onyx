@@ -92,7 +92,7 @@ main :: (args: [] cstr) {
 		}
 	}
 
-	printf("Scanning error: %i\n", total_scanning_error);
+	printf("Scanning error: {}\n", total_scanning_error);
 
 	cols_to_assign := array.make(u32, fields.count);
 	defer array.free(^cols_to_assign);
@@ -134,5 +134,5 @@ main :: (args: [] cstr) {
 		if string.starts_with(field.name, "departure") do prod *= ~~my_ticket[field.column];
 	}
 
-	printf("Departure multiply: %l\n", prod);
+	printf("Departure multiply: {}\n", prod);
 }

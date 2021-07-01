@@ -81,5 +81,5 @@ main :: (args: [] cstr) {
         elseif instr.opcode == OpCode.Jmp do instr.opcode = OpCode.Nop;
     }
 
-    printf("Accumulator value: %i\n", acc);
+    printf("Accumulator value: {}\n", acc);
 }

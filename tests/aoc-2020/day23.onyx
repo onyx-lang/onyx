@@ -76,12 +76,12 @@ main :: (args: [] cstr) {
     // Part 1
     // one_idx := get_idx(array.to_slice(^cups), 1);
     // for i: 1 .. 9 {
-    //     printf("%i", cast(i32) cups[w(one_idx + i)]);
+    //     printf("{}", cast(i32) cups[w(one_idx + i)]);
     // }
     // printf("\n");
 
     // Part 2
     one_idx := get_idx(array.to_slice(^cups), 1);
     prod: i64 = cast(i64) (cups[w(one_idx + 1)]) * cast(i64) (cups[w(one_idx + 2)]);
-    printf("Cup product: %l\n", prod);
+    printf("Cup product: {}\n", prod);
 }

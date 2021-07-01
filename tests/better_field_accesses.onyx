@@ -17,7 +17,7 @@ get_foo :: () -> Foo {
 }
 
 main :: (args: [] cstr) {
-    printf("%i\n", "Hello World!".count);
+    printf("{}\n", "Hello World!".count);
 
     println(get_foo().name);
     println(get_foo().x);

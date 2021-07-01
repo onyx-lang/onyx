@@ -67,5 +67,5 @@ main :: (args: [] cstr) {
     encryption_key_0 := transform_subject(door_pub_key, card_loop_secret);
     encryption_key_1 := transform_subject(card_pub_key, door_loop_secret);
 
-    printf("%i == %i\n", encryption_key_0, encryption_key_1);
+    printf("{} == {}\n", encryption_key_0, encryption_key_1);
 }

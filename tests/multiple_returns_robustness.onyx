@@ -41,7 +41,7 @@ main :: (args: [] cstr) {
 
 
     least, greatest := get_extrema(i32.[ -5, 20, 5, -10, 200, 8 ]);
-    printf("%i to %i\n", least, greatest);
+    printf("{} to {}\n", least, greatest);
 
     iarr, farr := return_multiple_arrays();
     array_print(iarr);

@@ -66,7 +66,7 @@ main :: (args: [] cstr) {
     println(foo.some_constant);
     
     person := Foo2.SubStruct.{ name = "Joe", age = 30 };
-    printf("%s is %i.\n", person.name, person.age);
+    printf("{} is {}.\n", person.name, person.age);
 
     {
         BasicallyANamespace.function_3();
@@ -80,7 +80,7 @@ main :: (args: [] cstr) {
 
 
     v := Vec3.{ 4, 9, 16 };
-    printf("V3(%f, %f, %f)\n", v.x, v.y, v.z);
+    printf("V3({}, {}, {})\n", v.x, v.y, v.z);
 }
 
 BasicallyANamespace :: struct {

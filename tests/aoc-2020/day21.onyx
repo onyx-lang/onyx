@@ -129,7 +129,7 @@ main :: (args: [] cstr) {
         map.delete(^ingredient_map, safe);
     }
 
-    printf("Total safe: %i\n", total_safe);
+    printf("Total safe: {}\n", total_safe);
 
     matched_ingredients := array.make(Ingredient);
     defer array.free(^matched_ingredients);
@@ -166,8 +166,8 @@ main :: (args: [] cstr) {
         return string.compare(i1.allergen, i2.allergen);
     });
 
-    for ^mi: matched_ingredients do printf("%s -> %s\n", mi.name, mi.allergen);
-    for ^mi: matched_ingredients do printf("%s,", mi.name);
+    for ^mi: matched_ingredients do printf("{} -> {}\n", mi.name, mi.allergen);
+    for ^mi: matched_ingredients do printf("{},", mi.name);
     println("\n(Don't copy the last ','!)");
 }
 

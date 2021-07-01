@@ -31,8 +31,8 @@ main :: (args: [] cstr) {
         if vals[i + 1] - vals[i] != 1 do missing = vals[i] + 1;
     }
 
-    printf("Max val: %i\n", max_val);
-    printf("Your seat: %i\n", missing);
+    printf("Max val: {}\n", max_val);
+    printf("Your seat: {}\n", missing);
 }
 
 cmp_asc :: (a: $T, b: T) -> i32 do return ~~(a - b);

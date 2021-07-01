@@ -171,5 +171,5 @@ main :: (args: [] cstr) {
         if cyk_algorithm(^grammar, line) do valid_count += 1;
     }
 
-    printf("Valid count: %i\n", valid_count);
+    printf("Valid count: {}\n", valid_count);
 }

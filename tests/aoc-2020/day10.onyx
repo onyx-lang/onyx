@@ -47,6 +47,6 @@ main :: (args: [] cstr) {
     for i: 1 .. nums.count do diffs[nums[i] - nums[i - 1] - 1] += 1;
     diffs[2] += 1;
 
-    printf("Diff prod: %i\n", diffs[0] * diffs[2]);
-    printf("Arrangements: %l\n", count_ending_paths(nums));
+    printf("Diff prod: {}\n", diffs[0] * diffs[2]);
+    printf("Arrangements: {}\n", count_ending_paths(nums));
 }

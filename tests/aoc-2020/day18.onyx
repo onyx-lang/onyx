@@ -73,5 +73,5 @@ main :: (args: [] cstr) {
 		total += parse_expression_mul(^file);
 	}
 
-	printf("Total: %l\n", total);
+	printf("Total: {}\n", total);
 }

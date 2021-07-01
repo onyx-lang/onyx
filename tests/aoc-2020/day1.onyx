@@ -17,7 +17,7 @@ main :: (args: [] cstr) {
 
     for i: nums do for j: nums do for k: nums {
         if j + i + k == 2020 {
-            printf("Answer: %i\n", i * j * k);
+            printf("Answer: {}\n", i * j * k);
 
             // Break out of all of the loops
             break break break;

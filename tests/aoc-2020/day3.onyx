@@ -58,5 +58,5 @@ main :: (args: [] cstr) {
         tree_prod *= tree_count;
     }
 
-    printf("Tree product: %l\n", tree_prod);
+    printf("Tree product: {}\n", tree_prod);
 }

@@ -4,8 +4,8 @@ use package core
 
 main :: (args: [] cstr) {
     foo :: (x: i32, y: f32) {
-        printf("x is %i\n", x);
-        printf("y is %f\n", y);
+        printf("x is {}\n", x);
+        printf("y is {}\n", y);
     }
 
     foo(10, 20);
@@ -42,8 +42,8 @@ main :: (args: [] cstr) {
         println(x);
         println(y);
 
-        for elem: z do printf("%f ", elem);
-        printf("\n");
+        for elem: z do printf("{} ", elem);
+        print("\n");
     }
 
     overload_with_varargs(10, 20, 30, 40, 50);
@@ -61,7 +61,7 @@ main :: (args: [] cstr) {
         options_f := false,
         options_g := true,
         ) {
-        printf("%b %b %b %b %b %b %b\n",
+        printf("{} {} {} {} {} {} {}\n",
             options_a, options_b,
             options_c, options_d,
             options_e, options_f,

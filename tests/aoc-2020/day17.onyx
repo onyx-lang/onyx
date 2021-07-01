@@ -100,5 +100,5 @@ main :: (args: [] cstr) {
     active_count := 0;
     for ^cube_entry: cubes.entries do if cube_entry.value.alive do active_count += 1;
 
-    printf("Active count: %i\n", active_count);
+    printf("Active count: {}\n", active_count);
 }

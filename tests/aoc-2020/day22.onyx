@@ -134,7 +134,7 @@ main :: (args: [] cstr) {
         defer array.free(^player2_copy);
 
         combat_score := combat(^player1_copy, ^player2_copy);
-        printf("Answer: %i\n", combat_score);
+        printf("Answer: {}\n", combat_score);
     }
 
     {
@@ -152,6 +152,6 @@ main :: (args: [] cstr) {
         if winner == 1 do score = score_player(^player1_copy);
         if winner == 2 do score = score_player(^player2_copy);
 
-        printf("Recursive answer: %i\n", score);
+        printf("Recursive answer: {}\n", score);
     }
 }

@@ -7,31 +7,31 @@ main :: (args: [] cstr) {
     i := 0;
     while i < 10 {
         defer i += 1;
-        defer printf("Index is %i\n", i);
+        defer printf("Index is {}\n", i);
 
         if i == 3 {
-            printf("Skipping %i!!\n", i);
+            printf("Skipping {}!!\n", i);
             continue;
         }
 
-        printf("Doing something with ");
+        print("Doing something with ");
     }
-    printf("i is %i\n", i);
+    printf("i is {}\n", i);
 
     println("\n\n===================================");
     i = 0;
     while i < 10 {
         defer i += 1;
-        defer printf("Index is %i\n", i);
+        defer printf("Index is {}\n", i);
 
         if i == 3 {
-            printf("Skipping %i!!\n", i);
+            printf("Skipping {}!!\n", i);
             break;
         }
 
-        printf("Doing something with ");
+        print("Doing something with ");
     }
-    printf("i is %i\n", i);
+    printf("i is {}\n", i);
 
     println("\n\n===================================");
     switch i {

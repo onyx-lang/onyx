@@ -106,13 +106,13 @@ main :: (args: [] cstr) {
     //     
     //     for container: bag.contained_in {
     //         if !array.contains(^processed_bags, container.bag) && !array.contains(^to_process_bags, container.bag) {
-    //             // printf("Adding %s to process.\n", container.bag.color);
+    //             // printf("Adding {} to process.\n", container.bag.color);
     //             array.push(^to_process_bags, container.bag);
     //         }
     //     }
     // }
 
-    // printf("Count: %i\n", processed_bags.count - 1);
+    // printf("Count: {}\n", processed_bags.count - 1);
     
     // Part 2
     to_process := array.make(#type ^BagNode);
@@ -132,5 +132,5 @@ main :: (args: [] cstr) {
         }
     }
 
-    printf("Count: %i\n", count - 1);
+    printf("Count: {}\n", count - 1);
 }

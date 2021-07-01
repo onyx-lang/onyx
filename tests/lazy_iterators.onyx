@@ -67,6 +67,6 @@ main :: (args: [] cstr) {
                 |> iter.zip(iter.const(42.0f));
 
     for value: zipped_iterator {
-        printf("%i   %f\n", value.first, value.second);
+        printf("{}   {}\n", value.first, value.second);
     }
 }

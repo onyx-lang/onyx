@@ -82,11 +82,11 @@ main :: (args: [] cstr) {
     // }
 
     // result := take_bus * (depart - est);
-    // printf("Bus: %i\n", take_bus);
-    // printf("Depart at: %i\n", depart);
-    // printf("Result: %i\n", result);
+    // printf("Bus: {}\n", take_bus);
+    // printf("Depart at: {}\n", depart);
+    // printf("Result: {}\n", result);
 
     // Part 2
     result := chinese_remainder_theorem(buses, rems); 
-    printf("Result: %l\n", result);
+    printf("Result: {}\n", result);
 }

@@ -96,6 +96,6 @@ main :: (args: [] cstr) {
     occupied := 0;
     for s: gos.seats do if s == SeatState.Occupied do occupied += 1;
     
-    printf("Occupied: %i\n", occupied);
+    printf("Occupied: {}\n", occupied);
 }
 

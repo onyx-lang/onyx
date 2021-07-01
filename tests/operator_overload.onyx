@@ -68,24 +68,24 @@ main :: (args: [] cstr) {
         b := C(0, 1);
 
         c := a + b;
-        printf("(%f, %f)\n", c.re, c.im);
+        printf("({}, {})\n", c.re, c.im);
 
         c = a - b;
-        printf("(%f, %f)\n", c.re, c.im);
+        printf("({}, {})\n", c.re, c.im);
 
         c = a * b;
-        printf("(%f, %f)\n", c.re, c.im);
+        printf("({}, {})\n", c.re, c.im);
     }
 
     {
         a := make_vec(f32.[10, 20]);
         b := make_vec(f32.[3,  4]);
         c := a + b;
-        printf("(%f, %f)\n", c.data[0], c.data[1]);
+        printf("({}, {})\n", c.data[0], c.data[1]);
 
         d := make_vec(f32.[2, 3, 5, 7]);
         e := join(d, c);
-        for v: e.data do printf("%f ", v);
+        for v: e.data do printf("{} ", v);
         print("\n");
     }
 
@@ -93,7 +93,7 @@ main :: (args: [] cstr) {
         a := make_vec(Complex.[C(2, 3), C(0, 1)]);
         b := make_vec(Complex.[C(1, 0), C(3, 7)]);
         c := a * b;
-        printf("(%f, %f)\n", c.re, c.im);
+        printf("({}, {})\n", c.re, c.im);
     }
 
     println(test_overload("World!", "Hello!"));

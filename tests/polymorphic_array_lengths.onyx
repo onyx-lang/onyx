@@ -4,7 +4,7 @@ use package core
 
 main :: (args: [] cstr) {
     arr := u32.[ 1, 2, 3, 4, 5 ];
-    for elem: array_to_slice(arr) do printf("%i ", elem);
+    for elem: array_to_slice(arr) do printf("{} ", elem);
 
     roots : [20] f32;
     compute_roots(roots);

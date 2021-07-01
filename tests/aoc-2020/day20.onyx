@@ -313,7 +313,7 @@ main :: (args: [] cstr) {
         }
 	}
 
-	printf("Corner product: %l\n", prod);
+	printf("Corner product: {}\n", prod);
 
     grid : [12 * 12] u32;
     memory.set(^grid, 0, sizeof [12 * 12] u32);
@@ -369,5 +369,5 @@ main :: (args: [] cstr) {
     safe_count := 0;
     for c: forest do if c == #char "#" do safe_count += 1;
 
-    printf("Safe count: %i\n", safe_count);
+    printf("Safe count: {}\n", safe_count);
 }

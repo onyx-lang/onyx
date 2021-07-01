@@ -35,5 +35,5 @@ main :: (args: [] cstr) {
         if count == 1 do valid += 1;
     }
 
-    printf("Number valid: %i\n", valid);
+    printf("Number valid: {}\n", valid);
 }

@@ -29,9 +29,9 @@ println :: (x: $T) {
     print("\n");
 }
 
-printf :: (format: str, va: ...) {
+printf :: (format: str, va: ..any) {
     buffer: [2048] u8;
-    print(conv.str_format_va(format, buffer[0 .. 2048], va));
+    print(conv.str_format_va(format, buffer[0 .. 2048], ~~va));
 }
 
 // This works on both slices and arrays

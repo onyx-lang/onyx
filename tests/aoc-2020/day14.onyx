@@ -125,5 +125,5 @@ main :: (args: [] cstr) {
 	s: u64 = 0;
 	for e: mem.entries do s += e.value;
 
-	printf("Sum: %l\n", s);
+	printf("Sum: {}\n", s);
 }
