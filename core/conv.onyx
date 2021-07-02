@@ -186,7 +186,7 @@ f64_to_str :: (f: f64, buf: [] u8) -> str {
 
 // This is better than the above version, but still relies on converting the integer
 // part of the float to an integer, which could overflow.
-f64_to_str :: (f: f64, buf: [] u8) -> str {
+f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     math :: package core.math
 
     len := 0;
@@ -208,15 +208,14 @@ f64_to_str :: (f: f64, buf: [] u8) -> str {
 
     digits := "0123456789";
 
-    decimals :: 4;
-    for i: decimals {
+    for i: digits_after_decimal {
         dec_part *= 10;
         v := math.trunc(dec_part);
         dec_part -= v;
 
         buf.data[len + i] = digits[cast(i32) v];
     }
-    len += decimals;
+    len += digits_after_decimal;
 
     return str.{ buf.data, len };
 }
@@ -226,7 +225,6 @@ str_format :: (format: str, buffer: [] u8, va: ..any) -> str {
 }
 
 str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
-    @Cleanup
     Output :: struct {
         data: ^u8;
         count: u32;
@@ -241,7 +239,12 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
             },
 
             (use output: ^Output, s: str) {
-                for c: s do output->write(c);
+                for c: s {
+                    if count >= capacity do return;
+
+                    data[count] = c;
+                    count += 1;
+                }
             }
         }
     }
@@ -251,7 +254,6 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
     Format :: struct {
         digits_after_decimal := cast(u32) 4;
     }
-    formatting := Format.{};
 
     vararg_index := 0;
 
@@ -259,6 +261,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
         defer i += 1;
 
         ch := format[i];
+        formatting := Format.{};
 
         if ch == #char "{" {
             if format[i + 1] == #char "{" {
@@ -267,8 +270,8 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 continue;
             }
 
+            i += 1;
             while true {
-                i += 1;
                 ch = format[i];
 
                 switch ch {
@@ -282,6 +285,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                             i += 1;
                         }
 
+                        ch = format[i];
                         formatting.digits_after_decimal = digits;
                     }
 
@@ -299,7 +303,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
             arg := va[vararg_index];
             vararg_index += 1;
-            print_any(^output, arg);
+            print_any(^output, formatting, arg);
 
             continue;
         }
@@ -309,7 +313,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
     return .{ output.data, output.count };
 
-    print_any :: (output: ^Output, v: any) {
+    print_any :: (output: ^Output, formatting: Format, v: any) {
         use package builtin.type_info
         array :: package core.array
 
@@ -318,6 +322,19 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 value := *(cast(^bool) v.data);
                 if value do output->write("true");
                 else     do output->write("false");
+            }
+
+            case u8 {
+                value := *(cast(^u8) v.data);
+
+                if value > 31 {
+                    output->write(value);
+
+                } else {
+                    ibuf : [128] u8;
+                    istr := i64_to_str(~~value, 16, ~~ibuf);
+                    output->write(istr);
+                }
             }
 
             case i32, u32 {
@@ -340,7 +357,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 value := *(cast(^f32) v.data);
 
                 fbuf : [128] u8;
-                fstr := f64_to_str(~~value, ~~fbuf);
+                fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
                 output->write(fstr);
             }
 
@@ -348,7 +365,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 value := *(cast(^f64) v.data);
 
                 fbuf : [128] u8;
-                fstr := f64_to_str(~~value, ~~fbuf);
+                fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
                 output->write(fstr);
             }
 
@@ -377,13 +394,23 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                         output->write(member.name);
                         output->write(" = ");
 
-                        print_any(output, .{ ~~(cast(^u8) v.data + member.offset), member.type });
+                        print_any(output, formatting, .{ ~~(cast(^u8) v.data + member.offset), member.type });
                     }
 
                     output->write(" }");
                 }
 
-                if info.kind == .Function do output->write("<function>");
+                if info.kind == .Function {
+                    output->write("func[");
+
+                    value := *(cast(^i32) v.data);
+
+                    ibuf : [128] u8;
+                    istr := i64_to_str(~~value, 10, ~~ibuf);
+                    output->write(istr);
+
+                    output->write("]");
+                }
 
                 if info.kind == .Pointer {
                     value := *(cast(^rawptr) v.data);
@@ -405,7 +432,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                     for i: count {
                         if i != 0 do output->write(", ");
 
-                        print_any(output, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
+                        print_any(output, formatting, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
                     }
                     
                     output->write(" ]");
@@ -420,7 +447,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                     for i: a.count {
                         if i != 0 do output->write(", ");
 
-                        print_any(output, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
+                        print_any(output, formatting, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
                     }
 
                     output->write(" ]");

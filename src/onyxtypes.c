@@ -484,6 +484,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             AstPolyCallType* pc_type = (AstPolyCallType *) type_node;
 
             if (!(pc_type->callee && pc_type->callee->kind == Ast_Kind_Poly_Struct_Type)) {
+                // If it is an unresolved field access, just return because an error will be printed elsewhere.
+                if (pc_type->callee->kind == Ast_Kind_Field_Access) return NULL;
+
                 onyx_report_error(pc_type->token->pos, "Cannot instantiate a concrete type off of a non-polymorphic type.");
                 return NULL;
             }

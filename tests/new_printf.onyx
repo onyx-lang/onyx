@@ -3,5 +3,5 @@
 use package core
 
 main :: (args: [] cstr) {
-    printf("{} {} {{ }} {} {}\n", 123, "Test", false, ^stdio.print_writer);
+    printf("{} {} {{}} {} {.1} {.5}\n", 123, "Test", false, 12.34, 12.3456789);
 }

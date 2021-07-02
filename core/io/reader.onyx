@@ -24,10 +24,17 @@ read_byte :: (use reader: ^Reader) -> u8 {
     return byte;
 }
 
-read_bytes :: (use reader: ^Reader, bytes := 1, allocator := context.allocator) -> str {
-    buffer := memory.make_slice(u8, bytes, allocator);
-    stream_read(stream, buffer);
-    return buffer;
+read_bytes :: #match {
+    (use reader: ^Reader, bytes := 1, allocator := context.allocator) -> str {
+        buffer := memory.make_slice(u8, bytes, allocator);
+        stream_read(stream, buffer);
+        return buffer;
+    },
+
+    (use reader: ^Reader, bytes: [] u8) -> str {
+        err, bytes_read := stream_read(stream, bytes);
+        return bytes;
+    }
 }
 
 read_u32 :: (use reader: ^Reader) -> u32 {
