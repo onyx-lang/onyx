@@ -1601,6 +1601,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
             //         break;
             //     }
             // }
+            if (expr->type == NULL) return Check_Yield_Macro;
 
             expr->flags |= Ast_Flag_Function_Used;
             break;

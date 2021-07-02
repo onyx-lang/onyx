@@ -252,7 +252,10 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
     output := Output.{ buffer.data, 0, buffer.count };
 
     Format :: struct {
+        pretty_printing      := false;
         digits_after_decimal := cast(u32) 4;
+
+        indentation := cast(u32) 0;
     }
 
     vararg_index := 0;
@@ -287,6 +290,11 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
                         ch = format[i];
                         formatting.digits_after_decimal = digits;
+                    }
+
+                    case #char "p" {
+                        i += 1;
+                        formatting.pretty_printing = true;
                     }
 
                     case #default do break break;
@@ -387,14 +395,31 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
                     if s.name.count > 0 do output->write(s.name);
                     output->write(" { ");
+
+                    {
+                        format := formatting;
+                        if format.pretty_printing {
+                            format.indentation += 4;
+                        }
+                        
+                        for ^member: s.members {
+                            if member != s.members.data do output->write(", ");
+
+                            if formatting.pretty_printing {
+                                output->write(#char "\n");
+                                for i: format.indentation do output->write(#char " ");
+                            }
+
+                            output->write(member.name);
+                            output->write(" = ");
+
+                            print_any(output, format, .{ ~~(cast(^u8) v.data + member.offset), member.type });
+                        }
+                    }
                     
-                    for ^member: s.members {
-                        if member != s.members.data do output->write(", ");
-
-                        output->write(member.name);
-                        output->write(" = ");
-
-                        print_any(output, formatting, .{ ~~(cast(^u8) v.data + member.offset), member.type });
+                    if formatting.pretty_printing {
+                        output->write(#char "\n");
+                        for i: formatting.indentation - 1 do output->write(#char " ");
                     }
 
                     output->write(" }");
@@ -429,13 +454,30 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                     data  := arr.data;
                     count := arr.count;
 
+                    format := formatting;
+                    if format.pretty_printing do format.indentation += 2;
+
                     for i: count {
                         if i != 0 do output->write(", ");
 
-                        print_any(output, formatting, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
+                        if formatting.pretty_printing {
+                            output->write("\n");
+                            for _: format.indentation do output->write(#char " ");
+                        }
+
+                        print_any(output, format, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
                     }
-                    
-                    output->write(" ]");
+
+
+                    if formatting.pretty_printing {
+                        format.indentation -= 2;
+                        output->write("\n");
+                        for _: format.indentation do output->write(#char " ");
+                        output->write(#char "]");
+
+                    } else {
+                        output->write(" ]");
+                    }
                 }
 
                 if info.kind == .Array {

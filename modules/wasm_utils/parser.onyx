@@ -1,0 +1,165 @@
+//
+// Sections that still need to be parse-able
+//    - Function
+//    - Table
+//    - Memory
+//    - Global
+//    - Start
+//    - Element
+//    - Code
+//    - Data
+//    - DataCount
+
+
+package wasm_utils
+
+// The allocator to be used for all allocations in the parser. This is set when
+// calling any of the top-level parsing functions. Because this is here, it is
+// unsafe to use this library in a multi-threaded context, if Wasm ever officially
+// supports that.
+#private_file wasm_allocator : Allocator
+
+parse_type_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> [] WasmFuncType {
+    if !map.has(^sections, .Type) do return .{ null, 0 };
+    wasm_allocator = allocator;
+
+    @Cleanup @WasmStream // These are going to be needed in many places
+    stream := io.string_stream_make(data);   
+    reader := io.reader_make(^stream);
+
+    io.stream_seek(^stream, map.get(^sections, .Type).offset, .Start);
+
+    return parse_vector(^reader, bin, read_func_type);
+
+    read_func_type :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmFuncType {
+        _, pos := io.stream_tell(reader.stream);
+
+        assert(io.read_byte(reader) == ~~0x60, "function type expected 0x60 as first byte");
+
+        params  := parse_vector(reader, binary, read_val_type); 
+        results := parse_vector(reader, binary, read_val_type);
+
+        _, after_pos := io.stream_tell(reader.stream);
+
+        return .{
+            params = params,
+            results = results,
+            reference = binary.data.data[pos .. ~~(after_pos - pos)],
+        };
+    }
+}
+
+parse_import_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> [] WasmImport {
+    if !map.has(^sections, .Import) do return .{ null, 0 };
+
+    wasm_allocator = allocator;
+
+    @Cleanup @WasmStream // These are going to be needed in many places
+    stream := io.string_stream_make(data);   
+    reader := io.reader_make(^stream);
+
+    io.stream_seek(^stream, map.get(^sections, .Import).offset, .Start);
+
+    return parse_vector(^reader, bin, read_import);
+
+    read_import :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmImport {
+        module_name := parse_name(reader, binary);
+        import_name := parse_name(reader, binary);
+
+        kind  := io.read_byte(reader);
+        index := read_uleb128(reader);
+        
+        return .{ module_name, import_name, ~~kind, ~~index };
+    }
+}
+
+parse_export_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> [] WasmExport {
+    if !map.has(^sections, .Export) do return .{ null, 0 };
+
+    wasm_allocator = allocator;
+
+    @Cleanup @WasmStream // These are going to be needed in many places
+    stream := io.string_stream_make(data);   
+    reader := io.reader_make(^stream);
+
+    io.stream_seek(^stream, map.get(^sections, .Export).offset, .Start);
+
+    return parse_vector(^reader, bin, read_export);
+
+    read_export :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmExport {
+        name := parse_name(reader, binary);
+
+        kind  := io.read_byte(reader);
+        index := read_uleb128(reader);
+        
+        return .{ name, ~~kind, ~~index };
+    }
+}
+
+parse_function_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> [] WasmFunction {
+    if !map.has(^sections, .Function) do return .{ null, 0 };
+
+    wasm_allocator = allocator;
+
+    @Cleanup @WasmStream // These are going to be needed in many places
+    stream := io.string_stream_make(data);   
+    reader := io.reader_make(^stream);
+
+    io.stream_seek(^stream, map.get(^sections, .Function).offset, .Start);
+
+    return parse_vector(^reader, bin, read_function);
+
+    read_function :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmFunction {
+        return .{ ~~read_uleb128(reader) }; 
+    }
+}
+
+parse_start_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> i32 {
+    if !map.has(^sections, .Start) do return -1;
+
+    @Cleanup @WasmStream // These are going to be needed in many places
+    stream := io.string_stream_make(data);   
+    reader := io.reader_make(^stream);
+
+    io.stream_seek(^stream, map.get(^sections, .Function).offset, .Start);
+
+    return ~~read_uleb128(^reader);
+}
+
+#private
+parse_vector :: (reader: ^io.Reader, bin: ^WasmBinary,
+                 read: (^io.Reader, ^WasmBinary) -> $T) -> [] T {
+    
+    n := cast(u32) read_uleb128(reader);
+    result := memory.make_slice(T, n, allocator=wasm_allocator);
+
+    for i: n {
+        result[i] = read(reader, bin);
+    }
+
+    return result;
+}
+
+#private
+parse_name :: (reader: ^io.Reader, bin: ^WasmBinary) -> [] u8 {
+    return parse_vector(reader, bin, read_byte);
+
+    read_byte :: (reader: ^io.Reader, bin: ^WasmBinary) -> u8 {
+        return io.read_byte(reader);
+    }
+}
+
+#private
+read_val_type :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmValueType {
+    byte := io.read_byte(reader);
+    switch byte {
+        case 127 do return .I32;
+        case 126 do return .I64;
+        case 125 do return .F32;
+        case 124 do return .F64;
+        case 123 do return .V128;
+        case #default do assert(false, "Bad wasm value type");
+    }
+
+    return ~~0;
+}
