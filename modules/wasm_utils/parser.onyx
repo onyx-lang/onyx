@@ -342,3 +342,48 @@ parse_const_uint32 :: (reader: ^io.Reader, binary: ^WasmBinary) -> u32 {
 
     return ~~value;
 }
+
+#private
+parse_section_locations :: (use bin: ^WasmBinary) -> bool {
+    stream := io.string_stream_make(data);
+    reader := io.reader_make(^stream);
+
+    {
+        // Checking the magic string
+        magic_buffer: [4] u8; 
+
+        @Bug // If these are string literals, then the null byte messes up the compiler and it thinks its a 0-character string.
+        if !(io.read_bytes(^reader, cast([] u8) magic_buffer) == ~~u8.[ 0, #char "a", #char "s", #char "m" ]) do return false;
+        if !(io.read_bytes(^reader, cast([] u8) magic_buffer) == ~~u8.[ 1, 0, 0, 0 ]) do return false; // This may not be necessary
+    }
+ 
+    while !io.stream_end_of_file(^stream) {
+        section_number := cast(WasmSection) io.read_byte(^reader);
+        section_size   := read_uleb128(^reader);
+        _, pos := io.stream_tell(^stream);
+
+        switch section_number {
+            @Incomplete
+            case .Custom ---
+
+            case .Type, .Import, .Function, .Table, .Memory, .Global,
+                .Export, .Start, .Element, .Code, .Data, .DataCount  {
+                map.put(^sections, section_number, .{
+                    offset = pos,
+                    size   = ~~section_size,
+                });
+            }
+
+            case #default {
+                buffer: [128] u8;
+                conv :: package core.conv
+                assert(false, conv.str_format("Bad section number {}", ~~buffer, cast(i32) section_number));
+            }
+        }
+
+        err := io.stream_seek(^stream, pos + ~~section_size, .Start);
+        if err == .OutOfBounds do break;
+    }
+
+    return true;
+}
