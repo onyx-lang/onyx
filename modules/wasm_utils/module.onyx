@@ -8,7 +8,9 @@ package wasm_utils
 
 #load "./types"
 #load "./utils"
+#load "./parser"
 
-#private map  :: package core.map
-#private io   :: package core.io
-#private hash :: package core.hash
+#private map    :: package core.map
+#private io     :: package core.io
+#private hash   :: package core.hash
+#private memory :: package core.memory

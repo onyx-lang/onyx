@@ -23,14 +23,122 @@ WasmSection :: enum {
 WasmBinary :: struct {
     data: [] u8;
 
-    // Section number -> Offset into data
+    // Section number -> Offset+size of data
     // This does not work for custom sections, as they all have the same section number
-    section_locations : map.Map(WasmSection, i32);
+    sections: map.Map(WasmSection, WasmSectionData);
 
+    // Custom section name -> Offset into data
     // So there is a custom section location that maps the name of the custom section
     // to the offset into the file. The backing-store for the keys is just the data
     // itself, as the names are in the data for the binary.
     custom_section_locations : map.Map(str, i32);
+}
+
+WasmSectionData :: struct {
+    offset: u32 = 0;
+    size: u32   = 0;
+}
+
+WasmValueType :: enum (u8) {
+    I32; I64;
+    F32; F64;
+    V128;
+}
+
+WasmFuncType :: struct {
+    params  : [] WasmValueType;
+    results : [] WasmValueType; // This will probably have only 1 value most of the time, but it is a good idea to support the multi-return proposal
+
+    reference : [] u8; // Where in the data is this function type
+}
+
+WasmForeignType :: enum {
+    Function;
+    Table;
+    Memory;
+    Global;
+}
+
+WasmImport :: struct {
+    module_name : str;
+    import_name : str;
+
+    type  : WasmForeignType;
+    index : u32;
+}
+
+WasmExport :: struct {
+    name  : str;
+    type  : WasmForeignType;
+    index : u32;
+}
+
+WasmFunction :: struct {
+    type_index : u32;
+}
+
+WasmLimits :: struct {
+    minimum, maximum: u32;
+}
+
+WasmMemory :: struct {
+    use limits: WasmLimits;
+}
+
+WasmTableType :: enum {
+    AnyFunc :: 0x70;
+}
+
+WasmTable :: struct {
+    element_type: WasmTableType;
+
+    use limits: WasmLimits;
+}
+
+WasmGlobal :: struct {
+    type    : WasmValueType;
+    mutable : bool;
+}
+
+WasmElement :: struct {
+    table_index : u32;
+    offset      : u32;
+    funcs       : [] u32;
+}
+
+WasmData :: struct {
+    memory_index : u32;
+    offset       : u32;
+    
+    data : [] u8;
+}
+
+WasmCode :: struct {
+    size : u32;
+    locals : [] WasmLocal;
+    code_offset : u32;
+}
+
+WasmLocal :: struct {
+    type  : WasmValueType;
+    index : u32; // This realistically could be a u16, which would have better packing, but dealing with casts from u16 to u32 is annoying.
+}
+
+@Relocate // This should maybe in the WasmBinary structure? I'll need to see how I want to use this library.
+WasmSections :: struct {
+    allocator: Allocator;
+
+    type_section     : [] WasmFuncType;
+    import_section   : [] WasmImport;
+    export_section   : [] WasmExport;
+    function_section : [] WasmFunction;
+    start_section    : i32; // Index of function to start
+    memory_section   : [] WasmMemory;
+    table_section    : [] WasmTable;
+    global_section   : [] WasmGlobal;
+    element_section  : [] WasmElement;
+    code_section     : [] WasmCode;
+    data_section     : [] WasmData;
 }
 
 load :: (data: [] u8, allocator := context.allocator) -> WasmBinary {
@@ -39,13 +147,32 @@ load :: (data: [] u8, allocator := context.allocator) -> WasmBinary {
     
     #context_scope {
         context.allocator = allocator;
-        map.init(^binary.section_locations, -1);
+        map.init(^binary.sections, .{});
         map.init(^binary.custom_section_locations, -1);
     }
 
     assert(parse_section_locations(^binary), "Failed to parse WASM binary");
 
     return binary;
+}
+
+parse_sections :: (use bin: ^WasmBinary, allocator := context.allocator) -> WasmSections {
+    ws: WasmSections;
+    ws.allocator = allocator;
+
+    ws.type_section     = parse_type_section(bin, allocator); 
+    ws.import_section   = parse_import_section(bin, allocator); 
+    ws.export_section   = parse_export_section(bin, allocator); 
+    ws.function_section = parse_function_section(bin, allocator); 
+    ws.start_section    = parse_start_section(bin, allocator); 
+    ws.memory_section   = parse_memory_section(bin, allocator); 
+    ws.table_section    = parse_table_section(bin, allocator); 
+    ws.global_section   = parse_global_section(bin, allocator); 
+    ws.element_section  = parse_element_section(bin, allocator); 
+    ws.code_section     = parse_code_section(bin, allocator); 
+    ws.data_section     = parse_data_section(bin, allocator); 
+
+    return ws;
 }
 
 
@@ -58,6 +185,7 @@ parse_section_locations :: (use bin: ^WasmBinary) -> bool {
         // Checking the magic string
         magic_buffer: [4] u8; 
 
+        @Bug // If these are string literals, then the null byte messes up the compiler and it thinks its a 0-character string.
         if !(io.read_bytes(^reader, cast([] u8) magic_buffer) == ~~u8.[ 0, #char "a", #char "s", #char "m" ]) do return false;
         if !(io.read_bytes(^reader, cast([] u8) magic_buffer) == ~~u8.[ 1, 0, 0, 0 ]) do return false; // This may not be necessary
     }
@@ -73,7 +201,10 @@ parse_section_locations :: (use bin: ^WasmBinary) -> bool {
 
             case .Type, .Import, .Function, .Table, .Memory, .Global,
                 .Export, .Start, .Element, .Code, .Data, .DataCount  {
-                map.put(^section_locations, section_number, pos);
+                map.put(^sections, section_number, .{
+                    offset = pos,
+                    size   = ~~section_size,
+                });
             }
 
             case #default {
