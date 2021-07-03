@@ -34,6 +34,7 @@
     NODE(DirectiveAddOverload) \
     NODE(DirectiveOperator)    \
     NODE(DirectiveExport)      \
+    NODE(DirectiveDefined)     \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -180,6 +181,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Add_Overload,
     Ast_Kind_Directive_Operator,
     Ast_Kind_Directive_Export,
+    Ast_Kind_Directive_Defined,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Note,
@@ -968,6 +970,13 @@ struct AstDirectiveExport {
     AstTyped* export;
 };
 
+struct AstDirectiveDefined {
+    AstTyped_base;
+    AstTyped *expr;
+
+    b32 is_defined: 1;
+};
+
 struct AstNote {
     AstNode_base;
 };
@@ -1245,6 +1254,7 @@ i64 get_expression_integer_value(AstTyped* node);
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
 
+AstNumLit*       make_bool_literal(bh_allocator, b32 b);
 AstNumLit*       make_int_literal(bh_allocator a, i64 value);
 AstNumLit*       make_float_literal(bh_allocator a, f64 value);
 AstRangeLiteral* make_range_literal(bh_allocator a, AstTyped* low, AstTyped* high);

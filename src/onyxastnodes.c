@@ -83,6 +83,8 @@ static const char* ast_node_names[] = {
     "ADD OVERLOAD",
     "OPERATOR OVERLOAD",
     "EXPORT",
+    "DEFINED",
+    "CALL SITE",
 
     "NOTE",
 
@@ -719,7 +721,14 @@ char* get_function_name(AstFunction* func) {
     return "<anonymous procedure>";
 }
 
+AstNumLit* make_bool_literal(bh_allocator a, b32 b) {
+    AstNumLit* bl = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    bl->flags |= Ast_Flag_Comptime;
+    bl->type_node = (AstType *) &basic_type_bool;
 
+    bl->value.i = b ? 1 : 0;
+    return bl;
+}
 
 AstNumLit* make_int_literal(bh_allocator a, i64 i) {
     AstNumLit* num = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);

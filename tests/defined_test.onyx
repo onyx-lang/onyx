@@ -1,0 +1,9 @@
+#load "core/std"
+
+use package core
+
+main :: (args: [] cstr) {
+    println(#defined(stdio));
+    println(#defined(foobar));
+    println(#defined(array.Untyped_Array.foo));
+}

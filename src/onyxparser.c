@@ -560,6 +560,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
             else if (parse_possible_directive(parser, "solidify")) {
                 AstDirectiveSolidify* solid = make_node(AstDirectiveSolidify, Ast_Kind_Directive_Solidify);
+                // :LinearTokenDependent
                 solid->token = parser->curr - 1;
 
                 solid->poly_proc = (AstPolyProc *) parse_factor(parser);
@@ -589,6 +590,19 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 }
 
                 retval = (AstTyped *) solid;
+                break;
+            }
+            else if (parse_possible_directive(parser, "defined")) {
+                AstDirectiveDefined* defined = make_node(AstDirectiveDefined, Ast_Kind_Directive_Defined);
+                // :LinearTokenDependent
+                defined->token = parser->curr - 1;
+                defined->type_node = (AstType *) &basic_type_bool;
+
+                expect_token(parser, '(');
+                defined->expr = parse_expression(parser, 0);
+                expect_token(parser, ')');
+
+                retval = (AstTyped *) defined;
                 break;
             }
 

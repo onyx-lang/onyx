@@ -1610,6 +1610,11 @@ CheckStatus check_expression(AstTyped** pexpr) {
             *pexpr = (AstTyped *) ((AstDirectiveSolidify *) expr)->resolved_proc;
             break;
 
+        case Ast_Kind_Directive_Defined:
+            *pexpr = (AstTyped *) make_bool_literal(context.ast_alloc, ((AstDirectiveDefined *) expr)->is_defined);
+            fill_in_type(*pexpr);
+            break;
+
         case Ast_Kind_Compound:
             CHECK(compound, (AstCompound *) expr);
             break;

@@ -43,6 +43,7 @@ static SymresStatus symres_for(AstFor* fornode);
 static SymresStatus symres_switch(AstSwitch* switchnode);
 static SymresStatus symres_use(AstUse* use);
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid);
+static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined);
 static SymresStatus symres_statement_chain(AstNode** walker);
 static SymresStatus symres_statement(AstNode** stmt, b32 *remove);
 static SymresStatus symres_block(AstBlock* block);
@@ -449,6 +450,10 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(directive_solidify, (AstDirectiveSolidify **) expr);
             break;
 
+        case Ast_Kind_Directive_Defined:
+            SYMRES(directive_defined, (AstDirectiveDefined **) expr);
+            break;
+
         case Ast_Kind_Compound:
             SYMRES(compound, (AstCompound *) *expr);
             break;
@@ -706,6 +711,31 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
 
     // NOTE: Not a DirectiveSolidify.
     *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
+    return Symres_Success;
+}
+
+static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
+    AstDirectiveDefined* defined = *pdefined;
+
+    b32 old_report_unresolved_symbols = report_unresolved_symbols;
+    report_unresolved_symbols = 0;
+
+    SymresStatus ss = symres_expression(&defined->expr);
+    if (old_report_unresolved_symbols && ss != Symres_Success) {
+        // The symbol definitely was not found and there is no chance that it could be found.
+        defined->is_defined = 0;
+
+    } else {
+        if (ss == Symres_Success) {
+            defined->is_defined = 1;
+
+        } else {
+            report_unresolved_symbols = old_report_unresolved_symbols;
+            return Symres_Yield_Macro;
+        }
+    }
+
+    report_unresolved_symbols = old_report_unresolved_symbols;
     return Symres_Success;
 }
 
