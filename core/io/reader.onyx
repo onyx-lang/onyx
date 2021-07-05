@@ -12,11 +12,14 @@ reader_make :: (s: ^Stream) -> Reader {
     return Reader.{ s };
 }
 
-reader_from_string :: (s: str) -> Reader {
-    stream_ptr := new(StringStream);     @Leak
+// You need to free the StringStream from the context.allocator when you use this. For example,
+//      reader, stream := reader_from_string(s);
+//      defer cfree(stream);
+reader_from_string :: (s: str) -> (Reader, ^StringStream) {
+    stream_ptr := new(StringStream);
     *stream_ptr = string_stream_make(s);
 
-    return Reader.{ stream_ptr };
+    return Reader.{ stream_ptr }, stream_ptr;
 }
 
 read_byte :: (use reader: ^Reader) -> u8 {

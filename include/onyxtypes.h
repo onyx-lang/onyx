@@ -50,7 +50,7 @@ enum BasicFlag {
 
     Basic_Flag_Numeric          = Basic_Flag_Integer | Basic_Flag_Float,
     Basic_Flag_Ordered          = Basic_Flag_Integer | Basic_Flag_Float | Basic_Flag_Pointer,
-    Basic_Flag_Equality         = Basic_Flag_Ordered | Basic_Flag_Type_Index,
+    Basic_Flag_Equality         = Basic_Flag_Ordered | Basic_Flag_Type_Index | Basic_Flag_Boolean,
     Basic_Flag_Constant_Type    = Basic_Flag_Boolean | Basic_Flag_Numeric | Basic_Flag_Pointer,
     Basic_Flag_Numeric_Ordered  = Basic_Flag_Numeric | Basic_Flag_Ordered,
 };
