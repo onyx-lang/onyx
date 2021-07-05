@@ -153,6 +153,9 @@ string_stream_make :: (s: str) -> StringStream {
     };
 }
 
+string_stream_to_str :: (use ss: ^StringStream) -> str {
+    return .{ data.data, curr_pos };
+}
 
 #private
 string_stream_vtable := Stream_Vtable.{

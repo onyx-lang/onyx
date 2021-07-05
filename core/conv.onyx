@@ -387,6 +387,23 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 output->write(istr);
             }
 
+            case type_expr {
+                value := *(cast(^type_expr) v.data);
+
+                io :: package core.io
+
+                buf : [256] u8;          
+
+                // This is a little gross but the only way to output the type name for a type_expr
+                // is through a io.Writer. That should maybe be changed in the future? Also, I think
+                // 256 bytes is enough for the name of a type but I'm not entirely sure...
+                stream := io.string_stream_make(~~buf);
+                writer := io.writer_make(^stream);
+                type_info.write_type_name(^writer, value);
+
+                output->write(io.string_stream_to_str(^stream));
+            }
+
             case #default {
                 info := get_type_info(v.type);
 
