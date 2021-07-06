@@ -2257,6 +2257,7 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
         if (!result_is_local) emit_store_instruction(mod, &code, if_expr->type, offset);
         else                  WIL(WI_LOCAL_SET, result_local);
 
+    offset = 0;
     WI(WI_ELSE);
         if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
 
@@ -2267,6 +2268,7 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
 
     emit_leave_structured_block(mod, &code);
 
+    offset = 0;
     if (!result_is_local) {
         emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
         emit_load_instruction(mod, &code, if_expr->type, offset);

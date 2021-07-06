@@ -12,6 +12,8 @@ new_max :: (a: $T, b: T) -> T {
     return a if a > b else b;
 }
 
+V2 :: struct { x, y: f32; }
+
 main :: (args: [] cstr) {
 
     condition := 12 > 34;
@@ -22,4 +24,7 @@ main :: (args: [] cstr) {
     println("True" if x > 5000 else "False" if false else "REALLY FALSE");
 
     println(new_max(10, 20));
+
+    v: V2 = (.{ 10, 20 }) if true else .{ 30, 40 };
+    printf("{}\n", v);
 }
