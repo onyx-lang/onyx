@@ -154,23 +154,27 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
 }
 
 AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol) {
-    // CLEANUP: So many checks for null....
-    if (!node) return NULL;
+    b32 used_pointer = 0;
 
-    if (node->kind == Ast_Kind_Type_Raw_Alias)
-        node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type;
+    while (1) {
+        if (!node) return NULL;
 
-    if (!node) return NULL;
+        switch (node->kind) {
+            case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
+            case Ast_Kind_Type_Alias:     node = (AstNode *) ((AstTypeAlias *) node)->to; break;
+            case Ast_Kind_Pointer_Type: {
+                if (used_pointer) goto all_types_peeled_off;
+                used_pointer = 1;
 
-    if (node->kind == Ast_Kind_Type_Alias)
-        node = (AstNode *) ((AstTypeAlias *) node)->to;
+                node = (AstNode *) ((AstPointerType *) node)->elem;
+                break;
+            }
 
-    if (!node) return NULL;
+            default: goto all_types_peeled_off;
+        }
+    }
 
-    // A single pointer can be dereferenced to lookup symbols in struct.
-    if (node->kind == Ast_Kind_Pointer_Type)
-        node = (AstNode *) ((AstPointerType *) node)->elem;
-
+all_types_peeled_off:
     if (!node) return NULL;
 
     switch (node->kind) {

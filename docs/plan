@@ -34,7 +34,7 @@ HOW:
         I have a working compiler with many features, but here are some additional features
         I would like to consider adding in the future.
 
-        [ ] Put type info in data section so it is runtime accessible
+        [X] Put type info in data section so it is runtime accessible
             - type name
             - size
             - alignment

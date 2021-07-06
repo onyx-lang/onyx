@@ -1,0 +1,39 @@
+package immediate_mode
+
+use package core
+
+// A render target that can be used instead of the default
+Canvas :: struct {
+    color_texture        : Texture;
+    depth_stencil_buffer : gl.GLRenderbuffer;
+    framebuffer          : gl.GLFramebuffer;
+
+    width, height: i32;
+}
+
+create_canvas :: (width: i32, height: i32) -> Canvas {
+
+    color_texture := create_texture(width, height, gl.RGBA8);
+
+    depth_stencil_buffer := gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, depth_stencil_buffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, width, height);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, -1);
+
+    framebuffer := gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, color_texture.texture, 0);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, depth_stencil_buffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, -1);
+
+    assert(gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE, "Framebuffer not complete!");
+
+    return .{
+        color_texture = color_texture,
+        depth_stencil_buffer = depth_stencil_buffer,
+        framebuffer = framebuffer,
+        width = width,
+        height = height,
+    };
+}
+

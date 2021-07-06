@@ -3,3 +3,7 @@ package immediate_mode
 
 #load "./immediate_renderer"
 #load "./gl_utils"
+#load "./canvas"
+#load "./texture"
+
+#private gl :: package gl

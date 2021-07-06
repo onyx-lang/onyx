@@ -11,7 +11,7 @@ Command Line Interface:
 
     [X] Remove old code from CLI logic
     [X] Add statistic printing
-    [ ] Fix documentation generation (broken since compiler architecture change) 
+    [X] Fix documentation generation (broken since compiler architecture change) 
     [ ] Add automated running component
         - Store to temporary file (OS independent)
         - Detect / choose WASM backend

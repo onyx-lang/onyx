@@ -747,7 +747,7 @@ bufferDataNoData               :: (target: GLenum, size: GLsizei, usage: GLenum)
 bufferData                     :: #match { bufferDataWithData, bufferDataNoData }
 bufferSubData                  :: (target: GLenum, offset: GLsizei, data: [] void) -> void #foreign "gl" "bufferSubData" ---
 canvasSize                     :: (width: GLsizei, height: GLsizei) -> void #foreign "gl" "canvasSize" ---
-checkFrameBufferStatus         :: (target: GLenum) -> GLenum #foreign "gl" "checkFrameBufferStatus" ---
+checkFramebufferStatus         :: (target: GLenum) -> GLenum #foreign "gl" "checkFramebufferStatus" ---
 clear                          :: (mask: GLbitfield) -> void #foreign "gl" "clear" ---
 clearColor                     :: (red: GLclampf, green: GLclampf, blue: GLclampf, alpha: GLclampf) -> void #foreign "gl" "clearColor" ---
 clearDepth                     :: (depth: GLclampf) -> void #foreign "gl" "clearDepth" ---
@@ -819,7 +819,8 @@ printProgramInfoLog            :: (program: GLProgram) -> void #foreign "gl" "pr
 printShaderInfoLog             :: (shader: GLShader) -> void #foreign "gl" "printShaderInfoLog" ---
 readBuffer                     :: (src: GLenum) -> void #foreign "gl" "readBuffer" ---
 readPixels                     :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) -> void #foreign "gl" "readPixels" ---
-renderbufferStorageMultisample :: (target: GLenum, samples: GLsizei, internalforamt: GLenum, width: GLsizei, height: GLsizei) -> void #foreign "gl" "renderbufferStorageMultisample" ---
+renderbufferStorage            :: (target: GLenum, internalformat: GLenum, width: GLsizei, height: GLsizei) -> void #foreign "gl" "renderbufferStorage" ---
+renderbufferStorageMultisample :: (target: GLenum, samples: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei) -> void #foreign "gl" "renderbufferStorageMultisample" ---
 sampleCoverage                 :: (value: GLclampf, invert: GLboolean) -> void #foreign "gl" "sampleCoverage" ---
 scissor                        :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void #foreign "gl" "scissor" ---
 setSize                        :: (width: GLint, y: GLint) -> void #foreign "gl" "setSize" ---
@@ -833,6 +834,7 @@ stencilOpSeparate              :: (face: GLenum, fail: GLenum, zfail: GLenum, zp
 texImage2D                     :: (target: GLenum, level: GLint, internalFormat: GLenum, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, type: GLenum, pixels: str) -> void #foreign "gl" "texImage2D" ---
 texParameterf                  :: (target: GLenum, pname: GLenum, param: GLfloat) -> void #foreign "gl" "texParameterf" ---
 texParameteri                  :: (target: GLenum, pname: GLenum, param: GLint) -> void #foreign "gl" "texParameteri" ---
+texStorage2D                   :: (target: GLenum, levels: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei) -> void #foreign "gl" "texStorage2D" ---
 texSubImage2D                  :: (target: GLenum, level: GLint, xoff: GLint, yoff: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: str) -> void #foreign "gl" "texSubImage2D" ---
 uniform1f                      :: (loc: GLUniformLocation, x: GLfloat) -> void #foreign "gl" "uniform1f" ---
 uniform1i                      :: (loc: GLUniformLocation, x: GLint) -> void #foreign "gl" "uniform1i" ---

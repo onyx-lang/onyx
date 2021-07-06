@@ -38,10 +38,34 @@ window.ONYX_MODULES.push({
             gl.bindBuffer(target, buffers[buffer]);
         }
     },
-    bindFramebuffer(target, framebuffer) { gl.bindFramebuffer(target, framebuffers[framebuffer]); },
-    bindRenderbuffer(target, renderbuffer) { gl.bindRenderbuffer(target, renderbuffers[renderbuffer]); },
-    bindTexture(target, texture) { gl.bindTexture(target, textures[texture]); },
-    bindVertexArray(vertexArray) { gl.bindVertexArray(vertexArrays[vertexArray]); },
+    bindFramebuffer(target, framebuffer) {
+        if (framebuffer == -1) {
+            gl.bindFramebuffer(target, null);
+        } else {
+            gl.bindFramebuffer(target, framebuffers[framebuffer]);
+        }
+    },
+    bindRenderbuffer(target, renderbuffer) {
+        if (renderbuffer == -1) {
+            gl.bindRenderbuffer(target, null);
+        } else {
+            gl.bindRenderbuffer(target, renderbuffers[renderbuffer]);
+        }
+    },
+    bindTexture(target, texture) {
+        if (texture == -1) {
+            gl.bindTexture(target, null);
+        } else {
+            gl.bindTexture(target, textures[texture]);
+        }
+    },
+    bindVertexArray(vertexArray) {
+        if (vertexArray == -1) {
+            gl.bindVertexArray(null);
+        } else {
+            gl.bindVertexArray(vertexArrays[vertexArray]); 
+        }
+    },
 
     blendColor(red, green, blue, alpha) { gl.blendColor(red, green, blue, alpha); },
     blendEquation(mode) { gl.blendEquation(mode); },
@@ -67,7 +91,7 @@ window.ONYX_MODULES.push({
         canvas.width = width;
         canvas.height = height;
     },
-    checkFrameBufferStatus(target) { return gl.checkFrameBufferStatus(target); },
+    checkFramebufferStatus(target) { return gl.checkFramebufferStatus(target); },
     clear(bit) { gl.clear(bit); },
     clearColor(r, g, b, a) { gl.clearColor(r, g, b, a); },
     clearDepth(depth) { gl.clearDepth(depth); },
@@ -83,8 +107,8 @@ window.ONYX_MODULES.push({
         gl.compressedSubTexImage2D(target, level, internalformat, xoff, yoff, width, height, format, pixels);
     },
     copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size) { gl.copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size); },
-    copyTexImage2D(target, level, internalforamt, x, y, width, height, border) {
-        gl.copyTexImage2D(target, level, internalforamt, x, y, width, height, border);
+    copyTexImage2D(target, level, internalformat, x, y, width, height, border) {
+        gl.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
     },
     copyTexSubImage2D(target, level, xoff, yoff, x, y, width, height) {
         gl.copyTexSubImage2D(target, level, xoff, yoff, x, y, width, height);
@@ -229,8 +253,9 @@ window.ONYX_MODULES.push({
         gl.readPixels(x, y, width, height, format, type, pixeldata);
     },
     readBuffer(src) { gl.readBuffer(src); },
-    renderbufferStorageMultisample(target, samples, internalforamt, width, height) {
-        gl.renderbufferStorageMultisample(target, samples, internalforamt, width, height);
+    renderbufferStorage(target, internalformat, width, height) { gl.renderbufferStorage(target, internalformat, width, height); },
+    renderbufferStorageMultisample(target, samples, internalformat, width, height) {
+        gl.renderbufferStorageMultisample(target, samples, internalformat, width, height);
     },
     sampleCoverage(value, invert) { gl.sampleCoverage(value, invert); },
     scissor(x, y, width, height) { gl.scissor(x, y, width, height); },
@@ -248,12 +273,13 @@ window.ONYX_MODULES.push({
     stencilMaskSeparate(face, mask) { gl.stencilMaskSeparate(face, mask); },
     stencilOp(fail, zfail, mask) { gl.stencilOp(fail, zfail, mask); },
     stencilOpSeparate(face, fail, zfail, zpass) { gl.stencilOpSeparate(face, fail, zfail, zpass); },
-    texImage2D(target, level, internalforamt, width, height, border, format, type, pixels, pixelslen) {
+    texImage2D(target, level, internalformat, width, height, border, format, type, pixels, pixelslen) {
         const data = new Uint8Array(window.ONYX_MEMORY.buffer, pixels, pixelslen);
-        gl.texImage2D(target, level, internalforamt, width, height, border, format, type, data);
+        gl.texImage2D(target, level, internalformat, width, height, border, format, type, data);
     },
     texParameterf(target, pname, param) { gl.texParameterf(target, pname, param); },
     texParameteri(target, pname, param) { gl.texParameteri(target, pname, param); },
+    texStorage2D(target, levels, internalformat, width, height) { gl.texStorage2D(target, levels, internalformat, width, height); },
     texSubImage2D(target, level, xoff, yoff, width, height, format, type, pixels, pixelslen) {
         const data = new Uint8Array(window.ONYX_MEMORY.buffer, pixels, pixelslen);
         gl.texSubImage2D(target, level, xoff, yoff, width, height, format, type, data);

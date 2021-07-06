@@ -1,7 +1,7 @@
 package immediate_mode
 
 use package core
-#private_file gl :: package gl
+use package core.intrinsics.onyx { __initialize }
 
 Vector2 :: struct {
     x, y: f32;
@@ -12,6 +12,11 @@ Color4 :: struct {
     a: f32 = 1;
 }
 
+Immediate_Mode :: enum {
+    Triangles;
+    Lines;
+}
+
 Immediate_Vertex :: struct {
     position   : Vector2;
     color      : Color4;
@@ -19,7 +24,6 @@ Immediate_Vertex :: struct {
 }
 
 Immediate_Renderer :: struct {
-    // Will point to either the simple_shader or the textured_shader.
     active_shader : ^Shader;
 
     simple_shader, textured_shader : Shader;
@@ -28,7 +32,8 @@ Immediate_Renderer :: struct {
     // 'verticies' contains the vertex data and the maximum number of verticies
     // that can be rendered at a given time. 'vertex_count' is used to store how
     // many verticies will be rendered in the next draw call. 'vertex_count' is
-    // expected to be a multiple of 3, given that triangles are being rendered.
+    // expected to be a multiple of 3 or 2, given that triangles or lines are
+    // being rendered.
     verticies : [] Immediate_Vertex;
     vertex_count : u32;
 
@@ -37,11 +42,18 @@ Immediate_Renderer :: struct {
     vertex_array  : gl.GLVertexArrayObject;
     vertex_buffer : gl.GLBuffer;
 
-    // Needs to be a multiple of 3!!
-    Default_Max_Verticies :: 1023;
+    // Needs to be a multiple of 6!!
+    Default_Max_Verticies :: 1020;
+
+    mode := Immediate_Mode.Triangles;
+
+    canvas: ^Canvas = null;
+
+    window_width, window_height: i32;
 
     make :: (max_verticies := Default_Max_Verticies) -> Immediate_Renderer {
         ir : Immediate_Renderer;
+        __initialize(^ir);
         init(^ir, max_verticies);
 
         return ir;
@@ -120,9 +132,15 @@ Immediate_Renderer :: struct {
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, .{ count = vertex_count * sizeof Immediate_Vertex, data = ~~verticies.data });
         gl.bindBuffer(gl.ARRAY_BUFFER, -1);
 
+        gl_mode : gl.GLenum;
+        switch mode {
+            case .Triangles do gl_mode = gl.TRIANGLES;
+            case .Lines     do gl_mode = gl.LINES;
+        }
+
         gl.useProgram(active_shader.program);
         gl.bindVertexArray(vertex_array);
-        gl.drawArrays(gl.TRIANGLES, 0, vertex_count);
+        gl.drawArrays(gl_mode, 0, vertex_count);
         gl.bindVertexArray(-1);
 
         vertex_count = 0;
@@ -267,6 +285,45 @@ Immediate_Renderer :: struct {
             gl.disable(gl.SCISSOR_TEST);
         }
     }
+
+    set_mode :: (use ir: ^Immediate_Renderer, new_mode: Immediate_Mode) {
+        if mode != new_mode {
+            ir->flush();
+            mode = new_mode;
+        }
+    }
+
+    use_canvas :: (use ir: ^Immediate_Renderer, new_canvas: ^Canvas) {
+        if canvas == new_canvas do return;
+        ir->flush();
+
+        canvas = new_canvas;
+        if canvas != null {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, canvas.framebuffer);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            @Note // This flips the projection because generally with using framebuffers as textures,
+            // the bottom left, (0, 0) in WebGL world, you want to be the top left when you render it.
+            ir->use_ortho_projection(0, ~~canvas.width, ~~canvas.height, 0);
+
+        } else {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, -1);
+            gl.viewport(0, 0, window_width, window_height);
+            ir->use_ortho_projection(0, ~~window_width, 0, ~~window_height);
+        }
+    }
+
+    set_window_size :: (use ir: ^Immediate_Renderer, width: i32, height: i32) {
+        window_width = width;
+        window_height = height;
+
+        // If there is no active canvas, immediately update the values.
+        // Maybe this should flush the current buffer first?
+        if canvas == null {
+            gl.viewport(0, 0, window_width, window_height);
+            ir->use_ortho_projection(0, ~~window_width, 0, ~~window_height);
+        }
+    }
 }
 
 
@@ -280,7 +337,7 @@ Immediate_Renderer :: struct {
 immediate_renderer : Immediate_Renderer;
 
 immediate_renderer_init :: () {
-    Immediate_Renderer.init(^immediate_renderer);
+    immediate_renderer = Immediate_Renderer.make();
 }
 
 immediate_renderer_free :: () {
@@ -306,7 +363,20 @@ circle :: (center: Vector2, radius: f32, color: Color4 = .{1,1,1}, segments := 1
 
 flush :: () do immediate_renderer->flush();
 
-set_texture :: (texture_id: i32 = -1) do immediate_renderer->set_texture(texture_id);
+set_texture :: #match {
+    (texture_id: i32 = -1) { immediate_renderer->set_texture(texture_id); },
+    (texture: ^Texture, texture_index := 0) {
+        immediate_renderer->set_texture(texture_index);
+
+        if texture_index >= 0 {
+            gl.activeTexture(gl.TEXTURE0 + texture_index);
+            gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+
+        } else {
+            gl.bindTexture(gl.TEXTURE_2D, -1);
+        }
+    }
+}
 
 use_ortho_projection :: (left: f32, right: f32, top: f32, bottom: f32) {
     immediate_renderer->use_ortho_projection(left, right, top, bottom);
@@ -322,4 +392,16 @@ scissor :: (x: f32, y: f32, w: f32, h: f32) {
 
 scissor_disable :: () {
     immediate_renderer->scissor_disable();
+}
+
+set_mode :: (mode: Immediate_Mode) {
+    immediate_renderer->set_mode(mode);
+}
+
+use_canvas :: (canvas: ^Canvas) {
+    immediate_renderer->use_canvas(canvas);
+}
+
+set_window_size :: (width: i32, height: i32) {
+    immediate_renderer->set_window_size(width, height);
 }
