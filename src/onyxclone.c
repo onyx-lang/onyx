@@ -92,6 +92,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Named_Value: return sizeof(AstNamedValue);
         case Ast_Kind_Call_Site: return sizeof(AstCallSite);
         case Ast_Kind_Static_If: return sizeof(AstIfWhile);
+        case Ast_Kind_If_Expression: return sizeof(AstIfExpression);
         case Ast_Kind_Count: return 0;
 	}
 
@@ -423,6 +424,13 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_Named_Value: {
             ((AstNamedValue *) nn)->value = (AstTyped *) ast_clone(a, ((AstNamedValue *) node)->value);
+            break;
+        }
+
+        case Ast_Kind_If_Expression: {
+            ((AstIfExpression *) nn)->cond = (AstTyped *) ast_clone(a, ((AstIfExpression *) node)->cond);
+            ((AstIfExpression *) nn)->true_expr = (AstTyped *) ast_clone(a, ((AstIfExpression *) node)->true_expr);
+            ((AstIfExpression *) nn)->false_expr = (AstTyped *) ast_clone(a, ((AstIfExpression *) node)->false_expr);
             break;
         }
 	}

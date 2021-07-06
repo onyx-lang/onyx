@@ -35,6 +35,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl);
 CheckStatus check_array_literal(AstArrayLiteral* al);
 CheckStatus check_range_literal(AstRangeLiteral** range);
 CheckStatus check_compound(AstCompound* compound);
+CheckStatus check_if_expression(AstIfExpression* if_expr);
 CheckStatus check_expression(AstTyped** expr);
 CheckStatus check_address_of(AstAddressOf* aof);
 CheckStatus check_dereference(AstDereference* deref);
@@ -1276,6 +1277,28 @@ CheckStatus check_compound(AstCompound* compound) {
     return Check_Success;
 }
 
+CheckStatus check_if_expression(AstIfExpression* if_expr) {
+    CHECK(expression, &if_expr->cond);
+    CHECK(expression, &if_expr->true_expr);
+    CHECK(expression, &if_expr->false_expr);
+
+    if (!type_check_or_auto_cast(&if_expr->cond, &basic_types[Basic_Kind_Bool])) {
+        onyx_report_error(if_expr->token->pos, "If-expression expected boolean for condition, got '%s'.",
+            type_get_name(if_expr->cond->type));
+        return Check_Error;
+    }
+
+    resolve_expression_type((AstTyped *) if_expr);
+
+    if (!types_are_compatible(if_expr->true_expr->type, if_expr->false_expr->type)) {
+        onyx_report_error(if_expr->token->pos, "Mismatched types for if-expression, left side is '%s', and right side is '%s'.",
+            type_get_name(if_expr->true_expr->type), type_get_name(if_expr->false_expr->type));
+        return Check_Error;
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_address_of(AstAddressOf* aof) {
     CHECK(expression, &aof->expr);
     if (aof->expr->type == NULL) {
@@ -1623,6 +1646,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             // NOTE: This has to be set here because if it were to be set in the parser,
             // builtin_callsite_type wouldn't be known when parsing the builtin.onyx file.
             expr->type_node = builtin_callsite_type;
+            break;
+
+        case Ast_Kind_If_Expression:
+            CHECK(if_expression, (AstIfExpression *) expr);
             break;
 
         case Ast_Kind_StrLit: break;

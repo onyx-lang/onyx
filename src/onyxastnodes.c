@@ -67,6 +67,7 @@ static const char* ast_node_names[] = {
     "FILE CONTENTS",
     "STRUCT LITERAL",
     "ARRAY LITERAL",
+    "IF EXPRESSION",
 
     "IF",
     "FOR",
@@ -515,6 +516,20 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
         
         return 1;
     }
+    else if (node->kind == Ast_Kind_If_Expression) {
+        AstIfExpression* if_expr = (AstIfExpression *) node;
+
+        b32 true_success  = type_check_or_auto_cast(&if_expr->true_expr,  type);
+        b32 false_success = type_check_or_auto_cast(&if_expr->false_expr, type);
+
+        if (true_success && false_success) {
+            if_expr->type = type;
+            return 1;
+
+        } else {
+            return 0;
+        }
+    }
 
     return 0;
 }
@@ -530,6 +545,15 @@ Type* resolve_expression_type(AstTyped* node) {
 
     if (node->kind == Ast_Kind_Argument) {
         node->type = resolve_expression_type(((AstArgument *) node)->value);
+    }
+
+    if (node->kind == Ast_Kind_If_Expression) {
+        AstIfExpression* if_expr = (AstIfExpression *) node;
+
+        Type* ltype = resolve_expression_type(if_expr->true_expr);
+        type_check_or_auto_cast(&if_expr->false_expr, ltype);
+
+        if_expr->type = ltype;
     }
 
     if (node_is_type((AstNode *) node)) {

@@ -254,6 +254,7 @@ EMIT_FUNC(compound_store,                Type* type, u64 offset, b32 location_fi
 EMIT_FUNC(array_store,                   Type* type, u32 offset);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                 AstRangeLiteral* range);
+EMIT_FUNC(if_expression,                 AstIfExpression* if_expr);
 EMIT_FUNC(expression,                    AstTyped* expr);
 EMIT_FUNC(cast,                          AstUnaryOp* cast);
 EMIT_FUNC(return,                        AstReturn* ret);
@@ -2238,6 +2239,45 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
     *pcode = code;
 }
 
+EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 offset = 0;
+    u64 result_local    = local_allocate(mod->local_alloc, (AstTyped *) if_expr);
+    b32 result_is_local = (b32) ((result_local & LOCAL_IS_WASM) != 0);
+    bh_imap_put(&mod->local_map, (u64) if_expr, result_local);
+
+    emit_expression(mod, &code, if_expr->cond); 
+
+    emit_enter_structured_block(mod, &code, SBT_Basic_If);
+        if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
+
+        emit_expression(mod, &code, if_expr->true_expr);
+
+        if (!result_is_local) emit_store_instruction(mod, &code, if_expr->type, offset);
+        else                  WIL(WI_LOCAL_SET, result_local);
+
+    WI(WI_ELSE);
+        if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
+
+        emit_expression(mod, &code, if_expr->false_expr);
+
+        if (!result_is_local) emit_store_instruction(mod, &code, if_expr->type, offset);
+        else                  WIL(WI_LOCAL_SET, result_local);
+
+    emit_leave_structured_block(mod, &code);
+
+    if (!result_is_local) {
+        emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
+        emit_load_instruction(mod, &code, if_expr->type, offset);
+        
+    } else {
+        WIL(WI_LOCAL_GET, result_local);
+    }
+
+    *pcode = code;
+}
+
 EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -2587,6 +2627,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
             emit_expression(mod, &code, (AstTyped *) callsite->filename);
             emit_expression(mod, &code, (AstTyped *) callsite->line);
             emit_expression(mod, &code, (AstTyped *) callsite->column);
+            break;
+        }
+
+        case Ast_Kind_If_Expression: {
+            AstIfExpression* if_expr = (AstIfExpression *) expr;
+            emit_if_expression(mod, &code, if_expr);
             break;
         }
 

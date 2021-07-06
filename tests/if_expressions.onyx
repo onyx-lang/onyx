@@ -1,0 +1,25 @@
+#load "core/std"
+
+use package core
+
+some_function :: () -> f32 {
+    println("In some function!");
+    return 1234;
+}
+
+new_max :: (a: $T, b: T) -> T {
+    // Much much better!
+    return a if a > b else b;
+}
+
+main :: (args: [] cstr) {
+
+    condition := 12 > 34;
+
+    x := some_function() if condition else 5678.0f;
+    println(x);
+
+    println("True" if x > 5000 else "False" if false else "REALLY FALSE");
+
+    println(new_max(10, 20));
+}

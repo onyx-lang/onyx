@@ -28,6 +28,7 @@
     NODE(ArrayLiteral)         \
     NODE(RangeLiteral)         \
     NODE(Compound)             \
+    NODE(IfExpression)         \
                                \
     NODE(DirectiveSolidify)    \
     NODE(DirectiveError)       \
@@ -165,6 +166,7 @@ typedef enum AstKind {
     Ast_Kind_File_Contents,
     Ast_Kind_Struct_Literal,
     Ast_Kind_Array_Literal,
+    Ast_Kind_If_Expression,
 
     Ast_Kind_If,
     Ast_Kind_For,
@@ -593,6 +595,13 @@ struct AstCompound {
     AstTyped_base;
 
     bh_arr(AstTyped *) exprs;
+};
+struct AstIfExpression {
+    AstTyped_base;
+
+    AstTyped* cond;
+    AstTyped* true_expr;
+    AstTyped* false_expr;
 };
 
 struct AstDirectiveSolidify {

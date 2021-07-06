@@ -297,6 +297,13 @@ static SymresStatus symres_compound(AstCompound* compound) {
     return Symres_Success;
 }
 
+static SymresStatus symres_if_expression(AstIfExpression* if_expr) {
+    SYMRES(expression, &if_expr->cond);
+    SYMRES(expression, &if_expr->true_expr);
+    SYMRES(expression, &if_expr->false_expr);
+    return Symres_Success;
+}
+
 static SymresStatus symres_pipe(AstBinaryOp** pipe) {
     AstCall* call_node = (AstCall *) (*pipe)->right;
     SYMRES(expression, (AstTyped **) &call_node);
@@ -460,6 +467,10 @@ static SymresStatus symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Package:
             SYMRES(package, (AstPackage *) *expr);
+            break;
+
+        case Ast_Kind_If_Expression:
+            SYMRES(if_expression, (AstIfExpression *) *expr);
             break;
 
         default: break;

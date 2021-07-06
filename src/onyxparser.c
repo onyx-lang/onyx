@@ -682,6 +682,21 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
+            case Token_Type_Keyword_If: {
+                AstIfExpression* if_expression = make_node(AstIfExpression, Ast_Kind_If_Expression);
+                if_expression->token = expect_token(parser, Token_Type_Keyword_If);
+
+                if_expression->true_expr  = retval;
+                if_expression->cond       = parse_expression(parser, 0);
+                expect_token(parser, Token_Type_Keyword_Else);
+                if_expression->false_expr = parse_expression(parser, 0);
+
+                retval = (AstTyped *) if_expression;
+
+                // nocheckin This should maybe be goto factor_parsed; ??
+                break;
+            }
+
             default: goto factor_parsed;
         }
     }
