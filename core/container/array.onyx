@@ -145,6 +145,15 @@ get :: (arr: ^[..] $T, idx: i32) -> T {
     return arr.data[idx];
 }
 
+get_ptr :: (arr: ^[..] $T, idx: i32) -> ^T {
+    if arr.count == 0 do return null;
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    return ^arr.data[idx];
+}
+
 set :: (arr: ^[..] $T, idx: i32, value: T) {
     if arr.count == 0 do return;
 

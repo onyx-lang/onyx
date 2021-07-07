@@ -28,10 +28,10 @@ create_texture :: (width: i32, height: i32, format: gl.GLenum) -> Texture {
     };
 }
 
-load_texture :: (width: i32, height: i32, data: [] u8, format: gl.GLenum, internal_type := gl.UNSIGNED_BYTE) -> Texture {
+load_texture :: (width: i32, height: i32, data: [] u8, format: gl.GLenum, internal_format: gl.GLenum, internal_type := gl.UNSIGNED_BYTE) -> Texture {
     texture := gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, internal_type, data);
+    gl.texImage2D(gl.TEXTURE_2D, 0, internal_format, width, height, 0, format, internal_type, data);
 
     // Setting some reasonable defaults for the texture parameters
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);

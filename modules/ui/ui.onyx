@@ -285,7 +285,7 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
 
     tex_width, tex_height := font.common.scale_width, font.common.scale_height;
 
-    font_texture = gfx.load_texture(tex_width, tex_height, texture_data, gl.ALPHA);
+    font_texture = gfx.load_texture(tex_width, tex_height, texture_data, gl.ALPHA, gl.ALPHA);
 }
 
 

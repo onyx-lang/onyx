@@ -6,6 +6,9 @@ use package core
 // This Shader represents an OpenGL program, not a shader. The name
 // is confusing but conceptually for most people, shaders are a bundled
 // version of the vertex and fragment shader.
+
+@Todo // Rewrite this so members that start with "uniform_" are automatically detected and the uniform location
+// is automatically retrieved. Same thing with vertex attributes.
 Shader :: struct {
     program : gl.GLProgram;
 

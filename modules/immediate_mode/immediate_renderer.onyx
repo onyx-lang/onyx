@@ -24,6 +24,9 @@ Immediate_Vertex :: struct {
 }
 
 Immediate_Renderer :: struct {
+    // Needs to be a multiple of 6!!
+    Default_Max_Verticies :: 1020;
+
     active_shader : ^Shader;
 
     simple_shader, textured_shader : Shader;
@@ -42,14 +45,14 @@ Immediate_Renderer :: struct {
     vertex_array  : gl.GLVertexArrayObject;
     vertex_buffer : gl.GLBuffer;
 
-    // Needs to be a multiple of 6!!
-    Default_Max_Verticies :: 1020;
-
     mode := Immediate_Mode.Triangles;
 
     canvas: ^Canvas = null;
 
     window_width, window_height: i32;
+
+    world_transform_stack : [..] Transform;
+    world_transform_dirty := false; // If the world transform matrix should be pushed to the shader uniform.
 
     make :: (max_verticies := Default_Max_Verticies) -> Immediate_Renderer {
         ir : Immediate_Renderer;
@@ -78,7 +81,11 @@ Immediate_Renderer :: struct {
         vertex_buffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
         gl.bufferData(gl.ARRAY_BUFFER, cast(gl.GLsizei) (max_verticies * sizeof Immediate_Vertex), gl.STREAM_DRAW);
-        
+
+        world_transform_stack = array.make(Transform, capacity=1);
+        array.insert_empty(^world_transform_stack, 0);
+        transform_identity(array.get_ptr(^world_transform_stack, -1));
+    
         ir->init_shader_params(^simple_shader);
         ir->init_shader_params(^textured_shader);
         ir->init_shader_params(^alpha_shader);
@@ -111,12 +118,10 @@ Immediate_Renderer :: struct {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, -1);
 
-        // TEMPORARY
-        gl.uniformMatrix4(shader.world_uniform, false,
-                          f32.[ 1, 0, 0, 0,
-                                0, 1, 0, 0,
-                                0, 0, 1, 0,
-                                0, 0, 0, 1 ]);
+        world_transform := array.get_ptr(^world_transform_stack, -1);
+        world_matrix := transform_to_matrix(world_transform);
+
+        gl.uniformMatrix4(shader.world_uniform, false, world_matrix);
     }
 
     free :: (use ir: ^Immediate_Renderer) {
@@ -130,6 +135,17 @@ Immediate_Renderer :: struct {
 
     flush :: (use ir: ^Immediate_Renderer) {
         if vertex_count == 0 do return;
+
+        if world_transform_dirty || true {
+            world_transform_dirty = false;
+            world_transform := array.get_ptr(^world_transform_stack, -1);
+            world_matrix := transform_to_matrix(world_transform);
+
+            for shader: (#type ^Shader).[ ^simple_shader, ^textured_shader, ^alpha_shader ] {
+                gl.useProgram(shader.program);
+                gl.uniformMatrix4(shader.world_uniform, false, world_matrix);
+            }
+        }
 
         gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, .{ count = vertex_count * sizeof Immediate_Vertex, data = ~~verticies.data });
@@ -327,6 +343,29 @@ Immediate_Renderer :: struct {
             ir->use_ortho_projection(0, ~~window_width, 0, ~~window_height);
         }
     }
+
+    push_matrix :: (use ir: ^Immediate_Renderer) {
+        if vertex_count > 0 do flush(ir);
+        world_transform_dirty = true;
+
+        array.push(^world_transform_stack, world_transform_stack[world_transform_stack.count - 1]);
+        transform_identity(array.get_ptr(^world_transform_stack, -1));
+    }
+
+    pop_matrix :: (use ir: ^Immediate_Renderer) {
+        if vertex_count > 0 do flush(ir);
+        world_transform_dirty = true;
+
+        array.pop(^world_transform_stack);
+    }
+
+    identity :: (use ir: ^Immediate_Renderer) {
+        transform_identity(array.get_ptr(^world_transform_stack, -1));
+    }
+
+    get_transform :: (use ir: ^Immediate_Renderer) -> ^Transform {
+        return array.get_ptr(^world_transform_stack, -1);
+    }
 }
 
 
@@ -336,40 +375,39 @@ Immediate_Renderer :: struct {
 // that operate on a global immediate renderer. This is probably the most common way that 
 // it will be used.
 
-#private
-immediate_renderer : Immediate_Renderer;
+global_renderer : Immediate_Renderer;
 
 immediate_renderer_init :: () {
-    immediate_renderer = Immediate_Renderer.make();
+    global_renderer = Immediate_Renderer.make();
 }
 
 immediate_renderer_free :: () {
-    Immediate_Renderer.free(^immediate_renderer);
+    Immediate_Renderer.free(^global_renderer);
 }
 
 vertex :: #match {
-    (position: Vector2)                { immediate_renderer->push_vertex(position); },
-    (position: Vector2, color: Color4) { immediate_renderer->push_vertex(position, color); },
+    (position: Vector2)                { global_renderer->push_vertex(position); },
+    (position: Vector2, color: Color4) { global_renderer->push_vertex(position, color); },
 }
 
 rect :: (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
-    immediate_renderer->rect(position, size, color);
+    global_renderer->rect(position, size, color);
 }
 
 textured_rect :: (position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
-    immediate_renderer->textured_rect(position, size, texture_position, texture_size, color);
+    global_renderer->textured_rect(position, size, texture_position, texture_size, color);
 }
 
 circle :: (center: Vector2, radius: f32, color: Color4 = .{1,1,1}, segments := 12) {
-    immediate_renderer->circle(center, radius, color, segments);
+    global_renderer->circle(center, radius, color, segments);
 }
 
-flush :: () do immediate_renderer->flush();
+flush :: () do global_renderer->flush();
 
 set_texture :: #match {
-    (texture_id: i32 = -1) { immediate_renderer->set_texture(texture_id); },
+    (texture_id: i32 = -1) { global_renderer->set_texture(texture_id); },
     (texture: ^Texture, texture_index := 0) {
-        immediate_renderer->set_texture(texture_index);
+        global_renderer->set_texture(texture_index);
 
         if texture_index >= 0 {
             gl.activeTexture(gl.TEXTURE0 + texture_index);
@@ -382,29 +420,33 @@ set_texture :: #match {
 }
 
 use_ortho_projection :: (left: f32, right: f32, top: f32, bottom: f32) {
-    immediate_renderer->use_ortho_projection(left, right, top, bottom);
+    global_renderer->use_ortho_projection(left, right, top, bottom);
 }
 
 use_alpha_shader :: (texture_id: i32 = -1) {
-    immediate_renderer->use_alpha_shader(texture_id);
+    global_renderer->use_alpha_shader(texture_id);
 }
 
 scissor :: (x: f32, y: f32, w: f32, h: f32) {
-    immediate_renderer->scissor(x, y, w, h);
+    global_renderer->scissor(x, y, w, h);
 }
 
 scissor_disable :: () {
-    immediate_renderer->scissor_disable();
+    global_renderer->scissor_disable();
 }
 
 set_mode :: (mode: Immediate_Mode) {
-    immediate_renderer->set_mode(mode);
+    global_renderer->set_mode(mode);
 }
 
 use_canvas :: (canvas: ^Canvas) {
-    immediate_renderer->use_canvas(canvas);
+    global_renderer->use_canvas(canvas);
 }
 
 set_window_size :: (width: i32, height: i32) {
-    immediate_renderer->set_window_size(width, height);
+    global_renderer->set_window_size(width, height);
 }
+
+push_matrix :: () do global_renderer->push_matrix();
+pop_matrix  :: () do global_renderer->pop_matrix();
+identity    :: () do global_renderer->identity();
