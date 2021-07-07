@@ -1,0 +1,10 @@
+package ui
+use package core
+
+scrollable_area_start :: (use r: Rectangle) {
+
+}
+
+scrollable_area_end :: () {
+    
+}

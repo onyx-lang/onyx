@@ -23,6 +23,10 @@ Immediate_Vertex :: struct {
     texture    : Vector2;
 }
 
+Scissor_State :: struct {
+    x, y, w, h: f32;
+}
+
 Immediate_Renderer :: struct {
     // Needs to be a multiple of 6!!
     Default_Max_Verticies :: 1020;
@@ -53,6 +57,8 @@ Immediate_Renderer :: struct {
 
     world_transform_stack : [..] Transform;
     world_transform_dirty := false; // If the world transform matrix should be pushed to the shader uniform.
+
+    scissor_stack : [..] Scissor_State;
 
     make :: (max_verticies := Default_Max_Verticies) -> Immediate_Renderer {
         ir : Immediate_Renderer;
@@ -85,6 +91,8 @@ Immediate_Renderer :: struct {
         world_transform_stack = array.make(Transform, capacity=1);
         array.insert_empty(^world_transform_stack, 0);
         transform_identity(array.get_ptr(^world_transform_stack, -1));
+
+        scissor_stack = array.make(Scissor_State);
     
         ir->init_shader_params(^simple_shader);
         ir->init_shader_params(^textured_shader);
@@ -289,13 +297,39 @@ Immediate_Renderer :: struct {
 
     @Cleanup // right now, these are raw screen coordinates, with x and y being the bottom left of the screen.
     // This is backwards from what use_ortho_projections does, so it's not great to work with.
-    scissor :: (use ir: ^Immediate_Renderer, x: f32, y: f32, w: f32, h: f32) {
+    push_scissor :: (use ir: ^Immediate_Renderer, x: f32, y: f32, w: f32, h: f32, intersect_previous := true) {
+        if vertex_count > 0 do ir->flush();
+
         if !gl.isEnabled(gl.SCISSOR_TEST) {
-            ir->flush();
             gl.enable(gl.SCISSOR_TEST);
         }
 
-        gl.scissor(~~x, ~~y, ~~w, ~~h);
+        world_matrix := ir->get_transform()
+                        |> transform_to_matrix();
+
+        new_x0 := world_matrix[0] * x + world_matrix[1] * y + world_matrix[12] * 1;
+        new_y0 := world_matrix[4] * x + world_matrix[5] * y + world_matrix[13] * 1;
+        new_x1 := world_matrix[0] * (x + w) + world_matrix[1] * (y + h) + world_matrix[12] * 1;
+        new_y1 := world_matrix[4] * (x + w) + world_matrix[5] * (y + h) + world_matrix[13] * 1;
+        new_w  := new_x1 - new_x0;
+        new_h  := new_y1 - new_y0;
+
+        array.push(^scissor_stack, .{ new_x0, new_y0, new_w, new_h });
+
+        gl.scissor(~~new_x0, ~~(-new_y0 + new_h * 2), ~~new_w, ~~new_h);
+    }
+
+    pop_scissor :: (use ir: ^Immediate_Renderer) {
+        array.pop(^scissor_stack);
+
+        if scissor_stack.count > 0 {
+            s := scissor_stack[scissor_stack.count - 1];
+
+            gl.scissor(~~s.x, ~~s.y, ~~s.w, ~~s.h);
+
+        } else {
+            ir->scissor_disable();
+        }
     }
 
     scissor_disable :: (use ir: ^Immediate_Renderer) {
@@ -427,9 +461,11 @@ use_alpha_shader :: (texture_id: i32 = -1) {
     global_renderer->use_alpha_shader(texture_id);
 }
 
-scissor :: (x: f32, y: f32, w: f32, h: f32) {
-    global_renderer->scissor(x, y, w, h);
+push_scissor :: (x: f32, y: f32, w: f32, h: f32) {
+    global_renderer->push_scissor(x, y, w, h);
 }
+
+pop_scissor :: () do global_renderer->pop_scissor();
 
 scissor_disable :: () {
     global_renderer->scissor_disable();

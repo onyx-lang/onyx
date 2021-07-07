@@ -125,7 +125,7 @@ delete :: (arr: ^[..] $T, idx: u32) {
 fast_delete :: (arr: ^[..] $T, idx: u32) {
     if idx >= arr.count do return;
 
-    arr.data[idx] = arr.data[arr.count - 1];
+    if idx != arr.count - 1 do arr.data[idx] = arr.data[arr.count - 1];
     arr.count -= 1;
 }
 
