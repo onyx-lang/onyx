@@ -9,14 +9,13 @@ static Scope*       curr_scope    = NULL;
 bh_arr(AstBlock *)  block_stack   = NULL;
 static b32 report_unresolved_symbols = 1;
 
+// Everything related to waiting on is imcomplete at the moment.
+static Entity* waiting_on         = NULL;
+
 #define SYMRES(kind, ...) do { \
     SymresStatus ss = symres_ ## kind (__VA_ARGS__); \
     if (ss > Symres_Errors_Start) return ss;         \
     } while (0)
-
-#define SYMRES_IF_SYMBOL(node_ptr) do { \
-    if ((*(node_ptr))->kind == Ast_Kind_Symbol) SYMRES(expression, node_ptr); \
-    } while (0);
 
 typedef enum SymresStatus {
     Symres_Success,
@@ -598,20 +597,20 @@ static SymresStatus symres_use(AstUse* use) {
             scope_include(curr_scope, package->package->scope, pos);
 
         } else {
-            bh_arr_each(AstAlias *, alias, use->only) {
-                AstNode* thing = symbol_resolve(package->package->scope, (*alias)->token);
+            bh_arr_each(QualifiedUse, qu, use->only) {
+                AstNode* thing = symbol_resolve(package->package->scope, qu->symbol_name);
                 if (thing == NULL) { // :SymresStall
                     if (report_unresolved_symbols) {
-                        onyx_report_error((*alias)->token->pos,
+                        onyx_report_error(qu->symbol_name->pos,
                                 "The symbol '%b' was not found in this package.",
-                                (*alias)->token->text, (*alias)->token->length);
+                                qu->symbol_name->text, qu->symbol_name->length);
                         return Symres_Error;
                     } else {
                         return Symres_Yield_Macro;
                     }
                 }
 
-                symbol_introduce(curr_scope, (*alias)->alias, thing);
+                symbol_introduce(curr_scope, qu->as_name, thing);
             }
         }
 
@@ -637,16 +636,16 @@ static SymresStatus symres_use(AstUse* use) {
             scope_include(curr_scope, st->scope, use->token->pos);
 
         } else {
-            bh_arr_each(AstAlias *, alias, use->only) {
-                AstNode* thing = symbol_resolve(st->scope, (*alias)->token);
+            bh_arr_each(QualifiedUse, qu, use->only) {
+                AstNode* thing = symbol_resolve(st->scope, qu->symbol_name);
                 if (thing == NULL) {
-                    onyx_report_error((*alias)->token->pos,
+                    onyx_report_error(qu->symbol_name->pos,
                             "The symbol '%b' was not found in this scope.",
-                            (*alias)->token->text, (*alias)->token->length);
+                            qu->symbol_name->text, qu->symbol_name->length);
                     return Symres_Error;
                 }
 
-                symbol_introduce(curr_scope, (*alias)->alias, thing);
+                symbol_introduce(curr_scope, qu->as_name, thing);
             }
         }
 

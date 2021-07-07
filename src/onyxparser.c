@@ -1215,15 +1215,15 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
         while (!consume_token_if_next(parser, '}')) {
             if (parser->hit_unexpected_token) return NULL;
 
-            AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
-            alias->token = expect_token(parser, Token_Type_Symbol);
+            QualifiedUse qu;
+            qu.symbol_name = expect_token(parser, Token_Type_Symbol);
 
             if (consume_token_if_next(parser, Token_Type_Keyword_As))
-                alias->alias = expect_token(parser, Token_Type_Symbol);
+                qu.as_name = expect_token(parser, Token_Type_Symbol);
             else
-                alias->alias = alias->token;
+                qu.as_name = qu.symbol_name;
 
-            bh_arr_push(use_node->only, alias);
+            bh_arr_push(use_node->only, qu);
 
             if (parser->curr->type != '}')
                 expect_token(parser, ',');

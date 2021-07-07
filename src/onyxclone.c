@@ -27,7 +27,6 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Package: return sizeof(AstPackage);
         case Ast_Kind_Load_File: return sizeof(AstInclude);
         case Ast_Kind_Load_Path: return sizeof(AstInclude);
-        case Ast_Kind_Alias: return sizeof(AstAlias);
         case Ast_Kind_Memres: return sizeof(AstMemRes);
         case Ast_Kind_Binding: return sizeof(AstBinding);
         case Ast_Kind_Function: return sizeof(AstFunction);

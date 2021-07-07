@@ -71,7 +71,6 @@
     NODE(MemRes)               \
     NODE(Include)              \
     NODE(UsePackage)           \
-    NODE(Alias)                \
     NODE(Global)               \
     NODE(Param)                \
     NODE(Function)             \
@@ -106,7 +105,6 @@ typedef enum AstKind {
     Ast_Kind_Package,
     Ast_Kind_Load_File,
     Ast_Kind_Load_Path,
-    Ast_Kind_Alias,
     Ast_Kind_Memres,
 
     Ast_Kind_Binding,
@@ -616,11 +614,16 @@ struct AstDirectiveSolidify {
 // Intruction Node
 struct AstReturn        { AstNode_base; AstTyped* expr; };
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
+
+typedef struct QualifiedUse {
+    OnyxToken* symbol_name;
+    OnyxToken* as_name;
+} QualifiedUse;
 struct AstUse           {
     AstNode_base;
 
     AstTyped* expr;
-    bh_arr(AstAlias *) only;
+    bh_arr(QualifiedUse) only;
 };
 
 // Structure Nodes
@@ -1064,6 +1067,9 @@ typedef struct Entity {
 
     Package *package;
     Scope *scope;
+
+    // TODO: This is incomplete. Add proper cycle detection and halting.
+    // struct Entity *waiting_on;
 
     union {
         AstDirectiveError     *error;

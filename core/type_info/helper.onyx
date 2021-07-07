@@ -113,3 +113,18 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
         }            
     }
 }
+
+
+offset_of :: (T: type_expr, member: str) -> u32 {
+    info := get_type_info(T);
+    if info == null         do return 0;
+    if info.kind != .Struct do return 0;
+
+    struct_info := cast(^Type_Info_Struct) info;
+    for ^m: struct_info.members {
+        if m.name == member do return m.offset;
+    }
+
+    // Should this return something else if the member was not found?
+    return 0;
+}

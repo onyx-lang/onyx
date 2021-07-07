@@ -94,17 +94,19 @@ Immediate_Renderer :: struct {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
 
+        use package builtin.type_info { offset_of };
+
         // Position
         gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, sizeof Immediate_Vertex, 0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, sizeof Immediate_Vertex, offset_of(Immediate_Vertex, "position"));
 
         // Color
         gl.enableVertexAttribArray(1);
-        gl.vertexAttribPointer(1, 4, gl.FLOAT, false, sizeof Immediate_Vertex, 2 * sizeof f32);
+        gl.vertexAttribPointer(1, 4, gl.FLOAT, false, sizeof Immediate_Vertex, offset_of(Immediate_Vertex, "color"));
 
         // Texture
         gl.enableVertexAttribArray(2);
-        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, sizeof Immediate_Vertex, 6 * sizeof f32);
+        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, sizeof Immediate_Vertex, offset_of(Immediate_Vertex, "texture"));
 
         gl.bindBuffer(gl.ARRAY_BUFFER, -1);
 
