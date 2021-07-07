@@ -555,6 +555,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             type_register(comp_type);
             return comp_type;
         }
+
+        case Ast_Kind_Alias: {
+            AstAlias* alias = (AstAlias *) type_node;
+            return type_build_from_ast(alloc, (AstType *) alias->alias);
+        }
     }
 
     return NULL;

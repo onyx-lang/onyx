@@ -10,6 +10,7 @@ static const char* ast_node_names[] = {
     "MEMORY RESERVATION",
 
     "BINDING",
+    "ALIAS",
     "FUNCTION",
     "OVERLOADED_FUNCTION",
     "POLYMORPHIC PROC",
@@ -231,27 +232,31 @@ AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
 
 #define REDUCE_UNOP(op) \
     if (type_is_small_integer(unop->type) || type_is_bool(unop->type)) { \
-        res->value.i = op ((AstNumLit *) unop->expr)->value.i; \
+        res->value.i = op (operand)->value.i; \
     } else if (type_is_integer(unop->type) || unop->type->Basic.kind == Basic_Kind_Int_Unsized) { \
-        res->value.l = op ((AstNumLit *) unop->expr)->value.l; \
+        res->value.l = op (operand)->value.l; \
     } else if (unop->type->Basic.kind == Basic_Kind_F32) { \
-        res->value.f = op ((AstNumLit *) unop->expr)->value.f; \
+        res->value.f = op (operand)->value.f; \
     } else if (unop->type->Basic.kind == Basic_Kind_F64 || unop->type->Basic.kind == Basic_Kind_Float_Unsized) { \
-        res->value.d = op ((AstNumLit *) unop->expr)->value.d; \
+        res->value.d = op (operand)->value.d; \
     } \
     break;
 
 #define REDUCE_UNOP_INT(op) \
     if (type_is_small_integer(unop->type) || type_is_bool(unop->type)) { \
-        res->value.i = op ((AstNumLit *) unop->expr)->value.i; \
+        res->value.i = op (operand)->value.i; \
     } else if (type_is_integer(unop->type) || res->type->Basic.kind == Basic_Kind_Int_Unsized) { \
-        res->value.l = op ((AstNumLit *) unop->expr)->value.l; \
+        res->value.l = op (operand)->value.l; \
     }
 
 AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
-    unop->expr = ast_reduce(a, unop->expr);
+    // GROSS
+    AstNumLit* operand = (AstNumLit *) ast_reduce(a, unop->expr);
+    unop->expr = (AstTyped *) operand;
 
-    if (unop->expr->kind != Ast_Kind_NumLit) {
+    // while (operand->kind == Ast_Kind_Alias) operand = (AstNumLit *) ((AstAlias *) operand)->alias;
+
+    if (operand->kind != Ast_Kind_NumLit) {
         return (AstTyped *) unop;
     }
 
@@ -265,7 +270,7 @@ AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
     switch (unop->operation) {
         case Unary_Op_Negate: REDUCE_UNOP(-);
         case Unary_Op_Not: {
-            if (type_is_bool(res->type)) res->value.i = ! ((AstNumLit *) unop->expr)->value.i;
+            if (type_is_bool(res->type)) res->value.i = ! (operand)->value.i;
             break;
         }
         case Unary_Op_Bitwise_Not: REDUCE_UNOP_INT(~);
@@ -283,6 +288,7 @@ AstTyped* ast_reduce(bh_allocator a, AstTyped* node) {
         case Ast_Kind_Binary_Op:  return (AstTyped *) ast_reduce_binop(a, (AstBinaryOp *) node);
         case Ast_Kind_Unary_Op:   return (AstTyped *) ast_reduce_unaryop(a, (AstUnaryOp *) node);
         case Ast_Kind_Enum_Value: return (AstTyped *) ((AstEnumValue *) node)->value;
+        case Ast_Kind_Alias:      return (AstTyped *) ast_reduce(a, ((AstAlias *) node)->alias);
         default:                  return node;
     }
 }
@@ -529,6 +535,10 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
             return 0;
         }
     }
+    else if (node->kind == Ast_Kind_Alias) {
+        AstAlias* alias = (AstAlias *) node;
+        return type_check_or_auto_cast(&alias->alias, type);
+    }
 
     return 0;
 }
@@ -553,6 +563,11 @@ Type* resolve_expression_type(AstTyped* node) {
         type_check_or_auto_cast(&if_expr->false_expr, ltype);
 
         if_expr->type = ltype;
+    }
+
+    if (node->kind == Ast_Kind_Alias) {
+        AstAlias* alias = (AstAlias *) node;
+        alias->type = resolve_expression_type(alias->alias);
     }
 
     if (node_is_type((AstNode *) node)) {
@@ -584,6 +599,10 @@ i64 get_expression_integer_value(AstTyped* node) {
         return ((AstNumLit *) node)->value.l;
     }
 
+    if (node->kind == Ast_Kind_NumLit && type_is_bool(node->type)) {
+        return ((AstNumLit *) node)->value.i;
+    }
+
     if (node->kind == Ast_Kind_Argument) {
         return get_expression_integer_value(((AstArgument *) node)->value);
     }
@@ -594,6 +613,10 @@ i64 get_expression_integer_value(AstTyped* node) {
 
     if (node->kind == Ast_Kind_Align_Of) {
         return ((AstAlignOf *) node)->alignment;
+    }
+
+    if (node->kind == Ast_Kind_Alias) {
+        return get_expression_integer_value(((AstAlias *) node)->alias);
     }
 
     if (node_is_type((AstNode*) node)) {
@@ -918,8 +941,8 @@ const char* node_get_type_name(void* node) {
 b32 static_if_resolution(AstIf* static_if) {
     if (static_if->kind != Ast_Kind_Static_If) return 0;
 
-    AstNumLit* condition_value = (AstNumLit *) static_if->cond;
-    assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
+    // assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
+    i64 value = get_expression_integer_value(static_if->cond);
 
-    return condition_value->value.i != 0;
+    return value != 0;
 }

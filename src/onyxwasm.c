@@ -2467,6 +2467,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Intrinsic_Call: emit_intrinsic_call(mod, &code, (AstCall *) expr); break;
         case Ast_Kind_Binary_Op:      emit_binop(mod, &code, (AstBinaryOp *) expr); break;
         case Ast_Kind_Unary_Op:       emit_unaryop(mod, &code, (AstUnaryOp *) expr); break;
+        case Ast_Kind_Alias:          emit_expression(mod, &code, ((AstAlias *) expr)->alias); break;
 
         case Ast_Kind_Address_Of: {
             AstAddressOf* aof = (AstAddressOf *) expr;

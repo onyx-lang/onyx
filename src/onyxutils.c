@@ -162,6 +162,7 @@ AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol) {
         switch (node->kind) {
             case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
             case Ast_Kind_Type_Alias:     node = (AstNode *) ((AstTypeAlias *) node)->to; break;
+            case Ast_Kind_Alias:          node = (AstNode *) ((AstAlias *) node)->alias; break;
             case Ast_Kind_Pointer_Type: {
                 if (used_pointer) goto all_types_peeled_off;
                 used_pointer = 1;

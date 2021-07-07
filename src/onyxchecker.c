@@ -1652,6 +1652,12 @@ CheckStatus check_expression(AstTyped** pexpr) {
             CHECK(if_expression, (AstIfExpression *) expr);
             break;
 
+        case Ast_Kind_Alias:
+            CHECK(expression, &((AstAlias *) expr)->alias);
+            expr->flags |= (((AstAlias *) expr)->alias->flags & Ast_Flag_Comptime);
+            expr->type = ((AstAlias *) expr)->alias->type;
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;

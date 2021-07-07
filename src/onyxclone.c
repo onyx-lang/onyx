@@ -15,6 +15,7 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_Enum_Value:
 		case Ast_Kind_Overloaded_Function:
 		case Ast_Kind_Polymorphic_Proc:
+		case Ast_Kind_Alias:
 			return 0;
 
 		default: return 1;

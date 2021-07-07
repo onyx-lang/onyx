@@ -220,6 +220,13 @@ static SymresStatus symres_type(AstType** type) {
             AstCompoundType* ctype = (AstCompoundType *) *type;
 
             bh_arr_each(AstType *, type, ctype->types) SYMRES(type, type);
+            break;
+        }
+
+        case Ast_Kind_Alias: {
+            AstAlias* alias = (AstAlias *) *type;
+            SYMRES(type, (AstType **) &alias->alias);
+            break;
         }
     }
 
@@ -415,6 +422,7 @@ static SymresStatus symres_expression(AstTyped** expr) {
         case Ast_Kind_Method_Call:  SYMRES(method_call, (AstBinaryOp **) expr); break;
         case Ast_Kind_Size_Of:      SYMRES(size_of, (AstSizeOf *)*expr); break;
         case Ast_Kind_Align_Of:     SYMRES(align_of, (AstAlignOf *)*expr); break;
+        case Ast_Kind_Alias:        SYMRES(expression, &((AstAlias *) *expr)->alias); break;
 
         case Ast_Kind_Range_Literal:
             SYMRES(expression, &((AstRangeLiteral *)(*expr))->low);

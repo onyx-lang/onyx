@@ -2275,10 +2275,20 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             node->token = symbol;
         }
 
+        if      (node_is_type((AstNode *) node));
+        else if (node->kind == Ast_Kind_Package);
+        else if (node->kind == Ast_Kind_NumLit);
+        else {
+            AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
+            alias->token = node->token;
+            alias->alias = node;
+            node = (AstTyped *) alias;
+        }
+
         // HACK: This should maybe be entered elsewhere?
         ENTITY_SUBMIT(node);
     }
-    
+
     AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
     binding->token = symbol;
     binding->node = (AstNode *) node;
