@@ -304,19 +304,18 @@ Immediate_Renderer :: struct {
             gl.enable(gl.SCISSOR_TEST);
         }
 
-        world_matrix := ir->get_transform()
-                        |> transform_to_matrix();
+        transform := ir->get_transform();
 
-        new_x0 := world_matrix[0] * x + world_matrix[1] * y + world_matrix[12] * 1;
-        new_y0 := world_matrix[4] * x + world_matrix[5] * y + world_matrix[13] * 1;
-        new_x1 := world_matrix[0] * (x + w) + world_matrix[1] * (y + h) + world_matrix[12] * 1;
-        new_y1 := world_matrix[4] * (x + w) + world_matrix[5] * (y + h) + world_matrix[13] * 1;
+        new_x0 := x * transform.scale.x + transform.translation.x;
+        new_y0 := y * transform.scale.y + transform.translation.y;
+        new_x1 := (x + w) * transform.scale.x + transform.translation.x;
+        new_y1 := (y + h) * transform.scale.y + transform.translation.y;
         new_w  := new_x1 - new_x0;
         new_h  := new_y1 - new_y0;
 
         array.push(^scissor_stack, .{ new_x0, new_y0, new_w, new_h });
 
-        gl.scissor(~~new_x0, ~~(-new_y0 + new_h * 2), ~~new_w, ~~new_h);
+        gl.scissor(~~new_x0, window_height - ~~new_y0 - ~~new_h, ~~new_w, ~~new_h);
     }
 
     pop_scissor :: (use ir: ^Immediate_Renderer) {
@@ -399,6 +398,24 @@ Immediate_Renderer :: struct {
 
     get_transform :: (use ir: ^Immediate_Renderer) -> ^Transform {
         return array.get_ptr(^world_transform_stack, -1);
+    }
+
+    to_screen_coordinates :: (use ir: ^Immediate_Renderer, use v: Vector2) -> Vector2 {
+        transform := ir->get_transform();
+
+        return .{
+            x * transform.scale.x + transform.translation.x,
+            y * transform.scale.y + transform.translation.y,
+        };
+    }
+
+    to_world_coordinates :: (use ir: ^Immediate_Renderer, use v: Vector2) -> Vector2 {
+        transform := ir->get_transform();
+
+        return .{
+            (x - transform.translation.x) / transform.scale.x,
+            (y - transform.translation.y) / transform.scale.y,
+        };
     }
 }
 

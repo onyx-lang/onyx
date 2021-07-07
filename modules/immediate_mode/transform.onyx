@@ -4,20 +4,23 @@ package immediate_mode
 Transform :: struct {
     translation: Vector2;
     scale:       Vector2;
-    rotation:    f32;    // In radians
+
+    // No rotation for right now. Not need for GUI stuff.
+    // rotation:    f32;    // In radians
 }
 
 transform_identity :: (use t: ^Transform) {
     translation = .{ 0, 0 };
     scale       = .{ 1, 1 };
-    rotation    = 0;
+
+    // rotation    = 0;
 }
 
 transform_to_matrix :: (use t: ^Transform) -> [16] f32 {
     math :: package core.math
 
-    st := math.sin(rotation);
-    ct := math.cos(rotation);
+    // st := math.sin(rotation);
+    // ct := math.cos(rotation);
 
     sx := scale.x;
     sy := scale.y;
@@ -26,8 +29,8 @@ transform_to_matrix :: (use t: ^Transform) -> [16] f32 {
     ty := translation.y;
 
     return f32.[
-        sx * ct, -sy * st, 0, 0,
-        sx * st,  sy * ct, 0, 0,
+        sx, 0, 0, 0,
+        0,  sy, 0, 0,
         0, 0, 1, 0,
         tx, ty, 0, 1
     ];
