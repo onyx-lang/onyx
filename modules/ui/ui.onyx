@@ -22,7 +22,7 @@ init_ui :: () {
     init_font();
 
     map.init(^animation_states, default=.{}, hash_count=4);
-    map.init(^scrollable_area_states, default=.{}, hash_count=4);
+    map.init(^workspace_states, default=.{}, hash_count=4);
 }
 
 // This function should be called at the end of drawing a frame, after all of the UI elements

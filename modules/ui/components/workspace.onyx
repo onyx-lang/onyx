@@ -3,7 +3,7 @@ package ui
 use package core
 
 #private_file
-SA_State :: struct {
+Workspace_State :: struct {
     transform: gfx.Transform = .{
         translation = .{ 0, 0 },
         scale       = .{ 1, 1 },
@@ -13,14 +13,14 @@ SA_State :: struct {
 }
 
 #private
-scrollable_area_states : map.Map(UI_Id, SA_State);
+workspace_states : map.Map(UI_Id, Workspace_State);
 
-scrollable_area_start :: (use r: Rectangle, site := #callsite) {
+workspace_start :: (use r: Rectangle, site := #callsite) {
     hash := get_site_hash(site, 0);
     x, y := Rectangle.top_left(r);    
     width, height := Rectangle.dimensions(r);
 
-    state := map.get(^scrollable_area_states, hash);
+    state := map.get(^workspace_states, hash);
 
     mx, my := get_mouse_position();
     if Rectangle.contains(r, mx, my) {
@@ -61,13 +61,13 @@ scrollable_area_start :: (use r: Rectangle, site := #callsite) {
         state.dragging = false;
     }
 
-    map.put(^scrollable_area_states, hash, state);
+    map.put(^workspace_states, hash, state);
 
     gfx.push_scissor(x, y, width, height);
     gfx.push_matrix();
     gfx.apply_transform(state.transform);
 
-    zoom :: (state: ^SA_State, r: Rectangle, scale := 1.0f) {
+    zoom :: (state: ^Workspace_State, r: Rectangle, scale := 1.0f) {
         x, y := Rectangle.top_left(r);    
         width, height := Rectangle.dimensions(r);
 
@@ -82,7 +82,7 @@ scrollable_area_start :: (use r: Rectangle, site := #callsite) {
     }
 }
 
-scrollable_area_end :: () {
+workspace_end :: () {
     gfx.pop_scissor();
     gfx.pop_matrix();
 }

@@ -23,6 +23,8 @@ Textbox_Theme :: struct {
     cursor_color := gfx.Color4.{ 0.5, 0.5, 0.5 };
     cursor_width := 4.0f;   @InPixels
     cursor_blink_speed := 0.04f;   // Bigger is faster
+
+    placeholder_text_color := gfx.Color4.{ 0.5, 0.5, 0.5 };
 }
 
 default_textbox_theme := Textbox_Theme.{};
@@ -41,7 +43,7 @@ Textbox_Editing_State :: struct {
 // There is only one 'Textbox_Editing_State', not a map of them because there can only be one textbox being edited at once.
 textbox_editing_state := Textbox_Editing_State.{};
 
-textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^default_textbox_theme, site := #callsite, increment := 0) -> bool {
+textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, placeholder := null_str, theme := ^default_textbox_theme, site := #callsite, increment := 0) -> bool {
     result := false;
 
     hash := get_site_hash(site, increment);
@@ -51,7 +53,12 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^defa
     border_width  := theme.border_width;
     width, height := Rectangle.dimensions(r);
 
+    text_color := theme.text_color;
     text := string.buffer_to_str(text_buffer);
+    if text.count == 0 && placeholder.count > 0 {
+        text = placeholder;
+        text_color = theme.placeholder_text_color;
+    }
     text_width  := bmfont.get_width(^font, text, theme.font_size);
     text_height := bmfont.get_height(^font, text, theme.font_size);
 
@@ -147,7 +154,7 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, theme := ^defa
     surface_color  = color_lerp(animation_state.click_time, surface_color, theme.click_color);
     gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, surface_color);
 
-    draw_text_raw(text, text_x, text_y, theme.font_size, theme.text_color);
+    draw_text_raw(text, text_x, text_y, theme.font_size, text_color);
 
     if textbox_editing_state.hash == hash {
         cursor_x := get_cursor_location(text_buffer, text_x, text_y, theme.font_size, textbox_editing_state.cursor_position);
