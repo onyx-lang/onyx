@@ -144,7 +144,7 @@ Immediate_Renderer :: struct {
     flush :: (use ir: ^Immediate_Renderer) {
         if vertex_count == 0 do return;
 
-        if world_transform_dirty || true {
+        if world_transform_dirty {
             world_transform_dirty = false;
             world_transform := array.get_ptr(^world_transform_stack, -1);
             world_matrix := transform_to_matrix(world_transform);
@@ -295,8 +295,6 @@ Immediate_Renderer :: struct {
         gl.useProgram(active_shader.program);
     }
 
-    @Cleanup // right now, these are raw screen coordinates, with x and y being the bottom left of the screen.
-    // This is backwards from what use_ortho_projections does, so it's not great to work with.
     push_scissor :: (use ir: ^Immediate_Renderer, x: f32, y: f32, w: f32, h: f32, intersect_previous := true) {
         if vertex_count > 0 do ir->flush();
 
@@ -319,6 +317,8 @@ Immediate_Renderer :: struct {
     }
 
     pop_scissor :: (use ir: ^Immediate_Renderer) {
+        if vertex_count > 0 do ir->flush();
+        
         array.pop(^scissor_stack);
 
         if scissor_stack.count > 0 {
@@ -382,7 +382,9 @@ Immediate_Renderer :: struct {
         world_transform_dirty = true;
 
         array.push(^world_transform_stack, world_transform_stack[world_transform_stack.count - 1]);
-        transform_identity(array.get_ptr(^world_transform_stack, -1));
+        *array.get_ptr(^world_transform_stack, -1) = *array.get_ptr(^world_transform_stack, -2);
+
+        // transform_identity(array.get_ptr(^world_transform_stack, -1));
     }
 
     pop_matrix :: (use ir: ^Immediate_Renderer) {
@@ -398,6 +400,10 @@ Immediate_Renderer :: struct {
 
     get_transform :: (use ir: ^Immediate_Renderer) -> ^Transform {
         return array.get_ptr(^world_transform_stack, -1);
+    }
+
+    apply_transform :: (use ir: ^Immediate_Renderer, transform: Transform) {
+        transform_apply(array.get_ptr(^world_transform_stack, -1), transform);
     }
 
     to_screen_coordinates :: (use ir: ^Immediate_Renderer, use v: Vector2) -> Vector2 {
@@ -503,3 +509,4 @@ set_window_size :: (width: i32, height: i32) {
 push_matrix :: () do global_renderer->push_matrix();
 pop_matrix  :: () do global_renderer->pop_matrix();
 identity    :: () do global_renderer->identity();
+apply_transform :: (transform: Transform) do global_renderer->apply_transform(transform);

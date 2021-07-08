@@ -1,10 +1,88 @@
 package ui
+
 use package core
 
-scrollable_area_start :: (use r: Rectangle) {
+#private_file
+SA_State :: struct {
+    transform: gfx.Transform = .{
+        translation = .{ 0, 0 },
+        scale       = .{ 1, 1 },
+    };
 
+    dragging := false;
+}
+
+#private
+scrollable_area_states : map.Map(UI_Id, SA_State);
+
+scrollable_area_start :: (use r: Rectangle, site := #callsite) {
+    hash := get_site_hash(site, 0);
+    x, y := Rectangle.top_left(r);    
+    width, height := Rectangle.dimensions(r);
+
+    state := map.get(^scrollable_area_states, hash);
+
+    mx, my := get_mouse_position();
+    if Rectangle.contains(r, mx, my) {
+        if hot_item == 0 do set_hot_item(hash);
+    }
+
+    if is_hot_item(hash) {
+        speed :: 30.0f; @ThemeConfiguration
+        scale_speed :: 0.02f; @ThemeConfiguration
+
+        if is_key_down(38)  do state.transform.translation.y += speed;
+        if is_key_down(40)  do state.transform.translation.y -= speed;
+        if is_key_down(39)  do state.transform.translation.x -= speed;
+        if is_key_down(37)  do state.transform.translation.x += speed;
+
+        if is_key_down(187) do zoom(^state, r, 1.02);
+        if is_key_down(189) do zoom(^state, r, 0.98);
+
+        if mouse_state.left_button_just_down && !state.dragging {
+            state.dragging = true;
+        }
+
+        if state.dragging {
+            if !mouse_state.left_button_down {
+                state.dragging = false;
+
+            } else {
+                dx, dy := get_mouse_delta();
+                state.transform.translation.x -= dx;
+                state.transform.translation.y -= dy;
+            }
+        }
+
+        if mouse_state.dwheel > 0 do zoom(^state, r, 1.04);
+        if mouse_state.dwheel < 0 do zoom(^state, r, 0.96);
+
+    } else {
+        state.dragging = false;
+    }
+
+    map.put(^scrollable_area_states, hash, state);
+
+    gfx.push_scissor(x, y, width, height);
+    gfx.push_matrix();
+    gfx.apply_transform(state.transform);
+
+    zoom :: (state: ^SA_State, r: Rectangle, scale := 1.0f) {
+        x, y := Rectangle.top_left(r);    
+        width, height := Rectangle.dimensions(r);
+
+        bx: f32 = (state.transform.translation.x - (width / 2) - x) / state.transform.scale.x;
+        by: f32 = (state.transform.translation.y - (height / 2) - y) / state.transform.scale.y;
+
+        state.transform.scale.x *= scale;
+        state.transform.scale.y *= scale;
+
+        state.transform.translation.x = bx * state.transform.scale.x + (width / 2) + x;
+        state.transform.translation.y = by * state.transform.scale.y + (height / 2) + y;
+    }
 }
 
 scrollable_area_end :: () {
-    
+    gfx.pop_scissor();
+    gfx.pop_matrix();
 }

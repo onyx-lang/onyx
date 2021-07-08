@@ -1,0 +1,162 @@
+package ui
+
+
+Mouse_State :: struct {
+    left_button_down      := false;
+    left_button_just_down := false;
+    left_button_just_up   := false;
+
+    right_button_down      := false;
+    right_button_just_down := false;
+    right_button_just_up   := false;
+
+    dwheel : f32 = 0;
+
+    x_  : f32 = 0;
+    y_  : f32 = 0;
+    dx_ : f32 = 0;
+    dy_ : f32 = 0;
+}
+
+mouse_state := Mouse_State.{};
+
+Keyboard_State :: struct {
+    Max_Keys_Per_Frame :: 4;
+
+    Key_Event :: struct {
+        code: u32 = 0;
+        modifiers: Modifiers = ~~0;
+
+        Modifiers :: enum #flags {
+            CTRL; ALT; SHIFT; META;
+        }
+    }
+
+    keycodes_down_this_frame  : [Max_Keys_Per_Frame] Key_Event;
+    keys_down_this_frame      : u32;
+
+    keycodes_up_this_frame    : [Max_Keys_Per_Frame] Key_Event;
+    keys_up_this_frame        : u32;
+
+    Key_Count :: 256;
+
+    Key_State :: enum (u8) {
+        Up;
+        Down;
+        Just_Up;
+        Just_Down;
+    }
+
+    state : [Key_Count] Key_State;
+}
+
+@Note // This assumes that this gets zero intialized.
+keyboard_state: Keyboard_State;
+
+
+
+
+//
+// Telling the UI system about hardware updates
+//
+
+update_mouse_position :: (new_x: f32, new_y: f32) {
+    mouse_state.dx_ += mouse_state.x_ - new_x;
+    mouse_state.dy_ += mouse_state.y_ - new_y;
+    mouse_state.x_  = new_x;
+    mouse_state.y_  = new_y;
+}
+
+#private_file Mouse_Button_Kind :: enum { Left; Right; Middle; WheelUp; WheelDown; }
+
+button_pressed :: (kind: Mouse_Button_Kind) {
+    switch kind {
+        case .Left {
+            mouse_state.left_button_down      = true;
+            mouse_state.left_button_just_down = true;
+        }
+
+        case .Right {
+            mouse_state.right_button_down      = true;
+            mouse_state.right_button_just_down = true;
+        }
+        
+        case .WheelUp   do mouse_state.dwheel =  1.0;
+        case .WheelDown do mouse_state.dwheel = -1.0;
+    }
+}
+
+button_released :: (kind: Mouse_Button_Kind) {
+    switch kind {
+        case .Left {
+            mouse_state.left_button_down    = false;
+            mouse_state.left_button_just_up = true;
+        }
+
+        case .Right {
+            mouse_state.right_button_down    = false;
+            mouse_state.right_button_just_up = true;
+        }
+
+        case .WheelUp   do mouse_state.dwheel = 0;
+        case .WheelDown do mouse_state.dwheel = 0;
+    }
+}
+
+#private_file
+__key_state_transition_table := Keyboard_State.Key_State.[
+                    /* KeyUp */                        /* KeyDown */
+    /* Up */        Keyboard_State.Key_State.Up,       Keyboard_State.Key_State.Just_Down,
+    /* Down */      Keyboard_State.Key_State.Just_Up,  Keyboard_State.Key_State.Down,
+    /* Just_Up */   Keyboard_State.Key_State.Up,       Keyboard_State.Key_State.Just_Down,
+    /* Just_Down */ Keyboard_State.Key_State.Just_Up,  Keyboard_State.Key_State.Down,
+]
+
+key_down :: (keycode: u32, modifiers: Keyboard_State.Key_Event.Modifiers) {
+    keyboard_state.keycodes_down_this_frame[keyboard_state.keys_down_this_frame] = .{
+        keycode,
+        modifiers
+    };
+
+    keyboard_state.keys_down_this_frame += 1;
+    keyboard_state.state[keycode] = __key_state_transition_table[cast(i32) keyboard_state.state[keycode] * 2 + 1];
+}
+
+key_up :: (keycode: u32, modifiers: Keyboard_State.Key_Event.Modifiers) {
+    keyboard_state.keycodes_up_this_frame[keyboard_state.keys_up_this_frame] = .{
+        keycode,
+        modifiers
+    };
+
+    keyboard_state.keys_up_this_frame += 1;
+    keyboard_state.state[keycode] = __key_state_transition_table[cast(i32) keyboard_state.state[keycode] * 2];
+}
+
+
+
+//
+// Querying the UI system for current input state
+//
+
+// Relative to the current transformations on the immediate renderer
+get_mouse_position :: () -> (x: f32, y: f32) {
+    transform := gfx.global_renderer->get_transform();
+    return (mouse_state.x_ - transform.translation.x) / transform.scale.x,
+           (mouse_state.y_ - transform.translation.y) / transform.scale.y;
+}
+
+get_mouse_delta :: () -> (dx: f32, dy: f32) {
+    transform := gfx.global_renderer->get_transform();
+    return mouse_state.dx_ / transform.scale.x,
+           mouse_state.dy_ / transform.scale.y;
+}
+
+is_key_down :: (keycode: u32) -> bool {
+    s := keyboard_state.state[keycode];
+    return s == .Down || s == .Just_Down;
+}
+
+is_key_up :: (keycode: u32) -> bool {
+    s := keyboard_state.state[keycode];
+    return s == .Up || s == .Just_Up;
+}

@@ -17,57 +17,25 @@ UI_Id :: #type u32
 #private active_item : UI_Id = 0
 #private hot_item_was_set := false
 
-Mouse_State :: struct {
-    left_button_down      := false;
-    left_button_just_down := false;
-    left_button_just_up   := false;
-
-    right_button_down      := false;
-    right_button_just_down := false;
-    right_button_just_up   := false;
-
-    x: f32 = 0;
-    y: f32 = 0;
-}
-
-mouse_state := Mouse_State.{};
-
-Keyboard_State :: struct {
-    Max_Keys_Per_Frame :: 4;
-
-    Key_State :: struct {
-        code: u32 = 0;
-        modifiers: Modifiers = ~~0;
-
-        Modifiers :: enum #flags {
-            CTRL; ALT; SHIFT; META;
-        }
-    }
-
-    keycodes_down_this_frame  : [Max_Keys_Per_Frame] Key_State;
-    keys_down_this_frame      : u32;
-
-    keycodes_up_this_frame    : [Max_Keys_Per_Frame] Key_State;
-    keys_up_this_frame        : u32;
-}
-
-@Note // This assumes that this gets zero intialized.
-keyboard_state: Keyboard_State;
-
 
 init_ui :: () {
     init_font();
 
     map.init(^animation_states, default=.{}, hash_count=4);
+    map.init(^scrollable_area_states, default=.{}, hash_count=4);
 }
 
 // This function should be called at the end of drawing a frame, after all of the UI elements
 // had a chance to interact with the hardware events.
-clear_buttons :: () {
+end_frame :: () {
     mouse_state.left_button_just_up    = false;
     mouse_state.left_button_just_down  = false;
     mouse_state.right_button_just_up   = false;
     mouse_state.right_button_just_down = false;
+
+    mouse_state.dwheel = 0;
+    mouse_state.dx_ = 0;
+    mouse_state.dy_ = 0;
 
     // I don't think these need to be cleared every frame, so long as you don't try
     // to use them without checking keys_down_this_frame first.
@@ -79,62 +47,6 @@ clear_buttons :: () {
 
     if !hot_item_was_set do set_hot_item(0);
     hot_item_was_set = false;
-}
-
-//
-// Telling the UI system about hardware updates
-//
-
-update_mouse_position :: (new_x: f32, new_y: f32) {
-    mouse_state.x = new_x;
-    mouse_state.y = new_y;
-}
-
-#private_file Mouse_Button_Kind :: enum { Left; Right; Middle; }
-
-button_pressed :: (kind: Mouse_Button_Kind) {
-    switch kind {
-        case .Left {
-            mouse_state.left_button_down      = true;
-            mouse_state.left_button_just_down = true;
-        }
-        case .Right {
-            mouse_state.right_button_down      = true;
-            mouse_state.right_button_just_down = true;
-        }
-    }
-}
-
-button_released :: (kind: Mouse_Button_Kind) {
-    switch kind {
-        case .Left {
-            mouse_state.left_button_down    = false;
-            mouse_state.left_button_just_up = true;
-        }
-
-        case .Right {
-            mouse_state.right_button_down    = false;
-            mouse_state.right_button_just_up = true;
-        }
-    }
-}
-
-key_down :: (keycode: u32, modifiers: Keyboard_State.Key_State.Modifiers) {
-    keyboard_state.keycodes_down_this_frame[keyboard_state.keys_down_this_frame] = .{
-        keycode,
-        modifiers
-    };
-
-    keyboard_state.keys_down_this_frame += 1;
-}
-
-key_up :: (keycode: u32, modifiers: Keyboard_State.Key_State.Modifiers) {
-    keyboard_state.keycodes_up_this_frame[keyboard_state.keys_up_this_frame] = .{
-        keycode,
-        modifiers
-    };
-
-    keyboard_state.keys_up_this_frame += 1;
 }
 
 set_active_item :: (id: UI_Id) -> bool {
