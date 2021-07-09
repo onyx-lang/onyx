@@ -174,6 +174,10 @@ parse_global_section :: (use bin: ^WasmBinary, allocator := context.allocator) -
     read_global :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmGlobal {
         type := read_val_type(reader, bin);
         mutable := io.read_byte(reader) == 1;
+
+        initial_value := parse_instruction(reader, bin);
+        assert(io.read_byte(reader) == ~~0x0B, "Expected '0x0B' after constant expression");
+
         return .{ type, mutable };
     }
 }
@@ -193,7 +197,10 @@ parse_element_section :: (use bin: ^WasmBinary, allocator := context.allocator) 
 
     read_element :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmElement {
         table_index := read_uleb128(reader);
-        offset      := parse_const_uint32(reader, bin);
+
+        offset      := parse_instruction(reader, bin);
+        assert(io.read_byte(reader) == ~~0x0B, "Expected '0x0B' after constant expression");
+
         funcs       := parse_vector(reader, bin, read_function_index);
         return .{ ~~table_index, offset, funcs };
     }
@@ -218,7 +225,9 @@ parse_data_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> 
     
     read_data :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmData {
         memory_index := read_uleb128(reader);
-        offset       := parse_const_uint32(reader, bin);
+
+        offset       := parse_instruction(reader, bin);
+        assert(io.read_byte(reader) == ~~0x0B, "Expected '0x0B' after constant expression");
 
         size := read_uleb128(reader);
         _, pos := io.stream_tell(reader.stream);
@@ -328,7 +337,14 @@ read_val_type :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmValueType {
         case 125 do return .F32;
         case 124 do return .F64;
         case 123 do return .V128;
-        case #default do assert(false, "Bad wasm value type");
+        case #default {
+            conv :: package core.conv
+
+            buf : [256] u8;
+            _, loc := io.stream_tell(reader.stream);
+            s := conv.str_format("Bad wasm value type {} at {x}", ~~buf, cast(i32) byte, loc);
+            assert(false, s);
+        }
     }
 
     return ~~0;

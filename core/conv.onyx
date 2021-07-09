@@ -256,6 +256,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
         digits_after_decimal := cast(u32) 4;
 
         indentation := cast(u32) 0;
+        base        := cast(u64) 10;
     }
 
     vararg_index := 0;
@@ -295,6 +296,11 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                     case #char "p" {
                         i += 1;
                         formatting.pretty_printing = true;
+                    }
+
+                    case #char "x" {
+                        i += 1;
+                        formatting.base = 16;
                     }
 
                     case #default do break break;
@@ -349,7 +355,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 value := *(cast(^i32) v.data);
 
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, 10, ~~ibuf);
+                istr := i64_to_str(~~value, formatting.base, ~~ibuf);
                 output->write(istr);
             }
 
@@ -357,7 +363,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 value := *(cast(^i64) v.data);
 
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, 10, ~~ibuf);
+                istr := i64_to_str(~~value, formatting.base, ~~ibuf);
                 output->write(istr);
             }
 

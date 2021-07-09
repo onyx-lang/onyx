@@ -430,6 +430,8 @@ CheckStatus check_call(AstCall* call) {
     // which can be multiple if we have to yield on a callee's type.
     arguments_clone(&call->original_args, &call->args);
 
+    while (call->callee->kind == Ast_Kind_Alias) call->callee = ((AstAlias *) call->callee)->alias;
+
     if (call->callee->kind == Ast_Kind_Overloaded_Function) {
         AstTyped* new_callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args);
         if (new_callee == NULL) {

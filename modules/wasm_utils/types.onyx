@@ -102,13 +102,13 @@ WasmGlobal :: struct {
 
 WasmElement :: struct {
     table_index : u32;
-    offset      : u32;
+    offset      : WasmInstruction;
     funcs       : [] u32;
 }
 
 WasmData :: struct {
     memory_index : u32;
-    offset       : u32;
+    offset       : WasmInstruction;
     
     data : [] u8;
 }
@@ -176,15 +176,15 @@ parse_sections :: (use bin: ^WasmBinary, allocator := context.allocator) -> Wasm
 }
 
 free_sections :: (use sections: ^WasmSections) {
-    raw_free(allocator, type_section.data);
-    raw_free(allocator, import_section.data);
-    raw_free(allocator, export_section.data);
-    raw_free(allocator, function_section.data);
-    raw_free(allocator, memory_section.data);
-    raw_free(allocator, table_section.data);
-    raw_free(allocator, global_section.data);
-    raw_free(allocator, code_section.data);
-    raw_free(allocator, data_section.data);
+    if type_section.data != null     do raw_free(allocator, type_section.data);
+    if import_section.data != null   do raw_free(allocator, import_section.data);
+    if export_section.data != null   do raw_free(allocator, export_section.data);
+    if function_section.data != null do raw_free(allocator, function_section.data);
+    if memory_section.data != null   do raw_free(allocator, memory_section.data);
+    if table_section.data != null    do raw_free(allocator, table_section.data);
+    if global_section.data != null   do raw_free(allocator, global_section.data);
+    if code_section.data != null     do raw_free(allocator, code_section.data);
+    if data_section.data != null     do raw_free(allocator, data_section.data);
 }
 
 

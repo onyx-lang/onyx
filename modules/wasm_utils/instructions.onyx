@@ -1,0 +1,430 @@
+package wasm_utils
+
+Z :: (package core.intrinsics.onyx).__zero_value
+
+WasmCodeParser :: struct {
+
+}
+
+WasmInstructionCode :: enum {
+    unreachable   :: 0x00;
+    nop           :: 0x01;
+    block         :: 0x02;
+    loop          :: 0x03;
+    if_           :: 0x04;
+    else_         :: 0x05;
+    end           :: 0x0B;
+    branch        :: 0x0C;
+    branch_if     :: 0x0D;
+    branch_table  :: 0x0E;
+    return_       :: 0x0F;
+    call          :: 0x10;
+    call_indirect :: 0x11;
+
+    ref_null    :: 0xD0;
+    ref_is_null :: 0xD1;
+    ref_func    :: 0xD2;
+
+    drop   :: 0x1A;
+    select :: 0x1B;
+
+    local_get  :: 0x20;
+    local_set  :: 0x21;
+    local_tee  :: 0x22;
+    global_get :: 0x23;
+    global_set :: 0x24;
+
+    table_get  :: 0x25;
+    table_set  :: 0x26;
+    table_init :: 0xFC0C;
+    elem_drop  :: 0xFC0D;
+    table_copy :: 0xFC0E;
+    table_grow :: 0xFC0F;
+    table_size :: 0xFC10;
+    table_fill :: 0xFC11;
+
+    i32_load :: 0x28;
+    i64_load :: 0x29;
+    f32_load :: 0x2A;
+    f64_load :: 0x2B;
+
+    i32_load8_s  :: 0x2C;
+    i32_load8_u  :: 0x2D;
+    i32_load16_s :: 0x2E;
+    i32_load16_u :: 0x2F;
+    i64_load8_s  :: 0x30;
+    i64_load8_u  :: 0x31;
+    i64_load16_s :: 0x32;
+    i64_load16_u :: 0x33;
+    i64_load32_s :: 0x34;
+    i64_load32_u :: 0x35;
+
+    i32_store :: 0x36;
+    i64_store :: 0x37;
+    f32_store :: 0x38;
+    f64_store :: 0x39;
+
+    i32_store8  :: 0x3A;
+    i32_store16 :: 0x3B;
+    i64_store8  :: 0x3C;
+    i64_store16 :: 0x3D;
+    i64_store32 :: 0x3E;
+
+    memory_size :: 0x3F;
+    memory_grow :: 0x40;
+    memory_init :: 0xFC08;
+    data_drop   :: 0xFC09;
+    memory_copy :: 0xFC0A;
+    memory_fill :: 0xFC0B;
+
+    i32_const :: 0x41;
+    i64_const :: 0x42;
+    f32_const :: 0x43;
+    f64_const :: 0x44;
+
+    i32_eqz  :: 0x45;
+    i32_eq   :: 0x46;
+    i32_ne   :: 0x47;
+    i32_lt_s :: 0x48;
+    i32_lt_u :: 0x49;
+    i32_gt_s :: 0x4A;
+    i32_gt_u :: 0x4B;
+    i32_le_s :: 0x4C;
+    i32_le_u :: 0x4D;
+    i32_ge_s :: 0x4E;
+    i32_ge_u :: 0x4F;
+
+    i64_eqz  :: 0x50;
+    i64_eq   :: 0x51;
+    i64_ne   :: 0x52;
+    i64_lt_s :: 0x53;
+    i64_lt_u :: 0x54;
+    i64_gt_s :: 0x55;
+    i64_gt_u :: 0x56;
+    i64_le_s :: 0x57;
+    i64_le_u :: 0x58;
+    i64_ge_s :: 0x59;
+    i64_ge_u :: 0x5A;
+
+    f32_eq :: 0x5B;
+    f32_ne :: 0x5C;
+    f32_lt :: 0x5D;
+    f32_gt :: 0x5E;
+    f32_le :: 0x5F;
+    f32_ge :: 0x60;
+
+    f64_eq :: 0x61;
+    f64_ne :: 0x62;
+    f64_lt :: 0x63;
+    f64_gt :: 0x64;
+    f64_le :: 0x65;
+    f64_ge :: 0x66;
+
+    i32_clz    :: 0x67;
+    i32_ctz    :: 0x68;
+    i32_popcnt :: 0x69;
+    i32_add    :: 0x6A;
+    i32_sub    :: 0x6B;
+    i32_mul    :: 0x6C;
+    i32_div_s  :: 0x6D;
+    i32_div_u  :: 0x6E;
+    i32_rem_s  :: 0x6F;
+    i32_rem_u  :: 0x70;
+    i32_and    :: 0x71;
+    i32_or     :: 0x72;
+    i32_xor    :: 0x73;
+    i32_shl    :: 0x74;
+    i32_shr_s  :: 0x75;
+    i32_shr_u  :: 0x76;
+    i32_rotl   :: 0x77;
+    i32_rotr   :: 0x78;
+
+    i64_clz    :: 0x79;
+    i64_ctz    :: 0x7A;
+    i64_popcnt :: 0x7B;
+    i64_add    :: 0x7C;
+    i64_sub    :: 0x7D;
+    i64_mul    :: 0x7E;
+    i64_div_s  :: 0x7F;
+    i64_div_u  :: 0x80;
+    i64_rem_s  :: 0x81;
+    i64_rem_u  :: 0x82;
+    i64_and    :: 0x83;
+    i64_or     :: 0x84;
+    i64_xor    :: 0x85;
+    i64_shl    :: 0x86;
+    i64_shr_s  :: 0x87;
+    i64_shr_u  :: 0x88;
+    i64_rotl   :: 0x89;
+    i64_rotr   :: 0x8A;
+
+    f32_abs      :: 0x8B;
+    f32_neg      :: 0x8C;
+    f32_ceil     :: 0x8D;
+    f32_floor    :: 0x8E;
+    f32_trunc    :: 0x8F;
+    f32_nearest  :: 0x90;
+    f32_sqrt     :: 0x91;
+    f32_add      :: 0x92;
+    f32_sub      :: 0x93;
+    f32_mul      :: 0x94;
+    f32_div      :: 0x95;
+    f32_min      :: 0x96;
+    f32_max      :: 0x97;
+    f32_copysign :: 0x98;
+
+    f64_abs      :: 0x99;
+    f64_neg      :: 0x9A;
+    f64_ceil     :: 0x9B;
+    f64_floor    :: 0x9C;
+    f64_trunc    :: 0x9D;
+    f64_nearest  :: 0x9E;
+    f64_sqrt     :: 0x9F;
+    f64_add      :: 0xA0;
+    f64_sub      :: 0xA1;
+    f64_mul      :: 0xA2;
+    f64_div      :: 0xA3;
+    f64_min      :: 0xA4;
+    f64_max      :: 0xA5;
+    f64_copysign :: 0xA6;
+
+    i32_from_i64    :: 0xA7;
+    i32_from_f32_s  :: 0xA8;
+    i32_from_f32_u  :: 0xA9;
+    i32_from_f64_s  :: 0xAA;
+    i32_from_f64_u  :: 0xAB;
+    i64_from_i32_s  :: 0xAC;
+    i64_from_i32_u  :: 0xAD;
+    i64_from_f32_s  :: 0xAE;
+    i64_from_f32_u  :: 0xAF;
+    i64_from_f64_s  :: 0xB0;
+    i64_from_f64_u  :: 0xB1;
+    f32_from_i32_s  :: 0xB2;
+    f32_from_i32_u  :: 0xB3;
+    f32_from_i64_s  :: 0xB4;
+    f32_from_i64_u  :: 0xB5;
+    f32_from_f64    :: 0xB6;
+    f64_from_i32_s  :: 0xB7;
+    f64_from_i32_u  :: 0xB8;
+    f64_from_i64_s  :: 0xB9;
+    f64_from_i64_u  :: 0xBA;
+    f64_from_f32    :: 0xBB;
+
+    i32_transmute_f32 :: 0xBC;
+    i64_transmute_f64 :: 0xBD;
+    f32_transmute_i32 :: 0xBE;
+    f64_transmute_i64 :: 0xBF;
+
+    i32_trunc_sat_f32_s :: 0xFC00;
+    i32_trunc_sat_f32_u :: 0xFC01;
+    i32_trunc_sat_f64_s :: 0xFC02;
+    i32_trunc_sat_f64_u :: 0xFC03;
+    i64_trunc_sat_f32_s :: 0xFC04;
+    i64_trunc_sat_f32_u :: 0xFC05;
+    i64_trunc_sat_f64_s :: 0xFC06;
+    i64_trunc_sat_f64_u :: 0xFC07;
+}
+
+WasmInstruction :: struct {
+    code : WasmInstructionCode;
+
+    // Offset to the immediates after the instruction.
+    data : u32;
+}
+
+instruction_iterator :: (binary: ^WasmBinary, code: ^WasmCode, allocator := context.allocator) -> Iterator(WasmInstruction) {
+
+    CodeContext :: struct {
+        allocator : Allocator;     
+        binary    : ^WasmBinary;
+
+        code      : ^WasmCode;
+
+        stream : io.StringStream;
+        reader : io.Reader;
+
+        current_block_depth : u32;
+    }
+
+    data := make(CodeContext, allocator=allocator);
+    data.allocator = allocator;
+    data.binary = binary;
+    data.code = code;
+    data.current_block_depth = 1;
+    
+    data.stream = io.string_stream_make(binary.data.data[code.code_offset .. (code.code_offset + code.size)]);
+    data.reader = io.reader_make(^data.stream);
+
+    next :: (use c: ^CodeContext) -> (WasmInstruction, bool) {
+        if current_block_depth == 0 do return Z(WasmInstruction), false;
+
+        return parse_instruction(^reader, binary, code.code_offset, ^current_block_depth), true;
+    }
+
+    close :: (use c: ^CodeContext) {
+        raw_free(allocator, c);
+    }
+
+    return .{ data, next, close };
+}
+
+instructions_as_array :: (binary: ^WasmBinary, code: ^WasmCode, allocator := context.allocator) -> [..] WasmInstruction {
+    return instruction_iterator(binary, code, allocator)
+           |> iter.to_array(allocator=allocator);
+}
+
+#private
+parse_instruction :: (reader: ^io.Reader, binary: ^WasmBinary, code_offset := 0, current_block_depth: ^i32 = null) -> WasmInstruction {
+
+    Parse_After :: enum {
+        None;
+        Block_Type;
+        Index;
+        Zero_Byte;
+        Memory_Arg;
+        Index_Then_Zero_Byte;
+        Two_Zero_Bytes;
+        Two_Indicies;
+
+        Signed_Leb;
+        Unsigned_Leb;
+        Float32;
+        Float64;
+        
+        Branch_Table;
+    }
+
+    instr: WasmInstruction;
+    instr.data = 0;
+
+    parse_after := Parse_After.None;
+    block_depth := (*current_block_depth) if current_block_depth != null else 0;
+
+    ib := io.read_byte(reader);
+    switch cast(u32) ib {
+        case 0x00 do instr.code = .unreachable;
+        case 0x01 do instr.code = .nop;
+        case 0x02 { instr.code = .block;  block_depth += 1; parse_after = .Block_Type; }
+        case 0x03 { instr.code = .loop;   block_depth += 1; parse_after = .Block_Type; }
+        case 0x04 { instr.code = .if_;    block_depth += 1; parse_after = .Block_Type; }
+        case 0x05 { instr.code = .else_; }
+        case 0x0B { instr.code = .end;    block_depth -= 1; }
+
+        case 0x0C { instr.code = .branch;       parse_after = .Index; }
+        case 0x0D { instr.code = .branch_if;    parse_after = .Index; }
+        case 0x0E { instr.code = .branch_table; parse_after = .Branch_Table; }
+
+        case 0x0F { instr.code = .return_; }
+        case 0x10 { instr.code = .call; parse_after = .Index; }
+        case 0x11 { instr.code = .call_indirect; parse_after = .Two_Indicies; }
+        case 0x1A { instr.code = .drop; }
+        case 0x1B { instr.code = .select; }
+
+        case 0x20 { instr.code = .local_get;  parse_after = .Index; }
+        case 0x21 { instr.code = .local_set;  parse_after = .Index; }
+        case 0x22 { instr.code = .local_tee;  parse_after = .Index; }
+        case 0x23 { instr.code = .global_get; parse_after = .Index; }
+        case 0x24 { instr.code = .global_set; parse_after = .Index; }
+
+        case 0x28 { instr.code = .i32_load; parse_after = .Memory_Arg; }
+        case 0x29 { instr.code = .i64_load; parse_after = .Memory_Arg; }
+        case 0x2A { instr.code = .f32_load; parse_after = .Memory_Arg; }
+        case 0x2B { instr.code = .f64_load; parse_after = .Memory_Arg; }
+
+        case 0x2C { instr.code = .i32_load8_s;  parse_after = .Memory_Arg; }
+        case 0x2D { instr.code = .i32_load8_u;  parse_after = .Memory_Arg; }
+        case 0x2E { instr.code = .i32_load16_s; parse_after = .Memory_Arg; }
+        case 0x2F { instr.code = .i32_load16_u; parse_after = .Memory_Arg; }
+
+        case 0x30 { instr.code = .i64_load8_s;  parse_after = .Memory_Arg; }
+        case 0x31 { instr.code = .i64_load8_u;  parse_after = .Memory_Arg; }
+        case 0x32 { instr.code = .i64_load16_s; parse_after = .Memory_Arg; }
+        case 0x33 { instr.code = .i64_load16_u; parse_after = .Memory_Arg; }
+        case 0x34 { instr.code = .i64_load32_s; parse_after = .Memory_Arg; }
+        case 0x35 { instr.code = .i64_load32_u; parse_after = .Memory_Arg; }
+
+        case 0x36 { instr.code = .i32_store; parse_after = .Memory_Arg; }
+        case 0x37 { instr.code = .i64_store; parse_after = .Memory_Arg; }
+        case 0x38 { instr.code = .f32_store; parse_after = .Memory_Arg; }
+        case 0x39 { instr.code = .f64_store; parse_after = .Memory_Arg; }
+
+        case 0x3A { instr.code = .i32_store8;  parse_after = .Memory_Arg; }
+        case 0x3B { instr.code = .i32_store16; parse_after = .Memory_Arg; }
+        case 0x3C { instr.code = .i64_store8;  parse_after = .Memory_Arg; }
+        case 0x3D { instr.code = .i64_store16; parse_after = .Memory_Arg; }
+        case 0x3E { instr.code = .i64_store32; parse_after = .Memory_Arg; }
+
+        case 0x3F { instr.code = .memory_size; parse_after = .Zero_Byte; }
+        case 0x40 { instr.code = .memory_copy; parse_after = .Zero_Byte; }
+
+        case 0x41 { instr.code = .i32_const; parse_after = .Signed_Leb; }
+        case 0x42 { instr.code = .i64_const; parse_after = .Signed_Leb; }
+        case 0x43 { instr.code = .f32_const; parse_after = .Float32; }
+        case 0x44 { instr.code = .f64_const; parse_after = .Float64; }
+
+        case #default {
+            // Special instructions
+            if ~~ib == 0xFC {
+                instr_num := cast(u32) read_uleb128(reader);
+                switch instr_num {
+                    case 0x00 do instr.code = .i32_trunc_sat_f32_s;
+                    case 0x01 do instr.code = .i32_trunc_sat_f32_u;
+                    case 0x02 do instr.code = .i32_trunc_sat_f64_s;
+                    case 0x03 do instr.code = .i32_trunc_sat_f64_u;
+                    case 0x04 do instr.code = .i64_trunc_sat_f32_s;
+                    case 0x05 do instr.code = .i64_trunc_sat_f32_u;
+                    case 0x06 do instr.code = .i64_trunc_sat_f64_s;
+                    case 0x07 do instr.code = .i64_trunc_sat_f64_u;
+
+                    case 0x08 { instr.code = .memory_init; parse_after = .Index_Then_Zero_Byte; }
+                    case 0x09 { instr.code = .data_drop;   parse_after = .Index; }
+                    case 0x0a { instr.code = .memory_copy; parse_after = .Two_Zero_Bytes; }
+                    case 0x0b { instr.code = .memory_fill; parse_after = .Zero_Byte; }
+                }
+            } else {
+                instr.code = ~~ ib;
+            }
+        }
+    }
+
+    _, data_offset := io.stream_tell(reader.stream);
+    instr.data = code_offset + data_offset;
+
+    switch parse_after {
+        case .Block_Type do io.read_byte(reader);
+        case .Index      do read_uleb128(reader);
+        case .Zero_Byte  do io.read_byte(reader);
+        case .Memory_Arg {
+            read_uleb128(reader);
+            read_uleb128(reader);
+        }
+        case .Index_Then_Zero_Byte {
+            read_uleb128(reader);
+            io.read_byte(reader);
+        }
+        case .Two_Zero_Bytes {
+            io.read_byte(reader);
+            io.read_byte(reader);
+        }
+        case .Two_Indicies {
+            read_uleb128(reader);
+            read_uleb128(reader);
+        }
+        case .Signed_Leb   do read_sleb128(reader);
+        case .Unsigned_Leb do read_uleb128(reader);
+        case .Float32      do io.skip_bytes(reader, 4);
+        case .Float64      do io.skip_bytes(reader, 8);
+        case .Branch_Table {
+            parse_vector(reader, binary, read_label);
+            read_label(reader, binary);
+
+            read_label :: (reader: ^io.Reader, binary: ^WasmBinary) -> u32 {
+                return cast(u32) read_uleb128(reader);
+            }
+        }
+    }
+
+    if current_block_depth != null do *current_block_depth = block_depth;
+
+    return instr;
+}
