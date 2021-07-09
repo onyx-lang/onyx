@@ -1446,7 +1446,11 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
                 return 0;
             }
 
-            assert(idx < bh_arr_length(args->values));
+            // assert(idx < bh_arr_length(args->values));
+            if (idx >= bh_arr_length(args->values)) {
+                token_toggle_end(named_value->token);
+                return 0;
+            }
 
             if (args->values[idx] != NULL && args->values[idx] != named_value->value) {
                 if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Multiple values given for parameter named '%s'.", named_value->token->text);

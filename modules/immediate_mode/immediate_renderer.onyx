@@ -295,7 +295,7 @@ Immediate_Renderer :: struct {
         gl.useProgram(active_shader.program);
     }
 
-    push_scissor :: (use ir: ^Immediate_Renderer, x: f32, y: f32, w: f32, h: f32, intersect_previous := true) {
+    push_scissor :: (use ir: ^Immediate_Renderer, x: f32, y: f32, w: f32, h: f32) {
         if vertex_count > 0 do ir->flush();
 
         if !gl.isEnabled(gl.SCISSOR_TEST) {
@@ -313,7 +313,7 @@ Immediate_Renderer :: struct {
 
         array.push(^scissor_stack, .{ new_x0, new_y0, new_w, new_h });
 
-        gl.scissor(~~new_x0, window_height - ~~new_y0 - ~~new_h, ~~new_w, ~~new_h);
+        gl.scissor(~~new_x0, window_height - ~~new_y1, ~~new_w, ~~new_h);
     }
 
     pop_scissor :: (use ir: ^Immediate_Renderer) {
@@ -324,7 +324,7 @@ Immediate_Renderer :: struct {
         if scissor_stack.count > 0 {
             s := scissor_stack[scissor_stack.count - 1];
 
-            gl.scissor(~~s.x, ~~s.y, ~~s.w, ~~s.h);
+            gl.scissor(~~s.x, window_height - ~~s.y - ~~s.h, ~~s.w, ~~s.h);
 
         } else {
             ir->scissor_disable();
