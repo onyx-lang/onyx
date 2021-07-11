@@ -44,6 +44,14 @@ make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] 
     };
 }
 
+free_slice :: (sl: ^[] $T, allocator := context.allocator) {
+    if sl.data == null do return;
+
+    raw_free(allocator, sl.data);
+    sl.data = null;
+    sl.count = 0;
+}
+
 align :: #match {
     (size: ^u64, align: u64) {
         if *size % align != 0 {

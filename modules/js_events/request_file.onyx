@@ -1,12 +1,13 @@
 package js_events
 
-#private_file next_request_id := 0;
+// 0 is reserved for dropped files
+#private_file next_request_id := 1;
 
 request_file :: (filepath: str) -> u32 {
     js_request_file :: (event_storage: ^EventStorage, event_size: u32, filepath: str, fileid: u32) -> void #foreign "js_events" "request_file" ---;
 
-    next_request_id += 1;
     fileid := next_request_id;
+    next_request_id += 1;
 
     js_request_file(^event_storage, sizeof Event, filepath, fileid);
     return fileid;

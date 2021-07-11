@@ -25,9 +25,11 @@ radio :: (use r: Rectangle, selected: ^$T, value: T, text: str, theme := ^defaul
     hash := get_site_hash(site, increment);
     animation_state := map.get(^animation_states, hash);
 
+    mx, my := get_mouse_position();
+
     if is_active_item(hash) {
         if mouse_state.left_button_just_up {
-            if is_hot_item(hash) && Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+            if is_hot_item(hash) && Rectangle.contains(r, mx, my) {
                 result = true;
                 *selected = value;
                 animation_state.click_time = 1.0f;
@@ -42,7 +44,7 @@ radio :: (use r: Rectangle, selected: ^$T, value: T, text: str, theme := ^defaul
         }
     }
 
-    if Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+    if Rectangle.contains(r, mx, my) {
         set_hot_item(hash);
     }
 

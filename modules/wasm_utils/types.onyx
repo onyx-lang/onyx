@@ -175,6 +175,12 @@ parse_sections :: (use bin: ^WasmBinary, allocator := context.allocator) -> Wasm
     return ws;
 }
 
+free :: (use bin: ^WasmBinary) {
+    map.free(^sections);
+    map.free(^custom_section_locations);
+}
+
+
 free_sections :: (use sections: ^WasmSections) {
     if type_section.data != null     do raw_free(allocator, type_section.data);
     if import_section.data != null   do raw_free(allocator, import_section.data);

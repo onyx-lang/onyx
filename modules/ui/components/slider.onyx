@@ -23,6 +23,7 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, theme := ^d
     hash := get_site_hash(site, increment);
     animation_state := map.get(^animation_states, hash);
     width, height := Rectangle.dimensions(r);
+    mx, my := get_mouse_position();
 
     if is_hot_item(hash) {
         if mouse_state.left_button_down {
@@ -30,7 +31,7 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, theme := ^d
             result = true;
 
             // Animate this?
-            x := mouse_state.x - x0;
+            x := mx - x0;
 
             if T == i32 || T == i64 || T == u32 || T == u64 {
                 step_width := width / ~~math.abs(max_value - min_value);
@@ -49,7 +50,7 @@ slider :: (use r: Rectangle, value: ^$T, min_value: T, max_value: T, theme := ^d
         }
     }
 
-    if Rectangle.contains(r, mouse_state.x, mouse_state.y) {
+    if Rectangle.contains(r, mx, my) {
         set_hot_item(hash);
     }
 

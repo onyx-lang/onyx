@@ -404,6 +404,7 @@ Immediate_Renderer :: struct {
 
     apply_transform :: (use ir: ^Immediate_Renderer, transform: Transform) {
         transform_apply(array.get_ptr(^world_transform_stack, -1), transform);
+        world_transform_dirty = true;
     }
 
     to_screen_coordinates :: (use ir: ^Immediate_Renderer, use v: Vector2) -> Vector2 {

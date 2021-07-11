@@ -106,6 +106,29 @@ window.ONYX_MODULES.push({
 
         push_event_to_buffer(esp, event_size, 0x06, [ window.innerWidth, window.innerHeight ]);
 
+        document.getElementsByTagName("canvas")[0].addEventListener("drop", function (ev) {
+            ev.preventDefault();
+
+            // ROBUSTNESS: Currently, this only gives the first file, which for a lot of purposes, will be enough.
+            // But if multiple files are dropped, the application will only know about the first one.
+            ev.dataTransfer.items[0].getAsFile().arrayBuffer()
+                .then(response => {
+                    // 0 is assumed to be reserved in request_file.onyx.
+                    requested_file_data[0] = response;
+                    push_event_to_buffer(esp, event_size, 0x08, [0x01, 0, response.byteLength]);
+                })
+                .catch(error => {
+                    push_event_to_buffer(esp, event_size, 0x08, [0x02, 0, 0]);
+                });
+
+            return false;
+        });
+
+        document.getElementsByTagName("canvas")[0].addEventListener("dragover", function(ev) {
+            ev.preventDefault();
+            return false;
+        });
+
         document.oncontextmenu = (e) => {
             e.preventDefault = true;
             return false;
