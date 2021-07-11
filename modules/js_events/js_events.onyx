@@ -5,7 +5,7 @@
 
 package js_events
 
-#private_file Num_Buffered_Events :: 16
+#private_file Max_Buffered_Events :: 16
 
 // NOTE: These need to match exactly what is in the corresponding javascript
 DomEventKind :: enum {
@@ -20,6 +20,9 @@ DomEventKind :: enum {
     KeyUp      :: 0x05;
 
     Resize     :: 0x06;
+
+    FileDropped :: 0x08;
+    FileRequest :: 0x09;
 }
 
 DomEvent :: struct {
@@ -73,12 +76,23 @@ ResizeEvent :: struct {
     height : u32;
 }
 
+FileEvent :: struct {
+    use dom : DomEvent;
+
+    Status :: enum (u32) { Success :: 0x01; Failed :: 0x02; };
+    status : Status;
+
+    file_id : u32;
+    size    : u32;
+}
+
 Event :: struct #union {
     use dom : DomEvent;
 
     keyboard : KeyboardEvent;
     mouse    : MouseEvent;
     resize   : ResizeEvent;
+    file     : FileEvent;
 }
 
 clear_event :: (ev: ^Event) {
@@ -88,7 +102,7 @@ clear_event :: (ev: ^Event) {
 
 init :: () {
     event_storage.event_count = 0;
-    event_storage.max_events = Num_Buffered_Events;
+    event_storage.max_events = Max_Buffered_Events;
 
     for ^ev: event_storage.event_buffer do clear_event(ev);
 
@@ -101,9 +115,9 @@ consume :: () -> Iterator(^Event) {
         if event_storage.event_count == 0 do return null, false;
 
         @CodeGeneration // This instruction (and all instructions involving Event) generate a TON of instructions because Event is a union.
-        processing_event := event_storage.event_buffer[0];
+        processing_event = event_storage.event_buffer[0];
 
-        for i: 0 .. Num_Buffered_Events - 2 {
+        for i: 0 .. Max_Buffered_Events - 2 {
             event_storage.event_buffer[i] = event_storage.event_buffer[i + 1];
         }
         event_storage.event_count -= 1;
@@ -116,11 +130,11 @@ consume :: () -> Iterator(^Event) {
 
 /* Private members */
 
-#private_file EventStorage :: struct {
+#private EventStorage :: struct {
     event_count  : u32;
     max_events   : u32;
-    event_buffer : [Num_Buffered_Events] Event;
+    event_buffer : [Max_Buffered_Events] Event;
 }
 
-#private_file event_storage : EventStorage;
-#private_file event_setup :: (event_storage: ^EventStorage, event_size: u32) -> void #foreign "js_events" "setup" ---
+#private event_storage : EventStorage;
+#private event_setup :: (event_storage: ^EventStorage, event_size: u32) -> void #foreign "js_events" "setup" ---

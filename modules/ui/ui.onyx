@@ -47,6 +47,11 @@ end_frame :: () {
 
     if !hot_item_was_set do set_hot_item(0);
     hot_item_was_set = false;
+
+    for ^s: keyboard_state.state {
+        if *s == .Just_Down do *s = .Down;
+        if *s == .Just_Up   do *s = .Up;
+    }
 }
 
 set_active_item :: (id: UI_Id) -> bool {

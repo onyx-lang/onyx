@@ -1,0 +1,19 @@
+package js_events
+
+#private_file next_request_id := 0;
+
+request_file :: (filepath: str) -> u32 {
+    js_request_file :: (event_storage: ^EventStorage, event_size: u32, filepath: str, fileid: u32) -> void #foreign "js_events" "request_file" ---;
+
+    next_request_id += 1;
+    fileid := next_request_id;
+
+    js_request_file(^event_storage, sizeof Event, filepath, fileid);
+    return fileid;
+}
+
+get_requested_file_data :: (fileid: u32, buffer: [] u8) -> bool {
+    js_get_requested_file_data :: (fileid: u32, buffer: [] u8) -> u32 #foreign "js_events" "get_requested_file_data" ---;
+
+    return js_get_requested_file_data(fileid, buffer) == 1;
+}

@@ -442,10 +442,12 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                     
                     if formatting.pretty_printing {
                         output->write(#char "\n");
-                        for i: formatting.indentation - 1 do output->write(#char " ");
+                        for i: formatting.indentation do output->write(#char " ");
+                        output->write("}");
+                        
+                    } else {
+                        output->write(" }");
                     }
-
-                    output->write(" }");
                 }
 
                 if info.kind == .Function {

@@ -156,6 +156,10 @@ is_key_down :: (keycode: u32) -> bool {
     return s == .Down || s == .Just_Down;
 }
 
+is_key_just_down :: (keycode: u32) -> bool {
+    return keyboard_state.state[keycode] == .Just_Down;
+}
+
 is_key_up :: (keycode: u32) -> bool {
     s := keyboard_state.state[keycode];
     return s == .Up || s == .Just_Up;

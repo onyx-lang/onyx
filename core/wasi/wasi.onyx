@@ -207,7 +207,7 @@ OFlags :: enum #flags (u16) {
     Trunc;
 }
 
-LinkCount :: #type u32;
+LinkCount :: #type u64;
 
 FileStat :: struct {
     dev      : Device;
@@ -225,8 +225,14 @@ FileStat :: struct {
     // a 32-bit value, not 64-bit, which means the offsets were
     // incorrect. I fixed it for now, but when wasmtime updates
     // the size of 'LinkCount' needs to be changed.
+    //
+    // EVEN ANGRIER(Brendan Hansen): ACTUALLY, I realized today
+    // that it has changed (at least for Wasmer). There was not
+    // any mention of this on any release documents, but hey, I
+    // guess this can actually be 64-bits now.
     //                                   - brendanfh 2020/12/05
     //                                   - brendanfh 2020/12/07
+    //                                   - brendanfh 2021/07/10
     nlink    : LinkCount;
 
     size     : Filesize;

@@ -19,6 +19,8 @@ function push_event_to_buffer(esp, event_size, event_kind, data) {
     }
 }
 
+var requested_file_data = {};
+
 window.ONYX_MODULES.push({
     module_name: "js_events",
 
@@ -109,4 +111,41 @@ window.ONYX_MODULES.push({
             return false;
         };
     },
+
+    request_file(esp, event_size, filename_ptr, filename_len, fileid) {
+        esp /= 4;
+
+        var path_memory = new Uint8Array(ONYX_MEMORY.buffer, filename_ptr, filename_len);
+        var path = new TextDecoder("utf-8").decode(path_memory);
+        console.log(path);
+
+        fetch(path)
+            .then(response => response.arrayBuffer())
+            .then(array_buffer => {
+                requested_file_data[fileid] = array_buffer;
+
+                push_event_to_buffer(esp, event_size, 0x09, [ 0x01, fileid, array_buffer.byteLength ]);
+            })
+            .catch((error) => {
+                push_event_to_buffer(esp, event_size, 0x09, [ 0x02, fileid, 0 ]);
+            });
+    },
+
+    get_requested_file_data(fileid, bufferptr, bufferlen) {
+        var file_data = requested_file_data[fileid];
+        if (file_data == null) return 0;
+
+        if (bufferlen < file_data.byteLength) return 0;
+
+        let WASM_U8 = new Uint8Array(ONYX_MEMORY.buffer);
+        var u8_data = new Uint8Array(file_data);
+
+        WASM_U8.set(u8_data, bufferptr);
+
+        requested_file_data[fileid] = null;
+        delete requested_file_data[fileid];
+
+        return 1;
+    },
 });
+
