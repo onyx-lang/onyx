@@ -390,6 +390,8 @@ parse_instruction :: (reader: ^io.Reader, binary: ^WasmBinary, code_offset := 0,
     _, data_offset := io.stream_tell(reader.stream);
     instr.data = code_offset + data_offset;
 
+    // I think these shouldn't just be skipped, but instead should be stored in the instruction struct.
+    // However, I don't know the best way other than a complex union.
     switch parse_after {
         case .Block_Type do io.read_byte(reader);
         case .Index      do read_uleb128(reader);
