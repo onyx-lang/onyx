@@ -2,10 +2,6 @@ package wasm_utils
 
 Z :: (package core.intrinsics.onyx).__zero_value
 
-WasmCodeParser :: struct {
-
-}
-
 WasmInstructionCode :: enum {
     unreachable   :: 0x00;
     nop           :: 0x01;
