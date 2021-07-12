@@ -206,10 +206,8 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
 }
 
 
-
-
-
-#private move_towards :: (value: ^$T, target: T, step: T) {
+@Relocate
+move_towards :: (value: ^$T, target: T, step: T) {
     if *value < target do *value += step;
     if *value > target do *value -= step;
     if *value > target - step && *value < target + step do *value = target;

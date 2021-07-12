@@ -1,0 +1,5 @@
+package ui
+
+Font :: struct {
+    texture: gfx.Texture;
+}
