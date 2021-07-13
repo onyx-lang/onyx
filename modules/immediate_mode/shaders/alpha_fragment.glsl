@@ -10,6 +10,6 @@ in vec2 v_texture;
 out vec4 fragColor;
 
 void main() {
-    float alpha = texture(u_texture, v_texture).a;
+    float alpha = texture(u_texture, v_texture).r;
     fragColor = v_color * alpha;
 }

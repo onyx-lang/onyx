@@ -5,6 +5,8 @@ use package core
 
 load_bmfont :: (fnt_data: [] u8) -> BMFont {
     bmf: BMFont;
+    memory.set(^bmf, 0, sizeof BMFont);
+    
     map.init(^bmf.pages);
     map.init(^bmf.glyphs);
 
@@ -13,9 +15,9 @@ load_bmfont :: (fnt_data: [] u8) -> BMFont {
     @Cleanup // this was a stupid way of doing this. Just use a f-ing for loop.
     array.map(^bmf.glyphs.entries, ^bmf, (glyph: ^map.Map.Entry(i32, BMFont_Glyph), font: ^BMFont) {
         glyph.value.tex_x = ~~ glyph.value.x / cast(f32) font.common.scale_width;        
-        glyph.value.tex_y = ~~ glyph.value.y / cast(f32) font.common.scale_width;        
+        glyph.value.tex_y = ~~ glyph.value.y / cast(f32) font.common.scale_height;        
         glyph.value.tex_w = ~~ glyph.value.w / cast(f32) font.common.scale_width;        
-        glyph.value.tex_h = ~~ glyph.value.h / cast(f32) font.common.scale_width;        
+        glyph.value.tex_h = ~~ glyph.value.h / cast(f32) font.common.scale_height;        
     });
 
     return bmf;

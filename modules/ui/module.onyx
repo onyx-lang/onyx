@@ -42,6 +42,7 @@ package ui
 #load "./ui"
 #load "./flow"
 #load "./input"
+#load "./font"
 
 #load "./components/button"
 #load "./components/checkbox"

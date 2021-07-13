@@ -83,13 +83,12 @@ checkbox :: (use r: Rectangle, value: ^bool, text: str, theme := ^default_checkb
         surface_color
     );
 
-    text_width  := bmfont.get_width(^font, text, theme.font_size);
-    text_height := bmfont.get_height(^font, text, theme.font_size);
+    text_width, text_height := main_font->get_dimensions(text, theme.font_size);
 
     draw_text_raw(
         text,
         x0 + box_size + 4 * 2,   @Cleanup @ThemeConfiguration
-        y0 + ~~ font.common.baseline * theme.font_size + (height - text_height) / 2,
+        y0 + main_font->get_baseline(theme.font_size) + (height - text_height) / 2,
         theme.font_size, theme.text_color);
 
     move_towards(^animation_state.click_time, 0.0f, theme.click_decay_speed);

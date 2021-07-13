@@ -4,8 +4,7 @@ use package core
 
 @Cleanup // Move these to the theme?
 // Or create a cache of fonts and put pointers/string in the themes?
-#private font : bmfont.BMFont;
-#private font_texture : gfx.Texture;
+#private main_font : Font;
 
 @Temporary
 DEFAULT_TEXT_SIZE :: 1.0f
@@ -78,18 +77,7 @@ is_hot_item :: (id: UI_Id) -> bool {
 
 @FontSizing // Currently, `size` is just a multipler for the baked font size. This should be changed to be height in pixels, or 'em's.
 draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
-    gfx.set_texture(^font_texture);
-    gfx.use_alpha_shader(0);
-
-    for glyph: bmfont.get_character_positions(^font, size, text, x, y) {
-        gfx.textured_rect(
-            .{ glyph.pos_x, glyph.pos_y }, .{ glyph.pos_w, glyph.pos_h },
-            .{ glyph.tex_x, glyph.tex_y }, .{ glyph.tex_w, glyph.tex_h },
-            color = color);
-    }
-    
-    gfx.flush();
-    gfx.set_texture();
+    main_font->render(text, x, y, size, color);
 }
 
 draw_rect :: #match {
@@ -107,7 +95,7 @@ draw_rect :: #match {
 }
 
 draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme, site := #callsite) -> bool {
-    draw_text_raw(text, x0, y0 + ~~font.common.baseline * theme.font_size, theme.font_size, theme.text_color);
+    draw_text_raw(text, x0, y0 + main_font->get_baseline(theme.font_size), theme.font_size, theme.text_color);
 }
 
 Rectangle :: struct {
@@ -185,7 +173,7 @@ get_site_hash :: (site: CallSite, increment := 0) -> UI_Id {
 }
 
 get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
-    return font->get_width(text, size);
+    return main_font->get_width(text, size);
 }
 
 
@@ -195,14 +183,17 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
 // to a font and it will remain valid. Probably want some kind of arena
 // with a map from i32 -> ^BMFont.
 #private init_font :: () {
+    fnt_file_data := #file_contents "./resources/fonts/FiraCode.fnt";
+    texture_data := #file_contents "./resources/fonts/FiraCode.data";
+
+    main_font = create_font(fnt_file_data, texture_data);
+}
+
+TEMP_switch_font :: () {
     fnt_file_data := #file_contents "./resources/fonts/Calibri.fnt";
     texture_data := #file_contents "./resources/fonts/Calibri_0.data";
 
-    font = bmfont.load_bmfont(fnt_file_data);
-
-    tex_width, tex_height := font.common.scale_width, font.common.scale_height;
-
-    font_texture = gfx.load_texture(tex_width, tex_height, texture_data, gl.ALPHA, gl.ALPHA);
+    main_font = create_font(fnt_file_data, texture_data);
 }
 
 

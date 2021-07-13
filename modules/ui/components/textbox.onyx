@@ -59,11 +59,11 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, placeholder :=
         text = placeholder;
         text_color = theme.placeholder_text_color;
     }
-    text_width  := bmfont.get_width(^font, text, theme.font_size);
-    text_height := bmfont.get_height(^font, text, theme.font_size);
+
+    text_width, text_height := main_font->get_dimensions(text, theme.font_size);
 
     text_x := x0 + border_width;
-    text_y := y0 + ~~ font.common.baseline * theme.font_size + (height - text_height) / 2;
+    text_y := y0 + main_font->get_baseline(theme.font_size) + (height - text_height) / 2;
 
     if is_hot_item(hash) && !is_active_item(hash) {
         if mouse_state.left_button_down && Rectangle.contains(r, mx, my) {
@@ -191,7 +191,8 @@ get_cursor_location :: (text_buffer: ^string.String_Buffer, text_x: f32, text_y:
 
     text := string.buffer_to_str(text_buffer);
 
-    for glyph: bmfont.get_character_positions(^font, text_size, text, text_x, text_y) {
+    bm_font := ^main_font.font;
+    for glyph: bmfont.get_character_positions(bm_font, text_size * main_font.em / ~~bm_font.common.line_height, text, text_x, text_y) {
         if countdown == 0 do return last_x;
 
         last_x = glyph.pos_x;
@@ -212,7 +213,9 @@ get_cursor_position :: (text_buffer: ^string.String_Buffer, text_x: f32, text_y:
     last_x: f32 = text_x;
     text := string.buffer_to_str(text_buffer);
 
-    for glyph: bmfont.get_character_positions(^font, text_size, text, text_x, text_y) {
+    @FontCleanup
+    bm_font := ^main_font.font;
+    for glyph: bmfont.get_character_positions(bm_font, text_size * main_font.em / ~~bm_font.common.line_height, text, text_x, text_y) {
         cursor_position += 1;
         if cursor_position == 1 do continue;
 
