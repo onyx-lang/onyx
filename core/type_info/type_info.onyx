@@ -141,6 +141,7 @@ Type_Info_Struct :: struct {
 
     name: str;
     members: [] Member;
+    parameters: [] any;
 }
 
 Type_Info_Compound :: struct {

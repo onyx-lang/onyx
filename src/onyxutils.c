@@ -703,6 +703,8 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
         *resolved = ((PolySolveResult) { PSK_Type, .actual = resolved_type });
 
     } else {
+        resolve_expression_type(value);
+
         if ((value->flags & Ast_Flag_Comptime) == 0) {
             if (err_msg) *err_msg = "Expected compile-time known argument.";
             return;
@@ -1257,6 +1259,8 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
         }
 
         if (sln->kind == PSK_Value) {
+            resolve_expression_type(sln->value);
+
             if ((sln->value->flags & Ast_Flag_Comptime) == 0) {
                 onyx_report_error(pos,
                     "Expected compile-time known argument for '%b'.",

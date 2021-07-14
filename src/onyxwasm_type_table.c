@@ -168,6 +168,7 @@ u64 build_type_table(OnyxWasmModule* module) {
             case Type_Kind_Struct: {
                 TypeStruct* s = &type->Struct;
                 u32* name_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
+                u32* param_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(s->poly_sln));
 
                 u32 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
@@ -178,6 +179,37 @@ u64 build_type_table(OnyxWasmModule* module) {
                 }
 
                 bh_buffer_align(&table_buffer, 8);
+
+                i = 0;
+                bh_arr_each(AstPolySolution, sln, s->poly_sln) {
+                    bh_buffer_align(&table_buffer, 8);
+                    param_locations[i++] = table_buffer.length;
+
+                    switch (sln->kind) {
+                        case PSK_Type: {
+                            // NOTE: This assumes a little endian compiler (which is assumed in other part of the code too)
+                            bh_buffer_append(&table_buffer, &sln->type->id, 4);
+                            break;
+                        }
+
+                        case PSK_Value: {
+                            assert(sln->value->type);
+                            u32 size = type_size_of(sln->value->type);
+
+                            bh_buffer_grow(&table_buffer, table_buffer.length + size);
+                            u8* buffer = table_buffer.data + table_buffer.length;
+                            emit_raw_data(module, buffer, sln->value);
+                            table_buffer.length += size;
+                            break;
+                        }
+
+                        default: {
+                            // Set to null if this is not known how to encode
+                            param_locations[i-1] = 0;
+                            break;
+                        }
+                    }
+                }
 
                 u32 members_base = table_buffer.length;
 
@@ -195,6 +227,19 @@ u64 build_type_table(OnyxWasmModule* module) {
                     bh_buffer_write_u32(&table_buffer, mem->type->id);
                     bh_buffer_write_byte(&table_buffer, mem->used ? 1 : 0);
                     bh_buffer_write_byte(&table_buffer, mem->initial_value != NULL ? 1 : 0);
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                u32 params_base = table_buffer.length;
+
+                i = 0;
+                bh_arr_each(AstPolySolution, sln, s->poly_sln) {
+                    bh_buffer_align(&table_buffer, 8);
+                    PATCH;
+                    bh_buffer_write_u64(&table_buffer, param_locations[i++]);
+
+                    if (sln->kind == PSK_Type) bh_buffer_write_u32(&table_buffer, basic_types[Basic_Kind_Type_Index].id);
+                    else                       bh_buffer_write_u32(&table_buffer, sln->value->type->id);
                 }
 
                 u32 name_base = 0;
@@ -217,6 +262,9 @@ u64 build_type_table(OnyxWasmModule* module) {
                 PATCH;
                 bh_buffer_write_u64(&table_buffer, members_base);
                 bh_buffer_write_u64(&table_buffer, s->mem_count);
+                PATCH;
+                bh_buffer_write_u64(&table_buffer, params_base);
+                bh_buffer_write_u64(&table_buffer, bh_arr_length(s->poly_sln));
 
                 break;
             }
