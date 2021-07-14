@@ -57,3 +57,4 @@ package ui
 #private bmfont :: package bmfont
 
 #private math   :: package core.math
+#private map    :: package core.map

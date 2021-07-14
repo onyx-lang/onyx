@@ -265,6 +265,8 @@ EMIT_FUNC(zero_value_for_type,           Type* type, OnyxToken* where);
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
 
+static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node);
+
 #include "onyxwasm_intrinsics.c"
 #include "onyxwasm_type_table.c"
 

@@ -2,10 +2,6 @@ package ui
 
 use package core
 
-@Cleanup // Move these to the theme?
-// Or create a cache of fonts and put pointers/string in the themes?
-#private main_font : Font;
-
 @Temporary
 DEFAULT_TEXT_SIZE :: 1.0f
 
@@ -16,12 +12,13 @@ UI_Id :: #type u32
 #private active_item : UI_Id = 0
 #private hot_item_was_set := false
 
+#private current_font : Font;
 
 init_ui :: () {
-    init_font();
-
     map.init(^animation_states, default=.{}, hash_count=4);
     map.init(^workspace_states, default=.{}, hash_count=4);
+
+    map.init(^font_registry, hash_count=4);
 }
 
 // This function should be called at the end of drawing a frame, after all of the UI elements
@@ -75,9 +72,9 @@ is_hot_item :: (id: UI_Id) -> bool {
     return hot_item == id;
 }
 
-@FontSizing // Currently, `size` is just a multipler for the baked font size. This should be changed to be height in pixels, or 'em's.
+@FontSizing // In the new font system, size is in ems, which can be set per font.
 draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
-    main_font->render(text, x, y, size, color);
+    current_font->render(text, x, y, size, color);
 }
 
 draw_rect :: #match {
@@ -95,7 +92,7 @@ draw_rect :: #match {
 }
 
 draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme, site := #callsite) -> bool {
-    draw_text_raw(text, x0, y0 + main_font->get_baseline(theme.font_size), theme.font_size, theme.text_color);
+    draw_text_raw(text, x0, y0 + current_font->get_baseline(theme.font_size), theme.font_size, theme.text_color);
 }
 
 Rectangle :: struct {
@@ -135,6 +132,8 @@ Rectangle :: struct {
 @Relocate
 Text_Theme :: struct {
     text_color := gfx.Color4.{ 1, 1, 1 };
+
+    font       : i32 = 0; // Default to font index 0 
     font_size  := 1.0f;
 }
 
@@ -173,28 +172,9 @@ get_site_hash :: (site: CallSite, increment := 0) -> UI_Id {
 }
 
 get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
-    return main_font->get_width(text, size);
+    return current_font->get_width(text, size);
 }
 
-
-@Cleanup
-// There should be a way to load multiple fonts and have a font cache.
-// The font cache pointers should be stable so you can take a pointer
-// to a font and it will remain valid. Probably want some kind of arena
-// with a map from i32 -> ^BMFont.
-#private init_font :: () {
-    fnt_file_data := #file_contents "./resources/fonts/FiraCode.fnt";
-    texture_data := #file_contents "./resources/fonts/FiraCode.data";
-
-    main_font = create_font(fnt_file_data, texture_data);
-}
-
-TEMP_switch_font :: () {
-    fnt_file_data := #file_contents "./resources/fonts/Calibri.fnt";
-    texture_data := #file_contents "./resources/fonts/Calibri_0.data";
-
-    main_font = create_font(fnt_file_data, texture_data);
-}
 
 
 @Relocate
