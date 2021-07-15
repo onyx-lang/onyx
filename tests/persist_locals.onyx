@@ -1,0 +1,57 @@
+// This test does not make a whole ton of sense, but it does thoroughly test the #persist local capability.
+
+#load "core/std"
+
+use package core
+
+
+main :: (args: [] cstr) {
+
+    foo(10);
+    foo(30);
+    foo(60);
+    result := foo(100);
+    println(result);
+
+    cached_fib(10) |> println();
+    cached_fib(80) |> println();
+
+}
+
+foo :: (x: i32) -> i32 {
+    #persist total := 0;
+
+    total += x;
+    return total;
+}
+
+
+cached_fib :: (n: u64) -> u64 {
+    #persist cache : map.Map(u64, u64);
+    if cache.hashes.data == null {
+        map.init(^cache, hash_count=128);
+    }
+
+    if n <= 1 do return n;
+
+    if map.has(^cache, n) do return map.get(^cache, n);
+
+    res := cached_fib(n - 1) + cached_fib(n - 2);
+    map.put(^cache, n, res);
+
+    print_cache_size();
+
+    return res;
+
+    // This can see cache because it is statically lexically scoped.
+    print_cache_size :: () {
+        #persist a := 0;
+        if a % 10 == 0 {
+            print("\n");
+            a = 0;
+        }
+        a += 1;
+
+        printf("{} ", cache.entries.count);
+    }
+}

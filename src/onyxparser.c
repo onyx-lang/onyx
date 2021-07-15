@@ -1360,18 +1360,34 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 break;
             }
 
-            /*
-            This is in theory where the static if in procedures will be parsed. However,
-            this breaks many things because static if statements currently only parse top
-            level expressions in them, not general statements.
-            */
-
             if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_If)) {
                 AstIf* static_if = parse_static_if_stmt(parser, 1);
                 ENTITY_SUBMIT(static_if);
 
                 needs_semicolon = 0;
                 retval = (AstNode *) static_if;
+                break;
+            }
+
+            if (parse_possible_directive(parser, "persist")) {
+                // :Duplicated from parse_top_level_statement
+                AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
+                memres->token = expect_token(parser, Token_Type_Symbol);
+                expect_token(parser, ':');
+
+                if (parser->curr->type != '=')
+                    memres->type_node = parse_type(parser);
+                
+                if (consume_token_if_next(parser, '='))
+                    memres->initial_value = parse_expression(parser, 1);
+                
+                
+                ENTITY_SUBMIT(memres);
+
+                AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+                binding->token = memres->token;
+                binding->node = (AstNode *) memres;
+                ENTITY_SUBMIT(binding);
                 break;
             }
         }

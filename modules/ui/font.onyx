@@ -70,7 +70,7 @@ create_font :: (bmfont_data: [] u8, font_texture_data: [] u8) -> Font {
 }
 
 @Bug // Why is '#type' needed here?
-Font_Index :: #type i32;
+Font_Index :: i32;
 
 #private font_registry : map.Map(Font_Index, Font);
 register_font :: (index: Font_Index, font: Font) {

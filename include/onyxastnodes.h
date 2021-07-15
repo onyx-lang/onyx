@@ -1337,6 +1337,8 @@ static inline b32 binop_is_compare(BinaryOp binop) {
 }
 
 static inline b32 node_is_type(AstNode* node) {
+    if (node->kind == Ast_Kind_Alias) return node_is_type((AstNode *) ((AstAlias *) node)->alias);
+
     return (node->kind > Ast_Kind_Type_Start) && (node->kind < Ast_Kind_Type_End);
 }
 
