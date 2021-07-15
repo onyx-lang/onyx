@@ -140,8 +140,6 @@ AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
         }
     }
 
-    if (res == NULL) return NULL;
-
     return res;
 }
 
@@ -201,7 +199,24 @@ all_types_peeled_off:
 
         case Ast_Kind_Struct_Type: {
             AstStructType* stype = (AstStructType *) node;
-            return symbol_raw_resolve(stype->scope, symbol);
+            AstNode* result = symbol_raw_resolve(stype->scope, symbol);
+
+            if (result == NULL && stype->stcache != NULL) {
+                Type* struct_type = stype->stcache;
+                assert(struct_type->kind == Type_Kind_Struct);
+
+                bh_arr_each(AstPolySolution, sln, struct_type->Struct.poly_sln) {
+                    if (token_text_equals(sln->poly_sym->token, symbol)) {
+                        if (sln->kind == PSK_Type) {
+                            result = (AstNode *) sln->type->ast_type;
+                        } else {
+                            result = (AstNode *) sln->value;
+                        }
+                    }
+                }
+            }
+
+            return result;
         }
 
         case Ast_Kind_Poly_Struct_Type: {
