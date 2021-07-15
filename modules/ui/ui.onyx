@@ -12,13 +12,18 @@ UI_Id :: #type u32
 #private active_item : UI_Id = 0
 #private hot_item_was_set := false
 
-#private current_font : Font;
+#private current_font : ^Font;
 
 init_ui :: () {
+    map.init(^font_registry, hash_count=4);
+
     map.init(^animation_states, default=.{}, hash_count=4);
     map.init(^workspace_states, default=.{}, hash_count=4);
 
-    map.init(^font_registry, hash_count=4);
+    // Register a default font so things don't break everywhere
+    builtin_font := create_font(#file_contents "./fonts/builtin.fnt", #file_contents "./fonts/builtin.data");
+    register_font(-1, builtin_font);
+    use_font(-1);
 }
 
 // This function should be called at the end of drawing a frame, after all of the UI elements
@@ -73,7 +78,9 @@ is_hot_item :: (id: UI_Id) -> bool {
 }
 
 @FontSizing // In the new font system, size is in ems, which can be set per font.
-draw_text_raw :: (text: str, x: f32, y: f32, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
+draw_text_raw :: (text: str, x: f32, y: f32, font: i32 = -1, size := DEFAULT_TEXT_SIZE, color := gfx.Color4.{1,1,1}) {
+    use_font(font);
+    if current_font == null do use_font(-1);
     current_font->render(text, x, y, size, color);
 }
 
@@ -92,7 +99,7 @@ draw_rect :: #match {
 }
 
 draw_text :: (use r: Rectangle, text: str, theme := ^default_text_theme, site := #callsite) -> bool {
-    draw_text_raw(text, x0, y0 + current_font->get_baseline(theme.font_size), theme.font_size, theme.text_color);
+    draw_text_raw(text, x0, y0 + current_font->get_baseline(theme.font_size), theme.font, theme.font_size, theme.text_color);
 }
 
 Rectangle :: struct {

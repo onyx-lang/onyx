@@ -140,6 +140,7 @@ window.ONYX_MODULES.push({
 
         var path_memory = new Uint8Array(ONYX_MEMORY.buffer, filename_ptr, filename_len);
         var path = new TextDecoder("utf-8").decode(path_memory);
+        console.log(`Requesting file '${path}'`);
 
         fetch(path)
             .then(response => response.arrayBuffer())

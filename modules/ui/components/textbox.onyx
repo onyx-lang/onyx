@@ -60,6 +60,7 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, placeholder :=
         text_color = theme.placeholder_text_color;
     }
 
+    use_font(theme.font);
     text_width, text_height := current_font->get_dimensions(text, theme.font_size);
 
     text_x := x0 + border_width;
@@ -154,7 +155,7 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, placeholder :=
     surface_color  = color_lerp(animation_state.click_time, surface_color, theme.click_color);
     gfx.rect(.{ x0 + border_width, y0 + border_width }, .{ width - border_width * 2, height - border_width * 2 }, surface_color);
 
-    draw_text_raw(text, text_x, text_y, theme.font_size, text_color);
+    draw_text_raw(text, text_x, text_y, theme.font, theme.font_size, text_color);
 
     if textbox_editing_state.hash == hash {
         cursor_x := get_cursor_location(text_buffer, text_x, text_y, theme.font_size, textbox_editing_state.cursor_position);
