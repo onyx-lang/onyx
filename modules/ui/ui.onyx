@@ -19,6 +19,7 @@ init_ui :: () {
 
     map.init(^animation_states, default=.{}, hash_count=4);
     map.init(^workspace_states, default=.{}, hash_count=4);
+    map.init(^scrollable_region_states, default=.{}, hash_count=4);
 
     // Register a default font so things don't break everywhere
     builtin_font := create_font(#file_contents "./fonts/builtin.fnt", #file_contents "./fonts/builtin.data");

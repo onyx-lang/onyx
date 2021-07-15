@@ -50,6 +50,7 @@ package ui
 #load "./components/radio"
 #load "./components/textbox"
 #load "./components/workspace"
+#load "./components/scrollable_region"
 
 // Package inclusions that are part of all files in the "ui" package.
 #private gfx    :: package immediate_mode    // The immediate_mode module needs to be accessible

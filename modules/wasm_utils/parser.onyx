@@ -17,7 +17,7 @@ parse_type_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> 
     wasm_allocator = allocator;
 
     @Cleanup @WasmStream // These are going to be needed in many places
-    stream := io.string_stream_make(data);   
+    stream := io.string_stream_make(data);
     reader := io.reader_make(^stream);
 
     io.stream_seek(^stream, map.get(^sections, .Type).offset, .Start);

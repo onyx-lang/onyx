@@ -507,6 +507,10 @@ set_window_size :: (width: i32, height: i32) {
     global_renderer->set_window_size(width, height);
 }
 
+get_window_size :: () -> (width: i32, height: i32) {
+    return global_renderer.window_width, global_renderer.window_height;
+}
+
 push_matrix :: () do global_renderer->push_matrix();
 pop_matrix  :: () do global_renderer->pop_matrix();
 identity    :: () do global_renderer->identity();

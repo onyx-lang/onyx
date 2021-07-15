@@ -1,0 +1,50 @@
+package ui
+
+use package core
+
+#private_file
+Scrollable_Region_State :: struct {
+    transform: gfx.Transform = .{
+        translation = .{ 0, 0 },
+        scale       = .{ 1, 1 },
+    };
+}
+
+#private
+scrollable_region_states : map.Map(UI_Id, Scrollable_Region_State);
+
+scrollable_region_start :: (use r: Rectangle, x_scroll: ^f32, y_scroll: ^f32, site := #callsite) {
+    hash := get_site_hash(site, 0);
+    x, y := Rectangle.top_left(r);    
+    width, height := Rectangle.dimensions(r);
+
+    state := map.get(^scrollable_region_states, hash);
+
+    mx, my := get_mouse_position();
+    contained := false;
+    if Rectangle.contains(r, mx, my) {
+        // if hot_item == 0 do set_hot_item(hash);
+        contained = true;
+    }
+
+    if contained { // is_hot_item(hash) {
+        speed :: 30.0f; @ThemeConfiguration
+
+        if is_key_down(38)  do state.transform.translation.y += speed;
+        if is_key_down(40)  do state.transform.translation.y -= speed;
+
+        if mouse_state.dwheel > 0 do state.transform.translation.y += speed;
+        if mouse_state.dwheel < 0 do state.transform.translation.y -= speed;
+    }
+
+    map.put(^scrollable_region_states, hash, state);
+
+    gfx.push_scissor(x, y, width, height);
+    gfx.push_matrix();
+    gfx.apply_transform(state.transform);
+}
+
+scrollable_region_stop :: () {
+    gfx.pop_scissor();
+    gfx.pop_matrix();
+}
