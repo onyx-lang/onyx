@@ -13,8 +13,8 @@ request_file :: (filepath: str) -> u32 {
     return fileid;
 }
 
-get_requested_file_data :: (fileid: u32, buffer: [] u8) -> bool {
-    js_get_requested_file_data :: (fileid: u32, buffer: [] u8) -> u32 #foreign "js_events" "get_requested_file_data" ---;
+get_requested_file_data :: (fileid: u32, buffer: [] u8, name_buffer: [] u8 = .{ null, 0 } ) -> bool {
+    js_get_requested_file_data :: (fileid: u32, buffer: [] u8, name_buffer: [] u8) -> u32 #foreign "js_events" "get_requested_file_data" ---;
 
-    return js_get_requested_file_data(fileid, buffer) == 1;
+    return js_get_requested_file_data(fileid, buffer, name_buffer) == 1;
 }

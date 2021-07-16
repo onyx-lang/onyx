@@ -12,9 +12,7 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     filter_iterator.iterator = it;
     filter_iterator.predicate = predicate;
 
-    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        fi := cast(^FilterIterator(T)) data;
-
+    next :: ($T: type_expr, fi: ^FilterIterator(T)) -> (T, bool) {
         value, cont := fi.iterator.next(fi.iterator.data);
         if cont {
             while !fi.predicate(value) {
@@ -28,10 +26,9 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
         }
     }
 
-    close :: ($T: type_expr, data: rawptr) {
-        fi := cast(^FilterIterator(T)) data;
+    close :: ($T: type_expr, fi: ^FilterIterator(T)) {
         fi.iterator.close(fi.iterator.data);
-        cfree(data);
+        cfree(fi);
     }
 
     return .{
@@ -51,19 +48,16 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
     map_iterator.iterator = it;
     map_iterator.transform = transform;
 
-    next :: ($T: type_expr, $R: type_expr, data: rawptr) -> (R, bool) {
-        mi := cast(^MapIterator(T, R)) data;
-
+    next :: ($T: type_expr, $R: type_expr, mi: ^MapIterator(T, R)) -> (R, bool) {
         value, cont := mi.iterator.next(mi.iterator.data);
         if !cont do return value, false;
 
         return mi.transform(value), true;
     }
 
-    close :: ($T: type_expr, $R: type_expr, data: rawptr) {
-        mi := cast(^MapIterator(T, R)) data;
+    close :: ($T: type_expr, $R: type_expr, mi: ^MapIterator(T, R)) {
         mi.iterator.close(mi.iterator.data);
-        cfree(data);
+        cfree(mi);
     }
 
     return .{
@@ -83,18 +77,16 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
     take_iterator.iterator = it;
     take_iterator.remaining = count;
 
-    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        ti := cast(^TakeIterator(T)) data;
+    next :: ($T: type_expr, ti: ^TakeIterator(T)) -> (T, bool) {
         if ti.remaining == 0 do return __zero_value(T), false;
 
         ti.remaining -= 1;
         return ti.iterator.next(ti.iterator.data);
     }
 
-    close :: ($T: type_expr, data: rawptr) {
-        ti := cast(^TakeIterator(T)) data;
+    close :: ($T: type_expr, ti: ^TakeIterator(T)) {
         ti.iterator.close(ti.iterator.data);
-        cfree(data);
+        cfree(ti);
     }
 
     return .{
@@ -114,19 +106,16 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     take_iterator.iterator = it;
     take_iterator.predicate = predicate;
 
-    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        ti := cast(^TakeIterator(T)) data;
-
+    next :: ($T: type_expr, ti: ^TakeIterator(T)) -> (T, bool) {
         value, cont := ti.iterator.next(ti.iterator.data);
         if !cont do return value, false;
 
         return value, ti.predicate(value);
     }
 
-    close :: ($T: type_expr, data: rawptr) {
-        ti := cast(^TakeIterator(T)) data;
+    close :: ($T: type_expr, ti: ^TakeIterator(T)) {
         ti.iterator.close(ti.iterator.data);
-        cfree(data);
+        cfree(ti);
     }
 
     return .{
@@ -147,9 +136,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     skip_iterator.iterator = it;
     skip_iterator.to_skip = count;
 
-    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        si := cast(^SkipIterator(T)) data;
-
+    next :: ($T: type_expr, si: ^SkipIterator(T)) -> (T, bool) {
         while !si.skipped && si.to_skip > 0 {
             si.to_skip -= 1;
             value, cont := si.iterator.next(si.iterator.data);
@@ -163,10 +150,9 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
         return si.iterator.next(si.iterator.data);
     }
 
-    close :: ($T: type_expr, data: rawptr) {
-        si := cast(^SkipIterator(T)) data;
+    close :: ($T: type_expr, si: ^SkipIterator(T)) {
         si.iterator.close(si.iterator.data);
-        cfree(data);
+        cfree(si);
     }
 
     return .{
@@ -191,20 +177,17 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Z
     zipped_iterator.iterator1 = left_iterator;
     zipped_iterator.iterator2 = right_iterator;
 
-    next :: ($T: type_expr, $R: type_expr, data: rawptr) -> (Zipped(T, R), bool) {
-        zi := cast(^ZippedIterator(T, R)) data;
-
+    next :: ($T: type_expr, $R: type_expr, zi: ^ZippedIterator(T, R)) -> (Zipped(T, R), bool) {
         v1, cont1 := zi.iterator1.next(zi.iterator1.data);
         v2, cont2 := zi.iterator2.next(zi.iterator2.data);
 
         return .{ v1, v2 }, cont1 && cont2;
     }
 
-    close :: ($T: type_expr, $R: type_expr, data: rawptr) {
-        zi := cast(^ZippedIterator(T, R)) data;
+    close :: ($T: type_expr, $R: type_expr, zi: ^ZippedIterator(T, R)) {
         zi.iterator1.close(zi.iterator1.data);
         zi.iterator2.close(zi.iterator2.data);
-        cfree(data);
+        cfree(zi);
     }
 
     return .{
@@ -216,8 +199,7 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Z
 
 const :: (value: $T) -> Iterator(T) {
     next :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        value := *(cast(^T) data);
-        return value, true;
+        return *(cast(^T) data), true;
     }
 
     allocated := cast(^T) calloc(sizeof T);

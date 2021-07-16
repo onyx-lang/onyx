@@ -162,9 +162,9 @@ starts_with :: (s: str, prefix: str) -> bool {
 
 ends_with :: (s: str, suffix: str) -> bool {
     if s.count < suffix.count do return false;
-    while i := s.count - 1; i >= s.count - suffix.count {
-        if s[i] != suffix[i] do return false;
-        i -= 1;
+    while i := 0; i < suffix.count {
+        if s[s.count - 1 - i] != suffix[suffix.count - 1 - i] do return false;
+        i += 1;
     }
     return true;
 }

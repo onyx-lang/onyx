@@ -82,8 +82,9 @@ FileEvent :: struct {
     Status :: enum (u32) { Success :: 0x01; Failed :: 0x02; };
     status : Status;
 
-    file_id : u32;
-    size    : u32;
+    file_id     : u32;
+    size        : u32;
+    name_length : u32;
 }
 
 Event :: struct #union {

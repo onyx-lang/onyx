@@ -111,15 +111,18 @@ window.ONYX_MODULES.push({
 
             // ROBUSTNESS: Currently, this only gives the first file, which for a lot of purposes, will be enough.
             // But if multiple files are dropped, the application will only know about the first one.
-            ev.dataTransfer.items[0].getAsFile().arrayBuffer()
-                .then(response => {
-                    // 0 is assumed to be reserved in request_file.onyx.
-                    requested_file_data[0] = response;
-                    push_event_to_buffer(esp, event_size, 0x08, [0x01, 0, response.byteLength]);
-                })
-                .catch(error => {
-                    push_event_to_buffer(esp, event_size, 0x08, [0x02, 0, 0]);
-                });
+            var response = ev.dataTransfer.items[0].getAsFile();
+            response.arrayBuffer().then(data => {
+                // 0 is assumed to be reserved in request_file.onyx.
+                requested_file_data[0] = {
+                    name: response.name,
+                    data: data,
+                };
+                push_event_to_buffer(esp, event_size, 0x08, [0x01, 0, data.byteLength, response.name.length ]);
+            })
+            .catch(error => {
+                push_event_to_buffer(esp, event_size, 0x08, [0x02, 0, 0, 0]);
+            });
 
             return false;
         });
@@ -145,25 +148,33 @@ window.ONYX_MODULES.push({
         fetch(path)
             .then(response => response.arrayBuffer())
             .then(array_buffer => {
-                requested_file_data[fileid] = array_buffer;
+                requested_file_data[fileid] = {
+                    name: path,
+                    data: array_buffer,
+                };
 
-                push_event_to_buffer(esp, event_size, 0x09, [ 0x01, fileid, array_buffer.byteLength ]);
+                push_event_to_buffer(esp, event_size, 0x09, [ 0x01, fileid, array_buffer.byteLength, path.length ]);
             })
             .catch((error) => {
-                push_event_to_buffer(esp, event_size, 0x09, [ 0x02, fileid, 0 ]);
+                push_event_to_buffer(esp, event_size, 0x09, [ 0x02, fileid, 0, 0 ]);
             });
     },
 
-    get_requested_file_data(fileid, bufferptr, bufferlen) {
+    get_requested_file_data(fileid, bufferptr, bufferlen, nameptr, namelen) {
         var file_data = requested_file_data[fileid];
         if (file_data == null) return 0;
 
-        if (bufferlen < file_data.byteLength) return 0;
+        if (bufferlen < file_data.data.byteLength) return 0;
 
         let WASM_U8 = new Uint8Array(ONYX_MEMORY.buffer);
-        var u8_data = new Uint8Array(file_data);
+        var u8_data = new Uint8Array(file_data.data);
 
         WASM_U8.set(u8_data, bufferptr);
+
+        if (namelen >= file_data.name.length) {
+            var name_data = new TextEncoder().encode(file_data.name);
+            WASM_U8.set(name_data, nameptr);
+        }
 
         requested_file_data[fileid] = null;
         delete requested_file_data[fileid];
