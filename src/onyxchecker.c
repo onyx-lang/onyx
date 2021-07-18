@@ -2139,6 +2139,12 @@ void check_entity(Entity* ent) {
 
         case Entity_Type_Process_Directive:        cs = check_process_directive((AstNode *) ent->expr); break;
 
+        case Entity_Type_File_Contents: 
+            if (context.options->no_file_contents) {
+                onyx_report_error(ent->expr->token->pos, "#file_contents is disabled for this compilation.");
+            }
+            break;
+
         default: break;
     }
 

@@ -1155,6 +1155,7 @@ struct CompileOptions {
     b32 print_static_if_results : 1;
     b32 print_notes             : 1;
     b32 no_colors               : 1;
+    b32 no_file_contents        : 1;
     
     b32 use_post_mvp_features : 1;
 
