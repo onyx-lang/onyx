@@ -10,7 +10,7 @@ u64 build_type_table(OnyxWasmModule* module) {
 #define PATCH (bh_arr_push(base_patch_locations, table_buffer.length))
 
     // This is the data behind the "type_table" slice in type_info.onyx
-    u32 type_count = bh_arr_length(type_map.entries) + 1;
+    u32 type_count = bh_arr_length(type_map.entries) + 2;
     u64* table_info = bh_alloc_array(global_heap_allocator, u64, type_count + 4); // HACK
 
     bh_buffer table_buffer;
