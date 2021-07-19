@@ -211,6 +211,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                     }
                 }
 
+                bh_buffer_align(&table_buffer, 8);
                 u32 members_base = table_buffer.length;
 
                 i = 0;
