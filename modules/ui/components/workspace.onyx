@@ -31,13 +31,14 @@ workspace_start :: (use r: Rectangle, site := #callsite) {
         speed :: 30.0f; @ThemeConfiguration
         scale_speed :: 0.02f; @ThemeConfiguration
 
-        if is_key_down(38)  do state.transform.translation.y += speed;
-        if is_key_down(40)  do state.transform.translation.y -= speed;
-        if is_key_down(39)  do state.transform.translation.x -= speed;
-        if is_key_down(37)  do state.transform.translation.x += speed;
+        if is_key_down(38) do state.transform.translation.y += speed;
+        if is_key_down(40) do state.transform.translation.y -= speed;
+        if is_key_down(39) do state.transform.translation.x -= speed;
+        if is_key_down(37) do state.transform.translation.x += speed;
 
-        if is_key_down(187) do zoom(^state, r, 1.02);
-        if is_key_down(189) do zoom(^state, r, 0.98);
+        // These keys are weird because keycode is not standard between all browsers... ugh
+        if is_key_down(187) || is_key_down(61)  do zoom(^state, r, 1.02);
+        if is_key_down(189) || is_key_down(173) do zoom(^state, r, 0.98);
 
         if mouse_state.left_button_just_down && !state.dragging {
             state.dragging = true;

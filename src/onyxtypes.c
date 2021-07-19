@@ -4,8 +4,6 @@
 #include "onyxutils.h"
 #include "onyxerrors.h"
 
-static u32 next_unique_id = 1;
-
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_void, { Basic_Kind_Void,                    0,                       0,  1, "void"   } },
@@ -47,6 +45,7 @@ static bh_imap type_dynarr_map;
 static bh_imap type_vararg_map;
 
 static void type_register(Type* type) {
+    static u32 next_unique_id = 1;
     type->id = next_unique_id++;
 
     bh_imap_put(&type_map, type->id, (u64) type);
