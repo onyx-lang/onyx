@@ -468,8 +468,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return ((AstBasicType *) type_node)->basic_type;
         }
 
-        case Ast_Kind_Type_Alias:
-            return type_build_from_ast(alloc, ((AstTypeAlias *) type_node)->to);
+        case Ast_Kind_Type_Alias: {
+            Type* type = type_build_from_ast(alloc, ((AstTypeAlias *) type_node)->to);
+            if (type && type->ast_type) type_node->type_id = type->id;
+            return type;
+        }
 
         case Ast_Kind_Type_Raw_Alias:
             return ((AstTypeRawAlias *) type_node)->to;
