@@ -47,6 +47,7 @@ static bh_imap type_vararg_map;
 static void type_register(Type* type) {
     static u32 next_unique_id = 1;
     type->id = next_unique_id++;
+    if (type->ast_type) type->ast_type->type_id = type->id;
 
     bh_imap_put(&type_map, type->id, (u64) type);
 }

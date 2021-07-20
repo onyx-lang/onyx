@@ -710,7 +710,7 @@ struct AstSwitch {
     u32 flags;             \
     OnyxToken* token;      \
     struct Entity* entity; \
-    char* name;            \
+    u64 type_id;           \
     void* __unused;        \
     Type* type
 struct AstType { AstType_base; };
@@ -724,6 +724,7 @@ struct AstDynArrType    { AstType_base; AstType* elem; };
 struct AstVarArgType    { AstType_base; AstType* elem; };
 struct AstStructType {
     AstType_base;
+    char *name;
 
     bh_arr(AstStructMember *) members;
 
@@ -751,6 +752,7 @@ struct AstPolyStructParam {
 };
 struct AstPolyStructType {
     AstType_base;
+    char *name;
 
     Scope *scope;
     bh_arr(AstPolyStructParam) poly_params;
@@ -768,6 +770,7 @@ struct AstPolyCallType {
 };
 struct AstEnumType {
     AstType_base;
+    char *name;
     Scope *scope;
 
     AstType *backing;

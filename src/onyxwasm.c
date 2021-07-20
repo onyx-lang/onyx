@@ -2343,8 +2343,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (node_is_type((AstNode *) expr)) {
-        Type* type = type_build_from_ast(context.ast_alloc, (AstType *) expr);
-        WID(WI_I32_CONST, type->id);
+        AstType* type = (AstType *) expr;
+        if (type->type_id != 0) {
+            WID(WI_I32_CONST, ((AstType *) expr)->type_id);
+        } else {
+            Type* t = type_build_from_ast(context.ast_alloc, type);
+            WID(WI_I32_CONST, t->id);
+        }
 
         *pcode = code;
         return;
