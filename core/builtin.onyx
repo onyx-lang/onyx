@@ -187,3 +187,7 @@ any :: struct {
     data: rawptr;
     type: type_expr;
 }
+
+
+// Represents a code block. Not constructable outside of using a '#{}' block.
+Code :: struct {}

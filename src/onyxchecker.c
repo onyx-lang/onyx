@@ -16,6 +16,7 @@ typedef enum CheckStatus {
     Check_Complete, // The node is done processing
 
     Check_Errors_Start,
+    Check_Return_To_Symres, // Return this node for further symres processing
     Check_Yield_Macro,
     Check_Error,    // There was an error when checking the node
 } CheckStatus;
@@ -1660,6 +1661,11 @@ CheckStatus check_expression(AstTyped** pexpr) {
             expr->type = ((AstAlias *) expr)->alias->type;
             break;
 
+        case Ast_Kind_Code_Block:
+            expr->flags |= Ast_Flag_Comptime;
+            fill_in_type(expr);
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -1696,6 +1702,42 @@ CheckStatus check_global(AstGlobal* global) {
     return Check_Success;
 }
 
+CheckStatus check_insert_directive(AstDirectiveInsert* insert) {
+    if (insert->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
+
+    CHECK(expression, &insert->code_expr);
+    if (insert->code_expr->type == NULL) return Check_Yield_Macro;
+
+    Type* code_type = type_build_from_ast(context.ast_alloc, builtin_code_type);
+
+    if (!type_check_or_auto_cast(&insert->code_expr, code_type)) {
+        onyx_report_error(insert->token->pos, "#insert expected a value of type 'Code', got '%s'.",
+            type_get_name(insert->code_expr->type));
+
+        return Check_Error;
+    }
+
+    AstCodeBlock* code_block = (AstCodeBlock *) insert->code_expr;
+    while (code_block->kind == Ast_Kind_Alias) {
+        code_block = (AstCodeBlock *) ((AstAlias *) code_block)->alias;
+    }
+
+    assert(code_block->kind == Ast_Kind_Code_Block);
+
+    AstBlock* cloned_block = (AstBlock *) ast_clone(context.ast_alloc, code_block->code);
+
+    AstNode* next = insert->next;
+    insert->next = (AstNode *) cloned_block->body;
+
+    AstNode* last_stmt = insert->next;
+    while (last_stmt->next != NULL) last_stmt = last_stmt->next;
+    last_stmt->next = next;
+
+    insert->flags |= Ast_Flag_Has_Been_Checked;
+
+    return Check_Return_To_Symres;
+}
+
 CheckStatus check_statement(AstNode** pstmt) {
     AstNode* stmt = *pstmt;
 
@@ -1710,6 +1752,8 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
+
+        case Ast_Kind_Directive_Insert: return check_insert_directive((AstDirectiveInsert *) stmt);
 
         case Ast_Kind_Binary_Op:
             CHECK(binaryop, (AstBinaryOp **) pstmt, 1);
@@ -2148,9 +2192,10 @@ void check_entity(Entity* ent) {
         default: break;
     }
 
-    if (cs == Check_Success)     ent->state = Entity_State_Code_Gen;
-    if (cs == Check_Complete)    ent->state = Entity_State_Finalized;
-    if (cs == Check_Yield_Macro) ent->macro_attempts++;
+    if (cs == Check_Success)          ent->state = Entity_State_Code_Gen;
+    if (cs == Check_Complete)         ent->state = Entity_State_Finalized;
+    if (cs == Check_Return_To_Symres) ent->state = Entity_State_Resolve_Symbols;
+    if (cs == Check_Yield_Macro)      ent->macro_attempts++;
     else {
         ent->macro_attempts = 0;
         ent->micro_attempts = 0;

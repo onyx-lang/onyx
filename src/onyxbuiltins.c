@@ -48,6 +48,7 @@ AstType  *builtin_allocator_type;
 AstType  *builtin_iterator_type;
 AstType  *builtin_callsite_type;
 AstType  *builtin_any_type;
+AstType  *builtin_code_type;
 
 AstTyped *type_table_node = NULL;
 
@@ -395,6 +396,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_any_type = (AstType *) symbol_raw_resolve(p->scope, "any");
     if (builtin_any_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, "'any' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_code_type = (AstType *) symbol_raw_resolve(p->scope, "Code");
+    if (builtin_code_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'Code' struct not found in builtin package.");
         return;
     }
 

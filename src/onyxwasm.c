@@ -400,6 +400,9 @@ EMIT_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_Block:      emit_block(mod, &code, (AstBlock *) stmt, 1); break;
         case Ast_Kind_Defer:      emit_defer(mod, &code, (AstDefer *) stmt); break;
         case Ast_Kind_Local:      emit_local_allocation(mod, &code, (AstTyped *) stmt); break;
+        
+        case Ast_Kind_Directive_Insert: break;
+
         default:                  emit_expression(mod, &code, (AstTyped *) stmt); break;
     }
 

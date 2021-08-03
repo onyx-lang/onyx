@@ -16,6 +16,7 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_Overloaded_Function:
 		case Ast_Kind_Polymorphic_Proc:
 		case Ast_Kind_Alias:
+		case Ast_Kind_Code_Block:
 			return 0;
 
 		default: return 1;
@@ -93,6 +94,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Call_Site: return sizeof(AstCallSite);
         case Ast_Kind_Static_If: return sizeof(AstIfWhile);
         case Ast_Kind_If_Expression: return sizeof(AstIfExpression);
+        case Ast_Kind_Directive_Insert: return sizeof(AstDirectiveInsert);
         case Ast_Kind_Count: return 0;
 	}
 
@@ -433,6 +435,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             ((AstIfExpression *) nn)->false_expr = (AstTyped *) ast_clone(a, ((AstIfExpression *) node)->false_expr);
             break;
         }
+
+       	case Ast_Kind_Directive_Insert: {
+       		((AstDirectiveInsert *) nn)->code_expr = (AstTyped *) ast_clone(a, ((AstDirectiveInsert *) node)->code_expr);
+       		break;
+       	}
 	}
 
 	return nn;

@@ -87,6 +87,9 @@ static const char* ast_node_names[] = {
     "DEFINED",
     "CALL SITE",
 
+    "CODE BLOCK",
+    "DIRECTIVE INSERT"
+
     "NOTE",
 
     "AST_NODE_KIND_COUNT",

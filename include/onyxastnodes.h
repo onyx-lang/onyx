@@ -85,6 +85,9 @@
     NODE(Note)                 \
     NODE(CallSite)             \
                                \
+    NODE(CodeBlock)            \
+    NODE(DirectiveInsert)      \
+                               \
     NODE(Package)          
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
@@ -185,6 +188,9 @@ typedef enum AstKind {
     Ast_Kind_Directive_Export,
     Ast_Kind_Directive_Defined,
     Ast_Kind_Call_Site,
+
+    Ast_Kind_Code_Block,
+    Ast_Kind_Directive_Insert,
 
     Ast_Kind_Note,
 
@@ -1005,6 +1011,19 @@ struct AstCallSite {
     AstNumLit* column;
 };
 
+// Represents a "pastable" block of code.
+struct AstCodeBlock {
+    AstTyped_base;
+
+    AstBlock *code;
+};
+
+struct AstDirectiveInsert {
+    AstNode_base;
+
+    AstTyped *code_expr;
+};
+
 typedef enum EntityState {
     Entity_State_Error,
     
@@ -1233,6 +1252,7 @@ extern AstType  *builtin_allocator_type;
 extern AstType  *builtin_iterator_type;
 extern AstType  *builtin_callsite_type;
 extern AstType  *builtin_any_type;
+extern AstType  *builtin_code_type;
 extern AstTyped *type_table_node;
 
 typedef struct BuiltinSymbol {
