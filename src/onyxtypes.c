@@ -44,6 +44,13 @@ static bh_imap type_slice_map;
 static bh_imap type_dynarr_map;
 static bh_imap type_vararg_map;
 
+static Type* type_create(TypeKind kind, bh_allocator a, u32 extra_type_pointer_count) {
+    Type* type = bh_alloc(a, sizeof(Type) + sizeof(Type *) * extra_type_pointer_count);
+    type->kind = kind;
+    type->ast_type = NULL;
+    return type;
+}
+
 static void type_register(Type* type) {
     static u32 next_unique_id = 1;
     type->id = next_unique_id++;
@@ -240,9 +247,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             Type* return_type = type_build_from_ast(alloc, ftype_node->return_type);
             if (return_type == NULL) return NULL;
 
-            Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
-
-            func_type->kind = Type_Kind_Function;
+            Type* func_type = type_create(Type_Kind_Function, alloc, param_count);
             func_type->ast_type = type_node;
             func_type->Function.param_count = param_count;
             func_type->Function.needed_param_count = param_count;
@@ -264,9 +269,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Array_Type: {
             AstArrayType* a_node = (AstArrayType *) type_node;
 
-            Type* a_type = bh_alloc(alloc, sizeof(Type));
-            a_type->kind = Type_Kind_Array;
-            a_type->ast_type = type_node;
+            Type* a_type = type_create(Type_Kind_Array, alloc, 0);
             a_type->Array.elem = type_build_from_ast(alloc, a_node->elem);
 
             u32 count = 0;
@@ -304,10 +307,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             Type* s_type;
             if (s_node->stcache == NULL) {
-                s_type = bh_alloc(alloc, sizeof(Type));
+                s_type = type_create(Type_Kind_Struct, alloc, 0);
                 s_node->stcache = s_type;
 
-                s_type->kind = Type_Kind_Struct;
                 s_type->ast_type = type_node;
                 s_type->Struct.name = s_node->name;
                 s_type->Struct.mem_count = bh_arr_length(s_node->members);
@@ -433,10 +435,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             if (enum_node->etcache) return enum_node->etcache;
             if (enum_node->backing_type == NULL) return NULL;
 
-            Type* enum_type = bh_alloc(alloc, sizeof(Type));
+            Type* enum_type = type_create(Type_Kind_Enum, alloc, 0);
             enum_node->etcache = enum_type;
 
-            enum_type->kind = Type_Kind_Enum;
             enum_type->ast_type = type_node;
             enum_type->Enum.backing = enum_node->backing_type;
             enum_type->Enum.name = enum_node->name;
@@ -534,8 +535,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             i64 type_count = bh_arr_length(ctype->types);
 
-            Type* comp_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * type_count);
-            comp_type->kind = Type_Kind_Compound;
+            Type* comp_type = type_create(Type_Kind_Compound, alloc, type_count);
             comp_type->Compound.size = 0;
             comp_type->Compound.count = type_count;
 
@@ -575,9 +575,7 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
     Type* return_type = type_build_from_ast(alloc, func->return_type);
     if (return_type == NULL) return NULL;
 
-    Type* func_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * param_count);
-
-    func_type->kind = Type_Kind_Function;
+    Type* func_type = type_create(Type_Kind_Function, alloc, param_count);
     func_type->Function.param_count = param_count;
     func_type->Function.needed_param_count = 0;
     func_type->Function.vararg_arg_pos = -1;
@@ -606,8 +604,7 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
         if (compound->exprs[i]->type == NULL) return NULL;
     }
 
-    Type* comp_type = bh_alloc(alloc, sizeof(Type) + sizeof(Type *) * expr_count);
-    comp_type->kind = Type_Kind_Compound;
+    Type* comp_type = type_create(Type_Kind_Compound, alloc, expr_count);
     comp_type->Compound.size = 0;
     comp_type->Compound.count = expr_count;
 
@@ -637,9 +634,7 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
         return ptr_type;
 
     } else {
-        Type* ptr_type = bh_alloc_item(alloc, Type);
-
-        ptr_type->kind = Type_Kind_Pointer;
+        Type* ptr_type = type_create(Type_Kind_Pointer, alloc, 0);
         ptr_type->Pointer.base.flags |= Basic_Flag_Pointer;
         ptr_type->Pointer.base.size = 8;
         ptr_type->Pointer.elem = to;
@@ -654,9 +649,7 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
     if (to == NULL) return NULL;
 
-    Type* arr_type = bh_alloc_item(alloc, Type);
-
-    arr_type->kind = Type_Kind_Array;
+    Type* arr_type = type_create(Type_Kind_Array, alloc, 0);
     arr_type->Array.count = count;
     arr_type->Array.elem = to;
     arr_type->Array.size = count * type_size_of(to);
@@ -676,8 +669,7 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
         return slice_type;
 
     } else {
-        Type* slice_type = bh_alloc(alloc, sizeof(Type));
-        slice_type->kind = Type_Kind_Slice;
+        Type* slice_type = type_create(Type_Kind_Slice, alloc, 0);
         type_register(slice_type);
         bh_imap_put(&type_slice_map, of->id, slice_type->id);
 
@@ -697,8 +689,7 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
         return dynarr;
 
     } else {
-        Type* dynarr = bh_alloc(alloc, sizeof(Type));
-        dynarr->kind = Type_Kind_DynArray;
+        Type* dynarr = type_create(Type_Kind_DynArray, alloc, 0);
         type_register(dynarr);
         bh_imap_put(&type_dynarr_map, of->id, dynarr->id);
 
@@ -718,8 +709,7 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
         return va_type;
 
     } else {
-        Type* va_type = bh_alloc(alloc, sizeof(Type));
-        va_type->kind = Type_Kind_VarArgs;
+        Type* va_type = type_create(Type_Kind_VarArgs, alloc, 0);
         type_register(va_type);
         bh_imap_put(&type_vararg_map, of->id, va_type->id);
 

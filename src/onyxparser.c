@@ -605,8 +605,8 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) defined;
                 break;
             }
-            else if (next_tokens_are(parser, 2, '#', '{')) {
-                OnyxToken* code_token = expect_token(parser, '#');
+            else if (parse_possible_directive(parser, "code")) {
+                OnyxToken* code_token = parser->curr - 1;
                 // expect_token(parser, '{');
 
                 AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);

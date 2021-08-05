@@ -21,7 +21,10 @@ main :: (args: [] cstr) {
 
     // Structs can be passed by value to procedures.
     print_person :: (person: Person) {
-        printf("Person(%s, %i, %i)\n", person.name, person.age, person.height);
+        printf("Person({}, {}, {})\n", person.name, person.age, person.height);
+
+        // Structs can also be printed using a single '{}' in printf.
+        printf("{}\n", person);
     }
 
     // This is the verbose way to declare a local variable with a struct
@@ -60,7 +63,7 @@ main :: (args: [] cstr) {
     }
 
     print_vector2f :: (vec: Vector2f) {
-        printf("Vector2f(%f, %f)", vec.x, vec.y);
+        printf("{}", vec);
     }
 
     // This does initialize the members to their defaults.
@@ -81,7 +84,7 @@ main :: (args: [] cstr) {
 
     fiu : FloatIntUnion;
     fiu.f = 0.5f;
-    printf("Integer representation of 0.5: %p\n", fiu.i);
+    printf("Integer representation of 0.5: {}\n", fiu.i);
 
 
 
@@ -121,14 +124,14 @@ main :: (args: [] cstr) {
         another_data_member = 1234,
     };
 
-    printf("%s, (%f, %f)\n", thing.name, thing.velocity.x, thing.velocity.y);
+    printf("{}, ({}, {})\n", thing.name, thing.velocity.x, thing.velocity.y);
 
     // This is very useful in many different situtations. Another useful feature is an implicit
     // pointer conversion between two structs, A and B, if A is the first member of B, and is used.
     // For example, we can pass `thing` to this procedure, even though it is not a ComponentOne.
     // The first member is a ComponentOne and is used, so a implicit pointer conversion is always safe.
     do_something_with_component_one :: (c: ^ComponentOne) {
-        printf("ComponentOne's name is %s.\n", c.name);
+        printf("ComponentOne's name is {}.\n", c.name);
     }
 
     do_something_with_component_one(^thing);
@@ -155,7 +158,7 @@ main :: (args: [] cstr) {
 
     println("param_struct_instance values:");
     println(param_struct_instance.t_member);
-    for elem: param_struct_instance.array_of_T do printf("%f ", elem);
+    for elem: param_struct_instance.array_of_T do printf("{} ", elem);
     print("\n");
 
 

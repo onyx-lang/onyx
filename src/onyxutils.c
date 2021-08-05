@@ -33,6 +33,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
 
         char* pac_name = bh_alloc_array(alloc, char, strlen(package_name) + 1);
         memcpy(pac_name, package_name, strlen(package_name) + 1);
+        pac_name[strlen(package_name)] = '\0';
 
         package->name = pac_name;
         package->scope = scope_create(alloc, parent_scope, (OnyxFilePos) { 0 });

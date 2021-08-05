@@ -9,11 +9,12 @@
 use package core
 
 main :: (args: [] cstr) {
-    // Currently, for loops can iterate over four kinds of data structures in Onyx:
+    // Currently, for loops can iterate over five kinds of data structures in Onyx:
     //      * Ranges
     //      * Fixed arrays
     //      * Slices
     //      * Dynamic arrays
+    //      * Custom iterators
 
     // The syntax of for loops is very simple:
     // for ^? <iteration variable>: <iterator> <block>
@@ -40,11 +41,37 @@ main :: (args: [] cstr) {
     print("Doubled primes: ");
     print_array(primes);
 
-    // Currently, there is not support for defining custom iterators for for-loops.
-    // At the moment, this pattern is the best for that purpose:
+    // There is also support for custom iterators using the built-in Iterator type.
+    // You have to specify a next, close, and data member. The semantics are roughly
+    // as follows:
     //
-    //  while it := iterator_create(...); !iterator_done(^it) {
-    //      defer iterator_next(^it);
-    //      ...
-    //  }
+    //     1. next is called to get two values: the next iteration value, and a
+    //        continuation flag. If the continuation flag is true, then the iteration
+    //        will continue for another iteration. If the continuation flag is false
+    //        the iteration immediately terminates and the iteration value will be
+    //        ignored.
+    //
+    //     2. close is called whenever the for-loop exits in any manner (finished,
+    //        break, return).
+
+    {
+        value: i32 = 10;
+
+        //       This is pointer provided to the iterator structure.
+        next :: (v: ^i32) -> (i32, bool) {
+            defer *v -= 1;
+            return *v, *v >= 0;
+        }
+
+        close :: (v: ^i32) {
+            println("Closing the iterator.");
+        }
+
+        iterator: Iterator(i32) = .{ data = ^value, next = next, close = close };
+
+        // Simply use the iterator.
+        for v: iterator {
+            println(v);
+        }
+    }
 }

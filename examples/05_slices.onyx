@@ -23,7 +23,7 @@ main :: (args: [] cstr) {
     slice.count = 4;
 
     // You can iterate over slices directly using a for-loop.
-    for elem: slice do printf("%i ", elem);
+    for elem: slice do printf("{} ", elem);
     print("\n");
 
     // Another equivalent way of writing lines 22 and 23 is to
@@ -33,7 +33,7 @@ main :: (args: [] cstr) {
     slice = arr[3 .. 7];
 
     // Printing it out to verify it is the same.
-    for elem: slice do printf("%i ", elem);
+    for elem: slice do printf("{} ", elem);
     print("\n");
 
     // Since strings are represented as slices in Onyx, substrings
