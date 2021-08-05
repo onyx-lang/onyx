@@ -53,6 +53,7 @@ CheckStatus check_function_header(AstFunction* func);
 CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
 CheckStatus check_type(AstType* type);
+CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
 
 
 // HACK HACK HACK
@@ -1661,6 +1662,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             expr->type = ((AstAlias *) expr)->alias->type;
             break;
 
+        case Ast_Kind_Directive_Insert:
+            retval = check_insert_directive((AstDirectiveInsert **) pexpr);
+            break;
+
         case Ast_Kind_Code_Block:
             expr->flags |= Ast_Flag_Comptime;
             fill_in_type(expr);
@@ -1702,7 +1707,8 @@ CheckStatus check_global(AstGlobal* global) {
     return Check_Success;
 }
 
-CheckStatus check_insert_directive(AstDirectiveInsert* insert) {
+CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
+    AstDirectiveInsert* insert = *pinsert;
     if (insert->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
     CHECK(expression, &insert->code_expr);
@@ -1724,14 +1730,19 @@ CheckStatus check_insert_directive(AstDirectiveInsert* insert) {
 
     assert(code_block->kind == Ast_Kind_Code_Block);
 
-    AstBlock* cloned_block = (AstBlock *) ast_clone(context.ast_alloc, code_block->code);
+    AstNode* cloned_block = ast_clone(context.ast_alloc, code_block->code);
 
-    AstNode* next = insert->next;
-    insert->next = (AstNode *) cloned_block->body;
+    if (cloned_block->kind == Ast_Kind_Block) {
+        AstNode* next = insert->next;
+        insert->next = (AstNode *) ((AstBlock *) cloned_block)->body;
 
-    AstNode* last_stmt = insert->next;
-    while (last_stmt->next != NULL) last_stmt = last_stmt->next;
-    last_stmt->next = next;
+        AstNode* last_stmt = insert->next;
+        while (last_stmt->next != NULL) last_stmt = last_stmt->next;
+        last_stmt->next = next;
+
+    } else {
+        *(AstNode **) pinsert = cloned_block;
+    }
 
     insert->flags |= Ast_Flag_Has_Been_Checked;
 
@@ -1752,8 +1763,6 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
-
-        case Ast_Kind_Directive_Insert: return check_insert_directive((AstDirectiveInsert *) stmt);
 
         case Ast_Kind_Binary_Op:
             CHECK(binaryop, (AstBinaryOp **) pstmt, 1);

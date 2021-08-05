@@ -1015,7 +1015,7 @@ struct AstCallSite {
 struct AstCodeBlock {
     AstTyped_base;
 
-    AstBlock *code;
+    AstNode *code;
 };
 
 struct AstDirectiveInsert {

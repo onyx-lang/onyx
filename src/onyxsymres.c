@@ -43,6 +43,7 @@ static SymresStatus symres_switch(AstSwitch* switchnode);
 static SymresStatus symres_use(AstUse* use);
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid);
 static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined);
+static SymresStatus symres_directive_insert(AstDirectiveInsert* insert);
 static SymresStatus symres_statement_chain(AstNode** walker);
 static SymresStatus symres_statement(AstNode** stmt, b32 *remove);
 static SymresStatus symres_block(AstBlock* block);
@@ -480,6 +481,11 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(if_expression, (AstIfExpression *) *expr);
             break;
 
+        case Ast_Kind_Directive_Insert:
+            SYMRES(directive_insert, (AstDirectiveInsert *) *expr);
+            break;
+
+
         default: break;
     }
 
@@ -777,8 +783,6 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
         case Ast_Kind_Block:       SYMRES(block, (AstBlock *) *stmt);                    break;
         case Ast_Kind_Defer:       SYMRES(statement, &((AstDefer *) *stmt)->stmt, NULL); break;
         case Ast_Kind_Jump:        break;
-
-        case Ast_Kind_Directive_Insert: SYMRES(directive_insert, (AstDirectiveInsert *) *stmt); break;
 
         case Ast_Kind_Local:
             // if (remove) *remove = 1;

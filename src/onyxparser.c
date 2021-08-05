@@ -607,7 +607,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
             else if (parse_possible_directive(parser, "code")) {
                 OnyxToken* code_token = parser->curr - 1;
-                // expect_token(parser, '{');
 
                 AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
                 code_block->token = code_token;
@@ -615,9 +614,22 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 assert(builtin_code_type != NULL);
                 code_block->type_node = builtin_code_type;
 
-                code_block->code = parse_block(parser, 1);
+                if (parser->curr->type == '{') {
+                    code_block->code = (AstNode *) parse_block(parser, 1);
+
+                } else {
+                    code_block->code = (AstNode *) parse_expression(parser, 0);
+                }
 
                 retval = (AstTyped *) code_block;
+                break;
+            }
+            else if (parse_possible_directive(parser, "insert")) {
+                AstDirectiveInsert* insert = make_node(AstDirectiveInsert, Ast_Kind_Directive_Insert);
+                insert->token = parser->curr - 1;
+                insert->code_expr = parse_expression(parser, 0);
+
+                retval = (AstTyped *) insert;
                 break;
             }
 
@@ -1406,12 +1418,8 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 break;
             }
 
-            if (parse_possible_directive(parser, "insert")) {
-                AstDirectiveInsert* insert = make_node(AstDirectiveInsert, Ast_Kind_Directive_Insert);
-                insert->token = parser->curr - 1;
-                insert->code_expr = parse_expression(parser, 0);
-
-                retval = (AstNode *) insert;
+            if (next_tokens_are(parser, 2, '#', Token_Type_Symbol)) {
+                retval = (AstNode *) parse_factor(parser);
                 break;
             }
         }
