@@ -50,7 +50,7 @@ main :: (args: [] cstr) {
 
         case 5 {
             x := math.max(20, 50);
-            defer printf("x in case '5' is %i.\n", x);
+            defer printf("x in case '5' is {}.\n", x);
 
             if x >= 40 do fallthrough;
 

@@ -36,8 +36,8 @@ main :: (args: [] cstr) {
     foo     := 10;
     foo_ptr := ^foo;
 
-    printf("foo is %i\n", foo);
-    printf("foo_ptr is %p\n", foo_ptr);
+    printf("foo is {}\n", foo);
+    printf("foo_ptr is {}\n", foo_ptr);
 
 
     // An important type to know before proceeding is the range type. When designing
@@ -52,7 +52,7 @@ main :: (args: [] cstr) {
     // to specify the step in a range literal.
     rng := 5 .. 25;
     print("rng is ");
-    print(rng);
+    println(rng);
 
     // Onyx has 3 different array-like types:
     //  * Fixed-size arrays, written [N] <type>, where N is a compile time know integer.
@@ -67,7 +67,7 @@ main :: (args: [] cstr) {
     for i: 0 .. 10 {
         fixed_arr[i] = i * i;
     }
-    print("fixed_arr[3] is %i\n", fixed_arr[3]);
+    printf("fixed_arr[3] is {}\n", fixed_arr[3]);
 
     // A quick thing to note about fixed size arrays is that they copy their contents
     // on assignment. In this example, another_arr declares space on the stack for 10
@@ -79,7 +79,7 @@ main :: (args: [] cstr) {
 
     fixed_arr[3] = 1234;
 
-    printf("another_arr[3] is %i\n", another_arr[3]);
+    printf("another_arr[3] is {}\n", another_arr[3]);
 
 
     // Slices are a concept not unique to Onyx. They represent a pointer and a count,
@@ -92,7 +92,7 @@ main :: (args: [] cstr) {
     // of fixed_arr. It is important to know that this does NOT make a copy of the
     // data. It simply points into the same memory as fixed_arr.
     slice_arr := fixed_arr[3 .. 9];
-    print("slice_arr[3] is %i\n", slice_arr[3]);
+    printf("slice_arr[3] is {}\n", slice_arr[3]);
 
 
     // Dynamic arrays are the most common arrays used in practice. They represent a
@@ -108,8 +108,7 @@ main :: (args: [] cstr) {
         array.push(^dyn_arr, i * i * i);
     }
 
-    print("dyn_arr is ");
-    print_array(dyn_arr);
+    printf("dyn_arr is {}\n", dyn_arr);
 
 
 
@@ -155,7 +154,7 @@ main :: (args: [] cstr) {
     // for i to be 11.
 
     while i := 0; i < 10 {
-        printf("%i ", i);
+        printf("{} ", i);
         i += 1;
     } else {
         print("The while loop never ran...");
@@ -172,7 +171,7 @@ main :: (args: [] cstr) {
     // break or continue the loop that you want to. Take this example.
     while i := 0; i < 10 {
         while j := 0; j < 10 {
-            printf("%i %j\n", i, j);
+            printf("{} {}\n", i, j);
 
             if i == 1 && j == 2 do break break;
             j += 1;

@@ -56,7 +56,7 @@ main :: (args: [] cstr) {
         // procedure between two areas of concern.
 
         basically_a_method :: (use dummy: ^Dummy) {
-            printf("Dummy with name '%s', and age '%i'.\n", name, age);
+            printf("Dummy with name '{}', and age '{}'.\n", name, age);
         }
 
         dummy := Dummy.{ "Phil", 15 };

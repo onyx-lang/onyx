@@ -29,7 +29,7 @@ main :: (args: [] cstr) {
     typed_varargs :: (args: ..i32) {
         print("Typed variadic arguments: ");
         for x: args {
-            printf("%i ", x);
+            printf("{} ", x);
         }
         print("\n");
     }
@@ -47,12 +47,19 @@ main :: (args: [] cstr) {
     // can be achieved because in Onyx, untyped varargs know how many varargs are passed
     // through a runtime count. This means if you call vararg_get more times than there
     // are varargs, you will get empty or default results back.
+    //
+    // Most of the time with untyped varargs, you will have some kind of format
+    // specifier to indicate how many and of what type the varargs are. For example
+    // 'printf' used to use this:
+    //
+    //   printf :: (format: str, va: ...) -> void
+    //   printf("%i %f %l %d", int, float, long, double);
     untyped_varargs :: (args: ...) {
         print("Untyped variadic arguments: ");
 
         x: i32;
         while vararg_get(args, ^x) {
-            printf("%p ", x);
+            printf("{} ", cast(rawptr) x);
         }
 
         print("\n");
@@ -62,18 +69,21 @@ main :: (args: [] cstr) {
 
 
 
+    // Untyped varargs will remain in the language for now, but a much better approach
+    // has been taken to have mixed type variadic arguments, and it is called 'any'.
+    // This is a procedure that takes a variadic number of 'any's. The powerful fact
+    // about 'any' is that is contains a member called 'type', which can be used to
+    // lookup type information at runtime. 'printf' already uses this for its '{}' format
+    // specifiers, and it knows how to print type names.
+    any_varargs :: (args: ..any) {
+        print("Any variadic arguments: ");
 
-    // Most of the time with untyped varargs, you will have some kind of format
-    // specifier to indicate how many and of what type the varargs are. For example
-    // 'printf' uses this:
-    //
-    //   printf :: (format: str, va: ...) -> void
-    //   printf("%i %f %l %d", int, float, long, double);
-    //
-    // There are plans for the future to have better runtime type information available,
-    // which would allow you to introspect the types of each vararg at runtime. This
-    // would mean that instead of using '%i' style specifiers in printf, you could use
-    // '{}' to indicate the next variadic argument, whose type is automatically determined.
-    // If I'm not explaining this very well I apologize and hope that when the feature
-    // is implemented, it will make sense why it is a good idea.
+        for arg: args {
+            printf("{}, ", arg.type);
+        }
+
+        print("\n");
+    }
+
+    any_varargs(1, 2.0f, "test", any_varargs);
 }

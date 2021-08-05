@@ -30,13 +30,13 @@ main :: (args: [] cstr) {
     // To access certain elements of the array, simply use the array access operator,
     // [...], as so. This sets the fourth element of the array to be 1234.
     arr[3] = 1234;
-    printf("arr[3] is %i\n", arr[3]);
+    printf("arr[3] is {}\n", arr[3]);
 
     // Fixed-size arrays can be iterated over using a `for` loop as so.
     for element: arr {
-        printf("%i ", element);
+        printf("{} ", element);
     }
-    printf("\n");
+    print("\n");
 
 
     // Fixed-size arrays are passed to procedures by reference. In the following example,
@@ -50,7 +50,7 @@ main :: (args: [] cstr) {
 
     array_proc(arr);
     for element: arr {
-        printf("%i ", element);
+        printf("{} ", element);
     }
 
 
@@ -59,8 +59,8 @@ main :: (args: [] cstr) {
     // array. Slices and dynamic arrays do not operate this way.
     other_arr : [10] i32;
     other_arr = arr;
-    for other_element: other_arr do printf("%i ", other_element);
-    printf("\n");
+    for other_element: other_arr do printf("{} ", other_element);
+    print("\n");
 
     // This does mean that the following pattern of double buffering arrays (which
     // is used widely in many C programs), will work in Onyx, but it will be much
@@ -84,8 +84,8 @@ main :: (args: [] cstr) {
     // OR
     arr_lit := i32.[ 2, 3, 5, 7, 11 ];
     
-    for elem: arr_lit do printf("%i ", elem);
-    printf("\n");
+    for elem: arr_lit do printf("{} ", elem);
+    print("\n");
 
     // The type of the elements of the array is given right before the `.`. The
     // expression `u32.[ 1, 2, 3, 4, 5 ]` has the type `[5] u32`. The elements
