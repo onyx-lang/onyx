@@ -266,6 +266,7 @@ EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
 
 static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node);
+static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node);
 
 #include "onyxwasm_intrinsics.c"
 #include "onyxwasm_type_table.c"
@@ -3181,6 +3182,16 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
 }
 
 static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
+    if (!emit_raw_data_(mod, data, node)) {
+        onyx_report_error(node->token->pos,
+            "Cannot generate constant data for '%s'.",
+            onyx_ast_node_kind_string(node->kind));
+    }
+}
+
+static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
+    b32 retval = 1;
+
     switch (node->kind) {
     case Ast_Kind_Array_Literal: {
         AstArrayLiteral* al = (AstArrayLiteral *) node;
@@ -3189,7 +3200,7 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         i32 elem_size = type_size_of(al->type->Array.elem);
 
         bh_arr_each(AstTyped *, expr, al->values) {
-            emit_raw_data(mod, bh_pointer_add(data, i * elem_size), *expr);
+            retval &= emit_raw_data_(mod, bh_pointer_add(data, i * elem_size), *expr);
             i++;
         }
 
@@ -3200,11 +3211,15 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         AstStructLiteral* sl = (AstStructLiteral *) node;
 
         Type* sl_type = sl->type;
-        assert(sl_type->kind == Type_Kind_Struct);
+        // ROBUSTNESS: Handle cases for slices and dynamic arrays
+        if (sl_type->kind != Type_Kind_Struct) {
+            retval = 0;
+            break;
+        }
 
         i32 i = 0;
         bh_arr_each(AstTyped *, expr, sl->args.values) {
-            emit_raw_data(mod, bh_pointer_add(data, sl_type->Struct.memarr[i]->offset), *expr);
+            retval &= emit_raw_data_(mod, bh_pointer_add(data, sl_type->Struct.memarr[i]->offset), *expr);
             i++;
         }
 
@@ -3225,7 +3240,7 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
     case Ast_Kind_Enum_Value: {
         AstEnumValue* ev = (AstEnumValue *) node;
-        emit_raw_data(mod, data, (AstTyped *) ev->value);
+        retval &= emit_raw_data_(mod, data, (AstTyped *) ev->value);
         break;
     }
 
@@ -3252,41 +3267,42 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         case Basic_Kind_I8:
         case Basic_Kind_U8:
             *((i8 *) data) = (i8) ((AstNumLit *) node)->value.i;
-            return;
+            return retval;
 
         case Basic_Kind_I16:
         case Basic_Kind_U16:
             *((i16 *) data) = (i16) ((AstNumLit *) node)->value.i;
-            return;
+            return retval;
 
         case Basic_Kind_I32:
         case Basic_Kind_U32:
             *((i32 *) data) = ((AstNumLit *) node)->value.i;
-            return;
+            return retval;
 
         case Basic_Kind_I64:
         case Basic_Kind_U64:
         case Basic_Kind_Rawptr:
             *((i64 *) data) = ((AstNumLit *) node)->value.l;
-            return;
+            return retval;
 
         case Basic_Kind_F32:
             *((f32 *) data) = ((AstNumLit *) node)->value.f;
-            return;
+            return retval;
 
         case Basic_Kind_F64:
             *((f64 *) data) = ((AstNumLit *) node)->value.d;
-            return;
+            return retval;
 
         default: break;
         }
 
         //fallthrough
     }
-    default: onyx_report_error(node->token->pos,
-            "Cannot generate constant data for '%s'.",
-            onyx_ast_node_kind_string(node->kind));
+
+    default: retval = 0;
     }
+
+    return retval;
 }
 
 static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {

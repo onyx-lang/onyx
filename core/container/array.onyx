@@ -345,6 +345,20 @@ find_ptr :: (arr: ^[..] $T, value: T) -> ^T {
     return null;
 }
 
+first :: #match {
+    (arr: ^[..] $T, predicate: (T) -> bool) -> ^T {
+        first((#type [] T).{ arr.data, arr.count }, predicate);
+    },
+
+    (arr: [] $T, predicate: (T) -> bool) -> ^T {
+        for ^it: arr {
+            if predicate(*it) do return it;
+        }
+
+        return null;
+    },
+}
+
 count_where :: #match {
     (arr: ^[..] $T, predicate: (T) -> bool) -> u32 {
         count: u32 = 0;

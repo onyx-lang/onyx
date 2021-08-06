@@ -12,9 +12,13 @@ u64 build_type_table(OnyxWasmModule* module) {
     // This is the data behind the "type_table" slice in type_info.onyx
     u32 type_count = bh_arr_length(type_map.entries) + 1;
     u64* table_info = bh_alloc_array(global_heap_allocator, u64, type_count); // HACK
+    memset(table_info, 0, type_count * sizeof(u64));
 
     bh_buffer table_buffer;
     bh_buffer_init(&table_buffer, global_heap_allocator, 4096);
+
+    // Write a "NULL" at the beginning so nothing will have to point to the first byte of the buffer.
+    bh_buffer_write_u64(&table_buffer, 0);
 
     bh_arr_each(bh__imap_entry, type_entry, type_map.entries) {
         u64 type_idx = type_entry->key;
@@ -169,6 +173,8 @@ u64 build_type_table(OnyxWasmModule* module) {
                 TypeStruct* s = &type->Struct;
                 u32* name_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
                 u32* param_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(s->poly_sln));
+                u32* value_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
+                memset(value_locations, 0, s->mem_count * sizeof(u32));
 
                 u32 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
@@ -212,13 +218,52 @@ u64 build_type_table(OnyxWasmModule* module) {
                 }
 
                 bh_buffer_align(&table_buffer, 8);
+
+                i = 0;
+                bh_arr_each(StructMember*, pmem, s->memarr) {
+                    StructMember* mem = *pmem;
+
+                    if (mem->initial_value == NULL || *mem->initial_value == NULL) {
+                        i++;
+                        continue;
+                    }
+
+                    AstTyped* value = *mem->initial_value;
+                    assert(value->type);
+
+                    if ((value->flags & Ast_Flag_Comptime) == 0) {
+                        // onyx_report_warning(value->token->pos, "Warning: skipping generating default value for '%s' in '%s' because it is not compile-time known.\n", mem->name, s->name);
+                        i++;
+                        continue;
+                    }
+
+                    u32 size = type_size_of(value->type);
+                    bh_buffer_align(&table_buffer, type_alignment_of(value->type));
+
+                    bh_buffer_grow(&table_buffer, table_buffer.length + size);
+                    u8* buffer = table_buffer.data + table_buffer.length;
+
+                    if (!emit_raw_data_(module, buffer, value)) {
+                        // Failed to generate raw data
+                        // onyx_report_warning(value->token->pos, "Warning: failed to generate default value for '%s' in '%s'.\n", mem->name, s->name);
+                        value_locations[i++] = 0;
+
+                    } else {
+                        // Success 
+                        value_locations[i++] = table_buffer.length;
+                        table_buffer.length += size;
+                    }
+                }
+
+                bh_buffer_align(&table_buffer, 8);
                 u32 members_base = table_buffer.length;
 
                 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
                     StructMember* mem = *pmem;
 
-                    u32 name_loc = name_locations[i++];
+                    u32 name_loc = name_locations[i];
+                    u32 value_loc = value_locations[i++];
 
                     bh_buffer_align(&table_buffer, 8);
                     PATCH;
@@ -227,7 +272,10 @@ u64 build_type_table(OnyxWasmModule* module) {
                     bh_buffer_write_u32(&table_buffer, mem->offset);
                     bh_buffer_write_u32(&table_buffer, mem->type->id);
                     bh_buffer_write_byte(&table_buffer, mem->used ? 1 : 0);
-                    bh_buffer_write_byte(&table_buffer, mem->initial_value != NULL ? 1 : 0);
+                    
+                    bh_buffer_align(&table_buffer, 8);
+                    PATCH;
+                    bh_buffer_write_u64(&table_buffer, value_loc);
                 }
 
                 bh_buffer_align(&table_buffer, 8);
@@ -291,7 +339,10 @@ u64 build_type_table(OnyxWasmModule* module) {
     }
 
     bh_arr_each(u32, patch_loc, base_patch_locations) {
-        *(u64 *) (bh_pointer_add(table_buffer.data, *patch_loc)) += offset;
+        u64* loc = bh_pointer_add(table_buffer.data, *patch_loc);
+        if (*loc == 0) continue;
+        
+        *loc += offset;
     }
 
     WasmDatum type_info_data = {

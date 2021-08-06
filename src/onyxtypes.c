@@ -43,6 +43,7 @@ static bh_imap type_pointer_map;
 static bh_imap type_slice_map;
 static bh_imap type_dynarr_map;
 static bh_imap type_vararg_map;
+static bh_table(u64) type_func_map;
 
 static Type* type_create(TypeKind kind, bh_allocator a, u32 extra_type_pointer_count) {
     Type* type = bh_alloc(a, sizeof(Type) + sizeof(Type *) * extra_type_pointer_count);
@@ -65,6 +66,7 @@ void types_init() {
     bh_imap_init(&type_slice_map,   global_heap_allocator, 255);
     bh_imap_init(&type_dynarr_map,  global_heap_allocator, 255);
     bh_imap_init(&type_vararg_map,  global_heap_allocator, 255);
+    bh_table_init(global_heap_allocator, type_func_map, 64);
 
     fori (i, 0, Basic_Kind_Count) type_register(&basic_types[i]);
 }
@@ -262,7 +264,18 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     if (func_type->Function.params[i] == NULL) return NULL;
                 }
 
+            char* name = (char *) type_get_unique_name(func_type);
+            if (bh_table_has(u64, type_func_map, name)) {
+                u64 id = bh_table_get(u64, type_func_map, name);
+                Type* existing_type = (Type *) bh_imap_get(&type_map, id);
+
+                // LEAK LEAK LEAK the func_type that is created
+                return existing_type;
+            }
+
             type_register(func_type);
+            bh_table_put(u64, type_func_map, name, func_type->id);
+
             return func_type;
         }
 
@@ -594,7 +607,19 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
         }
     }
 
+    // CopyPaste from above in type_build_from_ast
+    char* name = (char *) type_get_unique_name(func_type);
+    if (bh_table_has(u64, type_func_map, name)) {
+        u64 id = bh_table_get(u64, type_func_map, name);
+        Type* existing_type = (Type *) bh_imap_get(&type_map, id);
+
+        // LEAK LEAK LEAK the func_type that is created
+        return existing_type;
+    }
+
     type_register(func_type);
+    bh_table_put(u64, type_func_map, name, func_type->id);
+
     return func_type;
 }
 
@@ -770,21 +795,41 @@ const char* type_get_unique_name(Type* type) {
         case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_unique_name(type->DynArray.ptr_to_data->Pointer.elem));
 
         case Type_Kind_Function: {
-            char buf[512];
-            fori (i, 0, 512) buf[i] = 0;
+            char buf[1024];
+            memset(buf, 0, 1024);
 
-            strncat(buf, "(", 511);
+            strncat(buf, "(", 1023);
             fori (i, 0, type->Function.param_count) {
-                strncat(buf, type_get_unique_name(type->Function.params[i]), 511);
+                strncat(buf, type_get_unique_name(type->Function.params[i]), 1023);
+
+                if (i >= type->Function.needed_param_count)
+                    strncat(buf, "?", 1023);
+
                 if (i != type->Function.param_count - 1)
-                    strncat(buf, ", ", 511);
+                    strncat(buf, ", ", 1023);
             }
 
-            strncat(buf, ") -> ", 511);
-            strncat(buf, type_get_unique_name(type->Function.return_type), 511);
+            strncat(buf, ") -> ", 1023);
+            strncat(buf, type_get_unique_name(type->Function.return_type), 1023);
 
             return bh_aprintf(global_scratch_allocator, "%s", buf);
         }
+
+        case Type_Kind_Compound: {
+            char buf[1024];
+            memset(buf, 0, 1024);
+
+            strncat(buf, "(", 1023);
+            fori (i, 0, type->Compound.count) {
+                strncat(buf, type_get_unique_name(type->Compound.types[i]), 1023);
+                if (i != type->Compound.count - 1)
+                    strncat(buf, ", ", 1023);
+            }
+            strncat(buf, ")", 1023);
+
+            return bh_aprintf(global_scratch_allocator, "%s", buf);
+        }
+
 
         default: return "unknown";
     }

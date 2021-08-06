@@ -136,7 +136,11 @@ Type_Info_Struct :: struct {
         type: type_expr;
 
         used: bool;
-        has_default: bool;
+        default: rawptr; // Pointer to the initial value of the same type as the member.
+                         // null if no default value is given, or if it is not compile time known.
+
+                         // As another thought. This could become a thunk that get the default value
+                         // at runtime or returns the value.
     }
 
     name: str;

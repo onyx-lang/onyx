@@ -128,3 +128,16 @@ offset_of :: (T: type_expr, member: str) -> u32 {
     // Should this return something else if the member was not found?
     return 0;
 }
+
+#operator == (t1: Type_Info_Function, t2: Type_Info_Function) -> bool {
+    if t1.parameter_types.count != t2.parameter_types.count do return false;
+    if t1.return_type           != t2.return_type           do return false;
+    if t1.is_variadic           != t2.is_variadic           do return false;
+
+    while i := 0; i < t1.parameter_types.count {
+        @Robustness // This does not handle nested procedure types
+        if t1.parameter_types[i] != t2.parameter_types[i] do return false;
+    }
+
+    return true;
+}

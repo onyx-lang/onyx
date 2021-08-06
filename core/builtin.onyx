@@ -189,5 +189,5 @@ any :: struct {
 }
 
 
-// Represents a code block. Not constructable outside of using a '#{}' block.
+// Represents a code block. Not constructable outside of using a '#code' directive.
 Code :: struct {}
