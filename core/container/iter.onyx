@@ -27,7 +27,7 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     }
 
     close :: ($T: type_expr, fi: ^FilterIterator(T)) {
-        fi.iterator.close(fi.iterator.data);
+        if fi.iterator.close != null_proc do fi.iterator.close(fi.iterator.data);
         cfree(fi);
     }
 
@@ -56,7 +56,7 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
     }
 
     close :: ($T: type_expr, $R: type_expr, mi: ^MapIterator(T, R)) {
-        mi.iterator.close(mi.iterator.data);
+        if mi.iterator.close != null_proc do mi.iterator.close(mi.iterator.data);
         cfree(mi);
     }
 
@@ -114,7 +114,7 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     }
 
     close :: ($T: type_expr, ti: ^TakeIterator(T)) {
-        ti.iterator.close(ti.iterator.data);
+        if ti.iterator.close != null_proc do ti.iterator.close(ti.iterator.data);
         cfree(ti);
     }
 
@@ -151,7 +151,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     }
 
     close :: ($T: type_expr, si: ^SkipIterator(T)) {
-        si.iterator.close(si.iterator.data);
+        if si.iterator.close != null_proc do si.iterator.close(si.iterator.data);
         cfree(si);
     }
 
@@ -185,8 +185,8 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Z
     }
 
     close :: ($T: type_expr, $R: type_expr, zi: ^ZippedIterator(T, R)) {
-        zi.iterator1.close(zi.iterator1.data);
-        zi.iterator2.close(zi.iterator2.data);
+        if zi.iterator1.close != null_proc do zi.iterator1.close(zi.iterator1.data);
+        if zi.iterator2.close != null_proc do zi.iterator2.close(zi.iterator2.data);
         cfree(zi);
     }
 
@@ -209,6 +209,79 @@ const :: (value: $T) -> Iterator(T) {
         data = allocated,
         next = #solidify next { T=T },
         close = cfree,
+    };
+}
+
+#private_file Enumeration_Value :: struct (T: type_expr) {
+    index: i32;
+    value: T;
+}
+
+enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Value(T)) {
+    Enumeration_Context :: struct (T: type_expr) {
+        iterator:      Iterator(T);
+        current_index: i32;
+    }
+
+    ec := make(#type Enumeration_Context(T));
+    ec.iterator = it;
+    ec.current_index = start_index;
+
+    next :: ($T: type_expr, use data: ^Enumeration_Context(T)) -> (Enumeration_Value(T), bool) {
+        value, cont := iterator.next(iterator.data);
+
+        if !cont do return .{ current_index, __zero_value(T) }, false;
+
+        defer current_index += 1;
+        return .{ current_index, value }, true;
+    }
+
+    close :: ($T: type_expr, use data: ^Enumeration_Context(T)) {
+        if iterator.close != null_proc do iterator.close(iterator.data);
+        cfree(data);
+    }
+
+    return .{
+        data  = ec,
+        next  = #solidify next  { T = T },
+        close = #solidify close { T = T },
+    };
+}
+
+from_array :: (arr: [..] $T) -> Iterator(^T) {
+    return from_slice((#type [] T).{ arr.data, arr.count });
+}
+
+from_slice :: (arr: [] $T) -> Iterator(^T) {
+    Context :: struct (T: type_expr) {
+        data: ^T;
+        count: u32;
+        current: u32;
+    }
+
+    c := make(#type Context(T));
+    c.data = arr.data;
+    c.count = arr.count;
+    c.current = 0;
+
+    next :: ($T: type_expr, use _: ^Context(T)) -> (^T, bool) {
+        if current < count {
+            defer current += 1;
+            return ^data[current], true;
+
+        } else {
+            return null, false;
+        }
+    }
+
+    close :: (data: rawptr) {
+        cfree(data);
+    }
+
+    return .{
+        data  = c,
+        next  = #solidify next { T = T },
+        close = close,
     };
 }
 

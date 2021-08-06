@@ -1131,7 +1131,7 @@ void entity_heap_remove_top(EntityHeap* entities);
 // If target_arr is null, the entities will be placed directly in the heap.
 void add_entities_for_node(bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
 
-void entity_bring_to_state(Entity* ent, EntityState state);
+b32  entity_bring_to_state(Entity* ent, EntityState state);
 void symres_entity(Entity* ent);
 void check_entity(Entity* ent);
 void emit_entity(Entity* ent);

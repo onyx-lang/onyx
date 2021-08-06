@@ -962,7 +962,7 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
         .scope = solidified_func.poly_scope,
     };
 
-    entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
+    b32 successful = entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
     if (onyx_has_errors()) {
         onyx_clear_errors();
         return NULL;
@@ -1084,8 +1084,8 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
         if (overload->kind != Ast_Kind_Function) continue;
-        if (overload->type == NULL) continue;
-        assert(overload->type->kind == Type_Kind_Function);
+        // if (overload->type == NULL) continue;
+        // assert(overload->type->kind == Type_Kind_Function);
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list
         if (!fill_in_arguments(&args, (AstNode *) overload, NULL)) continue;
@@ -1324,7 +1324,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
     return NULL;
 }
 
-void entity_bring_to_state(Entity* ent, EntityState state) {
+b32 entity_bring_to_state(Entity* ent, EntityState state) {
     EntityState last_state = ent->state;
 
     while (ent->state != state) {
@@ -1333,14 +1333,16 @@ void entity_bring_to_state(Entity* ent, EntityState state) {
             case Entity_State_Check_Types:     check_entity(ent);  break;
             case Entity_State_Code_Gen:        emit_entity(ent);   break;
 
-            default: return;
+            default: return 0;
         }
 
-        if (ent->state == last_state) break;
+        if (ent->state == last_state) return 0;
         last_state = ent->state;
 
-        if (onyx_has_errors()) return;
+        if (onyx_has_errors()) return 0;
     }
+
+    return 1;
 }
 
 
