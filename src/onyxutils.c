@@ -372,6 +372,8 @@ static AstSolidifiedFunction generate_solidified_function(
     b32 header_only) {
 
     AstSolidifiedFunction solidified_func;
+    solidified_func.header_complete = 0;
+    solidified_func.body_complete = 0;
 
     // NOTE: Use the position of token if one was provided, otherwise just use NULL.
     OnyxFilePos poly_scope_pos = { 0 };
@@ -943,16 +945,20 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 
     ensure_polyproc_cache_is_created(pp);
 
+    AstSolidifiedFunction solidified_func;
+
     char* unique_key = build_poly_slns_unique_key(slns);
     if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
-        AstSolidifiedFunction solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
-        return solidified_func.func;
+        solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
+
+    } else {
+        // NOTE: This function is only going to have the header of it correctly created.
+        // Nothing should happen to this function's body or else the original will be corrupted.
+        //                                                      - brendanfh 2021/01/10
+        solidified_func = generate_solidified_function(pp, slns, NULL, 1);
     }
 
-    // NOTE: This function is only going to have the header of it correctly created.
-    // Nothing should happen to this function's body or else the original will be corrupted.
-    //                                                      - brendanfh 2021/01/10
-    AstSolidifiedFunction solidified_func = generate_solidified_function(pp, slns, NULL, 1);
+    if (solidified_func.header_complete) return solidified_func.func;
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,
@@ -967,6 +973,8 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
         onyx_clear_errors();
         return NULL;
     }
+
+    solidified_func.header_complete = successful;
 
     // NOTE: Cache the function for later use, only if it didn't have errors in its header.
     bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
@@ -1058,7 +1066,7 @@ void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_o
     }
 }
 
-AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* param_args) {
+AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* param_args, b32* should_yield) {
     Arguments args;
     arguments_clone(&args, param_args);
     arguments_ensure_length(&args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
@@ -1084,7 +1092,15 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
         if (overload->kind != Ast_Kind_Function) continue;
-        if (overload->type == NULL) continue;
+        if (overload->type == NULL) {
+            // If it was not possible to create the type for this procedure, tell the
+            // caller that this should yield and try again later.
+            if (should_yield) *should_yield = 1;
+
+            // return and not continue because if the overload that didn't have a type will
+            // work in the future, then it has to take precedence over the other options available.
+            return NULL;
+        }
         assert(overload->type->kind == Type_Kind_Function);
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list

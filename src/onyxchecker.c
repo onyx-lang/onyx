@@ -435,9 +435,10 @@ CheckStatus check_call(AstCall* call) {
     while (call->callee->kind == Ast_Kind_Alias) call->callee = ((AstAlias *) call->callee)->alias;
 
     if (call->callee->kind == Ast_Kind_Overloaded_Function) {
-        AstTyped* new_callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args);
+        b32 should_yield = 0;
+        AstTyped* new_callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args, &should_yield);
         if (new_callee == NULL) {
-            if (call->callee->entity->state > Entity_State_Check_Types) {
+            if (call->callee->entity->state > Entity_State_Check_Types && !should_yield) {
                 report_unable_to_match_overload(call);
                 return Check_Error;
 
@@ -906,7 +907,8 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     bh_arr_push(args.values, binop->left);
     bh_arr_push(args.values, binop->right);
 
-    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args);
+    b32 should_yield = 0;
+    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args, &should_yield);
     if (overload == NULL) {
         bh_arr_free(args.values);
         return NULL;

@@ -939,6 +939,9 @@ struct AstPolySolution {
 };
 
 struct AstSolidifiedFunction {
+    b32 header_complete: 1;
+    b32 body_complete:   1;
+    
     AstFunction* func;
     Scope*       poly_scope;
 };
@@ -1326,7 +1329,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
 
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
-AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
+AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args, b32* should_yield);
 AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type);
 void report_unable_to_match_overload(AstCall* call);
 

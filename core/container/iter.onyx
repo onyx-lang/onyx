@@ -248,41 +248,43 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
     };
 }
 
-from_array :: (arr: [..] $T) -> Iterator(^T) {
-    return from_slice((#type [] T).{ arr.data, arr.count });
-}
+from_array :: #match {
+    (arr: [..] $T) -> Iterator(^T) {
+        return from_slice((#type [] T).{ arr.data, arr.count });
+    },
 
-from_slice :: (arr: [] $T) -> Iterator(^T) {
-    Context :: struct (T: type_expr) {
-        data: ^T;
-        count: u32;
-        current: u32;
-    }
-
-    c := make(#type Context(T));
-    c.data = arr.data;
-    c.count = arr.count;
-    c.current = 0;
-
-    next :: ($T: type_expr, use _: ^Context(T)) -> (^T, bool) {
-        if current < count {
-            defer current += 1;
-            return ^data[current], true;
-
-        } else {
-            return null, false;
+    (arr: [] $T) -> Iterator(^T) {
+        Context :: struct (T: type_expr) {
+            data: ^T;
+            count: u32;
+            current: u32;
         }
-    }
 
-    close :: (data: rawptr) {
-        cfree(data);
-    }
+        c := make(#type Context(T));
+        c.data = arr.data;
+        c.count = arr.count;
+        c.current = 0;
 
-    return .{
-        data  = c,
-        next  = #solidify next { T = T },
-        close = close,
-    };
+        next :: ($T: type_expr, use _: ^Context(T)) -> (^T, bool) {
+            if current < count {
+                defer current += 1;
+                return ^data[current], true;
+
+            } else {
+                return null, false;
+            }
+        }
+
+        close :: (data: rawptr) {
+            cfree(data);
+        }
+
+        return .{
+            data  = c,
+            next  = #solidify next { T = T },
+            close = close,
+        };
+    }
 }
 
 fold :: (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
