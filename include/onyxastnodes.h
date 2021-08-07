@@ -939,11 +939,10 @@ struct AstPolySolution {
 };
 
 struct AstSolidifiedFunction {
-    b32 header_complete: 1;
-    b32 body_complete:   1;
-    
     AstFunction* func;
     Scope*       poly_scope;
+
+    b32 header_complete: 1;
 };
 
 struct AstPolyProc {

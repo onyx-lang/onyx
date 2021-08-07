@@ -165,7 +165,14 @@ Animation_State :: struct {
     click_time := 0.0f;
 }
 
+has_active_animation :: () -> bool {
+    for ^anim: animation_states.entries {
+        if anim.value.hover_time != 0.0f || anim.value.hover_time != 1.0f do return true;
+        if anim.value.click_time != 0.0f || anim.value.click_time != 1.0f do return true;
+    }
 
+    return false;
+}
 
 
 // Utilities

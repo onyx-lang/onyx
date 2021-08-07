@@ -373,7 +373,6 @@ static AstSolidifiedFunction generate_solidified_function(
 
     AstSolidifiedFunction solidified_func;
     solidified_func.header_complete = 0;
-    solidified_func.body_complete = 0;
 
     // NOTE: Use the position of token if one was provided, otherwise just use NULL.
     OnyxFilePos poly_scope_pos = { 0 };
