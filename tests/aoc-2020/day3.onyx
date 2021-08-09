@@ -34,12 +34,13 @@ main :: (args: [] cstr) {
         for ch: line do array.push(^forest, ch);
     }
 
-    lis : [5] LineInterp;
-    lis[0] = .{ 0, 0, 1, 1 };
-    lis[1] = .{ 0, 0, 3, 1 };
-    lis[2] = .{ 0, 0, 5, 1 };
-    lis[3] = .{ 0, 0, 7, 1 };
-    lis[4] = .{ 0, 0, 1, 2 };
+    lis := LineInterp.[
+        .{ 0, 0, 1, 1 },
+        .{ 0, 0, 3, 1 },
+        .{ 0, 0, 5, 1 },
+        .{ 0, 0, 7, 1 },
+        .{ 0, 0, 1, 2 },
+    ];
 
     tree_prod: u64 = 1;
 

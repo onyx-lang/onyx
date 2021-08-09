@@ -3212,15 +3212,17 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
         Type* sl_type = sl->type;
         // ROBUSTNESS: Handle cases for slices and dynamic arrays
-        if (sl_type->kind != Type_Kind_Struct) {
+        if (sl_type->kind != Type_Kind_Struct && sl_type->kind != Type_Kind_Slice && sl_type->kind != Type_Kind_DynArray) {
             retval = 0;
             break;
         }
 
-        i32 i = 0;
-        bh_arr_each(AstTyped *, expr, sl->args.values) {
-            retval &= emit_raw_data_(mod, bh_pointer_add(data, sl_type->Struct.memarr[i]->offset), *expr);
-            i++;
+        i32 mem_count = type_structlike_mem_count(sl_type);
+        StructMember smem;
+
+        fori (i, 0, mem_count) {
+            type_lookup_member_by_idx(sl_type, i, &smem);
+            retval &= emit_raw_data_(mod, bh_pointer_add(data, smem.offset), sl->args.values[i]);
         }
 
         break;

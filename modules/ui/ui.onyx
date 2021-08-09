@@ -29,6 +29,7 @@ init_ui :: () {
 
 // This function should be called at the end of drawing a frame, after all of the UI elements
 // had a chance to interact with the hardware events.
+
 end_frame :: () {
     mouse_state.left_button_just_up    = false;
     mouse_state.left_button_just_down  = false;
@@ -47,7 +48,9 @@ end_frame :: () {
     keyboard_state.keys_down_this_frame = 0;
     keyboard_state.keys_up_this_frame = 0;
 
+    hot_item_depth_needed = hot_item_depth;
     if !hot_item_was_set do set_hot_item(0);
+    hot_item_depth = 0;
     hot_item_was_set = false;
 
     for ^s: keyboard_state.state {
@@ -61,13 +64,26 @@ set_active_item :: (id: UI_Id) -> bool {
     return true;
 }
 
-set_hot_item :: (id: UI_Id) -> bool {
+#private_file hot_item_depth := 0;
+#private_file hot_item_depth_needed := 0;
+
+set_hot_item :: (id: UI_Id, force := false) -> bool {
     if active_item != 0 do return false;
 
-    hot_item_was_set = true;
+    if force {
+        hot_item_was_set = true;
+        hot_item = id;
+        return true;
+    }
 
-    hot_item = id;
-    return true;
+    hot_item_depth += 1;
+    if hot_item_depth >= hot_item_depth_needed {
+        hot_item_was_set = true;
+        hot_item = id;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 is_active_item :: (id: UI_Id) -> bool {

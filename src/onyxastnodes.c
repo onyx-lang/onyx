@@ -58,7 +58,7 @@ static const char* ast_node_names[] = {
     "ARRAY ACCESS",
     "SLICE",
     "FIELD ACCESS",
-    "UNARY FIELD ACCESS"
+    "UNARY FIELD ACCESS",
     "PIPE",
     "METHOD_CALL",
     "RANGE",
@@ -257,8 +257,6 @@ AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
     AstNumLit* operand = (AstNumLit *) ast_reduce(a, unop->expr);
     unop->expr = (AstTyped *) operand;
 
-    // while (operand->kind == Ast_Kind_Alias) operand = (AstNumLit *) ((AstAlias *) operand)->alias;
-
     if (operand->kind != Ast_Kind_NumLit) {
         return (AstTyped *) unop;
     }
@@ -277,6 +275,72 @@ AstTyped* ast_reduce_unaryop(bh_allocator a, AstUnaryOp* unop) {
             break;
         }
         case Unary_Op_Bitwise_Not: REDUCE_UNOP_INT(~);
+
+        case Unary_Op_Cast: {
+            #if 0
+            Type* from = operand->type;
+            Type* to   = unop->type;
+
+            if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
+            if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
+
+            if (from->kind != Type_Kind_Pointer && from->kind != Type_Kind_Basic) return (AstTyped *) unop;
+            if (to->kind != Type_Kind_Pointer && to->kind != Type_Kind_Basic) return (AstTyped *) unop;
+
+            b32 from_is_int=0, to_is_int=0;
+            i32 from_size,     to_size;
+
+            from_size   = type_size_of(from);
+            to_size     = type_size_of(to);
+
+            if (from->kind == Type_Kind_Basic) from_is_int = (from->flags & (Basic_Flag_Integer | Basic_Flag_Pointer)) != 0;
+            if (to->kind   == Type_Kind_Basic) to_is_int   = (to->flags   & (Basic_Flag_Integer | Basic_Flag_Pointer)) != 0;
+
+            if (from->kind == Type_Kind_Pointer) from_is_int = 1;
+            if (to->kind   == Type_Kind_Pointer) to_is_int = 1;
+
+            if (from_is_int == to_is_int && from_size == to_size) {
+                // If they are already equal, nothing to do
+                return (AstTyped *) res;
+            }
+
+            if (from_is_int && !to_is_int) {
+                if (from_size == to_size) {
+                    if (from_size == 4) {
+                        res->value.f = (f32) operand->value.i;
+                    }
+                    else if (from_size == 8) {
+                        res->value.d = (f64) operand->value.l;
+                    }
+                } else {
+                    if (from_size == 4) {
+                        res->value.d = (f64) operand->value.i;
+                    }
+                    else if (from_size == 8) {
+                        res->value.f = (f32) operand->value.l;
+                    }
+                }
+            } else {
+                if (from_size == to_size) {
+                    if (from_size == 4) {
+                        res->value.i = (i32) operand->value.f;
+                    }
+                    else if (from_size == 8) {
+                        res->value.l = (i64) operand->value.d;
+                    }
+                } else {
+                    if (from_size == 4) {
+                        res->value.l = (i64) operand->value.f;
+                    }
+                    else if (from_size == 8) {
+                        res->value.i = (i32) operand->value.d;
+                    }
+                }
+            }
+            break;
+
+            #endif
+        }
 
         default: return (AstTyped *) unop;
     }

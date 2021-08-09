@@ -1733,6 +1733,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
     assert(code_block->kind == Ast_Kind_Code_Block);
 
     AstNode* cloned_block = ast_clone(context.ast_alloc, code_block->code);
+    cloned_block->next = insert->next;
 
     if (cloned_block->kind == Ast_Kind_Block) {
         AstNode* next = insert->next;

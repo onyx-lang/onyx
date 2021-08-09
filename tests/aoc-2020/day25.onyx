@@ -20,8 +20,7 @@ power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
 }
 
 dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
-    use package core.intrinsics.wasm { ceil_f64, sqrt_f64 }
-    m := cast(u32) ceil_f64(sqrt_f64(~~n));
+    m := cast(u32) math.ceil(math.sqrt(cast(f64) n));
 
     t := map.make(u32, u32, default=0, hash_count=m/2);
     defer map.free(^t);
@@ -36,8 +35,8 @@ dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
 
     tmp = ~~b;
     for i: 0 .. m {
-        if map.has(^t, cast(u32) tmp) {
-            v := map.get(^t, cast(u32) tmp);
+        if map.has(^t, ~~tmp) {
+            v := map.get(^t, ~~tmp);
             return i * m + v; 
         }
 

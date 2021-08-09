@@ -515,3 +515,10 @@ push_matrix :: () do global_renderer->push_matrix();
 pop_matrix  :: () do global_renderer->pop_matrix();
 identity    :: () do global_renderer->identity();
 apply_transform :: (transform: Transform) do global_renderer->apply_transform(transform);
+
+
+
+save_matrix :: #code {
+    (package immediate_mode).push_matrix();
+    defer (package immediate_mode).pop_matrix();
+}

@@ -24,7 +24,7 @@ workspace_start :: (use r: Rectangle, site := #callsite) {
 
     mx, my := get_mouse_position();
     if Rectangle.contains(r, mx, my) {
-        if hot_item == 0 do set_hot_item(hash);
+        set_hot_item(hash);
     }
 
     if is_hot_item(hash) {
