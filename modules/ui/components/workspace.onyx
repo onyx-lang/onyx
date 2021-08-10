@@ -1,13 +1,21 @@
 package ui
 
 use package core
+use package core.intrinsics.onyx { __zero_value, __initialize }
 
-#private_file
 Workspace_State :: struct {
     transform: gfx.Transform = .{
         translation = .{ 0, 0 },
         scale       = .{ 1, 1 },
     };
+
+    @Transient
+    target_transform: gfx.Transform = .{
+        translation = .{ 0, 0 },
+        scale       =. { 1, 1 },
+    };
+
+    transform_transition := 0.0f;
 
     dragging := false;
 }
@@ -15,12 +23,35 @@ Workspace_State :: struct {
 #private
 workspace_states : map.Map(UI_Id, Workspace_State);
 
-workspace_start :: (use r: Rectangle, site := #callsite) {
+workspace_start :: (use r: Rectangle, site := #callsite, state: ^Workspace_State = null) {
     hash := get_site_hash(site, 0);
-    x, y := Rectangle.top_left(r);    
+    x, y := Rectangle.top_left(r);
     width, height := Rectangle.dimensions(r);
 
-    state := map.get(^workspace_states, hash);
+    @Hack // This whole situtation is a hack of trying to a pointer to a valid state.
+    if state == null {
+        state = map.get_ptr(^workspace_states, hash);
+
+        if state == null {
+            map.put(^workspace_states, hash, .{});
+            state = map.get_ptr(^workspace_states, hash);
+        }
+    }
+
+    if state.transform_transition > 0.0f {
+        move_towards(^state.transform_transition, 0, 0.08f);
+
+        use state;
+
+        if transform_transition == 0.0f {
+            transform.translation.x = target_transform.translation.x;
+            transform.translation.y = target_transform.translation.y;
+
+        } else {
+            transform.translation.x = (transform.translation.x + target_transform.translation.x) / 2;
+            transform.translation.y = (transform.translation.y + target_transform.translation.y) / 2;
+        }
+    }
 
     mx, my := get_mouse_position();
     if Rectangle.contains(r, mx, my) {
@@ -37,8 +68,8 @@ workspace_start :: (use r: Rectangle, site := #callsite) {
         if is_key_down(37) do state.transform.translation.x += speed;
 
         // These keys are weird because keycode is not standard between all browsers... ugh
-        if is_key_down(187) || is_key_down(61)  do zoom(^state, r, 1.02);
-        if is_key_down(189) || is_key_down(173) do zoom(^state, r, 0.98);
+        if is_key_down(187) || is_key_down(61)  do workspace_zoom(state, r, 1.02);
+        if is_key_down(189) || is_key_down(173) do workspace_zoom(state, r, 0.98);
 
         if mouse_state.left_button_just_down && !state.dragging {
             state.dragging = true;
@@ -55,35 +86,34 @@ workspace_start :: (use r: Rectangle, site := #callsite) {
             }
         }
 
-        if mouse_state.dwheel > 0 do zoom(^state, r, 1.04);
-        if mouse_state.dwheel < 0 do zoom(^state, r, 0.96);
+        if mouse_state.dwheel > 0 do workspace_zoom(state, r, 1.04);
+        if mouse_state.dwheel < 0 do workspace_zoom(state, r, 0.96);
 
     } else {
         state.dragging = false;
     }
 
-    map.put(^workspace_states, hash, state);
-
     gfx.push_scissor(x, y, width, height);
     gfx.push_matrix();
     gfx.apply_transform(state.transform);
 
-    zoom :: (state: ^Workspace_State, r: Rectangle, scale := 1.0f) {
-        x, y := Rectangle.top_left(r);    
-        width, height := Rectangle.dimensions(r);
-
-        bx: f32 = (state.transform.translation.x - (width / 2) - x) / state.transform.scale.x;
-        by: f32 = (state.transform.translation.y - (height / 2) - y) / state.transform.scale.y;
-
-        state.transform.scale.x *= scale;
-        state.transform.scale.y *= scale;
-
-        state.transform.translation.x = bx * state.transform.scale.x + (width / 2) + x;
-        state.transform.translation.y = by * state.transform.scale.y + (height / 2) + y;
-    }
 }
 
 workspace_end :: () {
     gfx.pop_scissor();
     gfx.pop_matrix();
+}
+
+workspace_zoom :: (state: ^Workspace_State, r: Rectangle, scale := 1.0f) {
+    x, y := Rectangle.top_left(r);    
+    width, height := Rectangle.dimensions(r);
+
+    bx: f32 = (state.transform.translation.x - (width / 2) - x) / state.transform.scale.x;
+    by: f32 = (state.transform.translation.y - (height / 2) - y) / state.transform.scale.y;
+
+    state.transform.scale.x *= scale;
+    state.transform.scale.y *= scale;
+
+    state.transform.translation.x = bx * state.transform.scale.x + (width / 2) + x;
+    state.transform.translation.y = by * state.transform.scale.y + (height / 2) + y;
 }

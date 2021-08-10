@@ -148,6 +148,10 @@ Rectangle :: struct {
         return math.min(x0, x1) <= x && x <= math.max(x0, x1) &&
                math.min(y0, y1) <= y && y <= math.max(y0, y1);
     }
+
+    intersects :: (use r: Rectangle, o: Rectangle) -> bool {
+        return x1 >= o.x0 && x0 <= o.x1 && y1 >= o.y0 && y0 <= o.y1;
+    }
 }
 
 
@@ -206,7 +210,9 @@ get_text_width :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
     return current_font->get_width(text, size);
 }
 
-
+get_text_height  :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
+    return current_font->get_height(text, size);
+}
 
 @Relocate
 move_towards :: (value: ^$T, target: T, step: T) {

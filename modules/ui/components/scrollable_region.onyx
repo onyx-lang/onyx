@@ -2,7 +2,6 @@ package ui
 
 use package core
 
-#private_file
 Scrollable_Region_State :: struct {
     transform: gfx.Transform = .{
         translation = .{ 0, 0 },
@@ -13,12 +12,19 @@ Scrollable_Region_State :: struct {
 #private
 scrollable_region_states : map.Map(UI_Id, Scrollable_Region_State);
 
-scrollable_region_start :: (use r: Rectangle, x_scroll: ^f32, y_scroll: ^f32, site := #callsite) {
+scrollable_region_start :: (use r: Rectangle, minimum_y := 0.0f, maximum_y := 10000.0f, site := #callsite, state: ^Scrollable_Region_State = null) {
     hash := get_site_hash(site, 0);
-    x, y := Rectangle.top_left(r);    
+    x, y := Rectangle.top_left(r);
     width, height := Rectangle.dimensions(r);
 
-    state := map.get(^scrollable_region_states, hash);
+    if state == null {
+        state = map.get_ptr(^scrollable_region_states, hash);
+
+        if state == null {
+            map.put(^scrollable_region_states, hash, .{});
+            state = map.get_ptr(^scrollable_region_states, hash);
+        }
+    }
 
     mx, my := get_mouse_position();
     if Rectangle.contains(r, mx, my) {
@@ -33,9 +39,9 @@ scrollable_region_start :: (use r: Rectangle, x_scroll: ^f32, y_scroll: ^f32, si
 
         if mouse_state.dwheel > 0 do state.transform.translation.y += speed;
         if mouse_state.dwheel < 0 do state.transform.translation.y -= speed;
-    }
 
-    map.put(^scrollable_region_states, hash, state);
+        state.transform.translation.y = math.clamp(state.transform.translation.y, -maximum_y, minimum_y);
+    }
 
     gfx.push_scissor(x, y, width, height);
     gfx.push_matrix();

@@ -9,6 +9,7 @@ package core
 #load "./container/list"
 #load "./container/iter"
 #load "./container/set"
+#load "./container/bucket_array"
 
 #load "./conv"
 #load "./math"

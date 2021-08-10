@@ -5,6 +5,8 @@ use package core.intrinsics.onyx { __initialize }
 
 Vector2 :: struct {
     x, y: f32;
+
+    zero :: Vector2.{ 0, 0 };
 }
 
 Color4 :: struct {

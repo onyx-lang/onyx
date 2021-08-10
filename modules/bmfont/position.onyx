@@ -61,6 +61,11 @@ get_character_positions :: (font: ^BMFont, size: f32, text: str, x: f32, y: f32)
                 continue;
             }
 
+            if char == #char "\t" {
+                rc.x += ~~(rc.font->get_glyph(#char " ")).xadvance * 4.0f;
+                continue;
+            }
+
             glyph := rc.font->get_glyph(char);
 
             if glyph == null {

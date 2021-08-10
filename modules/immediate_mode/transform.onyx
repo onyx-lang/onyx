@@ -52,3 +52,10 @@ transform_apply :: (use t: ^Transform, other: Transform) {
     scale.x *= other.scale.x;
     scale.y *= other.scale.y;
 }
+
+transform_point :: (use t: ^Transform, v: Vector2) -> Vector2 {
+    return .{
+        x = (v.x - translation.x) / scale.x,
+        y = (v.y - translation.y) / scale.y,
+    };
+}

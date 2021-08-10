@@ -1,0 +1,85 @@
+@Incomplete // This implementation is not functional at all but is something I want to get around to adding.
+
+package core.bucket_array
+
+#private_file array :: package core.array
+
+Bucket_Array :: struct (T: type_expr) {
+    allocator : Allocator;
+    elements_per_bucket : i32;
+    buckets : [..] Bucket(T);
+
+    Bucket :: struct (T: type_expr) {
+        count : i32;
+        data : ^T; // Actually an array of elements_per_bucket things, but putting that
+                   // that into the type system makes these cumbersome to work with.
+    }
+}
+
+make :: ($T: type_expr, elements_per_bucket: i32,
+         array_allocator := context.allocator, bucket_allocator := context.allocator) -> Bucket_Array(T) {
+
+    buckets : Bucket_Array(T);
+    init(^buckets);
+    return buckets;
+}
+
+init :: (use b: ^Bucket_Array($T), elements_per_bucket: i32,
+         array_allocator := context.allocator, bucket_allocator := context.allocator) {
+    
+    allocator = bucket_allocator;
+    buckets   = array.make(#type Bucket(T), allocator=array_allocator);
+
+    initial_bucket := alloc_bucket(b);
+    array.push(^buckets, initial_bucket);
+}
+
+// Frees all the buckets
+clear :: (use b: ^Bucket_Array($T)) {
+    for ^bucket: ^buckets {
+        raw_free(bucket_allocator, bucket.data);
+        bucket.count = 0;
+    }
+
+    array.clear(^buckets);
+}
+
+get :: (use b: ^Bucket_Array($T), idx: i32) -> T {
+    bucket_index := idx / elements_per_bucket;
+    elem_index   := idx % elements_per_bucket;
+    return buckets[bucket_index].data[elem_index];
+}
+
+get_ptr :: (use b: ^Bucket_Array($T), idx: i32) -> ^T {
+    bucket_index := idx / elements_per_bucket;
+    elem_index   := idx % elements_per_bucket;
+    return ^buckets[bucket_index].data[elem_index];
+}
+
+push :: (use b: ^Bucket_Array($T), elem: T) -> bool {
+    last_bucket := ^buckets[buckets.count - 1];
+    if last_bucket.count < elements_per_bucket {
+        last_bucket.data[last_bucket.count] = elem;
+        last_bucket.count += 1;
+
+    } else {
+        new_bucket := alloc_bucket(b);
+        array.push(^buckets, new_bucket);
+
+        last_bucket = ^buckets[buckets.count - 1];
+        last_bucket.data[last_bucket.count] = elem;
+        last_bucket.count += 1;
+    }
+}
+
+pop :: (use b: ^Bucket_Array($T)) {
+    last_bucket := ^buckets[buckets.count - 1];
+    last_bucket.count -= 1;
+}
+
+
+#private
+alloc_bucket :: (use b: ^Bucket_Array($T)) -> Bucket(T) {
+    data := raw_alloc(allocator, sizeof T * elements_per_bucket);
+    return .{ 0, data };
+}

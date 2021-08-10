@@ -86,6 +86,10 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, placeholder :=
 
     if Rectangle.contains(r, mx, my) {
         set_hot_item(hash);
+
+        #if #defined(set_cursor) {
+            if is_hot_item(hash) do set_cursor(Cursors.Text);
+        }
     }
 
     if textbox_editing_state.hash == hash {

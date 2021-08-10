@@ -136,6 +136,30 @@ pop :: (arr: ^[..] $T) -> T {
     return arr.data[arr.count];
 }
 
+transplant :: (arr: ^[..] $T, old_index: i32, new_index: i32) -> bool {
+    if old_index < 0 || old_index >= arr.count do return false;
+    if new_index < 0 || new_index >= arr.count do return false;
+    if old_index == new_index do return true;
+
+    value := arr.data[old_index];
+
+    if old_index < new_index { // Moving forward
+        while i := old_index; i < new_index {
+            defer i += 1;
+            arr.data[i] = arr.data[i + 1];
+        }
+
+    } else { // Moving backward
+        while i := old_index; i > new_index {
+            defer i -= 1;
+            arr.data[i] = arr.data[i - 1];
+        }
+    }
+
+    arr.data[new_index] = value;
+    return true;
+}
+
 get :: (arr: ^[..] $T, idx: i32) -> T {
     if arr.count == 0 do return __zero_value(T);
 

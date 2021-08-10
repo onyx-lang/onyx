@@ -94,7 +94,7 @@ str_to_f64 :: (s_: str) -> f64 {
     }
 }
 
-i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
+i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     is_neg := false;
     if n < 0 && base == 10 {
         is_neg = true;
@@ -130,22 +130,24 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0) -> str {
         }
     }
 
-    if base == 16 {
-        *c = #char "x";
-        len += 1;
-        c -= 1;
-        *c = #char "0";
-        len += 1;
-        c -= 1;
-    }
+    if prefix {
+        if base == 16 {
+            *c = #char "x";
+            len += 1;
+            c -= 1;
+            *c = #char "0";
+            len += 1;
+            c -= 1;
+        }
 
-    if base == 2 {
-        *c = #char "b";
-        len += 1;
-        c -= 1;
-        *c = #char "0";
-        len += 1;
-        c -= 1;
+        if base == 2 {
+            *c = #char "b";
+            len += 1;
+            c -= 1;
+            *c = #char "0";
+            len += 1;
+            c -= 1;
+        }
     }
 
     if is_neg {
@@ -253,10 +255,12 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
     Format :: struct {
         pretty_printing      := false;
+        quote_strings        := false;
         digits_after_decimal := cast(u32) 4;
 
-        indentation := cast(u32) 0;
-        base        := cast(u64) 10;
+        indentation   := cast(u32) 0;
+        base          := cast(u64) 10;
+        minimum_width := cast(u32) 0;
     }
 
     vararg_index := 0;
@@ -303,6 +307,32 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                         formatting.base = 16;
                     }
 
+                    case #char "b" {
+                        i += 1;
+
+                        digits := 0;
+                        while format[i] >= #char "0" && format[i] <= #char "9" {
+                            digits *= 10;
+                            digits += ~~(format[i] - #char "0");
+                            i += 1;
+                        }
+
+                        formatting.base = ~~digits;
+                    }
+
+                    case #char "w" {
+                        i += 1;
+
+                        digits := 0;
+                        while format[i] >= #char "0" && format[i] <= #char "9" {
+                            digits *= 10;
+                            digits += ~~(format[i] - #char "0");
+                            i += 1;
+                        }
+
+                        formatting.minimum_width = ~~digits;
+                    }
+
                     case #default do break break;
                 }
             }
@@ -346,7 +376,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
                 } else {
                     ibuf : [128] u8;
-                    istr := i64_to_str(~~value, 16, ~~ibuf);
+                    istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
                     output->write(istr);
                 }
             }
@@ -355,7 +385,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 value := *(cast(^i32) v.data);
 
                 ibuf : [128] u8;
-                istr := i64_to_str(~~value, formatting.base, ~~ibuf);
+                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
                 output->write(istr);
             }
 
@@ -383,14 +413,23 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 output->write(fstr);
             }
 
-            case str do output->write(*(cast(^str) v.data));
+            case str {
+                if formatting.quote_strings do output->write("\"");
+                @Todo // escape '"' when quote_strings is enabled.
+                output->write(*(cast(^str) v.data));
+                if formatting.quote_strings do output->write("\"");
+            }
 
             case rawptr {
                 value := *(cast(^rawptr) v.data);
 
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, 16, ~~ibuf);
-                output->write(istr);
+                if value == null {
+                    output->write("(null)");
+                } else {
+                    ibuf : [128] u8;
+                    istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
+                    output->write(istr);
+                }
             }
 
             case type_expr {
@@ -421,6 +460,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
                     {
                         format := formatting;
+                        format.quote_strings = true;
                         if format.pretty_printing {
                             format.indentation += 4;
                         }
@@ -466,7 +506,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                     value := *(cast(^rawptr) v.data);
 
                     ibuf : [128] u8;
-                    istr := i64_to_str(~~value, 16, ~~ibuf);
+                    istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
                     output->write(istr);
                 }
 
@@ -480,6 +520,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                     count := arr.count;
 
                     format := formatting;
+                    format.quote_strings = true;
                     if format.pretty_printing do format.indentation += 2;
 
                     for i: count {

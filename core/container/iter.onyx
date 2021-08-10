@@ -250,7 +250,7 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
 
 from_array :: #match {
     (arr: [..] $T) -> Iterator(^T) {
-        return from_slice((#type [] T).{ arr.data, arr.count });
+        return from_array((#type [] T).{ arr.data, arr.count });
     },
 
     (arr: [] $T) -> Iterator(^T) {
