@@ -30,7 +30,7 @@ CheckStatus check_while(AstIfWhile* whilenode);
 CheckStatus check_for(AstFor* fornode);
 CheckStatus check_switch(AstSwitch* switchnode);
 CheckStatus check_call(AstCall* call);
-CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok);
+CheckStatus check_binaryop(AstBinaryOp** pbinop);
 CheckStatus check_unaryop(AstUnaryOp** punop);
 CheckStatus check_struct_literal(AstStructLiteral* sl);
 CheckStatus check_array_literal(AstArrayLiteral* al);
@@ -58,6 +58,10 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
 
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
+
+#define STATEMENT_LEVEL 1
+#define EXPRESSION_LEVEL 2
+u32 current_checking_level=0;
 
 static inline void fill_in_type(AstTyped* node);
 
@@ -673,8 +677,8 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
             node_get_type_name(binop->right));
 }
 
-CheckStatus check_binaryop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) {
-    if (!assignment_is_ok) {
+CheckStatus check_binaryop_assignment(AstBinaryOp* binop) {
+    if (current_checking_level == EXPRESSION_LEVEL) {
         onyx_report_error(binop->token->pos, "Assignment not valid in expression.");
         return Check_Error;
     }
@@ -758,7 +762,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp* binop, b32 assignment_is_ok) 
 
         AstBinaryOp* new_right = make_binary_op(context.ast_alloc, operation, binop->left, binop->right);
         new_right->token = binop->token;
-        CHECK(binaryop, &new_right, 0);
+        CHECK(binaryop, &new_right);
 
         binop->right = (AstTyped *) new_right;
         binop->operation = Binary_Op_Assign;
@@ -926,17 +930,19 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     return implicit_call;
 }
 
-CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
+CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
+    u32 current_checking_level_store = current_checking_level;
     CHECK(expression, &binop->left);
     CHECK(expression, &binop->right);
+    current_checking_level = current_checking_level_store;
 
     if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
         binop->flags |= Ast_Flag_Comptime;
     }
 
-    if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(binop, assignment_is_ok);
+    if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(binop);
 
     if (expression_types_must_be_known) {
         if (binop->left->type == NULL || binop->right->type == NULL) {
@@ -998,7 +1004,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop, b32 assignment_is_ok) {
 
         AstBinaryOp* binop_node = make_binary_op(context.ast_alloc, Binary_Op_Multiply, binop->right, (AstTyped *) numlit);
         binop_node->token = binop->token;
-        CHECK(binaryop, &binop_node, 0);
+        CHECK(binaryop, &binop_node);
 
         binop->right = (AstTyped *) binop_node;
         binop->type = binop->left->type;
@@ -1563,10 +1569,11 @@ CheckStatus check_expression(AstTyped** pexpr) {
     }
 
     fill_in_type(expr);
+    current_checking_level = EXPRESSION_LEVEL;
 
     CheckStatus retval = Check_Success;
     switch (expr->kind) {
-        case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp **) pexpr, 0); break;
+        case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp **) pexpr); break;
         case Ast_Kind_Unary_Op:  retval = check_unaryop((AstUnaryOp **) pexpr); break;
 
         case Ast_Kind_Call:     retval = check_call((AstCall *) expr); break;
@@ -1755,6 +1762,8 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
 CheckStatus check_statement(AstNode** pstmt) {
     AstNode* stmt = *pstmt;
 
+    current_checking_level = STATEMENT_LEVEL;
+
     switch (stmt->kind) {
         case Ast_Kind_Jump:       return Check_Success;
 
@@ -1768,7 +1777,7 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
 
         case Ast_Kind_Binary_Op:
-            CHECK(binaryop, (AstBinaryOp **) pstmt, 1);
+            CHECK(binaryop, (AstBinaryOp **) pstmt);
             (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
             return Check_Success;
 
@@ -2162,7 +2171,7 @@ CheckStatus check_node(AstNode* node) {
         case Ast_Kind_Static_If:            return check_if((AstIfWhile *) node);
         case Ast_Kind_While:                return check_while((AstIfWhile *) node);
         case Ast_Kind_Call:                 return check_call((AstCall *) node);
-        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp **) &node, 1);
+        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp **) &node);
         default:                            return check_expression((AstTyped **) &node);
     }
 }
