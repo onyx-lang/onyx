@@ -6,7 +6,6 @@
 
 // Variables used during the symbol resolution phase.
 static Scope*       curr_scope    = NULL;
-bh_arr(AstBlock *)  block_stack   = NULL;
 static b32 report_unresolved_symbols = 1;
 
 // Everything related to waiting on is imcomplete at the moment.
@@ -57,6 +56,7 @@ static SymresStatus symres_memres_type(AstMemRes** memres);
 static SymresStatus symres_memres(AstMemRes** memres);
 static SymresStatus symres_struct_defaults(AstType* st);
 static SymresStatus symres_static_if(AstIf* static_if);
+static SymresStatus symres_macro(AstMacro* macro);
 
 static void scope_enter(Scope* new_scope) {
     curr_scope = new_scope;
@@ -524,6 +524,7 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
 
         SYMRES(expression, &ifnode->cond);
 
+        // NOTE: These are statements because "elseif" means the `false_stmt` has an if node.
         if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
         if (ifnode->false_stmt != NULL) SYMRES(statement, (AstNode **) &ifnode->false_stmt, NULL);
 
@@ -819,20 +820,22 @@ static SymresStatus symres_statement_chain(AstNode** walker) {
 }
 
 static SymresStatus symres_block(AstBlock* block) {
-    if (block->scope == NULL)
-        block->scope = scope_create(context.ast_alloc, curr_scope, block->token->pos);
+    if (block->rules & Block_Rule_New_Scope) {
+        if (block->scope == NULL)
+            block->scope = scope_create(context.ast_alloc, curr_scope, block->token->pos);
 
-    scope_enter(block->scope);
-    bh_arr_push(block_stack, block);
+        scope_enter(block->scope);
+    }
 
     if (block->binding_scope != NULL)
-        scope_include(block->scope, block->binding_scope, block->token->pos);
+        scope_include(curr_scope, block->binding_scope, block->token->pos);
 
     if (block->body)
         SYMRES(statement_chain, &block->body);
 
-    bh_arr_pop(block_stack);
-    scope_leave();
+    if (block->rules & Block_Rule_New_Scope)
+        scope_leave();
+
     return Symres_Success;
 }
 
@@ -1151,9 +1154,15 @@ static SymresStatus symres_process_directive(AstNode* directive) {
     return Symres_Success;
 }
 
-void symres_entity(Entity* ent) {
-    if (block_stack == NULL) bh_arr_new(global_heap_allocator, block_stack, 16);
+static SymresStatus symres_macro(AstMacro* macro) {
+    if (macro->body->kind == Ast_Kind_Function) {
+        SYMRES(function_header, (AstFunction *) macro->body);
+    }
 
+    return Symres_Success;
+}
+
+void symres_entity(Entity* ent) {
     Scope* old_scope = NULL;
     if (ent->scope) {
         old_scope = curr_scope;
@@ -1198,8 +1207,8 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc); break;
         case Entity_Type_String_Literal:          ss = symres_expression(&ent->expr); break;
         case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults((AstType *) ent->type_alias); break;
-        case Entity_Type_Process_Directive:       ss = symres_process_directive((AstNode *) ent->expr);
-                                                  break;
+        case Entity_Type_Process_Directive:       ss = symres_process_directive((AstNode *) ent->expr); break;
+        case Entity_Type_Macro:                   ss = symres_macro(ent->macro); break;
 
         default: break;
     }

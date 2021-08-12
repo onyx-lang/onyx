@@ -10,7 +10,7 @@ endif
 let s:cpo_save = &cpo
 set cpo&vim
 
-syn keyword onyxKeyword package struct enum proc use global
+syn keyword onyxKeyword package struct enum proc use global macro
 syn keyword onyxKeyword if elseif else
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword switch case

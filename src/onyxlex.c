@@ -35,6 +35,7 @@ static const char* token_type_names[] = {
     "switch",
     "case",
     "fallthrough",
+    "macro",
 
     "->",
     "<-",
@@ -333,6 +334,9 @@ whitespace_skipped:
         break;
     case 'i':
         LITERAL_TOKEN("if",          1, Token_Type_Keyword_If);
+        break;
+    case 'm':
+        LITERAL_TOKEN("macro",       1, Token_Type_Keyword_Macro);
         break;
     case 'p':
         LITERAL_TOKEN("package",     1, Token_Type_Keyword_Package);

@@ -469,12 +469,14 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        #if 0
         case Token_Type_Keyword_Proc: {
             OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
             onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
             retval = (AstTyped *) parse_function_definition(parser, proc_token);
             break;
         }
+        #endif
 
         case Token_Type_Keyword_Package: {
             retval = (AstTyped *) parse_package_expression(parser);
@@ -616,6 +618,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 if (parser->curr->type == '{') {
                     code_block->code = (AstNode *) parse_block(parser, 1);
+                    ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
 
                 } else {
                     code_block->code = (AstNode *) parse_expression(parser, 0);
@@ -1435,6 +1438,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
 static AstBlock* parse_block(OnyxParser* parser, b32 make_a_new_scope) {
     AstBlock* block = make_node(AstBlock, Ast_Kind_Block);
+    block->rules = Block_Rule_Normal;
 
     // NOTE: --- is for an empty block
     if (parser->curr->type == Token_Type_Empty_Block) {
@@ -2018,11 +2022,6 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
 }
 
 static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* token) {
-    // :TemporaryForProcRemoval
-    if (parser->curr->type == '{') {
-        return (AstFunction *) parse_overloaded_function(parser, token);
-    }
-
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = token;
 
@@ -2076,17 +2075,16 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         pp->poly_params = polymorphic_vars;
         pp->base_func = func_def;
         
-        ENTITY_SUBMIT(pp);
         return (AstFunction *) pp;
+
     } else {
         bh_arr_free(polymorphic_vars);
-        
-        ENTITY_SUBMIT(func_def);
         return func_def;
     }
 }
 
 static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret) {
+    #if 0
     if (parser->curr->type == Token_Type_Keyword_Proc) {
         OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
         onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
@@ -2094,6 +2092,7 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
         *ret = (AstTyped *) func_node;
         return 1;
     }
+    #endif
 
     if (parser->curr->type == '(') {
         OnyxToken* matching_paren = find_matching_paren(parser->curr);
@@ -2120,6 +2119,7 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
 
         OnyxToken* proc_token = parser->curr;
         AstFunction* func_node = parse_function_definition(parser, proc_token);
+        ENTITY_SUBMIT(func_node);
         *ret = (AstTyped *) func_node;
         return 1;
     }
@@ -2251,7 +2251,17 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
     return static_if_node;
 }
 
+static AstMacro* parse_macro(OnyxParser* parser) {
+    AstMacro* macro = make_node(AstMacro, Ast_Kind_Macro);
+    macro->token = expect_token(parser, Token_Type_Keyword_Macro);
+    macro->body  = (AstTyped *) parse_function_definition(parser, macro->token);
+
+    ENTITY_SUBMIT(macro);
+    return macro;
+}
+
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
+    #if 0
     if (parser->curr->type == Token_Type_Keyword_Proc) {
         OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
         onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
@@ -2259,10 +2269,12 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
 
         return (AstTyped *) func_node;
     }
+    #endif
     
     if (parser->curr->type == Token_Type_Keyword_Global) return parse_global_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Struct) return (AstTyped *) parse_struct(parser);
     if (parser->curr->type == Token_Type_Keyword_Enum)   return (AstTyped *) parse_enum_declaration(parser);
+    if (parser->curr->type == Token_Type_Keyword_Macro)  return (AstTyped *) parse_macro(parser);
     
     if (parse_possible_directive(parser, "type")) {
         AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
@@ -2303,6 +2315,15 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             proc->base_func->intrinsic_name = symbol;
 
         proc->base_func->name = symbol;
+
+    } else if (node->kind == Ast_Kind_Macro) {
+        AstMacro* macro = (AstMacro *) node;
+
+        AstFunction* func = (AstFunction *) macro->body;
+        if (func->kind == Ast_Kind_Polymorphic_Proc)
+            func = (AstFunction *) ((AstPolyProc *) func)->base_func;
+
+        func->name = symbol;
 
     } else if (node->kind == Ast_Kind_Global) {
         AstGlobal* global = (AstGlobal *) node;

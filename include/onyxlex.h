@@ -37,6 +37,7 @@ typedef enum TokenType {
     Token_Type_Keyword_Case,
     Token_Type_Keyword_Switch,
     Token_Type_Keyword_Fallthrough,
+    Token_Type_Keyword_Macro,
 
     Token_Type_Right_Arrow,
     Token_Type_Left_Arrow,

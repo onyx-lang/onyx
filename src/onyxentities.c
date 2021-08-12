@@ -287,6 +287,13 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ENTITY_INSERT(ent);
             break;
         }
+
+        case Ast_Kind_Macro: {
+            ent.type = Entity_Type_Macro;
+            ent.macro = (AstMacro *) node;
+            ENTITY_INSERT(ent);
+            break;
+        }
         
         case Ast_Kind_Polymorphic_Proc: {
             ent.type = Entity_Type_Polymorphic_Proc;

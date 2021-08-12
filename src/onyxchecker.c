@@ -29,7 +29,7 @@ CheckStatus check_if(AstIfWhile* ifnode);
 CheckStatus check_while(AstIfWhile* whilenode);
 CheckStatus check_for(AstFor* fornode);
 CheckStatus check_switch(AstSwitch* switchnode);
-CheckStatus check_call(AstCall* call);
+CheckStatus check_call(AstCall** pcall);
 CheckStatus check_binaryop(AstBinaryOp** pbinop);
 CheckStatus check_unaryop(AstUnaryOp** punop);
 CheckStatus check_struct_literal(AstStructLiteral* sl);
@@ -413,7 +413,7 @@ typedef enum ArgState {
     AS_Expecting_Untyped_VA,
 } ArgState;
 
-CheckStatus check_call(AstCall* call) {
+CheckStatus check_call(AstCall** pcall) {
     // All the things that need to be done when checking a call node.
     //      1. Ensure the callee is not a symbol
     //      2. Check the callee expression (since it could be a variable or a field access, etc)
@@ -424,11 +424,14 @@ CheckStatus check_call(AstCall* call) {
     //      7. Fill in arguments
     //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
     //      9. Check types of formal and actual params against each other, handling varargs
-
+    AstCall* call = *pcall;
+    
     if (call->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
+    u32 current_checking_level_store = current_checking_level;
     CHECK(expression, &call->callee);
     CHECK(arguments, &call->args);
+    current_checking_level = current_checking_level_store;
 
     // SPEED CLEANUP: Keeping an original copy for basically no reason except that sometimes you
     // need to know the baked argument values in code generation.
@@ -438,11 +441,28 @@ CheckStatus check_call(AstCall* call) {
 
     while (call->callee->kind == Ast_Kind_Alias) call->callee = ((AstAlias *) call->callee)->alias;
 
-    if (call->callee->kind == Ast_Kind_Overloaded_Function) {
+    AstTyped *effective_callee = call->callee;
+
+    // If we are "calling" a macro, the callee on the call node should not be replaced
+    // as then it would remove the macro from the callee, which would turn it into a
+    // normal function call.
+    b32 calling_a_macro = 0;
+
+    if (effective_callee->kind == Ast_Kind_Macro) {
+        calling_a_macro = 1;
+        if (current_checking_level == EXPRESSION_LEVEL) {
+            onyx_report_error(call->token->pos, "Macros calls are not allowed at the expression level yet.");
+            return Check_Error;
+        }
+
+        effective_callee = ((AstMacro * ) effective_callee)->body;
+    }
+
+    if (effective_callee->kind == Ast_Kind_Overloaded_Function) {
         b32 should_yield = 0;
-        AstTyped* new_callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) call->callee)->overloads, &call->args, &should_yield);
+        AstTyped* new_callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) effective_callee)->overloads, &call->args, &should_yield);
         if (new_callee == NULL) {
-            if (call->callee->entity->state > Entity_State_Check_Types && !should_yield) {
+            if (effective_callee->entity->state > Entity_State_Check_Types && !should_yield) {
                 report_unable_to_match_overload(call);
                 return Check_Error;
 
@@ -451,19 +471,21 @@ CheckStatus check_call(AstCall* call) {
             }
         }
 
-        call->callee = new_callee;
+        effective_callee = new_callee;
+        if (!calling_a_macro) call->callee = new_callee;
     }
 
-    if (call->callee->kind == Ast_Kind_Polymorphic_Proc) {
-        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) call->callee, PPLM_By_Arguments, &call->args, call->token);
+    if (effective_callee->kind == Ast_Kind_Polymorphic_Proc) {
+        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) effective_callee, PPLM_By_Arguments, &call->args, call->token);
         if (new_callee == (AstTyped *) &node_that_signals_a_yield) return Check_Yield_Macro;
         if (new_callee == NULL) return Check_Error;
 
         arguments_remove_baked(&call->args);
-        call->callee = new_callee;
+        effective_callee = new_callee;
+        if (!calling_a_macro) call->callee = new_callee;
     }
 
-    AstFunction* callee = (AstFunction *) call->callee;
+    AstFunction* callee = (AstFunction *) effective_callee;
 
     // NOTE: Build callee's type
     fill_in_type((AstTyped *) callee);
@@ -475,7 +497,6 @@ CheckStatus check_call(AstCall* call) {
                 callee->token->text, callee->token->length);
         return Check_Error;
     }
-
 
     // CLEANUP maybe make function_get_expected_arguments?
     i32 non_vararg_param_count = (i32) callee->type->Function.param_count;
@@ -644,7 +665,8 @@ CheckStatus check_call(AstCall* call) {
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
-                break;
+                break;CheckStatus check_compound(AstCompound* compound);
+
             }
         }
 
@@ -665,7 +687,12 @@ type_checking_done:
         return Check_Error;
     }
 
-    callee->flags |= Ast_Flag_Function_Used;
+    if (!calling_a_macro) {
+        callee->flags |= Ast_Flag_Function_Used;
+
+    } else {
+        // Macro expansion
+    }
 
     return Check_Success;
 }
@@ -967,7 +994,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
         if (implicit_call != NULL) {
-            CHECK(call, implicit_call);
+            CHECK(call, &implicit_call);
 
             // NOTE: Not a binary op
             *pbinop = (AstBinaryOp *) implicit_call;
@@ -1365,7 +1392,7 @@ CheckStatus check_subscript(AstSubscript** psub) {
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
         if (implicit_call != NULL) {
-            CHECK(call, implicit_call);
+            CHECK(call, &implicit_call);
 
             // NOTE: Not an array access
             *psub = (AstSubscript *) implicit_call;
@@ -1519,7 +1546,7 @@ CheckStatus check_method_call(AstBinaryOp** mcall) {
     }    
     (*mcall)->flags |= Ast_Flag_Has_Been_Checked;
 
-    CHECK(call, call_node);
+    CHECK(call, &call_node);
     call_node->next = (*mcall)->next;
 
     *mcall = (AstBinaryOp *) call_node;
@@ -1568,6 +1595,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
         return Check_Success;
     }
 
+    if (expr->kind == Ast_Kind_Macro) {
+        return Check_Success;
+    }
+
     fill_in_type(expr);
     current_checking_level = EXPRESSION_LEVEL;
 
@@ -1576,7 +1607,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp **) pexpr); break;
         case Ast_Kind_Unary_Op:  retval = check_unaryop((AstUnaryOp **) pexpr); break;
 
-        case Ast_Kind_Call:     retval = check_call((AstCall *) expr); break;
+        case Ast_Kind_Call:     retval = check_call((AstCall **) pexpr); break;
         case Ast_Kind_Argument: retval = check_argument((AstArgument **) pexpr); break;
         case Ast_Kind_Block:    retval = check_block((AstBlock *) expr); break;
 
@@ -1742,7 +1773,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
     AstNode* cloned_block = ast_clone(context.ast_alloc, code_block->code);
     cloned_block->next = insert->next;
 
-    if (cloned_block->kind == Ast_Kind_Block) {
+    /*if (cloned_block->kind == Ast_Kind_Block) {
         AstNode* next = insert->next;
         insert->next = (AstNode *) ((AstBlock *) cloned_block)->body;
 
@@ -1751,8 +1782,9 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
         last_stmt->next = next;
 
     } else {
+        */
         *(AstNode **) pinsert = cloned_block;
-    }
+    //}
 
     insert->flags |= Ast_Flag_Has_Been_Checked;
 
@@ -1775,6 +1807,11 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
+        case Ast_Kind_Call: {
+            CHECK(call, (AstCall **) pstmt);
+            stmt->flags |= Ast_Flag_Expr_Ignored;
+            return Check_Success;
+        }
 
         case Ast_Kind_Binary_Op:
             CHECK(binaryop, (AstBinaryOp **) pstmt);
@@ -2161,6 +2198,14 @@ CheckStatus check_process_directive(AstNode* directive) {
     return Check_Success;
 }
 
+CheckStatus check_macro(AstMacro* macro) {
+    if (macro->body->kind == Ast_Kind_Function) {
+        CHECK(function_header, (AstFunction *) macro->body);
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -2170,7 +2215,7 @@ CheckStatus check_node(AstNode* node) {
         case Ast_Kind_If:                   return check_if((AstIfWhile *) node);
         case Ast_Kind_Static_If:            return check_if((AstIfWhile *) node);
         case Ast_Kind_While:                return check_while((AstIfWhile *) node);
-        case Ast_Kind_Call:                 return check_call((AstCall *) node);
+        case Ast_Kind_Call:                 return check_call((AstCall **) &node);
         case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp **) &node);
         default:                            return check_expression((AstTyped **) &node);
     }
@@ -2189,6 +2234,7 @@ void check_entity(Entity* ent) {
         case Entity_Type_Memory_Reservation_Type:  cs = check_memres_type(ent->mem_res); break;
         case Entity_Type_Memory_Reservation:       cs = check_memres(ent->mem_res); break;
         case Entity_Type_Static_If:                cs = check_static_if(ent->static_if); break;
+        case Entity_Type_Macro:                    cs = check_macro(ent->macro);
 
         case Entity_Type_Expression:
             cs = check_expression(&ent->expr);

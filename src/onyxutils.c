@@ -921,7 +921,6 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         AstPolyProc* new_pp = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyProc), Ast_Kind_Polymorphic_Proc);
         new_pp->token = pp->token;                            // TODO: Change this to be the solidify->token
         new_pp->base_func = pp->base_func;
-        new_pp->poly_scope = new_pp->poly_scope; // CLEANUP: This doesn't seem correct??
         new_pp->flags = pp->flags;
         new_pp->poly_params = pp->poly_params;
 

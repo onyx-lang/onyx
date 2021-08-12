@@ -87,6 +87,7 @@
                                \
     NODE(CodeBlock)            \
     NODE(DirectiveInsert)      \
+    NODE(Macro)                \
                                \
     NODE(Package)          
 
@@ -191,6 +192,7 @@ typedef enum AstKind {
 
     Ast_Kind_Code_Block,
     Ast_Kind_Directive_Insert,
+    Ast_Kind_Macro,
 
     Ast_Kind_Note,
 
@@ -481,6 +483,16 @@ typedef enum VarArgKind {
     VA_Kind_Untyped,
 } VarArgKind;
 
+typedef enum BlockRule {
+    Block_Rule_New_Scope         = BH_BIT(1),
+    Block_Rule_New_Binding_Scope = BH_BIT(2), // Unused
+    Block_Rule_Clear_Defer       = BH_BIT(3),
+
+    Block_Rule_Normal     = Block_Rule_New_Scope | Block_Rule_New_Binding_Scope | Block_Rule_Clear_Defer,
+    Block_Rule_Macro      = Block_Rule_New_Scope | Block_Rule_New_Binding_Scope,
+    Block_Rule_Code_Block = Block_Rule_New_Scope,
+} BlockRule;
+
 typedef struct Arguments Arguments;
 struct Arguments {
     bh_arr(AstTyped *) values;
@@ -637,10 +649,12 @@ struct AstUse           {
 // Structure Nodes
 struct AstBlock         {
     AstNode_base;
-    AstNode *body;
-    Scope *scope;
 
+    AstNode *body;
+
+    Scope *scope;
     Scope *binding_scope;
+    BlockRule rules;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {
@@ -1026,6 +1040,12 @@ struct AstDirectiveInsert {
     AstTyped *code_expr;
 };
 
+struct AstMacro {
+    AstTyped_base;
+
+    AstTyped* body;
+};
+
 typedef enum EntityState {
     Entity_State_Error,
     
@@ -1061,6 +1081,7 @@ typedef enum EntityType {
     Entity_Type_Memory_Reservation_Type,
     Entity_Type_Use,
     Entity_Type_Polymorphic_Proc,
+    Entity_Type_Macro,
     Entity_Type_Foreign_Function_Header,
     Entity_Type_Foreign_Global_Header,
     Entity_Type_Function_Header,
@@ -1109,6 +1130,7 @@ typedef struct Entity {
         AstEnumType           *enum_type;
         AstMemRes             *mem_res;
         AstPolyProc           *poly_proc;
+        AstMacro              *macro;
         AstUse                *use;
     };
 } Entity;

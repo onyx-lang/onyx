@@ -88,7 +88,8 @@ static const char* ast_node_names[] = {
     "CALL SITE",
 
     "CODE BLOCK",
-    "DIRECTIVE INSERT"
+    "DIRECTIVE INSERT",
+    "MACRO",
 
     "NOTE",
 
@@ -142,6 +143,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Memory Reservation Type",
     "Use",
     "Polymorphic Proc",
+    "Macro",
     "Foreign_Function Header",
     "Foreign_Global Header",
     "Function Header",

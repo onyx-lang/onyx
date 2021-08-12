@@ -280,6 +280,8 @@ EMIT_FUNC(function_body, AstFunction* fd) {
 EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    generate_block_headers = generate_block_headers && (block->rules & Block_Rule_New_Scope);
+
     if (generate_block_headers)
         emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
 
@@ -287,8 +289,8 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
         emit_statement(mod, &code, stmt);
     }
 
-    emit_deferred_stmts(mod, &code);
-    emit_free_local_allocations(mod, &code);
+    if (block->rules & Block_Rule_Clear_Defer) emit_deferred_stmts(mod, &code);
+    if (block->rules & Block_Rule_New_Scope)   emit_free_local_allocations(mod, &code);
 
     if (generate_block_headers)
         emit_leave_structured_block(mod, &code);
@@ -1200,7 +1202,7 @@ EMIT_FUNC_NO_ARGS(deferred_stmts) {
 
     u64 depth = bh_arr_length(mod->structured_jump_target);
 
-    while (bh_arr_length(mod->deferred_stmts) > 0 && bh_arr_last(mod->deferred_stmts).depth == depth) {
+    while (bh_arr_length(mod->deferred_stmts) > 0 && bh_arr_last(mod->deferred_stmts).depth >= depth) {
         emit_deferred_stmt(mod, pcode, bh_arr_last(mod->deferred_stmts));
         bh_arr_pop(mod->deferred_stmts);
     }
