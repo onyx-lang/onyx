@@ -1354,7 +1354,8 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
 AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type);
 void report_unable_to_match_overload(AstCall* call);
 
-void expand_macro(AstCall** pcall);
+void expand_macro(AstCall** pcall, AstFunction* template);
+AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite);
 
 AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
 

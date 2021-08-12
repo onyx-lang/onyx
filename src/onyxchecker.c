@@ -444,12 +444,13 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
 
         calling_a_macro = 1;
         call->callee = callee;
-        callee = ((AstMacro *) callee)->body;
 
-        if (callee->kind == Ast_Kind_Polymorphic_Proc) {
-            onyx_report_error(call->token->pos, "Cannot call polymorphic macros... yet.");
-            return Check_Error;
-        }
+        AstTyped* new_callee = (AstTyped *) macro_resolve_header((AstMacro *) callee, &call->args, call->token);
+        if (new_callee == (AstTyped *) &node_that_signals_a_yield) return Check_Yield_Macro;
+        if (new_callee == NULL) return Check_Error;
+
+        arguments_remove_baked(&call->args);
+        callee = new_callee;
 
     } else if (callee->kind == Ast_Kind_Polymorphic_Proc) {
         AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) callee, PPLM_By_Arguments, &call->args, call->token);
@@ -702,7 +703,7 @@ type_checking_done:
     callee->flags |= Ast_Flag_Function_Used;
 
     if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
-        expand_macro(pcall);
+        expand_macro(pcall, callee);
         return Check_Return_To_Symres;
     }
 
@@ -1764,7 +1765,14 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
     if (insert->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
     CHECK(expression, &insert->code_expr);
-    if (insert->code_expr->type == NULL) return Check_Yield_Macro;
+    if (insert->code_expr->type == NULL) {
+        if (insert->code_expr->entity && insert->code_expr->entity->state >= Entity_State_Code_Gen) {
+            onyx_report_error(insert->token->pos, "Expected expression of type 'Code'.");
+            return Check_Error;
+        }
+
+        return Check_Yield_Macro;
+    }
 
     Type* code_type = type_build_from_ast(context.ast_alloc, builtin_code_type);
 

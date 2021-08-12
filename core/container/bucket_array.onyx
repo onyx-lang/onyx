@@ -16,19 +16,20 @@ Bucket_Array :: struct (T: type_expr) {
     }
 }
 
-make :: ($T: type_expr, elements_per_bucket: i32,
+make :: ($T: type_expr, elements: i32,
          array_allocator := context.allocator, bucket_allocator := context.allocator) -> Bucket_Array(T) {
 
     buckets : Bucket_Array(T);
-    init(^buckets);
+    init(^buckets, elements);
     return buckets;
 }
 
-init :: (use b: ^Bucket_Array($T), elements_per_bucket: i32,
+init :: (use b: ^Bucket_Array($T), elements: i32,
          array_allocator := context.allocator, bucket_allocator := context.allocator) {
     
     allocator = bucket_allocator;
-    buckets   = array.make(#type Bucket(T), allocator=array_allocator);
+    b.elements_per_bucket = elements;
+    buckets   = array.make(#type Bucket_Array.Bucket(T), allocator=array_allocator);
 
     initial_bucket := alloc_bucket(b);
     array.push(^buckets, initial_bucket);
@@ -77,9 +78,19 @@ pop :: (use b: ^Bucket_Array($T)) {
     last_bucket.count -= 1;
 }
 
+// Give you a pointer to the bucket data via 'it'.
+for_each :: macro (b: Bucket_Array($T), $body: Code) {
+    for ^bucket: b.buckets {
+        for bucket_index: bucket.count {
+            it := ^bucket.data[bucket_index];
+
+            #insert body;
+        }
+    }
+}
 
 #private
-alloc_bucket :: (use b: ^Bucket_Array($T)) -> Bucket(T) {
+alloc_bucket :: (use b: ^Bucket_Array($T)) -> Bucket_Array.Bucket(T) {
     data := raw_alloc(allocator, sizeof T * elements_per_bucket);
     return .{ 0, data };
 }

@@ -1158,6 +1158,9 @@ static SymresStatus symres_macro(AstMacro* macro) {
     if (macro->body->kind == Ast_Kind_Function) {
         SYMRES(function_header, (AstFunction *) macro->body);
     }
+    else if (macro->body->kind == Ast_Kind_Polymorphic_Proc) {
+        SYMRES(polyproc, (AstPolyProc *) macro->body);
+    }
 
     return Symres_Success;
 }

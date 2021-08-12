@@ -729,10 +729,11 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
 
         if (param->type == NULL)
             param->type = type_build_from_ast(context.ast_alloc, param->type_expr);
+        assert(param->type);
 
         if (!type_check_or_auto_cast(&value, param->type)) {
             if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
-                    "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
+                    "The procedure '%s' expects a value of type '%s' for baked %d%s parameter, got '%s'.",
                     get_function_name(pp->base_func),
                     type_get_name(param->type),
                     param->idx + 1,
@@ -783,10 +784,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
             default: if (err_msg) *err_msg = "Invalid polymorphic parameter kind. This is a compiler bug.";
         }
 
-        if (flag_to_yield) {
-            bh_arr_free(slns);
-            return NULL;
-        }
+        if (flag_to_yield) goto sln_not_found;
         
         switch (resolved.kind) {
             case PSK_Undefined:
@@ -968,6 +966,7 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 
     b32 successful = entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
     if (onyx_has_errors()) {
+        onyx_errors_print();
         onyx_clear_errors();
         return NULL;
     }
@@ -1205,12 +1204,11 @@ void report_unable_to_match_overload(AstCall* call) {
 //
 //
 // TODO: Write this documentation
-void expand_macro(AstCall** pcall) {
+void expand_macro(AstCall** pcall, AstFunction* template) {
     AstCall* call = *pcall;
     AstMacro* macro = (AstMacro *) call->callee;
     assert(macro->kind == Ast_Kind_Macro);
 
-    AstFunction* template = (AstFunction *) macro->body;
     assert(template->kind == Ast_Kind_Function);
     assert(template->type != NULL);
 
@@ -1232,8 +1230,80 @@ void expand_macro(AstCall** pcall) {
             (AstNode *) ((AstArgument *) call->args.values[i])->value);
     }
 
+    if (template->flags & Ast_Flag_From_Polymorphism) {
+        // SLOW DUMB HACKY WAY TO DO THIS!!!!! FIX IT!!!!!
+
+        AstPolyProc* pp = (AstPolyProc *) macro->body;
+        bh_table_each_start(AstSolidifiedFunction, pp->concrete_funcs);
+
+            if (value.func == template) 
+                scope_include(argument_scope, value.poly_scope, call->token->pos);
+
+        bh_table_each_end;
+    }
+
     *(AstBlock **) pcall = expansion;
     return;
+}
+
+AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite) {
+    switch (macro->body->kind) {
+        case Ast_Kind_Function: return (AstFunction *) macro->body;
+
+        case Ast_Kind_Polymorphic_Proc: {
+            AstPolyProc* pp = (AstPolyProc *) macro->body;
+            ensure_polyproc_cache_is_created(pp);
+
+            char* err_msg=NULL;
+            bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, PPLM_By_Arguments, args, &err_msg);
+            
+            if (slns == NULL) {
+                if (flag_to_yield) {
+                    flag_to_yield = 0;
+                    return (AstFunction *) &node_that_signals_a_yield;
+                }
+
+                onyx_report_error(callsite->pos, err_msg);
+                return NULL;
+            }
+
+            // CLEANUP Copy'n'pasted from polymorphic_proc_build_only_header
+            AstSolidifiedFunction solidified_func;
+
+            char* unique_key = build_poly_slns_unique_key(slns);
+            if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
+                solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
+
+            } else {
+                // NOTE: This function is only going to have the header of it correctly created.
+                // Nothing should happen to this function's body or else the original will be corrupted.
+                //                                                      - brendanfh 2021/01/10
+                solidified_func = generate_solidified_function(pp, slns, callsite, 1);
+            }
+
+            if (solidified_func.header_complete) return solidified_func.func;
+
+            Entity func_header_entity = {
+                .state = Entity_State_Resolve_Symbols,
+                .type = Entity_Type_Function_Header,
+                .function = solidified_func.func,
+                .package = NULL,
+                .scope = solidified_func.poly_scope,
+            };
+
+            b32 successful = entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
+            if (onyx_has_errors()) return NULL;
+
+            solidified_func.header_complete = successful;
+
+            bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
+            if (!successful) return (AstFunction *) &node_that_signals_a_yield;
+
+            return solidified_func.func;
+        }
+
+        default: assert(("Bad macro body type.", 0));
+    }
 }
 
 //
