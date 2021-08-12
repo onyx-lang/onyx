@@ -1,0 +1,19 @@
+#load "core/std"
+
+use package core
+
+main :: (args: [] cstr) {
+
+    ba := bucket_array.make(i32, 4);    
+    for i: 24 {
+        bucket_array.push(^ba, i);
+    }
+
+    sum := 0;
+    bucket_array.for_each(ba, #code {
+        printf("[{}] -> {}\n", bucket_index, *it);
+        sum += *it;
+    });
+
+    printf("Sum is {}\n", sum);
+}
