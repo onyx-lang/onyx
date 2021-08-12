@@ -64,6 +64,7 @@ static b32            parse_possible_function_definition(OnyxParser* parser, Ast
 static AstFunction*   parse_function_definition(OnyxParser* parser, OnyxToken* token);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
+static AstMacro*      parse_macro(OnyxParser* parser);
 static AstIf*         parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statements);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
@@ -480,6 +481,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         case Token_Type_Keyword_Package: {
             retval = (AstTyped *) parse_package_expression(parser);
+            break;
+        }
+
+        case Token_Type_Keyword_Macro: {
+            retval = (AstTyped *) parse_macro(parser);
             break;
         }
 

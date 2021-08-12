@@ -407,6 +407,76 @@ static i32 non_baked_argument_count(Arguments* args) {
     return count;
 }
 
+static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_callee) {
+    if (call->kind == Ast_Kind_Intrinsic_Call) return Check_Success;
+
+    while (call->callee->kind == Ast_Kind_Alias)
+        call->callee = ((AstAlias *) call->callee)->alias;
+
+    AstTyped* callee = call->callee;
+    b32 calling_a_macro = 0;
+
+    if (callee->kind == Ast_Kind_Overloaded_Function) {
+        b32 should_yield = 0;
+        AstTyped* new_callee = find_matching_overload_by_arguments(
+            ((AstOverloadedFunction *) callee)->overloads,
+            &call->args,
+            &should_yield);
+
+        if (new_callee == NULL) {
+            if (callee->entity->state > Entity_State_Check_Types && !should_yield) {
+                report_unable_to_match_overload(call);
+                return Check_Error;
+
+            } else {
+                return Check_Yield_Macro;
+            }
+        }
+
+        callee = new_callee;
+    }
+
+    if (callee->kind == Ast_Kind_Macro) {
+        if (current_checking_level == EXPRESSION_LEVEL) {
+            onyx_report_error(call->token->pos, "Macros calls are not allowed at the expression level yet.");
+            return Check_Error;
+        }
+
+        calling_a_macro = 1;
+        call->callee = callee;
+        callee = ((AstMacro *) callee)->body;
+
+        if (callee->kind == Ast_Kind_Polymorphic_Proc) {
+            onyx_report_error(call->token->pos, "Cannot call polymorphic macros... yet.");
+            return Check_Error;
+        }
+
+    } else if (callee->kind == Ast_Kind_Polymorphic_Proc) {
+        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) callee, PPLM_By_Arguments, &call->args, call->token);
+        if (new_callee == (AstTyped *) &node_that_signals_a_yield) return Check_Yield_Macro;
+        if (new_callee == NULL) return Check_Error;
+
+        arguments_remove_baked(&call->args);
+        callee = new_callee;
+    }
+
+    if (!calling_a_macro) call->callee = callee;
+
+    // NOTE: Build callee's type
+    fill_in_type((AstTyped *) callee);
+    if (callee->type == NULL) return Check_Yield_Macro;
+
+    if (callee->type->kind != Type_Kind_Function) {
+        onyx_report_error(call->token->pos,
+                "Attempting to call something that is not a function, '%b'.",
+                callee->token->text, callee->token->length);
+        return Check_Error;
+    }
+
+    *effective_callee = callee;
+    return Check_Success;
+}
+
 typedef enum ArgState {
     AS_Expecting_Exact,
     AS_Expecting_Typed_VA,
@@ -439,64 +509,8 @@ CheckStatus check_call(AstCall** pcall) {
     // which can be multiple if we have to yield on a callee's type.
     arguments_clone(&call->original_args, &call->args);
 
-    while (call->callee->kind == Ast_Kind_Alias) call->callee = ((AstAlias *) call->callee)->alias;
-
-    AstTyped *effective_callee = call->callee;
-
-    // If we are "calling" a macro, the callee on the call node should not be replaced
-    // as then it would remove the macro from the callee, which would turn it into a
-    // normal function call.
-    b32 calling_a_macro = 0;
-
-    if (effective_callee->kind == Ast_Kind_Macro) {
-        calling_a_macro = 1;
-        if (current_checking_level == EXPRESSION_LEVEL) {
-            onyx_report_error(call->token->pos, "Macros calls are not allowed at the expression level yet.");
-            return Check_Error;
-        }
-
-        effective_callee = ((AstMacro * ) effective_callee)->body;
-    }
-
-    if (effective_callee->kind == Ast_Kind_Overloaded_Function) {
-        b32 should_yield = 0;
-        AstTyped* new_callee = find_matching_overload_by_arguments(((AstOverloadedFunction *) effective_callee)->overloads, &call->args, &should_yield);
-        if (new_callee == NULL) {
-            if (effective_callee->entity->state > Entity_State_Check_Types && !should_yield) {
-                report_unable_to_match_overload(call);
-                return Check_Error;
-
-            } else {
-                return Check_Yield_Macro;
-            }
-        }
-
-        effective_callee = new_callee;
-        if (!calling_a_macro) call->callee = new_callee;
-    }
-
-    if (effective_callee->kind == Ast_Kind_Polymorphic_Proc) {
-        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) effective_callee, PPLM_By_Arguments, &call->args, call->token);
-        if (new_callee == (AstTyped *) &node_that_signals_a_yield) return Check_Yield_Macro;
-        if (new_callee == NULL) return Check_Error;
-
-        arguments_remove_baked(&call->args);
-        effective_callee = new_callee;
-        if (!calling_a_macro) call->callee = new_callee;
-    }
-
-    AstFunction* callee = (AstFunction *) effective_callee;
-
-    // NOTE: Build callee's type
-    fill_in_type((AstTyped *) callee);
-    if (callee->type == NULL) return Check_Yield_Macro;
-
-    if (callee->type->kind != Type_Kind_Function) {
-        onyx_report_error(call->token->pos,
-                "Attempting to call something that is not a function, '%b'.",
-                callee->token->text, callee->token->length);
-        return Check_Error;
-    }
+    AstFunction* callee=NULL;
+    CHECK(resolve_callee, call, (AstTyped **) &callee);
 
     // CLEANUP maybe make function_get_expected_arguments?
     i32 non_vararg_param_count = (i32) callee->type->Function.param_count;
@@ -603,7 +617,6 @@ CheckStatus check_call(AstCall** pcall) {
                     continue;
                 }
 
-                // CLEANUP POTENTIAL BUG if the builtin_vararg_type_type is ever rebuilt
                 if ((i16) arg_pos == callee->type->Function.vararg_arg_pos) {
                     arg_state = AS_Expecting_Untyped_VA;
                     continue;
@@ -665,8 +678,7 @@ CheckStatus check_call(AstCall** pcall) {
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
-                break;CheckStatus check_compound(AstCompound* compound);
-
+                break;
             }
         }
 
@@ -687,11 +699,11 @@ type_checking_done:
         return Check_Error;
     }
 
-    if (!calling_a_macro) {
-        callee->flags |= Ast_Flag_Function_Used;
+    callee->flags |= Ast_Flag_Function_Used;
 
-    } else {
-        // Macro expansion
+    if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
+        expand_macro(pcall);
+        return Check_Return_To_Symres;
     }
 
     return Check_Success;
@@ -1911,8 +1923,9 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
         if (   node->kind != Ast_Kind_Function
-            && node->kind != Ast_Kind_Polymorphic_Proc) {
-            onyx_report_error(node->token->pos, "Overload option not procedure. Got '%s'",
+            && node->kind != Ast_Kind_Polymorphic_Proc
+            && node->kind != Ast_Kind_Macro) {
+            onyx_report_error(node->token->pos, "Overload option not procedure or macro. Got '%s'",
                 onyx_ast_node_kind_string(node->kind));
 
             bh_imap_free(&all_overloads);

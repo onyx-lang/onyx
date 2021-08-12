@@ -1084,6 +1084,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         AstFunction* overload = NULL;
         switch (node->kind) {
             case Ast_Kind_Function:         overload = (AstFunction *) node; break;
+            case Ast_Kind_Macro:            overload = (AstFunction *) ((AstMacro *) node)->body; break;
             case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstPolyProc *) node, PPLM_By_Arguments, param_args); break;
         }
 
@@ -1199,6 +1200,41 @@ void report_unable_to_match_overload(AstCall* call) {
 }
 
 
+//
+// Macros
+//
+//
+// TODO: Write this documentation
+void expand_macro(AstCall** pcall) {
+    AstCall* call = *pcall;
+    AstMacro* macro = (AstMacro *) call->callee;
+    assert(macro->kind == Ast_Kind_Macro);
+
+    AstFunction* template = (AstFunction *) macro->body;
+    assert(template->kind == Ast_Kind_Function);
+    assert(template->type != NULL);
+
+    AstBlock* expansion = (AstBlock *) ast_clone(context.ast_alloc, template->body);
+    expansion->rules = Block_Rule_Macro;
+    expansion->scope = NULL;
+    expansion->next = call->next;
+
+    Scope* argument_scope = scope_create(context.ast_alloc, NULL, call->token->pos);
+    if (expansion->binding_scope != NULL)
+        scope_include(argument_scope, expansion->binding_scope, call->token->pos);
+    expansion->binding_scope = argument_scope;
+
+    // HACK HACK HACK This is probably very wrong. I don't know what guarentees that
+    // the paramters and arguments are going to be in the same order exactly.
+    fori (i, 0, bh_arr_length(call->args.values)) {
+        symbol_introduce(argument_scope,
+            template->params[i].local->token,
+            (AstNode *) ((AstArgument *) call->args.values[i])->value);
+    }
+
+    *(AstBlock **) pcall = expansion;
+    return;
+}
 
 //
 // Polymorphic Structures
@@ -1211,6 +1247,8 @@ void report_unable_to_match_overload(AstCall* call) {
 // that types need to be known completely by the time symbol resolution is done, even though that
 // information shouldn't need to be known until right before the types are checked.
 //
+// The above documentation is very incorrect but I don't want to fix it right now. Basically, polymorphic
+// structures now have a delay instantiation phase and are not forced to be completed immediately.
 
 char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
     char name_buf[256];

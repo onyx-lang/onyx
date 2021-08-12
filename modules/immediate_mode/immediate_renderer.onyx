@@ -521,6 +521,7 @@ apply_transform :: (transform: Transform) do global_renderer->apply_transform(tr
 
 
 save_matrix :: #code {
-    (package immediate_mode).push_matrix();
-    defer (package immediate_mode).pop_matrix();
+    I :: package immediate_mode
+    I.push_matrix();
+    defer I.pop_matrix();
 }
