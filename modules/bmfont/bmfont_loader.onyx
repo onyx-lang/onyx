@@ -13,11 +13,11 @@ load_bmfont :: (fnt_data: [] u8) -> BMFont {
     parse_bmfont(fnt_data, ^bmf);
 
     @Cleanup // this was a stupid way of doing this. Just use a f-ing for loop.
-    array.map(^bmf.glyphs.entries, ^bmf, (glyph: ^map.Map.Entry(i32, BMFont_Glyph), font: ^BMFont) {
-        glyph.value.tex_x = ~~ glyph.value.x / cast(f32) font.common.scale_width;        
-        glyph.value.tex_y = ~~ glyph.value.y / cast(f32) font.common.scale_height;        
-        glyph.value.tex_w = ~~ glyph.value.w / cast(f32) font.common.scale_width;        
-        glyph.value.tex_h = ~~ glyph.value.h / cast(f32) font.common.scale_height;        
+    array.map(bmf.glyphs.entries, #code {
+        it.value.tex_x = ~~ it.value.x / cast(f32) bmf.common.scale_width;        
+        it.value.tex_y = ~~ it.value.y / cast(f32) bmf.common.scale_height;        
+        it.value.tex_w = ~~ it.value.w / cast(f32) bmf.common.scale_width;        
+        it.value.tex_h = ~~ it.value.h / cast(f32) bmf.common.scale_height;        
     });
 
     return bmf;

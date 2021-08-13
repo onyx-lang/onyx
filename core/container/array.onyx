@@ -74,6 +74,9 @@ push :: (arr: ^[..] $T, x: T) -> bool {
     return true;
 }
 
+// Semi-useful shortcut for adding something to an array.
+#operator << macro (arr: [..] $T, v: T) do array.push(^arr, v);
+
 insert :: (arr: ^[..] $T, idx: u32, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
 
@@ -305,14 +308,16 @@ fold :: #match {
 }
 
 map :: #match {
-    (arr: ^[..] $T, f: (^T) -> void)              do for ^it: *arr do f(it);,
-    (arr: ^[..] $T, f: (T) -> T)                  do for ^it: *arr do *it = f(*it);,
-    (arr: ^[..] $T, data: $R, f: (^T, R) -> void) do for ^it: *arr do f(it, data);,
-    (arr: ^[..] $T, data: $R, f: (T, R) -> T)     do for ^it: *arr do *it = f(*it, data);,
-    (arr: [] $T, f: (^T) -> void)                 do for ^it:  arr do f(it);,
-    (arr: [] $T, f: (T) -> T)                     do for ^it:  arr do *it = f(*it);,
-    (arr: [] $T, data: $R, f: (^T, R) -> void)    do for ^it:  arr do f(it, data);,
-    (arr: [] $T, data: $R, f: (T, R) -> T)        do for ^it:  arr do *it = f(*it, data);,
+    macro (arr: [..] $T, f: (^T) -> void)              do for ^it: arr do f(it);,
+    macro (arr: [..] $T, f: (T) -> T)                  do for ^it: arr do *it = f(*it);,
+    macro (arr: [..] $T, body: Code)                   do for ^it: arr do #insert body;,
+    macro (arr: [..] $T, data: $R, f: (^T, R) -> void) do for ^it: arr do f(it, data);,
+    macro (arr: [..] $T, data: $R, f: (T, R) -> T)     do for ^it: arr do *it = f(*it, data);,
+    macro (arr: [] $T, f: (^T) -> void)                do for ^it: arr do f(it);,
+    macro (arr: [] $T, f: (T) -> T)                    do for ^it: arr do *it = f(*it);,
+    macro (arr: [] $T, body: Code)                     do for ^it: arr do #insert body;,
+    macro (arr: [] $T, data: $R, f: (^T, R) -> void)   do for ^it: arr do f(it, data);,
+    macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
 }
 
 every :: (arr: ^[..] $T, predicate: (T) -> bool) -> bool {
