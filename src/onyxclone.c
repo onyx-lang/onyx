@@ -126,6 +126,9 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 	if (node == NULL) return NULL;
 	if (!should_clone(node)) return node;
 
+	static int clone_depth = 0;
+	clone_depth++;
+
 	i32 node_size = ast_kind_to_size(node);
 	// bh_printf("Cloning %s with size %d\n", onyx_ast_node_kind_string(node->kind), node_size);
 
@@ -363,6 +366,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			break;
 
 		case Ast_Kind_Function: {
+			if (clone_depth > 1) {
+				clone_depth--;
+				return node;
+			}
+
 			AstFunction* df = (AstFunction *) nn;
 			AstFunction* sf = (AstFunction *) node;
 
@@ -442,6 +450,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
        	}
 	}
 
+	clone_depth--;
 	return nn;
 }
 
