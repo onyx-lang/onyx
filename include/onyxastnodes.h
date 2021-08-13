@@ -1412,6 +1412,7 @@ static inline ParamPassType type_get_param_pass(Type* type) {
 static inline AstFunction* get_function_from_node(AstNode* node) {
     if (node->kind == Ast_Kind_Function) return (AstFunction *) node;
     if (node->kind == Ast_Kind_Polymorphic_Proc) return ((AstPolyProc *) node)->base_func;
+    if (node->kind == Ast_Kind_Macro) return get_function_from_node((AstNode*) ((AstMacro *) node)->body);
     return NULL;
 }
 

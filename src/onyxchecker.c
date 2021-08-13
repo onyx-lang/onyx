@@ -953,6 +953,11 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
 
     b32 should_yield = 0;
     AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args, &should_yield);
+    if (should_yield) {
+        bh_arr_free(args.values);
+        return (AstCall *) &node_that_signals_a_yield;
+    }
+
     if (overload == NULL) {
         bh_arr_free(args.values);
         return NULL;
@@ -1006,11 +1011,15 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic)) {
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
-        if (implicit_call != NULL) {
-            CHECK(call, &implicit_call);
+        if (implicit_call == (AstCall *) &node_that_signals_a_yield)
+            return Check_Yield_Macro;
 
+        if (implicit_call != NULL) {
             // NOTE: Not a binary op
+            implicit_call->next = binop->next;
             *pbinop = (AstBinaryOp *) implicit_call;
+
+            CHECK(call, (AstCall **) pbinop);
             return Check_Success;
         }
     }
@@ -1404,11 +1413,15 @@ CheckStatus check_subscript(AstSubscript** psub) {
         AstBinaryOp* binop = (AstBinaryOp *) sub;
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
-        if (implicit_call != NULL) {
-            CHECK(call, &implicit_call);
+        if (implicit_call == (AstCall *) &node_that_signals_a_yield)
+            return Check_Yield_Macro;
 
+        if (implicit_call != NULL) {
             // NOTE: Not an array access
+            implicit_call->next = sub->next;
             *psub = (AstSubscript *) implicit_call;
+
+            CHECK(call, (AstCall **) psub);
             return Check_Success;
         }
     }
