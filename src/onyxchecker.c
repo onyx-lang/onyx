@@ -1805,19 +1805,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
 
     AstNode* cloned_block = ast_clone(context.ast_alloc, code_block->code);
     cloned_block->next = insert->next;
-
-    /*if (cloned_block->kind == Ast_Kind_Block) {
-        AstNode* next = insert->next;
-        insert->next = (AstNode *) ((AstBlock *) cloned_block)->body;
-
-        AstNode* last_stmt = insert->next;
-        while (last_stmt->next != NULL) last_stmt = last_stmt->next;
-        last_stmt->next = next;
-
-    } else {
-        */
-        *(AstNode **) pinsert = cloned_block;
-    //}
+    *(AstNode **) pinsert = cloned_block;
 
     insert->flags |= Ast_Flag_Has_Been_Checked;
 

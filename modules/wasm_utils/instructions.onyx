@@ -298,8 +298,8 @@ parse_instruction :: (reader: ^io.Reader, binary: ^WasmBinary, code_offset := 0,
 
     ib := io.read_byte(reader);
     switch cast(u32) ib {
-        case 0x00 do instr.code = .unreachable;
-        case 0x01 do instr.code = .nop;
+        case 0x00 { instr.code = .unreachable; }
+        case 0x01 { instr.code = .nop; }
         case 0x02 { instr.code = .block;  block_depth += 1; parse_after = .Block_Type; }
         case 0x03 { instr.code = .loop;   block_depth += 1; parse_after = .Block_Type; }
         case 0x04 { instr.code = .if_;    block_depth += 1; parse_after = .Block_Type; }

@@ -1236,8 +1236,10 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         AstPolyProc* pp = (AstPolyProc *) macro->body;
         bh_table_each_start(AstSolidifiedFunction, pp->concrete_funcs);
 
-            if (value.func == template) 
+            if (value.func == template) {
                 scope_include(argument_scope, value.poly_scope, call->token->pos);
+                break;
+            }
 
         bh_table_each_end;
     }

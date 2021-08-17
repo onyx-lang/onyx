@@ -48,7 +48,7 @@ buffer_insert :: (use buffer: ^String_Buffer, position: i32, ch: u8) -> bool {
 }
 
 buffer_append :: (use buffer: ^String_Buffer, end: str) -> bool {
-    if count + end.count == capacity do return false;
+    if count + end.count > capacity do return false;
 
     for i: end.count {
         data[i + count] = end[i];

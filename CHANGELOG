@@ -8,6 +8,7 @@ are going to be changed and added in the future, but first I want to get this be
 version out there in a packaged format.
 
 Additions:
+* Macros and paste-able code blocks
 * overloaded procedures can have polymorphic and overloaded procedures as overloads.  This makes them MUCH more powerful.
 * types are not required on struct members that have default values. This is still very experimental so there are some
     noticable bugs with it. You can always specify the type explicitly if you have issues.

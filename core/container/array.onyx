@@ -75,7 +75,7 @@ push :: (arr: ^[..] $T, x: T) -> bool {
 }
 
 // Semi-useful shortcut for adding something to an array.
-#operator << macro (arr: [..] $T, v: T) do array.push(^arr, v);
+#operator << macro (arr: [..] $T, v: T) do (package core.array).push(^arr, v);
 
 insert :: (arr: ^[..] $T, idx: u32, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;

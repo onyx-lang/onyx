@@ -333,6 +333,14 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                         formatting.minimum_width = ~~digits;
                     }
 
+                    case #char "}" {
+                        arg := va[vararg_index];
+                        vararg_index += 1;
+                        print_any(^output, formatting, arg);
+
+                        break break;
+                    }
+
                     case #default do break break;
                 }
             }
@@ -344,10 +352,6 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 i += 1;
                 continue;
             }
-
-            arg := va[vararg_index];
-            vararg_index += 1;
-            print_any(^output, formatting, arg);
 
             continue;
         }
