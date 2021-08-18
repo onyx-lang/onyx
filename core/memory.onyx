@@ -38,7 +38,7 @@ alloc_slice :: (sl: ^[] $T, count: i32, allocator := context.allocator) {
 }
 
 make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] T {
-    return <[] T>.{
+    return .{
         data = raw_alloc(allocator, sizeof T * count),
         count = count
     };
@@ -50,6 +50,13 @@ free_slice :: (sl: ^[] $T, allocator := context.allocator) {
     raw_free(allocator, sl.data);
     sl.data = null;
     sl.count = 0;
+}
+
+copy_slice :: (sl: [] $T, allocator := context.allocator) -> [] T {
+    data := raw_alloc(allocator, sl.count * sizeof T);
+    copy(data, sl.data, sl.count * sizeof T);
+
+    return .{ data = data, count = sl.count };
 }
 
 align :: #match {

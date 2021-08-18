@@ -715,6 +715,15 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     Type* from = from_;
     Type* to   = to_;
 
+    if (from == NULL) {
+        if (err_msg) *err_msg = "'from' is null. (Compiler Error)";
+        return 0;
+    }
+    if (to == NULL) {
+        if (err_msg) *err_msg = "'to' is null. (Compiler Error)";
+        return 0;
+    }
+
     if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
     if (to->kind == Type_Kind_Enum) to = to->Enum.backing;
 

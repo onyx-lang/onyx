@@ -12,7 +12,15 @@ Scrollable_Region_State :: struct {
 #private
 scrollable_region_states : map.Map(UI_Id, Scrollable_Region_State);
 
-scrollable_region_start :: (use r: Rectangle, minimum_y := 0.0f, maximum_y := 10000.0f, site := #callsite, state: ^Scrollable_Region_State = null) {
+Scrollable_Region_Controls :: struct {
+    minimum_y := 0.0f;
+    maximum_y := 10000.0f; // Senseless default
+    minimum_x := 0.0f;
+    maximum_x := 10000.0f; // Senseless default
+}
+
+scrollable_region_start :: (use r: Rectangle, use src: Scrollable_Region_Controls = .{},
+                            site := #callsite, state: ^Scrollable_Region_State = null) {
     hash := get_site_hash(site, 0);
     x, y := Rectangle.top_left(r);
     width, height := Rectangle.dimensions(r);
@@ -36,11 +44,14 @@ scrollable_region_start :: (use r: Rectangle, minimum_y := 0.0f, maximum_y := 10
 
         if is_key_down(38)  do state.transform.translation.y += speed;
         if is_key_down(40)  do state.transform.translation.y -= speed;
+        if is_key_down(37)  do state.transform.translation.x -= speed;
+        if is_key_down(39)  do state.transform.translation.x += speed;
 
         if mouse_state.dwheel > 0 do state.transform.translation.y += speed;
         if mouse_state.dwheel < 0 do state.transform.translation.y -= speed;
 
         state.transform.translation.y = math.clamp(state.transform.translation.y, -maximum_y, minimum_y);
+        state.transform.translation.x = math.clamp(state.transform.translation.x, -maximum_x, minimum_x);
     }
 
     gfx.push_scissor(x, y, width, height);

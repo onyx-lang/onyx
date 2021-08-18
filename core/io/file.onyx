@@ -72,12 +72,12 @@ file_open :: (path: str, mode := OpenMode.Read, flags := FDFlags.Sync) -> (File,
     switch mode {
         case .Write {
             open_flags |= OFlags.Creat | OFlags.Trunc;
-            rights     |= Rights.Write;
+            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
         }
 
         case .Append {
             open_flags |= OFlags.Creat;
-            rights     |= Rights.Write;
+            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
             fd_flags   |= FDFlags.Append;
         }
 

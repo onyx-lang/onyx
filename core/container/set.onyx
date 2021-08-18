@@ -50,6 +50,8 @@ insert :: (use set: ^Set($T), value: T) {
     hashes[lr.hash_index] = entries.count - 1;
 }
 
+#operator << macro (set: Set($T), value: T) do (package core.set).insert(^set, value);
+
 has :: (use set: ^Set($T), value: T) -> bool {
     lr := lookup(set, value);
     return lr.entry_index >= 0;

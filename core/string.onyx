@@ -169,7 +169,6 @@ ends_with :: (s: str, suffix: str) -> bool {
     return true;
 }
 
-
 strip_leading_whitespace :: #match {
     (s: ^str) {
         while true do switch s.data[0] {

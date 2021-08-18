@@ -17,6 +17,7 @@ static inline b32 should_clone(AstNode* node) {
 		case Ast_Kind_Polymorphic_Proc:
 		case Ast_Kind_Alias:
 		case Ast_Kind_Code_Block:
+		case Ast_Kind_Macro:
 			return 0;
 
 		default: return 1;
