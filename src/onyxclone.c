@@ -384,7 +384,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 			bh_arr_new(global_heap_allocator, df->params, bh_arr_length(sf->params));
 
 			bh_arr_each(AstParam, param, sf->params) {
-				AstParam new_param;
+				AstParam new_param = { 0 };
 				new_param.local = (AstLocal *) ast_clone(a, param->local);
 				new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
                 new_param.vararg_kind = param->vararg_kind;

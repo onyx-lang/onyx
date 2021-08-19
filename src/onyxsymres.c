@@ -890,7 +890,7 @@ SymresStatus symres_function(AstFunction* func) {
             // The 'use t : T' member requires completely knowing the type of T, to know which
             // members should be brought in. At the moment, that requires completely building the
             // type of Foo($T).
-            if (param->local->flags & Ast_Flag_Param_Use) {
+            if ((param->local->flags & Ast_Flag_Param_Use) != 0 && param->use_processed == 0) {
                 if (param->local->type_node != NULL && param->local->type == NULL) {
                     param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
 
@@ -913,6 +913,8 @@ SymresStatus symres_function(AstFunction* func) {
                         AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value.name);
                         symbol_raw_introduce(curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
                     bh_table_each_end;
+
+                    param->use_processed = 1;
 
                 } else if (param->local->type != NULL) {
                     onyx_report_error(param->local->token->pos, "Can only 'use' structures or pointers to structures.");

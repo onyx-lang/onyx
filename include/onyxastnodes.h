@@ -830,6 +830,7 @@ struct AstParam {
     AstTyped *default_value;
 
     VarArgKind vararg_kind;
+    b32 use_processed : 1;
 };
 struct AstFunction {
     AstTyped_base;
