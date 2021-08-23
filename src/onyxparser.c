@@ -2220,7 +2220,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 
     if (parser->curr->type == '{') {
         body_block = parse_block(parser, 1);
-        return_type = (AstType *) &basic_type_void;
+        return_type = (AstType *) &basic_type_auto_return;
 
     } else {
         AstTyped* body = parse_expression(parser, 0);

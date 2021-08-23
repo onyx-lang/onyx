@@ -84,6 +84,10 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
     if (t1 == NULL || t2 == NULL) return 0;
     if (t1->id == t2->id) return 1;
 
+    if (t1 == &type_auto_return || t2 == &type_auto_return) {
+        return 0;
+    }
+
     switch (t1->kind) {
         case Type_Kind_Basic:
             if (t2->kind == Type_Kind_Basic) {

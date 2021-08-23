@@ -108,25 +108,38 @@ static inline void fill_in_type(AstTyped* node) {
 }
 
 // HACK: This should be baked into a structure, not a global variable.
-static Type* expected_return_type = NULL;
+static Type** expected_return_type = NULL;
 
 CheckStatus check_return(AstReturn* retnode) {
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
 
-        if (!type_check_or_auto_cast(&retnode->expr, expected_return_type)) {
+        if (*expected_return_type == &type_auto_return) {
+            resolve_expression_type(retnode->expr);
+            if (retnode->expr->type == NULL) return Check_Yield_Macro;
+
+            *expected_return_type = retnode->expr->type;
+            return Check_Success;
+        }
+
+        if (!type_check_or_auto_cast(&retnode->expr, *expected_return_type)) {
             onyx_report_error(retnode->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
-                    type_get_name(expected_return_type),
+                    type_get_name(*expected_return_type),
                     node_get_type_name(retnode->expr));
             return Check_Error;
         }
 
     } else {
-        if (expected_return_type->Basic.size > 0) {
+        if (*expected_return_type == &type_auto_return) {
+            *expected_return_type = &basic_types[Basic_Kind_Void];
+            return Check_Success;
+        }
+
+        if ((*expected_return_type)->Basic.size > 0) {
             onyx_report_error(retnode->token->pos,
                 "Returning from non-void function without a value. Expected a value of type '%s'.",
-                type_get_name(expected_return_type));
+                type_get_name(*expected_return_type));
             return Check_Error;
         }
     }
@@ -593,8 +606,9 @@ CheckStatus check_call(AstCall** pcall) {
         token_toggle_end(callee->intrinsic_name);
     }
 
-    call->type = callee->type->Function.return_type;
     call->va_kind = VA_Kind_Not_VA;
+    call->type = callee->type->Function.return_type;
+    if (call->type == &type_auto_return) return Check_Yield_Macro;
 
     Type **formal_params = callee->type->Function.params;
 
@@ -1622,7 +1636,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
     }
 
     if (expr->kind == Ast_Kind_Polymorphic_Proc) {
-        // Polymoprhic procedures do not need to be checked. Their concrete instantiations
+        // polymorphic procedures do not need to be checked. Their concrete instantiations
         // will be checked when they are created.
         return Check_Success;
     }
@@ -1914,17 +1928,20 @@ CheckStatus check_function(AstFunction* func) {
     if (func->flags & Ast_Flag_Already_Checked) return Check_Success;
     if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen) return Check_Yield_Macro;
     
-    expected_return_type = func->type->Function.return_type;
+    expected_return_type = &func->type->Function.return_type;
     if (func->body) {
         CheckStatus status = check_block(func->body);
         if (status == Check_Error && func->generated_from)
             onyx_report_error(func->generated_from->pos, "Error in polymorphic procedure generated from this location.");
 
-        return status;
+        if (status != Check_Success) return status;
     }
-    
-    func->flags |= Ast_Flag_Already_Checked;
 
+    if (*expected_return_type == &type_auto_return) {
+        *expected_return_type = &basic_types[Basic_Kind_Void];
+    }
+
+    func->flags |= Ast_Flag_Already_Checked;
     return Check_Success;
 }
 

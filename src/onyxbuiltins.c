@@ -31,6 +31,11 @@ AstBasicType basic_type_f32x4 = { Ast_Kind_Basic_Type, 0, &simd_token, NULL, 0, 
 AstBasicType basic_type_f64x2 = { Ast_Kind_Basic_Type, 0, &simd_token, NULL, 0, NULL, NULL, &basic_types[Basic_Kind_F64X2] };
 AstBasicType basic_type_v128  = { Ast_Kind_Basic_Type, 0, &simd_token, NULL, 0,  NULL, NULL, &basic_types[Basic_Kind_V128]  };
 
+// HACK
+// :AutoReturnType
+Type         type_auto_return = { 0 };
+AstBasicType basic_type_auto_return = { Ast_Kind_Basic_Type, 0, &simd_token, NULL, 0, NULL, NULL, &type_auto_return };
+
 OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
 
 static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };

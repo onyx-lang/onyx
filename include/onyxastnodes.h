@@ -1273,6 +1273,10 @@ extern AstBasicType basic_type_f32x4;
 extern AstBasicType basic_type_f64x2;
 extern AstBasicType basic_type_v128;
 
+// HACK
+// :AutoReturnType
+extern Type type_auto_return;
+extern AstBasicType basic_type_auto_return;
 
 extern OnyxToken builtin_package_token;
 extern AstNumLit builtin_heap_start;

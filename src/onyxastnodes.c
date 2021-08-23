@@ -561,6 +561,14 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     if (type->kind == Type_Kind_Function && (node->flags & Ast_Flag_Proc_Is_Null) != 0) return 1;
 
     if (types_are_compatible(node->type, type)) return 1;
+    // :AutoReturnType
+    if (node->type && node->type->kind == Type_Kind_Function
+        && node->type->Function.return_type == &type_auto_return
+        && type->kind == Type_Kind_Function) {
+
+        node->type->Function.return_type = type->Function.return_type;
+        return 1;
+    }
     if (node_is_auto_cast((AstNode *) node)) {
         char* dummy;
         Type* from_type = ((AstUnaryOp *) node)->expr->type;
