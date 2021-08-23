@@ -229,6 +229,12 @@ static SymresStatus symres_type(AstType** type) {
             SYMRES(type, (AstType **) &alias->alias);
             break;
         }
+
+        case Ast_Kind_Typeof: {
+            AstTypeOf* type_of = (AstTypeOf *) *type;
+            SYMRES(expression, &type_of->expr);
+            break;
+        }
     }
 
     return Symres_Success;
@@ -842,10 +848,29 @@ static SymresStatus symres_block(AstBlock* block) {
 SymresStatus symres_function_header(AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
+    if (func->scope == NULL)
+        func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
+
+    scope_enter(func->scope);
+
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
             SYMRES(expression, &param->default_value);
             if (onyx_has_errors()) return Symres_Error;
+        }
+    }
+
+    if ((func->flags & Ast_Flag_Params_Introduced) == 0) {
+        bh_arr_each(AstParam, param, func->params) {
+            symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+        }
+
+        func->flags |= Ast_Flag_Params_Introduced;
+    }
+
+    bh_arr_each(AstParam, param, func->params) {
+        if (param->local->type_node != NULL) {
+            SYMRES(type, &param->local->type_node);
         }
     }
 
@@ -854,11 +879,8 @@ SymresStatus symres_function_header(AstFunction* func) {
         onyx_report_error(func->token->pos, "Return type is not a type.");
     }
 
-    bh_arr_each(AstParam, param, func->params) {
-        if (param->local->type_node != NULL) {
-            SYMRES(type, &param->local->type_node);
-        }
-    }
+    scope_leave();
+
     return Symres_Success;
 }
 
@@ -871,8 +893,6 @@ SymresStatus symres_function(AstFunction* func) {
 
     if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
         bh_arr_each(AstParam, param, func->params) {
-            symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
-
             // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
             // resolved and built. This is excessive because all that should need to be known
             // is the names of the members, since all that happens is implicit field accesses

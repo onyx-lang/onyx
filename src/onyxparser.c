@@ -57,6 +57,7 @@ static AstNode*       parse_use_stmt(OnyxParser* parser);
 static AstBlock*      parse_block(OnyxParser* parser, b32 make_a_new_scope);
 static AstNode*       parse_statement(OnyxParser* parser);
 static AstType*       parse_type(OnyxParser* parser);
+static AstTypeOf*     parse_typeof(OnyxParser* parser);
 static AstStructType* parse_struct(OnyxParser* parser);
 static void           parse_function_params(OnyxParser* parser, AstFunction* func);
 static b32            parse_possible_directive(OnyxParser* parser, const char* dir);
@@ -418,6 +419,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             ao_node->type_node = (AstType *) &basic_type_i32;
 
             retval = (AstTyped *) ao_node;
+            break;
+        }
+
+        case Token_Type_Keyword_Typeof: {
+            retval = (AstTyped *) parse_typeof(parser);
             break;
         }
 
@@ -1734,6 +1740,12 @@ static AstType* parse_type(OnyxParser* parser) {
                 break;
             }
 
+            case Token_Type_Keyword_Typeof: {
+                *next_insertion = (AstType *) parse_typeof(parser);
+                next_insertion = NULL;
+                break;
+            }
+
             default:
                 onyx_report_error(parser->curr->pos, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
                 consume_token(parser);
@@ -1744,6 +1756,17 @@ static AstType* parse_type(OnyxParser* parser) {
     }
 
     return root;
+}
+
+static AstTypeOf* parse_typeof(OnyxParser* parser) {
+    OnyxToken* token = expect_token(parser, Token_Type_Keyword_Typeof);
+
+    AstTypeOf* type_of = make_node(AstTypeOf, Ast_Kind_Typeof);
+    type_of->token = token;
+    type_of->expr = parse_expression(parser, 0);
+    type_of->resolved_type = NULL;
+
+    return type_of;
 }
 
 static AstStructType* parse_struct(OnyxParser* parser) {

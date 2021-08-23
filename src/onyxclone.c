@@ -57,6 +57,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Type_Alias: return sizeof(AstTypeAlias);
         case Ast_Kind_Type_Raw_Alias: return sizeof(AstTypeRawAlias);
         case Ast_Kind_Type_Compound: return sizeof(AstCompoundType);
+        case Ast_Kind_Typeof: return sizeof(AstTypeOf);
         case Ast_Kind_Type_End: return 0;
         case Ast_Kind_Struct_Member: return sizeof(AstStructMember);
         case Ast_Kind_Enum_Value: return sizeof(AstEnumValue);
@@ -447,6 +448,12 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
        	case Ast_Kind_Directive_Insert: {
        		((AstDirectiveInsert *) nn)->code_expr = (AstTyped *) ast_clone(a, ((AstDirectiveInsert *) node)->code_expr);
+       		break;
+       	}
+
+       	case Ast_Kind_Typeof: {
+       		((AstTypeOf *) nn)->expr = (AstTyped *) ast_clone(a, ((AstTypeOf *) node)->expr);
+       		((AstTypeOf *) nn)->resolved_type = NULL;
        		break;
        	}
 	}

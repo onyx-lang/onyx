@@ -30,6 +30,7 @@ static const char* token_type_names[] = {
     "continue",
     "sizeof",
     "alignof",
+    "typeof",
     "defer",
     "do",
     "switch",
@@ -346,12 +347,13 @@ whitespace_skipped:
         LITERAL_TOKEN("return",      1, Token_Type_Keyword_Return);
         break;
     case 's':
-        LITERAL_TOKEN("sizeof",      1, Token_Type_Keyword_Sizeof);
         LITERAL_TOKEN("struct",      1, Token_Type_Keyword_Struct);
+        LITERAL_TOKEN("sizeof",      1, Token_Type_Keyword_Sizeof);
         LITERAL_TOKEN("switch",      1, Token_Type_Keyword_Switch);
         break;
     case 't':
         LITERAL_TOKEN("true",        1, Token_Type_Literal_True);
+        LITERAL_TOKEN("typeof",      1, Token_Type_Keyword_Typeof);
         break;
     case 'u':
         LITERAL_TOKEN("use",         1, Token_Type_Keyword_Use);

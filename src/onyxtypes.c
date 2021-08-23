@@ -359,7 +359,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
-                    onyx_report_error((*member)->token->pos, "Invalid member type: %s", type_get_name((*member)->type)); 
+                    onyx_report_error((*member)->token->pos, "Invalid member type: %s. Has alignment %d", type_get_name((*member)->type), mem_alignment); 
                     return NULL;
                 }
 
@@ -575,6 +575,15 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Alias: {
             AstAlias* alias = (AstAlias *) type_node;
             return type_build_from_ast(alloc, (AstType *) alias->alias);
+        }
+
+        case Ast_Kind_Typeof: {
+            AstTypeOf* type_of = (AstTypeOf *) type_node;
+            if (type_of->resolved_type != NULL) {
+                return type_of->resolved_type;
+            }
+            
+            return NULL;
         }
     }
 

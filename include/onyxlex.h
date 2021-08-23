@@ -32,6 +32,7 @@ typedef enum TokenType {
     Token_Type_Keyword_Continue,
     Token_Type_Keyword_Sizeof,
     Token_Type_Keyword_Alignof,
+    Token_Type_Keyword_Typeof,
     Token_Type_Keyword_Defer,
     Token_Type_Keyword_Do,
     Token_Type_Keyword_Case,

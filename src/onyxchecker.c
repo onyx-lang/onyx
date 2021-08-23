@@ -1607,6 +1607,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
         // This is to ensure that the type will exist when compiling. For example, a poly-call type
         // would have to wait for the entity to pass through, which the code generation does not know
         // about.
+        if (expr->kind == Ast_Kind_Typeof) {
+            CHECK(type, (AstType *) expr);
+        }
+
         if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
             return Check_Yield_Macro;
         }
@@ -1646,7 +1650,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Param:
             if (expr->type == NULL) {
-                onyx_report_error(expr->token->pos, "Parameter with unknown type. You should hopefully never see this.");
+                onyx_report_error(expr->token->pos, "Parameter with bad type.");
                 retval = Check_Error;
             }
             break;
@@ -1848,6 +1852,8 @@ CheckStatus check_statement(AstNode** pstmt) {
             AstTyped* typed_stmt = (AstTyped *) stmt;
             fill_in_type(typed_stmt);
             if (typed_stmt->type_node != NULL && typed_stmt->type == NULL) {
+                CHECK(type, typed_stmt->type_node);
+
                 if (!node_is_type((AstNode *) typed_stmt->type_node)) {
                     onyx_report_error(stmt->token->pos, "Local's type is not a type.");
                     return Check_Error;
@@ -2156,15 +2162,57 @@ CheckStatus check_type(AstType* type) {
     while (type->kind == Ast_Kind_Type_Alias)
         type = ((AstTypeAlias *) type)->to;
 
-    if (type->kind == Ast_Kind_Poly_Call_Type) {
-        AstPolyCallType* pc_node = (AstPolyCallType *) type;
+    switch (type->kind) {
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType* pc_node = (AstPolyCallType *) type;
 
-        bh_arr_each(AstNode *, param, pc_node->params) {
-            if (!node_is_type(*param)) {
-                CHECK(expression, (AstTyped **) param);
-                resolve_expression_type((AstTyped *) *param);
+            bh_arr_each(AstNode *, param, pc_node->params) {
+                if (!node_is_type(*param)) {
+                    CHECK(expression, (AstTyped **) param);
+                    resolve_expression_type((AstTyped *) *param);
+                }
             }
+
+            break;
         }
+
+        case Ast_Kind_Typeof: {
+            AstTypeOf *type_of = (AstTypeOf *) type;
+            CHECK(expression, (AstTyped **) &type_of->expr);
+            resolve_expression_type(type_of->expr);
+
+            if (type_of->expr->type == NULL) {
+                return Check_Yield_Macro;
+            }
+
+            type_of->resolved_type = type_of->expr->type;
+            break;
+        }
+
+        case Ast_Kind_Pointer_Type: CHECK(type, ((AstPointerType *) type)->elem); break;
+        case Ast_Kind_Slice_Type:   CHECK(type, ((AstSliceType *) type)->elem); break;
+        case Ast_Kind_DynArr_Type:  CHECK(type, ((AstDynArrType *) type)->elem); break;
+        case Ast_Kind_VarArg_Type:  CHECK(type, ((AstVarArgType *) type)->elem); break;
+
+        case Ast_Kind_Function_Type: {
+            AstFunctionType* ftype = (AstFunctionType *) type;
+
+            CHECK(type, ftype->return_type);
+
+            if (ftype->param_count > 0) {
+                fori (i, 0, (i64) ftype->param_count) {
+                    CHECK(type, ftype->params[i]);
+                }
+            }
+            break;
+        }
+
+        case Ast_Kind_Type_Compound: {
+            AstCompoundType* ctype = (AstCompoundType *) type;
+
+            bh_arr_each(AstType *, type, ctype->types) CHECK(type, *type);
+            break;
+        }    
     }
 
     return Check_Success;

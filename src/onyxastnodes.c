@@ -41,6 +41,7 @@ static const char* ast_node_names[] = {
     "TYPE_ALIAS",
     "TYPE RAW ALIAS",
     "COMPOUND TYPE",
+    "TYPE OF",
     "TYPE_END (BAD)",
 
     "STRUCT MEMBER",

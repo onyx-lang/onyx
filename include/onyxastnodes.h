@@ -66,6 +66,7 @@
     NODE(TypeAlias)            \
     NODE(TypeRawAlias)         \
     NODE(CompoundType)         \
+    NODE(TypeOf)               \
                                \
     NODE(Binding)              \
     NODE(Alias)                \
@@ -144,6 +145,7 @@ typedef enum AstKind {
     Ast_Kind_Type_Alias,
     Ast_Kind_Type_Raw_Alias,
     Ast_Kind_Type_Compound,
+    Ast_Kind_Typeof,
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
@@ -252,6 +254,9 @@ typedef enum AstFlags {
     Ast_Flag_Has_Been_Checked      = BH_BIT(27),
 
     Ast_Flag_Static_If_Resolved    = BH_BIT(28),
+
+    // :TEMPORARY
+    Ast_Flag_Params_Introduced     = BH_BIT(29),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -807,6 +812,12 @@ struct AstCompoundType {
     AstType_base;
 
     bh_arr(AstType *) types;
+};
+struct AstTypeOf {
+    AstType_base;
+
+    AstTyped* expr;
+    Type* resolved_type;
 };
 
 // Top level nodes
