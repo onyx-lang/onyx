@@ -361,7 +361,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
             }
 
             resolve_expression_type((*value));
-            promote_numlit_to_larger((AstNumLit *) (*value));
+            // promote_numlit_to_larger((AstNumLit *) (*value));
 
             if (add_case_to_switch_statement(switchnode, ((AstNumLit *) (*value))->value.l, sc->block, sc->block->token->pos))
                 return Check_Error;
@@ -1581,6 +1581,7 @@ CheckStatus check_method_call(AstBinaryOp** mcall) {
 
 CheckStatus check_size_of(AstSizeOf* so) {
     fill_in_array_count(so->so_ast_type);
+    CHECK(type, so->so_ast_type);
 
     so->so_type = type_build_from_ast(context.ast_alloc, so->so_ast_type);
     if (so->so_type == NULL) return Check_Yield_Macro;
@@ -1592,6 +1593,7 @@ CheckStatus check_size_of(AstSizeOf* so) {
 
 CheckStatus check_align_of(AstAlignOf* ao) {
     fill_in_array_count(ao->ao_ast_type);
+    CHECK(type, ao->ao_ast_type);
 
     ao->ao_type = type_build_from_ast(context.ast_alloc, ao->ao_ast_type);
     if (ao->ao_type == NULL) return Check_Yield_Macro;
@@ -1966,6 +1968,10 @@ CheckStatus check_struct(AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types) return Check_Yield_Macro;
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
+        if ((*smem)->type_node != NULL) {
+            CHECK(type, (*smem)->type_node);
+        }
+
         if ((*smem)->type_node == NULL && (*smem)->initial_value != NULL) {
             CHECK(expression, &(*smem)->initial_value);
 
@@ -2122,6 +2128,7 @@ CheckStatus check_function_header(AstFunction* func) {
 }
 
 CheckStatus check_memres_type(AstMemRes* memres) {
+    CHECK(type, memres->type_node);
     fill_in_type((AstTyped *) memres);
     if (memres->type_node && !memres->type) return Check_Yield_Macro;
     return Check_Success;
@@ -2159,6 +2166,8 @@ CheckStatus check_memres(AstMemRes* memres) {
 }
 
 CheckStatus check_type(AstType* type) {
+    if (type == NULL) return Check_Success;
+    
     while (type->kind == Ast_Kind_Type_Alias)
         type = ((AstTypeAlias *) type)->to;
 

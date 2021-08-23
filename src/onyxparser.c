@@ -62,6 +62,7 @@ static AstStructType* parse_struct(OnyxParser* parser);
 static void           parse_function_params(OnyxParser* parser, AstFunction* func);
 static b32            parse_possible_directive(OnyxParser* parser, const char* dir);
 static b32            parse_possible_function_definition(OnyxParser* parser, AstTyped** ret);
+static b32            parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret);
 static AstFunction*   parse_function_definition(OnyxParser* parser, OnyxToken* token);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
@@ -315,6 +316,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
     switch ((u16) parser->curr->type) {
         case '(': {
             if (parse_possible_function_definition(parser, &retval)) break;
+            if (parse_possible_quick_function_definition(parser, &retval)) break;
 
             consume_token(parser);
             retval = parse_compound_expression(parser, 0);
@@ -2113,16 +2115,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 }
 
 static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret) {
-    #if 0
-    if (parser->curr->type == Token_Type_Keyword_Proc) {
-        OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
-        onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
-        AstFunction* func_node = parse_function_definition(parser, proc_token);
-        *ret = (AstTyped *) func_node;
-        return 1;
-    }
-    #endif
-
     if (parser->curr->type == '(') {
         OnyxToken* matching_paren = find_matching_paren(parser->curr);
         if (matching_paren == NULL) return 0;
@@ -2154,6 +2146,122 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
     }
 
     return 0;
+}
+
+static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret) {
+    if (parser->curr->type != '(') return 0;
+
+    OnyxToken* matching_paren = find_matching_paren(parser->curr);
+    if (matching_paren == NULL) return 0;
+
+    // :LinearTokenDependent
+    OnyxToken* token_after_paren = matching_paren + 1;
+    if (token_after_paren->type != '=' || (token_after_paren + 1)->type != '>')
+        return 0;
+
+    OnyxToken* proc_token = expect_token(parser, '(');
+
+    bh_arr(OnyxToken*) params=NULL;
+    bh_arr_new(global_heap_allocator, params, 4);
+
+    while (parser->curr->type != ')') {
+        if (parser->hit_unexpected_token) return 0;
+
+        bh_arr_push(params, expect_token(parser, Token_Type_Symbol));
+
+        if (parser->curr->type != ')') {
+            expect_token(parser, ',');
+        }
+    }
+
+    expect_token(parser, ')');
+    expect_token(parser, '=');
+    expect_token(parser, '>');
+
+    bh_arr(AstNode*) poly_params=NULL;
+    bh_arr_new(global_heap_allocator, poly_params, bh_arr_length(params));
+    bh_arr_each(OnyxToken*, param, params) {
+        char text[512];
+        memset(text, 0, 512);
+        strncat(text, "__type_", 511);
+        token_toggle_end(*param);
+        strncat(text, (*param)->text, 511);
+        token_toggle_end(*param);
+
+        OnyxToken* new_token = bh_alloc(parser->allocator, sizeof(OnyxToken));
+        new_token->type = Token_Type_Symbol;
+        new_token->length = 7 + (*param)->length;
+        new_token->text = bh_strdup(parser->allocator, text);
+        new_token->pos = (*param)->pos;
+
+        AstNode* type_node = make_symbol(parser->allocator, new_token);
+        bh_arr_push(poly_params, type_node);
+    }
+
+    AstFunction* func_node = make_node(AstFunction, Ast_Kind_Function);
+    AstPolyProc* poly_proc = make_node(AstPolyProc, Ast_Kind_Polymorphic_Proc);
+
+    bh_arr_new(global_heap_allocator, func_node->params, bh_arr_length(params));
+    fori (i, 0, bh_arr_length(params)) {
+        AstLocal* param_local = make_local(parser->allocator, params[i], (AstType *) poly_params[i]);
+        param_local->kind = Ast_Kind_Param;
+
+        bh_arr_push(func_node->params, ((AstParam) {
+            .local = param_local,
+            .default_value = NULL,
+
+            .vararg_kind = 0,
+            .use_processed = 0,
+        }));
+    }
+
+    AstBlock* body_block;
+    AstType*  return_type;
+
+    if (parser->curr->type == '{') {
+        body_block = parse_block(parser, 1);
+        return_type = (AstType *) &basic_type_void;
+
+    } else {
+        AstTyped* body = parse_expression(parser, 0);
+
+        AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
+        return_node->token = body->token;
+        return_node->expr = body;
+
+        body_block = make_node(AstBlock, Ast_Kind_Block);
+        body_block->token = body->token;
+        body_block->body = (AstNode *) return_node;
+
+        AstTypeOf* return_type_of = make_node(AstTypeOf, Ast_Kind_Typeof);
+        return_type_of->token = body->token;
+        return_type_of->expr = body;
+        return_type = (AstType *) return_type_of;
+    }
+
+    func_node->token = proc_token;
+    func_node->body = body_block;
+    func_node->return_type = (AstType *) return_type;
+
+    poly_proc->token = proc_token;
+    bh_arr_new(global_heap_allocator, poly_proc->poly_params, bh_arr_length(params));
+    fori (i, 0, bh_arr_length(params)) {
+        bh_arr_push(poly_proc->poly_params, ((AstPolyParam) {
+            .kind = PSK_Type,
+            .idx  = i,
+            .poly_sym = poly_params[i],
+            .type_expr = (AstType *) poly_params[i],
+            .type = NULL,
+        }));
+    }
+    poly_proc->base_func = func_node;
+
+    ENTITY_SUBMIT(poly_proc);
+    *ret = (AstTyped *) poly_proc;
+
+    bh_arr_free(params);
+    bh_arr_free(poly_params);
+    return 1;
 }
 
 static AstTyped* parse_global_declaration(OnyxParser* parser) {
