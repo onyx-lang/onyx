@@ -129,7 +129,7 @@ Language Cohesion:
         if val.Property2 { ... }
         ```
 
-    [X] #solidify polymoprhic procedures.
+    [X] #solidify polymorphic procedures.
 
 API Expansion:
     There are many different places where the standard API for WASI and JS

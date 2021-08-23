@@ -180,6 +180,11 @@ open :: (path: str, mode := OpenMode.Read) -> (Error, FileStream) {
     return .None, fs;
 }
 
+close :: (file: ^FileStream) {
+    file_close(file.file);
+    file.stream.vtable = null;
+}
+
 #private
 file_stream_vtable := Stream_Vtable.{
     seek = (use fs: ^FileStream, to: i32, whence: SeekFrom) -> Error {

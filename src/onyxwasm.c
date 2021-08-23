@@ -2623,6 +2623,9 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_File_Contents: {
             AstFileContents* fc = (AstFileContents *) expr;
 
+            assert(fc->addr > 0);
+            assert(fc->size > 0);
+
             WID(WI_PTR_CONST, fc->addr);
             WID(WI_I32_CONST, fc->size);
             break;

@@ -223,7 +223,7 @@ log :: (a: $T, base: $R) -> T {
 
 
 // These function are overloaded in order to use the builtin WASM intrinsics for the
-// operation first, and then default to a polymoprhic function that works on any type.
+// operation first, and then default to a polymorphic function that works on any type.
 // The clunky part about these at the moment is that, if you wanted to pass 'max' to
 // a procedure, you would have to pass 'max_poly' instead, because overloaded functions
 // are not resolved when used by value, i.e. foo : (f32, f32) -> f32 = math.max; Even if

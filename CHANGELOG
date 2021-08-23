@@ -51,7 +51,7 @@ Additions:
     it will work on many systems. ARM / PowerPC may not work correctly.
 * procedures can be polymorphic on an array size.
 * structures can be polymorphic on any compile-time known value.
-* procedures can be polymoprhic on any compile-time known value, including type expressions.
+* procedures can be polymorphic on any compile-time known value, including type expressions.
 * basics of operator overloading using `#operator +`.
 * multiple return values and multiple assignment / declarations.
 * #solidify directive for explicitly specifying type variables in polymorphic procs.
@@ -74,7 +74,7 @@ Changes:
     value, but one that was still computed at the assignment site. Now, they instead are used to
     declare top level expressions in the procedure scope. This means that things like structs and
     enums can be declared at any block scope. The top-level expressions currently do not have
-    access to polymoprhic variables in the procedure.
+    access to polymorphic variables in the procedure.
 * `#include_file` is now `#load` and `#include_folder` is now `#load_path`. I like the shorter names.
 * enum values are compile time known.
 * struct literals are compile time known can be used at top level scope.
@@ -176,7 +176,7 @@ Changes:
 Bug fixes:
 * many bugs related to var args and procedure calls in general.
 * polymorphic structs caused segmentation fault when trying to produce an error message.
-* polymorhpic structs caused scope to change when using a struct literal of a polymoprhic type.
+* polymorhpic structs caused scope to change when using a struct literal of a polymorphic type.
 * #char "\"" did not work.
 * nested function calls returning non-basic types would simply be wrong.
 * Recursive structs are no longer possible.

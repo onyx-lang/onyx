@@ -215,7 +215,7 @@ get_text_height  :: (text: str, size := DEFAULT_TEXT_SIZE) -> f32 {
 }
 
 @Relocate
-move_towards :: (value: ^$T, target: T, step: T) {
+move_towards :: macro (value: ^$T, target: T, step: T) {
     if *value < target do *value += step;
     if *value > target do *value -= step;
     if *value > target - step && *value < target + step do *value = target;

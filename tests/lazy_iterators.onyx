@@ -36,12 +36,19 @@ count_iterator :: (lo: i32, hi: i32, step := 1) -> Iterator(i32) {
 
 main :: (args: [] cstr) {
     // Hopefully soon, the following will be possible.
-    // iterator := count_iterator(1, 10)
-    //             |> iter.map(x => x * 2)
-    //             |> iter.filter(x => x > 10)
-    //             |> iter.map(x => x + 42)
-    //             |> iter.take(5)
-    //             |> iter.to_array();
+/*
+    quick_iterator :=
+                count_iterator(1, 10)
+                |> iter.map((x) => x * 2)
+                |> iter.filter((x) => x > 10)
+                |> iter.map((x) => x + 42)
+                |> iter.take(5)
+                |> iter.to_array();
+
+    for v: quick_iterator {
+        println(v);
+    }
+*/
 
     iterator := count_iterator(1, 10)
                 |> iter.map((x: i32) -> i32     { return x * 2; })

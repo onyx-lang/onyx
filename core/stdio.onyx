@@ -20,11 +20,11 @@ print :: #match {
         if x[x.count - 1] == #char "\n" && auto_flush_stdio do __flush_stdio();
     },
 
-    (x: $T)        { io.write(^stdio.print_writer, x); },
-    (x: $T, y: $R) { io.write(^stdio.print_writer, x, y); },
+    (x)    => { io.write(^stdio.print_writer, x); },
+    (x, y) => { io.write(^stdio.print_writer, x, y); },
 }
 
-println :: (x: $T) {
+println :: (x) => {
     print(x);
     print("\n");
 }

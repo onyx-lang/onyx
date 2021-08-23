@@ -246,6 +246,9 @@ void scope_clear(Scope* scope) {
 // Polymorphic Procedures
 //
 
+// HACK HACK HACK nocheckin
+static b32 flag_to_yield = 0;
+
 AstNode node_that_signals_a_yield = { 0 };
 
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
@@ -424,7 +427,7 @@ static void ensure_solidified_function_has_body(AstPolyProc* pp, AstSolidifiedFu
 }
 
 // NOTE: These are temporary data structures used to represent the pattern matching system
-// of polymoprhic type resolution.
+// of polymorphic type resolution.
 typedef struct PolySolveResult {
     PolySolutionKind kind;
     union {
@@ -444,7 +447,7 @@ typedef struct PolySolveElem {
 } PolySolveElem;
 
 // NOTE: The job of this function is to solve for the type/value that belongs in a
-// polymoprhic variable. This function takes in three arguments:
+// polymorphic variable. This function takes in three arguments:
 //  * The symbol node of the polymorphic parameter being searched for
 //  * The type expression that should contain the symbol node it is some where
 //  * The actual type to pattern match against
@@ -681,8 +684,6 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstPolyP
     *resolved = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
 }
 
-// HACK HACK HACK nocheckin
-static b32 flag_to_yield = 0;
 
 // NOTE: The job of this function is to look through the arguments provided and find a matching
 // value that is to be baked into the polymorphic procedures poly-scope. It expected that param
@@ -775,7 +776,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
         }
         if (already_solved) continue;
 
-        // NOTE: Solve for the polymoprhic parameter's value
+        // NOTE: Solve for the polymorphic parameter's value
         PolySolveResult resolved = { PSK_Undefined };
         switch (param->kind) {
             case PPK_Poly_Type:   solve_for_polymorphic_param_type (&resolved, pp, param, pp_lookup, actual, err_msg); break;
@@ -792,7 +793,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
                 // resolution was unsuccessful, provide a basic dummy one.
                 if (err_msg && *err_msg == NULL)
                     *err_msg = bh_aprintf(global_scratch_allocator,
-                        "Unable to solve for polymoprhic variable '%b'.",
+                        "Unable to solve for polymorphic variable '%b'.",
                         param->poly_sym->token->text,
                         param->poly_sym->token->length);
 
@@ -824,8 +825,8 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
 }
 
 // NOTE: The job of this function is to be a wrapper to other functions, providing an error
-// message if a solution could not be found. This can't be merged with polymoprhic_proc_solidify
-// because polymoprhic_proc_try_solidify uses the aforementioned function.
+// message if a solution could not be found. This can't be merged with polymorphic_proc_solidify
+// because polymorphic_proc_try_solidify uses the aforementioned function.
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn) {
     ensure_polyproc_cache_is_created(pp);
 
