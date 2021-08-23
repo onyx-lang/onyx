@@ -402,19 +402,24 @@ count_where :: #match {
     },
 }
 
-#private_file
-fold_idx_elem :: (arr: ^$T, count: i32, cmp: (T, T) -> bool) -> (i32, T) {
-    idx  := 0;
-    elem := arr[0];
-    
-    for i: 1 .. count {
-        if cmp(arr[i], elem) {
-            idx  = i;
-            elem = arr[i];
+fold_idx_elem :: #match {
+    (arr: ^[..] $T, cmp: (T, T) -> bool) -> (i32, T) {
+        return fold_idx_elem(arr.data, arr.count, cmp);
+    },
+
+    (arr: ^$T, count: i32, cmp: (T, T) -> bool) -> (i32, T) {
+        idx  := 0;
+        elem := arr[0];
+        
+        for i: 1 .. count {
+            if cmp(arr[i], elem) {
+                idx  = i;
+                elem = arr[i];
+            }
         }
-    }
-    
-    return idx, elem;
+        
+        return idx, elem;
+    },
 }
 
 #private_file cmp_greater :: (x: $T, y: T) -> bool do return x > y;

@@ -6,7 +6,7 @@ Stream :: struct {
     vtable : ^Stream_Vtable;
 }
 
-#private
+// #private
 Stream_Vtable :: struct {
     seek         : (s: ^Stream, to: i32, whence: SeekFrom) -> Error;
     tell         : (s: ^Stream) -> (Error, u32);

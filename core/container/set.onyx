@@ -57,6 +57,11 @@ has :: (use set: ^Set($T), value: T) -> bool {
     return lr.entry_index >= 0;
 }
 
+get :: (use set: ^Set($T), value: T) -> T {
+    lr := lookup(set, value);
+    return entries[lr.entry_index].value if lr.entry_index >= 0 else __zero_value(T);
+}
+
 remove :: (use set: ^Set($T), value: T) {
     lr := lookup(set, value);
     if lr.entry_index < 0 do return;
