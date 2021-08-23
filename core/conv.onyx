@@ -577,7 +577,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                         case #default do assert(false, "Bad enum backing type");
                     }
 
-                    {
+                    if !e.is_flags {
                         for ^member: e.members {
                             if value == member.value {
                                 output->write(member.name);
@@ -586,6 +586,20 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                         }
 
                         output->write("UNKNOWN");
+
+                    } else {
+                        first := true;
+                        for ^member: e.members {
+                            if value & member.value != 0 {
+                                if !first do output->write(" | ");
+                                output->write(member.name);
+                                first = false;
+                            }
+                        }
+
+                        if first {
+                            output->write("None");
+                        }
                     }
                 }
             }
