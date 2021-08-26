@@ -11,6 +11,24 @@
     if (cs > Check_Errors_Start) return cs; \
     } while (0)
 
+#define YIELD(loc, msg) do { \
+    if (context.cycle_detected) { \
+        onyx_report_error(loc, msg); \
+        return Check_Error; \
+    } else { \
+        return Check_Yield_Macro; \
+    } \
+    } while (0)
+
+#define YIELD_(loc, msg, ...) do { \
+    if (context.cycle_detected) { \
+        onyx_report_error(loc, msg, __VA_ARGS__); \
+        return Check_Error; \
+    } else { \
+        return Check_Yield_Macro; \
+    } \
+    } while (0)
+
 typedef enum CheckStatus {
     Check_Success,  // The node was successfully checked with out errors
     Check_Complete, // The node is done processing
@@ -116,7 +134,8 @@ CheckStatus check_return(AstReturn* retnode) {
 
         if (*expected_return_type == &type_auto_return) {
             resolve_expression_type(retnode->expr);
-            if (retnode->expr->type == NULL) return Check_Yield_Macro;
+            if (retnode->expr->type == NULL)
+                YIELD(retnode->token->pos, "Trying to determine automatic return type.");
 
             *expected_return_type = retnode->expr->type;
             return Check_Success;
@@ -152,7 +171,7 @@ CheckStatus check_if(AstIfWhile* ifnode) {
 
     if (ifnode->kind == Ast_Kind_Static_If) {
         if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
-            return Check_Yield_Macro;
+            YIELD(ifnode->token->pos, "Waiting for static if to be resolved.");
         }
 
         if (static_if_resolution(ifnode)) {
@@ -442,7 +461,7 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
                 return Check_Error;
 
             } else {
-                return Check_Yield_Macro;
+                YIELD(call->token->pos, "Waiting for overloaded function option to pass type-checking.");
             }
         }
 
@@ -459,16 +478,20 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
         call->callee = callee;
 
         AstTyped* new_callee = (AstTyped *) macro_resolve_header((AstMacro *) callee, &call->args, call->token);
-        if (new_callee == (AstTyped *) &node_that_signals_a_yield) return Check_Yield_Macro;
         if (new_callee == NULL) return Check_Error;
+        if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
+            YIELD(call->token->pos, "Waiting for macro header to pass type-checking.");
+        }
 
         arguments_remove_baked(&call->args);
         callee = new_callee;
 
     } else if (callee->kind == Ast_Kind_Polymorphic_Proc) {
         AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) callee, PPLM_By_Arguments, &call->args, call->token);
-        if (new_callee == (AstTyped *) &node_that_signals_a_yield) return Check_Yield_Macro;
         if (new_callee == NULL) return Check_Error;
+        if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
+            YIELD(call->token->pos, "Waiting for polymorphic procedure header to pass type-checking.");
+        }
 
         arguments_remove_baked(&call->args);
         callee = new_callee;
@@ -478,7 +501,9 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
 
     // NOTE: Build callee's type
     fill_in_type((AstTyped *) callee);
-    if (callee->type == NULL) return Check_Yield_Macro;
+    if (callee->type == NULL) {
+        YIELD(call->token->pos, "Trying to resolve function type for callee.");
+    }
 
     if (callee->type->kind != Type_Kind_Function) {
         onyx_report_error(call->token->pos,
@@ -608,7 +633,9 @@ CheckStatus check_call(AstCall** pcall) {
 
     call->va_kind = VA_Kind_Not_VA;
     call->type = callee->type->Function.return_type;
-    if (call->type == &type_auto_return) return Check_Yield_Macro;
+    if (call->type == &type_auto_return) {
+        YIELD(call->token->pos, "Waiting for auto-return type to be solved.");
+    }
 
     Type **formal_params = callee->type->Function.params;
 
@@ -766,7 +793,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp* binop) {
                     return Check_Error;
 
                 } else {
-                    return Check_Yield_Macro;
+                    YIELD(binop->token->pos, "Trying to resolve try of right hand side.");
                 }
             }
 
@@ -824,7 +851,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp* binop) {
 
     if (binop->right->type == NULL) {
         if (binop->right->entity != NULL && binop->right->entity->state <= Entity_State_Check_Types) {
-            return Check_Yield_Macro;
+            YIELD(binop->token->pos, "Trying to resolve type of right hand side.");
         }
     }
 
@@ -1026,7 +1053,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)
-            return Check_Yield_Macro;
+            YIELD(binop->token->pos, "Trying to resolve operator overload.");
 
         if (implicit_call != NULL) {
             // NOTE: Not a binary op
@@ -1125,7 +1152,8 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
 
     if (unaryop->operation == Unary_Op_Cast) {
         char* err;
-        if (unaryop->type == NULL) return Check_Yield_Macro;
+        if (unaryop->type == NULL)
+            YIELD(unaryop->token->pos, "Trying to resolve destination type for cast.");
 
         if (!cast_is_legal(unaryop->expr->type, unaryop->type, &err)) {
             onyx_report_error(unaryop->token->pos, "Cast Error: %s", err);
@@ -1176,7 +1204,8 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         }
 
         fill_in_type((AstTyped *) sl);
-        if (sl->type == NULL) return Check_Yield_Macro;
+        if (sl->type == NULL)
+            YIELD(sl->token->pos, "Trying to resolve type of struct literal.");
     }
 
     if (!type_is_structlike_strict(sl->type)) {
@@ -1222,20 +1251,20 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     sl->flags |= Ast_Flag_Comptime;
 
     fori (i, 0, mem_count) {
+        // NOTE: Not checking the return on this function because
+        // this for loop is bounded by the number of members in the
+        // type.
+        type_lookup_member_by_idx(sl->type, i, &smem);
+        Type* formal = smem.type;
+
         CHECK(expression, actual);
 
         // HACK HACK HACK
         if ((*actual)->type == NULL &&
             (*actual)->entity != NULL &&
             (*actual)->entity->state <= Entity_State_Check_Types) {
-            return Check_Yield_Macro;
+            YIELD_((*actual)->token->pos, "Trying to resolve type of expression for member '%s'.", smem.name);
         }
-
-        // NOTE: Not checking the return on this function because
-        // this for loop is bounded by the number of members in the
-        // type.
-        type_lookup_member_by_idx(sl->type, i, &smem);
-        Type* formal = smem.type;
 
         if (!type_check_or_auto_cast(actual, formal)) {
             onyx_report_error(sl->token->pos,
@@ -1265,7 +1294,8 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
         }
 
         fill_in_type((AstTyped *) al);
-        if (al->type == NULL) return Check_Yield_Macro;
+        if (al->type == NULL)
+            YIELD(al->token->pos, "Trying to resolve type of array literal.");
 
         al->type = type_make_array(context.ast_alloc, al->type, bh_arr_length(al->values));
         if (al->type == NULL || al->type->kind != Type_Kind_Array) {
@@ -1292,7 +1322,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
         if ((*expr)->type == NULL &&
             (*expr)->entity != NULL &&
             (*expr)->entity->state <= Entity_State_Check_Types) {
-            return Check_Yield_Macro;
+            YIELD_(al->token->pos, "Trying to resolve type of %d%s element of array literal.", expr - al->values, bh_num_suffix(expr - al->values));
         }
 
         al->flags &= ((*expr)->flags & Ast_Flag_Comptime) | (al->flags &~ Ast_Flag_Comptime);
@@ -1377,7 +1407,7 @@ CheckStatus check_if_expression(AstIfExpression* if_expr) {
 CheckStatus check_address_of(AstAddressOf* aof) {
     CHECK(expression, &aof->expr);
     if (aof->expr->type == NULL) {
-        return Check_Yield_Macro;
+        YIELD(aof->token->pos, "Trying to resolve type of expression to take a reference.");
     }
 
     if ((aof->expr->kind != Ast_Kind_Subscript
@@ -1428,7 +1458,7 @@ CheckStatus check_subscript(AstSubscript** psub) {
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)
-            return Check_Yield_Macro;
+            YIELD(sub->token->pos, "Trying to resolve operator overload.");
 
         if (implicit_call != NULL) {
             // NOTE: Not an array access
@@ -1510,7 +1540,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     CHECK(expression, &field->expr);
     if (field->expr->type == NULL) {
         // onyx_report_error(field->token->pos, "Unable to deduce type of expression for accessing field.");
-        return Check_Yield_Macro;
+        YIELD(field->token->pos, "Trying to resolve type of source expression.");
     }
 
     if (!type_is_structlike(field->expr->type)) {
@@ -1562,7 +1592,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
 CheckStatus check_method_call(AstBinaryOp** mcall) {
     CHECK(expression, &(*mcall)->left);
     if ((*mcall)->left->type == NULL) {
-        return Check_Yield_Macro;
+        YIELD((*mcall)->token->pos, "Trying to resolve type of left hand side.");
     }
 
     AstTyped* implicit_argument = (*mcall)->left;
@@ -1598,7 +1628,8 @@ CheckStatus check_size_of(AstSizeOf* so) {
     CHECK(type, so->so_ast_type);
 
     so->so_type = type_build_from_ast(context.ast_alloc, so->so_ast_type);
-    if (so->so_type == NULL) return Check_Yield_Macro;
+    if (so->so_type == NULL)
+        YIELD(so->token->pos, "Trying to resolve type to take the size of.");
 
     so->size = type_size_of(so->so_type);
 
@@ -1610,7 +1641,8 @@ CheckStatus check_align_of(AstAlignOf* ao) {
     CHECK(type, ao->ao_ast_type);
 
     ao->ao_type = type_build_from_ast(context.ast_alloc, ao->ao_ast_type);
-    if (ao->ao_type == NULL) return Check_Yield_Macro;
+    if (ao->ao_type == NULL)
+        YIELD(ao->token->pos, "Trying to resolve type to take the alignment of.");
 
     ao->alignment = type_alignment_of(ao->ao_type);
 
@@ -1628,7 +1660,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         }
 
         if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
-            return Check_Yield_Macro;
+            YIELD(expr->token->pos, "Trying to construct type.");
         }
 
         expr->type = &basic_types[Basic_Kind_Type_Index];
@@ -1714,7 +1746,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
             //         break;
             //     }
             // }
-            if (expr->type == NULL) return Check_Yield_Macro;
+            if (expr->type == NULL)
+                YIELD(expr->token->pos, "Waiting for function type to be resolved.");
 
             expr->flags |= Ast_Flag_Function_Used;
             break;
@@ -1804,7 +1837,8 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
             return Check_Error;
         }
 
-        return Check_Yield_Macro;
+        // Bad wording for the message.
+        YIELD(insert->token->pos, "Waiting for resolution to code expression type.");
     }
 
     Type* code_type = type_build_from_ast(context.ast_alloc, builtin_code_type);
@@ -1874,8 +1908,8 @@ CheckStatus check_statement(AstNode** pstmt) {
                     onyx_report_error(stmt->token->pos, "Local's type is not a type.");
                     return Check_Error;
                 }
-                
-                return Check_Yield_Macro;
+
+                YIELD(typed_stmt->token->pos, "Waiting for local variable's type.");
             }
             return Check_Success;
         }
@@ -1926,7 +1960,8 @@ CheckStatus check_block(AstBlock* block) {
 
 CheckStatus check_function(AstFunction* func) {
     if (func->flags & Ast_Flag_Already_Checked) return Check_Success;
-    if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen) return Check_Yield_Macro;
+    if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
+        YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
     
     expected_return_type = &func->type->Function.return_type;
     if (func->body) {
@@ -1978,11 +2013,12 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
     bh_imap_free(&all_overloads);
 
     if (done) return Check_Success;
-    else      return Check_Yield_Macro;
+    else      YIELD(func->token->pos, "Waiting for all options to pass type-checking.");
 }
 
 CheckStatus check_struct(AstStructType* s_node) {
-    if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types) return Check_Yield_Macro;
+    if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
+        YIELD(s_node->token->pos, "Waiting for struct member definitions to pass symbol resolution.");
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
@@ -1993,7 +2029,8 @@ CheckStatus check_struct(AstStructType* s_node) {
             CHECK(expression, &(*smem)->initial_value);
 
             fill_in_type((*smem)->initial_value);
-            if ((*smem)->initial_value->type == NULL) return Check_Yield_Macro;
+            if ((*smem)->initial_value->type == NULL)
+                YIELD((*smem)->initial_value->token->pos, "Trying to resolve type for initial value for member.");
 
             resolve_expression_type((*smem)->initial_value);
             if ((*smem)->type == NULL) (*smem)->type = (*smem)->initial_value->type;
@@ -2007,7 +2044,8 @@ CheckStatus check_struct(AstStructType* s_node) {
 
     // NOTE: fills in the stcache
     type_build_from_ast(context.ast_alloc, (AstType *) s_node);
-    if (s_node->stcache == NULL || !s_node->stcache_is_valid) return Check_Yield_Macro;
+    if (s_node->stcache == NULL || !s_node->stcache_is_valid)
+        YIELD(s_node->token->pos, "Waiting for type to be constructed.");
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->type->kind == Type_Kind_Compound) {
@@ -2020,7 +2058,8 @@ CheckStatus check_struct(AstStructType* s_node) {
 }
 
 CheckStatus check_struct_defaults(AstStructType* s_node) {
-    if (s_node->entity_type && s_node->entity_type->state < Entity_State_Code_Gen) return Check_Yield_Macro;
+    if (s_node->entity_type && s_node->entity_type->state < Entity_State_Code_Gen)
+        YIELD(s_node->token->pos, "Waiting for struct type to be constructed before checking defaulted members.");
 
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->initial_value && *(*smem)->initial_value) {
@@ -2042,7 +2081,8 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 }
 
 CheckStatus check_function_header(AstFunction* func) {
-    if (func->entity_body && func->entity_body->state < Entity_State_Check_Types) return Check_Yield_Macro;
+    if (func->entity_body && func->entity_body->state < Entity_State_Check_Types)
+        YIELD(func->token->pos, "Waiting for function header to complete symbol resolution");
 
     b32 expect_default_param = 0;
     b32 has_had_varargs = 0;
@@ -2105,7 +2145,7 @@ CheckStatus check_function_header(AstFunction* func) {
             //         "Unable to resolve type for parameter, '%b'",
             //         local->token->text,
             //         local->token->length);
-            return Check_Yield_Macro;
+            YIELD(local->token->pos, "Waiting for parameter type to be known.");
         }
 
         if (local->type->kind == Type_Kind_Compound) {
@@ -2139,7 +2179,7 @@ CheckStatus check_function_header(AstFunction* func) {
     if (func->return_type != NULL) CHECK(type, func->return_type);
 
     func->type = type_build_function_type(context.ast_alloc, func);
-    if (func->type == NULL) return Check_Yield_Macro;
+    if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
 
     return Check_Success;
 }
@@ -2147,7 +2187,7 @@ CheckStatus check_function_header(AstFunction* func) {
 CheckStatus check_memres_type(AstMemRes* memres) {
     CHECK(type, memres->type_node);
     fill_in_type((AstTyped *) memres);
-    if (memres->type_node && !memres->type) return Check_Yield_Macro;
+    if (memres->type_node && !memres->type) YIELD(memres->token->pos, "Waiting for global type to be constructed.");
     return Check_Success;
 }
 
@@ -2173,7 +2213,7 @@ CheckStatus check_memres(AstMemRes* memres) {
 
         } else {
             if (memres->initial_value->type == NULL && memres->initial_value->entity != NULL && memres->initial_value->entity->state <= Entity_State_Check_Types) {
-                return Check_Yield_Macro;
+                YIELD(memres->token->pos, "Waiting for global type to be constructed.");
             }
             memres->type = memres->initial_value->type;
         }
@@ -2208,7 +2248,7 @@ CheckStatus check_type(AstType* type) {
             resolve_expression_type(type_of->expr);
 
             if (type_of->expr->type == NULL) {
-                return Check_Yield_Macro;
+                YIELD(type_of->token->pos, "Trying to check type for type-of expression.");
             }
 
             type_of->resolved_type = type_of->expr->type;
@@ -2288,7 +2328,8 @@ CheckStatus check_static_if(AstIf* static_if) {
 CheckStatus check_process_directive(AstNode* directive) {
     if (directive->kind == Ast_Kind_Directive_Export) {
         AstTyped* export = ((AstDirectiveExport *) directive)->export;
-        if (export->entity && export->entity->state <= Entity_State_Check_Types) return Check_Yield_Macro;
+        if (export->entity && export->entity->state <= Entity_State_Check_Types)
+            YIELD(directive->token->pos, "Waiting for export type to be known.");
     }
 
     return Check_Success;

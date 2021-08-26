@@ -197,6 +197,22 @@ pow :: #match {
     }
 }
 
+power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
+    t: u64 = 1;
+    e: u64 = ~~exp;
+    b: u64 = ~~base;
+    m: u64 = ~~mod;
+
+    while e > 0 {
+        if e % 2 != 0 do t = (t * b) % m;
+
+        b = (b * b) % m;
+        e /= 2;
+    }
+
+    return ~~(t % m);
+}
+
 ln :: (a: f32) -> f32 {
     // FIX: This is probably not the most numerically stable solution.
     if a < 1 {

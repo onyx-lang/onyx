@@ -232,3 +232,5 @@ init :: () {
     heap_allocator.data = ^heap_state;
     heap_allocator.func = heap_alloc_proc;
 }
+
+get_watermark :: () => cast(u32) heap_state.next_alloc;

@@ -71,6 +71,8 @@ read_byte :: (use reader: ^String_Reader) -> u8 {
     return data[0];
 }
 
+peek_byte :: (use reader: ^String_Reader) -> u8 do return data[0];
+
 read_bytes :: (use reader: ^String_Reader, byte_count := 1) -> str {
     bc := byte_count;
     if count < bc do bc = count;
@@ -131,13 +133,14 @@ read_until :: (use reader: ^String_Reader, skip: u32, uptos: ..u8) -> str {
 }
 
 // Reads a continuous string of alphabetic chars along with underscores '_'
-read_word :: (use reader: ^String_Reader) -> str {
+read_word :: (use reader: ^String_Reader, numeric_allowed := false) -> str {
     if count == 0 do return str.{ null, 0 };
 
     out := str.{ data, 0 };
     for ch: *(cast(^str) reader) {
         if     (ch >= #char "a" && ch <= #char "z")
             || (ch >= #char "A" && ch <= #char "Z")
+            || (numeric_allowed && (ch >= #char "0" && ch <= #char "9"))
             || ch == #char "_" {
             out.count += 1;            
         }

@@ -22,6 +22,10 @@ reader_from_string :: (s: str) -> (Reader, ^StringStream) {
     return Reader.{ stream_ptr }, stream_ptr;
 }
 
+reader_empty :: (use reader: ^Reader) -> bool {
+    return stream_end_of_file(stream);
+}
+
 read_byte :: (use reader: ^Reader) -> u8 {
     err, byte := stream_read_byte(stream);
     return byte;
@@ -38,6 +42,60 @@ read_bytes :: #match {
         err, bytes_read := stream_read(stream, bytes);
         return bytes;
     }
+}
+
+read_i32 :: (use reader: ^Reader) -> i32 {
+    n: i32 = 0;
+
+    skip_whitespace(reader);
+
+    is_negative := false;
+    err, curr := stream_peek_byte(stream);
+    if curr == #char "-" {
+        is_negative = true;
+        err, curr = stream_read_byte(stream);
+        err, curr = stream_peek_byte(stream);
+    }
+
+    while curr >= #char "0" && curr <= #char "9" {
+        err, curr = stream_read_byte(stream);
+
+        n *= 10;
+        n += cast(u32) (curr - #char "0"); 
+
+        err, curr = stream_peek_byte(stream);
+        if err == Error.EOF do break;
+    }
+
+    if is_negative do n = -n;
+    return n;
+}
+
+read_i64 :: (use reader: ^Reader) -> i64 {
+    n: i64 = 0;
+
+    skip_whitespace(reader);
+
+    is_negative := false;
+    err, curr := stream_peek_byte(stream);
+    if curr == #char "-" {
+        is_negative = true;
+        err, curr = stream_read_byte(stream);
+        err, curr = stream_peek_byte(stream);
+    }
+
+    while curr >= #char "0" && curr <= #char "9" {
+        err, curr = stream_read_byte(stream);
+
+        n *= 10;
+        n += cast(u64) (curr - #char "0"); 
+
+        err, curr = stream_peek_byte(stream);
+        if err == Error.EOF do break;
+    }
+
+    if is_negative do n = -n;
+    return n;
 }
 
 read_u32 :: (use reader: ^Reader) -> u32 {

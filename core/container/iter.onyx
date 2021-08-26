@@ -67,6 +67,12 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
     };
 }
 
+take_one :: (it: Iterator($T)) -> (T, bool) {
+    ret, cont := it.next(it.data);
+    if !cont do it.close(it.data);
+    return ret, cont;
+}
+
 take :: (it: Iterator($T), count: u32) -> Iterator(T) {
     TakeIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);

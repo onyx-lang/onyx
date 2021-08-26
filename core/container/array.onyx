@@ -389,15 +389,19 @@ first :: #match {
 }
 
 count_where :: #match {
-    (arr: ^[..] $T, predicate: (T) -> bool) -> u32 {
+    (arr: ^[..] $T, predicate: $Pred) -> u32 {
+        return count_where((#type [] T).{ arr.data, arr.count }, predicate);
+    },
+
+    (arr: [] $T, predicate: (T) -> bool) -> u32 {
         count: u32 = 0;
-        for ^it: *arr do if predicate(*it) do count += 1;
+        for ^it: arr do if predicate(*it) do count += 1;
         return count;
     },
 
-    (arr: ^[..] $T, predicate: (^T) -> bool) -> u32 {
+    (arr: [] $T, predicate: (^T) -> bool) -> u32 {
         count: u32 = 0;
-        for ^it: *arr do if predicate(it) do count += 1;
+        for ^it: arr do if predicate(it) do count += 1;
         return count;
     },
 }

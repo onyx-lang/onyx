@@ -2066,8 +2066,13 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     parser->polymorph_context.poly_params = NULL;
 
     func_def->return_type = (AstType *) &basic_type_void;
-    if (consume_token_if_next(parser, Token_Type_Right_Arrow))
-        func_def->return_type = parse_type(parser);
+    if (consume_token_if_next(parser, Token_Type_Right_Arrow)) {
+        if (parse_possible_directive(parser, "auto")) {
+            func_def->return_type = (AstType *) &basic_type_auto_return;
+        } else {
+            func_def->return_type = parse_type(parser);
+        }
+    }
 
     while (parser->curr->type == '#') {
         if (parse_possible_directive(parser, "intrinsic")) {

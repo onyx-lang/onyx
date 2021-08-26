@@ -403,6 +403,23 @@ static void output_dummy_progress_bar() {
 }
 #endif
 
+static void dump_cycles() {
+    context.cycle_detected = 1;
+    Entity* ent;
+
+    onyx_report_error((OnyxFilePos) { 0 }, "Cycle detected. Dumping all stuck processing units.");
+
+    while (1) {
+        ent = entity_heap_top(&context.entities);
+        entity_heap_remove_top(&context.entities);
+        if (ent->state < Entity_State_Code_Gen) process_entity(ent);
+
+        if (bh_arr_length(context.entities.entities) == 0) {
+            break;
+        }
+    }
+}
+
 static i32 onyx_compile() {
     u64 start_time = bh_time_curr();
 
@@ -440,12 +457,20 @@ static i32 onyx_compile() {
         // before the "key" node that will unblock the progress. This means a more sophisticated
         // cycle detection algorithm must be used.
         //
-        static Entity* first_no_change = NULL;
+        static Entity* watermarked_node = NULL;
         if (!changed) {
-            if (!first_no_change) first_no_change = ent;
-            else if (first_no_change == ent) context.cycle_detected = 1;
+            if (!watermarked_node) {
+                watermarked_node = ent;
+            }
+            else if (watermarked_node == ent) {
+                entity_heap_insert_existing(&context.entities, ent);
+                dump_cycles();
+            }
+            else if (watermarked_node->macro_attempts < ent->macro_attempts) {
+                watermarked_node = ent;
+            }
         } else {
-            first_no_change = NULL;
+            watermarked_node = NULL;
         }
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;

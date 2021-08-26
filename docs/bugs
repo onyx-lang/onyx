@@ -1,5 +1,13 @@
 List of known bugs:
 
+[ ] macros are not allowed at the expression level. This is not necessarily a bug, but does
+    bring many complications to the table about how resolve this.
+
+[ ] recursive quick-procedures / procedures that use #auto have trouble if the first lexical
+    return statement is a recursive call.
+
+[X] There is not proper cycle detection in the compiler. Infinite should not be possible.
+
 [ ] Compound assignment operators such as += evaluate the location of their left-value twice.
     Not only is this bad for efficiency, if the value requires calling a function, that
     function will be called twice instead of once. This is a simple code generation fix,
