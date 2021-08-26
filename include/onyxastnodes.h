@@ -1111,6 +1111,8 @@ typedef enum EntityType {
 extern const char* entity_type_strings[Entity_Type_Count];
 
 typedef struct Entity {
+    u32 id;
+
     EntityType type;
     EntityState state;
 
@@ -1149,6 +1151,7 @@ typedef struct Entity {
 typedef struct EntityHeap {
     bh_arena entity_arena;
     bh_arr(Entity *) entities;
+    i32 next_id;
 
     i32 state_count[Entity_State_Count];
     i32 type_count[Entity_Type_Count];

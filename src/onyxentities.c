@@ -21,9 +21,10 @@ static i32 entity_compare(Entity* e1, Entity* e2) {
         return (i32) e1->state - (i32) e2->state;
     else if (e1->type != e2->type)
         return (i32) e1->type - (i32) e2->type;
-    else
+    else if (e1->micro_attempts != e2->micro_attempts)
         return (i32) (e1->micro_attempts - e2->micro_attempts);
-
+    else
+        return (i32) (e1->id - e2->id); 
 }
 
 #define eh_parent(index) (((index) - 1) / 2)
@@ -148,6 +149,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
     Entity* entity;
     
     Entity ent;
+    ent.id = entities->next_id++;
     ent.state = Entity_State_Resolve_Symbols;
     ent.package = package;
     ent.scope   = scope;
@@ -189,6 +191,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
                 ENTITY_INSERT(ent);
                 ((AstFunction *) node)->entity_header = entity;
                 
+                ent.id       = entities->next_id++;
                 ent.type     = Entity_Type_Function;
                 ent.function = (AstFunction *) node;
                 ENTITY_INSERT(ent);
@@ -215,6 +218,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
                 ent.global = (AstGlobal *) node;
                 ENTITY_INSERT(ent);
                 
+                ent.id       = entities->next_id++;
                 ent.type   = Entity_Type_Global;
                 ent.global = (AstGlobal *) node;
                 ENTITY_INSERT(ent);
@@ -241,6 +245,8 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ent.type_alias = (AstType *) node;
             ENTITY_INSERT(ent);
             ((AstStructType *) node)->entity_defaults = entity;
+
+            ent.id       = entities->next_id++;
             // fallthrough
         }
         
@@ -282,6 +288,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ent.mem_res = (AstMemRes *) node;
             ENTITY_INSERT(ent);
             
+            ent.id       = entities->next_id++;
             ent.type = Entity_Type_Memory_Reservation;
             ent.mem_res = (AstMemRes *) node;
             ENTITY_INSERT(ent);

@@ -184,6 +184,7 @@ static void context_init(CompileOptions* opts) {
     bh_table_init(global_heap_allocator, context.packages, 16);
 
     // NOTE: This will be initialized upon the first call to entity_heap_insert.
+    context.entities.next_id  = 0;
     context.entities.entities = NULL;
 
     onyx_errors_init(&context.loaded_files);
