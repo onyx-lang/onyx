@@ -570,6 +570,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
             else if (parse_possible_directive(parser, "type")) {
                 AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
+                alias->token = parser->curr - 2;
                 alias->to = parse_type(parser);
                 retval = (AstTyped *) alias;
                 break;

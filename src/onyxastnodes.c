@@ -511,6 +511,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     // if (node_is_type((AstNode *) node)) return 0;
 
     if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
+        if (node->entity != NULL) return 1;
         if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.ptr_to_data->Pointer.elem;
         if (!type_is_sl_constructable(type)) return 0;
 
@@ -521,6 +522,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     }
 
     if (node->kind == Ast_Kind_Array_Literal && node->type_node == NULL) {
+        if (node->entity != NULL) return 1;
         node->type = type;
         node->flags |= Ast_Flag_Array_Literal_Typed;
 

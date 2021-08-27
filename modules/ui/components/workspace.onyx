@@ -41,15 +41,13 @@ workspace_start :: (use r: Rectangle, site := #callsite, state: ^Workspace_State
     if state.transform_transition > 0.0f {
         move_towards(^state.transform_transition, 0, 0.08f);
 
-        use state;
-
-        if transform_transition == 0.0f {
-            transform.translation.x = target_transform.translation.x;
-            transform.translation.y = target_transform.translation.y;
+        if state.transform_transition == 0.0f {
+            state.transform.translation.x = state.target_transform.translation.x;
+            state.transform.translation.y = state.target_transform.translation.y;
 
         } else {
-            transform.translation.x = (transform.translation.x + target_transform.translation.x) / 2;
-            transform.translation.y = (transform.translation.y + target_transform.translation.y) / 2;
+            state.transform.translation.x = (state.transform.translation.x + state.target_transform.translation.x) / 2;
+            state.transform.translation.y = (state.transform.translation.y + state.target_transform.translation.y) / 2;
         }
     }
 

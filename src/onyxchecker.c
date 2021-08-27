@@ -1019,6 +1019,8 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
 CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
+    if (binop->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
+
     u32 current_checking_level_store = current_checking_level;
     CHECK(expression, &binop->left);
     CHECK(expression, &binop->right);
@@ -1128,6 +1130,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if (binop->type->kind == Type_Kind_Enum && binop->type->Enum.is_flags && binop->operation == Binary_Op_And) {
          binop->type = &basic_types[Basic_Kind_Bool];
     }
+
+    binop->flags |= Ast_Flag_Has_Been_Checked;
 
     if (binop->flags & Ast_Flag_Comptime) {
         // NOTE: Not a binary op
@@ -2018,7 +2022,7 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 
 CheckStatus check_struct(AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
-        YIELD(s_node->token->pos, "Waiting for struct member definitions to pass symbol resolution.");
+        YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
@@ -2081,8 +2085,8 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 }
 
 CheckStatus check_function_header(AstFunction* func) {
-    if (func->entity_body && func->entity_body->state < Entity_State_Check_Types)
-        YIELD(func->token->pos, "Waiting for function header to complete symbol resolution");
+    //if (func->entity_body && func->entity_body->state < Entity_State_Check_Types)
+    //    YIELD(func->token->pos, "Waiting for function body to complete symbol resolution to check header.");
 
     b32 expect_default_param = 0;
     b32 has_had_varargs = 0;

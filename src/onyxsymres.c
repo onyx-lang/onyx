@@ -748,11 +748,12 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
 static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
     AstDirectiveDefined* defined = *pdefined;
 
+    b32 use_package_count = (context.entities.type_count[Entity_Type_Use_Package] == 0);
     b32 old_report_unresolved_symbols = report_unresolved_symbols;
     report_unresolved_symbols = 0;
 
     SymresStatus ss = symres_expression(&defined->expr);
-    if (old_report_unresolved_symbols && ss != Symres_Success) {
+    if ((use_package_count || old_report_unresolved_symbols) && ss != Symres_Success) {
         // The symbol definitely was not found and there is no chance that it could be found.
         defined->is_defined = 0;
 
@@ -1061,9 +1062,9 @@ static SymresStatus symres_struct_defaults(AstType* t) {
             // CLEANUP: I hate that this is here. The type inference for a struct member should happen once the actual type is known.
             // There seems to be a problem with setting it in the checker however, because whenever I disable this code, somehow
             // the compiler gets to the code generation without all the types figured out???
-            if ((*smem)->type_node == NULL && (*smem)->initial_value->type_node != NULL) {
-                (*smem)->type_node = (*smem)->initial_value->type_node;
-            }
+            // if ((*smem)->type_node == NULL && (*smem)->initial_value->type_node != NULL) {
+            //    (*smem)->type_node = (*smem)->initial_value->type_node;
+            // }
         }
     }
     
@@ -1194,9 +1195,10 @@ void symres_entity(Entity* ent) {
         scope_enter(ent->scope);
     }
 
-    report_unresolved_symbols = (context.entities.type_count[Entity_Type_Static_If] == 0 &&
-                                 context.entities.type_count[Entity_Type_Use_Package] == 0)
-                                || context.cycle_detected;
+    report_unresolved_symbols = context.cycle_detected;
+                                //(context.entities.type_count[Entity_Type_Static_If] == 0 &&
+                                // context.entities.type_count[Entity_Type_Use_Package] == 0)
+                                //|| context.cycle_detected;
 
     SymresStatus ss = Symres_Success;
     EntityState next_state = Entity_State_Check_Types;

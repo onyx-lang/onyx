@@ -459,16 +459,21 @@ static i32 onyx_compile() {
         // cycle detection algorithm must be used.
         //
         static Entity* watermarked_node = NULL;
+        static u32 highest_watermark = 0;
         if (!changed) {
             if (!watermarked_node) {
                 watermarked_node = ent;
+                highest_watermark = bh_max(highest_watermark, ent->macro_attempts);
             }
             else if (watermarked_node == ent) {
-                entity_heap_insert_existing(&context.entities, ent);
-                dump_cycles();
+                if (ent->macro_attempts > highest_watermark) {
+                    entity_heap_insert_existing(&context.entities, ent);
+                    dump_cycles();
+                }
             }
             else if (watermarked_node->macro_attempts < ent->macro_attempts) {
                 watermarked_node = ent;
+                highest_watermark = bh_max(highest_watermark, ent->macro_attempts);
             }
         } else {
             watermarked_node = NULL;

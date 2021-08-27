@@ -104,7 +104,6 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     c := ^buf[buf.count - 1];
     len := 0;
 
-    @Bug // Make this work with '::';
     BASE64_MAP := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
 
     while n > 0 {
