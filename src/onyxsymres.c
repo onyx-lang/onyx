@@ -359,10 +359,14 @@ static SymresStatus symres_method_call(AstBinaryOp** mcall) {
     SYMRES(expression, &(*mcall)->left);
     if ((*mcall)->left == NULL) return Symres_Error;
 
-    AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
-    implicit_field_access->token = call_node->callee->token;
-    call_node->callee = (AstTyped *) implicit_field_access;
+    if (((*mcall)->flags & Ast_Flag_Has_Been_Symres) == 0) {
+        AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
+        implicit_field_access->token = call_node->callee->token;
+        call_node->callee = (AstTyped *) implicit_field_access;
+    }
+
     SYMRES(expression, (AstTyped **) &call_node);
+    (*mcall)->flags |= Ast_Flag_Has_Been_Symres;
 
     return Symres_Success;
 }

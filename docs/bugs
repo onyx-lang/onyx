@@ -1,6 +1,6 @@
 List of known bugs:
 
-[ ] macros are not allowed at the expression level. This is not necessarily a bug, but does
+[X] macros are not allowed at the expression level. This is not necessarily a bug, but does
     bring many complications to the table about how resolve this. Current solution is to
     turn expression macros (macros that specify a return value) into a `do` expression.
 

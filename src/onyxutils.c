@@ -1212,11 +1212,25 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
 
     assert(template->kind == Ast_Kind_Function);
     assert(template->type != NULL);
+    assert(template->type->kind == Type_Kind_Function);
 
     AstBlock* expansion = (AstBlock *) ast_clone(context.ast_alloc, template->body);
     expansion->rules = Block_Rule_Macro;
     expansion->scope = NULL;
     expansion->next = call->next;
+
+    AstNode* subst = (AstNode *) expansion;
+
+    if (template->type->Function.return_type != &basic_types[Basic_Kind_Void]) {
+        AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
+        doblock->token = expansion->token;
+        doblock->block = expansion;
+        doblock->type = template->type->Function.return_type;
+        doblock->next = expansion->next;
+        expansion->next = NULL;
+
+        subst = (AstNode *) doblock;
+    }
 
     Scope* argument_scope = scope_create(context.ast_alloc, NULL, call->token->pos);
     if (expansion->binding_scope != NULL)
@@ -1245,7 +1259,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         bh_table_each_end;
     }
 
-    *(AstBlock **) pcall = expansion;
+    *(AstNode **) pcall = subst;
     return;
 }
 

@@ -462,10 +462,6 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
     }
 
     if (callee->kind == Ast_Kind_Macro) {
-        if (current_checking_level == EXPRESSION_LEVEL) {
-            ERROR(call->token->pos, "Macros calls are not allowed at the expression level yet.");
-        }
-
         calling_a_macro = 1;
         call->callee = callee;
 

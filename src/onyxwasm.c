@@ -2296,6 +2296,8 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
         WIL(WI_LOCAL_GET, result_local);
     }
 
+    local_free(mod->local_alloc, (AstTyped *) if_expr);
+
     *pcode = code;
 }
 
@@ -2320,6 +2322,7 @@ EMIT_FUNC(do_block, AstDoBlock* doblock) {
     }
 
     bh_arr_pop(mod->return_location_stack);
+    local_free(mod->local_alloc, (AstTyped *) doblock);
 
     *pcode = code;
 }
