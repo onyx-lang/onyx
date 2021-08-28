@@ -3,8 +3,12 @@ List of known bugs:
 [ ] macros are not allowed at the expression level. This is not necessarily a bug, but does
     bring many complications to the table about how resolve this.
 
-[ ] recursive quick-procedures / procedures that use #auto have trouble if the first lexical
+[X] recursive quick-procedures / procedures that use #auto have trouble if the first lexical
     return statement is a recursive call.
+
+    There is now an error message about this. The only other solution would be to use a different
+    return statement to resolve the type; however, I believe this breaks the simple rule that
+    the first lexical return statement determines the automatic return type.
 
 [X] There is not proper cycle detection in the compiler. Infinite should not be possible.
 
@@ -31,14 +35,10 @@ List of known bugs:
         .{ -1, 0 }, .{ -1,  1 }, .{ 0,  1 }, 
     ];
 
-[ ] :UnaryFieldAccessIsGross
-
-[ ] Segfault when trying to immediately access type inferred array literal.
+[X] Segfault when trying to immediately access type inferred array literal.
     println( (.[ 1, 2, 3, 4, 5 ])[0] );
 
-[ ] Why are character literals signed????
-
-[ ] Aliasing in many cases does not work. For example:
+[X] Aliasing in many cases does not work. For example:
     
     SomeNamespace :: struct {
         foo :: () { ... }

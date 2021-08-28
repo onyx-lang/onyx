@@ -1,0 +1,22 @@
+#load "core/std"
+use package core
+
+SomeNamespace :: struct {
+    foo :: () {
+        println("Aliasing is working");
+    }
+}
+
+main :: (args) => {
+    {
+        SN :: SomeNamespace
+
+        SN.foo();
+    }
+
+    {
+        use SomeNamespace;
+
+        foo();
+    }
+}

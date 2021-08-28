@@ -856,6 +856,14 @@ char* get_function_name(AstFunction* func) {
     return "<anonymous procedure>";
 }
 
+AstNode* strip_aliases(AstNode* n) {
+    if (n == NULL) return n;
+
+    while (n->kind == Ast_Kind_Alias) n = (AstNode *) ((AstAlias *) n)->alias;
+
+    return n;
+}
+
 AstNumLit* make_bool_literal(bh_allocator a, b32 b) {
     AstNumLit* bl = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
     bl->flags |= Ast_Flag_Comptime;

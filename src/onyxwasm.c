@@ -188,6 +188,7 @@ enum StructuredBlockType {
     SBT_Breakable_Block,   // Targeted using break
     SBT_Continue_Block,    // Targeted using continue
     SBT_Fallthrough_Block, // Targeted using fallthrough
+    SBT_Return_Block,      // Targeted using return, (used for expression macros)
 
     SBT_Basic_If,          // Cannot be targeted using jump
     SBT_Breakable_If,      // Targeted using break
@@ -306,6 +307,7 @@ EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
         /* SBT_Breakable_Block */   1,
         /* SBT_Continue_Block */    2,
         /* SBT_Fallthrough_Block */ 3,
+        /* SBT_Return_Block */      4,
 
         /* SBT_Basic_If */          0,
         /* SBT_Breakable_If */      1,
@@ -319,6 +321,7 @@ EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
         /* SBT_Breakable_Block */   WI_BLOCK_START,
         /* SBT_Continue_Block */    WI_BLOCK_START,
         /* SBT_Fallthrough_Block */ WI_BLOCK_START,
+        /* SBT_Return_Block */      WI_BLOCK_START,
 
         /* SBT_Basic_If */          WI_IF_START,
         /* SBT_Breakable_If */      WI_IF_START,
@@ -348,7 +351,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
 
     // :CLEANUP These numbers should become constants because they are shared with
     // enter_structured_block's definitions.
-    static const u8 wants[Jump_Type_Count] = { 1, 2, 3 };
+    static const u8 wants[Jump_Type_Count] = { 1, 2, 3, 4 };
 
     u64 labelidx = 0;
     u8 wanted = wants[jump->jump];
@@ -2773,6 +2776,7 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 EMIT_FUNC(return, AstReturn* ret) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    // If we have an expression to return, we see if it should be placed on the linear memory stack, or the WASM stack.
     if (ret->expr) {
         if (mod->curr_cc == CC_Return_Stack) {
             WIL(WI_LOCAL_GET, mod->stack_base_idx);
@@ -2787,8 +2791,10 @@ EMIT_FUNC(return, AstReturn* ret) {
         }
     }
 
+    // Clear the normal deferred statements
     emit_deferred_stmts(mod, &code);
 
+    // Clear the rest of the deferred statements
     if (bh_arr_length(mod->deferred_stmts) != 0) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
         while (i >= 0) {
@@ -2797,6 +2803,7 @@ EMIT_FUNC(return, AstReturn* ret) {
         }
     }
 
+    // Make a patch for the two instructions needed to restore the stack pointer
     SUBMIT_PATCH(mod->stack_leave_patches, 0);
     WI(WI_NOP);
     WI(WI_NOP);
@@ -3305,6 +3312,8 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
         //fallthrough
     }
+
+    case Ast_Kind_Code_Block: break;
 
     default: retval = 0;
     }

@@ -1119,14 +1119,17 @@ b32 type_struct_is_simple(Type* type) {
 }
 
 b32 type_is_pointer(Type* type) {
+    if (type == NULL) return 0;
     return type->kind == Type_Kind_Pointer;
 }
 
 b32 type_is_rawptr(Type* type) {
+    if (type == NULL) return 0;
     return type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Rawptr;
 }
 
 b32 type_is_array(Type* type) {
+    if (type == NULL) return 0;
     return type->kind == Type_Kind_Array;
 }
 
@@ -1139,16 +1142,19 @@ b32 type_is_struct(Type* type) {
 }
 
 b32 type_is_bool(Type* type) {
+    if (type == NULL) return 0;
     return type != NULL && type->kind == Type_Kind_Basic && type->Basic.kind == Basic_Kind_Bool;
 }
 
 b32 type_is_small_integer(Type* type) {
+    if (type == NULL) return 0;
     if (type->kind != Type_Kind_Basic) return 0;
 
     return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U32;
 }
 
 b32 type_is_integer(Type* type) {
+    if (type == NULL) return 0;
     if (type->kind != Type_Kind_Basic) return 0;
 
     return (type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U64)
@@ -1156,6 +1162,7 @@ b32 type_is_integer(Type* type) {
 }
 
 b32 type_is_numeric(Type* type) {
+    if (type == NULL) return 0;
     if (type->kind == Type_Kind_Enum) return 1;
     if (type->kind != Type_Kind_Basic) return 0;
 
@@ -1163,6 +1170,7 @@ b32 type_is_numeric(Type* type) {
 }
 
 b32 type_is_compound(Type* type) {
+    if (type == NULL) return 0;
     return type->kind != Type_Kind_Basic
         && type->kind != Type_Kind_Pointer
         && type->kind != Type_Kind_Enum
@@ -1171,6 +1179,7 @@ b32 type_is_compound(Type* type) {
 }
 
 b32 type_is_simd(Type* type) {
+    if (type == NULL) return 0;
     if (type->kind != Type_Kind_Basic) return 0;
     return type->Basic.flags & Basic_Flag_SIMD;
 }
@@ -1184,6 +1193,7 @@ b32 type_results_in_void(Type* type) {
 }
 
 b32 type_is_array_accessible(Type* type) {
+    if (type == NULL) return 0;
     if (type_is_pointer(type)) return 1;
     if (type->kind == Type_Kind_Array) return 1;
     if (type->kind == Type_Kind_Slice) return 1;
@@ -1193,6 +1203,7 @@ b32 type_is_array_accessible(Type* type) {
 }
 
 b32 type_is_structlike(Type* type) {
+    if (type == NULL) return 0;
     if (type->kind == Type_Kind_Struct) return 1;
     if (type->kind == Type_Kind_Slice)  return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
@@ -1206,6 +1217,7 @@ b32 type_is_structlike(Type* type) {
 }
 
 b32 type_is_structlike_strict(Type* type) {
+    if (type == NULL) return 0;
     if (type->kind == Type_Kind_Struct)   return 1;
     if (type->kind == Type_Kind_Slice)    return 1;
     if (type->kind == Type_Kind_DynArray) return 1;
@@ -1214,6 +1226,7 @@ b32 type_is_structlike_strict(Type* type) {
 }
 
 u32 type_structlike_mem_count(Type* type) {
+    if (type == NULL) return 0;
     switch (type->kind) {
         case Type_Kind_Struct:   return type->Struct.mem_count;
         case Type_Kind_Slice:    return 2;
@@ -1224,6 +1237,7 @@ u32 type_structlike_mem_count(Type* type) {
 }
 
 u32 type_structlike_is_simple(Type* type) {
+    if (type == NULL) return 0;
     switch (type->kind) {
         case Type_Kind_Struct:   return type_struct_is_simple(type);
         case Type_Kind_Slice:    return 1;
@@ -1234,6 +1248,7 @@ u32 type_structlike_is_simple(Type* type) {
 }
 
 b32 type_is_sl_constructable(Type* type) {
+    if (type == NULL) return 0;
     switch (type->kind) {
         case Type_Kind_Struct:   return 1;
         case Type_Kind_Slice:    return 1;
@@ -1243,6 +1258,7 @@ b32 type_is_sl_constructable(Type* type) {
 }
 
 b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* from) {
+    if (struct_type == NULL) return 0;
     if (struct_type->kind != Type_Kind_Struct) return 0;
 
     return struct_type->Struct.constructed_from == from;

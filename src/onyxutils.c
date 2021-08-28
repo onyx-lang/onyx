@@ -1341,13 +1341,19 @@ char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
             case PSK_Type:      strncat(name_buf, type_get_name(ptype->type), 255); break;
             case PSK_Value: {
                 // FIX
-                if (ptype->value->kind == Ast_Kind_NumLit) {
-                    AstNumLit* nl = (AstNumLit *) ptype->value;
+                AstNode* value = strip_aliases((AstNode *) ptype->value);
+
+                if (value->kind == Ast_Kind_NumLit) {
+                    AstNumLit* nl = (AstNumLit *) value;
                     if (type_is_integer(nl->type)) {
                         strncat(name_buf, bh_bprintf("%l", nl->value.l), 127);
                     } else {
                         strncat(name_buf, "numlit (FIX ME)", 127);
                     }
+                } else if (value->kind == Ast_Kind_Code_Block) {
+                    AstCodeBlock* code = (AstCodeBlock *) value;
+                    OnyxFilePos code_loc = code->token->pos;
+                    strncat(name_buf, bh_bprintf("code at %s:%d,%d", code_loc.filename, code_loc.line, code_loc.column), 127);
                 } else {
                     strncat(name_buf, "<expr>", 127);
                 }

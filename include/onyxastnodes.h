@@ -461,6 +461,7 @@ typedef enum JumpType {
     Jump_Type_Break,
     Jump_Type_Continue,
     Jump_Type_Fallthrough,
+    Jump_Type_Return,
 
     Jump_Type_Count,
 } JumpType;
@@ -1333,6 +1334,8 @@ i64 get_expression_integer_value(AstTyped* node);
 
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
+
+AstNode* strip_aliases(AstNode* node);
 
 AstNumLit*       make_bool_literal(bh_allocator, b32 b);
 AstNumLit*       make_int_literal(bh_allocator a, i64 value);

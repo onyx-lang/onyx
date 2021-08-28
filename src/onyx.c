@@ -414,6 +414,7 @@ static void dump_cycles() {
         ent = entity_heap_top(&context.entities);
         entity_heap_remove_top(&context.entities);
         if (ent->state < Entity_State_Code_Gen) process_entity(ent);
+        else break;
 
         if (bh_arr_length(context.entities.entities) == 0) {
             break;

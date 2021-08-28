@@ -1724,6 +1724,8 @@ static AstType* parse_type(OnyxParser* parser) {
                     break;
                 }
 
+                next_insertion = NULL;
+                break;
             }
 
             case '(': {
