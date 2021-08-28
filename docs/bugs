@@ -1,7 +1,22 @@
 List of known bugs:
 
 [ ] macros are not allowed at the expression level. This is not necessarily a bug, but does
-    bring many complications to the table about how resolve this.
+    bring many complications to the table about how resolve this. Current solution is to
+    turn expression macros (macros that specify a return value) into a `do` expression.
+
+[ ] Enums suck. Make them more powerful.
+
+[ ] add `do` expressions:
+    
+    x := do {
+        a := 1;
+        b := 2;
+        return a + b;
+    };
+
+[X] Add support for tabs in error messages.
+
+[ ] switch statements should work with any type that supports '=='.
 
 [X] recursive quick-procedures / procedures that use #auto have trouble if the first lexical
     return statement is a recursive call.

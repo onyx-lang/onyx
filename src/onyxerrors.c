@@ -21,7 +21,9 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     #endif
 
     i32 linelength = 0;
+    i32 first_char = 0;
     char* walker = err->pos.line_start;
+    while (*walker == ' ' || *walker == '\t') first_char++, linelength++, walker++;
     while (*walker != '\n') linelength++, walker++;
 
     if (colored_printing) bh_printf("\033[90m");
@@ -30,7 +32,9 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     bh_printf("%b\n", err->pos.line_start, linelength);
 
     char* pointer_str = bh_alloc_array(global_scratch_allocator, char, linelength + numlen);
-    memset(pointer_str, ' ', linelength + numlen);
+    memset(pointer_str, ' ', numlen);
+    memcpy(pointer_str + numlen - 1, err->pos.line_start, first_char);
+    memset(pointer_str + first_char + numlen - 1, ' ', err->pos.column - first_char);
     memset(pointer_str + err->pos.column + numlen - 1, '~', err->pos.length - 1);
     pointer_str[err->pos.column + numlen - 2] = '^';
     pointer_str[err->pos.column + numlen + err->pos.length - 1] = 0;
