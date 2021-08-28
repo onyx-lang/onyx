@@ -491,6 +491,9 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(directive_insert, (AstDirectiveInsert *) *expr);
             break;
 
+        case Ast_Kind_Do_Block:
+            SYMRES(block, ((AstDoBlock *) *expr)->block);
+            break;
 
         default: break;
     }

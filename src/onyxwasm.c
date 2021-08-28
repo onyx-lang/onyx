@@ -256,6 +256,7 @@ EMIT_FUNC(array_store,                   Type* type, u32 offset);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                 AstRangeLiteral* range);
 EMIT_FUNC(if_expression,                 AstIfExpression* if_expr);
+EMIT_FUNC(do_block,                      AstDoBlock* doblock);
 EMIT_FUNC(expression,                    AstTyped* expr);
 EMIT_FUNC(cast,                          AstUnaryOp* cast);
 EMIT_FUNC(return,                        AstReturn* ret);
@@ -283,8 +284,11 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
 
     generate_block_headers = generate_block_headers && (block->rules & Block_Rule_New_Scope);
 
-    if (generate_block_headers)
-        emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
+    if (generate_block_headers) {
+        emit_enter_structured_block(mod, &code, (block->rules & Block_Rule_Override_Return)
+                                                ? SBT_Return_Block
+                                                : SBT_Breakable_Block);
+    }
 
     forll (AstNode, stmt, block->body, next) {
         emit_statement(mod, &code, stmt);
@@ -346,18 +350,14 @@ EMIT_FUNC_NO_ARGS(leave_structured_block) {
     *pcode = code;
 }
 
-EMIT_FUNC(structured_jump, AstJump* jump) {
-    bh_arr(WasmInstruction) code = *pcode;
-
+i64 get_structured_jump_label(OnyxWasmModule* mod, JumpType jump_type, u32 jump_count) {
     // :CLEANUP These numbers should become constants because they are shared with
     // enter_structured_block's definitions.
     static const u8 wants[Jump_Type_Count] = { 1, 2, 3, 4 };
 
-    u64 labelidx = 0;
-    u8 wanted = wants[jump->jump];
+    i64 labelidx = 0;
+    u8 wanted = wants[jump_type];
     b32 success = 0;
-
-    u32 jump_count = jump->count;
 
     i32 len = bh_arr_length(mod->structured_jump_target) - 1;
     for (u8* t = &bh_arr_last(mod->structured_jump_target); len >= 0; len--, t--) {
@@ -370,6 +370,14 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         labelidx++;
     }
 
+    return (success == 0) ? -1 : labelidx;
+}
+
+EMIT_FUNC(structured_jump, AstJump* jump) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    i64 labelidx = get_structured_jump_label(mod, jump->jump, jump->count);
+
     if (bh_arr_length(mod->deferred_stmts) != 0) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
         i32 d = bh_arr_length(mod->structured_jump_target) - (labelidx + 1);
@@ -380,7 +388,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         }
     }
 
-    if (success) {
+    if (labelidx >= 0) {
         // NOTE: If the previous instruction was a non conditional jump,
         // don't emit another jump since it will never be reached.
         if (bh_arr_last(code).type != WI_JUMP)
@@ -406,7 +414,7 @@ EMIT_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_Block:      emit_block(mod, &code, (AstBlock *) stmt, 1); break;
         case Ast_Kind_Defer:      emit_defer(mod, &code, (AstDefer *) stmt); break;
         case Ast_Kind_Local:      emit_local_allocation(mod, &code, (AstTyped *) stmt); break;
-        
+
         case Ast_Kind_Directive_Insert: break;
 
         default:                  emit_expression(mod, &code, (AstTyped *) stmt); break;
@@ -2283,10 +2291,35 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
     if (!result_is_local) {
         emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
         emit_load_instruction(mod, &code, if_expr->type, offset);
-        
+
     } else {
         WIL(WI_LOCAL_GET, result_local);
     }
+
+    *pcode = code;
+}
+
+EMIT_FUNC(do_block, AstDoBlock* doblock) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 result_local    = local_allocate(mod->local_alloc, (AstTyped *) doblock);
+    b32 result_is_local = (b32) ((result_local & LOCAL_IS_WASM) != 0);
+
+    bh_imap_put(&mod->local_map, (u64) doblock, result_local);
+    bh_arr_push(mod->return_location_stack, (AstLocal *) doblock);
+
+    emit_block(mod, &code, doblock->block, 1);
+
+    u64 offset = 0;
+    if (!result_is_local) {
+        emit_local_location(mod, &code, (AstLocal *) doblock, &offset);
+        emit_load_instruction(mod, &code, doblock->type, offset);
+
+    } else {
+        WIL(WI_LOCAL_GET, result_local);
+    }
+
+    bh_arr_pop(mod->return_location_stack);
 
     *pcode = code;
 }
@@ -2478,6 +2511,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Block:          emit_block(mod, &code, (AstBlock *) expr, 1); break;
+        case Ast_Kind_Do_Block:       emit_do_block(mod, &code, (AstDoBlock *) expr); break;
         case Ast_Kind_Call:           emit_call(mod, &code, (AstCall *) expr); break;
         case Ast_Kind_Argument:       emit_expression(mod, &code, ((AstArgument *) expr)->value); break;
         case Ast_Kind_Intrinsic_Call: emit_intrinsic_call(mod, &code, (AstCall *) expr); break;
@@ -2764,7 +2798,7 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
     if (fromidx != -1 && toidx != -1) {
         WasmInstructionType cast_op = cast_map[fromidx][toidx];
         assert(cast_op != WI_UNREACHABLE);
-        
+
         if (cast_op != WI_NOP) {
             WI(cast_op);
         }
@@ -2778,7 +2812,20 @@ EMIT_FUNC(return, AstReturn* ret) {
 
     // If we have an expression to return, we see if it should be placed on the linear memory stack, or the WASM stack.
     if (ret->expr) {
-        if (mod->curr_cc == CC_Return_Stack) {
+        if (bh_arr_length(mod->return_location_stack) > 0) {
+            AstLocal* dest = bh_arr_last(mod->return_location_stack);
+            u64 dest_loc = bh_imap_get(&mod->local_map, (u64) dest);
+            b32 dest_is_local = (b32) ((dest_loc & LOCAL_IS_WASM) != 0);
+
+            u64 offset = 0;
+            if (!dest_is_local) emit_local_location(mod, &code, dest, &offset);
+
+            emit_expression(mod, &code, ret->expr);
+
+            if (!dest_is_local) emit_store_instruction(mod, &code, dest->type, offset);
+            else                WIL(WI_LOCAL_SET, dest_loc);
+
+        } else if (mod->curr_cc == CC_Return_Stack) {
             WIL(WI_LOCAL_GET, mod->stack_base_idx);
             WID(WI_I32_CONST, type_size_of(ret->expr->type));
             WI(WI_I32_SUB);
@@ -2803,12 +2850,18 @@ EMIT_FUNC(return, AstReturn* ret) {
         }
     }
 
-    // Make a patch for the two instructions needed to restore the stack pointer
-    SUBMIT_PATCH(mod->stack_leave_patches, 0);
-    WI(WI_NOP);
-    WI(WI_NOP);
+    i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, 1);
+    if (jump_label >= 0) {
+        WIL(WI_JUMP, jump_label);
 
-    WI(WI_RETURN);
+    } else {
+        // Make a patch for the two instructions needed to restore the stack pointer
+        SUBMIT_PATCH(mod->stack_leave_patches, 0);
+        WI(WI_NOP);
+        WI(WI_NOP);
+
+        WI(WI_RETURN);
+    }
 
     *pcode = code;
 }
@@ -2858,7 +2911,7 @@ EMIT_FUNC(zero_value, WasmType wt) {
 
 EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
-    
+
     if (type_is_structlike_strict(type)) {
         i32 mem_count = type_linear_member_count(type);
         TypeWithOffset two;
@@ -3036,7 +3089,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
         bh_arr_insert_end(wasm_func.code, 5);
         fori (i, 0, 5) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
-        
+
         mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
         // Generate code
@@ -3173,7 +3226,7 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
         StrLitInfo sti = bh_table_get(StrLitInfo, mod->string_literals, (char *) strdata);
         strlit->addr   = sti.addr;
         strlit->length = sti.len;
-        
+
         bh_free(global_heap_allocator, strdata);
         return;
     }
@@ -3216,7 +3269,7 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
             i++;
         }
 
-        break;    
+        break;
     }
 
     case Ast_Kind_Struct_Literal: {
@@ -3275,7 +3328,7 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
         if (effective_type->kind == Type_Kind_Enum)
             effective_type = effective_type->Enum.backing;
-        
+
         switch (effective_type->Basic.kind) {
         case Basic_Kind_Bool:
         case Basic_Kind_I8:
@@ -3449,6 +3502,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .next_elem_idx = 0,
 
         .structured_jump_target = NULL,
+        .return_location_stack = NULL,
         .local_allocations = NULL,
         .stack_leave_patches = NULL,
 
@@ -3473,6 +3527,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.data, 4);
     bh_arr_new(alloc, module.elems, 4);
 
+    bh_arr_new(global_heap_allocator, module.return_location_stack, 4);
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
     bh_arr_set_length(module.structured_jump_target, 0);
 
@@ -3520,7 +3575,7 @@ void emit_entity(Entity* ent) {
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
             if (!should_emit_function(ent->function)) break;
-            
+
             module->foreign_function_count++;
             emit_foreign_function(module, ent->function);
             // fallthrough
@@ -3535,7 +3590,7 @@ void emit_entity(Entity* ent) {
                     ent->expr->token->pos.line,
                     ent->expr->token->pos.column);
             }
-            
+
             bh_imap_put(&module->index_map, (u64) ent->function, module->next_func_idx++);
 
             if (ent->function->flags & Ast_Flag_Proc_Is_Null) {

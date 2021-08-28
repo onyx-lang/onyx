@@ -82,7 +82,7 @@ CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
 CheckStatus check_type(AstType* type);
 CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
-
+CheckStatus check_do_block(AstDoBlock** pdoblock);
 
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
@@ -1357,6 +1357,26 @@ CheckStatus check_if_expression(AstIfExpression* if_expr) {
     return Check_Success;
 }
 
+CheckStatus check_do_block(AstDoBlock** pdoblock) {
+    AstDoBlock* doblock = *pdoblock;
+    if (doblock->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
+
+    fill_in_type((AstTyped *) doblock);
+
+    Type** old_expected_return_type = expected_return_type;
+    expected_return_type = &doblock->type;
+
+    doblock->block->rules = Block_Rule_Do_Block;
+    CHECK(block, doblock->block);
+
+    if (doblock->type == &type_auto_return)
+        ERROR(doblock->token->pos, "Unable to determine type of do-block expression.");
+
+    expected_return_type = old_expected_return_type;
+    doblock->flags |= Ast_Flag_Has_Been_Checked;
+    return Check_Success;
+}
+
 CheckStatus check_address_of(AstAddressOf* aof) {
     CHECK(expression, &aof->expr);
     if (aof->expr->type == NULL) {
@@ -1549,12 +1569,12 @@ CheckStatus check_method_call(AstBinaryOp** mcall) {
         // would be good.                                      - brendanfh 2020/02/05
         if (implicit_argument->type->kind != Type_Kind_Pointer)
             implicit_argument = (AstTyped *) make_address_of(context.ast_alloc, implicit_argument);
-        
+
         implicit_argument = (AstTyped *) make_argument(context.ast_alloc, implicit_argument);
 
         bh_arr_insertn(call_node->args.values, 0, 1);
         call_node->args.values[0] = implicit_argument;
-    }    
+    }
     (*mcall)->flags |= Ast_Flag_Has_Been_Checked;
 
     CHECK(call, &call_node);
@@ -1731,6 +1751,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             fill_in_type(expr);
             break;
 
+        case Ast_Kind_Do_Block:
+            retval = check_do_block((AstDoBlock **) pexpr);
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -1740,7 +1764,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Package: break;
         case Ast_Kind_Error: break;
         case Ast_Kind_Unary_Field_Access: break;
-        
+
         // NOTE: The only way to have an Intrinsic_Call node is to have gone through the
         // checking of a call node at least once.
         case Ast_Kind_Intrinsic_Call: break;

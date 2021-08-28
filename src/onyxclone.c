@@ -3,30 +3,30 @@
 #include "onyxutils.h"
 
 static inline b32 should_clone(AstNode* node) {
-	if (node->flags & Ast_Flag_No_Clone) return 0;
+    if (node->flags & Ast_Flag_No_Clone) return 0;
 
-	switch (node->kind) {
-		// List of nodes that should not be copied
-		case Ast_Kind_Global:
-		case Ast_Kind_Memres:
-		case Ast_Kind_StrLit:
-		case Ast_Kind_Package:
-		case Ast_Kind_Enum_Type:
-		case Ast_Kind_Enum_Value:
-		case Ast_Kind_Overloaded_Function:
-		case Ast_Kind_Polymorphic_Proc:
-		case Ast_Kind_Alias:
-		case Ast_Kind_Code_Block:
-		case Ast_Kind_Macro:
-		case Ast_Kind_File_Contents:
-			return 0;
+    switch (node->kind) {
+        // List of nodes that should not be copied
+        case Ast_Kind_Global:
+        case Ast_Kind_Memres:
+        case Ast_Kind_StrLit:
+        case Ast_Kind_Package:
+        case Ast_Kind_Enum_Type:
+        case Ast_Kind_Enum_Value:
+        case Ast_Kind_Overloaded_Function:
+        case Ast_Kind_Polymorphic_Proc:
+        case Ast_Kind_Alias:
+        case Ast_Kind_Code_Block:
+        case Ast_Kind_Macro:
+        case Ast_Kind_File_Contents:
+            return 0;
 
-		default: return 1;
-	}
+        default: return 1;
+    }
 }
 
 static inline i32 ast_kind_to_size(AstNode* node) {
-	switch (node->kind) {
+    switch (node->kind) {
         case Ast_Kind_Error: return sizeof(AstNode);
         case Ast_Kind_Package: return sizeof(AstPackage);
         case Ast_Kind_Load_File: return sizeof(AstInclude);
@@ -98,217 +98,218 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Static_If: return sizeof(AstIfWhile);
         case Ast_Kind_If_Expression: return sizeof(AstIfExpression);
         case Ast_Kind_Directive_Insert: return sizeof(AstDirectiveInsert);
+        case Ast_Kind_Do_Block: return sizeof(AstDoBlock);
         case Ast_Kind_Count: return 0;
-	}
+    }
 
     return 0;
 }
 
 AstNode* ast_clone_list(bh_allocator a, void* n) {
-	AstNode* node = (AstNode *) n;
-	if (node == NULL) return NULL;
+    AstNode* node = (AstNode *) n;
+    if (node == NULL) return NULL;
 
-	AstNode* root = ast_clone(a, node);
-	AstNode* curr = root->next;
-	AstNode** insertion = &root->next;
+    AstNode* root = ast_clone(a, node);
+    AstNode* curr = root->next;
+    AstNode** insertion = &root->next;
 
-	while (curr != NULL) {
-		curr = ast_clone(a, curr);
-		*insertion = curr;
-		insertion = &curr->next;
-		curr = curr->next;
-	}
+    while (curr != NULL) {
+        curr = ast_clone(a, curr);
+        *insertion = curr;
+        insertion = &curr->next;
+        curr = curr->next;
+    }
 
-	return root;
+    return root;
 }
 
 #define C(nt, mname) ((nt *) nn)->mname = (void *) ast_clone(a, ((nt *) node)->mname);
 
 // NOTE: Using void* to avoid a lot of unnecessary casting
 AstNode* ast_clone(bh_allocator a, void* n) {
-	AstNode* node = (AstNode *) n;
+    AstNode* node = (AstNode *) n;
 
-	if (node == NULL) return NULL;
-	if (!should_clone(node)) return node;
+    if (node == NULL) return NULL;
+    if (!should_clone(node)) return node;
 
-	static int clone_depth = 0;
-	clone_depth++;
+    static int clone_depth = 0;
+    clone_depth++;
 
-	i32 node_size = ast_kind_to_size(node);
-	// bh_printf("Cloning %s with size %d\n", onyx_ast_node_kind_string(node->kind), node_size);
+    i32 node_size = ast_kind_to_size(node);
+    // bh_printf("Cloning %s with size %d\n", onyx_ast_node_kind_string(node->kind), node_size);
 
-	AstNode* nn = onyx_ast_node_new(a, node_size, node->kind);
-	memmove(nn, node, node_size);
+    AstNode* nn = onyx_ast_node_new(a, node_size, node->kind);
+    memmove(nn, node, node_size);
 
-	switch ((u16) node->kind) {
-		case Ast_Kind_Binary_Op:
+    switch ((u16) node->kind) {
+        case Ast_Kind_Binary_Op:
         case Ast_Kind_Pipe:
         case Ast_Kind_Method_Call:
-        	C(AstBinaryOp, left);
-        	C(AstBinaryOp, right);
-			break;
+            C(AstBinaryOp, left);
+            C(AstBinaryOp, right);
+            break;
 
-		case Ast_Kind_Unary_Op:
-			C(AstUnaryOp, expr);
-			C(AstUnaryOp, type_node);
-			break;
+        case Ast_Kind_Unary_Op:
+            C(AstUnaryOp, expr);
+            C(AstUnaryOp, type_node);
+            break;
 
-		case Ast_Kind_Param:
-		case Ast_Kind_Local:
-			C(AstLocal, type_node);
-			break;
+        case Ast_Kind_Param:
+        case Ast_Kind_Local:
+            C(AstLocal, type_node);
+            break;
 
-		case Ast_Kind_Call:
+        case Ast_Kind_Call:
             arguments_deep_clone(a, &((AstCall *) nn)->args, &((AstCall *) node)->args);
-			break;
+            break;
 
-		case Ast_Kind_Argument:
-			C(AstArgument, value);
-			break;
+        case Ast_Kind_Argument:
+            C(AstArgument, value);
+            break;
 
-		case Ast_Kind_Address_Of:
-			C(AstAddressOf, expr);
-			break;
+        case Ast_Kind_Address_Of:
+            C(AstAddressOf, expr);
+            break;
 
-		case Ast_Kind_Dereference:
-			C(AstDereference, expr);
-			break;
+        case Ast_Kind_Dereference:
+            C(AstDereference, expr);
+            break;
 
-		case Ast_Kind_Slice:
-		case Ast_Kind_Subscript:
-			C(AstSubscript, addr);
-			C(AstSubscript, expr);
-			break;
+        case Ast_Kind_Slice:
+        case Ast_Kind_Subscript:
+            C(AstSubscript, addr);
+            C(AstSubscript, expr);
+            break;
 
-		case Ast_Kind_Field_Access:
-			C(AstFieldAccess, expr);
-			break;
+        case Ast_Kind_Field_Access:
+            C(AstFieldAccess, expr);
+            break;
 
-		case Ast_Kind_Size_Of:
-			C(AstSizeOf, so_ast_type);
-			break;
+        case Ast_Kind_Size_Of:
+            C(AstSizeOf, so_ast_type);
+            break;
 
-		case Ast_Kind_Align_Of:
-			C(AstAlignOf, ao_ast_type);
-			break;
+        case Ast_Kind_Align_Of:
+            C(AstAlignOf, ao_ast_type);
+            break;
 
-		case Ast_Kind_Struct_Literal: {
-			AstStructLiteral* st = (AstStructLiteral *) node;
-			AstStructLiteral* dt = (AstStructLiteral *) nn;
+        case Ast_Kind_Struct_Literal: {
+            AstStructLiteral* st = (AstStructLiteral *) node;
+            AstStructLiteral* dt = (AstStructLiteral *) nn;
 
-			dt->stnode = (AstTyped *) ast_clone(a, st->stnode);
+            dt->stnode = (AstTyped *) ast_clone(a, st->stnode);
 
             arguments_deep_clone(a, &dt->args, &st->args);
-			break;
-		}
+            break;
+        }
 
-		case Ast_Kind_Array_Literal: {
-			AstArrayLiteral* st = (AstArrayLiteral *) node;
-			AstArrayLiteral* dt = (AstArrayLiteral *) nn;
+        case Ast_Kind_Array_Literal: {
+            AstArrayLiteral* st = (AstArrayLiteral *) node;
+            AstArrayLiteral* dt = (AstArrayLiteral *) nn;
 
-			dt->atnode = (AstTyped *) ast_clone(a, st->atnode);
+            dt->atnode = (AstTyped *) ast_clone(a, st->atnode);
 
-			dt->values = NULL;
-			bh_arr_new(global_heap_allocator, dt->values, bh_arr_length(st->values));
-			bh_arr_each(AstTyped *, val, st->values)
-				bh_arr_push(dt->values, (AstTyped *) ast_clone(a, *val));
+            dt->values = NULL;
+            bh_arr_new(global_heap_allocator, dt->values, bh_arr_length(st->values));
+            bh_arr_each(AstTyped *, val, st->values)
+                bh_arr_push(dt->values, (AstTyped *) ast_clone(a, *val));
 
-			break;
-		}
+            break;
+        }
 
         case Ast_Kind_Range_Literal:
-        	C(AstRangeLiteral, low);
-        	C(AstRangeLiteral, high);
-        	C(AstRangeLiteral, step);
-        	break;
+            C(AstRangeLiteral, low);
+            C(AstRangeLiteral, high);
+            C(AstRangeLiteral, step);
+            break;
 
-		case Ast_Kind_Return:
-			C(AstReturn, expr);
-			break;
+        case Ast_Kind_Return:
+            C(AstReturn, expr);
+            break;
 
-		case Ast_Kind_Block:
-			((AstBlock *) nn)->body = ast_clone_list(a, ((AstBlock *) node)->body);
-			break;
+        case Ast_Kind_Block:
+            ((AstBlock *) nn)->body = ast_clone_list(a, ((AstBlock *) node)->body);
+            break;
 
-		case Ast_Kind_Defer:
-			C(AstDefer, stmt);
-			break;
+        case Ast_Kind_Defer:
+            C(AstDefer, stmt);
+            break;
 
-		case Ast_Kind_For:
-			C(AstFor, var);
-			C(AstFor, iter);
-			C(AstFor, stmt);
-			break;
+        case Ast_Kind_For:
+            C(AstFor, var);
+            C(AstFor, iter);
+            C(AstFor, stmt);
+            break;
 
-		case Ast_Kind_If:
-		case Ast_Kind_While:
-			C(AstIfWhile, local);
-			C(AstIfWhile, assignment);
+        case Ast_Kind_If:
+        case Ast_Kind_While:
+            C(AstIfWhile, local);
+            C(AstIfWhile, assignment);
 
-			if (((AstIfWhile *) nn)->assignment)
-				((AstIfWhile *) nn)->assignment->left = (AstTyped *) ((AstIfWhile *) nn)->local;
+            if (((AstIfWhile *) nn)->assignment)
+                ((AstIfWhile *) nn)->assignment->left = (AstTyped *) ((AstIfWhile *) nn)->local;
 
-			C(AstIfWhile, cond);
-			//fallthrough
+            C(AstIfWhile, cond);
+            //fallthrough
 
-		case Ast_Kind_Static_If:
-			C(AstIfWhile, true_stmt);
-			C(AstIfWhile, false_stmt);
-			break;
+        case Ast_Kind_Static_If:
+            C(AstIfWhile, true_stmt);
+            C(AstIfWhile, false_stmt);
+            break;
 
-		case Ast_Kind_Switch: {
-			AstSwitch* dw = (AstSwitch *) nn;
-			AstSwitch* sw = (AstSwitch *) node;
+        case Ast_Kind_Switch: {
+            AstSwitch* dw = (AstSwitch *) nn;
+            AstSwitch* sw = (AstSwitch *) node;
 
-			dw->local = (AstLocal *) ast_clone(a, sw->local);
-			dw->assignment = (AstBinaryOp *) ast_clone(a, sw->assignment);
-			if (dw->assignment)
-				dw->assignment->left = (AstTyped *) sw->local;
-			dw->expr = (AstTyped *) ast_clone(a, sw->expr);
+            dw->local = (AstLocal *) ast_clone(a, sw->local);
+            dw->assignment = (AstBinaryOp *) ast_clone(a, sw->assignment);
+            if (dw->assignment)
+                dw->assignment->left = (AstTyped *) sw->local;
+            dw->expr = (AstTyped *) ast_clone(a, sw->expr);
 
-			dw->default_case = (AstBlock *) ast_clone(a, sw->default_case);
+            dw->default_case = (AstBlock *) ast_clone(a, sw->default_case);
 
-			dw->cases = NULL;
-			bh_arr_new(global_heap_allocator, dw->cases, bh_arr_length(sw->cases));
+            dw->cases = NULL;
+            bh_arr_new(global_heap_allocator, dw->cases, bh_arr_length(sw->cases));
 
-			bh_arr_each(AstSwitchCase, c, sw->cases) {
-				bh_arr(AstTyped *) new_values = NULL;
-				bh_arr_new(global_heap_allocator, new_values, bh_arr_length(c->values));
-				bh_arr_each(AstTyped *, value, c->values)
-					bh_arr_push(new_values, (AstTyped *) ast_clone(a, *value));
+            bh_arr_each(AstSwitchCase, c, sw->cases) {
+                bh_arr(AstTyped *) new_values = NULL;
+                bh_arr_new(global_heap_allocator, new_values, bh_arr_length(c->values));
+                bh_arr_each(AstTyped *, value, c->values)
+                    bh_arr_push(new_values, (AstTyped *) ast_clone(a, *value));
 
-				AstSwitchCase sc;
-				sc.values = new_values;	
-				sc.block = (AstBlock *) ast_clone(a, c->block);
-				bh_arr_push(dw->cases, sc);
-			}
-			break;
-		}
+                AstSwitchCase sc;
+                sc.values = new_values; 
+                sc.block = (AstBlock *) ast_clone(a, c->block);
+                bh_arr_push(dw->cases, sc);
+            }
+            break;
+        }
 
-		case Ast_Kind_Pointer_Type:
-			C(AstPointerType, elem);
-			break;
+        case Ast_Kind_Pointer_Type:
+            C(AstPointerType, elem);
+            break;
 
-		case Ast_Kind_Array_Type:
-			C(AstArrayType, count_expr);
-			C(AstArrayType, elem);
-			break;
+        case Ast_Kind_Array_Type:
+            C(AstArrayType, count_expr);
+            C(AstArrayType, elem);
+            break;
 
-		case Ast_Kind_Slice_Type:
-			C(AstSliceType, elem);
-			break;
+        case Ast_Kind_Slice_Type:
+            C(AstSliceType, elem);
+            break;
 
-		case Ast_Kind_DynArr_Type:
-			C(AstDynArrType, elem);
-			break;
+        case Ast_Kind_DynArr_Type:
+            C(AstDynArrType, elem);
+            break;
 
-		case Ast_Kind_VarArg_Type:
-			C(AstVarArgType, elem);
-			break;
+        case Ast_Kind_VarArg_Type:
+            C(AstVarArgType, elem);
+            break;
 
-		case Ast_Kind_Type_Alias:
-			C(AstTypeAlias, to);
-			break;
+        case Ast_Kind_Type_Alias:
+            C(AstTypeAlias, to);
+            break;
 
         case Ast_Kind_Struct_Type: {
             AstStructType* ds = (AstStructType *) nn;
@@ -326,8 +327,8 @@ AstNode* ast_clone(bh_allocator a, void* n) {
         }
 
         case Ast_Kind_Struct_Member:
-    		C(AstStructMember, type_node);
-    		C(AstStructMember, initial_value);
+            C(AstStructMember, type_node);
+            C(AstStructMember, initial_value);
             break;
 
         case Ast_Kind_Poly_Call_Type: {
@@ -358,72 +359,72 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             break;
         }
 
-		case Ast_Kind_Function_Type:
-			C(AstFunctionType, return_type);
-			((AstFunctionType *) nn)->param_count = ((AstFunctionType *) node)->param_count;
-			fori (i, 0, (i64) ((AstFunctionType *) nn)->param_count) {
-				((AstFunctionType *) nn)->params[i] = (AstType *) ast_clone(a, ((AstFunctionType *) node)->params[i]);
-			}
-			break;
+        case Ast_Kind_Function_Type:
+            C(AstFunctionType, return_type);
+            ((AstFunctionType *) nn)->param_count = ((AstFunctionType *) node)->param_count;
+            fori (i, 0, (i64) ((AstFunctionType *) nn)->param_count) {
+                ((AstFunctionType *) nn)->params[i] = (AstType *) ast_clone(a, ((AstFunctionType *) node)->params[i]);
+            }
+            break;
 
-		case Ast_Kind_Binding:
-			bh_printf("Cloning binding: %b\n", node->token->text, node->token->length);
-			C(AstTyped, type_node);
-			C(AstBinding, node);
-			break;
+        case Ast_Kind_Binding:
+            bh_printf("Cloning binding: %b\n", node->token->text, node->token->length);
+            C(AstTyped, type_node);
+            C(AstBinding, node);
+            break;
 
-		case Ast_Kind_Function: {
-			if (clone_depth > 1) {
-				clone_depth--;
-				return node;
-			}
+        case Ast_Kind_Function: {
+            if (clone_depth > 1) {
+                clone_depth--;
+                return node;
+            }
 
-			AstFunction* df = (AstFunction *) nn;
-			AstFunction* sf = (AstFunction *) node;
+            AstFunction* df = (AstFunction *) nn;
+            AstFunction* sf = (AstFunction *) node;
 
-			if (sf->flags & Ast_Flag_Foreign) return node;
+            if (sf->flags & Ast_Flag_Foreign) return node;
 
-			df->return_type = (AstType *) ast_clone(a, sf->return_type);
-			df->body = (AstBlock *) ast_clone(a, sf->body);
+            df->return_type = (AstType *) ast_clone(a, sf->return_type);
+            df->body = (AstBlock *) ast_clone(a, sf->body);
 
-			df->params = NULL;
-			bh_arr_new(global_heap_allocator, df->params, bh_arr_length(sf->params));
+            df->params = NULL;
+            bh_arr_new(global_heap_allocator, df->params, bh_arr_length(sf->params));
 
-			bh_arr_each(AstParam, param, sf->params) {
-				AstParam new_param = { 0 };
-				new_param.local = (AstLocal *) ast_clone(a, param->local);
-				new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
+            bh_arr_each(AstParam, param, sf->params) {
+                AstParam new_param = { 0 };
+                new_param.local = (AstLocal *) ast_clone(a, param->local);
+                new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
                 new_param.vararg_kind = param->vararg_kind;
-				bh_arr_push(df->params, new_param);
-			}
+                bh_arr_push(df->params, new_param);
+            }
 
-			break;
-		}
+            break;
+        }
 
-		case Ast_Kind_Use:
-			C(AstUse, expr);
-			break;
+        case Ast_Kind_Use:
+            C(AstUse, expr);
+            break;
 
-		case Ast_Kind_Directive_Solidify: {
-			AstDirectiveSolidify* dd = (AstDirectiveSolidify *) nn;
-			AstDirectiveSolidify* sd = (AstDirectiveSolidify *) node;
+        case Ast_Kind_Directive_Solidify: {
+            AstDirectiveSolidify* dd = (AstDirectiveSolidify *) nn;
+            AstDirectiveSolidify* sd = (AstDirectiveSolidify *) node;
 
-			dd->poly_proc = (AstPolyProc *) ast_clone(a, (AstNode *) sd->poly_proc);
-			dd->resolved_proc = NULL;
+            dd->poly_proc = (AstPolyProc *) ast_clone(a, (AstNode *) sd->poly_proc);
+            dd->resolved_proc = NULL;
 
-			dd->known_polyvars = NULL;
-			bh_arr_new(global_heap_allocator, dd->known_polyvars, bh_arr_length(sd->known_polyvars));
+            dd->known_polyvars = NULL;
+            bh_arr_new(global_heap_allocator, dd->known_polyvars, bh_arr_length(sd->known_polyvars));
 
-			bh_arr_each(AstPolySolution, sln, sd->known_polyvars) {
-				AstPolySolution new_sln;
+            bh_arr_each(AstPolySolution, sln, sd->known_polyvars) {
+                AstPolySolution new_sln;
                 new_sln.kind     = sln->kind;
-				new_sln.poly_sym = (AstNode *) ast_clone(a, (AstNode *) sln->poly_sym);
-				new_sln.ast_type = (AstType *) ast_clone(a, (AstNode *) sln->ast_type);
-				bh_arr_push(dd->known_polyvars, new_sln);
-			}
+                new_sln.poly_sym = (AstNode *) ast_clone(a, (AstNode *) sln->poly_sym);
+                new_sln.ast_type = (AstType *) ast_clone(a, (AstNode *) sln->ast_type);
+                bh_arr_push(dd->known_polyvars, new_sln);
+            }
 
-			break;
-		}
+            break;
+        }
 
         case Ast_Kind_Compound: {
             AstCompound* cd = (AstCompound *) nn;
@@ -439,27 +440,32 @@ AstNode* ast_clone(bh_allocator a, void* n) {
         }
 
         case Ast_Kind_Named_Value:
-        	C(AstNamedValue, value);
+            C(AstNamedValue, value);
             break;
 
         case Ast_Kind_If_Expression:
-        	C(AstIfExpression, cond);
-        	C(AstIfExpression, true_expr);
-        	C(AstIfExpression, false_expr);
+            C(AstIfExpression, cond);
+            C(AstIfExpression, true_expr);
+            C(AstIfExpression, false_expr);
             break;
 
-       	case Ast_Kind_Directive_Insert:
-       		C(AstDirectiveInsert, code_expr);
-       		break;
+        case Ast_Kind_Directive_Insert:
+            C(AstDirectiveInsert, code_expr);
+            break;
 
-       	case Ast_Kind_Typeof:
-       		C(AstTypeOf, expr);
-       		((AstTypeOf *) nn)->resolved_type = NULL;
-       		break;
-	}
+        case Ast_Kind_Typeof:
+            C(AstTypeOf, expr);
+            ((AstTypeOf *) nn)->resolved_type = NULL;
+            break;
 
-	clone_depth--;
-	return nn;
+        case Ast_Kind_Do_Block:
+            C(AstDoBlock, block);
+            ((AstDoBlock *) nn)->type_node = (AstType *) &basic_type_auto_return;
+            break;
+    }
+
+    clone_depth--;
+    return nn;
 }
 
 #undef C

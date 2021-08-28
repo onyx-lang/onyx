@@ -6,13 +6,21 @@ List of known bugs:
 
 [ ] Enums suck. Make them more powerful.
 
-[ ] add `do` expressions:
-    
+[X] add `do` expressions:
+
     x := do {
         a := 1;
         b := 2;
         return a + b;
     };
+
+    So then, expression macros can just do the following:
+
+    add :: macro (x: i32, y: i32) -> i32 do return x + y;
+
+    x := add(1, 2);
+    x := do { return 1 + 2; }
+
 
 [X] Add support for tabs in error messages.
 

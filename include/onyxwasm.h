@@ -556,7 +556,8 @@ typedef struct OnyxWasmModule {
     bh_table(StrLitInfo) loaded_file_info;
     bh_table(StrLitInfo) string_literals;
 
-    bh_arr(u8) structured_jump_target;
+    bh_arr(u8)  structured_jump_target;
+    bh_arr(AstLocal*) return_location_stack;   // NOTE: Used for do-block return expressions.
 
     bh_arr(WasmFuncType*) types; // NOTE: This have to be pointers because the type is variadic in size
     bh_arr(WasmImport)    imports;

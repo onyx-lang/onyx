@@ -91,6 +91,7 @@ static const char* ast_node_names[] = {
     "CODE BLOCK",
     "DIRECTIVE INSERT",
     "MACRO",
+    "DO BLOCK",
 
     "NOTE",
 

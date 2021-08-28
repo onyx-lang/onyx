@@ -478,15 +478,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
-        #if 0
-        case Token_Type_Keyword_Proc: {
-            OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
-            onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
-            retval = (AstTyped *) parse_function_definition(parser, proc_token);
-            break;
-        }
-        #endif
-
         case Token_Type_Keyword_Package: {
             retval = (AstTyped *) parse_package_expression(parser);
             break;
@@ -494,6 +485,24 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
         case Token_Type_Keyword_Macro: {
             retval = (AstTyped *) parse_macro(parser);
+            break;
+        }
+
+        case Token_Type_Keyword_Do: {
+            OnyxToken* do_token = expect_token(parser, Token_Type_Keyword_Do);
+            AstDoBlock* do_block = make_node(AstDoBlock, Ast_Kind_Do_Block);
+            do_block->token = do_token;
+            do_block->type_node = (AstType *) &basic_type_auto_return;
+
+            if (parser->curr->type != '{') {
+                onyx_report_error(parser->curr->pos, "Expected '{' after 'do', got '%s'.", token_name(parser->curr->type));
+                retval = NULL;
+                break;
+            }
+
+            do_block->block = parse_block(parser, 1);
+
+            retval = (AstTyped *) do_block;
             break;
         }
 
