@@ -282,7 +282,7 @@ EMIT_FUNC(function_body, AstFunction* fd) {
 EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    generate_block_headers = generate_block_headers && (block->rules & Block_Rule_New_Scope);
+    generate_block_headers = generate_block_headers && (block->rules & Block_Rule_Emit_Instructions);
 
     if (generate_block_headers) {
         emit_enter_structured_block(mod, &code, (block->rules & Block_Rule_Override_Return)

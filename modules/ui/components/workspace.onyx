@@ -30,9 +30,7 @@ workspace_start :: (use r: Rectangle, site := #callsite, state: ^Workspace_State
 
     @Hack // This whole situtation is a hack of trying to a pointer to a valid state.
     if state == null {
-        state = map.get_ptr(^workspace_states, hash);
-
-        if state == null {
+        if state = map.get_ptr(^workspace_states, hash); state == null {
             map.put(^workspace_states, hash, .{});
             state = map.get_ptr(^workspace_states, hash);
         }
@@ -51,8 +49,8 @@ workspace_start :: (use r: Rectangle, site := #callsite, state: ^Workspace_State
         }
     }
 
-    mx, my := get_mouse_position();
-    if Rectangle.contains(r, mx, my) {
+    if  mx, my := get_mouse_position();
+        Rectangle.contains(r, mx, my) {
         set_hot_item(hash);
     }
 

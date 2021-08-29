@@ -493,13 +493,14 @@ typedef enum VarArgKind {
 
 typedef enum BlockRule {
     Block_Rule_New_Scope         = BH_BIT(1),
-    Block_Rule_Clear_Defer       = BH_BIT(2),
-    Block_Rule_Override_Return   = BH_BIT(3),
+    Block_Rule_Emit_Instructions = BH_BIT(2),
+    Block_Rule_Clear_Defer       = BH_BIT(3),
+    Block_Rule_Override_Return   = BH_BIT(4),
 
-    Block_Rule_Normal     = Block_Rule_New_Scope | Block_Rule_Clear_Defer,
+    Block_Rule_Normal     = Block_Rule_New_Scope | Block_Rule_Clear_Defer | Block_Rule_Emit_Instructions,
     Block_Rule_Macro      = Block_Rule_New_Scope,
     Block_Rule_Code_Block = Block_Rule_New_Scope,
-    Block_Rule_Do_Block   = Block_Rule_New_Scope | Block_Rule_Clear_Defer | Block_Rule_Override_Return,
+    Block_Rule_Do_Block   = Block_Rule_New_Scope | Block_Rule_Clear_Defer | Block_Rule_Override_Return | Block_Rule_Emit_Instructions,
 } BlockRule;
 
 typedef struct Arguments Arguments;
