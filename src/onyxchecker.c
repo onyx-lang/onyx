@@ -175,7 +175,7 @@ CheckStatus check_return(AstReturn* retnode) {
 }
 
 CheckStatus check_if(AstIfWhile* ifnode) {
-    if (ifnode->assignment != NULL) CHECK(statement, (AstNode **) &ifnode->assignment);
+    if (ifnode->initialization != NULL) CHECK(statement_chain, &ifnode->initialization);
 
     if (ifnode->kind == Ast_Kind_Static_If) {
         if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
@@ -184,7 +184,7 @@ CheckStatus check_if(AstIfWhile* ifnode) {
 
         if (static_if_resolution(ifnode)) {
             if (ifnode->true_stmt != NULL) CHECK(statement, (AstNode **) &ifnode->true_stmt);
-            
+
         } else {
             if (ifnode->false_stmt != NULL) CHECK(statement, (AstNode **) &ifnode->false_stmt);
         }
@@ -204,7 +204,7 @@ CheckStatus check_if(AstIfWhile* ifnode) {
 }
 
 CheckStatus check_while(AstIfWhile* whilenode) {
-    if (whilenode->assignment != NULL) CHECK(statement, (AstNode **) &whilenode->assignment);
+    if (whilenode->initialization != NULL) CHECK(statement_chain, &whilenode->initialization);
 
     CHECK(expression, &whilenode->cond);
 
@@ -317,7 +317,7 @@ static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, A
 }
 
 CheckStatus check_switch(AstSwitch* switchnode) {
-    if (switchnode->assignment != NULL) CHECK(statement, (AstNode **) &switchnode->assignment);
+    if (switchnode->initialization != NULL) CHECK(statement_chain, &switchnode->initialization);
 
     CHECK(expression, &switchnode->expr);
     Type* resolved_expr_type = resolve_expression_type(switchnode->expr);

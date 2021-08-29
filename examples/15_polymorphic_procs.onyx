@@ -1,3 +1,62 @@
+// There going to be examples in this sections that I do not want to be part of the
+// code, but I want the syntax highlighting to apply to them so I'm just going to
+// `#if false` this section out so the examples compiled.
+#if false {
+
+// If you are unfamiliar, polymorphic procedures allow you to write code that applies
+// to all types, instead of to only a particular type. For example, you will probably
+// want something like a max function that returns the larger of its two arguments.
+// You might start by writing it for just integer types as so:
+
+max :: (a: i32, b: i32) -> i32 {
+    return a if a > b else b;
+}
+
+// This will work as advertised, but if you try to call it with something other than
+// i32's, you will get a compile time error, even though the function body doesn't do
+// any thing that only applies to i32's. The function body just assumes that '>' is
+// defined for a and b.
+
+// To write max in a polymorphic way, you can do it in this way:
+
+max :: (a: $Type, b: Type) -> Type {
+    return a if a > b else b;
+}
+
+// In this example, 'Type' is a polymorphic variable, meaning that it is solved for
+// whenever 'max' is called. You'll notice that the first 'Type' has a dollar sign in
+// front of it. The dollar sign appears exactly once in front the polymorphic variable
+// name, as it specifies where the variable should be solved for. In this example, 'Type'
+// will be given to be the same type as 'a', and then 'b' and the return type should be
+// of the same type.
+
+// As another example, take 'array.push':
+
+push :: (arr: ^[..] $T, value: T) {
+    // ...
+}
+
+// The dollar sign in front of the first T means the argument will provide the type for T,
+// then the value is expected to be the same type. If the dollar sign would have been on
+// the second T like so,
+
+push :: (arr: ^[..] T, value: $T) {
+    // ...
+}
+
+// then the type of value would be used for T. This wouldn't change much in practice, for a
+// correct program. However, if your program has an error, then the second example would
+// report an error saying that the first argument is of the wrong type, instead of the more
+// likely error that the second argument is of the wrong type.
+
+// One final example is a single compose function:
+
+compose :: (a: $A, f: (A) -> $B, g: (B) -> $C) -> C {
+    return g(f(a));
+}
+
+}
+
 #load "core/std"
 
 use package core

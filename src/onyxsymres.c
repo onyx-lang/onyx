@@ -520,19 +520,17 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
 
         if (static_if_resolution(ifnode)) {
             if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
-            
+
         } else {
             if (ifnode->false_stmt != NULL) SYMRES(statement, (AstNode **) &ifnode->false_stmt, NULL);
         }
 
     } else {
-        if (ifnode->assignment != NULL) {
+        if (ifnode->initialization != NULL) {
             ifnode->scope = scope_create(context.ast_alloc, curr_scope, ifnode->token->pos);
             scope_enter(ifnode->scope);
 
-            SYMRES(local, &ifnode->local);
-
-            SYMRES(statement, (AstNode **) &ifnode->assignment, NULL);
+            SYMRES(statement_chain, &ifnode->initialization);
         }
 
         SYMRES(expression, &ifnode->cond);
@@ -541,20 +539,18 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
         if (ifnode->true_stmt != NULL)  SYMRES(statement, (AstNode **) &ifnode->true_stmt, NULL);
         if (ifnode->false_stmt != NULL) SYMRES(statement, (AstNode **) &ifnode->false_stmt, NULL);
 
-        if (ifnode->assignment != NULL) scope_leave();
+        if (ifnode->initialization != NULL) scope_leave();
     }
 
     return Symres_Success;
 }
 
 static SymresStatus symres_while(AstIfWhile* whilenode) {
-    if (whilenode->assignment != NULL) {
+    if (whilenode->initialization != NULL) {
         whilenode->scope = scope_create(context.ast_alloc, curr_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
-        SYMRES(local, &whilenode->local);
-
-        SYMRES(statement, (AstNode **) &whilenode->assignment, NULL);
+        SYMRES(statement_chain, &whilenode->initialization);
     }
 
     SYMRES(expression, &whilenode->cond);
@@ -562,7 +558,7 @@ static SymresStatus symres_while(AstIfWhile* whilenode) {
     if (whilenode->true_stmt)  SYMRES(block, whilenode->true_stmt);
     if (whilenode->false_stmt) SYMRES(block, whilenode->false_stmt);
 
-    if (whilenode->assignment != NULL) scope_leave();
+    if (whilenode->initialization != NULL) scope_leave();
 
     return Symres_Success;
 }
@@ -579,13 +575,11 @@ static SymresStatus symres_for(AstFor* fornode) {
 }
 
 static SymresStatus symres_switch(AstSwitch* switchnode) {
-    if (switchnode->assignment != NULL) {
+    if (switchnode->initialization != NULL) {
         switchnode->scope = scope_create(context.ast_alloc, curr_scope, switchnode->token->pos);
         scope_enter(switchnode->scope);
 
-        symbol_introduce(curr_scope, switchnode->local->token, (AstNode *) switchnode->local);
-
-        SYMRES(statement, (AstNode **) &switchnode->assignment, NULL);
+        SYMRES(statement_chain, &switchnode->initialization);
     }
 
     SYMRES(expression, &switchnode->expr);
@@ -593,14 +587,15 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
     bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
         bh_arr_each(AstTyped *, value, sc->values)
             SYMRES(expression, value);
-            
+
         SYMRES(block, sc->block);
     }
 
     if (switchnode->default_case)
         SYMRES(block, switchnode->default_case);
 
-    if (switchnode->assignment != NULL) scope_leave();
+    if (switchnode->initialization != NULL) scope_leave();
+
     return Symres_Success;
 }
 

@@ -693,10 +693,12 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
 EMIT_FUNC(if, AstIfWhile* if_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (if_node->assignment != NULL) {
-        bh_imap_put(&mod->local_map, (u64) if_node->local, local_allocate(mod->local_alloc, (AstTyped *) if_node->local));
+    if (if_node->initialization != NULL) {
+        // bh_imap_put(&mod->local_map, (u64) if_node->local, local_allocate(mod->local_alloc, (AstTyped *) if_node->local));
 
-        emit_assignment(mod, &code, if_node->assignment);
+        forll (AstNode, stmt, if_node->initialization, next) {
+            emit_statement(mod, &code, stmt);
+        }
     }
 
     if (if_node->kind == Ast_Kind_Static_If) {
@@ -727,21 +729,16 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
 
     emit_leave_structured_block(mod, &code);
 
-    if (if_node->assignment != NULL) {
-        local_free(mod->local_alloc, (AstTyped *) if_node->local);
-    }
-
-
     *pcode = code;
 }
 
 EMIT_FUNC(while, AstIfWhile* while_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    if (while_node->assignment != NULL) {
-        bh_imap_put(&mod->local_map, (u64) while_node->local, local_allocate(mod->local_alloc, (AstTyped *) while_node->local));
-
-        emit_assignment(mod, &code, while_node->assignment);
+    if (while_node->initialization != NULL) {
+        forll (AstNode, stmt, while_node->initialization, next) {
+            emit_statement(mod, &code, stmt);
+        }
     }
 
     if (while_node->false_stmt == NULL) {
@@ -778,9 +775,6 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
 
         emit_leave_structured_block(mod, &code);
     }
-
-    if (while_node->assignment != NULL)
-        local_free(mod->local_alloc, (AstTyped *) while_node->local);
 
     *pcode = code;
 }
@@ -1108,10 +1102,10 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     bh_imap block_map;
     bh_imap_init(&block_map, global_heap_allocator, bh_arr_length(switch_node->cases));
 
-    if (switch_node->assignment != NULL) {
-        bh_imap_put(&mod->local_map, (u64) switch_node->local, local_allocate(mod->local_alloc, (AstTyped *) switch_node->local));
-
-        emit_assignment(mod, &code, switch_node->assignment);
+    if (switch_node->initialization != NULL) {
+        forll (AstNode, stmt, switch_node->initialization, next) {
+            emit_statement(mod, &code, stmt);
+        }
     }
 
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
@@ -1177,9 +1171,6 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     }
 
     emit_leave_structured_block(mod, &code);
-
-    if (switch_node->assignment != NULL)
-        local_free(mod->local_alloc, (AstTyped *) switch_node->local);
 
     bh_imap_free(&block_map);
     *pcode = code;

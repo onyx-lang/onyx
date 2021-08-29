@@ -695,8 +695,7 @@ struct AstIfWhile {
     AstNode_base;
 
     Scope *scope;
-    AstLocal *local;
-    AstBinaryOp *assignment;
+    AstNode* initialization;
 
     AstTyped *cond;
 
@@ -720,8 +719,7 @@ struct AstSwitch {
     AstNode_base;
 
     Scope *scope;
-    AstLocal *local;
-    AstBinaryOp *assignment;
+    AstNode* initialization;
 
     AstTyped *expr;
 

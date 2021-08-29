@@ -243,11 +243,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
         case Ast_Kind_If:
         case Ast_Kind_While:
-            C(AstIfWhile, local);
-            C(AstIfWhile, assignment);
-
-            if (((AstIfWhile *) nn)->assignment)
-                ((AstIfWhile *) nn)->assignment->left = (AstTyped *) ((AstIfWhile *) nn)->local;
+            ((AstIfWhile *) nn)->initialization = ast_clone_list(a, ((AstIfWhile *) node)->initialization);
 
             C(AstIfWhile, cond);
             //fallthrough
@@ -261,10 +257,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstSwitch* dw = (AstSwitch *) nn;
             AstSwitch* sw = (AstSwitch *) node;
 
-            dw->local = (AstLocal *) ast_clone(a, sw->local);
-            dw->assignment = (AstBinaryOp *) ast_clone(a, sw->assignment);
-            if (dw->assignment)
-                dw->assignment->left = (AstTyped *) sw->local;
+            ((AstSwitch *) nn)->initialization = ast_clone_list(a, ((AstSwitch *) node)->initialization);
             dw->expr = (AstTyped *) ast_clone(a, sw->expr);
 
             dw->default_case = (AstBlock *) ast_clone(a, sw->default_case);

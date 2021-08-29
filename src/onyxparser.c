@@ -954,32 +954,30 @@ static AstIfWhile* parse_if_stmt(OnyxParser* parser) {
     if_node->token = expect_token(parser, Token_Type_Keyword_If);
 
     AstIfWhile* root_if = if_node;
+    AstTyped* cond;
+    AstNode* initialization_or_cond=NULL;
+    b32 had_initialization = 0;
+    if (parse_possible_symbol_declaration(parser, &initialization_or_cond)) {
+        had_initialization = 1;
 
-    // CLEANUP: All of the control blocks use this same kind of logic, and it
-    // is underpowered for what I think should be possible. Factor it out and
-    // make it better?
-    if (peek_token(1)->type == ':') {
-        OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
-        if_node->local = make_local(parser->allocator, local_sym, NULL);
-
-        expect_token(parser, ':');
-
-        AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
-        assignment->operation = Binary_Op_Assign;
-        assignment->token = expect_token(parser, '=');
-        assignment->left = (AstTyped *) if_node->local;
-        assignment->right = parse_expression(parser, 0);
-
-        if_node->assignment = assignment;
-        expect_token(parser, ';');
+    } else {
+        // NOTE: Assignment is allowed here because instead of not parsing correctly,
+        // an error is reported in the typechecking, saying that assignment isn't allowed
+        // here, which is better than an unexpected token error.
+        initialization_or_cond = (AstNode *) parse_compound_expression(parser, 1);
     }
 
-    // NOTE: Assignment is allowed here because instead of not parsing correctly,
-    // an error is reported in the typechecking, saying that assignment isn't allowed
-    // here, which is better than an unexpected token error.
-    AstTyped* cond = parse_expression(parser, 1);
+    if (had_initialization || parser->curr->type == ';') {
+        expect_token(parser, ';');
+        cond = parse_expression(parser, 1);
+    } else {
+        cond = (AstTyped *) initialization_or_cond;
+        initialization_or_cond = NULL;
+    }
+
     AstBlock* true_stmt = parse_block(parser, 1);
 
+    if_node->initialization = initialization_or_cond;
     if_node->cond = cond;
     if (true_stmt != NULL)
         if_node->true_stmt = true_stmt;
@@ -1015,24 +1013,29 @@ static AstIfWhile* parse_while_stmt(OnyxParser* parser) {
     AstIfWhile* while_node = make_node(AstIfWhile, Ast_Kind_While);
     while_node->token = while_token;
 
-    // CLEANUP: See above in parse_if_stmt
-    if (peek_token(1)->type == ':') {
-        OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
-        while_node->local = make_local(parser->allocator, local_sym, NULL);
+    AstTyped* cond;
+    AstNode* initialization_or_cond=NULL;
+    b32 had_initialization = 0;
+    if (parse_possible_symbol_declaration(parser, &initialization_or_cond)) {
+        had_initialization = 1;
 
-        expect_token(parser, ':');
-
-        AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
-        assignment->operation = Binary_Op_Assign;
-        assignment->token = expect_token(parser, '=');
-        assignment->left = (AstTyped *) while_node->local;
-        assignment->right = parse_expression(parser, 0);
-
-        while_node->assignment = assignment;
-        expect_token(parser, ';');
+    } else {
+        // NOTE: Assignment is allowed here because instead of not parsing correctly,
+        // an error is reported in the typechecking, saying that assignment isn't allowed
+        // here, which is better than an unexpected token error.
+        initialization_or_cond = (AstNode *) parse_compound_expression(parser, 1);
     }
 
-    while_node->cond = parse_expression(parser, 1);
+    if (had_initialization || parser->curr->type == ';') {
+        expect_token(parser, ';');
+        cond = parse_expression(parser, 1);
+    } else {
+        cond = (AstTyped *) initialization_or_cond;
+        initialization_or_cond = NULL;
+    }
+
+    while_node->initialization = initialization_or_cond;
+    while_node->cond = cond;
     while_node->true_stmt = parse_block(parser, 1);
 
     if (consume_token_if_next(parser, Token_Type_Keyword_Else)) {
@@ -1068,24 +1071,31 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
 
     bh_arr_new(global_heap_allocator, switch_node->cases, 4);
 
-    // CLEANUP: See above in parse_if_stmt
-    if (peek_token(1)->type == ':') {
-        OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
-        switch_node->local = make_local(parser->allocator, local_sym, NULL);
+    AstTyped* expr;
+    AstNode* initialization_or_expr=NULL;
+    b32 had_initialization = 0;
+    if (parse_possible_symbol_declaration(parser, &initialization_or_expr)) {
+        had_initialization = 1;
 
-        expect_token(parser, ':');
-
-        AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
-        assignment->operation = Binary_Op_Assign;
-        assignment->token = expect_token(parser, '=');
-        assignment->left = (AstTyped *) switch_node->local;
-        assignment->right = parse_expression(parser, 0);
-
-        switch_node->assignment = assignment;
-        expect_token(parser, ';');
+    } else {
+        // NOTE: Assignment is allowed here because instead of not parsing correctly,
+        // an error is reported in the typechecking, saying that assignment isn't allowed
+        // here, which is better than an unexpected token error.
+        initialization_or_expr = (AstNode *) parse_compound_expression(parser, 1);
     }
 
-    switch_node->expr = parse_expression(parser, 1);
+    if (had_initialization || parser->curr->type == ';') {
+        expect_token(parser, ';');
+        expr = parse_expression(parser, 1);
+
+    } else {
+        expr = (AstTyped *) initialization_or_expr;
+        initialization_or_expr = NULL;
+    }
+
+    switch_node->initialization = initialization_or_expr;
+    switch_node->expr = expr;
+
     expect_token(parser, '{');
 
     while (consume_token_if_next(parser, Token_Type_Keyword_Case)) {
@@ -1204,7 +1214,7 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
     if (parser->curr->type == ':') {
         AstBinding* binding = parse_top_level_binding(parser, symbol);
         if (parser->hit_unexpected_token) return 2;
-        
+
         ENTITY_SUBMIT(binding);
         return 2;
     }
@@ -1325,7 +1335,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             i32 symbol_res = parse_possible_symbol_declaration(parser, &retval);
             if (symbol_res == 2) needs_semicolon = 0;
             if (symbol_res != 0) break;
-            
+
             // fallthrough
         }
 
@@ -1431,11 +1441,11 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
                 if (parser->curr->type != '=')
                     memres->type_node = parse_type(parser);
-                
+
                 if (consume_token_if_next(parser, '='))
                     memres->initial_value = parse_expression(parser, 1);
-                
-                
+
+
                 ENTITY_SUBMIT(memres);
 
                 AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
@@ -1873,7 +1883,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
             AstBinding* binding = parse_top_level_binding(parser, binding_name);
             if (binding) ENTITY_SUBMIT(binding);
-            
+
             consume_token_if_next(parser, ';');
 
         } else {
@@ -2302,7 +2312,7 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
     }
 
     global_node->type_node = parse_type(parser);
-    
+
     ENTITY_SUBMIT(global_node);
 
     return (AstTyped *) global_node;
