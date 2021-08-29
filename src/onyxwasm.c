@@ -294,8 +294,18 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
         emit_statement(mod, &code, stmt);
     }
 
-    if (block->rules & Block_Rule_Clear_Defer) emit_deferred_stmts(mod, &code);
-    if (block->rules & Block_Rule_New_Scope)   emit_free_local_allocations(mod, &code);
+    // HACK: I'm not convinced this is the best way to handle this case. Essentially, if
+    // a deferred statement uses a local that is freed from the a macro block, then the
+    // local won't be valid anymore and could have garbage data. This ensures that the
+    // freeing of the local variables and flushing of the deferred statements happen together,
+    // so a deferred statement can never try to use a local that has been freed.
+    //                                                                   - brendanfh 2021/08/29
+    if (block->rules & Block_Rule_Clear_Defer) {
+        emit_deferred_stmts(mod, &code);
+
+        // if (block->rules & Block_Rule_New_Scope)
+        emit_free_local_allocations(mod, &code);
+    }
 
     if (generate_block_headers)
         emit_leave_structured_block(mod, &code);
@@ -378,7 +388,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
 
     i64 labelidx = get_structured_jump_label(mod, jump->jump, jump->count);
 
-    if (bh_arr_length(mod->deferred_stmts) != 0) {
+    if (bh_arr_length(mod->deferred_stmts) > 0) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
         i32 d = bh_arr_length(mod->structured_jump_target) - (labelidx + 1);
 
@@ -436,7 +446,7 @@ EMIT_FUNC_NO_ARGS(free_local_allocations) {
     if (bh_arr_length(mod->local_allocations) == 0) return;
 
     u64 depth = bh_arr_length(mod->structured_jump_target);
-    while (bh_arr_length(mod->local_allocations) > 0 && bh_arr_last(mod->local_allocations).depth == depth) {
+    while (bh_arr_length(mod->local_allocations) > 0 && bh_arr_last(mod->local_allocations).depth >= depth) {
         // CHECK: Not sure this next line is okay to be here...
         bh_imap_delete(&mod->local_map, (u64) bh_arr_last(mod->local_allocations).expr);
 
@@ -1204,18 +1214,18 @@ EMIT_FUNC(deferred_stmt, DeferredStmt deferred_stmt) {
             break;
         }
     }
-    
+
     *pcode = code;
 }
 
 EMIT_FUNC_NO_ARGS(deferred_stmts) {
-    if (bh_arr_length(mod->deferred_stmts) == 0) return;
+    if (bh_arr_length(mod->deferred_stmts) <= 0) return;
 
     u64 depth = bh_arr_length(mod->structured_jump_target);
 
     while (bh_arr_length(mod->deferred_stmts) > 0 && bh_arr_last(mod->deferred_stmts).depth >= depth) {
-        emit_deferred_stmt(mod, pcode, bh_arr_last(mod->deferred_stmts));
-        bh_arr_pop(mod->deferred_stmts);
+        DeferredStmt stmt = bh_arr_pop(mod->deferred_stmts);
+        emit_deferred_stmt(mod, pcode, stmt);
     }
 }
 
@@ -1480,7 +1490,7 @@ EMIT_FUNC(call, AstCall* call) {
 
                 reserve_size += any_size;
             }
-            
+
             // fallthrough
         }
 
@@ -2845,7 +2855,7 @@ EMIT_FUNC(return, AstReturn* ret) {
     emit_deferred_stmts(mod, &code);
 
     // Clear the rest of the deferred statements
-    if (bh_arr_length(mod->deferred_stmts) != 0) {
+    if (bh_arr_length(mod->deferred_stmts) > 0) {
         i32 i = bh_arr_length(mod->deferred_stmts) - 1;
         while (i >= 0) {
             emit_deferred_stmt(mod, &code, mod->deferred_stmts[i]);
@@ -3508,6 +3518,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .return_location_stack = NULL,
         .local_allocations = NULL,
         .stack_leave_patches = NULL,
+        .deferred_stmts = NULL,
 
         .stack_top_ptr = NULL,
         .stack_base_idx = 0,

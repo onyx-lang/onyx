@@ -1,0 +1,22 @@
+#load "core/std"
+
+use package core
+
+test_macro :: macro () {
+    defer {
+        println("Deferred.");
+    }
+}
+
+time :: macro (name: str) {
+    start := 10;
+    defer {
+        end := 1010;
+        printf("{} took {} milliseconds. {} {}\n", name, end - start, end, start);
+    }
+}
+
+main :: (args) => {
+    test_macro();
+    time("main");
+}
