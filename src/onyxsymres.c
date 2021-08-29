@@ -1058,23 +1058,16 @@ static SymresStatus symres_memres(AstMemRes** memres) {
 
 static SymresStatus symres_struct_defaults(AstType* t) {
     if (t->kind != Ast_Kind_Struct_Type) return Symres_Error;
-    
+
     AstStructType* st = (AstStructType *) t;
     if (st->scope) scope_enter(st->scope);
-    
+
     bh_arr_each(AstStructMember *, smem, st->members) {
         if ((*smem)->initial_value != NULL) {
             SYMRES(expression, &(*smem)->initial_value);
-            
-            // CLEANUP: I hate that this is here. The type inference for a struct member should happen once the actual type is known.
-            // There seems to be a problem with setting it in the checker however, because whenever I disable this code, somehow
-            // the compiler gets to the code generation without all the types figured out???
-            // if ((*smem)->type_node == NULL && (*smem)->initial_value->type_node != NULL) {
-            //    (*smem)->type_node = (*smem)->initial_value->type_node;
-            // }
         }
     }
-    
+
     if (st->scope) scope_leave();
     return Symres_Success;
 }

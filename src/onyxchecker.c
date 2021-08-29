@@ -579,7 +579,7 @@ CheckStatus check_call(AstCall** pcall) {
             filename->kind  = Ast_Kind_StrLit;
             filename->token = str_token;
             filename->addr  = 0;
-            
+
             add_entities_for_node(NULL, (AstNode *) filename, NULL, NULL);
             callsite->filename = filename;
 
@@ -616,7 +616,7 @@ CheckStatus check_call(AstCall** pcall) {
 
     call->va_kind = VA_Kind_Not_VA;
     call->type = callee->type->Function.return_type;
-    if (call->type == &type_auto_return) {
+    if (call->type == &type_auto_return && call->callee->kind != Ast_Kind_Macro) {
         YIELD(call->token->pos, "Waiting for auto-return type to be solved.");
     }
 
@@ -1959,7 +1959,7 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
 
         if (node->kind == Ast_Kind_Function) {
             AstFunction* func = (AstFunction *) node;
-            
+
             if (func->entity_header && func->entity_header->state <= Entity_State_Check_Types) {
                 done = 0;
             }

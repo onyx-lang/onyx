@@ -1273,7 +1273,7 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
 
             char* err_msg=NULL;
             bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, PPLM_By_Arguments, args, &err_msg);
-            
+
             if (slns == NULL) {
                 if (flag_to_yield) {
                     flag_to_yield = 0;
@@ -1281,7 +1281,7 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
                 }
 
                 if (callsite) onyx_report_error(callsite->pos, err_msg);
-                
+
                 return NULL;
             }
 

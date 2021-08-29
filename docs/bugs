@@ -1,5 +1,13 @@
 List of known bugs:
 
+[ ] macros cannot use 'use'.
+
+    Vec2 :: struct { x, y : f32; }
+
+    foo :: macro (use v: Vec2) {
+        println(x); // Doesn't work
+    }
+
 [X] macros are not allowed at the expression level. This is not necessarily a bug, but does
     bring many complications to the table about how resolve this. Current solution is to
     turn expression macros (macros that specify a return value) into a `do` expression.
