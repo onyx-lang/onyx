@@ -196,7 +196,7 @@ has_active_animation :: () -> bool {
 
 
 // Utilities
-get_site_hash :: (site: CallSite, increment := 0) -> UI_Id {
+get_site_hash :: macro (site: CallSite, increment := 0) -> UI_Id {
     hash :: package core.hash
 
     file_hash   := hash.to_u32(site.file);
@@ -221,7 +221,7 @@ move_towards :: macro (value: ^$T, target: T, step: T) {
     if *value > target - step && *value < target + step do *value = target;
 }
 
-#private color_lerp :: (t: f32, c1: gfx.Color4, c2: gfx.Color4) -> gfx.Color4 {
+#private color_lerp :: macro (t: f32, c1: gfx.Color4, c2: gfx.Color4) -> gfx.Color4 {
     return .{
         r = c1.r * (1 - t) + c2.r * t,
         g = c1.g * (1 - t) + c2.g * t,

@@ -2,7 +2,7 @@
 
 use package core
 
-main ::  (args: [] cstr) {
+main :: (args: [] cstr) {
     // Onyx does not have map type built into the language semantics,
     // but using polymorphic structs and overloaded procedures, it does
     // provide an 'any-to-any' hash map in it's core libraries.

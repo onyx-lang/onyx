@@ -16,7 +16,7 @@ use package core
 // a binary operator, you cannot pass a custom allocator.
 
 #operator + (x: str, y: str) -> str {
-    return string.concat(x, y); 
+    return string.concat(x, y);
 }
 
 main :: (args: [] cstr) {
@@ -35,7 +35,7 @@ main :: (args: [] cstr) {
 
     // As a side note, '==' is already overloaded for strings in the
     // standard library, so you can do this:
-    
+
     if array.contains(cast([] str) strings, "is ") {
         println("The array contains 'is '.");
     } else {

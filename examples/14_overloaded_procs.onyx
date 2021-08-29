@@ -14,7 +14,7 @@
 // multiple times. Instead, to do the above in Onyx, you create a explicitly
 // overloaded procedure,
 //
-//    foo :: proc {
+//    foo :: #match {
 //        (x: i32) { ... },
 //        (y: str) { ... },
 //    }

@@ -54,7 +54,7 @@ main :: (args: [] cstr) {
         // you can leave out the enum name from the lookup and just use a unary '.'.
         // For example,
         //
-        
+
         val := SimpleEnum.Value2;
 
         // Here .Value2 can be resolved from the context of "val".

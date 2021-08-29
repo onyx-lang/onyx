@@ -810,11 +810,11 @@ CheckStatus check_binaryop_assignment(AstBinaryOp* binop) {
         else if (binop->operation == Binary_Op_Assign_Sar)      operation = Binary_Op_Sar;
 
         AstBinaryOp* new_right = make_binary_op(context.ast_alloc, operation, binop->left, binop->right);
-        new_right->token = binop->token;
-        CHECK(binaryop, &new_right);
-
         binop->right = (AstTyped *) new_right;
+        new_right->token = binop->token;
         binop->operation = Binary_Op_Assign;
+
+        CHECK(binaryop, (AstBinaryOp **) &binop->right);
     }
 
     if (binop->right->type == NULL) {
@@ -1182,7 +1182,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         char* err_msg = NULL;
         if (!fill_in_arguments(&sl->args, (AstNode *) sl, &err_msg)) {
             onyx_report_error(sl->token->pos, err_msg);
-            
+
             bh_arr_each(AstTyped *, value, sl->args.values) {
                 if (*value == NULL) {
                     i32 member_idx = value - sl->args.values; // Pointer subtraction hack
@@ -1434,10 +1434,10 @@ CheckStatus check_subscript(AstSubscript** psub) {
         }
     }
 
-    if (!type_is_array_accessible(sub->addr->type))
-        ERROR_(sub->token->pos,
-                "Expected pointer or array type for left of array access, got '%s'.",
-                node_get_type_name(sub->addr));
+    if (!type_is_array_accessible(sub->addr->type)) {
+        report_bad_binaryop((AstBinaryOp *) sub);
+        return Check_Error;
+    }
 
     if (types_are_compatible(sub->expr->type, builtin_range_type_type)) {
         Type *of = NULL;
@@ -1448,6 +1448,7 @@ CheckStatus check_subscript(AstSubscript** psub) {
         else {
             // FIXME: Slice creation should be allowed for slice types and dynamic array types, like it
             // is below, but this code doesn't look at that.
+            report_bad_binaryop((AstBinaryOp *) sub);
             ERROR(sub->token->pos, "Invalid type for left of slice creation.");
         }
 
@@ -1461,6 +1462,7 @@ CheckStatus check_subscript(AstSubscript** psub) {
     resolve_expression_type(sub->expr);
     if (sub->expr->type->kind != Type_Kind_Basic
             || (sub->expr->type->Basic.kind != Basic_Kind_I32 && sub->expr->type->Basic.kind != Basic_Kind_U32)) {
+        report_bad_binaryop((AstBinaryOp *) sub);
         ERROR_(sub->token->pos,
             "Expected type u32 or i32 for index, got '%s'.",
             node_get_type_name(sub->expr));
@@ -1486,6 +1488,7 @@ CheckStatus check_subscript(AstSubscript** psub) {
         sub->type = sub->addr->type->Pointer.elem;
     }
     else {
+        report_bad_binaryop((AstBinaryOp *) sub);
         ERROR(sub->token->pos, "Invalid type for left of array access.");
     }
 

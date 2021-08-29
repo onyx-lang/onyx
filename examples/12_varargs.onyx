@@ -20,7 +20,7 @@
 use package core
 
 main :: (args: [] cstr) {
-    
+
     // This is how you specify a fixed type variadic procedure. 'args' can be thought
     // of as a slice of integers, with data and count fields. You can iterate over the
     // varargs using a for-loop like any other array-like structure. Note, do not

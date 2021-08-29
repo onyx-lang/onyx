@@ -109,7 +109,7 @@ Language Cohesion:
 
     [ ] Functions should return the correct value in all branches.
 
-    [ ] Add macros.
+    [X] Add macros.
 
     [ ] enum #flags should be able to be used as so:
         ```
