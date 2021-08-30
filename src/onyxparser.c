@@ -2425,21 +2425,11 @@ static AstMacro* parse_macro(OnyxParser* parser) {
 }
 
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
-    #if 0
-    if (parser->curr->type == Token_Type_Keyword_Proc) {
-        OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
-        onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
-        AstFunction* func_node = parse_function_definition(parser, proc_token);
-
-        return (AstTyped *) func_node;
-    }
-    #endif
-    
     if (parser->curr->type == Token_Type_Keyword_Global) return parse_global_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Struct) return (AstTyped *) parse_struct(parser);
     if (parser->curr->type == Token_Type_Keyword_Enum)   return (AstTyped *) parse_enum_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Macro)  return (AstTyped *) parse_macro(parser);
-    
+
     if (parse_possible_directive(parser, "type")) {
         AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
         alias->to = parse_type(parser);
@@ -2452,7 +2442,7 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         AstOverloadedFunction* ofunc = parse_overloaded_function(parser, directive_token);
         return (AstTyped *) ofunc;
     }
-    
+
     return parse_expression(parser, 1);
 }
 
@@ -2462,7 +2452,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
     AstTyped* node = parse_top_level_expression(parser);
     if (parser->hit_unexpected_token || node == NULL)
         return NULL;
-    
+
     // CLEANUP
     if (node->kind == Ast_Kind_Function) {
         AstFunction* func = (AstFunction *) node;
@@ -2504,11 +2494,8 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
                 "%b", symbol->text, symbol->length);
         }
 
-        if (node->kind == Ast_Kind_Type_Alias) {
-            node->token = symbol;
-        }
-
-        if      (node_is_type((AstNode *) node));
+        if (node->kind == Ast_Kind_Type_Alias)    node->token = symbol;
+        else if (node_is_type((AstNode *) node));
         else if (node->kind == Ast_Kind_Package);
         else if (node->kind == Ast_Kind_NumLit);
         else {

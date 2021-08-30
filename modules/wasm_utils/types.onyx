@@ -16,7 +16,7 @@ WasmSection :: enum {
     DataCount :: 0x0c;
 }
 
-#add_match hash.to_u32, (w: WasmSection) -> u32 {
+#add_match hash.to_u32, macro (w: WasmSection) -> u32 {
     return hash.to_u32(cast(u32) w);
 }
 
@@ -25,13 +25,13 @@ WasmBinary :: struct {
 
     // Section number -> Offset+size of data
     // This does not work for custom sections, as they all have the same section number
-    sections: map.Map(WasmSection, WasmSectionData);
+    sections: Map(WasmSection, WasmSectionData);
 
     // Custom section name -> Offset into data
     // So there is a custom section location that maps the name of the custom section
     // to the offset into the file. The backing-store for the keys is just the data
     // itself, as the names are in the data for the binary.
-    custom_section_locations : map.Map(str, i32);
+    custom_section_locations : Map(str, i32);
 }
 
 WasmSectionData :: struct {
@@ -109,7 +109,7 @@ WasmElement :: struct {
 WasmData :: struct {
     memory_index : u32;
     offset       : WasmInstruction;
-    
+
     data : [] u8;
 }
 

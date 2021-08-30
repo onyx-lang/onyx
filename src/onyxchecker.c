@@ -1619,8 +1619,11 @@ CheckStatus check_expression(AstTyped** pexpr) {
             CHECK(type, (AstType *) expr);
         }
 
-        if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
-            YIELD(expr->token->pos, "Trying to construct type.");
+        // Don't try to construct a polystruct ahead of time because you can't.
+        if (expr->kind != Ast_Kind_Poly_Struct_Type) {
+            if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
+                YIELD(expr->token->pos, "Trying to construct type.");
+            }
         }
 
         expr->type = &basic_types[Basic_Kind_Type_Index];

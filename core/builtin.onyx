@@ -182,7 +182,6 @@ CallSite :: struct {
 }
 
 
-
 any :: struct {
     data: rawptr;
     type: type_expr;
@@ -191,3 +190,19 @@ any :: struct {
 
 // Represents a code block. Not constructable outside of using a '#code' directive.
 Code :: struct {_:i32;}
+
+
+// Define aliases for common datastructures in the core library, if the core library is available.
+// I'm on the fence about keeping this, as the programmer may want to use these names for their own
+// structures, but for the moment I don't see any harm. I'm also thinking about removing the '[..]'
+// syntax for dynamic arrays and just make them like Map's and Set's, i.e. Array(T). This would
+// remove some confusion around the 3 different array types as dynamic arrays would clearly just be
+// normal structures. With the recent addition of macros and iterators, there really wouldn't be much
+// difference anyway.
+#if #defined((package core.map).Map) {
+    Map :: (package core.map).Map;
+}
+
+#if #defined((package core.set).Set) {
+    Set :: (package core.set).Set;
+}

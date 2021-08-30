@@ -80,7 +80,7 @@ encode :: #match {
         return .None;
     },
 
-    (w: ^io.Writer, v: map.Map(str, $T)) -> Encoding_Error {
+    (w: ^io.Writer, v: Map(str, $T)) -> Encoding_Error {
         io.write_byte(w, #char "{");
 
         for i: v.entries.count {

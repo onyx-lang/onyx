@@ -719,7 +719,7 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
 
         solid->poly_proc = potentially_resolved_proc;
     }
-    
+
     if (!solid->poly_proc || solid->poly_proc->kind != Ast_Kind_Polymorphic_Proc) {
         onyx_report_error(solid->token->pos, "Expected polymorphic procedure in #solidify directive.");
         return Symres_Error;

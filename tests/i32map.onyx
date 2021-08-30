@@ -5,7 +5,7 @@ package main
 use package core
 
 main :: (args: [] cstr) {
-    imap : map.Map(i32, str);
+    imap : Map(i32, str);
     map.init(^imap, "");
     defer {
         print("Freeing map\n");

@@ -10,7 +10,7 @@ True_Type_Font :: struct {
     entry_selector : u16;
     range_shift    : u16;
 
-    tables : map.Map(u32, TTF_Table_Info);
+    tables : Map(u32, TTF_Table_Info);
     char_maps : [..] TTF_Cmap;
 
     version : u32;
@@ -99,7 +99,7 @@ TTF_Cmap4 :: struct {
     range_shift    : u16;
 
     segments : [..] TTF_Segment;
-    cache    : map.Map(i32, i32);
+    cache    : Map(i32, i32);
 }
 
 TTF_Segment :: struct {

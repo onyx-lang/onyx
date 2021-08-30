@@ -496,19 +496,22 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return ((AstTypeRawAlias *) type_node)->to;
 
         case Ast_Kind_Poly_Struct_Type:
-            onyx_report_error(type_node->token->pos,
-                "This structure is polymorphic, which means you need to provide arguments to it to make it a concrete structure. "
-                "This error message is probably in the wrong place, so look through your code for uses of this struct.");
+            //onyx_report_error(type_node->token->pos,
+            //    "This structure is polymorphic, which means you need to provide arguments to it to make it a concrete structure. "
+            //    "This error message is probably in the wrong place, so look through your code for uses of this struct.");
+            return NULL;
             break;
 
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_type = (AstPolyCallType *) type_node;
+            pc_type->callee = (AstType *) strip_aliases((AstNode *) pc_type->callee);
 
             if (!(pc_type->callee && pc_type->callee->kind == Ast_Kind_Poly_Struct_Type)) {
-                // If it is an unresolved field access, just return because an error will be printed elsewhere.
-                if (pc_type->callee->kind == Ast_Kind_Field_Access) return NULL;
+                // If it is an unresolved field access or symbol, just return because an error will be printed elsewhere.
+                if (pc_type->callee->kind == Ast_Kind_Field_Access || pc_type->callee->kind == Ast_Kind_Symbol) return NULL;
 
                 onyx_report_error(pc_type->token->pos, "Cannot instantiate a concrete type off of a non-polymorphic type.");
+                onyx_report_error(pc_type->callee->token->pos, "Here is the type trying to be instantiated. (%s)", onyx_ast_node_kind_string(pc_type->callee->kind));
                 return NULL;
             }
 

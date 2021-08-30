@@ -21,7 +21,7 @@ Workspace_State :: struct {
 }
 
 #private
-workspace_states : map.Map(UI_Id, Workspace_State);
+workspace_states : Map(UI_Id, Workspace_State);
 
 workspace_start :: (use r: Rectangle, site := #callsite, state: ^Workspace_State = null) {
     hash := get_site_hash(site, 0);

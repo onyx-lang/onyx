@@ -7,8 +7,8 @@ BMFont :: struct {
     info   : BMFont_Info;
     common : BMFont_Common;
 
-    pages  : map.Map(i32, str);
-    glyphs : map.Map(i32, BMFont_Glyph);
+    pages  : Map(i32, str);
+    glyphs : Map(i32, BMFont_Glyph);
 
     get_glyph :: (use bmfont: ^BMFont, char: u8) -> ^BMFont_Glyph {
         return map.get_ptr(^glyphs, ~~char);

@@ -71,7 +71,7 @@ create_font :: (bmfont_data: [] u8, font_texture_data: [] u8) -> Font {
 
 Font_Index :: i32;
 
-#private font_registry : map.Map(Font_Index, Font);
+#private font_registry : Map(Font_Index, Font);
 register_font :: (index: Font_Index, font: Font) {
     assert(!map.has(^font_registry, index), "Font with this index already exists.");
     map.put(^font_registry, index, font);

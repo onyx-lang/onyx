@@ -902,7 +902,7 @@ struct AstOverloadedFunction {
     AstTyped_base;
 
     bh_arr(OverloadOption) overloads;
-    
+
     // CLEANUP: This is unused right now, but should be used to cache
     // the complete set of overloads that can be used by an overloaded
     // function.
