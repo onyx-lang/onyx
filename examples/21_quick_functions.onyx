@@ -1,0 +1,9 @@
+// Unfinished Example
+
+#load "core/std"
+
+use package core
+
+main :: (args) => {
+    
+}

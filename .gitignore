@@ -12,3 +12,4 @@ session.vim
 *.exe
 *.rdbg
 tmp/
+.vimspector.json

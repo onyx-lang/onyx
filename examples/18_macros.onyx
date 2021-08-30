@@ -1,0 +1,20 @@
+// Unfinished Example
+
+#load "core/std"
+
+use package core
+
+say_something :: macro (thing: Code) {
+    #persist increment := 0;
+    increment += 1;
+    printf("[INFO:{}] {}\n", increment, #insert thing);
+}
+
+main :: (args: [] cstr) {
+    data := "Some string in the main function";
+
+    say_something(#code "Foo");
+    say_something(#code 10);
+    say_something(#code context);
+    say_something(#code data);
+}
