@@ -1940,7 +1940,7 @@ CheckStatus check_function(AstFunction* func) {
     expected_return_type = &func->type->Function.return_type;
     if (func->body) {
         CheckStatus status = check_block(func->body);
-        if (status == Check_Error && func->generated_from)
+        if (status == Check_Error && func->generated_from && context.cycle_detected == 0)
             ERROR(func->generated_from->pos, "Error in polymorphic procedure generated from this location.");
 
         if (status != Check_Success) return status;

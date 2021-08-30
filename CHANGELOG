@@ -1,4 +1,4 @@
-Release v0.0.7
+Release v0.1.0-beta
 --------------
 This release contains MANY CHANGES because I am terrible at keeping up to date with a
 proper changelog and release schedule. Basically, this is the first release where I
@@ -8,6 +8,10 @@ are going to be changed and added in the future, but first I want to get this be
 version out there in a packaged format.
 
 Additions:
+* Quick-Functions
+* do-expressions
+* typeof
+* '#auto' return type
 * Macros and paste-able code blocks
 * overloaded procedures can have polymorphic and overloaded procedures as overloads.  This makes them MUCH more powerful.
 * types are not required on struct members that have default values. This is still very experimental so there are some
@@ -31,6 +35,7 @@ Additions:
 Removals:
 
 Changes:
+* initialization statements on if/while/switch are a lot more powerful.
 * the "proc" keyword is now optional in a lot of cases. There are inevitably some bugs with this change,
     but you can always add it in when it may be necessary. Note, that for overloaded procedures, "#match"
     is now used.

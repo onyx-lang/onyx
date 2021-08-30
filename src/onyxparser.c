@@ -2418,7 +2418,12 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
 static AstMacro* parse_macro(OnyxParser* parser) {
     AstMacro* macro = make_node(AstMacro, Ast_Kind_Macro);
     macro->token = expect_token(parser, Token_Type_Keyword_Macro);
-    macro->body  = (AstTyped *) parse_function_definition(parser, macro->token);
+    
+    // First try quick function
+    if (!parse_possible_quick_function_definition(parser, &macro->body)) {
+        // Otherwise, do a normal function
+        macro->body  = (AstTyped *) parse_function_definition(parser, macro->token);
+    }
 
     ENTITY_SUBMIT(macro);
     return macro;
