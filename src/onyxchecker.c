@@ -735,7 +735,54 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
             node_get_type_name(binop->right));
 }
 
-CheckStatus check_binaryop_assignment(AstBinaryOp* binop) {
+static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
+    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
+
+    Arguments args = ((Arguments) { NULL, NULL });
+    bh_arr_new(global_heap_allocator, args.values, 2);
+    bh_arr_push(args.values, binop->left);
+    bh_arr_push(args.values, binop->right);
+
+    if (binop_is_assignment(binop->operation)) {
+        args.values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
+
+        u32 current_checking_level_store = current_checking_level;
+        CheckStatus cs = check_address_of((AstAddressOf *) args.values[0]);
+        current_checking_level = current_checking_level_store;
+
+        if (cs == Check_Yield_Macro) return (AstCall *) &node_that_signals_a_yield;
+        if (cs == Check_Error) {
+            return NULL;
+        }
+    }
+
+    b32 should_yield = 0;
+    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args, &should_yield);
+    if (should_yield) {
+        bh_arr_free(args.values);
+        return (AstCall *) &node_that_signals_a_yield;
+    }
+
+    if (overload == NULL) {
+        bh_arr_free(args.values);
+        return NULL;
+    }
+
+    AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+    implicit_call->token = binop->token;
+    implicit_call->callee = overload;
+    implicit_call->va_kind = VA_Kind_Not_VA;
+
+    bh_arr_each(AstTyped *, arg, args.values)
+        *arg = (AstTyped *) make_argument(context.ast_alloc, *arg);
+
+    implicit_call->args = args;
+    return implicit_call;
+}
+
+
+CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
+    AstBinaryOp* binop = *pbinop;
     if (current_checking_level == EXPRESSION_LEVEL)
         ERROR(binop->token->pos, "Assignment not valid in expression.");
 
@@ -947,38 +994,6 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
     return Check_Success;
 }
 
-static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
-    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
-
-    Arguments args = ((Arguments) { NULL, NULL });
-    bh_arr_new(global_heap_allocator, args.values, 2);
-    bh_arr_push(args.values, binop->left);
-    bh_arr_push(args.values, binop->right);
-
-    b32 should_yield = 0;
-    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args, &should_yield);
-    if (should_yield) {
-        bh_arr_free(args.values);
-        return (AstCall *) &node_that_signals_a_yield;
-    }
-
-    if (overload == NULL) {
-        bh_arr_free(args.values);
-        return NULL;
-    }
-
-    AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
-    implicit_call->token = binop->token;
-    implicit_call->callee = overload;
-    implicit_call->va_kind = VA_Kind_Not_VA;
-
-    bh_arr_each(AstTyped *, arg, args.values)
-        *arg = (AstTyped *) make_argument(context.ast_alloc, *arg);
-
-    implicit_call->args = args;
-    return implicit_call;
-}
-
 CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
@@ -992,8 +1007,6 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
         binop->flags |= Ast_Flag_Comptime;
     }
-
-    if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(binop);
 
     if (expression_types_must_be_known) {
         if (binop->left->type == NULL || binop->right->type == NULL) {
@@ -1028,6 +1041,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
             return Check_Success;
         }
     }
+
+    if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(pbinop);
 
     // NOTE: Comparision operators and boolean operators are handled separately.
     if (binop_is_compare(binop->operation)) 

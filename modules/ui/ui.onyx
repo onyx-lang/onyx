@@ -161,7 +161,7 @@ Rectangle :: struct {
 Text_Theme :: struct {
     text_color := gfx.Color4.{ 1, 1, 1 };
 
-    font       : i32 = 0; // Default to font index 0 
+    font       := 0; // Default to font index 0 
     font_size  := 1.0f;
 }
 

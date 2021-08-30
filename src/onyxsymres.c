@@ -68,7 +68,7 @@ static void scope_leave() {
 
 static SymresStatus symres_symbol(AstNode** symbol_node) {
     OnyxToken* token = (*symbol_node)->token;
-    AstNode* res = symbol_resolve(curr_scope, token);    
+    AstNode* res = symbol_resolve(curr_scope, token);
 
     if (!res) { // :SymresStall
         if (report_unresolved_symbols) {
@@ -906,7 +906,7 @@ SymresStatus symres_function(AstFunction* func) {
             //
             //     Foo :: struct (T: type_expr) {
             //         use t : T;
-            // 
+            //
             //         something_else := 5 + 6 * 8;
             //     }
             //
@@ -1078,7 +1078,7 @@ static SymresStatus symres_polyproc(AstPolyProc* pp) {
         // because I think the following should be possible:
         //
         //     baked_proc :: (x: $T, $f: (T) -> T) -> T ...
-        // 
+        //
         // The type of 'f' depends on resolving the value for the polyvar 'T'.
         SYMRES(type, &param->type_expr);
     }
@@ -1127,10 +1127,10 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            if (binop_is_assignment(operator->operator)) {
+            /*if (binop_is_assignment(operator->operator)) {
                 onyx_report_error(overload->token->pos, "'%s' is not currently overloadable.", binaryop_string[operator->operator]);
                 return Symres_Error;
-            }
+            }*/
 
             add_overload_option(&operator_overloads[operator->operator], 0, operator->overload);
             break;
@@ -1207,7 +1207,7 @@ void symres_entity(Entity* ent) {
         }
 
         case Entity_Type_Static_If:               ss = symres_static_if(ent->static_if); break;
-        
+
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function_Header:         ss = symres_function_header(ent->function); break;
         case Entity_Type_Function:                ss = symres_function(ent->function);        break;

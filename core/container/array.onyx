@@ -107,7 +107,7 @@ remove :: (arr: ^[..] $T, elem: T) {
 
     while i := 0; i < arr.count - move {
         defer i += 1;
-        
+
         if arr.data[i + move] == elem do move += 1;
         if move != 0 do arr.data[i] = arr.data[i + move];
     }

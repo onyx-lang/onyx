@@ -118,4 +118,9 @@ write :: #match {
     write_range,
 
     write_format,
+
+    // Catch all for any type. Has a high precedence so you can easily override it.
+    #precedence 1000 (w: ^Writer, a: $T) {
+        write_format(w, "{}", a);
+    }
 }
