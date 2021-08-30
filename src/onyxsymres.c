@@ -879,6 +879,9 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     SYMRES(type, &func->return_type);
     if (!node_is_type((AstNode *) func->return_type)) {
+        AstType* return_type = (AstType *) strip_aliases((AstNode *) func->return_type);
+        if (return_type->kind == Ast_Kind_Symbol) return Symres_Yield_Macro;
+
         onyx_report_error(func->token->pos, "Return type is not a type.");
     }
 
