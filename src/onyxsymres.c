@@ -158,7 +158,7 @@ static SymresStatus symres_type(AstType** type) {
             SYMRES(field_access, (AstFieldAccess **) type);
 
             if (!node_is_type((AstNode *) *type))
-                onyx_report_error((*type)->token->pos, "Field access did not result in a type.");
+                onyx_report_error((*type)->token->pos, "Field access did not result in a type. (%s)", onyx_ast_node_kind_string((*type)->kind));
             break;
         }
 
@@ -285,9 +285,11 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     SYMRES(expression, &(*fa)->expr);
     if ((*fa)->expr == NULL) return Symres_Error;
 
-    AstNode* resolution = try_symbol_resolve_from_node((AstNode *) (*fa)->expr, (*fa)->token);
+    AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) (*fa)->expr);
+
+    AstNode* resolution = try_symbol_resolve_from_node((AstNode *) expr, (*fa)->token);
     if (resolution) *((AstNode **) fa) = resolution;
-    else if ((*fa)->expr->kind == Ast_Kind_Package) {
+    else if (expr->kind == Ast_Kind_Package) {
         if (report_unresolved_symbols) {
             onyx_report_error((*fa)->token->pos, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
                 (*fa)->token->text,

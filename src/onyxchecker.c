@@ -1380,8 +1380,10 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     doblock->block->rules = Block_Rule_Do_Block;
     CHECK(block, doblock->block);
 
-    if (doblock->type == &type_auto_return)
-        ERROR(doblock->token->pos, "Unable to determine type of do-block expression.");
+    if (doblock->type == &type_auto_return) {
+        // ERROR(doblock->token->pos, "Unable to determine type of do-block expression.");
+        doblock->type = &basic_types[Basic_Kind_Void];
+    }
 
     expected_return_type = old_expected_return_type;
     doblock->flags |= Ast_Flag_Has_Been_Checked;
