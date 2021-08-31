@@ -2250,7 +2250,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         return_type = (AstType *) &basic_type_auto_return;
 
     } else {
-        AstTyped* body = parse_expression(parser, 0);
+        AstTyped* body = parse_compound_expression(parser, 0);
 
         AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
         return_node->token = body->token;
