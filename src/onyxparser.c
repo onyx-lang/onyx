@@ -72,6 +72,7 @@ static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
 static void           parse_top_level_statement(OnyxParser* parser);
 static AstPackage*    parse_package_expression(OnyxParser* parser);
+static void           parse_top_level_statements_until(OnyxParser* parser, TokenType tt);
 
 static void consume_token(OnyxParser* parser) {
     if (parser->hit_unexpected_token) return;
@@ -2523,8 +2524,36 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
 
 static void parse_top_level_statement(OnyxParser* parser) {
     AstFlags private_kind = 0;
-    if      (parse_possible_directive(parser, "private"))      private_kind = Ast_Flag_Private_Package;
-    else if (parse_possible_directive(parser, "private_file")) private_kind = Ast_Flag_Private_File;
+    if (bh_arr_length(parser->scope_flags) > 0)
+        private_kind = bh_arr_last(parser->scope_flags);
+
+    // :CLEANUP this very repetetive code...
+    if (parse_possible_directive(parser, "private")) {
+        private_kind = Ast_Flag_Private_Package;
+        if (parser->curr->type == '{') {
+            bh_arr_push(parser->scope_flags, private_kind);
+
+            expect_token(parser, '{');
+            parse_top_level_statements_until(parser, '}');
+            expect_token(parser, '}');
+
+            bh_arr_pop(parser->scope_flags);
+            return;
+        }
+    }
+    else if (parse_possible_directive(parser, "private_file")) {
+        private_kind = Ast_Flag_Private_File;
+        if (parser->curr->type == '{') {
+            bh_arr_push(parser->scope_flags, private_kind);
+
+            expect_token(parser, '{');
+            parse_top_level_statements_until(parser, '}');
+            expect_token(parser, '}');
+
+            bh_arr_pop(parser->scope_flags);
+            return;
+        }
+    }
 
     AstBinding* binding = NULL;
 
@@ -2534,11 +2563,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
             if (use_node) ENTITY_SUBMIT(use_node);
             return;
         }
-
-        // case Token_Type_Keyword_Proc:
-        //     onyx_report_warning(parser->curr->pos, "Warning: 'proc' is a deprecated keyword.");
-        //     parse_top_level_expression(parser);
-        //     return;
 
         case Token_Type_Symbol: {
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
@@ -2776,6 +2800,14 @@ static Package* parse_file_package(OnyxParser* parser) {
     return package_node->package;
 }
 
+static void parse_top_level_statements_until(OnyxParser* parser, TokenType tt) {
+    while (parser->curr->type != tt) {
+        if (parser->hit_unexpected_token) break;
+        if (onyx_has_errors()) break;
+        parse_top_level_statement(parser);
+    }
+}
+
 
 // NOTE: This returns a void* so I don't need to cast it everytime I use it
 void* onyx_ast_node_new(bh_allocator alloc, i32 size, AstKind kind) {
@@ -2797,6 +2829,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.hit_unexpected_token = 0;
     parser.current_scope = NULL;
     parser.alternate_entity_placement_stack = NULL;
+    parser.scope_flags = NULL;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,
@@ -2804,6 +2837,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     };
 
     bh_arr_new(global_heap_allocator, parser.alternate_entity_placement_stack, 4);
+    bh_arr_new(global_heap_allocator, parser.scope_flags, 4);
 
     return parser;
 }
@@ -2825,11 +2859,7 @@ void onyx_parse(OnyxParser *parser) {
     implicit_use_builtin->expr = (AstTyped *) implicit_builtin_package;
     ENTITY_SUBMIT(implicit_use_builtin);
 
-    while (parser->curr->type != Token_Type_End_Stream) {
-        if (parser->hit_unexpected_token) break;
-        if (onyx_has_errors()) break;
-        parse_top_level_statement(parser);
-    }
+    parse_top_level_statements_until(parser, Token_Type_End_Stream);
 
     parser->current_scope = parser->current_scope->parent;
 }

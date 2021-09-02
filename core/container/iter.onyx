@@ -50,7 +50,7 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
 
     next :: ($T: type_expr, $R: type_expr, mi: ^MapIterator(T, R)) -> (R, bool) {
         value, cont := mi.iterator.next(mi.iterator.data);
-        if !cont do return value, false;
+        if !cont do return __zero_value(R), false;
 
         return mi.transform(value), true;
     }
