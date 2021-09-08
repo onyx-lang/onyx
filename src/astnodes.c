@@ -969,6 +969,8 @@ void arguments_initialize(Arguments* args) {
         args->values[i] = NULL;
         args->named_values[i] = NULL;
     }
+
+    args->used_argument_count = -1;
 }
 
 void arguments_ensure_length(Arguments* args, u32 count) {
@@ -983,20 +985,24 @@ void arguments_ensure_length(Arguments* args, u32 count) {
 }
 
 void arguments_copy(Arguments* dest, Arguments* src) {
+    dest->used_argument_count = -1;
     dest->named_values = src->named_values;
     
-    arguments_ensure_length(dest, bh_arr_length(src->values));
+    bh_arr_grow(dest->values, (u32) bh_arr_length(src->values));
+    bh_arr_set_length(dest->values, (u32) bh_arr_length(src->values));
     bh_arr_each(AstTyped*, arg, dest->values) *arg = NULL;
     fori (i, 0, bh_arr_length(src->values)) dest->values[i] = src->values[i];
 }
 
 // In clone, the named_values are not copied. This is used in find_matching_overload_by_arguments since it doesn't need them to be copied.
 void arguments_clone(Arguments* dest, Arguments* src) {
+    dest->used_argument_count = -1;
     dest->named_values = src->named_values;
     dest->values = bh_arr_copy(global_heap_allocator, src->values);
 }
 
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src) {
+    dest->used_argument_count = -1;
     dest->values = NULL;
     dest->named_values = NULL;
 

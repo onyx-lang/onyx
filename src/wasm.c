@@ -2845,20 +2845,20 @@ EMIT_FUNC(return, AstReturn* ret) {
     // Clear the normal deferred statements
     emit_deferred_stmts(mod, &code);
 
-    // Clear the rest of the deferred statements
-    if (bh_arr_length(mod->deferred_stmts) > 0) {
-        i32 i = bh_arr_length(mod->deferred_stmts) - 1;
-        while (i >= 0) {
-            emit_deferred_stmt(mod, &code, mod->deferred_stmts[i]);
-            i--;
-        }
-    }
-
     i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, 1);
     if (jump_label >= 0) {
         WIL(WI_JUMP, jump_label);
 
     } else {
+        // Clear the rest of the deferred statements
+        if (bh_arr_length(mod->deferred_stmts) > 0) {
+            i32 i = bh_arr_length(mod->deferred_stmts) - 1;
+            while (i >= 0) {
+                emit_deferred_stmt(mod, &code, mod->deferred_stmts[i]);
+                i--;
+            }
+        }
+
         // Make a patch for the two instructions needed to restore the stack pointer
         SUBMIT_PATCH(mod->stack_leave_patches, 0);
         WI(WI_NOP);

@@ -79,6 +79,10 @@ void onyx_clear_errors() {
     bh_arr_set_length(errors.errors, 0);
 }
 
+void onyx_submit_error(OnyxError error) {
+    bh_arr_push(errors.errors, error);
+}
+
 void onyx_report_error(OnyxFilePos pos, char * format, ...) {
 
     va_list vargs;
@@ -94,6 +98,19 @@ void onyx_report_error(OnyxFilePos pos, char * format, ...) {
     bh_arr_push(errors.errors, err);
 }
 
+void onyx_submit_warning(OnyxError error) {
+    bh_file_contents file_contents = { 0 };
+    bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
+        if (!strcmp(fc->filename, error.pos.filename)) {
+            file_contents = *fc;
+            break;
+        }
+    }
+
+    print_detailed_message(&error, &file_contents);
+}
+
+// This definitely doesn't do what I thought it did?
 void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
     va_list vargs;
     va_start(vargs, format);

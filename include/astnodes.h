@@ -3,6 +3,7 @@
 
 #include "lex.h"
 #include "types.h"
+#include "errors.h"
 
 #define AST_NODES              \
     NODE(Node)                 \
@@ -507,6 +508,9 @@ typedef struct Arguments Arguments;
 struct Arguments {
     bh_arr(AstTyped *) values;
     bh_arr(AstNamedValue *) named_values;
+
+    // How many arguments were not baked.
+    i32 used_argument_count;
 };
 
 
@@ -1364,6 +1368,9 @@ void arguments_copy(Arguments* dest, Arguments* src);
 void arguments_clone(Arguments* dest, Arguments* src);
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
 void arguments_remove_baked(Arguments* args);
+b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
+                                 OnyxToken* location, char* func_name, struct OnyxError* error);
+i32 function_get_minimum_argument_count(TypeFunction* type, Arguments* args);
 
 // GROSS: Using void* to avoid having to cast everything.
 const char* node_get_type_name(void* node);

@@ -6,6 +6,7 @@
 #include "errors.h"
 #include "parser.h"
 #include "astnodes.h"
+#include "errors.h"
 
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
@@ -366,36 +367,14 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         }
         assert(overload->type->kind == Type_Kind_Function);
 
+        arguments_remove_baked(&args);
+        arguments_ensure_length(&args, function_get_minimum_argument_count(&overload->type->Function, &args));
+
         // NOTE: If the arguments cannot be placed successfully in the parameters list
         if (!fill_in_arguments(&args, (AstNode *) overload, NULL)) continue;
-
-        TypeFunction* ol_type = &overload->type->Function;
-        if (bh_arr_length(args.values) < (i32) ol_type->needed_param_count) continue;
-
-        b32 all_arguments_work = 1;
-        fori (i, 0, bh_arr_length(args.values)) {
-            if (i >= ol_type->param_count) {
-                all_arguments_work = 0;
-                break;
-            }
-
-            Type* type_to_match = ol_type->params[i];
-            AstTyped** value    = &args.values[i];
-
-            if (type_to_match->kind == Type_Kind_VarArgs) type_to_match = type_to_match->VarArgs.elem;
-            if ((*value)->kind == Ast_Kind_Argument) {
-                // :ArgumentResolvingIsComplicated
-                if (((AstArgument *) (*value))->is_baked) continue;
-                value = &((AstArgument *) *value)->value;
-            }
-
-            if (!unify_node_and_type_(value, type_to_match, 0)) {
-                all_arguments_work = 0;
-                break;
-            }
-        }
-
-        if (all_arguments_work) {
+        
+        VarArgKind va_kind;
+        if (check_arguments_against_type(&args, &overload->type->Function, &va_kind, NULL, NULL, NULL)) {
             matched_overload = node;
             break;
         }
@@ -692,6 +671,33 @@ static i32 maximum_argument_count(AstNode* provider) {
     return 0x7fffffff;
 }
 
+static i32 non_baked_argument_count(Arguments* args) {
+    if (args->used_argument_count >= 0) return args->used_argument_count;
+
+    i32 count = 0;
+
+    bh_arr_each(AstTyped *, actual, args->values) {
+        if ((*actual)->kind != Ast_Kind_Argument) count++;
+        else if (!((AstArgument *) (*actual))->is_baked) count++;
+    }
+
+    bh_arr_each(AstNamedValue *, named_value, args->named_values) {
+        if ((*named_value)->value->kind != Ast_Kind_Argument) count++;
+        else if (!((AstArgument *) (*named_value)->value)->is_baked) count++;
+    }
+
+    args->used_argument_count = count;
+    return count;
+}
+
+i32 function_get_minimum_argument_count(TypeFunction* type, Arguments* args) {
+    i32 non_vararg_param_count = (i32) type->param_count;
+    if (non_vararg_param_count > 0 && type->params[type->param_count - 1] == builtin_vararg_type_type)
+        non_vararg_param_count--;
+
+    return bh_max(non_vararg_param_count, non_baked_argument_count(args));
+}
+
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
@@ -735,6 +741,7 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
 
             // assert(idx < bh_arr_length(args->values));
             if (idx >= bh_arr_length(args->values)) {
+                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Error placing value with name '%s' at index '%d'.", named_value->token->text, idx);
                 token_toggle_end(named_value->token);
                 return 0;
             }
@@ -754,19 +761,158 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
     fori (idx, 0, bh_arr_length(args->values)) {
         if (args->values[idx] == NULL) args->values[idx] = (AstTyped *) lookup_default_value_by_idx(provider, idx);
         if (args->values[idx] == NULL) {
-            *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
+            if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
             success = 0;
         }
     }
 
     i32 maximum_arguments = maximum_argument_count(provider);
     if (bh_arr_length(args->values) > maximum_arguments) {
-        *err_msg = bh_aprintf(global_scratch_allocator, "Too many values provided. Expected at most %d.", maximum_arguments);
+        if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "Too many values provided. Expected at most %d.", maximum_arguments);
         success = 0;
     }
 
     return success;
 }
+
+
+//
+// Argument checking
+//
+
+typedef enum ArgState {
+    AS_Expecting_Exact,
+    AS_Expecting_Typed_VA,
+    AS_Expecting_Untyped_VA,
+} ArgState;
+
+b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
+                                 OnyxToken* location, char* func_name, OnyxError* error) {
+    b32 permanent = location != NULL;
+    if (func_name == NULL) func_name = "UNKNOWN FUNCTION";
+
+    bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) args->values;
+    i32 arg_count = function_get_minimum_argument_count(func_type, args);
+
+    Type **formal_params = func_type->params;
+    Type* variadic_type = NULL;
+    i64 any_type_id = type_build_from_ast(context.ast_alloc, builtin_any_type)->id;
+
+    ArgState arg_state = AS_Expecting_Exact;
+    u32 arg_pos = 0;
+    while (1) {
+        switch (arg_state) {
+            case AS_Expecting_Exact: {
+                if (arg_pos >= func_type->param_count) goto type_checking_done;
+
+                if (formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
+                    variadic_type = formal_params[arg_pos]->VarArgs.elem;
+                    arg_state = AS_Expecting_Typed_VA;
+                    continue;
+                }
+
+                if ((i16) arg_pos == func_type->vararg_arg_pos) {
+                    arg_state = AS_Expecting_Untyped_VA;
+                    continue;
+                }
+
+                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
+
+                assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
+                if (!unify_node_and_type_(&arg_arr[arg_pos]->value, formal_params[arg_pos], permanent)) {
+                    if (error != NULL) {
+                        error->pos = arg_arr[arg_pos]->token->pos,
+                        error->text = bh_aprintf(global_heap_allocator,
+                                "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
+                                func_name,
+                                type_get_name(formal_params[arg_pos]),
+                                arg_pos + 1,
+                                bh_num_suffix(arg_pos + 1),
+                                node_get_type_name(arg_arr[arg_pos]->value));
+                    }
+                    return 0;
+                }
+
+                arg_arr[arg_pos]->va_kind = VA_Kind_Not_VA;
+                break;
+            }
+
+            case AS_Expecting_Typed_VA: {
+                if (variadic_type->id == any_type_id) *va_kind = VA_Kind_Any;
+
+                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
+
+                if (variadic_type->id == any_type_id) {
+                    resolve_expression_type(arg_arr[arg_pos]->value);
+                    arg_arr[arg_pos]->va_kind = VA_Kind_Any; 
+                    break;
+                }
+
+                *va_kind = VA_Kind_Typed;
+
+                assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
+                if (!unify_node_and_type_(&arg_arr[arg_pos]->value, variadic_type, permanent)) {
+                    if (error != NULL) {
+                        error->pos = arg_arr[arg_pos]->token->pos,
+                        error->text = bh_aprintf(global_heap_allocator,
+                            "The procedure '%s' expects a value of type '%s' for the variadic parameter, got '%s'.",
+                            func_name,
+                            type_get_name(variadic_type),
+                            node_get_type_name(arg_arr[arg_pos]->value));
+                    }
+                    return 0;
+                }
+
+                arg_arr[arg_pos]->va_kind = VA_Kind_Typed;
+                break;
+            }
+
+            case AS_Expecting_Untyped_VA: {
+                *va_kind = VA_Kind_Untyped;
+
+                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
+
+                assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
+                resolve_expression_type(arg_arr[arg_pos]->value);
+                if (arg_arr[arg_pos]->value->type == NULL) {
+                    if (error != NULL) {
+                        error->pos = arg_arr[arg_pos]->token->pos;
+                        error->text = "Unable to resolve type for argument.";
+                    }
+                    return 0;
+                }
+
+                arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
+                break;
+            }
+        }
+
+        arg_pos++;
+    }
+
+type_checking_done:
+    if (arg_pos < func_type->needed_param_count) {
+        if (error != NULL) {
+            error->pos = location->pos;
+            error->text = "Too few arguments to function call.";
+        }
+        return 0;
+    }
+
+    if (arg_pos < (u32) arg_count) {
+        if (error != NULL) {
+            error->pos = location->pos;
+            error->text = bh_aprintf(global_heap_allocator, "Too many arguments to function call. %d %d", arg_pos, arg_count);
+        }
+        return 0;
+    }
+
+    return 1;
+}
+        
+
+
+
 
 //
 // String parsing helpers

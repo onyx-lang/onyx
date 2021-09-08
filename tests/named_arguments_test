@@ -26,3 +26,6 @@ MATCHED Z: 10
 =========================
 false true false true true false true
 true false false true true false true
+MATCHED X
+MATCHED Y
+MATCHED Z [ 10, 40, 90 ]

@@ -73,13 +73,13 @@ main :: (args: [] cstr) {
 
 
     // This currently does not work and would require a lot of rewriting of compiler internals to make work.
-    // named_baked_overloaded_parameters :: proc {
-    //     ($T: type_expr, x: T)      do { println("MATCHED X"); },
-    //     ($T: type_expr, y: [$N] T) do { println("MATCHED X"); },
-    //     ($T: type_expr, z: T)      do { println("MATCHED X"); },
-    // }
+    named_baked_overloaded_parameters :: #match {
+        ($T: type_expr, x: T)      { println("MATCHED X"); },
+        ($T: type_expr, y: [$N] T) { println("MATCHED Y"); },
+        ($T: type_expr, z: [$N] T) { printf("MATCHED Z {}\n", z); },
+    }
 
-    // named_baked_overloaded_parameters(i32, 10);
-    // named_baked_overloaded_parameters(i32, u32.[ 10, 20, 30 ]);
-    // named_baked_overloaded_parameters(i32, z = u32.[ 10, 20, 30 ]);
+    named_baked_overloaded_parameters(i32, 10);
+    named_baked_overloaded_parameters(i32, u32.[ 10, 20, 30 ]);
+    named_baked_overloaded_parameters(i32, z = u32.[ 10, 40, 90 ]);
 }

@@ -419,22 +419,6 @@ CheckStatus check_argument(AstArgument** parg) {
     return Check_Success;
 }
 
-static i32 non_baked_argument_count(Arguments* args) {
-    i32 count = 0;
-
-    bh_arr_each(AstTyped *, actual, args->values) {
-        assert((*actual)->kind == Ast_Kind_Argument);
-        if (!((AstArgument *) (*actual))->is_baked) count++;
-    }
-
-    bh_arr_each(AstNamedValue *, named_value, args->named_values) {
-        assert((*named_value)->value->kind == Ast_Kind_Argument);
-        if (!((AstArgument *) (*named_value)->value)->is_baked) count++;
-    }
-
-    return count;
-}
-
 static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_callee) {
     if (call->kind == Ast_Kind_Intrinsic_Call) return Check_Success;
 
@@ -505,12 +489,6 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
     return Check_Success;
 }
 
-typedef enum ArgState {
-    AS_Expecting_Exact,
-    AS_Expecting_Typed_VA,
-    AS_Expecting_Untyped_VA,
-} ArgState;
-
 CheckStatus check_call(AstCall** pcall) {
     // All the things that need to be done when checking a call node.
     //      1. Ensure the callee is not a symbol
@@ -540,13 +518,7 @@ CheckStatus check_call(AstCall** pcall) {
     AstFunction* callee=NULL;
     CHECK(resolve_callee, call, (AstTyped **) &callee);
 
-    // CLEANUP maybe make function_get_expected_arguments?
-    i32 non_vararg_param_count = (i32) callee->type->Function.param_count;
-    if (non_vararg_param_count > 0 &&
-        callee->type->Function.params[callee->type->Function.param_count - 1] == builtin_vararg_type_type)
-        non_vararg_param_count--;
-
-    i32 arg_count = bh_max(non_vararg_param_count, non_baked_argument_count(&call->args));
+    i32 arg_count = function_get_minimum_argument_count(&callee->type->Function, &call->args);
     arguments_ensure_length(&call->args, arg_count);
 
     char* err_msg = NULL;
@@ -622,103 +594,14 @@ CheckStatus check_call(AstCall** pcall) {
         YIELD(call->token->pos, "Waiting for auto-return type to be solved.");
     }
 
-    Type **formal_params = callee->type->Function.params;
-
-    Type* variadic_type = NULL;
-    AstParam* variadic_param = NULL;
-
-    // SPEED CLEANUP: Caching the any type here.
-    Type* any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
-
-    ArgState arg_state = AS_Expecting_Exact;
-    u32 arg_pos = 0;
-    while (1) {
-        switch (arg_state) {
-            case AS_Expecting_Exact: {
-                if (arg_pos >= callee->type->Function.param_count) goto type_checking_done;
-
-                if (formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
-                    variadic_type = formal_params[arg_pos]->VarArgs.elem;
-                    variadic_param = &callee->params[arg_pos];
-                    arg_state = AS_Expecting_Typed_VA;
-                    continue;
-                }
-
-                if ((i16) arg_pos == callee->type->Function.vararg_arg_pos) {
-                    arg_state = AS_Expecting_Untyped_VA;
-                    continue;
-                }
-
-                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
-                if (!unify_node_and_type(&arg_arr[arg_pos]->value, formal_params[arg_pos])) {
-                    ERROR_(arg_arr[arg_pos]->token->pos,
-                            "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
-                            get_function_name(callee),
-                            type_get_name(formal_params[arg_pos]),
-                            arg_pos + 1,
-                            bh_num_suffix(arg_pos + 1),
-                            node_get_type_name(arg_arr[arg_pos]->value));
-                }
-
-                arg_arr[arg_pos]->va_kind = VA_Kind_Not_VA;
-                break;
-            }
-
-            case AS_Expecting_Typed_VA: {
-                if (variadic_type->id == any_type->id) call->va_kind = VA_Kind_Any;
-                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
-
-                if (variadic_type->id == any_type->id) {
-                    resolve_expression_type(arg_arr[arg_pos]->value);
-                    arg_arr[arg_pos]->va_kind = VA_Kind_Any; 
-                    break;
-                }
-
-                call->va_kind = VA_Kind_Typed;
-
-                if (!unify_node_and_type(&arg_arr[arg_pos]->value, variadic_type)) {
-                    onyx_report_error(arg_arr[arg_pos]->token->pos,
-                            "The procedure '%s' expects a value of type '%s' for the variadic parameter, '%b', got '%s'.",
-                            get_function_name(callee),
-                            type_get_name(variadic_type),
-                            variadic_param->local->token->text,
-                            variadic_param->local->token->length,
-                            node_get_type_name(arg_arr[arg_pos]->value));
-                    return Check_Error;
-                }
-
-                arg_arr[arg_pos]->va_kind = VA_Kind_Typed;
-                break;
-            }
-
-            case AS_Expecting_Untyped_VA: {
-                call->va_kind = VA_Kind_Untyped;
-
-                if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
-
-                resolve_expression_type(arg_arr[arg_pos]->value);
-                if (arg_arr[arg_pos]->value->type == NULL) {
-                    ERROR(arg_arr[arg_pos]->token->pos, "Unable to resolve type for argument.");
-                }
-
-                arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
-                break;
-            }
-        }
-
-        arg_pos++;
+    OnyxError error;
+    if (!check_arguments_against_type(&call->args, &callee->type->Function, &call->va_kind,
+            call->token, get_function_name(callee), &error)) {
+        onyx_submit_error(error);
+        return Check_Error;
     }
 
-type_checking_done:
-
-    call->flags |= Ast_Flag_Has_Been_Checked;
-
-    if (arg_pos < callee->type->Function.needed_param_count)
-        ERROR(call->token->pos, "Too few arguments to function call.");
-
-    if (arg_pos < (u32) arg_count)
-        ERROR(call->token->pos, "Too many arguments to function call.");
-
+    call->flags   |= Ast_Flag_Has_Been_Checked;
     callee->flags |= Ast_Flag_Function_Used;
 
     if (call->kind == Ast_Kind_Call && call->callee->kind == Ast_Kind_Macro) {
@@ -741,8 +624,13 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
 
     Arguments args = ((Arguments) { NULL, NULL });
     bh_arr_new(global_heap_allocator, args.values, 2);
-    bh_arr_push(args.values, binop->left);
-    bh_arr_push(args.values, binop->right);
+    bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, binop->left));
+    bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, binop->right));
+
+    u32 current_checking_level_store = current_checking_level;
+    check_argument((AstArgument **) &args.values[0]);
+    check_argument((AstArgument **) &args.values[1]);
+    current_checking_level = current_checking_level_store;
 
     if (binop_is_assignment(binop->operation)) {
         args.values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
@@ -755,6 +643,11 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
         if (cs == Check_Error) {
             return NULL;
         }
+
+        args.values[0] = (AstTyped *) make_argument(context.ast_alloc, args.values[0]);
+        current_checking_level_store = current_checking_level;
+        check_argument((AstArgument **) &args.values[0]);
+        current_checking_level = current_checking_level_store;
     }
 
     b32 should_yield = 0;
@@ -773,9 +666,6 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
     implicit_call->token = binop->token;
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
-
-    bh_arr_each(AstTyped *, arg, args.values)
-        *arg = (AstTyped *) make_argument(context.ast_alloc, *arg);
 
     implicit_call->args = args;
     return implicit_call;
