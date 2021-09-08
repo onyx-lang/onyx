@@ -5,14 +5,15 @@ use package core
 @Temporary
 DEFAULT_TEXT_SIZE :: 1.0f
 
-
 UI_Id :: #type u32
 
-#private hot_item    : UI_Id = 0
-#private active_item : UI_Id = 0
-#private hot_item_was_set := false
+#private {
+    hot_item    : UI_Id = 0
+    active_item : UI_Id = 0
+    hot_item_was_set := false
 
-#private current_font : ^Font;
+    current_font : ^Font;
+}
 
 init_ui :: () {
     map.init(^font_registry, hash_count=4);

@@ -8,7 +8,7 @@ main :: (args: [] cstr) {
     // provide an 'any-to-any' hash map in it's core libraries.
 
     // To use it, simply create one like so:
-    ages : map.Map(str, u32);
+    ages : Map(str, u32);
     map.init(^ages, default=0, hash_count=16);
     defer map.free(^ages);
 
@@ -29,7 +29,7 @@ main :: (args: [] cstr) {
     map.put(^ages, "Pam", 24);
 
     // To retrieve an entry's value, use the map.get procedure.
-    print_age :: (ages: ^map.Map(str, u32), name: str) {
+    print_age :: (ages: ^Map(str, u32), name: str) {
         age := map.get(ages, name);
         printf("{}'s age is {}.\n", name, age);
     }

@@ -13,216 +13,6 @@ Enable_Debug :: false
 
 #load "core/intrinsics/wasm"
 
-uintptr :: #type u32
-
-use package core.intrinsics.wasm {
-    memory_size, memory_grow,
-    memory_copy, memory_fill,
-}
-#private_file memory :: package core.memory
-#private_file math   :: package core.math
-
-// The global heap state
-#private_file
-heap_state : struct {
-    free_list       : ^heap_freed_block;
-    next_alloc      : rawptr;
-    remaining_space : u32;
-}
-
-#private_file
-heap_block :: struct {
-    size         : u32;
-    magic_number : u32;
-}
-
-#private_file
-heap_freed_block :: struct {
-    use base: heap_block;
-    next : ^heap_freed_block;
-    prev : ^heap_freed_block;
-}
-
-#private_file
-heap_allocated_block :: struct {
-    use base: heap_block;
-}
-
-#private_file Allocated_Flag          :: 0x1
-#private_file Free_Block_Magic_Number :: 0xdeadbeef
-#private_file Block_Split_Size        :: 512
-
-// FIX: This does not respect the choice of alignment
-#private_file
-heap_alloc :: (size_: u32, align: u32) -> rawptr {
-    if size_ == 0 do return null;
-
-    size := size_ + sizeof heap_block;
-    size = math.max(size, sizeof heap_freed_block);
-    memory.align(~~^size, ~~align);
-
-    prev := ^heap_state.free_list;
-    hb := heap_state.free_list;
-    while hb != null {
-        if hb.size >= size {
-            #if Enable_Debug {
-                assert(hb.size & Allocated_Flag == 0, "Allocated block in free list.");
-                assert(hb.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.");
-            }
-
-            if hb.size - size >= Block_Split_Size {
-                hb.size = size;
-
-                new_block := cast(^heap_freed_block) (cast(uintptr) hb + size);
-                new_block.size = hb.size - size;
-                new_block.next = hb.next;
-                new_block.prev = hb.prev;
-                new_block.magic_number = Free_Block_Magic_Number;
-
-                if hb.next != null do hb.next.prev = new_block;
-                *prev = new_block;
-
-            } else {
-                if hb.next != null do hb.next.prev = hb.prev;
-                *prev = hb.next;
-            }
-
-            hb.next = null;
-            hb.prev = null;
-            hb.magic_number = 0;
-            hb.size |= Allocated_Flag;
-            return cast(rawptr) (cast(uintptr) hb + sizeof heap_allocated_block);
-        }
-
-        prev = ^hb.next;
-        hb = hb.next;
-    }
-
-    if size < heap_state.remaining_space {
-        ret := cast(^heap_allocated_block) heap_state.next_alloc;
-        ret.size = size;
-        ret.size |= Allocated_Flag;
-
-        heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
-        heap_state.remaining_space -= size;
-
-        return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block);
-    }
-
-    new_pages := ((size - heap_state.remaining_space) >> 16) + 1;
-    if memory_grow(new_pages) == -1 {
-        // out of memory
-        return null;
-    }
-    heap_state.remaining_space += new_pages << 16;
-
-    ret := cast(^heap_allocated_block) heap_state.next_alloc;
-    ret.size = size;
-    ret.size |= Allocated_Flag;
-
-    heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
-    heap_state.remaining_space -= size;
-
-    return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block);
-}
-
-#private_file
-heap_free :: (ptr: rawptr) {
-    #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
-
-    hb_ptr := cast(^heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
-    #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
-
-    hb_ptr.size &= ~Allocated_Flag;
-    orig_size := hb_ptr.size - sizeof heap_allocated_block;
-
-    #if Enable_Debug do memory_fill(ptr, ~~0xcc, orig_size);
-
-    // CLEANUP: This is not complete. This only checks if the block after the freed block is also free.
-    // There are three other cases related to the block before this one that need to be handled for
-    // the best efficiency and minimal fragmentation.
-    if cast(uintptr) hb_ptr + hb_ptr.size < cast(uintptr) heap_state.next_alloc {
-        next_block := cast(^heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size);
-
-        if next_block.size & Allocated_Flag == 0 && next_block.magic_number == Free_Block_Magic_Number {
-            hb_ptr.size += next_block.size;
-
-            if next_block.next != null do next_block.next.prev = next_block.prev;
-            if next_block.prev != null do next_block.prev.next = next_block.next;
-            else                       do heap_state.free_list = next_block.next;
-
-            next_block.next = null;
-            next_block.prev = null;
-        }
-    }
-
-    hb_ptr.magic_number = Free_Block_Magic_Number;
-    hb_ptr.prev = null;
-    hb_ptr.next = heap_state.free_list;
-
-    if heap_state.free_list != null do heap_state.free_list.prev = hb_ptr;
-    heap_state.free_list = hb_ptr;
-}
-
-#private_file
-heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
-    if ptr == null do return null;
-
-    new_size := new_size_ + sizeof heap_block;
-    new_size = math.max(new_size, sizeof heap_freed_block);
-    new_size = ~~memory.align(cast(u64) new_size, ~~align);
-    
-    hb_ptr := cast(^heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
-    #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
-    hb_ptr.size &= ~Allocated_Flag;
-
-    old_size := hb_ptr.size;
-
-    // If there is already enough space in the current allocated block,
-    // just return the block that already exists and has the memory in it.
-    if old_size >= new_size {
-        hb_ptr.size |= Allocated_Flag;
-        return ptr;
-    }
-
-    // If we are at the end of the allocation space, just extend it
-    if cast(uintptr) hb_ptr + hb_ptr.size >= cast(uintptr) heap_state.next_alloc {
-        needed_size := cast(u32) memory.align(cast(u64) (new_size - old_size), 16);
-
-        if needed_size >= heap_state.remaining_space {
-            new_pages := ((needed_size - heap_state.remaining_space) >> 16) + 1;
-            if memory_grow(new_pages) == -1 {
-                // out of memory
-                return null;
-            }
-            heap_state.remaining_space += new_pages << 16;
-        }
-
-        hb_ptr.size = new_size;
-        hb_ptr.size |= Allocated_Flag;
-        heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + needed_size);
-        heap_state.remaining_space -= needed_size;
-        return ptr;
-    }
-
-    hb_ptr.size |= Allocated_Flag;
-    new_ptr := heap_alloc(new_size_, align);
-    memory_copy(new_ptr, ptr, old_size - sizeof heap_block);
-    heap_free(ptr);
-    return new_ptr;
-}
-
-#private_file
-heap_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
-    switch aa {
-        case .Alloc  do return heap_alloc(size, align);
-        case .Resize do return heap_resize(oldptr, size, align);
-        case .Free   do heap_free(oldptr);
-    }
-
-    return null;
-}
-
 init :: () {
     heap_state.free_list = null;
     heap_state.next_alloc = cast(rawptr) (cast(uintptr) __heap_start + 8);
@@ -234,3 +24,209 @@ init :: () {
 }
 
 get_watermark :: () => cast(u32) heap_state.next_alloc;
+
+#private_file {
+    use package core.intrinsics.wasm {
+        memory_size, memory_grow,
+        memory_copy, memory_fill,
+    }
+
+    memory :: package core.memory
+    math   :: package core.math
+
+    uintptr :: #type u32
+
+    // The global heap state
+    heap_state : struct {
+        free_list       : ^heap_freed_block;
+        next_alloc      : rawptr;
+        remaining_space : u32;
+    }
+
+    heap_block :: struct {
+        size         : u32;
+        magic_number : u32;
+    }
+
+    heap_freed_block :: struct {
+        use base: heap_block;
+        next : ^heap_freed_block;
+        prev : ^heap_freed_block;
+    }
+
+    heap_allocated_block :: struct {
+        use base: heap_block;
+    }
+
+    Allocated_Flag          :: 0x1
+    Free_Block_Magic_Number :: 0xdeadbeef
+    Block_Split_Size        :: 512
+
+    // FIX: This does not respect the choice of alignment
+    heap_alloc :: (size_: u32, align: u32) -> rawptr {
+        if size_ == 0 do return null;
+
+        size := size_ + sizeof heap_block;
+        size = math.max(size, sizeof heap_freed_block);
+        memory.align(~~^size, ~~align);
+
+        prev := ^heap_state.free_list;
+        hb := heap_state.free_list;
+        while hb != null {
+            if hb.size >= size {
+                #if Enable_Debug {
+                    assert(hb.size & Allocated_Flag == 0, "Allocated block in free list.");
+                    assert(hb.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.");
+                }
+
+                if hb.size - size >= Block_Split_Size {
+                    hb.size = size;
+
+                    new_block := cast(^heap_freed_block) (cast(uintptr) hb + size);
+                    new_block.size = hb.size - size;
+                    new_block.next = hb.next;
+                    new_block.prev = hb.prev;
+                    new_block.magic_number = Free_Block_Magic_Number;
+
+                    if hb.next != null do hb.next.prev = new_block;
+                    *prev = new_block;
+
+                } else {
+                    if hb.next != null do hb.next.prev = hb.prev;
+                    *prev = hb.next;
+                }
+
+                hb.next = null;
+                hb.prev = null;
+                hb.magic_number = 0;
+                hb.size |= Allocated_Flag;
+                return cast(rawptr) (cast(uintptr) hb + sizeof heap_allocated_block);
+            }
+
+            prev = ^hb.next;
+            hb = hb.next;
+        }
+
+        if size < heap_state.remaining_space {
+            ret := cast(^heap_allocated_block) heap_state.next_alloc;
+            ret.size = size;
+            ret.size |= Allocated_Flag;
+
+            heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
+            heap_state.remaining_space -= size;
+
+            return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block);
+        }
+
+        new_pages := ((size - heap_state.remaining_space) >> 16) + 1;
+        if memory_grow(new_pages) == -1 {
+            // out of memory
+            return null;
+        }
+        heap_state.remaining_space += new_pages << 16;
+
+        ret := cast(^heap_allocated_block) heap_state.next_alloc;
+        ret.size = size;
+        ret.size |= Allocated_Flag;
+
+        heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
+        heap_state.remaining_space -= size;
+
+        return cast(rawptr) (cast(uintptr) ret + sizeof heap_allocated_block);
+    }
+
+    heap_free :: (ptr: rawptr) {
+        #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
+
+        hb_ptr := cast(^heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
+        #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
+
+        hb_ptr.size &= ~Allocated_Flag;
+        orig_size := hb_ptr.size - sizeof heap_allocated_block;
+
+        #if Enable_Debug do memory_fill(ptr, ~~0xcc, orig_size);
+
+        // CLEANUP: This is not complete. This only checks if the block after the freed block is also free.
+        // There are three other cases related to the block before this one that need to be handled for
+        // the best efficiency and minimal fragmentation.
+        if cast(uintptr) hb_ptr + hb_ptr.size < cast(uintptr) heap_state.next_alloc {
+            next_block := cast(^heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size);
+
+            if next_block.size & Allocated_Flag == 0 && next_block.magic_number == Free_Block_Magic_Number {
+                hb_ptr.size += next_block.size;
+
+                if next_block.next != null do next_block.next.prev = next_block.prev;
+                if next_block.prev != null do next_block.prev.next = next_block.next;
+                else                       do heap_state.free_list = next_block.next;
+
+                next_block.next = null;
+                next_block.prev = null;
+            }
+        }
+
+        hb_ptr.magic_number = Free_Block_Magic_Number;
+        hb_ptr.prev = null;
+        hb_ptr.next = heap_state.free_list;
+
+        if heap_state.free_list != null do heap_state.free_list.prev = hb_ptr;
+        heap_state.free_list = hb_ptr;
+    }
+
+    heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
+        if ptr == null do return null;
+
+        new_size := new_size_ + sizeof heap_block;
+        new_size = math.max(new_size, sizeof heap_freed_block);
+        new_size = ~~memory.align(cast(u64) new_size, ~~align);
+        
+        hb_ptr := cast(^heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
+        #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
+        hb_ptr.size &= ~Allocated_Flag;
+
+        old_size := hb_ptr.size;
+
+        // If there is already enough space in the current allocated block,
+        // just return the block that already exists and has the memory in it.
+        if old_size >= new_size {
+            hb_ptr.size |= Allocated_Flag;
+            return ptr;
+        }
+
+        // If we are at the end of the allocation space, just extend it
+        if cast(uintptr) hb_ptr + hb_ptr.size >= cast(uintptr) heap_state.next_alloc {
+            needed_size := cast(u32) memory.align(cast(u64) (new_size - old_size), 16);
+
+            if needed_size >= heap_state.remaining_space {
+                new_pages := ((needed_size - heap_state.remaining_space) >> 16) + 1;
+                if memory_grow(new_pages) == -1 {
+                    // out of memory
+                    return null;
+                }
+                heap_state.remaining_space += new_pages << 16;
+            }
+
+            hb_ptr.size = new_size;
+            hb_ptr.size |= Allocated_Flag;
+            heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + needed_size);
+            heap_state.remaining_space -= needed_size;
+            return ptr;
+        }
+
+        hb_ptr.size |= Allocated_Flag;
+        new_ptr := heap_alloc(new_size_, align);
+        memory_copy(new_ptr, ptr, old_size - sizeof heap_block);
+        heap_free(ptr);
+        return new_ptr;
+    }
+
+    heap_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+        switch aa {
+            case .Alloc  do return heap_alloc(size, align);
+            case .Resize do return heap_resize(oldptr, size, align);
+            case .Free   do heap_free(oldptr);
+        }
+
+        return null;
+    }
+}
+

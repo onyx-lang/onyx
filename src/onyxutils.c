@@ -249,7 +249,7 @@ void scope_clear(Scope* scope) {
 // HACK HACK HACK nocheckin
 static b32 flag_to_yield = 0;
 
-AstNode node_that_signals_a_yield = { 0 };
+AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
 
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
     if (pp->concrete_funcs == NULL) {

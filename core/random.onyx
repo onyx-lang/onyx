@@ -1,16 +1,19 @@
 package core.random
 
-#private_file seed : i32 = 8675309
+#private_file seed : i64 = 867530932187
 
-#private_file RANDOM_MULTIPLIER :: 1664525
-#private_file RANDOM_INCREMENT  :: 1013904223
+#private_file RANDOM_MULTIPLIER :: 25214903917
+#private_file RANDOM_INCREMENT  :: cast(i64) 11
 // #private_file RANDOM_MODULUS    :: 1 << 32
 
-set_seed :: (s: u32) do seed = s;
+set_seed :: #match {
+    (s: u32) do seed = ~~s; ,
+    (s: u64) do seed =   s; ,
+}
 
 int :: (s := ^seed) -> u32 {
     *s = *s * RANDOM_MULTIPLIER + RANDOM_INCREMENT;
-    return *s;
+    return cast(u32) ((*s >> 16) & ~~0xffffffff);
 }
 
 between :: (lo: i32, hi: i32) -> i32 do return int () % (hi + 1 - lo) + lo;

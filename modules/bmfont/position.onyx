@@ -1,32 +1,34 @@
 package bmfont
 
-#private_file math :: package core.math
+#private_file {
+    math :: package core.math
 
-#private_file Renderable_Glyph :: struct {
-    pos_x, pos_y : f32;
-    pos_w, pos_h : f32;
+    renderable_glyph: Renderable_Glyph;
+    Renderable_Glyph :: struct {
+        pos_x, pos_y : f32;
+        pos_w, pos_h : f32;
 
-    tex_x, tex_y : f32;
-    tex_w, tex_h : f32;
+        tex_x, tex_y : f32;
+        tex_w, tex_h : f32;
 
-    x_advance : f32;
+        x_advance : f32;
+    }
+
+    rendering_context: Rendering_Context;
+    Rendering_Context :: struct {
+        font : ^BMFont;
+        size : f32;
+
+        x, y : f32;
+
+        original_x  : f32;
+        baseline    : f32;
+        line_height : f32;
+
+        text : str;
+        text_position : u32;
+    }
 }
-#private_file renderable_glyph: Renderable_Glyph;
-
-#private_file Rendering_Context :: struct {
-    font : ^BMFont;
-    size : f32;
-
-    x, y : f32;
-
-    original_x  : f32;
-    baseline    : f32;
-    line_height : f32;
-
-    text : str;
-    text_position : u32;
-}
-#private_file rendering_context: Rendering_Context;
 
 @FontSizing // Currently, `size` is just a multipler for the baked font size. This should be changed to be height in pixels, or 'em's.
 @Rename

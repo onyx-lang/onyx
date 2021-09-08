@@ -223,6 +223,8 @@ CheckStatus check_for(AstFor* fornode) {
     resolve_expression_type(fornode->iter);
 
     Type* iter_type = fornode->iter->type;
+    if (iter_type == NULL) YIELD(fornode->token->pos, "Waiting for iteration expression type to be known.");
+
     fornode->loop_type = For_Loop_Invalid;
     if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I32])) {
         if (fornode->by_pointer) {
