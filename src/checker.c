@@ -259,8 +259,8 @@ CheckStatus check_for(AstFor* fornode) {
         fornode->loop_type = For_Loop_Array;
     }
     else if (iter_type->kind == Type_Kind_Slice) {
-        if (fornode->by_pointer) fornode->var->type = iter_type->Slice.ptr_to_data;
-        else                     fornode->var->type = iter_type->Slice.ptr_to_data->Pointer.elem;
+        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->Slice.elem);
+        else                     fornode->var->type = iter_type->Slice.elem;
 
         fornode->loop_type = For_Loop_Slice;
 
@@ -270,14 +270,14 @@ CheckStatus check_for(AstFor* fornode) {
             ERROR_(fornode->var->token->pos, "Cannot iterate by pointer over '%s'.", type_get_name(iter_type));
         }
 
-        fornode->var->type = iter_type->VarArgs.ptr_to_data->Pointer.elem;
+        fornode->var->type = iter_type->VarArgs.elem;
 
         // NOTE: Slices are VarArgs are being treated the same here.
         fornode->loop_type = For_Loop_Slice;
     }
     else if (iter_type->kind == Type_Kind_DynArray) {
-        if (fornode->by_pointer) fornode->var->type = iter_type->DynArray.ptr_to_data;
-        else                     fornode->var->type = iter_type->DynArray.ptr_to_data->Pointer.elem;
+        if (fornode->by_pointer) fornode->var->type = type_make_pointer(context.ast_alloc, iter_type->DynArray.elem);
+        else                     fornode->var->type = iter_type->DynArray.elem;
 
         fornode->loop_type = For_Loop_DynArr;
     }
@@ -638,7 +638,7 @@ CheckStatus check_call(AstCall** pcall) {
                 if (arg_pos >= callee->type->Function.param_count) goto type_checking_done;
 
                 if (formal_params[arg_pos]->kind == Type_Kind_VarArgs) {
-                    variadic_type = formal_params[arg_pos]->VarArgs.ptr_to_data->Pointer.elem;
+                    variadic_type = formal_params[arg_pos]->VarArgs.elem;
                     variadic_param = &callee->params[arg_pos];
                     arg_state = AS_Expecting_Typed_VA;
                     continue;

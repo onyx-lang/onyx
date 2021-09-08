@@ -282,7 +282,7 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstSliceType *) elem.type_expr)->elem,
                     .kind = PSK_Type,
-                    .actual = elem.actual->Slice.ptr_to_data->Pointer.elem,
+                    .actual = elem.actual->Slice.elem,
                 }));
                 break;
             }
@@ -293,7 +293,7 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstDynArrType *) elem.type_expr)->elem,
                     .kind = PSK_Type,
-                    .actual = elem.actual->DynArray.ptr_to_data->Pointer.elem,
+                    .actual = elem.actual->DynArray.elem,
                 }));
                 break;
             }

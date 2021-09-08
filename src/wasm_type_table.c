@@ -58,7 +58,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type->kind);
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
-                bh_buffer_write_u32(&table_buffer, type->Slice.ptr_to_data->Pointer.elem->id);
+                bh_buffer_write_u32(&table_buffer, type->Slice.elem->id);
                 break;
             }
 
@@ -67,7 +67,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type->kind);
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
-                bh_buffer_write_u32(&table_buffer, type->DynArray.ptr_to_data->Pointer.elem->id);
+                bh_buffer_write_u32(&table_buffer, type->DynArray.elem->id);
                 break;
             }
 
@@ -76,7 +76,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type->kind);
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
-                bh_buffer_write_u32(&table_buffer, type->VarArgs.ptr_to_data->Pointer.elem->id);
+                bh_buffer_write_u32(&table_buffer, type->VarArgs.elem->id);
                 break;
             }
 

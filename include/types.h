@@ -113,9 +113,9 @@ struct TypeWithOffset {
         Type* types[];                                            \
     })                                                            \
     TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
-    TYPE_KIND(Slice, struct { Type *ptr_to_data; })               \
-    TYPE_KIND(DynArray, struct { Type *ptr_to_data; })            \
-    TYPE_KIND(VarArgs, struct { Type *ptr_to_data; })             \
+    TYPE_KIND(Slice, struct { Type *elem; })                      \
+    TYPE_KIND(DynArray, struct { Type *elem; })                   \
+    TYPE_KIND(VarArgs, struct { Type *elem; })                    \
     TYPE_KIND(Enum, struct {                                      \
         char* name;                                               \
         Type* backing;                                            \

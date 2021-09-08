@@ -382,7 +382,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
             Type* type_to_match = ol_type->params[i];
             AstTyped** value    = &args.values[i];
 
-            if (type_to_match->kind == Type_Kind_VarArgs) type_to_match = type_to_match->VarArgs.ptr_to_data->Pointer.elem;
+            if (type_to_match->kind == Type_Kind_VarArgs) type_to_match = type_to_match->VarArgs.elem;
             if ((*value)->kind == Ast_Kind_Argument) {
                 // :ArgumentResolvingIsComplicated
                 if (((AstArgument *) (*value))->is_baked) continue;

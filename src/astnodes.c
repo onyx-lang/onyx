@@ -513,7 +513,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
 
     if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
         if (node->entity != NULL) return 1;
-        if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.ptr_to_data->Pointer.elem;
+        if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.elem;
         if (!type_is_sl_constructable(type)) return 0;
 
         node->type = type;
@@ -745,7 +745,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_Array) {
-        if (!types_are_compatible(to->Slice.ptr_to_data->Pointer.elem, from->Array.elem)) {
+        if (!types_are_compatible(to->Slice.elem, from->Array.elem)) {
             *err_msg = "Array to slice cast is not valid here because the types are different.";
             return 0;
         } else {
@@ -754,7 +754,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_VarArgs) {
-        if (!types_are_compatible(to->Slice.ptr_to_data->Pointer.elem, from->VarArgs.ptr_to_data->Pointer.elem)) {
+        if (!types_are_compatible(to->Slice.elem, from->VarArgs.elem)) {
             *err_msg = "Variadic argument to slice cast is not valid here because the types are different.";
             return 0;
         } else {

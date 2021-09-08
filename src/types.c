@@ -164,17 +164,17 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
 
         case Type_Kind_Slice: {
             if (t2->kind != Type_Kind_Slice) return 0;
-            return types_are_compatible(t1->Slice.ptr_to_data->Pointer.elem, t2->Slice.ptr_to_data->Pointer.elem);
+            return types_are_compatible(t1->Slice.elem, t2->Slice.elem);
         }
 
         case Type_Kind_VarArgs: {
             if (t2->kind != Type_Kind_VarArgs) return 0;
-            return types_are_compatible(t1->VarArgs.ptr_to_data->Pointer.elem, t2->VarArgs.ptr_to_data->Pointer.elem);
+            return types_are_compatible(t1->VarArgs.elem, t2->VarArgs.elem);
         }
 
         case Type_Kind_DynArray: {
             if (t2->kind != Type_Kind_DynArray) return 0;
-            return types_are_compatible(t1->DynArray.ptr_to_data->Pointer.elem, t2->DynArray.ptr_to_data->Pointer.elem);
+            return types_are_compatible(t1->DynArray.elem, t2->DynArray.elem);
         }
 
         case Type_Kind_Compound: {
@@ -714,7 +714,8 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
         type_register(slice_type);
         bh_imap_put(&type_slice_map, of->id, slice_type->id);
 
-        slice_type->Slice.ptr_to_data = type_make_pointer(alloc, of);
+        type_make_pointer(alloc, of);
+        slice_type->Slice.elem = of;
 
         return slice_type;
     }
@@ -734,7 +735,8 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
         type_register(dynarr);
         bh_imap_put(&type_dynarr_map, of->id, dynarr->id);
 
-        dynarr->DynArray.ptr_to_data = type_make_pointer(alloc, of);
+        type_make_pointer(alloc, of);
+        dynarr->DynArray.elem = of;
 
         return dynarr;
     }
@@ -754,7 +756,8 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
         type_register(va_type);
         bh_imap_put(&type_vararg_map, of->id, va_type->id);
 
-        va_type->VarArgs.ptr_to_data = type_make_pointer(alloc, of);
+        type_make_pointer(alloc, of);
+        va_type->VarArgs.elem = of;
 
         return va_type;
     }
@@ -806,9 +809,9 @@ const char* type_get_unique_name(Type* type) {
             else
                 return bh_aprintf(global_scratch_allocator, "%s@%l", "<anonymous enum>", type->id);
 
-        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_unique_name(type->Slice.ptr_to_data->Pointer.elem));
-        case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_unique_name(type->VarArgs.ptr_to_data->Pointer.elem));
-        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_unique_name(type->DynArray.ptr_to_data->Pointer.elem));
+        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_unique_name(type->Slice.elem));
+        case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_unique_name(type->VarArgs.elem));
+        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_unique_name(type->DynArray.elem));
 
         case Type_Kind_Function: {
             char buf[1024];
@@ -869,9 +872,9 @@ const char* type_get_name(Type* type) {
             else
                 return "<anonymous enum>";
 
-        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_name(type->Slice.ptr_to_data->Pointer.elem));
-        case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_name(type->VarArgs.ptr_to_data->Pointer.elem));
-        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_name(type->DynArray.ptr_to_data->Pointer.elem));
+        case Type_Kind_Slice: return bh_aprintf(global_scratch_allocator, "[] %s", type_get_name(type->Slice.elem));
+        case Type_Kind_VarArgs: return bh_aprintf(global_scratch_allocator, "..%s", type_get_name(type->VarArgs.elem));
+        case Type_Kind_DynArray: return bh_aprintf(global_scratch_allocator, "[..] %s", type_get_name(type->DynArray.elem));
 
         case Type_Kind_Function: {
             char buf[512];
@@ -948,7 +951,7 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             fori (i, 0, (i64) (sizeof(slice_members) / sizeof(StructMember))) {
                 if (strcmp(slice_members[i].name, member) == 0) {
                     *smem = slice_members[i];
-                    if (smem->idx == 0) smem->type = type->Slice.ptr_to_data;
+                    if (smem->idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->Slice.elem);
 
                     return 1;
                 }
@@ -960,7 +963,7 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
             fori (i, 0, (i64) (sizeof(array_members) / sizeof(StructMember))) {
                 if (strcmp(array_members[i].name, member) == 0) {
                     *smem = array_members[i];
-                    if (smem->idx == 0) smem->type = type->DynArray.ptr_to_data;
+                    if (smem->idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->DynArray.elem);
                     if (smem->idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
 
                     return 1;
@@ -992,7 +995,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             if (idx > 2) return 0;
 
             *smem = slice_members[idx];
-            if (smem->idx == 0) smem->type = type->Slice.ptr_to_data;
+            if (smem->idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->Slice.elem);
 
             return 1;
         }
@@ -1001,7 +1004,7 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
             if (idx > 4) return 0;
 
             *smem = array_members[idx];
-            if (idx == 0) smem->type = type->DynArray.ptr_to_data;
+            if (idx == 0) smem->type = type_make_pointer(context.ast_alloc, type->DynArray.elem);
             if (idx == 3) smem->type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
 
             return 1;
@@ -1027,7 +1030,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs: {
             if (idx == 0) { 
-                two->type = type->Slice.ptr_to_data;
+                two->type = type_make_pointer(context.ast_alloc, type->Slice.elem);
                 two->offset = 0;
             }
             if (idx == 1) {
@@ -1039,7 +1042,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
         }
         case Type_Kind_DynArray: {
             if (idx == 0) { 
-                two->type = type->DynArray.ptr_to_data;
+                two->type = type_make_pointer(context.ast_alloc, type->DynArray.elem);
                 two->offset = 0;
             }
             if (idx == 1) {
