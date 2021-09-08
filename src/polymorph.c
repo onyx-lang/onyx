@@ -494,7 +494,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
             param->type = type_build_from_ast(context.ast_alloc, param->type_expr);
         assert(param->type);
 
-        if (!type_check_or_auto_cast(&value, param->type)) {
+        if (!unify_node_and_type(&value, param->type)) {
             if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
                     "The procedure '%s' expects a value of type '%s' for baked %d%s parameter, got '%s'.",
                     get_function_name(pp->base_func),

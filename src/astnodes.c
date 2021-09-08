@@ -504,17 +504,19 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
 }
 
 // NOTE: Returns 0 if it was not possible to make the types compatible.
-b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
+b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     AstTyped* node = *pnode;
     if (type == NULL) return 0;
     if (node == NULL) return 0;
-
-    // if (node_is_type((AstNode *) node)) return 0;
 
     if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
         if (node->entity != NULL) return 1;
         if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.elem;
         if (!type_is_sl_constructable(type)) return 0;
+
+        // If this shouldn't make permanent changes and submit entities,
+        // just assume that it works and don't submit the entities.
+        if (!permanent) return 1;
 
         node->type = type;
 
@@ -524,6 +526,11 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
 
     if (node->kind == Ast_Kind_Array_Literal && node->type_node == NULL) {
         if (node->entity != NULL) return 1;
+
+        // If this shouldn't make permanent changes and submit entities,
+        // just assume that it works and don't submit the entities.
+        if (!permanent) return 1;
+
         node->type = type;
         node->flags |= Ast_Flag_Array_Literal_Typed;
 
@@ -595,7 +602,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
         if (expr_count != type->Compound.count) return 0;
 
         fori (i, 0, (i64) expr_count) {
-            if (!type_check_or_auto_cast(&compound->exprs[i], type->Compound.types[i])) return 0;
+            if (!unify_node_and_type_(&compound->exprs[i], type->Compound.types[i], permanent)) return 0;
         }
 
         compound->type = type_build_compound_type(context.ast_alloc, compound);
@@ -605,8 +612,8 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     else if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
 
-        b32 true_success  = type_check_or_auto_cast(&if_expr->true_expr,  type);
-        b32 false_success = type_check_or_auto_cast(&if_expr->false_expr, type);
+        b32 true_success  = unify_node_and_type_(&if_expr->true_expr,  type, permanent);
+        b32 false_success = unify_node_and_type_(&if_expr->false_expr, type, permanent);
 
         if (true_success && false_success) {
             if_expr->type = type;
@@ -618,7 +625,7 @@ b32 type_check_or_auto_cast(AstTyped** pnode, Type* type) {
     }
     else if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
-        return type_check_or_auto_cast(&alias->alias, type);
+        return unify_node_and_type_(&alias->alias, type, permanent);
     }
 
     return 0;
@@ -641,7 +648,7 @@ Type* resolve_expression_type(AstTyped* node) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
 
         Type* ltype = resolve_expression_type(if_expr->true_expr);
-        type_check_or_auto_cast(&if_expr->false_expr, ltype);
+        unify_node_and_type(&if_expr->false_expr, ltype);
 
         if_expr->type = ltype;
     }

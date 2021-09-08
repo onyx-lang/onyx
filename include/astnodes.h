@@ -1336,7 +1336,8 @@ void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source)
 void promote_numlit_to_larger(AstNumLit* num);
 b32 convert_numlit_to_type(AstNumLit* num, Type* type);
 
-b32 type_check_or_auto_cast(AstTyped** pnode, Type* type);
+#define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
+b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
 Type* resolve_expression_type(AstTyped* node);
 i64 get_expression_integer_value(AstTyped* node);
 

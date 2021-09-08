@@ -389,7 +389,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
                 value = &((AstArgument *) *value)->value;
             }
 
-            if (!type_check_or_auto_cast(value, type_to_match)) {
+            if (!unify_node_and_type_(value, type_to_match, 0)) {
                 all_arguments_work = 0;
                 break;
             }
@@ -419,7 +419,7 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
         AstTyped* node = (AstTyped *) entry->key;
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
-        if (type_check_or_auto_cast(&node, type)) {
+        if (unify_node_and_type(&node, type)) {
             matched_overload = node;
             break;
         }
