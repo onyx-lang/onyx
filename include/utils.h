@@ -1,6 +1,6 @@
 #include "bh.h"
 
-#include "onyxastnodes.h"
+#include "astnodes.h"
 
 extern bh_scratch global_scratch;
 extern bh_allocator global_scratch_allocator;

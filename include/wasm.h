@@ -3,8 +3,8 @@
 
 #include "bh.h"
 
-#include "onyxastnodes.h"
-#include "onyxerrors.h"
+#include "astnodes.h"
+#include "errors.h"
 
 typedef u8 WasmType;
 

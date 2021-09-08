@@ -1,6 +1,6 @@
-#include "onyxdoc.h"
-#include "onyxutils.h"
-#include "onyxtypes.h"
+#include "doc.h"
+#include "utils.h"
+#include "types.h"
 
 static i32 cmp_doc_entry(const void * a, const void * b) {
     DocEntry* d1 = (DocEntry *) a;

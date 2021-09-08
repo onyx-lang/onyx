@@ -1,6 +1,6 @@
-#include "onyxastnodes.h"
-#include "onyxparser.h"
-#include "onyxutils.h"
+#include "astnodes.h"
+#include "parser.h"
+#include "utils.h"
 
 static const char* ast_node_names[] = {
     "ERROR",

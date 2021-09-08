@@ -1,8 +1,8 @@
 #define BH_DEBUG
-#include "onyxtypes.h"
-#include "onyxastnodes.h"
-#include "onyxutils.h"
-#include "onyxerrors.h"
+#include "types.h"
+#include "astnodes.h"
+#include "utils.h"
+#include "errors.h"
 
 // NOTE: These have to be in the same order as Basic
 Type basic_types[] = {

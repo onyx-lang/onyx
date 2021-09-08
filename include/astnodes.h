@@ -1,8 +1,8 @@
 #ifndef ONYXASTNODES_H
 #define ONYXASTNODES_H
 
-#include "onyxlex.h"
-#include "onyxtypes.h"
+#include "lex.h"
+#include "types.h"
 
 #define AST_NODES              \
     NODE(Node)                 \

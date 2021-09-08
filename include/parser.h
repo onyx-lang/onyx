@@ -3,9 +3,9 @@
 
 #include "bh.h"
 
-#include "onyxlex.h"
-#include "onyxerrors.h"
-#include "onyxastnodes.h"
+#include "lex.h"
+#include "errors.h"
+#include "astnodes.h"
 
 typedef struct PolymorphicContext {
     AstType* root_node;

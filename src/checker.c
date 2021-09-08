@@ -1,6 +1,6 @@
 #define BH_DEBUG
-#include "onyxparser.h"
-#include "onyxutils.h"
+#include "parser.h"
+#include "utils.h"
 
 // All of the `check` functions return a boolean that signals if an issue
 // was reached while processing the node. These error booleans propagate

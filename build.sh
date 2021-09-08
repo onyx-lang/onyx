@@ -7,7 +7,7 @@ sudo cp -r ./core/ "$CORE_DIR"
 
 [ "$1" = "libs_only" ] && exit 0
 
-C_FILES="onyx onyxastnodes onyxbuiltins onyxchecker onyxclone onyxdoc onyxentities onyxerrors onyxlex onyxparser onyxsymres onyxtypes onyxutils onyxwasm"
+C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm"
 CC='gcc'
 
 WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'

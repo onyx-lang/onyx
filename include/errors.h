@@ -2,7 +2,7 @@
 #define ONYXERRORS_H
 
 #include "bh.h"
-#include "onyxlex.h"
+#include "lex.h"
 
 #include <stdarg.h>
 

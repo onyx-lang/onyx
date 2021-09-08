@@ -2,7 +2,7 @@
 #define ONYXDOC_H
 
 #include "bh.h"
-#include "onyxastnodes.h"
+#include "astnodes.h"
 
 typedef enum DocFormat {
     Doc_Format_Human,

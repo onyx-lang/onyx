@@ -3,13 +3,10 @@
 // such as procedure definitions, string literals, struct definitions
 // and declarations to be introduced into scopes.
 
-// Things that need to be cleaned up in the parser:
-//  - control block local variables should be more extensible and reuse more code
-
-#include "onyxlex.h"
-#include "onyxerrors.h"
-#include "onyxparser.h"
-#include "onyxutils.h"
+#include "lex.h"
+#include "errors.h"
+#include "parser.h"
+#include "utils.h"
 
 #define make_node(nclass, kind)             onyx_ast_node_new(parser->allocator, sizeof(nclass), kind)
 // :LinearTokenDependent

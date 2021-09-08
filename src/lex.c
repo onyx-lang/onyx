@@ -1,7 +1,7 @@
 #include "bh.h"
-#include "onyxlex.h"
-#include "onyxutils.h"
-#include "onyxerrors.h"
+#include "lex.h"
+#include "utils.h"
+#include "errors.h"
 
 u64 lexer_lines_processed = 0;
 u64 lexer_tokens_processed = 0;

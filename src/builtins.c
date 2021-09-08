@@ -1,7 +1,7 @@
-#include "onyxastnodes.h"
-#include "onyxtypes.h"
-#include "onyxerrors.h"
-#include "onyxutils.h"
+#include "astnodes.h"
+#include "types.h"
+#include "errors.h"
+#include "utils.h"
 
 AstBasicType basic_type_void      = { Ast_Kind_Basic_Type, 0, NULL, NULL, 0, NULL, NULL, &basic_types[Basic_Kind_Void]  };
 AstBasicType basic_type_bool      = { Ast_Kind_Basic_Type, 0, NULL, NULL, 0, NULL, NULL, &basic_types[Basic_Kind_Bool]  };

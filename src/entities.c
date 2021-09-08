@@ -1,6 +1,6 @@
 #include "bh.h"
-#include "onyxastnodes.h"
-#include "onyxutils.h"
+#include "astnodes.h"
+#include "utils.h"
 
 static inline i32 entity_phase(Entity* e1) {
     if (e1->state <= Entity_State_Parse) return 1;

@@ -14,8 +14,8 @@
 
 
 #define BH_DEBUG
-#include "onyxwasm.h"
-#include "onyxutils.h"
+#include "wasm.h"
+#include "utils.h"
 
 #define WASM_TYPE_INT32   0x7F
 #define WASM_TYPE_INT64   0x7E
@@ -270,8 +270,8 @@ EMIT_FUNC_NO_ARGS(leave_structured_block);
 static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node);
 static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node);
 
-#include "onyxwasm_intrinsics.c"
-#include "onyxwasm_type_table.c"
+#include "wasm_intrinsics.c"
+#include "wasm_type_table.c"
 
 EMIT_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
@@ -3669,4 +3669,4 @@ void onyx_wasm_module_free(OnyxWasmModule* module) {
 }
 
 
-#include "onyxwasm_output.c"
+#include "wasm_output.c"

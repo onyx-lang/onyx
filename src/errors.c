@@ -1,5 +1,5 @@
-#include "onyxerrors.h"
-#include "onyxutils.h"
+#include "errors.h"
+#include "utils.h"
 
 OnyxErrors errors;
 

@@ -2,12 +2,12 @@
 #define BH_DEFINE
 #include "bh.h"
 
-#include "onyxlex.h"
-#include "onyxerrors.h"
-#include "onyxparser.h"
-#include "onyxutils.h"
-#include "onyxwasm.h"
-#include "onyxdoc.h"
+#include "lex.h"
+#include "errors.h"
+#include "parser.h"
+#include "utils.h"
+#include "wasm.h"
+#include "doc.h"
 
 #define VERSION "v0.1.0-beta"
 

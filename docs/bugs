@@ -8,6 +8,10 @@ List of known bugs:
         println(x); // Doesn't work
     }
 
+[ ] Memory reservation type checking doesn't work how I think it should. This errors for example:
+    
+    x: i64 = 1;
+
 [X] Initialization statements on control statements should be better. For example, this should
     be possible:
 

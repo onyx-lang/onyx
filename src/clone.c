@@ -1,6 +1,6 @@
-#include "onyxastnodes.h"
-#include "onyxparser.h"
-#include "onyxutils.h"
+#include "astnodes.h"
+#include "parser.h"
+#include "utils.h"
 
 static inline b32 should_clone(AstNode* node) {
     if (node->flags & Ast_Flag_No_Clone) return 0;

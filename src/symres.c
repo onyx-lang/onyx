@@ -1,8 +1,8 @@
 #define BH_DEBUG
-#include "onyxparser.h"
-#include "onyxutils.h"
-#include "onyxastnodes.h"
-#include "onyxerrors.h"
+#include "parser.h"
+#include "utils.h"
+#include "astnodes.h"
+#include "errors.h"
 
 // Variables used during the symbol resolution phase.
 static Scope*       curr_scope    = NULL;
