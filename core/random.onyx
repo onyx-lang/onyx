@@ -1,6 +1,6 @@
 package core.random
 
-#private_file seed : i64 = 867530932187
+#private_file seed : i64 = 8675309
 
 #private_file RANDOM_MULTIPLIER :: 25214903917
 #private_file RANDOM_INCREMENT  :: cast(i64) 11

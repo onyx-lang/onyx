@@ -368,7 +368,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         assert(overload->type->kind == Type_Kind_Function);
 
         arguments_remove_baked(&args);
-        arguments_ensure_length(&args, function_get_minimum_argument_count(&overload->type->Function, &args));
+        arguments_ensure_length(&args, get_argument_buffer_size(&overload->type->Function, &args));
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list
         if (!fill_in_arguments(&args, (AstNode *) overload, NULL)) continue;
@@ -690,10 +690,12 @@ static i32 non_baked_argument_count(Arguments* args) {
     return count;
 }
 
-i32 function_get_minimum_argument_count(TypeFunction* type, Arguments* args) {
+i32 get_argument_buffer_size(TypeFunction* type, Arguments* args) {
     i32 non_vararg_param_count = (i32) type->param_count;
-    if (non_vararg_param_count > 0 && type->params[type->param_count - 1] == builtin_vararg_type_type)
-        non_vararg_param_count--;
+    if (non_vararg_param_count > 0) {
+        if (type->params[type->param_count - 1] == builtin_vararg_type_type) non_vararg_param_count--;
+        if (type->params[type->param_count - 1]->kind == Type_Kind_VarArgs)  non_vararg_param_count--;
+    }
 
     return bh_max(non_vararg_param_count, non_baked_argument_count(args));
 }
@@ -792,7 +794,7 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
     if (func_name == NULL) func_name = "UNKNOWN FUNCTION";
 
     bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) args->values;
-    i32 arg_count = function_get_minimum_argument_count(func_type, args);
+    i32 arg_count = get_argument_buffer_size(func_type, args);
 
     Type **formal_params = func_type->params;
     Type* variadic_type = NULL;

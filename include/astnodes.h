@@ -1370,7 +1370,7 @@ void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
 void arguments_remove_baked(Arguments* args);
 b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
                                  OnyxToken* location, char* func_name, struct OnyxError* error);
-i32 function_get_minimum_argument_count(TypeFunction* type, Arguments* args);
+i32 get_argument_buffer_size(TypeFunction* type, Arguments* args);
 
 // GROSS: Using void* to avoid having to cast everything.
 const char* node_get_type_name(void* node);

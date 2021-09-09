@@ -518,7 +518,7 @@ CheckStatus check_call(AstCall** pcall) {
     AstFunction* callee=NULL;
     CHECK(resolve_callee, call, (AstTyped **) &callee);
 
-    i32 arg_count = function_get_minimum_argument_count(&callee->type->Function, &call->args);
+    i32 arg_count = get_argument_buffer_size(&callee->type->Function, &call->args);
     arguments_ensure_length(&call->args, arg_count);
 
     char* err_msg = NULL;
@@ -2050,7 +2050,6 @@ CheckStatus check_memres_type(AstMemRes* memres) {
 CheckStatus check_memres(AstMemRes* memres) {
     if (memres->initial_value != NULL) {
         CHECK(expression, &memres->initial_value);
-        resolve_expression_type(memres->initial_value);
 
         if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
             ERROR(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
@@ -2066,6 +2065,7 @@ CheckStatus check_memres(AstMemRes* memres) {
             }
 
         } else {
+            resolve_expression_type(memres->initial_value);
             if (memres->initial_value->type == NULL && memres->initial_value->entity != NULL && memres->initial_value->entity->state <= Entity_State_Check_Types) {
                 YIELD(memres->token->pos, "Waiting for global type to be constructed.");
             }
