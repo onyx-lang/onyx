@@ -846,6 +846,14 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
 
                 if (variadic_type->id == any_type_id) {
                     resolve_expression_type(arg_arr[arg_pos]->value);
+                    if (arg_arr[arg_pos]->value->type == NULL) {
+                        if (error != NULL) {
+                            error->pos = arg_arr[arg_pos]->token->pos;
+                            error->text = "Unable to resolve type of argument.";
+                        }
+                        return 0;
+                    }
+
                     arg_arr[arg_pos]->va_kind = VA_Kind_Any; 
                     break;
                 }

@@ -171,7 +171,7 @@ window.ONYX_MODULES.push({
 
         WASM_U8.set(u8_data, bufferptr);
 
-        if (namelen >= file_data.name.length) {
+        if (nameptr != 0 && namelen <= file_data.name.length) {
             var name_data = new TextEncoder().encode(file_data.name);
             WASM_U8.set(name_data, nameptr);
         }
