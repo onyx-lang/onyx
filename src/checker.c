@@ -696,7 +696,8 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
         if (binop->left->type == NULL) {
             resolve_expression_type(binop->right);
 
-            if (binop->right->type == NULL) {
+            Type* right_type = get_expression_type(binop->right);
+            if (right_type == NULL) {
                 if (binop->right->entity == NULL || binop->right->entity->state > Entity_State_Check_Types) {
                     ERROR(binop->token->pos, "Could not resolve type of right hand side to infer.");
 
@@ -705,7 +706,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                 }
             }
 
-            if (binop->right->type->kind == Type_Kind_Compound) {
+            if (right_type->kind == Type_Kind_Compound) {
                 AstCompound* lhs = (AstCompound *) binop->left;
                 if (lhs->kind != Ast_Kind_Compound) {
                     ERROR_(binop->token->pos,
@@ -713,7 +714,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                             binop->right->type->Compound.count);
                 }
 
-                i32 expr_count = binop->right->type->Compound.count;
+                i32 expr_count = right_type->Compound.count;
                 if (bh_arr_length(lhs->exprs) != expr_count) {
                     ERROR_(binop->token->pos,
                             "Expected left hand side to have %d expressions.",
@@ -721,13 +722,13 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                 }
 
                 fori (i, 0, expr_count) {
-                    lhs->exprs[i]->type = binop->right->type->Compound.types[i];
+                    lhs->exprs[i]->type = right_type->Compound.types[i];
                 }
 
                 lhs->type = type_build_compound_type(context.ast_alloc, lhs);
 
             } else {
-                binop->left->type = binop->right->type;
+                binop->left->type = right_type;
             }
         }
 

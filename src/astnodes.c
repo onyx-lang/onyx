@@ -543,7 +543,7 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         AstNode* resolved = try_symbol_resolve_from_node((AstNode *) ast_type, node->token);
         if (resolved == NULL) return 0;
 
-        *pnode = (AstTyped *) resolved;
+        if (permanent) *pnode = (AstTyped *) resolved;
         return 1;
     }
 
@@ -568,31 +568,66 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     }
 
     // HACK: NullProcHack
+    // The null_proc matches any procedure, and because of that, will cause a runtime error if you
+    // try to call it.
     if (type->kind == Type_Kind_Function && (node->flags & Ast_Flag_Proc_Is_Null) != 0) return 1;
 
-    if (types_are_compatible(node->type, type)) return 1;
+    // The normal case where everything works perfectly.
+    Type* node_type = get_expression_type(node);
+    if (types_are_compatible(node_type, type)) return 1;
+
+    // Here are some of the ways you can unify a node with a type if the type of the
+    // node does not match the given type:
+    // 
+    // If the nodes type is a function type and that function has an automatic return
+    // value placeholder, fill in that placeholder with the actual type.
     // :AutoReturnType
-    if (node->type && node->type->kind == Type_Kind_Function
-        && node->type->Function.return_type == &type_auto_return
+    if (node_type && node_type->kind == Type_Kind_Function
+        && node_type->Function.return_type == &type_auto_return
         && type->kind == Type_Kind_Function) {
 
-        node->type->Function.return_type = type->Function.return_type;
+        node_type->Function.return_type = type->Function.return_type;
         return 1;
     }
+
+    // If the node is an auto cast (~~) node, then check to see if the cast is legal
+    // to the destination type, and if it is change the type to cast to.
     if (node_is_auto_cast((AstNode *) node)) {
         char* dummy;
-        Type* from_type = ((AstUnaryOp *) node)->expr->type;
+        Type* from_type = get_expression_type(((AstUnaryOp *) node)->expr);
         if (!from_type || !cast_is_legal(from_type, type, &dummy)) {
             return 0;
 
         } else {
-            ((AstUnaryOp *) node)->type = type;
+            if (permanent) ((AstUnaryOp *) node)->type = type;
             return 1;
         }
     }
+
+    // If the destination type is a slice, then automatically convert arrays, dynamic
+    // arrays, and var args, if they are the same type. This is big convenience feature
+    // that makes working with arrays much easier.
+    // [N] T  -> [] T
+    // [..] T -> [] T
+    // ..T    -> [] T
+    else if (node_type && type->kind == Type_Kind_Slice) {
+        if (node_type->kind == Type_Kind_Array || node_type->kind == Type_Kind_DynArray || node_type->kind == Type_Kind_VarArgs) {
+            char* dummy;
+            if (cast_is_legal(node_type, type, &dummy)) {
+                *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
+                return 1;
+            }
+        }
+    }
+
+    // If the node is a numeric literal, try to convert it to the destination type.
     else if (node->kind == Ast_Kind_NumLit) {
         if (convert_numlit_to_type((AstNumLit *) node, type)) return 1;
     }
+
+    // If the node is a compound expression, and it doesn't have a type created,
+    // recursive call this function with the individual components of the compound
+    // expression.
     else if (node->kind == Ast_Kind_Compound) {
         if (type->kind != Type_Kind_Compound) return 0;
 
@@ -609,6 +644,7 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         
         return 1;
     }
+
     else if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
 
@@ -616,13 +652,14 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         b32 false_success = unify_node_and_type_(&if_expr->false_expr, type, permanent);
 
         if (true_success && false_success) {
-            if_expr->type = type;
+            if (permanent) if_expr->type = type;
             return 1;
 
         } else {
             return 0;
         }
     }
+
     else if (node->kind == Ast_Kind_Alias) {
         AstAlias* alias = (AstAlias *) node;
         return unify_node_and_type_(&alias->alias, type, permanent);
@@ -751,9 +788,20 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         return 0;
     }
 
+    // CLEANUP: These error messages should be a lot better and actually
+    // provide the types of the things in question.
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_Array) {
         if (!types_are_compatible(to->Slice.elem, from->Array.elem)) {
             *err_msg = "Array to slice cast is not valid here because the types are different.";
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+
+    if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_DynArray) {
+        if (!types_are_compatible(to->Slice.elem, from->DynArray.elem)) {
+            *err_msg = "Dynmaic array to slice cast is not valid here because the types are different.";
             return 0;
         } else {
             return 1;
@@ -958,6 +1006,15 @@ AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
     AstNode* symbol = onyx_ast_node_new(a, sizeof(AstNode), Ast_Kind_Symbol);
     symbol->token = sym;
     return symbol;
+}
+
+AstUnaryOp* make_cast(bh_allocator a, AstTyped* expr, Type* to) {
+    AstUnaryOp* cast = onyx_ast_node_new(a, sizeof(AstUnaryOp), Ast_Kind_Unary_Op);
+    cast->token = expr->token;
+    cast->operation = Unary_Op_Cast;
+    cast->expr = expr;
+    cast->type = to;
+    return cast;
 }
 
 void arguments_initialize(Arguments* args) {

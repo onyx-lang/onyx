@@ -1360,6 +1360,7 @@ AstFieldAccess*  make_field_access(bh_allocator a, AstTyped* node, char* field);
 AstAddressOf*    make_address_of(bh_allocator a, AstTyped* node);
 AstLocal*        make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
 AstNode*         make_symbol(bh_allocator a, OnyxToken* sym);
+AstUnaryOp*      make_cast(bh_allocator a, AstTyped* expr, Type* to);
 
 void arguments_initialize(Arguments* args);
 b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg);
@@ -1432,6 +1433,13 @@ static inline b32 node_is_type(AstNode* node) {
 
 static inline b32 node_is_auto_cast(AstNode* node) {
     return (node->kind == Ast_Kind_Unary_Op) && (((AstUnaryOp *) node)->operation == Unary_Op_Auto_Cast);
+}
+
+static inline Type* get_expression_type(AstTyped* expr) {
+    switch (expr->kind) {
+        case Ast_Kind_Block: case Ast_Kind_If: case Ast_Kind_While: return NULL;
+        default: return expr->type;
+    }
 }
 
 static inline CallingConvention type_function_get_cc(Type* type) {

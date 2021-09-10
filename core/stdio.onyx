@@ -31,7 +31,7 @@ println :: (x) => {
 
 printf :: (format: str, va: ..any) {
     buffer: [8196] u8;
-    print(conv.str_format_va(format, ~~buffer, ~~va));
+    print(conv.str_format_va(buffer, format, va));
 }
 
 // This works on both slices and arrays

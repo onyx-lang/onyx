@@ -342,7 +342,7 @@ read_val_type :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmValueType {
 
             buf : [256] u8;
             _, loc := io.stream_tell(reader.stream);
-            s := conv.str_format("Bad wasm value type {} at {x}", ~~buf, cast(i32) byte, loc);
+            s := conv.str_format(buf, "Bad wasm value type {} at {x}", cast(i32) byte, loc);
             assert(false, s);
         }
     }
@@ -393,7 +393,7 @@ parse_section_locations :: (use bin: ^WasmBinary) -> bool {
             case #default {
                 buffer: [128] u8;
                 conv :: package core.conv
-                assert(false, conv.str_format("Bad section number {}", ~~buffer, cast(i32) section_number));
+                assert(false, conv.str_format(buffer, "Bad section number {}", cast(i32) section_number));
             }
         }
 

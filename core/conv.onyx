@@ -221,11 +221,11 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     return str.{ buf.data, len };
 }
 
-str_format :: (format: str, buffer: [] u8, va: ..any) -> str {
-    return str_format_va(format, buffer, ~~va); 
+str_format :: (buffer: [] u8, format: str, va: ..any) -> str {
+    return str_format_va(buffer, format, ~~va); 
 }
 
-str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
+str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
     Output :: struct {
         data: ^u8;
         count: u32;
@@ -255,6 +255,7 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
     Format :: struct {
         pretty_printing      := false;
         quote_strings        := false;
+        dereference          := false;
         digits_after_decimal := cast(u32) 4;
 
         indentation   := cast(u32) 0;
@@ -282,6 +283,11 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
                 ch = format[i];
 
                 switch ch {
+                    case #char "*" {
+                        i += 1;
+                        formatting.dereference = true;
+                    }
+
                     case #char "." {
                         i += 1;
 
@@ -362,7 +368,20 @@ str_format_va :: (format: str, buffer: [] u8, va: [] any) -> str {
 
     print_any :: (output: ^Output, formatting: Format, v: any) {
         use package builtin.type_info
-        array :: package core.array
+        array :: package core.array;
+
+        if formatting.dereference {
+            ti := get_type_info(v.type);
+            if ti.kind == .Pointer {
+                formatting.dereference = false;
+
+                new_any: any;
+                new_any.type = (cast(^Type_Info_Pointer) ti).to;
+                new_any.data = *(cast(^rawptr) v.data);
+                print_any(output, formatting, new_any);
+                return;
+            }
+        }
 
         switch v.type {
             case bool {
