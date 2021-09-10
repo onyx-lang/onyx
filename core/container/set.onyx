@@ -25,7 +25,7 @@ make :: ($T: type_expr, default := __zero_value(T), hash_count: i32 = 16) -> Set
 init :: (use set: ^Set($T), default := __zero_value(T), hash_count: i32 = 16) {
     array.init(^hashes, hash_count);
     hashes.count = hash_count;
-    array.fill(^hashes, -1);
+    array.fill(hashes, -1);
 
     array.init(^entries, 4); 
 

@@ -26,7 +26,7 @@ main :: (args: [] cstr) {
     }
 
     missing := 0;
-    array.sort(^vals, cmp_asc);
+    array.sort(vals, cmp_asc);
     for i: 0 .. vals.count - 1 {
         if vals[i + 1] - vals[i] != 1 do missing = vals[i] + 1;
     }

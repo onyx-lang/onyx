@@ -68,7 +68,7 @@ main :: (args: [] cstr) {
     
     // Part 2
     for i: 9 .. 1000000 do array.push(^cups, i);
-    simulate(array.to_slice(^cups), 10000000);
+    simulate(cups, 10000000);
 
     // Undo the zero-indexing
     for ^cup: cups do *cup += 1;
@@ -81,7 +81,7 @@ main :: (args: [] cstr) {
     // printf("\n");
 
     // Part 2
-    one_idx := get_idx(array.to_slice(^cups), 1);
+    one_idx := get_idx(cups, 1);
     prod: i64 = cast(i64) (cups[w(one_idx + 1)]) * cast(i64) (cups[w(one_idx + 2)]);
     printf("Cup product: {}\n", prod);
 }

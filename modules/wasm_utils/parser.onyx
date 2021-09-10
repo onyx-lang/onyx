@@ -275,8 +275,7 @@ parse_code_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> 
         _, pos := io.stream_tell(reader.stream);
         io.stream_seek(reader.stream, before_locals + size, .Start);
 
-        locals_slice := array.copy_range(^locals, 0 .. local_index, allocator=wasm_allocator)
-                        |> array.to_slice();
+        locals_slice: [] WasmLocal = array.copy_range(^locals, 0 .. local_index, allocator=wasm_allocator);
 
         return .{ size, locals_slice, pos };
     }

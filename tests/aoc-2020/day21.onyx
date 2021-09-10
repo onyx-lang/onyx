@@ -143,7 +143,7 @@ main :: (args: [] cstr) {
                 matches := true;
 
                 for ap: allergen_entry.value.appears_on {
-                    if !array.contains(^ingredient_entry.value.appears_on, ap) do matches = false;
+                    if !array.contains(ingredient_entry.value.appears_on, ap) do matches = false;
                 }
 
                 if matches {
@@ -162,7 +162,7 @@ main :: (args: [] cstr) {
         }
     }
 
-    array.sort(^matched_ingredients, (i1: ^Ingredient, i2: ^Ingredient) -> i32 {
+    array.sort(matched_ingredients, (i1: ^Ingredient, i2: ^Ingredient) -> i32 {
         return string.compare(i1.allergen, i2.allergen);
     });
 

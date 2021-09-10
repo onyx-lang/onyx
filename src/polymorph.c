@@ -277,11 +277,13 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
             }
 
             case Ast_Kind_Slice_Type: {
-                if (elem.actual->kind != Type_Kind_Slice) break;
+                if (elem.actual->kind != Type_Kind_Slice && elem.actual->kind != Type_Kind_DynArray && elem.actual->kind != Type_Kind_VarArgs) break;
 
                 bh_arr_push(elem_queue, ((PolySolveElem) {
                     .type_expr = ((AstSliceType *) elem.type_expr)->elem,
                     .kind = PSK_Type,
+
+                    // HACK: This makes the assumption that slices, dynamic arrays and varargs have the same element type at the same location.
                     .actual = elem.actual->Slice.elem,
                 }));
                 break;

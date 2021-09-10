@@ -63,11 +63,11 @@ grammar_prepare :: (use g: ^Grammar) {
         }
     }
 
-    array.sort(^terminate_rules, (a: Term, b: Term) -> i32 {
+    array.sort(terminate_rules, (a: Term, b: Term) -> i32 {
         return (cast(i32) a.nt) - (cast(i32) b.nt);
     });
 
-    array.sort(^production_rules, (a: Prod, b: Prod) -> i32 {
+    array.sort(production_rules, (a: Prod, b: Prod) -> i32 {
         return (cast(i32) a.nt0) - (cast(i32) b.nt0);
     });
 

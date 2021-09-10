@@ -5,7 +5,7 @@ use package core.intrinsics.onyx { __zero_value }
 // [..] T == Array(T)
 //   where
 // Array :: struct (T: type_expr) {
-//     data      : T;
+//     data      : ^T;
 //     count     : u32;
 //     capacity  : u32;
 //     allocator : Allocator;
@@ -139,272 +139,10 @@ pop :: (arr: ^[..] $T) -> T {
     return arr.data[arr.count];
 }
 
-transplant :: (arr: ^[..] $T, old_index: i32, new_index: i32) -> bool {
-    if old_index < 0 || old_index >= arr.count do return false;
-    if new_index < 0 || new_index >= arr.count do return false;
-    if old_index == new_index do return true;
-
-    value := arr.data[old_index];
-
-    if old_index < new_index { // Moving forward
-        while i := old_index; i < new_index {
-            defer i += 1;
-            arr.data[i] = arr.data[i + 1];
-        }
-
-    } else { // Moving backward
-        while i := old_index; i > new_index {
-            defer i -= 1;
-            arr.data[i] = arr.data[i - 1];
-        }
-    }
-
-    arr.data[new_index] = value;
-    return true;
-}
-
-get :: (arr: ^[..] $T, idx: i32) -> T {
-    if arr.count == 0 do return __zero_value(T);
-
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
-
-    return arr.data[idx];
-}
-
-get_ptr :: (arr: ^[..] $T, idx: i32) -> ^T {
-    if arr.count == 0 do return null;
-
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
-
-    return ^arr.data[idx];
-}
-
-set :: (arr: ^[..] $T, idx: i32, value: T) {
-    if arr.count == 0 do return;
-
-    while idx < 0          do idx += arr.count;
-    while idx >= arr.count do idx -= arr.count;
-
-    arr.data[idx] = value;
-}
-
 concat :: (arr: ^[..] $T, other: [..] T) {
     for ^o: other do push(arr, *o);
 }
 
-// Uses '==' to compare for equality.
-contains :: #match {
-    (arr: ^[..] $T, x: T) -> bool {
-        for it: *arr do if it == x do return true;
-        return false;
-    },
-
-    (arr: [] $T, x: T) -> bool {
-        for it: arr do if it == x do return true;
-        return false;
-    }
-}
-
-// Uses '+' to sum.
-sum :: #match {
-    (arr: ^[..] $T, start: T = 0) -> T {
-        sum := start;
-        for it: *arr do sum += it;
-        return sum;
-    },
-
-    (arr: [] $T, start: T = 0) -> T {
-        sum := start;
-        for it: arr do sum += it;
-        return sum;
-    }
-}
-
-product :: #match {
-    (arr: ^[..] $T, start: T = 1) -> T {
-        sum := start;
-        for it: *arr do sum *= it;
-        return sum;
-    },
-
-    (arr: [] $T, start: T = 1) -> T {
-        sum := start;
-        for it: arr do sum *= it;
-        return sum;
-    }
-}
-
-average :: (arr: ^[..] $T) -> T {
-    sum := cast(T) 0;
-    for it: *arr do sum += it;
-
-    return sum / cast(T) arr.count;
-}
-
-to_slice :: #match {
-    (arr: [..] $T) -> [] T {
-        return arr.data[0 .. arr.count];
-    },
-
-    (arr: ^[..] $T) -> [] T {
-        return arr.data[0 .. arr.count];
-    },
-}
-
-/*
-** Simple insertion sort
-**    cmp should return >0 if left > right
-*/
-sort :: #match {
-    (arr: ^[..] $T, cmp: (T, T) -> i32) {
-        for i: 1 .. arr.count {
-            x := arr.data[i];
-            j := i - 1;
-
-            @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
-            while j >= 0 {
-                if cmp(arr.data[j], x) > 0 {
-                    arr.data[j + 1] = arr.data[j];
-                    j -= 1;
-                } else {
-                    break;
-                }
-            }
-
-            arr.data[j + 1] = x;
-        }
-    },
-
-    (arr: ^[..] $T, cmp: (^T, ^T) -> i32) {
-        for i: 1 .. arr.count {
-            j := i;
-
-            while j > 0 {
-                if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
-                    arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
-                    j -= 1;
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-}
-
-fold :: #match {
-    (arr: ^[..] $T, init: $R, f: (T, R) -> R) -> R {
-        val := init;
-        for it: *arr do val = f(it, val);
-        return val;
-    },
-
-    (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
-        val := init;
-        for it: arr do val = f(it, val);
-        return val;
-    }
-}
-
-map :: #match {
-    macro (arr: [..] $T, f: (^T) -> void)              do for ^it: arr do f(it);,
-    macro (arr: [..] $T, f: (T) -> T)                  do for ^it: arr do *it = f(*it);,
-    macro (arr: [..] $T, body: Code)                   do for ^it: arr do #insert body;,
-    macro (arr: [..] $T, data: $R, f: (^T, R) -> void) do for ^it: arr do f(it, data);,
-    macro (arr: [..] $T, data: $R, f: (T, R) -> T)     do for ^it: arr do *it = f(*it, data);,
-    macro (arr: [] $T, f: (^T) -> void)                do for ^it: arr do f(it);,
-    macro (arr: [] $T, f: (T) -> T)                    do for ^it: arr do *it = f(*it);,
-    macro (arr: [] $T, body: Code)                     do for ^it: arr do #insert body;,
-    macro (arr: [] $T, data: $R, f: (^T, R) -> void)   do for ^it: arr do f(it, data);,
-    macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
-}
-
-every :: (arr: ^[..] $T, predicate: (T) -> bool) -> bool {
-    val := true;
-    for ^it: *arr do val = val && predicate(*it);
-    return val;
-}
-
-some :: (arr: ^[..] $T, predicate: (T) -> bool) -> bool {
-    val := false;
-    for ^it: *arr {
-        val = val || predicate(*it);
-        if val do break;
-    }
-    return val;
-}
-
-fill :: (arr: ^[..] $T, value: T) {
-    for i: arr.count {
-        arr.data[i] = value;
-    }
-}
-
-fill_range :: (arr: ^[..] $T, r: range, value: T) {
-    for i: r {
-        if i >= arr.count || i < 0 do continue;
-        arr.data[i] = value;
-    }
-}
-
-to_list :: (arr: ^[..] $T, allocator := context.allocator) -> List(T) {
-    new_list := list.make(T, allocator);
-
-    for ^it: *arr {
-        list.push_end(^new_list, *it);
-    }
-
-    return new_list;
-}
-
-find :: (arr: ^[..] $T, value: T) -> i32 {
-    for i: arr.count {
-        if value == arr.data[i] do return i;
-    }
-
-    return -1;
-}
-
-find_ptr :: (arr: ^[..] $T, value: T) -> ^T {
-    for ^it: *arr {
-        if value == *it do return it;
-    }
-
-    return null;
-}
-
-first :: #match {
-    (arr: ^[..] $T, predicate: (T) -> bool) -> ^T {
-        first((#type [] T).{ arr.data, arr.count }, predicate);
-    },
-
-    (arr: [] $T, predicate: (T) -> bool) -> ^T {
-        for ^it: arr {
-            if predicate(*it) do return it;
-        }
-
-        return null;
-    },
-}
-
-count_where :: #match {
-    (arr: ^[..] $T, predicate: $Pred) -> u32 {
-        return count_where((#type [] T).{ arr.data, arr.count }, predicate);
-    },
-
-    (arr: [] $T, predicate: (T) -> bool) -> u32 {
-        count: u32 = 0;
-        for ^it: arr do if predicate(*it) do count += 1;
-        return count;
-    },
-
-    (arr: [] $T, predicate: (^T) -> bool) -> u32 {
-        count: u32 = 0;
-        for ^it: arr do if predicate(it) do count += 1;
-        return count;
-    },
-}
 
 fold_idx_elem :: #match {
     (arr: ^[..] $T, cmp: (T, T) -> bool) -> (i32, T) {
@@ -450,3 +188,215 @@ Untyped_Array :: struct {
     capacity: u32;
     allocator: Allocator;
 }
+
+
+
+// Things that work with slices and arrays
+
+transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
+    if old_index < 0 || old_index >= arr.count do return false;
+    if new_index < 0 || new_index >= arr.count do return false;
+    if old_index == new_index do return true;
+
+    value := arr.data[old_index];
+
+    if old_index < new_index { // Moving forward
+        while i := old_index; i < new_index {
+            defer i += 1;
+            arr.data[i] = arr.data[i + 1];
+        }
+
+    } else { // Moving backward
+        while i := old_index; i > new_index {
+            defer i -= 1;
+            arr.data[i] = arr.data[i - 1];
+        }
+    }
+
+    arr.data[new_index] = value;
+    return true;
+}
+
+get :: (arr: [] $T, idx: i32) -> T {
+    if arr.count == 0 do return __zero_value(T);
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    return arr.data[idx];
+}
+
+get_ptr :: (arr: [] $T, idx: i32) -> ^T {
+    if arr.count == 0 do return null;
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    return ^arr.data[idx];
+}
+
+set :: (arr: [] $T, idx: i32, value: T) {
+    if arr.count == 0 do return;
+
+    while idx < 0          do idx += arr.count;
+    while idx >= arr.count do idx -= arr.count;
+
+    arr.data[idx] = value;
+}
+
+// Uses '==' to compare for equality.
+contains :: (arr: [] $T, x: T) -> bool {
+    for it: arr do if it == x do return true;
+    return false;
+}
+
+// Uses '+' to sum.
+sum :: (arr: [] $T, start: T = 0) -> T {
+    sum := start;
+    for it: arr do sum += it;
+    return sum;
+}
+
+product :: (arr: [] $T, start: T = 1) -> T {
+    prod := start;
+    for it: arr do prod *= it;
+    return prod;
+}
+
+average :: (arr: [] $T) -> T {
+    sum := cast(T) 0;
+    for it: *arr do sum += it;
+
+    return sum / cast(T) arr.count;
+}
+
+//
+// Simple insertion sort
+//    cmp should return >0 if left > right
+//
+sort :: #match {
+    (arr: [] $T, cmp: (T, T) -> i32) {
+        for i: 1 .. arr.count {
+            x := arr.data[i];
+            j := i - 1;
+
+            @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
+            while j >= 0 {
+                if cmp(arr.data[j], x) > 0 {
+                    arr.data[j + 1] = arr.data[j];
+                    j -= 1;
+                } else {
+                    break;
+                }
+            }
+
+            arr.data[j + 1] = x;
+        }
+    },
+
+    (arr: [] $T, cmp: (^T, ^T) -> i32) {
+        for i: 1 .. arr.count {
+            j := i;
+
+            while j > 0 {
+                if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
+                    arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
+                    j -= 1;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
+    val := init;
+    for it: arr do val = f(it, val);
+    return val;
+}
+
+map :: #match {
+    macro (arr: [] $T, f: (^T) -> void)                do for ^it: arr do f(it);,
+    macro (arr: [] $T, f: (T) -> T)                    do for ^it: arr do *it = f(*it);,
+    macro (arr: [] $T, body: Code)                     do for ^it: arr do #insert body;,
+    macro (arr: [] $T, data: $R, f: (^T, R) -> void)   do for ^it: arr do f(it, data);,
+    macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
+}
+
+every :: (arr: [] $T, predicate: (T) -> bool) -> bool {
+    val := true;
+    for ^it: arr do val = val && predicate(*it);
+    return val;
+}
+
+some :: (arr: [] $T, predicate: (T) -> bool) -> bool {
+    val := false;
+    for ^it: arr {
+        val = val || predicate(*it);
+        if val do break;
+    }
+    return val;
+}
+
+fill :: (arr: [] $T, value: T) {
+    for i: arr.count {
+        arr[i] = value;
+    }
+}
+
+fill_range :: (arr: [] $T, r: range, value: T) {
+    for i: r {
+        if i >= arr.count || i < 0 do continue;
+        arr[i] = value;
+    }
+}
+
+to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
+    new_list := list.make(T, allocator);
+
+    for ^it: arr {
+        list.push_end(^new_list, *it);
+    }
+
+    return new_list;
+}
+
+find :: (arr: [] $T, value: T) -> i32 {
+    for i: arr.count {
+        if value == arr.data[i] do return i;
+    }
+
+    return -1;
+}
+
+find_ptr :: (arr: [] $T, value: T) -> ^T {
+    for ^it: arr {
+        if value == *it do return it;
+    }
+
+    return null;
+}
+
+first :: (arr: [] $T, predicate: (T) -> bool) -> ^T {
+    for ^it: arr {
+        if predicate(*it) do return it;
+    }
+
+    return null;
+}
+
+count_where :: #match {
+    (arr: [] $T, predicate: (T) -> bool) -> u32 {
+        count: u32 = 0;
+        for ^it: arr do if predicate(*it) do count += 1;
+        return count;
+    },
+
+    (arr: [] $T, predicate: (^T) -> bool) -> u32 {
+        count: u32 = 0;
+        for ^it: arr do if predicate(it) do count += 1;
+        return count;
+    },
+}
+
