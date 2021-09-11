@@ -1952,92 +1952,117 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 
     u32 param_idx = 0;
     assert(parser->polymorph_context.poly_params != NULL);
+    
+    bh_arr(AstParam) param_buffer=NULL;
+    bh_arr_new(global_heap_allocator, param_buffer, 2);
 
-    b32 param_use = 0;
-    b32 param_is_baked = 0;
     OnyxToken* symbol;
     while (!consume_token_if_next(parser, ')')) {
-        if (parser->hit_unexpected_token) return;
+        do {
+            if (parser->hit_unexpected_token) return;
 
-        AstParam curr_param = { 0 };
+            b32 param_use = 0;
+            b32 param_is_baked = 0;
+            AstParam curr_param = { 0 };
 
-        if (consume_token_if_next(parser, Token_Type_Keyword_Use)) param_use = 1;
-        if (consume_token_if_next(parser, '$'))                    param_is_baked = 1;
+            if (consume_token_if_next(parser, Token_Type_Keyword_Use)) param_use = 1;
+            if (consume_token_if_next(parser, '$'))                    param_is_baked = 1;
 
-        symbol = expect_token(parser, Token_Type_Symbol);
+            symbol = expect_token(parser, Token_Type_Symbol);
+
+            curr_param.vararg_kind = VA_Kind_Not_VA;
+            curr_param.local = make_local(parser->allocator, symbol, NULL);
+            curr_param.local->kind = Ast_Kind_Param;
+
+            if (param_use) {
+                curr_param.local->flags |= Ast_Flag_Param_Use;
+                param_use = 0;
+            }
+
+            if (param_is_baked) {
+                curr_param.is_baked = 1;
+                param_is_baked = 0;
+            }
+
+            bh_arr_push(param_buffer, curr_param);
+        } while (consume_token_if_next(parser, ','));
+
         expect_token(parser, ':');
 
-        curr_param.vararg_kind = VA_Kind_Not_VA;
-        curr_param.local = make_local(parser->allocator, symbol, NULL);
-        curr_param.local->kind = Ast_Kind_Param;
-
-        if (param_use) {
-            curr_param.local->flags |= Ast_Flag_Param_Use;
-            param_use = 0;
-        }
+        VarArgKind vararg_kind=VA_Kind_Not_VA;
+        AstType* type_node=NULL;
+        AstTyped* default_value=NULL;
 
         if (parser->curr->type != '=') {
             if (consume_token_if_next(parser, Token_Type_Dot_Dot)) {
-                if (consume_token_if_next(parser, '.')) curr_param.vararg_kind = VA_Kind_Untyped;
-                else                                    curr_param.vararg_kind = VA_Kind_Typed;
+                if (consume_token_if_next(parser, '.')) vararg_kind = VA_Kind_Untyped;
+                else                                    vararg_kind = VA_Kind_Typed;
             }
 
-            if (curr_param.vararg_kind != VA_Kind_Untyped) {
+            if (vararg_kind != VA_Kind_Untyped) {
                 // CLEANUP: This is mess and it is hard to follow what is going on here.
                 // I think with recent rewrites, this should be easier to do.
                 i32 old_len = bh_arr_length(*parser->polymorph_context.poly_params);
-                curr_param.local->type_node = parse_type(parser);
+                type_node = parse_type(parser);
                 i32 new_len = bh_arr_length(*parser->polymorph_context.poly_params);
 
-                if (curr_param.vararg_kind == VA_Kind_Typed) {
+                if (vararg_kind == VA_Kind_Typed) {
                     AstVarArgType* va_type = make_node(AstVarArgType, Ast_Kind_VarArg_Type);
-                    va_type->elem = curr_param.local->type_node;
-                    va_type->token = curr_param.local->type_node->token;
-                    curr_param.local->type_node = (AstType *) va_type;
+                    va_type->elem = type_node;
+                    va_type->token = type_node->token;
+                    type_node = (AstType *) va_type;
                 }
 
                 fori (i, 0, new_len - old_len) {
-                    (*parser->polymorph_context.poly_params)[old_len + i].type_expr = curr_param.local->type_node;
+                    (*parser->polymorph_context.poly_params)[old_len + i].type_expr = type_node;
                     (*parser->polymorph_context.poly_params)[old_len + i].idx = param_idx;
                 }
             }
         }
 
-        if (curr_param.vararg_kind == VA_Kind_Not_VA && consume_token_if_next(parser, '=')) {
+        if (vararg_kind == VA_Kind_Not_VA && consume_token_if_next(parser, '=')) {
             OnyxToken* directive_token = parser->curr;
 
             // :Callsite  currently #callsite is only valid as a default value for a funciton parameter.
             if (parse_possible_directive(parser, "callsite")) {
                 AstCallSite* cs = make_node(AstCallSite, Ast_Kind_Call_Site);
                 cs->token = directive_token;
-                curr_param.default_value = (AstTyped *) cs;
+                default_value = (AstTyped *) cs;
 
             } else {
-                curr_param.default_value = parse_expression(parser, 0);
+                default_value = parse_expression(parser, 0);
             }
         }
 
-        if (param_is_baked) {
-            param_is_baked = 0;
+        bh_arr_each(AstParam, param, param_buffer) {
+            param->vararg_kind      = vararg_kind;
+            param->local->type_node = type_node;
+            param->default_value    = default_value;
 
-            bh_arr(AstPolyParam) pv = *parser->polymorph_context.poly_params;
-            bh_arr_push(pv, ((AstPolyParam) {
-                .kind = PPK_Baked_Value,
-                .idx = param_idx,
+            if (param->is_baked) {
+                bh_arr(AstPolyParam) pv = *parser->polymorph_context.poly_params;
+                bh_arr_push(pv, ((AstPolyParam) {
+                    .kind = PPK_Baked_Value,
+                    .idx = param_idx,
 
-                .poly_sym = (AstNode *) curr_param.local,
-                .type_expr = curr_param.local->type_node,
-            }));
+                    .poly_sym = (AstNode *) param->local,
+                    .type_expr = type_node,
+                }));
 
-            *parser->polymorph_context.poly_params = pv;
+                *parser->polymorph_context.poly_params = pv;
+            }
+
+            bh_arr_push(func->params, *param);
+            param_idx++;
         }
 
-        bh_arr_push(func->params, curr_param);
-        param_idx++;
+        bh_arr_clear(param_buffer);
 
         if (parser->curr->type != ')')
             expect_token(parser, ',');
     }
+
+    bh_arr_free(param_buffer);
     return;
 }
 

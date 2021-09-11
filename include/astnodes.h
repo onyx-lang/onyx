@@ -855,6 +855,7 @@ struct AstParam {
 
     VarArgKind vararg_kind;
     b32 use_processed : 1;
+    b32 is_baked      : 1;
 };
 struct AstFunction {
     AstTyped_base;
