@@ -310,6 +310,52 @@ sort :: #match {
     }
 }
 
+quicksort :: #match {
+    (arr: [] $T, cmp: ( T,  T) -> i32) do quicksort_impl(arr, cmp, 0, arr.count - 1); ,
+    (arr: [] $T, cmp: (^T, ^T) -> i32) do quicksort_impl(arr, cmp, 0, arr.count - 1); ,
+}
+
+#private_file {
+    quicksort_impl :: (arr: [] $T, cmp: $PredicateFunction, lo, hi: i32) {
+        if lo < 0 || hi < 0 do return;
+        if lo >= hi do return;
+
+        pivot := quicksort_partition(arr, cmp, lo, hi);
+        quicksort_impl(arr, cmp, lo, pivot - 1);
+        quicksort_impl(arr, cmp, pivot + 1, hi);
+    }
+
+    quicksort_partition :: #match {
+        (arr: [] $T, cmp: (T, T) -> i32, lo, hi: i32) -> i32 {
+            pivot := arr[hi];
+            i := lo - 1;
+
+            for j: lo .. hi+1 {
+                if cmp(arr[j], pivot) <= 0 {
+                    i += 1;
+                    arr[i], arr[j] = arr[j], arr[i];
+                }
+            }
+
+            return i;
+        },
+
+        (arr: [] $T, cmp: (^T, ^T) -> i32, lo, hi: i32) -> i32 {
+            pivot := ^arr[hi];
+            i := lo - 1;
+
+            for j: lo .. hi+1 {
+                if cmp(^arr[j], pivot) <= 0 {
+                    i += 1;
+                    arr[i], arr[j] = arr[j], arr[i];
+                }
+            }
+
+            return i;
+        }
+    }
+}
+
 fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
     val := init;
     for it: arr do val = f(it, val);

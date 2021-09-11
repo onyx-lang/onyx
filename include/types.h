@@ -112,7 +112,7 @@ struct TypeWithOffset {
         bh_arr(TypeWithOffset) linear_members;                    \
         Type* types[];                                            \
     })                                                            \
-    TYPE_KIND(Array, struct { u32 size; u32 count; Type *elem; }) \
+    TYPE_KIND(Array, struct { Type* elem; u32 size; u32 count; }) \
     TYPE_KIND(Slice, struct { Type *elem; })                      \
     TYPE_KIND(DynArray, struct { Type *elem; })                   \
     TYPE_KIND(VarArgs, struct { Type *elem; })                    \
