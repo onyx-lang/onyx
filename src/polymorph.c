@@ -497,14 +497,19 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
             param->type = type_build_from_ast(context.ast_alloc, param->type_expr);
         assert(param->type);
 
-        if (!unify_node_and_type(&value, param->type)) {
+        AstTyped* value_to_use = value;
+        if (value->kind == Ast_Kind_Macro) {
+            value_to_use = (AstTyped *) get_function_from_node((AstNode *) value);
+        }
+
+        if (!unify_node_and_type(&value_to_use, param->type)) {
             if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
                     "The procedure '%s' expects a value of type '%s' for baked %d%s parameter, got '%s'.",
                     get_function_name(pp->base_func),
                     type_get_name(param->type),
                     param->idx + 1,
                     bh_num_suffix(param->idx + 1),
-                    node_get_type_name(value));
+                    node_get_type_name(value_to_use));
             return;
         }
 

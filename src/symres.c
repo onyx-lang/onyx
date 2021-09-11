@@ -1185,6 +1185,8 @@ static SymresStatus symres_macro(AstMacro* macro) {
         SYMRES(polyproc, (AstPolyProc *) macro->body);
     }
 
+    macro->flags |= Ast_Flag_Comptime;
+
     return Symres_Success;
 }
 
