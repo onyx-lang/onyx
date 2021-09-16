@@ -23,7 +23,7 @@ checkbox :: (use r: Rectangle, value: ^bool, text: str, theme := ^default_checkb
     result := false;
 
     hash := get_site_hash(site, increment);
-    animation_state := map.get(^animation_states, hash);
+    animation_state := get_animation(hash);
     mx, my := get_mouse_position();
 
     if is_active_item(hash) {
@@ -93,12 +93,6 @@ checkbox :: (use r: Rectangle, value: ^bool, text: str, theme := ^default_checkb
         theme.font, theme.font_size, theme.text_color);
 
     move_towards(^animation_state.click_time, 0.0f, theme.click_decay_speed);
-
-    if animation_state.click_time > 0 || animation_state.hover_time > 0 {
-        map.put(^animation_states, hash, animation_state);
-    } else {
-        map.delete(^animation_states, hash);
-    }
 
     return result;
 }

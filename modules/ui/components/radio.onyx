@@ -23,7 +23,7 @@ radio :: (use r: Rectangle, selected: ^$T, value: T, text: str, theme := ^defaul
     result := false;
 
     hash := get_site_hash(site, increment);
-    animation_state := map.get(^animation_states, hash);
+    animation_state := get_animation(hash);
 
     mx, my := get_mouse_position();
 
@@ -86,12 +86,6 @@ radio :: (use r: Rectangle, selected: ^$T, value: T, text: str, theme := ^defaul
         theme.font, theme.font_size, theme.text_color);
 
     move_towards(^animation_state.click_time, 0.0f, theme.click_decay_speed);
-
-    if animation_state.click_time > 0 || animation_state.hover_time > 0 {
-        map.put(^animation_states, hash, animation_state);
-    } else {
-        map.delete(^animation_states, hash);
-    }
 
     return result;
 }

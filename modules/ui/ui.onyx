@@ -58,6 +58,19 @@ end_frame :: () {
         if *s == .Just_Down do *s = .Down;
         if *s == .Just_Up   do *s = .Up;
     }
+
+    for ^state: animation_states.entries {
+        // If the animation isn't being used anymore, discard it. This makes the has_active_animation function
+        // correct, otherwise, there could be animations that didn't finish, but the element was removed, and is
+        // no longer being updated.
+        if !state.value.accessed_this_frame || (state.value.click_time == 0 && state.value.hover_time == 0) {
+            map.delete(^animation_states, state.key);
+        }
+    }
+
+    for ^state: animation_states.entries {
+        state.value.accessed_this_frame = false;
+    }
 }
 
 set_active_item :: (id: UI_Id) -> bool {
@@ -179,11 +192,26 @@ Animation_Theme :: struct {
 // Animation states are stored globally as there is not much to the state of a button.
 // Forcing the end user to store a structure for each button that is just the animation
 // state of the component feels very wrong.
-#private animation_states : Map(UI_Id, Animation_State);
+#private_file animation_states : Map(UI_Id, Animation_State);
 
 Animation_State :: struct {
     hover_time := 0.0f;
     click_time := 0.0f;
+
+    accessed_this_frame := false;
+}
+
+get_animation :: (id: UI_Id) -> ^Animation_State {
+    retval := map.get_ptr(^animation_states, id);
+
+    if retval == null {
+        map.put(^animation_states, id, .{});
+        retval = map.get_ptr(^animation_states, id);
+    }
+
+    // printf("{*}\n", retval);
+    retval.accessed_this_frame = true;
+    return retval;
 }
 
 has_active_animation :: () -> bool {
