@@ -369,18 +369,18 @@ whitespace_skipped:
         break;
 
     case '<':
+        LITERAL_TOKEN("<=",          0, Token_Type_Less_Equal);
         LITERAL_TOKEN("<-",          0, Token_Type_Right_Arrow);
         LITERAL_TOKEN("<<=",         0, Token_Type_Shl_Equal);
         LITERAL_TOKEN("<<",          0, Token_Type_Shift_Left);
-        LITERAL_TOKEN("<=",          0, Token_Type_Less_Equal);
         break;
 
     case '>':
+        LITERAL_TOKEN(">=",          0, Token_Type_Greater_Equal);
         LITERAL_TOKEN(">>>=",        0, Token_Type_Sar_Equal);
         LITERAL_TOKEN(">>=",         0, Token_Type_Shr_Equal);
         LITERAL_TOKEN(">>>",         0, Token_Type_Shift_Arith_Right);
         LITERAL_TOKEN(">>",          0, Token_Type_Shift_Right);
-        LITERAL_TOKEN(">=",          0, Token_Type_Greater_Equal);
         break;
 
     case '&':

@@ -8,7 +8,7 @@ List of known bugs:
         println(x); // Doesn't work
     }
 
-[ ] Memory reservation type checking doesn't work how I think it should. This errors for example:
+[X] Memory reservation type checking doesn't work how I think it should. This errors for example:
     
     x: i64 = 1;
 

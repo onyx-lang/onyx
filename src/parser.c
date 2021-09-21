@@ -2198,6 +2198,11 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
     return 0;
 }
 
+typedef struct QuickParam {
+    OnyxToken* token;
+    b32 is_baked;
+} QuickParam;
+
 static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret) {
     if (parser->curr->type != '(') return 0;
 
@@ -2211,13 +2216,17 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 
     OnyxToken* proc_token = expect_token(parser, '(');
 
-    bh_arr(OnyxToken*) params=NULL;
+    bh_arr(QuickParam) params=NULL;
     bh_arr_new(global_heap_allocator, params, 4);
 
     while (parser->curr->type != ')') {
         if (parser->hit_unexpected_token) return 0;
 
-        bh_arr_push(params, expect_token(parser, Token_Type_Symbol));
+        QuickParam param = { 0 };
+        if (consume_token_if_next(parser, '$')) param.is_baked = 1;
+        param.token = expect_token(parser, Token_Type_Symbol);
+
+        bh_arr_push(params, param);
 
         if (parser->curr->type != ')') {
             expect_token(parser, ',');
@@ -2228,21 +2237,21 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
     expect_token(parser, '=');
     expect_token(parser, '>');
 
-    bh_arr(AstNode*) poly_params=NULL;
+    bh_arr(AstNode *) poly_params=NULL;
     bh_arr_new(global_heap_allocator, poly_params, bh_arr_length(params));
-    bh_arr_each(OnyxToken*, param, params) {
+    bh_arr_each(QuickParam, param, params) {
         char text[512];
         memset(text, 0, 512);
         strncat(text, "__type_", 511);
-        token_toggle_end(*param);
-        strncat(text, (*param)->text, 511);
-        token_toggle_end(*param);
+        token_toggle_end(param->token);
+        strncat(text, param->token->text, 511);
+        token_toggle_end(param->token);
 
         OnyxToken* new_token = bh_alloc(parser->allocator, sizeof(OnyxToken));
         new_token->type = Token_Type_Symbol;
-        new_token->length = 7 + (*param)->length;
+        new_token->length = 7 + param->token->length;
         new_token->text = bh_strdup(parser->allocator, text);
-        new_token->pos = (*param)->pos;
+        new_token->pos = param->token->pos;
 
         AstNode* type_node = make_symbol(parser->allocator, new_token);
         bh_arr_push(poly_params, type_node);
@@ -2253,7 +2262,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 
     bh_arr_new(global_heap_allocator, func_node->params, bh_arr_length(params));
     fori (i, 0, bh_arr_length(params)) {
-        AstLocal* param_local = make_local(parser->allocator, params[i], (AstType *) poly_params[i]);
+        AstLocal* param_local = make_local(parser->allocator, params[i].token, (AstType *) poly_params[i]);
         param_local->kind = Ast_Kind_Param;
 
         bh_arr_push(func_node->params, ((AstParam) {
@@ -2303,6 +2312,10 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
             .type_expr = (AstType *) poly_params[i],
             .type = NULL,
         }));
+
+        if (params[i].is_baked) {
+            // This is not handled currently, as you cannot say f :: ($x: $T) yet, which is what this would have to do.
+        }
     }
     poly_proc->base_func = func_node;
 
