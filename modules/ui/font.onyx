@@ -32,7 +32,7 @@ Font :: struct {
         return ~~font.common.baseline * size;
     }
 
-    render :: (use f: ^Font, text: str, x: f32, y: f32, font_size: f32, color := gfx.Color4.{1,1,1}) {
+    render :: (use f: ^Font, text: str, x, y: f32, font_size: f32, color := gfx.Color4.{1,1,1}) {
         gfx.set_texture(^texture);
 
         switch rendering_kind {

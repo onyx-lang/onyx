@@ -123,7 +123,7 @@ draw_rect :: #match {
         gfx.rect(.{ x0, y0 }, .{ width, height }, color);
     },
 
-    (x: f32, y: f32, w: f32, h: f32, color := gfx.Color4.{1,1,1}) {
+    (x, y, w, h: f32, color := gfx.Color4.{1,1,1}) {
         gfx.set_texture();
         gfx.rect(.{ x, y }, .{ w, h }, color);
     }
@@ -158,7 +158,7 @@ Rectangle :: struct {
     bottom_left  :: (use r: Rectangle) -> (x: f32, y: f32) do return math.min(x0, x1), math.max(y0, y1);
     bottom_right :: (use r: Rectangle) -> (x: f32, y: f32) do return math.max(x0, x1), math.max(y0, y1);
 
-    contains :: (use r: Rectangle, x: f32, y: f32) -> bool {
+    contains :: (use r: Rectangle, x, y: f32) -> bool {
         return math.min(x0, x1) <= x && x <= math.max(x0, x1) &&
                math.min(y0, y1) <= y && y <= math.max(y0, y1);
     }
