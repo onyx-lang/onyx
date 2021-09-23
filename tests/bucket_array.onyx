@@ -3,7 +3,7 @@
 use package core
 
 main :: (args: [] cstr) {
-    ba := bucket_array.make(i32, 4);    
+    ba := bucket_array.make(i32, 4);
     for i: 24 do ba << i;
 
     sum := 0;

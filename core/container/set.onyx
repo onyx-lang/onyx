@@ -89,6 +89,37 @@ empty :: (use set: ^Set($T)) -> bool {
     return entries.count == 0;
 }
 
+iterator :: (set: ^Set($T)) -> Iterator(T) {
+    Context :: struct (T: type_expr) {
+        entry_array: [..] Set.Entry(T);
+        position: i32;
+    }
+
+    context := new(#type Context(T));
+    context.entry_array = set.entries;
+    context.position = 0;
+
+    next :: ($T: type_expr, use context: ^Context(T)) -> (T, bool) {
+        if position < entry_array.count {
+            defer position += 1;
+            return entry_array[position].value, true;
+
+        } else {
+            return __zero_value(T), false;
+        }
+    }
+
+    close :: (context: rawptr) {
+        cfree(context);
+    }
+
+    return .{
+        data = context,
+        next = #solidify next { T = T },
+        close = close,
+    };
+}
+
 //
 // Private symbols
 //

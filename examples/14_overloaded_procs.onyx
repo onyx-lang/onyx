@@ -17,7 +17,19 @@
 //        (y: str) { ... },
 //    }
 //
-
+//
+// There are several tradeoffs when comparing explicit vs implicit procedure
+// overloads. The primary reason a language like C++ would have implicit overloads
+// is that procedures cannot be defined inside of other procedures, and overall
+// the scoping rules for procedures are a lot simpler. In Onyx however, because
+// procedures can be arbitrarily nested, determining which procedure is actually
+// going to be called is difficult from both a compiler design perspective, and
+// from the person whose is actually writing the code. This complexity is not
+// worth the engineering effort to support in the compiler, and therefore I
+// settled on the explicit approach. After writing a lot of code in the Onyx, I
+// believe I made the right choice.
+//
+// Let's look at some examples of overloaded procedures and how they are resolved.
 
 
 #load "core/std"
@@ -25,4 +37,68 @@
 use package core
 
 main :: (args: [] cstr) {
+    // See the overloaded procedure defined below.
+
+    // This works as you would expect.
+    print_type(10);
+    print_type(3.14159f);
+    print_type("Hello, overloaded procedures!");
+
+    print_type(Person.{ "Joe", 38 });
+
+    // Some internal data structures like Map and Set use an overloaded procedure to provide a hash
+    // for the keys of the data. This procedure is core.hash.to_u32. If you want to have a set of 
+    // a datatype you made, or a map with keys of a datatype you made, you need to provide an overload
+    // to core.hash.to_u32 for your datatype. In this program, that definition is at the end of the file.
+    person_set := set.make(Person);
+    person_set << Person.{ "Joe", 38 };
+    person_set << Person.{ "Jane", 36 };
+    person_set << Person.{ "Joe", 38 };
+
+    // "Joe" will only be printed once.
+    for person: set.iterator(^person_set) {
+        println(person);
+    }
+}
+
+// Here is a basic overloaded procedure. It prints out the type of the variable you called it with.
+print_type :: #match {
+    (x: i32) { printf("Called with an i32 ({})\n", x); },
+    (x: f32) { printf("Called with an f32 ({})\n", x); },
+    (x: str) { printf("Called with a str ({})\n", x); },
+}
+
+// print_type is a little silly to have in this language because Onyx has complete
+// type knowledge at runtime. To rectify this, let's add a new case that makes
+// this work for any type:
+
+#add_match print_type, #precedence 10 (x: $T) {
+    printf("Fallback case: called with a {} ({})\n", T, x);
+}
+
+// There are a couple things going on here. The #add_match directive takes two "parameters" separated
+// by a comma: the overloaded procedure to add a match option to, and the option itself. The other
+// thing to notice is the "#precedence 10" specification. Onyx tries to match the arguments you provided
+// with each of the options. The first one that matches perfectly, is the one that is used. The order in
+// which it does this process is important, and that is why you can control it with the #precedence
+// directive. The #precedence directive is allowed in two places: right before the option in the original
+// #match directive, or in front of the option in an #add_match directive, as seen above. Currently,
+// the options are sorted in ascending order according to the precedence. I feel like this is backwards,
+// so that may change in the future. Either way, setting the precedence allows you to place the options
+// in the correct order so something like (x: $T), which will match ANY single argument, is placed last
+// after the specific versions above. Without the precedence, each option will match with the new option,
+// as they have a default precedence of 0. It is good to note that in the original #match directive,
+// options automatically have a precedence of 1 more than the option before it, so lexicographical order
+// does matter.
+
+Person :: struct { name: str; age: i32; }
+
+// The overload option for hashing a person:
+#add_match (package core).hash.to_u32, (use p: Person) -> u32 {
+    return hash.to_u32(name) * 16239563 + age;
+}
+
+// Ignore this for now, but it is needed in order to make a set of Persons.
+#operator == (p1: Person, p2: Person) -> bool {
+    return p1.name == p2.name && p1.age == p2.age;
 }
