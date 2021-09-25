@@ -51,9 +51,9 @@ main :: (args: [] cstr) {
     // a datatype you made, or a map with keys of a datatype you made, you need to provide an overload
     // to core.hash.to_u32 for your datatype. In this program, that definition is at the end of the file.
     person_set := set.make(Person);
-    person_set << Person.{ "Joe", 38 };
-    person_set << Person.{ "Jane", 36 };
-    person_set << Person.{ "Joe", 38 };
+    person_set << .{ "Joe", 38 };
+    person_set << .{ "Jane", 36 };
+    person_set << .{ "Joe", 38 };
 
     // "Joe" will only be printed once.
     for person: set.iterator(^person_set) {

@@ -917,8 +917,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     }
 
     // NOTE: Try operator overloading before checking everything else.
-    if ((binop->left->type != NULL && binop->right->type != NULL) &&
-        (binop->left->type->kind != Type_Kind_Basic || binop->right->type->kind != Type_Kind_Basic)) {
+    if ((binop->left->type != NULL && binop->left->type->kind != Type_Kind_Basic)
+        || (binop->right->type != NULL && binop->right->type->kind != Type_Kind_Basic)) {
         AstCall *implicit_call = binaryop_try_operator_overload(binop);
 
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)

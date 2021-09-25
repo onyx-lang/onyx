@@ -565,6 +565,8 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
 
         default: assert(("Bad macro body type.", 0));
     }
+
+    return NULL;
 }
 
 b32 entity_bring_to_state(Entity* ent, EntityState state) {
