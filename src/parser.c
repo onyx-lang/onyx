@@ -2105,12 +2105,34 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     bh_arr(AstPolyParam) polymorphic_vars = NULL;
     bh_arr_new(global_heap_allocator, polymorphic_vars, 4);
+    // defer bh_arr_free(polymorphic_vars);
 
     parser->polymorph_context.poly_params = &polymorphic_vars;
     parse_function_params(parser, func_def);
     parser->polymorph_context.poly_params = NULL;
 
     func_def->return_type = (AstType *) &basic_type_void;
+
+    if (consume_token_if_next(parser, '=')) {
+        expect_token(parser, '>');
+        func_def->return_type = (AstType *) &basic_type_auto_return;
+
+        AstTyped* returned_value = parse_compound_expression(parser, 0);
+
+        AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
+        return_node->token = returned_value->token;
+        return_node->expr = returned_value;
+
+        AstBlock* body_block = make_node(AstBlock, Ast_Kind_Block);
+        body_block->token = returned_value->token;
+        body_block->body = (AstNode *) return_node;
+
+        func_def->body = body_block;
+
+        bh_arr_free(polymorphic_vars);
+        return func_def;
+    }
+
     if (consume_token_if_next(parser, Token_Type_Right_Arrow)) {
         if (parse_possible_directive(parser, "auto")) {
             func_def->return_type = (AstType *) &basic_type_auto_return;
@@ -2174,7 +2196,8 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
         if (token_after_paren->type != Token_Type_Right_Arrow
             && token_after_paren->type != '{'
             && token_after_paren->type != Token_Type_Keyword_Do
-            && token_after_paren->type != Token_Type_Empty_Block)
+            && token_after_paren->type != Token_Type_Empty_Block
+            && (token_after_paren->type != '=' || (token_after_paren + 1)->type != '>'))
             return 0;
 
         // :LinearTokenDependent
