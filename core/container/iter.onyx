@@ -77,6 +77,20 @@ take_one :: (it: Iterator($T)) -> (T, bool) {
     return ret, cont;
 }
 
+// Macro that allows you to extract elements from an iterator in a simple way:
+//
+// value: i32;
+// iterator: Iterator(i32) = ...;
+//
+// if (#code value) << iterator {
+//     ...iterater closed...
+// }
+#operator << macro (dest: Code, it: Iterator($T)) -> bool {
+    cont: bool;
+    (#insert dest), cont = (package core.iter).take_one(it);
+    return !cont;
+}
+
 take :: (it: Iterator($T), count: u32) -> Iterator(T) {
     TakeIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);

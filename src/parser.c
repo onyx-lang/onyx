@@ -649,6 +649,23 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) code_block;
                 break;
             }
+            else if (next_tokens_are(parser, 2, '#', '(')) {
+                OnyxToken* code_token = expect_token(parser, '#');
+                expect_token(parser, '(');
+
+                AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
+                code_block->token = code_token;
+
+                assert(builtin_code_type != NULL);
+                code_block->type_node = builtin_code_type;
+                
+                code_block->code = (AstNode *) parse_expression(parser, 0);
+
+                expect_token(parser, ')');
+
+                retval = (AstTyped *) code_block;
+                break;
+            }
             else if (parse_possible_directive(parser, "insert")) {
                 AstDirectiveInsert* insert = make_node(AstDirectiveInsert, Ast_Kind_Directive_Insert);
                 insert->token = parser->curr - 1;

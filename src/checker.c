@@ -91,48 +91,12 @@ b32 expression_types_must_be_known = 0;
 #define EXPRESSION_LEVEL 2
 u32 current_checking_level=0;
 
-static inline void fill_in_type(AstTyped* node);
-
-static inline void fill_in_array_count(AstType* type_node) {
-    if (type_node == NULL) return;
-
-    if (type_node->kind == Ast_Kind_Type_Alias) {
-        fill_in_array_count(((AstTypeAlias *) type_node)->to);
-    }
-
-    if (type_node->kind == Ast_Kind_Array_Type) {
-        if (((AstArrayType *) type_node)->count_expr) {
-            // CLEANUP: The return value is not checked on this call.
-            check_expression(&((AstArrayType *) type_node)->count_expr);
-
-            resolve_expression_type(((AstArrayType *) type_node)->count_expr);
-        }
-    }
-}
-
-static inline void fill_in_poly_call_args(AstType* type_node) {
-    if (type_node == NULL) return;
-    if (type_node->kind != Ast_Kind_Poly_Call_Type) return;
-
-    AstPolyCallType* pctype = (AstPolyCallType *) type_node;
-
-    bh_arr_each(AstNode *, param, pctype->params) {
-        if (!node_is_type(*param)) {
-            // CLEANUP: The return value is not checked on this call.
-            check_expression((AstTyped **) param);
-            
-            resolve_expression_type((AstTyped *) *param);
-            fill_in_type((AstTyped *) *param);
-        }
-    }
-}
-
 static inline void fill_in_type(AstTyped* node) {
-    fill_in_array_count(node->type_node);
-    fill_in_poly_call_args(node->type_node);
+    if (node->type == NULL) {
+        if (check_type(node->type_node) > Check_Errors_Start) return;
 
-    if (node->type == NULL)
         node->type = type_build_from_ast(context.ast_alloc, node->type_node);
+    }
 }
 
 // HACK: This should be baked into a structure, not a global variable.
@@ -1493,7 +1457,6 @@ CheckStatus check_method_call(AstBinaryOp** mcall) {
 }
 
 CheckStatus check_size_of(AstSizeOf* so) {
-    fill_in_array_count(so->so_ast_type);
     CHECK(type, so->so_ast_type);
 
     so->so_type = type_build_from_ast(context.ast_alloc, so->so_ast_type);
@@ -1506,7 +1469,6 @@ CheckStatus check_size_of(AstSizeOf* so) {
 }
 
 CheckStatus check_align_of(AstAlignOf* ao) {
-    fill_in_array_count(ao->ao_ast_type);
     CHECK(type, ao->ao_ast_type);
 
     ao->ao_type = type_build_from_ast(context.ast_alloc, ao->ao_ast_type);
@@ -1524,9 +1486,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         // This is to ensure that the type will exist when compiling. For example, a poly-call type
         // would have to wait for the entity to pass through, which the code generation does not know
         // about.
-        if (expr->kind == Ast_Kind_Typeof) {
-            CHECK(type, (AstType *) expr);
-        }
+        CHECK(type, (AstType *) expr);
 
         // Don't try to construct a polystruct ahead of time because you can't.
         if (expr->kind != Ast_Kind_Poly_Struct_Type) {
@@ -1562,10 +1522,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Block:    retval = check_block((AstBlock *) expr); break;
 
         case Ast_Kind_Symbol:
-            onyx_report_error(expr->token->pos,
-                    "Symbol was unresolved in symbol resolution phase, '%b'. This is definitely a compiler bug.",
-                    expr->token->text, expr->token->length);
-            retval = Check_Error;
+            YIELD_(expr->token->pos, "Waiting to resolve symbol, '%b'.", expr->token->text, expr->token->length);
             break;
 
         case Ast_Kind_Param:
@@ -2083,6 +2040,8 @@ CheckStatus check_type(AstType* type) {
     while (type->kind == Ast_Kind_Type_Alias)
         type = ((AstTypeAlias *) type)->to;
 
+    if (type->flags & Ast_Flag_Already_Checked) return Check_Success;
+
     switch (type->kind) {
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_node = (AstPolyCallType *) type;
@@ -2091,6 +2050,7 @@ CheckStatus check_type(AstType* type) {
                 if (!node_is_type(*param)) {
                     CHECK(expression, (AstTyped **) param);
                     resolve_expression_type((AstTyped *) *param);
+                    fill_in_type((AstTyped *) *param);
                 }
             }
 
@@ -2133,9 +2093,20 @@ CheckStatus check_type(AstType* type) {
 
             bh_arr_each(AstType *, type, ctype->types) CHECK(type, *type);
             break;
-        }    
+        }
+        
+        case Ast_Kind_Array_Type: {
+            AstArrayType* atype = (AstArrayType *) type;
+            if (atype->count_expr) {
+                CHECK(expression, &atype->count_expr);
+                resolve_expression_type(atype->count_expr);
+            }
+
+            break;
+        }
     }
 
+    type->flags |= Ast_Flag_Already_Checked;
     return Check_Success;
 }
 
