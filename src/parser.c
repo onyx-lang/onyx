@@ -2561,7 +2561,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
         }
 
         if (node->kind == Ast_Kind_Type_Alias)    node->token = symbol;
-        else if (node_is_type((AstNode *) node));
+        if (node_is_type((AstNode *) node) && node->kind != Ast_Kind_Type_Alias);
         else if (node->kind == Ast_Kind_Package);
         else if (node->kind == Ast_Kind_NumLit);
         else {
