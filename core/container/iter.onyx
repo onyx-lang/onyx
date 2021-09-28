@@ -2,6 +2,10 @@ package core.iter
 
 use package core.intrinsics.onyx { __zero_value }
 
+close :: (it: Iterator($T)) {
+    it.close(it.data);
+}
+
 filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);

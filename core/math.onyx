@@ -327,3 +327,15 @@ choose :: (n: $T, k: T) -> T {
 
     return ret;
 }
+
+gcd :: (a: $T, b: T) -> T {
+    if a < 0 do a = -a;
+    if b < 0 do b = -b;
+
+    if b == 0 do return a;
+    return gcd(b, a % b);
+}
+
+lcm :: (a: $T, b: T) -> T {
+    return (a * b) / gcd(a, b);
+}

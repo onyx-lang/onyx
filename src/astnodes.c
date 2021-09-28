@@ -504,6 +504,9 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
 }
 
 // NOTE: Returns 0 if it was not possible to make the types compatible.
+// TODO: This function should be able return a "yield" condition. There
+// are a couple cases that need to yield in order to be correct, like
+// polymorphic functions with a typeof for the return type.
 b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     AstTyped* node = *pnode;
     if (type == NULL) return 0;
@@ -562,6 +565,9 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return 0;
+
+        // FIXME: This is incorrect. It should actually yield and not return a failure.
+        if (func == &node_that_signals_a_yield) return 0;
 
         *pnode = (AstTyped *) func;
         node = *pnode;

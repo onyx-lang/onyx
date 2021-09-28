@@ -2129,8 +2129,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
         func_def->body = body_block;
 
-        bh_arr_free(polymorphic_vars);
-        return func_def;
+        goto function_defined;
     }
 
     if (consume_token_if_next(parser, Token_Type_Right_Arrow)) {
@@ -2172,6 +2171,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     func_def->body = parse_block(parser, 1);
 
+function_defined:
     if (bh_arr_length(polymorphic_vars) > 0) {
         AstPolyProc* pp = make_node(AstPolyProc, Ast_Kind_Polymorphic_Proc);
         pp->token = func_def->token;
@@ -2190,6 +2190,8 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
     if (parser->curr->type == '(') {
         OnyxToken* matching_paren = find_matching_paren(parser->curr);
         if (matching_paren == NULL) return 0;
+
+        if (next_tokens_are(parser, 4, '(', ')', '=', '>')) return 0;
 
         // :LinearTokenDependent
         OnyxToken* token_after_paren = matching_paren + 1;
