@@ -82,7 +82,7 @@ take_one :: (it: Iterator($T)) -> (T, bool) {
 // value: i32;
 // iterator: Iterator(i32) = ...;
 //
-// if (#code value) << iterator {
+// if #(value) << iterator {
 //     ...iterater closed...
 // }
 #operator << macro (dest: Code, it: Iterator($T)) -> bool {

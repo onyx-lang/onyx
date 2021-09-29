@@ -108,7 +108,7 @@ main :: (args: [] cstr) {
 		}
 
 		for ^cell: cells_to_consider {
-			map.update(^grid, *cell, (state: ^Cell) { state.alive = state.next; });
+			map.update(^grid, *cell, #code { it.alive = it.next; });
 		}
 
 		array.clear(^cells_to_consider);

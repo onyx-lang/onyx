@@ -67,6 +67,8 @@ get :: (use map: ^Map($K, $V), key: K) -> V {
     return default_value;
 }
 
+#operator [] macro (map: Map($K, $V), key: K) -> V do return (package core.map).get(^map, key);
+
 get_ptr :: (use map: ^Map($K, $V), key: K) -> ^V {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return ^entries[lr.entry_index].value;
@@ -92,11 +94,15 @@ delete :: (use map: ^Map($K, $V), key: K) {
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-update :: (use map: ^Map($K, $V), key: K, f: (^V) -> void) {
-    lr := lookup(map, key);
-    if lr.entry_index < 0 do return;
+update :: macro (map: ^Map($K, $V), key: K, body: Code) {
+    @Hack // Weird hack because 'lookup' exists at file scope.
+    lookup_ :: lookup
 
-    f(^entries[lr.entry_index].value);
+    lr := lookup_(map, key);
+    if lr.entry_index >= 0 {
+        it := ^map.entries[lr.entry_index].value;
+        #insert body;
+    }
 }
 
 clear :: (use map: ^Map($K, $V)) {
