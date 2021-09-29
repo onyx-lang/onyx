@@ -1402,6 +1402,13 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     }
 
     if (!type_lookup_member(field->expr->type, field->field, &smem)) {
+        if (field->expr->type->kind == Type_Kind_Array) {
+            if (!strcmp(field->field, "count")) {
+                *pfield = (AstFieldAccess *) make_int_literal(context.ast_alloc, field->expr->type->Array.count);
+                return Check_Success;
+            }
+        }
+
         AstType* type_node = field->expr->type->ast_type;
         AstNode* n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
         if (n) {
