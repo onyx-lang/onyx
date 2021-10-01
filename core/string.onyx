@@ -141,7 +141,6 @@ compare :: (str1: str, str2: str) -> i32 {
     return ~~(str1[i] - str2[i]);
 }
 
-#operator == equal
 equal :: (str1: str, str2: str) -> bool {
     if str1.count != str2.count do return false;
     while i := 0; i < str1.count {
@@ -150,6 +149,9 @@ equal :: (str1: str, str2: str) -> bool {
     }
     return true;
 }
+
+#operator == equal
+#operator != macro (s1: str, s2: str) => !(s1 == s2);
 
 starts_with :: (s: str, prefix: str) -> bool {
     if s.count < prefix.count do return false;

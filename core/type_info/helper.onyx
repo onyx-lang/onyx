@@ -141,3 +141,27 @@ offset_of :: (T: type_expr, member: str) -> u32 {
 
     return true;
 }
+
+enum_name :: (value: $Backing_Type) -> str {
+    info := get_type_info(Backing_Type);
+    if info.kind != .Enum do return null_str;
+
+    etype := cast(^Type_Info_Enum) info;
+    for ^member: etype.members {
+        if member.value == ~~value do return member.name;
+    }
+    
+    return null_str;
+}
+
+enum_value :: ($E: type_expr, name: str) -> E {
+    info := get_type_info(E); 
+    if info.kind != .Enum do return ~~0;
+
+    etype := cast(^Type_Info_Enum) info;
+    for ^member: etype.members {
+        if member.name == name do return ~~member.value;
+    }
+
+    return ~~0;
+}

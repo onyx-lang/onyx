@@ -365,11 +365,11 @@ parse_section_locations :: (use bin: ^WasmBinary) -> bool {
 
     {
         // Checking the magic string
-        magic_buffer: [4] u8; 
+        magic_buffer: [4] u8;
 
         @Bug // If these are string literals, then the null byte messes up the compiler and it thinks its a 0-character string.
-        if !(io.read_bytes(^reader, cast([] u8) magic_buffer) == ~~u8.[ 0, #char "a", #char "s", #char "m" ]) do return false;
-        if !(io.read_bytes(^reader, cast([] u8) magic_buffer) == ~~u8.[ 1, 0, 0, 0 ]) do return false; // This may not be necessary
+        if io.read_bytes(^reader, magic_buffer) != u8.[ 0, #char "a", #char "s", #char "m" ] do return false;
+        if io.read_bytes(^reader, magic_buffer) != u8.[ 1, 0, 0, 0 ] do return false; // This may not be necessary
     }
  
     while !io.stream_end_of_file(^stream) {

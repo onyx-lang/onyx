@@ -313,8 +313,14 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
     switch ((u16) parser->curr->type) {
         case '(': {
-            if (parse_possible_function_definition(parser, &retval)) break;
-            if (parse_possible_quick_function_definition(parser, &retval)) break;
+            if (parse_possible_function_definition(parser, &retval)) {
+                ENTITY_SUBMIT(retval);
+                break;
+            }
+            if (parse_possible_quick_function_definition(parser, &retval)) {
+                ENTITY_SUBMIT(retval);
+                break;
+            }
 
             consume_token(parser);
             retval = parse_compound_expression(parser, 0);
@@ -2232,7 +2238,6 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
 
         OnyxToken* proc_token = parser->curr;
         AstFunction* func_node = parse_function_definition(parser, proc_token);
-        ENTITY_SUBMIT(func_node);
         *ret = (AstTyped *) func_node;
         return 1;
     }
@@ -2361,7 +2366,6 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
     }
     poly_proc->base_func = func_node;
 
-    ENTITY_SUBMIT(poly_proc);
     *ret = (AstTyped *) poly_proc;
 
     bh_arr_free(params);
@@ -2496,15 +2500,19 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
 static AstMacro* parse_macro(OnyxParser* parser) {
     AstMacro* macro = make_node(AstMacro, Ast_Kind_Macro);
     macro->token = expect_token(parser, Token_Type_Keyword_Macro);
-    
-    // First try quick function
-    if (!parse_possible_quick_function_definition(parser, &macro->body)) {
-        // Otherwise, do a normal function
-        macro->body  = (AstTyped *) parse_function_definition(parser, macro->token);
+
+    if (parse_possible_function_definition(parser, &macro->body)) {
+        ENTITY_SUBMIT(macro);
+        return macro;
     }
 
-    ENTITY_SUBMIT(macro);
-    return macro;
+    if (parse_possible_quick_function_definition(parser, &macro->body)) {
+        ENTITY_SUBMIT(macro);
+        return macro;
+    }
+
+    onyx_report_error(parser->curr->pos, "'macro' expects to be followed by a producure definition.");
+    return NULL;
 }
 
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {

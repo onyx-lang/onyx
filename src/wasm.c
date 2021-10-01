@@ -2153,6 +2153,11 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     WIL(WI_LOCAL_SET, rptr_local);
     WIL(WI_LOCAL_SET, lptr_local);
 
+    WIL(WI_LOCAL_GET, rptr_local);
+    WID(WI_I32_CONST, 0);
+    WI(WI_I32_NE);
+    emit_enter_structured_block(mod, &code, SBT_Basic_If);
+
     if (elem_count <= 2) {
         // Inline copying for a small number of elements. It still may be faster to do this in a tight loop.
 
@@ -2175,8 +2180,11 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
             bh_arr_last(code).type = WI_LOCAL_TEE;
         else
             WIL(WI_LOCAL_GET, lptr_local);
-        WIL(WI_PTR_CONST, offset);
-        WI(WI_PTR_ADD);
+
+        if (offset != 0) {
+            WIL(WI_PTR_CONST, offset);
+            WI(WI_PTR_ADD);
+        }
 
         WIL(WI_LOCAL_GET, rptr_local);
         WIL(WI_I32_CONST, elem_count * elem_size);
@@ -2219,9 +2227,30 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
         local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     }
 
+    WI(WI_ELSE);
+
+    { // If the source ptr is null (0), then just copy in 0 bytes.
+        WIL(WI_LOCAL_GET, lptr_local);
+        if (offset != 0) {
+            WIL(WI_PTR_CONST, offset);
+            WI(WI_PTR_ADD);
+        }
+
+        WIL(WI_I32_CONST, 0);
+
+        WIL(WI_I32_CONST, elem_count * elem_size);
+
+        if (context.options->use_post_mvp_features) {
+            WI(WI_MEMORY_FILL);
+        } else {
+            emit_intrinsic_memory_fill(mod, &code);
+        }
+    }
+
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
+    emit_leave_structured_block(mod, &code);
     *pcode = code;
     return;
 }
@@ -2932,7 +2961,6 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
             type_linear_member_lookup(type, i, &two);
             emit_zero_value_for_type(mod, &code, two.type, where);
         }
-
     }
     else if (type->kind == Type_Kind_Function) {
         WID(WI_I32_CONST, mod->null_proc_func_idx);
