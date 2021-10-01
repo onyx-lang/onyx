@@ -1115,7 +1115,7 @@ b32 type_struct_is_simple(Type* type) {
 
     b32 is_simple = 1;
     bh_arr_each(StructMember *, mem, type->Struct.memarr) {
-        if (type_is_compound((*mem)->type)) {
+        if (type_is_compound((*mem)->type) || (*mem)->type->kind == Type_Kind_Array) {
             is_simple = 0;
             break;
         }
