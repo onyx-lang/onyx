@@ -9,7 +9,7 @@ main :: (args: [] cstr) {
 
     // To use it, simply create one like so:
     ages : Map(str, u32);
-    map.init(^ages, default=0, hash_count=16);
+    map.init(^ages, default=0);
     defer map.free(^ages);
 
     // Alternatively you can use the map.make function to achieve the
@@ -19,9 +19,7 @@ main :: (args: [] cstr) {
     // The defer statement ensures that the map memory will be freed
     // when this procedure exits, no matter through which way. The
     // 'default' argument is used to specify what value should be
-    // returned when the map does not contain the requested key. The
-    // hash_count is an implementation detail that will go away in the
-    // near future. It is the maximum number of chains in the hash table.
+    // returned when the map does not contain the requested key.
 
     // To put an entry into the map, use the map.put procedure.
     map.put(^ages, "Dwight", 32);

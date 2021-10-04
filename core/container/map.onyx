@@ -1,11 +1,18 @@
 package core.map
 
-#private_file array  :: package core.array
-#private_file hash   :: package core.hash
-use package core.intrinsics.onyx { __zero_value }
+#private_file {
+    array  :: package core.array
+    hash   :: package core.hash
+    memory :: package core.memory
+    math   :: package core.math
+
+    use package core.intrinsics.onyx { __zero_value, __initialize }
+}
 
 Map :: struct (K: type_expr, V: type_expr) {
-    hashes  : [..] i32;
+    allocator : Allocator;
+
+    hashes  : [] i32;
     entries : [..] Entry(K, V);
 
     // The value provided by `map.get`, if nothing was found.
@@ -18,23 +25,26 @@ Map :: struct (K: type_expr, V: type_expr) {
     }
 }
 
-make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value), hash_count: i32 = 16) -> Map(Key, Value) {
+make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value)) -> Map(Key, Value) {
     map : Map(Key, Value);
-    init(^map, default = default, hash_count = hash_count);
+    init(^map, default = default);
     return map;
 }
 
-init :: (use map: ^Map($K, $V), default := __zero_value(V), hash_count: i32 = 16) {
-    array.init(^hashes, hash_count);
-    array.init(^entries, 4);
+init :: (use map: ^Map($K, $V), default := __zero_value(V)) {
+    __initialize(map);
 
+    allocator = context.allocator;
     default_value = default;
 
-    for i: 0 .. hash_count do array.push(^hashes, -1);
+    memory.alloc_slice(^hashes, 8, allocator=allocator);
+    memory.fill_slice(hashes, -1);
+
+    array.init(^entries, allocator=allocator);
 }
 
 free :: (use map: ^Map($K, $V)) {
-    array.free(^hashes);
+    memory.free_slice(^hashes, allocator=allocator);
     array.free(^entries);
 }
 
@@ -46,13 +56,10 @@ put :: (use map: ^Map($K, $V), key: K, value: V) {
         return;
     }
 
-    array.push(^entries, .{
-        key = key,
-        value = value,
-        hashes[lr.hash_index],
-    });
-
+    entries << .{ hashes[lr.hash_index], key, value };
     hashes[lr.hash_index] = entries.count - 1;
+
+    if full(map) do grow(map);
 }
 
 has :: (use map: ^Map($K, $V), key: K) -> bool {
@@ -83,7 +90,7 @@ delete :: (use map: ^Map($K, $V), key: K) {
     if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next;
     else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
 
-    if lr.entry_index == entries.count - 1 {
+    if lr.entry_index == entries.count - 1{
         array.pop(^entries);
         return;
     }
@@ -118,28 +125,62 @@ empty :: (use map: ^Map($K, $V)) -> bool {
 // Private symbols
 //
 
-#private_file
-MapLookupResult :: struct {
-    hash_index  : i32 = -1;
-    entry_index : i32 = -1;
-    entry_prev  : i32 = -1;
-}
-
-#private_file
-lookup :: (use map: ^Map($K, $V), key: K) -> MapLookupResult {
-    lr := MapLookupResult.{};
-
-    hash_value: u32 = hash.to_u32(key); // You cannot use this type for the key, unless you add an overload.
-
-    lr.hash_index = hash_value % hashes.count;
-    lr.entry_index = hashes[lr.hash_index];
-
-    while lr.entry_index >= 0 {
-        if entries[lr.entry_index].key == key do return lr;
-
-        lr.entry_prev = lr.entry_index;
-        lr.entry_index = entries[lr.entry_index].next;
+#private_file {
+    MapLookupResult :: struct {
+        hash_index  : i32 = -1;
+        entry_index : i32 = -1;
+        entry_prev  : i32 = -1;
     }
 
-    return lr;
+    lookup :: (use map: ^Map($K, $V), key: K) -> MapLookupResult {
+        lr := MapLookupResult.{};
+
+        hash_value: u32 = hash.to_u32(key); // You cannot use this type for the key, unless you add an overload.
+
+        lr.hash_index = hash_value % hashes.count;
+        lr.entry_index = hashes[lr.hash_index];
+
+        while lr.entry_index >= 0 {
+            if entries[lr.entry_index].key == key do return lr;
+
+            lr.entry_prev = lr.entry_index;
+            lr.entry_index = entries[lr.entry_index].next;
+        }
+
+        return lr;
+    }
+
+    add_entry :: (use map: ^Map($K, $V), key: K) -> i32 {
+        entry: Map.Entry(K, V);
+        entry.key = key;
+        entry.next = -1;
+
+        entries << entry;
+
+        return entries.count - 1;
+    }
+
+    full :: (use map: ^Map($K, $V)) => entries.count >= ~~(0.75f * ~~hashes.count);
+
+    grow :: (use map: ^Map($K, $V)) {
+        new_size := math.max(hashes.count << 1, 8);
+        rehash(map, new_size);
+    }
+
+    rehash :: (use map: ^Map($K, $V), new_size: i32) {
+        memory.free_slice(^hashes, allocator);
+        memory.alloc_slice(^hashes, new_size, allocator);
+        memory.fill_slice(hashes, -1);
+
+        for ^entry: entries do entry.next = -1;
+
+        index := 0;
+        for ^entry: entries {
+            defer index += 1;
+
+            lr := lookup(map, entry.key); 
+            entries[index].next = hashes[lr.hash_index];
+            hashes[lr.hash_index] = index;
+        }
+    }
 }

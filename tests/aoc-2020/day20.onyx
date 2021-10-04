@@ -246,7 +246,7 @@ main :: (args: [] cstr) {
 	tiles := array.make(Tile);
 	defer array.free(^tiles);
 
-    tile_map := map.make(u32, #type ^Tile, null, 67);
+    tile_map := map.make(u32, #type ^Tile, null);
     defer map.free(^tile_map);
 
 	tile_data := calloc(200 * sizeof TileData);

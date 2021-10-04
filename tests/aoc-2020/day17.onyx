@@ -41,7 +41,7 @@ main :: (args: [] cstr) {
 
     file := reader.make(contents);
 
-    cubes := map.make(CubePos, CubeState, .{}, 2047);
+    cubes := map.make(CubePos, CubeState, .{});
     defer map.free(^cubes);
 
     z := 0;

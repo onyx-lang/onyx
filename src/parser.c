@@ -1964,6 +1964,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         return (AstStructType *) poly_struct;
 
     } else {
+        ENTITY_SUBMIT(s_node);
         return s_node;
     }
 }
@@ -2597,7 +2598,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
         }
 
         // HACK: This should maybe be entered elsewhere?
-        ENTITY_SUBMIT(node);
+        if (node->kind != Ast_Kind_Struct_Type) ENTITY_SUBMIT(node);
     }
 
     AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);

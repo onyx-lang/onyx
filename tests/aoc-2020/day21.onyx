@@ -36,7 +36,7 @@ main :: (args: [] cstr) {
 
 	file := reader.make(contents);
 
-    map.init(^ingredient_map, .{}, 127);
+    map.init(^ingredient_map, .{});
     map.init(^allergen_map, .{});
     defer {
         map.free(^ingredient_map);

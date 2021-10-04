@@ -14,7 +14,7 @@ main :: (args: [] cstr) {
     // The current implementation of Map is rather slow at a large scale.
     // Any changes to the implementation of Map should be tested on this
     // file to validate if they 1) work and 2) are faster.
-    nums := map.make(u32, spoken_times, .{}, 32767);
+    nums := map.make(u32, spoken_times, .{});
     defer map.free(^nums);
 
     turn := 1;

@@ -1138,6 +1138,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
     }
 
     al->flags |= Ast_Flag_Comptime;
+    assert(al->type->kind == Type_Kind_Array);
 
     Type* elem_type = al->type->Array.elem;
     bh_arr_each(AstTyped *, expr, al->values) {

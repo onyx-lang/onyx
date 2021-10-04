@@ -567,7 +567,7 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         if (func == NULL) return 0;
 
         // FIXME: This is incorrect. It should actually yield and not return a failure.
-        if (func == &node_that_signals_a_yield) return 0;
+        if (func == (AstFunction *) &node_that_signals_a_yield) return 0;
 
         *pnode = (AstTyped *) func;
         node = *pnode;

@@ -16,11 +16,11 @@ UI_Id :: #type u32
 }
 
 init_ui :: () {
-    map.init(^font_registry, hash_count=4);
+    map.init(^font_registry);
 
-    map.init(^animation_states, default=.{}, hash_count=4);
-    map.init(^workspace_states, default=.{}, hash_count=4);
-    map.init(^scrollable_region_states, default=.{}, hash_count=4);
+    map.init(^animation_states, default=.{});
+    map.init(^workspace_states, default=.{});
+    map.init(^scrollable_region_states, default=.{});
 
     // Register a default font so things don't break everywhere
     builtin_font := create_font(#file_contents "./fonts/builtin.fnt", #file_contents "./fonts/builtin.data");

@@ -140,11 +140,9 @@ main :: (args: [] cstr) {
     test_polymorphic_union_with_use :: () {
         println("\n\nTesting a polymorphic union with use.");
 
-        PolyStruct :: struct (T: type_expr, R: type_expr) {
-            use container : struct #union {
-                t_data : T;
-                r_data : R;
-            };
+        PolyStruct :: struct (T: type_expr, R: type_expr) #union {
+            t_data : T;
+            r_data : R;
         }
 
         printf("{} == 16\n", sizeof PolyStruct(i32, [] u32));

@@ -59,6 +59,20 @@ copy_slice :: (sl: [] $T, allocator := context.allocator) -> [] T {
     return .{ data = data, count = sl.count };
 }
 
+resize_slice :: (sl: [] $T, new_size: i32, allocator := context.allocator) -> [] T {
+    new_slice: [] T;
+    new_slice.data = raw_alloc(allocator, sizeof T * new_size);
+    new_slice.count = new_size;
+
+    copy(new_slice.data, sl.data, sl.count * sizeof T);
+
+    return new_slice;
+}
+
+fill_slice :: macro (sl: [] $T, v: T) {
+    for ^it: sl do *it = v;
+}
+
 align :: #match {
     (size: ^u64, align: u64) {
         if *size % align != 0 {

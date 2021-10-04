@@ -93,6 +93,9 @@ Value_Float :: struct {
 Value_String :: struct {
     use base := Value.{ type = .String };
     str_: str;
+
+    // Set if the string should not be freed from the allocator.
+    static := false;
 }
 
 Value_Array :: struct {
@@ -104,6 +107,8 @@ Value_Object :: struct {
     use base := Value.{ type = .Object };
     object_: [..] struct {
         key   : str;
+        key_is_static := false;
+
         value : ^Value;
     };
 }
@@ -133,11 +138,35 @@ get_idx :: (v: ^Value, idx: i32) -> ^Value {
     return v_arr.array_[idx];
 }
 
+set :: #match {
+    macro (v: ^Value, key: str, value: ^Value, key_is_static := false) {
+        if v.type == .Object {
+            Value_Object_ :: Value_Object ;
+
+            (cast(^Value_Object_) v).object_ << .{ key, key_is_static, value };
+        }
+    },
+
+    // Quick thing for allocating json values on the stack.
+    macro (v: ^Value, key: str, value: str, key_is_static := false, value_is_static := false) {
+        Value_String_ :: Value_String ;
+        Value_Object_ :: Value_Object ;
+
+        if v.type == .Object {
+            json_value := init(Value_String_);
+            json_value.str_ = value;
+            json_value.static = value_is_static;
+
+            (cast(^Value_Object_) v).object_ << .{ key, key_is_static, ^json_value };
+        }
+    }
+}
+
 free :: #match {
     (v: ^Value, allocator: Allocator) do switch v.type {
         case .String {
             v_str := cast(^Value_String) v;
-            raw_free(allocator, v_str.str_.data);
+            if !v_str.static do raw_free(allocator, v_str.str_.data);
         }
 
         case .Array {
@@ -151,7 +180,7 @@ free :: #match {
         case .Object {
             v_obj := cast(^Value_Object) v;
             for ^entry: v_obj.object_ {
-                raw_free(allocator, entry.key.data);
+                if !entry.key_is_static do raw_free(allocator, entry.key.data);
                 free(entry.value, allocator);
             }
             array.free(^v_obj.object_);
@@ -161,4 +190,8 @@ free :: #match {
     (use j: Json) {
         free(root, allocator);
     },
+}
+
+static_string :: (s: str) -> Value_String {
+    return .{ str_ = s, static = true };
 }

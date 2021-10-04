@@ -22,7 +22,7 @@ power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
 dlp_bsgs :: (n: u32, a: u32, b: u32) -> u32 {
     m := cast(u32) math.ceil(math.sqrt(cast(f64) n));
 
-    t := map.make(u32, u32, default=0, hash_count=m/2);
+    t := map.make(u32, u32, default=0);
     defer map.free(^t);
 
     tmp: u64 = 1;

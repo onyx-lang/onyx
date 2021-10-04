@@ -477,8 +477,12 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
                 if info.kind == .Struct {
                     s := cast(^Type_Info_Struct) info;
 
-                    if s.name.count > 0 do output->write(s.name);
-                    output->write(" { ");
+                    if s.name.count > 0 {
+                        output->write(s.name);
+                        output->write(" { ");
+                    } else {
+                        output->write("{ ");
+                    }
 
                     {
                         format := formatting;
@@ -534,7 +538,11 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
 
                 // This assumes that the following type_info kinds are basically the same.
                 if info.kind == .Dynamic_Array || info.kind == .Slice || info.kind == .Variadic_Argument {
-                    output->write("[ ");
+                    if formatting.pretty_printing {
+                        output->write("[");
+                    } else {
+                        output->write("[ ");
+                    }
 
                     a := cast(^Type_Info_Dynamic_Array) info;
                     arr := cast(^array.Untyped_Array) v.data;
@@ -543,7 +551,7 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
 
                     format := formatting;
                     format.quote_strings = true;
-                    if format.pretty_printing do format.indentation += 2;
+                    if format.pretty_printing do format.indentation += 4;
 
                     for i: count {
                         if i != 0 do output->write(", ");
@@ -558,7 +566,7 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
 
 
                     if formatting.pretty_printing {
-                        format.indentation -= 2;
+                        format.indentation -= 4;
                         output->write("\n");
                         for _: format.indentation do output->write(#char " ");
                         output->write(#char "]");

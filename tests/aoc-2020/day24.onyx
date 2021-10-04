@@ -31,7 +31,7 @@ main :: (args: [] cstr) {
     file_stream := io.string_stream_make(contents);
 	file := io.reader_make(^file_stream);
 
-	grid := map.make(Vec2, Cell, .{}, 1021); // `true` is black
+	grid := map.make(Vec2, Cell, .{}); // `true` is black
 	defer map.free(^grid);
 
 	while !io.stream_end_of_file(^file_stream) {
