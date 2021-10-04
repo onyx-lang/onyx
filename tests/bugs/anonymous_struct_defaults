@@ -1,0 +1,8 @@
+S { 
+    some_array = [
+        { 
+            name = "Joe", 
+            age = 14
+        }
+    ]
+}

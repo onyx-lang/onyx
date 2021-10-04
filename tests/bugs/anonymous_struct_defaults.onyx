@@ -1,0 +1,23 @@
+#load "core/std"
+
+use package core
+
+S :: struct {
+    some_array: [..] struct {
+        name : str = "Default";
+        age  : i32 = 43;
+    };
+}
+
+main :: (args) => {
+    v: S;
+    array.init(^v.some_array);
+
+    do_something_with_S(^v);
+
+    printf("{*p}\n", ^v);
+}
+
+do_something_with_S :: (s: ^S) {
+    s.some_array << .{ "Joe", 14 };
+}
