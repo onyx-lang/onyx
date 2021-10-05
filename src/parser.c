@@ -732,6 +732,29 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 parse_arguments(parser, ')', &call_node->args);
 
+//              This could be a cool feature where you can write:
+//
+//              foo(x, y) {
+//                  // ...
+//              }
+//
+//              which just desugars into
+//
+//              foo(x, y, #code {
+//                  // ...
+//              })
+//
+//                if (parser->curr->type == '{') {
+//                    AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
+//                    code_block->token = parser->curr;
+//                    code_block->type_node = builtin_code_type;
+//
+//                    code_block->code = (AstNode *) parse_block(parser, 1);
+//                    ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
+//
+//                    bh_arr_push(call_node->args.values, (AstTyped *) code_block);
+//                }
+
                 // Wrap expressions in AstArgument
                 bh_arr_each(AstTyped *, arg, call_node->args.values) {
                     if ((*arg) == NULL) continue;

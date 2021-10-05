@@ -19,8 +19,23 @@ Scrollable_Region_Controls :: struct {
     maximum_x := 340000000000000000000000000000000000000.0f; // Senseless default
 }
 
+Scrollable_Region_Handle :: struct {
+    rect: Rectangle;
+    state: ^Scrollable_Region_State;
+
+    get_visible_rectangle :: (use this: ^Scrollable_Region_Handle) -> Rectangle {
+        trans := ^state.transform;
+        x0 := (rect.x0 - trans.translation.x) / trans.scale.x;
+        y0 := (rect.y0 - trans.translation.y) / trans.scale.y;
+        x1 := (rect.x1 - trans.translation.x) / trans.scale.x;
+        y1 := (rect.y1 - trans.translation.y) / trans.scale.y;
+
+        return .{ x0, y0, x1, y1 };
+    }
+}
+
 scrollable_region_start :: (use r: Rectangle, use src: Scrollable_Region_Controls = .{},
-                            site := #callsite, state: ^Scrollable_Region_State = null) {
+                            site := #callsite, state: ^Scrollable_Region_State = null) -> Scrollable_Region_Handle {
     hash := get_site_hash(site, 0);
     x, y := Rectangle.top_left(r);
     width, height := Rectangle.dimensions(r);
@@ -57,6 +72,8 @@ scrollable_region_start :: (use r: Rectangle, use src: Scrollable_Region_Control
     gfx.push_scissor(x, y, width, height);
     gfx.push_matrix();
     gfx.apply_transform(state.transform);
+
+    return .{ r, state };
 }
 
 scrollable_region_stop :: () {
