@@ -209,7 +209,6 @@ get_animation :: (id: UI_Id) -> ^Animation_State {
         retval = map.get_ptr(^animation_states, id);
     }
 
-    // printf("{*}\n", retval);
     retval.accessed_this_frame = true;
     return retval;
 }

@@ -547,11 +547,19 @@ struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 addr; u64 length; };
 struct AstLocal         { AstTyped_base; };
-struct AstArgument      { AstTyped_base; AstTyped *value; VarArgKind va_kind; b32 is_baked : 1; };
 struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_ast_type; Type *ao_type; u64 alignment; };
+struct AstArgument      {
+    AstTyped_base;
+
+    AstTyped *value;
+
+    VarArgKind va_kind;
+    b32 is_baked : 1;
+    b32 pass_as_any : 1;
+};
 struct AstSubscript   {
     AstTyped_base;
     BinaryOp __unused_operation; // This will be set to Binary_Op_Subscript

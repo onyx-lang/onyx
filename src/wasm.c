@@ -1439,6 +1439,10 @@ EMIT_FUNC(call, AstCall* call) {
             vararg_count += 1;
         }
 
+        if (arg->pass_as_any) {
+            place_on_stack = 1;
+        }
+
         if (place_on_stack) WIL(WI_LOCAL_GET, stack_top_store_local);
 
         emit_expression(mod, &code, arg->value);
@@ -1456,6 +1460,10 @@ EMIT_FUNC(call, AstCall* call) {
             if (arg->va_kind == VA_Kind_Any) {
                 vararg_any_offsets[vararg_count - 1] = reserve_size;
                 vararg_any_types[vararg_count - 1] = arg->value->type->id;
+            }
+
+            if (arg->pass_as_any) {
+                WIL(WI_I32_CONST, arg->value->type->id);
             }
 
             reserve_size += type_size_of(arg->value->type);

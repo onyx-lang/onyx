@@ -582,6 +582,9 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     Type* node_type = get_expression_type(node);
     if (types_are_compatible(node_type, type)) return 1;
 
+    i64 any_id = type_build_from_ast(context.ast_alloc, builtin_any_type)->id;
+    if (node_type && node_type->id != any_id && type->id == any_id) return 1;
+
     // Here are some of the ways you can unify a node with a type if the type of the
     // node does not match the given type:
     // 

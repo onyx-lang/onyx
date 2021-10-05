@@ -50,6 +50,10 @@ radio :: (use r: Rectangle, selected: ^$T, value: T, text: str, theme := ^defaul
 
     if is_hot_item(hash) {
         move_towards(^animation_state.hover_time, 1.0f, theme.hover_speed);
+
+        #if #defined(set_cursor) {
+            set_cursor(Cursors.Pointer);
+        }
     } else {
         move_towards(^animation_state.hover_time, 0.0f, theme.hover_speed);
     }
