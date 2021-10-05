@@ -174,7 +174,9 @@ u64 build_type_table(OnyxWasmModule* module) {
                 u32* name_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
                 u32* param_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(s->poly_sln));
                 u32* value_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
+                u32* meta_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
                 memset(value_locations, 0, s->mem_count * sizeof(u32));
+                memset(meta_locations, 0, s->mem_count * sizeof(u32));
 
                 u32 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
@@ -255,6 +257,53 @@ u64 build_type_table(OnyxWasmModule* module) {
                     }
                 }
 
+                i = 0;
+                bh_arr_each(StructMember*, pmem, s->memarr) {
+                    StructMember* mem = *pmem;
+
+                    if (mem->meta_tags == NULL) {
+                        i += 1;
+                        continue;
+                    }
+
+                    bh_arr(AstTyped *) meta_tags = mem->meta_tags;
+                    assert(meta_tags);
+
+                    bh_arr(u64) meta_tag_locations=NULL;
+                    bh_arr_new(global_heap_allocator, meta_tag_locations, bh_arr_length(meta_tags));
+
+                    int j = 0;
+                    bh_arr_each(AstTyped *, meta, meta_tags) {
+                        AstTyped* value = *meta;                        
+                        assert(value->flags & Ast_Flag_Comptime);
+                        assert(value->type);
+
+                        u32 size = type_size_of(value->type);
+                        bh_buffer_align(&table_buffer, type_alignment_of(value->type));
+                        meta_tag_locations[j] = table_buffer.length;
+
+                        bh_buffer_grow(&table_buffer, table_buffer.length + size);
+                        u8* buffer = table_buffer.data + table_buffer.length;
+
+                        assert(emit_raw_data_(module, buffer, value));
+                        table_buffer.length += size;
+
+                        j += 1;
+                    }
+
+                    bh_buffer_align(&table_buffer, 8);
+                    meta_locations[i] = table_buffer.length;
+
+                    fori (k, 0, bh_arr_length(meta_tags)) {
+                        PATCH;
+                        bh_buffer_write_u64(&table_buffer, meta_tag_locations[k]);
+                        bh_buffer_write_u64(&table_buffer, meta_tags[k]->type->id);
+                    }
+
+                    bh_arr_free(meta_tag_locations);
+                    i += 1;
+                }
+
                 bh_buffer_align(&table_buffer, 8);
                 u32 members_base = table_buffer.length;
 
@@ -263,7 +312,8 @@ u64 build_type_table(OnyxWasmModule* module) {
                     StructMember* mem = *pmem;
 
                     u32 name_loc = name_locations[i];
-                    u32 value_loc = value_locations[i++];
+                    u32 value_loc = value_locations[i];
+                    u32 meta_loc = meta_locations[i++];
 
                     bh_buffer_align(&table_buffer, 8);
                     PATCH;
@@ -276,6 +326,10 @@ u64 build_type_table(OnyxWasmModule* module) {
                     bh_buffer_align(&table_buffer, 8);
                     PATCH;
                     bh_buffer_write_u64(&table_buffer, value_loc);
+
+                    PATCH;
+                    bh_buffer_write_u64(&table_buffer, meta_loc);
+                    bh_buffer_write_u64(&table_buffer, bh_arr_length(mem->meta_tags));
                 }
 
                 bh_buffer_align(&table_buffer, 8);

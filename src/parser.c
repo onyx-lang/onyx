@@ -1931,6 +1931,16 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             consume_token_if_next(parser, ';');
 
         } else {
+            bh_arr(AstTyped *) meta_tags=NULL;
+            while (parse_possible_directive(parser, "tag")) {
+                AstTyped* expr = parse_expression(parser, 0);
+
+                if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
+                bh_arr_push(meta_tags, expr);
+
+                expect_token(parser, ';');
+            }
+
             bh_arr_clear(member_list_temp);
             while (!consume_token_if_next(parser, ':')) {
                 if (parser->hit_unexpected_token) return NULL;
@@ -1968,6 +1978,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
                 mem->token = *member_name;
                 mem->type_node = member_type;
                 mem->initial_value = initial_value;
+                mem->meta_tags = meta_tags;
 
                 if (member_is_used) mem->flags |= Ast_Flag_Struct_Mem_Used;
 

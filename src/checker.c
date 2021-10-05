@@ -1905,6 +1905,18 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 
             resolve_expression_type(*(*smem)->initial_value);
         }
+
+        if ((*smem)->meta_tags) {
+            bh_arr_each(AstTyped *, meta, (*smem)->meta_tags) {
+                CHECK(expression, meta);
+                resolve_expression_type(*meta);
+
+                if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
+                    onyx_report_error((*meta)->token->pos, "#meta expression are expected to be compile-time known.");
+                    return Check_Error;
+                }
+            }
+        }
     }
 
     return Check_Success;

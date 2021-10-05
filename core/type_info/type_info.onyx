@@ -141,6 +141,8 @@ Type_Info_Struct :: struct {
 
                          // As another thought. This could become a thunk that get the default value
                          // at runtime or returns the value.
+
+        tags: [] any;
     }
 
     name: str;

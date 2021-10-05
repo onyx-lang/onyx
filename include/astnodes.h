@@ -791,6 +791,8 @@ struct AstStructType {
 struct AstStructMember {
     AstTyped_base;
     AstTyped* initial_value;
+
+    bh_arr(AstTyped *) meta_tags;
 };
 struct AstPolyStructParam {
     AstTyped_base;

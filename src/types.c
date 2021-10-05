@@ -381,6 +381,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .initial_value = &(*member)->initial_value,
                     .included_through_use = 0,
                     .used = (((*member)->flags & Ast_Flag_Struct_Mem_Used) != 0),
+                    .meta_tags = (*member)->meta_tags,
                 };
 
                 if (bh_table_has(StructMember, s_type->Struct.members, (*member)->token->text)) {
@@ -402,6 +403,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                             .initial_value = (*psmem)->initial_value,
                             .included_through_use = 1,
                             .used = 0,
+                            .meta_tags = (*psmem)->meta_tags,
                         };
 
                         if (bh_table_has(StructMember, s_type->Struct.members, (*psmem)->name)) {

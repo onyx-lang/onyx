@@ -78,6 +78,8 @@ typedef struct StructMember {
     struct AstTyped** initial_value;
     b32 included_through_use : 1;
     b32 used : 1;
+
+    bh_arr(struct AstTyped *) meta_tags;
 } StructMember;
 
 typedef struct TypeWithOffset TypeWithOffset;
