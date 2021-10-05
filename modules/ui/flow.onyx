@@ -43,16 +43,16 @@ Flow :: struct {
             x0, y0 := Rectangle.top_left(r);
             x1, y1 := Rectangle.bottom_right(r);
 
-            return .{ x0=x0, x1=x1, y0=y0, y1=y0+top_height },
-                   .{ x0=x0, x1=x1, y0=y0+top_height+padding, y1=y1 };
+            return .{ x0=x0, x1=x1, y0=y0, y1=math.max(y0, y0+top_height) },
+                   .{ x0=x0, x1=x1, y0=math.min(y1, y0+top_height+padding), y1=y1 };
         },
 
         (r: Rectangle, bottom_height: f32, padding := 0.0f) -> (top: Rectangle, bottom: Rectangle) {
             x0, y0 := Rectangle.top_left(r);
             x1, y1 := Rectangle.bottom_right(r);
 
-            return .{ x0=x0, x1=x1, y0=y0, y1=y1-bottom_height-padding },
-                   .{ x0=x0, x1=x1, y0=y1-bottom_height, y1=y1 };
+            return .{ x0=x0, x1=x1, y0=y0, y1=math.max(y0, y1-bottom_height-padding) },
+                   .{ x0=x0, x1=x1, y0=math.min(y1,y1-bottom_height), y1=y1 };
         }
     }
 

@@ -14,9 +14,9 @@ scrollable_region_states : Map(UI_Id, Scrollable_Region_State);
 
 Scrollable_Region_Controls :: struct {
     minimum_y := 0.0f;
-    maximum_y := 10000.0f; // Senseless default
+    maximum_y := 340000000000000000000000000000000000000.0f; // Senseless default
     minimum_x := 0.0f;
-    maximum_x := 10000.0f; // Senseless default
+    maximum_x := 340000000000000000000000000000000000000.0f; // Senseless default
 }
 
 scrollable_region_start :: (use r: Rectangle, use src: Scrollable_Region_Controls = .{},
