@@ -35,8 +35,9 @@ Scrollable_Region_Handle :: struct {
 }
 
 scrollable_region_start :: (use r: Rectangle, use src: Scrollable_Region_Controls = .{},
-                            site := #callsite, state: ^Scrollable_Region_State = null) -> Scrollable_Region_Handle {
-    hash := get_site_hash(site, 0);
+                            site := #callsite, increment := 0,
+                            state: ^Scrollable_Region_State = null) -> Scrollable_Region_Handle {
+    hash := get_site_hash(site, increment);
     x, y := Rectangle.top_left(r);
     width, height := Rectangle.dimensions(r);
 

@@ -1253,18 +1253,20 @@ CheckStatus check_address_of(AstAddressOf* aof) {
         YIELD(aof->token->pos, "Trying to resolve type of expression to take a reference.");
     }
 
-    if ((aof->expr->kind != Ast_Kind_Subscript
-            && aof->expr->kind != Ast_Kind_Dereference
-            && aof->expr->kind != Ast_Kind_Field_Access
-            && aof->expr->kind != Ast_Kind_Memres
-            && aof->expr->kind != Ast_Kind_Local)
-            || (aof->expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
+    AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
+
+    if ((expr->kind != Ast_Kind_Subscript
+            && expr->kind != Ast_Kind_Dereference
+            && expr->kind != Ast_Kind_Field_Access
+            && expr->kind != Ast_Kind_Memres
+            && expr->kind != Ast_Kind_Local)
+            || (expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
         ERROR(aof->token->pos, "Cannot take the address of something that is not an l-value.");
     }
 
-    aof->expr->flags |= Ast_Flag_Address_Taken;
+    expr->flags |= Ast_Flag_Address_Taken;
 
-    aof->type = type_make_pointer(context.ast_alloc, aof->expr->type);
+    aof->type = type_make_pointer(context.ast_alloc, expr->type);
 
     return Check_Success;
 }
@@ -1892,6 +1894,18 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
     if (s_node->entity_type && s_node->entity_type->state < Entity_State_Code_Gen)
         YIELD(s_node->token->pos, "Waiting for struct type to be constructed before checking defaulted members.");
 
+    if (s_node->meta_tags) {
+        bh_arr_each(AstTyped *, meta, s_node->meta_tags) {
+            CHECK(expression, meta);
+            resolve_expression_type(*meta);
+
+            if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
+                onyx_report_error((*meta)->token->pos, "#tag expressions are expected to be compile-time known.");
+                return Check_Error;
+            }
+        }
+    }
+
     bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
         if ((*smem)->initial_value && *(*smem)->initial_value) {
             CHECK(expression, (*smem)->initial_value);
@@ -1912,7 +1926,7 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
                 resolve_expression_type(*meta);
 
                 if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                    onyx_report_error((*meta)->token->pos, "#meta expression are expected to be compile-time known.");
+                    onyx_report_error((*meta)->token->pos, "#tag expressions are expected to be compile-time known.");
                     return Check_Error;
                 }
             }
@@ -2057,6 +2071,7 @@ CheckStatus check_memres(AstMemRes* memres) {
 CheckStatus check_type(AstType* type) {
     if (type == NULL) return Check_Success;
     
+    AstType* original_type = type;
     while (type->kind == Ast_Kind_Type_Alias)
         type = ((AstTypeAlias *) type)->to;
 
@@ -2124,6 +2139,12 @@ CheckStatus check_type(AstType* type) {
 
             break;
         }
+    }
+
+    type = original_type;
+    while (type->kind == Ast_Kind_Type_Alias) {
+        type->flags |= Ast_Flag_Comptime;
+        type = ((AstTypeAlias *) type)->to;
     }
 
     type->flags |= Ast_Flag_Already_Checked;

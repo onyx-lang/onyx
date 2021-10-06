@@ -772,6 +772,7 @@ struct AstStructType {
     char *name;
 
     bh_arr(AstStructMember *) members;
+    bh_arr(AstTyped *) meta_tags;
 
     u32 min_alignment, min_size;
 

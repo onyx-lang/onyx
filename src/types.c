@@ -330,6 +330,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 s_type->ast_type = type_node;
                 s_type->Struct.name = s_node->name;
                 s_type->Struct.mem_count = bh_arr_length(s_node->members);
+                s_type->Struct.meta_tags = s_node->meta_tags;
                 type_register(s_type);
 
                 s_type->Struct.memarr = NULL;

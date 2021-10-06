@@ -1782,6 +1782,7 @@ static AstType* parse_type(OnyxParser* parser) {
                 case Token_Type_Literal_Float:
                 case Token_Type_Literal_True:
                 case Token_Type_Literal_False:
+                case '-':
                     *next_insertion = (AstType *) parse_expression(parser, 0);
                     next_insertion = NULL;
                     break;
@@ -1875,7 +1876,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     }
 
     bh_arr_new(global_heap_allocator, s_node->members, 4);
-
+    
+    bh_arr(AstTyped *) struct_meta_tags=NULL;
     while (parser->curr->type == '#') {
         if (parser->hit_unexpected_token) return NULL;
 
@@ -1897,6 +1899,17 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             s_node->min_size = numlit->value.i;
         }
 
+        else if (parse_possible_directive(parser, "tag")) {
+            expect_token(parser, '(');
+
+            AstTyped* expr = parse_expression(parser, 0);
+
+            if (struct_meta_tags == NULL) bh_arr_new(global_heap_allocator, struct_meta_tags, 1);
+            bh_arr_push(struct_meta_tags, expr);
+
+            expect_token(parser, ')');
+        }
+
         else {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
@@ -1904,6 +1917,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
+
+    s_node->meta_tags = struct_meta_tags;
 
     expect_token(parser, '{');
 
@@ -1933,12 +1948,14 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         } else {
             bh_arr(AstTyped *) meta_tags=NULL;
             while (parse_possible_directive(parser, "tag")) {
+                expect_token(parser, '(');
+
                 AstTyped* expr = parse_expression(parser, 0);
 
                 if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
                 bh_arr_push(meta_tags, expr);
 
-                expect_token(parser, ';');
+                expect_token(parser, ')');
             }
 
             bh_arr_clear(member_list_temp);

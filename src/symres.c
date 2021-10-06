@@ -1062,6 +1062,12 @@ static SymresStatus symres_struct_defaults(AstType* t) {
     AstStructType* st = (AstStructType *) t;
     if (st->scope) scope_enter(st->scope);
 
+    if (st->meta_tags) {
+        bh_arr_each(AstTyped *, meta, st->meta_tags) {
+            SYMRES(expression, meta);
+        }
+    }
+
     bh_arr_each(AstStructMember *, smem, st->members) {
         if ((*smem)->initial_value != NULL) {
             SYMRES(expression, &(*smem)->initial_value);

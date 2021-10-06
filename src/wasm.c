@@ -491,6 +491,19 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
         }
     }
 
+    if (lval->kind == Ast_Kind_Field_Access) {
+        AstFieldAccess* fa = (AstFieldAccess *) lval;
+        if (fa->expr->kind == Ast_Kind_Param && type_is_structlike_strict(fa->expr->type)) {
+            emit_expression(mod, &code, assign->right);
+
+            u64 localidx = bh_imap_get(&mod->local_map, (u64) fa->expr);
+            WIL(WI_LOCAL_SET, localidx + fa->idx);
+
+            *pcode = code;
+            return;
+        }
+    }
+
     if (lval->kind == Ast_Kind_Global) {
         emit_expression(mod, &code, assign->right);
 
@@ -2368,6 +2381,8 @@ EMIT_FUNC(do_block, AstDoBlock* doblock) {
 EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    expr = (AstTyped *) strip_aliases((AstNode *) expr);
+
     switch (expr->kind) {
         case Ast_Kind_Param:
         case Ast_Kind_Local: {
@@ -3304,6 +3319,12 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
 static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     b32 retval = 1;
+
+    if (node_is_type((AstNode *) node)) {
+        Type* constructed_type = type_build_from_ast(context.ast_alloc, (AstType *) node);
+        ((i32 *) data)[0] = constructed_type->id;
+        return 1;
+    }
 
     switch (node->kind) {
     case Ast_Kind_Array_Literal: {

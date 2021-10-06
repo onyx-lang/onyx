@@ -313,9 +313,9 @@ Immediate_Renderer :: struct {
         new_w  := new_x1 - new_x0;
         new_h  := new_y1 - new_y0;
 
-        array.push(^scissor_stack, .{ new_x0, new_y0, new_w, new_h });
+        array.push(^scissor_stack, .{ new_x0, new_y0, new_w + 1, new_h + 1 });
 
-        gl.scissor(~~new_x0, window_height - ~~new_y1, ~~new_w, ~~new_h);
+        gl.scissor(~~new_x0, window_height - ~~new_y1, ~~math.ceil(new_w + 1), ~~math.ceil(new_h + 1));
     }
 
     pop_scissor :: (use ir: ^Immediate_Renderer) {

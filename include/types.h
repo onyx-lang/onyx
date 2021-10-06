@@ -107,6 +107,7 @@ struct TypeWithOffset {
         bh_arr(struct AstPolySolution) poly_sln;                  \
         bh_arr(TypeWithOffset) linear_members;                    \
         struct AstType *constructed_from;                         \
+        bh_arr(struct AstTyped *) meta_tags;                      \
     })                                                            \
     TYPE_KIND(Compound, struct {                                  \
         u32 count;                                                \

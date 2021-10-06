@@ -175,8 +175,10 @@ u64 build_type_table(OnyxWasmModule* module) {
                 u32* param_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(s->poly_sln));
                 u32* value_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
                 u32* meta_locations = bh_alloc_array(global_scratch_allocator, u32, s->mem_count);
+                u32* struct_tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(s->meta_tags));
                 memset(value_locations, 0, s->mem_count * sizeof(u32));
                 memset(meta_locations, 0, s->mem_count * sizeof(u32));
+                memset(struct_tag_locations, 0, bh_arr_length(s->meta_tags) * sizeof(u32));
 
                 u32 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
@@ -345,6 +347,34 @@ u64 build_type_table(OnyxWasmModule* module) {
                     else                       bh_buffer_write_u32(&table_buffer, sln->value->type->id);
                 }
 
+                i = 0;
+                bh_arr_each(AstTyped *, tag, s->meta_tags) {
+                    AstTyped* value = *tag;                        
+                    assert(value->flags & Ast_Flag_Comptime);
+                    assert(value->type);
+
+                    u32 size = type_size_of(value->type);
+                    bh_buffer_align(&table_buffer, type_alignment_of(value->type));
+                    struct_tag_locations[i] = table_buffer.length;
+
+                    bh_buffer_grow(&table_buffer, table_buffer.length + size);
+                    u8* buffer = table_buffer.data + table_buffer.length;
+
+                    assert(emit_raw_data_(module, buffer, value));
+                    table_buffer.length += size;
+
+                    i += 1;
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                u32 struct_tag_base = table_buffer.length;
+
+                fori (i, 0, bh_arr_length(s->meta_tags)) {
+                    PATCH;
+                    bh_buffer_write_u64(&table_buffer, struct_tag_locations[i]);
+                    bh_buffer_write_u64(&table_buffer, s->meta_tags[i]->type->id);
+                }
+
                 u32 name_base = 0;
                 u32 name_length = 0;
                 if (s->name) {
@@ -368,6 +398,9 @@ u64 build_type_table(OnyxWasmModule* module) {
                 PATCH;
                 bh_buffer_write_u64(&table_buffer, params_base);
                 bh_buffer_write_u64(&table_buffer, bh_arr_length(s->poly_sln));
+                PATCH;
+                bh_buffer_write_u64(&table_buffer, struct_tag_base);
+                bh_buffer_write_u64(&table_buffer, bh_arr_length(s->meta_tags));
 
                 break;
             }
