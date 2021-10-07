@@ -1947,15 +1947,15 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
         } else {
             bh_arr(AstTyped *) meta_tags=NULL;
-            while (parse_possible_directive(parser, "tag")) {
-                expect_token(parser, '(');
+            while (parser->curr->type == '[') {
+                expect_token(parser, '[');
 
                 AstTyped* expr = parse_expression(parser, 0);
 
                 if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
                 bh_arr_push(meta_tags, expr);
 
-                expect_token(parser, ')');
+                expect_token(parser, ']');
             }
 
             bh_arr_clear(member_list_temp);
@@ -2825,6 +2825,17 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 export->export = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(export);
+                return;
+            }
+            else if (parse_possible_directive(parser, "tag")) {
+                AstDirectiveTag *tag = make_node(AstDirectiveTag, Ast_Kind_Directive_Tag);
+                tag->token = dir_token;
+
+                tag->expr = parse_expression(parser, 0);
+                expect_token(parser, ',');
+                tag->tag = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(tag);
                 return;
             }
             else {

@@ -1184,6 +1184,13 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
             break;
         }
+
+        case Ast_Kind_Directive_Tag: {
+            AstDirectiveTag *tag = (AstDirectiveTag *) directive;
+            SYMRES(expression, &tag->tag);
+            SYMRES(expression, &tag->expr);
+            break;
+        }
     }
 
     return Symres_Success;

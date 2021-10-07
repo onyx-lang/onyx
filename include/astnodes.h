@@ -38,6 +38,7 @@
     NODE(DirectiveOperator)    \
     NODE(DirectiveExport)      \
     NODE(DirectiveDefined)     \
+    NODE(DirectiveTag)         \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -192,6 +193,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Operator,
     Ast_Kind_Directive_Export,
     Ast_Kind_Directive_Defined,
+    Ast_Kind_Directive_Tag,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1047,6 +1049,13 @@ struct AstDirectiveDefined {
     AstTyped *expr;
 
     b32 is_defined: 1;
+};
+
+struct AstDirectiveTag {
+    AstNode_base;
+
+    AstTyped* expr;
+    AstTyped* tag;
 };
 
 struct AstNote {

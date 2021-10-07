@@ -86,6 +86,7 @@ static const char* ast_node_names[] = {
     "OPERATOR OVERLOAD",
     "EXPORT",
     "DEFINED",
+    "TAG",
     "CALL SITE",
 
     "CODE BLOCK",

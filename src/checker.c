@@ -2197,6 +2197,62 @@ CheckStatus check_process_directive(AstNode* directive) {
             YIELD(directive->token->pos, "Waiting for export type to be known.");
     }
 
+    if (directive->kind == Ast_Kind_Directive_Tag) {
+        AstDirectiveTag *tag = (AstDirectiveTag *) directive;
+
+        CHECK(expression, &tag->tag);
+
+        switch (tag->expr->kind) {
+            case Ast_Kind_Struct_Type: {
+                AstStructType* st = (AstStructType *) tag->expr;
+
+                if (st->meta_tags == NULL) bh_arr_new(global_heap_allocator, st->meta_tags, 1);
+                bh_arr_push(st->meta_tags, tag->tag);
+
+                return Check_Complete;
+            }
+
+            case Ast_Kind_Field_Access: {
+                AstFieldAccess* fa = (AstFieldAccess *) tag->expr;
+
+                if (fa->expr->kind == Ast_Kind_Struct_Type) {
+                    AstStructType* st = (AstStructType *) fa->expr;
+                    Type* s_type = type_build_from_ast(context.ast_alloc, (AstType *) st);
+
+                    bh_arr_each(AstStructMember *, smem, st->members) {
+                        if (token_equals((*smem)->token, fa->token)) {
+                            bh_arr(AstTyped *) tags = (*smem)->meta_tags;
+
+                            if (tags == NULL) bh_arr_new(global_heap_allocator, tags, 1);
+                            bh_arr_push(tags, tag->tag);
+
+                            (*smem)->meta_tags = tags;
+
+                            bh_arr_each(StructMember *, smem_type, s_type->Struct.memarr) {
+                                if (token_text_equals((*smem)->token, (*smem_type)->name)) {
+                                    (*smem_type)->meta_tags = tags;
+                                    break;
+                                }
+                            }
+
+                            return Check_Complete;
+                        }
+                    }
+
+                    onyx_report_error(fa->token->pos, "'%b' is not a member of '%s'.",
+                        fa->token->text, fa->token->length,
+                        st->name);
+                    return Check_Error;
+                }
+            }
+
+            default: {
+                onyx_report_error(tag->token->pos, "Cannot tag this.");
+                return Check_Error;
+            }
+        }
+    }
+
     return Check_Success;
 }
 
