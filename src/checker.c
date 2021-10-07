@@ -2216,6 +2216,7 @@ CheckStatus check_process_directive(AstNode* directive) {
                 AstFieldAccess* fa = (AstFieldAccess *) tag->expr;
 
                 if (fa->expr->kind == Ast_Kind_Struct_Type) {
+                    // CLEANUP: Everything in this case is handled very poorly.
                     AstStructType* st = (AstStructType *) fa->expr;
                     Type* s_type = type_build_from_ast(context.ast_alloc, (AstType *) st);
 

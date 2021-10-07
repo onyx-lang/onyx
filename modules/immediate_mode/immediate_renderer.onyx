@@ -446,8 +446,14 @@ immediate_renderer_free :: () {
 }
 
 vertex :: #match {
-    (position: Vector2)                { global_renderer->push_vertex(position); },
-    (position: Vector2, color: Color4) { global_renderer->push_vertex(position, color); },
+    macro (position: Vector2) {
+        gr :: global_renderer
+        gr->push_vertex(position);
+    },
+    macro (position: Vector2, color: Color4) {
+        gr :: global_renderer
+        gr->push_vertex(position, color);
+    },
 }
 
 rect :: (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {

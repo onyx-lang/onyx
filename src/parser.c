@@ -1877,7 +1877,6 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
     bh_arr_new(global_heap_allocator, s_node->members, 4);
     
-    bh_arr(AstTyped *) struct_meta_tags=NULL;
     while (parser->curr->type == '#') {
         if (parser->hit_unexpected_token) return NULL;
 
@@ -1899,23 +1898,30 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             s_node->min_size = numlit->value.i;
         }
 
-        else if (parse_possible_directive(parser, "tag")) {
-            expect_token(parser, '(');
-
-            AstTyped* expr = parse_expression(parser, 0);
-
-            if (struct_meta_tags == NULL) bh_arr_new(global_heap_allocator, struct_meta_tags, 1);
-            bh_arr_push(struct_meta_tags, expr);
-
-            expect_token(parser, ')');
-        }
-
         else {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
             onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
+    }
+
+    bh_arr(AstTyped *) struct_meta_tags=NULL;
+    if (parser->curr->type == '[') {
+        expect_token(parser, '[');
+        if (struct_meta_tags == NULL) bh_arr_new(global_heap_allocator, struct_meta_tags, 1);
+
+        while (parser->curr->type != ']') {
+            if (parser->hit_unexpected_token) return s_node;
+
+            AstTyped* expr = parse_expression(parser, 0);
+            bh_arr_push(struct_meta_tags, expr);
+
+            if (parser->curr->type != ']')
+                expect_token(parser, ',');
+        }
+
+        expect_token(parser, ']');
     }
 
     s_node->meta_tags = struct_meta_tags;
@@ -1948,12 +1954,17 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         } else {
             bh_arr(AstTyped *) meta_tags=NULL;
             while (parser->curr->type == '[') {
-                expect_token(parser, '[');
-
-                AstTyped* expr = parse_expression(parser, 0);
-
                 if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
-                bh_arr_push(meta_tags, expr);
+
+                expect_token(parser, '[');
+                while (parser->curr->type != ']') {
+                    AstTyped* expr = parse_expression(parser, 0);
+                    bh_arr_push(meta_tags, expr);
+
+                    if (parser->curr->type != ']') {
+                        expect_token(parser, ',');
+                    }
+                }
 
                 expect_token(parser, ']');
             }
