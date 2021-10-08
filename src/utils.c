@@ -78,6 +78,7 @@ Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     scope->id = next_scope_id++;
     scope->parent = parent;
     scope->created_at = created_at;
+    scope->name = NULL;
 
     scope->symbols = NULL;
     bh_table_init(global_heap_allocator, scope->symbols, 64);

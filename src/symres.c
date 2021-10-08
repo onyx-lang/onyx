@@ -93,6 +93,7 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
     if (s_node->flags & Ast_Flag_Type_Is_Resolved) return Symres_Success;
 
     s_node->flags |= Ast_Flag_Type_Is_Resolved;
+    s_node->flags |= Ast_Flag_Comptime;
 
     if (s_node->scope) {
         // FIX: This is probably wrong for the long term.
