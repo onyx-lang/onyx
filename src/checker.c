@@ -1503,6 +1503,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
             if (type_build_from_ast(context.ast_alloc, (AstType*) expr) == NULL) {
                 YIELD(expr->token->pos, "Trying to construct type.");
             }
+        } else {
+            type_build_from_ast(context.ast_alloc, (AstType*) expr);
         }
 
         expr->type = &basic_types[Basic_Kind_Type_Index];

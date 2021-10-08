@@ -82,6 +82,12 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
             else                do io.write_str(writer, "<anonymous struct>");
         }
 
+        case .Polymorphic_Struct {
+            s := cast(^Type_Info_Polymorphic_Struct) info;
+            if s.name.count > 0 do io.write_str(writer, s.name);
+            else                do io.write_str(writer, "<anonymous polymorphic struct>");
+        }
+
         case .Compound {
             comp := cast(^Type_Info_Compound) info;
             io.write_str(writer, "(");
@@ -127,6 +133,13 @@ offset_of :: (T: type_expr, member: str) -> u32 {
 
     // Should this return something else if the member was not found?
     return 0;
+}
+
+struct_constructed_from :: (struct_type: type_expr, base_type: type_expr) -> bool {
+    struct_info := get_type_info(struct_type);
+    if struct_info.kind != .Struct do return false;
+
+    return (cast(^Type_Info_Struct) struct_info).constructed_from == base_type;
 }
 
 #operator == (t1: Type_Info_Function, t2: Type_Info_Function) -> bool {

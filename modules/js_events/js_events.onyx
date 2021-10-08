@@ -49,7 +49,7 @@ KeyboardEvent :: struct {
         SHIFT :: 0x08;
     }
 
-    get_name :: (use e: ^KeyboardEvent) -> str do return str.{ ~~keyname, ~~keyname_count };
+    get_name :: (use e: ^KeyboardEvent) => str.{ ~~keyname, ~~keyname_count };
 }
 
 MouseEvent :: struct {

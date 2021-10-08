@@ -109,6 +109,10 @@ struct TypeWithOffset {
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
     })                                                            \
+    TYPE_KIND(PolyStruct, struct {                                \
+        char* name;                                               \
+        bh_arr(struct AstTyped *) meta_tags;                      \
+    })                                                            \
     TYPE_KIND(Compound, struct {                                  \
         u32 count;                                                \
         u32 size;                                                 \

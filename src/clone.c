@@ -315,14 +315,31 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 bh_arr_push(ds->members, (AstStructMember *) ast_clone(a, *smem));
             }
 
+            ds->meta_tags = NULL;
+            bh_arr_new(global_heap_allocator, ds->meta_tags, bh_arr_length(ss->meta_tags));
+            bh_arr_each(AstTyped *, tag, ss->meta_tags) {
+                bh_arr_push(ds->meta_tags, (AstTyped *) ast_clone(a, *tag));
+            }
+
             ds->stcache = NULL;
             break;
         }
 
-        case Ast_Kind_Struct_Member:
+        case Ast_Kind_Struct_Member: {
             C(AstStructMember, type_node);
             C(AstStructMember, initial_value);
+
+            AstStructMember *ds = (AstStructMember *) nn;
+            AstStructMember *ss = (AstStructMember *) node;
+
+            ds->meta_tags = NULL;
+            bh_arr_new(global_heap_allocator, ds->meta_tags, bh_arr_length(ss->meta_tags));
+            bh_arr_each(AstTyped *, tag, ss->meta_tags) {
+                bh_arr_push(ds->meta_tags, (AstTyped *) ast_clone(a, *tag));
+            }
+
             break;
+        }
 
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pcd = (AstPolyCallType *) nn;

@@ -388,7 +388,13 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type->kind);
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
-                bh_buffer_write_u32(&table_buffer, 0);
+
+                if (type->Struct.constructed_from != NULL) {
+                    bh_buffer_write_u32(&table_buffer, type->Struct.constructed_from->type_id);
+                } else {
+                    bh_buffer_write_u32(&table_buffer, 0);
+                }
+
                 PATCH;
                 bh_buffer_write_u64(&table_buffer, name_base);
                 bh_buffer_write_u64(&table_buffer, name_length);
@@ -401,6 +407,59 @@ u64 build_type_table(OnyxWasmModule* module) {
                 PATCH;
                 bh_buffer_write_u64(&table_buffer, struct_tag_base);
                 bh_buffer_write_u64(&table_buffer, bh_arr_length(s->meta_tags));
+
+                break;
+            }
+
+            case Type_Kind_PolyStruct: {
+                u32* tag_locations = bh_alloc_array(global_scratch_allocator, u32, bh_arr_length(type->PolyStruct.meta_tags));
+                memset(tag_locations, 0, sizeof(u32) * bh_arr_length(type->PolyStruct.meta_tags));
+
+                u32 name_base = table_buffer.length;
+                u32 name_length = strlen(type->PolyStruct.name);
+                bh_buffer_append(&table_buffer, type->PolyStruct.name, name_length);
+
+                i32 i = 0;
+                bh_arr_each(AstTyped *, tag, type->PolyStruct.meta_tags) {
+                    AstTyped* value = *tag;                        
+                    assert(value->flags & Ast_Flag_Comptime);
+                    assert(value->type);
+
+                    u32 size = type_size_of(value->type);
+                    bh_buffer_align(&table_buffer, type_alignment_of(value->type));
+                    tag_locations[i] = table_buffer.length;
+
+                    bh_buffer_grow(&table_buffer, table_buffer.length + size);
+                    u8* buffer = table_buffer.data + table_buffer.length;
+
+                    assert(emit_raw_data_(module, buffer, value));
+                    table_buffer.length += size;
+
+                    i += 1;
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                u32 tags_base = table_buffer.length;
+                u32 tags_count = bh_arr_length(type->PolyStruct.meta_tags);
+
+                fori (i, 0, tags_count) {
+                    PATCH;
+                    bh_buffer_write_u64(&table_buffer, tag_locations[i]);
+                    bh_buffer_write_u64(&table_buffer, type->PolyStruct.meta_tags[i]->type->id);
+                }
+
+                bh_buffer_align(&table_buffer, 8);
+                table_info[type_idx] = table_buffer.length;
+                bh_buffer_write_u32(&table_buffer, type->kind);
+                bh_buffer_write_u32(&table_buffer, 0);
+                bh_buffer_write_u32(&table_buffer, 0);
+                bh_buffer_write_u32(&table_buffer, 0);
+                PATCH;
+                bh_buffer_write_u64(&table_buffer, name_base);
+                bh_buffer_write_u64(&table_buffer, name_length);
+                PATCH;
+                bh_buffer_write_u64(&table_buffer, tags_base);
+                bh_buffer_write_u64(&table_buffer, tags_count);
 
                 break;
             }

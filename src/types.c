@@ -498,12 +498,21 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Type_Raw_Alias:
             return ((AstTypeRawAlias *) type_node)->to;
 
-        case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Poly_Struct_Type: {
             //onyx_report_error(type_node->token->pos,
             //    "This structure is polymorphic, which means you need to provide arguments to it to make it a concrete structure. "
             //    "This error message is probably in the wrong place, so look through your code for uses of this struct.");
+
+            if (type_node->type_id != 0) return NULL;
+
+            Type* p_type = type_create(Type_Kind_PolyStruct, alloc, 0);
+            p_type->ast_type = type_node;
+            p_type->PolyStruct.name = ((AstPolyStructType *) type_node)->name;
+            p_type->PolyStruct.meta_tags = ((AstPolyStructType *) type_node)->base_struct->meta_tags;
+
+            type_register(p_type);
             return NULL;
-            break;
+        }
 
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pc_type = (AstPolyCallType *) type_node;

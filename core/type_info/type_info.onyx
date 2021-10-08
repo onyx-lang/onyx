@@ -8,17 +8,18 @@ type_table : [] ^Type_Info;
 Type_Info :: struct {
     // This must match the order of the elements in onyxtypes.h
     Kind :: enum {
-        Invalid           :: 0x00; // Unused
-        Basic             :: 0x01;
-        Pointer           :: 0x02;
-        Function          :: 0x03;
-        Struct            :: 0x04;
-        Compound          :: 0x05;
-        Array             :: 0x06;
-        Slice             :: 0x07;
-        Dynamic_Array     :: 0x08;
-        Variadic_Argument :: 0x09;
-        Enum              :: 0x0a;
+        Invalid            :: 0x00; // Unused
+        Basic              :: 0x01;
+        Pointer            :: 0x02;
+        Function           :: 0x03;
+        Struct             :: 0x04;
+        Polymorphic_Struct :: 0x05;
+        Compound           :: 0x06;
+        Array              :: 0x07;
+        Slice              :: 0x08;
+        Dynamic_Array      :: 0x09;
+        Variadic_Argument  :: 0x0a;
+        Enum               :: 0x0b;
     }
 
     kind := Kind.Invalid;
@@ -145,9 +146,17 @@ Type_Info_Struct :: struct {
         tags: [] any;
     }
 
+    constructed_from: type_expr;
     name: str;
     members: [] Member;
     parameters: [] any;
+    tags: [] any;
+}
+
+Type_Info_Polymorphic_Struct :: struct {
+    use base : Type_Info;
+
+    name: str;
     tags: [] any;
 }
 
