@@ -466,6 +466,10 @@ u64 build_type_table(OnyxWasmModule* module) {
         }
     }
 
+    if (context.options->verbose_output == 1) {
+        bh_printf("Type table size: %d bytes.\n", table_buffer.length);
+    }
+
     u32 offset = module->next_datum_offset;
     bh_align(offset, 8);
 
