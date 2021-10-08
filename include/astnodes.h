@@ -105,6 +105,7 @@ typedef struct Scope {
     u64 id;
     struct Scope *parent;
     OnyxFilePos created_at;
+    char* name;
     bh_table(AstNode *) symbols;
 } Scope;
 
@@ -854,7 +855,7 @@ struct AstInclude       { AstNode_base; char* name; };
 struct AstGlobal        {
     AstTyped_base;
 
-    OnyxToken* name;
+    char* name;
 
     OnyxToken* foreign_module;
     OnyxToken* foreign_name;
@@ -880,7 +881,7 @@ struct AstFunction {
 
     AstBlock *body;
 
-    OnyxToken* name;
+    char* name;
 
 
     // NOTE: This is NULL, unless this function was generated from a polymorphic

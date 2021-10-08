@@ -908,9 +908,7 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 char* get_function_name(AstFunction* func) {
     if (func->kind != Ast_Kind_Function) return "<procedure>";
 
-    if (func->name != NULL) {
-        return bh_aprintf(global_scratch_allocator, "%b", func->name->text, func->name->length);
-    }
+    if (func->name != NULL) return func->name;
 
     if (func->exported_name != NULL) {
         return bh_aprintf(global_scratch_allocator,

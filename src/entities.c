@@ -144,6 +144,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         entity_heap_insert_existing(entities, entity);          \
     }                                                           \
 
+    if (node->entity != NULL) return;
 
     EntityHeap* entities = &context.entities;
     Entity* entity;

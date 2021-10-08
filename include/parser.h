@@ -27,6 +27,7 @@ typedef struct OnyxParser {
 
     Scope *current_scope;
     bh_arr(bh_arr(Entity *) *) alternate_entity_placement_stack;
+    bh_arr(OnyxToken *) current_symbol_stack;
 
     bh_arr(AstFlags) scope_flags;
 
