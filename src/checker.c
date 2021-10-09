@@ -2045,10 +2045,6 @@ CheckStatus check_memres(AstMemRes* memres) {
     if (memres->initial_value != NULL) {
         CHECK(expression, &memres->initial_value);
 
-        if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
-            ERROR(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
-        }
-
         if (memres->type != NULL) {
             Type* memres_type = memres->type;
             if (!unify_node_and_type(&memres->initial_value, memres_type)) {
@@ -2064,6 +2060,10 @@ CheckStatus check_memres(AstMemRes* memres) {
                 YIELD(memres->token->pos, "Waiting for global type to be constructed.");
             }
             memres->type = memres->initial_value->type;
+        }
+
+        if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
+            ERROR(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
         }
     }
 
