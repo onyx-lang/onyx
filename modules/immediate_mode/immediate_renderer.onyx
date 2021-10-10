@@ -456,24 +456,34 @@ vertex :: #match {
     },
 }
 
-rect :: (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
-    global_renderer->rect(position, size, color);
+rect :: macro (position: Vector2, size: Vector2, color: Color4 = .{1,1,1}) {
+    gr :: global_renderer
+    gr->rect(position, size, color);
 }
 
-textured_rect :: (position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
-    global_renderer->textured_rect(position, size, texture_position, texture_size, color);
+textured_rect :: macro (position: Vector2, size: Vector2, texture_position: Vector2, texture_size: Vector2, color: Color4 = .{1,1,1}) {
+    gr :: global_renderer
+    gr->textured_rect(position, size, texture_position, texture_size, color);
 }
 
-circle :: (center: Vector2, radius: f32, color: Color4 = .{1,1,1}, segments := 12) {
-    global_renderer->circle(center, radius, color, segments);
+circle :: macro (center: Vector2, radius: f32, color: Color4 = .{1,1,1}, segments := 12) {
+    gr :: global_renderer
+    gr->circle(center, radius, color, segments);
 }
 
-flush :: () do global_renderer->flush();
+flush :: macro () {
+    gr :: global_renderer
+    gr->flush();
+}
 
 set_texture :: #match {
-    (texture_id: i32 = -1) { global_renderer->set_texture(texture_id); },
-    (texture: ^Texture, texture_index := 0) {
-        global_renderer->set_texture(texture_index);
+    macro (texture_id: i32 = -1) {
+        gr :: global_renderer
+        gr->set_texture(texture_id);
+    },
+    macro (texture: ^Texture, texture_index := 0) {
+        gr :: global_renderer
+        gr->set_texture(texture_index);
 
         if texture_index >= 0 {
             gl.activeTexture(gl.TEXTURE0 + texture_index);
@@ -485,51 +495,65 @@ set_texture :: #match {
     }
 }
 
-use_ortho_projection :: (left: f32, right: f32, top: f32, bottom: f32) {
-    global_renderer->use_ortho_projection(left, right, top, bottom);
+use_ortho_projection :: macro (left: f32, right: f32, top: f32, bottom: f32) {
+    gr :: global_renderer
+    gr->use_ortho_projection(left, right, top, bottom);
 }
 
-use_alpha_shader :: (texture_id: i32 = -1) {
-    global_renderer->use_alpha_shader(texture_id);
+use_alpha_shader :: macro (texture_id: i32 = -1) {
+    gr :: global_renderer
+    gr->use_alpha_shader(texture_id);
 }
 
 push_scissor :: (x: f32, y: f32, w: f32, h: f32) {
-    global_renderer->push_scissor(x, y, w, h);
+    gr :: global_renderer
+    gr->push_scissor(x, y, w, h);
 }
 
-pop_scissor :: () do global_renderer->pop_scissor();
-
-scissor_disable :: () {
-    global_renderer->scissor_disable();
+pop_scissor :: macro () {
+    gr :: global_renderer
+    gr->pop_scissor();
 }
 
-set_mode :: (mode: Immediate_Mode) {
-    global_renderer->set_mode(mode);
+scissor_disable :: macro () {
+    gr :: global_renderer
+    gr->scissor_disable();
 }
 
-use_canvas :: (canvas: ^Canvas) {
-    global_renderer->use_canvas(canvas);
+set_mode :: macro (mode: Immediate_Mode) {
+    gr :: global_renderer
+    gr->set_mode(mode);
 }
 
-set_window_size :: (width: i32, height: i32) {
-    global_renderer->set_window_size(width, height);
+use_canvas :: macro (canvas: ^Canvas) {
+    gr :: global_renderer
+    gr->use_canvas(canvas);
 }
 
-get_window_size :: () -> (width: i32, height: i32) {
-    return global_renderer.window_width, global_renderer.window_height;
+set_window_size :: macro (width: i32, height: i32) {
+    gr :: global_renderer
+    gr->set_window_size(width, height);
 }
 
-push_matrix :: () do global_renderer->push_matrix();
-pop_matrix  :: () do global_renderer->pop_matrix();
-identity    :: () do global_renderer->identity();
-apply_transform :: (transform: Transform) do global_renderer->apply_transform(transform);
+get_window_size :: macro () -> (width: i32, height: i32) {
+    gr :: global_renderer
+    return gr.window_width, gr.window_height;
+}
+
+push_matrix :: macro () { gr :: global_renderer; gr->push_matrix(); }
+pop_matrix  :: macro () { gr :: global_renderer; gr->pop_matrix();  }
+identity    :: macro () { gr :: global_renderer; gr->identity();    }
+apply_transform :: macro (transform: Transform) {
+    gr :: global_renderer
+    gr->apply_transform(transform);
+}
 
 
 
 save_matrix :: macro () {
-    // Not counting a specific name for this import
-    I :: package immediate_mode
+    push_m :: push_matrix
+    pop_m  :: pop_matrix
 
-    I.push_matrix();
-    defer I.pop_matrix();
+    push_m();
+    defer pop_m();
 }
