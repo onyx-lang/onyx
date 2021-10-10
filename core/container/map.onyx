@@ -150,16 +150,6 @@ empty :: (use map: ^Map($K, $V)) -> bool {
         return lr;
     }
 
-    add_entry :: (use map: ^Map($K, $V), key: K) -> i32 {
-        entry: Map.Entry(K, V);
-        entry.key = key;
-        entry.next = -1;
-
-        entries << entry;
-
-        return entries.count - 1;
-    }
-
     full :: (use map: ^Map($K, $V)) => entries.count >= ~~(0.75f * ~~hashes.count);
 
     grow :: (use map: ^Map($K, $V)) {

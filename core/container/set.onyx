@@ -1,11 +1,17 @@
 package core.set
 
-#private_file array :: package core.array
-#private_file hash  :: package core.hash
+#private_file {
+    array :: package core.array
+    hash  :: package core.hash
+    memory :: package core.memory
+    math :: package core.math
+}
 use package core.intrinsics.onyx { __zero_value }
 
 Set :: struct (T: type_expr) {
-    hashes  : [..] i32;
+    allocator : Allocator;
+
+    hashes  : [] i32;
     entries : [..] Entry(T);
 
     default_value: T;
@@ -16,24 +22,24 @@ Set :: struct (T: type_expr) {
     }
 }
 
-make :: ($T: type_expr, default := __zero_value(T), hash_count: i32 = 16) -> Set(T) {
+make :: ($T: type_expr, default := __zero_value(T)) -> Set(T) {
     set : Set(T);
-    init(^set, default=default, hash_count=hash_count);
+    init(^set, default=default);
     return set;
 }
 
-init :: (use set: ^Set($T), default := __zero_value(T), hash_count: i32 = 16) {
-    array.init(^hashes, hash_count);
-    hashes.count = hash_count;
-    array.fill(hashes, -1);
-
-    array.init(^entries, 4); 
-
+init :: (use set: ^Set($T), default := __zero_value(T)) {
+    allocator = context.allocator;
     default_value = default;
+
+    memory.alloc_slice(^hashes, 8, allocator=allocator);
+    memory.fill_slice(hashes, -1);
+
+    array.init(^entries, 4, allocator=allocator); 
 }
 
 free :: (use set: ^Set($T)) {
-    array.free(^hashes);
+    memory.free_slice(^hashes, allocator=allocator);
     array.free(^entries);
 }
 
@@ -42,12 +48,10 @@ insert :: (use set: ^Set($T), value: T) {
 
     if lr.entry_index >= 0 do return;
 
-    array.push(^entries, .{
-        value = value,
-        hashes[lr.hash_index],
-    });
-
+    entries << .{ hashes[lr.hash_index], value };
     hashes[lr.hash_index] = entries.count - 1;
+
+    if full(set) do grow(set);
 }
 
 #operator << macro (set: Set($T), value: T) do (package core.set).insert(^set, value);
@@ -124,28 +128,52 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
 // Private symbols
 //
 
-#private_file
-SetLookupResult :: struct {
-    hash_index  : i32 = -1;
-    entry_index : i32 = -1;
-    entry_prev  : i32 = -1;
-}
-
-#private_file
-lookup :: (use set: ^Set($T), value: T) -> SetLookupResult {
-    lr := SetLookupResult.{};
-
-    hash_value: u32 = hash.to_u32(value); // You cannot have a set of this type without defining a to_u32 hash.
-
-    lr.hash_index = hash_value % hashes.count;
-    lr.entry_index = hashes[lr.hash_index];
-
-    while lr.entry_index >= 0 {
-        if entries[lr.entry_index].value == value do return lr;
-
-        lr.entry_prev = lr.entry_index;
-        lr.entry_index = entries[lr.entry_index].next;
+#private_file {
+    SetLookupResult :: struct {
+        hash_index  : i32 = -1;
+        entry_index : i32 = -1;
+        entry_prev  : i32 = -1;
     }
 
-    return lr;
+    lookup :: (use set: ^Set($T), value: T) -> SetLookupResult {
+        lr := SetLookupResult.{};
+
+        hash_value: u32 = hash.to_u32(value); // You cannot have a set of this type without defining a to_u32 hash.
+
+        lr.hash_index = hash_value % hashes.count;
+        lr.entry_index = hashes[lr.hash_index];
+
+        while lr.entry_index >= 0 {
+            if entries[lr.entry_index].value == value do return lr;
+
+            lr.entry_prev = lr.entry_index;
+            lr.entry_index = entries[lr.entry_index].next;
+        }
+
+        return lr;
+    }
+
+    full :: (use set: ^Set($T)) => entries.count >= ~~(0.75f * ~~hashes.count);
+
+    grow :: (use set: ^Set($T)) {
+        new_size := math.max(hashes.count << 1, 8);
+        rehash(set, new_size);
+    }
+
+    rehash :: (use set: ^Set($T), new_size: i32) {
+        memory.free_slice(^hashes, allocator);
+        memory.alloc_slice(^hashes, new_size, allocator);
+        memory.fill_slice(hashes, -1);
+
+        for ^entry: entries do entry.next = -1;
+
+        index := 0;
+        for ^entry: entries {
+            defer index += 1;
+
+            lr := lookup(set, entry.value); 
+            entries[index].next = hashes[lr.hash_index];
+            hashes[lr.hash_index] = index;
+        }
+    }
 }
