@@ -12,7 +12,7 @@ main :: (args: [] cstr) {
         map.free(^imap);
     }
     map.put(^imap, 50, "Hello ");
-    map.put(^imap, 1234, "World!");
+    imap->put(1234, "World!");
 
     println(map.has(^imap, 50));
     println(map.has(^imap, 51));
