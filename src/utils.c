@@ -132,18 +132,21 @@ void symbol_subpackage_introduce(Scope* scope, char* sym, AstPackage* package) {
 }
 
 AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
-    AstNode* res = NULL;
     Scope* scope = start_scope;
 
-    while (res == NULL && scope != NULL) {
+    while (scope != NULL) {
         if (bh_table_has(AstNode *, scope->symbols, sym)) {
-            res = bh_table_get(AstNode *, scope->symbols, sym);
-        } else {
-            scope = scope->parent;
+            AstNode* res = bh_table_get(AstNode *, scope->symbols, sym);
+
+            if ((res->flags & Ast_Flag_Symbol_Invisible) == 0) {
+                return res;
+            }
         }
+
+        scope = scope->parent;
     }
 
-    return res;
+    return NULL;
 }
 
 AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {

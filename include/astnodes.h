@@ -263,6 +263,8 @@ typedef enum AstFlags {
 
     // :TEMPORARY
     Ast_Flag_Params_Introduced     = BH_BIT(29),
+
+    Ast_Flag_Symbol_Invisible      = BH_BIT(30),
 } AstFlags;
 
 typedef enum UnaryOp {

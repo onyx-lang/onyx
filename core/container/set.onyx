@@ -21,13 +21,13 @@ Set :: struct (T: type_expr) {
         value : T;
     }
 
-    has      :: (package core.set).has
-    get      :: (package core.set).get
-    insert   :: (package core.set).insert
-    remove   :: (package core.set).remove
-    clear    :: (package core.set).clear
-    empty    :: (package core.set).empty
-    iterator :: (package core.set).iterator
+    has      :: has
+    get      :: get
+    insert   :: insert
+    remove   :: remove
+    clear    :: clear
+    empty    :: empty
+    iterator :: iterator
 }
 
 make :: ($T: type_expr, default := __zero_value(T)) -> Set(T) {

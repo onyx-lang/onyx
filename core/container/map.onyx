@@ -24,14 +24,14 @@ Map :: struct (K: type_expr, V: type_expr) {
         value : V;
     }
 
-    has     :: (package core.map).has
-    get     :: (package core.map).get
-    get_ptr :: (package core.map).get_ptr
-    put     :: (package core.map).put
-    delete  :: (package core.map).delete
-    update  :: (package core.map).update
-    clear   :: (package core.map).clear
-    empty   :: (package core.map).empty
+    has     :: has
+    get     :: get
+    get_ptr :: get_ptr
+    put     :: put
+    delete  :: delete
+    update  :: update
+    clear   :: clear
+    empty   :: empty
 }
 
 make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value)) -> Map(Key, Value) {
