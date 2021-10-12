@@ -543,6 +543,8 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 AstArrayLiteral* al = (AstArrayLiteral *) node;
                 array_type = type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
 
+                *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
+
                 break;
             }
 
