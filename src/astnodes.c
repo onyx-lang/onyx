@@ -535,7 +535,21 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         // just assume that it works and don't submit the entities.
         if (!permanent) return 1;
 
-        node->type = type;
+        Type* array_type=NULL;
+        switch (type->kind) {
+            case Type_Kind_Array: array_type = type; break;
+            case Type_Kind_Slice: {
+                Type* elem_type = type->Slice.elem;
+                AstArrayLiteral* al = (AstArrayLiteral *) node;
+                array_type = type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
+
+                break;
+            }
+
+            default: assert(0);
+        }
+
+        node->type = array_type;
         node->flags |= Ast_Flag_Array_Literal_Typed;
 
         add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);

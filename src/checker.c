@@ -1115,8 +1115,8 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
 CheckStatus check_array_literal(AstArrayLiteral* al) {
     // :Idempotency
     if ((al->flags & Ast_Flag_Array_Literal_Typed) == 0) {
-        if (al->atnode == NULL)
-            YIELD(al->token->pos, "Waiting for array literal type to be known.");
+        if (al->atnode == NULL) return Check_Success;
+            // YIELD(al->token->pos, "Waiting for array literal type to be known.");
 
         if (!node_is_type((AstNode *) al->atnode))
             ERROR(al->token->pos, "Array type is not a type.");
