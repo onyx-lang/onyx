@@ -725,6 +725,23 @@ Type* resolve_expression_type(AstTyped* node) {
         return &basic_types[Basic_Kind_Type_Index];
     }
 
+    if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
+        AstArrayLiteral* al = (AstArrayLiteral *) node;
+        Type* elem_type = &basic_types[Basic_Kind_Void];
+        if (bh_arr_length(al->values) > 0) {
+            elem_type = resolve_expression_type(al->values[0]);
+        }
+
+        if (elem_type) {
+            node->type = type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
+            node->flags |= Ast_Flag_Array_Literal_Typed;
+            
+            if (node->entity == NULL) {
+                add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
+            }
+        }
+    }
+
     if (node->type == NULL)
         node->type = type_build_from_ast(context.ast_alloc, node->type_node);
 

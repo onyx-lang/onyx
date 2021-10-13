@@ -52,18 +52,18 @@ main :: (args: [] cstr) {
         println("Array of structs on a struct.");
 
         es : EntityStore;
-        es.positions = Vec2.[
-            Vec2.{ 0, 0 },
-            Vec2.{ 1, 1 },
-            Vec2.{ 2, 4 },
-            Vec2.{ 3, 9 },
+        es.positions = .[
+            .{ 0, 0 },
+            .{ 1, 1 },
+            .{ 2, 4 },
+            .{ 3, 9 },
         ];
 
-        es.velocities = Vec2.[
-            Vec2.{ 0, 0 },
-            Vec2.{ 1, 1 },
-            Vec2.{ 2, 8 },
-            Vec2.{ 3, 27 },
+        es.velocities = .[
+            .{ 0, 0 },
+            .{ 1, 1 },
+            .{ 2, 8 },
+            .{ 3, 27 },
         ];
 
         println(es.positions[3]);
