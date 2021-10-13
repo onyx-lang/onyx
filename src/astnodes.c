@@ -528,7 +528,7 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         return 1;
     }
 
-    if (node->kind == Ast_Kind_Array_Literal && node->type_node == NULL) {
+    if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
         if (node->entity != NULL) return 1;
 
         // If this shouldn't make permanent changes and submit entities,
@@ -639,10 +639,12 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     else if (node_type && type->kind == Type_Kind_Slice) {
         if (node_type->kind == Type_Kind_Array || node_type->kind == Type_Kind_DynArray || node_type->kind == Type_Kind_VarArgs) {
             char* dummy;
-            if (cast_is_legal(node_type, type, &dummy)) {
+            b32 legal = cast_is_legal(node_type, type, &dummy);
+            if (permanent && legal) {
                 *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
-                return 1;
             }
+
+            return legal;
         }
     }
 
