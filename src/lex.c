@@ -207,6 +207,28 @@ whitespace_skipped:
         goto token_parsed;
     }
 
+    if (*tk.text == '"' && *(tk.text + 1) == '"' && *(tk.text + 2) == '"') {
+        u64 len = 0;
+
+        INCREMENT_CURR_TOKEN(tokenizer);
+        INCREMENT_CURR_TOKEN(tokenizer);
+        INCREMENT_CURR_TOKEN(tokenizer);
+
+        while (!(*tokenizer->curr == '"' && *(tokenizer->curr + 1) == '"' && *(tokenizer->curr + 2) == '"')) {
+            len++;
+            INCREMENT_CURR_TOKEN(tokenizer);
+        }
+        
+        INCREMENT_CURR_TOKEN(tokenizer);
+        INCREMENT_CURR_TOKEN(tokenizer);
+        INCREMENT_CURR_TOKEN(tokenizer);
+
+        tk.text += 3;
+        tk.length = len;
+        tk.type = Token_Type_Literal_String;
+        goto token_parsed;
+    }
+
     // String literal
     if (*tk.text == '"') {
         u64 len = 0;
