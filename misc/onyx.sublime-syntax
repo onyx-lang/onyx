@@ -9,6 +9,9 @@ contexts:
   main:
     # Strings begin and end with quotes, and use backslashes as an escape
     # character
+    - match: '"""'
+      scope: punctuation.definition.string.begin.onyx
+      push: triple_quoted_string
     - match: '"'
       scope: punctuation.definition.string.begin.onyx
       push: double_quoted_string
@@ -94,6 +97,12 @@ contexts:
     - match: '\\.'
       scope: constant.character.escape.onyx
     - match: '"'
+      scope: punctuation.definition.string.end.onyx
+      pop: true
+
+  triple_quoted_string:
+    - meta_scope: string.quoted.triple.onyx
+    - match: '"""'
       scope: punctuation.definition.string.end.onyx
       pop: true
 

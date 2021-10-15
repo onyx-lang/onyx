@@ -21,3 +21,7 @@ between :: (lo: i32, hi: i32) -> i32 do return int () % (hi + 1 - lo) + lo;
 float :: (lo := 0.0f, hi := 1.0f) -> f32 {
     return (cast(f32) (int() % (1 << 20)) / cast(f32) (1 << 20)) * (hi - lo) + lo;
 }
+
+choice :: (a: [] $T) -> T {
+    return a[between(0, a.count - 1)];
+}

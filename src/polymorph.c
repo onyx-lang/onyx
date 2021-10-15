@@ -814,7 +814,7 @@ char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
     return bh_aprintf(global_heap_allocator, "%s", name_buf);
 }
 
-AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
+Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
     // @Cleanup
     assert(ps_type->scope != NULL);
 
@@ -890,7 +890,7 @@ AstStructType* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstP
         if (cs_type->Struct.poly_sln == NULL) cs_type->Struct.poly_sln = bh_arr_copy(global_heap_allocator, slns);
         if (cs_type->Struct.name == NULL)     cs_type->Struct.name = build_poly_struct_name(ps_type, cs_type);
 
-        return concrete_struct;
+        return cs_type;
     }
 
     Scope* sln_scope = scope_create(context.ast_alloc, ps_type->scope, ps_type->token->pos);

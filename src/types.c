@@ -550,16 +550,15 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 }
             }
 
-            AstStructType* concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos);
+            Type* concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos);
 
             // This should be copied in the previous function.
             // CLEANUP: Maybe don't copy it and just use this one since it is allocated on the heap?
             bh_arr_free(slns);
 
             if (!concrete) return NULL;
-            Type* struct_type = type_build_from_ast(alloc, (AstType *) concrete);
-            struct_type->Struct.constructed_from = (AstType *) ps_type;
-            return struct_type;
+            concrete->Struct.constructed_from = (AstType *) ps_type;
+            return concrete;
         }
 
         case Ast_Kind_Type_Compound: {

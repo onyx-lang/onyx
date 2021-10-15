@@ -229,6 +229,11 @@ all_types_peeled_off:
             AstStructType* stype = ((AstPolyStructType *) node)->base_struct;
             return symbol_raw_resolve(stype->scope, symbol);
         }
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstNode* callee = (AstNode *) ((AstPolyCallType *) node)->callee;
+            return try_symbol_raw_resolve_from_node(callee, symbol);
+        }
     }
 
     return NULL;

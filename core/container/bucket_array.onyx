@@ -45,6 +45,11 @@ clear :: (use b: ^Bucket_Array($T)) {
     array.clear(^buckets);
 }
 
+#operator [] macro (b: Bucket_Array($T), idx: i32) -> T {
+    get :: get
+    return get(^b, idx);
+}
+
 get :: (use b: ^Bucket_Array($T), idx: i32) -> T {
     bucket_index := idx / elements_per_bucket;
     elem_index   := idx % elements_per_bucket;
