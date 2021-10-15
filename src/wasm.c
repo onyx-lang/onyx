@@ -3386,6 +3386,18 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         break;
     }
 
+    case Ast_Kind_Size_Of: {
+        AstSizeOf* so = (AstSizeOf *) node;
+        *((u32 *) data) = so->size;
+        break;
+    }
+
+    case Ast_Kind_Align_Of: {
+        AstAlignOf* ao = (AstAlignOf *) node;
+        *((u32 *) data) = ao->alignment;
+        break;
+    }
+
     case Ast_Kind_NumLit: {
         // NOTE: This makes a big assumption that we are running on a
         // little endian machine, since WebAssembly is little endian

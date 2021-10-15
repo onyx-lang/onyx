@@ -1474,6 +1474,7 @@ CheckStatus check_size_of(AstSizeOf* so) {
         YIELD(so->token->pos, "Trying to resolve type to take the size of.");
 
     so->size = type_size_of(so->so_type);
+    so->flags |= Ast_Flag_Comptime;
 
     return Check_Success;
 }
@@ -1486,6 +1487,7 @@ CheckStatus check_align_of(AstAlignOf* ao) {
         YIELD(ao->token->pos, "Trying to resolve type to take the alignment of.");
 
     ao->alignment = type_alignment_of(ao->ao_type);
+    ao->flags |= Ast_Flag_Comptime;
 
     return Check_Success;
 }
