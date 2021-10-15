@@ -1806,7 +1806,10 @@ CheckStatus check_function(AstFunction* func) {
         if (status == Check_Error && func->generated_from && context.cycle_detected == 0)
             ERROR(func->generated_from->pos, "Error in polymorphic procedure generated from this location.");
 
-        if (status != Check_Success) return status;
+        if (status != Check_Success) {
+            expected_return_type = NULL;
+            return status;
+        }
     }
 
     if (*expected_return_type == &type_auto_return) {

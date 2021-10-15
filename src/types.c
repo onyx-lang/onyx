@@ -260,21 +260,24 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             func_type->Function.vararg_arg_pos = -1;
             func_type->Function.return_type = return_type;
 
-            if (param_count > 0)
+            if (param_count > 0) {
                 fori (i, 0, (i64) param_count) {
                     func_type->Function.params[i] = type_build_from_ast(alloc, ftype_node->params[i]);
 
                     // LEAK LEAK LEAK
                     if (func_type->Function.params[i] == NULL) return NULL;
                 }
+            }
 
             char* name = (char *) type_get_unique_name(func_type);
-            if (bh_table_has(u64, type_func_map, name)) {
-                u64 id = bh_table_get(u64, type_func_map, name);
-                Type* existing_type = (Type *) bh_imap_get(&type_map, id);
+            if (func_type->Function.return_type != &type_auto_return) {
+                if (bh_table_has(u64, type_func_map, name)) {
+                    u64 id = bh_table_get(u64, type_func_map, name);
+                    Type* existing_type = (Type *) bh_imap_get(&type_map, id);
 
-                // LEAK LEAK LEAK the func_type that is created
-                return existing_type;
+                    // LEAK LEAK LEAK the func_type that is created
+                    return existing_type;
+                }
             }
 
             type_register(func_type);
@@ -636,12 +639,14 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
 
     // CopyPaste from above in type_build_from_ast
     char* name = (char *) type_get_unique_name(func_type);
-    if (bh_table_has(u64, type_func_map, name)) {
-        u64 id = bh_table_get(u64, type_func_map, name);
-        Type* existing_type = (Type *) bh_imap_get(&type_map, id);
+    if (func_type->Function.return_type != &type_auto_return) {
+        if (bh_table_has(u64, type_func_map, name)) {
+            u64 id = bh_table_get(u64, type_func_map, name);
+            Type* existing_type = (Type *) bh_imap_get(&type_map, id);
 
-        // LEAK LEAK LEAK the func_type that is created
-        return existing_type;
+            // LEAK LEAK LEAK the func_type that is created
+            return existing_type;
+        }
     }
 
     type_register(func_type);

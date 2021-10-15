@@ -86,8 +86,10 @@ take_one :: (it: Iterator($T)) -> (T, bool) {
 //     ...iterater closed...
 // }
 #operator << macro (dest: Code, it: Iterator($T)) -> bool {
+    take_one :: take_one
+
     cont: bool;
-    (#insert dest), cont = (package core.iter).take_one(it);
+    (#insert dest), cont = take_one(it);
     return !cont;
 }
 
