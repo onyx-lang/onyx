@@ -16,8 +16,9 @@ typedef struct WasmFuncType {
     WasmType param_types[];
 } WasmFuncType;
 
-#define SIMD_INSTR_MASK 0x10000
-#define EXT_INSTR_MASK  0x20000
+#define SIMD_INSTR_MASK   0x10000
+#define EXT_INSTR_MASK    0x20000
+#define ATOMIC_INSTR_MASK 0x40000
 
 typedef enum WasmInstructionType {
     WI_UNREACHABLE                   = 0x00,
@@ -425,6 +426,7 @@ typedef enum WasmInstructionType {
     
     WI_MEMORY_COPY                   = EXT_INSTR_MASK | 0x0a,
     WI_MEMORY_FILL                   = EXT_INSTR_MASK | 0x0b,
+
 } WasmInstructionType;
 
 typedef union {

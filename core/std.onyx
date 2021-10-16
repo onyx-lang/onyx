@@ -52,3 +52,7 @@ package core
 #if runtime.Runtime != runtime.Runtime_Custom {
     #load "./stdio"
 }
+
+#if #defined(runtime.Allow_Multi_Threading) {
+    #load "./intrinsics/atomics"
+}

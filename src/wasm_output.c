@@ -406,6 +406,11 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
         bh_buffer_write_byte(buff, 0xFC);
         leb = uint_to_uleb128((u64) (instr->type &~ EXT_INSTR_MASK), &leb_len);
         bh_buffer_append(buff, leb, leb_len);
+
+    } else if (instr->type & ATOMIC_INSTR_MASK) {
+        bh_buffer_write_byte(buff, 0xFE);
+        leb = uint_to_uleb128((u64) (instr->type &~ ATOMIC_INSTR_MASK), &leb_len);
+        bh_buffer_append(buff, leb, leb_len);
         
     } else {
         bh_buffer_write_byte(buff, (u8) instr->type);

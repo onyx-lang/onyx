@@ -151,3 +151,39 @@ EMIT_FUNC(initialize_type, Type* type, OnyxToken* where) {
     
     *pcode = code;
 }
+
+EMIT_FUNC(intrinsic_atomic_wait, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_notify, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC_NO_ARGS(intrinsic_atomic_fence) {
+}
+
+EMIT_FUNC(intrinsic_atomic_load, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_store, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_add, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_sub, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_and, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_or, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_xor, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_xchg, Type* type, OnyxToken* where) {
+}
+
+EMIT_FUNC(intrinsic_atomic_cmpxchg, Type* type, OnyxToken* where) {
+}

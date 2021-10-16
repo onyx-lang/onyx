@@ -1,0 +1,26 @@
+package core.intrinsics.atomics
+
+#private_file {
+    runtime :: package Runtime
+
+    #if !#defined(runtime.Allow_Multi_Threading) {
+        #error "Multi-threading is not enabled so you cannot include the 'core.intrinsics.atomics' package."
+    }
+}
+
+// __atomic_wait is only valid for i32 and i64
+__atomic_wait   :: (addr: ^$T, value: T, timeout: i64 = 0) -> i32 #intrinsic ---
+__atomic_notify :: (addr: rawptr, maximum: i32 = 1) -> i32 #intrinsic ---
+
+__atomic_fence  :: () -> void #intrinsic ---
+
+// These are only valid for the eight integer types (i8, u8, i16, u16, i32, u32, i64, u64)
+__atomic_load    :: (addr: ^$T) -> T                       #intrinsic ---
+__atomic_store   :: (addr: ^$T, value: T) -> void          #intrinsic ---
+__atomic_add     :: (addr: ^$T, value: T) -> T             #intrinsic ---
+__atomic_sub     :: (addr: ^$T, value: T) -> T             #intrinsic ---
+__atomic_and     :: (addr: ^$T, value: T) -> T             #intrinsic ---
+__atomic_or      :: (addr: ^$T, value: T) -> T             #intrinsic ---
+__atomic_xor     :: (addr: ^$T, value: T) -> T             #intrinsic ---
+__atomic_xchg    :: (addr: ^$T, value: T) -> T             #intrinsic ---
+__atomic_cmpxchg :: (addr: ^$T, compare: T, value: T) -> T #intrinsic ---

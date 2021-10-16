@@ -332,6 +332,21 @@ static IntrinsicMap builtin_intrinsics[] = {
     { "f32x4_convert_i32x4_s",   ONYX_INTRINSIC_F32X4_CONVERT_I32X4_S },
     { "f32x4_convert_i32x4_u",   ONYX_INTRINSIC_F32X4_CONVERT_I32X4_U },
 
+    { "__atomic_wait",    ONYX_INTRINSIC_ATOMIC_WAIT    },
+    { "__atomic_notify",  ONYX_INTRINSIC_ATOMIC_NOTIFY  },
+
+    { "__atomic_fence",   ONYX_INTRINSIC_ATOMIC_FENCE   },
+
+    { "__atomic_load",    ONYX_INTRINSIC_ATOMIC_LOAD    },
+    { "__atomic_store",   ONYX_INTRINSIC_ATOMIC_STORE   },
+    { "__atomic_add",     ONYX_INTRINSIC_ATOMIC_ADD     },
+    { "__atomic_sub",     ONYX_INTRINSIC_ATOMIC_SUB     },
+    { "__atomic_and",     ONYX_INTRINSIC_ATOMIC_AND     },
+    { "__atomic_or",      ONYX_INTRINSIC_ATOMIC_OR      },
+    { "__atomic_xor",     ONYX_INTRINSIC_ATOMIC_XOR     },
+    { "__atomic_xchg",    ONYX_INTRINSIC_ATOMIC_XCHG    },
+    { "__atomic_cmpxchg", ONYX_INTRINSIC_ATOMIC_CMPXCHG },
+
     { NULL, ONYX_INTRINSIC_UNDEFINED },
 };
 
