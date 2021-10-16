@@ -1968,6 +1968,76 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
         case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_S:   WI(WI_F32X4_CONVERT_I32X4_S); break;
         case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_U:   WI(WI_F32X4_CONVERT_I32X4_U); break;
 
+        case ONYX_INTRINSIC_ATOMIC_WAIT: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_wait(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_NOTIFY: {
+            emit_intrinsic_atomic_notify(mod, &code);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_FENCE: {
+            emit_intrinsic_atomic_fence(mod, &code);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_LOAD: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_load(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_STORE: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_store(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_ADD: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_add(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_SUB: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_sub(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_AND: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_and(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_OR: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_or(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_XOR: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_xor(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_XCHG: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_xchg(mod, &code, atomic_type, call->token);
+            break;
+        }
+
+        case ONYX_INTRINSIC_ATOMIC_CMPXCHG: {
+            Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
+            emit_intrinsic_atomic_cmpxchg(mod, &code, atomic_type, call->token);
+            break;
+        }
+
         default: assert(("Unsupported intrinsic", 0));
     }
 

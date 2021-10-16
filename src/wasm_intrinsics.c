@@ -148,42 +148,265 @@ EMIT_FUNC(initialize_type, Type* type, OnyxToken* where) {
                     type_get_name(type)); 
             break;
     }
-    
+
     *pcode = code;
 }
 
 EMIT_FUNC(intrinsic_atomic_wait, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_WAIT32, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_WAIT64, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic wait, '%s'. Only i32 and i64 are supported.", type_get_name(type));
 }
 
-EMIT_FUNC(intrinsic_atomic_notify, Type* type, OnyxToken* where) {
+EMIT_FUNC_NO_ARGS(intrinsic_atomic_notify) {
+    bh_arr(WasmInstruction) code = *pcode;
+    WI(WI_ATOMIC_NOTIFY);
+    *pcode = code;
 }
 
 EMIT_FUNC_NO_ARGS(intrinsic_atomic_fence) {
+    bh_arr(WasmInstruction) code = *pcode;
+    WI(WI_ATOMIC_FENCE);
+    *pcode = code;
 }
 
 EMIT_FUNC(intrinsic_atomic_load, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_LOAD8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_LOAD16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_LOAD, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_LOAD, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic load, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_store, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_STORE8, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_STORE16, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_STORE, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_STORE, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic store, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_add, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_ADD8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_ADD16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_ADD, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_ADD, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic add, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_sub, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_SUB8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_SUB16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_SUB, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_SUB, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic sub, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_and, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_AND8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_AND16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_AND, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_AND, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic and, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_or, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_OR8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_OR16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_OR, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_OR, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic or, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_xor, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_XOR8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_XOR16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_XOR, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_XOR, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic xor, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_xchg, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_XCHG8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_XCHG16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_XCHG, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_XCHG, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic xchg, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
 
 EMIT_FUNC(intrinsic_atomic_cmpxchg, Type* type, OnyxToken* where) {
+    if (type->kind != Type_Kind_Basic) goto bad_type;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    switch (type->Basic.kind) {
+        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_CMPXCHG8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(WI_ATOMIC_I32_CMPXCHG16_U, ((WasmInstructionData) { 1, 0 })); break;
+
+        case Basic_Kind_I32:
+        case Basic_Kind_U32: WID(WI_ATOMIC_I32_CMPXCHG, ((WasmInstructionData) { 2, 0 })); break;
+
+        case Basic_Kind_I64:
+        case Basic_Kind_U64: WID(WI_ATOMIC_I64_CMPXCHG, ((WasmInstructionData) { 3, 0 })); break;
+
+        default: goto bad_type;
+    }
+
+    *pcode = code;
+    return;
+
+bad_type:
+    onyx_report_error(where->pos, "Bad type for atomic cmpxchg, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
