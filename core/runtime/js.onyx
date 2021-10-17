@@ -12,6 +12,9 @@ __exit          :: (status: i32) -> void #foreign "host" "exit" ---
 #export "_start" () {
     __runtime_initialize();
 
+    __tls_base = raw_alloc(context.allocator, __tls_size);
+    __stdio_init();
+
     args: [] cstr = .{ null, 0 };
     (package main).main(args);
 
@@ -24,14 +27,18 @@ __exit          :: (status: i32) -> void #foreign "host" "exit" ---
     #export "_thread_start" (func: (data: rawptr) -> void, data: rawptr) {
         __stack_top = raw_alloc(context.allocator, 1 << 20);
 
-        // Need to initialize thread-local variables here
+        __tls_base  = raw_alloc(context.allocator, __tls_size);
+        __stdio_init();
 
         func(data);
+
+        __flush_stdio();
     }
 
     #export "_thread_exit" (id: i32) {
         // raw_free(context.allocator, __stack_top);
-        
+        raw_free(context.allocator, __tls_base);
+
         thread.__exited(id);
     }
 }

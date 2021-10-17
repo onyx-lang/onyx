@@ -65,6 +65,7 @@ static AstTyped*      parse_global_declaration(OnyxParser* parser);
 static AstEnumType*   parse_enum_declaration(OnyxParser* parser);
 static AstMacro*      parse_macro(OnyxParser* parser);
 static AstIf*         parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statements);
+static AstMemRes*     parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 thread_local);
 static AstTyped*      parse_top_level_expression(OnyxParser* parser);
 static AstBinding*    parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol);
 static void           parse_top_level_statement(OnyxParser* parser);
@@ -1478,19 +1479,10 @@ static AstNode* parse_statement(OnyxParser* parser) {
             }
 
             if (parse_possible_directive(parser, "persist")) {
-                // :Duplicated from parse_top_level_statement
-                AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
-                memres->token = expect_token(parser, Token_Type_Symbol);
-                expect_token(parser, ':');
+                b32 thread_local = parse_possible_directive(parser, "threadlocal");
 
-                if (parser->curr->type != '=')
-                    memres->type_node = parse_type(parser);
-
-                if (consume_token_if_next(parser, '='))
-                    memres->initial_value = parse_expression(parser, 1);
-
-
-                ENTITY_SUBMIT(memres);
+                OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+                AstMemRes* memres = parse_memory_reservation(parser, symbol, thread_local);
 
                 AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
                 binding->token = memres->token;
@@ -2575,6 +2567,23 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
     return static_if_node;
 }
 
+static AstMemRes* parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 threadlocal) {
+    expect_token(parser, ':');
+
+    AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
+    memres->threadlocal = threadlocal;
+    memres->token = symbol;
+
+    if (parser->curr->type != '=')
+        memres->type_node = parse_type(parser);
+
+    if (consume_token_if_next(parser, '='))
+        memres->initial_value = parse_expression(parser, 1);
+
+    ENTITY_SUBMIT(memres);
+    return memres;
+}
+
 static AstMacro* parse_macro(OnyxParser* parser) {
     AstMacro* macro = make_node(AstMacro, Ast_Kind_Macro);
     macro->token = expect_token(parser, Token_Type_Keyword_Macro);
@@ -2759,9 +2768,10 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
         case Token_Type_Symbol: {
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
-            expect_token(parser, ':');
 
-            if (parser->curr->type == ':') {
+            if (next_tokens_are(parser, 2, ':', ':')) {
+                expect_token(parser, ':');
+
                 bh_arr_push(parser->current_symbol_stack, symbol);
                 binding = parse_top_level_binding(parser, symbol);
                 bh_arr_pop(parser->current_symbol_stack);
@@ -2771,17 +2781,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 goto submit_binding_to_entities;
             }
 
-            AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
-            memres->token = symbol;
-
-            if (parser->curr->type != '=')
-                memres->type_node = parse_type(parser);
-
-            if (consume_token_if_next(parser, '='))
-                memres->initial_value = parse_expression(parser, 1);
-
-
-            ENTITY_SUBMIT(memres);
+            AstMemRes* memres = parse_memory_reservation(parser, symbol, 0);
 
             binding = make_node(AstBinding, Ast_Kind_Binding);
             binding->token = symbol;
@@ -2896,6 +2896,17 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                 ENTITY_SUBMIT(tag);
                 return;
+            }
+            else if (parse_possible_directive(parser, "threadlocal")) {
+                OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+                AstMemRes* memres = parse_memory_reservation(parser, symbol, 1);
+
+                binding = make_node(AstBinding, Ast_Kind_Binding);
+                binding->token = symbol;
+                binding->flags |= private_kind;
+                binding->node = (AstNode *) memres;
+
+                goto submit_binding_to_entities;
             }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');

@@ -2048,6 +2048,11 @@ CheckStatus check_memres_type(AstMemRes* memres) {
 
 CheckStatus check_memres(AstMemRes* memres) {
     if (memres->initial_value != NULL) {
+        if (memres->threadlocal) {
+            onyx_report_error(memres->token->pos, "'#threadlocal' variables cannot have an initializer at the moment.");
+            return Check_Error;
+        }
+
         CHECK(expression, &memres->initial_value);
 
         if (memres->type != NULL) {

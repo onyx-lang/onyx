@@ -40,8 +40,12 @@ OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
 
 static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
 static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
+static OnyxToken builtin_tls_base_token   = { Token_Type_Symbol, 10, "__tls_base ",  { 0 } };
+static OnyxToken builtin_tls_size_token   = { Token_Type_Symbol, 10, "__tls_size ",  { 0 } };
 AstNumLit builtin_heap_start  = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
 AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
+AstGlobal builtin_tls_base    = { Ast_Kind_Global, 0, &builtin_tls_base_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
+AstGlobal builtin_tls_size    = { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &basic_type_u32, NULL };
 
 AstType  *builtin_string_type;
 AstType  *builtin_range_type;
@@ -83,6 +87,8 @@ const BuiltinSymbol builtin_symbols[] = {
 
     { "builtin", "__heap_start", (AstNode *) &builtin_heap_start },
     { "builtin", "__stack_top",  (AstNode *) &builtin_stack_top },
+    { "builtin", "__tls_base",   (AstNode *) &builtin_tls_base },
+    { "builtin", "__tls_size",   (AstNode *) &builtin_tls_size },
 
     { NULL, NULL, NULL },
 };

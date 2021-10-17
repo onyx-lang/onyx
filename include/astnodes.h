@@ -867,8 +867,14 @@ struct AstTypeOf {
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
 struct AstAlias         { AstTyped_base; AstTyped* alias; };
-struct AstMemRes        { AstTyped_base; u64 addr; AstTyped *initial_value; };
 struct AstInclude       { AstNode_base; char* name; };
+struct AstMemRes        {
+    AstTyped_base;
+    u64 addr;
+    AstTyped *initial_value;
+
+    b32 threadlocal : 1;
+};
 struct AstGlobal        {
     AstTyped_base;
 
@@ -1337,6 +1343,8 @@ extern AstBasicType basic_type_auto_return;
 extern OnyxToken builtin_package_token;
 extern AstNumLit builtin_heap_start;
 extern AstGlobal builtin_stack_top;
+extern AstGlobal builtin_tls_base;
+extern AstGlobal builtin_tls_size;
 extern AstType  *builtin_string_type;
 extern AstType  *builtin_range_type;
 extern Type     *builtin_range_type_type;

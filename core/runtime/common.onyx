@@ -29,8 +29,6 @@ __runtime_initialize :: () {
     context.temp_allocator = alloc.temp_allocator;
     context.assert_handler = __assert_handler;
 
-    __stdio_init();
-
     #if Multi_Threading_Enabled {
         thread.__initialize();
     }

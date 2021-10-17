@@ -2117,6 +2117,13 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
 EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
     bh_arr(WasmInstruction) code = *pcode;
     WID(WI_PTR_CONST, memres->addr);
+
+    if (memres->threadlocal) {
+        u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_tls_base);
+        WIL(WI_GLOBAL_GET, tls_base_idx);
+        WI(WI_PTR_ADD);
+    }
+
     *pcode = code;
 }
 
@@ -2480,7 +2487,7 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
 
         case Ast_Kind_Memres: {
             AstMemRes* memres = (AstMemRes *) expr;
-            WID(WI_PTR_CONST, memres->addr);
+            emit_memory_reservation_location(mod, &code, memres);
             *offset_return = 0;
             break;
         }
@@ -2778,7 +2785,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Memres: {
             AstMemRes* memres = (AstMemRes *) expr;
-            WID(WI_I32_CONST, memres->addr);
+            emit_memory_reservation_location(mod, &code, memres);
             emit_load_instruction(mod, &code, memres->type, 0);
             break;
         }
@@ -3321,8 +3328,10 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
 
     bh_arr_set_at(module->globals, global_idx - module->foreign_global_count, glob);
 
-    if (global->flags & Ast_Flag_Global_Stack_Top)
+    if (global == &builtin_stack_top)
         module->stack_top_ptr = &module->globals[global_idx - module->foreign_global_count].initial_value[0].data.i1;
+    if (global == &builtin_tls_size)
+        module->tls_size_ptr  = &module->globals[global_idx - module->foreign_global_count].initial_value[0].data.i1;
 }
 
 static void emit_foreign_global(OnyxWasmModule* module, AstGlobal* global) {
@@ -3538,24 +3547,31 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
         return;
     }
 
-    u32 offset = mod->next_datum_offset;
-    bh_align(offset, alignment);
+    if (memres->threadlocal) {
+        memres->addr = mod->next_tls_offset;
+        bh_align(memres->addr, alignment);
+        mod->next_tls_offset = memres->addr + size;
+
+    } else {
+        memres->addr = mod->next_datum_offset;
+        bh_align(memres->addr, alignment);
+        mod->next_datum_offset = memres->addr + size;
+    }
 
     if (memres->initial_value != NULL) {
+        assert(!memres->threadlocal);
+
         u8* data = bh_alloc(global_heap_allocator, size);
         emit_raw_data(mod, data, memres->initial_value);
 
         WasmDatum datum = {
-            .offset = offset,
+            .offset = memres->addr,
             .length = size,
             .data = data,
         };
 
         bh_arr_push(mod->data, datum);
     }
-
-    memres->addr = offset;
-    mod->next_datum_offset = offset + size;
 }
 
 static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
@@ -3648,6 +3664,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .data = NULL,
         .next_datum_offset = 32, // Starting offset so null pointers don't immediately
                                  // break constant data.       - brendanfh 2020/12/16
+
+        .next_tls_offset = 0,
 
         .elems = NULL,
         .next_elem_idx = 0,
