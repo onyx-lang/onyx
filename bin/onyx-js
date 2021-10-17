@@ -46,13 +46,23 @@ const ENV = {
 if (isMainThread) {
     wasm_bytes = fs.readFileSync(process.argv[2]);
 
+    let multi_threaded = false;
+    if (process.argv.length >= 3 && process.argv[3] == "multi") {
+        multi_threaded = true;
+    }
+
     // main thread
-    wasm_memory = new WebAssembly.Memory({ initial: 1024, maximum: 65536, shared: true });
-    ENV.onyx.memory = wasm_memory;
+    if (multi_threaded) {
+        wasm_memory = new WebAssembly.Memory({ initial: 1024, maximum: 65536, shared: true });
+        ENV.onyx.memory = wasm_memory;
+    }
 
     WebAssembly.instantiate(new Uint8Array(wasm_bytes), ENV)
         .then(res => {
             wasm_instance = res.instance;
+            if (!multi_threaded) {
+                wasm_memory = wasm_instance.exports.memory;
+            }
 
             const lib = res.instance.exports;
             lib._start();
