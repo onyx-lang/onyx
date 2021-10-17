@@ -30,6 +30,8 @@ __exit          :: (status: i32) -> void #foreign "host" "exit" ---
     }
 
     #export "_thread_exit" (id: i32) {
+        // raw_free(context.allocator, __stack_top);
+        
         thread.__exited(id);
     }
 }

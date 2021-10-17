@@ -9,7 +9,7 @@ package core.intrinsics.atomics
 }
 
 // __atomic_wait is only valid for i32 and i64
-__atomic_wait   :: (addr: ^$T, value: T, timeout: i64 = 0) -> i32 #intrinsic ---
+__atomic_wait   :: (addr: ^$T, value: T, timeout: i64 = -1) -> i32 #intrinsic ---
 __atomic_notify :: (addr: rawptr, maximum: i32 = 1) -> i32 #intrinsic ---
 
 __atomic_fence  :: () -> void #intrinsic ---

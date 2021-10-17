@@ -1,6 +1,7 @@
 package core.thread
 
 use package core
+use package core.intrinsics.atomics
 
 #private {
     thread_mutex   : sync.Mutex;
@@ -28,7 +29,7 @@ spawn :: (t: ^Thread, func: (rawptr) -> void, data: rawptr) {
 }
 
 join :: (t: ^Thread) {
-    while t.alive ---;
+    while t.alive do __atomic_wait(^t.id, t.id);
 }
 
 __initialize :: () {
@@ -41,6 +42,8 @@ __exited :: (id: i32) {
     thread := thread_map->get(id);
     if thread != null {
         thread.alive = false;
+        __atomic_notify(^thread.id);
+        
         thread_map->delete(id);
     }
 }

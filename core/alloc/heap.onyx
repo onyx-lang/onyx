@@ -15,7 +15,7 @@ Enable_Debug :: false
 
 #if runtime.Multi_Threading_Enabled {
     sync :: package core.sync
-    
+
     heap_mutex: sync.Mutex
 }
 
