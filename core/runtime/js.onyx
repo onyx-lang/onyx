@@ -19,13 +19,17 @@ __exit          :: (status: i32) -> void #foreign "host" "exit" ---
 }
 
 #if Multi_Threading_Enabled {
-    __spawn_thread :: (func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "host" "spawn_thread" ---
+    __spawn_thread :: (id: i32, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "host" "spawn_thread" ---
 
     #export "_thread_start" (func: (data: rawptr) -> void, data: rawptr) {
-        // Do thread initialization stuff...
-        // Just has to setup a stack frame for itself
         __stack_top = raw_alloc(context.allocator, 1 << 20);
 
+        // Need to initialize thread-local variables here
+
         func(data);
+    }
+
+    #export "_thread_exit" (id: i32) {
+        thread.__exited(id);
     }
 }

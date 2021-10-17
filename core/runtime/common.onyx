@@ -30,5 +30,9 @@ __runtime_initialize :: () {
     context.assert_handler = __assert_handler;
 
     __stdio_init();
+
+    #if Multi_Threading_Enabled {
+        thread.__initialize();
+    }
 }
 

@@ -1,0 +1,35 @@
+package core.sync
+
+use package core.intrinsics.atomics
+
+Mutex :: struct {
+    lock  : i32;
+    // owner : Thread_Id;
+}
+
+mutex_init :: (m: ^Mutex) {
+    m.lock = 0;
+}
+
+mutex_destroy :: (m: ^Mutex) {
+    m.lock = -1;
+}
+
+mutex_lock :: (m: ^Mutex) {
+    while __atomic_cmpxchg(^m.lock, 0, 1) == 1 {
+        __atomic_wait(^m.lock, 0);
+    }
+}
+
+mutex_unlock :: (m: ^Mutex) {
+    __atomic_store(^m.lock, 0);
+    __atomic_notify(^m.lock, maximum = 1);
+}
+
+scoped_mutex :: macro (m: ^Mutex) {
+    ml :: mutex_lock
+    mu :: mutex_unlock
+
+    ml(m);
+    defer mu(m);
+}

@@ -1,0 +1,49 @@
+package core.thread
+
+use package core
+
+#private {
+    thread_mutex   : sync.Mutex;
+    next_thread_id := 1;
+    thread_map     : Map(Thread_ID, ^Thread);
+}
+
+Thread_ID :: #type i32
+
+Thread :: struct {
+    id    : Thread_ID;
+    alive : bool;
+}
+
+spawn :: (t: ^Thread, func: (rawptr) -> void, data: rawptr) {
+    sync.scoped_mutex(^thread_mutex);
+
+    t.id    = next_thread_id;
+    t.alive = true;
+    next_thread_id += 1;
+
+    thread_map->put(t.id, t);
+
+    runtime.__spawn_thread(t.id, func, data);
+}
+
+join :: (t: ^Thread) {
+    while t.alive ---;
+}
+
+__initialize :: () {
+    thread_map->init();
+}
+
+__exited :: (id: i32) {
+    sync.scoped_mutex(^thread_mutex);
+
+    thread := thread_map->get(id);
+    if thread != null {
+        thread.alive = false;
+        thread_map->delete(id);
+    }
+}
+
+#private_file runtime :: package runtime
+

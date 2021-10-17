@@ -53,6 +53,8 @@ package core
     #load "./stdio"
 }
 
-#if #defined(runtime.Allow_Multi_Threading) {
+#if runtime.Multi_Threading_Enabled {
     #load "./intrinsics/atomics"
+    #load "./sync/mutex"
+    #load "./threads/thread"
 }
