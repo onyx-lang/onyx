@@ -1,0 +1,37 @@
+package core.sync
+
+use package core.intrinsics.atomics
+
+Semaphore :: struct {
+    mutex   : Mutex;
+    counter : i32;
+}
+
+semaphore_init :: (s: ^Semaphore, value: i32) {
+    s.counter = value;
+
+    mutex_init(^s.mutex);
+}
+
+semaphore_post :: (s: ^Semaphore) {
+    scoped_mutex(^s.mutex);
+    s.counter += 1;
+    __atomic_notify(^s.counter, maximum = 1);
+}
+
+semaphore_wait :: (s: ^Semaphore) {
+    while true {
+        mutex_lock(^s.mutex);
+        if s.counter > 0 {
+            s.counter -= 1;
+
+            mutex_unlock(^s.mutex);
+            return;
+
+        } else {
+            mutex_unlock(^s.mutex);
+
+            __atomic_wait(^s.counter, 0);
+        }
+    }
+}
