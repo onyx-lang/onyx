@@ -14,7 +14,9 @@ Enable_Debug :: false
 #load "core/intrinsics/wasm"
 
 #if runtime.Multi_Threading_Enabled {
-    heap_mutex: sync.Mutex;
+    sync :: package core.sync
+    
+    heap_mutex: sync.Mutex
 }
 
 init :: () {
@@ -42,7 +44,6 @@ get_watermark :: () => cast(u32) heap_state.next_alloc;
     memory  :: package core.memory
     math    :: package core.math
     runtime :: package runtime
-    sync    :: package core.sync
 
     uintptr :: #type u32
 
@@ -191,7 +192,7 @@ get_watermark :: () => cast(u32) heap_state.next_alloc;
 
     heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
         if ptr == null do return null;
-        
+
         #if runtime.Multi_Threading_Enabled {
             sync.scoped_mutex(^heap_mutex);
         }

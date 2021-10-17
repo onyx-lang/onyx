@@ -186,8 +186,8 @@ To-Do list for threading capability in the browser:
     [X] Change initialization process for main thread / worker threads
         - _thread_start
     [X] Write the JS glue code that will ship with the multi-threaded binary
-    [ ] Write basic threading primatives like mutex and semaphore
-    [ ] Make heap and printf take a mutex
+    [X] Write basic threading primatives like mutex and semaphore
+    [X] Make heap and printf take a mutex
 
     [ ] LATER: add thread-local variables
         - Have a new global that is the TLS base pointer
