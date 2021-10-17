@@ -3263,8 +3263,8 @@ static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
     WasmImport import = {
         .kind = WASM_FOREIGN_FUNCTION,
         .idx  = type_idx,
-        .mod  = fd->foreign_module,
-        .name = fd->foreign_name,
+        .mod  = bh_aprintf(global_heap_allocator, "%b", fd->foreign_module->text, fd->foreign_module->length),
+        .name = bh_aprintf(global_heap_allocator, "%b", fd->foreign_name->text, fd->foreign_name->length),
     };
 
     bh_arr_push(mod->imports, import);
@@ -3332,8 +3332,8 @@ static void emit_foreign_global(OnyxWasmModule* module, AstGlobal* global) {
         WasmImport import = {
             .kind = WASM_FOREIGN_GLOBAL,
             .idx  = global_type,
-            .mod  = global->foreign_module,
-            .name = global->foreign_name,
+            .mod  = bh_aprintf(global_heap_allocator, "%b", global->foreign_module->text, global->foreign_module->length),
+            .name = bh_aprintf(global_heap_allocator, "%b", global->foreign_name->text, global->foreign_name->length),
         };
 
         bh_arr_push(module->imports, import);
@@ -3696,14 +3696,28 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.local_allocations, 4);
     bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
 
-    WasmExport mem_export = {
-        .kind = WASM_FOREIGN_MEMORY,
-        .idx = 0,
-    };
-    // :ArbitraryConstant
-    // :WasmMemory
-    bh_table_put(WasmExport, module.exports, "memory", mem_export);
-    module.export_count++;
+    if (context.options->use_multi_threading) {
+        WasmImport mem_import = {
+            .kind   = WASM_FOREIGN_MEMORY,
+            .min    = 1024,
+            .max    = 65536, // NOTE: Why not use all 4 Gigs of memory?
+            .shared = 1,
+
+            .mod    = "onyx",
+            .name   = "memory",
+        };
+
+        bh_arr_push(module.imports, mem_import);
+
+    } else {
+        WasmExport mem_export = {
+            .kind = WASM_FOREIGN_MEMORY,
+            .idx = 0,
+        };
+
+        bh_table_put(WasmExport, module.exports, "memory", mem_export);
+        module.export_count++;
+    }
 
     return module;
 }

@@ -3,8 +3,8 @@ package core.intrinsics.atomics
 #private_file {
     runtime :: package runtime
 
-    #if !#defined(runtime.Allow_Multi_Threading) {
-        // #error "Multi-threading is not enabled so you cannot include the 'core.intrinsics.atomics' package."
+    #if !runtime.Multi_Threading_Enabled {
+        #error "Multi-threading is not enabled so you cannot include the 'core.intrinsics.atomics' package."
     }
 }
 

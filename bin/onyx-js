@@ -1,29 +1,80 @@
 #!/usr/bin/env node
 
+const { Worker, isMainThread, parentPort, workerData } = require("worker_threads");
 const fs = require('fs');
-const buf = fs.readFileSync(process.argv[2]);
 
+let wasm_bytes;
 let wasm_instance;
+let wasm_memory;
 
 const ENV = {
+    onyx: { memory: null },
+
     host: {
         print_str(ptr, len) {
-            const data = new Uint8Array(wasm_instance.exports.memory.buffer, ptr, len);
+            const data = new Uint8Array(wasm_memory.buffer, ptr, len);
             const str  = new TextDecoder().decode(data);
             process.stdout.write(str);
         },
 
         exit(status) {
             process.exit(status);
-        }
-    }   
+        },
+
+        spawn_thread(funcidx, dataptr) {
+            try {
+                const worker = new Worker(__filename, {
+                    workerData: {
+                        memory: wasm_memory,
+                        wasm_bytes: wasm_bytes,
+                        funcidx: funcidx,
+                        dataptr: dataptr,
+                    },
+                });
+
+                /*worker.on("exit", (code) => {
+                    console.log("THREAD STOPPED");
+                });
+                */
+
+                return 1;
+
+            } catch (e) {
+                console.error(e);
+                return 0;
+            }
+        },
+    }
 }
 
-WebAssembly.instantiate(new Uint8Array(buf), ENV)
-    .then(res => {
-        wasm_instance = res.instance;
+if (isMainThread) {
+    wasm_bytes = fs.readFileSync(process.argv[2]);
 
-        const lib = res.instance.exports;
-        lib._start();
-    });
+    // main thread
+    wasm_memory = new WebAssembly.Memory({ initial: 1024, maximum: 65536, shared: true });
+    ENV.onyx.memory = wasm_memory;
+
+    WebAssembly.instantiate(new Uint8Array(wasm_bytes), ENV)
+        .then(res => {
+            wasm_instance = res.instance;
+
+            const lib = res.instance.exports;
+            lib._start();
+        });
+
+} else {
+    let { memory, wasm_bytes, funcidx, dataptr } = workerData;
+
+    ENV.onyx.memory = memory;
+    wasm_memory = memory;
+
+    // worker thread
+    WebAssembly.instantiate(new Uint8Array(wasm_bytes), ENV)
+        .then(res => {
+            wasm_instance = res.instance;
+
+            const lib = res.instance.exports;
+            lib._thread_start(funcidx, dataptr);
+        });
+}
 

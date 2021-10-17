@@ -1270,6 +1270,7 @@ struct CompileOptions {
     b32 no_file_contents        : 1;
     
     b32 use_post_mvp_features : 1;
+    b32 use_multi_threading   : 1;
 
     Runtime runtime;
 

@@ -41,7 +41,7 @@ OnyxToken builtin_package_token = { Token_Type_Symbol, 7, "builtin ", { 0 } };
 static OnyxToken builtin_heap_start_token = { Token_Type_Symbol, 12, "__heap_start ", { 0 } };
 static OnyxToken builtin_stack_top_token  = { Token_Type_Symbol, 11, "__stack_top ",  { 0 } };
 AstNumLit builtin_heap_start  = { Ast_Kind_NumLit, Ast_Flag_Const, &builtin_heap_start_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL, 0 };
-AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Const | Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
+AstGlobal builtin_stack_top   = { Ast_Kind_Global, Ast_Flag_Global_Stack_Top,  &builtin_stack_top_token, NULL, NULL, (AstType *) &basic_type_rawptr, NULL };
 
 AstType  *builtin_string_type;
 AstType  *builtin_range_type;
@@ -447,4 +447,8 @@ void introduce_build_options(bh_allocator a) {
 
     AstNumLit* runtime_type = make_int_literal(a, context.options->runtime);
     symbol_builtin_introduce(p->scope, "Runtime", (AstNode *) runtime_type);
+
+    AstNumLit* multi_threaded = make_int_literal(a, context.options->use_multi_threading);
+    multi_threaded->type_node = (AstType *) &basic_type_bool;
+    symbol_builtin_introduce(p->scope, "Multi_Threading_Enabled", (AstNode *) multi_threaded);
 }

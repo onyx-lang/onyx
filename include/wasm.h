@@ -564,8 +564,14 @@ typedef struct WasmExport {
 
 typedef struct WasmImport {
     WasmForeignKind kind;
-    i32 idx;
-    OnyxToken *mod, *name;
+    union {
+        i32 idx;
+        struct {
+            i32 min, max;
+            b32 shared;
+        };
+    };
+    char *mod, *name;
 } WasmImport;
 
 typedef struct WasmDatum {

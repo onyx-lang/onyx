@@ -648,7 +648,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
 
     if ((binop->left->flags & Ast_Flag_Const) != 0 && binop->left->type != NULL)
         ERROR_(binop->token->pos,
-                "Cannot assign to constant '%b.'.",
+                "Cannot assign to constant '%b'.",
                 binop->left->token->text, binop->left->token->length);
 
     if (binop->operation == Binary_Op_Assign) {

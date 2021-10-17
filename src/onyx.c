@@ -37,20 +37,21 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
     "Flags:\n"
     "\t<input files>           List of initial files\n"
-    "\t-o <target_file>        Specify the target file (default: out.wasm)\n"
+    "\t-o <target_file>        Specify the target file (default: out.wasm).\n"
     "\t--runtime, -r <runtime> Specifies a runtime. Can be: wasi, js, custom.\n"
-    "\t--verbose, -V           Verbose output\n"
-    "\t           -VV          Very verbose output\n"
-    "\t           -VVV         Very very verbose output (to be used by compiler developers)\n"
-    "\t--use-post-mvp-features Enables post MVP WASM features such as memory.copy and memory.fill\n"
+    "\t--verbose, -V           Verbose output.\n"
+    "\t           -VV          Very verbose output.\n"
+    "\t           -VVV         Very very verbose output (to be used by compiler developers).\n"
+    "\t--use-post-mvp-features Enables post MVP WASM features.\n"
     "\t--doc <doc_file>\n"
+    "\t--use-multi-threading   Enables multi-threading for this compilation.\n"
     "\n"
     "Developer flags:\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
     "\t--print-static-if-results Prints the conditional result of each #if statement. Useful for debugging.\n"
     "\t--print-notes             Prints the location of notes throughout the loaded code.\n"
-    "\t--no-colors               Disables colors in the error message\n"
-    "\t--no-file-contents        Disables '#file_contents' for security\n"
+    "\t--no-colors               Disables colors in the error message.\n"
+    "\t--no-file-contents        Disables '#file_contents' for security.\n"
     "\n";
 
 
@@ -62,8 +63,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .verbose_output          = 0,
         .fun_output              = 0,
         .print_function_mappings = 0,
-        .use_post_mvp_features   = 0,
         .no_file_contents        = 0,
+
+        .use_post_mvp_features   = 0,
+        .use_multi_threading     = 0,
 
         .runtime = Runtime_Wasi,
 
@@ -116,6 +119,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--use-post-mvp-features")) {
                 options.use_post_mvp_features = 1;
+            }
+            else if (!strcmp(argv[i], "--use-multi-threading")) {
+                options.use_multi_threading = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);

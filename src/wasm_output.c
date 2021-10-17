@@ -47,11 +47,15 @@ static i32 output_name(const char* start, i32 length, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
-static i32 output_limits(i32 min, i32 max, bh_buffer* buff) {
+static i32 output_limits(i32 min, i32 max, b32 shared, bh_buffer* buff) {
     i32 leb_len, prev_len = buff->length;
     u8* leb;
+
+    u8 mem_type = 0x00;
+    if (max >= 0) mem_type |= 0x01;
+    if (shared)   mem_type |= 0x02;
     
-    bh_buffer_write_byte(buff, (max >= 0) ? 0x01 : 0x00);
+    bh_buffer_write_byte(buff, mem_type);
     
     leb = uint_to_uleb128((u64) min, &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -148,7 +152,7 @@ static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
     
     // NOTE: funcrefs are the only valid table element type
     bh_buffer_write_byte(&vec_buff, 0x70);
-    output_limits(bh_arr_length(module->elems), -1, &vec_buff);
+    output_limits(bh_arr_length(module->elems), -1, 0, &vec_buff);
     
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -160,6 +164,8 @@ static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
+    if (context.options->use_multi_threading) return 0;
+
     i32 prev_len = buff->length;
     bh_buffer_write_byte(buff, WASM_SECTION_ID_MEMORY);
     
@@ -173,7 +179,7 @@ static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
     // FIXME: This needs to be dynamically chosen depending on the size of
     // the data section and stack size pre-requeseted.
     // :WasmMemory
-    output_limits(1024, -1, &vec_buff);
+    output_limits(1024, -1, 0, &vec_buff);
     
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -227,16 +233,29 @@ static i32 output_importsection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
     
     bh_arr_each(WasmImport, import, module->imports) {
-        output_name(import->mod->text, import->mod->length, &vec_buff);
-        output_name(import->name->text, import->name->length, &vec_buff);
+        output_name(import->mod, strlen(import->mod), &vec_buff);
+        output_name(import->name, strlen(import->name), &vec_buff);
         bh_buffer_write_byte(&vec_buff, (u8) import->kind);
-        
-        leb = uint_to_uleb128((u64) import->idx, &leb_len);
-        bh_buffer_append(&vec_buff, leb, leb_len);
-        
-        if (import->kind == WASM_FOREIGN_GLOBAL) {
-            // NOTE: All foreign globals are mutable
-            bh_buffer_write_byte(&vec_buff, 0x01);
+
+        switch (import->kind) {
+            case WASM_FOREIGN_FUNCTION:
+                leb = uint_to_uleb128((u64) import->idx, &leb_len);
+                bh_buffer_append(&vec_buff, leb, leb_len);
+                break;
+
+            case WASM_FOREIGN_GLOBAL:
+                leb = uint_to_uleb128((u64) import->idx, &leb_len);
+                bh_buffer_append(&vec_buff, leb, leb_len);
+
+                // NOTE: All foreign globals are mutable
+                bh_buffer_write_byte(&vec_buff, 0x01);
+                break;
+
+            case WASM_FOREIGN_MEMORY:
+                output_limits(import->min, import->max, import->shared, &vec_buff);
+                break;
+
+            case WASM_FOREIGN_TABLE: assert(0);
         }
     }
     
