@@ -43,7 +43,7 @@ __exited :: (id: i32) {
     if thread != null {
         thread.alive = false;
         __atomic_notify(^thread.id);
-        
+
         thread_map->delete(id);
     }
 }
