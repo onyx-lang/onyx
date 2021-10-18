@@ -22,9 +22,6 @@ __exit :: (status: i32) do proc_exit(status);
 // Sets up everything needed for execution.
 #export "_start" () {
     __runtime_initialize();
-    
-    __tls_base = raw_alloc(context.allocator, __tls_size);
-    __stdio_init();
 
     args : [] cstr;
     argv_buf_size : Size;

@@ -1479,7 +1479,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
             }
 
             if (parse_possible_directive(parser, "persist")) {
-                b32 thread_local = parse_possible_directive(parser, "threadlocal");
+                b32 thread_local = parse_possible_directive(parser, "thread_local");
 
                 OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
                 AstMemRes* memres = parse_memory_reservation(parser, symbol, thread_local);
@@ -2897,7 +2897,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(tag);
                 return;
             }
-            else if (parse_possible_directive(parser, "threadlocal")) {
+            else if (parse_possible_directive(parser, "thread_local")) {
                 OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
                 AstMemRes* memres = parse_memory_reservation(parser, symbol, 1);
 

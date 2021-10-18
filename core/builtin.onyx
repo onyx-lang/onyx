@@ -70,14 +70,7 @@ OnyxContext :: struct {
     }
 }
 
-// @Robustness
-// Currently, because the only compilation target is WebAssembly, which is only
-// single threaded for the moment, it is safe to store the context in a global
-// variable. If other compilations targets are added, or if WebAssembly standardizes
-// a multi-threading proposal, this context will need to be changed. Either it will
-// need to be a thread-local variable, or it needs to be implicitly passed as the
-// first parameter to ALL procedures in a compilation unit.
-context : OnyxContext;
+#thread_local context : OnyxContext;
 
 assert :: (cond: bool, msg: str, site := #callsite) {
     if !cond do context.assert_handler(msg, site);

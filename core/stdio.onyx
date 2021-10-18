@@ -100,7 +100,7 @@ byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 // Private and internal things
 //
 
-#threadlocal stdio : struct {
+#thread_local stdio : struct {
     print_stream : io.DynamicStringStream;
     print_writer : io.Writer;
 }
