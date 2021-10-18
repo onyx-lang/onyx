@@ -24,7 +24,7 @@ barrier_destroy :: (b: ^Barrier) {
 }
 
 barrier_wait :: (b: ^Barrier) {
-    scoped_mutex(^b.mutex);
+    mutex_lock(^b.mutex);
 
     local_gen := b.generation;
     b.index += 1;
@@ -41,5 +41,7 @@ barrier_wait :: (b: ^Barrier) {
     b.index = 0;
     b.generation += 1;
     condition_broadcast(^b.cond);
+    
+    mutex_unlock(^b.mutex);
     return;
 }
