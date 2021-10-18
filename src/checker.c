@@ -801,6 +801,9 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     Type* ltype = binop->left->type;
     Type* rtype = binop->right->type;
 
+    if (ltype == NULL) YIELD(binop->token->pos, "Waiting for left-type to be known.");
+    if (rtype == NULL) YIELD(binop->token->pos, "Waiting for right-type to be known.");
+
     if (ltype->kind == Type_Kind_Pointer) ltype = &basic_types[Basic_Kind_Rawptr];
     if (rtype->kind == Type_Kind_Pointer) rtype = &basic_types[Basic_Kind_Rawptr];
 

@@ -1,0 +1,20 @@
+package ouit
+
+/*
+
+Ouit ("Wheat") - The Onyx User-Interface Template
+
+An all-encompassing user-interface template for Onyx program thats makes
+it easy to setup a web-based user interface.
+
+*/
+
+#load "core/std"
+
+#load "modules/bmfont/module"
+#load "modules/immediate_mode/module"
+#load "modules/js_events/module"
+#load "modules/ui/module"
+#load "modules/webgl2/module"
+
+#load "./ouit"

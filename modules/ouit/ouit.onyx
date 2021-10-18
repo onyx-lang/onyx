@@ -1,0 +1,45 @@
+package ouit
+
+#private_file {
+    gl     :: package gl
+    gfx    :: package immediate_mode
+    events :: package js_events
+}
+
+start :: () -> void #foreign "ouit" "loop" ---
+
+init :: (canvas_name: str,
+    he: typeof ouit_handle_event,
+    u:  typeof ouit_update,
+    d:  typeof ouit_draw) {
+
+    gl.init(canvas_name);
+    events.init();
+    gfx.immediate_renderer_init();
+
+    ouit_handle_event = he;
+    ouit_update       = u;
+    ouit_draw         = d;
+}
+
+#private {
+    ouit_handle_event : (^events.Event) -> void;
+    ouit_update       : (dt: f32)       -> void;
+    ouit_draw         : ()              -> void;
+}
+
+#export "ouit_loop" () {
+    time_now :: () -> i32 #foreign "ouit" "time_now" --- ;
+
+    #persist last_time := 0;
+    if last_time == 0 do last_time = time_now();
+
+    now := time_now();
+    dt  := cast(f32) (now - last_time) / 1000.0f;
+    last_time = now;
+
+    for event: events.consume() do ouit_handle_event(event);
+
+    ouit_update(dt);
+    ouit_draw();
+}
