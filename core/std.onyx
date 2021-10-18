@@ -55,6 +55,11 @@ package core
 
 #if runtime.Multi_Threading_Enabled {
     #load "./intrinsics/atomics"
+
     #load "./sync/mutex"
+    #load "./sync/condition_variable"
+    #load "./sync/semaphore"
+    #load "./sync/barrier"
+
     #load "./threads/thread"
 }

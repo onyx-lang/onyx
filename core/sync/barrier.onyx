@@ -1,0 +1,45 @@
+package core.sync
+
+Barrier :: struct {
+    mutex : Mutex;
+    cond  : Condition_Variable;
+
+    index        : i32;
+    generation   : i32;
+    thread_count : i32;
+}
+
+barrier_init :: (b: ^Barrier, thread_count: i32) {
+    mutex_init(^b.mutex);
+    condition_init(^b.cond);
+
+    b.index = 0;
+    b.generation = 0;
+    b.thread_count = thread_count;
+}
+
+barrier_destroy :: (b: ^Barrier) {
+    mutex_destroy(^b.mutex);
+    condition_destroy(^b.cond);
+}
+
+barrier_wait :: (b: ^Barrier) {
+    scoped_mutex(^b.mutex);
+
+    local_gen := b.generation;
+    b.index += 1;
+
+    if b.index < b.thread_count {
+        mutex_unlock(^b.mutex);
+
+        while local_gen == b.generation && b.index < b.thread_count {
+            condition_wait(^b.cond);
+        }
+        return;
+    }
+
+    b.index = 0;
+    b.generation += 1;
+    condition_broadcast(^b.cond);
+    return;
+}

@@ -13,6 +13,10 @@ semaphore_init :: (s: ^Semaphore, value: i32) {
     mutex_init(^s.mutex);
 }
 
+semaphore_destroy :: (s: ^Semaphore) {
+    mutex_destroy(^s.mutex);
+}
+
 semaphore_post :: (s: ^Semaphore) {
     scoped_mutex(^s.mutex);
     s.counter += 1;

@@ -1,0 +1,56 @@
+package core.sync
+
+// TODO: Free the semaphores after they are used.
+
+Condition_Variable :: struct {
+    Node :: struct {
+        semaphore : Semaphore;
+        next      : ^Node;
+    }
+
+    mutex: Mutex;
+    queue: ^Node;
+}
+
+condition_init :: (c: ^Condition_Variable) {
+    mutex_init(^c.mutex);
+    c.queue = null;
+}
+
+condition_destroy :: (c: ^Condition_Variable) {
+    if c.queue != null do condition_broadcast(c);
+
+    mutex_destroy(^c.mutex);
+}
+
+condition_wait :: (c: ^Condition_Variable) {
+    self: Condition_Variable.Node;
+
+    critical_section(^c.mutex, #code {
+        self.next = c.queue;
+        c.queue   = ^self;
+        semaphore_init(^self.semaphore, 0);
+    });
+
+    semaphore_wait(^self.semaphore);
+}
+
+condition_signal :: (c: ^Condition_Variable) {
+    scoped_mutex(^c.mutex);
+
+    if c.queue != null {
+        semaphore_post(^c.queue.semaphore);
+        semaphore_destroy(^c.queue.semaphore);
+        c.queue = c.queue.next;
+    }
+}
+
+condition_broadcast :: (c: ^Condition_Variable) {
+    scoped_mutex(^c.mutex);
+
+    while c.queue != null {
+        semaphore_post(^c.queue.semaphore);
+        semaphore_destroy(^c.queue.semaphore);
+        c.queue = c.queue.next;
+    }
+}

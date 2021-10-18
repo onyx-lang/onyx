@@ -4,6 +4,8 @@ use package core
 use package core.intrinsics.atomics
 
 #private {
+    runtime :: package runtime
+
     thread_mutex   : sync.Mutex;
     next_thread_id := 1;
     thread_map     : Map(Thread_ID, ^Thread);
@@ -48,5 +50,4 @@ __exited :: (id: i32) {
     }
 }
 
-#private_file runtime :: package runtime
 
