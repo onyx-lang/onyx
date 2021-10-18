@@ -501,7 +501,33 @@ static i32 onyx_compile() {
     if (context.options->verbose_output)
         bh_printf("Outputting to WASM file:   %s\n", output_file.filename);
 
-    onyx_wasm_module_write_to_file(context.wasm_module, output_file);
+    // APPARENTLY... the WebAssembly Threading proposal says that the data segment initializations
+    // in a WASM module are copied into the linear memory EVERY time the module is instantiated, not
+    // just the first time. This means that if we are happily chugging along and modifying global state
+    // and then we spawn a thread, that thread will completely wipe all changes to the global and return
+    // it to its original state. This is horrible obviously, but the only thing that is more horrible is
+    // that the best way around this is to create a second WASM module that simply initializes the given
+    // data section. Then have a section module that is actually your code. For right now, this is going
+    // to be fine since the browser is really the only place that multi-threading can be used to any
+    // degree of competency. But still... This is god awful and I hope that there is some other way to
+    // around this down the line.
+    if (context.options->use_multi_threading) {
+        bh_file data_file;
+        if (bh_file_create(&data_file, bh_aprintf(global_scratch_allocator, "%s.data", context.options->target_file)) != BH_FILE_ERROR_NONE)
+            return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;
+
+        OnyxWasmModule* data_module = bh_alloc_item(global_heap_allocator, OnyxWasmModule);
+        *data_module = onyx_wasm_module_create(global_heap_allocator);
+
+        data_module->data = context.wasm_module->data;
+        context.wasm_module->data = NULL;
+
+        onyx_wasm_module_write_to_file(data_module, data_file);
+        onyx_wasm_module_write_to_file(context.wasm_module, output_file);
+
+    } else {
+        onyx_wasm_module_write_to_file(context.wasm_module, output_file);
+    }
 
     u64 duration = bh_time_duration(start_time);
     
@@ -519,10 +545,6 @@ static i32 onyx_compile() {
         docs.format = Doc_Format_Human;
         onyx_docs_emit(&docs, context.options->documentation_file);
     }
-
-#if 0
-    types_dump_type_info();
-#endif
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
