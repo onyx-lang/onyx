@@ -56,6 +56,8 @@ OnyxContext :: struct {
     logger         : Logger = .{ default_logger, null };
 
     assert_handler : (msg: str, site: CallSite) -> void;
+
+    thread_id      : i32;
 }
 
 #if runtime.Runtime != runtime.Runtime_Custom {

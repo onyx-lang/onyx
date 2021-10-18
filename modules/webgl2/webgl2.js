@@ -15,9 +15,7 @@ window.ONYX_MODULES.push({
     module_name: "gl",
 
     init(name, namelen) {
-        const decoder = new TextDecoder();
-        const str = new Uint8Array(window.ONYX_MEMORY.buffer, name, namelen);
-        const canvasname = decoder.decode(str);
+        const canvasname = onyx_decode_text(name, namelen);
 
         canvas = document.getElementById(canvasname);
         if (canvas == null) return 0;
@@ -207,9 +205,7 @@ window.ONYX_MODULES.push({
     },
     // getAttachedShaders() { console.log("NOT IMPLEMENTED!"); },
     getAttribLocation(program, name, namelen) {
-        const decoder = new TextDecoder();
-        const str = new Uint8Array(window.ONYX_MEMORY.buffer, name, namelen);
-        const attribname = decoder.decode(str);
+        const attribname = onyx_decode_text(name, namelen);
 
         return gl.getAttribLocation(programs[program], attribname);
     },
@@ -224,9 +220,7 @@ window.ONYX_MODULES.push({
     getShaderParameter(shader, param) { return gl.getShaderParameter(shaders[shader], param); },
     getProgramParameter(program, param) { return gl.getProgramParameter(programs[program], param); },
     getUniformLocation(program, name, namelen) {
-        const decoder = new TextDecoder();
-        const str = new Int8Array(window.ONYX_MEMORY.buffer, name, namelen);
-        const uniname = decoder.decode(str);
+        const uniname = onyx_decode_text(name, namelen);
 
         uniformlocs.push(gl.getUniformLocation(programs[program], uniname));
         return uniformlocs.length - 1;
@@ -261,9 +255,7 @@ window.ONYX_MODULES.push({
     scissor(x, y, width, height) { gl.scissor(x, y, width, height); },
     setSize(width, height) { canvas.width = width; canvas.height = height; },
     shaderSource(shader, source, sourcelen) {
-        const decoder = new TextDecoder();
-        const str = new Int8Array(window.ONYX_MEMORY.buffer, source, sourcelen);
-        const sourcedata = decoder.decode(str);
+        const sourcedata = onyx_decode_text(source, sourcelen);
 
         gl.shaderSource(shaders[shader], sourcedata);
     },

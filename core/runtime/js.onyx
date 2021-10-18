@@ -4,13 +4,14 @@ package runtime
 
 use package core
 
-__output_string :: (s: str) -> u32 #foreign "host" "print_str" ---
+__output_string :: (s: str)      -> u32  #foreign "host" "print_str" ---
 __exit          :: (status: i32) -> void #foreign "host" "exit" ---
 
 // The builtin _start proc.
 // Sets up everything needed for execution.
 #export "_start" () {
     __runtime_initialize();
+    context.thread_id = 0;
 
     args: [] cstr = .{ null, 0 };
     (package main).main(args);
@@ -21,9 +22,11 @@ __exit          :: (status: i32) -> void #foreign "host" "exit" ---
 #if Multi_Threading_Enabled {
     __spawn_thread :: (id: i32, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "host" "spawn_thread" ---
 
-    #export "_thread_start" (func: (data: rawptr) -> void, data: rawptr) {
+    #export "_thread_start" (id: i32, func: (data: rawptr) -> void, data: rawptr) {
         __stack_top = raw_alloc(alloc.heap_allocator, 1 << 20);
         __thread_initialize();
+
+        context.thread_id = id;
 
         func(data);
 

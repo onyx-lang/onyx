@@ -176,7 +176,7 @@ bad_type:
 
 EMIT_FUNC_NO_ARGS(intrinsic_atomic_notify) {
     bh_arr(WasmInstruction) code = *pcode;
-    WI(WI_ATOMIC_NOTIFY);
+    WID(WI_ATOMIC_NOTIFY, ((WasmInstructionData) { 2, 0 }));
     *pcode = code;
 }
 

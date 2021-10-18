@@ -87,7 +87,7 @@ if (isMainThread) {
             wasm_instance = res.instance;
 
             const lib = res.instance.exports;
-            lib._thread_start(funcidx, dataptr);
+            lib._thread_start(thread_id, funcidx, dataptr);
             lib._thread_exit(thread_id);
         });
 }

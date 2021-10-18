@@ -66,7 +66,7 @@ window.ONYX_MODULES.push({
             if (ev.altKey)   modifiers |= 0x02;
             if (ev.metaKey)  modifiers |= 0x04;
             if (ev.shiftKey) modifiers |= 0x08;
-            
+
             push_event_to_buffer(esp, event_size, 0x05, [ ev.keyCode, modifiers ]);
 
             var keyname = ev.code;
@@ -141,8 +141,9 @@ window.ONYX_MODULES.push({
     request_file(esp, event_size, filename_ptr, filename_len, fileid) {
         esp /= 4;
 
-        var path_memory = new Uint8Array(ONYX_MEMORY.buffer, filename_ptr, filename_len);
-        var path = new TextDecoder("utf-8").decode(path_memory);
+        var data_view   = new DataView(ONYX_MEMORY.buffer);
+        var path        = "";
+        for (var i = 0; i < filename_len; i++) path += String.fromCharCode(data_view.getUint8(filename_ptr + i));
         console.log(`Requesting file '${path}'`);
 
         fetch(path)
