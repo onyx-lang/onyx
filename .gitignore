@@ -2,7 +2,6 @@
 *.o
 tags
 *.wasm
-*.html
 session.vim
 *.sublime-project
 *.sublime-workspace

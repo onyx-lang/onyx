@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>OUIT</title>
+
+        <style>
+        html, body, canvas {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: black;
+        }
+        </style>
+
+        <script type="application/onyx" multi-threaded="true" data="ouit.wasm.data" src="ouit.wasm"></script>
+        <script type="text/javascript" src="modules/webgl2/webgl2.js"></script>
+        <script type="text/javascript" src="modules/js_events/js_events.js"></script>
+        <script type="text/javascript" src="modules/ouit/ouit.js"></script>
+        <script type="text/javascript" src="js/onyx-loader.js"></script>
+
+        <script>window.ONYX_THREAD_SCRIPT = "js/onyx-thread.js";</script>
+    </head>
+
+    <body>
+        <canvas id="main_canvas">This browser does not support the Canvas API.</canvas>
+    </body>
+</html>

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ONYX_FOLDER="$HOME/dev/c/onyx"
+[ -z "$ONYX_FOLDER" ] && ONYX_FOLDER="$HOME/dev/c/onyx"
 
 [ ! -s "./modules" ]    && ln -s "$ONYX_FOLDER/modules" $(pwd)/modules
 [ ! -s "./js" ]         && ln -s "$ONYX_FOLDER/bin"     $(pwd)/js
