@@ -1357,6 +1357,7 @@ extern AstType  *builtin_callsite_type;
 extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
 extern AstTyped *type_table_node;
+extern AstFunction *builtin_initialize_data_segments;
 
 typedef struct BuiltinSymbol {
     char*    package;

@@ -410,3 +410,21 @@ EMIT_FUNC(intrinsic_atomic_cmpxchg, Type* type, OnyxToken* where) {
 bad_type:
     onyx_report_error(where->pos, "Bad type for atomic cmpxchg, '%s'. Only u8, u16, u32, i32, u64, and i64 are supported.", type_get_name(type));
 }
+
+EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
+    if (!context.options->use_multi_threading || !context.options->use_post_mvp_features) return;
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    i32 index = 0;
+    bh_arr_each(WasmDatum, datum, mod->data) {
+        WID(WI_PTR_CONST,   datum->offset);
+        WID(WI_PTR_CONST,   0);
+        WID(WI_I32_CONST,   datum->length);
+        WID(WI_MEMORY_INIT, ((WasmInstructionData) { index, 0 }));
+
+        index += 1;
+    }
+
+    *pcode = code;
+}

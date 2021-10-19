@@ -432,8 +432,8 @@ void initialize_builtins(bh_allocator a) {
         return;
     }
 
-    builtin_initialize_data_segments = (AstType *) symbol_raw_resolve(p->scope, "__initialize_data_segments");
-    if (builtin_code_type == NULL) {
+    builtin_initialize_data_segments = (AstFunction *) symbol_raw_resolve(p->scope, "__initialize_data_segments");
+    if (builtin_initialize_data_segments == NULL || builtin_initialize_data_segments->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, "'__initialize_data_segments' procedure not found in builtin package.");
         return;
     }

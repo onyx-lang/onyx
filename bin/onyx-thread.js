@@ -31,7 +31,7 @@ self.onmessage = function (msg) {
     WebAssembly.instantiate(new Uint8Array(data.wasm_bytes), import_object)
     .then(function(res) {
         self.ONYX_MEMORY = data.memory;
-        
+
         res.instance.exports._thread_start(data.thread_id, data.funcidx, data.dataptr);
         res.instance.exports._thread_exit(data.thread_id);
     });

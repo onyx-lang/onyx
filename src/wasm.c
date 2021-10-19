@@ -3176,25 +3176,20 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     i32 type_idx = generate_type_idx(mod, fd->type);
 
-    WasmFunc wasm_func = {
-        .type_idx = type_idx,
-        .locals = {
-            .param_count = 0,
-
-            .allocated = { 0 },
-            .freed     = { 0 },
-
-            .max_stack = 0,
-            .curr_stack = 0,
-        },
-        .code = NULL,
-    };
+    WasmFunc wasm_func = { 0 };
+    wasm_func.type_idx = type_idx;
 
     bh_arr_new(mod->allocator, wasm_func.code, 4);
 
     i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) fd);
 
-    // If there is no body then don't process the code
+    if (fd == builtin_initialize_data_segments) {
+        emit_initialize_data_segments_body(mod, &wasm_func.code);
+        bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+        bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
+        return;
+    }
+
     if (fd->body != NULL) {
         // NOTE: Generate the local map
         u64 localidx = 0;
@@ -3253,13 +3248,11 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     WasmFuncType* ft = mod->types[type_idx];
     emit_zero_value(mod, &wasm_func.code, ft->return_type);
-
     bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
 
-    bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
-
-    // NOTE: Clear the local map on exit of generating this function
     bh_imap_clear(&mod->local_map);
+
+    bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
 }
 
 static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {

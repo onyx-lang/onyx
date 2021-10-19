@@ -56,14 +56,10 @@ if (isMainThread) {
         wasm_memory = new WebAssembly.Memory({ initial: 1024, maximum: 32768, shared: true });
         ENV.onyx.memory = wasm_memory;
 
-        let data_module_bytes = fs.readFileSync(process.argv[2] + ".data");
-        WebAssembly.instantiate(new Uint8Array(data_module_bytes), ENV)
-            .then(_ => {
-                WebAssembly.instantiate(new Uint8Array(wasm_bytes), ENV)
-                    .then(res => {
-                        wasm_instance = res.instance;
-                        wasm_instance.exports._start();
-                    });
+        WebAssembly.instantiate(new Uint8Array(wasm_bytes), ENV)
+            .then(res => {
+                wasm_instance = res.instance;
+                wasm_instance.exports._start();
             });
 
     } else {

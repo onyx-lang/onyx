@@ -148,7 +148,7 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
         // for forever.
         use package core.intrinsics.onyx { __initialize }
         if initialize do __initialize(res);
-        
+
         return res;
     }
 
@@ -206,5 +206,5 @@ Code :: struct {_:i32;}
 // This procedure is a special compiler generated procedure that initializes all the data segments
 // in the program. It should only be called once, by the main thread, at the start of execution. It
 // is undefined behaviour if it is called more than once.
-__initialize_data_segments :: () -> i32 ---
+__initialize_data_segments :: () -> void ---
 

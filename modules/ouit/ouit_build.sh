@@ -6,5 +6,5 @@
 [ ! -s "./js" ]         && ln -s "$ONYX_FOLDER/bin"     $(pwd)/js
 [ ! -f "./index.html" ] && cp "$ONYX_FOLDER/modules/ouit/index.html" .
 
-onyx -r js -V --use-multi-threading --use-post-mvp-features -o ouit.wasm "$1"
+onyx -r js -V --use-multi-threading -o ouit.wasm "$1"
 

@@ -65,7 +65,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .print_function_mappings = 0,
         .no_file_contents        = 0,
 
-        .use_post_mvp_features   = 0,
+        .use_post_mvp_features   = 1,
         .use_multi_threading     = 0,
 
         .runtime = Runtime_Wasi,
@@ -119,6 +119,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--use-post-mvp-features")) {
                 options.use_post_mvp_features = 1;
+            }
+            else if (!strcmp(argv[i], "--mvp-features-only")) {
+                options.use_post_mvp_features = 0;
             }
             else if (!strcmp(argv[i], "--use-multi-threading")) {
                 options.use_multi_threading = 1;
@@ -511,7 +514,7 @@ static i32 onyx_compile() {
     // to be fine since the browser is really the only place that multi-threading can be used to any
     // degree of competency. But still... This is god awful and I hope that there is some other way to
     // around this down the line.
-    if (context.options->use_multi_threading) {
+    if (context.options->use_multi_threading && !context.options->use_post_mvp_features) {
         bh_file data_file;
         if (bh_file_create(&data_file, bh_aprintf(global_scratch_allocator, "%s.data", context.options->target_file)) != BH_FILE_ERROR_NONE)
             return ONYX_COMPILER_PROGRESS_FAILED_OUTPUT;

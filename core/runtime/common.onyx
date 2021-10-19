@@ -20,6 +20,8 @@ __assert_handler :: (msg: str, site: CallSite) {
 }
 
 __runtime_initialize :: () {
+    __initialize_data_segments();
+
     alloc.init();
     __thread_initialize();
 

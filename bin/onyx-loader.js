@@ -78,9 +78,9 @@ function launch_onyx_program(script_path, call_start) {
     });
 }
 
-function launch_multi_threaded_onyx_program(script_path, data_path, call_start) {
-    Promise.all([fetch(script_path), fetch(data_path)])
-    .then(function(xs) { return Promise.all([xs[0].arrayBuffer(), xs[1].arrayBuffer()]); })
+function launch_multi_threaded_onyx_program(script_path, call_start) {
+    fetch(script_path)
+    .then(function(res) { return res.arrayBuffer(); })
     .then(function(data) {
         var import_object = {};
 
@@ -90,15 +90,12 @@ function launch_multi_threaded_onyx_program(script_path, data_path, call_start) 
 
         import_object["onyx"] = { memory: new WebAssembly.Memory({ initial: 1024, maximum: 65536, shared: true }) };
         window.ONYX_MEMORY = import_object["onyx"]["memory"];
-        window.ONYX_BYTES  = data[0];
+        window.ONYX_BYTES  = data;
 
-        WebAssembly.instantiate(data[1], import_object)
-        .then(function (data_module) {
-            WebAssembly.instantiate(data[0], import_object)
-            .then(function (code_module) {
-                window.ONYX_INSTANCE = code_module.instance;
-                code_module.instance.exports._start();
-            });
+        WebAssembly.instantiate(data, import_object)
+        .then(function (code_module) {
+            window.ONYX_INSTANCE = code_module.instance;
+            code_module.instance.exports._start();
         });
     });
 }
@@ -109,7 +106,7 @@ window.onload = function() {
     for (var i = 0; i < script_tags.length; i++) {
         if (script_tags[i].getAttribute("type") == "application/onyx") {
             if (script_tags[i].getAttribute("multi-threaded")) {
-                launch_multi_threaded_onyx_program(script_tags[i].getAttribute("src"), script_tags[i].getAttribute("data"), true);
+                launch_multi_threaded_onyx_program(script_tags[i].getAttribute("src"), true);
             } else {
                 launch_onyx_program(script_tags[i].getAttribute("src"), true);
             }
