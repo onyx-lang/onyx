@@ -189,9 +189,13 @@ To-Do list for threading capability in the browser:
     [X] Write basic threading primatives like mutex and semaphore
     [X] Make heap and printf take a mutex
 
-    [ ] LATER: add thread-local variables
+    [X] LATER: add thread-local variables
         - Have a new global that is the TLS base pointer
         - Any global variable (memres) tagged with #threadlocal will be placed in a block with the
           base pointer being the new global
         - The global is initialized to a heap allocated block at the start of each thread
 
+Optimize the generation of multi-threaded modules when post-mvp features are enabled:
+    [X] memory.init intrinsic
+    [ ] atomatic generation of initializers for all data segments
+    [ ] emit datacount section

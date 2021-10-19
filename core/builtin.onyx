@@ -201,3 +201,10 @@ Code :: struct {_:i32;}
 #if #defined((package core.set).Set) {
     Set :: (package core.set).Set;
 }
+
+
+// This procedure is a special compiler generated procedure that initializes all the data segments
+// in the program. It should only be called once, by the main thread, at the start of execution. It
+// is undefined behaviour if it is called more than once.
+__initialize_data_segments :: () -> i32 ---
+

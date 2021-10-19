@@ -471,6 +471,7 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
             bh_buffer_append(buff, leb, leb_len);
             break;
         
+        case WI_MEMORY_INIT:
         case WI_MEMORY_COPY:
             leb = uint_to_uleb128((u64) instr->data.i1, &leb_len);
             bh_buffer_append(buff, leb, leb_len);

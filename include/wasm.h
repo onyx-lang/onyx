@@ -424,6 +424,7 @@ typedef enum WasmInstructionType {
     WI_F32X4_CONVERT_I32X4_U         = SIMD_INSTR_MASK | 251,
     
     
+    WI_MEMORY_INIT                   = EXT_INSTR_MASK | 0x08,
     WI_MEMORY_COPY                   = EXT_INSTR_MASK | 0x0a,
     WI_MEMORY_FILL                   = EXT_INSTR_MASK | 0x0b,
 

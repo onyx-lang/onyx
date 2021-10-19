@@ -59,7 +59,8 @@ AstType  *builtin_callsite_type;
 AstType  *builtin_any_type;
 AstType  *builtin_code_type;
 
-AstTyped *type_table_node = NULL;
+AstFunction *builtin_initialize_data_segments = NULL;
+AstTyped    *type_table_node = NULL;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -428,6 +429,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_code_type = (AstType *) symbol_raw_resolve(p->scope, "Code");
     if (builtin_code_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, "'Code' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_initialize_data_segments = (AstType *) symbol_raw_resolve(p->scope, "__initialize_data_segments");
+    if (builtin_code_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'__initialize_data_segments' procedure not found in builtin package.");
         return;
     }
 
