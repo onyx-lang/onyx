@@ -284,6 +284,14 @@ window.ONYX_MODULES.push({
     uniform3i(loc, x, y, z) { gl.uniform3i(uniformlocs[loc], x, y, z); },
     uniform4f(loc, x, y, z, w) { gl.uniform4f(uniformlocs[loc], x, y, z, w); },
     uniform4i(loc, x, y, z, w) { gl.uniform4i(uniformlocs[loc], x, y, z, w); },
+    uniform1iv(loc, valueptr, valuelen) { gl.uniform1iv(uniformlocs[loc], new Int32Array(window.ONYX_MEMORY.buffer,   valueptr, valuelen)); },
+    uniform1fv(loc, valueptr, valuelen) { gl.uniform1fv(uniformlocs[loc], new Float32Array(window.ONYX_MEMORY.buffer, valueptr, valuelen)); },
+    uniform2iv(loc, valueptr, valuelen) { gl.uniform2iv(uniformlocs[loc], new Int32Array(window.ONYX_MEMORY.buffer,   valueptr, valuelen * 2)); },
+    uniform2fv(loc, valueptr, valuelen) { gl.uniform2fv(uniformlocs[loc], new Float32Array(window.ONYX_MEMORY.buffer, valueptr, valuelen * 2)); },
+    uniform3iv(loc, valueptr, valuelen) { gl.uniform3iv(uniformlocs[loc], new Int32Array(window.ONYX_MEMORY.buffer,   valueptr, valuelen * 3)); },
+    uniform3fv(loc, valueptr, valuelen) { gl.uniform3fv(uniformlocs[loc], new Float32Array(window.ONYX_MEMORY.buffer, valueptr, valuelen * 3)); },
+    uniform4iv(loc, valueptr, valuelen) { gl.uniform4iv(uniformlocs[loc], new Int32Array(window.ONYX_MEMORY.buffer,   valueptr, valuelen * 4)); },
+    uniform4fv(loc, valueptr, valuelen) { gl.uniform4fv(uniformlocs[loc], new Float32Array(window.ONYX_MEMORY.buffer, valueptr, valuelen * 4)); },
     uniformMatrix2(loc, transpose, valueptr) {
         const data = new Float32Array(window.ONYX_MEMORY.buffer, valueptr, 4);
         gl.uniformMatrix2fv(uniformlocs[loc], transpose, data);

@@ -844,6 +844,14 @@ uniform3f                      :: (loc: GLUniformLocation, x: GLfloat, y: GLfloa
 uniform3i                      :: (loc: GLUniformLocation, x: GLint, y: GLint, z: GLint) -> void #foreign "gl" "uniform3i" ---
 uniform4f                      :: (loc: GLUniformLocation, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) -> void #foreign "gl" "uniform4f" ---
 uniform4i                      :: (loc: GLUniformLocation, x: GLint, y: GLint, z: GLint, w: GLint) -> void #foreign "gl" "uniform4i" ---
+uniform1iv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform1iv" ---
+uniform1fv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform1fv" ---
+uniform2iv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform2iv" ---
+uniform2fv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform2fv" ---
+uniform3iv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform3iv" ---
+uniform3fv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform3fv" ---
+uniform4iv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform4iv" ---
+uniform4fv                     :: (loc: GLUniformLocation, v: [] void) -> void #foreign "gl" "uniform4fv" ---
 uniformMatrix2                 :: (loc: GLUniformLocation, transpose: GLboolean, value: GLMat2) -> void #foreign "gl" "uniformMatrix2" ---
 uniformMatrix3                 :: (loc: GLUniformLocation, transpose: GLboolean, value: GLMat3) -> void #foreign "gl" "uniformMatrix3" ---
 uniformMatrix4                 :: (loc: GLUniformLocation, transpose: GLboolean, value: GLMat4) -> void #foreign "gl" "uniformMatrix4" ---

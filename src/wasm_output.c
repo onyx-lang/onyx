@@ -633,7 +633,7 @@ static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     bh_arr_each(WasmDatum, datum, module->data) {
-        if (datum->data == NULL) continue;
+        assert(datum->data != NULL);
 
         i32 memory_flags = 0x00;
         if (context.options->use_multi_threading) memory_flags |= 0x01;

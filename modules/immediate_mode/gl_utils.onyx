@@ -47,37 +47,6 @@ Shader :: struct {
         texture_uniform = gl.getUniformLocation(program, "u_texture");
         view_uniform    = gl.getUniformLocation(program, "u_view");
         world_uniform   = gl.getUniformLocation(program, "u_world");
-
-        compile_shader :: (source: str, shader_type: gl.GLenum) -> (gl.GLShader, bool) {
-            shader := gl.createShader(shader_type);
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-
-            success := true;
-            if gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0 {
-                println("Error compiling shader.");
-                gl.printShaderInfoLog(shader);
-                success = false;
-            }
-
-            return shader, success;
-        }
-
-        link_program :: (vertex_shader: gl.GLShader, fragment_shader: gl.GLShader) -> (gl.GLProgram, bool) {
-            program := gl.createProgram();
-            gl.attachShader(program, vertex_shader);
-            gl.attachShader(program, fragment_shader);
-            gl.linkProgram(program);
-
-            success := true;
-            if gl.getProgramParameter(program, gl.LINK_STATUS) == 0 {
-                println("Error linking program.");
-                gl.printProgramInfoLog(program);
-                success = false;
-            }
-
-            return program, success;
-        }
     }
 
     free :: (use shader: ^Shader) {
@@ -85,3 +54,33 @@ Shader :: struct {
     }
 }
 
+compile_shader :: (source: str, shader_type: gl.GLenum) -> (gl.GLShader, bool) {
+    shader := gl.createShader(shader_type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    success := true;
+    if gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0 {
+        println("Error compiling shader.");
+        gl.printShaderInfoLog(shader);
+        success = false;
+    }
+
+    return shader, success;
+}
+
+link_program :: (vertex_shader: gl.GLShader, fragment_shader: gl.GLShader) -> (gl.GLProgram, bool) {
+    program := gl.createProgram();
+    gl.attachShader(program, vertex_shader);
+    gl.attachShader(program, fragment_shader);
+    gl.linkProgram(program);
+
+    success := true;
+    if gl.getProgramParameter(program, gl.LINK_STATUS) == 0 {
+        println("Error linking program.");
+        gl.printProgramInfoLog(program);
+        success = false;
+    }
+
+    return program, success;
+}
