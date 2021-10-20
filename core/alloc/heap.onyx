@@ -77,9 +77,7 @@ get_watermark :: () => cast(u32) heap_state.next_alloc;
     heap_alloc :: (size_: u32, align: u32) -> rawptr {
         if size_ == 0 do return null;
 
-        #if runtime.Multi_Threading_Enabled {
-            sync.scoped_mutex(^heap_mutex);
-        }
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
 
         size := size_ + sizeof heap_block;
         size = math.max(size, sizeof heap_freed_block);
@@ -152,9 +150,7 @@ get_watermark :: () => cast(u32) heap_state.next_alloc;
 
     heap_free :: (ptr: rawptr) {
         #if Enable_Debug do assert(ptr != null, "Trying to free a null pointer.");
-        #if runtime.Multi_Threading_Enabled {
-            sync.scoped_mutex(^heap_mutex);
-        }
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
 
         hb_ptr := cast(^heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
         #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
@@ -193,14 +189,12 @@ get_watermark :: () => cast(u32) heap_state.next_alloc;
     heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
         if ptr == null do return null;
 
-        #if runtime.Multi_Threading_Enabled {
-            sync.scoped_mutex(^heap_mutex);
-        }
+        #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
 
         new_size := new_size_ + sizeof heap_block;
         new_size = math.max(new_size, sizeof heap_freed_block);
         new_size = ~~memory.align(cast(u64) new_size, ~~align);
-        
+
         hb_ptr := cast(^heap_allocated_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
         #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on resize.");
         hb_ptr.size &= ~Allocated_Flag;

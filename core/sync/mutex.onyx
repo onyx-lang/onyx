@@ -30,6 +30,7 @@ mutex_destroy :: (m: ^Mutex) {
 
 mutex_lock :: (m: ^Mutex) {
     while __atomic_cmpxchg(^m.lock, 0, 1) == 1 {
+        if m.owner == context.thread_id do return;
         __atomic_wait(^m.lock, 1);
     }
 

@@ -147,10 +147,16 @@ CheckStatus check_if(AstIfWhile* ifnode) {
         }
 
         if (static_if_resolution(ifnode)) {
-            if (ifnode->true_stmt != NULL) CHECK(statement, (AstNode **) &ifnode->true_stmt);
+            if (ifnode->true_stmt != NULL) {
+                CHECK(statement, (AstNode **) &ifnode->true_stmt);
+                ifnode->true_stmt->rules = Block_Rule_Macro;
+            }
 
         } else {
-            if (ifnode->false_stmt != NULL) CHECK(statement, (AstNode **) &ifnode->false_stmt);
+            if (ifnode->false_stmt != NULL) {
+                CHECK(statement, (AstNode **) &ifnode->false_stmt);
+                ifnode->false_stmt->rules = Block_Rule_Macro;
+            }
         }
 
     } else {
