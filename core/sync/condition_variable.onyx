@@ -32,9 +32,9 @@ condition_wait :: (c: ^Condition_Variable, m: ^Mutex) {
     semaphore_init(^node.semaphore, 0);
     mutex_unlock(^c.mutex);
 
-    mutex_unlock(m);
+    if m != null do mutex_unlock(m);
     semaphore_wait(^node.semaphore);
-    mutex_lock(m);
+    if m != null do mutex_lock(m);
 }
 
 condition_signal :: (c: ^Condition_Variable) {

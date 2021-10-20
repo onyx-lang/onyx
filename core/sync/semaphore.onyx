@@ -18,9 +18,11 @@ semaphore_destroy :: (s: ^Semaphore) {
 }
 
 semaphore_post :: (s: ^Semaphore, count := 1) {
+    if count == 0 do return;
+    
     scoped_mutex(^s.mutex);
     s.counter += count;
-    __atomic_notify(^s.counter, maximum = 1);
+    __atomic_notify(^s.counter, maximum = count);
 }
 
 semaphore_wait :: (s: ^Semaphore) {
