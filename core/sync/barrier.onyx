@@ -25,15 +25,14 @@ barrier_destroy :: (b: ^Barrier) {
 
 barrier_wait :: (b: ^Barrier) {
     mutex_lock(^b.mutex);
+    defer mutex_unlock(^b.mutex);
 
     local_gen := b.generation;
     b.index += 1;
 
     if b.index < b.thread_count {
-        mutex_unlock(^b.mutex);
-
         while local_gen == b.generation && b.index < b.thread_count {
-            condition_wait(^b.cond);
+            condition_wait(^b.cond, ^b.mutex);
         }
         return;
     }
@@ -41,7 +40,5 @@ barrier_wait :: (b: ^Barrier) {
     b.index = 0;
     b.generation += 1;
     condition_broadcast(^b.cond);
-    
-    mutex_unlock(^b.mutex);
     return;
 }

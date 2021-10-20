@@ -17,9 +17,9 @@ semaphore_destroy :: (s: ^Semaphore) {
     mutex_destroy(^s.mutex);
 }
 
-semaphore_post :: (s: ^Semaphore) {
+semaphore_post :: (s: ^Semaphore, count := 1) {
     scoped_mutex(^s.mutex);
-    s.counter += 1;
+    s.counter += count;
     __atomic_notify(^s.counter, maximum = 1);
 }
 

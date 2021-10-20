@@ -23,16 +23,18 @@ condition_destroy :: (c: ^Condition_Variable) {
     mutex_destroy(^c.mutex);
 }
 
-condition_wait :: (c: ^Condition_Variable) {
-    self: Condition_Variable.Node;
+condition_wait :: (c: ^Condition_Variable, m: ^Mutex) {
+    node: Condition_Variable.Node;
 
-    critical_section(^c.mutex, #code {
-        self.next = c.queue;
-        c.queue   = ^self;
-        semaphore_init(^self.semaphore, 0);
-    });
+    mutex_lock(^c.mutex);
+    node.next = c.queue;
+    c.queue   = ^node;
+    semaphore_init(^node.semaphore, 0);
+    mutex_unlock(^c.mutex);
 
-    semaphore_wait(^self.semaphore);
+    mutex_unlock(m);
+    semaphore_wait(^node.semaphore);
+    mutex_lock(m);
 }
 
 condition_signal :: (c: ^Condition_Variable) {
@@ -40,7 +42,6 @@ condition_signal :: (c: ^Condition_Variable) {
 
     if c.queue != null {
         semaphore_post(^c.queue.semaphore);
-        semaphore_destroy(^c.queue.semaphore);
         c.queue = c.queue.next;
     }
 }
@@ -50,7 +51,6 @@ condition_broadcast :: (c: ^Condition_Variable) {
 
     while c.queue != null {
         semaphore_post(^c.queue.semaphore);
-        semaphore_destroy(^c.queue.semaphore);
         c.queue = c.queue.next;
     }
 }

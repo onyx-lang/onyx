@@ -32,6 +32,7 @@ __runtime_initialize :: () {
 // standard library when you are dropped directly into a function.
 __thread_initialize :: () {
     __tls_base = raw_alloc(alloc.heap_allocator, __tls_size);
+    memory.set(__tls_base, 0, __tls_size);
 
     __initialize(^context);
     context.allocator = alloc.heap_allocator;
