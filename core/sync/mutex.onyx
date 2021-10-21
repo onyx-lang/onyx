@@ -38,6 +38,8 @@ mutex_lock :: (m: ^Mutex) {
 }
 
 mutex_unlock :: (m: ^Mutex) {
+    if m.owner != context.thread_id do return;
+    
     m.owner = -1;
     __atomic_store(^m.lock, 0);
     __atomic_notify(^m.lock, maximum = 1);

@@ -64,7 +64,11 @@ WasmImport :: struct {
     import_name : str;
 
     type  : WasmForeignType;
-    index : u32;
+
+    use __: struct #union {
+        index  : u32;
+        limits : WasmLimits;
+    };
 }
 
 WasmExport :: struct {
@@ -79,6 +83,7 @@ WasmFunction :: struct {
 
 WasmLimits :: struct {
     minimum, maximum: u32;
+    shared: bool;
 }
 
 WasmMemory :: struct {

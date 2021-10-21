@@ -56,13 +56,23 @@ parse_import_section :: (use bin: ^WasmBinary, allocator := context.allocator) -
     return parse_vector(^reader, bin, read_import);
 
     read_import :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmImport {
-        module_name := parse_name(reader, binary);
-        import_name := parse_name(reader, binary);
+        import: WasmImport;
+        import.module_name = parse_name(reader, binary);
+        import.import_name = parse_name(reader, binary);
 
-        kind  := io.read_byte(reader);
-        index := read_uleb128(reader);
+        import.type = ~~io.read_byte(reader);
+
+        switch import.type {
+            case .Memory {
+                import.limits = parse_limits(reader, binary);
+            }
+
+            case #default {
+                import.index = ~~read_uleb128(reader);
+            }
+        }
         
-        return .{ module_name, import_name, ~~kind, ~~index };
+        return import;
     }
 }
 
@@ -219,15 +229,18 @@ parse_data_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> 
     stream := io.string_stream_make(data);   
     reader := io.reader_make(^stream);
 
-    io.stream_seek(^stream, map.get(^sections, .Data).offset, .Start);
+    io.stream_seek(^stream, sections[WasmSection.Data].offset, .Start);
 
     return parse_vector(^reader, bin, read_data);
-    
+
     read_data :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmData {
         memory_index := read_uleb128(reader);
 
-        offset       := parse_instruction(reader, bin);
-        assert(io.read_byte(reader) == ~~0x0B, "Expected '0x0B' after constant expression");
+        offset: WasmInstruction;
+        if memory_index == 0 {
+            offset = parse_instruction(reader, bin);
+            assert(io.read_byte(reader) == ~~0x0B, "Expected '0x0B' after constant expression");
+        }
 
         size := read_uleb128(reader);
         _, pos := io.stream_tell(reader.stream);
@@ -309,8 +322,9 @@ parse_limits :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmLimits {
     byte := io.read_byte(reader);
 
     minimum, maximum : u32;
+    shared           := (byte & 2) != 0;
 
-    switch byte {
+    switch byte & 1 {
         case 0 {
             minimum =~~ read_uleb128(reader);
             maximum = 0;
@@ -324,7 +338,7 @@ parse_limits :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmLimits {
         case #default do assert(false, "Bad limit header");
     }
 
-    return .{ minimum=minimum, maximum=maximum };
+    return .{ minimum=minimum, maximum=maximum, shared=shared };
 }
 
 #private
