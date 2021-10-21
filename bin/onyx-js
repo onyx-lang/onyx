@@ -6,6 +6,7 @@ const fs = require('fs');
 let wasm_bytes;
 let wasm_instance;
 let wasm_memory;
+let workers = {};
 
 const ENV = {
     onyx: { memory: null },
@@ -23,7 +24,7 @@ const ENV = {
 
         spawn_thread(id, funcidx, dataptr) {
             try {
-                const worker = new Worker(__filename, {
+                workers[id] = new Worker(__filename, {
                     workerData: {
                         thread_id: id,
                         memory: wasm_memory,
@@ -39,6 +40,15 @@ const ENV = {
                 console.error(e);
                 return 0;
             }
+        },
+
+        kill_thread(id) {
+            if (workers[id] == null) return 0;
+            
+            workers[id].terminate();
+            delete workers[id];
+            workers[id] = null;
+            return 1;
         },
     }
 }

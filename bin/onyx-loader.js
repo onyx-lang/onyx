@@ -4,6 +4,7 @@ window.ONYX_MEMORY   = null;
 window.ONYX_INSTANCE = null;
 window.ONYX_BYTES    = null;
 window.ONYX_THREAD_SCRIPT = "onyx-thread.js";
+window.ONYX_WORKERS  = {};
 
 window.ONYX_MODULES.push({
     module_name: "host",
@@ -28,8 +29,8 @@ window.ONYX_MODULES.push({
                 }
             }
 
-            const worker = new Worker(window.ONYX_THREAD_SCRIPT);
-            worker.postMessage({
+            window.ONYX_WORKERS[id] = new Worker(window.ONYX_THREAD_SCRIPT);
+            window.ONYX_WORKERS[id].postMessage({
                 thread_id  : id,
                 memory     : window.ONYX_MEMORY,
                 wasm_bytes : window.ONYX_BYTES,
@@ -44,6 +45,16 @@ window.ONYX_MODULES.push({
             console.error(e);
             return 0;
         }
+    },
+
+    kill_thread(id) {
+        if (window.ONYX_WORKERS[id] == null) return 0;
+
+        window.ONYX_WORKERS[id].terminate();
+        delete window.ONYX_WORKERS[id];
+        ONYX_WORKERS[id] = null;
+
+        return 1;
     },
 });
 

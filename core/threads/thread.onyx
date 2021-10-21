@@ -34,6 +34,15 @@ join :: (t: ^Thread) {
     while t.alive do __atomic_wait(^t.id, t.id);
 }
 
+kill :: (t: ^Thread) -> i32 {
+    if !t.alive do return -1;
+
+    ret := runtime.__kill_thread(t.id);
+    if ret > 0 do __exited(t.id);
+
+    return 1;
+}
+
 __initialize :: () {
     thread_map->init();
 }
