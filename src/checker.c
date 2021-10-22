@@ -592,11 +592,14 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
     if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
 
+    u8 value_buffer[sizeof(bh__arr) + sizeof(AstTyped *) * 3];
     Arguments args = ((Arguments) { NULL, NULL });
-    bh_arr_new(global_heap_allocator, args.values, third_argument ? 3 : 2);
-    bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, binop->left));
-    bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, binop->right));
-    if (third_argument) bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, third_argument));
+    args.values = (AstTyped **) &value_buffer[sizeof(bh__arr)];
+    bh_arr_set_length(args.values, third_argument ? 3 : 2);
+
+    args.values[0] = (AstTyped *) make_argument(context.ast_alloc, binop->left);
+    args.values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
+    if (third_argument != NULL) args.values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
 
     u32 current_checking_level_store = current_checking_level;
     bh_arr_each(AstTyped *, v, args.values) check_argument((AstArgument **) v);
@@ -610,9 +613,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
         current_checking_level = current_checking_level_store;
 
         if (cs == Check_Yield_Macro) return (AstCall *) &node_that_signals_a_yield;
-        if (cs == Check_Error) {
-            return NULL;
-        }
+        if (cs == Check_Error)       return NULL;
 
         args.values[0] = (AstTyped *) make_argument(context.ast_alloc, args.values[0]);
         current_checking_level_store = current_checking_level;
@@ -622,22 +623,15 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
 
     b32 should_yield = 0;
     AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args, &should_yield);
-    if (should_yield) {
-        bh_arr_free(args.values);
-        return (AstCall *) &node_that_signals_a_yield;
-    }
-
-    if (overload == NULL) {
-        bh_arr_free(args.values);
-        return NULL;
-    }
+    if (should_yield)     return (AstCall *) &node_that_signals_a_yield;
+    if (overload == NULL) return NULL;
 
     AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = binop->token;
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
 
-    implicit_call->args = args;
+    arguments_clone(&implicit_call->args, &args);
     return implicit_call;
 }
 
