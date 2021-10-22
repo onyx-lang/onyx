@@ -197,5 +197,19 @@ To-Do list for threading capability in the browser:
 
 Optimize the generation of multi-threaded modules when post-mvp features are enabled:
     [X] memory.init intrinsic
-    [ ] atomatic generation of initializers for all data segments
-    [ ] emit datacount section
+    [X] atomatic generation of initializers for all data segments
+    [X] emit datacount section
+
+Wishlist:
+    [ ] #operator []=
+    [ ] #operator ^[]
+        - Taking the pointer to an offset with a subscript
+        - Useful for map.get_ptr (^arr[10] or ^people["John"])
+    [ ] Complete the set of combinations of procedure declaration syntaxes
+        - Currently (x: i32) => { ... } isn't legal.
+    [ ] Tests for new language features
+        - Do blocks
+        - Code blocks
+        - Quick functions
+        - Macros
+        - Tags

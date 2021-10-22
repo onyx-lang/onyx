@@ -66,7 +66,7 @@ CheckStatus check_range_literal(AstRangeLiteral** range);
 CheckStatus check_compound(AstCompound* compound);
 CheckStatus check_if_expression(AstIfExpression* if_expr);
 CheckStatus check_expression(AstTyped** expr);
-CheckStatus check_address_of(AstAddressOf* aof);
+CheckStatus check_address_of(AstAddressOf** paof);
 CheckStatus check_dereference(AstDereference* deref);
 CheckStatus check_subscript(AstSubscript** paa);
 CheckStatus check_field_access(AstFieldAccess** pfield);
@@ -606,7 +606,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
         args.values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
 
         u32 current_checking_level_store = current_checking_level;
-        CheckStatus cs = check_address_of((AstAddressOf *) args.values[0]);
+        CheckStatus cs = check_address_of((AstAddressOf **) &args.values[0]);
         current_checking_level = current_checking_level_store;
 
         if (cs == Check_Yield_Macro) return (AstCall *) &node_that_signals_a_yield;
@@ -1256,13 +1256,38 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     return Check_Success;
 }
 
-CheckStatus check_address_of(AstAddressOf* aof) {
+CheckStatus check_address_of(AstAddressOf** paof) {
+    AstAddressOf* aof = *paof;
+
+    AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
+    if (expr->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Ptr_Subscript]) > 0) {
+        CHECK(expression, &((AstSubscript *) expr)->addr);
+        CHECK(expression, &((AstSubscript *) expr)->expr);
+
+        AstBinaryOp op;
+        op.kind = Ast_Kind_Binary_Op;
+        op.operation = Binary_Op_Ptr_Subscript;
+        op.left  = ((AstSubscript *) expr)->addr;
+        op.right = ((AstSubscript *) expr)->expr;
+        op.token = aof->token;
+
+        AstCall* call = binaryop_try_operator_overload(&op);
+        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(aof->token->pos, "Waiting for operator overload to possibly resolve.");
+        if (call != NULL) {
+            call->next = aof->next;
+            *(AstCall **) paof = call;
+
+            CHECK(call, (AstCall **) paof);
+            return Check_Success;
+        }
+    }
+
     CHECK(expression, &aof->expr);
     if (aof->expr->type == NULL) {
         YIELD(aof->token->pos, "Trying to resolve type of expression to take a reference.");
     }
 
-    AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
+    expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
 
     if ((expr->kind != Ast_Kind_Subscript
             && expr->kind != Ast_Kind_Dereference
@@ -1270,7 +1295,7 @@ CheckStatus check_address_of(AstAddressOf* aof) {
             && expr->kind != Ast_Kind_Memres
             && expr->kind != Ast_Kind_Local)
             || (expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
-        ERROR(aof->token->pos, "Cannot take the address of something that is not an l-value.");
+        ERROR_(aof->token->pos, "Cannot take the address of something that is not an l-value. %s", onyx_ast_node_kind_string(expr->kind));
     }
 
     expr->flags |= Ast_Flag_Address_Taken;
@@ -1557,7 +1582,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Local: break;
 
-        case Ast_Kind_Address_Of:    retval = check_address_of((AstAddressOf *) expr); break;
+        case Ast_Kind_Address_Of:    retval = check_address_of((AstAddressOf **) pexpr); break;
         case Ast_Kind_Dereference:   retval = check_dereference((AstDereference *) expr); break;
         case Ast_Kind_Slice:
         case Ast_Kind_Subscript:     retval = check_subscript((AstSubscript **) pexpr); break;

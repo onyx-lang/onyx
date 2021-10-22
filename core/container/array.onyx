@@ -139,44 +139,38 @@ pop :: (arr: ^[..] $T) -> T {
     return arr.data[arr.count];
 }
 
-concat :: (arr: ^[..] $T, other: [..] T) {
+concat :: (arr: ^[..] $T, other: [] T) {
     for ^o: other do push(arr, *o);
 }
 
 
-fold_idx_elem :: #match {
-    (arr: ^[..] $T, cmp: (T, T) -> bool) -> (i32, T) {
-        return fold_idx_elem(arr.data, arr.count, cmp);
-    },
-
-    (arr: ^$T, count: i32, cmp: (T, T) -> bool) -> (i32, T) {
-        idx  := 0;
-        elem := arr[0];
-        
-        for i: 1 .. count {
-            if cmp(arr[i], elem) {
-                idx  = i;
-                elem = arr[i];
-            }
+fold_idx_elem :: (arr: [] $T, cmp: (T, T) -> bool) -> (i32, T) {
+    idx  := 0;
+    elem := arr[0];
+    
+    for i: 1 .. arr.count {
+        if cmp(arr[i], elem) {
+            idx  = i;
+            elem = arr[i];
         }
-        
-        return idx, elem;
-    },
+    }
+    
+    return idx, elem;
 }
 
-#private_file cmp_greater :: (x: $T, y: T) -> bool do return x > y;
-#private_file cmp_less    :: (x: $T, y: T) -> bool do return x < y;
+#private_file cmp_greater :: (x, y) => x > y;
+#private_file cmp_less    :: (x, y) => x < y;
 
 greatest :: #match {
-    (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_greater); },
-    (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_greater); },
-    (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(cast(^T) arr, N,     cmp_greater); },
+    (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr, cmp_greater); },
+    (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr, cmp_greater); },
+    (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(.{ cast(^T) arr, N }, cmp_greater); },
 }
 
 least :: #match {
-    (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_less); },
-    (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr.data, arr.count, cmp_less); },
-    (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(cast(^T) arr, N,     cmp_less); },
+    (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr, cmp_less); },
+    (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr, cmp_less); },
+    (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(.{ cast(^T) arr, N }, cmp_less); },
 }
 
 

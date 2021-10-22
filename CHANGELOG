@@ -8,6 +8,9 @@ are going to be changed and added in the future, but first I want to get this be
 version out there in a packaged format.
 
 Additions:
+* Multi-threading for the JS backend (--use-multi-threading)
+* threading primitives (mutex, semaphore, etc.)
+* atomic intrinsics
 * Quick-Functions
 * do-expressions
 * typeof
@@ -33,12 +36,10 @@ Additions:
     notes without having to parse comments. The syntax is "@Note".
 
 Removals:
+* the "proc" keyword.
 
 Changes:
 * initialization statements on if/while/switch are a lot more powerful.
-* the "proc" keyword is now optional in a lot of cases. There are inevitably some bugs with this change,
-    but you can always add it in when it may be necessary. Note, that for overloaded procedures, "#match"
-    is now used.
 * operator overloading is now done as a top level declaration handled through the entity
     system, instead of relying on creating a procedure. This lets you use an existing
     procedure as an operator overload. Take a look at '#operator ==' in string.onyx.

@@ -2840,6 +2840,22 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 AstDirectiveOperator *operator = make_node(AstDirectiveOperator, Ast_Kind_Directive_Operator);
                 operator->token = dir_token;
 
+                // These cases have to happen first because these are not necessarily "binary operators",
+                // they are just things that I want to be able to overload. []= is technically a ternary
+                // operator so all these things are horribly named anyway.
+                if (next_tokens_are(parser, 3, '^', '[', ']')) {
+                    consume_tokens(parser, 3);
+                    operator->operator = Binary_Op_Ptr_Subscript;
+                    goto operator_determined;
+                }
+
+                if (next_tokens_are(parser, 3, '[', ']', '=')) {
+                    consume_tokens(parser, 3);
+                    operator->operator = Binary_Op_Subscript_Equals;
+                    goto operator_determined;
+                }
+
+                // The default case
                 BinaryOp op = binary_op_from_token_type(parser->curr->type);
                 consume_token(parser);
                 if (op == Binary_Op_Subscript) expect_token(parser, ']');    // #operator [] ... needs to consume the other ']'
@@ -2850,6 +2866,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                     operator->operator = op;
                 }
 
+              operator_determined:
                 operator->overload = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(operator);
