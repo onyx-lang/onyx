@@ -1147,8 +1147,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            if (bh_arr_length(overload->params) != 2) {
-                onyx_report_error(operator->token->pos, "Expected 2 exactly arguments for binary operator overload.");
+            if (operator->operator != Binary_Op_Subscript_Equals && bh_arr_length(overload->params) != 2) {
+                onyx_report_error(operator->token->pos, "Expected exactly 2 arguments for binary operator overload.");
                 return Symres_Error;
             }
 

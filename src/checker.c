@@ -589,17 +589,17 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
             node_get_type_name(binop->right));
 }
 
-static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop) {
+static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
     if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
 
     Arguments args = ((Arguments) { NULL, NULL });
-    bh_arr_new(global_heap_allocator, args.values, 2);
+    bh_arr_new(global_heap_allocator, args.values, third_argument ? 3 : 2);
     bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, binop->left));
     bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, binop->right));
+    if (third_argument) bh_arr_push(args.values, (AstTyped *) make_argument(context.ast_alloc, third_argument));
 
     u32 current_checking_level_store = current_checking_level;
-    check_argument((AstArgument **) &args.values[0]);
-    check_argument((AstArgument **) &args.values[1]);
+    bh_arr_each(AstTyped *, v, args.values) check_argument((AstArgument **) v);
     current_checking_level = current_checking_level_store;
 
     if (binop_is_assignment(binop->operation)) {
@@ -864,6 +864,25 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     if (binop->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
+    if (binop->operation == Binary_Op_Assign && binop->left->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Subscript_Equals]) > 0) {
+        AstBinaryOp op;
+        op.kind = Ast_Kind_Binary_Op;
+        op.token = binop->token;
+        op.operation = Binary_Op_Subscript_Equals;
+        op.left  = ((AstSubscript *) binop->left)->addr;
+        op.right = ((AstSubscript *) binop->left)->expr;
+
+        AstCall* call = binaryop_try_operator_overload(&op, binop->right);
+        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(op.token->pos, "Waiting on potential operator overload.");
+        if (call != NULL) {
+            call->next = binop->next;
+            *(AstCall **) pbinop = call;
+
+            CHECK(call, (AstCall **) pbinop);
+            return Check_Success;
+        }
+    }
+
     u32 current_checking_level_store = current_checking_level;
     CHECK(expression, &binop->left);
     CHECK(expression, &binop->right);
@@ -892,7 +911,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     // NOTE: Try operator overloading before checking everything else.
     if ((binop->left->type != NULL && binop->left->type->kind != Type_Kind_Basic)
         || (binop->right->type != NULL && binop->right->type->kind != Type_Kind_Basic)) {
-        AstCall *implicit_call = binaryop_try_operator_overload(binop);
+        AstCall *implicit_call = binaryop_try_operator_overload(binop, NULL);
 
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)
             YIELD(binop->token->pos, "Trying to resolve operator overload.");
@@ -1271,7 +1290,7 @@ CheckStatus check_address_of(AstAddressOf** paof) {
         op.right = ((AstSubscript *) expr)->expr;
         op.token = aof->token;
 
-        AstCall* call = binaryop_try_operator_overload(&op);
+        AstCall* call = binaryop_try_operator_overload(&op, NULL);
         if (call == (AstCall *) &node_that_signals_a_yield) YIELD(aof->token->pos, "Waiting for operator overload to possibly resolve.");
         if (call != NULL) {
             call->next = aof->next;
@@ -1329,7 +1348,7 @@ CheckStatus check_subscript(AstSubscript** psub) {
         (sub->addr->type->kind != Type_Kind_Basic || sub->expr->type->kind != Type_Kind_Basic)) {
         // AstSubscript is the same as AstBinaryOp for the first sizeof(AstBinaryOp) bytes
         AstBinaryOp* binop = (AstBinaryOp *) sub;
-        AstCall *implicit_call = binaryop_try_operator_overload(binop);
+        AstCall *implicit_call = binaryop_try_operator_overload(binop, NULL);
 
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)
             YIELD(sub->token->pos, "Trying to resolve operator overload.");

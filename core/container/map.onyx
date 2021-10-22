@@ -84,7 +84,8 @@ get :: (use map: ^Map($K, $V), key: K) -> V {
 }
 
 #operator []  macro (map: Map($K, $V), key: K) -> V do return (package core.map).get(^map, key);
-// #operator []= macro (map: Map($K, $V), key: K, value: V) do (package core.map).put(^map, key, value);
+#operator []= macro (map: Map($K, $V), key: K, value: V) do (package core.map).put(^map, key, value);
+#operator ^[] macro (map: Map($K, $V), key: K) -> ^V do return (package core.map).get_ptr(^map, key);
 
 get_ptr :: (use map: ^Map($K, $V), key: K) -> ^V {
     lr := lookup(map, key);
