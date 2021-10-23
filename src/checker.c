@@ -86,6 +86,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock);
 
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
+b32 all_checks_are_final           = 1;
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
@@ -601,9 +602,12 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
     args.values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
     if (third_argument != NULL) args.values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
 
+    u32 current_all_checks_are_final = all_checks_are_final;
+    all_checks_are_final = 0;
     u32 current_checking_level_store = current_checking_level;
     bh_arr_each(AstTyped *, v, args.values) check_argument((AstArgument **) v);
     current_checking_level = current_checking_level_store;
+    all_checks_are_final   = current_all_checks_are_final;
 
     if (binop_is_assignment(binop->operation)) {
         args.values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
@@ -983,12 +987,15 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
          binop->type = &basic_types[Basic_Kind_Bool];
     }
 
-    binop->flags |= Ast_Flag_Has_Been_Checked;
+    if (all_checks_are_final) {
+        binop->flags |= Ast_Flag_Has_Been_Checked;
 
-    if (binop->flags & Ast_Flag_Comptime) {
-        // NOTE: Not a binary op
-        *pbinop = (AstBinaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) binop);
+        if (binop->flags & Ast_Flag_Comptime) {
+            // NOTE: Not a binary op
+            *pbinop = (AstBinaryOp *) ast_reduce(context.ast_alloc, (AstTyped *) binop);
+        }
     }
+
     return Check_Success;
 
 bad_binaryop:
