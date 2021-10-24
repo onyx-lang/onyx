@@ -118,7 +118,7 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
                 goto struct_symres_done;
             }
 
-            if (member->flags & Ast_Flag_Struct_Mem_Used) {
+            if (member->is_used) {
                 AstType *used = (AstType *) member->type_node;
 
                 while (used->kind == Ast_Kind_Type_Alias) {
@@ -873,15 +873,9 @@ SymresStatus symres_function_header(AstFunction* func) {
         }
     }
 
-    if ((func->flags & Ast_Flag_Params_Introduced) == 0) {
-        bh_arr_each(AstParam, param, func->params) {
-            symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
-        }
-
-        func->flags |= Ast_Flag_Params_Introduced;
-    }
-
     bh_arr_each(AstParam, param, func->params) {
+        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+        
         if (param->local->type_node != NULL) {
             SYMRES(type, &param->local->type_node);
         }
@@ -926,7 +920,7 @@ SymresStatus symres_function(AstFunction* func) {
             // The 'use t : T' member requires completely knowing the type of T, to know which
             // members should be brought in. At the moment, that requires completely building the
             // type of Foo($T).
-            if ((param->local->flags & Ast_Flag_Param_Use) != 0 && param->use_processed == 0) {
+            if (param->is_used && !param->use_processed) {
                 if (param->local->type_node != NULL && param->local->type == NULL) {
                     param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
 
@@ -1015,7 +1009,7 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
 
     type_build_from_ast(context.ast_alloc, (AstType *) enum_node);
 
-    u64 next_assign_value = (enum_node->flags & Ast_Flag_Enum_Is_Flags) ? 1 : 0;
+    u64 next_assign_value = enum_node->is_flags ? 1 : 0;
     bh_arr_each(AstEnumValue *, value, enum_node->values) {
         symbol_introduce(enum_node->scope, (*value)->token, (AstNode *) *value);
         (*value)->type = enum_node->etcache;
@@ -1043,7 +1037,7 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
 
         (*value)->flags |= Ast_Flag_Comptime;
 
-        if (enum_node->flags & Ast_Flag_Enum_Is_Flags) {
+        if (enum_node->is_flags) {
             next_assign_value <<= 1;
         } else {
             next_assign_value++;
@@ -1165,19 +1159,19 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             AstDirectiveExport *export = (AstDirectiveExport *) directive;
             SYMRES(expression, &export->export);
 
-            export->export->flags |= Ast_Flag_Exported;
 
             if (export->export->kind == Ast_Kind_Function) {
                 AstFunction *func = (AstFunction *) export->export;
                 func->exported_name = export->export_name;
+                func->is_exported = 1;
 
-                if ((func->flags & Ast_Flag_Exported) != 0) {
-                    if ((func->flags & Ast_Flag_Foreign) != 0) {
+                if (func->is_exported) {
+                    if (func->is_foreign) {
                         onyx_report_error(export->token->pos, "exporting a foreign function");
                         return Symres_Error;
                     }
 
-                    if ((func->flags & Ast_Flag_Intrinsic) != 0) {
+                    if (func->is_intrinsic) {
                         onyx_report_error(export->token->pos, "exporting a intrinsic function");
                         return Symres_Error;
                     }
@@ -1246,7 +1240,6 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Function_Header:         ss = symres_function_header(ent->function); break;
         case Entity_Type_Function:                ss = symres_function(ent->function);        break;
 
-        case Entity_Type_Foreign_Global_Header:
         case Entity_Type_Global_Header:           ss = symres_global(ent->global); break;
 
         case Entity_Type_Use_Package:

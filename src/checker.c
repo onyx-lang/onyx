@@ -540,7 +540,7 @@ CheckStatus check_call(AstCall** pcall) {
 
     // NOTE: If we are calling an intrinsic function, translate the
     // call into an intrinsic call node.
-    if (callee->flags & Ast_Flag_Intrinsic) {
+    if (callee->kind == Ast_Kind_Function && callee->is_intrinsic) {
         call->kind = Ast_Kind_Intrinsic_Call;
         call->callee = NULL;
 
@@ -1852,7 +1852,7 @@ CheckStatus check_block(AstBlock* block) {
 }
 
 CheckStatus check_function(AstFunction* func) {
-    if (func->flags & Ast_Flag_Already_Checked) return Check_Success;
+    if (func->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
     if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
     
@@ -1872,7 +1872,7 @@ CheckStatus check_function(AstFunction* func) {
         *expected_return_type = &basic_types[Basic_Kind_Void];
     }
 
-    func->flags |= Ast_Flag_Already_Checked;
+    func->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
 }
 
@@ -2141,7 +2141,7 @@ CheckStatus check_type(AstType* type) {
     while (type->kind == Ast_Kind_Type_Alias)
         type = ((AstTypeAlias *) type)->to;
 
-    if (type->flags & Ast_Flag_Already_Checked) return Check_Success;
+    if (type->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
     switch (type->kind) {
         case Ast_Kind_Poly_Call_Type: {
@@ -2213,7 +2213,7 @@ CheckStatus check_type(AstType* type) {
         type = ((AstTypeAlias *) type)->to;
     }
 
-    type->flags |= Ast_Flag_Already_Checked;
+    type->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
 }
 

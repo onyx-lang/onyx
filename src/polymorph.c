@@ -103,7 +103,7 @@ static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_fun
         .type = Entity_Type_Function_Header,
         .function = solidified_func.func,
         .package = NULL,
-        .scope = solidified_func.poly_scope,
+        .scope = solidified_func.func->poly_scope,
     };
 
     entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
@@ -114,7 +114,7 @@ static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_fun
         .type = Entity_Type_Function,
         .function = solidified_func.func,
         .package = NULL,
-        .scope = solidified_func.poly_scope,
+        .scope = solidified_func.func->poly_scope,
     };
 
     Entity* entity_header = entity_heap_insert(&context.entities, func_header_entity);
@@ -143,9 +143,6 @@ static AstSolidifiedFunction generate_solidified_function(
     OnyxFilePos poly_scope_pos = { 0 };
     if (tkn) poly_scope_pos = tkn->pos;
 
-    solidified_func.poly_scope = scope_create(context.ast_alloc, pp->poly_scope, poly_scope_pos);
-    insert_poly_slns_into_scope(solidified_func.poly_scope, slns);
-
     if (header_only) {
         solidified_func.func = (AstFunction *) clone_function_header(context.ast_alloc, pp->base_func);
         solidified_func.func->flags |= Ast_Flag_Incomplete_Body;
@@ -153,6 +150,9 @@ static AstSolidifiedFunction generate_solidified_function(
     } else {
         solidified_func.func = (AstFunction *) ast_clone(context.ast_alloc, pp->base_func);
     }
+
+    solidified_func.func->poly_scope = scope_create(context.ast_alloc, pp->poly_scope, poly_scope_pos);
+    insert_poly_slns_into_scope(solidified_func.func->poly_scope, slns);
 
     solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
     solidified_func.func->generated_from = tkn;
@@ -732,7 +732,7 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
         .type = Entity_Type_Function_Header,
         .function = solidified_func.func,
         .package = NULL,
-        .scope = solidified_func.poly_scope,
+        .scope = solidified_func.func->poly_scope,
     };
 
     // HACK: Everything with entity_bring_to_state is a big hack...

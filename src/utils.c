@@ -497,19 +497,8 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
             (AstNode *) ((AstArgument *) call->args.values[i])->value);
     }
 
-    if (template->flags & Ast_Flag_From_Polymorphism) {
-        // SLOW DUMB HACKY WAY TO DO THIS!!!!! FIX IT!!!!!
-
-        AstPolyProc* pp = (AstPolyProc *) macro->body;
-        bh_table_each_start(AstSolidifiedFunction, pp->concrete_funcs);
-
-            if (value.func == template) {
-                scope_include(argument_scope, value.poly_scope, call->token->pos);
-                break;
-            }
-
-        bh_table_each_end;
-    }
+    if (template->poly_scope != NULL)
+        scope_include(argument_scope, template->poly_scope, call->token->pos);
 
     *(AstNode **) pcall = subst;
     return;
@@ -558,7 +547,7 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
                 .type = Entity_Type_Function_Header,
                 .function = solidified_func.func,
                 .package = NULL,
-                .scope = solidified_func.poly_scope,
+                .scope = solidified_func.func->poly_scope,
             };
 
             b32 successful = entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);

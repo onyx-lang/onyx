@@ -662,7 +662,6 @@ typedef struct OnyxWasmModule {
     u32 next_tls_offset;
     u32 next_elem_idx;
     u32 foreign_function_count;
-    u32 foreign_global_count;
 
     i32 *stack_top_ptr;
     i32 *tls_size_ptr;

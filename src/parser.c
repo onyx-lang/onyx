@@ -1873,9 +1873,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     while (parser->curr->type == '#') {
         if (parser->hit_unexpected_token) return NULL;
 
-        if (parse_possible_directive(parser, "union")) {
-            s_node->flags |= Ast_Flag_Struct_Is_Union;
-        }
+        if (parse_possible_directive(parser, "union")) s_node->is_union = 1;
 
         else if (parse_possible_directive(parser, "align")) {
             AstNumLit* numlit = parse_int_literal(parser);
@@ -2004,7 +2002,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
                 mem->initial_value = initial_value;
                 mem->meta_tags = meta_tags;
 
-                if (member_is_used) mem->flags |= Ast_Flag_Struct_Mem_Used;
+                if (member_is_used) mem->is_used = 1;
 
                 bh_arr_push(s_node->members, mem);
             }
@@ -2057,7 +2055,7 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
             curr_param.local->kind = Ast_Kind_Param;
 
             if (param_use) {
-                curr_param.local->flags |= Ast_Flag_Param_Use;
+                curr_param.is_used = 1;
                 param_use = 0;
             }
 
@@ -2224,7 +2222,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     while (parser->curr->type == '#') {
         if (parse_possible_directive(parser, "intrinsic")) {
-            func_def->flags |= Ast_Flag_Intrinsic;
+            func_def->is_intrinsic = 1;
 
             if (parser->curr->type == Token_Type_Literal_String) {
                 func_def->intrinsic_name = expect_token(parser, Token_Type_Literal_String);
@@ -2235,7 +2233,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
             func_def->foreign_module = expect_token(parser, Token_Type_Literal_String);
             func_def->foreign_name   = expect_token(parser, Token_Type_Literal_String);
 
-            func_def->flags |= Ast_Flag_Foreign;
+            func_def->is_foreign = 1;
         }
 
         // HACK: NullProcHack
@@ -2447,22 +2445,6 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
     AstGlobal* global_node = make_node(AstGlobal, Ast_Kind_Global);
     global_node->token = expect_token(parser, Token_Type_Keyword_Global);
 
-    while (parser->curr->type == '#') {
-        if (parse_possible_directive(parser, "foreign")) {
-            global_node->foreign_module = expect_token(parser, Token_Type_Literal_String);
-            global_node->foreign_name   = expect_token(parser, Token_Type_Literal_String);
-
-            global_node->flags |= Ast_Flag_Foreign;
-        }
-
-        else {
-            OnyxToken* directive_token = expect_token(parser, '#');
-            OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
-
-            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
-        }
-    }
-
     global_node->type_node = parse_type(parser);
 
     ENTITY_SUBMIT(global_node);
@@ -2478,7 +2460,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 
     while (parser->curr->type == '#') {
         if (parse_possible_directive(parser, "flags")) {
-            enum_node->flags |= Ast_Flag_Enum_Is_Flags;
+            enum_node->is_flags = 1;
         } else {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);

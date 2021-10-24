@@ -148,7 +148,6 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Polymorphic Proc",
     "Macro",
     "Foreign_Function Header",
-    "Foreign_Global Header",
     "Function Header",
     "Global Header",
     "Process Directive",

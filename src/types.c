@@ -352,7 +352,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             s_node->stcache_is_valid = 1;
 
-            b32 is_union = (s_node->flags & Ast_Flag_Struct_Is_Union) != 0;
+            b32 is_union = s_node->is_union;
             u32 size = 0;
             u32 offset = 0;
             u32 alignment = 1, mem_alignment;
@@ -385,7 +385,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .name = bh_strdup(alloc, (*member)->token->text),
                     .initial_value = &(*member)->initial_value,
                     .included_through_use = 0,
-                    .used = (((*member)->flags & Ast_Flag_Struct_Mem_Used) != 0),
+                    .used = (*member)->is_used,
                     .meta_tags = (*member)->meta_tags,
                 };
 
@@ -465,7 +465,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             enum_type->ast_type = type_node;
             enum_type->Enum.backing = enum_node->backing_type;
             enum_type->Enum.name = enum_node->name;
-            enum_type->Enum.is_flags = enum_node->flags & Ast_Flag_Enum_Is_Flags;
+            enum_type->Enum.is_flags = enum_node->is_flags;
 
             type_register(enum_type);
             return enum_type;

@@ -181,7 +181,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         }
 
         case Ast_Kind_Function: {
-            if ((node->flags & Ast_Flag_Foreign) != 0) {
+            if (((AstFunction *) node)->is_foreign != 0) {
                 ent.type     = Entity_Type_Foreign_Function_Header;
                 ent.function = (AstFunction *) node;
                 ENTITY_INSERT(ent);
@@ -209,21 +209,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         }
 
         case Ast_Kind_Global: {
-            if ((node->flags & Ast_Flag_Foreign) != 0) {
-                ent.type   = Entity_Type_Foreign_Global_Header;
-                ent.global = (AstGlobal *) node;
-                ENTITY_INSERT(ent);
+            ent.type   = Entity_Type_Global_Header;
+            ent.global = (AstGlobal *) node;
+            ENTITY_INSERT(ent);
 
-            } else {
-                ent.type   = Entity_Type_Global_Header;
-                ent.global = (AstGlobal *) node;
-                ENTITY_INSERT(ent);
-
-                ent.id       = entities->next_id++;
-                ent.type   = Entity_Type_Global;
-                ent.global = (AstGlobal *) node;
-                ENTITY_INSERT(ent);
-            }
+            ent.id     = entities->next_id++;
+            ent.type   = Entity_Type_Global;
+            ent.global = (AstGlobal *) node;
+            ENTITY_INSERT(ent);
             break;
         }
 

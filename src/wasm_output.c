@@ -244,14 +244,6 @@ static i32 output_importsection(OnyxWasmModule* module, bh_buffer* buff) {
                 bh_buffer_append(&vec_buff, leb, leb_len);
                 break;
 
-            case WASM_FOREIGN_GLOBAL:
-                leb = uint_to_uleb128((u64) import->idx, &leb_len);
-                bh_buffer_append(&vec_buff, leb, leb_len);
-
-                // NOTE: All foreign globals are mutable
-                bh_buffer_write_byte(&vec_buff, 0x01);
-                break;
-
             case WASM_FOREIGN_MEMORY:
                 output_limits(import->min, import->max, import->shared, &vec_buff);
                 break;

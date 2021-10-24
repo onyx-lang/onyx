@@ -392,7 +392,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
 
-            if (sf->flags & Ast_Flag_Foreign) return node;
+            if (sf->is_foreign) return node;
 
             df->return_type = (AstType *) ast_clone(a, sf->return_type);
             df->body = (AstBlock *) ast_clone(a, sf->body);
@@ -405,6 +405,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 new_param.local = (AstLocal *) ast_clone(a, param->local);
                 new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
                 new_param.vararg_kind = param->vararg_kind;
+                new_param.is_used = param->is_used;
                 bh_arr_push(df->params, new_param);
             }
 
@@ -483,7 +484,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
     if (func->kind != Ast_Kind_Function) return NULL;
 
-    if (func->flags & Ast_Flag_Foreign) return func;
+    if (func->is_foreign) return func;
 
     AstFunction* new_func = onyx_ast_node_new(a, sizeof(AstFunction), func->kind);
     memmove(new_func, func, sizeof(AstFunction));
@@ -497,6 +498,7 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
         new_param.local = (AstLocal *) ast_clone(a, param->local);
         new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
         new_param.vararg_kind = param->vararg_kind;
+        new_param.is_used = param->is_used;
         bh_arr_push(new_func->params, new_param);
     }
 

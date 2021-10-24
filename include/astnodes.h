@@ -211,60 +211,41 @@ typedef enum AstKind {
 // only 32-bits of flags to play with
 typedef enum AstFlags {
     // Top-level flags
-    Ast_Flag_Exported              = BH_BIT(1),
-    Ast_Flag_Foreign               = BH_BIT(2),
-    Ast_Flag_Const                 = BH_BIT(3),
-    Ast_Flag_Comptime              = BH_BIT(4),
-    Ast_Flag_Private_Package       = BH_BIT(5),
-    Ast_Flag_Private_File          = BH_BIT(6),
-
-    // Global flags
-    Ast_Flag_Global_Stack_Top      = BH_BIT(7),
+    Ast_Flag_Const                 = BH_BIT(1),
+    Ast_Flag_Comptime              = BH_BIT(2),
+    Ast_Flag_Private_Package       = BH_BIT(3),
+    Ast_Flag_Private_File          = BH_BIT(4),
 
     // Function flags
-    Ast_Flag_Already_Checked       = BH_BIT(8),
-    Ast_Flag_Intrinsic             = BH_BIT(10),
-    Ast_Flag_Function_Used         = BH_BIT(11),
+    Ast_Flag_Function_Used         = BH_BIT(5),
 
     // Expression flags
-    Ast_Flag_Expr_Ignored          = BH_BIT(13),
-    Ast_Flag_Param_Use             = BH_BIT(14), // Unneeded, just use a bool on AstParam
-    Ast_Flag_Address_Taken         = BH_BIT(15),
+    Ast_Flag_Expr_Ignored          = BH_BIT(6),
+    Ast_Flag_Address_Taken         = BH_BIT(7),
 
     // Type flags
-    Ast_Flag_Type_Is_Resolved      = BH_BIT(16),
+    Ast_Flag_Type_Is_Resolved      = BH_BIT(8),
 
-    // Enum flags
-    Ast_Flag_Enum_Is_Flags         = BH_BIT(17), // Unneeded, just use a bool on AstEnum
+    Ast_Flag_No_Clone              = BH_BIT(9),
 
-    // Struct flags
-    Ast_Flag_Struct_Is_Union       = BH_BIT(18), // Unneeded, just a usea bool on AstStruct
-
-    Ast_Flag_No_Clone              = BH_BIT(19),
-
-    Ast_Flag_Cannot_Take_Addr      = BH_BIT(20),
-
-    Ast_Flag_Struct_Mem_Used       = BH_BIT(21), // Unneeded, just a usea bool on AstStructMember
+    Ast_Flag_Cannot_Take_Addr      = BH_BIT(10),
 
     // HACK: NullProcHack
-    Ast_Flag_Proc_Is_Null          = BH_BIT(22),
+    Ast_Flag_Proc_Is_Null          = BH_BIT(11),
 
-    Ast_Flag_From_Polymorphism     = BH_BIT(23),
+    Ast_Flag_From_Polymorphism     = BH_BIT(12),
 
-    Ast_Flag_Incomplete_Body       = BH_BIT(24),
+    Ast_Flag_Incomplete_Body       = BH_BIT(13),
 
-    Ast_Flag_Array_Literal_Typed   = BH_BIT(25),
+    Ast_Flag_Array_Literal_Typed   = BH_BIT(14),
 
-    Ast_Flag_Has_Been_Symres       = BH_BIT(26),
+    Ast_Flag_Has_Been_Symres       = BH_BIT(15),
 
-    Ast_Flag_Has_Been_Checked      = BH_BIT(27),
+    Ast_Flag_Has_Been_Checked      = BH_BIT(16),
 
-    Ast_Flag_Static_If_Resolved    = BH_BIT(28),
+    Ast_Flag_Static_If_Resolved    = BH_BIT(17),
 
-    // :TEMPORARY
-    Ast_Flag_Params_Introduced     = BH_BIT(29),
-
-    Ast_Flag_Symbol_Invisible      = BH_BIT(30),
+    Ast_Flag_Symbol_Invisible      = BH_BIT(18),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -810,12 +791,15 @@ struct AstStructType {
     struct Entity* entity_defaults;
 
     b32 stcache_is_valid : 1;
+    b32 is_union         : 1;
 };
 struct AstStructMember {
     AstTyped_base;
     AstTyped* initial_value;
 
     bh_arr(AstTyped *) meta_tags;
+
+    b32 is_used : 1;
 };
 struct AstPolyStructParam {
     AstTyped_base;
@@ -850,6 +834,8 @@ struct AstEnumType {
 
     // NOTE: Used to cache the actual type for the same reason as above.
     Type *etcache;
+
+    b32 is_flags : 1;
 };
 struct AstEnumValue    { AstTyped_base; AstNumLit* value; };
 struct AstTypeAlias    { AstType_base; AstType* to; };
@@ -893,6 +879,7 @@ struct AstParam {
     AstTyped *default_value;
 
     VarArgKind vararg_kind;
+    b32 is_used       : 1;
     b32 use_processed : 1;
     b32 is_baked      : 1;
 };
@@ -912,6 +899,7 @@ struct AstFunction {
     // NOTE: This is NULL, unless this function was generated from a polymorphic
     // procedure call. Then it is set to the token of the call node.
     OnyxToken* generated_from;
+    Scope*     poly_scope;
 
     // NOTE: This is NULL, unless this function is used in a "#export" directive.
     // It is undefined which name it will have if there are multiple export directives
@@ -930,6 +918,10 @@ struct AstFunction {
 
     struct Entity* entity_header;
     struct Entity* entity_body;
+
+    b32 is_exported  : 1;
+    b32 is_foreign   : 1;
+    b32 is_intrinsic : 1;
 };
 
 typedef struct OverloadOption OverloadOption;
@@ -1018,7 +1010,6 @@ struct AstPolySolution {
 
 struct AstSolidifiedFunction {
     AstFunction* func;
-    Scope*       poly_scope;
 
     b32 header_complete: 1;
 };
@@ -1154,7 +1145,6 @@ typedef enum EntityType {
     Entity_Type_Polymorphic_Proc,
     Entity_Type_Macro,
     Entity_Type_Foreign_Function_Header,
-    Entity_Type_Foreign_Global_Header,
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
     Entity_Type_Process_Directive,

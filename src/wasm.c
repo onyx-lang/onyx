@@ -3155,12 +3155,12 @@ static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
 
 static inline b32 should_emit_function(AstFunction* fd) {
     // NOTE: Don't output intrinsic functions
-    if (fd->flags & Ast_Flag_Intrinsic) return 0;
+    if (fd->is_intrinsic) return 0;
 
     // NOTE: Don't output functions that are not used, only if
     // they are also not exported.
     if ((fd->flags & Ast_Flag_Function_Used) == 0) {
-        if (fd->flags & Ast_Flag_Exported) {
+        if (fd->is_exported) {
             return 1;
         } else {
             return 0;
@@ -3319,27 +3319,12 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
         default: assert(("Invalid global type", 0)); break;
     }
 
-    bh_arr_set_at(module->globals, global_idx - module->foreign_global_count, glob);
+    bh_arr_set_at(module->globals, global_idx, glob);
 
     if (global == &builtin_stack_top)
-        module->stack_top_ptr = &module->globals[global_idx - module->foreign_global_count].initial_value[0].data.i1;
+        module->stack_top_ptr = &module->globals[global_idx].initial_value[0].data.i1;
     if (global == &builtin_tls_size)
-        module->tls_size_ptr  = &module->globals[global_idx - module->foreign_global_count].initial_value[0].data.i1;
-}
-
-static void emit_foreign_global(OnyxWasmModule* module, AstGlobal* global) {
-    WasmType global_type = onyx_type_to_wasm_type(global->type);
-
-    if (global->flags & Ast_Flag_Foreign) {
-        WasmImport import = {
-            .kind = WASM_FOREIGN_GLOBAL,
-            .idx  = global_type,
-            .mod  = bh_aprintf(global_heap_allocator, "%b", global->foreign_module->text, global->foreign_module->length),
-            .name = bh_aprintf(global_heap_allocator, "%b", global->foreign_name->text, global->foreign_name->length),
-        };
-
-        bh_arr_push(module->imports, import);
-    }
+        module->tls_size_ptr  = &module->globals[global_idx].initial_value[0].data.i1;
 }
 
 static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
@@ -3673,7 +3658,6 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .stack_base_idx = 0,
 
         .foreign_function_count = 0,
-        .foreign_global_count = 0,
 
         .null_proc_func_idx = -1,
     };
@@ -3774,11 +3758,6 @@ void emit_entity(Entity* ent) {
                 if (module->null_proc_func_idx == -1) module->null_proc_func_idx = get_element_idx(module, ent->function);
             }
             break;
-
-        case Entity_Type_Foreign_Global_Header:
-            module->foreign_global_count++;
-            emit_foreign_global(module, ent->global);
-            // fallthrough
 
         case Entity_Type_Global_Header:
             bh_imap_put(&module->index_map, (u64) ent->global, module->next_global_idx++);
