@@ -3183,7 +3183,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) fd);
 
-    if (fd == builtin_initialize_data_segments) {
+    if (fd == builtin_initialize_data_segments && context.options->use_post_mvp_features) {
         emit_initialize_data_segments_body(mod, &wasm_func.code);
         bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
         bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);

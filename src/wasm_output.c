@@ -592,6 +592,8 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_datacountsection(OnyxWasmModule* module, bh_buffer* buff) {
+    if (!context.options->use_post_mvp_features) return 0;
+
     i32 prev_len = buff->length;
 
     bh_buffer_write_byte(buff, WASM_SECTION_ID_DATACOUNT);
