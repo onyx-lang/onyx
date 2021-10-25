@@ -598,32 +598,28 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
     args.values = (AstTyped **) &value_buffer[sizeof(bh__arr)];
     bh_arr_set_length(args.values, third_argument ? 3 : 2);
 
-    args.values[0] = (AstTyped *) make_argument(context.ast_alloc, binop->left);
-    args.values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
-    if (third_argument != NULL) args.values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
-
-    u32 current_all_checks_are_final = all_checks_are_final;
-    all_checks_are_final = 0;
-    u32 current_checking_level_store = current_checking_level;
-    bh_arr_each(AstTyped *, v, args.values) check_argument((AstArgument **) v);
-    current_checking_level = current_checking_level_store;
-    all_checks_are_final   = current_all_checks_are_final;
-
     if (binop_is_assignment(binop->operation)) {
         args.values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
 
+        u32 current_all_checks_are_final = all_checks_are_final;
+        all_checks_are_final = 0;
         u32 current_checking_level_store = current_checking_level;
         CheckStatus cs = check_address_of((AstAddressOf **) &args.values[0]);
         current_checking_level = current_checking_level_store;
+        all_checks_are_final   = current_all_checks_are_final;
 
-        if (cs == Check_Yield_Macro) return (AstCall *) &node_that_signals_a_yield;
-        if (cs == Check_Error)       return NULL;
+        if (cs == Check_Yield_Macro)      return (AstCall *) &node_that_signals_a_yield;
+        if (cs == Check_Error)            return NULL;
 
         args.values[0] = (AstTyped *) make_argument(context.ast_alloc, args.values[0]);
-        current_checking_level_store = current_checking_level;
-        check_argument((AstArgument **) &args.values[0]);
-        current_checking_level = current_checking_level_store;
+
+    } else {
+        args.values[0] = (AstTyped *) make_argument(context.ast_alloc, binop->left);
     }
+
+
+    args.values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
+    if (third_argument != NULL) args.values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
 
     b32 should_yield = 0;
     AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args, &should_yield);
@@ -863,6 +859,14 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if (binop->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
     if (binop->operation == Binary_Op_Assign && binop->left->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Subscript_Equals]) > 0) {
+        AstSubscript* sub = (AstSubscript *) binop->left;
+        
+        u32 current_checking_level_store = current_checking_level;
+        CHECK(expression, &sub->addr);
+        CHECK(expression, &sub->expr);
+        CHECK(expression, &binop->right);
+        current_checking_level = current_checking_level_store;
+
         AstBinaryOp op;
         op.kind = Ast_Kind_Binary_Op;
         op.token = binop->token;
@@ -879,6 +883,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
             CHECK(call, (AstCall **) pbinop);
             return Check_Success;
         }
+
     }
 
     u32 current_checking_level_store = current_checking_level;

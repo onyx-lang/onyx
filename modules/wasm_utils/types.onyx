@@ -63,9 +63,9 @@ WasmImport :: struct {
     module_name : str;
     import_name : str;
 
-    type  : WasmForeignType;
+    type : WasmForeignType;
 
-    use __: struct #union {
+    use _: struct #union {
         index  : u32;
         limits : WasmLimits;
     };

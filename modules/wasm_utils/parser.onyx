@@ -295,8 +295,9 @@ parse_code_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> 
 }
 
 #private
-parse_vector :: (reader: ^io.Reader, bin: ^WasmBinary,
-                 read: (^io.Reader, ^WasmBinary) -> $T) -> [] T {
+parse_vector :: macro (reader: ^io.Reader, bin: ^WasmBinary,
+                       read: (^io.Reader, ^WasmBinary) -> $T) -> [] T {
+    wasm_allocator :: wasm_allocator;
     
     n := cast(u32) read_uleb128(reader);
     result := memory.make_slice(T, n, allocator=wasm_allocator);
