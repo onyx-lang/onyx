@@ -262,7 +262,7 @@ advance :: #match {
 }
 
 replace :: (s: str, to_replace: u8, replace_with: u8) {
-    for ^c: str {
+    for ^c: s {
         if *c == to_replace do *c = replace_with;
     }
 }
