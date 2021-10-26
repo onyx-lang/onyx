@@ -8,12 +8,12 @@ decode :: (data: str, allocator := context.allocator) -> Json {
     json.root = null;
 
     root, err := parse(data, allocator);
-    if err != .None {
-        switch err {
-            case .EOF do println("Reached EOF");
-            case .Illegal_Character do println("Illegal Character");
-            case .String_Unterminated do println("Unterminated String");
-            case .Unexpected_Token do println("Unexpected Token");
+    if err.kind != .None {
+        switch err.kind {
+            case .EOF do printf("Reached EOF\n");
+            case .Illegal_Character do printf("Illegal Character: {}\n", err.pos);
+            case .String_Unterminated do printf("Unterminated String: {}\n", err.pos);
+            case .Unexpected_Token do printf("Unexpected Token: {}\n", err.pos);
         }
 
         return json;

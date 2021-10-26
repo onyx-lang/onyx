@@ -13,13 +13,19 @@ Json :: struct {
     root: ^Value;
 }
 
-Error :: enum {
-    None;
-    EOF;
-    Illegal_Character;
-    String_Unterminated;
-    Unexpected_Token;
+Error :: struct {
+    Kind :: enum {
+        None;
+        EOF;
+        Illegal_Character;
+        String_Unterminated;
+        Unexpected_Token;
+    }
+
+    kind := Kind.None;
+    use pos := Position.{ 0, 1, 1 };
 }
+
 
 Value :: struct {
     Type :: enum {

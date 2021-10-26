@@ -47,8 +47,9 @@ consume_token_if_next :: (use parser: ^Parser, kind: Token.Kind) -> bool {
 expect_token :: (use parser: ^Parser, kind: Token.Kind) -> (Token, Error) {
     previous :=  current_token;
     consume_token(parser);
-    if previous.kind == kind do return previous, .None;
-    else                     do return previous, .Unexpected_Token;
+    error := Error.{ .None, previous.position };
+    if previous.kind != kind do error.kind = .Unexpected_Token;
+    return previous, error;
 }
 
 #private
@@ -98,25 +99,25 @@ parse_value :: (use parser: ^Parser) -> (^Value, Error) {
 
         case .Open_Bracket {
             value, err := parse_array(parser);
-            if err != .None do return value, err;
+            if err.kind != .None do return value, err;
             
             return_value = value;
         }
 
         case .Open_Brace {
             value, err := parse_object(parser);
-            if err != .None do return value, err;
+            if err.kind != .None do return value, err;
 
             return_value = value;
         }
 
         case #default {
             consume_token(parser);
-            return return_value, .Unexpected_Token;
+            return return_value, .{ .Unexpected_Token, current.position };
         }
     }
 
-    return return_value, .None;
+    return return_value, .{ .None };
 }
 
 #private_file
@@ -124,11 +125,11 @@ parse_array :: (use parser: ^Parser) -> (^Value_Array, Error) {
     value := new(Value_Array, allocator);
 
     _, err := expect_token(parser, .Open_Bracket);
-    if err != .None do return value, err;
+    if err.kind != .None do return value, err;
 
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
     arr := array.make(#type ^Value, allocator=context.allocator);
-    defer if err != .None {
+    defer if err.kind != .None {
         for elem: arr {
             free(elem, allocator);
         } 
@@ -138,7 +139,7 @@ parse_array :: (use parser: ^Parser) -> (^Value_Array, Error) {
 
     while current_token.kind != .Close_Bracket {
         elem, elem_err := parse_value(parser);
-        if elem_err != .None {
+        if elem_err.kind != .None {
             err = elem_err;
             return value, err;
         }
@@ -151,7 +152,7 @@ parse_array :: (use parser: ^Parser) -> (^Value_Array, Error) {
     }
 
     _, close_err := expect_token(parser, .Close_Bracket);
-    if close_err != .None {
+    if close_err.kind != .None {
         err = close_err;
         return value, err;
     }
@@ -166,17 +167,17 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
     value := new(Value_Object, allocator);
 
     _, err := expect_token(parser, .Open_Brace);
-    if err != .None do return value, err;
+    if err.kind != .None do return value, err;
 
     // This uses the context allocators because the array resizing needs to happen in a general purpose heap allocator
     array.init(^value.object_, allocator=context.allocator);
-    defer if err != .None {
+    defer if err.kind != .None {
         free(value, allocator);
     }
 
     while current_token.kind != .Close_Brace {
         key_token, key_err := expect_token(parser, .String);
-        if key_err != .None {
+        if key_err.kind != .None {
             err = key_err;
             return value, err;
         }
@@ -184,13 +185,13 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
         key := unescape_string(key_token, allocator);
 
         _, colon_err := expect_token(parser, .Colon);
-        if colon_err != .None {
+        if colon_err.kind != .None {
             err = colon_err;
             return value, err;
         }
 
         elem, elem_err := parse_value(parser);
-        if elem_err != .None {
+        if elem_err.kind != .None {
             err = elem_err;
             return value, err;
         }
@@ -199,7 +200,8 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
         #if false {
             for elem: value.object_ {
                 if elem.key == key {
-                    err = .Duplicate_Keys;
+                    err.kind = .Duplicate_Keys;
+                    err.pos  = key_token.pos;
                     string.free(key, allocator);
                     return value, err;
                 }
@@ -217,7 +219,7 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
     } 
 
     _, close_err := expect_token(parser, .Close_Brace);
-    if close_err != .None {
+    if close_err.kind != .None {
         err = close_err;
         return value, err;
     }

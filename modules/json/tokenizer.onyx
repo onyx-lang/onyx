@@ -48,7 +48,7 @@ Position :: struct {
 
 #private
 token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
-    err := Error.None;
+    err := Error.{};
 
     skip_whitespace(tkn);
     token := Token.{};
@@ -56,7 +56,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
 
     curr_char := data[offset];
     next_char, has_next := next_character(tkn);
-    if !has_next do return .{}, .EOF;
+    if !has_next do return .{}, .{ .EOF, token.position };
 
     switch curr_char {
         case #char "{" do token.kind = .Open_Brace;
@@ -77,11 +77,11 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
         }
 
         case #char "-" {
-            next_character(tkn);
             switch data[offset] {
                 case #char "0" .. #char "9" ---
                 case #default {
-                    err = .Illegal_Character;
+                    err.kind = .Illegal_Character;
+                    err.pos  = token.position;
                     break break;
                 }
             }
@@ -114,7 +114,8 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
             while offset < data.count {
                 ch := data[offset];
                 if ch == #char "\n" {
-                    err = .String_Unterminated;
+                    err.kind = .String_Unterminated;
+                    err.pos  = token.position;
                     break break;
                 }
 
@@ -132,7 +133,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
 
     token.text = data.data[token.offset .. offset];
 
-    if token.kind == .Invalid do err = .Illegal_Character;
+    if token.kind == .Invalid do err.kind = .Illegal_Character;
 
     return token, err;
 }
@@ -143,7 +144,7 @@ next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
 
     retval := data[offset];
     offset += 1;
-    column += offset;
+    column += 1;
 
     return retval, true;
 }

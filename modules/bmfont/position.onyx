@@ -75,7 +75,7 @@ get_character_positions :: (font: ^BMFont, size: f32, text: str, x: f32, y: f32)
             }
 
             renderable_glyph.pos_x = math.floor(rc.x + ~~glyph.xoffset * rc.size + .5);
-            renderable_glyph.pos_y = math.floor(rc.y + ~~glyph.yoffset * rc.size - rc.baseline + .5);
+            renderable_glyph.pos_y = math.floor(rc.y + ~~glyph.yoffset * rc.size + .5) - math.floor(rc.baseline);
             renderable_glyph.pos_w = math.floor(~~glyph.w * rc.size + .5);
             renderable_glyph.pos_h = math.floor(~~glyph.h * rc.size + .5);
 
@@ -84,8 +84,8 @@ get_character_positions :: (font: ^BMFont, size: f32, text: str, x: f32, y: f32)
             renderable_glyph.tex_w = glyph.tex_w;
             renderable_glyph.tex_h = glyph.tex_h;
 
-            renderable_glyph.x_advance = ~~glyph.xadvance * rc.size;
-            rc.x += ~~glyph.xadvance * rc.size;
+            renderable_glyph.x_advance = math.floor(~~glyph.xadvance * rc.size + 0.5);
+            rc.x += math.floor(~~glyph.xadvance * rc.size + 0.5);
 
             return ^renderable_glyph, true;
         }

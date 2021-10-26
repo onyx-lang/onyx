@@ -2,7 +2,6 @@ package bmfont
 
 #private_file math :: package core.math
 
-@Incomplete // does not use the size parameter
 get_width :: (use font: ^BMFont, text: str, size: f32) -> f32 {
     max_x := 0.0f;
     x := 0.0f;
