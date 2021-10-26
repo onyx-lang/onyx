@@ -261,6 +261,12 @@ advance :: #match {
     }
 }
 
+replace :: (s: str, to_replace: u8, replace_with: u8) {
+    for ^c: str {
+        if *c == to_replace do *c = replace_with;
+    }
+}
+
 read_until :: (s: ^str, upto: u8, skip := 0) -> str {
     if s.count == 0 do return "";
 
