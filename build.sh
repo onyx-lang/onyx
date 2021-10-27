@@ -20,7 +20,7 @@ else
     TARGET='./bin/onyx'
 fi
 
-BUILD_DIR='.'
+BUILD_DIR='./build'
 mkdir -p "$BUILD_DIR"
 
 for file in $C_FILES ; do

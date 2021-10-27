@@ -12,3 +12,4 @@ session.vim
 *.rdbg
 tmp/
 .vimspector.json
+.vscode/

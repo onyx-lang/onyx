@@ -1,0 +1,38 @@
+{
+    "name": "onyx",
+    "displayName": "Onyx",
+    "description": "Onyx syntax highlighting.",
+    "version": "0.0.1",
+    "publisher": "brendanfh",
+    "engines": {
+        "vscode": "^1.42.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "onyx",
+            "aliases": ["Onyx", "onyx"],
+            "extensions": [".onyx"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "onyx",
+            "scopeName": "source.onyx",
+            "path": "./syntaxes/onyx.tmLanguage"
+        }],
+        "problemMatchers": [{
+            "name": "onyx",
+            "owner": "onyx",
+            "fileLocation": "absolute",
+            "pattern": {
+                "regexp": "^\\(([^:]+):([0-9]+),([0-9]+)\\) (.*)",
+                "file": 1,
+                "line": 2,
+                "column": 3,
+                "message": 4
+            }
+        }]
+    }
+}
