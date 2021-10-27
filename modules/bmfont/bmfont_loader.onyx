@@ -1,14 +1,10 @@
 package bmfont
 
 use package core
-
+#private_file json :: package json
 
 load_bmfont :: (fnt_data: [] u8) -> BMFont {
-    bmf: BMFont;
-    memory.set(^bmf, 0, sizeof BMFont);
-    
-    map.init(^bmf.pages);
-    map.init(^bmf.glyphs);
+    bmf := create_bmfont();
 
     parse_bmfont(fnt_data, ^bmf);
 
@@ -18,6 +14,26 @@ load_bmfont :: (fnt_data: [] u8) -> BMFont {
         it.value.tex_w = ~~ it.value.w / cast(f32) bmf.common.scale_width;        
         it.value.tex_h = ~~ it.value.h / cast(f32) bmf.common.scale_height;        
     }
+
+    return bmf;
+}
+
+load_bmfont_from_json :: (fnt_data: [] u8) -> BMFont {
+    bmf := create_bmfont();
+
+    j := json.decode(fnt_data);
+    defer json.free(j);
+
+    extract_bmfont_from_json(^bmf, j.root);
+}
+
+#private_file
+create_bmfont :: () -> BMFont {
+    bmf: BMFont;
+    memory.set(^bmf, 0, sizeof BMFont);
+
+    map.init(^bmf.pages);
+    map.init(^bmf.glyphs);
 
     return bmf;
 }
@@ -132,5 +148,66 @@ parse_bmfont :: (fnt_data: [] u8, font: ^BMFont) {
         elseif key == "redChnl"    do common.red_channel   = ~~ conv.str_to_i64(value);
         elseif key == "greenChnl"  do common.alpha_channel = ~~ conv.str_to_i64(value);
         elseif key == "blueChnl"   do common.blue_channel  = ~~ conv.str_to_i64(value);
+    }
+}
+
+#private_file
+extract_bmfont_from_json :: (font: ^BMFont, root: ^json.Value) {
+    font_info          := root["info"];
+    font.info.face_name = font_info["face"]->as_str();
+    font.info.size      = ~~font_info["size"]->as_int();
+    font.info.bold      = font_info["bold"]->as_int() != 0;
+    font.info.italic    = font_info["italic"]->as_int() != 0;
+    font.info.unicode   = font_info["unicode"]->as_int() != 0;
+    font.info.stretchH  = ~~font_info["stretchH"]->as_int();
+    font.info.smooth    = font_info["smooth"]->as_int() != 0;
+    font.info.supersampling = ~~font_info["aa"]->as_int();
+
+    font_padding := font_info["padding"];
+    font.info.padding.top    = ~~font_padding[0]->as_int();
+    font.info.padding.right  = ~~font_padding[1]->as_int();
+    font.info.padding.bottom = ~~font_padding[2]->as_int();
+    font.info.padding.left   = ~~font_padding[3]->as_int();
+
+    font_spacing := font_info["spacing"];
+    font.info.spacing.horizontal = ~~font_spacing[0]->as_int();
+    font.info.spacing.vertical   = ~~font_spacing[1]->as_int();
+
+    font_common := root["common"];
+    font.common.line_height   = ~~font_common["lineHeight"]->as_int();
+    font.common.baseline      = ~~font_common["base"]->as_int();
+    font.common.scale_width   = ~~font_common["scaleW"]->as_int();
+    font.common.scale_height  = ~~font_common["scaleH"]->as_int();
+    font.common.page_count    = ~~font_common["pages"]->as_int();
+    font.common.packed        = font_common["packed"]->as_int() != 0;
+    font.common.alpha_channel = ~~font_common["alphaChnl"]->as_int();
+    font.common.red_channel   = ~~font_common["redChnl"]->as_int();
+    font.common.green_channel = ~~font_common["greenChnl"]->as_int();
+    font.common.blue_channel  = ~~font_common["blueChnl"]->as_int();
+
+    i := 0;
+    for page: root["pages"]->as_array() {
+        defer i += 1;
+
+        font.pages[i] = page->as_str();
+    }
+
+    for ch: root["chars"]->as_array() {
+        id := cast(i32) ch["id"]->as_int();
+        font.glyphs[id] = .{
+            id = id,
+
+            x = ~~ch["x"]->as_int(),
+            y = ~~ch["y"]->as_int(),
+            w = ~~ch["width"]->as_int(),
+            h = ~~ch["height"]->as_int(),
+
+            xoffset  = ~~ch["xoffset"]->as_int(),
+            yoffset  = ~~ch["yoffset"]->as_int(),
+            xadvance = ~~ch["xadvance"]->as_int(),
+
+            page    = ~~ch["page"]->as_int(),
+            channel = ~~ch["chnl"]->as_int(),
+        };
     }
 }

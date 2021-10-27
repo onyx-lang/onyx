@@ -14,5 +14,9 @@ main :: (args: [] cstr) {
         sum += *it;
     });
 
+    for it: bucket_array.iterator(^ba) {
+        printf("{}\n", it);
+    }
+
     printf("Sum is {}\n", sum);
 }

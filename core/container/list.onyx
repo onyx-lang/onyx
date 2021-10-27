@@ -120,6 +120,4 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
 }
 
 #private_file
-allocate_elem :: (list: ^List($T)) -> ^ListElem(T) {
-    return new(#type ListElem(T), allocator=list.allocator);
-}
+allocate_elem :: macro (list: ^List($T)) => new(#type ListElem(T), allocator=list.allocator);

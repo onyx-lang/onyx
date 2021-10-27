@@ -279,7 +279,7 @@ Immediate_Renderer :: struct {
         gl.uniform1i(active_shader.texture_uniform, math.max(texture_id, 0));
     }
 
-    use_ortho_projection :: (use ir: ^Immediate_Renderer, left: f32, right: f32, top: f32, bottom: f32) {
+    use_ortho_projection :: (use ir: ^Immediate_Renderer, left, right, top, bottom: f32) {
         projection_matrix := f32.[
             2 / (right - left), 0, 0, 0,
             0, 2 / (top - bottom), 0, 0,
@@ -297,7 +297,7 @@ Immediate_Renderer :: struct {
         gl.useProgram(active_shader.program);
     }
 
-    push_scissor :: (use ir: ^Immediate_Renderer, x: f32, y: f32, w: f32, h: f32) {
+    push_scissor :: (use ir: ^Immediate_Renderer, x, y, w, h: f32) {
         if vertex_count > 0 do ir->flush();
 
         if !gl.isEnabled(gl.SCISSOR_TEST) {
@@ -367,7 +367,7 @@ Immediate_Renderer :: struct {
         }
     }
 
-    set_window_size :: (use ir: ^Immediate_Renderer, width: i32, height: i32) {
+    set_window_size :: (use ir: ^Immediate_Renderer, width, height: i32) {
         window_width = width;
         window_height = height;
 

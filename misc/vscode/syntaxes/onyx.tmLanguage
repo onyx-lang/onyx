@@ -267,7 +267,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(str|cstr)\b</string>
+					<string>\b(str|cstr|type_expr|any)\b</string>
 					<key>name</key>
 					<string>storage.type.onyx</string>
 				</dict>
@@ -303,13 +303,13 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[!]?\s*[\(]</string>
+					<string>(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*[\(]</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>support.function.onyx</string>
+							<string>entity.name.function.onyx</string>
 						</dict>
 					</dict>
 				</dict>
