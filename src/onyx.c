@@ -31,7 +31,10 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "The compiler for the Onyx programming language, created by Brendan Hansen.\n"
     "\n"
     "Usage:\n"
-    "\tonyx [-o <target file>] [--verbose] <input files>\n"
+    "\tonyx compile [-o <target file>] [--verbose] <input files>\n"
+#ifdef ENABLE_RUN_WITH_WASMER
+    "\tonyx run <input files> -- <args>\n"
+#endif
     // "\tonyx doc <input files>\n"
     "\tonyx help\n"
     "\n"
@@ -90,6 +93,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     i32 arg_parse_start = 1;
 
     if (!strcmp(argv[1], "help"))     options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+    if (!strcmp(argv[1], "compile")) {
+        options.action = ONYX_COMPILE_ACTION_COMPILE;
+        arg_parse_start = 2;
+    }
     #ifdef ENABLE_RUN_WITH_WASMER
     else if (!strcmp(argv[1], "run")) {
         options.action = ONYX_COMPILE_ACTION_RUN;

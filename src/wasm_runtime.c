@@ -4,7 +4,7 @@
 #include "wasmer.h"
 
 #ifndef WASMER_VERSION
-    #error "Currently, building the Onyx compile with built-in execution support requires the Wasmer library to be compiled and linked."
+    #error "Currently, building the Onyx compiler with built-in execution support requires the Wasmer library to be compiled and linked."
 #endif
 
 void onyx_run_wasm(bh_buffer wasm_bytes) {
