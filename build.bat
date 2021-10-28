@@ -1,11 +1,11 @@
 @echo off
 
-set SOURCE_FILES=src/onyx.c src/astnodes.c src/builtins.c src/checker.c src/clone.c src/doc.c src/entities.c src/errors.c src/lex.c src/parser.c src/symres.c src/types.c src/utils.c src/wasm.c
+set SOURCE_FILES=src/onyx.c src/astnodes.c src/builtins.c src/checker.c src/clone.c src/doc.c src/entities.c src/errors.c src/lex.c src/parser.c src/symres.c src/types.c src/utils.c src/wasm_emit.c
 
 if "%1" == "1" (
-    set FLAGS=/O2 /MT /Z7
-) else (
     set FLAGS=/Od /MDd /Z7
+) else (
+    set FLAGS=/O2 /MT /Z7
 )
 
 del *.pdb > NUL 2> NUL

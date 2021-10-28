@@ -1239,6 +1239,7 @@ struct Package {
 typedef enum CompileAction CompileAction;
 enum CompileAction {
     ONYX_COMPILE_ACTION_COMPILE,
+    ONYX_COMPILE_ACTION_RUN,
     ONYX_COMPILE_ACTION_DOCUMENT,
     ONYX_COMPILE_ACTION_PRINT_HELP,
 };

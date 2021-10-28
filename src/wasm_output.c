@@ -655,24 +655,28 @@ static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
+void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
+    bh_buffer_init(buffer, global_heap_allocator, 128);
+    bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
+    bh_buffer_append(buffer, WASM_VERSION, 4);
+
+    output_typesection(module, buffer);
+    output_importsection(module, buffer);
+    output_funcsection(module, buffer);
+    output_tablesection(module, buffer);
+    output_memorysection(module, buffer);
+    output_globalsection(module, buffer);
+    output_exportsection(module, buffer);
+    output_startsection(module, buffer);
+    output_elemsection(module, buffer);
+    output_datacountsection(module, buffer);
+    output_codesection(module, buffer);
+    output_datasection(module, buffer);
+}
+
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {
     bh_buffer master_buffer;
-    bh_buffer_init(&master_buffer, global_heap_allocator, 128);
-    bh_buffer_append(&master_buffer, WASM_MAGIC_STRING, 4);
-    bh_buffer_append(&master_buffer, WASM_VERSION, 4);
-
-    output_typesection(module, &master_buffer);
-    output_importsection(module, &master_buffer);
-    output_funcsection(module, &master_buffer);
-    output_tablesection(module, &master_buffer);
-    output_memorysection(module, &master_buffer);
-    output_globalsection(module, &master_buffer);
-    output_exportsection(module, &master_buffer);
-    output_startsection(module, &master_buffer);
-    output_elemsection(module, &master_buffer);
-    output_datacountsection(module, &master_buffer);
-    output_codesection(module, &master_buffer);
-    output_datasection(module, &master_buffer);
+    onyx_wasm_module_write_to_buffer(module, &master_buffer);
 
     bh_file_write(&file, master_buffer.data, master_buffer.length);
 }

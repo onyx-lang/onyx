@@ -14,7 +14,7 @@
 
 
 #define BH_DEBUG
-#include "wasm.h"
+#include "wasm_emit.h"
 #include "utils.h"
 
 #define WASM_TYPE_INT32   0x7F

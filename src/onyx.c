@@ -6,7 +6,7 @@
 #include "errors.h"
 #include "parser.h"
 #include "utils.h"
-#include "wasm.h"
+#include "wasm_emit.h"
 #include "doc.h"
 
 #define VERSION "v0.1.0-beta"
@@ -84,12 +84,19 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     bh_arr_push(options.included_folders, ".");
 
     if (argc == 1) return options;
+    i32 arg_parse_start = 1;
 
     if (!strcmp(argv[1], "help"))     options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
+    #ifdef ENABLE_RUN_WITH_WASMER
+    else if (!strcmp(argv[1], "run")) {
+        options.action = ONYX_COMPILE_ACTION_RUN;
+        arg_parse_start = 2;
+    }
+    #endif
     else options.action = ONYX_COMPILE_ACTION_COMPILE;
 
     if (options.action != ONYX_COMPILE_ACTION_PRINT_HELP) {
-        fori(i, 1, argc) {
+        fori(i, arg_parse_start, argc) {
             if (!strcmp(argv[i], "-o")) {
                 options.target_file = argv[++i];
             }
@@ -496,6 +503,22 @@ static i32 onyx_compile() {
             entity_heap_insert_existing(&context.entities, ent);
     }
 
+    u64 duration = bh_time_duration(start_time);
+    
+    if (context.options->verbose_output > 0) {
+        // TODO: Replace these with bh_printf when padded formatting is added.
+        printf("\nStatistics:\n");
+        printf("    Time taken: %lf seconds\n", (double) duration / 1000);
+        printf("    Processed %ld lines (%f lines/second).\n", lexer_lines_processed, ((f32) 1000 * lexer_lines_processed) / (duration));
+        printf("    Processed %ld tokens (%f tokens/second).\n", lexer_tokens_processed, ((f32) 1000 * lexer_tokens_processed) / (duration));
+        printf("\n");
+    }
+
+    return ONYX_COMPILER_PROGRESS_SUCCESS;
+}
+
+CompilerProgress onyx_flush_module() {
+
     // NOTE: Output to file
     bh_file output_file;
     if (bh_file_create(&output_file, context.options->target_file) != BH_FILE_ERROR_NONE)
@@ -532,17 +555,6 @@ static i32 onyx_compile() {
         onyx_wasm_module_write_to_file(context.wasm_module, output_file);
     }
 
-    u64 duration = bh_time_duration(start_time);
-    
-    if (context.options->verbose_output > 0) {
-        // TODO: Replace these with bh_printf when padded formatting is added.
-        printf("\nStatistics:\n");
-        printf("    Time taken: %lf seconds\n", (double) duration / 1000);
-        printf("    Processed %ld lines (%f lines/second).\n", lexer_lines_processed, ((f32) 1000 * lexer_lines_processed) / (duration));
-        printf("    Processed %ld tokens (%f tokens/second).\n", lexer_tokens_processed, ((f32) 1000 * lexer_tokens_processed) / (duration));
-        printf("\n");
-    }
-
     if (context.options->documentation_file != NULL) {
         OnyxDocumentation docs = onyx_docs_generate();
         docs.format = Doc_Format_Human;
@@ -572,7 +584,21 @@ int main(int argc, char *argv[]) {
 
         case ONYX_COMPILE_ACTION_COMPILE:
             compiler_progress = onyx_compile();
+            if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
+                onyx_flush_module();
+            }
             break;
+
+        #ifdef ENABLE_RUN_WITH_WASMER
+        case ONYX_COMPILE_ACTION_RUN:
+            compiler_progress = onyx_compile();
+            if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
+                bh_buffer code_buffer;
+                onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
+                onyx_run_wasm(code_buffer);
+            }
+            break;
+        #endif
 
         default: break;
     }

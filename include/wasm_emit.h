@@ -674,6 +674,11 @@ typedef struct OnyxWasmModule {
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
 void onyx_wasm_module_free(OnyxWasmModule* module);
+void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
+
+#ifdef ENABLE_RUN_WITH_WASMER
+void onyx_run_wasm(bh_buffer code_buffer);
+#endif
 
 #endif
