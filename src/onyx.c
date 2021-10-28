@@ -74,6 +74,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .target_file = "out.wasm",
 
         .documentation_file = NULL,
+
+        .passthrough_argument_count = 0,
+        .passthrough_argument_data  = NULL,
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -148,6 +151,11 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--doc")) {
                 options.documentation_file = argv[++i];
+            }
+            else if (!strcmp(argv[i], "--")) {
+                options.passthrough_argument_count = argc - i - 1;
+                options.passthrough_argument_data  = &argv[i + 1];
+                break;
             }
 #if defined(_BH_LINUX)
             // NOTE: Fun output is only enabled for Linux because Windows command line
@@ -517,7 +525,7 @@ static i32 onyx_compile() {
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
-CompilerProgress onyx_flush_module() {
+static CompilerProgress onyx_flush_module() {
 
     // NOTE: Output to file
     bh_file output_file;
@@ -564,6 +572,18 @@ CompilerProgress onyx_flush_module() {
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
+#ifdef ENABLE_RUN_WITH_WASMER
+static void onyx_run() {
+    bh_buffer code_buffer;
+    onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
+
+    if (context.options->verbose_output > 0)
+        bh_printf("Running program:");
+
+    onyx_run_wasm(code_buffer);
+}
+#endif
+
 int main(int argc, char *argv[]) {
 
     bh_scratch_init(&global_scratch, bh_heap_allocator(), 256 * 1024); // NOTE: 256 KiB
@@ -593,9 +613,7 @@ int main(int argc, char *argv[]) {
         case ONYX_COMPILE_ACTION_RUN:
             compiler_progress = onyx_compile();
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
-                bh_buffer code_buffer;
-                onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
-                onyx_run_wasm(code_buffer);
+                onyx_run();
             }
             break;
         #endif

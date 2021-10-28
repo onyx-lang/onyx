@@ -32,9 +32,6 @@ File :: struct {
 }
 
 file_open :: (path: str, mode := OpenMode.Read, flags := FDFlags.Sync) -> (File, bool) {
-    // Currently the directory's file descriptor appears to always be 3
-    DIR_FD :: 3;
-
     // Requesting all of the rights because why not.
     rights :=
         Rights.DataSync
@@ -87,24 +84,28 @@ file_open :: (path: str, mode := OpenMode.Read, flags := FDFlags.Sync) -> (File,
     }
 
     file := File.{ fd = -1 };
-
-    if err := wasi.path_open(
-        DIR_FD,
-        .SymLinkFollow,
-        path,
-        open_flags,
-        rights,
-        rights,
-        fd_flags,
-        ^file.fd);
-        err != .Success {
-        return file, false;
-    }
-
     file.mode   = mode;
     file.rights = rights;
     file.flags  = fd_flags;
-    return file, true;
+
+    // Currently the directory's file descriptor appears to always be 3
+    // However, this is not necessarily correct, so also try a preopened directory
+    for DIR_FD: .[ 3, 4 ] {
+        if err := wasi.path_open(
+            DIR_FD,
+            .SymLinkFollow,
+            path,
+            open_flags,
+            rights,
+            rights,
+            fd_flags,
+            ^file.fd);
+            err == .Success {
+                return file, true;        
+        }
+    }
+
+    return file, false;
 }
 
 file_close :: (file: File) -> bool {

@@ -1,4 +1,5 @@
 #include "bh.h"
+#include "astnodes.h"
 #include "wasm.h"
 #include "wasmer.h"
 
@@ -15,7 +16,13 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
     }
 
     wasi_config_t* wasi_config = wasi_config_new("onyx");
-    wasi_config_preopen_dir(wasi_config, ".");
+    if (context.options->passthrough_argument_count > 0) {
+        fori (i, 0, context.options->passthrough_argument_count) {
+            wasi_config_arg(wasi_config, context.options->passthrough_argument_data[i]);
+        }
+    }
+
+    wasi_config_preopen_dir(wasi_config, "./");
 
     wasi_env_t* wasi_env  = wasi_env_new(wasi_config);
 

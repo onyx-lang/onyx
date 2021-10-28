@@ -1277,6 +1277,9 @@ struct CompileOptions {
     bh_arr(const char *) files;
     const char* target_file;
     const char* documentation_file;
+
+    i32    passthrough_argument_count;
+    char** passthrough_argument_data;
 };
 
 typedef struct Context Context;
