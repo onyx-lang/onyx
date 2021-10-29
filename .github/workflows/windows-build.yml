@@ -30,7 +30,7 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Build a release build
-        run: cmd.exe /c 'build.bat 1'
+        run: cmd.exe /c 'build.bat'
 
       - name: Upload executable file
         uses: actions/upload-artifact@v2
