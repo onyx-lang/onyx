@@ -9,6 +9,8 @@ version out there in a packaged format.
 
 Additions:
 * Multi-threading for the JS backend (--use-multi-threading)
+* Running Onyx directly from the compiler using 'onyx run'
+    - This internally links with libwasmer to provide the WASM runtime.
 * threading primitives (mutex, semaphore, etc.)
 * atomic intrinsics
 * Quick-Functions
