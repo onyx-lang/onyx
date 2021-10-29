@@ -27,11 +27,11 @@ else
     TARGET='./bin/onyx'
 fi
 
-if [ ! -z "$ONYX_ENABLE_RUN_WITH_WASMER" ]; then
+if true; then
     C_FILES="$C_FILES wasm_runtime"
     FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
-    LIBS="$(wasmer config --libs) -Wl,-rpath=$(wasmer config --libdir)"
-    INCLUDES="$(wasmer config --cflags)"
+    LIBS="-L$(pwd)/lib/linux/lib -lwasmer -Wl,-rpath=$(pwd)/lib/linux/lib"
+    INCLUDES="-I$(pwd)/lib/linux/include"
 fi
 
 BUILD_DIR='./build'

@@ -585,7 +585,7 @@ static void onyx_run() {
     onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
 
     if (context.options->verbose_output > 0)
-        bh_printf("Running program:");
+        bh_printf("Running program:\n");
 
     onyx_run_wasm(code_buffer);
 }

@@ -8,14 +8,23 @@
 #endif
 
 void onyx_run_wasm(bh_buffer wasm_bytes) {
-    wasm_config_t* config = wasm_config_new();
+    wasm_config_t*   config = NULL;
+    wasi_config_t*   wasi_config = NULL;
+    wasi_env_t*      wasi_env = NULL;
+    wasm_engine_t*   engine = NULL;
+    wasm_store_t*    store = NULL;
+    wasm_module_t*   module = NULL;
+    wasm_instance_t* instance = NULL;
+
+    config = wasm_config_new();
+    if (!config) goto error_handling;
 
     // Prefer the LLVM compile because it is faster. This should be configurable from the command line and/or a top-level directive.
     if (wasmer_is_compiler_available(LLVM)) {
         wasm_config_set_compiler(config, LLVM);
     }
 
-    wasi_config_t* wasi_config = wasi_config_new("onyx");
+    wasi_config = wasi_config_new("onyx");
     if (context.options->passthrough_argument_count > 0) {
         fori (i, 0, context.options->passthrough_argument_count) {
             wasi_config_arg(wasi_config, context.options->passthrough_argument_data[i]);
@@ -24,19 +33,20 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
 
     wasi_config_preopen_dir(wasi_config, "./");
 
-    wasi_env_t* wasi_env  = wasi_env_new(wasi_config);
+    wasi_env  = wasi_env_new(wasi_config);
+    if (!wasi_env) goto error_handling;
 
-    wasm_engine_t* engine = wasm_engine_new_with_config(config);
+    engine = wasm_engine_new_with_config(config);
     if (!engine) goto error_handling;
 
-    wasm_store_t*  store  = wasm_store_new(engine);
+    store  = wasm_store_new(engine);
     if (!store) goto error_handling;
 
     wasm_byte_vec_t wasm_data;
     wasm_data.size = wasm_bytes.length;
     wasm_data.data = wasm_bytes.data;
 
-    wasm_module_t* module = wasm_module_new(store, &wasm_data);
+    module = wasm_module_new(store, &wasm_data);
     if (!module) goto error_handling;
 
     wasm_extern_vec_t imports = WASM_EMPTY_VEC;
@@ -44,7 +54,7 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
 
     wasm_trap_t* traps = NULL;
 
-    wasm_instance_t* instance = wasm_instance_new(store, module, &imports, &traps);
+    instance = wasm_instance_new(store, module, &imports, &traps);
     if (!instance) goto error_handling;
 
     // Find the start function
@@ -79,9 +89,10 @@ error_handling:
     bh_printf("An error occured trying to run the WASM module...\n");
 
 cleanup:
-    if (instance) wasm_instance_delete(instance);
-    if (module)   wasm_module_delete(module);
-    if (store)    wasm_store_delete(store);
-    if (engine)   wasm_engine_delete(engine);
+    if (instance)    wasm_instance_delete(instance);
+    if (module)      wasm_module_delete(module);
+    if (store)       wasm_store_delete(store);
+    if (engine)      wasm_engine_delete(engine);
+    if (wasi_env)    wasi_env_delete(wasi_env);
     return;
 }

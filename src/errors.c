@@ -42,7 +42,7 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     if (colored_printing) bh_printf("\033[91m");
     bh_printf("%s\n", pointer_str);
 
-    if (colored_printing) bh_printf("\033[97m");
+    if (colored_printing) bh_printf("\033[0m");
 }
 
 void onyx_errors_print() {
