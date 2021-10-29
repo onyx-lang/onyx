@@ -93,6 +93,5 @@ cleanup:
     if (module)      wasm_module_delete(module);
     if (store)       wasm_store_delete(store);
     if (engine)      wasm_engine_delete(engine);
-    if (wasi_env)    wasi_env_delete(wasi_env);
     return;
 }
