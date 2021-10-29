@@ -21,6 +21,6 @@ if "%ONYX_ENABLE_RUN_WITH_WASMER%" == "1" (
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl.exe %FLAGS% /Iinclude /std:c17 /Tc %SOURCE_FILES% /link %LINK_OPTIONS% /DEBUG /OUT:onyx.exe /incremental:no /opt:ref /subsystem:console
+cl.exe %FLAGS% /Iinclude /std:c17 /TC %SOURCE_FILES% /link /IGNORE:4217 %LINK_OPTIONS% /DEBUG /OUT:onyx.exe /incremental:no /opt:ref /subsystem:console
 
 del *.obj > NUL 2> NUL
