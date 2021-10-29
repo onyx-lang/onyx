@@ -7,19 +7,11 @@ for /r tests %%v in (*.onyx) do (
     echo Checking %%~pv%%~nv.onyx
 
     set ERRORLEVEL=0
-    %ONYX_DIR%\onyx.exe -r js --use-post-mvp-features "%%v" -o "%ONYX_DIR%\tests\%%~nv.wasm"
+    %ONYX_DIR%\onyx.exe run "%%v" > %ONYX_DIR%\tmpoutput
     if %ERRORLEVEL% GEQ 1 (
         echo Failed to compile %%~nv.onyx.
         set failed=1
-        goto ::continue::
-    )
-
-    set ERRORLEVEL=0
-    node %ONYX_DIR%\bin\onyx-js "%ONYX_DIR%\tests\%%~nv.wasm" > %ONYX_DIR%\tmpoutput
-    if %ERRORLEVEL% GEQ 1 (
-        echo Failed to run %%~nv.onyx.
-        set failed=1
-        goto ::continue::
+        goto continue
     )
 
     set ERRORLEVEL=0
@@ -27,11 +19,10 @@ for /r tests %%v in (*.onyx) do (
     if %ERRORLEVEL% GEQ 1 (
         echo Output did not match for %%~nv.onyx.
         set failed=1
-        goto ::continue::
     )
 
 ::continue::
-    del %ONYX_DIR%\tests\%%~nv.wasm > nul
+    del %ONYX_DIR%\tmpoutput
 )
 
 del %ONYX_DIR%\tmpoutput

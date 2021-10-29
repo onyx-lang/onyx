@@ -137,7 +137,7 @@ main :: (args: [] cstr) {
         printf("Answer: {}\n", combat_score);
     }
 
-    {
+    #if false {
         key_arena = alloc.arena.make(context.allocator, 1 << 14);
         key_alloc = alloc.arena.make_allocator(^key_arena);
 

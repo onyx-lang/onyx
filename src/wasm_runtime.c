@@ -65,7 +65,7 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
         wasm_exporttype_t* export_type = export_types.data[i];
         const wasm_name_t* export_name = wasm_exporttype_name(export_type);
         
-        if (!strcmp(export_name->data, "_start")) {
+        if (!strncmp(export_name->data, "_start", 6)) {
             start_function_idx = i;
             break;
         }
