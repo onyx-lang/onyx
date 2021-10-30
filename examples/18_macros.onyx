@@ -89,9 +89,9 @@ main :: (args: [] cstr) {
     // Because simple_code is a compile-time value, it can be passed to procedures as so:
     triple :: ($body: Code) {
         println("Running 3 times!");
-        #insert simple_code;
-        #insert simple_code;
-        #insert simple_code;
+        #insert body;
+        #insert body;
+        #insert body;
     }
 
     triple(simple_code);
@@ -100,12 +100,16 @@ main :: (args: [] cstr) {
     // compile-time parameter (the '$').
     triple_macro :: macro (body: Code) {
         println("Running 3 times in a macro!");
-        #insert simple_code;
-        #insert simple_code;
-        #insert simple_code;
+        #insert body;
+        #insert body;
+        #insert body;
     }
 
     triple_macro(simple_code);
+
+    // As another small shorthand, if a code block only contains one expression (like the code block above),
+    // then you can write by wrapping the expression in #(...).
+    triple_macro(#(println("Short code block!")));
 }
 
 #load "core/std"
