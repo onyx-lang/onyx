@@ -1159,6 +1159,10 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             AstDirectiveExport *export = (AstDirectiveExport *) directive;
             SYMRES(expression, &export->export);
 
+            if (export->export->kind == Ast_Kind_Polymorphic_Proc) {
+                onyx_report_error(export->token->pos, "Cannot export a polymorphic function.");
+                return Symres_Error;
+            }
 
             if (export->export->kind == Ast_Kind_Function) {
                 AstFunction *func = (AstFunction *) export->export;
@@ -1167,18 +1171,18 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
                 if (func->is_exported) {
                     if (func->is_foreign) {
-                        onyx_report_error(export->token->pos, "exporting a foreign function");
+                        onyx_report_error(export->token->pos, "Cannot export a foreign function.");
                         return Symres_Error;
                     }
 
                     if (func->is_intrinsic) {
-                        onyx_report_error(export->token->pos, "exporting a intrinsic function");
+                        onyx_report_error(export->token->pos, "Cannot export an intrinsic function.");
                         return Symres_Error;
                     }
 
                     // NOTE: This should never happen
                     if (func->exported_name == NULL) {
-                        onyx_report_error(export->token->pos, "exporting function without a name");
+                        onyx_report_error(export->token->pos, "Cannot export function without a name.");
                         return Symres_Error;
                     }
                 }

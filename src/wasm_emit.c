@@ -3714,6 +3714,13 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         module.export_count++;
     }
 
+    WasmExport func_table_export = {
+        .kind = WASM_FOREIGN_TABLE,
+        .idx  = 0,
+    };
+    bh_table_put(WasmExport, module.exports, "func_table", func_table_export);
+    module.export_count++;
+
     return module;
 }
 
