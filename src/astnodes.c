@@ -503,36 +503,35 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* type) {
     return 0;
 }
 
-// NOTE: Returns 0 if it was not possible to make the types compatible.
 // TODO: This function should be able return a "yield" condition. There
 // are a couple cases that need to yield in order to be correct, like
 // polymorphic functions with a typeof for the return type.
-b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
+TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     AstTyped* node = *pnode;
-    if (type == NULL) return 0;
-    if (node == NULL) return 0;
+    if (type == NULL) return TYPE_MATCH_FAILED;
+    if (node == NULL) return TYPE_MATCH_FAILED;
 
     if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
-        if (node->entity != NULL) return 1;
+        if (node->entity != NULL) return TYPE_MATCH_SUCCESS;
         if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.elem;
-        if (!type_is_sl_constructable(type)) return 0;
+        if (!type_is_sl_constructable(type)) return TYPE_MATCH_FAILED;
 
         // If this shouldn't make permanent changes and submit entities,
         // just assume that it works and don't submit the entities.
-        if (!permanent) return 1;
+        if (!permanent) return TYPE_MATCH_SUCCESS;
 
         node->type = type;
 
         add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
-        return 1;
+        return TYPE_MATCH_SUCCESS;
     }
 
     if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
-        if (node->entity != NULL) return 1;
+        if (node->entity != NULL) return TYPE_MATCH_SUCCESS;
 
         // If this shouldn't make permanent changes and submit entities,
         // just assume that it works and don't submit the entities.
-        if (!permanent) return 1;
+        if (!permanent) return TYPE_MATCH_SUCCESS;
 
         Type* array_type=NULL;
         switch (type->kind) {
@@ -554,21 +553,21 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         node->flags |= Ast_Flag_Array_Literal_Typed;
 
         add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
-        return 1;
+        return TYPE_MATCH_SUCCESS;
     }
 
     if (node->kind == Ast_Kind_Unary_Field_Access) {
         AstType* ast_type = type->ast_type;
         AstNode* resolved = try_symbol_resolve_from_node((AstNode *) ast_type, node->token);
-        if (resolved == NULL) return 0;
+        if (resolved == NULL) return TYPE_MATCH_FAILED;
 
         if (permanent) *pnode = (AstTyped *) resolved;
-        return 1;
+        return TYPE_MATCH_SUCCESS;
     }
 
     if (node->kind == Ast_Kind_Overloaded_Function) {
         AstTyped* func = find_matching_overload_by_type(((AstOverloadedFunction *) node)->overloads, type);
-        if (func == NULL) return 0;
+        if (func == NULL) return TYPE_MATCH_FAILED;
 
         // HACK: It feels like there should be a better place to flag that a procedure was definitely used.
         if (func->kind == Ast_Kind_Function)
@@ -580,10 +579,10 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
-        if (func == NULL) return 0;
+        if (func == NULL) return TYPE_MATCH_FAILED;
 
         // FIXME: This is incorrect. It should actually yield and not return a failure.
-        if (func == (AstFunction *) &node_that_signals_a_yield) return 0;
+        if (func == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
         *pnode = (AstTyped *) func;
         node = *pnode;
@@ -592,14 +591,14 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // HACK: NullProcHack
     // The null_proc matches any procedure, and because of that, will cause a runtime error if you
     // try to call it.
-    if (type->kind == Type_Kind_Function && (node->flags & Ast_Flag_Proc_Is_Null) != 0) return 1;
+    if (type->kind == Type_Kind_Function && (node->flags & Ast_Flag_Proc_Is_Null) != 0) return TYPE_MATCH_SUCCESS;
 
     // The normal case where everything works perfectly.
     Type* node_type = get_expression_type(node);
-    if (types_are_compatible(node_type, type)) return 1;
+    if (types_are_compatible(node_type, type)) return TYPE_MATCH_SUCCESS;
 
     i64 any_id = type_build_from_ast(context.ast_alloc, builtin_any_type)->id;
-    if (node_type && node_type->id != any_id && type->id == any_id) return 1;
+    if (node_type && node_type->id != any_id && type->id == any_id) return TYPE_MATCH_SUCCESS;
 
     // Here are some of the ways you can unify a node with a type if the type of the
     // node does not match the given type:
@@ -612,7 +611,7 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         && type->kind == Type_Kind_Function) {
 
         node_type->Function.return_type = type->Function.return_type;
-        return 1;
+        return TYPE_MATCH_SUCCESS;
     }
 
     // If the node is an auto cast (~~) node, then check to see if the cast is legal
@@ -621,11 +620,11 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         char* dummy;
         Type* from_type = get_expression_type(((AstUnaryOp *) node)->expr);
         if (!from_type || !cast_is_legal(from_type, type, &dummy)) {
-            return 0;
+            return TYPE_MATCH_FAILED;
 
         } else {
             if (permanent) ((AstUnaryOp *) node)->type = type;
-            return 1;
+            return TYPE_MATCH_SUCCESS;
         }
     }
 
@@ -643,47 +642,53 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
             }
 
-            return legal;
+            return legal ? TYPE_MATCH_SUCCESS : TYPE_MATCH_FAILED;
         }
     }
 
     // If the node is a numeric literal, try to convert it to the destination type.
     else if (node->kind == Ast_Kind_NumLit) {
-        if (convert_numlit_to_type((AstNumLit *) node, type)) return 1;
+        if (convert_numlit_to_type((AstNumLit *) node, type)) return TYPE_MATCH_SUCCESS;
     }
 
     // If the node is a compound expression, and it doesn't have a type created,
     // recursive call this function with the individual components of the compound
     // expression.
     else if (node->kind == Ast_Kind_Compound) {
-        if (type->kind != Type_Kind_Compound) return 0;
+        if (type->kind != Type_Kind_Compound) return TYPE_MATCH_FAILED;
 
         AstCompound* compound = (AstCompound *) node;
 
         u32 expr_count = bh_arr_length(compound->exprs);
-        if (expr_count != type->Compound.count) return 0;
+        if (expr_count != type->Compound.count) return TYPE_MATCH_FAILED;
 
         fori (i, 0, (i64) expr_count) {
-            if (!unify_node_and_type_(&compound->exprs[i], type->Compound.types[i], permanent)) return 0;
+            TypeMatch tm = unify_node_and_type_(&compound->exprs[i], type->Compound.types[i], permanent);
+            if (tm != TYPE_MATCH_SUCCESS) {
+                return tm;
+            }
         }
 
         compound->type = type_build_compound_type(context.ast_alloc, compound);
         
-        return 1;
+        return TYPE_MATCH_SUCCESS;
     }
 
     else if (node->kind == Ast_Kind_If_Expression) {
         AstIfExpression* if_expr = (AstIfExpression *) node;
 
-        b32 true_success  = unify_node_and_type_(&if_expr->true_expr,  type, permanent);
-        b32 false_success = unify_node_and_type_(&if_expr->false_expr, type, permanent);
+        TypeMatch true_success  = unify_node_and_type_(&if_expr->true_expr,  type, permanent);
+        TypeMatch false_success = unify_node_and_type_(&if_expr->false_expr, type, permanent);
 
-        if (true_success && false_success) {
+        if (true_success == TYPE_MATCH_SUCCESS && false_success == TYPE_MATCH_SUCCESS) {
             if (permanent) if_expr->type = type;
-            return 1;
+            return TYPE_MATCH_SUCCESS;
+
+        } else if (true_success == TYPE_MATCH_FAILED || false_success == TYPE_MATCH_FAILED) {
+            return TYPE_MATCH_FAILED;
 
         } else {
-            return 0;
+            return TYPE_MATCH_YIELD;
         }
     }
 
@@ -692,7 +697,7 @@ b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         return unify_node_and_type_(&alias->alias, type, permanent);
     }
 
-    return 0;
+    return TYPE_MATCH_FAILED;
 }
 
 Type* resolve_expression_type(AstTyped* node) {

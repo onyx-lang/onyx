@@ -364,6 +364,13 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
 
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
+        if (overload == (AstFunction *) &node_that_signals_a_yield) {
+            // If it was not possible to create the type for this procedure, tell the
+            // caller that this should yield and try again later.
+            if (should_yield) *should_yield = 1;
+
+            return NULL;
+        }
         if (overload->kind != Ast_Kind_Function) continue;
         if (overload->type == NULL) {
             // If it was not possible to create the type for this procedure, tell the
@@ -383,9 +390,15 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         if (!fill_in_arguments(&args, (AstNode *) overload, NULL)) continue;
         
         VarArgKind va_kind;
-        if (check_arguments_against_type(&args, &overload->type->Function, &va_kind, NULL, NULL, NULL)) {
+        TypeMatch tm = check_arguments_against_type(&args, &overload->type->Function, &va_kind, NULL, NULL, NULL);
+        if (tm == TYPE_MATCH_SUCCESS) {
             matched_overload = node;
             break;
+        }
+
+        if (tm == TYPE_MATCH_YIELD) {
+            if (should_yield) *should_yield = 1;
+            return NULL;
         }
     }
 
@@ -407,9 +420,14 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
         AstTyped* node = (AstTyped *) entry->key;
         if (node->kind == Ast_Kind_Overloaded_Function) continue;
 
-        if (unify_node_and_type(&node, type)) {
+        TypeMatch tm = unify_node_and_type(&node, type);
+        if (tm == TYPE_MATCH_SUCCESS) {
             matched_overload = node;
             break;
+        }
+
+        if (tm == TYPE_MATCH_YIELD) {
+            return (AstTyped *) &node_that_signals_a_yield;
         }
     }
     
@@ -527,65 +545,13 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
             }
 
             // CLEANUP Copy'n'pasted from polymorphic_proc_build_only_header
-            AstSolidifiedFunction solidified_func;
-
-            char* unique_key = build_poly_slns_unique_key(slns);
-            if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
-                solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
-
-            } else {
-                // NOTE: This function is only going to have the header of it correctly created.
-                // Nothing should happen to this function's body or else the original will be corrupted.
-                //                                                      - brendanfh 2021/01/10
-                solidified_func = generate_solidified_function(pp, slns, callsite, 1);
-            }
-
-            if (solidified_func.header_complete) return solidified_func.func;
-
-            Entity func_header_entity = {
-                .state = Entity_State_Resolve_Symbols,
-                .type = Entity_Type_Function_Header,
-                .function = solidified_func.func,
-                .package = NULL,
-                .scope = solidified_func.func->poly_scope,
-            };
-
-            b32 successful = entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
-            if (onyx_has_errors()) return NULL;
-
-            solidified_func.header_complete = successful;
-
-            bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
-            if (!successful) return (AstFunction *) &node_that_signals_a_yield;
-
-            return solidified_func.func;
+            return polymorphic_proc_build_only_header_with_slns(pp, slns);
         }
 
         default: assert(("Bad macro body type.", 0));
     }
 
     return NULL;
-}
-
-b32 entity_bring_to_state(Entity* ent, EntityState state) {
-    EntityState last_state = ent->state;
-
-    while (ent->state != state) {
-        switch (ent->state) {
-            case Entity_State_Resolve_Symbols: symres_entity(ent); break;
-            case Entity_State_Check_Types:     check_entity(ent);  break;
-            case Entity_State_Code_Gen:        emit_entity(ent);   break;
-
-            default: return 0;
-        }
-
-        if (ent->state == last_state) return 0;
-        last_state = ent->state;
-
-        if (onyx_has_errors()) return 0;
-    }
-
-    return 1;
 }
 
 
@@ -788,8 +754,8 @@ typedef enum ArgState {
     AS_Expecting_Untyped_VA,
 } ArgState;
 
-b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
-                                 OnyxToken* location, char* func_name, OnyxError* error) {
+TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
+                                       OnyxToken* location, char* func_name, OnyxError* error) {
     b32 permanent = location != NULL;
     if (func_name == NULL) func_name = "UNKNOWN FUNCTION";
 
@@ -821,7 +787,9 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
                 if (arg_pos >= (u32) bh_arr_length(arg_arr)) goto type_checking_done;
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
-                if (!unify_node_and_type_(&arg_arr[arg_pos]->value, formal_params[arg_pos], permanent)) {
+                TypeMatch tm = unify_node_and_type_(&arg_arr[arg_pos]->value, formal_params[arg_pos], permanent);
+                if (tm == TYPE_MATCH_YIELD) return tm;
+                if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos,
                         error->text = bh_aprintf(global_heap_allocator,
@@ -832,7 +800,7 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
                                 bh_num_suffix(arg_pos + 1),
                                 node_get_type_name(arg_arr[arg_pos]->value));
                     }
-                    return 0;
+                    return tm;
                 }
 
                 if (arg_arr[arg_pos]->value->type && arg_arr[arg_pos]->value->type->id != any_type_id && formal_params[arg_pos]->id == any_type_id) {
@@ -856,7 +824,7 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
                             error->pos = arg_arr[arg_pos]->token->pos;
                             error->text = "Unable to resolve type of argument.";
                         }
-                        return 0;
+                        return TYPE_MATCH_FAILED;
                     }
 
                     arg_arr[arg_pos]->va_kind = VA_Kind_Any; 
@@ -866,7 +834,9 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
                 *va_kind = VA_Kind_Typed;
 
                 assert(arg_arr[arg_pos]->kind == Ast_Kind_Argument);
-                if (!unify_node_and_type_(&arg_arr[arg_pos]->value, variadic_type, permanent)) {
+                TypeMatch tm = unify_node_and_type_(&arg_arr[arg_pos]->value, variadic_type, permanent);
+                if (tm == TYPE_MATCH_YIELD) return tm;
+                if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
                         error->pos = arg_arr[arg_pos]->token->pos,
                         error->text = bh_aprintf(global_heap_allocator,
@@ -875,7 +845,7 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
                             type_get_name(variadic_type),
                             node_get_type_name(arg_arr[arg_pos]->value));
                     }
-                    return 0;
+                    return tm;
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Typed;
@@ -894,7 +864,7 @@ b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarAr
                         error->pos = arg_arr[arg_pos]->token->pos;
                         error->text = "Unable to resolve type for argument.";
                     }
-                    return 0;
+                    return TYPE_MATCH_FAILED;
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Untyped;
@@ -911,7 +881,7 @@ type_checking_done:
             error->pos = location->pos;
             error->text = "Too few arguments to function call.";
         }
-        return 0;
+        return TYPE_MATCH_FAILED;
     }
 
     if (arg_pos < (u32) arg_count) {
@@ -919,10 +889,10 @@ type_checking_done:
             error->pos = location->pos;
             error->text = bh_aprintf(global_heap_allocator, "Too many arguments to function call. %d %d", arg_pos, arg_count);
         }
-        return 0;
+        return TYPE_MATCH_FAILED;
     }
 
-    return 1;
+    return TYPE_MATCH_SUCCESS;
 }
         
 

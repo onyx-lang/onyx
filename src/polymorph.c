@@ -106,9 +106,6 @@ static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_fun
         .scope = solidified_func.func->poly_scope,
     };
 
-    entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
-    if (onyx_has_errors()) return 0;
-
     Entity func_entity = {
         .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Function,
@@ -120,6 +117,7 @@ static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_fun
     Entity* entity_header = entity_heap_insert(&context.entities, func_header_entity);
     Entity* entity_body   = entity_heap_insert(&context.entities, func_entity);
 
+    solidified_func.func_header_entity  = entity_header;
     solidified_func.func->entity_header = entity_header;
     solidified_func.func->entity_body   = entity_body;
 
@@ -137,7 +135,7 @@ static AstSolidifiedFunction generate_solidified_function(
     b32 header_only) {
 
     AstSolidifiedFunction solidified_func;
-    solidified_func.header_complete = 0;
+    solidified_func.func_header_entity = NULL;
 
     // NOTE: Use the position of token if one was provided, otherwise just use NULL.
     OnyxFilePos poly_scope_pos = { 0 };
@@ -502,7 +500,8 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
             value_to_use = (AstTyped *) get_function_from_node((AstNode *) value);
         }
 
-        if (!unify_node_and_type(&value_to_use, param->type)) {
+        TypeMatch tm = unify_node_and_type(&value_to_use, param->type);
+        if (tm == TYPE_MATCH_FAILED) {
             if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
                     "The procedure '%s' expects a value of type '%s' for baked %d%s parameter, got '%s'.",
                     get_function_name(pp->base_func),
@@ -512,6 +511,8 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
                     node_get_type_name(value_to_use));
             return;
         }
+
+        if (tm == TYPE_MATCH_YIELD) flag_to_yield = 1;
 
         *resolved = ((PolySolveResult) { PSK_Value, value });
     }
@@ -605,6 +606,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
     if (slns == NULL) {
         if (flag_to_yield) {
             flag_to_yield = 0;
+            bh_arr_free(slns);
             return (AstFunction *) &node_that_signals_a_yield;
         }
 
@@ -647,12 +649,9 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     // NOTE: Cache the function for later use, reducing duplicate functions.
     bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
 
-    if (!add_solidified_function_entities(solidified_func, 0)) {
-        onyx_report_error(tkn->pos, "Error in polymorphic procedure header generated from this call site.");
-        return NULL;
-    }
+    add_solidified_function_entities(solidified_func, 0);
 
-    return solidified_func.func;
+    return (AstFunction *) &node_that_signals_a_yield;
 }
 
 // NOTE: This can return either a AstFunction or an AstPolyProc, depending if enough parameters were
@@ -712,6 +711,10 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 
     ensure_polyproc_cache_is_created(pp);
 
+    return polymorphic_proc_build_only_header_with_slns(pp, slns);
+}
+
+AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_arr(AstPolySolution) slns) {
     AstSolidifiedFunction solidified_func;
 
     char* unique_key = build_poly_slns_unique_key(slns);
@@ -725,36 +728,23 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
         solidified_func = generate_solidified_function(pp, slns, NULL, 1);
     }
 
-    if (solidified_func.header_complete) return solidified_func.func;
+    if (solidified_func.func_header_entity && solidified_func.func_header_entity->state == Entity_State_Finalized) return solidified_func.func;
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,
-        .type = Entity_Type_Function_Header,
+        .type = Entity_Type_Temp_Function_Header,
         .function = solidified_func.func,
         .package = NULL,
         .scope = solidified_func.func->poly_scope,
     };
 
-    // HACK: Everything with entity_bring_to_state is a big hack...
-    // The idea is that instead of making the caller yield for a simple procedure header,
-    // do a single pass of trying to solve for the parameter types and return types.
-    // The big missing piece of the entity pumping system is that once an entity is
-    // entered into the system, it cannot be removed and it is assumed it is going to
-    // be used in the final binary. This is obviously not always the case, but that
-    // is how the system currently works.
-    b32 successful = entity_bring_to_state(&func_header_entity, Entity_State_Code_Gen);
-    if (onyx_has_errors()) {
-        onyx_errors_print();
-        onyx_clear_errors();
-        return NULL;
-    }
+    Entity* func_header_entity_ptr = entity_heap_insert(&context.entities, func_header_entity);
+    solidified_func.func_header_entity = func_header_entity_ptr;
 
-    solidified_func.header_complete = successful;
-
-    // NOTE: Cache the function for later use, only if it didn't have errors in its header.
+    // NOTE: Cache the function for later use.
     bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
     
-    return solidified_func.func;
+    return (AstFunction *) &node_that_signals_a_yield;
 }
 
 //

@@ -39,6 +39,16 @@
     return Check_Error; \
     } while (0)
 
+#define TYPE_CHECK_(expr, type, type_name)                                                      \
+    TypeMatch type_name;                                                                        \
+    type_name = unify_node_and_type(expr, type);                                                \
+    if (type_name == TYPE_MATCH_YIELD) YIELD((*expr)->token->pos, "Waiting on type checking."); \
+    if (type_name == TYPE_MATCH_FAILED)
+
+#define CONCAT(a, b) a##_##b
+#define DEFER_LINE(a, line) CONCAT(a, line)
+#define TYPE_CHECK(expr, type) TYPE_CHECK_(expr, type, DEFER_LINE(tc, __LINE__))
+
 typedef enum CheckStatus {
     Check_Success,  // The node was successfully checked with out errors
     Check_Complete, // The node is done processing
@@ -77,6 +87,7 @@ CheckStatus check_global(AstGlobal* global);
 CheckStatus check_function(AstFunction* func);
 CheckStatus check_overloaded_function(AstOverloadedFunction* func);
 CheckStatus check_struct(AstStructType* s_node);
+CheckStatus check_temp_function_header(AstFunction* func);
 CheckStatus check_function_header(AstFunction* func);
 CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
@@ -116,7 +127,7 @@ CheckStatus check_return(AstReturn* retnode) {
             return Check_Success;
         }
 
-        if (!unify_node_and_type(&retnode->expr, *expected_return_type)) {
+        TYPE_CHECK(&retnode->expr, *expected_return_type) {
             ERROR_(retnode->token->pos,
                     "Expected to return a value of type '%s', returning value of type '%s'.",
                     type_get_name(*expected_return_type),
@@ -334,7 +345,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 continue;
             }
 
-            if (!unify_node_and_type(value, resolved_expr_type)) {
+            TYPE_CHECK(value, resolved_expr_type) {
                 OnyxToken* tkn = sc->block->token;
                 if ((*value)->token) tkn = (*value)->token;
 
@@ -566,11 +577,14 @@ CheckStatus check_call(AstCall** pcall) {
     }
 
     OnyxError error;
-    if (!check_arguments_against_type(&call->args, &callee->type->Function, &call->va_kind,
-            call->token, get_function_name(callee), &error)) {
+    TypeMatch tm = check_arguments_against_type(&call->args, &callee->type->Function, &call->va_kind,
+                                                call->token, get_function_name(callee), &error);
+    if (tm == TYPE_MATCH_FAILED) {
         onyx_submit_error(error);
         return Check_Error;
     }
+
+    if (tm == TYPE_MATCH_YIELD) YIELD(call->token->pos, "Waiting on argument type checking.");
 
     call->flags   |= Ast_Flag_Has_Been_Checked;
     callee->flags |= Ast_Flag_Function_Used;
@@ -726,7 +740,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
         }
     }
 
-    if (!unify_node_and_type(&binop->right, binop->left->type)) {
+    TYPE_CHECK(&binop->right, binop->left->type) {
         ERROR_(binop->token->pos,
                 "Cannot assign value of type '%s' to a '%s'.",
                 node_get_type_name(binop->right),
@@ -812,8 +826,8 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
         b32 right_ac = node_is_auto_cast((AstNode *) binop->right);
 
         if (left_ac && right_ac) ERROR(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
-        else if (unify_node_and_type(&binop->left, rtype));
-        else if (unify_node_and_type(&binop->right, ltype));
+        else if (unify_node_and_type(&binop->left, rtype) == TYPE_MATCH_SUCCESS);  // @TODO: Should check for yield
+        else if (unify_node_and_type(&binop->right, ltype) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield
         else {
             ERROR_(binop->token->pos,
                     "Cannot compare '%s' to '%s'.",
@@ -903,8 +917,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     // :UnaryFieldAccessIsGross
     if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
-        if      (unify_node_and_type(&binop->left, binop->right->type));
-        else if (unify_node_and_type(&binop->right, binop->left->type));
+        if      (unify_node_and_type(&binop->left, binop->right->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
+        else if (unify_node_and_type(&binop->right, binop->left->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
         else {
             report_bad_binaryop(binop);
             return Check_Error;
@@ -973,8 +987,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
         if (left_ac && right_ac) {
             ERROR(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
         }
-        else if (unify_node_and_type(&binop->left, binop->right->type));
-        else if (unify_node_and_type(&binop->right, binop->left->type));
+        else if (unify_node_and_type(&binop->left, binop->right->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
+        else if (unify_node_and_type(&binop->right, binop->left->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
         else {
             ERROR_(binop->token->pos,
                     "Mismatched types for binary operation '%s'. left: '%s', right: '%s'.",
@@ -1130,7 +1144,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             YIELD_((*actual)->token->pos, "Trying to resolve type of expression for member '%s'.", smem.name);
         }
 
-        if (!unify_node_and_type(actual, formal)) {
+        TYPE_CHECK(actual, formal) {
             ERROR_(sl->token->pos,
                     "Mismatched types for %d%s member named '%s', expected '%s', got '%s'.",
                     i + 1, bh_num_suffix(i + 1),
@@ -1187,7 +1201,7 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
 
         al->flags &= ((*expr)->flags & Ast_Flag_Comptime) | (al->flags &~ Ast_Flag_Comptime);
 
-        if (!unify_node_and_type(expr, elem_type)) {
+        TYPE_CHECK(expr, elem_type) {
             ERROR_((*expr)->token->pos, "Mismatched types for value of in array, expected '%s', got '%s'.",
                 type_get_name(elem_type),
                 node_get_type_name(*expr));
@@ -1206,14 +1220,14 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     StructMember smem;
 
     type_lookup_member(expected_range_type, "low", &smem);
-    if (!unify_node_and_type(&range->low, smem.type)) {
+    TYPE_CHECK(&range->low, smem.type) {
         ERROR_(range->token->pos,
             "Expected left side of range to be a 32-bit integer, got '%s'.",
             node_get_type_name(range->low));
     }
 
     type_lookup_member(expected_range_type, "high", &smem);
-    if (!unify_node_and_type(&range->high, smem.type)) {
+    TYPE_CHECK(&range->high, smem.type) {
         ERROR_(range->token->pos,
             "Expected right side of range to be a 32-bit integer, got '%s'.",
             node_get_type_name(range->high));
@@ -1244,7 +1258,7 @@ CheckStatus check_if_expression(AstIfExpression* if_expr) {
     CHECK(expression, &if_expr->true_expr);
     CHECK(expression, &if_expr->false_expr);
 
-    if (!unify_node_and_type(&if_expr->cond, &basic_types[Basic_Kind_Bool])) {
+    TYPE_CHECK(&if_expr->cond, &basic_types[Basic_Kind_Bool]) {
         ERROR_(if_expr->token->pos, "If-expression expected boolean for condition, got '%s'.",
             type_get_name(if_expr->cond->type));
     }
@@ -1746,7 +1760,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
 
     Type* code_type = type_build_from_ast(context.ast_alloc, builtin_code_type);
 
-    if (!unify_node_and_type(&insert->code_expr, code_type)) {
+    TYPE_CHECK(&insert->code_expr, code_type) {
         ERROR_(insert->token->pos, "#insert expected a value of type 'Code', got '%s'.",
             type_get_name(insert->code_expr->type));
     }
@@ -1976,7 +1990,7 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
         if ((*smem)->initial_value && *(*smem)->initial_value) {
             CHECK(expression, (*smem)->initial_value);
 
-            if (!unify_node_and_type((*smem)->initial_value, (*smem)->type)) {
+            TYPE_CHECK((*smem)->initial_value, (*smem)->type) {
                 ERROR_((*(*smem)->initial_value)->token->pos,
                         "Mismatched type for initial value, expected '%s', got '%s'.",
                         type_get_name((*smem)->type),
@@ -2000,6 +2014,11 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
     }
 
     return Check_Success;
+}
+
+CheckStatus check_temp_function_header(AstFunction* func) {
+    CHECK(function_header, func);
+    return Check_Complete;
 }
 
 CheckStatus check_function_header(AstFunction* func) {
@@ -2116,7 +2135,7 @@ CheckStatus check_memres(AstMemRes* memres) {
 
         if (memres->type != NULL) {
             Type* memres_type = memres->type;
-            if (!unify_node_and_type(&memres->initial_value, memres_type)) {
+            TYPE_CHECK(&memres->initial_value, memres_type) {
                 ERROR_(memres->token->pos,
                         "Cannot assign value of type '%s' to a '%s'.",
                         node_get_type_name(memres->initial_value),
@@ -2357,6 +2376,7 @@ void check_entity(Entity* ent) {
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Function_Header:          cs = check_function_header(ent->function); break;
+        case Entity_Type_Temp_Function_Header:     cs = check_temp_function_header(ent->function); break;
         case Entity_Type_Function:                 cs = check_function(ent->function); break;
         case Entity_Type_Overloaded_Function:      cs = check_overloaded_function(ent->overloaded_function); break;
         case Entity_Type_Global:                   cs = check_global(ent->global); break;

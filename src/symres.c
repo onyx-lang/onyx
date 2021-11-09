@@ -751,6 +751,10 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
     }
 
     solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token);
+    if (solid->resolved_proc == (AstFunction *) &node_that_signals_a_yield) {
+        solid->resolved_proc = NULL;
+        return Symres_Yield_Macro;
+    }
 
     // NOTE: Not a DirectiveSolidify.
     *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
@@ -1241,6 +1245,7 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Static_If:               ss = symres_static_if(ent->static_if); break;
 
         case Entity_Type_Foreign_Function_Header:
+        case Entity_Type_Temp_Function_Header:
         case Entity_Type_Function_Header:         ss = symres_function_header(ent->function); break;
         case Entity_Type_Function:                ss = symres_function(ent->function);        break;
 

@@ -1009,9 +1009,8 @@ struct AstPolySolution {
 };
 
 struct AstSolidifiedFunction {
-    AstFunction* func;
-
-    b32 header_complete: 1;
+    AstFunction   *func;
+    struct Entity *func_header_entity;
 };
 
 struct AstPolyProc {
@@ -1145,6 +1144,7 @@ typedef enum EntityType {
     Entity_Type_Polymorphic_Proc,
     Entity_Type_Macro,
     Entity_Type_Foreign_Function_Header,
+    Entity_Type_Temp_Function_Header,    // Same as a Function_Header, except it disappears after it checks completely.
     Entity_Type_Function_Header,
     Entity_Type_Global_Header,
     Entity_Type_Process_Directive,
@@ -1219,7 +1219,6 @@ void entity_heap_remove_top(EntityHeap* entities);
 // If target_arr is null, the entities will be placed directly in the heap.
 void add_entities_for_node(bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
 
-b32  entity_bring_to_state(Entity* ent, EntityState state);
 void symres_entity(Entity* ent);
 void check_entity(Entity* ent);
 void emit_entity(Entity* ent);
@@ -1385,8 +1384,13 @@ void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source)
 void promote_numlit_to_larger(AstNumLit* num);
 b32 convert_numlit_to_type(AstNumLit* num, Type* type);
 
+typedef enum TypeMatch {
+    TYPE_MATCH_SUCCESS,
+    TYPE_MATCH_FAILED,
+    TYPE_MATCH_YIELD,
+} TypeMatch;
 #define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
-b32 unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
+TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
 Type* resolve_expression_type(AstTyped* node);
 i64 get_expression_integer_value(AstTyped* node);
 
@@ -1414,7 +1418,7 @@ void arguments_copy(Arguments* dest, Arguments* src);
 void arguments_clone(Arguments* dest, Arguments* src);
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
 void arguments_remove_baked(Arguments* args);
-b32 check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
+TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
                                  OnyxToken* location, char* func_name, struct OnyxError* error);
 i32 get_argument_buffer_size(TypeFunction* type, Arguments* args);
 
@@ -1431,6 +1435,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
+AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_arr(AstPolySolution) slns);
 
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args, b32* should_yield);
