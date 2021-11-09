@@ -751,7 +751,7 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
     }
 
     solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token);
-    if (solid->resolved_proc == (AstFunction *) &node_that_signals_a_yield) {
+    if (solid->resolved_proc == (AstTyped *) &node_that_signals_a_yield) {
         solid->resolved_proc = NULL;
         return Symres_Yield_Macro;
     }

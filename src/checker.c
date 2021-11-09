@@ -410,20 +410,17 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
     b32 calling_a_macro = 0;
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
-        b32 should_yield = 0;
         AstTyped* new_callee = find_matching_overload_by_arguments(
             ((AstOverloadedFunction *) callee)->overloads,
-            &call->args,
-            &should_yield);
+            &call->args);
 
         if (new_callee == NULL) {
-            if (callee->entity->state > Entity_State_Check_Types && !should_yield) {
-                report_unable_to_match_overload(call);
-                return Check_Error;
+            report_unable_to_match_overload(call);
+            return Check_Error;
+        }
 
-            } else {
-                YIELD(call->token->pos, "Waiting for overloaded function option to pass type-checking.");
-            }
+        if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
+            YIELD(call->token->pos, "Waiting for overloaded function option to pass type-checking.");
         }
 
         callee = new_callee;
@@ -635,10 +632,8 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
     args.values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
     if (third_argument != NULL) args.values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
 
-    b32 should_yield = 0;
-    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args, &should_yield);
-    if (should_yield)     return (AstCall *) &node_that_signals_a_yield;
-    if (overload == NULL) return NULL;
+    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args);
+    if (overload == NULL || overload == (AstTyped *) &node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
     implicit_call->token = binop->token;

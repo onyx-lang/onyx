@@ -338,7 +338,7 @@ void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_o
     }
 }
 
-AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* param_args, b32* should_yield) {
+AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* param_args) {
     Arguments args;
     arguments_clone(&args, param_args);
     arguments_ensure_length(&args, bh_arr_length(args.values) + bh_arr_length(args.named_values));
@@ -364,22 +364,15 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
 
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
-        if (overload == (AstFunction *) &node_that_signals_a_yield) {
-            // If it was not possible to create the type for this procedure, tell the
-            // caller that this should yield and try again later.
-            if (should_yield) *should_yield = 1;
-
-            return NULL;
-        }
+        if (overload == (AstFunction *) &node_that_signals_a_yield) return (AstTyped *) overload;
         if (overload->kind != Ast_Kind_Function) continue;
         if (overload->type == NULL) {
             // If it was not possible to create the type for this procedure, tell the
             // caller that this should yield and try again later.
-            if (should_yield) *should_yield = 1;
 
             // return and not continue because if the overload that didn't have a type will
             // work in the future, then it has to take precedence over the other options available.
-            return NULL;
+            return (AstTyped *) &node_that_signals_a_yield;
         }
         assert(overload->type->kind == Type_Kind_Function);
 
@@ -397,8 +390,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         }
 
         if (tm == TYPE_MATCH_YIELD) {
-            if (should_yield) *should_yield = 1;
-            return NULL;
+            return (AstTyped *) &node_that_signals_a_yield;
         }
     }
 
