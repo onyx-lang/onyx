@@ -1,0 +1,232 @@
+// Currently the only way for something to be generic and type checked
+// in Onyx is to use polymorphic procedures and overloaded procedures
+// to allow a procedure to be statically duck-typed after it has been
+// determined that this is the procedure you are calling (think Map
+// and hash.to_u32). This has been okay, but it leads to some grossness
+// in the language semantics and the kinds of error messages that are
+// producable.
+//
+// For example, it is not immediately clear that in order to make a Map
+// or a Set out of a type, you need to declare a match option for hash.to_u32
+// and define '==' for the type. This is kind of probablimatic and doesn't
+// make for great self explanatory or maintainable code. Also I don't like
+// #add_match at all, as it feels like a complete and utter hack.
+//
+// To remedy all of this, I think Onyx should have interfaces (or constraints,
+// I'm not sure what I want to call them yet). The idea is much like
+// an type class in Haskell where you must define a set of procedure types
+// that the implementer must define in order to provide the interface.
+// With these interfaces, I would get rid of #add_match and only provide
+// locally overloaded procedures (like print right now), as these are still
+// useful.
+//
+// One thing I was wondering was if this is how operator overloading should
+// work as well. I don't think so, but I do think that interfaces should
+// provide a mechanism for specifying that a certain operator must be defined
+// as well.
+
+// This is how interfaces will be declared. Interfaces must have at
+// least 1 parameter, and for now, all parameters must be type_exprs.
+Hashable :: interface (T: type_expr) {
+
+    // Each "method" listed in the interface is just a symbol name
+    // and a function type. It can use the parameters to the interface
+    // to describe the type.
+    hash :: (T) -> u32
+}
+
+// This is how you implement an interface for a certain set of type
+// arguments. All interface "methods" must be defined here and their
+// types must match the interface types listed above.
+implement Hashable(str) {
+    hash :: (s: str) -> i32 {
+        // ...
+    }
+}
+
+Vec2 :: struct (T: type_expr) {
+    x, y: T;
+}
+
+implement Hashable(Vec2($T)) {
+    hash :: (v: Vec2($T)) -> i32 where H :: Hashable(T) {
+        return H.hash(v.x) * H.hash(v.y);
+    }
+}
+
+v : Vec2(i32);
+h := Hashable(typeof v).hash(v);
+
+// This shows two things: interfaces can have constraints, and interfaces
+// can declare that a certain operator must be overloaded with a particular
+// type.
+Mappable :: interface (T: type_expr) where Hashable(T) {
+    #operator == (T, T) -> bool
+}
+
+Map :: struct (K: type_expr, V: type_expr) where Mappable(K) {
+}
+
+// This will have the "Hashable(K)" constraint of Map checked when
+// the Map(K, V) type is constructed for the parameter type.
+get :: (m: ^Map($K, $V), key: K) -> V where H :: Hashable(K) {
+    // ...
+    hash := H.hash(key);
+}
+
+// 'where' clauses are also allowed on procedures and can be bound
+// to a symbol in order to call the interface functions for that type.
+do_hash :: (h: $T) -> i32 where H :: Hashable(T) {
+    return H.hash(h);  // returns an i32;
+}
+
+// Interfaces don't have to have any methods inside of them.
+Numeric :: interface (T: type_expr) {}
+implement Numeric(i32) {}
+implement Numeric(f32) {}
+
+V2 :: struct { x, y: f32; }
+implement Numeric(V2) {}
+
+// This demonstrates the ability for a constraint to just exist as
+// a declaration that something must be numeric. The way you check
+// for something being numeric is if `impl Numeric(T) {}` has been
+// declared.
+add :: (a, b: $T) -> T where Numeric(T) {
+    return a + b;
+}
+
+
+// At the moment I do not plan on forcing the programmer to declare constaints
+// where they are present. Instead, they are primarily there in order to provide
+// better error messages. For example, this function calls do_hash, which
+// requires that T is hashable, but the caller does not need to add constraints
+// to itself because of this.
+compare_things :: (s1, s2: $T) -> bool {
+    h1 := do_hash(s1);
+    h2 := do_hash(s2);
+    return h1 == h2;
+}
+
+compare_strings :: (s1, s2: str) -> bool {
+    use Hashable(str);
+    return hash(s1) == hash(s2);
+}
+
+// As I'm thinking about whether or not this feature is worth implementing, I want
+// a list of interfaces that will be in the standard library.
+//
+// - Hashable    (hash)
+// - Stringable  (to_string)
+// - Comparable  (==)
+// - Writable    (write to io.Writer)
+// - Readable
+// - Iterable    (as_iter :: (t: T) -> Iterator())
+
+Stringable :: interface (T: type_expr) {
+    to_string :: (T, Allocator) -> str;
+}
+
+implement Stringable(i32) {
+    to_string :: (v: i32, a: Allocator) -> str {
+        buf: [128] u8;
+        s := conv.i64_to_str(~~v, 10, buf);
+        return string.alloc_copy(s, a);
+    }
+}
+
+
+// This is a more complicated case because it requires pattern matching
+// on the types given.
+Iterable :: interface (T: type_expr, V: type_expr) {
+    as_iter :: (T) -> Iterator(V)
+}
+
+implement Iterable([..] $T, T) {
+    as_iter :: (arr: [..] $T) -> Iterator(T) {
+        // ...
+    }
+}
+
+implement Iterable(^List($T), T) {
+    as_iter :: (package core.list).get_iterator
+}
+
+implement Iterable(range, i32) {
+    as_iter :: (r: range) -> Iterator(i32) {
+    }
+}
+
+iterate :: (i: $I) where Iter :: Iterable(I, $V) {
+    for it: Iter.as_iter(i) {
+        println(it);
+    }
+}
+
+
+
+Collecter :: interface (T: type_expr, V: type_expr) {
+    collect :: (T, V) -> void
+}
+
+implement Collecter(^[..] $T, T) {
+    collect :: array.push
+}
+
+implement Collecter(^List($T), T) {
+    collect :: (l: ^List($T), v: T) { /* .. */ }
+}
+
+gather_values :: (i: $Iter, c: $T) where I :: Iterable(Iter, $V),
+                                         C :: Collecter(T, V) {
+    for it: I.as_iter(i) {
+        C.collect(c, it);
+    }
+}
+
+
+
+For :: interface (T: type_expr) {
+    expand     :: (T, body: Code) -> void;
+    expand_ptr :: (T, body: Code) -> void;
+}
+
+implement For([..] $T) {
+    expand :: macro (arr: [..] $T, body: Code) {
+        for it: arr {
+            #insert body;
+        }
+    }
+
+    expand_ptr :: macro (arr: [..] $T, body: Code) {
+        for ^it: arr {
+            #insert body;
+        }
+    }
+}
+
+implement For(Map($K, $V)) {
+    expand :: macro (m: Map($K, $V), body: Code) {
+        for ^it: m.entries {
+            key   := it.key;
+            value := it.value;
+            #insert body;
+        }
+    }
+
+    expand_ptr :: macro (m: Map($K, $V), body: Code) {
+        for ^it: m.entries {
+            key   := ^it.key;
+            value := ^it.value;
+            #insert body;
+        }
+    }
+}
+
+for_ :: macro (a: $T, body: Code) where F :: For(T) {
+    F.expand(a, body);
+}
+
+for_ptr :: macro (a: $T, body: Code) where F :: For(T) {
+    F.expand_ptr(a, body);
+}

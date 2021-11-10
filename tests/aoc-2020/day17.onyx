@@ -23,7 +23,7 @@ CubeState :: struct {
         && (a.w == b.w);
 }
 
-get_neighbor_count :: (cubes: ^map.Map(CubePos, CubeState), pos: CubePos) -> u32 {
+get_neighbor_count :: (cubes: ^Map(CubePos, CubeState), pos: CubePos) -> u32 {
     count := 0;
 
     for x: -1 .. 2 do for y: -1 .. 2 do for z: -1 .. 2 do for w: -1 .. 2 {

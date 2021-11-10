@@ -236,6 +236,8 @@ u32 type_alignment_of(Type* type) {
     }
 }
 
+// If this function returns NULL, then the caller MUST yield because the type may still be constructed in the future.
+// If there was an error constructing the type, then this function will report that directly.
 Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
     if (type_node == NULL) return NULL;
 
