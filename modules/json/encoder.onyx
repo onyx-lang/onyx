@@ -135,7 +135,7 @@ encode :: #match {
     // This is disabled because I would prefer to have a compile time error for an unsupported type,
     // as opposed to a error to check programatically.
     //
-    // // Inserted after any of the #add_match directives
+    // // Inserted after any of the #match directives
     // #precedence 1000 (w: ^io.Writer, v: $T) -> Encoding_Error {
     //     return .Unsupported_Type;
     // }

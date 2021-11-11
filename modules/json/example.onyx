@@ -51,7 +51,7 @@ Vector2 :: struct {
     x, y: f32;
 }
 
-#add_match json.encode, (w: ^io.Writer, v: Vector2) -> json.Encoding_Error {
+#match json.encode (w: ^io.Writer, v: Vector2) -> json.Encoding_Error {
     io.write_format(w, "{{\"x\":{},\"y\":{}}}", v.x, v.y);
 
     return .None;

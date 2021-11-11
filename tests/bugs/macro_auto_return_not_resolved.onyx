@@ -4,7 +4,7 @@ use package core
 
 Point :: struct { x, y: i32; }
 
-#add_match hash.to_u32, macro (p: Point) -> #auto do return p.x * 1000 + p.y;
+#match hash.to_u32 macro (p: Point) -> #auto do return p.x * 1000 + p.y;
 
 #operator == macro (p1: Point, p2: Point) -> #auto {
     return p1.x == p2.x && p1.y == p2.y;

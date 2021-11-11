@@ -15,6 +15,6 @@ main :: (args: [] cstr) {
     overloaded(z=10);
 }
 
-#add_match overloaded, #precedence 3 (q: i32) { println("Option Q"); }
-#add_match overloaded, #precedence 2 (r: i32) { println("Option R"); }
-#add_match overloaded, #precedence 1 (m: i32) { println("Option M"); }
+#match overloaded #precedence 3 (q: i32) { println("Option Q"); }
+#match overloaded #precedence 2 (r: i32) { println("Option R"); }
+#match overloaded #precedence 1 (m: i32) { println("Option M"); }

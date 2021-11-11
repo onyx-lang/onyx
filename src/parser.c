@@ -56,9 +56,12 @@ static AstNode*       parse_statement(OnyxParser* parser);
 static AstType*       parse_type(OnyxParser* parser);
 static AstTypeOf*     parse_typeof(OnyxParser* parser);
 static AstStructType* parse_struct(OnyxParser* parser);
+static AstInterface*  parse_interface(OnyxParser* parser);
 static void           parse_function_params(OnyxParser* parser, AstFunction* func);
 static b32            parse_possible_directive(OnyxParser* parser, const char* dir);
+static b32            parse_possible_function_definition_no_consume(OnyxParser* parser);
 static b32            parse_possible_function_definition(OnyxParser* parser, AstTyped** ret);
+static b32            parse_possible_quick_function_definition_no_consume(OnyxParser* parser);
 static b32            parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret);
 static AstFunction*   parse_function_definition(OnyxParser* parser, OnyxToken* token);
 static AstTyped*      parse_global_declaration(OnyxParser* parser);
@@ -725,6 +728,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             }
 
             case '(': {
+                if (!parser->greedily_consume_calls) {
+                    if (parse_possible_function_definition_no_consume(parser)) goto factor_parsed;
+                    if (parse_possible_quick_function_definition_no_consume(parser)) goto factor_parsed;
+                }
+
                 AstCall* call_node = make_node(AstCall, Ast_Kind_Call);
                 call_node->token = expect_token(parser, '(');
                 call_node->callee = retval;
@@ -2271,7 +2279,7 @@ function_defined:
     }
 }
 
-static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret) {
+static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
     if (parser->curr->type == '(') {
         OnyxToken* matching_paren = find_matching_paren(parser->curr);
         if (matching_paren == NULL) return 0;
@@ -2298,9 +2306,18 @@ static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret
 
         if (!is_params) return 0;
 
+        return 1;
+    }
+
+    return 0;
+}
+
+static b32 parse_possible_function_definition(OnyxParser* parser, AstTyped** ret) {
+    if (parse_possible_function_definition_no_consume(parser)) {
         OnyxToken* proc_token = parser->curr;
         AstFunction* func_node = parse_function_definition(parser, proc_token);
         *ret = (AstTyped *) func_node;
+
         return 1;
     }
 
@@ -2312,7 +2329,7 @@ typedef struct QuickParam {
     b32 is_baked;
 } QuickParam;
 
-static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret) {
+static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parser) {
     if (parser->curr->type != '(') return 0;
 
     OnyxToken* matching_paren = find_matching_paren(parser->curr);
@@ -2322,6 +2339,12 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
     OnyxToken* token_after_paren = matching_paren + 1;
     if (token_after_paren->type != '=' || (token_after_paren + 1)->type != '>')
         return 0;
+
+    return 1;
+}
+
+static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret) {
+    if (!parse_possible_quick_function_definition_no_consume(parser)) return 0;
 
     OnyxToken* proc_token = expect_token(parser, '(');
 
@@ -2854,12 +2877,13 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(operator);
                 return;
             }
-            else if (parse_possible_directive(parser, "add_overload") || parse_possible_directive(parser, "add_match")) {
+            else if (parse_possible_directive(parser, "match")) {
                 AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
                 add_overload->token = dir_token;
-                add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);
 
-                expect_token(parser, ',');
+                parser->greedily_consume_calls = 0;
+                add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);
+                parser->greedily_consume_calls = 1;
 
                 if (parse_possible_directive(parser, "precedence")) {
                     AstNumLit* pre = parse_int_literal(parser);
@@ -3048,6 +3072,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.alternate_entity_placement_stack = NULL;
     parser.current_symbol_stack = NULL;
     parser.scope_flags = NULL;
+    parser.greedily_consume_calls = 1;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,

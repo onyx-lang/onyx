@@ -43,7 +43,7 @@ vector2_equal :: (a: Vector2($T), b: Vector2(T)) -> bool {
     return a.x == b.x && a.y == b.y;
 }
 
-#add_match io.write, vector2_write
+#match io.write vector2_write
 vector2_write :: (writer: ^io.Writer, v: Vector2($T)) {
     io.write(writer, "Vector2(");
     io.write(writer, v.x);

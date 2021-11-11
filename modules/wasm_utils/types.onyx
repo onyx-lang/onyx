@@ -16,7 +16,7 @@ WasmSection :: enum {
     DataCount :: 0x0c;
 }
 
-#add_match hash.to_u32, macro (w: WasmSection) -> u32 {
+#match hash.to_u32 macro (w: WasmSection) -> u32 {
     return hash.to_u32(cast(u32) w);
 }
 

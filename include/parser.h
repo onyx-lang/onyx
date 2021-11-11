@@ -32,6 +32,11 @@ typedef struct OnyxParser {
     bh_arr(AstFlags) scope_flags;
 
     b32 hit_unexpected_token : 1;
+
+    // If this is 1, then things that look like calls with immediately be parsed as calls.
+    // However, if this is 0 then things that look like procedure definitions after expressions,
+    // will be parsed as procedure definitions.
+    b32 greedily_consume_calls : 1;
 } OnyxParser;
 
 const char* onyx_ast_node_kind_string(AstKind kind);

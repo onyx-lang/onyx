@@ -10,13 +10,41 @@
 // or a Set out of a type, you need to declare a match option for hash.to_u32
 // and define '==' for the type. This is kind of probablimatic and doesn't
 // make for great self explanatory or maintainable code. Also I don't like
-// #add_match at all, as it feels like a complete and utter hack.
+// #match at all, as it feels like a complete and utter hack.
 //
+
+// Ignore everything that is said below. It all sounded like a good idea
+// at one point, until I started implementing it when I realized that not
+// only is it WAY too complicated and adds too much complexity in the compiler
+// but it doesn't feel like a natural extention to Onyx.
+//
+// Instead, 'interfaces' are going to be much much simpler, but to write
+// and for the compiler to deal with. Effectively, they are compile time checks
+// that assert that a particular set of expressions is valid, and optionally
+// return the correct type. They are offered as an extension to overloaded functions
+// and polymorphic functions, instead of being a replacement for them. To remedy
+// the "#add_match" syntax, some work has gone into the parser to make the following
+// legal syntax:
+
+#match hash.to_u32 (x: Vec2) -> u32 { /* .. */ }
+
+// This feels a lot nicer to write and doesn't have the weird line noise of the
+// _ and the ,.
+
+
+
+ValidKey :: interface (T: type_expr) {
+    hash.to_u32(T);
+    T == T;
+}
+
+
+
 // To remedy all of this, I think Onyx should have interfaces (or constraints,
 // I'm not sure what I want to call them yet). The idea is much like
 // an type class in Haskell where you must define a set of procedure types
 // that the implementer must define in order to provide the interface.
-// With these interfaces, I would get rid of #add_match and only provide
+// With these interfaces, I would get rid of #match and only provide
 // locally overloaded procedures (like print right now), as these are still
 // useful.
 //

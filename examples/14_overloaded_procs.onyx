@@ -72,17 +72,16 @@ print_type :: #match {
 // type knowledge at runtime. To rectify this, let's add a new case that makes
 // this work for any type:
 
-#add_match print_type, #precedence 10 (x: $T) {
+#match print_type #precedence 10 (x: $T) {
     printf("Fallback case: called with a {} ({})\n", T, x);
 }
 
-// There are a couple things going on here. The #add_match directive takes two "parameters" separated
-// by a comma: the overloaded procedure to add a match option to, and the option itself. The other
+// There are a couple things going on here. The #match directive takes two "parameters": the overloaded procedure to add a match option to, and the option itself. The other
 // thing to notice is the "#precedence 10" specification. Onyx tries to match the arguments you provided
 // with each of the options. The first one that matches perfectly, is the one that is used. The order in
 // which it does this process is important, and that is why you can control it with the #precedence
 // directive. The #precedence directive is allowed in two places: right before the option in the original
-// #match directive, or in front of the option in an #add_match directive, as seen above. Currently,
+// #match directive, or in front of the option in an #match directive, as seen above. Currently,
 // the options are sorted in ascending order according to the precedence. I feel like this is backwards,
 // so that may change in the future. Either way, setting the precedence allows you to place the options
 // in the correct order so something like (x: $T), which will match ANY single argument, is placed last
@@ -94,7 +93,7 @@ print_type :: #match {
 Person :: struct { name: str; age: i32; }
 
 // The overload option for hashing a person:
-#add_match (package core).hash.to_u32, (use p: Person) -> u32 {
+#match (package core).hash.to_u32 (use p: Person) -> u32 {
     return hash.to_u32(name) * 16239563 + age;
 }
 
