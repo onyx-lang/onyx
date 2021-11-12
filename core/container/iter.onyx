@@ -2,6 +2,12 @@ package core.iter
 
 use package core.intrinsics.onyx { __zero_value }
 
+as_iterator :: #match {}
+
+Iterable :: interface (T: type_expr) {
+    as_iterator(T);
+}
+
 close :: (it: Iterator($T)) {
     it.close(it.data);
 }
@@ -274,6 +280,24 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
     };
 }
 
+fold :: (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
+    for value: it {
+        initial_value = combine(value, initial_value);
+    }
+    
+    return initial_value;
+}
+
+to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
+    array :: package core.array
+
+    arr := array.make(T, allocator=allocator);
+    for v: it do array.push(^arr, v);
+
+    return arr;
+}
+
+#match as_iterator from_array
 from_array :: (arr: [] $T) -> Iterator(^T) {
     Context :: struct (T: type_expr) {
         data: ^T;
@@ -307,19 +331,32 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     };
 }
 
-fold :: (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
-    for value: it {
-        initial_value = combine(value, initial_value);
+#match as_iterator (r: range) -> Iterator(i32) {
+    Context :: struct {
+        r: range;
+        v: i32;
     }
-    
-    return initial_value;
-}
 
-to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
-    array :: package core.array
+    next :: (use c: ^Context) -> (i32, bool) {
+        if v > r.high {
+            return 0, false;
+        } else {
+            defer v += r.step;
+            return v, true;
+        }
+    }
 
-    arr := array.make(T, allocator=allocator);
-    for v: it do array.push(^arr, v);
+    close :: (c: ^Context) {
+        cfree(c);
+    }
 
-    return arr;
+    c := new(Context);
+    c.r = r;
+    c.v = r.low;
+
+    return .{
+        data  = c,
+        next  = next,
+        close = close,
+    };
 }

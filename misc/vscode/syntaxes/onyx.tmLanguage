@@ -164,7 +164,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-                    <string>\b(use|macro|package)\b</string>
+                    <string>\b(use|macro|package|where)\b</string>
 					<key>name</key>
 					<string>keyword.control.onyx</string>
 				</dict>
@@ -200,7 +200,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|enum)\b</string>
+					<string>\b(struct|enum|interface)\b</string>
 					<key>name</key>
 					<string>storage.type.onyx</string>
 				</dict>
@@ -230,7 +230,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|enum)\b(?:(\{)(\}))?</string>
+					<string>\b(struct|enum|interface)\b(?:(\{)(\}))?</string>
 					<key>name</key>
 					<string>storage.type.onyx</string>
 				</dict>
@@ -315,7 +315,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(struct|enum)</string>
+					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(struct|enum|interface)</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
