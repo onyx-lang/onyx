@@ -1849,29 +1849,30 @@ CheckStatus check_statement_chain(AstNode** start) {
 }
 
 CheckStatus check_block(AstBlock* block) {
-    CHECK(statement_chain, &block->body);
+    // This used to use statement_chain, but since block optimize which statements need to be rechecked,
+    // it has to be its own thing.
 
-    // CLEANUP: There will need to be some other method of 
-    // checking the following conditions.
-    //
-    // bh_arr_each(AstTyped *, value, block->allocate_exprs) {
-    //     fill_in_type(*value);
+    AstNode** start = &block->body;
+    fori (i, 0, block->statement_idx) {
+        start = &(*start)->next;
+    }
 
-    //     if ((*value)->kind == Ast_Kind_Local) {
-    //         if ((*value)->type == NULL) {
-    //             onyx_report_error((*value)->token->pos,
-    //                     "Unable to resolve type for local '%b'.",
-    //                     (*value)->token->text, (*value)->token->length);
-    //             return Check_Error;
-    //         }
+    while (*start) {
+        CheckStatus cs = check_statement(start);
+        switch (cs) {
+            case Check_Success:
+                start = &(*start)->next;
+                block->statement_idx++;
+                break;
 
-    //         if ((*value)->type->kind == Type_Kind_Compound) {
-    //             onyx_report_error((*value)->token->pos,
-    //                     "Compound type not allowed as local variable type. Try splitting this into multiple variables.");
-    //             return Check_Error;
-    //         }
-    //     }
-    // }
+            case Check_Return_To_Symres:
+                block->statement_idx = 0;
+
+            default:
+                return cs;
+        }
+
+    }
 
     return Check_Success;
 }

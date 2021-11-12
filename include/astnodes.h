@@ -705,6 +705,8 @@ struct AstBlock         {
     Scope *scope;
     Scope *binding_scope;
     BlockRule rules;
+
+    u32 statement_idx;
 };
 struct AstDefer         { AstNode_base; AstNode *stmt; };
 struct AstFor           {

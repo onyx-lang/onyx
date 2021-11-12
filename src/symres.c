@@ -860,8 +860,38 @@ static SymresStatus symres_block(AstBlock* block) {
     if (block->binding_scope != NULL)
         scope_include(curr_scope, block->binding_scope, block->token->pos);
 
-    if (block->body)
-        SYMRES(statement_chain, &block->body);
+    if (block->body) {
+        AstNode** start = &block->body;
+        fori (i, 0, block->statement_idx) {
+            start = &(*start)->next;
+        }
+
+        b32 remove = 0;
+
+        while (*start) {
+            SymresStatus cs = symres_statement(start, &remove);
+
+            if (remove) {
+                remove = 0;
+                AstNode* tmp = (*start)->next;
+                (*start)->next = NULL;
+                (*start) = tmp;
+
+            } else {
+                switch (cs) {
+                    case Symres_Success:
+                        start = &(*start)->next;
+                        block->statement_idx++;
+                        break;
+
+                    default:
+                        return cs;
+                }
+            }
+        }
+
+        block->statement_idx = 0;
+    }
 
     if (block->rules & Block_Rule_New_Scope)
         scope_leave();
