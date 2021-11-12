@@ -1,10 +1,10 @@
 package core.random
 
-#private_file seed : i64 = 8675309
+#local seed : i64 = 8675309
 
-#private_file RANDOM_MULTIPLIER :: 25214903917
-#private_file RANDOM_INCREMENT  :: cast(i64) 11
-// #private_file RANDOM_MODULUS    :: 1 << 32
+#local RANDOM_MULTIPLIER :: 25214903917
+#local RANDOM_INCREMENT  :: cast(i64) 11
+// #local RANDOM_MODULUS    :: 1 << 32
 
 set_seed :: #match {
     (s: u32) do seed = ~~s; ,

@@ -159,7 +159,7 @@ HOW:
         [X] Pointer math
             - Addition and subtraction
 
-        [X] #private
+        [X] #package
             - symbol is scoped to package and not brought in from a 'use package' statement
 
         [X] Hex literals

@@ -1,7 +1,7 @@
 package bmfont
 
 use package core
-#private_file json :: package json
+#local json :: package json
 
 load_bmfont :: (fnt_data: [] u8) -> BMFont {
     bmf := create_bmfont();
@@ -27,7 +27,7 @@ load_bmfont_from_json :: (fnt_data: [] u8) -> BMFont {
     extract_bmfont_from_json(^bmf, j.root);
 }
 
-#private_file
+#local
 create_bmfont :: () -> BMFont {
     bmf: BMFont;
     memory.set(^bmf, 0, sizeof BMFont);
@@ -38,7 +38,7 @@ create_bmfont :: () -> BMFont {
     return bmf;
 }
 
-#private_file
+#local
 parse_bmfont :: (fnt_data: [] u8, font: ^BMFont) {
     R :: package core.string.reader
 
@@ -151,7 +151,7 @@ parse_bmfont :: (fnt_data: [] u8, font: ^BMFont) {
     }
 }
 
-#private_file
+#local
 extract_bmfont_from_json :: (font: ^BMFont, root: ^json.Value) {
     font_info          := root["info"];
     font.info.face_name = font_info["face"]->as_str();

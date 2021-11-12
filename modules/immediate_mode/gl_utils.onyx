@@ -1,7 +1,7 @@
 package immediate_mode
 
 use package core
-#private_file gl :: package gl
+#local gl :: package gl
 
 // This Shader represents an OpenGL program, not a shader. The name
 // is confusing but conceptually for most people, shaders are a bundled

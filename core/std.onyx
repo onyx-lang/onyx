@@ -36,7 +36,7 @@ package core
 
 #load "./type_info/helper"
 
-#private_file runtime :: package runtime
+#local runtime :: package runtime
 #if runtime.Runtime == runtime.Runtime_Wasi {
     #load "./runtime/wasi"
     #load "./wasi/wasi"

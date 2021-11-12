@@ -158,8 +158,8 @@ fold_idx_elem :: (arr: [] $T, cmp: (T, T) -> bool) -> (i32, T) {
     return idx, elem;
 }
 
-#private_file cmp_greater :: (x, y) => x > y;
-#private_file cmp_less    :: (x, y) => x < y;
+#local cmp_greater :: (x, y) => x > y;
+#local cmp_less    :: (x, y) => x < y;
 
 greatest :: #match {
     (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr, cmp_greater); },
@@ -309,7 +309,7 @@ quicksort :: #match {
     (arr: [] $T, cmp: (^T, ^T) -> i32) do quicksort_impl(arr, cmp, 0, arr.count - 1); ,
 }
 
-#private_file {
+#local {
     quicksort_impl :: (arr: [] $T, cmp: $PredicateFunction, lo, hi: i32) {
         if lo < 0 || hi < 0 do return;
         if lo >= hi do return;

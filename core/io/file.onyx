@@ -1,13 +1,13 @@
 package core.io
 
-#private_file runtime :: package runtime
+#local runtime :: package runtime
 #if runtime.Runtime != runtime.Runtime_Wasi {
     #error "The file system library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
 }
 
 use package core
 
-#private_file wasi :: package wasi
+#local wasi :: package wasi
 use package wasi {
     FileDescriptor,
     FDFlags, OFlags, Rights,
@@ -186,7 +186,7 @@ close :: (file: ^FileStream) {
     file.stream.vtable = null;
 }
 
-#private
+#package
 file_stream_vtable := Stream_Vtable.{
     seek = (use fs: ^FileStream, to: i32, whence: SeekFrom) -> Error {
         // Currently, the new offset is just ignored.
@@ -307,7 +307,7 @@ file_logger_close :: (logger := context.logger) {
     cfree(logger.data);
 }
 
-#private_file
+#local
 file_logger_proc :: (data: ^File, msg: str) {
     file_write(*data, msg);
     file_write(*data, "\n");

@@ -7,7 +7,7 @@ package core
 // in anyway.
 
 
-#private_file runtime :: package runtime
+#local runtime :: package runtime
 #if runtime.Runtime == runtime.Runtime_Custom {
     #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
 }

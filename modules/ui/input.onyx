@@ -67,7 +67,7 @@ update_mouse_position :: (new_x: f32, new_y: f32) {
     mouse_state.y_  = new_y;
 }
 
-#private_file Mouse_Button_Kind :: enum { Left; Right; Middle; WheelUp; WheelDown; }
+#local Mouse_Button_Kind :: enum { Left; Right; Middle; WheelUp; WheelDown; }
 
 button_pressed :: (kind: Mouse_Button_Kind) {
     switch kind {
@@ -103,7 +103,7 @@ button_released :: (kind: Mouse_Button_Kind) {
     }
 }
 
-#private_file
+#local
 __key_state_transition_table := Keyboard_State.Key_State.[
                     /* KeyUp */                        /* KeyDown */
     /* Up */        Keyboard_State.Key_State.Up,       Keyboard_State.Key_State.Just_Down,

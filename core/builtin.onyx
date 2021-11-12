@@ -3,7 +3,7 @@ package builtin
 // CLEANUP: Should builtin.onyx really be including other files in the compilation?
 // Does that complicate things too much?
 #load "core/runtime/build_opts"
-#private_file runtime :: package runtime
+#local runtime :: package runtime
 
 str  :: #type []u8;
 cstr :: #type ^u8;
@@ -61,13 +61,13 @@ OnyxContext :: struct {
 }
 
 #if runtime.Runtime != runtime.Runtime_Custom {
-    #private_file default_logger :: (data: rawptr, msg: str) {
+    #local default_logger :: (data: rawptr, msg: str) {
         use package core
         println(msg);
     }
 
 } else {
-    #private_file default_logger :: (data: rawptr, msg: str) {
+    #local default_logger :: (data: rawptr, msg: str) {
         // In a custom runtime, there is no way to know how to log something.
     }
 }
@@ -98,7 +98,7 @@ log :: (msg: str, use logger: Logger = context.logger) {
 // The implementations of all of the allocators can be found in core/alloc/.
 // These need to be here so the context structure has the types and enum values.
 //
-#private_file
+#local
 Default_Allocation_Alignment :: 16
 
 AllocationAction :: enum {
@@ -107,7 +107,7 @@ AllocationAction :: enum {
     Resize;
 }
 
-#private_file
+#local
 allocator_proc :: #type (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
 
 Allocator :: struct {

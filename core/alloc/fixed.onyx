@@ -15,7 +15,7 @@ FixedAllocatorData :: struct {
     size : u32;
 }
 
-#private_file
+#local
 fixed_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     fa_data := cast(^FixedAllocatorData) data;  
 

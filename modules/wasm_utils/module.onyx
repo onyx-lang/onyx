@@ -11,8 +11,8 @@ package wasm_utils
 #load "./parser"
 #load "./instructions"
 
-#private map    :: package core.map
-#private io     :: package core.io
-#private hash   :: package core.hash
-#private memory :: package core.memory
-#private iter   :: package core.iter
+#package map    :: package core.map
+#package io     :: package core.io
+#package hash   :: package core.hash
+#package memory :: package core.memory
+#package iter   :: package core.iter

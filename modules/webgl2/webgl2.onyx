@@ -3,7 +3,7 @@ package gl
 // To be used with the corresponding gl.js
 // There are many things that are missing but this suffices for me.
 
-#private_file runtime :: package runtime
+#local runtime :: package runtime
 #if runtime.Runtime != runtime.Runtime_Js {
     #error "'webgl' can only be used with the 'js' runtime."
 }

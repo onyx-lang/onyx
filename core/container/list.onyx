@@ -119,5 +119,5 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
     };
 }
 
-#private_file
+#local
 allocate_elem :: macro (list: ^List($T)) => new(#type ListElem(T), allocator=list.allocator);

@@ -1,6 +1,6 @@
 package core.map
 
-#private_file {
+#local {
     array  :: package core.array
     hash   :: package core.hash
     memory :: package core.memory
@@ -9,7 +9,7 @@ package core.map
     use package core.intrinsics.onyx { __zero_value, __initialize }
 }
 
-#private_file {
+#local {
     ValidKey :: interface (T: type_expr) {
         // In order to use a certain type as a key in a Map, you must
         // provide an implementation of core.hash.to_u32() for that type,
@@ -147,7 +147,7 @@ empty :: (use map: ^Map($K, $V)) -> bool {
 // Private symbols
 //
 
-#private_file {
+#local {
     MapLookupResult :: struct {
         hash_index  : i32 = -1;
         entry_index : i32 = -1;

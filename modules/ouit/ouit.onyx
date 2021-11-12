@@ -1,6 +1,6 @@
 package ouit
 
-#private_file {
+#local {
     gl     :: package gl
     gfx    :: package immediate_mode
     events :: package js_events
@@ -22,7 +22,7 @@ init :: (canvas_name: str,
     ouit_draw         = d;
 }
 
-#private {
+#package {
     ouit_handle_event : (^events.Event) -> void;
     ouit_update       : (dt: f32)       -> void;
     ouit_draw         : ()              -> void;

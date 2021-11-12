@@ -269,7 +269,7 @@ instructions_as_array :: (binary: ^WasmBinary, code: ^WasmCode, allocator := con
            |> iter.to_array(allocator=allocator);
 }
 
-#private
+#package
 parse_instruction :: (reader: ^io.Reader, binary: ^WasmBinary, code_offset := 0, current_block_depth: ^i32 = null) -> WasmInstruction {
 
     Parse_After :: enum {

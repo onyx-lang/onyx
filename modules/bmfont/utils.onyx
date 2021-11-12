@@ -1,6 +1,6 @@
 package bmfont
 
-#private_file math :: package core.math
+#local math :: package core.math
 
 get_width :: (use font: ^BMFont, text: str, size: f32) -> f32 {
     max_x := 0.0f;

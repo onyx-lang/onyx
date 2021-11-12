@@ -6,7 +6,7 @@
 
 package core.string
 
-#private_file math :: package core.math
+#local math :: package core.math
 
 String_Buffer :: struct {
     data     : ^u8;

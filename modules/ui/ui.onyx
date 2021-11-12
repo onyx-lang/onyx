@@ -7,7 +7,7 @@ DEFAULT_TEXT_SIZE :: 1.0f
 
 UI_Id :: #type u32
 
-#private {
+#package {
     hot_item    : UI_Id = 0
     active_item : UI_Id = 0
     hot_item_was_set := false
@@ -78,8 +78,8 @@ set_active_item :: (id: UI_Id) -> bool {
     return true;
 }
 
-#private_file hot_item_depth := 0;
-#private_file hot_item_depth_needed := 0;
+#local hot_item_depth := 0;
+#local hot_item_depth_needed := 0;
 
 set_hot_item :: (id: UI_Id, force := false) -> bool {
     if active_item != 0 do return false;
@@ -192,7 +192,7 @@ Animation_Theme :: struct {
 // Animation states are stored globally as there is not much to the state of a button.
 // Forcing the end user to store a structure for each button that is just the animation
 // state of the component feels very wrong.
-#private_file animation_states : Map(UI_Id, Animation_State);
+#local animation_states : Map(UI_Id, Animation_State);
 
 Animation_State :: struct {
     hover_time := 0.0f;
@@ -249,7 +249,7 @@ move_towards :: macro (value: ^$T, target: T, step: T) {
     if *value > target - step && *value < target + step do *value = target;
 }
 
-#private color_lerp :: macro (t: f32, c1: gfx.Color4, c2: gfx.Color4) -> gfx.Color4 {
+#package color_lerp :: macro (t: f32, c1: gfx.Color4, c2: gfx.Color4) -> gfx.Color4 {
     return .{
         r = c1.r * (1 - t) + c2.r * t,
         g = c1.g * (1 - t) + c2.g * t,

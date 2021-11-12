@@ -20,7 +20,7 @@ Workspace_State :: struct {
     dragging := false;
 }
 
-#private
+#package
 workspace_states : Map(UI_Id, Workspace_State);
 
 workspace_start :: (use r: Rectangle, site := #callsite, state: ^Workspace_State = null) {

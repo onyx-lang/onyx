@@ -25,7 +25,7 @@ ArenaState :: struct {
 
 Arena :: struct { next : ^Arena; }
 
-#private_file
+#local
 arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     alloc_arena := cast(^ArenaState) data;
 

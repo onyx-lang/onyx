@@ -8,7 +8,7 @@ Allocation_Action_Strings := str.[
     "resize",
 ];
 
-#private_file
+#local
 logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     allocator := cast(^Allocator) data;
     res := allocator.func(allocator.data, aa, size, align, oldptr);

@@ -3,7 +3,7 @@ package core.thread
 use package core
 use package core.intrinsics.atomics
 
-#private {
+#package {
     runtime :: package runtime
 
     thread_mutex   : sync.Mutex;

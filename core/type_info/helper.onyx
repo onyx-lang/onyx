@@ -1,6 +1,6 @@
 package builtin.type_info
 
-#private_file io :: package core.io
+#local io :: package core.io
 
 write_type_name :: (writer: ^io.Writer, t: type_expr) {
     info := get_type_info(t);

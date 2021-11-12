@@ -29,7 +29,7 @@ Textbox_Theme :: struct {
 
 default_textbox_theme := Textbox_Theme.{};
 
-#private_file
+#local
 Textbox_Editing_State :: struct {
     hash: UI_Id = 0;
 
@@ -39,7 +39,7 @@ Textbox_Editing_State :: struct {
     cursor_animation_speed := 0.02f;
 }
 
-#private
+#package
 // There is only one 'Textbox_Editing_State', not a map of them because there can only be one textbox being edited at once.
 textbox_editing_state := Textbox_Editing_State.{};
 
@@ -182,7 +182,7 @@ textbox :: (use r: Rectangle, text_buffer: ^string.String_Buffer, placeholder :=
     return result;
 }
 
-#private_file
+#local
 get_cursor_location :: (text_buffer: ^string.String_Buffer, text_x: f32, text_y: f32, text_size: f32, cursor_position: i32) -> f32 {
     countdown := cursor_position + 1;
     last_x : f32 = text_x;
@@ -205,7 +205,7 @@ get_cursor_location :: (text_buffer: ^string.String_Buffer, text_x: f32, text_y:
     return last_x + last_w;
 }
 
-#private_file
+#local
 get_cursor_position :: (text_buffer: ^string.String_Buffer, text_x: f32, text_y: f32, text_size: f32, mouse_x: f32, mouse_y: f32) -> i32 {
     cursor_position := 0;
 

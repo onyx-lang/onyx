@@ -13,7 +13,7 @@ TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
 heap_allocator : Allocator;
 
 // The global temp allocator, set up upon program intialization.
-#private_file
+#local
 temp_state     : ring.RingState;
 temp_allocator : Allocator;
 

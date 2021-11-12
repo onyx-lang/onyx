@@ -10,7 +10,7 @@ package wasm_utils
 // calling any of the top-level parsing functions. Because this is here, it is
 // unsafe to use this library in a multi-threaded context, if Wasm ever officially
 // supports that.
-#private_file wasm_allocator : Allocator
+#local wasm_allocator : Allocator
 
 parse_type_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> [] WasmFuncType {
     if !map.has(^sections, .Type) do return .{ null, 0 };
@@ -294,7 +294,7 @@ parse_code_section :: (use bin: ^WasmBinary, allocator := context.allocator) -> 
     }
 }
 
-#private
+#package
 parse_vector :: macro (reader: ^io.Reader, bin: ^WasmBinary,
                        read: (^io.Reader, ^WasmBinary) -> $T) -> [] T {
     wasm_allocator :: wasm_allocator;
@@ -309,7 +309,7 @@ parse_vector :: macro (reader: ^io.Reader, bin: ^WasmBinary,
     return result;
 }
 
-#private
+#package
 parse_name :: (reader: ^io.Reader, bin: ^WasmBinary) -> [] u8 {
     return parse_vector(reader, bin, read_byte);
 
@@ -318,7 +318,7 @@ parse_name :: (reader: ^io.Reader, bin: ^WasmBinary) -> [] u8 {
     }
 }
 
-#private
+#package
 parse_limits :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmLimits {
     byte := io.read_byte(reader);
 
@@ -342,7 +342,7 @@ parse_limits :: (reader: ^io.Reader, bin: ^WasmBinary) -> WasmLimits {
     return .{ minimum=minimum, maximum=maximum, shared=shared };
 }
 
-#private
+#package
 read_val_type :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmValueType {
     byte := io.read_byte(reader);
     switch byte {
@@ -364,7 +364,7 @@ read_val_type :: (reader: ^io.Reader, binary: ^WasmBinary) -> WasmValueType {
     return ~~0;
 }
 
-#private
+#package
 parse_const_uint32 :: (reader: ^io.Reader, binary: ^WasmBinary) -> u32 {
     assert(io.read_byte(reader) == 65, "Expected integer constant");
     value := read_uleb128(reader);
@@ -373,7 +373,7 @@ parse_const_uint32 :: (reader: ^io.Reader, binary: ^WasmBinary) -> u32 {
     return ~~value;
 }
 
-#private
+#package
 parse_section_locations :: (use bin: ^WasmBinary) -> bool {
     stream := io.string_stream_make(data);
     reader := io.reader_make(^stream);

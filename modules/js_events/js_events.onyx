@@ -5,7 +5,7 @@
 
 package js_events
 
-#private_file Max_Buffered_Events :: 16
+#local Max_Buffered_Events :: 16
 
 // NOTE: These need to match exactly what is in the corresponding javascript
 DomEventKind :: enum {
@@ -110,7 +110,7 @@ init :: () {
     event_setup(^event_storage, sizeof Event);
 }
 
-#private_file processing_event: Event
+#local processing_event: Event
 consume :: () -> Iterator(^Event) {
     next :: (_: rawptr) -> (^Event, bool) {
         if event_storage.event_count == 0 do return null, false;
@@ -131,11 +131,11 @@ consume :: () -> Iterator(^Event) {
 
 /* Private members */
 
-#private EventStorage :: struct {
+#package EventStorage :: struct {
     event_count  : u32;
     max_events   : u32;
     event_buffer : [Max_Buffered_Events] Event;
 }
 
-#private event_storage : EventStorage;
-#private event_setup :: (event_storage: ^EventStorage, event_size: u32) -> void #foreign "js_events" "setup" ---
+#package event_storage : EventStorage;
+#package event_setup :: (event_storage: ^EventStorage, event_size: u32) -> void #foreign "js_events" "setup" ---

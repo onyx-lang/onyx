@@ -1,7 +1,7 @@
 package json
 use package core
 
-#private
+#package
 Parser :: struct {
     tokenizer : Tokenizer;
     allocator : Allocator;
@@ -10,7 +10,7 @@ Parser :: struct {
     previous_token : Token;
 }
 
-#private
+#package
 make_parser :: (data: [] u8, allocator := context.allocator) -> Parser {
     parser: Parser;
     parser.tokenizer = Tokenizer.{ data = data };
@@ -19,13 +19,13 @@ make_parser :: (data: [] u8, allocator := context.allocator) -> Parser {
     return parser;
 }
 
-#private
+#package
 parse :: (data: [] u8, allocator := context.allocator) -> (^Value, Error) {
     parser := make_parser(data, allocator);
     return parse_value(^parser);
 }
 
-#private_file
+#local
 consume_token :: (use parser: ^Parser) -> (Token, Error) {
     error: Error;
     previous_token = current_token;
@@ -33,7 +33,7 @@ consume_token :: (use parser: ^Parser) -> (Token, Error) {
     return previous_token, error;
 }
 
-#private_file
+#local
 consume_token_if_next :: (use parser: ^Parser, kind: Token.Kind) -> bool {
     if current_token.kind == kind {
         consume_token(parser);
@@ -43,7 +43,7 @@ consume_token_if_next :: (use parser: ^Parser, kind: Token.Kind) -> bool {
     return false;
 }
 
-#private_file
+#local
 expect_token :: (use parser: ^Parser, kind: Token.Kind) -> (Token, Error) {
     previous :=  current_token;
     consume_token(parser);
@@ -52,7 +52,7 @@ expect_token :: (use parser: ^Parser, kind: Token.Kind) -> (Token, Error) {
     return previous, error;
 }
 
-#private
+#package
 parse_value :: (use parser: ^Parser) -> (^Value, Error) {
     return_value: ^Value = null;
 
@@ -120,7 +120,7 @@ parse_value :: (use parser: ^Parser) -> (^Value, Error) {
     return return_value, .{ .None };
 }
 
-#private_file
+#local
 parse_array :: (use parser: ^Parser) -> (^Value_Array, Error) {
     value := new(Value_Array, allocator);
 
@@ -162,7 +162,7 @@ parse_array :: (use parser: ^Parser) -> (^Value_Array, Error) {
 }
 
 
-#private_file
+#local
 parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
     value := new(Value_Object, allocator);
 
@@ -228,7 +228,7 @@ parse_object :: (use parser: ^Parser) -> (^Value_Object, Error) {
 }
 
 
-#private_file
+#local
 unescape_string :: (token: Token, allocator: Allocator) -> str {
     if token.kind != .String do return "";
 

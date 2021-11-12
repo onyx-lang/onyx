@@ -157,7 +157,7 @@ Additions:
     - Will also report errors in the cast is not possible.
 * Arbitrarily typed varargs. They behave similar to C-style varargs.
 * vararg_get builtin procedure to retrieve a value from a ... vararg.
-* #private_file directive for placing a symbol at file scope.
+* #local directive for placing a symbol at file scope.
 * a basic implentation of printf in the standard library.
 * use statements at the function level.
 * nested packages, i.e. 'core.array'
@@ -201,7 +201,7 @@ Additions:
 * Added println to core library; print followed by a newline.
 * Added tests/ folder and runtests.sh which will compile and execute the programs in the
     folder and test against their expected output.
-* #private_file for specifying symbols at the file scope.
+* #local for specifying symbols at the file scope.
 
 Removals:
 

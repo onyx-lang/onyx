@@ -35,7 +35,7 @@ init :: () {
 
 get_watermark :: () => cast(u32) heap_state.next_alloc;
 
-#private_file {
+#local {
     use package core.intrinsics.wasm {
         memory_size, memory_grow,
         memory_copy, memory_fill,

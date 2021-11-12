@@ -16,7 +16,7 @@ RingState :: struct {
     curr_ptr : rawptr;
 }
 
-#private_file
+#local
 ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     ss := cast(^RingState) data;
 

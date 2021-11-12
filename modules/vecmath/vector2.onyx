@@ -1,6 +1,6 @@
 package vecmath
 
-#private_file io :: package core.io
+#local io :: package core.io
 use package core.intrinsics.onyx { __zero_value }
 
 Vector2i :: #type Vector2(i32);

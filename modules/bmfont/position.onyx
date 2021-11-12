@@ -1,6 +1,6 @@
 package bmfont
 
-#private_file {
+#local {
     math :: package core.math
 
     renderable_glyph: Renderable_Glyph;

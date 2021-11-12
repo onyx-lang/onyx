@@ -1,8 +1,8 @@
 package wasm_utils
 
-#private_file io :: package core.io
+#local io :: package core.io
 
-#private
+#package
 read_uleb128 :: (use reader: ^io.Reader) -> u64 {
     result: u64 = 0;
     shift := 0;
@@ -19,7 +19,7 @@ read_uleb128 :: (use reader: ^io.Reader) -> u64 {
     return result;
 }
 
-#private
+#package
 read_sleb128 :: (use reader: ^io.Reader, size := 4) -> i64 {
     result: i64 = 0;
     shift := 0;

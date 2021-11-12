@@ -5,9 +5,9 @@ package core.string.builder
 
 #if false {
 
-#private_file array  :: package core.array
-#private_file string :: package core.string
-#private_file conv   :: package core.conv
+#local array  :: package core.array
+#local string :: package core.string
+#local conv   :: package core.conv
 
 Builder :: struct {
     data  : [..] u8;

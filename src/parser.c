@@ -2819,7 +2819,8 @@ static void parse_top_level_statement(OnyxParser* parser) {
         private_kind = bh_arr_last(parser->scope_flags);
 
     // :CLEANUP this very repetetive code...
-    if (parse_possible_directive(parser, "private")) {
+    if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_Package)) {
+        consume_tokens(parser, 2);
         private_kind = Ast_Flag_Private_Package;
         if (parser->curr->type == '{') {
             bh_arr_push(parser->scope_flags, private_kind);
@@ -2832,7 +2833,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
             return;
         }
     }
-    else if (parse_possible_directive(parser, "private_file")) {
+    else if (parse_possible_directive(parser, "local")) {
         private_kind = Ast_Flag_Private_File;
         if (parser->curr->type == '{') {
             bh_arr_push(parser->scope_flags, private_kind);

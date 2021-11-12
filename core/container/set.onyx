@@ -1,6 +1,6 @@
 package core.set
 
-#private_file {
+#local {
     array :: package core.array
     hash  :: package core.hash
     memory :: package core.memory
@@ -136,7 +136,7 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
 // Private symbols
 //
 
-#private_file {
+#local {
     SetLookupResult :: struct {
         hash_index  : i32 = -1;
         entry_index : i32 = -1;

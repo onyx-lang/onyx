@@ -131,7 +131,7 @@ ttf_create :: (ttf_data: [] u8) -> True_Type_Font {
     return ttf;
 }
 
-#private
+#package
 ttf_read_offset_table :: (use ttf: ^True_Type_Font) {
     scalar_type = reader->get_u32();
     num_tables := reader->get_u16();
@@ -162,7 +162,7 @@ ttf_read_offset_table :: (use ttf: ^True_Type_Font) {
     }
 }
 
-#private
+#package
 ttf_read_head_table :: (use ttf: ^True_Type_Font) {
     head_table_info  := map.get(^tables, string_to_beu32("head"));
     reader->seek(head_table_info.offset);
@@ -246,7 +246,7 @@ ttf_glyph_destroy :: (glyph: ^TTF_Glyph, allocator := context.allocator) {
     raw_free(allocator, glyph);
 }
 
-#private_file
+#local
 TTF_Glyph_Flags :: enum #flags {
     On_Curve  :: 0x01;
     X_Is_Byte :: 0x02;
@@ -256,7 +256,7 @@ TTF_Glyph_Flags :: enum #flags {
     Y_Delta   :: 0x20;
 }
 
-#private_file
+#local
 ttf_read_simple_glyph :: (use ttf: ^True_Type_Font, glyph: ^TTF_Glyph) {
     array.init(^glyph.contour_ends, ~~glyph.contour_count);
     array.init(^glyph.points);
@@ -423,13 +423,13 @@ ttf_lookup_glyph_by_char :: (use ttf: ^True_Type_Font, charcode: u32) -> u32 {
     return potential_code;
 }
 
-#private_file
+#local
 ttf_lookup_in_cmap0 :: (use ttf: ^True_Type_Font, cmap: ^TTF_Cmap0, charcode: u32) -> u32 {
     if charcode < 0 || charcode >= 256 do return 0;
     return ~~cmap.glyph_indicies[charcode];
 }
 
-#private_file
+#local
 ttf_lookup_in_cmap4 :: (use ttf: ^True_Type_Font, cmap: ^TTF_Cmap4, charcode: u32) -> u32 {
     if map.has(^cmap.cache, charcode) do return map.get(^cmap.cache, charcode);
 
@@ -511,7 +511,7 @@ ttf_lookup_horizontal_metrics :: (use ttf: ^True_Type_Font, glyph_index: u32) ->
 }
 
 
-#private_file
+#local
 ttf_calc_table_checksum :: (reader: ^TTF_Reader, offset: u32, length: u32) -> u32 {
     old := reader->seek(offset);
     defer reader->seek(old);
@@ -522,7 +522,7 @@ ttf_calc_table_checksum :: (reader: ^TTF_Reader, offset: u32, length: u32) -> u3
     return sum;
 }
 
-#private_file
+#local
 string_to_beu32 :: (s: str) -> u32 {
     return (cast(u32) s[0] << 24)
          | (cast(u32) s[1] << 16)

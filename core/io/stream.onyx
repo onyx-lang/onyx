@@ -6,7 +6,7 @@ Stream :: struct {
     vtable : ^Stream_Vtable;
 }
 
-// #private
+// #package
 Stream_Vtable :: struct {
     seek         : (s: ^Stream, to: i32, whence: SeekFrom) -> Error;
     tell         : (s: ^Stream) -> (Error, u32);
@@ -157,7 +157,7 @@ string_stream_to_str :: (use ss: ^StringStream) -> str {
     return .{ data.data, curr_pos };
 }
 
-#private
+#package
 string_stream_vtable := Stream_Vtable.{
     seek = (use ss: ^StringStream, to: i32, whence: SeekFrom) -> Error {
         if to >= data.count do return .OutOfBounds;
@@ -277,7 +277,7 @@ dynamic_string_stream_to_str :: (use dds: ^DynamicStringStream) -> str {
     return data.data[0 .. curr_pos];
 }
 
-#private
+#package
 dynamic_string_stream_vtable := Stream_Vtable.{
     seek = (use dss: ^DynamicStringStream, to: i32, whence: SeekFrom) -> Error {
         dest : i32;

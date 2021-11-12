@@ -16,7 +16,7 @@ PoolAllocator :: struct (Elem: type_expr) {
     first_free : ^Elem;
 }
 
-#private_file
+#local
 pool_allocator_proc :: (pool: ^PoolAllocator($Elem), aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
     switch aa {
         case .Alloc {

@@ -2,7 +2,7 @@
 
 package core.bucket_array
 
-#private_file array :: package core.array
+#local array :: package core.array
 
 Bucket_Array :: struct (T: type_expr) {
     allocator : Allocator;
@@ -138,7 +138,7 @@ iterator :: (b: ^Bucket_Array($T)) -> Iterator(T) {
     };
 }
 
-#private
+#package
 alloc_bucket :: (use b: ^Bucket_Array($T)) -> Bucket_Array.Bucket(T) {
     data := raw_alloc(allocator, sizeof T * elements_per_bucket);
     return .{ 0, data };

@@ -1,4 +1,4 @@
-// Everything in this file is marked #private because I do not think
+// Everything in this file is marked #package because I do not think
 // that this code will be needed outside of this module. I do not see
 // the value of having access to the tokenizer and parser of JSON directly.
 
@@ -6,13 +6,13 @@
 package json
 use package core
 
-#private
+#package
 Tokenizer :: struct {
     data: [] u8;
     use position := Position.{ 0, 1, 1 };
 }
 
-#private
+#package
 Token :: struct {
     Kind :: enum {
         Invalid;
@@ -40,13 +40,13 @@ Token :: struct {
     use position := Position.{ 0, 1, 1 };
 }
 
-#private
+#package
 Position :: struct {
     offset       : u32;  // Offset into the stream
     line, column : u32;  // Line and column number
 }
 
-#private
+#package
 token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
     err := Error.{};
 
@@ -138,7 +138,7 @@ token_get :: (use tkn: ^Tokenizer) -> (Token, Error) {
     return token, err;
 }
 
-#private_file
+#local
 next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
     if offset >= data.count do return 0, false;
 
@@ -149,7 +149,7 @@ next_character :: (use tkn: ^Tokenizer) -> (u8, bool) {
     return retval, true;
 }
 
-#private_file
+#local
 skip_whitespace :: (use tkn: ^Tokenizer) {
     while offset < data.count {
         switch data[offset] {
@@ -170,7 +170,7 @@ skip_whitespace :: (use tkn: ^Tokenizer) {
     }
 }
 
-#private_file
+#local
 skip_alpha_numeric :: (use tkn: ^Tokenizer) {
     while offset < data.count {
         switch data[offset] {
@@ -184,7 +184,7 @@ skip_alpha_numeric :: (use tkn: ^Tokenizer) {
     }
 }
 
-#private_file
+#local
 skip_numeric :: (use tkn: ^Tokenizer) {
     while offset < data.count {
         switch data[offset] {
@@ -198,7 +198,7 @@ skip_numeric :: (use tkn: ^Tokenizer) {
     }
 }
 
-#private_file
+#local
 skip_escape :: (use tkn: ^Tokenizer) {
     switch data[offset] {
         case #char "u" {

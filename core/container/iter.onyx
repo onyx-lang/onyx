@@ -188,7 +188,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     };
 }
 
-#private_file Zipped :: struct (T: type_expr, R: type_expr) {
+#local Zipped :: struct (T: type_expr, R: type_expr) {
     first: T;
     second: R;
 }
@@ -238,7 +238,7 @@ const :: (value: $T) -> Iterator(T) {
     };
 }
 
-#private_file Enumeration_Value :: struct (T: type_expr) {
+#local Enumeration_Value :: struct (T: type_expr) {
     index: i32;
     value: T;
 }
