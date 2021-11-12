@@ -433,7 +433,7 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
         calling_a_macro = 1;
         call->callee = callee;
 
-        AstTyped* new_callee = (AstTyped *) macro_resolve_header((AstMacro *) callee, &call->args, call->token);
+        AstTyped* new_callee = (AstTyped *) macro_resolve_header((AstMacro *) callee, &call->args, call->token, 1);
         if (new_callee == NULL) return Check_Error;
         if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for macro header to pass type-checking.");
@@ -1336,7 +1336,8 @@ CheckStatus check_address_of(AstAddressOf** paof) {
             && expr->kind != Ast_Kind_Dereference
             && expr->kind != Ast_Kind_Field_Access
             && expr->kind != Ast_Kind_Memres
-            && expr->kind != Ast_Kind_Local)
+            && expr->kind != Ast_Kind_Local
+            && expr->kind != Ast_Kind_Constraint_Sentinel)
             || (expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
         ERROR_(aof->token->pos, "Cannot take the address of something that is not an l-value. %s", onyx_ast_node_kind_string(expr->kind));
     }
@@ -2028,7 +2029,10 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 CheckStatus check_temp_function_header(AstFunction* func) {
     CheckStatus cs = check_function_header(func);
     if (cs == Check_Error) {
-        onyx_clear_errors();
+        if (func->flags & Ast_Flag_Header_Check_No_Error) {
+            onyx_clear_errors();
+        }
+
         return Check_Failed;
     }
 

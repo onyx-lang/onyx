@@ -708,10 +708,10 @@ AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupM
 
     ensure_polyproc_cache_is_created(pp);
 
-    return polymorphic_proc_build_only_header_with_slns(pp, slns);
+    return polymorphic_proc_build_only_header_with_slns(pp, slns, 0);
 }
 
-AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_arr(AstPolySolution) slns) {
+AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed) {
     AstSolidifiedFunction solidified_func;
 
     char* unique_key = build_poly_slns_unique_key(slns);
@@ -731,6 +731,8 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_ar
 
         return (AstFunction *) &node_that_signals_a_yield;
     }
+
+    BH_MASK_SET(solidified_func.func->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,

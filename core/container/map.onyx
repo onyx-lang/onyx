@@ -11,6 +11,10 @@ package core.map
 
 #private_file {
     ValidKey :: interface (T: type_expr) {
+        // In order to use a certain type as a key in a Map, you must
+        // provide an implementation of core.hash.to_u32() for that type,
+        // and you must provide an operator overload for ==.
+
         hash.to_u32(T);
         T == T;
     }

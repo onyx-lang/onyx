@@ -251,6 +251,8 @@ typedef enum AstFlags {
     Ast_Flag_Static_If_Resolved    = BH_BIT(17),
 
     Ast_Flag_Symbol_Invisible      = BH_BIT(18),
+
+    Ast_Flag_Header_Check_No_Error = BH_BIT(19),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1500,7 +1502,7 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
-AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_arr(AstPolySolution) slns);
+AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
 
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
@@ -1508,7 +1510,7 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
 void report_unable_to_match_overload(AstCall* call);
 
 void expand_macro(AstCall** pcall, AstFunction* template);
-AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite);
+AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
 
 Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
 
@@ -1520,7 +1522,8 @@ static inline b32 is_lval(AstNode* node) {
         || (node->kind == Ast_Kind_Dereference)
         || (node->kind == Ast_Kind_Subscript)
         || (node->kind == Ast_Kind_Field_Access)
-        || (node->kind == Ast_Kind_Memres))
+        || (node->kind == Ast_Kind_Memres)
+        || (node->kind == Ast_Kind_Constraint_Sentinel)) // Bit of a hack, but this makes constraints like 'T->foo()' work.
         return 1;
 
     if (node->kind == Ast_Kind_Compound) {

@@ -2373,6 +2373,7 @@ static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
             && token_after_paren->type != '{'
             && token_after_paren->type != Token_Type_Keyword_Do
             && token_after_paren->type != Token_Type_Empty_Block
+            && token_after_paren->type != Token_Type_Keyword_Where
             && (token_after_paren->type != '=' || (token_after_paren + 1)->type != '>'))
             return 0;
 
