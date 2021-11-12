@@ -99,6 +99,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_If_Expression: return sizeof(AstIfExpression);
         case Ast_Kind_Directive_Insert: return sizeof(AstDirectiveInsert);
         case Ast_Kind_Do_Block: return sizeof(AstDoBlock);
+        case Ast_Kind_Constraint: return sizeof(AstConstraint);
         case Ast_Kind_Count: return 0;
     }
 
@@ -320,6 +321,15 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             bh_arr_each(AstTyped *, tag, ss->meta_tags) {
                 bh_arr_push(ds->meta_tags, (AstTyped *) ast_clone(a, *tag));
             }
+            
+            if (ss->constraints.constraints) {
+                memset(&ds->constraints, 0, sizeof(ConstraintContext));
+                bh_arr_new(global_heap_allocator, ds->constraints.constraints, bh_arr_length(ss->constraints.constraints));
+
+                bh_arr_each(AstConstraint *, constraint, ss->constraints.constraints) {
+                    bh_arr_push(ds->constraints.constraints, (AstConstraint *) ast_clone(a, (AstNode *) *constraint));
+                }
+            }
 
             ds->stcache = NULL;
             break;
@@ -407,6 +417,31 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 new_param.vararg_kind = param->vararg_kind;
                 new_param.is_used = param->is_used;
                 bh_arr_push(df->params, new_param);
+            }
+
+            if (sf->constraints.constraints) {
+                memset(&df->constraints, 0, sizeof(ConstraintContext));
+                bh_arr_new(global_heap_allocator, df->constraints.constraints, bh_arr_length(sf->constraints.constraints));
+
+                bh_arr_each(AstConstraint *, constraint, sf->constraints.constraints) {
+                    bh_arr_push(df->constraints.constraints, (AstConstraint *) ast_clone(a, (AstNode *) *constraint));
+                }
+            }
+
+            break;
+        }
+
+        case Ast_Kind_Constraint: {
+            C(AstConstraint, interface);
+
+            AstConstraint* dc = (AstConstraint *) nn;
+            AstConstraint* sc = (AstConstraint *) node;
+
+            dc->type_args = NULL;
+            bh_arr_new(global_heap_allocator, dc->type_args, bh_arr_length(sc->type_args));
+
+            bh_arr_each(AstType *, type_arg, sc->type_args) {
+                bh_arr_push(dc->type_args, (AstType *) ast_clone(a, (AstNode *) *type_arg));
             }
 
             break;
@@ -500,6 +535,15 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
         new_param.vararg_kind = param->vararg_kind;
         new_param.is_used = param->is_used;
         bh_arr_push(new_func->params, new_param);
+    }
+
+    if (func->constraints.constraints) {
+        memset(&new_func->constraints, 0, sizeof(ConstraintContext));
+        bh_arr_new(global_heap_allocator, new_func->constraints.constraints, bh_arr_length(func->constraints.constraints));
+
+        bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
+            bh_arr_push(new_func->constraints.constraints, (AstConstraint *) ast_clone(a, (AstNode *) *constraint));
+        }
     }
 
     return new_func;

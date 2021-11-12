@@ -57,6 +57,7 @@ static SymresStatus symres_memres(AstMemRes** memres);
 static SymresStatus symres_struct_defaults(AstType* st);
 static SymresStatus symres_static_if(AstIf* static_if);
 static SymresStatus symres_macro(AstMacro* macro);
+static SymresStatus symres_constraint(AstConstraint* constraint);
 
 static void scope_enter(Scope* new_scope) {
     curr_scope = new_scope;
@@ -100,6 +101,12 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
         s_node->scope->parent = curr_scope;
 
         scope_enter(s_node->scope);
+    }
+
+    if (s_node->constraints.constraints) {
+        bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
+            SYMRES(constraint, *constraint);
+        }
     }
 
     fori (i, 0, bh_arr_length(s_node->members)) {
@@ -893,6 +900,12 @@ SymresStatus symres_function_header(AstFunction* func) {
         onyx_report_error(func->token->pos, "Return type is not a type.");
     }
 
+    if (func->constraints.constraints != NULL) {
+        bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
+            SYMRES(constraint, *constraint);
+        }
+    }
+
     scope_leave();
 
     return Symres_Success;
@@ -1219,6 +1232,30 @@ static SymresStatus symres_macro(AstMacro* macro) {
     return Symres_Success;
 }
 
+static SymresStatus symres_constraint(AstConstraint* constraint) {
+    switch (constraint->phase) {
+        case Constraint_Phase_Waiting_To_Be_Queued: {
+            SYMRES(expression, (AstTyped **) &constraint->interface);
+
+            bh_arr_each(AstType *, type_arg, constraint->type_args) {
+                SYMRES(type, type_arg);
+            }
+
+            return Symres_Success;
+        }
+
+        case Constraint_Phase_Checking_Expressions: {
+            fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
+                SYMRES(expression, &constraint->exprs[i]);
+            }
+
+            return Symres_Success;
+        }
+    }
+
+    return Symres_Success;
+}
+
 void symres_entity(Entity* ent) {
     Scope* old_scope = NULL;
     if (ent->scope) {
@@ -1267,6 +1304,7 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults((AstType *) ent->type_alias); break;
         case Entity_Type_Process_Directive:       ss = symres_process_directive((AstNode *) ent->expr); break;
         case Entity_Type_Macro:                   ss = symres_macro(ent->macro); break;
+        case Entity_Type_Constraint_Check:        ss = symres_constraint(ent->constraint); break;
 
         default: break;
     }

@@ -401,7 +401,7 @@ static void output_dummy_progress_bar() {
 
     static const char* state_colors[] = {
         "\e[91m", "\e[93m", "\e[94m", "\e[93m", 
-        "\e[97m", "\e[95m", "\e[96m", "\e[92m",
+        "\e[97m", "\e[95m", "\e[96m", "\e[92m", "\e[91m",
     };
 
     printf("\e[2;1H");
@@ -514,7 +514,7 @@ static i32 onyx_compile() {
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
 
-        if (ent->state != Entity_State_Finalized)
+        if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
             entity_heap_insert_existing(&context.entities, ent);
     }
 

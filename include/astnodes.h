@@ -80,6 +80,8 @@
     NODE(Param)                \
     NODE(Function)             \
     NODE(OverloadedFunction)   \
+    NODE(Interface)            \
+    NODE(Constraint)           \
                                \
     NODE(PolyParam)            \
     NODE(PolySolution)         \
@@ -122,6 +124,9 @@ typedef enum AstKind {
     Ast_Kind_Function,
     Ast_Kind_Overloaded_Function,
     Ast_Kind_Polymorphic_Proc,
+    Ast_Kind_Interface,
+    Ast_Kind_Constraint,
+    Ast_Kind_Constraint_Sentinel,
     Ast_Kind_Block,
     Ast_Kind_Local,
     Ast_Kind_Global,
@@ -507,6 +512,19 @@ typedef enum BlockRule {
     Block_Rule_Do_Block   = Block_Rule_New_Scope | Block_Rule_Clear_Defer | Block_Rule_Override_Return | Block_Rule_Emit_Instructions,
 } BlockRule;
 
+typedef enum ConstraintCheckStatus {
+    Constraint_Check_Status_Queued,
+    Constraint_Check_Status_Failed,
+    Constraint_Check_Status_Success,
+} ConstraintCheckStatus;
+
+typedef struct ConstraintContext {
+    bh_arr(AstConstraint *) constraints;
+    ConstraintCheckStatus *constraint_checks;
+    b32 constraints_met : 1;
+} ConstraintContext;
+
+
 typedef struct Arguments Arguments;
 struct Arguments {
     bh_arr(AstTyped *) values;
@@ -790,6 +808,8 @@ struct AstStructType {
     struct Entity* entity_type;
     struct Entity* entity_defaults;
 
+    ConstraintContext constraints;
+
     b32 stcache_is_valid : 1;
     b32 is_union         : 1;
 };
@@ -919,6 +939,8 @@ struct AstFunction {
     struct Entity* entity_header;
     struct Entity* entity_body;
 
+    ConstraintContext constraints;
+
     b32 is_exported  : 1;
     b32 is_foreign   : 1;
     b32 is_intrinsic : 1;
@@ -944,6 +966,44 @@ struct AstOverloadedFunction {
     // function.
     bh_imap            all_overloads;
 };
+
+// @CLEANUP: Is this really necessary?
+typedef struct InterfaceParam {
+    OnyxToken *token;
+    AstType   *type_node;
+    Type      *type;
+} InterfaceParam;
+
+struct AstInterface {
+    AstTyped_base;
+    char *name;
+
+    bh_arr(InterfaceParam) params;
+    bh_arr(AstTyped *)  exprs;
+};
+
+typedef enum ConstraintPhase {
+    Constraint_Phase_Waiting_To_Be_Queued,
+    Constraint_Phase_Cloning_Expressions,
+    Constraint_Phase_Checking_Expressions,
+    Constraint_Phase_Finished,
+} ConstraintPhase;
+
+struct AstConstraint {
+    AstNode_base;
+
+    ConstraintPhase phase;
+
+    AstInterface *interface;
+    bh_arr(AstType *) type_args;
+
+    ConstraintCheckStatus *report_status;
+
+    Scope* scope;
+    bh_arr(AstTyped *) exprs;
+    u32 expr_idx;
+};
+
 
 struct AstPackage {
     AstTyped_base;
@@ -1117,6 +1177,7 @@ typedef enum EntityState {
     Entity_State_Check_Types,
     Entity_State_Code_Gen,
     Entity_State_Finalized,
+    Entity_State_Failed,
 
     Entity_State_Count,
 } EntityState;
@@ -1141,6 +1202,8 @@ typedef enum EntityType {
     Entity_Type_Type_Alias,
     Entity_Type_Memory_Reservation_Type,
     Entity_Type_Use,
+    Entity_Type_Interface,
+    Entity_Type_Constraint_Check,
     Entity_Type_Polymorphic_Proc,
     Entity_Type_Macro,
     Entity_Type_Foreign_Function_Header,
@@ -1195,6 +1258,8 @@ typedef struct Entity {
         AstPolyProc           *poly_proc;
         AstMacro              *macro;
         AstUse                *use;
+        AstInterface          *interface;
+        AstConstraint         *constraint;
     };
 } Entity;
 

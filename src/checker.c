@@ -56,6 +56,7 @@ typedef enum CheckStatus {
     Check_Errors_Start,
     Check_Return_To_Symres, // Return this node for further symres processing
     Check_Yield_Macro,
+    Check_Failed,           // The node is done processing and should be put in the state of Failed.
     Check_Error,    // There was an error when checking the node
 } CheckStatus;
 
@@ -94,6 +95,8 @@ CheckStatus check_memres(AstMemRes* memres);
 CheckStatus check_type(AstType* type);
 CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
 CheckStatus check_do_block(AstDoBlock** pdoblock);
+CheckStatus check_constraint(AstConstraint *constraint);
+CheckStatus check_constraint_context(ConstraintContext *cc, OnyxFilePos pos);
 
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
@@ -496,6 +499,12 @@ CheckStatus check_call(AstCall** pcall) {
 
     AstFunction* callee=NULL;
     CHECK(resolve_callee, call, (AstTyped **) &callee);
+
+    if (callee->kind == Ast_Kind_Function) {
+        if (callee->constraints.constraints != NULL && callee->constraints.constraints_met == 0) {
+            YIELD(call->token->pos, "Waiting for constraints to be checked on callee.");
+        }
+    }
 
     i32 arg_count = get_argument_buffer_size(&callee->type->Function, &call->args);
     arguments_ensure_length(&call->args, arg_count);
@@ -1714,6 +1723,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Package: break;
         case Ast_Kind_Error: break;
         case Ast_Kind_Unary_Field_Access: break;
+        case Ast_Kind_Constraint_Sentinel: break;
 
         // NOTE: The only way to have an Intrinsic_Call node is to have gone through the
         // checking of a call node at least once.
@@ -1930,6 +1940,10 @@ CheckStatus check_struct(AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
+    if (s_node->constraints.constraints) {
+        CHECK(constraint_context, &s_node->constraints, s_node->token->pos);
+    }
+
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
             CHECK(type, (*smem)->type_node);
@@ -2012,7 +2026,14 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 }
 
 CheckStatus check_temp_function_header(AstFunction* func) {
-    CHECK(function_header, func);
+    CheckStatus cs = check_function_header(func);
+    if (cs == Check_Error) {
+        onyx_clear_errors();
+        return Check_Failed;
+    }
+
+    if (cs != Check_Success) return cs;
+
     return Check_Complete;
 }
 
@@ -2105,6 +2126,10 @@ CheckStatus check_function_header(AstFunction* func) {
     }
 
     if (func->return_type != NULL) CHECK(type, func->return_type);
+
+    if (func->constraints.constraints != NULL) {
+        CHECK(constraint_context, &func->constraints, func->token->pos);
+    }
 
     func->type = type_build_function_type(context.ast_alloc, func);
     if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
@@ -2350,6 +2375,120 @@ CheckStatus check_macro(AstMacro* macro) {
     return Check_Success;
 }
 
+CheckStatus check_constraint(AstConstraint *constraint) {
+    switch (constraint->phase) {
+        case Constraint_Phase_Cloning_Expressions: {
+            if (constraint->interface->kind != Ast_Kind_Interface) {
+                // CLEANUP: This error message might not look totally right in some cases.
+                ERROR_(constraint->token->pos, "'%b' is not an interface.", constraint->token->text, constraint->token->length);
+            }
+
+            bh_arr_new(global_heap_allocator, constraint->exprs, bh_arr_length(constraint->interface->exprs));
+            bh_arr_each(AstTyped *, expr, constraint->interface->exprs) {
+                bh_arr_push(constraint->exprs, (AstTyped *) ast_clone(context.ast_alloc, (AstNode *) *expr));
+            }
+
+            assert(constraint->interface->entity && constraint->interface->entity->scope);
+
+            constraint->scope = scope_create(context.ast_alloc, constraint->interface->entity->scope, constraint->token->pos);
+
+            fori (i, 0, bh_arr_length(constraint->interface->params)) {
+                InterfaceParam *ip = &constraint->interface->params[i];
+
+                AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
+                sentinel->token = ip->token;
+                sentinel->type_node = constraint->type_args[i];
+
+                symbol_introduce(constraint->scope, ip->token, (AstNode *) sentinel);
+            }
+
+            assert(constraint->entity);
+            constraint->entity->scope = constraint->scope;
+
+            constraint->phase = Constraint_Phase_Checking_Expressions;
+            return Check_Return_To_Symres;
+        }
+
+        case Constraint_Phase_Checking_Expressions: {
+            fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
+                CheckStatus cs = check_expression(&constraint->exprs[i]);
+                if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
+                    return cs;
+                }
+
+                if (cs == Check_Error) {
+                    // HACK HACK HACK
+                    onyx_clear_errors();
+
+                    // onyx_report_error(constraint->interface->exprs[i]->token->pos, "This constraint was not satisfied.");
+                    // onyx_report_error(constraint->token->pos, "Here was where the interface was used.");
+                    *constraint->report_status = Constraint_Check_Status_Failed;
+                    return Check_Failed;
+                }
+
+                constraint->expr_idx++;
+            }
+
+            *constraint->report_status = Constraint_Check_Status_Success;
+            return Check_Complete;
+        }
+    }
+
+    return Check_Success;
+}
+
+CheckStatus check_constraint_context(ConstraintContext *cc, OnyxFilePos pos) {
+    if (cc->constraint_checks) {
+        if (cc->constraints_met == 1) return Check_Success;
+
+        fori (i, 0, bh_arr_length(cc->constraints)) {
+            if (cc->constraint_checks[i] == Constraint_Check_Status_Failed) {
+                AstConstraint *constraint = cc->constraints[i];
+                char constraint_map[512] = {0};
+                fori (i, 0, bh_arr_length(constraint->type_args)) {
+                    if (i != 0) strncat(constraint_map, ", ", 511);
+
+                    OnyxToken* symbol = constraint->interface->params[i].token;
+                    token_toggle_end(symbol);
+                    strncat(constraint_map, symbol->text, 511);
+                    token_toggle_end(symbol);
+
+                    strncat(constraint_map, " is of type '", 511);
+                    strncat(constraint_map, type_get_name(type_build_from_ast(context.ast_alloc, constraint->type_args[i])), 511);
+                    strncat(constraint_map, "'", 511);
+                }
+
+                onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, "Failed to satisfy constraint where %s.", constraint_map);
+                onyx_report_error(constraint->token->pos, "Here is where the interface was used.");
+                return Check_Error;
+            }
+
+            if (cc->constraint_checks[i] == Constraint_Check_Status_Queued) {
+                YIELD(pos, "Waiting for constraints to be checked.");
+            }
+        }
+
+        cc->constraints_met = 1;
+        return Check_Success;
+
+    } else {
+        u32 count = bh_arr_length(cc->constraints);
+        ConstraintCheckStatus *ccs = bh_alloc_array(context.ast_alloc, ConstraintCheckStatus, count);
+
+        cc->constraint_checks = ccs;
+
+        fori (i, 0, count) {
+            ccs[i] = Constraint_Check_Status_Queued;
+            cc->constraints[i]->report_status = &ccs[i];
+            cc->constraints[i]->phase = Constraint_Phase_Cloning_Expressions;
+
+            add_entities_for_node(NULL, (AstNode *) cc->constraints[i], NULL, NULL);
+        }
+
+        return Check_Yield_Macro;
+    }
+}
+
 CheckStatus check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -2379,7 +2518,8 @@ void check_entity(Entity* ent) {
         case Entity_Type_Memory_Reservation_Type:  cs = check_memres_type(ent->mem_res); break;
         case Entity_Type_Memory_Reservation:       cs = check_memres(ent->mem_res); break;
         case Entity_Type_Static_If:                cs = check_static_if(ent->static_if); break;
-        case Entity_Type_Macro:                    cs = check_macro(ent->macro);
+        case Entity_Type_Macro:                    cs = check_macro(ent->macro); break;
+        case Entity_Type_Constraint_Check:         cs = check_constraint(ent->constraint); break;
 
         case Entity_Type_Expression:
             cs = check_expression(&ent->expr);
@@ -2407,6 +2547,7 @@ void check_entity(Entity* ent) {
     if (cs == Check_Success)          ent->state = Entity_State_Code_Gen;
     if (cs == Check_Complete)         ent->state = Entity_State_Finalized;
     if (cs == Check_Return_To_Symres) ent->state = Entity_State_Resolve_Symbols;
+    if (cs == Check_Failed)           ent->state = Entity_State_Failed;
     if (cs == Check_Yield_Macro)      ent->macro_attempts++;
     else {
         ent->macro_attempts = 0;

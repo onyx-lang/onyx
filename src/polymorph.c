@@ -91,15 +91,12 @@ static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
 // NOTE: This function adds a solidified function to the entity heap for it to be processed
 // later. It optionally can start the function header entity at the code generation state if
 // the header has already been processed.
-static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_func, b32 header_already_processed) {
+static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_func) {
     solidified_func.func->flags |= Ast_Flag_Function_Used;
     solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
 
-    EntityState header_start_state = Entity_State_Resolve_Symbols;
-    if (header_already_processed) header_start_state = Entity_State_Code_Gen;
-
     Entity func_header_entity = {
-        .state = header_start_state,
+        .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Function_Header,
         .function = solidified_func.func,
         .package = NULL,
@@ -180,7 +177,7 @@ static void ensure_solidified_function_has_body(AstPolyProc* pp, AstSolidifiedFu
         // header. This should never be the case in this situation, since the header would
         // have to have successfully passed type checking before it would become a solidified
         // procedure.
-        assert(add_solidified_function_entities(solidified_func, 1));
+        assert(add_solidified_function_entities(solidified_func));
 
         solidified_func.func->flags &= ~Ast_Flag_Incomplete_Body;
     }
@@ -649,7 +646,7 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     // NOTE: Cache the function for later use, reducing duplicate functions.
     bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
 
-    add_solidified_function_entities(solidified_func, 0);
+    add_solidified_function_entities(solidified_func);
 
     return (AstFunction *) &node_that_signals_a_yield;
 }
@@ -728,7 +725,12 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_ar
         solidified_func = generate_solidified_function(pp, slns, NULL, 1);
     }
 
-    if (solidified_func.func_header_entity && solidified_func.func_header_entity->state == Entity_State_Finalized) return solidified_func.func;
+    if (solidified_func.func_header_entity) {
+        if (solidified_func.func_header_entity->state == Entity_State_Finalized) return solidified_func.func;
+        if (solidified_func.func_header_entity->state == Entity_State_Failed)    return NULL;
+
+        return (AstFunction *) &node_that_signals_a_yield;
+    }
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,

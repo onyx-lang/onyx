@@ -37,6 +37,8 @@ static const char* token_type_names[] = {
     "case",
     "fallthrough",
     "macro",
+    "interface",
+    "where",
 
     "->",
     "<-",
@@ -357,6 +359,7 @@ whitespace_skipped:
         break;
     case 'i':
         LITERAL_TOKEN("if",          1, Token_Type_Keyword_If);
+        LITERAL_TOKEN("interface",   1, Token_Type_Keyword_Interface);
         break;
     case 'm':
         LITERAL_TOKEN("macro",       1, Token_Type_Keyword_Macro);
@@ -382,6 +385,7 @@ whitespace_skipped:
         break;
     case 'w':
         LITERAL_TOKEN("while",       1, Token_Type_Keyword_While);
+        LITERAL_TOKEN("where",       1, Token_Type_Keyword_Where);
         break;
 
     case '-':

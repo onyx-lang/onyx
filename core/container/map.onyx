@@ -9,7 +9,14 @@ package core.map
     use package core.intrinsics.onyx { __zero_value, __initialize }
 }
 
-Map :: struct (K: type_expr, V: type_expr) {
+#private_file {
+    ValidKey :: interface (T: type_expr) {
+        hash.to_u32(T);
+        T == T;
+    }
+}
+
+Map :: struct (K: type_expr, V: type_expr) where ValidKey(K) {
     allocator : Allocator;
 
     hashes  : [] i32;

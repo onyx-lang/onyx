@@ -337,6 +337,22 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
+        case Ast_Kind_Interface: {
+            ent.type = Entity_Type_Interface;
+            ent.interface = (AstInterface *) node;
+            ent.state = Entity_State_Resolve_Symbols;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
+        case Ast_Kind_Constraint: {
+            ent.type = Entity_Type_Constraint_Check;
+            ent.constraint = (AstConstraint *) node;
+            ent.state = Entity_State_Resolve_Symbols;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
         default: {
             ent.type = Entity_Type_Expression;
             ent.expr = (AstTyped *) node;
