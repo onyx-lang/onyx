@@ -483,7 +483,25 @@ CheckStatus check_call(AstCall** pcall) {
     //      8. If callee is an intrinsic, turn call into an Intrinsic_Call node
     //      9. Check types of formal and actual params against each other, handling varargs
     AstCall* call = *pcall;
-    
+
+    {
+        AstNode* callee = strip_aliases((AstNode *) call->callee);
+        if (callee->kind == Ast_Kind_Poly_Struct_Type) {
+            // HACK HACK HACK
+            AstPolyCallType *pct = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
+            pct->token = call->token;
+            pct->callee = (AstType *) callee;
+            pct->params = (AstNode **) call->args.values;
+            bh_arr_each(AstNode *, pp, pct->params) {
+                *pp = (AstNode *) (*(AstArgument **) pp)->value;
+            }
+
+            CHECK(type, (AstType *) pct);
+            *pcall = (AstCall *) pct;
+            return Check_Success;
+        }
+    }
+
     if (call->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
 
     u32 current_checking_level_store = current_checking_level;
@@ -1082,11 +1100,12 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         // stnode is filled out.
         if (sl->stnode == NULL) return Check_Success;
 
+        CHECK(expression, &sl->stnode);
         if (!node_is_type((AstNode *) sl->stnode)) {
             ERROR(sl->token->pos, "Type used for struct literal is not a type.");
         }
 
-        fill_in_type((AstTyped *) sl);
+        sl->type = type_build_from_ast(context.ast_alloc, (AstType *) sl->stnode);
         if (sl->type == NULL)
             YIELD(sl->token->pos, "Trying to resolve type of struct literal.");
     }
@@ -1170,10 +1189,11 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
         if (al->atnode == NULL) return Check_Success;
             // YIELD(al->token->pos, "Waiting for array literal type to be known.");
 
+        CHECK(expression, &al->atnode);
         if (!node_is_type((AstNode *) al->atnode))
             ERROR(al->token->pos, "Array type is not a type.");
 
-        fill_in_type((AstTyped *) al);
+        al->type = type_build_from_ast(context.ast_alloc, (AstType *) al->atnode);
         if (al->type == NULL)
             YIELD(al->token->pos, "Trying to resolve type of array literal.");
 

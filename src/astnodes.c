@@ -714,6 +714,9 @@ Type* resolve_expression_type(AstTyped* node) {
         bh_arr_each(AstTyped *, expr, ((AstCompound *) node)->exprs) {
             resolve_expression_type(*expr);
         }
+
+        node->type = type_build_compound_type(context.ast_alloc, (AstCompound *) node);
+        return node->type;
     }
 
     if (node->kind == Ast_Kind_Argument) {
@@ -835,6 +838,8 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
         if (err_msg) *err_msg = "'to' is null. (Compiler Error)";
         return 0;
     }
+
+    if (from_->id == to_->id) return 1;
 
     if (from->kind == Type_Kind_Enum) from = from->Enum.backing;
     if (to->kind == Type_Kind_Enum) to = to->Enum.backing;

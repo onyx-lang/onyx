@@ -109,7 +109,7 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
         current: ^ListElem(T);
     }
 
-    list_iterator := new(#type ListIterator(T));
+    list_iterator := new(ListIterator(T));
     list_iterator.current = list.first;
 
     return .{
@@ -120,4 +120,4 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
 }
 
 #local
-allocate_elem :: macro (list: ^List($T)) => new(#type ListElem(T), allocator=list.allocator);
+allocate_elem :: macro (list: ^List($T)) => new(ListElem(T), allocator=list.allocator);

@@ -395,7 +395,6 @@ static SymresStatus symres_unaryop(AstUnaryOp** unaryop) {
 
 static SymresStatus symres_struct_literal(AstStructLiteral* sl) {
     if (sl->stnode != NULL) SYMRES(expression, &sl->stnode);
-    SYMRES(type, (AstType **) &sl->stnode);
 
     sl->type_node = (AstType *) sl->stnode;
     while (sl->type_node && sl->type_node->kind == Ast_Kind_Type_Alias)
@@ -408,7 +407,6 @@ static SymresStatus symres_struct_literal(AstStructLiteral* sl) {
 
 static SymresStatus symres_array_literal(AstArrayLiteral* al) {
     if (al->atnode != NULL) SYMRES(expression, &al->atnode);
-    SYMRES(type, (AstType **) &al->atnode);
 
     al->type_node = (AstType *) al->atnode;
     while (al->type_node && al->type_node->kind == Ast_Kind_Type_Alias)

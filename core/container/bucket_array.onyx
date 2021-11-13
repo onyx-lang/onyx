@@ -29,7 +29,7 @@ init :: (use b: ^Bucket_Array($T), elements: i32,
     
     allocator = bucket_allocator;
     b.elements_per_bucket = elements;
-    buckets   = array.make(#type Bucket_Array.Bucket(T), allocator=array_allocator);
+    buckets   = array.make(Bucket_Array.Bucket(T), allocator=array_allocator);
 
     initial_bucket := alloc_bucket(b);
     array.push(^buckets, initial_bucket);
@@ -108,7 +108,7 @@ iterator :: (b: ^Bucket_Array($T)) -> Iterator(T) {
         elem_idx   : i32;
     }
 
-    c := new(#type Context(T));
+    c := new(Context(T));
     c.ba = b;
     c.bucket_idx = 0;
     c.elem_idx   = 0;

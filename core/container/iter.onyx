@@ -18,7 +18,7 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
         predicate: (T) -> bool;
     }
 
-    filter_iterator := new(#type FilterIterator(T));
+    filter_iterator := new(FilterIterator(T));
     filter_iterator.iterator = it;
     filter_iterator.predicate = predicate;
 
@@ -54,7 +54,7 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
         transform: (T) -> R;
     }
 
-    map_iterator := new(#type MapIterator(T, R));
+    map_iterator := new(MapIterator(T, R));
     map_iterator.iterator = it;
     map_iterator.transform = transform;
 
@@ -105,7 +105,7 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
         remaining: u32;
     }
 
-    take_iterator := new(#type TakeIterator(T));
+    take_iterator := new(TakeIterator(T));
     take_iterator.iterator = it;
     take_iterator.remaining = count;
 
@@ -134,7 +134,7 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
         predicate: (T) -> bool;
     }
 
-    take_iterator := new(#type TakeIterator(T));
+    take_iterator := new(TakeIterator(T));
     take_iterator.iterator = it;
     take_iterator.predicate = predicate;
 
@@ -164,7 +164,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
         skipped:  bool = false;
     }
 
-    skip_iterator := new(#type SkipIterator(T));
+    skip_iterator := new(SkipIterator(T));
     skip_iterator.iterator = it;
     skip_iterator.to_skip = count;
 
@@ -205,7 +205,7 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Z
         iterator2: Iterator(R);
     }
 
-    zipped_iterator := new(#type ZippedIterator(T, R));
+    zipped_iterator := new(ZippedIterator(T, R));
     zipped_iterator.iterator1 = left_iterator;
     zipped_iterator.iterator2 = right_iterator;
 
@@ -255,7 +255,7 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
         current_index: i32;
     }
 
-    ec := make(#type Enumeration_Context(T));
+    ec := make(Enumeration_Context(T));
     ec.iterator = it;
     ec.current_index = start_index;
 
@@ -305,7 +305,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         current: u32;
     }
 
-    c := make(#type Context(T));
+    c := make(Context(T));
     c.data = arr.data;
     c.count = arr.count;
     c.current = 0;

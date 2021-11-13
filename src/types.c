@@ -662,6 +662,11 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
     i64 expr_count = bh_arr_length(compound->exprs);
     fori (i, 0, expr_count) {
         if (compound->exprs[i]->type == NULL) return NULL;
+        if (compound->exprs[i]->type->kind == Type_Kind_Basic) {
+            if (compound->exprs[i]->type->Basic.kind == Basic_Kind_Int_Unsized || compound->exprs[i]->type->Basic.kind == Basic_Kind_Float_Unsized) {
+                return NULL;
+            }
+        }
     }
 
     Type* comp_type = type_create(Type_Kind_Compound, alloc, expr_count);

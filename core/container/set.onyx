@@ -107,7 +107,7 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
         position: i32;
     }
 
-    context := new(#type Context(T));
+    context := new(Context(T));
     context.entry_array = set.entries;
     context.position = 0;
 
