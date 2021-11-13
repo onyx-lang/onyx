@@ -408,6 +408,7 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
     u8* leb;
 
     if (instr->type == WI_NOP) return;
+    if (instr->type == WI_UNREACHABLE) assert(("EMITTING UNREACHABLE!!", 0));
 
     if (instr->type & SIMD_INSTR_MASK) {
         bh_buffer_write_byte(buff, 0xFD);
@@ -552,6 +553,8 @@ static i32 output_code(WasmFunc* func, bh_buffer* buff) {
 
     // Output locals
     output_locals(func, &code_buff);
+
+    assert(func->code);
 
     // Output code
     bh_arr_each(WasmInstruction, instr, func->code) output_instruction(func, instr, &code_buff);

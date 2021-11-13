@@ -386,8 +386,8 @@ static b32 process_entity(Entity* ent) {
 
     b32 changed = ent->state != before_state;
     if (context.options->verbose_output == 3) {
-        if (changed) printf("SUCCESS | %s", verbose_output_buffer);
-        else         printf("YIELD   | %s", verbose_output_buffer);
+        if (changed) printf("SUCCESS to %20s | %s", entity_state_strings[ent->state], verbose_output_buffer);
+        else         printf("YIELD   to %20s | %s", entity_state_strings[ent->state], verbose_output_buffer);
     }
 
     return changed;

@@ -76,6 +76,8 @@ b32 onyx_has_errors() {
 }
 
 void onyx_clear_errors() {
+    if (context.cycle_detected) return;
+
     bh_arr_set_length(errors.errors, 0);
 }
 

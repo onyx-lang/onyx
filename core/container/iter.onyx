@@ -338,7 +338,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     }
 
     next :: (use c: ^Context) -> (i32, bool) {
-        if v > r.high {
+        if v >= r.high {
             return 0, false;
         } else {
             defer v += r.step;

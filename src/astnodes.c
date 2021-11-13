@@ -130,8 +130,8 @@ const char* entity_state_strings[Entity_State_Count] = {
     "Resolve Symbols",
     "Check Types",
     "Code Gen",
-    "Failed",
     "Finalized",
+    "Failed",
 };
 
 const char* entity_type_strings[Entity_Type_Count] = {

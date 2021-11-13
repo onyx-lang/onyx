@@ -8,8 +8,21 @@ List of known bugs:
         println(x); // Doesn't work
     }
 
+[ ] I don't know why this doesn't work... It is complaining that it couldn't match
+    either of these cases, but if I remove the first, it matches the second. This
+    is clearly wrong behavior, but I don't immediately see where the problem is.
+
+    CanCastTo :: interface (T: type_expr, D: type_expr) {
+        cast(typeof D) T;
+    }
+
+    cast_able :: #match {
+        (_: $T, $D: type_expr) -> bool where CanCastTo(T, D) do return true; ,
+        (_: any, d: type_expr) -> bool { return false; },
+    }
+
 [X] Memory reservation type checking doesn't work how I think it should. This errors for example:
-    
+
     x: i64 = 1;
 
 [X] Initialization statements on control statements should be better. For example, this should
