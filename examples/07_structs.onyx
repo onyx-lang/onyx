@@ -152,9 +152,10 @@ main :: (args: [] cstr) {
     // The first being of type T, and the second being an N dimensional array of type T.
 
     // To use a struct with parameters, simply pass them in the type.
-    param_struct_instance : ParamStruct(f32, 10);
-    param_struct_instance.t_member = 3.14159;
-    param_struct_instance.array_of_T = f32.[ 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 ];
+    param_struct_instance := ParamStruct(f32, 10).{
+        t_member = 3.14159,
+        array_of_T = .[ 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 ],
+    };
 
     println("param_struct_instance values:");
     println(param_struct_instance.t_member);

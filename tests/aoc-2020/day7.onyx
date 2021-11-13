@@ -115,7 +115,7 @@ main :: (args: [] cstr) {
     // printf("Count: {}\n", processed_bags.count - 1);
     
     // Part 2
-    to_process := array.make(#type ^BagNode);
+    to_process := array.make(^BagNode);
     multiplier := array.make(u32);
     array.push(^to_process, bg_get_node(^graph, "shiny gold"));
     array.push(^multiplier, 1);

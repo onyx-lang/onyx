@@ -780,8 +780,8 @@ struct AstSwitch {
     u32 flags;             \
     OnyxToken* token;      \
     struct Entity* entity; \
-    u64 type_id;           \
     void* __unused;        \
+    u64 type_id;           \
     Type* type
 struct AstType { AstType_base; };
 

@@ -2519,12 +2519,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
     if (node_is_type((AstNode *) expr)) {
         AstType* type = (AstType *) expr;
+        if (type->flags & Ast_Flag_Expr_Ignored) return;
+
         if (type->type_id != 0) {
             WID(WI_I32_CONST, ((AstType *) expr)->type_id);
         } else {
             Type* t = type_build_from_ast(context.ast_alloc, type);
             WID(WI_I32_CONST, t->id);
         }
+
 
         *pcode = code;
         return;

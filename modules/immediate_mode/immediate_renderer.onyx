@@ -151,7 +151,7 @@ Immediate_Renderer :: struct {
             world_transform := array.get_ptr(world_transform_stack, -1);
             world_matrix := transform_to_matrix(world_transform);
 
-            for shader: (#type ^Shader).[ ^simple_shader, ^textured_shader, ^alpha_shader ] {
+            for shader: (^Shader).[ ^simple_shader, ^textured_shader, ^alpha_shader ] {
                 gl.useProgram(shader.program);
                 gl.uniformMatrix4(shader.world_uniform, false, world_matrix);
             }

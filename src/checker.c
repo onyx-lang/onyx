@@ -490,14 +490,15 @@ CheckStatus check_call(AstCall** pcall) {
             // HACK HACK HACK
             AstPolyCallType *pct = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
             pct->token = call->token;
+            pct->__unused = call->next;
             pct->callee = (AstType *) callee;
             pct->params = (AstNode **) call->args.values;
             bh_arr_each(AstNode *, pp, pct->params) {
                 *pp = (AstNode *) (*(AstArgument **) pp)->value;
             }
 
-            CHECK(type, (AstType *) pct);
             *pcall = (AstCall *) pct;
+            CHECK(expression, (AstTyped **) pcall);
             return Check_Success;
         }
     }
@@ -1351,6 +1352,15 @@ CheckStatus check_address_of(AstAddressOf** paof) {
     }
 
     expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
+    if (node_is_type((AstNode *) expr)) {
+        AstPointerType *pt = onyx_ast_node_new(context.ast_alloc, sizeof(AstPointerType), Ast_Kind_Pointer_Type);
+        pt->token     = aof->token;
+        pt->elem      = (AstType *) expr;
+        pt->__unused  = aof->next;
+        *paof         = (AstAddressOf *) pt;
+        CHECK(type, (AstType *) pt);
+        return Check_Success;
+    }
 
     if ((expr->kind != Ast_Kind_Subscript
             && expr->kind != Ast_Kind_Dereference
@@ -1823,7 +1833,7 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
         case Ast_Kind_Call: {
             CHECK(call, (AstCall **) pstmt);
-            stmt->flags |= Ast_Flag_Expr_Ignored;
+            (*pstmt)->flags |= Ast_Flag_Expr_Ignored;
             return Check_Success;
         }
 

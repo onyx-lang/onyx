@@ -9,7 +9,7 @@ TILE_DATA_HEIGHT :: 10
 // Thought about making this dynamic and really fancy...
 // and then I remembered this is advent of code so that
 // is not necessary.
-TileData :: #type [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;
+TileData :: [TILE_DATA_WIDTH * TILE_DATA_HEIGHT] bool;
 
 Tile :: struct {
 	id          : u32;
@@ -41,7 +41,7 @@ TO :: enum (u8) {
 }
 
 // TOT[t0][t1] = t1 * t0;    t1 after t0
-tile_orientation_table := (#type [8] TO).[
+tile_orientation_table := ([8] TO).[
     //                N         R90       R180      R270      F         FR90      FR180     FR270
     /* N     */ TO.[ TO.N,     TO.R90,   TO.R180,  TO.R270,  TO.F,     TO.FR90,  TO.FR180, TO.FR270 ],
     /* R90   */ TO.[ TO.R90,   TO.R180,  TO.R270,  TO.N,     TO.FR270, TO.F,     TO.FR90,  TO.FR180,],
@@ -96,7 +96,7 @@ build_edges :: (tile: [] bool, a := context.allocator) -> [] u32 {
 
 // These were not fun to think about by hand... But they make the
 // program ridiculously faster so I'm okay with it.
-side_relations := (#type [4] TO).[
+side_relations := ([4] TO).[
     TO.[ TO.F,     TO.N,     TO.R90,   TO.FR90,   ],
     TO.[ TO.N,     TO.F,     TO.FR90,  TO.R90,    ],
     TO.[ TO.R270,  TO.FR90,  TO.FR180, TO.N,      ],
@@ -246,7 +246,7 @@ main :: (args: [] cstr) {
 	tiles := array.make(Tile);
 	defer array.free(^tiles);
 
-    tile_map := map.make(u32, #type ^Tile, null);
+    tile_map := map.make(u32, ^Tile, null);
     defer map.free(^tile_map);
 
 	tile_data := calloc(200 * sizeof TileData);
@@ -362,7 +362,7 @@ main :: (args: [] cstr) {
         }
     }
 
-    for ori: TO.[ TO.N, TO.R90, TO.R180, TO.R270, TO.F, TO.FR90, TO.FR180, TO.FR270 ] {
+    for ori: .[ TO.N, TO.R90, TO.R180, TO.R270, TO.F, TO.FR90, TO.FR180, TO.FR270 ] {
         if scan_for_monsters(cast(^u8) forest, ori, 12 * 8, 12 * 8) do break;
     }
     

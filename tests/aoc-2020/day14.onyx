@@ -4,7 +4,7 @@ use package core
 reader :: package core.string.reader
 
 MASK_SIZE :: 36
-Bitmask :: #type [MASK_SIZE] u8;
+Bitmask :: [MASK_SIZE] u8;
 
 // Part 1
 bitmask_p1 :: (mask: Bitmask, val: u64) -> u64 {

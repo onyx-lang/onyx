@@ -527,6 +527,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '[': {
+            AstType *type = parse_type(parser);
+            retval = (AstTyped *) type;
+            break;
+        }
+
         case '#': {
             if (parse_possible_directive(parser, "file_contents")) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
