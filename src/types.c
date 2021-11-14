@@ -291,8 +291,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Array_Type: {
             AstArrayType* a_node = (AstArrayType *) type_node;
 
+            Type *elem_type = type_build_from_ast(alloc, a_node->elem);
+            if (elem_type == NULL)  return NULL;
+
             Type* a_type = type_create(Type_Kind_Array, alloc, 0);
-            a_type->Array.elem = type_build_from_ast(alloc, a_node->elem);
+            a_type->Array.elem = elem_type;
 
             u32 count = 0;
             if (a_node->count_expr) {
@@ -303,7 +306,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     a_node->count_expr = ((AstUnaryOp *) a_node)->expr;
                 }
 
-                resolve_expression_type((AstTyped *) a_node->count_expr);
+                resolve_expression_type(a_node->count_expr);
 
                 // NOTE: Currently, the count_expr has to be an I32 literal
                 if (a_node->count_expr->type->kind != Type_Kind_Basic
@@ -313,7 +316,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     return NULL;
                 }
 
-                count = get_expression_integer_value((AstTyped *) a_node->count_expr);
+                count = get_expression_integer_value(a_node->count_expr);
             }
 
             a_type->Array.count = count;

@@ -7,6 +7,7 @@
 // Variables used during the symbol resolution phase.
 static Scope*       curr_scope    = NULL;
 static b32 report_unresolved_symbols = 1;
+static b32 resolved_a_symbol         = 0;
 
 // Everything related to waiting on is imcomplete at the moment.
 static Entity* waiting_on         = NULL;
@@ -58,6 +59,7 @@ static SymresStatus symres_struct_defaults(AstType* st);
 static SymresStatus symres_static_if(AstIf* static_if);
 static SymresStatus symres_macro(AstMacro* macro);
 static SymresStatus symres_constraint(AstConstraint* constraint);
+static SymresStatus symres_polyquery(AstPolyQuery *query);
 
 static void scope_enter(Scope* new_scope) {
     curr_scope = new_scope;
@@ -85,6 +87,7 @@ static SymresStatus symres_symbol(AstNode** symbol_node) {
 
     } else {
         *symbol_node = res;
+        resolved_a_symbol = 1;
     }
 
     return Symres_Success;
@@ -1134,19 +1137,6 @@ static SymresStatus symres_struct_defaults(AstType* t) {
 static SymresStatus symres_polyproc(AstPolyProc* pp) {
     pp->flags |= Ast_Flag_Comptime;
     pp->poly_scope = curr_scope;
-
-    bh_arr_each(AstPolyParam, param, pp->poly_params) {
-        if (param->kind != PPK_Baked_Value) continue;
-
-        // FIX: Looking up symbols immediately in the type of the baked value does not always work
-        // because I think the following should be possible:
-        //
-        //     baked_proc :: (x: $T, $f: (T) -> T) -> T ...
-        //
-        // The type of 'f' depends on resolving the value for the polyvar 'T'.
-        SYMRES(type, &param->type_expr);
-    }
-
     return Symres_Success;
 }
 
@@ -1297,6 +1287,37 @@ static SymresStatus symres_constraint(AstConstraint* constraint) {
     return Symres_Success;
 }
 
+static SymresStatus symres_polyquery(AstPolyQuery *query) {
+    query->successful_symres = 0;
+
+    if (query->function_header->scope == NULL)
+        query->function_header->scope = scope_create(context.ast_alloc, query->proc->poly_scope, query->token->pos);
+
+    scope_enter(query->function_header->scope);
+
+    u32 idx = 0;
+    bh_arr_each(AstParam, param, query->function_header->params) {
+        bh_arr_each(AstPolyParam, pp, query->proc->poly_params) {
+            if (pp->kind == PPK_Baked_Value && pp->idx == idx) goto skip_introducing_symbol;
+        }
+        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+
+    skip_introducing_symbol:
+        if (param->local->type_node != NULL) {
+            resolved_a_symbol = 0;
+            symres_type(&param->local->type_node);
+            onyx_clear_errors();
+
+            if (resolved_a_symbol) query->successful_symres = 1;
+        }
+
+        idx++;
+    }
+
+    scope_leave();
+    return Symres_Success;
+}
+
 void symres_entity(Entity* ent) {
     Scope* old_scope = NULL;
     if (ent->scope) {
@@ -1346,6 +1367,7 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Process_Directive:       ss = symres_process_directive((AstNode *) ent->expr); break;
         case Entity_Type_Macro:                   ss = symres_macro(ent->macro); break;
         case Entity_Type_Constraint_Check:        ss = symres_constraint(ent->constraint); break;
+        case Entity_Type_Polymorph_Query:         ss = symres_polyquery(ent->poly_query); break;
 
         default: break;
     }

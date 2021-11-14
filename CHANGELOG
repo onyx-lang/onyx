@@ -16,6 +16,7 @@ Additions:
 * Quick-Functions
 * do-expressions
 * typeof
+* interfaces and where clauses
 * '#auto' return type
 * Macros and paste-able code blocks
 * overloaded procedures can have polymorphic and overloaded procedures as overloads.  This makes them MUCH more powerful.
@@ -45,6 +46,7 @@ Changes:
 * operator overloading is now done as a top level declaration handled through the entity
     system, instead of relying on creating a procedure. This lets you use an existing
     procedure as an operator overload. Take a look at '#operator ==' in string.onyx.
+* easier to write types in expressions
 * Tons of internal code cleanup relating to structures and code generation.
 
 Bug fixes:

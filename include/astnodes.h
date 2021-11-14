@@ -88,6 +88,7 @@
     NODE(PolySolution)         \
     NODE(SolidifiedFunction)   \
     NODE(PolyProc)             \
+    NODE(PolyQuery)            \
                                \
     NODE(Note)                 \
     NODE(CallSite)             \
@@ -125,6 +126,7 @@ typedef enum AstKind {
     Ast_Kind_Function,
     Ast_Kind_Overloaded_Function,
     Ast_Kind_Polymorphic_Proc,
+    Ast_Kind_Polymorph_Query,
     Ast_Kind_Interface,
     Ast_Kind_Constraint,
     Ast_Kind_Constraint_Sentinel,
@@ -567,15 +569,28 @@ struct AstTyped { AstTyped_base; };
 
 // Expression Nodes
 struct AstNamedValue    { AstTyped_base; AstTyped* value; };
-struct AstBinaryOp      { AstTyped_base; BinaryOp operation; AstTyped *left, *right; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 addr; u64 length; };
 struct AstLocal         { AstTyped_base; };
-struct AstAddressOf     { AstTyped_base; AstTyped *expr; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_ast_type; Type *ao_type; u64 alignment; };
+struct AstBinaryOp      {
+    AstTyped_base;
+    BinaryOp operation;
+    AstTyped *left, *right;
+
+    Arguments *overload_args; // This is set of the binary operator is attempted to be overloaded
+                              // but isnt successful yet.
+    AstBinaryOp *potential_substitute;
+};
+struct AstAddressOf     {
+    AstTyped_base;
+    AstTyped *expr;
+
+    AstBinaryOp *potential_substitute;
+};
 struct AstArgument      {
     AstTyped_base;
 
@@ -590,6 +605,11 @@ struct AstSubscript   {
     BinaryOp __unused_operation; // This will be set to Binary_Op_Subscript
     AstTyped *addr;
     AstTyped *expr;
+
+    Arguments *overload_args; // This is set of the binary operator is attempted to be overloaded
+                              // but isnt successful yet.
+    AstBinaryOp *potential_substitute;
+
     u64 elem_size;
 };
 struct AstFieldAccess   {
@@ -1040,6 +1060,11 @@ typedef enum PolySolutionKind {
     PSK_Value,
 } PolySolutionKind;
 
+typedef enum PolyProcLookupMethod {
+    PPLM_By_Arguments,
+    PPLM_By_Function_Type,
+} PolyProcLookupMethod;
+
 struct AstPolyParam {
     PolyParamKind kind;
 
@@ -1091,6 +1116,23 @@ struct AstPolyProc {
 
     AstFunction* base_func;
     bh_table(AstSolidifiedFunction) concrete_funcs;
+    bh_imap active_queries;
+};
+
+struct AstPolyQuery {
+    AstNode_base;
+
+    AstPolyProc *proc;
+    PolyProcLookupMethod pp_lookup;
+    ptr given;
+    OnyxToken *error_loc;
+
+    bh_arr(AstPolySolution) slns;
+
+    AstFunction *function_header;
+
+    b32 error_on_fail : 1;     // Whether or not to report errors on failing to match.
+    b32 successful_symres : 1; // If something successful happened in symbol resolution
 };
 
 
@@ -1218,6 +1260,7 @@ typedef enum EntityType {
     Entity_Type_Interface,
     Entity_Type_Constraint_Check,
     Entity_Type_Polymorphic_Proc,
+    Entity_Type_Polymorph_Query,
     Entity_Type_Macro,
     Entity_Type_Foreign_Function_Header,
     Entity_Type_Temp_Function_Header,    // Same as a Function_Header, except it disappears after it checks completely.
@@ -1269,6 +1312,7 @@ typedef struct Entity {
         AstEnumType           *enum_type;
         AstMemRes             *mem_res;
         AstPolyProc           *poly_proc;
+        AstPolyQuery          *poly_query;
         AstMacro              *macro;
         AstUse                *use;
         AstInterface          *interface;
@@ -1507,10 +1551,8 @@ const char* node_get_type_name(void* node);
 
 b32 static_if_resolution(AstIf* static_if);
 
-typedef enum PolyProcLookupMethod {
-    PPLM_By_Arguments,
-    PPLM_By_Function_Type,
-} PolyProcLookupMethod;
+void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln);
+TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg);
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn);
 AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);

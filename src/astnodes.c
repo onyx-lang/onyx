@@ -14,6 +14,7 @@ static const char* ast_node_names[] = {
     "FUNCTION",
     "OVERLOADED_FUNCTION",
     "POLYMORPHIC PROC",
+    "POLYMORPH QUERY",
     "INTERFACE",
     "CONSTRAINT",
     "CONSTRAINT SENTITEL",
@@ -153,6 +154,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Interface",
     "Constraint Check",
     "Polymorphic Proc",
+    "Polymorph Query",
     "Macro",
     "Foreign_Function Header",
     "Temporary Function Header",
@@ -588,8 +590,6 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
         AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return TYPE_MATCH_FAILED;
-
-        // FIXME: This is incorrect. It should actually yield and not return a failure.
         if (func == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
         *pnode = (AstTyped *) func;

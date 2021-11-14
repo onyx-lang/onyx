@@ -17,28 +17,34 @@ AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
     if (pp->concrete_funcs == NULL) {
         bh_table_init(global_heap_allocator, pp->concrete_funcs, 16);
+
+        bh_imap_init(&pp->active_queries, global_heap_allocator, 31);
     }
+}
+
+void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln) {
+    AstNode *node = NULL;
+
+    switch (sln->kind) {
+        case PSK_Type:
+            node = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+            ((AstTypeRawAlias *) node)->token = sln->poly_sym->token;
+            ((AstTypeRawAlias *) node)->to = sln->type;
+            break;
+
+        case PSK_Value:
+            // CLEANUP: Maybe clone this?
+            assert(sln->value->flags & Ast_Flag_Comptime);
+            node = (AstNode *) sln->value;
+            break;
+    }
+
+    symbol_introduce(scope, sln->poly_sym->token, node);
 }
 
 static void insert_poly_slns_into_scope(Scope* scope, bh_arr(AstPolySolution) slns) {
     bh_arr_each(AstPolySolution, sln, slns) {
-        AstNode *node = NULL;
-
-        switch (sln->kind) {
-            case PSK_Type:
-                node = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
-                ((AstTypeRawAlias *) node)->token = sln->poly_sym->token;
-                ((AstTypeRawAlias *) node)->to = sln->type;
-                break;
-
-            case PSK_Value:
-                // CLEANUP: Maybe clone this?
-                assert(sln->value->flags & Ast_Flag_Comptime);
-                node = (AstNode *) sln->value;
-                break;
-        }
-
-        symbol_introduce(scope, sln->poly_sym->token, node);
+        insert_poly_sln_into_scope(scope, sln);
     }
 }
 
@@ -382,14 +388,14 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
 // and solve for the argument that matches the parameter. This is needed because polymorphic
 // procedure resolution has to happen before the named arguments are placed in their correct
 // positions.
-static AstTyped* lookup_param_in_arguments(AstPolyProc* pp, AstPolyParam* param, Arguments* args, char** err_msg) {
+static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* param, Arguments* args, char** err_msg) {
     bh_arr(AstTyped *) arg_arr = args->values;
     bh_arr(AstNamedValue *) named_values = args->named_values;
 
     // NOTE: This check is safe because currently the arguments given without a name
     // always map to the beginning indidies of the argument array.
     if (param->idx >= (u64) bh_arr_length(arg_arr)) {
-        OnyxToken* param_name = pp->base_func->params[param->idx].local->token;
+        OnyxToken* param_name = func->params[param->idx].local->token;
 
         bh_arr_each(AstNamedValue *, named_value, named_values) {
             if (token_equals(param_name, (*named_value)->token)) {
@@ -411,14 +417,14 @@ static AstTyped* lookup_param_in_arguments(AstPolyProc* pp, AstPolyParam* param,
 // information. It is asssumed that the "param" is of kind PPK_Poly_Type. This function uses
 // either the arguments provided, or a function type to compare against to pattern match for
 // the type that the parameter but be.
-static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstPolyProc* pp, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
     Type* actual_type = NULL;
 
     switch (pp_lookup) {
         case PPLM_By_Arguments: {
             Arguments* args = (Arguments *) actual;
 
-            AstTyped* typed_param = lookup_param_in_arguments(pp, param, args, err_msg);
+            AstTyped* typed_param = lookup_param_in_arguments(func, param, args, err_msg);
             if (typed_param == NULL) return;
 
             actual_type = resolve_expression_type(typed_param);
@@ -451,14 +457,14 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstPolyP
 // CLEANUP: This function is kind of gross at the moment, because it handles different cases for
 // the argument kind. When type expressions (type_expr) become first-class types in the type
 // system, this code should be able to be a lot cleaner.
-static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPolyProc* pp, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
     if (pp_lookup != PPLM_By_Arguments) {
         *err_msg = "Function type cannot be used to solved for baked parameter value.";
         return;
     }
 
     Arguments* args = (Arguments *) actual;
-    AstTyped* value = lookup_param_in_arguments(pp, param, args, err_msg);
+    AstTyped* value = lookup_param_in_arguments(func, param, args, err_msg);
     if (value == NULL) return;
 
     // HACK: Storing the original value because if this was an AstArgument, we need to flag
@@ -469,7 +475,8 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
         value = ((AstArgument *) value)->value;
     }
 
-    if (param->type_expr == (AstType *) &basic_type_type_expr) {
+    AstType *param_type_expr = func->params[param->idx].local->type_node;
+    if (param_type_expr == (AstType *) &basic_type_type_expr) {
         if (!node_is_type((AstNode *) value)) {
             if (err_msg) *err_msg = "Expected type expression.";
             return;
@@ -489,8 +496,13 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
         }
 
         if (param->type == NULL)
-            param->type = type_build_from_ast(context.ast_alloc, param->type_expr);
-        assert(param->type);
+            param->type = type_build_from_ast(context.ast_alloc, param_type_expr);
+
+        if (param->type == NULL) {
+            flag_to_yield = 1;
+            *err_msg = "Waiting to know type for polymorphic value.";
+            return;
+        }
 
         AstTyped* value_to_use = value;
         if (value->kind == Ast_Kind_Macro) {
@@ -501,7 +513,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
         if (tm == TYPE_MATCH_FAILED) {
             if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
                     "The procedure '%s' expects a value of type '%s' for baked %d%s parameter, got '%s'.",
-                    get_function_name(pp->base_func),
+                    get_function_name(func),
                     type_get_name(param->type),
                     param->idx + 1,
                     bh_num_suffix(param->idx + 1),
@@ -519,10 +531,65 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstPoly
     }
 }
 
+TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+    // NOTE: Solve for the polymorphic parameter's value
+    PolySolveResult resolved = { PSK_Undefined };
+    switch (param->kind) {
+        case PPK_Poly_Type:   solve_for_polymorphic_param_type (&resolved, func, param, pp_lookup, actual, err_msg); break;
+        case PPK_Baked_Value: solve_for_polymorphic_param_value(&resolved, func, param, pp_lookup, actual, err_msg); break;
+
+        default: if (err_msg) *err_msg = "Invalid polymorphic parameter kind. This is a compiler bug.";
+    }
+
+    if (flag_to_yield) {
+        flag_to_yield = 0;
+        return TYPE_MATCH_YIELD;
+    }
+
+    switch (resolved.kind) {
+        case PSK_Type:
+            out->kind = PSK_Type;
+            out->poly_sym = param->poly_sym;
+            out->type = resolved.actual;
+            return TYPE_MATCH_SUCCESS;
+
+        case PSK_Value:
+            out->kind = PSK_Value;
+            out->poly_sym = param->poly_sym;
+            out->value = resolved.value;
+            return TYPE_MATCH_SUCCESS;
+
+        case PSK_Undefined:
+        default:
+            // NOTE: If no error message has been assigned to why this polymorphic parameter
+            // resolution was unsuccessful, provide a basic dummy one.
+            if (err_msg && *err_msg == NULL)
+                *err_msg = bh_aprintf(global_scratch_allocator,
+                    "Unable to solve for polymorphic variable '%b'.",
+                    param->poly_sym->token->text,
+                    param->poly_sym->token->length);
+
+            out->kind = PSK_Undefined;
+            return TYPE_MATCH_FAILED;
+    }
+}
+
 // NOTE: The job of this function is to take a polymorphic procedure, as well as a method of
 // solving for the polymorphic variables, in order to return an array of the solutions for all
 // of the polymorphic variables.
-static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
+static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken *tkn, b32 necessary) {
+    if (bh_imap_has(&pp->active_queries, (u64) actual)) {
+        AstPolyQuery *query = (AstPolyQuery *) bh_imap_get(&pp->active_queries, (u64) actual);
+        assert(query->kind == Ast_Kind_Polymorph_Query);
+        assert(query->entity);
+
+        if (query->entity->state == Entity_State_Finalized) return query->slns;
+        if (query->entity->state == Entity_State_Failed)    return NULL;
+
+        flag_to_yield = 1;
+        return NULL;
+    }
+
     bh_arr(AstPolySolution) slns = NULL;
     bh_arr_new(global_heap_allocator, slns, bh_arr_length(pp->poly_params));
 
@@ -531,64 +598,22 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
     // empty and these solutions will be used.
     bh_arr_each(AstPolySolution, known_sln, pp->known_slns) bh_arr_push(slns, *known_sln);
 
-    bh_arr_each(AstPolyParam, param, pp->poly_params) {
+    AstPolyQuery *query = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyQuery), Ast_Kind_Polymorph_Query);
+    query->token = pp->token;
+    query->proc = pp;
+    query->pp_lookup = pp_lookup;
+    query->given = actual;
+    query->error_loc = tkn;
+    query->slns = slns;
+    query->function_header = clone_function_header(context.ast_alloc, pp->base_func);
+    query->function_header->flags |= Ast_Flag_Header_Check_No_Error;
+    query->error_on_fail = necessary;
+    query->successful_symres = 1;
 
-        // NOTE: First check to see if this polymorphic variable was already specified in the
-        // known solutions.
-        b32 already_solved = 0;
-        bh_arr_each(AstPolySolution, known_sln, pp->known_slns) {
-            if (token_equals(param->poly_sym->token, known_sln->poly_sym->token)) {
-                already_solved = 1;
-                break;
-            }
-        }
-        if (already_solved) continue;
+    bh_imap_put(&pp->active_queries, (u64) actual, (u64) query);
+    add_entities_for_node(NULL, (AstNode *) query, NULL, NULL);
 
-        // NOTE: Solve for the polymorphic parameter's value
-        PolySolveResult resolved = { PSK_Undefined };
-        switch (param->kind) {
-            case PPK_Poly_Type:   solve_for_polymorphic_param_type (&resolved, pp, param, pp_lookup, actual, err_msg); break;
-            case PPK_Baked_Value: solve_for_polymorphic_param_value(&resolved, pp, param, pp_lookup, actual, err_msg); break;
-
-            default: if (err_msg) *err_msg = "Invalid polymorphic parameter kind. This is a compiler bug.";
-        }
-
-        if (flag_to_yield) goto sln_not_found;
-        
-        switch (resolved.kind) {
-            case PSK_Undefined:
-                // NOTE: If no error message has been assigned to why this polymorphic parameter
-                // resolution was unsuccessful, provide a basic dummy one.
-                if (err_msg && *err_msg == NULL)
-                    *err_msg = bh_aprintf(global_scratch_allocator,
-                        "Unable to solve for polymorphic variable '%b'.",
-                        param->poly_sym->token->text,
-                        param->poly_sym->token->length);
-
-                goto sln_not_found;
-
-            case PSK_Type:
-                bh_arr_push(slns, ((AstPolySolution) {
-                    .kind     = PSK_Type,
-                    .poly_sym = param->poly_sym,
-                    .type     = resolved.actual,
-                }));
-                break;
-
-            case PSK_Value:
-                bh_arr_push(slns, ((AstPolySolution) {
-                    .kind     = PSK_Value,
-                    .poly_sym = param->poly_sym,
-                    .value    = resolved.value,
-                }));
-                break;
-        }
-    }
-
-    return slns;
-
-    sln_not_found:
-    bh_arr_free(slns);
+    flag_to_yield = 1;
     return NULL;
 }
 
@@ -598,8 +623,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
 AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn) {
     ensure_polyproc_cache_is_created(pp);
 
-    char *err_msg = NULL;
-    bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, &err_msg);
+    bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, tkn, 1);
     if (slns == NULL) {
         if (flag_to_yield) {
             flag_to_yield = 0;
@@ -607,15 +631,10 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
             return (AstFunction *) &node_that_signals_a_yield;
         }
 
-        if (err_msg != NULL) onyx_report_error(tkn->pos, err_msg);
-        else                 onyx_report_error(tkn->pos, "Some kind of error occured when generating a polymorphic procedure. You hopefully will not see this");
-
         return NULL;
     }
 
     AstFunction* result = polymorphic_proc_solidify(pp, slns, tkn);
-    
-    bh_arr_free(slns);
     return result;
 }
 
@@ -703,7 +722,12 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 }
 
 AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual) {
-    bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, NULL);
+    ensure_polyproc_cache_is_created(pp);
+    bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, pp_lookup, actual, NULL, 0);
+    if (flag_to_yield) {
+        flag_to_yield = 0;
+        return (AstFunction *) &node_that_signals_a_yield;
+    }
     if (slns == NULL) return NULL;
 
     ensure_polyproc_cache_is_created(pp);

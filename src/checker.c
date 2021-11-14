@@ -97,6 +97,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
 CheckStatus check_do_block(AstDoBlock** pdoblock);
 CheckStatus check_constraint(AstConstraint *constraint);
 CheckStatus check_constraint_context(ConstraintContext *cc, OnyxFilePos pos);
+CheckStatus check_polyquery(AstPolyQuery *query);
 
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
@@ -632,35 +633,36 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
     if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
 
-    u8 value_buffer[sizeof(bh__arr) + sizeof(AstTyped *) * 3];
-    Arguments args = ((Arguments) { NULL, NULL });
-    args.values = (AstTyped **) &value_buffer[sizeof(bh__arr)];
-    bh_arr_set_length(args.values, third_argument ? 3 : 2);
+    if (binop->overload_args == NULL) {
+        binop->overload_args = bh_alloc_item(context.ast_alloc, Arguments);
+        bh_arr_new(context.ast_alloc, binop->overload_args->values, 3);
+        bh_arr_set_length(binop->overload_args->values, third_argument ? 3 : 2);
 
-    if (binop_is_assignment(binop->operation)) {
-        args.values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
+        if (binop_is_assignment(binop->operation)) {
+            binop->overload_args->values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);
 
-        u32 current_all_checks_are_final = all_checks_are_final;
-        all_checks_are_final = 0;
-        u32 current_checking_level_store = current_checking_level;
-        CheckStatus cs = check_address_of((AstAddressOf **) &args.values[0]);
-        current_checking_level = current_checking_level_store;
-        all_checks_are_final   = current_all_checks_are_final;
+            u32 current_all_checks_are_final = all_checks_are_final;
+            all_checks_are_final = 0;
+            u32 current_checking_level_store = current_checking_level;
+            CheckStatus cs = check_address_of((AstAddressOf **) &binop->overload_args->values[0]);
+            current_checking_level = current_checking_level_store;
+            all_checks_are_final   = current_all_checks_are_final;
 
-        if (cs == Check_Yield_Macro)      return (AstCall *) &node_that_signals_a_yield;
-        if (cs == Check_Error)            return NULL;
+            if (cs == Check_Yield_Macro)      return (AstCall *) &node_that_signals_a_yield;
+            if (cs == Check_Error)            return NULL;
 
-        args.values[0] = (AstTyped *) make_argument(context.ast_alloc, args.values[0]);
+            binop->overload_args->values[0] = (AstTyped *) make_argument(context.ast_alloc, binop->overload_args->values[0]);
 
-    } else {
-        args.values[0] = (AstTyped *) make_argument(context.ast_alloc, binop->left);
+        } else {
+            binop->overload_args->values[0] = (AstTyped *) make_argument(context.ast_alloc, binop->left);
+        }
+
+
+        binop->overload_args->values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
+        if (third_argument != NULL) binop->overload_args->values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
     }
 
-
-    args.values[1] = (AstTyped *) make_argument(context.ast_alloc, binop->right);
-    if (third_argument != NULL) args.values[2] = (AstTyped *) make_argument(context.ast_alloc, third_argument);
-
-    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], &args);
+    AstTyped* overload = find_matching_overload_by_arguments(operator_overloads[binop->operation], binop->overload_args);
     if (overload == NULL || overload == (AstTyped *) &node_that_signals_a_yield) return (AstCall *) overload;
 
     AstCall* implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
@@ -668,7 +670,7 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
     implicit_call->callee = overload;
     implicit_call->va_kind = VA_Kind_Not_VA;
 
-    arguments_clone(&implicit_call->args, &args);
+    arguments_clone(&implicit_call->args, binop->overload_args);
     return implicit_call;
 }
 
@@ -898,21 +900,24 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if (binop->operation == Binary_Op_Assign && binop->left->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Subscript_Equals]) > 0) {
         AstSubscript* sub = (AstSubscript *) binop->left;
         
-        u32 current_checking_level_store = current_checking_level;
-        CHECK(expression, &sub->addr);
-        CHECK(expression, &sub->expr);
-        CHECK(expression, &binop->right);
-        current_checking_level = current_checking_level_store;
+        if (binop->potential_substitute == NULL) {
+            u32 current_checking_level_store = current_checking_level;
+            CHECK(expression, &sub->addr);
+            CHECK(expression, &sub->expr);
+            CHECK(expression, &binop->right);
+            current_checking_level = current_checking_level_store;
 
-        AstBinaryOp op;
-        op.kind = Ast_Kind_Binary_Op;
-        op.token = binop->token;
-        op.operation = Binary_Op_Subscript_Equals;
-        op.left  = ((AstSubscript *) binop->left)->addr;
-        op.right = ((AstSubscript *) binop->left)->expr;
+            AstBinaryOp *op = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
+            op->token = binop->token;
+            op->operation = Binary_Op_Subscript_Equals;
+            op->left  = ((AstSubscript *) binop->left)->addr;
+            op->right = ((AstSubscript *) binop->left)->expr;
 
-        AstCall* call = binaryop_try_operator_overload(&op, binop->right);
-        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(op.token->pos, "Waiting on potential operator overload.");
+            binop->potential_substitute = op;
+        }
+
+        AstCall* call = binaryop_try_operator_overload(binop->potential_substitute, binop->right);
+        if (call == (AstCall *) &node_that_signals_a_yield) YIELD(binop->token->pos, "Waiting on potential operator overload.");
         if (call != NULL) {
             call->next = binop->next;
             *(AstCall **) pbinop = call;
@@ -1238,6 +1243,8 @@ CheckStatus check_array_literal(AstArrayLiteral* al) {
 
 CheckStatus check_range_literal(AstRangeLiteral** prange) {
     AstRangeLiteral* range = *prange;
+    if (range->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
+
     CHECK(expression, &range->low);
     CHECK(expression, &range->high);
 
@@ -1266,6 +1273,7 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
         range->step = *smem.initial_value;
     }
 
+    range->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
 }
 
@@ -1325,17 +1333,20 @@ CheckStatus check_address_of(AstAddressOf** paof) {
 
     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
     if (expr->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Ptr_Subscript]) > 0) {
-        CHECK(expression, &((AstSubscript *) expr)->addr);
-        CHECK(expression, &((AstSubscript *) expr)->expr);
+        if (aof->potential_substitute == NULL) {
+            CHECK(expression, &((AstSubscript *) expr)->addr);
+            CHECK(expression, &((AstSubscript *) expr)->expr);
 
-        AstBinaryOp op;
-        op.kind = Ast_Kind_Binary_Op;
-        op.operation = Binary_Op_Ptr_Subscript;
-        op.left  = ((AstSubscript *) expr)->addr;
-        op.right = ((AstSubscript *) expr)->expr;
-        op.token = aof->token;
+            AstBinaryOp *op = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinaryOp), Ast_Kind_Binary_Op);
+            op->operation = Binary_Op_Ptr_Subscript;
+            op->left  = ((AstSubscript *) expr)->addr;
+            op->right = ((AstSubscript *) expr)->expr;
+            op->token = aof->token;
 
-        AstCall* call = binaryop_try_operator_overload(&op, NULL);
+            aof->potential_substitute = op;
+        }
+
+        AstCall* call = binaryop_try_operator_overload(aof->potential_substitute, NULL);
         if (call == (AstCall *) &node_that_signals_a_yield) YIELD(aof->token->pos, "Waiting for operator overload to possibly resolve.");
         if (call != NULL) {
             call->next = aof->next;
@@ -2566,6 +2577,72 @@ CheckStatus check_constraint_context(ConstraintContext *cc, OnyxFilePos pos) {
     }
 }
 
+CheckStatus check_polyquery(AstPolyQuery *query) {
+    if (query->function_header->scope == NULL)
+        query->function_header->scope = scope_create(context.ast_alloc, query->proc->poly_scope, query->token->pos);
+
+    CheckStatus header_check = check_temp_function_header(query->function_header);
+    if (header_check == Check_Return_To_Symres) return Check_Return_To_Symres;
+
+    b32 solved_something = 0;
+    i32 solved_count = 0; 
+    char *err_msg = NULL;
+    bh_arr_each(AstPolyParam, param, query->proc->poly_params) {
+        AstPolySolution sln;
+        bh_arr_each(AstPolySolution, solved_sln, query->slns) {
+            if (token_equals(param->poly_sym->token, solved_sln->poly_sym->token)) {
+                goto poly_query_done;
+            }
+        }
+
+        // CLEANUP: I think this can go away because it is already done in polymorph.c
+        bh_arr_each(AstPolySolution, known_sln, query->proc->known_slns) {
+            if (token_equals(param->poly_sym->token, known_sln->poly_sym->token)) {
+                sln = *known_sln;
+                goto poly_var_solved;
+            }
+        }
+
+        TypeMatch result = find_polymorphic_sln(&sln, param, query->function_header, query->pp_lookup, query->given, &err_msg);
+
+        switch (result) {
+            case TYPE_MATCH_SUCCESS:
+                goto poly_var_solved;
+
+            case TYPE_MATCH_YIELD:
+            case TYPE_MATCH_FAILED: {
+                if (query->successful_symres) continue;
+
+                if (query->error_on_fail || context.cycle_detected) {
+                    onyx_report_error(query->token->pos, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
+                    if (err_msg != NULL)  onyx_report_error(query->token->pos, "%s", err_msg);
+                    if (query->error_loc) onyx_report_error(query->error_loc->pos, "Here is where the call is located."); // :ErrorMessage
+                }
+
+                return Check_Failed;
+            }
+        }
+
+poly_var_solved:
+        solved_something = 1;
+        bh_arr_push(query->slns, sln);
+        insert_poly_sln_into_scope(query->function_header->scope, &sln);
+
+poly_query_done:
+        solved_count += 1;
+    }
+
+    if (solved_count != bh_arr_length(query->proc->poly_params)) {
+        if (solved_something || query->successful_symres) {
+            return Check_Return_To_Symres;
+        } else {
+            return Check_Failed;
+        }
+    }
+
+    return Check_Complete;
+}
+
 CheckStatus check_node(AstNode* node) {
     switch (node->kind) {
         case Ast_Kind_Function:             return check_function((AstFunction *) node);
@@ -2597,6 +2674,7 @@ void check_entity(Entity* ent) {
         case Entity_Type_Static_If:                cs = check_static_if(ent->static_if); break;
         case Entity_Type_Macro:                    cs = check_macro(ent->macro); break;
         case Entity_Type_Constraint_Check:         cs = check_constraint(ent->constraint); break;
+        case Entity_Type_Polymorph_Query:          cs = check_polyquery(ent->poly_query); break;
 
         case Entity_Type_Expression:
             cs = check_expression(&ent->expr);

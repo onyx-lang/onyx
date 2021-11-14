@@ -303,6 +303,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
+        case Ast_Kind_Polymorph_Query: {
+            ent.type = Entity_Type_Polymorph_Query;
+            ent.state = Entity_State_Check_Types;
+            ent.poly_query = (AstPolyQuery *) node;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
         case Ast_Kind_Static_If: {
             ent.state = Entity_State_Resolve_Symbols;
             ent.type = Entity_Type_Static_If;
