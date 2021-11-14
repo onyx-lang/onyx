@@ -19,6 +19,11 @@ __assert_handler :: (msg: str, site: CallSite) {
     __exit(1);
 }
 
+// This procedure should only be called once at the very begining
+// of the program. It initializes the data segments, the global heap
+// allocator, as well as thread-local storage, the context, and stdio
+// on the main thread. Finally it runs initialization procedures, which
+// should only happen once.
 __runtime_initialize :: () {
     __initialize_data_segments();
 
@@ -26,6 +31,8 @@ __runtime_initialize :: () {
     __thread_initialize();
 
     #if Multi_Threading_Enabled do thread.__initialize();
+
+    __run_init_procedures();
 }
 
 // Use this procedure to initialize everything needed in the

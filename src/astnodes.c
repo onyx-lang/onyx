@@ -90,6 +90,7 @@ static const char* ast_node_names[] = {
     "EXPORT",
     "DEFINED",
     "TAG",
+    "INIT",
     "CALL SITE",
 
     "CODE BLOCK",

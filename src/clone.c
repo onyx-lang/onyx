@@ -19,6 +19,7 @@ static inline b32 should_clone(AstNode* node) {
         case Ast_Kind_Code_Block:
         case Ast_Kind_Macro:
         case Ast_Kind_File_Contents:
+        case Ast_Kind_Symbol:
             return 0;
 
         default: return 1;

@@ -3193,6 +3193,13 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         return;
     }
 
+    if (fd == builtin_run_init_procedures) {
+        emit_run_init_procedures(mod, &wasm_func.code);
+        bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+        bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
+        return;
+    }
+
     if (fd->body != NULL) {
         // NOTE: Generate the local map
         u64 localidx = 0;

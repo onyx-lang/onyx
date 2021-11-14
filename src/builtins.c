@@ -59,8 +59,10 @@ AstType  *builtin_callsite_type;
 AstType  *builtin_any_type;
 AstType  *builtin_code_type;
 
-AstFunction *builtin_initialize_data_segments = NULL;
 AstTyped    *type_table_node = NULL;
+AstFunction *builtin_initialize_data_segments = NULL;
+AstFunction *builtin_run_init_procedures = NULL;
+bh_arr(AstFunction *) init_procedures = NULL;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -437,6 +439,14 @@ void initialize_builtins(bh_allocator a) {
         onyx_report_error((OnyxFilePos) { 0 }, "'__initialize_data_segments' procedure not found in builtin package.");
         return;
     }
+
+    builtin_run_init_procedures = (AstFunction *) symbol_raw_resolve(p->scope, "__run_init_procedures");
+    if (builtin_run_init_procedures == NULL || builtin_run_init_procedures->kind != Ast_Kind_Function) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'__run_init_procedures");
+        return;
+    }
+
+    bh_arr_new(global_heap_allocator, init_procedures, 4);
 
     p = package_lookup("builtin.type_info");
     if (p != NULL) {

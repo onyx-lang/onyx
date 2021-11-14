@@ -207,6 +207,7 @@ Wishlist:
         - Useful for map.get_ptr (^arr[10] or ^people["John"])
     [ ] Complete the set of combinations of procedure declaration syntaxes
         - Currently (x: i32) => { ... } isn't legal.
+    [X] #init functions (run before main, added to list at compile time, emitted with __run_init_procedures())
     [ ] Tests for new language features
         - Do blocks
         - Code blocks

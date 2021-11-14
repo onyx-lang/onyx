@@ -39,6 +39,7 @@
     NODE(DirectiveExport)      \
     NODE(DirectiveDefined)     \
     NODE(DirectiveTag)         \
+    NODE(DirectiveInit)        \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -200,6 +201,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Export,
     Ast_Kind_Directive_Defined,
     Ast_Kind_Directive_Tag,
+    Ast_Kind_Directive_Init,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1165,6 +1167,13 @@ struct AstDirectiveInsert {
     AstTyped *code_expr;
 };
 
+struct AstDirectiveInit {
+    AstNode_base;
+
+    AstTyped *init_proc;
+    bh_arr(AstDirectiveInit *) dependencies;
+};
+
 struct AstMacro {
     AstTyped_base;
 
@@ -1422,6 +1431,8 @@ extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
 extern AstTyped *type_table_node;
 extern AstFunction *builtin_initialize_data_segments;
+extern AstFunction *builtin_run_init_procedures;
+extern bh_arr(AstFunction *) init_procedures;
 
 typedef struct BuiltinSymbol {
     char*    package;

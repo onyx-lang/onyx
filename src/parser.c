@@ -2695,6 +2695,25 @@ static AstMacro* parse_macro(OnyxParser* parser) {
     return NULL;
 }
 
+static AstDirectiveInit* parse_init_directive(OnyxParser *parser, OnyxToken *token) {
+    AstDirectiveInit *init = make_node(AstDirectiveInit, Ast_Kind_Directive_Init);
+    init->token = token;
+
+    parser->parse_calls = 0;
+    while (parse_possible_directive(parser, "after")) {
+        if (parser->hit_unexpected_token) return init;
+        if (init->dependencies == NULL) bh_arr_new(global_heap_allocator, init->dependencies, 2);
+
+        AstTyped *dependency = parse_expression(parser, 0);
+        bh_arr_push(init->dependencies, (AstDirectiveInit *) dependency);
+    }
+    parser->parse_calls = 1;
+
+    init->init_proc = parse_expression(parser, 0);
+    ENTITY_SUBMIT(init);
+    return init;
+}
+
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Global)    return parse_global_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Struct)    return (AstTyped *) parse_struct(parser);
@@ -2713,6 +2732,12 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
         OnyxToken* directive_token = parser->curr - 2;
         AstOverloadedFunction* ofunc = parse_overloaded_function(parser, directive_token);
         return (AstTyped *) ofunc;
+    }
+
+    if (parse_possible_directive(parser, "init")) {
+        // :LinearTokenDependent
+        AstDirectiveInit *init = parse_init_directive(parser, parser->curr - 2);
+        return (AstTyped *) init;
     }
 
     return parse_expression(parser, 1);
@@ -2778,6 +2803,8 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             func->name = generate_name_within_scope(parser, symbol);
             break;
         }
+
+        case Ast_Kind_Directive_Init: break;
 
         case Ast_Kind_Global: ((AstGlobal *) node)->name = generate_name_within_scope(parser, symbol);
 
@@ -3021,6 +3048,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 binding->node = (AstNode *) memres;
 
                 goto submit_binding_to_entities;
+            }
+            else if (parse_possible_directive(parser, "init")) {
+                // :LinearTokenDependent
+                parse_init_directive(parser, parser->curr - 2);
+                return;
             }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');

@@ -1242,6 +1242,19 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             SYMRES(expression, &tag->expr);
             break;
         }
+
+        case Ast_Kind_Directive_Init: {
+            AstDirectiveInit *init = (AstDirectiveInit *) directive;
+            SYMRES(expression, &init->init_proc);
+
+            if (init->dependencies) {
+                bh_arr_each(AstDirectiveInit *, dependency, init->dependencies) {
+                    SYMRES(expression, (AstTyped **) dependency);
+                }
+            }
+
+            break;
+        }
     }
 
     return Symres_Success;

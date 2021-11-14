@@ -1631,6 +1631,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
         return Check_Success;
     }
 
+    if (expr->kind == Ast_Kind_Directive_Init) {
+        ERROR(expr->token->pos, "#init declarations are not in normal expressions, only in #after clauses.");
+    }
+
     fill_in_type(expr);
     current_checking_level = EXPRESSION_LEVEL;
 
@@ -2397,6 +2401,44 @@ CheckStatus check_process_directive(AstNode* directive) {
                 return Check_Error;
             }
         }
+    }
+
+    if (directive->kind == Ast_Kind_Directive_Init) {
+        AstDirectiveInit *init = (AstDirectiveInit *) directive;
+        if ((init->flags & Ast_Flag_Has_Been_Checked) == 0) {
+            CHECK(expression, &init->init_proc);
+
+            if (init->init_proc->kind != Ast_Kind_Function) {
+                ERROR_(init->token->pos, "#init only works for functions, got '%s'", onyx_ast_node_kind_string(init->init_proc->kind));
+            }
+
+            assert(init->init_proc->type);
+            if (init->init_proc->type->Function.param_count != 0) {
+                ERROR(init->token->pos, "#init expects a function that takes 0 arguments.");
+            }
+        }
+
+        init->flags |= Ast_Flag_Has_Been_Checked;
+
+        if (init->dependencies) {
+            i32 i = 0;
+            bh_arr_each(AstDirectiveInit *, dependency, init->dependencies) {
+                AstTyped *d = (AstTyped *) strip_aliases((AstNode *) *dependency);
+                if (d->kind != Ast_Kind_Directive_Init) {
+                    ERROR_(init->token->pos, "All dependencies of an #init must be another #init. The %d%s dependency was not.", i + 1, bh_num_suffix(i + 1));
+                }
+
+                assert(d->entity);
+                if (d->entity->state != Entity_State_Finalized) {
+                    YIELD(init->token->pos, "Circular dependency in #init nodes. Here are the nodes involved.");
+                }
+
+                i++;
+            }
+        }
+
+        bh_arr_push(init_procedures, (AstFunction *) init->init_proc);
+        return Check_Complete;
     }
 
     return Check_Success;

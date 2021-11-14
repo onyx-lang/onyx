@@ -208,3 +208,6 @@ Code :: struct {_:i32;}
 // is undefined behaviour if it is called more than once.
 __initialize_data_segments :: () -> void ---
 
+// This is also a special compiler generated procedure that calls all procedures specified with
+// #init, in the specified order. It should theoritically only be called once on the main thread.
+__run_init_procedures :: () -> void ---
