@@ -36,7 +36,6 @@ count_iterator :: (lo: i32, hi: i32, step := 1) -> Iterator(i32) {
 
 main :: (args: [] cstr) {
     // Hopefully soon, the following will be possible.
-/*
     quick_iterator :=
                 count_iterator(1, 10)
                 |> iter.map((x) => x * 2)
@@ -48,7 +47,6 @@ main :: (args: [] cstr) {
     for v: quick_iterator {
         println(v);
     }
-*/
 
     iterator := count_iterator(1, 10)
                 |> iter.map((x: i32) -> i32     { return x * 2; })

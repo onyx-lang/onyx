@@ -9,6 +9,11 @@
 // checker ever gets multi-threaded, this would have to become a threadlocal variable.
 static b32 flag_to_yield = 0;
 
+// This flag is used in the very special case that you are passing a polymorphic procedure
+// to a polymorphic procedure, and you have enough information to instantiate said procedure
+// in order to resolve the type of one of the return values.
+static b32 doing_nested_polymorph_lookup = 0;
+
 // The name is pretty self-descriptive, but this is a node that is returned from things
 // like polymorphic_proc_lookup when it is determined that everything works so far, but
 // the caller must yield in order to finish checking this polymorphic procedure.
@@ -413,6 +418,28 @@ static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* para
     return NULL;
 }
 
+static AstTyped* try_lookup_based_on_partial_function_type(AstPolyProc *pp, AstFunctionType *ft) {
+    if (ft->partial_function_type == NULL) {
+        AstType *old_return_type = ft->return_type;
+        ft->return_type = (AstType *) &basic_type_void;
+        ft->partial_function_type = type_build_from_ast(context.ast_alloc, (AstType *) ft);
+        assert(ft->partial_function_type);
+        ft->return_type = old_return_type;
+    }
+
+    AstTyped *result = (AstTyped *) polymorphic_proc_lookup(pp, PPLM_By_Function_Type, ft->partial_function_type, pp->token);
+    if (result && result->type == NULL) {
+        doing_nested_polymorph_lookup = 1;
+        result = NULL;
+    }
+    if (result == &node_that_signals_a_yield) {
+        doing_nested_polymorph_lookup = 1;
+        result = NULL;
+    }
+
+    return result;
+}
+
 // NOTE: The job of this function is to solve for type of AstPolySolution using the provided
 // information. It is asssumed that the "param" is of kind PPK_Poly_Type. This function uses
 // either the arguments provided, or a function type to compare against to pattern match for
@@ -426,6 +453,30 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
 
             AstTyped* typed_param = lookup_param_in_arguments(func, param, args, err_msg);
             if (typed_param == NULL) return;
+
+            // CLEANUP FIXME HACK TODO GROSS
+            if (typed_param->kind == Ast_Kind_Argument) {
+                AstTyped* potential = ((AstArgument *) typed_param)->value;
+                if (potential->kind == Ast_Kind_Polymorphic_Proc) {
+                    if (param->idx < (u32) bh_arr_length(func->params)) {
+                        AstType *param_type = func->params[param->idx].local->type_node;
+                        if (param_type->kind == Ast_Kind_Function_Type) {
+                            AstFunctionType *ft = (AstFunctionType *) param_type;
+                            b32 all_types = 1;
+                            fori (i, 0, (i32) ft->param_count) {
+                                if (!node_is_type((AstNode *) ft->params[i])) {
+                                    all_types = 0;
+                                    break;
+                                }
+                            }
+
+                            if (all_types) {
+                                typed_param = try_lookup_based_on_partial_function_type((AstPolyProc *) potential, ft);
+                            }
+                        }
+                    }
+                }
+            }
 
             actual_type = resolve_expression_type(typed_param);
             if (actual_type == NULL) return;
@@ -475,6 +526,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
         value = ((AstArgument *) value)->value;
     }
 
+    Type*    param_type = NULL;
     AstType *param_type_expr = func->params[param->idx].local->type_node;
     if (param_type_expr == (AstType *) &basic_type_type_expr) {
         if (!node_is_type((AstNode *) value)) {
@@ -495,10 +547,8 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
             return;
         }
 
-        if (param->type == NULL)
-            param->type = type_build_from_ast(context.ast_alloc, param_type_expr);
-
-        if (param->type == NULL) {
+        param_type = type_build_from_ast(context.ast_alloc, param_type_expr);
+        if (param_type == NULL) {
             flag_to_yield = 1;
             *err_msg = "Waiting to know type for polymorphic value.";
             return;
@@ -509,12 +559,12 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
             value_to_use = (AstTyped *) get_function_from_node((AstNode *) value);
         }
 
-        TypeMatch tm = unify_node_and_type(&value_to_use, param->type);
+        TypeMatch tm = unify_node_and_type(&value_to_use, param_type);
         if (tm == TYPE_MATCH_FAILED) {
             if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator,
                     "The procedure '%s' expects a value of type '%s' for baked %d%s parameter, got '%s'.",
                     get_function_name(func),
-                    type_get_name(param->type),
+                    type_get_name(param_type),
                     param->idx + 1,
                     bh_num_suffix(param->idx + 1),
                     node_get_type_name(value_to_use));
@@ -539,6 +589,11 @@ TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFun
         case PPK_Baked_Value: solve_for_polymorphic_param_value(&resolved, func, param, pp_lookup, actual, err_msg); break;
 
         default: if (err_msg) *err_msg = "Invalid polymorphic parameter kind. This is a compiler bug.";
+    }
+
+    if (doing_nested_polymorph_lookup) {
+        doing_nested_polymorph_lookup = 0;
+        return TYPE_MATCH_SPECIAL;
     }
 
     if (flag_to_yield) {
@@ -627,7 +682,6 @@ AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lo
     if (slns == NULL) {
         if (flag_to_yield) {
             flag_to_yield = 0;
-            bh_arr_free(slns);
             return (AstFunction *) &node_that_signals_a_yield;
         }
 

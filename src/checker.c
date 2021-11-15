@@ -2609,9 +2609,12 @@ CheckStatus check_polyquery(AstPolyQuery *query) {
             case TYPE_MATCH_SUCCESS:
                 goto poly_var_solved;
 
+            case TYPE_MATCH_SPECIAL:
+                return Check_Yield_Macro;
+
             case TYPE_MATCH_YIELD:
             case TYPE_MATCH_FAILED: {
-                if (query->successful_symres) continue;
+                if (query->successful_symres || solved_something) continue;
 
                 if (query->error_on_fail || context.cycle_detected) {
                     onyx_report_error(query->token->pos, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
@@ -2699,12 +2702,14 @@ void check_entity(Entity* ent) {
         default: break;
     }
 
-    if (cs == Check_Success)          ent->state = Entity_State_Code_Gen;
-    if (cs == Check_Complete)         ent->state = Entity_State_Finalized;
-    if (cs == Check_Return_To_Symres) ent->state = Entity_State_Resolve_Symbols;
-    if (cs == Check_Failed)           ent->state = Entity_State_Failed;
-    if (cs == Check_Yield_Macro)      ent->macro_attempts++;
-    else {
+    switch (cs) {
+        case Check_Yield_Macro:      ent->macro_attempts++; break;
+        case Check_Success:          ent->state = Entity_State_Code_Gen;        goto clear_attempts;
+        case Check_Complete:         ent->state = Entity_State_Finalized;       goto clear_attempts;
+        case Check_Return_To_Symres: ent->state = Entity_State_Resolve_Symbols; goto clear_attempts;
+        case Check_Failed:           ent->state = Entity_State_Failed;          goto clear_attempts;
+
+    clear_attempts:
         ent->macro_attempts = 0;
         ent->micro_attempts = 0;
     }

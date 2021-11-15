@@ -181,13 +181,13 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) *type;
 
-            SYMRES(type, &ftype->return_type);
-
             if (ftype->param_count > 0) {
                 fori (i, 0, (i64) ftype->param_count) {
                     SYMRES(type, &ftype->params[i]);
                 }
             }
+
+            SYMRES(type, &ftype->return_type);
             break;
         }
 

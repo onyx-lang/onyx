@@ -809,11 +809,21 @@ struct AstType { AstType_base; };
 
 struct AstBasicType     { AstType_base; Type* basic_type; };
 struct AstPointerType   { AstType_base; AstType* elem; };
-struct AstFunctionType  { AstType_base; AstType* return_type; u64 param_count; AstType* params[]; };
 struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstSliceType     { AstType_base; AstType* elem; };
 struct AstDynArrType    { AstType_base; AstType* elem; };
 struct AstVarArgType    { AstType_base; AstType* elem; };
+struct AstFunctionType  {
+    AstType_base;
+
+    // Used in a rare case in solve_for_polymorphic_param_type.
+    Type *partial_function_type;
+
+    AstType* return_type;
+
+    u64 param_count;
+    AstType* params[];
+};
 struct AstStructType {
     AstType_base;
     char *name;
@@ -1512,6 +1522,7 @@ typedef enum TypeMatch {
     TYPE_MATCH_SUCCESS,
     TYPE_MATCH_FAILED,
     TYPE_MATCH_YIELD,
+    TYPE_MATCH_SPECIAL, // Only used for nest polymorph function lookups
 } TypeMatch;
 #define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
 TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
