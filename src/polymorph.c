@@ -125,7 +125,6 @@ static b32 add_solidified_function_entities(AstSolidifiedFunction *solidified_fu
     solidified_func->func_header_entity  = entity_header;
     solidified_func->func->entity_header = entity_header;
     solidified_func->func->entity_body   = entity_body;
-
     return 1;
 }
 
