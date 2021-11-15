@@ -1,0 +1,39 @@
+#load "core/std"
+
+use package core
+
+main :: (args: [] cstr) {
+    baked_proc :: (x: $T, $func: (T) -> typeof x) -> T {
+        return func(x);
+    }
+
+    baked_proc(10, (x: i32) -> i32 { return x * 2; })
+    |> println();
+
+    compose :: (a: $A, f: (A) -> $B, g: (B) -> $C) -> C {
+        return g(f(a));
+    }
+
+    Number :: interface (T: type_expr) {
+        T * T;
+    }
+
+    dumb :: (ZZZ: $T) -> #auto where Number(T) {
+        return ZZZ * 2;
+    }
+
+    compose(10.0f, dumb, (ABC) => ABC + 3) |> println();
+
+    double  :: (x) => x * 2;
+    convert :: (x: $T, $TO: type_expr) => cast(TO) x;
+    add     :: (x: $T, y: T) => x + y;
+    map     :: (x: $T, f: (T) -> $R) => f(x);
+
+    5 |> double()
+      |> map((x) => x * 3) 
+      |> add(2)
+      |> double()
+      |> map((x) => cast(f32) x)
+      |> map((x) => x * 4 + 2)
+      |> println();
+}
