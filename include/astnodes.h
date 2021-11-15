@@ -893,7 +893,7 @@ struct AstEnumType {
 
     b32 is_flags : 1;
 };
-struct AstEnumValue    { AstTyped_base; AstNumLit* value; };
+struct AstEnumValue    { AstTyped_base; AstTyped* value; };
 struct AstTypeAlias    { AstType_base; AstType* to; };
 struct AstTypeRawAlias { AstType_base; Type* to; };
 struct AstCompoundType {
@@ -1263,6 +1263,7 @@ typedef enum EntityType {
     Entity_Type_String_Literal,
     Entity_Type_File_Contents,
     Entity_Type_Enum,
+    Entity_Type_Enum_Value,
     Entity_Type_Type_Alias,
     Entity_Type_Memory_Reservation_Type,
     Entity_Type_Use,
@@ -1319,6 +1320,7 @@ typedef struct Entity {
         AstFileContents       *file_contents;
         AstType               *type_alias;
         AstEnumType           *enum_type;
+        AstEnumValue          *enum_value;
         AstMemRes             *mem_res;
         AstPolyProc           *poly_proc;
         AstPolyQuery          *poly_query;

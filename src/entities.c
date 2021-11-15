@@ -264,6 +264,14 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
+        case Ast_Kind_Enum_Value: {
+            ent.type = Entity_Type_Enum_Value;
+            ent.state = Entity_State_Check_Types;
+            ent.enum_value = (AstEnumValue *) node;
+            ENTITY_INSERT(ent);
+            break;
+        }
+
         case Ast_Kind_Use: {
             if (((AstUse *) node)->expr->kind == Ast_Kind_Package) {
                 ent.state = Entity_State_Resolve_Symbols;

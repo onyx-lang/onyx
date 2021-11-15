@@ -2782,9 +2782,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Enum_Value: {
             AstEnumValue* ev = (AstEnumValue *) expr;
+            AstNumLit   * num = (AstNumLit *) ev->value;
+            assert(num->kind == Ast_Kind_NumLit);
+
             WasmType backing_type = onyx_type_to_wasm_type(ev->type);
-            if      (backing_type == WASM_TYPE_INT32) WID(WI_I32_CONST, ev->value->value.i);
-            else if (backing_type == WASM_TYPE_INT64) WID(WI_I64_CONST, ev->value->value.l);
+            if      (backing_type == WASM_TYPE_INT32) WID(WI_I32_CONST, num->value.i);
+            else if (backing_type == WASM_TYPE_INT64) WID(WI_I64_CONST, num->value.l);
             else onyx_report_error(ev->token->pos, "Invalid backing type for enum.");
             break;
         }

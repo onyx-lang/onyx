@@ -2601,9 +2601,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 
         if (consume_token_if_next(parser, ':')) {
             expect_token(parser, ':');
-
-            // TODO: Make this work for any expression.
-            evalue->value = parse_int_literal(parser);
+            evalue->value = parse_expression(parser, 0);
         }
 
         expect_token(parser, ';');

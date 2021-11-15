@@ -146,7 +146,10 @@ u64 build_type_table(OnyxWasmModule* module) {
                     PATCH;
                     bh_buffer_write_u64(&table_buffer, name_loc);
                     bh_buffer_write_u64(&table_buffer, (*value)->token->length);
-                    bh_buffer_write_u64(&table_buffer, (*value)->value->value.l);
+
+                    assert((*value)->value->kind == Ast_Kind_NumLit);
+                    AstNumLit *num = (AstNumLit *) (*value)->value;
+                    bh_buffer_write_u64(&table_buffer, num->value.l);
                 }
 
                 u32 name_base = table_buffer.length;

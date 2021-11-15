@@ -1181,6 +1181,7 @@ b32 type_is_bool(Type* type) {
 
 b32 type_is_small_integer(Type* type) {
     if (type == NULL) return 0;
+    if (type->kind == Type_Kind_Enum) return type_is_small_integer(type->Enum.backing);
     if (type->kind != Type_Kind_Basic) return 0;
 
     return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U32;
@@ -1188,6 +1189,7 @@ b32 type_is_small_integer(Type* type) {
 
 b32 type_is_integer(Type* type) {
     if (type == NULL) return 0;
+    if (type->kind == Type_Kind_Enum) return type_is_integer(type->Enum.backing);
     if (type->kind != Type_Kind_Basic) return 0;
 
     return (type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U64)

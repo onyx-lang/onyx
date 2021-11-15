@@ -24,10 +24,10 @@ main :: (args: [] cstr) {
 
     compose(10.0f, dumb, (ABC) => ABC + 3) |> println();
 
-    double  :: (x) => x * 2;
-    convert :: (x: $T, $TO: type_expr) => cast(TO) x;
-    add     :: (x: $T, y: T) => x + y;
-    map     :: (x: $T, f: (T) -> $R) => f(x);
+    double  :: macro (x) => x * 2;
+    convert :: macro (x: $T, $TO: type_expr) => cast(TO) x;
+    add     :: macro (x: $T, y: T) => x + y;
+    map     :: macro (x: $T, f: (T) -> $R) => f(x);
 
     5 |> double()
       |> map((x) => x * 3) 

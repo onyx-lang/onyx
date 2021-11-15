@@ -300,6 +300,11 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
 
     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) (*fa)->expr);
 
+    b32 force_a_lookup = 0;
+    if (expr->kind == Ast_Kind_Enum_Type) {
+        force_a_lookup = 1;
+    }
+
     AstNode* resolution = try_symbol_resolve_from_node((AstNode *) expr, (*fa)->token);
     if (resolution) *((AstNode **) fa) = resolution;
     else if (expr->kind == Ast_Kind_Package) {
@@ -312,6 +317,16 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         } else {
             return Symres_Yield_Macro;
         }
+    }
+    else if (force_a_lookup) {
+        if (context.cycle_detected) {
+            onyx_report_error((*fa)->token->pos, "'%b' does not exist here. This is a bad error message.",
+                (*fa)->token->text,
+                (*fa)->token->length);
+            return Symres_Error;
+        }
+
+        return Symres_Yield_Macro;
     }
 
     return Symres_Success;
@@ -1051,38 +1066,63 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
     if (enum_node->backing->kind == Ast_Kind_Symbol) SYMRES(symbol, (AstNode **) &enum_node->backing);
     if (enum_node->backing == NULL) return Symres_Error;
 
-    enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
-    enum_node->scope = scope_create(context.ast_alloc, NULL, enum_node->token->pos);
+    if (enum_node->scope == NULL) {
+        enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
+        enum_node->scope = scope_create(context.ast_alloc, curr_scope, enum_node->token->pos);
 
-    type_build_from_ast(context.ast_alloc, (AstType *) enum_node);
+        type_build_from_ast(context.ast_alloc, (AstType *) enum_node);
+    }
+
+    scope_enter(enum_node->scope);
 
     u64 next_assign_value = enum_node->is_flags ? 1 : 0;
     bh_arr_each(AstEnumValue *, value, enum_node->values) {
-        symbol_introduce(enum_node->scope, (*value)->token, (AstNode *) *value);
+        if ((*value)->flags & Ast_Flag_Has_Been_Checked) continue;
+
         (*value)->type = enum_node->etcache;
+        (*value)->flags |= Ast_Flag_Comptime;
 
         if ((*value)->value != NULL) {
-            // HACK
-            resolve_expression_type((AstTyped *) (*value)->value);
-            if (type_is_small_integer((*value)->value->type)) {
-                next_assign_value = (*value)->value->value.i;
-            } else if (type_is_integer((*value)->value->type)) {
-                next_assign_value = (*value)->value->value.l;
-            } else {
-                onyx_report_error((*value)->token->pos, "expected numeric integer literal for enum initialization");
-                return Symres_Error;
-            }
+            SYMRES(expression, &(*value)->value);
 
-            (*value)->value->type = enum_node->etcache;
+            if ((*value)->value->kind == Ast_Kind_NumLit) {
+                AstNumLit *n_value = (AstNumLit *) (*value)->value;
+                resolve_expression_type((AstTyped *) n_value);
+
+                if (type_is_small_integer(n_value->type)) {
+                    next_assign_value = n_value->value.i;
+                } else if (type_is_integer(n_value->type)) {
+                    next_assign_value = n_value->value.l;
+                } else {
+                    onyx_report_error((*value)->token->pos, "expected numeric integer literal for enum initialization, got '%s'", type_get_name(n_value->type));
+                    return Symres_Error;
+                }
+
+                n_value->type = enum_node->etcache;
+
+            } else {
+                if ((*value)->entity == NULL) {
+                    add_entities_for_node(NULL, (AstNode *) (*value), enum_node->scope, NULL);
+                }
+
+                if (context.cycle_detected) {
+                    onyx_report_error((*value)->token->pos, "Expected compile time known value for enum initialization.");
+                    return Symres_Error;
+                }
+
+                return Symres_Yield_Macro;
+            }
 
         } else {
             AstNumLit* num = make_int_literal(context.ast_alloc, next_assign_value);
             num->type = enum_node->etcache;
 
-            (*value)->value = num;
+            (*value)->value = (AstTyped *) num;
         }
 
-        (*value)->flags |= Ast_Flag_Comptime;
+        symbol_introduce(enum_node->scope, (*value)->token, (AstNode *) (*value));
+
+        (*value)->flags |= Ast_Flag_Comptime | Ast_Flag_Has_Been_Checked;
 
         if (enum_node->is_flags) {
             next_assign_value <<= 1;
@@ -1090,6 +1130,14 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
             next_assign_value++;
         }
     }
+
+    scope_leave();
+
+    // HACK this ensure that you can only lookup symbols in an Enum that are actually defined in the enum.
+    // However, during the symbol resolution of the values in an enum, they need to be able to see the
+    // enclosing scope.
+    enum_node->scope->parent = NULL;
+
     return Symres_Success;
 }
 

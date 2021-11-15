@@ -2684,6 +2684,10 @@ void check_entity(Entity* ent) {
             resolve_expression_type(ent->expr);
             break;
 
+        case Entity_Type_Enum_Value:
+            cs = check_expression(&ent->enum_value->value);
+            break;
+
         case Entity_Type_Type_Alias:
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 cs = check_struct((AstStructType *) ent->type_alias);
