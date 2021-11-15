@@ -22,7 +22,7 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     filter_iterator.iterator = it;
     filter_iterator.predicate = predicate;
 
-    next :: ($T: type_expr, fi: ^FilterIterator(T)) -> (T, bool) {
+    next :: (fi: ^FilterIterator($T)) -> (T, bool) {
         value, cont := fi.iterator.next(fi.iterator.data);
         if cont {
             while !fi.predicate(value) {
@@ -36,7 +36,7 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
         }
     }
 
-    close :: ($T: type_expr, fi: ^FilterIterator(T)) {
+    close :: (fi: ^FilterIterator($T)) {
         if fi.iterator.close != null_proc do fi.iterator.close(fi.iterator.data);
         cfree(fi);
     }
@@ -58,14 +58,14 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
     map_iterator.iterator = it;
     map_iterator.transform = transform;
 
-    next :: ($T: type_expr, $R: type_expr, mi: ^MapIterator(T, R)) -> (R, bool) {
+    next :: (mi: ^MapIterator($T, $R)) -> (R, bool) {
         value, cont := mi.iterator.next(mi.iterator.data);
         if !cont do return __zero_value(R), false;
 
         return mi.transform(value), true;
     }
 
-    close :: ($T: type_expr, $R: type_expr, mi: ^MapIterator(T, R)) {
+    close :: (mi: ^MapIterator($T, $R)) {
         if mi.iterator.close != null_proc do mi.iterator.close(mi.iterator.data);
         cfree(mi);
     }

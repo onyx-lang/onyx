@@ -20,11 +20,8 @@ static b32 doing_nested_polymorph_lookup = 0;
 AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
 
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
-    if (pp->concrete_funcs == NULL) {
-        bh_table_init(global_heap_allocator, pp->concrete_funcs, 16);
-
-        bh_imap_init(&pp->active_queries, global_heap_allocator, 31);
-    }
+    if (pp->concrete_funcs == NULL)        bh_table_init(global_heap_allocator, pp->concrete_funcs, 16);
+    if (pp->active_queries.hashes == NULL) bh_imap_init(&pp->active_queries, global_heap_allocator, 31);
 }
 
 void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln) {
@@ -102,32 +99,32 @@ static char* build_poly_slns_unique_key(bh_arr(AstPolySolution) slns) {
 // NOTE: This function adds a solidified function to the entity heap for it to be processed
 // later. It optionally can start the function header entity at the code generation state if
 // the header has already been processed.
-static b32 add_solidified_function_entities(AstSolidifiedFunction solidified_func) {
-    solidified_func.func->flags |= Ast_Flag_Function_Used;
-    solidified_func.func->flags |= Ast_Flag_From_Polymorphism;
+static b32 add_solidified_function_entities(AstSolidifiedFunction *solidified_func) {
+    solidified_func->func->flags |= Ast_Flag_Function_Used;
+    solidified_func->func->flags |= Ast_Flag_From_Polymorphism;
 
     Entity func_header_entity = {
         .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Function_Header,
-        .function = solidified_func.func,
+        .function = solidified_func->func,
         .package = NULL,
-        .scope = solidified_func.func->poly_scope,
+        .scope = solidified_func->func->poly_scope,
     };
 
     Entity func_entity = {
         .state = Entity_State_Resolve_Symbols,
         .type = Entity_Type_Function,
-        .function = solidified_func.func,
+        .function = solidified_func->func,
         .package = NULL,
-        .scope = solidified_func.func->poly_scope,
+        .scope = solidified_func->func->poly_scope,
     };
 
     Entity* entity_header = entity_heap_insert(&context.entities, func_header_entity);
     Entity* entity_body   = entity_heap_insert(&context.entities, func_entity);
 
-    solidified_func.func_header_entity  = entity_header;
-    solidified_func.func->entity_header = entity_header;
-    solidified_func.func->entity_body   = entity_body;
+    solidified_func->func_header_entity  = entity_header;
+    solidified_func->func->entity_header = entity_header;
+    solidified_func->func->entity_body   = entity_body;
 
     return 1;
 }
@@ -179,9 +176,9 @@ static AstSolidifiedFunction generate_solidified_function(
     return solidified_func;
 }
 
-static void ensure_solidified_function_has_body(AstPolyProc* pp, AstSolidifiedFunction solidified_func) {
-    if (solidified_func.func->flags & Ast_Flag_Incomplete_Body) {
-        clone_function_body(context.ast_alloc, solidified_func.func, pp->base_func);
+static void ensure_solidified_function_has_body(AstPolyProc* pp, AstSolidifiedFunction *solidified_func) {
+    if (solidified_func->func->flags & Ast_Flag_Incomplete_Body) {
+        clone_function_body(context.ast_alloc, solidified_func->func, pp->base_func);
 
         // HACK: I'm asserting that this function should return without an error, because
         // the only case where it can return an error is if there was a problem with the
@@ -190,7 +187,7 @@ static void ensure_solidified_function_has_body(AstPolyProc* pp, AstSolidifiedFu
         // procedure.
         assert(add_solidified_function_entities(solidified_func));
 
-        solidified_func.func->flags &= ~Ast_Flag_Incomplete_Body;
+        solidified_func->func->flags &= ~Ast_Flag_Incomplete_Body;
     }
 }
 
@@ -633,6 +630,7 @@ TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFun
 // solving for the polymorphic variables, in order to return an array of the solutions for all
 // of the polymorphic variables.
 static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken *tkn, b32 necessary) {
+    ensure_polyproc_cache_is_created(pp);
     if (bh_imap_has(&pp->active_queries, (u64) actual)) {
         AstPolyQuery *query = (AstPolyQuery *) bh_imap_get(&pp->active_queries, (u64) actual);
         assert(query->kind == Ast_Kind_Polymorph_Query);
@@ -662,6 +660,7 @@ static bh_arr(AstPolySolution) find_polymorphic_slns(AstPolyProc* pp, PolyProcLo
     query->slns = slns;
     query->function_header = clone_function_header(context.ast_alloc, pp->base_func);
     query->function_header->flags |= Ast_Flag_Header_Check_No_Error;
+    query->function_header->scope = NULL;
     query->error_on_fail = necessary;
     query->successful_symres = 1;
 
@@ -703,7 +702,7 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         // NOTE: If this solution was originally created from a "build_only_header" call, then the body
         // will not have been or type checked, or anything. This ensures that the body is copied, the
         // entities are created and entered into the pipeline.
-        ensure_solidified_function_has_body(pp, solidified_func);
+        ensure_solidified_function_has_body(pp, &solidified_func);
 
         // NOTE: Again, if this came from a "build_only_header" call, then there was no known token and
         // the "generated_from" member will be null. It is best to set it here so errors reported in that
@@ -715,11 +714,10 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     }
 
     AstSolidifiedFunction solidified_func = generate_solidified_function(pp, slns, tkn, 0);
+    add_solidified_function_entities(&solidified_func);
 
     // NOTE: Cache the function for later use, reducing duplicate functions.
     bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
-
-    add_solidified_function_entities(solidified_func);
 
     return (AstFunction *) &node_that_signals_a_yield;
 }
@@ -757,7 +755,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         // made it through the symbol resolution phase.
         //                                                    - brendanfh 2020/12/25
         AstPolyProc* new_pp = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyProc), Ast_Kind_Polymorphic_Proc);
-        new_pp->token = pp->token;                            // TODO: Change this to be the solidify->token
+        new_pp->token = tkn;
         new_pp->base_func = pp->base_func;
         new_pp->flags = pp->flags;
         new_pp->poly_params = pp->poly_params;

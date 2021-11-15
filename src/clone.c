@@ -162,6 +162,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             break;
 
         case Ast_Kind_Call:
+            C(AstCall, callee);
             arguments_deep_clone(a, &((AstCall *) nn)->args, &((AstCall *) node)->args);
             break;
 
@@ -404,6 +405,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstFunction* sf = (AstFunction *) node;
 
             if (sf->is_foreign) return node;
+            assert(df->scope == NULL);
 
             df->return_type = (AstType *) ast_clone(a, sf->return_type);
             df->body = (AstBlock *) ast_clone(a, sf->body);
@@ -524,6 +526,7 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
 
     AstFunction* new_func = onyx_ast_node_new(a, sizeof(AstFunction), func->kind);
     memmove(new_func, func, sizeof(AstFunction));
+    assert(new_func->scope == NULL);
 
     new_func->return_type = (AstType *) ast_clone(a, func->return_type);
 

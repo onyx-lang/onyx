@@ -917,7 +917,7 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     bh_arr_each(AstParam, param, func->params) {
         symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
-        
+
         if (param->local->type_node != NULL) {
             SYMRES(type, &param->local->type_node);
         }
@@ -943,9 +943,8 @@ SymresStatus symres_function_header(AstFunction* func) {
 }
 
 SymresStatus symres_function(AstFunction* func) {
-    if (func->scope == NULL)
-        func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
     if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
+    assert(func->scope);
 
     scope_enter(func->scope);
 
@@ -1319,11 +1318,7 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
 }
 
 void symres_entity(Entity* ent) {
-    Scope* old_scope = NULL;
-    if (ent->scope) {
-        old_scope = curr_scope;
-        scope_enter(ent->scope);
-    }
+    if (ent->scope) scope_enter(ent->scope);
 
     report_unresolved_symbols = context.cycle_detected;
                                 //(context.entities.type_count[Entity_Type_Static_If] == 0 &&
@@ -1380,5 +1375,5 @@ void symres_entity(Entity* ent) {
         ent->state = next_state;
     }
 
-    if (ent->scope) curr_scope = old_scope;
+    curr_scope = NULL;
 }

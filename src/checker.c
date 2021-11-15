@@ -1926,7 +1926,7 @@ CheckStatus check_function(AstFunction* func) {
     if (func->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
     if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
-    
+
     expected_return_type = &func->type->Function.return_type;
     if (func->body) {
         CheckStatus status = check_block(func->body);

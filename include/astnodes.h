@@ -951,7 +951,6 @@ struct AstFunction {
 
     char* name;
 
-
     // NOTE: This is NULL, unless this function was generated from a polymorphic
     // procedure call. Then it is set to the token of the call node.
     OnyxToken* generated_from;

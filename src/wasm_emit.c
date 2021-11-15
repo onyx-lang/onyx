@@ -2545,12 +2545,14 @@ EMIT_FUNC(expression, AstTyped* expr) {
                         fori (idx, 0, mem_count) WIL(WI_LOCAL_GET, localidx + idx);
 
                     } else {
+                        assert(localidx & LOCAL_IS_WASM);
                         WIL(WI_LOCAL_GET, localidx);
                     }
                     break;
                 }
 
                 case Param_Pass_By_Implicit_Pointer: {
+                    assert(localidx & LOCAL_IS_WASM);
                     WIL(WI_LOCAL_GET, localidx);
                     emit_load_instruction(mod, &code, expr->type, 0);
                     break;
@@ -2682,6 +2684,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             if (field->expr->kind == Ast_Kind_Param) {
                 if (type_get_param_pass(field->expr->type) == Param_Pass_By_Value && !type_is_pointer(field->expr->type)) {
                     u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
+                    assert(localidx & LOCAL_IS_WASM);
                     WIL(WI_LOCAL_GET, localidx);
                     break;
                 }

@@ -2,9 +2,8 @@
 
 use package core
 
-count_iterator :: (lo: i32, hi: i32, step := 1) -> Iterator(i32) {
-    next :: (data: rawptr) -> (i32, bool) {
-        ci := cast(^CountIterator) data;
+count_iterator :: (lo: $T, hi: T, step: T = 1) -> Iterator(T) {
+    next :: (ci: ^CountIterator($T)) -> (T, bool) {
         if ci.current > ci.high do return 0, false;
 
         defer ci.current += ci.step;
@@ -16,36 +15,39 @@ count_iterator :: (lo: i32, hi: i32, step := 1) -> Iterator(i32) {
         cfree(data);
     }
 
-    CountIterator :: struct {
-        low, high, step: i32;
-        current: i32;
+    CountIterator :: struct (T:type_expr) {
+        low, high, step: T;
+        current: T;
     }
 
-    count_iterator := new(CountIterator);
+    count_iterator := new(CountIterator(T));
     count_iterator.low = lo;
     count_iterator.high = hi;
     count_iterator.step = step;
     count_iterator.current = lo;
 
     return .{
-        data = count_iterator,
-        next = next,
+        data  = count_iterator,
+        next  = #solidify next {T=T},
         close = close,
     };
 }
 
 main :: (args: [] cstr) {
     // Hopefully soon, the following will be possible.
-    quick_iterator :=
-                count_iterator(1, 10)
-                |> iter.map((x) => x * 2)
-                |> iter.filter((x) => x > 10)
-                |> iter.map((x) => x + 42)
-                |> iter.take(5)
-                |> iter.to_array();
 
-    for v: quick_iterator {
-        println(v);
+    {
+        quick_iterator :=
+                    count_iterator(1.0f, 10.0f)
+                    |> iter.map((x) => x * 2)
+                    |> iter.filter((x) => x > 10)
+                    |> iter.map((x) => x + 42)
+                    |> iter.take(5)
+                    |> iter.to_array();
+
+        for v: quick_iterator {
+            println(v);
+        }
     }
 
     iterator := count_iterator(1, 10)
