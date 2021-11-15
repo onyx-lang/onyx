@@ -1085,6 +1085,11 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
         if ((*value)->value != NULL) {
             SYMRES(expression, &(*value)->value);
 
+            if ((*value)->value->kind == Ast_Kind_Enum_Value) {
+                (*value)->value = ((AstEnumValue *) (*value)->value)->value;
+                (*value)->value->type = enum_node->etcache;
+            }
+
             if ((*value)->value->kind == Ast_Kind_NumLit) {
                 AstNumLit *n_value = (AstNumLit *) (*value)->value;
                 resolve_expression_type((AstTyped *) n_value);
@@ -1092,11 +1097,7 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
                 if (type_is_small_integer(n_value->type)) {
                     next_assign_value = n_value->value.i;
                 } else if (type_is_integer(n_value->type)) {
-                    next_assign_value = n_value->value.l;
-                } else {
-                    onyx_report_error((*value)->token->pos, "expected numeric integer literal for enum initialization, got '%s'", type_get_name(n_value->type));
-                    return Symres_Error;
-                }
+ 
 
                 n_value->type = enum_node->etcache;
 
