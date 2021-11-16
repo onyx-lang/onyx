@@ -1403,13 +1403,16 @@ void symres_entity(Entity* ent) {
                                                   next_state = Entity_State_Finalized;
                                                   break;
 
+        case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc);
+                                                  next_state = Entity_State_Finalized;
+                                                  break;
+
         case Entity_Type_Overloaded_Function:     ss = symres_overloaded_function(ent->overloaded_function); break;
         case Entity_Type_Expression:              ss = symres_expression(&ent->expr); break;
         case Entity_Type_Type_Alias:              ss = symres_type(&ent->type_alias); break;
         case Entity_Type_Enum:                    ss = symres_enum(ent->enum_type); break;
         case Entity_Type_Memory_Reservation_Type: ss = symres_memres_type(&ent->mem_res); break;
         case Entity_Type_Memory_Reservation:      ss = symres_memres(&ent->mem_res); break;
-        case Entity_Type_Polymorphic_Proc:        ss = symres_polyproc(ent->poly_proc); break;
         case Entity_Type_String_Literal:          ss = symres_expression(&ent->expr); break;
         case Entity_Type_Struct_Member_Default:   ss = symres_struct_defaults((AstType *) ent->type_alias); break;
         case Entity_Type_Process_Directive:       ss = symres_process_directive((AstNode *) ent->expr); break;

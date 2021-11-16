@@ -33,7 +33,7 @@ main :: (args: [] cstr) {
       |> map((x) => x * 3) 
       |> add(2)
       |> double()
-      |> map((x) => cast(f32) x)
+      |> convert(f32)
       |> map((x) => x * 4 + 2)
       |> println();
 }

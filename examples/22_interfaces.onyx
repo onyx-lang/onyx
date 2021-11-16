@@ -1,0 +1,132 @@
+// You may have come across the term "interfaces" in other languages such as
+// Java or C#. Onyx uses the same work for a _similar_ but different concept.
+// The goal of an interface is to spell out what properties a type must have
+// in some generic code. In Java, this is accomplished by defining what methods
+// the class must have and what their signatures must be. This is a very OOP
+// approach to type constraints and does not fit well with the paradigm Onyx
+// bring to the table.
+//
+// As the other examples make clear, Onyx achieves type generic code through
+// polymorphic procedures and structures, overloaded procedures and operator
+// overloading. Sometimes you want to have a type generic function, but also
+// want to constrain which types are valid, due to the operations performed
+// in the procedure. To make this kind of constraint more explicit, Onyx
+// offers interfaces and the "where" clause.
+
+add_example :: () {
+    // Interfaces take a set of type parameters, and a set of expressions that
+    // must be valid in order for the constraint to be true for a set of type
+    // arguments. This is best explained through an example. This is a simple
+    // interface that takes one type parameter T, and says the expression T + T
+    // must be valid. This may look a little weird as T should be a type_expr,
+    // so you should never be able to add them. However, in the interface body,
+    // T actually means a value of type T. This is a little confusing at first,
+    // but after programming with it for a while, I think it is the right
+    // syntax.
+
+    CanAdd :: interface (T: type_expr) {
+        T + T;
+    }
+
+    // To use this interface, you must write a "where" clause for a procedure or
+    // polymorphic struct. Here is a simple polymorphic procedure with a where
+    // clause that specifies that T must fulfill the CanAdd interface. This is
+    // obviously a little silly, as it is pretty obvious. However, in more
+    // complicated code, something like this may not be obvious if you are
+    // calling add with a custom type. You would just get a random error message
+    // deep in the add procedure saying that you can not add your type. To
+    // make these errors a little nicer, a type constraint can be used.
+    add :: (x: $T, y: T) -> T where CanAdd(T) {
+        return x + y;
+    }
+
+    // From the end-user point of view, there is nothing different about calling
+    // a procedure with a type constraint (where clause).
+    x, y := 3, 4;
+    z    := add(x, y);
+
+    printf("add({}, {}) = {}\n", x, y, z);
+}
+
+
+// These have to be defined out here because #operator and #match are only allowed
+// as top level expressions currently.
+NumberLike :: interface (T: type_expr) {
+    // The constraints here are a little stricter than before, as you must be
+    // able to cast the result of these operations back to the original type.
+    // This effectively means that T + T must be the same type as (or a compatible
+    // type of) T.
+    cast(typeof T) (T + T);
+    cast(typeof T) (T - T);
+    cast(typeof T) (T * T);
+}
+
+// Here, Vector2 has the type constraint of NumberLike for T. This constraint
+// is checked when Vector2 is constructed with any parameters.
+Vector2 :: struct (T: type_expr) where NumberLike(T) {
+    x := __zero_value(T);
+    y := __zero_value(T);
+}
+
+#operator + (x, y: Vector2($T)) => Vector2(T).{ x.x + y.x, x.y + y.y };
+#operator - (x, y: Vector2($T)) => Vector2(T).{ x.x - y.x, x.y - y.y };
+#operator * (x, y: Vector2($T)) => x.x * y.x + x.y * y.y;
+
+struct_example :: () {
+    // This will work fine because a value of type f32 will satisfy all the
+    // constraints listed in NumberLike.
+    v1 := Vector2(f32).{};
+    println(v1);
+
+    // This will generate an error because the dot product definition of
+    // multiplication of two Vector2(f32) results in a f32, which cannot
+    // be casted to a Vector2(f32).
+    v2 := Vector2(Vector2(f32)).{};
+    // println(v2);
+}
+
+
+overloaded_procedure_example :: () {
+    // So far, all of the examples have shown how interfaces can be used to
+    // provide a sanity check when programming with polymorphic procedure
+    // and structures. Interfaces are slightly more powerful than that however
+    // when the are combined with overloaded procedures.
+
+    // Take this example. Here is the same CanAdd interface from before.
+    CanAdd :: interface (T: type_expr) {
+        T + T;
+    }
+
+    // This overloaded procedure has two procedures that have almost identical
+    // types. However the first procedure has the CanAdd type constraint on
+    // T. This means is in order to match the first procedure, x and y must be
+    // addable. If there are not, then the first procedure is not matched and
+    // it tries to the second procedure. Using this pattern, you can create
+    // compile time conditional code that introspects what values of a certain
+    // type can do to determine what procedure should be used.
+    add_if_possible :: #match {
+        (x: $T, y: T) -> T where CanAdd(T) {
+            return x + y;
+        },
+
+        (x: $T, y: T) -> T {
+            println("It is not possible to add x and y. Returning x.");
+            return x;
+        },
+    }
+
+    add_if_possible(3, 4) |> println();
+    add_if_possible("a", "b") |> println();
+}
+
+
+main :: (args) => {
+    add_example();
+    struct_example();
+    overloaded_procedure_example();
+}
+
+#load "core/std"
+
+use package core
+use package core.intrinsics.onyx

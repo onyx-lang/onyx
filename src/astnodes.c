@@ -148,6 +148,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "String Literal",
     "File Contents",
     "Enum",
+    "Enum Value",
     "Type Alias",
     "Memory Reservation Type",
     "Use",
