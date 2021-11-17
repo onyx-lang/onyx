@@ -8,7 +8,12 @@ package core.set
 }
 use package core.intrinsics.onyx { __zero_value }
 
-Set :: struct (T: type_expr) {
+#local SetValue :: interface (T: type_expr) {
+    hash.to_u32(T);
+    T == T;
+}
+
+Set :: struct (T: type_expr) where SetValue(T) {
     allocator : Allocator;
 
     hashes  : [] i32;

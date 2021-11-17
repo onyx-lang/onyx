@@ -50,3 +50,7 @@ __exit :: (status: i32) do proc_exit(status);
 
     __flush_stdio();
 }
+
+
+__spawn_thread :: (t: i32, func: (data: rawptr) -> void, data: rawptr) -> bool ---
+__kill_thread :: (t: i32) -> i32 ---

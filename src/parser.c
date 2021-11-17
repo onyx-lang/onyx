@@ -1717,14 +1717,6 @@ static AstType* parse_type(OnyxParser* parser) {
                 break;
             }
 
-            case Token_Type_Keyword_Proc: {
-                OnyxToken* proc_token = expect_token(parser, Token_Type_Keyword_Proc);
-                onyx_report_warning(proc_token->pos, "Warning: 'proc' is a deprecated keyword.");
-                *next_insertion = parse_function_type(parser, proc_token);
-                next_insertion = NULL;
-                break;
-            }
-
             case '$': {
                 parse_polymorphic_variable(parser, &next_insertion);
                 break;
@@ -2284,21 +2276,32 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     func_def->return_type = (AstType *) &basic_type_void;
 
+    char* name = NULL;
+    if (bh_arr_length(parser->current_symbol_stack) > 0) {
+        OnyxToken *current_symbol = bh_arr_last(parser->current_symbol_stack);
+        name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
+    }
+
     if (consume_token_if_next(parser, '=')) {
         expect_token(parser, '>');
         func_def->return_type = (AstType *) &basic_type_auto_return;
 
-        AstTyped* returned_value = parse_compound_expression(parser, 0);
+        if (parser->curr->type == '{') {
+            func_def->body = parse_block(parser, 1, name);
 
-        AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
-        return_node->token = returned_value->token;
-        return_node->expr = returned_value;
+        } else {
+            AstTyped* returned_value = parse_compound_expression(parser, 0);
 
-        AstBlock* body_block = make_node(AstBlock, Ast_Kind_Block);
-        body_block->token = returned_value->token;
-        body_block->body = (AstNode *) return_node;
+            AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
+            return_node->token = returned_value->token;
+            return_node->expr = returned_value;
 
-        func_def->body = body_block;
+            AstBlock* body_block = make_node(AstBlock, Ast_Kind_Block);
+            body_block->token = returned_value->token;
+            body_block->body = (AstNode *) return_node;
+
+            func_def->body = body_block;
+        }
 
         goto function_defined;
     }
@@ -2344,11 +2347,6 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
         }
     }
 
-    char* name = NULL;
-    if (bh_arr_length(parser->current_symbol_stack) > 0) {
-        OnyxToken *current_symbol = bh_arr_last(parser->current_symbol_stack);
-        name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
-    }
     func_def->body = parse_block(parser, 1, name);
 
 function_defined:

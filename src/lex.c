@@ -21,7 +21,6 @@ static const char* token_type_names[] = {
     "elseif",
     "return",
     "global",
-    "proc",
     "as",
     "cast",
     "while",
@@ -366,7 +365,6 @@ whitespace_skipped:
         break;
     case 'p':
         LITERAL_TOKEN("package",     1, Token_Type_Keyword_Package);
-        LITERAL_TOKEN("proc",        1, Token_Type_Keyword_Proc);
         break;
     case 'r':
         LITERAL_TOKEN("return",      1, Token_Type_Keyword_Return);

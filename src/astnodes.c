@@ -573,7 +573,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (node->kind == Ast_Kind_Unary_Field_Access) {
         AstType* ast_type = type->ast_type;
         AstNode* resolved = try_symbol_resolve_from_node((AstNode *) ast_type, node->token);
-        if (resolved == NULL) return TYPE_MATCH_FAILED;
+        if (resolved == NULL) return TYPE_MATCH_YIELD;
 
         if (permanent) *pnode = (AstTyped *) resolved;
         return TYPE_MATCH_SUCCESS;

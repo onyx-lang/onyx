@@ -419,6 +419,11 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstPolyProc *pp, AstF
         AstType *old_return_type = ft->return_type;
         ft->return_type = (AstType *) &basic_type_void;
         ft->partial_function_type = type_build_from_ast(context.ast_alloc, (AstType *) ft);
+        if (!ft->partial_function_type) {
+            doing_nested_polymorph_lookup = 1;
+            return NULL;
+        }
+
         assert(ft->partial_function_type);
         ft->return_type = old_return_type;
     }
