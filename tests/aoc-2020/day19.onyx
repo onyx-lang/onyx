@@ -63,13 +63,8 @@ grammar_prepare :: (use g: ^Grammar) {
         }
     }
 
-    array.sort(terminate_rules, (a: Term, b: Term) -> i32 {
-        return (cast(i32) a.nt) - (cast(i32) b.nt);
-    });
-
-    array.sort(production_rules, (a: Prod, b: Prod) -> i32 {
-        return (cast(i32) a.nt0) - (cast(i32) b.nt0);
-    });
+    array.quicksort(terminate_rules, (a, b) => (cast(i32) a.nt) - (cast(i32) b.nt));
+    array.quicksort(production_rules, (a, b) => (cast(i32) a.nt0) - (cast(i32) b.nt0));
 
     max_terminal = math.max(
         production_rules[production_rules.count - 1].nt0,

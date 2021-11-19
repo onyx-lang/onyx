@@ -39,8 +39,7 @@ main :: (args: [] cstr) {
     // Slight hack, but having 0 in the array makes both parts easier
     array.push(^nums, 0);
 
-    cmp_asc :: (a: $T, b: T) -> i32 do return ~~(a - b);
-    array.sort(nums, cmp_asc);
+    array.sort(nums, (a, b) => a - b);
 
     diffs: [3] u32;
     for ^d: diffs do *d = 0;

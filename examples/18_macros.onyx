@@ -4,7 +4,7 @@
 // and then it uses the symbols from the current scope.
 
 main :: (args: [] cstr) {
-    // A macro in Onyx looks just like a procedure, just with the work "macro" in front of it.
+    // A macro in Onyx looks just like a procedure, just with the word "macro" in front of it.
     a_simple_macro :: macro () {
         println("This is a simple macro");
     }

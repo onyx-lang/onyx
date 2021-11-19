@@ -162,9 +162,7 @@ main :: (args: [] cstr) {
         }
     }
 
-    array.sort(matched_ingredients, (i1: ^Ingredient, i2: ^Ingredient) -> i32 {
-        return string.compare(i1.allergen, i2.allergen);
-    });
+    array.sort(matched_ingredients, (i1: ^Ingredient, i2: ^Ingredient) => string.compare(i1.allergen, i2.allergen));
 
     for ^mi: matched_ingredients do printf("{} -> {}\n", mi.name, mi.allergen);
     for ^mi: matched_ingredients do printf("{},", mi.name);
