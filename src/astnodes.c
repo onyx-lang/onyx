@@ -582,6 +582,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (node->kind == Ast_Kind_Overloaded_Function) {
         AstTyped* func = find_matching_overload_by_type(((AstOverloadedFunction *) node)->overloads, type);
         if (func == NULL) return TYPE_MATCH_FAILED;
+        if (func == (AstTyped *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 
         // HACK: It feels like there should be a better place to flag that a procedure was definitely used.
         if (func->kind == Ast_Kind_Function)

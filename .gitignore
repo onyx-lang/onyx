@@ -13,3 +13,4 @@ session.vim
 tmp/
 .vimspector.json
 .vscode/
+dist/
