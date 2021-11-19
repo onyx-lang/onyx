@@ -168,7 +168,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     skip_iterator.iterator = it;
     skip_iterator.to_skip = count;
 
-    next :: ($T: type_expr, si: ^SkipIterator(T)) -> (T, bool) {
+    next :: (si: ^SkipIterator($T)) -> (T, bool) {
         while !si.skipped && si.to_skip > 0 {
             si.to_skip -= 1;
             value, cont := si.iterator.next(si.iterator.data);
@@ -182,7 +182,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
         return si.iterator.next(si.iterator.data);
     }
 
-    close :: ($T: type_expr, si: ^SkipIterator(T)) {
+    close :: (si: ^SkipIterator($T)) {
         if si.iterator.close != null_proc do si.iterator.close(si.iterator.data);
         cfree(si);
     }
@@ -209,14 +209,14 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Z
     zipped_iterator.iterator1 = left_iterator;
     zipped_iterator.iterator2 = right_iterator;
 
-    next :: ($T: type_expr, $R: type_expr, zi: ^ZippedIterator(T, R)) -> (Zipped(T, R), bool) {
+    next :: (zi: ^ZippedIterator($T, $R)) -> (Zipped(T, R), bool) {
         v1, cont1 := zi.iterator1.next(zi.iterator1.data);
         v2, cont2 := zi.iterator2.next(zi.iterator2.data);
 
         return .{ v1, v2 }, cont1 && cont2;
     }
 
-    close :: ($T: type_expr, $R: type_expr, zi: ^ZippedIterator(T, R)) {
+    close :: (zi: ^ZippedIterator($T, $R)) {
         if zi.iterator1.close != null_proc do zi.iterator1.close(zi.iterator1.data);
         if zi.iterator2.close != null_proc do zi.iterator2.close(zi.iterator2.data);
         cfree(zi);
@@ -230,7 +230,7 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Z
 }
 
 const :: (value: $T) -> Iterator(T) {
-    next :: ($T: type_expr, data: rawptr) -> (T, bool) {
+    next :: (data: ^$T) -> (T, bool) {
         return *(cast(^T) data), true;
     }
 
@@ -259,7 +259,7 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
     ec.iterator = it;
     ec.current_index = start_index;
 
-    next :: ($T: type_expr, use data: ^Enumeration_Context(T)) -> (Enumeration_Value(T), bool) {
+    next :: (use data: ^Enumeration_Context($T)) -> (Enumeration_Value(T), bool) {
         value, cont := iterator.next(iterator.data);
 
         if !cont do return .{ current_index, __zero_value(T) }, false;
@@ -268,7 +268,7 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
         return .{ current_index, value }, true;
     }
 
-    close :: ($T: type_expr, use data: ^Enumeration_Context(T)) {
+    close :: (use data: ^Enumeration_Context($T)) {
         if iterator.close != null_proc do iterator.close(iterator.data);
         cfree(data);
     }
@@ -310,7 +310,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     c.count = arr.count;
     c.current = 0;
 
-    next :: ($T: type_expr, use _: ^Context(T)) -> (^T, bool) {
+    next :: (use _: ^Context($T)) -> (^T, bool) {
         if current < count {
             defer current += 1;
             return ^data[current], true;

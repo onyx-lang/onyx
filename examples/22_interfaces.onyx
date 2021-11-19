@@ -81,7 +81,7 @@ struct_example :: () {
     // This will generate an error because the dot product definition of
     // multiplication of two Vector2(f32) results in a f32, which cannot
     // be casted to a Vector2(f32).
-    v2 := Vector2(Vector2(f32)).{};
+    // v2 := Vector2(Vector2(f32)).{};
     // println(v2);
 }
 
