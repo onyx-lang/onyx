@@ -9,7 +9,7 @@
 #include "wasm_emit.h"
 #include "doc.h"
 
-#define VERSION "v0.1.0-beta"
+#define VERSION "v0.1.0"
 
 
 #ifndef CORE_INSTALLATION
@@ -45,9 +45,9 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\t--verbose, -V           Verbose output.\n"
     "\t           -VV          Very verbose output.\n"
     "\t           -VVV         Very very verbose output (to be used by compiler developers).\n"
-    "\t--use-post-mvp-features Enables post MVP WASM features.\n"
+    "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
+    "\t---multi-threaded       Enables multi-threading for this compilation.\n"
     "\t--doc <doc_file>\n"
-    "\t--use-multi-threading   Enables multi-threading for this compilation.\n"
     "\n"
     "Developer flags:\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
@@ -134,13 +134,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             else if (!strcmp(argv[i], "--no-file-contents")) {
                 options.no_file_contents = 1;
             }
-            else if (!strcmp(argv[i], "--use-post-mvp-features")) {
-                options.use_post_mvp_features = 1;
-            }
-            else if (!strcmp(argv[i], "--mvp-features-only")) {
+            else if (!strcmp(argv[i], "--wasm-mvp")) {
                 options.use_post_mvp_features = 0;
             }
-            else if (!strcmp(argv[i], "--use-multi-threading")) {
+            else if (!strcmp(argv[i], "--multi-threaded")) {
                 options.use_multi_threading = 1;
             }
             else if (!strcmp(argv[i], "-I")) {

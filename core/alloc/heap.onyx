@@ -33,7 +33,16 @@ init :: () {
     }
 }
 
-get_watermark :: () => cast(u32) heap_state.next_alloc;
+get_watermark  :: () => cast(u32) heap_state.next_alloc;
+get_freed_size :: () => {
+    total := 0;
+    block := heap_state.free_list;
+    while block != null {
+        total += block.size;
+        block = block.next;
+    }
+    return total;
+}
 
 #local {
     use package core.intrinsics.wasm {
