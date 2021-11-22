@@ -704,12 +704,12 @@ static inline void* wasm_val_ptr(const wasm_val_t* val) {
 #endif
 }
 
-#define WASM_I32_VAL(i) {.kind = WASM_I32, .of = {.i32 = i}}
-#define WASM_I64_VAL(i) {.kind = WASM_I64, .of = {.i64 = i}}
-#define WASM_F32_VAL(z) {.kind = WASM_F32, .of = {.f32 = z}}
-#define WASM_F64_VAL(z) {.kind = WASM_F64, .of = {.f64 = z}}
-#define WASM_REF_VAL(r) {.kind = WASM_ANYREF, .of = {.ref = r}}
-#define WASM_INIT_VAL {.kind = WASM_ANYREF, .of = {.ref = NULL}}
+#define WASM_I32_VAL(i) (wasm_val_t) {.kind = WASM_I32, .of = {.i32 = i}}
+#define WASM_I64_VAL(i) (wasm_val_t) {.kind = WASM_I64, .of = {.i64 = i}}
+#define WASM_F32_VAL(z) (wasm_val_t) {.kind = WASM_F32, .of = {.f32 = z}}
+#define WASM_F64_VAL(z) (wasm_val_t) {.kind = WASM_F64, .of = {.f64 = z}}
+#define WASM_REF_VAL(r) (wasm_val_t) {.kind = WASM_ANYREF, .of = {.ref = r}}
+#define WASM_INIT_VAL   (wasm_val_t) {.kind = WASM_ANYREF, .of = {.ref = NULL}}
 
 
 ///////////////////////////////////////////////////////////////////////////////

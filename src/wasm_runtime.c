@@ -1,4 +1,5 @@
 #include "bh.h"
+#include "utils.h"
 #include "astnodes.h"
 #include "wasm.h"
 #include "wasmer.h"
@@ -66,11 +67,21 @@ typedef struct OnyxThread {
     #ifdef _BH_LINUX
         pthread_t thread;
     #endif
+
+    #ifdef _BH_WINDOWS
+        HANDLE thread_handle;
+        i32    thread_id;
+    #endif
 } OnyxThread;
 
 static bh_arr(OnyxThread) threads = NULL;
 
+#ifdef _BH_LINUX
 static void *onyx_run_thread(void *data) {
+#endif
+#ifdef _BH_WINDOWS
+static i32 onyx_run_thread(void *data) {
+#endif
     OnyxThread *thread = (OnyxThread *) data;
 
     wasm_trap_t* traps = NULL;
@@ -82,26 +93,34 @@ static void *onyx_run_thread(void *data) {
     wasm_extern_t* exit_extern = wasm_extern_lookup_by_name(wasm_module, thread->instance, "_thread_exit");
     wasm_func_t*   exit_func   = wasm_extern_as_func(exit_extern);
 
+    wasm_trap_t* trap=NULL;
+
     { // Call the _thread_start procedure
         wasm_val_t args[]    = { WASM_I32_VAL(thread->id), WASM_I32_VAL(thread->funcidx), WASM_I32_VAL(thread->dataptr) };
         wasm_val_vec_t results;
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
 
-        wasm_func_call(start_func, &args_array, &results);
+        trap = wasm_func_call(start_func, &args_array, &results);
+        if (trap != NULL) {
+            wasm_message_t msg;
+            wasm_trap_message(trap, &msg);
+            bh_printf("TRAP: %b\n", msg.data, msg.size);
+        }
     }
 
-    { // Cal lthe _thread_exit procedure
+    { // Call the _thread_exit procedure
         wasm_val_t args[]    = { WASM_I32_VAL(thread->id) };
         wasm_val_vec_t results;
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
 
-        wasm_func_call(exit_func, &args_array, &results);
+        trap = wasm_func_call(exit_func, &args_array, &results);
     }
 
-    return NULL;
+    return 0;
 }
 
 static wasm_trap_t* onyx_spawn_thread_impl(const wasm_val_vec_t* params, wasm_val_vec_t* results) {
+    if (threads == NULL) bh_arr_new(global_heap_allocator, threads, 128);
     bh_arr_insert_end(threads, 1);
     OnyxThread *thread = &bh_arr_last(threads);
 
@@ -114,7 +133,7 @@ static wasm_trap_t* onyx_spawn_thread_impl(const wasm_val_vec_t* params, wasm_va
     #endif
 
     #ifdef _BH_WINDOWS
-        #error "unimplemented"
+        thread->thread_handle = CreateThread(NULL, 0, onyx_run_thread, thread, 0, &thread->thread_id);
     #endif
 
     results->data[0] = WASM_I32_VAL(1);
@@ -124,15 +143,23 @@ static wasm_trap_t* onyx_spawn_thread_impl(const wasm_val_vec_t* params, wasm_va
 static wasm_trap_t* onyx_kill_thread_impl(const wasm_val_vec_t* params, wasm_val_vec_t* results) {
     i32 thread_id = params->data[0].of.i32;
 
+    i32 i = 0;
     bh_arr_each(OnyxThread, thread, threads) {
         if (thread->id == thread_id) {
             #ifdef _BH_LINUX
             pthread_kill(thread->thread, SIGKILL);
             #endif
 
+            #ifdef _BH_WINDOWS
+            TerminateThread(thread->thread_handle, 0);
+            #endif
+
+            bh_arr_deleten(threads, i, 1);
             results->data[0] = WASM_I32_VAL(1);
             return NULL;
         }
+
+        i++;
     }
 
     results->data[0] = WASM_I32_VAL(0);
