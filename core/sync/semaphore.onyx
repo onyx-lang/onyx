@@ -1,6 +1,7 @@
 package core.sync
 
 use package core.intrinsics.atomics
+#local runtime :: package runtime
 
 Semaphore :: struct {
     mutex   : Mutex;
@@ -22,7 +23,12 @@ semaphore_post :: (s: ^Semaphore, count := 1) {
     
     scoped_mutex(^s.mutex);
     s.counter += count;
-    __atomic_notify(^s.counter, maximum = count);
+
+    @Bug // This is susceptible to starvation. Semaphores should have a queue
+    // or something like that.
+    #if runtime.Wait_Notify_Available {
+        __atomic_notify(^s.counter, maximum = count);
+    }
 }
 
 semaphore_wait :: (s: ^Semaphore) {
@@ -37,7 +43,9 @@ semaphore_wait :: (s: ^Semaphore) {
         } else {
             mutex_unlock(^s.mutex);
 
-            __atomic_wait(^s.counter, 0);
+            #if runtime.Wait_Notify_Available {
+                __atomic_wait(^s.counter, 0);
+            }
         }
     }
 }

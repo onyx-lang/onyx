@@ -31,7 +31,11 @@ spawn :: (t: ^Thread, data: rawptr, func: (rawptr) -> void) {
 }
 
 join :: (t: ^Thread) {
-    while t.alive do __atomic_wait(^t.id, t.id);
+    while t.alive {
+        #if runtime.Wait_Notify_Available {
+            __atomic_wait(^t.id, t.id);
+        }
+    }
 }
 
 kill :: (t: ^Thread) -> i32 {
@@ -53,7 +57,9 @@ __exited :: (id: i32) {
     thread := thread_map->get(id);
     if thread != null {
         thread.alive = false;
-        __atomic_notify(^thread.id);
+        #if runtime.Wait_Notify_Available {
+            __atomic_notify(^thread.id);
+        }
 
         thread_map->delete(id);
     }

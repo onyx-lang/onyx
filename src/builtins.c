@@ -474,4 +474,8 @@ void introduce_build_options(bh_allocator a) {
     AstNumLit* multi_threaded = make_int_literal(a, context.options->use_multi_threading);
     multi_threaded->type_node = (AstType *) &basic_type_bool;
     symbol_builtin_introduce(p->scope, "Multi_Threading_Enabled", (AstNode *) multi_threaded);
+
+    AstNumLit* wait_notify_available = make_int_literal(a, context.options->use_multi_threading && context.options->runtime == Runtime_Js);
+    wait_notify_available->type_node = (AstType *) &basic_type_bool;
+    symbol_builtin_introduce(p->scope, "Wait_Notify_Available", (AstNode *) wait_notify_available);
 }
