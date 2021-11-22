@@ -505,7 +505,7 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
 
 // NOTE: The job of this function is to look through the arguments provided and find a matching
 // value that is to be baked into the polymorphic procedures poly-scope. It expected that param
-// will be of kind PPK_Baked_Value.
+// will be of kind PPK_Baked_Value. In other words, this handles the ($Baked: type) case.
 // CLEANUP: This function is kind of gross at the moment, because it handles different cases for
 // the argument kind. When type expressions (type_expr) become first-class types in the type
 // system, this code should be able to be a lot cleaner.

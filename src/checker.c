@@ -737,6 +737,7 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
 
     } else {
         // NOTE: +=, -=, ...
+        // NOTE: At this point, it is assumed that operator overloads for +=, -=, etc have been tested.
 
         BinaryOp operation = -1;
         if      (binop->operation == Binary_Op_Assign_Add)      operation = Binary_Op_Add;
