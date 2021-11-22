@@ -71,7 +71,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .use_post_mvp_features   = 1,
         .use_multi_threading     = 0,
 
-        .runtime = Runtime_Wasi,
+        .runtime = Runtime_Onyx,
 
         .files = NULL,
         .target_file = "out.wasm",
@@ -145,11 +145,12 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--runtime")) {
                 i += 1;
-                if      (!strcmp(argv[i], "wasi"))   options.runtime = Runtime_Wasi;
+                if      (!strcmp(argv[i], "onyx"))   options.runtime = Runtime_Onyx;
+                else if (!strcmp(argv[i], "wasi"))   options.runtime = Runtime_Wasi;
                 else if (!strcmp(argv[i], "js"))     options.runtime = Runtime_Js;
                 else if (!strcmp(argv[i], "custom")) options.runtime = Runtime_Custom;
                 else {
-                    bh_printf("WARNING: '%s' is not a valid runtime. Defaulting to 'wasi'.\n", argv[i]);
+                    bh_printf("WARNING: '%s' is not a valid runtime. Defaulting to 'onyx'.\n", argv[i]);
                     options.runtime = Runtime_Wasi;
                 }
             }

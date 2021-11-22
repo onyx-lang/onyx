@@ -3712,23 +3712,22 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
             .kind   = WASM_FOREIGN_MEMORY,
             .min    = 1024,
             .max    = 65536, // NOTE: Why not use all 4 Gigs of memory?
-            .shared = 1,
+            .shared = context.options->runtime != Runtime_Onyx,
 
             .mod    = "onyx",
             .name   = "memory",
         };
 
         bh_arr_push(module.imports, mem_import);
-
-    } else {
-        WasmExport mem_export = {
-            .kind = WASM_FOREIGN_MEMORY,
-            .idx = 0,
-        };
-
-        bh_table_put(WasmExport, module.exports, "memory", mem_export);
-        module.export_count++;
     }
+
+    WasmExport mem_export = {
+        .kind = WASM_FOREIGN_MEMORY,
+        .idx = 0,
+    };
+
+    bh_table_put(WasmExport, module.exports, "memory", mem_export);
+    module.export_count++;
 
     WasmExport func_table_export = {
         .kind = WASM_FOREIGN_TABLE,

@@ -1,7 +1,9 @@
 package core.clock
 
-#if (package runtime).Runtime != (package runtime).Runtime_Wasi {
-    #error "'core.clock' is only available with the 'wasi' runtime.";
+#local runtime :: package runtime
+#if runtime.Runtime != runtime.Runtime_Wasi 
+    && runtime.Runtime != runtime.Runtime_Onyx {
+    #error "'core.clock' is only available with the 'wasi' or 'onyx' runtimes.";
 }
 
 use package wasi

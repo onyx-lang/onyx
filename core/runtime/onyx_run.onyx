@@ -1,0 +1,32 @@
+package runtime
+
+#load "core/wasi/wasi"
+#load "core/runtime/common"
+
+use package core
+use package wasi
+
+// The "onyx_run" runtime extends the WASI runtime.
+#load "core/runtime/wasi"
+
+#if Multi_Threading_Enabled {
+    __spawn_thread :: (id: i32, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "env" "spawn_thread" ---
+    __kill_thread  :: (id: i32) -> i32 #foreign "env" "kill_thread" ---
+
+    #export "_thread_start" (id: i32, func: (data: rawptr) -> void, data: rawptr) {
+        __stack_top = raw_alloc(alloc.heap_allocator, 1 << 20);
+        __thread_initialize();
+
+        context.thread_id = id;
+
+        func(data);
+
+        __flush_stdio();
+    }
+    
+    #export "_thread_exit" (id: i32) {
+        raw_free(alloc.heap_allocator, __tls_base);
+
+        thread.__exited(id);
+    }
+}

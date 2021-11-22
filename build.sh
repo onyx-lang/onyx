@@ -43,12 +43,10 @@ else
     TARGET='./bin/onyx'
 fi
 
-if true; then
-    C_FILES="$C_FILES wasm_runtime"
-    FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
-    LIBS="-L$CORE_DIR/lib -lwasmer -Wl,-rpath=$CORE_DIR/lib"
-    INCLUDES="-I$WASMER_INCLUDE_DIR"
-fi
+C_FILES="$C_FILES wasm_runtime"
+FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
+LIBS="-L$CORE_DIR/lib -lwasmer -Wl,-rpath=$CORE_DIR/lib -lpthread"
+INCLUDES="-I$WASMER_INCLUDE_DIR"
 
 mkdir -p "$BUILD_DIR"
 

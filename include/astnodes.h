@@ -1381,9 +1381,10 @@ enum CompileAction {
 typedef enum Runtime Runtime;
 enum Runtime {
     Runtime_Unknown = 0,
-    Runtime_Wasi    = 1,
-    Runtime_Js      = 2,
-    Runtime_Custom  = 3,
+    Runtime_Onyx    = 1,
+    Runtime_Wasi    = 2,
+    Runtime_Js      = 3,
+    Runtime_Custom  = 4,
 };
 
 

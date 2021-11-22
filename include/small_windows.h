@@ -274,6 +274,7 @@ GB_DLL_IMPORT HANDLE  WINAPI CreateThread       (SECURITY_ATTRIBUTES *semaphore_
                                                  DWORD creation_flags, DWORD *thread_id);
 GB_DLL_IMPORT DWORD   WINAPI GetThreadId        (HANDLE handle);
 GB_DLL_IMPORT void    WINAPI RaiseException     (DWORD, DWORD, DWORD, ULONG_PTR const *);
+GB_DLL_IMPORT BOOL    WINAPI TerminateThread    (HANDLE hThread, DWORD dwExitCode);
 
 
 GB_DLL_IMPORT BOOL      WINAPI GetLogicalProcessorInformation(SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer, DWORD *return_length);
