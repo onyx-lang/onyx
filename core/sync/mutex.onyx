@@ -24,10 +24,12 @@ Mutex :: struct {
 
 mutex_init :: (m: ^Mutex) {
     m.lock = 0;
+    m.owner = -1;
 }
 
 mutex_destroy :: (m: ^Mutex) {
     m.lock = -1;
+    m.owner = -1;
 }
 
 mutex_lock :: (m: ^Mutex) {
@@ -42,6 +44,8 @@ mutex_lock :: (m: ^Mutex) {
             if context.thread_id != 0 {
                 __atomic_wait(^m.lock, 1);
             }
+        } else {
+            while (m.lock == 1) ---
         }
     }
 
@@ -68,6 +72,7 @@ scoped_mutex :: macro (m: ^Mutex) {
 }
 
 critical_section :: macro (m: ^Mutex, body: Code) -> i32 {
+    scoped_mutex :: scoped_mutex;
     scoped_mutex(m);
 
     #insert body;
