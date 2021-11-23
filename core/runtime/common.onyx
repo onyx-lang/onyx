@@ -54,3 +54,20 @@ __thread_initialize :: macro () {
     __stdio_init();
 }
 
+_thread_start :: (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) {
+    __tls_base = tls_base;
+    context.thread_id = id;
+
+    __stack_top = raw_alloc(alloc.heap_allocator, 1 << 20);
+    __thread_initialize();
+
+    func(data);
+
+    __flush_stdio();
+}
+
+_thread_exit :: (id: i32) {
+    raw_free(alloc.heap_allocator, __tls_base);
+
+    thread.__exited(id);
+}
