@@ -10,14 +10,15 @@ use package wasi
 #load "core/runtime/wasi"
 
 #if Multi_Threading_Enabled {
-    __spawn_thread :: (id: i32, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "env" "spawn_thread" ---
+    __spawn_thread :: (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "env" "spawn_thread" ---
     __kill_thread  :: (id: i32) -> i32 #foreign "env" "kill_thread" ---
 
-    #export "_thread_start" (id: i32, func: (data: rawptr) -> void, data: rawptr) {
+    #export "_thread_start" (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) {
+        __tls_base = tls_base;
+        context.thread_id = id;
+
         __stack_top = raw_alloc(alloc.heap_allocator, 1 << 20);
         __thread_initialize();
-
-        context.thread_id = id;
 
         func(data);
 

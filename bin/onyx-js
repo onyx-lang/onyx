@@ -22,13 +22,14 @@ const ENV = {
             process.exit(status);
         },
 
-        spawn_thread(id, funcidx, dataptr) {
+        spawn_thread(id, tls_base, funcidx, dataptr) {
             try {
                 workers[id] = new Worker(__filename, {
                     workerData: {
                         thread_id: id,
                         memory: wasm_memory,
                         wasm_bytes: wasm_bytes,
+                        tls_base: tls_base,
                         funcidx: funcidx,
                         dataptr: dataptr,
                     },
@@ -82,7 +83,7 @@ if (isMainThread) {
     }
 
 } else {
-    let { thread_id, memory, wasm_bytes, funcidx, dataptr } = workerData;
+    let { thread_id, memory, wasm_bytes, tls_base, funcidx, dataptr } = workerData;
 
     ENV.onyx.memory = memory;
     wasm_memory = memory;
@@ -93,7 +94,7 @@ if (isMainThread) {
             wasm_instance = res.instance;
 
             const lib = res.instance.exports;
-            lib._thread_start(thread_id, funcidx, dataptr);
+            lib._thread_start(thread_id, tls_base, funcidx, dataptr);
             lib._thread_exit(thread_id);
         });
 }

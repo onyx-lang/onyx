@@ -27,7 +27,10 @@ spawn :: (t: ^Thread, data: rawptr, func: (rawptr) -> void) {
 
     thread_map->put(t.id, t);
 
-    runtime.__spawn_thread(t.id, func, data);
+    tls_base := raw_alloc(alloc.heap_allocator, __tls_size);
+    memory.set(tls_base, 0, __tls_size);
+
+    runtime.__spawn_thread(t.id, tls_base, func, data);
 }
 
 join :: (t: ^Thread) {

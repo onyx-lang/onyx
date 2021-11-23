@@ -60,6 +60,7 @@ wasm_extern_t* wasm_extern_lookup_by_name(wasm_module_t* module, wasm_instance_t
 
 typedef struct OnyxThread {
     i32 id;
+    i32 tls_base;
     i32 funcidx;
     i32 dataptr;
     wasm_instance_t* instance;
@@ -96,7 +97,7 @@ static i32 onyx_run_thread(void *data) {
     wasm_trap_t* trap=NULL;
 
     { // Call the _thread_start procedure
-        wasm_val_t args[]    = { WASM_I32_VAL(thread->id), WASM_I32_VAL(thread->funcidx), WASM_I32_VAL(thread->dataptr) };
+        wasm_val_t args[]    = { WASM_I32_VAL(thread->id), WASM_I32_VAL(thread->tls_base), WASM_I32_VAL (thread->funcidx), WASM_I32_VAL(thread->dataptr) };
         wasm_val_vec_t results;
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
 
@@ -105,6 +106,9 @@ static i32 onyx_run_thread(void *data) {
             wasm_message_t msg;
             wasm_trap_message(trap, &msg);
             bh_printf("TRAP: %b\n", msg.data, msg.size);
+
+            wasm_frame_t *origin = wasm_trap_origin(trap);
+            bh_printf("HERE: func[%d] at %p.\n", wasm_frame_func_index(origin), wasm_frame_module_offset(origin));
         }
     }
 
@@ -124,9 +128,10 @@ static wasm_trap_t* onyx_spawn_thread_impl(const wasm_val_vec_t* params, wasm_va
     bh_arr_insert_end(threads, 1);
     OnyxThread *thread = &bh_arr_last(threads);
 
-    thread->id      = params->data[0].of.i32;
-    thread->funcidx = params->data[1].of.i32;
-    thread->dataptr = params->data[2].of.i32;
+    thread->id       = params->data[0].of.i32;
+    thread->tls_base = params->data[1].of.i32;
+    thread->funcidx  = params->data[2].of.i32;
+    thread->dataptr  = params->data[3].of.i32;
 
     #ifdef _BH_LINUX
         pthread_create(&thread->thread, NULL, onyx_run_thread, thread);
@@ -250,8 +255,8 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
 
         if (wasm_name_equals_string(module_name, "env")) {
             if (wasm_name_equals_string(import_name, "spawn_thread")) {
-                wasm_functype_t* func_type = wasm_functype_new_3_1(
-                    wasm_valtype_new_i32(), wasm_valtype_new_i32(), wasm_valtype_new_i32(),
+                wasm_functype_t* func_type = wasm_functype_new_4_1(
+                    wasm_valtype_new_i32(), wasm_valtype_new_i32(), wasm_valtype_new_i32(), wasm_valtype_new_i32(),
                     wasm_valtype_new_i32());
 
                 wasm_func_t* wasm_func = wasm_func_new(wasm_store, func_type, onyx_spawn_thread_impl);
