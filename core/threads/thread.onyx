@@ -18,7 +18,7 @@ Thread :: struct {
     alive : bool;
 }
 
-spawn :: (t: ^Thread, data: rawptr, func: (rawptr) -> void) {
+spawn :: (t: ^Thread, data: ^$T, func: (^T) -> void) {
     sync.scoped_mutex(^thread_mutex);
 
     t.id    = next_thread_id;
