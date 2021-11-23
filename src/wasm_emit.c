@@ -3712,7 +3712,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
             .kind   = WASM_FOREIGN_MEMORY,
             .min    = 1024,
             .max    = 65536, // NOTE: Why not use all 4 Gigs of memory?
-            .shared = context.options->runtime != Runtime_Onyx,
+            .shared = context.options->runtime == Runtime_Js,
 
             .mod    = "onyx",
             .name   = "memory",
