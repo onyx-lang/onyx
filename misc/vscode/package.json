@@ -10,30 +10,52 @@
     "categories": [
         "Programming Languages"
     ],
+    "activationEvents": [
+        "onLanguage:onyx"
+    ],
+    "main": "./out/extension.js",
     "contributes": {
-        "languages": [{
-            "id": "onyx",
-            "aliases": ["Onyx", "onyx"],
-            "extensions": [".onyx"],
-            "configuration": "./language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "onyx",
-            "scopeName": "source.onyx",
-            "path": "./syntaxes/onyx.tmLanguage"
-        }],
-        "problemMatchers": [{
-            "name": "onyx",
-            "owner": "onyx",
-            "fileLocation": "absolute",
-            "pattern": {
-                "regexp": "\\((/.*|[a-zA-Z]:[^:]+):([0-9]+),([0-9]+)\\) (.*)",
-                "file": 1,
-                "line": 2,
-                "column": 3,
-                "message": 4,
-                "loop": true
+        "languages": [
+            {
+                "id": "onyx",
+                "aliases": [
+                    "Onyx",
+                    "onyx"
+                ],
+                "extensions": [
+                    ".onyx"
+                ],
+                "configuration": "./language-configuration.json"
             }
-        }]
+        ],
+        "grammars": [
+            {
+                "language": "onyx",
+                "scopeName": "source.onyx",
+                "path": "./syntaxes/onyx.tmLanguage"
+            }
+        ],
+        "problemMatchers": [
+            {
+                "name": "onyx",
+                "owner": "onyx",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "\\((/.*|[a-zA-Z]:[^:]+):([0-9]+),([0-9]+)\\) (.*)",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4,
+                    "loop": true
+                }
+            }
+        ]
+    },
+    "files": ["./textmate-configuration.json"],
+    "dependencies": {
+        "vscode-textmate-languageservice": "^0.1.1"
+    },
+    "devDependencies": {
+        "vscode": "^1.1.37"
     }
 }

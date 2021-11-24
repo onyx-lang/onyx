@@ -14,3 +14,4 @@ tmp/
 .vimspector.json
 .vscode/
 dist/
+**/node_modules/

@@ -2,8 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>id</key>
+	<string>onyx</string>
 	<key>name</key>
-	<string>Jai</string>
+	<string>onyx</string>
 	<key>scopeName</key>
 	<string>source.onyx</string>
 	<key>fileTypes</key>
@@ -309,7 +311,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>entity.name.function.onyx</string>
+							<string>meta.function.onyx entity.name.function.onyx</string>
 						</dict>
 					</dict>
 				</dict>

@@ -1,0 +1,33 @@
+{
+    "language": {
+      "id": "onyx",  
+      "aliases": [ "Onyx" ],
+      "extensions": [ ".onyx" ]
+    },
+    "grammar": {
+      "language": "onyx",
+      "scopeName": "source.onyx",
+      "path": "./syntaxes/onyx.tmLanguage"
+    },
+    "comments": {
+      "lineComment": "comment.line.double-slash.onyx",
+      "blockComment": [ "comment.block.onyx" ]
+    },
+    "declarations": [
+        "entity\\.name\\.function\\.onyx",
+        "entity\\.name\\.type\\.onyx"
+    ],
+    "indentation": {},
+    "dedentation": [],
+    "punctuation": {
+      "continuation": ""
+    },
+    "markers": {
+        "start": "",
+        "end": ""
+    },
+    "symbols": {
+        "entity.name.function.onyx": 11,
+        "entity.name.type.onyx": 22
+    }
+}
