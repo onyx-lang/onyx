@@ -46,6 +46,7 @@ make :: (buffer: rawptr, length: u32) -> RingState {
     };
 }
 
+#match (package core.alloc).as_allocator make_allocator
 make_allocator :: (rs: ^RingState) -> Allocator {
     return .{
         func = ring_alloc_proc,

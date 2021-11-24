@@ -75,6 +75,7 @@ make :: (buffer: [] $Elem) -> PoolAllocator(Elem) {
     };
 }
 
+#match (package core.alloc).as_allocator make_allocator
 make_allocator :: (pool: ^PoolAllocator($Elem)) -> Allocator {
     return Allocator.{
         func = #solidify pool_allocator_proc { Elem = Elem },

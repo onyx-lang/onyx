@@ -76,6 +76,7 @@ make :: (backing: Allocator, arena_size: u32) -> ArenaState {
     };
 }
 
+#match (package core.alloc).as_allocator make_allocator
 make_allocator :: (rs: ^ArenaState) -> Allocator {
     return Allocator.{
         func = arena_alloc_proc,

@@ -3,7 +3,7 @@ package core.alloc.heap
 // Enable this to enable checking for invalid blocks and other corruptions
 // that may happen on the heap, with the added overhead of checking that
 // on every alloc/resize/free.
-Enable_Debug :: false
+Enable_Debug :: false 
 
 // This is the implementation for the general purpose heap allocator.
 // It is a simple bump allocator, with a free list. It is not very good
@@ -80,7 +80,7 @@ get_freed_size :: () => {
 
     Allocated_Flag          :: 0x1
     Free_Block_Magic_Number :: 0xdeadbeef
-    Block_Split_Size        :: 512
+    Block_Split_Size        :: 256
 
     // FIX: This does not respect the choice of alignment
     heap_alloc :: (size_: u32, align: u32) -> rawptr {
@@ -102,13 +102,12 @@ get_freed_size :: () => {
                 }
 
                 if hb.size - size >= Block_Split_Size {
-                    hb.size = size;
-
                     new_block := cast(^heap_freed_block) (cast(uintptr) hb + size);
                     new_block.size = hb.size - size;
                     new_block.next = hb.next;
                     new_block.prev = hb.prev;
                     new_block.magic_number = Free_Block_Magic_Number;
+                    hb.size = size;
 
                     if hb.next != null do hb.next.prev = new_block;
                     *prev = new_block;

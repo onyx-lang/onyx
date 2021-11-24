@@ -91,18 +91,12 @@ fold :: (list: ^List($T), init: $R, f: (T, R) -> R) -> R {
 // }
 
 get_iterator :: (list: ^List($T)) -> Iterator(T) {
-    iterator_next :: ($T: type_expr, data: rawptr) -> (T, bool) {
-        list_iter := cast(^ListIterator(T)) data;
-
+    iterator_next :: (list_iter: ^ListIterator($T)) -> (T, bool) {
         use package core.intrinsics.onyx { __zero_value }
         if list_iter.current == null do return __zero_value(T), false;
 
         defer list_iter.current = list_iter.current.next;
         return list_iter.current.data, true;
-    }
-
-    iterator_close :: (data: rawptr) {
-        cfree(data);
     }
 
     ListIterator :: struct (T: type_expr) {
@@ -115,7 +109,7 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
     return .{
         data = list_iterator,
         next = #solidify iterator_next { T = T },
-        close = iterator_close,
+        close = cfree,
     };
 }
 

@@ -7,6 +7,10 @@ package core.alloc
 #load "./alloc/pool"
 #load "./alloc/logging"
 
+as_allocator :: #match {
+    macro (a: Allocator) => a
+}
+
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
 
 // The global heap allocator, set up upon program intialization.
