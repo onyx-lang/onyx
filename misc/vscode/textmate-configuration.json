@@ -9,6 +9,7 @@
       "scopeName": "source.onyx",
       "path": "./syntaxes/onyx.tmLanguage"
     },
+    "exclude": "",
     "comments": {
       "lineComment": "comment.line.double-slash.onyx",
       "blockComment": [ "comment.block.onyx" ]
