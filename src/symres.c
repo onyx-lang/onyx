@@ -122,33 +122,6 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
                 if (s_node->scope) scope_leave();
                 return ss;
             }
-
-            if (!node_is_type((AstNode *) member->type_node)) {
-                onyx_report_error(member->token->pos, "Member type is not a type.");
-                goto struct_symres_done;
-            }
-
-            if (member->is_used) {
-                AstType *used = (AstType *) member->type_node;
-
-                while (used->kind == Ast_Kind_Type_Alias) {
-                    used = ((AstTypeAlias *) used)->to;
-                }
-
-                b32 use_works = (used->kind == Ast_Kind_Struct_Type || used->kind == Ast_Kind_Poly_Call_Type);
-
-                if (used->kind == Ast_Kind_Type_Raw_Alias) {
-                    AstTypeRawAlias* alias = (AstTypeRawAlias *) used;
-                    use_works = (alias->to->kind == Type_Kind_Struct);
-                }
-
-                if (!use_works) {
-                    onyx_report_error(member->token->pos,
-                            "Can only 'use' members of struct type, got '%s'.",
-                            onyx_ast_node_kind_string(used->kind));
-                    goto struct_symres_done;
-                }
-            }
         }
     }
 
@@ -739,6 +712,8 @@ cannot_use:
 }
 
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
+    // @Cleanup: A lot of this code should move to the checker?
+    
     AstDirectiveSolidify* solid = *psolid;
     if (solid->resolved_proc != NULL) {
         *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
@@ -761,7 +736,6 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
     bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
         // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
         SYMRES(expression, &sln->value);
-        if (onyx_has_errors()) return Symres_Error;
 
         if (node_is_type((AstNode *) sln->value)) {
             sln->type = type_build_from_ast(context.ast_alloc, sln->ast_type);
@@ -769,8 +743,6 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
         } else {
             sln->kind = PSK_Value;
         }
-
-        if (onyx_has_errors()) return Symres_Error;
     }
 
     solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token);
@@ -788,26 +760,20 @@ static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
     AstDirectiveDefined* defined = *pdefined;
 
     b32 use_package_count = (context.entities.type_count[Entity_Type_Use_Package] == 0);
-    b32 old_report_unresolved_symbols = report_unresolved_symbols;
-    report_unresolved_symbols = 0;
 
     SymresStatus ss = symres_expression(&defined->expr);
-    if ((use_package_count || old_report_unresolved_symbols) && ss != Symres_Success) {
+    if (use_package_count && ss != Symres_Success) {
         // The symbol definitely was not found and there is no chance that it could be found.
         defined->is_defined = 0;
-
-    } else {
-        if (ss == Symres_Success) {
-            defined->is_defined = 1;
-
-        } else {
-            report_unresolved_symbols = old_report_unresolved_symbols;
-            return Symres_Yield_Macro;
-        }
+        return Symres_Success;
     }
 
-    report_unresolved_symbols = old_report_unresolved_symbols;
-    return Symres_Success;
+    if (ss == Symres_Success) {
+        defined->is_defined = 1;
+        return Symres_Success;
+    }
+
+    return Symres_Yield_Macro;
 }
 
 static SymresStatus symres_directive_insert(AstDirectiveInsert* insert) {
@@ -986,11 +952,7 @@ SymresStatus symres_function(AstFunction* func) {
                 if (param->local->type_node != NULL && param->local->type == NULL) {
                     param->local->type = type_build_from_ast(context.ast_alloc, param->local->type_node);
 
-                    if (param->local->type == NULL) {
-                        // HACK HACK HACK
-                        scope_leave();
-                        return Symres_Yield_Macro;
-                    }
+                    if (param->local->type == NULL) return Symres_Yield_Macro;
                 }
 
                 if (type_is_struct(param->local->type)) {
@@ -1233,11 +1195,6 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            /*if (binop_is_assignment(operator->operator)) {
-                onyx_report_error(overload->token->pos, "'%s' is not currently overloadable.", binaryop_string[operator->operator]);
-                return Symres_Error;
-            }*/
-
             add_overload_option(&operator_overloads[operator->operator], 0, operator->overload);
             break;
         }
@@ -1264,12 +1221,6 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
                     if (func->is_intrinsic) {
                         onyx_report_error(export->token->pos, "Cannot export an intrinsic function.");
-                        return Symres_Error;
-                    }
-
-                    // NOTE: This should never happen
-                    if (func->exported_name == NULL) {
-                        onyx_report_error(export->token->pos, "Cannot export function without a name.");
                         return Symres_Error;
                     }
                 }
@@ -1374,9 +1325,6 @@ void symres_entity(Entity* ent) {
     if (ent->scope) scope_enter(ent->scope);
 
     report_unresolved_symbols = context.cycle_detected;
-                                //(context.entities.type_count[Entity_Type_Static_If] == 0 &&
-                                // context.entities.type_count[Entity_Type_Use_Package] == 0)
-                                //|| context.cycle_detected;
 
     SymresStatus ss = Symres_Success;
     EntityState next_state = Entity_State_Check_Types;

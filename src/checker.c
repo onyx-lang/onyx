@@ -711,22 +711,12 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
 
             if (right_type->kind == Type_Kind_Compound) {
                 AstCompound* lhs = (AstCompound *) binop->left;
-                if (lhs->kind != Ast_Kind_Compound) {
-                    ERROR_(binop->token->pos,
-                            "Expected left hand side to have %d expressions.",
-                            binop->right->type->Compound.count);
-                }
-
                 i32 expr_count = right_type->Compound.count;
-                if (bh_arr_length(lhs->exprs) != expr_count) {
-                    ERROR_(binop->token->pos,
-                            "Expected left hand side to have %d expressions.",
-                            binop->right->type->Compound.count);
+                if (lhs->kind != Ast_Kind_Compound || bh_arr_length(lhs->exprs) != expr_count) {
+                    ERROR_(binop->token->pos, "Expected left hand side to have %d expressions.", expr_count);
                 }
 
-                fori (i, 0, expr_count) {
-                    lhs->exprs[i]->type = right_type->Compound.types[i];
-                }
+                fori (i, 0, expr_count) lhs->exprs[i]->type = right_type->Compound.types[i];
 
                 lhs->type = type_build_compound_type(context.ast_alloc, lhs);
 
@@ -2136,11 +2126,6 @@ CheckStatus check_function_header(AstFunction* func) {
         }
 
         if (local->type_node != NULL) CHECK(type, local->type_node);
-        if (local->type_node != NULL) {
-            if (!node_is_type((AstNode *) local->type_node)) {
-                ERROR(local->token->pos, "Parameter type is not a type.");
-            }
-        }
 
         fill_in_type((AstTyped *) local);
         if (local->type == NULL) {
@@ -2198,7 +2183,7 @@ CheckStatus check_memres_type(AstMemRes* memres) {
 CheckStatus check_memres(AstMemRes* memres) {
     if (memres->initial_value != NULL) {
         if (memres->threadlocal) {
-            onyx_report_error(memres->token->pos, "'#threadlocal' variables cannot have an initializer at the moment.");
+            onyx_report_error(memres->token->pos, "'#thread_local' variables cannot have an initializer at the moment.");
             return Check_Error;
         }
 
@@ -2222,6 +2207,10 @@ CheckStatus check_memres(AstMemRes* memres) {
         }
 
         if ((memres->initial_value->flags & Ast_Flag_Comptime) == 0) {
+            if (memres->initial_value->entity != NULL && memres->initial_value->entity->state <= Entity_State_Check_Types) {
+                YIELD(memres->token->pos, "Waiting for initial value to be checked.");
+            }
+
             ERROR(memres->initial_value->token->pos, "Top level expressions must be compile time known.");
         }
     }
@@ -2509,8 +2498,6 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                     // HACK HACK HACK
                     onyx_clear_errors();
 
-                    // onyx_report_error(constraint->interface->exprs[i]->token->pos, "This constraint was not satisfied.");
-                    // onyx_report_error(constraint->token->pos, "Here was where the interface was used.");
                     *constraint->report_status = Constraint_Check_Status_Failed;
                     return Check_Failed;
                 }
