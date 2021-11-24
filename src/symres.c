@@ -282,11 +282,24 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     if (resolution) *((AstNode **) fa) = resolution;
     else if (expr->kind == Ast_Kind_Package) {
         if (report_unresolved_symbols) {
-            onyx_report_error((*fa)->token->pos, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
-                (*fa)->token->text,
-                (*fa)->token->length,
-                ((AstPackage *) (*fa)->expr)->package->name);
+            token_toggle_end((*fa)->token);
+            char *closest = find_closest_symbol_in_node((AstNode *) expr, (*fa)->token->text);
+            token_toggle_end((*fa)->token);
+
+            if (closest) {
+                onyx_report_error((*fa)->token->pos, "'%b' was not found in package '%s'. Did you mean '%s'?",
+                    (*fa)->token->text,
+                    (*fa)->token->length,
+                    ((AstPackage *) (*fa)->expr)->package->name,
+                    closest);
+            } else {
+                onyx_report_error((*fa)->token->pos, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
+                    (*fa)->token->text,
+                    (*fa)->token->length,
+                    ((AstPackage *) (*fa)->expr)->package->name);
+            }
             return Symres_Error;
+
         } else {
             return Symres_Yield_Macro;
         }

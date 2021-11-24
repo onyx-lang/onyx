@@ -27,11 +27,12 @@
             "owner": "onyx",
             "fileLocation": "absolute",
             "pattern": {
-                "regexp": "^\\(([^:]+):([0-9]+),([0-9]+)\\) (.*)",
+                "regexp": "\\((/.*|[a-zA-Z]:[^:]+):([0-9]+),([0-9]+)\\) (.*)",
                 "file": 1,
                 "line": 2,
                 "column": 3,
-                "message": 4
+                "message": 4,
+                "loop": true
             }
         }]
     }

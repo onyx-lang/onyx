@@ -573,7 +573,23 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (node->kind == Ast_Kind_Unary_Field_Access) {
         AstType* ast_type = type->ast_type;
         AstNode* resolved = try_symbol_resolve_from_node((AstNode *) ast_type, node->token);
-        if (resolved == NULL) return TYPE_MATCH_YIELD;
+        if (resolved == NULL) {
+            if (context.cycle_detected) {
+                token_toggle_end(node->token);
+                char *closest = find_closest_symbol_in_node((AstNode *) ast_type, node->token->text);
+                token_toggle_end(node->token);
+
+                if (closest) {
+                    onyx_report_error(node->token->pos, "'%b' does not exist in '%s'. Did you mean '%s'?",
+                        node->token->text, node->token->length,
+                        type_get_name(type),
+                        closest);
+                    return TYPE_MATCH_FAILED;
+                }
+            }
+
+            return TYPE_MATCH_YIELD;
+        }
 
         if (permanent) *pnode = (AstTyped *) resolved;
         return TYPE_MATCH_SUCCESS;

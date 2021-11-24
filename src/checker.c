@@ -1529,10 +1529,19 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
             return Check_Success;
         }
 
-        ERROR_(field->token->pos,
-            "Field '%s' does not exists on '%s'.",
-            field->field,
-            node_get_type_name(field->expr));
+        char* closest = find_closest_symbol_in_node((AstNode *) type_node, field->field);
+        if (closest) {
+            ERROR_(field->token->pos,
+                "Field '%s' does not exists on '%s'. Did you mean '%s'?",
+                field->field,
+                node_get_type_name(field->expr),
+                closest);
+        } else {
+            ERROR_(field->token->pos,
+                "Field '%s' does not exists on '%s'.",
+                field->field,
+                node_get_type_name(field->expr));
+        }
     }
 
     field->offset = smem.offset;

@@ -988,3 +988,134 @@ char* lookup_included_file(char* filename, char* relative_to, b32 add_onyx_suffi
 #undef DIR_SEPARATOR
 }
 
+u32 levenshtein_distance(const char *str1, const char *str2) {
+    i32 m = strlen(str1);
+    i32 n = strlen(str2);
+
+    i32 *d = bh_alloc_array(global_scratch_allocator, i32, m * n);
+    fori (i, 0, m * n) d[i] = 0;
+
+    fori (i, 0, m) d[i * n + 0] = i;
+    fori (j, 0, n) d[0 * n + j] = j;
+
+    fori (j, 0, n) {
+        fori (i, 0, m) {
+            i32 subst_cost = str1[i] == str2[j] ? 0 : 1;
+
+            i32 a = d[(i - 1) * n + j] + 1;
+            i32 b = d[i * n + (j - 1)] + 1;
+            i32 c = d[(i - 1) * n + (j - 1)] + subst_cost;
+
+            d[i * n + j] = min(min(a, b), c);
+        }
+    }
+
+    return d[m * n - 1];
+}
+
+char *find_closest_symbol_in_scope(Scope *scope, char *sym, u32 *out_distance) {
+    *out_distance = 0x7fffffff;
+
+    if (scope == NULL) return NULL;
+
+    char* closest = NULL;
+    bh_table_each_start(AstNode *, scope->symbols);
+        u32 d = levenshtein_distance(key, sym); 
+        if (d < *out_distance) {
+            *out_distance = d;
+            closest = (char *) key;
+        }
+    bh_table_each_end;
+
+    return closest;
+}
+        
+char *find_closest_symbol_in_node(AstNode* node, char *sym) {
+    b32 used_pointer = 0;
+
+    while (1) {
+        if (!node) return NULL;
+
+        switch (node->kind) {
+            case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
+            case Ast_Kind_Type_Alias:     node = (AstNode *) ((AstTypeAlias *) node)->to; break;
+            case Ast_Kind_Alias:          node = (AstNode *) ((AstAlias *) node)->alias; break;
+            case Ast_Kind_Pointer_Type: {
+                if (used_pointer) goto all_types_peeled_off;
+                used_pointer = 1;
+
+                node = (AstNode *) ((AstPointerType *) node)->elem;
+                break;
+            }
+
+            default: goto all_types_peeled_off;
+        }
+    }
+
+all_types_peeled_off:
+    if (!node) return NULL;
+
+    switch (node->kind) {
+        case Ast_Kind_Package: {
+            AstPackage* package = (AstPackage *) node;
+            if (package->package == NULL) return NULL;
+
+            u32 dist;
+            return find_closest_symbol_in_scope(package->package->scope, sym, &dist);
+        } 
+
+        case Ast_Kind_Enum_Type: {
+            AstEnumType* etype = (AstEnumType *) node;
+            u32 dist;
+            return find_closest_symbol_in_scope(etype->scope, sym, &dist);
+        }
+
+        case Ast_Kind_Struct_Type: {
+            AstStructType* stype = (AstStructType *) node;
+
+            u32 dist;
+            char *closest = find_closest_symbol_in_scope(stype->scope, sym, &dist);
+
+            Type *type = type_build_from_ast(context.ast_alloc, (AstType *) stype);
+            assert(type);
+            bh_arr_each(StructMember *, mem, type->Struct.memarr) {
+                u32 d = levenshtein_distance((*mem)->name, sym);
+                if (d < dist) {
+                    dist = d;
+                    closest = (*mem)->name;
+                }
+            }
+
+            return closest;
+        }
+
+        case Ast_Kind_Poly_Struct_Type: {
+            AstStructType* stype = ((AstPolyStructType *) node)->base_struct;
+            u32 dist;
+            return find_closest_symbol_in_scope(stype->scope, sym, &dist);
+        }
+
+        case Ast_Kind_Poly_Call_Type: {
+            AstPolyCallType* pcall = (AstPolyCallType *) node;
+
+            u32 dist = 0x7fffffff;
+            char *closest = NULL;
+
+            Type *type = type_build_from_ast(context.ast_alloc, (AstType *) pcall);
+            assert(type);
+
+            bh_arr_each(StructMember *, mem, type->Struct.memarr) {
+                i32 d = levenshtein_distance((*mem)->name, sym);
+                if (d < dist) {
+                    dist = d;
+                    closest = (*mem)->name;
+                }
+            }
+
+            return closest;
+        }
+    }
+
+    return NULL;
+}
+
