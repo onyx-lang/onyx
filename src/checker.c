@@ -840,15 +840,15 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
     if (!types_are_compatible(ltype, rtype)) {
         b32 left_ac  = node_is_auto_cast((AstNode *) binop->left);
         b32 right_ac = node_is_auto_cast((AstNode *) binop->right);
-
         if (left_ac && right_ac) ERROR(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
-        else if (unify_node_and_type(&binop->left, rtype) == TYPE_MATCH_SUCCESS);  // @TODO: Should check for yield
-        else if (unify_node_and_type(&binop->right, ltype) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield
-        else {
-            ERROR_(binop->token->pos,
-                    "Cannot compare '%s' to '%s'.",
-                    type_get_name(ltype),
-                    type_get_name(rtype));
+
+        TYPE_CHECK(&binop->left, rtype) {
+            TYPE_CHECK(&binop->right, ltype) {
+                ERROR_(binop->token->pos,
+                        "Cannot compare '%s' to '%s'.",
+                        type_get_name(ltype),
+                        type_get_name(rtype));
+            }
         }
     }
 
@@ -936,11 +936,11 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     // :UnaryFieldAccessIsGross
     if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
-        if      (unify_node_and_type(&binop->left, binop->right->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
-        else if (unify_node_and_type(&binop->right, binop->left->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
-        else {
-            report_bad_binaryop(binop);
-            return Check_Error;
+        TYPE_CHECK(&binop->left, binop->right->type) {
+            TYPE_CHECK(&binop->right, binop->left->type) {
+                report_bad_binaryop(binop);
+                return Check_Error;
+            }
         }
     }
 
@@ -1002,18 +1002,18 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if (!types_are_compatible(binop->left->type, binop->right->type)) {
         b32 left_ac  = node_is_auto_cast((AstNode *) binop->left);
         b32 right_ac = node_is_auto_cast((AstNode *) binop->right);
-
         if (left_ac && right_ac) {
             ERROR(binop->token->pos, "Cannot have auto cast on both sides of binary operator.");
         }
-        else if (unify_node_and_type(&binop->left, binop->right->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
-        else if (unify_node_and_type(&binop->right, binop->left->type) == TYPE_MATCH_SUCCESS); // @TODO: Should check for yield.
-        else {
-            ERROR_(binop->token->pos,
-                    "Mismatched types for binary operation '%s'. left: '%s', right: '%s'.",
-                    binaryop_string[binop->operation],
-                    node_get_type_name(binop->left),
-                    node_get_type_name(binop->right));
+
+        TYPE_CHECK(&binop->left, binop->right->type) {
+            TYPE_CHECK(&binop->right, binop->left->type) {
+                ERROR_(binop->token->pos,
+                        "Mismatched types for binary operation '%s'. left: '%s', right: '%s'.",
+                        binaryop_string[binop->operation],
+                        node_get_type_name(binop->left),
+                        node_get_type_name(binop->right));
+            }
         }
     }
 
