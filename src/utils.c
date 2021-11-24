@@ -989,8 +989,8 @@ char* lookup_included_file(char* filename, char* relative_to, b32 add_onyx_suffi
 }
 
 u32 levenshtein_distance(const char *str1, const char *str2) {
-    i32 m = strlen(str1);
-    i32 n = strlen(str2);
+    i32 m = strlen(str1) + 1;
+    i32 n = strlen(str2) + 1;
 
     i32 *d = bh_alloc_array(global_scratch_allocator, i32, m * n);
     fori (i, 0, m * n) d[i] = 0;
@@ -998,9 +998,9 @@ u32 levenshtein_distance(const char *str1, const char *str2) {
     fori (i, 0, m) d[i * n + 0] = i;
     fori (j, 0, n) d[0 * n + j] = j;
 
-    fori (j, 0, n) {
-        fori (i, 0, m) {
-            i32 subst_cost = str1[i] == str2[j] ? 0 : 1;
+    fori (j, 1, n) {
+        fori (i, 1, m) {
+            i32 subst_cost = str1[i - 1] == str2[j - 1] ? 0 : 1;
 
             i32 a = d[(i - 1) * n + j] + 1;
             i32 b = d[i * n + (j - 1)] + 1;
