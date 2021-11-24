@@ -1006,7 +1006,7 @@ u32 levenshtein_distance(const char *str1, const char *str2) {
             i32 b = d[i * n + (j - 1)] + 1;
             i32 c = d[(i - 1) * n + (j - 1)] + subst_cost;
 
-            d[i * n + j] = min(min(a, b), c);
+            d[i * n + j] = bh_min(bh_min(a, b), c);
         }
     }
 
@@ -1105,7 +1105,7 @@ all_types_peeled_off:
             assert(type);
 
             bh_arr_each(StructMember *, mem, type->Struct.memarr) {
-                i32 d = levenshtein_distance((*mem)->name, sym);
+                u32 d = levenshtein_distance((*mem)->name, sym);
                 if (d < dist) {
                     dist = d;
                     closest = (*mem)->name;
