@@ -41,7 +41,7 @@
                 "owner": "onyx",
                 "fileLocation": "absolute",
                 "pattern": {
-                    "regexp": "\\((/[^:]*|[a-zA-Z]:[^:]+):([0-9]+),([0-9]+)\\) (.*)",
+                    "regexp": "\\((/[^:]+|[a-zA-Z]:[^:]+):([0-9]+),([0-9]+)\\) (.*)",
                     "file": 1,
                     "line": 2,
                     "column": 3,
