@@ -39,6 +39,10 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
         return onyx_type_to_wasm_type(type->Enum.backing);
     }
 
+    if (type->kind == Type_Kind_Distinct) {
+        return onyx_type_to_wasm_type(type->Distinct.base_type);
+    }
+
     if (type->kind == Type_Kind_Pointer) {
         return WASM_TYPE_PTR;
     }
@@ -84,6 +88,7 @@ static b32 local_is_wasm_local(AstTyped* local) {
     if (local->kind == Ast_Kind_Local && local->flags & Ast_Flag_Address_Taken) return 0;
     if (local->type->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Enum && local->type->Enum.backing->kind == Type_Kind_Basic) return 1;
+    if (local->type->kind == Type_Kind_Distinct && local->type->Distinct.base_type->kind == Type_Kind_Basic) return 1;
     if (local->type->kind == Type_Kind_Pointer) return 1;
     return 0;
 }
@@ -613,6 +618,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     }
 
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
+    if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
     if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
 
     u32 alignment = type_get_alignment_log2(type);
@@ -662,6 +668,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     }
 
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
+    if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
     if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
 
     i32 load_size   = type_size_of(type);
@@ -2901,6 +2908,12 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_VarArgs) {
+        // Nothing needs to be done because they are identical
+        *pcode = code;
+        return;
+    }
+
+    if (to->kind == Type_Kind_Distinct || from->kind == Type_Kind_Distinct) {
         // Nothing needs to be done because they are identical
         *pcode = code;
         return;

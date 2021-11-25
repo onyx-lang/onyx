@@ -188,6 +188,10 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
             return 1;
         }
 
+        case Type_Kind_Distinct:
+            // If the above cases didn't catch it, then these distinct types are not compatible.
+            return 0;
+
         default:
             assert(("Invalid type", 0));
             break;
@@ -214,6 +218,7 @@ u32 type_size_of(Type* type) {
         case Type_Kind_VarArgs:  return 16; // but there are alignment issues right now with that so I decided to not fight it and just make them 16 bytes in size.
         case Type_Kind_DynArray: return 32; // data (8), count (4), capacity (4), allocator { func (4), ---(4), data (8) }
         case Type_Kind_Compound: return type->Compound.size;
+        case Type_Kind_Distinct: return type_size_of(type->Distinct.base_type);
         default:                 return 0;
     }
 }
@@ -232,6 +237,7 @@ u32 type_alignment_of(Type* type) {
         case Type_Kind_VarArgs:  return 8;
         case Type_Kind_DynArray: return 8;
         case Type_Kind_Compound: return 4; // HACK
+        case Type_Kind_Distinct: return type_alignment_of(type->Distinct.base_type);
         default: return 1;
     }
 }
@@ -612,6 +618,26 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             
             return NULL;
         }
+
+        case Ast_Kind_Distinct_Type: {
+            AstDistinctType* distinct = (AstDistinctType *) type_node;
+            if (distinct->dtcache) return distinct->dtcache;
+
+            Type *base_type = type_build_from_ast(alloc, distinct->base_type);
+            if (base_type == NULL) return NULL;
+            if (base_type->kind != Type_Kind_Basic) {
+                onyx_report_error(distinct->token->pos, "Distinct types can only be made out of primitive types. '%s' is not a primitive type.", type_get_name(base_type));
+                return NULL;
+            }
+
+            Type *distinct_type = type_create(Type_Kind_Distinct, alloc, 0);
+            distinct_type->Distinct.base_type = base_type;
+            distinct_type->Distinct.name = distinct->name;
+            distinct->dtcache = distinct_type;
+
+            type_register(distinct_type);
+            return distinct_type;
+        }
     }
 
     return NULL;
@@ -876,6 +902,9 @@ const char* type_get_unique_name(Type* type) {
             return bh_aprintf(global_scratch_allocator, "%s", buf);
         }
 
+        case Type_Kind_Distinct: {
+            return bh_aprintf(global_scratch_allocator, "%s@%l", type->Distinct.name, type->id);
+        }
 
         default: return "unknown";
     }
@@ -933,6 +962,10 @@ const char* type_get_name(Type* type) {
             strncat(buf, ")", 511);
 
             return bh_aprintf(global_scratch_allocator, "%s", buf);
+        }
+
+        case Type_Kind_Distinct: {
+            return bh_aprintf(global_scratch_allocator, "%s", type->Distinct.name);
         }
 
         default: return "unknown";
@@ -1090,6 +1123,12 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
         }
         case Type_Kind_Compound: *two = type->Compound.linear_members[idx]; return 1;
         case Type_Kind_Struct:   *two = type->Struct.linear_members[idx];   return 1;
+
+        case Type_Kind_Distinct:
+            two->type = type->Distinct.base_type;
+            two->offset = 0;
+            return 1;
+
         default: {
             if (idx > 0) return 0;
             two->offset = 0;

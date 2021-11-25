@@ -2717,23 +2717,33 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Enum)      return (AstTyped *) parse_enum_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Macro)     return (AstTyped *) parse_macro(parser);
 
-    if (parse_possible_directive(parser, "type")) {
-        AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
-        alias->to = parse_type(parser);
-        return (AstTyped *) alias;
-    }
+    if (parser->curr->type == '#') {
+        if (parse_possible_directive(parser, "type")) {
+            AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
+            alias->to = parse_type(parser);
+            return (AstTyped *) alias;
+        }
 
-    if (parse_possible_directive(parser, "match")) {
-        // :LinearTokenDependent
-        OnyxToken* directive_token = parser->curr - 2;
-        AstOverloadedFunction* ofunc = parse_overloaded_function(parser, directive_token);
-        return (AstTyped *) ofunc;
-    }
+        if (parse_possible_directive(parser, "match")) {
+            // :LinearTokenDependent
+            OnyxToken* directive_token = parser->curr - 2;
+            AstOverloadedFunction* ofunc = parse_overloaded_function(parser, directive_token);
+            return (AstTyped *) ofunc;
+        }
 
-    if (parse_possible_directive(parser, "init")) {
-        // :LinearTokenDependent
-        AstDirectiveInit *init = parse_init_directive(parser, parser->curr - 2);
-        return (AstTyped *) init;
+        if (parse_possible_directive(parser, "init")) {
+            // :LinearTokenDependent
+            AstDirectiveInit *init = parse_init_directive(parser, parser->curr - 2);
+            return (AstTyped *) init;
+        }
+
+        if (parse_possible_directive(parser, "distinct")) {
+            // :LinearTokenDependent
+            AstDistinctType *distinct = make_node(AstDistinctType, Ast_Kind_Distinct_Type);
+            distinct->token = parser->curr - 2;
+            distinct->base_type = parse_type(parser);
+            return (AstTyped *) distinct;
+        }
     }
 
     return parse_expression(parser, 1);
@@ -2812,6 +2822,7 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
         case Ast_Kind_Struct_Type:
         case Ast_Kind_Poly_Struct_Type:
         case Ast_Kind_Enum_Type:
+        case Ast_Kind_Distinct_Type:
             ((AstStructType *) node)->name = generate_name_within_scope(parser, symbol);
             goto default_case;
 

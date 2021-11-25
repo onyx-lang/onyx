@@ -71,6 +71,7 @@
     NODE(TypeRawAlias)         \
     NODE(CompoundType)         \
     NODE(TypeOf)               \
+    NODE(DistinctType)         \
                                \
     NODE(Binding)              \
     NODE(Alias)                \
@@ -158,6 +159,7 @@ typedef enum AstKind {
     Ast_Kind_Type_Raw_Alias,
     Ast_Kind_Type_Compound,
     Ast_Kind_Typeof,
+    Ast_Kind_Distinct_Type,
     Ast_Kind_Type_End,
 
     Ast_Kind_Struct_Member,
@@ -906,6 +908,12 @@ struct AstTypeOf {
 
     AstTyped* expr;
     Type* resolved_type;
+};
+struct AstDistinctType {
+    AstType_base;
+    char *name;
+    AstType *base_type;
+    Type *dtcache;
 };
 
 // Top level nodes

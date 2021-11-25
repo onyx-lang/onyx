@@ -20,6 +20,7 @@ Type_Info :: struct {
         Dynamic_Array      :: 0x09;
         Variadic_Argument  :: 0x0a;
         Enum               :: 0x0b;
+        Distinct           :: 0x0c;
     }
 
     kind := Kind.Invalid;
@@ -164,6 +165,13 @@ Type_Info_Compound :: struct {
     use base : Type_Info;
 
     components : [] type_expr;
+}
+
+Type_Info_Distinct :: struct {
+    use base : Type_Info;
+
+    base_type: type_expr;
+    name: str;
 }
 
 get_type_info :: (t: type_expr) -> ^Type_Info {

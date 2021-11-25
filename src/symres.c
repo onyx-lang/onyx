@@ -221,6 +221,12 @@ static SymresStatus symres_type(AstType** type) {
             SYMRES(expression, &type_of->expr);
             break;
         }
+
+        case Ast_Kind_Distinct_Type: {
+            AstDistinctType *distinct = (AstDistinctType *) *type;
+            SYMRES(type, &distinct->base_type);
+            break;
+        }
     }
 
     return Symres_Success;

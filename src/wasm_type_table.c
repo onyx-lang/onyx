@@ -466,6 +466,23 @@ u64 build_type_table(OnyxWasmModule* module) {
 
                 break;
             }
+        
+            case Type_Kind_Distinct: {
+                u32 name_base = table_buffer.length;
+                u32 name_length = strlen(type->Distinct.name);
+                bh_buffer_append(&table_buffer, type->Distinct.name, name_length);
+                bh_buffer_align(&table_buffer, 8);
+
+                table_info[type_idx] = table_buffer.length;
+                bh_buffer_write_u32(&table_buffer, type->kind);
+                bh_buffer_write_u32(&table_buffer, type_size_of(type));
+                bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
+                bh_buffer_write_u32(&table_buffer, type->Distinct.base_type->id);
+                PATCH;
+                bh_buffer_write_u64(&table_buffer, name_base);
+                bh_buffer_write_u64(&table_buffer, name_length);
+                break;
+            }
         }
     }
 

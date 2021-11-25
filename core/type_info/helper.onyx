@@ -117,6 +117,11 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
 
             write_type_name(writer, f.return_type);
         }            
+
+        case .Distinct {
+            d := cast(^Type_Info_Distinct) info;
+            io.write_str(writer, d.name);
+        }
     }
 }
 

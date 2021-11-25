@@ -127,6 +127,10 @@ struct TypeWithOffset {
         char* name;                                               \
         Type* backing;                                            \
         b32   is_flags;                                           \
+    })                                                            \
+    TYPE_KIND(Distinct, struct {                                  \
+        char* name;                                               \
+        Type* base_type;                                          \
     })
 
 

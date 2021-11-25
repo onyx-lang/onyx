@@ -628,6 +628,15 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
                         }
                     }
                 }
+
+                if info.kind == .Distinct {
+                    d := cast(^Type_Info_Distinct) info;
+
+                    output->write(d.name);
+                    output->write("[");
+                    print_any(output, formatting, any.{ v.data, d.base_type });
+                    output->write("]");
+                }
             }
         }
     }
