@@ -403,6 +403,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
 
     Type *type = to_type;
     if (type->kind == Type_Kind_Enum) type = type->Enum.backing;
+    if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
 
     if (num->type->Basic.kind == Basic_Kind_Int_Unsized) {
 

@@ -1221,6 +1221,7 @@ b32 type_is_bool(Type* type) {
 b32 type_is_small_integer(Type* type) {
     if (type == NULL) return 0;
     if (type->kind == Type_Kind_Enum) return type_is_small_integer(type->Enum.backing);
+    if (type->kind == Type_Kind_Distinct) return type_is_small_integer(type->Distinct.base_type);
     if (type->kind != Type_Kind_Basic) return 0;
 
     return type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U32;
@@ -1229,6 +1230,7 @@ b32 type_is_small_integer(Type* type) {
 b32 type_is_integer(Type* type) {
     if (type == NULL) return 0;
     if (type->kind == Type_Kind_Enum) return type_is_integer(type->Enum.backing);
+    if (type->kind == Type_Kind_Distinct) return type_is_integer(type->Distinct.base_type);
     if (type->kind != Type_Kind_Basic) return 0;
 
     return (type->Basic.kind >= Basic_Kind_I8 && type->Basic.kind <= Basic_Kind_U64)
@@ -1238,6 +1240,7 @@ b32 type_is_integer(Type* type) {
 b32 type_is_numeric(Type* type) {
     if (type == NULL) return 0;
     if (type->kind == Type_Kind_Enum) return 1;
+    if (type->kind == Type_Kind_Distinct) return type_is_numeric(type->Distinct.base_type);
     if (type->kind != Type_Kind_Basic) return 0;
 
     return type->Basic.kind >= Basic_Kind_Int_Unsized && type->Basic.kind <= Basic_Kind_F64;
@@ -1249,7 +1252,8 @@ b32 type_is_compound(Type* type) {
         && type->kind != Type_Kind_Pointer
         && type->kind != Type_Kind_Enum
         && type->kind != Type_Kind_Function
-        && type->kind != Type_Kind_Array;
+        && type->kind != Type_Kind_Array
+        && type->kind != Type_Kind_Distinct;
 }
 
 b32 type_is_simd(Type* type) {
