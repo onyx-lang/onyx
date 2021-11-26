@@ -12,7 +12,7 @@ Command Line Interface:
     [X] Remove old code from CLI logic
     [X] Add statistic printing
     [X] Fix documentation generation (broken since compiler architecture change) 
-    [ ] Add automated running component
+    [X] Add automated running component (this is built into the compiler now)
         - Store to temporary file (OS independent)
         - Detect / choose WASM backend
         - Run it
@@ -205,7 +205,7 @@ Wishlist:
     [X] #operator ^[]
         - Taking the pointer to an offset with a subscript
         - Useful for map.get_ptr (^arr[10] or ^people["John"])
-    [ ] Complete the set of combinations of procedure declaration syntaxes
+    [X] Complete the set of combinations of procedure declaration syntaxes
         - Currently (x: i32) => { ... } isn't legal.
     [X] #init functions (run before main, added to list at compile time, emitted with __run_init_procedures())
     [ ] Tests for new language features
