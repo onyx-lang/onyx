@@ -16,6 +16,8 @@ set FLAGS=%FLAGS% "/I%PWD%\lib\windows_x86_64\include" /DENABLE_RUN_WITH_WASMER=
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl.exe %FLAGS% /Iinclude /std:c17 /TC %SOURCE_FILES% /link /IGNORE:4217 %LINK_OPTIONS% /DEBUG /OUT:onyx.exe /incremental:no /opt:ref /subsystem:console
+rc.exe misc/icon_resource.rc
+cl.exe %FLAGS% /Iinclude /std:c17 /TC %SOURCE_FILES% /link /IGNORE:4217 %LINK_OPTIONS% /DEBUG /OUT:onyx.exe /incremental:no /opt:ref /subsystem:console misc\icon_resource.res
 
 del *.obj > NUL 2> NUL
+del misc\icon_resource.res
