@@ -13,10 +13,32 @@ List :: struct (T: type_expr) {
 
     first: ^ListElem(T) = null;
     last:  ^ListElem(T) = null;
+
+    // "Method" like things
+    free         :: free
+    push_end     :: push_end
+    push_begin   :: push_begin
+    pop_end      :: pop_end
+    pop_begin    :: pop_begin
+    count        :: count
+    at           :: at
+    contains     :: contains
+    fold         :: fold
+    map          :: map
+    get_iterator :: get_iterator
 }
 
 make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
     return .{ allocator = allocator };
+}
+
+free :: (list: ^List($T)) {
+    elem := list.first;
+    while elem != null {
+        to_delete := elem;
+        elem = elem.next;
+        raw_free(list.allocator, elem);
+    }
 }
 
 push_end :: (list: ^List($T), x: T) { 
@@ -63,6 +85,28 @@ pop_begin :: (list: ^List($T), default: T = __zero_value(T)) -> T {
     return begin.data;
 }
 
+count :: (list: ^List($T)) -> i32 {
+    c := 0;
+    elem := list.first;
+    while elem != null {
+        c += 1;
+        elem = elem.next;
+    }
+
+    return c;
+}
+
+at :: (list: ^List($T), index: i32) -> ^T {
+    elem := list.first;
+    while elem != null {
+        if index == 0 do return ^elem.data;
+        index -= 1;
+        elem = elem.next;
+    }
+
+    return null;
+}
+
 contains :: (list: ^List($T), x: T) -> bool {
     elem := list.first;
     while elem != null {
@@ -85,11 +129,26 @@ fold :: (list: ^List($T), init: $R, f: (T, R) -> R) -> R {
     return val;
 }
 
-// map :: #match {
-//     (list: ^List($T), f: (^T) -> void) {
-//     }
-// }
+map :: #match {}
+#match map (list: ^List($T), f: (^T) -> void) {
+    elem := list.first;
+    while elem != null {
+        f(^elem.data);
+        elem = elem.next;
+    }
+}
 
+#match map (list: ^List($T), f: (T) -> $R) -> List(R) {
+    new_list := make(R, allocator=list.allocator);
+    elem := list.first;
+    while elem != null {
+        push_end(new_list, f(elem.data));
+        elem = elem.next;
+    }
+}
+
+#local iter :: package core.iter
+#match iter.as_iterator get_iterator
 get_iterator :: (list: ^List($T)) -> Iterator(T) {
     iterator_next :: (list_iter: ^ListIterator($T)) -> (T, bool) {
         use package core.intrinsics.onyx { __zero_value }
@@ -113,5 +172,4 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
     };
 }
 
-#local
-allocate_elem :: macro (list: ^List($T)) => new(ListElem(T), allocator=list.allocator);
+#local allocate_elem :: macro (list: ^List($T)) => new(ListElem(T), allocator=list.allocator);

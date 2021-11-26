@@ -287,23 +287,6 @@ enumerate :: #match {}
     };
 }
 
-fold :: (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
-    for value: it {
-        initial_value = combine(value, initial_value);
-    }
-    
-    return initial_value;
-}
-
-to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
-    array :: package core.array
-
-    arr := array.make(T, allocator=allocator);
-    for v: it do array.push(^arr, v);
-
-    return arr;
-}
-
 #match as_iterator from_array
 from_array :: (arr: [] $T) -> Iterator(^T) {
     Context :: struct (T: type_expr) {
@@ -376,4 +359,62 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         next  = next,
         close = close,
     };
+}
+
+fold :: #match {}
+@Cleanup // some way to shorten this would be nice
+#match fold macro (it: $T, init: $R, combine: $S) -> #auto where Iterable(T) {
+    fold :: fold
+    return fold(it, init, combine);
+}
+
+#match fold (it: Iterator($T), initial_value: R, combine: (T, $R) -> R) -> R {
+    for value: it {
+        initial_value = combine(value, initial_value);
+    }
+    
+    return initial_value;
+}
+
+count :: #match {}
+#match count macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+    count :: count
+    return count(it, cond);
+}
+
+#match count (it: Iterator($T), cond: (T) -> bool) -> i32 {
+    c := 0;
+    for value: it do if cond(value) do c += 1;
+    return c;
+}
+
+some :: #match {}
+#match some macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+    some :: some
+    return some(it, cond);
+}
+
+#match some (it: Iterator($T), cond: (T) -> bool) -> bool {
+    for value: it do if cond(value) do return true;
+    return false;
+}
+
+every :: #match {}
+#match every macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+    every :: every
+    return every(it, cond);
+}
+
+#match every (it: Iterator($T), cond: (T) -> bool) -> bool {
+    for value: it do if !cond(value) do return false;
+    return true;
+}
+
+to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
+    array :: package core.array
+
+    arr := array.make(T, allocator=allocator);
+    for v: it do array.push(^arr, v);
+
+    return arr;
 }
