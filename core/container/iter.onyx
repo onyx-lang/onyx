@@ -249,7 +249,14 @@ const :: (value: $T) -> Iterator(T) {
     value: T;
 }
 
-enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Value(T)) {
+enumerate :: #match {}
+#match enumerate macro (it: $T, start_index: i32 = 0) -> #auto where Iterable(T) {
+    as_iterator :: as_iterator
+    enumerate :: enumerate
+    return enumerate(as_iterator(it), start_index);
+}
+
+#match enumerate (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Value(T)) {
     Enumeration_Context :: struct (T: type_expr) {
         iterator:      Iterator(T);
         current_index: i32;
