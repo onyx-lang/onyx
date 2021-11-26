@@ -42,26 +42,31 @@ static void eh_shift_up(EntityHeap* entities, i32 index) {
 }
 
 static void eh_shift_down(EntityHeap* entities, i32 index) {
-    i32 min_index = index;
+    while (1) {
+        i32 min_index = index;
 
-    i32 l = eh_lchild(index);
-    if (l < bh_arr_length(entities->entities)
-        && entity_compare(entities->entities[l], entities->entities[min_index]) < 0) {
-        min_index = l;
-    }
+        i32 l = eh_lchild(index);
+        if (l < bh_arr_length(entities->entities)
+            && entity_compare(entities->entities[l], entities->entities[min_index]) < 0) {
+            min_index = l;
+        }
 
-    i32 r = eh_rchild(index);
-    if (r < bh_arr_length(entities->entities)
-        && entity_compare(entities->entities[r], entities->entities[min_index]) < 0) {
-        min_index = r;
-    }
+        i32 r = eh_rchild(index);
+        if (r < bh_arr_length(entities->entities)
+            && entity_compare(entities->entities[r], entities->entities[min_index]) < 0) {
+            min_index = r;
+        }
 
-    if (index != min_index) {
-        Entity* tmp = entities->entities[min_index];
-        entities->entities[min_index] = entities->entities[index];
-        entities->entities[index] = tmp;
+        if (index != min_index) {
+            Entity* tmp = entities->entities[min_index];
+            entities->entities[min_index] = entities->entities[index];
+            entities->entities[index] = tmp;
 
-        eh_shift_down(entities, min_index);
+            index = min_index;
+            continue;
+        }
+
+        break;
     }
 }
 
