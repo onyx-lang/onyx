@@ -176,6 +176,11 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         }
     }
 
+    // NOTE: Always enable multi-threading for the Onyx runtime.
+    if (options.runtime == Runtime_Onyx) {
+        options.use_multi_threading = 1;
+    }
+
     return options;
 }
 

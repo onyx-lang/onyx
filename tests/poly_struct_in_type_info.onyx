@@ -1,0 +1,18 @@
+#load "core/std"
+use package core
+
+Base :: struct (T: type_expr) {
+    const: i32;
+    dynamic: T;
+}
+
+main :: (args) => {
+    printf("{}\n", Base);
+
+    x := Base(str).{ 10, "Hello" };
+    printf("{}\n", x);
+    printf("{}\n", type_info.struct_constructed_from(typeof x, Base));
+
+    y: Allocator;
+    printf("{}\n", type_info.struct_constructed_from(typeof y, Base));
+}
