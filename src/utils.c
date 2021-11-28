@@ -252,7 +252,7 @@ void scope_clear(Scope* scope) {
 }
 
 // Polymorphic procedures are in their own file to clean up this file.
-#include "polymorph.c"
+#include "polymorph.h"
 
 //
 // Overloaded Procedures

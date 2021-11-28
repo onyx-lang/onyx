@@ -275,8 +275,8 @@ EMIT_FUNC_NO_ARGS(leave_structured_block);
 static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node);
 static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node);
 
-#include "wasm_intrinsics.c"
-#include "wasm_type_table.c"
+#include "wasm_intrinsics.h"
+#include "wasm_type_table.h"
 
 EMIT_FUNC(function_body, AstFunction* fd) {
     if (fd->body == NULL) return;
@@ -3855,4 +3855,4 @@ void onyx_wasm_module_free(OnyxWasmModule* module) {
 }
 
 
-#include "wasm_output.c"
+#include "wasm_output.h"
