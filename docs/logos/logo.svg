@@ -9,6 +9,9 @@
    id="svg5"
    inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
    sodipodi:docname="logo.svg"
+   inkscape:export-filename="C:\dev\onyx\docs\logos\logo.png"
+   inkscape:export-xdpi="256"
+   inkscape:export-ydpi="256"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -23,12 +26,12 @@
      inkscape:pagecheckerboard="1"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="12.443434"
-     inkscape:cx="30.337284"
-     inkscape:cy="41.507834"
-     inkscape:window-width="2560"
+     inkscape:zoom="8.7988366"
+     inkscape:cx="48.585969"
+     inkscape:cy="60.519365"
+     inkscape:window-width="2498"
      inkscape:window-height="1417"
-     inkscape:window-x="2552"
+     inkscape:window-x="54"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
      inkscape:current-layer="layer1"
@@ -41,8 +44,14 @@
      id="layer1">
     <path
        id="path31"
-       style="fill:#333333;fill-rule:evenodd;stroke-width:0.029711"
-       d="M 11.801522,3.1905759 0.86090001,9.5071294 6.3312111,12.665378 11.801522,9.5071294 Z" />
+       style="fill:#4d4d4d;fill-rule:evenodd;stroke-width:0.112294"
+       d="M 44.603516 12.058594 L 3.2539062 35.931641 L 23.929688 47.869141 L 44.603516 12.058594 z "
+       transform="scale(0.26458333)" />
+    <path
+       id="path537"
+       style="fill:#333333;fill-rule:evenodd;stroke-width:0.112294"
+       d="M 44.603516 12.058594 L 23.929688 47.869141 L 44.603516 35.931641 L 44.603516 12.058594 z "
+       transform="scale(0.26458333)" />
     <path
        id="path1180"
        style="fill:#999999;fill-rule:evenodd;stroke-width:0.029711"

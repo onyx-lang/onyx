@@ -3,6 +3,7 @@
 package core.bucket_array
 
 #local array :: package core.array
+#local iter  :: package core.iter
 
 Bucket_Array :: struct (T: type_expr) {
     allocator : Allocator;
@@ -101,6 +102,7 @@ for_each :: macro (b: Bucket_Array($T), body: Code) {
     }
 }
 
+#match iter.as_iterator iterator
 iterator :: (b: ^Bucket_Array($T)) -> Iterator(T) {
     Context :: struct (T: type_expr) {
         ba         : ^Bucket_Array(T);
@@ -129,12 +131,10 @@ iterator :: (b: ^Bucket_Array($T)) -> Iterator(T) {
         return bucket.data[elem_idx], true;
     }
 
-    close :: (x: rawptr) => cfree(x);
-
     return .{
         data = c,
         next = #solidify next { T=T },
-        close = close,
+        close = cfree,
     };
 }
 
