@@ -96,7 +96,7 @@ CheckStatus check_type(AstType* type);
 CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
 CheckStatus check_do_block(AstDoBlock** pdoblock);
 CheckStatus check_constraint(AstConstraint *constraint);
-CheckStatus check_constraint_context(ConstraintContext *cc, OnyxFilePos pos);
+CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFilePos pos);
 CheckStatus check_polyquery(AstPolyQuery *query);
 
 // HACK HACK HACK
@@ -1988,7 +1988,7 @@ CheckStatus check_struct(AstStructType* s_node) {
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
     if (s_node->constraints.constraints) {
-        CHECK(constraint_context, &s_node->constraints, s_node->token->pos);
+        CHECK(constraint_context, &s_node->constraints, s_node->scope, s_node->token->pos);
     }
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
@@ -2173,7 +2173,7 @@ CheckStatus check_function_header(AstFunction* func) {
     if (func->return_type != NULL) CHECK(type, func->return_type);
 
     if (func->constraints.constraints != NULL) {
-        CHECK(constraint_context, &func->constraints, func->token->pos);
+        CHECK(constraint_context, &func->constraints, func->scope, func->token->pos);
     }
 
     func->type = type_build_function_type(context.ast_alloc, func);
@@ -2465,6 +2465,10 @@ CheckStatus check_macro(AstMacro* macro) {
 CheckStatus check_constraint(AstConstraint *constraint) {
     switch (constraint->phase) {
         case Constraint_Phase_Cloning_Expressions: {
+            if (constraint->interface->kind == Ast_Kind_Symbol) {
+                return Check_Return_To_Symres;
+            }
+
             if (constraint->interface->kind != Ast_Kind_Interface) {
                 // CLEANUP: This error message might not look totally right in some cases.
                 ERROR_(constraint->token->pos, "'%b' is not an interface. It is a '%s'.",
@@ -2524,7 +2528,7 @@ CheckStatus check_constraint(AstConstraint *constraint) {
     return Check_Success;
 }
 
-CheckStatus check_constraint_context(ConstraintContext *cc, OnyxFilePos pos) {
+CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFilePos pos) {
     if (cc->constraint_checks) {
         if (cc->constraints_met == 1) return Check_Success;
 
@@ -2569,7 +2573,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, OnyxFilePos pos) {
             cc->constraints[i]->report_status = &ccs[i];
             cc->constraints[i]->phase = Constraint_Phase_Cloning_Expressions;
 
-            add_entities_for_node(NULL, (AstNode *) cc->constraints[i], NULL, NULL);
+            add_entities_for_node(NULL, (AstNode *) cc->constraints[i], scope, NULL);
         }
 
         return Check_Yield_Macro;

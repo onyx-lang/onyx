@@ -1194,6 +1194,20 @@ void arguments_remove_baked(Arguments* args) {
     }
 }
 
+void arguments_clear_baked_flags(Arguments* args) {
+    bh_arr_each(AstTyped *, arg, args->values) {
+        if ((*arg)->kind == Ast_Kind_Argument) {
+            ((AstArgument *) *arg)->is_baked = 0;
+        }
+    }
+
+    bh_arr_each(AstNamedValue *, arg, args->named_values) {
+        if ((*arg)->value->kind == Ast_Kind_Argument) {
+            ((AstArgument *) (*arg)->value)->is_baked = 0;
+        }
+    }
+}
+
 // GROSS: Using void* to avoid having to cast everything.
 const char* node_get_type_name(void* node) {
     if (node_is_type((AstNode *) node)) return "type_expr";

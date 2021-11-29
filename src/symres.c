@@ -1288,6 +1288,7 @@ static SymresStatus symres_macro(AstMacro* macro) {
 
 static SymresStatus symres_constraint(AstConstraint* constraint) {
     switch (constraint->phase) {
+        case Constraint_Phase_Cloning_Expressions:
         case Constraint_Phase_Waiting_To_Be_Queued: {
             SYMRES(expression, (AstTyped **) &constraint->interface);
 

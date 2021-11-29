@@ -363,9 +363,12 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
 
         AstFunction* overload = NULL;
         switch (node->kind) {
-            case Ast_Kind_Function:         overload = (AstFunction *) node; break;
             case Ast_Kind_Macro:            overload = macro_resolve_header((AstMacro *) node, param_args, NULL, 0); break;
             case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstPolyProc *) node, PPLM_By_Arguments, param_args); break;
+            case Ast_Kind_Function:
+                overload = (AstFunction *) node;
+                arguments_clear_baked_flags(&args);
+                break;
         }
 
         // NOTE: Overload is not something that is known to be overloadable.

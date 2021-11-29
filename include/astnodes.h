@@ -1565,6 +1565,7 @@ void arguments_copy(Arguments* dest, Arguments* src);
 void arguments_clone(Arguments* dest, Arguments* src);
 void arguments_deep_clone(bh_allocator a, Arguments* dest, Arguments* src);
 void arguments_remove_baked(Arguments* args);
+void arguments_clear_baked_flags(Arguments* args);
 TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
                                  OnyxToken* location, char* func_name, struct OnyxError* error);
 i32 get_argument_buffer_size(TypeFunction* type, Arguments* args);

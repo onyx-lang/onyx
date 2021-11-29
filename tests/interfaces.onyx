@@ -23,10 +23,10 @@ CanCastTo :: interface (T: type_expr, D: type_expr) {
 // I don't know why this doesn't work... It is complaining that it couldn't match
 // either of these cases, but if I remove the first, it matches the second. This
 // is clearly wrong behavior, but I don't immediately see where the problem is.
-// cast_able :: #match {
-//     (_: $T, $D: type_expr) -> bool where CanCastTo(T, D) do return true; ,
-//     (_: any, d: type_expr) -> bool { return false; },
-// }
+cast_able :: #match {
+    (_: $T, $D: type_expr) -> bool where CanCastTo(T, D) do return true; ,
+    (_: any, d: type_expr) -> bool { return false; },
+}
 
 cast_able_to_int :: #match {
     macro (_: $T)  -> bool where CanCastTo(T, i32) { return true; },
@@ -108,4 +108,10 @@ main :: (args: [] cstr) {
 
     println(cast_able_to_int(12.34));
     println(cast_able_to_int("test"));
+
+    println(cast_able(12.34, i32));
+    println(cast_able("foo", i32));
+
+    b: [10] i32;
+    println(cast_able(b, [] i32));
 }
