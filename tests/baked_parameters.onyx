@@ -9,7 +9,7 @@ count_to :: ($N: i32) {
 
 alloc_slice :: ($T: type_expr, N: i32) -> [] T {
     data := cast(^T) calloc(sizeof T * N);
-    return <[] T>.{ data, N };
+    return .{ data, N };
 }
 
 count_to_30 :: #solidify count_to { N = #value 30 };
@@ -25,9 +25,9 @@ main :: (args: [] cstr) {
     count_to(UP_TO);
 
     sl := alloc_slice(i32, 10);
-    for ^elem: sl do *elem = 1234;
+    for ^ sl do *it = 1234;
 
-    for elem: sl do println(elem);
+    for sl do println(it);
 
 
     // This is so much cleaner than the alternative.
