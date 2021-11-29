@@ -74,13 +74,13 @@ consume :: macro (x: $T) -> #auto where iter.Iterable(T) {
         // Iterator over pointers get dereferenced
         macro (iter: Iterator(^$T)) -> [..] T {
             arr := array.make(T);
-            for it: iter do arr << *it;
+            for iter do arr << *it;
             return arr;
         },
 
         macro (iter: Iterator($T)) -> [..] T {
             arr := array.make(T);
-            for it: iter do arr << it;
+            for iter do arr << it;
             return arr;
         },
     }

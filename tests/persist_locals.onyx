@@ -28,9 +28,7 @@ foo :: (x: i32) -> i32 {
 
 cached_fib :: (n: u64) -> u64 {
     #persist cache : map.Map(u64, u64);
-    if cache.hashes.data == null {
-        map.init(^cache);
-    }
+    _ :: #init () { map.init(^cache); };
 
     if n <= 1 do return n;
 

@@ -748,7 +748,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
 //              This could be a cool feature where you can write:
 //
-//              foo(x, y) {
+//              foo(x, y) #{
 //                  // ...
 //              }
 //
@@ -1111,12 +1111,22 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
         for_node->by_pointer = 1;
     }
 
-    OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
-    AstLocal* var_node = make_local(parser->allocator, local_sym, NULL);
+    if (next_tokens_are(parser, 2, Token_Type_Symbol, ':')) {
+        OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
+        AstLocal* var_node = make_local(parser->allocator, local_sym, NULL);
 
-    for_node->var = var_node;
+        for_node->var = var_node;
 
-    expect_token(parser, ':');
+        expect_token(parser, ':');
+    } else {
+        // HACK
+        static char it_name[] = "it ";
+        static OnyxToken it_token = { Token_Type_Symbol, 2, it_name, { 0 } };
+
+        AstLocal* var_node = make_local(parser->allocator, &it_token, NULL);
+        for_node->var = var_node;
+    }
+
     for_node->iter = parse_expression(parser, 1);
     for_node->stmt = parse_block(parser, 1, NULL);
 

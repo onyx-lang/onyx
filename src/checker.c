@@ -211,10 +211,15 @@ CheckStatus check_for(AstFor* fornode) {
     Type* iter_type = fornode->iter->type;
     if (iter_type == NULL) YIELD(fornode->token->pos, "Waiting for iteration expression type to be known.");
 
+    OnyxFilePos error_loc = fornode->var->token->pos;
+    if (error_loc.filename == NULL) {
+        error_loc = fornode->token->pos;
+    }
+
     fornode->loop_type = For_Loop_Invalid;
     if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I32])) {
         if (fornode->by_pointer) {
-            ERROR(fornode->var->token->pos, "Cannot iterate by pointer over a range.");
+            ERROR(error_loc, "Cannot iterate by pointer over a range.");
         }
 
         AstNumLit* low_0    = make_int_literal(context.ast_alloc, 0);
@@ -228,7 +233,7 @@ CheckStatus check_for(AstFor* fornode) {
     }
     else if (types_are_compatible(iter_type, builtin_range_type_type)) {
         if (fornode->by_pointer) {
-            ERROR(fornode->var->token->pos, "Cannot iterate by pointer over a range.");
+            ERROR(error_loc, "Cannot iterate by pointer over a range.");
         }
 
         // NOTE: Blindly copy the first range member's type which will
@@ -253,7 +258,7 @@ CheckStatus check_for(AstFor* fornode) {
     }
     else if (iter_type->kind == Type_Kind_VarArgs) {
         if (fornode->by_pointer) {
-            ERROR_(fornode->var->token->pos, "Cannot iterate by pointer over '%s'.", type_get_name(iter_type));
+            ERROR_(error_loc, "Cannot iterate by pointer over '%s'.", type_get_name(iter_type));
         }
 
         fornode->var->type = iter_type->VarArgs.elem;
@@ -269,7 +274,7 @@ CheckStatus check_for(AstFor* fornode) {
     }
     else if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
         if (fornode->by_pointer) {
-            ERROR(fornode->var->token->pos, "Cannot iterate by pointer over an iterator.");
+            ERROR(error_loc, "Cannot iterate by pointer over an iterator.");
         }
 
         // HACK: This assumes the Iterator type only has a single type argument.
@@ -281,7 +286,7 @@ CheckStatus check_for(AstFor* fornode) {
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
 
     if (fornode->loop_type == For_Loop_Invalid) {
-        ERROR_(fornode->iter->token->pos,
+        ERROR_(error_loc,
                 "Cannot iterate over a '%s'.",
                 type_get_name(iter_type));
     }
