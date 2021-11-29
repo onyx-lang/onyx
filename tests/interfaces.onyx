@@ -1,0 +1,111 @@
+#load "core/std"
+
+use package core
+
+Hashable :: interface (T: type_expr) {
+    hash.to_u32(T);
+}
+
+try_hash :: #match {
+    macro (x: $T) where Hashable(T) {
+        println(hash.to_u32(x));
+    },
+
+    (x: any) {
+        printf("{} is not hashable!\n", x.type);
+    },
+}
+
+CanCastTo :: interface (T: type_expr, D: type_expr) {
+    cast(typeof D) T;
+}
+
+// I don't know why this doesn't work... It is complaining that it couldn't match
+// either of these cases, but if I remove the first, it matches the second. This
+// is clearly wrong behavior, but I don't immediately see where the problem is.
+// cast_able :: #match {
+//     (_: $T, $D: type_expr) -> bool where CanCastTo(T, D) do return true; ,
+//     (_: any, d: type_expr) -> bool { return false; },
+// }
+
+cast_able_to_int :: #match {
+    macro (_: $T)  -> bool where CanCastTo(T, i32) { return true; },
+    macro (_: any) -> bool { return false; },
+}
+
+do_math :: macro (x, y: $T) -> T where SemiRing(T) {
+    return x + y + x * y;
+}
+
+SemiRing :: interface (T: type_expr) {
+    T + T;
+    T * T;
+}
+
+bit_math :: (x, y: $T) -> T where BitField(T) {
+    return (x & y) | (x ^ y);
+}
+
+BitField :: interface (T: type_expr) {
+    ~T;
+    T & T;
+    T | T;
+    T ^ T;
+}
+
+Complex :: struct { x, y: f32; }
+#match io.write (w: ^io.Writer, c: Complex) {
+    io.write_format(w, "{.2} + {.2}i", c.x, c.y);
+}
+
+#operator + (c1, c2: Complex) => Complex.{ c1.x + c2.x, c1.y + c2.y };
+#operator * (c1, c2: Complex) => Complex.{ c1.x * c2.x - c1.y * c2.y, c1.x * c2.y + c1.y * c2.x };
+
+consume :: macro (x: $T) -> #auto where iter.Iterable(T) {
+    // This is a weird limitation of the Onyx type system.
+    // In order to be able tell what the iterator produces, you
+    // have to pattern match it in a procedure parameter. This means
+    // that you have to declare an internal macro that pattern
+    // matches the variable out. Also, you need to use #auto as the
+    // return type otherwise you can't say the correct type.
+    // I can't think of a better way of doing this without making
+    // everything WAY more complicated.
+    consume_inner :: #match {
+        // Iterator over pointers get dereferenced
+        macro (iter: Iterator(^$T)) -> [..] T {
+            arr := array.make(T);
+            for it: iter do arr << *it;
+            return arr;
+        },
+
+        macro (iter: Iterator($T)) -> [..] T {
+            arr := array.make(T);
+            for it: iter do arr << it;
+            return arr;
+        },
+    }
+
+    iterator := iter.as_iterator(x);
+    return consume_inner(iterator);
+}
+
+main :: (args: [] cstr) {
+    try_hash("This is a test");
+    try_hash(context);
+    try_hash(context.allocator);
+
+    printf("{p}\n", do_math(3, 4));
+    println(do_math(Complex.{ 10, 20 }, .{ 30, 40 }));
+
+    println(bit_math(3, 5));
+    // println(bit_math(3.0, 4.0));
+
+    a := consume(f32.[4,2,4,7,4]);
+    defer array.free(^a);
+    println(a);
+
+    consume(1 .. 10) |> println();
+
+    println(cast_able_to_int(12.34));
+    println(cast_able_to_int("test"));
+}

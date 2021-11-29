@@ -447,6 +447,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 bh_arr_push(dc->type_args, (AstType *) ast_clone(a, (AstNode *) *type_arg));
             }
 
+            dc->phase = Constraint_Phase_Waiting_To_Be_Queued;
             break;
         }
 

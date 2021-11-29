@@ -2467,7 +2467,9 @@ CheckStatus check_constraint(AstConstraint *constraint) {
         case Constraint_Phase_Cloning_Expressions: {
             if (constraint->interface->kind != Ast_Kind_Interface) {
                 // CLEANUP: This error message might not look totally right in some cases.
-                ERROR_(constraint->token->pos, "'%b' is not an interface.", constraint->token->text, constraint->token->length);
+                ERROR_(constraint->token->pos, "'%b' is not an interface. It is a '%s'.",
+                    constraint->token->text, constraint->token->length,
+                    onyx_ast_node_kind_string(constraint->interface->kind));
             }
 
             bh_arr_new(global_heap_allocator, constraint->exprs, bh_arr_length(constraint->interface->exprs));

@@ -1027,10 +1027,10 @@ struct AstInterface {
 };
 
 typedef enum ConstraintPhase {
-    Constraint_Phase_Waiting_To_Be_Queued,
-    Constraint_Phase_Cloning_Expressions,
-    Constraint_Phase_Checking_Expressions,
-    Constraint_Phase_Finished,
+    Constraint_Phase_Waiting_To_Be_Queued = 0,
+    Constraint_Phase_Cloning_Expressions  = 1,
+    Constraint_Phase_Checking_Expressions = 2,
+    Constraint_Phase_Finished             = 3,
 } ConstraintPhase;
 
 struct AstConstraint {

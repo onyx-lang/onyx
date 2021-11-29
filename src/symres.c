@@ -125,7 +125,6 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
         }
     }
 
-struct_symres_done:
     if (s_node->scope) scope_leave();
     return Symres_Success;
 }

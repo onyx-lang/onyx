@@ -1,0 +1,26 @@
+#load "core/std"
+
+use package core
+
+using_callsite :: (value: $T, site := #callsite) {
+    println(value);
+    path := string.split(site.file, #char "/");
+    printf("I was called from {}:{}:{}\n", path[path.count - 1], site.line, site.column);
+}
+
+main :: (args: [] cstr) {
+    using_callsite("Hello");
+    using_callsite(1234.0f);
+
+    something := Something.{};
+    something->method();
+}
+
+
+Something :: struct {
+    member := cast(u32) 1234;
+
+    method :: (use s: ^Something) {
+        using_callsite(member);
+    }
+}
