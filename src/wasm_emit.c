@@ -3138,8 +3138,9 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     *t = '\0';
 
     i32 type_idx = 0;
-    if (bh_table_has(i32, mod->type_map, type_repr_buf)) {
-        type_idx = bh_table_get(i32, mod->type_map, type_repr_buf);
+    i32 index = shgeti(mod->type_map, type_repr_buf);
+    if (index != -1) {
+        type_idx = mod->type_map[index].value;
     } else {
         // NOTE: Make a new type
         WasmFuncType* type = (WasmFuncType*) bh_alloc(mod->allocator, sizeof(WasmFuncType) + sizeof(WasmType) * param_count);
@@ -3151,7 +3152,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
 
         bh_arr_push(mod->types, type);
 
-        bh_table_put(i32, mod->type_map, type_repr_buf, mod->next_type_idx);
+        shput(mod->type_map, type_repr_buf, mod->next_type_idx);
         type_idx = mod->next_type_idx;
         mod->next_type_idx++;
     }
@@ -3319,7 +3320,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
                                 break;
     }
 
-    bh_table_put(WasmExport, mod->exports, export->export_name->text, wasm_export);
+    shput(mod->exports, export->export_name->text, wasm_export);
     mod->export_count++;
     
     token_toggle_end(export->export_name);
@@ -3371,8 +3372,9 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     }
     */
 
-    if (bh_table_has(StrLitInfo, mod->string_literals, (char *) strdata)) {
-        StrLitInfo sti = bh_table_get(StrLitInfo, mod->string_literals, (char *) strdata);
+    i32 index = shgeti(mod->string_literals, (char *) strdata);
+    if (index != -1) {
+        StrLitInfo sti = mod->string_literals[index].value;
         strlit->addr   = sti.addr;
         strlit->length = sti.len;
 
@@ -3390,7 +3392,7 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     strlit->length = length;
     mod->next_datum_offset += length;
 
-    bh_table_put(StrLitInfo, mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->addr, strlit->length }));
+    shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->addr, strlit->length }));
 
     bh_arr_push(mod->data, datum);
 }
@@ -3602,8 +3604,9 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
 
     token_toggle_end(fc->filename_token);
 
-    if (bh_table_has(StrLitInfo, mod->loaded_file_info, fc->filename)) {
-        StrLitInfo info = bh_table_get(StrLitInfo, mod->loaded_file_info, fc->filename);
+    i32 index = shgeti(mod->loaded_file_info, fc->filename);
+    if (index != -1) {
+        StrLitInfo info = mod->loaded_file_info[index].value;
         fc->addr = info.addr;
         fc->size = info.len;
         return;
@@ -3630,7 +3633,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     actual_data[contents.length] = 0;
     bh_file_contents_free(&contents);
 
-    bh_table_put(StrLitInfo, mod->loaded_file_info, fc->filename, ((StrLitInfo) {
+    shput(mod->loaded_file_info, fc->filename, ((StrLitInfo) {
         .addr = offset,
         .len  = length - 1,
     }));
@@ -3707,10 +3710,10 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
     bh_arr_set_length(module.structured_jump_target, 0);
 
-    bh_table_init(global_heap_allocator, module.type_map, 61);
-    bh_table_init(global_heap_allocator, module.exports, 61);
-    bh_table_init(global_heap_allocator, module.loaded_file_info, 7);
-    bh_table_init(global_heap_allocator, module.string_literals, 16);
+    sh_new_arena(module.type_map);
+    sh_new_arena(module.exports);
+    sh_new_arena(module.loaded_file_info);
+    sh_new_arena(module.string_literals);
 
     bh_imap_init(&module.index_map, global_heap_allocator, 128);
     bh_imap_init(&module.local_map, global_heap_allocator, 16);
@@ -3739,14 +3742,14 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .idx = 0,
     };
 
-    bh_table_put(WasmExport, module.exports, "memory", mem_export);
+    shput(module.exports, "memory", mem_export);
     module.export_count++;
 
     WasmExport func_table_export = {
         .kind = WASM_FOREIGN_TABLE,
         .idx  = 0,
     };
-    bh_table_put(WasmExport, module.exports, "func_table", func_table_export);
+    shput(module.exports, "func_type", func_table_export);
     module.export_count++;
 
     return module;
@@ -3850,8 +3853,8 @@ void onyx_wasm_module_free(OnyxWasmModule* module) {
     bh_arr_free(module->funcs);
     bh_imap_free(&module->local_map);
     bh_imap_free(&module->index_map);
-    bh_table_free(module->type_map);
-    bh_table_free(module->exports);
+    shfree(module->type_map);
+    shfree(module->exports);
 }
 
 

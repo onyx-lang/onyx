@@ -637,17 +637,17 @@ typedef struct OnyxWasmModule {
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )
     // to the function type index if it has been created.
-    bh_table(i32) type_map;
+    Table(i32) type_map;
 
-    bh_table(StrLitInfo) loaded_file_info;
-    bh_table(StrLitInfo) string_literals;
+    Table(StrLitInfo) loaded_file_info;
+    Table(StrLitInfo) string_literals;
 
     bh_arr(u8)  structured_jump_target;
     bh_arr(AstLocal*) return_location_stack;   // NOTE: Used for do-block return expressions.
 
     bh_arr(WasmFuncType*) types; // NOTE: This have to be pointers because the type is variadic in size
     bh_arr(WasmImport)    imports;
-    bh_table(WasmExport)  exports;
+    Table(WasmExport)     exports;
     bh_arr(WasmGlobal)    globals;
     bh_arr(WasmFunc)      funcs;
     bh_arr(WasmDatum)     data;

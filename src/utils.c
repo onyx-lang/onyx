@@ -18,16 +18,18 @@ bh_allocator global_heap_allocator;
 // Program info and packages
 //
 Package* package_lookup(char* package_name) {
-    if (bh_table_has(Package *, context.packages, package_name)) {
-        return bh_table_get(Package *, context.packages, package_name);
+    i32 index = shgeti(context.packages, package_name);
+    if (index != -1) {
+        return context.packages[index].value;
     } else {
         return NULL;
     }
 }
 
 Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_allocator alloc) {
-    if (bh_table_has(Package *, context.packages, package_name)) {
-        return bh_table_get(Package *, context.packages, package_name);
+    i32 index = shgeti(context.packages, package_name);
+    if (index != -1) {
+        return context.packages[index].value;
 
     } else {
         Package* package = bh_alloc_item(alloc, Package);
@@ -41,7 +43,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         package->private_scope = scope_create(alloc, package->scope, (OnyxFilePos) { 0 });
         package->use_package_entities = NULL;
 
-        bh_table_put(Package *, context.packages, pac_name, package);
+        shput(context.packages, pac_name, package);
 
         return package;
     }
@@ -81,15 +83,15 @@ Scope* scope_create(bh_allocator a, Scope* parent, OnyxFilePos created_at) {
     scope->name = NULL;
 
     scope->symbols = NULL;
-    bh_table_init(global_heap_allocator, scope->symbols, 64);
+    sh_new_arena(scope->symbols);
 
     return scope;
 }
 
 void scope_include(Scope* target, Scope* source, OnyxFilePos pos) {
-    bh_table_each_start(AstNode *, source->symbols);
-        symbol_raw_introduce(target, (char *) key, pos, value);
-    bh_table_each_end;
+    fori (i, 0, shlen(source->symbols)) {
+        symbol_raw_introduce(target, source->symbols[i].key, pos, source->symbols[i].value);
+    }
 }
 
 b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
@@ -103,8 +105,10 @@ b32 symbol_introduce(Scope* scope, OnyxToken* tkn, AstNode* symbol) {
 
 b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* symbol) {
     if (strcmp(name, "_")) {
-        if (bh_table_has(AstNode *, scope->symbols, name)) {
-            if (bh_table_get(AstNode *, scope->symbols, name) != symbol) {
+        i32 index = shgeti(scope->symbols, name);
+        if (index != -1) {
+            AstNode *node = scope->symbols[index].value;
+            if (node != symbol) {
                 onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
                 return 0;
             }
@@ -112,22 +116,23 @@ b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* sym
         }
     }
 
-    bh_table_put(AstNode *, scope->symbols, name, symbol);
+    shput(scope->symbols, name, symbol);
     return 1;
 }
 
 void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
-    bh_table_put(AstNode *, scope->symbols, sym, node);
+    shput(scope->symbols, sym, node);
 }
 
 void symbol_subpackage_introduce(Scope* scope, char* sym, AstPackage* package) {
-    if (bh_table_has(AstNode *, scope->symbols, sym)) {
-        AstNode* maybe_package = bh_table_get(AstNode *, scope->symbols, sym);
+    i32 index = shgeti(scope->symbols, sym);
+    if (index != -1) {
+        AstNode* maybe_package = scope->symbols[index].value;
         
         // CLEANUP: Make this assertion an actual error message.
         assert(maybe_package->kind == Ast_Kind_Package);
     } else {
-        bh_table_put(AstNode *, scope->symbols, sym, (AstNode *) package);
+        shput(scope->symbols, sym, (AstNode *) package);
     }
 }
 
@@ -135,8 +140,9 @@ AstNode* symbol_raw_resolve(Scope* start_scope, char* sym) {
     Scope* scope = start_scope;
 
     while (scope != NULL) {
-        if (bh_table_has(AstNode *, scope->symbols, sym)) {
-            AstNode* res = bh_table_get(AstNode *, scope->symbols, sym);
+        i32 index = shgeti(scope->symbols, sym);
+        if (index != -1) {
+            AstNode* res = scope->symbols[index].value;
 
             if ((res->flags & Ast_Flag_Symbol_Invisible) == 0) {
                 return res;
@@ -248,7 +254,7 @@ AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
 }
 
 void scope_clear(Scope* scope) {
-    bh_table_clear(scope->symbols);
+    sh_new_arena(scope->symbols);
 }
 
 // Polymorphic procedures are in their own file to clean up this file.
@@ -1019,13 +1025,14 @@ char *find_closest_symbol_in_scope(Scope *scope, char *sym, u32 *out_distance) {
     if (scope == NULL) return NULL;
 
     char* closest = NULL;
-    bh_table_each_start(AstNode *, scope->symbols);
+    fori (i, 0, shlen(scope->symbols)) {
+        char *key = scope->symbols[i].key;
         u32 d = levenshtein_distance(key, sym); 
         if (d < *out_distance) {
             *out_distance = d;
             closest = (char *) key;
         }
-    bh_table_each_end;
+    }
 
     return closest;
 }

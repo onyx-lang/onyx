@@ -20,7 +20,7 @@ static b32 doing_nested_polymorph_lookup = 0;
 AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
 
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
-    if (pp->concrete_funcs == NULL)        bh_table_init(global_heap_allocator, pp->concrete_funcs, 16);
+    if (pp->concrete_funcs == NULL)        sh_new_arena(pp->concrete_funcs);
     if (pp->active_queries.hashes == NULL) bh_imap_init(&pp->active_queries, global_heap_allocator, 31);
 }
 
@@ -700,8 +700,9 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
 
     // NOTE: Check if a version of this polyproc has already been created.
     char* unique_key = build_poly_slns_unique_key(slns);
-    if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
-        AstSolidifiedFunction solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
+    i32 index = shgeti(pp->concrete_funcs, unique_key);
+    if (index != -1) {
+        AstSolidifiedFunction solidified_func = pp->concrete_funcs[index].value;
 
         // NOTE: If this solution was originally created from a "build_only_header" call, then the body
         // will not have been or type checked, or anything. This ensures that the body is copied, the
@@ -721,7 +722,7 @@ AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
     add_solidified_function_entities(&solidified_func);
 
     // NOTE: Cache the function for later use, reducing duplicate functions.
-    bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
+    shput(pp->concrete_funcs, unique_key, solidified_func);
 
     return (AstFunction *) &node_that_signals_a_yield;
 }
@@ -795,8 +796,9 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_ar
     AstSolidifiedFunction solidified_func;
 
     char* unique_key = build_poly_slns_unique_key(slns);
-    if (bh_table_has(AstSolidifiedFunction, pp->concrete_funcs, unique_key)) {
-        solidified_func = bh_table_get(AstSolidifiedFunction, pp->concrete_funcs, unique_key);
+    i32 index = shgeti(pp->concrete_funcs, unique_key);
+    if (index != -1) {
+        solidified_func = pp->concrete_funcs[index].value;
 
     } else {
         // NOTE: This function is only going to have the header of it correctly created.
@@ -826,7 +828,7 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_ar
     solidified_func.func_header_entity = func_header_entity_ptr;
 
     // NOTE: Cache the function for later use.
-    bh_table_put(AstSolidifiedFunction, pp->concrete_funcs, unique_key, solidified_func);
+    shput(pp->concrete_funcs, unique_key, solidified_func);
     
     return (AstFunction *) &node_that_signals_a_yield;
 }
@@ -893,7 +895,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     assert(ps_type->scope != NULL);
 
     if (ps_type->concrete_structs == NULL) {
-        bh_table_init(global_heap_allocator, ps_type->concrete_structs, 16);
+        sh_new_arena(ps_type->concrete_structs);
     }
 
     if (bh_arr_length(slns) != bh_arr_length(ps_type->poly_params)) {
@@ -951,8 +953,9 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     }
 
     char* unique_key = build_poly_slns_unique_key(slns);
-    if (bh_table_has(AstStructType *, ps_type->concrete_structs, unique_key)) {
-        AstStructType* concrete_struct = bh_table_get(AstStructType *, ps_type->concrete_structs, unique_key);
+    i32 index = shgeti(ps_type->concrete_structs, unique_key);
+    if (index != -1) {
+        AstStructType* concrete_struct = ps_type->concrete_structs[index].value;
 
         if (concrete_struct->entity_type->state < Entity_State_Check_Types) {
             return NULL;
@@ -971,7 +974,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     insert_poly_slns_into_scope(sln_scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
-    bh_table_put(AstStructType *, ps_type->concrete_structs, unique_key, concrete_struct);
+    shput(ps_type->concrete_structs, unique_key, concrete_struct);
 
     add_entities_for_node(NULL, (AstNode *) concrete_struct, sln_scope, NULL);
     return NULL;

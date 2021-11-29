@@ -646,7 +646,8 @@ bh_table_iterator bh__table_iter_setup(bh__table *table, i32 elemsize);
 b32 bh_table_iter_next(bh_table_iterator* it);
 
 #endif
-
+// Using stb_ds for tables now because they are better in every single way.
+#define Table(T) struct { char *key; T value; } *
 
 
 

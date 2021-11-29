@@ -1,5 +1,7 @@
 // #define BH_DEBUG
 #define BH_DEFINE
+#define BH_NO_TABLE
+#define STB_DS_IMPLEMENTATION
 #include "bh.h"
 
 #include "lex.h"
@@ -215,7 +217,7 @@ static void context_init(CompileOptions* opts) {
     context.cycle_detected = 0;
 
     context.global_scope = scope_create(global_heap_allocator, NULL, (OnyxFilePos) { 0 });
-    bh_table_init(global_heap_allocator, context.packages, 16);
+    sh_new_arena(context.packages);
 
     // NOTE: This will be initialized upon the first call to entity_heap_insert.
     context.entities.next_id  = 0;

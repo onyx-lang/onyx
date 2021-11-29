@@ -96,7 +96,7 @@ const BuiltinSymbol builtin_symbols[] = {
     { NULL, NULL, NULL },
 };
 
-bh_table(OnyxIntrinsic) intrinsic_table;
+IntrinsicTable intrinsic_table;
 
 static IntrinsicMap builtin_intrinsics[] = {
     { "memory_size",  ONYX_INTRINSIC_MEMORY_SIZE },
@@ -457,10 +457,9 @@ void initialize_builtins(bh_allocator a) {
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
     }
 
-    bh_table_init(global_heap_allocator, intrinsic_table, 128);
     IntrinsicMap* intrinsic = &builtin_intrinsics[0];
     while (intrinsic->name != NULL) {
-        bh_table_put(OnyxIntrinsic, intrinsic_table, intrinsic->name, intrinsic->intrinsic);
+        shput(intrinsic_table, intrinsic->name, intrinsic->intrinsic);
         intrinsic++;
     }
 }

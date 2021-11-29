@@ -584,14 +584,14 @@ CheckStatus check_call(AstCall** pcall) {
         token_toggle_end(callee->intrinsic_name);
         char* intr_name = callee->intrinsic_name->text;
 
-        if (bh_table_has(OnyxIntrinsic, intrinsic_table, intr_name)) {
-            call->intrinsic = bh_table_get(OnyxIntrinsic, intrinsic_table, intr_name);
-
-        } else {
+        i32 index;
+        if ((index = shgeti(intrinsic_table, intr_name)) == -1) {
             onyx_report_error(callee->token->pos, "Intrinsic not supported, '%s'.", intr_name);
             token_toggle_end(callee->intrinsic_name);
             return Check_Error;
         }
+
+        call->intrinsic = intrinsic_table[index].value;
 
         token_toggle_end(callee->intrinsic_name);
     }

@@ -1,6 +1,7 @@
 #ifndef ONYXASTNODES_H
 #define ONYXASTNODES_H
 
+#include "stb_ds.h"
 #include "lex.h"
 #include "types.h"
 #include "errors.h"
@@ -111,7 +112,7 @@ typedef struct Scope {
     struct Scope *parent;
     OnyxFilePos created_at;
     char* name;
-    bh_table(AstNode *) symbols;
+    Table(AstNode *) symbols;
 } Scope;
 
 
@@ -868,7 +869,7 @@ struct AstPolyStructType {
 
     Scope *scope;
     bh_arr(AstPolyStructParam) poly_params;
-    bh_table(AstStructType *) concrete_structs;
+    Table(AstStructType *) concrete_structs;
 
     AstStructType* base_struct;
 };
@@ -1132,7 +1133,7 @@ struct AstPolyProc {
     bh_arr(AstPolySolution) known_slns;
 
     AstFunction* base_func;
-    bh_table(AstSolidifiedFunction) concrete_funcs;
+    Table(AstSolidifiedFunction) concrete_funcs;
     bh_imap active_queries;
 };
 
@@ -1425,7 +1426,7 @@ struct CompileOptions {
 
 typedef struct Context Context;
 struct Context {
-    bh_table(Package *)   packages;
+    Table(Package *)      packages;
     EntityHeap            entities;
 
     Scope *global_scope;
@@ -1511,7 +1512,8 @@ typedef struct IntrinsicMap {
     OnyxIntrinsic intrinsic;
 } IntrinsicMap;
 
-extern bh_table(OnyxIntrinsic) intrinsic_table;
+typedef Table(OnyxIntrinsic) IntrinsicTable;
+extern IntrinsicTable intrinsic_table;
 
 extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
 

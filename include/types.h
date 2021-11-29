@@ -102,7 +102,7 @@ struct TypeWithOffset {
         char* name;                                               \
         u32 size;                                                 \
         u16 alignment, mem_count;                                 \
-        bh_table(StructMember) members;                           \
+        Table(StructMember) members;                              \
         bh_arr(StructMember *) memarr;                            \
         bh_arr(struct AstPolySolution) poly_sln;                  \
         bh_arr(TypeWithOffset) linear_members;                    \

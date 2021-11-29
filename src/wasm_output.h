@@ -273,14 +273,17 @@ static i32 output_exportsection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     i32 key_len = 0;
-    bh_table_each_start(WasmExport, module->exports);
-    key_len = strlen(key);
-    output_name(key, key_len, &vec_buff);
+    fori (i, 0, shlen(module->exports)) {
+        char *key = module->exports[i].key;
+        WasmExport value = module->exports[i].value;
 
-    bh_buffer_write_byte(&vec_buff, (u8) (value.kind));
-    leb = uint_to_uleb128((u64) value.idx, &leb_len);
-    bh_buffer_append(&vec_buff, leb, leb_len);
-    bh_table_each_end;
+        key_len = strlen(key);
+        output_name(key, key_len, &vec_buff);
+
+        bh_buffer_write_byte(&vec_buff, (u8) (value.kind));
+        leb = uint_to_uleb128((u64) value.idx, &leb_len);
+        bh_buffer_append(&vec_buff, leb, leb_len);
+    }
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -295,14 +298,17 @@ static i32 output_startsection(OnyxWasmModule* module, bh_buffer* buff) {
     i32 prev_len = buff->length;
 
     i32 start_idx = -1;
-    bh_table_each_start(WasmExport, module->exports) {
+    fori (i, 0, shlen(module->exports)) {
+        char *key = module->exports[i].key;
+        WasmExport value = module->exports[i].value;
+
         if (value.kind == WASM_FOREIGN_FUNCTION) {
             if (strncmp("main", key, 5) == 0) {
                 start_idx = value.idx;
                 break;
             }
         }
-    } bh_table_each_end;
+    }
 
     if (start_idx != -1) {
         bh_buffer_write_byte(buff, WASM_SECTION_ID_START);

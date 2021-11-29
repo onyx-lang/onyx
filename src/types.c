@@ -1,4 +1,5 @@
 #define BH_DEBUG
+#include "stb_ds.h"
 #include "types.h"
 #include "astnodes.h"
 #include "utils.h"
@@ -43,7 +44,7 @@ static bh_imap type_pointer_map;
 static bh_imap type_slice_map;
 static bh_imap type_dynarr_map;
 static bh_imap type_vararg_map;
-static bh_table(u64) type_func_map;
+static Table(u64) type_func_map;
 
 static Type* type_create(TypeKind kind, bh_allocator a, u32 extra_type_pointer_count) {
     Type* type = bh_alloc(a, sizeof(Type) + sizeof(Type *) * extra_type_pointer_count);
@@ -66,7 +67,7 @@ void types_init() {
     bh_imap_init(&type_slice_map,   global_heap_allocator, 255);
     bh_imap_init(&type_dynarr_map,  global_heap_allocator, 255);
     bh_imap_init(&type_vararg_map,  global_heap_allocator, 255);
-    bh_table_init(global_heap_allocator, type_func_map, 64);
+    sh_new_arena(type_func_map);
 
     fori (i, 0, Basic_Kind_Count) type_register(&basic_types[i]);
 }
@@ -279,8 +280,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             char* name = (char *) type_get_unique_name(func_type);
             if (func_type->Function.return_type != &type_auto_return) {
-                if (bh_table_has(u64, type_func_map, name)) {
-                    u64 id = bh_table_get(u64, type_func_map, name);
+                i32 index = shgeti(type_func_map, name);
+                if (index != -1) {
+                    u64 id = type_func_map[index].value;
                     Type* existing_type = (Type *) bh_imap_get(&type_map, id);
 
                     // LEAK LEAK LEAK the func_type that is created
@@ -289,7 +291,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             }
 
             type_register(func_type);
-            bh_table_put(u64, type_func_map, name, func_type->id);
+            shput(type_func_map, name, func_type->id);
 
             return func_type;
         }
@@ -349,7 +351,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 type_register(s_type);
 
                 s_type->Struct.memarr = NULL;
-                bh_table_init(global_heap_allocator, s_type->Struct.members, s_type->Struct.mem_count + 1);
+                sh_new_arena(s_type->Struct.members);
                 bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
 
             } else {
@@ -359,7 +361,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             s_type->Struct.poly_sln = NULL;
 
             bh_arr_clear(s_type->Struct.memarr);
-            bh_table_clear(s_type->Struct.members);
+            // bh_table_clear(s_type->Struct.members);
+            shfree(s_type->Struct.members);
+            sh_new_arena(s_type->Struct.members);
 
             s_node->stcache_is_valid = 1;
 
@@ -400,11 +404,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     .meta_tags = (*member)->meta_tags,
                 };
 
-                if (bh_table_has(StructMember, s_type->Struct.members, (*member)->token->text)) {
+                if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
                     onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*member)->token->text);
                     return NULL;
                 }
-                bh_table_put(StructMember, s_type->Struct.members, (*member)->token->text, smem);
+                shput(s_type->Struct.members, (*member)->token->text, smem);
                 token_toggle_end((*member)->token);
 
                 if (smem.used) {
@@ -422,11 +426,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                             .meta_tags = (*psmem)->meta_tags,
                         };
 
-                        if (bh_table_has(StructMember, s_type->Struct.members, (*psmem)->name)) {
+                        if (shgeti(s_type->Struct.members, (*psmem)->name) != -1) {
                             onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*psmem)->name);
                             return NULL;
                         }
-                        bh_table_put(StructMember, s_type->Struct.members, (*psmem)->name, new_smem);
+                        shput(s_type->Struct.members, (*psmem)->name, new_smem);
                     }
                 }
 
@@ -444,7 +448,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             // table need to be resized.
             bh_arr_each(AstStructMember *, member, s_node->members) {
                 token_toggle_end((*member)->token);
-                bh_arr_push(s_type->Struct.memarr, &bh_table_get(StructMember, s_type->Struct.members, (*member)->token->text));
+                bh_arr_push(s_type->Struct.memarr, &s_type->Struct.members[shgeti(s_type->Struct.members, (*member)->token->text)].value);
                 token_toggle_end((*member)->token);
             }
 
@@ -672,8 +676,9 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
     // CopyPaste from above in type_build_from_ast
     char* name = (char *) type_get_unique_name(func_type);
     if (func_type->Function.return_type != &type_auto_return) {
-        if (bh_table_has(u64, type_func_map, name)) {
-            u64 id = bh_table_get(u64, type_func_map, name);
+        i32 index = shgeti(type_func_map, name);
+        if (index != -1) {
+            u64 id = type_func_map[index].value;
             Type* existing_type = (Type *) bh_imap_get(&type_map, id);
 
             // LEAK LEAK LEAK the func_type that is created
@@ -682,7 +687,7 @@ Type* type_build_function_type(bh_allocator alloc, AstFunction* func) {
     }
 
     type_register(func_type);
-    bh_table_put(u64, type_func_map, name, func_type->id);
+    shput(type_func_map, name, func_type->id);
 
     return func_type;
 }
@@ -1001,8 +1006,9 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
         case Type_Kind_Struct: {
             TypeStruct* stype = &type->Struct;
 
-            if (!bh_table_has(StructMember, stype->members, member)) return 0;
-            *smem = bh_table_get(StructMember, stype->members, member);
+            i32 index = shgeti(stype->members, member);
+            if (index == -1) return 0;
+            *smem = stype->members[index].value;
             return 1;
         }
 

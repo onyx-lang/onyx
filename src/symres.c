@@ -717,10 +717,11 @@ static SymresStatus symres_use(AstUse* use) {
         if (st->kind == Type_Kind_Pointer)
             st = st->Pointer.elem;
 
-        bh_table_each_start(StructMember, st->Struct.members);
+        fori (i, 0, shlen(st->Struct.members)) {
+            StructMember value = st->Struct.members[i].value;
             AstFieldAccess* fa = make_field_access(context.ast_alloc, use->expr, value.name);
             symbol_raw_introduce(curr_scope, value.name, use->token->pos, (AstNode *) fa);
-        bh_table_each_end;
+        }
 
         return Symres_Success;
     }
@@ -982,10 +983,11 @@ SymresStatus symres_function(AstFunction* func) {
                         st = param->local->type->Pointer.elem;
                     }
 
-                    bh_table_each_start(StructMember, st->Struct.members);
+                    fori (i, 0, shlen(st->Struct.members)) {
+                        StructMember value = st->Struct.members[i].value;
                         AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value.name);
                         symbol_raw_introduce(curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
-                    bh_table_each_end;
+                    }
 
                     param->use_processed = 1;
 

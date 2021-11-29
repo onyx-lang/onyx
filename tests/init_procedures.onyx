@@ -1,0 +1,15 @@
+#load "core/std"
+
+use package core
+
+first_init :: #init #after second_init () {
+    println("In an #init proc.");
+}
+
+second_init :: #init () {
+    println("In another #init proc.");
+}
+
+main :: (_) => {
+    println("In main!");
+}

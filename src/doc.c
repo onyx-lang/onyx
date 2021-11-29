@@ -98,7 +98,10 @@ static DocPackage doc_package_create(Package* p, bh_allocator a) {
     bh_arr_new(global_heap_allocator, dp.public_entries, 16);
     bh_arr_new(global_heap_allocator, dp.private_entries, 16);
 
-    bh_table_each_start(AstNode *, p->scope->symbols)
+    fori (i, 0, shlen(p->scope->symbols)) {
+        char *key = p->scope->symbols[i].key;
+        AstNode *value = p->scope->symbols[i].value;
+
         DocEntry de;
         if (value->token) de.pos = value->token->pos;
         de.def = node_to_doc_def(key, value, a);
@@ -106,9 +109,12 @@ static DocPackage doc_package_create(Package* p, bh_allocator a) {
         de.additional = NULL;
 
         bh_arr_push(dp.public_entries, de);
-    bh_table_each_end;
+    }
 
-    bh_table_each_start(AstNode *, p->private_scope->symbols)
+    fori (i, 0, shlen(p->private_scope->symbols)) {
+        char *key = p->scope->symbols[i].key;
+        AstNode *value = p->scope->symbols[i].value;
+
         DocEntry de;
         if (value->token) de.pos = value->token->pos;
         de.def = node_to_doc_def(key, value, a);
@@ -116,7 +122,7 @@ static DocPackage doc_package_create(Package* p, bh_allocator a) {
         de.additional = NULL;
 
         bh_arr_push(dp.private_entries, de);
-    bh_table_each_end;
+    }
 
     qsort(dp.public_entries,  bh_arr_length(dp.public_entries),  sizeof(DocEntry), cmp_doc_entry);
     qsort(dp.private_entries, bh_arr_length(dp.private_entries), sizeof(DocEntry), cmp_doc_entry);
@@ -133,10 +139,10 @@ OnyxDocumentation onyx_docs_generate() {
     doc.package_docs = NULL;
     bh_arr_new(global_heap_allocator, doc.package_docs, 16);
 
-    bh_table_each_start(Package *, context.packages);
-        DocPackage dp = doc_package_create(value, a);
+    fori (i, 0, shlen(context.packages)) {
+        DocPackage dp = doc_package_create(context.packages[i].value, a);
         bh_arr_push(doc.package_docs, dp);
-    bh_table_each_end;
+    }
 
     qsort(doc.package_docs, bh_arr_length(doc.package_docs), sizeof(DocPackage), cmp_doc_package);
 
