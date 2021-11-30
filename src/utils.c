@@ -510,10 +510,12 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
 
     // HACK HACK HACK This is probably very wrong. I don't know what guarentees that
     // the paramters and arguments are going to be in the same order exactly.
+    // Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
     fori (i, 0, bh_arr_length(call->args.values)) {
-        symbol_introduce(argument_scope,
-            template->params[i].local->token,
-            (AstNode *) ((AstArgument *) call->args.values[i])->value);
+        AstNode *value = (AstNode *) ((AstArgument *) call->args.values[i])->value;
+        // assert(template->params[i].local->type);
+
+        symbol_introduce(argument_scope, template->params[i].local->token, value);
     }
 
     if (template->poly_scope != NULL)

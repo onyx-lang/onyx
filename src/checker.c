@@ -1505,9 +1505,10 @@ CheckStatus check_subscript(AstSubscript** psub) {
 
 CheckStatus check_field_access(AstFieldAccess** pfield) {
     AstFieldAccess* field = *pfield;
+    if (field->flags & Ast_Flag_Has_Been_Checked) return Check_Success;
+
     CHECK(expression, &field->expr);
     if (field->expr->type == NULL) {
-        // onyx_report_error(field->token->pos, "Unable to deduce type of expression for accessing field.");
         YIELD(field->token->pos, "Trying to resolve type of source expression.");
     }
 
@@ -1524,16 +1525,13 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         field->expr = ((AstDereference *) field->expr)->expr;
     }
 
-    StructMember smem;
     if (field->token != NULL && field->field == NULL) {
         token_toggle_end(field->token);
-        // CLEANUP: Duplicating the string here isn't the best for effiency,
-        // but it fixes a lot of bugs, so here we are.
-        //                                      - brendanfh  2020/12/08
         field->field = bh_strdup(context.ast_alloc, field->token->text);
         token_toggle_end(field->token);
     }
 
+    StructMember smem;
     if (!type_lookup_member(field->expr->type, field->field, &smem)) {
         if (field->expr->type->kind == Type_Kind_Array) {
             if (!strcmp(field->field, "count")) {
@@ -1557,10 +1555,27 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         }
     }
 
+    // NOTE: If this member was included into the structure through a "use x: ^T" kind of statement,
+    // then we have to insert a intermediate field access in order to access the correct member.
+    if (smem.use_through_pointer_index >= 0) {
+        StructMember containing_member;
+        assert(type_lookup_member_by_idx(field->expr->type, smem.use_through_pointer_index, &containing_member));
+
+        AstFieldAccess *new_access = onyx_ast_node_new(context.ast_alloc, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
+        new_access->token = field->token;
+        new_access->offset = containing_member.offset;
+        new_access->idx = containing_member.idx;
+        new_access->type = containing_member.type;
+        new_access->expr = field->expr;
+        new_access->flags |= Ast_Flag_Has_Been_Checked;
+
+        field->expr = (AstTyped *) new_access;
+    }
+
     field->offset = smem.offset;
     field->idx = smem.idx;
     field->type = smem.type;
-
+    field->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
 }
 

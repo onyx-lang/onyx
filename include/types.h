@@ -76,6 +76,7 @@ typedef struct StructMember {
     char *name;
 
     struct AstTyped** initial_value;
+    i32 use_through_pointer_index;
     b32 included_through_use : 1;
     b32 used : 1;
 

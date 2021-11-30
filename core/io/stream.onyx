@@ -3,7 +3,7 @@ package core.io
 use package core
 
 Stream :: struct {
-    vtable : ^Stream_Vtable;
+    use vtable : ^Stream_Vtable;
 }
 
 // #package

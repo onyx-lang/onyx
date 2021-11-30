@@ -388,57 +388,80 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 }
 
                 if (mem_alignment > alignment) alignment = mem_alignment;
-                if (offset % mem_alignment != 0) {
-                    offset += mem_alignment - (offset % mem_alignment);
-                }
+                bh_align(offset, mem_alignment);
 
                 token_toggle_end((*member)->token);
+                if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
+                    onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*member)->token->text);
+                    return NULL;
+                }
+
                 StructMember smem = {
                     .offset = offset,
                     .type = (*member)->type,
                     .idx = idx,
                     .name = bh_strdup(alloc, (*member)->token->text),
                     .initial_value = &(*member)->initial_value,
+                    .meta_tags = (*member)->meta_tags,
+
                     .included_through_use = 0,
                     .used = (*member)->is_used,
-                    .meta_tags = (*member)->meta_tags,
+                    .use_through_pointer_index = -1,
                 };
-
-                if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
-                    onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*member)->token->text);
-                    return NULL;
-                }
                 shput(s_type->Struct.members, (*member)->token->text, smem);
                 token_toggle_end((*member)->token);
 
                 if (smem.used) {
-                    assert((*member)->type->kind == Type_Kind_Struct);
+                    Type* used_type = (*member)->type;
 
-                    bh_arr_each(StructMember*, psmem, (*member)->type->Struct.memarr) {
-                        StructMember new_smem = {
-                            .offset = offset + (*psmem)->offset,
-                            .type   = (*psmem)->type,
-                            .idx    = -1, // Dummy value because I don't think this is needed.
-                            .name   = (*psmem)->name,
-                            .initial_value = (*psmem)->initial_value,
-                            .included_through_use = 1,
-                            .used = 0,
-                            .meta_tags = (*psmem)->meta_tags,
-                        };
+                    b32 type_is_pointer = 0;
+                    if (used_type->kind == Type_Kind_Pointer) {
+                        type_is_pointer = 1;
+                        used_type = type_get_contained_type(used_type);
+                    }
 
+                    if (used_type->kind != Type_Kind_Struct) {
+                        onyx_report_error((*member)->token->pos, "Can only use things of structure, or pointer to structure type.");
+                        return NULL;
+                    }
+
+                    bh_arr_each(StructMember*, psmem, used_type->Struct.memarr) {
                         if (shgeti(s_type->Struct.members, (*psmem)->name) != -1) {
-                            onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*psmem)->name);
+                            onyx_report_error((*member)->token->pos, "Used name '%s' conflicts with existing struct member.", (*psmem)->name);
                             return NULL;
                         }
+
+                        StructMember new_smem;
+                        new_smem.type   = (*psmem)->type;
+                        new_smem.name   = (*psmem)->name;
+                        new_smem.meta_tags = (*psmem)->meta_tags;
+                        new_smem.used = 0;
+                        new_smem.included_through_use = 1;
+
+                        if (type_is_pointer) {
+                            new_smem.offset = offset;
+                            new_smem.idx = (*psmem)->idx;
+                            new_smem.initial_value = NULL;
+                            new_smem.use_through_pointer_index = idx;
+                        } else {
+                            new_smem.offset = offset + (*psmem)->offset;
+                            new_smem.idx    = -1; // Dummy value because I don't think this is needed.
+                            new_smem.initial_value = (*psmem)->initial_value;
+                            new_smem.use_through_pointer_index = -1;
+                        }
+
                         shput(s_type->Struct.members, (*psmem)->name, new_smem);
                     }
                 }
 
                 u32 type_size = type_size_of((*member)->type);
 
-                if (!is_union) offset += type_size;
-                if (!is_union) size = offset;
-                else           size = bh_max(size, type_size);
+                if (!is_union) {
+                    offset += type_size;
+                    size = offset;
+                } else {
+                    size = bh_max(size, type_size);
+                }
 
                 idx++;
             }
@@ -453,13 +476,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             }
 
             alignment = bh_max(s_node->min_alignment, alignment);
-            s_type->Struct.alignment = alignment;
-
-            if (size % alignment != 0) {
-                size += alignment - (size % alignment);
-            }
-
+            bh_align(size, alignment);
             size = bh_max(s_node->min_size, size);
+
+            s_type->Struct.alignment = alignment;
             s_type->Struct.size = size;
 
             s_type->Struct.linear_members = NULL;
@@ -1000,15 +1020,15 @@ Type* type_get_contained_type(Type* type) {
 }
 
 static const StructMember slice_members[] = {
-    { 0, 0, NULL,                         "data",  NULL, 0, 0 },
-    { 8, 1, &basic_types[Basic_Kind_U32], "count", NULL, 0, 0 },
+    { 0, 0, NULL,                         "data",  NULL, -1, 0, 0 },
+    { 8, 1, &basic_types[Basic_Kind_U32], "count", NULL, -1, 0, 0 },
 };
 
 static const StructMember array_members[] = {
-    { 0,  0, NULL,                         "data",      NULL, 0, 0 },
-    { 8,  1, &basic_types[Basic_Kind_U32], "count",     NULL, 0, 0 },
-    { 12, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, 0, 0 },
-    { 16, 3, NULL,                         "allocator", NULL, 0, 0 },
+    { 0,  0, NULL,                         "data",      NULL, -1, 0, 0 },
+    { 8,  1, &basic_types[Basic_Kind_U32], "count",     NULL, -1, 0, 0 },
+    { 12, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, -1, 0, 0 },
+    { 16, 3, NULL,                         "allocator", NULL, -1, 0, 0 },
 };
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
