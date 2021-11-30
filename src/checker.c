@@ -408,9 +408,9 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                     CHECK(binaryop, &bh_arr_last(switchnode->case_exprs).comparison);
                     break;
                 }
-            }
 
-        value_checked:
+                value_checked:
+            }
         }
 
         switchnode->yield_return_index += 1;
