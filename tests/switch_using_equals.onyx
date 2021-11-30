@@ -1,0 +1,25 @@
+#load "core/std"
+
+use package core
+
+Vector2 :: struct { x, y: i32; }
+#operator == macro (v1: Vector2, v2: Vector2) => v1.x == v2.x && v1.y == v2.y;
+
+main :: (args: [] cstr) {
+    for .[ "Some", "Thing", "Other" ] {
+        switch it {
+            case "Thing" do println("Got thing!");
+            case "Some"  do println("Got some!");
+            case #default do println("Got default!");
+        }
+    }
+
+    v := Vector2.{ 1, 0 };
+    switch v {
+        case .{ 0, 0 } do println("0, 0");
+        case .{ 0, 1 } do println("0, 1");
+        case .{ 1, 0 } do println("1, 0");
+        case .{ 1, 1 } do println("1, 1");
+        case #default do println("none of the above.");
+    }
+}

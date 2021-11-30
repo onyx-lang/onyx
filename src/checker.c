@@ -294,6 +294,8 @@ CheckStatus check_for(AstFor* fornode) {
 }
 
 static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, AstBlock* block, OnyxFilePos pos) {
+    assert(switchnode->switch_kind == Switch_Kind_Integer);
+
     switchnode->min_case = bh_min(switchnode->min_case, case_value);
     switchnode->max_case = bh_max(switchnode->max_case, case_value);
 
@@ -311,23 +313,39 @@ CheckStatus check_switch(AstSwitch* switchnode) {
 
     CHECK(expression, &switchnode->expr);
     Type* resolved_expr_type = resolve_expression_type(switchnode->expr);
-    if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
-        ERROR(switchnode->expr->token->pos, "expected integer or enum type for switch expression");
+
+    if (!(switchnode->flags & Ast_Flag_Has_Been_Checked)) {
+        if (resolved_expr_type == NULL) YIELD(switchnode->token->pos, "Waiting for expression type to be known.");
+
+        switchnode->switch_kind = Switch_Kind_Integer;
+        if (!type_is_integer(switchnode->expr->type) && switchnode->expr->type->kind != Type_Kind_Enum) {
+            switchnode->switch_kind = Switch_Kind_Use_Equals;
+        }
+
+        switch (switchnode->switch_kind) {
+            case Switch_Kind_Integer:
+                switchnode->min_case = 0xffffffffffffffff;
+                bh_imap_init(&switchnode->case_map, global_heap_allocator, bh_arr_length(switchnode->cases) * 2);
+                break;
+
+            case Switch_Kind_Use_Equals:
+                // Guessing the maximum number of case expressions there will be.
+                bh_arr_new(global_heap_allocator, switchnode->case_exprs, bh_arr_length(switchnode->cases) * 2);
+                break;
+
+            default: assert(0);
+        }
     }
+    switchnode->flags |= Ast_Flag_Has_Been_Checked;
 
-    // LEAK if this has to be yielded
-    bh_imap_init(&switchnode->case_map, global_heap_allocator, bh_arr_length(switchnode->cases) * 2);
-
-    switchnode->min_case = 0xffffffffffffffff;
-
-    // Umm, this doesn't check the type of the case expression to the type of the expression
-    bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
+    fori (i, switchnode->yield_return_index, bh_arr_length(switchnode->cases)) {
+        AstSwitchCase *sc = &switchnode->cases[i];
         CHECK(block, sc->block);
 
         bh_arr_each(AstTyped *, value, sc->values) {
             CHECK(expression, value);
 
-            if ((*value)->kind == Ast_Kind_Range_Literal) {
+            if (switchnode->switch_kind == Switch_Kind_Integer && (*value)->kind == Ast_Kind_Range_Literal) {
                 AstRangeLiteral* rl = (AstRangeLiteral *) (*value);
                 resolve_expression_type(rl->low);
                 resolve_expression_type(rl->high);
@@ -359,29 +377,43 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                     type_get_name(resolved_expr_type), type_get_name((*value)->type));
             }
 
-            if (node_is_type((AstNode*) (*value))) {
-                Type* type = type_build_from_ast(context.ast_alloc, (AstType*) (*value));
+            switch (switchnode->switch_kind) {
+                case Switch_Kind_Integer: {
+                    b32 is_valid;
+                    i64 integer_value = get_expression_integer_value(*value, &is_valid);
+                    if (!is_valid)
+                        ERROR_((*value)->token->pos, "Case statement expected compile time known integer. Got '%s'.", onyx_ast_node_kind_string((*value)->kind));
 
-                if (add_case_to_switch_statement(switchnode, type->id, sc->block, sc->block->token->pos))
-                    return Check_Error;
+                    if (add_case_to_switch_statement(switchnode, integer_value, sc->block, sc->block->token->pos))
+                        return Check_Error;
 
-                continue;
+                    break;
+                }
+
+                case Switch_Kind_Use_Equals: {
+                    bh_arr_each(CaseToBlock, ctb, switchnode->case_exprs) {
+                        if (ctb->original_value == *value) {
+                            CHECK(expression, (AstTyped **) &ctb->comparison);
+                            goto value_checked;
+                        }
+                    }
+
+                    CaseToBlock ctb;
+                    ctb.block = sc->block;
+                    ctb.original_value = *value;
+                    ctb.comparison = make_binary_op(context.ast_alloc, Binary_Op_Equal, switchnode->expr, *value);
+                    ctb.comparison->token = (*value)->token;
+                    bh_arr_push(switchnode->case_exprs, ctb);
+
+                    CHECK(binaryop, &bh_arr_last(switchnode->case_exprs).comparison);
+                    break;
+                }
             }
 
-            if ((*value)->kind == Ast_Kind_Enum_Value) {
-                (*value) = (AstTyped *) ((AstEnumValue *) (*value))->value;
-            }
-
-            if ((*value)->kind != Ast_Kind_NumLit) {
-                ERROR((*value)->token->pos, "case statement expected compile time known integer");
-            }
-
-            resolve_expression_type((*value));
-            // promote_numlit_to_larger((AstNumLit *) (*value));
-
-            if (add_case_to_switch_statement(switchnode, ((AstNumLit *) (*value))->value.l, sc->block, sc->block->token->pos))
-                return Check_Error;
+        value_checked:
         }
+
+        switchnode->yield_return_index += 1;
     }
 
     if (switchnode->default_case)

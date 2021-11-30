@@ -800,8 +800,10 @@ Type* resolve_expression_type(AstTyped* node) {
     return node->type;
 }
 
-i64 get_expression_integer_value(AstTyped* node) {
+i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
     resolve_expression_type(node);
+
+    if (is_valid) *is_valid = 1;
 
     if (node->kind == Ast_Kind_NumLit && type_is_integer(node->type)) {
         return ((AstNumLit *) node)->value.l;
@@ -812,7 +814,7 @@ i64 get_expression_integer_value(AstTyped* node) {
     }
 
     if (node->kind == Ast_Kind_Argument) {
-        return get_expression_integer_value(((AstArgument *) node)->value);
+        return get_expression_integer_value(((AstArgument *) node)->value, is_valid);
     }
 
     if (node->kind == Ast_Kind_Size_Of) {
@@ -824,14 +826,19 @@ i64 get_expression_integer_value(AstTyped* node) {
     }
 
     if (node->kind == Ast_Kind_Alias) {
-        return get_expression_integer_value(((AstAlias *) node)->alias);
+        return get_expression_integer_value(((AstAlias *) node)->alias, is_valid);
+    }
+
+    if (node->kind == Ast_Kind_Enum_Value) {
+        return get_expression_integer_value(((AstEnumValue *) node)->value, is_valid);
     }
 
     if (node_is_type((AstNode*) node)) {
         Type* type = type_build_from_ast(context.ast_alloc, (AstType *) node);
-        return type->id;
+        if (type) return type->id;
     }
 
+    if (is_valid) *is_valid = 0;
     return 0;
 }
 
@@ -1227,7 +1234,7 @@ b32 static_if_resolution(AstIf* static_if) {
     if (static_if->kind != Ast_Kind_Static_If) return 0;
 
     // assert(condition_value->kind == Ast_Kind_NumLit); // This should be right, right?
-    i64 value = get_expression_integer_value(static_if->cond);
+    i64 value = get_expression_integer_value(static_if->cond, NULL);
 
     return value != 0;
 }

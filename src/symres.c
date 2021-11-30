@@ -618,6 +618,12 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
     if (switchnode->default_case)
         SYMRES(block, switchnode->default_case);
 
+    if (switchnode->switch_kind == Switch_Kind_Use_Equals && switchnode->case_exprs) {
+        bh_arr_each(CaseToBlock, ctb, switchnode->case_exprs) {
+            SYMRES(expression, (AstTyped **) &ctb->comparison);
+        }
+    }
+
     if (switchnode->initialization != NULL) scope_leave();
 
     return Symres_Success;

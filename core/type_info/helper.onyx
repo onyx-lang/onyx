@@ -125,7 +125,6 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
     }
 }
 
-
 offset_of :: (T: type_expr, member: str) -> u32 {
     info := get_type_info(T);
     if info == null         do return 0;
@@ -138,6 +137,21 @@ offset_of :: (T: type_expr, member: str) -> u32 {
 
     // Should this return something else if the member was not found?
     return 0;
+}
+
+get_tags_for_member :: (S: type_expr, member_name: str) -> [] any {
+    use type_info;
+    
+    ti := get_type_info(S);
+    if ti.kind != .Struct do return .[];
+    
+    for ^ (cast(^Type_Info_Struct) ti).members {
+        if it.name == member_name {
+            return it.tags;
+        }
+    }
+    
+    return .[];
 }
 
 struct_constructed_from :: (struct_type: type_expr, base_type: type_expr) -> bool {

@@ -324,7 +324,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     return NULL;
                 }
 
-                count = get_expression_integer_value(a_node->count_expr);
+                count = get_expression_integer_value(a_node->count_expr, NULL);
             }
 
             a_type->Array.count = count;

@@ -1140,36 +1140,58 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         block_num++;
     }
 
-    u64 count = switch_node->max_case + 1 - switch_node->min_case;
-    BranchTable* bt = bh_alloc(mod->extended_instr_alloc, sizeof(BranchTable) + sizeof(u32) * count);
-    bt->count = count;
-    bt->default_case = block_num;
-    fori (i, 0, bt->count) bt->cases[i] = bt->default_case;
+    switch (switch_node->switch_kind) {
+        case Switch_Kind_Integer: {
+            u64 count = switch_node->max_case + 1 - switch_node->min_case;
+            BranchTable* bt = bh_alloc(mod->extended_instr_alloc, sizeof(BranchTable) + sizeof(u32) * count);
+            bt->count = count;
+            bt->default_case = block_num;
+            fori (i, 0, bt->count) bt->cases[i] = bt->default_case;
 
-    bh_arr_each(bh__imap_entry, sc, switch_node->case_map.entries) {
-        bt->cases[sc->key - switch_node->min_case] = bh_imap_get(&block_map, (u64) sc->value);
-    }
+            bh_arr_each(bh__imap_entry, sc, switch_node->case_map.entries) {
+                bt->cases[sc->key - switch_node->min_case] = bh_imap_get(&block_map, (u64) sc->value);
+            }
 
-    // CLEANUP: We enter a new block here in order to setup the correct
-    // indicies for the jump targets in the branch table. For example,
-    //
-    // <expr>
-    // jump_table
-    // label0:
-    // ...
-    // label1:
-    // ...
-    //
-    // If we didn't enter a new block, then jumping to label 0, would jump
-    // to the second block, and so on.
-    WID(WI_BLOCK_START, 0x40);
-    emit_expression(mod, &code, switch_node->expr);
-    if (switch_node->min_case != 0) {
-        WID(WI_I32_CONST, switch_node->min_case);
-        WI(WI_I32_SUB);
+            // NOTE: We enter a new block here in order to setup the correct
+            // indicies for the jump targets in the branch table. For example,
+            //
+            // <expr>
+            // jump_table
+            // label0:
+            // ...
+            // label1:
+            // ...
+            //
+            // If we didn't enter a new block, then jumping to label 0, would jump
+            // to the second block, and so on.
+            WID(WI_BLOCK_START, 0x40);
+            emit_expression(mod, &code, switch_node->expr);
+            if (switch_node->min_case != 0) {
+                WID(WI_I32_CONST, switch_node->min_case);
+                WI(WI_I32_SUB);
+            }
+            WIP(WI_JUMP_TABLE, bt);
+            WI(WI_BLOCK_END);
+            break;
+        }
+
+        case Switch_Kind_Use_Equals: {
+            WID(WI_BLOCK_START, 0x40);
+
+            bh_arr_each(CaseToBlock, ctb, switch_node->case_exprs) {
+                emit_expression(mod, &code, (AstTyped *) ctb->comparison);
+
+                u64 bn = bh_imap_get(&block_map, (u64) ctb->block);
+                WID(WI_IF_START, 0x40);
+                WID(WI_JUMP, bn + 1);
+                WI(WI_IF_END);
+            }
+
+            WID(WI_JUMP, block_num);
+            WI(WI_BLOCK_END);
+            break;
+        }
     }
-    WIP(WI_JUMP_TABLE, bt);
-    WI(WI_BLOCK_END);
 
     bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
         if (bh_imap_get(&block_map, (u64) sc->block) == 0xdeadbeef) continue;

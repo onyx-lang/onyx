@@ -772,12 +772,24 @@ struct AstIfWhile {
 typedef struct AstIfWhile AstIf;
 typedef struct AstIfWhile AstWhile;
 
+typedef enum SwitchKind {
+    Switch_Kind_Integer,
+    Switch_Kind_Use_Equals,
+} SwitchKind;
+
+typedef struct CaseToBlock {
+    AstTyped *original_value;
+    AstBinaryOp *comparison;
+    AstBlock *block;
+} CaseToBlock;
+
 struct AstSwitchCase {
     // NOTE: All expressions that end up in this block
     bh_arr(AstTyped *) values;
     
     AstBlock *block;
 };
+
 struct AstSwitch {
     AstNode_base;
 
@@ -789,10 +801,23 @@ struct AstSwitch {
     bh_arr(AstSwitchCase) cases;
     AstBlock *default_case;
 
-    // NOTE: This is a mapping from the compile time known case value
-    // to a pointer to the block that it is associated with.
-    bh_imap case_map;
-    u64 min_case, max_case;
+    i32 yield_return_index;
+    SwitchKind switch_kind;
+
+    union {
+        struct {
+            // NOTE: This is a mapping from the compile time known case value
+            // to a pointer to the block that it is associated with.
+            bh_imap case_map;
+            u64 min_case, max_case;
+        };
+
+        struct {
+            // NOTE: This is a mapping from the '==' binary op node to
+            // a pointer to the block that it is associated with.
+            bh_arr(CaseToBlock) case_exprs;
+        };
+    };
 };
 
 // Type Nodes
@@ -1539,7 +1564,7 @@ typedef enum TypeMatch {
 #define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
 TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
 Type* resolve_expression_type(AstTyped* node);
-i64 get_expression_integer_value(AstTyped* node);
+i64 get_expression_integer_value(AstTyped* node, b32 *out_is_valid);
 
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
