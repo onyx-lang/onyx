@@ -118,8 +118,7 @@ main :: (args: [] cstr) {
 
         printf("PolyStruct<i32, f32>({}, {})\n", ps1.t_data, ps1.r_data);
 
-        // Currently, this is how you have to do this.
-        ps2 := <PolyStruct(f32, i32)>.{ 1234, 5678 };
+        ps2 := PolyStruct(f32, i32).{ 1234, 5678 };
         printf("PolyStruct<f32, i32>({}, {})\n", ps2.t_data, ps2.r_data);
     }
 
@@ -131,7 +130,7 @@ main :: (args: [] cstr) {
             r_data : R = 5678;
         }
 
-        PolyStructTyped :: <PolyStruct(i32, f32)>;
+        PolyStructTyped :: PolyStruct(i32, f32);
 
         ps := PolyStructTyped.{};
         printf("PolyStruct<i32, f32>({}, {})\n", ps.t_data, ps.r_data);

@@ -24,7 +24,7 @@ main :: (args: [] cstr) {
         str_member : str = default; 
     }
 
-    swd := <SimpleWithDefault(i32, "Hello World!")>.{ x = 1234 };
+    swd := SimpleWithDefault(i32, "Hello World!").{ x = 1234 };
     println(swd.x);
     println(swd.str_member);
     poly_match(swd);

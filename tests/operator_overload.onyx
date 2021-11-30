@@ -59,7 +59,7 @@ join :: (a: Vec($T, $N), b: Vec(T, $M)) -> Vec(T, #value N + M) {
 }
 
 make_vec :: (data: [$N] $T) -> Vec(T, N) {
-    return <Vec(T, N)>.{ data };
+    return .{ data };
 }
 
 main :: (args: [] cstr) {

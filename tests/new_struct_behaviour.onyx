@@ -57,7 +57,7 @@ main :: (args: [] cstr) {
     foo := Foo.{};
     println(foo->get_member2_plus_three());
     
-    ps := <PolyStruct(i32)>.{ 1234 };
+    ps := PolyStruct(i32).{ 1234 };
     println(ps.works(ps.member));
 
     plus_one : (i32) -> i32 = PolyStruct.member_function;

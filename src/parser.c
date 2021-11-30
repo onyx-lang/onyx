@@ -516,17 +516,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
-        // :TypeValueInterchange
-        case '<': {
-            AstTypeAlias* alias = make_node(AstTypeAlias, Ast_Kind_Type_Alias);
-            alias->token = expect_token(parser, '<');
-            alias->to = parse_type(parser);
-            expect_token(parser, '>');
-
-            retval = (AstTyped *) alias;
-            break;
-        }
-
         case '[': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;

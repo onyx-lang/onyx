@@ -17,14 +17,14 @@ binary_write_byte :: (use bw: ^BinaryWriter, byte: u8) {
 }
 
 binary_write :: (use bw: ^BinaryWriter, $T: type_expr, v: ^T) {
-    stream_write(stream, <[] u8>.{ ~~ v, sizeof T });
+    stream_write(stream, .{ ~~ v, sizeof T });
 }
 
 binary_write_slice :: (use bw: ^BinaryWriter, sl: [] $T, output_size := false) {
     assert(false, "binary_write_slice is not working at the moment");
     if output_size do binary_write(bw, i32, sl.count);
 
-    bytes := <[] u8>.{
+    bytes := ([] u8).{
         data = cast(^u8) ^sl.data[0],
         count = sizeof T * sl.count,
     };
@@ -72,5 +72,5 @@ binary_read_slice :: (use br: ^BinaryReader,
     sl := memory.make_slice(u8, size * sizeof T, allocator = allocator);
     _, bytes_read := stream_read(stream, sl);
 
-    return <[] T>.{ data = cast(^T) sl.data, count = size };
+    return .{ data = cast(^T) sl.data, count = size };
 }
