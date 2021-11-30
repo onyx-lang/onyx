@@ -391,12 +391,16 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                 }
 
                 case Switch_Kind_Use_Equals: {
+                    // Gross
+                    b32 found = 0;
                     bh_arr_each(CaseToBlock, ctb, switchnode->case_exprs) {
                         if (ctb->original_value == *value) {
                             CHECK(expression, (AstTyped **) &ctb->comparison);
-                            goto value_checked;
+                            found = 1;
+                            break; 
                         }
                     }
+                    if (found) break;
 
                     CaseToBlock ctb;
                     ctb.block = sc->block;
@@ -408,8 +412,6 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                     CHECK(binaryop, &bh_arr_last(switchnode->case_exprs).comparison);
                     break;
                 }
-
-                value_checked:
             }
         }
 
