@@ -285,11 +285,8 @@ CheckStatus check_for(AstFor* fornode) {
     if (fornode->by_pointer)
         fornode->var->flags |= Ast_Flag_Cannot_Take_Addr;
 
-    if (fornode->loop_type == For_Loop_Invalid) {
-        ERROR_(error_loc,
-                "Cannot iterate over a '%s'.",
-                type_get_name(iter_type));
-    }
+    if (fornode->loop_type == For_Loop_Invalid)
+        ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(iter_type));
 
     CHECK(block, fornode->stmt);
 
@@ -1314,10 +1311,7 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
     doblock->block->rules = Block_Rule_Do_Block;
     CHECK(block, doblock->block);
 
-    if (doblock->type == &type_auto_return) {
-        // ERROR(doblock->token->pos, "Unable to determine type of do-block expression.");
-        doblock->type = &basic_types[Basic_Kind_Void];
-    }
+    if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
 
     expected_return_type = old_expected_return_type;
     doblock->flags |= Ast_Flag_Has_Been_Checked;
@@ -2633,21 +2627,6 @@ poly_query_done:
     return Check_Complete;
 }
 
-CheckStatus check_node(AstNode* node) {
-    switch (node->kind) {
-        case Ast_Kind_Function:             return check_function((AstFunction *) node);
-        case Ast_Kind_Overloaded_Function:  return check_overloaded_function((AstOverloadedFunction *) node);
-        case Ast_Kind_Block:                return check_block((AstBlock *) node);
-        case Ast_Kind_Return:               return check_return((AstReturn *) node);
-        case Ast_Kind_If:                   return check_if((AstIfWhile *) node);
-        case Ast_Kind_Static_If:            return check_if((AstIfWhile *) node);
-        case Ast_Kind_While:                return check_while((AstIfWhile *) node);
-        case Ast_Kind_Call:                 return check_call((AstCall **) &node);
-        case Ast_Kind_Binary_Op:            return check_binaryop((AstBinaryOp **) &node);
-        default:                            return check_expression((AstTyped **) &node);
-    }
-}
-
 void check_entity(Entity* ent) {
     CheckStatus cs = Check_Success;
 
@@ -2665,14 +2644,12 @@ void check_entity(Entity* ent) {
         case Entity_Type_Macro:                    cs = check_macro(ent->macro); break;
         case Entity_Type_Constraint_Check:         cs = check_constraint(ent->constraint); break;
         case Entity_Type_Polymorph_Query:          cs = check_polyquery(ent->poly_query); break;
+        case Entity_Type_Enum_Value:               cs = check_expression(&ent->enum_value->value); break;
+        case Entity_Type_Process_Directive:        cs = check_process_directive((AstNode *) ent->expr); break;
 
         case Entity_Type_Expression:
             cs = check_expression(&ent->expr);
             resolve_expression_type(ent->expr);
-            break;
-
-        case Entity_Type_Enum_Value:
-            cs = check_expression(&ent->enum_value->value);
             break;
 
         case Entity_Type_Type_Alias:
@@ -2681,8 +2658,6 @@ void check_entity(Entity* ent) {
             else
                 cs = check_type(ent->type_alias);
             break;
-
-        case Entity_Type_Process_Directive:        cs = check_process_directive((AstNode *) ent->expr); break;
 
         case Entity_Type_File_Contents: 
             if (context.options->no_file_contents) {
