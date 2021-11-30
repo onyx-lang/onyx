@@ -1,0 +1,32 @@
+#load "core/std"
+use package core
+
+Person_Vtable :: struct {
+    greet: (^Person) -> void;
+}
+
+Person :: struct {
+    use vtable: ^Person_Vtable;
+
+    name: str;
+}
+
+nice_person := Person_Vtable.{
+    greet = (use p: ^Person) {
+        printf("Hello, I am {}!\n", name);
+    }
+}
+
+mean_person := Person_Vtable.{
+    greet = (use p: ^Person) {
+        printf("Go away!! {}\n", greet);
+    }
+}
+
+main :: (args) => {
+    billy := Person.{ ^nice_person, "Billy" };
+    charles := Person.{ ^mean_person, "Charles" };
+
+    billy->greet();
+    charles->greet();
+}
