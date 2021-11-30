@@ -1537,9 +1537,9 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
 }
 
 CheckStatus check_method_call(AstBinaryOp** pmcall) {
-    AstBinaryOp* mcall = *pmcall
+    AstBinaryOp* mcall = *pmcall;
     CHECK(expression, &mcall->left);
-    if (mcall->left->type == NULL) YIELD((*mcall)->token->pos, "Trying to resolve type of left hand side.");
+    if (mcall->left->type == NULL) YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
 
     AstTyped* implicit_argument = mcall->left;
 
