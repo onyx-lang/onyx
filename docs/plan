@@ -46,7 +46,7 @@ HOW:
             - Removes the argument from the list and replaces the function with the
                 baked function
 
-        [ ] Add threading intrinsics
+        [X] Add threading intrinsics
             - This will actually be fairly easy since I think all that is needed is
                 to implement the intrinsics.
             - ^^^ This is a false statement. I also need to have 'thread local variables' for
@@ -56,8 +56,6 @@ HOW:
         [X] Array literals
 
         [ ] transmute
-
-        [ ] explicit memory controls at top level
 
         [ ] look into creating a source map
             - first-look looks really gross

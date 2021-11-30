@@ -1,5 +1,7 @@
 List of known bugs:
 
+[ ] switch statements should work with any type that supports '=='.
+
 [ ] macros cannot use 'use'.
 
     Vec2 :: struct { x, y : f32; }
@@ -8,7 +10,27 @@ List of known bugs:
         println(x); // Doesn't work
     }
 
-[ ] I don't know why this doesn't work... It is complaining that it couldn't match
+[ ] macros don't work with any:
+    format :: macro (format: str, args: ..any) -> str {
+        buffer: [1024] u8;
+        return conv.str_format_va(buffer, format, args);
+    }
+
+[ ] Compound assignment operators such as += evaluate the location of their left-value twice.
+    Not only is this bad for efficiency, if the value requires calling a function, that
+    function will be called twice instead of once. This is a simple code generation fix,
+    but will require not destroying this information in the checking phase of the compiler.
+
+[ ] Top level implicit typed arrays/struct literals are not correctly being marked as compile-time.
+
+    Vec2 :: struct { x, y: i32; }
+    
+    Hex_Directions := Vec2.[
+        .{  1, 0 }, .{  1, -1 }, .{ 0, -1 }, 
+        .{ -1, 0 }, .{ -1,  1 }, .{ 0,  1 }, 
+    ];
+
+[X] I don't know why this doesn't work... It is complaining that it couldn't match
     either of these cases, but if I remove the first, it matches the second. This
     is clearly wrong behavior, but I don't immediately see where the problem is.
 
@@ -36,7 +58,7 @@ List of known bugs:
     bring many complications to the table about how resolve this. Current solution is to
     turn expression macros (macros that specify a return value) into a `do` expression.
 
-[ ] Enums suck. Make them more powerful.
+[X] Enums suck. Make them more powerful.
 
 [X] add `do` expressions:
 
@@ -56,8 +78,6 @@ List of known bugs:
 
 [X] Add support for tabs in error messages.
 
-[ ] switch statements should work with any type that supports '=='.
-
 [X] recursive quick-procedures / procedures that use #auto have trouble if the first lexical
     return statement is a recursive call.
 
@@ -67,12 +87,7 @@ List of known bugs:
 
 [X] There is not proper cycle detection in the compiler. Infinite should not be possible.
 
-[ ] Compound assignment operators such as += evaluate the location of their left-value twice.
-    Not only is this bad for efficiency, if the value requires calling a function, that
-    function will be called twice instead of once. This is a simple code generation fix,
-    but will require not destroying this information in the checking phase of the compiler.
-
-[ ] This currently does not work but I think it should:
+[X] This currently does not work but I think it should:
 
     baked_proc :: (x: $T, $func: (T) -> T) -> T {
         return func(x);
@@ -80,15 +95,6 @@ List of known bugs:
 
     The problem is that 'T' is an unresolved symbol because the context of the function type
     does not have the solved value of T in it.
-
-[ ] Top level implicit typed arrays/struct literals are not correctly being marked as compile-time.
-
-    Vec2 :: struct { x, y: i32; }
-    
-    Hex_Directions := Vec2.[
-        .{  1, 0 }, .{  1, -1 }, .{ 0, -1 }, 
-        .{ -1, 0 }, .{ -1,  1 }, .{ 0,  1 }, 
-    ];
 
 [X] Segfault when trying to immediately access type inferred array literal.
     println( (.[ 1, 2, 3, 4, 5 ])[0] );
