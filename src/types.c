@@ -987,6 +987,18 @@ u32 type_get_alignment_log2(Type* type) {
     return 2;
 }
 
+Type* type_get_contained_type(Type* type) {
+    if (type == NULL) return NULL;
+    switch (type->kind) {
+        case Type_Kind_Pointer:  return type->Pointer.elem;
+        case Type_Kind_Array:    return type->Array.elem;
+        case Type_Kind_Slice:    return type->Slice.elem;
+        case Type_Kind_DynArray: return type->DynArray.elem;
+        case Type_Kind_VarArgs:  return type->VarArgs.elem;
+        default: return NULL;
+    }
+}
+
 static const StructMember slice_members[] = {
     { 0, 0, NULL,                         "data",  NULL, 0, 0 },
     { 8, 1, &basic_types[Basic_Kind_U32], "count", NULL, 0, 0 },

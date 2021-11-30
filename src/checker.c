@@ -1430,13 +1430,22 @@ CheckStatus check_subscript(AstSubscript** psub) {
         return Check_Error;
     }
 
+    if (sub->addr->type->kind == Type_Kind_Slice || sub->addr->type->kind == Type_Kind_DynArray || sub->addr->type->kind == Type_Kind_VarArgs) {
+        // If we are accessing on a slice or a dynamic array, implicitly add a field access for the data member
+        StructMember smem;
+        type_lookup_member(sub->addr->type, "data", &smem);
+
+        AstFieldAccess* fa = make_field_access(context.ast_alloc, sub->addr, "data");
+        fa->type   = smem.type;
+        fa->offset = smem.offset;
+        fa->idx    = smem.idx;
+
+        sub->addr = (AstTyped *) fa;
+    }
+
     if (types_are_compatible(sub->expr->type, builtin_range_type_type)) {
-        Type *of = NULL;
-        if (sub->addr->type->kind == Type_Kind_Pointer)
-            of = sub->addr->type->Pointer.elem;
-        else if (sub->addr->type->kind == Type_Kind_Array)
-            of = sub->addr->type->Array.elem;
-        else {
+        Type *of = type_get_contained_type(sub->addr->type);
+        if (of == NULL) {
             // FIXME: Slice creation should be allowed for slice types and dynamic array types, like it
             // is below, but this code doesn't look at that.
             report_bad_binaryop((AstBinaryOp *) sub);
@@ -1451,40 +1460,18 @@ CheckStatus check_subscript(AstSubscript** psub) {
     }
 
     resolve_expression_type(sub->expr);
-    if (sub->expr->type->kind != Type_Kind_Basic
-            || (sub->expr->type->Basic.kind != Basic_Kind_I32 && sub->expr->type->Basic.kind != Basic_Kind_U32)) {
+    if (!type_is_small_integer(sub->expr->type)) {
         report_bad_binaryop((AstBinaryOp *) sub);
-        ERROR_(sub->token->pos,
-            "Expected type u32 or i32 for index, got '%s'.",
-            node_get_type_name(sub->expr));
+        ERROR_(sub->token->pos, "Expected small integer type for index, got '%s'.", node_get_type_name(sub->expr));
     }
 
-    if (sub->addr->type->kind == Type_Kind_Pointer)
-        sub->type = sub->addr->type->Pointer.elem;
-    else if (sub->addr->type->kind == Type_Kind_Array)
-        sub->type = sub->addr->type->Array.elem;
-    else if (sub->addr->type->kind == Type_Kind_Slice
-            || sub->addr->type->kind == Type_Kind_DynArray
-            || sub->addr->type->kind == Type_Kind_VarArgs) {
-        // If we are accessing on a slice or a dynamic array, implicitly add a field access for the data member
-        StructMember smem;
-        type_lookup_member(sub->addr->type, "data", &smem);
-
-        AstFieldAccess* fa = make_field_access(context.ast_alloc, sub->addr, "data");
-        fa->type   = smem.type;
-        fa->offset = smem.offset;
-        fa->idx    = smem.idx;
-
-        sub->addr = (AstTyped *) fa;
-        sub->type = sub->addr->type->Pointer.elem;
-    }
-    else {
+    sub->type = type_get_contained_type(sub->addr->type);
+    if (sub->type == NULL) {
         report_bad_binaryop((AstBinaryOp *) sub);
         ERROR(sub->token->pos, "Invalid type for left of array access.");
     }
 
     sub->elem_size = type_size_of(sub->type);
-
     return Check_Success;
 }
 
@@ -1536,16 +1523,9 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
 
         char* closest = find_closest_symbol_in_node((AstNode *) type_node, field->field);
         if (closest) {
-            ERROR_(field->token->pos,
-                "Field '%s' does not exists on '%s'. Did you mean '%s'?",
-                field->field,
-                node_get_type_name(field->expr),
-                closest);
+            ERROR_(field->token->pos, "Field '%s' does not exists on '%s'. Did you mean '%s'?", field->field, node_get_type_name(field->expr), closest);
         } else {
-            ERROR_(field->token->pos,
-                "Field '%s' does not exists on '%s'.",
-                field->field,
-                node_get_type_name(field->expr));
+            ERROR_(field->token->pos, "Field '%s' does not exists on '%s'.", field->field, node_get_type_name(field->expr));
         }
     }
 
@@ -1556,20 +1536,19 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     return Check_Success;
 }
 
-CheckStatus check_method_call(AstBinaryOp** mcall) {
-    CHECK(expression, &(*mcall)->left);
-    if ((*mcall)->left->type == NULL) {
-        YIELD((*mcall)->token->pos, "Trying to resolve type of left hand side.");
-    }
+CheckStatus check_method_call(AstBinaryOp** pmcall) {
+    AstBinaryOp* mcall = *pmcall
+    CHECK(expression, &mcall->left);
+    if (mcall->left->type == NULL) YIELD((*mcall)->token->pos, "Trying to resolve type of left hand side.");
 
-    AstTyped* implicit_argument = (*mcall)->left;
+    AstTyped* implicit_argument = mcall->left;
 
     // Symbol resolution should have ensured that this is call node.
-    AstCall* call_node = (AstCall *) (*mcall)->right;
+    AstCall* call_node = (AstCall *) mcall->right;
     assert(call_node->kind == Ast_Kind_Call);
 
     // :Idempotency
-    if (((*mcall)->flags & Ast_Flag_Has_Been_Checked) == 0) {
+    if ((mcall->flags & Ast_Flag_Has_Been_Checked) == 0) {
         // Implicitly take the address of the value if it is not already a pointer type.
         // This could be weird to think about semantically so some testing with real code
         // would be good.                                      - brendanfh 2020/02/05
@@ -1581,12 +1560,12 @@ CheckStatus check_method_call(AstBinaryOp** mcall) {
         bh_arr_insertn(call_node->args.values, 0, 1);
         call_node->args.values[0] = implicit_argument;
     }
-    (*mcall)->flags |= Ast_Flag_Has_Been_Checked;
+    mcall->flags |= Ast_Flag_Has_Been_Checked;
 
     CHECK(call, &call_node);
-    call_node->next = (*mcall)->next;
+    call_node->next = mcall->next;
 
-    *mcall = (AstBinaryOp *) call_node;
+    *pmcall = (AstBinaryOp *) call_node;
     return Check_Success;
 }
 
