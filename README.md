@@ -5,4 +5,5 @@
 
 A simple, yet powerful language for WebAssembly.
 
+[Try Online](https://brendanfh.com/onyx) |
 [Read the Wiki](https://github.com/brendanfh/onyx/wiki)
