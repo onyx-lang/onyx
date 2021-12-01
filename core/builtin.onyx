@@ -17,11 +17,13 @@ range :: struct {
     step : i32 = 1;
 }
 
+@Deprecated
 vararg :: #type ^struct {
     data:  rawptr;
     count: i32;
 }
 
+@Deprecated
 vararg_get :: #match {
     (va: vararg, ret: ^$T) -> bool {
         if va.count <= 0 do return false;
@@ -134,20 +136,11 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
 // CLEANUP: Does this really need to be limited to a non-custom runtime?
 #if runtime.Runtime != runtime.Runtime_Custom {
-    new :: ($T: type_expr, allocator := context.allocator, initialize := true) -> ^T {
-        res := cast(^T) raw_alloc(allocator, sizeof T);
-
-        // @Robustness: This should be a '#if' when those are added in procedures because
-        // otherwise the __initialize intrinsic is going to be generated no matter what.
-        // This could be a problem if the type is not something that can be initialized.
-        //
-        // Static ifs in procedures are added now, however, much like nested procedures,
-        // static ifs cannot "see" polymorphic variables. They are only evaluated once
-        // NOT in the context of the polymorphic procedure they are instatiated in.
-        // This will be changed eventually. 'make' can be used for the time being or
-        // for forever.
+    new :: ($T: type_expr, allocator := context.allocator) -> ^T {
         use package core.intrinsics.onyx { __initialize }
-        if initialize do __initialize(res);
+
+        res := cast(^T) raw_alloc(allocator, sizeof T);
+        __initialize(res);
 
         return res;
     }
