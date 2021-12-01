@@ -1,5 +1,3 @@
-PART :: 2
-
 #load "core/std"
 
 use package core
@@ -33,12 +31,12 @@ main :: (args) => {
         io.skip_whitespace(^reader);
     }
 
-    #if PART == 1 {
+    { // Part 1
         increased_count := count_increasing(nums);
         printf("Part 1: {}\n", increased_count);
     }
 
-    #if PART == 2 {
+    { // Part 2
         windows := array.make(i32);
         for i: range.{ 0, nums.count - 2 } {
             sum := 0;

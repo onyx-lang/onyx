@@ -4,8 +4,9 @@ package runtime
 
 use package core
 
-__output_string :: (s: str)      -> u32  #foreign "host" "print_str" ---
-__exit          :: (status: i32) -> void #foreign "host" "exit" ---
+__output_string   :: (s: str)      -> u32  #foreign "host" "print_str" ---
+__exit            :: (status: i32) -> void #foreign "host" "exit" ---
+__read_from_input :: (buf: [] u8)  -> u32 do return 0;
 
 // The builtin _start proc.
 // Sets up everything needed for execution.

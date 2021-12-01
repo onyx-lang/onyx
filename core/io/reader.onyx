@@ -218,10 +218,12 @@ read_u64 :: (use reader: ^Reader) -> u64 {
     return n;
 }
 
-read_line :: (use reader: ^Reader, consume_newline := true, allocator := context.allocator) -> str {
+read_line :: (use reader: ^Reader, consume_newline := true, allocator := context.allocator, inplace := false) -> str {
     reader_read_next_chunk(reader);
 
     count := start;
+    defer start = count;
+
     while count < end && buffer[count] != #char "\n" {
         count += 1;
     }
@@ -230,21 +232,23 @@ read_line :: (use reader: ^Reader, consume_newline := true, allocator := context
         count += 1;
     }
 
+    if inplace do return buffer[start .. count];
+
     out := str.{
         data  = raw_alloc(allocator, count * sizeof(u8)),
         count = count - start,
     };
 
     memory.copy(out.data, buffer.data + start, count - start);
-    start = count;
     return out;
 }
 
-read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := context.allocator) -> str {
+read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := context.allocator, inplace := false) -> str {
     skip_whitespace(reader);
     reader_read_next_chunk(reader);
 
     count := start;
+    defer start = count;
     while count < end {
         curr := buffer[count];
         if     (curr >= #char "a" && curr <= #char "z")
@@ -258,20 +262,22 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
         }
     }
 
+    if inplace do return buffer[start .. count];
+
     out := str.{
         data  = raw_alloc(allocator, count * sizeof(u8)),
         count = count - start,
     };
 
     memory.copy(out.data, buffer.data + start, count - start);
-    start = count;
     return out;
 }
 
-read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false) -> str {
+read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false) -> str {
     reader_read_next_chunk(reader);
 
     count := start;
+    defer start = count;
     while count < end {
         curr := buffer[count];
         if curr != until {
@@ -284,13 +290,14 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
 
     if consume_end && count < end do count += 1;
 
+    if inplace do return buffer[start .. count];
+
     out := str.{
         data  = raw_alloc(allocator, count * sizeof(u8)),
         count = count - start,
     };
 
     memory.copy(out.data, buffer.data + start, count - start);
-    start = count;
     return out;
 }
 

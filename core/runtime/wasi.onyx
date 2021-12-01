@@ -18,6 +18,18 @@ __output_string :: (s: str) -> u32 {
 
 __exit :: (status: i32) do proc_exit(status);
 
+__read_from_input :: (buffer: [] u8) -> i32 {
+    STDIN_FILENO :: 0
+
+    vec := IOVec.{ buf = cast(i32) buffer.data, len = buffer.count };
+    read: Size;
+    error := fd_read(STDIN_FILENO, .{ cast(i32) ^vec, 1 }, ^read);
+    if error != .Success do return -1;
+
+    return read;
+}
+
+
 // The builtin _start proc.
 // Sets up everything needed for execution.
 #export "_start" () {
