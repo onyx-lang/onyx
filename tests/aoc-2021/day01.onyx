@@ -1,0 +1,52 @@
+PART :: 2
+
+#load "core/std"
+
+use package core
+
+count_increasing :: (arr: [] $T) -> u32 {
+    increased_count := 0;
+    for 1 .. arr.count {
+        if arr[it - 1] < arr[it] {
+            increased_count += 1;
+        }
+    }
+
+    return increased_count;
+}
+
+main :: (args) => {
+    #if false {
+        contents := #file_contents "./input/day01.txt";
+        reader, stream := io.reader_from_string(contents);
+        defer cfree(stream);
+    }
+
+    err, file := io.open("./tests/aoc-2021/input/day01.txt");
+    assert(err == .None, "Error opening file");
+    reader := io.reader_make(^file);
+    defer io.close(^file);
+
+    nums := array.make(i32);
+    while !io.reader_empty(^reader) {
+        nums << io.read_u32(^reader);
+        io.skip_whitespace(^reader);
+    }
+
+    #if PART == 1 {
+        increased_count := count_increasing(nums);
+        printf("Part 1: {}\n", increased_count);
+    }
+
+    #if PART == 2 {
+        windows := array.make(i32);
+        for i: range.{ 0, nums.count - 2 } {
+            sum := 0;
+            for k: i .. i+3 do sum += nums[k];
+            windows << sum;
+        }
+
+        increased_count := count_increasing(windows);
+        printf("Part 2: {}\n", increased_count);
+    }
+}

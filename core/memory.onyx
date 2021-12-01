@@ -1,21 +1,6 @@
 package core.memory
 
-// This will be replaced / augmented with a memory_copy intrinsic
-// when that is added to the compiler. There would be an easy flag
-// to control if this implementation is used, or the intrinsic. The
-// only case where this implementation should be used is in legacy
-// systems where the memory_copy instruction is not available.
-// However, it might be worth switching to an intrinsic completely
-// and having the intrinsic know whether or not to output the instruction
-// or an inlined version of this procedure.
 use package core.intrinsics.wasm { memory_copy, memory_fill }
-
-// Even though I thought this would work, this method of aliases functions
-// does not currently work. There needs to be a second level of indirection
-// on entities to allow for this case to work, which may not be hard to change
-// but still needs to happen.
-// copy :: memory_copy
-// set  :: memory_fill
 
 copy :: (dest: rawptr, src: rawptr, count: i32) do memory_copy(dest, src, count);
 set  :: (dest: rawptr, byte: u8, count: i32)    do memory_fill(dest, byte, count);

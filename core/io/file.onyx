@@ -236,10 +236,6 @@ file_stream_vtable := Stream_Vtable.{
         return .None, byte;
     },
 
-    unread_byte = (use fs: ^FileStream) -> Error {
-        return .NotImplemented;
-    },
-
     write = (use fs: ^FileStream, buffer: [] u8) -> (Error, u32) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };

@@ -34,7 +34,7 @@ main :: (args: [] cstr) {
 	grid := map.make(Vec2, Cell, .{}); // `true` is black
 	defer map.free(^grid);
 
-	while !io.stream_end_of_file(^file_stream) {
+	while !io.reader_empty(^file) {
 		line := io.read_line(^file);
 
 		loc := Vec2.{ 0, 0 };

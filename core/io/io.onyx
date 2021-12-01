@@ -20,4 +20,13 @@ Error :: enum {
 
     // The file or stream was not initialized correctly.
     BadFile        :: 0x06;
+
+    // Some underlying buffer used in stream processing is full.
+    BufferFull     :: 0x07;
+
+    // While trying to read from a stream, multiple reads failed in a row.
+    NoProgress     :: 0x08;
+
+    // Not possible to unread.
+    InvalidUnread  :: 0x09;
 }
