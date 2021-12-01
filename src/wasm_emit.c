@@ -1527,7 +1527,7 @@ EMIT_FUNC(call, AstCall* call) {
 
                 WIL(WI_LOCAL_GET, stack_top_store_local);
                 WID(WI_I32_CONST, vararg_any_types[i]);
-                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], vararg_offset + i * any_size + 8);
+                emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], vararg_offset + i * any_size + POINTER_SIZE);
 
                 reserve_size += any_size;
             }
@@ -1554,11 +1554,11 @@ EMIT_FUNC(call, AstCall* call) {
             }
             emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
 
-            // NOTE: There will be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
+            // NOTE: There may be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
 
             WIL(WI_LOCAL_GET, stack_top_store_local);
             WID(WI_I32_CONST, vararg_count);
-            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], reserve_size + 8);
+            emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], reserve_size + POINTER_SIZE);
 
             WIL(WI_LOCAL_GET, stack_top_store_local);
             if (reserve_size > 0) {
@@ -1566,7 +1566,7 @@ EMIT_FUNC(call, AstCall* call) {
                 WI(WI_PTR_ADD);
             }
 
-            reserve_size += 12;
+            reserve_size += 4 + POINTER_SIZE;
             break;
         }
     }
@@ -3478,9 +3478,15 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         // NOTE: This assumes the address and the length fields have been filled out
         // by emit_string_literal.
         u32* sdata = (u32 *) data;
-        sdata[0] = sl->addr;
-        sdata[1] = 0x00;
-        sdata[2] = sl->length;
+        if (POINTER_SIZE == 4) {
+            sdata[0] = sl->addr;
+            sdata[1] = sl->length;
+        } else {
+            sdata[0] = sl->addr;
+            sdata[1] = 0;
+            sdata[2] = sl->length;
+            sdata[3] = 0;
+        }
         break;
     }
 
@@ -3534,12 +3540,12 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
         case Basic_Kind_I32:
         case Basic_Kind_U32:
+        case Basic_Kind_Rawptr:
             *((i32 *) data) = ((AstNumLit *) node)->value.i;
             return retval;
 
         case Basic_Kind_I64:
         case Basic_Kind_U64:
-        case Basic_Kind_Rawptr:
             *((i64 *) data) = ((AstNumLit *) node)->value.l;
             return retval;
 

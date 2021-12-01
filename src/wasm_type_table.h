@@ -8,11 +8,25 @@ u64 build_type_table(OnyxWasmModule* module) {
     bh_arr_new(global_heap_allocator, base_patch_locations, 256);
 
 #define PATCH (bh_arr_push(base_patch_locations, table_buffer.length))
+#define WRITE_PTR(val) \
+    bh_buffer_align(&table_buffer, POINTER_SIZE); \
+    PATCH; \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&table_buffer, val); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&table_buffer, val); 
+#define WRITE_SLICE(ptr, count) \
+    WRITE_PTR(ptr); \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&table_buffer, count); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&table_buffer, count); 
 
     // This is the data behind the "type_table" slice in type_info.onyx
+    #if (POINTER_SIZE == 4)
+        #define Table_Info_Type u32
+    #else
+        #define Table_Info_Type u64
+    #endif
     u32 type_count = bh_arr_length(type_map.entries) + 1;
-    u64* table_info = bh_alloc_array(global_heap_allocator, u64, type_count); // HACK
-    memset(table_info, 0, type_count * sizeof(u64));
+    Table_Info_Type* table_info = bh_alloc_array(global_heap_allocator, Table_Info_Type, type_count); // HACK
+    memset(table_info, 0, type_count * sizeof(Table_Info_Type));
 
     bh_buffer table_buffer;
     bh_buffer_init(&table_buffer, global_heap_allocator, 4096);
@@ -94,10 +108,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type->kind);
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
-                bh_buffer_align(&table_buffer, 8);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, components_base);
-                bh_buffer_write_u64(&table_buffer, components_count);
+                WRITE_SLICE(components_base, components_count);
                 break;
             }
 
@@ -116,9 +127,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
                 bh_buffer_write_u32(&table_buffer, type->Function.return_type->id);
 
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, parameters_base);
-                bh_buffer_write_u64(&table_buffer, parameters_count);
+                WRITE_SLICE(parameters_base, parameters_count);
 
                 bh_buffer_write_u32(&table_buffer, type->Function.vararg_arg_pos > 0 ? 1 : 0);
                 break;
@@ -143,9 +152,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                     u32 name_loc = name_locations[i++];
 
                     bh_buffer_align(&table_buffer, 8);
-                    PATCH;
-                    bh_buffer_write_u64(&table_buffer, name_loc);
-                    bh_buffer_write_u64(&table_buffer, (*value)->token->length);
+                    WRITE_SLICE(name_loc, (*value)->token->length);
 
                     assert((*value)->value->kind == Ast_Kind_NumLit);
                     AstNumLit *num = (AstNumLit *) (*value)->value;
@@ -162,12 +169,8 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
                 bh_buffer_write_u32(&table_buffer, type->Enum.backing->id);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, name_base);
-                bh_buffer_write_u64(&table_buffer, name_length);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, member_base);
-                bh_buffer_write_u64(&table_buffer, member_count);
+                WRITE_SLICE(name_base, name_length);
+                WRITE_SLICE(member_base, member_count);
                 bh_buffer_write_u32(&table_buffer, type->Enum.is_flags ? 1 : 0);
                 break;
             }
@@ -300,9 +303,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                     meta_locations[i] = table_buffer.length;
 
                     fori (k, 0, bh_arr_length(meta_tags)) {
-                        PATCH;
-                        bh_buffer_write_u64(&table_buffer, meta_tag_locations[k]);
-                        bh_buffer_write_u64(&table_buffer, meta_tags[k]->type->id);
+                        WRITE_SLICE(meta_tag_locations[k], meta_tags[k]->type->id);
                     }
 
                     bh_arr_free(meta_tag_locations);
@@ -320,21 +321,14 @@ u64 build_type_table(OnyxWasmModule* module) {
                     u32 value_loc = value_locations[i];
                     u32 meta_loc = meta_locations[i++];
 
-                    bh_buffer_align(&table_buffer, 8);
-                    PATCH;
-                    bh_buffer_write_u64(&table_buffer, name_loc);
-                    bh_buffer_write_u64(&table_buffer, strlen(mem->name));
+                    WRITE_SLICE(name_loc, strlen(mem->name));
                     bh_buffer_write_u32(&table_buffer, mem->offset);
                     bh_buffer_write_u32(&table_buffer, mem->type->id);
                     bh_buffer_write_byte(&table_buffer, mem->used ? 1 : 0);
                     
-                    bh_buffer_align(&table_buffer, 8);
-                    PATCH;
-                    bh_buffer_write_u64(&table_buffer, value_loc);
+                    WRITE_PTR(value_loc);
 
-                    PATCH;
-                    bh_buffer_write_u64(&table_buffer, meta_loc);
-                    bh_buffer_write_u64(&table_buffer, bh_arr_length(mem->meta_tags));
+                    WRITE_SLICE(meta_loc, bh_arr_length(mem->meta_tags));
                 }
 
                 bh_buffer_align(&table_buffer, 8);
@@ -342,9 +336,7 @@ u64 build_type_table(OnyxWasmModule* module) {
 
                 i = 0;
                 bh_arr_each(AstPolySolution, sln, s->poly_sln) {
-                    bh_buffer_align(&table_buffer, 8);
-                    PATCH;
-                    bh_buffer_write_u64(&table_buffer, param_locations[i++]);
+                    WRITE_PTR(param_locations[i++]);
 
                     if (sln->kind == PSK_Type) bh_buffer_write_u32(&table_buffer, basic_types[Basic_Kind_Type_Index].id);
                     else                       bh_buffer_write_u32(&table_buffer, sln->value->type->id);
@@ -373,9 +365,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 u32 struct_tag_base = table_buffer.length;
 
                 fori (i, 0, bh_arr_length(s->meta_tags)) {
-                    PATCH;
-                    bh_buffer_write_u64(&table_buffer, struct_tag_locations[i]);
-                    bh_buffer_write_u64(&table_buffer, s->meta_tags[i]->type->id);
+                    WRITE_SLICE(struct_tag_locations[i], s->meta_tags[i]->type->id);
                 }
 
                 u32 name_base = 0;
@@ -398,18 +388,10 @@ u64 build_type_table(OnyxWasmModule* module) {
                     bh_buffer_write_u32(&table_buffer, 0);
                 }
 
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, name_base);
-                bh_buffer_write_u64(&table_buffer, name_length);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, members_base);
-                bh_buffer_write_u64(&table_buffer, s->mem_count);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, params_base);
-                bh_buffer_write_u64(&table_buffer, bh_arr_length(s->poly_sln));
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, struct_tag_base);
-                bh_buffer_write_u64(&table_buffer, bh_arr_length(s->meta_tags));
+                WRITE_SLICE(name_base, name_length);
+                WRITE_SLICE(members_base, s->mem_count);
+                WRITE_SLICE(params_base, bh_arr_length(s->poly_sln));
+                WRITE_SLICE(struct_tag_base, bh_arr_length(s->meta_tags));
 
                 break;
             }
@@ -446,9 +428,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 u32 tags_count = bh_arr_length(type->PolyStruct.meta_tags);
 
                 fori (i, 0, tags_count) {
-                    PATCH;
-                    bh_buffer_write_u64(&table_buffer, tag_locations[i]);
-                    bh_buffer_write_u64(&table_buffer, type->PolyStruct.meta_tags[i]->type->id);
+                    WRITE_SLICE(tag_locations[i], type->PolyStruct.meta_tags[i]->type->id);
                 }
 
                 bh_buffer_align(&table_buffer, 8);
@@ -456,13 +436,8 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type->kind);
                 bh_buffer_write_u32(&table_buffer, 0);
                 bh_buffer_write_u32(&table_buffer, 0);
-                bh_buffer_write_u32(&table_buffer, 0);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, name_base);
-                bh_buffer_write_u64(&table_buffer, name_length);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, tags_base);
-                bh_buffer_write_u64(&table_buffer, tags_count);
+                WRITE_SLICE(name_base, name_length);
+                WRITE_SLICE(tags_base, tags_count);
 
                 break;
             }
@@ -478,9 +453,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_write_u32(&table_buffer, type_size_of(type));
                 bh_buffer_write_u32(&table_buffer, type_alignment_of(type));
                 bh_buffer_write_u32(&table_buffer, type->Distinct.base_type->id);
-                PATCH;
-                bh_buffer_write_u64(&table_buffer, name_base);
-                bh_buffer_write_u64(&table_buffer, name_length);
+                WRITE_SLICE(name_base, name_length);
                 break;
             }
         }
@@ -497,7 +470,7 @@ u64 build_type_table(OnyxWasmModule* module) {
 
     WasmDatum type_table_data = {
         .offset = offset,
-        .length = type_count * 8,
+        .length = type_count * POINTER_SIZE,
         .data = table_info,
     };
     bh_arr_push(module->data, type_table_data);
@@ -509,10 +482,18 @@ u64 build_type_table(OnyxWasmModule* module) {
     }
 
     bh_arr_each(u32, patch_loc, base_patch_locations) {
-        u64* loc = bh_pointer_add(table_buffer.data, *patch_loc);
-        if (*loc == 0) continue;
-        
-        *loc += offset;
+        if (POINTER_SIZE == 4) {
+            u32* loc = bh_pointer_add(table_buffer.data, *patch_loc);
+            if (*loc == 0) continue;
+            
+            *loc += offset;
+        }
+        if (POINTER_SIZE == 8) {
+            u64* loc = bh_pointer_add(table_buffer.data, *patch_loc);
+            if (*loc == 0) continue;
+            
+            *loc += offset;
+        }
     }
 
     WasmDatum type_info_data = {
@@ -525,12 +506,12 @@ u64 build_type_table(OnyxWasmModule* module) {
 
     u64 global_data_ptr = offset;
 
-    u64* tmp_data = bh_alloc(global_heap_allocator, 16);
+    Table_Info_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
     tmp_data[0] = type_table_location;
     tmp_data[1] = type_count;
     WasmDatum type_table_global_data = {
         .offset = offset,
-        .length = 16,
+        .length = 2 * POINTER_SIZE,
         .data = tmp_data,
     };
     bh_arr_push(module->data, type_table_global_data);

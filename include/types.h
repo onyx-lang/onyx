@@ -3,6 +3,8 @@
 
 #include "bh.h"
 
+#define POINTER_SIZE 4
+
 enum BasicKind {
     Basic_Kind_Void,
 

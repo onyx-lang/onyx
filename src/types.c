@@ -25,7 +25,7 @@ Type basic_types[] = {
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f32, { Basic_Kind_F32,    Basic_Flag_Float,                         4,  4, "f32"    } },
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_f64, { Basic_Kind_F64,    Basic_Flag_Float,                         8,  4, "f64"    } },
 
-    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_rawptr, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                    8,  8, "rawptr" } },
+    { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_rawptr, { Basic_Kind_Rawptr, Basic_Flag_Pointer,                    POINTER_SIZE,  POINTER_SIZE, "rawptr" } },
 
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i8x16, { Basic_Kind_I8X16,  Basic_Flag_SIMD,                        16, 16, "i8x16" } },
     { Type_Kind_Basic, 0, 0, (AstType *) &basic_type_i16x8, { Basic_Kind_I16X8,  Basic_Flag_SIMD,                        16, 16, "i16x8" } },
@@ -210,14 +210,14 @@ u32 type_size_of(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.size;
-        case Type_Kind_Pointer:  return 8;
+        case Type_Kind_Pointer:  return POINTER_SIZE;
         case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type->Array.size;
         case Type_Kind_Struct:   return type->Struct.size;
         case Type_Kind_Enum:     return type_size_of(type->Enum.backing);
-        case Type_Kind_Slice:    return 16; // HACK: These should not have to be 16 bytes in size, they should only have to be 12,
-        case Type_Kind_VarArgs:  return 16; // but there are alignment issues right now with that so I decided to not fight it and just make them 16 bytes in size.
-        case Type_Kind_DynArray: return 32; // data (8), count (4), capacity (4), allocator { func (4), ---(4), data (8) }
+        case Type_Kind_Slice:    return POINTER_SIZE * 2; // HACK: These should not have to be 16 bytes in size, they should only have to be 12,
+        case Type_Kind_VarArgs:  return POINTER_SIZE * 2; // but there are alignment issues right now with that so I decided to not fight it and just make them 16 bytes in size.
+        case Type_Kind_DynArray: return POINTER_SIZE + 8 + 2 * POINTER_SIZE; // data (8), count (4), capacity (4), allocator { func (4), ---(4), data (8) }
         case Type_Kind_Compound: return type->Compound.size;
         case Type_Kind_Distinct: return type_size_of(type->Distinct.base_type);
         default:                 return 0;
@@ -229,14 +229,14 @@ u32 type_alignment_of(Type* type) {
 
     switch (type->kind) {
         case Type_Kind_Basic:    return type->Basic.alignment;
-        case Type_Kind_Pointer:  return 8;
+        case Type_Kind_Pointer:  return POINTER_SIZE;
         case Type_Kind_Function: return 4;
         case Type_Kind_Array:    return type_alignment_of(type->Array.elem);
         case Type_Kind_Struct:   return type->Struct.alignment;
         case Type_Kind_Enum:     return type_alignment_of(type->Enum.backing);
-        case Type_Kind_Slice:    return 8;
-        case Type_Kind_VarArgs:  return 8;
-        case Type_Kind_DynArray: return 8;
+        case Type_Kind_Slice:    return POINTER_SIZE;
+        case Type_Kind_VarArgs:  return POINTER_SIZE;
+        case Type_Kind_DynArray: return POINTER_SIZE;
         case Type_Kind_Compound: return 4; // HACK
         case Type_Kind_Distinct: return type_alignment_of(type->Distinct.base_type);
         default: return 1;
@@ -755,7 +755,7 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
     } else {
         Type* ptr_type = type_create(Type_Kind_Pointer, alloc, 0);
         ptr_type->Pointer.base.flags |= Basic_Flag_Pointer;
-        ptr_type->Pointer.base.size = 8;
+        ptr_type->Pointer.base.size = POINTER_SIZE;
         ptr_type->Pointer.elem = to;
 
         type_register(ptr_type);
@@ -1020,15 +1020,15 @@ Type* type_get_contained_type(Type* type) {
 }
 
 static const StructMember slice_members[] = {
-    { 0, 0, NULL,                         "data",  NULL, -1, 0, 0 },
-    { 8, 1, &basic_types[Basic_Kind_U32], "count", NULL, -1, 0, 0 },
+    { 0,            0, NULL,                         "data",  NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "count", NULL, -1, 0, 0 },
 };
 
 static const StructMember array_members[] = {
-    { 0,  0, NULL,                         "data",      NULL, -1, 0, 0 },
-    { 8,  1, &basic_types[Basic_Kind_U32], "count",     NULL, -1, 0, 0 },
-    { 12, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, -1, 0, 0 },
-    { 16, 3, NULL,                         "allocator", NULL, -1, 0, 0 },
+    { 0,                0, NULL,                         "data",      NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "count",     NULL, -1, 0, 0 },
+    { POINTER_SIZE + 4, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, -1, 0, 0 },
+    { POINTER_SIZE + 8, 3, NULL,                         "allocator", NULL, -1, 0, 0 },
 };
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
@@ -1133,7 +1133,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
             }
             if (idx == 1) {
                 two->type = &basic_types[Basic_Kind_U32];
-                two->offset = 8;
+                two->offset = POINTER_SIZE;
             }
 
             return 1;
@@ -1145,16 +1145,16 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
             }
             if (idx == 1) {
                 two->type = &basic_types[Basic_Kind_U32];
-                two->offset = 8;
+                two->offset = POINTER_SIZE;
             }
             if (idx == 2) {
                 two->type = &basic_types[Basic_Kind_U32];
-                two->offset = 12;
+                two->offset = POINTER_SIZE + 4;
             }
             if (idx == 3 || idx == 4) {
                 Type* allocator_type = type_build_from_ast(context.ast_alloc, builtin_allocator_type);
                 type_linear_member_lookup(allocator_type, idx - 3, two);
-                two->offset += 16;
+                two->offset += POINTER_SIZE + 8;
             }
 
             return 1;
@@ -1181,15 +1181,15 @@ i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs: {
             if (offset == 0) return 0;
-            if (offset == 8) return 1;
+            if (offset == POINTER_SIZE) return 1;
             return -1;
         }
         case Type_Kind_DynArray: {
-            if (offset == 0)   return 0;
-            if (offset == 8)   return 1;
-            if (offset == 12)  return 2;
-            if (offset == 16)  return 3;
-            if (offset == 24)  return 4;
+            if (offset == 0)                    return 0;
+            if (offset == POINTER_SIZE)         return 1;
+            if (offset == POINTER_SIZE + 4)     return 2;
+            if (offset == POINTER_SIZE + 8)     return 3;
+            if (offset == POINTER_SIZE * 2 + 8) return 4;
             return -1;
         }
         case Type_Kind_Compound: {
