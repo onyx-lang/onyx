@@ -124,7 +124,7 @@ file_write :: (file: File, data: str) {
     wasi.fd_datasync(file.fd);
 }
 
-get_size :: (file: File) -> u64 {
+file_get_size :: (file: File) -> u64 {
     fs: FileStat;
     if wasi.fd_filestat_get(file.fd, ^fs) != Errno.Success do return 0;
 
@@ -132,7 +132,7 @@ get_size :: (file: File) -> u64 {
 }
 
 get_contents_from_file :: (file: File) -> str {
-    size := cast(u32) get_size(file);
+    size := cast(u32) file_get_size(file);
 
     data := cast(^u8) raw_alloc(context.allocator, size);
 
@@ -178,7 +178,7 @@ open :: (path: str, mode := OpenMode.Read) -> (Error, FileStream) {
     if !success do return .NotFound, fs;
 
     fs.file = file;
-    fs.vtable = ^file_stream_vtable;
+    fs.vtable = ^wasi_file_stream_vtable;
     return .None, fs;
 }
 
@@ -187,8 +187,36 @@ close :: (file: ^FileStream) {
     file.stream.vtable = null;
 }
 
+with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^FileStream) {
+    Context :: struct {
+        valid_file_stream := false;
+
+        file_stream: FileStream;
+    }
+
+    c := new(Context);
+    if err, file_stream := open(path, mode); err == .None {
+        c.file_stream = file_stream;
+        c.valid_file_stream = true;
+    }
+
+    next :: (use c: ^Context) -> (^FileStream, bool) {
+        if !valid_file_stream do return null, false;
+
+        defer valid_file_stream = false;
+        return ^file_stream, true;
+    }
+
+    close_context :: (use c: ^Context) {
+        close(^file_stream);
+        cfree(c);
+    }
+
+    return .{ c, next, close_context };
+}
+
 #package
-file_stream_vtable := Stream_Vtable.{
+wasi_file_stream_vtable := Stream_Vtable.{
     seek = (use fs: ^FileStream, to: i32, whence: SeekFrom) -> Error {
         // Currently, the new offset is just ignored.
         newoffset : wasi.Filesize;
