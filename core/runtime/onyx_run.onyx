@@ -16,3 +16,5 @@ use package wasi
     #export "_thread_start" _thread_start
     #export "_thread_exit"  _thread_exit
 }
+
+__spawn_process :: (path: str) -> i32 #foreign "env" "spawn_process" ---
