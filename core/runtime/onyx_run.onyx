@@ -17,4 +17,4 @@ use package wasi
     #export "_thread_exit"  _thread_exit
 }
 
-__spawn_process :: (path: str) -> i32 #foreign "env" "spawn_process" ---
+__spawn_process :: (path: str, args: [] str) -> i32 #foreign "env" "spawn_process" ---

@@ -175,15 +175,32 @@ static wasm_trap_t* onyx_kill_thread_impl(const wasm_val_vec_t* params, wasm_val
 static wasm_trap_t* onyx_spawn_process_impl(const wasm_val_vec_t* params, wasm_val_vec_t* results) {
     char* process_str = (char *) wasm_memory_data(wasm_memory) + params->data[0].of.i32;
     i32   process_len = params->data[1].of.i32;
+    i32   args_ptr    = params->data[2].of.i32;
+    i32   args_len    = params->data[3].of.i32;
 
     char process_path[1024];
     process_len = bh_min(1023, process_len);
     memcpy(process_path, process_str, process_len);
     process_path[process_len] = '\0';
 
+    char **process_args = bh_alloc_array(global_scratch_allocator, char *, args_len + 2);
+    byte_t* data = wasm_memory_data(wasm_memory);
+    byte_t* array_loc = data + args_ptr;
+    fori (i, 1, args_len + 1) {
+        char *arg_str = data + *(i32 *) (array_loc + (i - 1) * 8);
+        i32   arg_len = *(i32 *) (array_loc + (i - 1) * 8 + 4);
+
+        char *arg = bh_alloc_array(global_scratch_allocator, char, arg_len + 1);
+        memcpy(arg, arg_str, arg_len);
+        arg[arg_len] = '\0';
+        process_args[i] = arg;
+    }
+    process_args[0] = process_path;
+    process_args[args_len + 1] = NULL;
+
     #ifdef _BH_LINUX
         if (fork() == 0) {
-            execv(process_path, NULL);
+            execv(process_path, process_args);
         }
 
         i32 status;
@@ -295,7 +312,9 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
             }
 
             if (wasm_name_equals_string(import_name, "spawn_process")) {
-                wasm_functype_t* func_type = wasm_functype_new_2_1(wasm_valtype_new_i32(), wasm_valtype_new_i32(), wasm_valtype_new_i32());
+                wasm_functype_t* func_type = wasm_functype_new_4_1(
+                    wasm_valtype_new_i32(), wasm_valtype_new_i32(), wasm_valtype_new_i32(), wasm_valtype_new_i32(),
+                    wasm_valtype_new_i32());
 
                 wasm_func_t* wasm_func = wasm_func_new(wasm_store, func_type, onyx_spawn_process_impl);
                 import = wasm_func_as_extern(wasm_func);
