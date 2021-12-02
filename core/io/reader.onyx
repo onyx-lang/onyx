@@ -381,7 +381,7 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
     }
 
     // Try to re-read multiple times
-    for 4 {
+    for 16 {
         err, n := stream_read(stream, buffer[end .. buffer.count]);
         end += n;
         if err != .None {
