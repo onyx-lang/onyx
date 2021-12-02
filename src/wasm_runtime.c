@@ -191,16 +191,16 @@ static wasm_trap_t* onyx_spawn_process_impl(const wasm_val_vec_t* params, wasm_v
         byte_t* array_loc = data + args_ptr;
         fori (i, 0, args_len) {
             char *arg_str = data + *(i32 *) (array_loc + i * 2 * POINTER_SIZE);
-            i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + 4);
+            i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + POINTER_SIZE);
 
             char *arg = bh_alloc_array(global_scratch_allocator, char, arg_len + 1);
             memcpy(arg, arg_str, arg_len);
             arg[arg_len] = '\0';
-            process_args[i - 1] = arg;
+            process_args[i + 1] = arg;
         }
         process_args[0] = process_path;
         process_args[args_len + 1] = NULL;
-
+        
         if (fork() == 0) {
             execv(process_path, process_args);
         }
