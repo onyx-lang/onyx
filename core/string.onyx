@@ -173,7 +173,7 @@ ends_with :: (s: str, suffix: str) -> bool {
 
 strip_whitespace :: #match {
     (s: ^str) { strip_leading_whitespace(s); strip_trailing_whitespace(s); },
-    (s:  str) { strip_leading_whitespace(s); strip_trailing_whitespace(s); },
+    (s:  str) => s |> strip_leading_whitespace() |> strip_trailing_whitespace()
 }
 
 strip_leading_whitespace :: #match {

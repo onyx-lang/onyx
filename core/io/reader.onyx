@@ -234,11 +234,7 @@ read_line :: (use reader: ^Reader, consume_newline := true, allocator := context
 
     if inplace do return buffer[start .. count];
 
-    out := str.{
-        data  = raw_alloc(allocator, count * sizeof(u8)),
-        count = count - start,
-    };
-
+    out := memory.make_slice(u8, count - start);
     memory.copy(out.data, buffer.data + start, count - start);
     return out;
 }
@@ -264,11 +260,7 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
 
     if inplace do return buffer[start .. count];
 
-    out := str.{
-        data  = raw_alloc(allocator, count * sizeof(u8)),
-        count = count - start,
-    };
-
+    out := memory.make_slice(u8, count - start);
     memory.copy(out.data, buffer.data + start, count - start);
     return out;
 }
@@ -292,11 +284,7 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
 
     if inplace do return buffer[start .. count];
 
-    out := str.{
-        data  = raw_alloc(allocator, count * sizeof(u8)),
-        count = count - start,
-    };
-
+    out := memory.make_slice(u8, count - start);
     memory.copy(out.data, buffer.data + start, count - start);
     return out;
 }
