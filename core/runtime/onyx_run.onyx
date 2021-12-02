@@ -25,8 +25,9 @@ use package wasi
     Error       :: 0x02;
 }
 
-__process_spawn :: (path: str, args: [] str, non_blocking_io: bool) -> io.Process.Handle #foreign "env" "process_spawn" ---
-__process_read  :: (handle: io.Process.Handle, buffer: [] u8) -> u32 #foreign "env" "process_read" ---
-__process_write :: (handle: io.Process.Handle, buffer: [] u8) -> u32 #foreign "env" "process_write" ---
-__process_kill  :: (handle: io.Process.Handle) -> bool #foreign "env" "process_kill" ---
-__process_wait  :: (handle: io.Process.Handle) -> ProcessResult #foreign "env" "process_wait" ---
+__process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> io.Process.Handle #foreign "env" "process_spawn" ---
+__process_read    :: (handle: io.Process.Handle, buffer: [] u8) -> u32 #foreign "env" "process_read" ---
+__process_write   :: (handle: io.Process.Handle, buffer: [] u8) -> u32 #foreign "env" "process_write" ---
+__process_kill    :: (handle: io.Process.Handle) -> bool #foreign "env" "process_kill" ---
+__process_wait    :: (handle: io.Process.Handle) -> ProcessResult #foreign "env" "process_wait" ---
+__process_destroy :: (handle: io.Process.Handle) -> void #foreign "env" "process_destroy" ---

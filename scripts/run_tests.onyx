@@ -1,0 +1,112 @@
+#load "core/std"
+
+use package core
+#local wasi :: package wasi
+
+Directory_Entry :: struct {
+    dirent : wasi.DirEnt;
+    name   : str;
+}
+
+list_directory :: (path: str) -> Iterator(Directory_Entry) {
+    Context :: struct {
+        dir_fd: wasi.FileDescriptor;
+        opened := false;
+        reached_end := false;
+
+        entry_walker: ^u8;
+
+        buffer_used: u32 = 0;
+        buffer: [1024] u8;
+
+        last_cookie: wasi.DirCookie = 0;
+    }
+
+    next :: (use c: ^Context) -> (Directory_Entry, bool) {
+        use package core.intrinsics.onyx {__zero_value}
+        if !opened do return __zero_value(Directory_Entry), false;
+
+        read_more :: macro () {
+            if !reached_end {
+                err := wasi.fd_readdir(dir_fd, ~~buffer, sizeof typeof buffer, last_cookie, ^buffer_used);
+                reached_end = buffer_used != sizeof typeof buffer;
+
+                entry_walker = ~~buffer;
+            } else {
+                return __zero_value(Directory_Entry), false;
+            }
+        }
+
+        if buffer_used < sizeof(wasi.DirEnt) do read_more();
+
+        dirent := cast(^wasi.DirEnt) entry_walker;
+        if buffer_used < sizeof(wasi.DirEnt) + dirent.d_namlen {
+            read_more();
+            dirent = ~~entry_walker;
+        }
+
+        name := str.{~~(dirent + 1), dirent.d_namlen};
+
+        entry_size := sizeof(wasi.DirEnt) + dirent.d_namlen;
+        entry_walker += entry_size;
+        buffer_used -= entry_size;
+        last_cookie = dirent.d_next;
+
+        return .{*dirent, name}, true;
+    }
+
+    close :: (use c: ^Context) {
+        wasi.fd_close(dir_fd);
+        cfree(c);
+    }
+
+    c := new(Context);
+    if err := wasi.path_open(4, 0, path, .Directory, ~~0xffffffff, ~~0xffffffff, .Sync, ^c.dir_fd); err == .Success {
+        c.opened = true;
+    }
+
+    return .{ c, next, close };
+}
+
+@Temporary
+find_onyx_files :: (root: str, cases: ^[..] str) {
+    for list_directory(root) {
+        path_buffer: [512] u8;
+        if string.ends_with(it.name, ".onyx") {
+            test_case := string.concat(path_buffer, root, "/", it.name) |> string.alloc_copy();
+            array.push(cases, test_case);
+        }
+
+        if it.dirent.d_type == .Directory {
+            find_onyx_files(string.concat(path_buffer, root, "/", it.name), cases);
+        }
+    }
+
+    return;
+}
+
+main :: (args) => {
+    test_folder := "./tests";
+
+    cases := array.make(str);
+    find_onyx_files(test_folder, ^cases);
+    for cases {
+        printf("Running test {}...\n", it);
+
+        proc := io.process_spawn("./bin/onyx", .["run", it]);
+        defer io.process_destroy(^proc);
+
+        proc_reader := io.reader_make(^proc);
+        output := io.read_all(^proc_reader);
+        defer memory.free_slice(^output);
+
+        if exit := io.process_wait(^proc); exit != .Success {
+            // Error running the test case
+            println(exit);
+            println(output);
+        }
+    }
+
+    // Ensure the corresponding correct output file present
+    // Run tests, checking their output
+}

@@ -206,6 +206,7 @@ WASM_INTEROP(onyx_process_spawn_impl) {
     process_path[process_len] = '\0';
 
     OnyxProcess *process = bh_alloc_item(global_heap_allocator, OnyxProcess);
+    memset(process, 0, sizeof(*process));
     process->magic_number = ONYX_PROCESS_MAGIC_NUMBER;
 
     #ifdef _BH_LINUX
@@ -231,13 +232,19 @@ WASM_INTEROP(onyx_process_spawn_impl) {
         switch (pid = fork()) {
             case -1: // Bad fork
                 wasm_val_init_ptr(&results->data[0], NULL); // Failed to run
+
+                close(process->proc_to_host[0]);
+                close(process->proc_to_host[1]);
+                close(process->host_to_proc[0]);
+                close(process->host_to_proc[1]);
                 break;
 
             case 0: // Child process
                 close(process->proc_to_host[0]);
                 close(process->host_to_proc[1]);
-                dup2(process->proc_to_host[1], 1); // Map the output to the pipe
                 dup2(process->host_to_proc[0], 0); // Map the output to the pipe
+                dup2(process->proc_to_host[1], 1); // Map the output to the pipe
+                dup2(process->proc_to_host[1], 2); // Stderr to stdout
 
                 if (!blocking_io) {
                     fcntl(0, F_SETFL, O_NONBLOCK);
@@ -245,9 +252,9 @@ WASM_INTEROP(onyx_process_spawn_impl) {
                 }
 
                 execv(process_path, process_args);
-                wasm_val_init_ptr(&results->data[0], NULL);
+                exit(-1);
                 break;
-            
+
             default: {
                 process->pid = pid;
                 close(process->host_to_proc[0]);
@@ -265,7 +272,7 @@ WASM_INTEROP(onyx_process_spawn_impl) {
         char cmdLine[2048];
         memset(cmdLine, 0, 2048);
         strncat(cmdLine, process_path, 2047);
-        
+
         byte_t* data = wasm_memory_data(wasm_memory);
         byte_t* array_loc = data + args_ptr;
         fori (i, 0, args_len) {
@@ -363,9 +370,27 @@ WASM_INTEROP(onyx_process_wait_impl) {
     #ifdef _BH_LINUX
         i32 status;
         waitpid(process->pid, &status, 0);
+        close(process->proc_to_host[0]);
+        close(process->host_to_proc[1]);
 
         i32 exit_code = WEXITSTATUS(status);
         results->data[0] = WASM_I32_VAL(exit_code != 0 ? 2 : 0);
+    #endif
+
+    return NULL;
+}
+
+WASM_INTEROP(onyx_process_destroy_impl) {
+    OnyxProcess *process = (OnyxProcess *) params->data[0].of.i64;
+    if (process == NULL || process->magic_number != ONYX_PROCESS_MAGIC_NUMBER) {
+        return NULL;
+    }
+
+    #ifdef _BH_LINUX
+        kill(process->pid, SIGKILL);
+        close(process->proc_to_host[0]);
+        close(process->host_to_proc[1]);
+        bh_free(global_heap_allocator, process);
     #endif
 
     return NULL;
@@ -520,6 +545,14 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
                 wasm_functype_t* func_type = wasm_functype_new_1_1(wasm_valtype_new_i64(), wasm_valtype_new_i32());
 
                 wasm_func_t* wasm_func = wasm_func_new(wasm_store, func_type, onyx_process_wait_impl);
+                import = wasm_func_as_extern(wasm_func);
+                goto import_found;
+            }
+
+            if (wasm_name_equals_string(import_name, "process_destroy")) {
+                wasm_functype_t* func_type = wasm_functype_new_1_0(wasm_valtype_new_i64());
+
+                wasm_func_t* wasm_func = wasm_func_new(wasm_store, func_type, onyx_process_destroy_impl);
                 import = wasm_func_as_extern(wasm_func);
                 goto import_found;
             }

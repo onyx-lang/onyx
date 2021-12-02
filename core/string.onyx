@@ -72,6 +72,20 @@ concat :: #match {
         return str.{ data, total_length };
     },
 
+    (buffer: [] u8, strings: ..str) -> str {
+        total_copied := 0;
+        for s: strings {
+            // Should never greater than, but better safe than sorry.
+            if total_copied >= buffer.count do break;
+
+            bytes_to_copy := math.min(s.count, buffer.count - total_copied);
+            memory.copy(buffer.data + total_copied, s.data, bytes_to_copy);
+            total_copied += bytes_to_copy;
+        }
+
+        return buffer[0 .. total_copied];
+    },
+
     (into: ^[..] u8, s: str) -> str {
         array.ensure_capacity(into, into.count + s.count);
         memory.copy(into.data, s.data, into.count);

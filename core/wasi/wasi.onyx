@@ -54,7 +54,7 @@ Errno :: enum (u16) {
     NetReset     :: 0x27;
     NetUnreach   :: 0x28;
     NFile        :: 0x29;
-    NoBufs       :: 0x2a;   
+    NoBufs       :: 0x2a;
     NoDev        :: 0x2b;
     NoEntry      :: 0x2c;
     NoExec       :: 0x2d;
@@ -152,7 +152,7 @@ Filetype :: enum (u8) {
     Directory    :: 0x03;
     RegularFile  :: 0x04;
     SocketDgram  :: 0x05;
-    SocketStream :: 0x06;   
+    SocketStream :: 0x06;
     SymLink      :: 0x07;
 }
 
@@ -164,7 +164,7 @@ DirEnt :: struct {
 }
 
 Advice :: enum (u8) {
-    Normal     :: 0x00; 
+    Normal     :: 0x00;
     Sequential :: 0x01;
     Random     :: 0x02;
     WillNeed   :: 0x03;

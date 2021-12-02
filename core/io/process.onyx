@@ -37,6 +37,10 @@ process_wait :: (use p: ^Process) => {
     return runtime.__process_wait(process_handle);
 }
 
+process_destroy :: (use p: ^Process) => {
+    runtime.__process_destroy(process_handle);
+}
+
 #local process_stream_vtable := Stream_Vtable.{
     read = (use p: ^Process, buffer: [] u8) -> (Error, u32) {
         // Read from the process stdout

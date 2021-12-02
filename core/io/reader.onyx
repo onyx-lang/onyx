@@ -23,6 +23,7 @@ reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator)
 
     reader: Reader;
     reader.stream = s;
+    reader.error = .None;
 
     memory.alloc_slice(^reader.buffer, buffer_size, allocator);
     reader.buffer_allocator = allocator;
@@ -58,6 +59,29 @@ reader_get_buffered :: (use reader: ^Reader) -> i32 {
 
 reader_empty :: (use reader: ^Reader) -> bool {
     return done && reader_get_buffered(reader) == 0;
+}
+
+read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
+    array :: package core.array
+    output := array.make(u8, 128, allocator=allocator);
+
+    while !reader_empty(reader) {
+        if err := reader_read_next_chunk(reader); err != .None do break;
+        if error != .None {
+            reader_consume_error(reader);
+            break;
+        }
+
+        buffered := reader_get_buffered(reader);
+        if buffered > 0 {
+            array.ensure_capacity(^output, output.count + buffered);
+            memory.copy(output.data + output.count, buffer.data, buffered);
+            output.count += buffered;
+            start = end;
+        }
+    }
+
+    return output;
 }
 
 read_byte :: (use reader: ^Reader) -> u8 {
