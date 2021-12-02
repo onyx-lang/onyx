@@ -256,6 +256,32 @@ typedef enum _GET_FILEEX_INFO_LEVELS {
     GetFileExInfoStandard,
     GetFileExMaxInfoLevel
 } GET_FILEEX_INFO_LEVELS;
+typedef struct _STARTUPINFOA {
+  DWORD  cb;
+  char * lpReserved;
+  char * lpDesktop;
+  char * lpTitle;
+  DWORD  dwX;
+  DWORD  dwY;
+  DWORD  dwXSize;
+  DWORD  dwYSize;
+  DWORD  dwXCountChars;
+  DWORD  dwYCountChars;
+  DWORD  dwFillAttribute;
+  DWORD  dwFlags;
+  WORD   wShowWindow;
+  WORD   cbReserved2;
+  char * lpReserved2;
+  HANDLE hStdInput;
+  HANDLE hStdOutput;
+  HANDLE hStdError;
+} STARTUPINFOA, *LPSTARTUPINFOA;
+typedef struct _PROCESS_INFORMATION {
+  HANDLE hProcess;
+  HANDLE hThread;
+  DWORD  dwProcessId;
+  DWORD  dwThreadId;
+} PROCESS_INFORMATION, *PPROCESS_INFORMATION, *LPPROCESS_INFORMATION;
 
 #define INFINITE 0xffffffffl
 #define INVALID_HANDLE_VALUE ((void *)(intptr_t)(-1))
@@ -275,7 +301,11 @@ GB_DLL_IMPORT HANDLE  WINAPI CreateThread       (SECURITY_ATTRIBUTES *semaphore_
 GB_DLL_IMPORT DWORD   WINAPI GetThreadId        (HANDLE handle);
 GB_DLL_IMPORT void    WINAPI RaiseException     (DWORD, DWORD, DWORD, ULONG_PTR const *);
 GB_DLL_IMPORT BOOL    WINAPI TerminateThread    (HANDLE hThread, DWORD dwExitCode);
-
+GB_DLL_IMPORT BOOL    WINAPI CreateProcessA     (char const * lpApplicationName, char * lpCommandLine,
+                                                 SECURITY_ATTRIBUTES* lpProcessAttrs, SECURITY_ATTRIBUTES* lpThreadAttributes,
+                                                 BOOL bInheritHandles, DWORD dwCreationFlags, void* lpEnvironment,
+                                                 char const * lpCurrentDirectory, LPSTARTUPINFOA lpStartupInfo,
+                                                 LPPROCESS_INFORMATION lpProcessInformation);
 
 GB_DLL_IMPORT BOOL      WINAPI GetLogicalProcessorInformation(SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer, DWORD *return_length);
 GB_DLL_IMPORT DWORD_PTR WINAPI SetThreadAffinityMask(HANDLE thread, DWORD_PTR check_mask);

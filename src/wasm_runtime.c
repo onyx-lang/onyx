@@ -183,22 +183,24 @@ static wasm_trap_t* onyx_spawn_process_impl(const wasm_val_vec_t* params, wasm_v
     memcpy(process_path, process_str, process_len);
     process_path[process_len] = '\0';
 
-    char **process_args = bh_alloc_array(global_scratch_allocator, char *, args_len + 2);
-    byte_t* data = wasm_memory_data(wasm_memory);
-    byte_t* array_loc = data + args_ptr;
-    fori (i, 1, args_len + 1) {
-        char *arg_str = data + *(i32 *) (array_loc + (i - 1) * 8);
-        i32   arg_len = *(i32 *) (array_loc + (i - 1) * 8 + 4);
-
-        char *arg = bh_alloc_array(global_scratch_allocator, char, arg_len + 1);
-        memcpy(arg, arg_str, arg_len);
-        arg[arg_len] = '\0';
-        process_args[i] = arg;
-    }
-    process_args[0] = process_path;
-    process_args[args_len + 1] = NULL;
+    // CLEANUP: Make the return value from the Windows and Linux version mean the same thing!!!
 
     #ifdef _BH_LINUX
+        char **process_args = bh_alloc_array(global_scratch_allocator, char *, args_len + 2);
+        byte_t* data = wasm_memory_data(wasm_memory);
+        byte_t* array_loc = data + args_ptr;
+        fori (i, 0, args_len) {
+            char *arg_str = data + *(i32 *) (array_loc + i * 2 * POINTER_SIZE);
+            i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + 4);
+
+            char *arg = bh_alloc_array(global_scratch_allocator, char, arg_len + 1);
+            memcpy(arg, arg_str, arg_len);
+            arg[arg_len] = '\0';
+            process_args[i - 1] = arg;
+        }
+        process_args[0] = process_path;
+        process_args[args_len + 1] = NULL;
+
         if (fork() == 0) {
             execv(process_path, process_args);
         }
@@ -206,6 +208,32 @@ static wasm_trap_t* onyx_spawn_process_impl(const wasm_val_vec_t* params, wasm_v
         i32 status;
         wait(&status);
         results->data[0] = WASM_I32_VAL(WEXITSTATUS(status));
+    #endif
+
+    #ifdef _BH_WINDOWS
+        // CLEANUP CLEANUP CLEANUP: This is so freaking bad...
+        char cmdLine[2048];
+        memset(cmdLine, 0, 2048);
+        strncat(cmdLine, process_path, 2047);
+        
+        byte_t* data = wasm_memory_data(wasm_memory);
+        byte_t* array_loc = data + args_ptr;
+        fori (i, 0, args_len) {
+            char *arg_str = data + *(i32 *) (array_loc + i * 2 * POINTER_SIZE);
+            i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + 4);
+
+            strncat(cmdLine, " ", 2047);
+            strncat(cmdLine, arg_str, arg_len);
+        }
+
+        STARTUPINFOA startup;
+        memset(&startup, 0, sizeof startup);
+        startup.cb = sizeof(startup);
+
+        PROCESS_INFORMATION proc_info;
+        BOOL success = CreateProcessA(process_path, cmdLine, NULL, NULL, 1, 0, NULL, NULL, &startup, &proc_info);
+        DWORD result = WaitForSingleObject(proc_info.hProcess, INFINITE);
+        results->data[0] = WASM_I32_VAL(result);
     #endif
 
     return NULL;
