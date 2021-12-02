@@ -17,4 +17,10 @@ use package wasi
     #export "_thread_exit"  _thread_exit
 }
 
-__spawn_process :: (path: str, args: [] str) -> i32 #foreign "env" "spawn_process" ---
+#local SpawnProcessResult :: enum {
+    Success     :: 0x00;
+    FailedToRun :: 0x01;
+    Error       :: 0x02;
+}
+
+__spawn_process :: (path: str, args: [] str) -> SpawnProcessResult #foreign "env" "spawn_process" ---

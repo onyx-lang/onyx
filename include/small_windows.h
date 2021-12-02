@@ -306,6 +306,7 @@ GB_DLL_IMPORT BOOL    WINAPI CreateProcessA     (char const * lpApplicationName,
                                                  BOOL bInheritHandles, DWORD dwCreationFlags, void* lpEnvironment,
                                                  char const * lpCurrentDirectory, LPSTARTUPINFOA lpStartupInfo,
                                                  LPPROCESS_INFORMATION lpProcessInformation);
+GB_DLL_IMPORT BOOL    WINAPI GetExitCodeProcess (HANDLE hProcess, DWORD *lpExitCode);
 
 GB_DLL_IMPORT BOOL      WINAPI GetLogicalProcessorInformation(SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer, DWORD *return_length);
 GB_DLL_IMPORT DWORD_PTR WINAPI SetThreadAffinityMask(HANDLE thread, DWORD_PTR check_mask);

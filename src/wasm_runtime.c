@@ -201,13 +201,25 @@ static wasm_trap_t* onyx_spawn_process_impl(const wasm_val_vec_t* params, wasm_v
         process_args[0] = process_path;
         process_args[args_len + 1] = NULL;
         
-        if (fork() == 0) {
-            execv(process_path, process_args);
+        switch (fork()) {
+            case -1: // Bad fork
+                results->data[0] = WASM_I32_VAL(1); // Failed to run
+                break;
+
+            case 0: // Child process
+                execv(process_path, process_args);
+            
+            default: {
+                i32 status;
+                wait(&status);
+
+                i32 exit_status = WEXITSTATUS(status);
+            
+                results->data[0] = WASM_I32_VAL(exit_status != 0 ? 2 : 0); // Error if non-zero exit, Success if zero.
+                break;
+            }
         }
 
-        i32 status;
-        wait(&status);
-        results->data[0] = WASM_I32_VAL(WEXITSTATUS(status));
     #endif
 
     #ifdef _BH_WINDOWS
@@ -232,8 +244,15 @@ static wasm_trap_t* onyx_spawn_process_impl(const wasm_val_vec_t* params, wasm_v
 
         PROCESS_INFORMATION proc_info;
         BOOL success = CreateProcessA(process_path, cmdLine, NULL, NULL, 1, 0, NULL, NULL, &startup, &proc_info);
+        if (!success) {
+            results->data[0] = WASM_I32_VAL(1); // Failed to run
+            return NULL;
+        }
+
         DWORD result = WaitForSingleObject(proc_info.hProcess, INFINITE);
-        results->data[0] = WASM_I32_VAL(result);
+        DWORD exitCode;
+        GetExitCodeProcess(proc_info.hProcess, &exitCode);
+        results->data[0] = WASM_I32_VAL(exitCode != 0 ? 2 : 0);
     #endif
 
     return NULL;
