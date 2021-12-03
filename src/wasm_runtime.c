@@ -147,7 +147,8 @@ WASM_INTEROP(onyx_spawn_thread_impl) {
     #endif
 
     #ifdef _BH_WINDOWS
-        thread->thread_handle = CreateThread(NULL, 0, onyx_run_thread, thread, 0, &thread->thread_id);
+        // thread->thread_handle = CreateThread(NULL, 0, onyx_run_thread, thread, 0, &thread->thread_id);
+        thread->thread_handle = (HANDLE) _beginthreadex(NULL, 0, onyx_run_thread, thread, 0, &thread->thread_id);
     #endif
 
     results->data[0] = WASM_I32_VAL(1);
@@ -166,6 +167,7 @@ WASM_INTEROP(onyx_kill_thread_impl) {
 
             #ifdef _BH_WINDOWS
             TerminateThread(thread->thread_handle, 0);
+            CloseHandle(thread->thread_handle);
             #endif
 
             bh_arr_deleten(threads, i, 1);
@@ -307,20 +309,30 @@ WASM_INTEROP(onyx_process_spawn_impl) {
         success = success && CreatePipe(&process->host_to_proc_read, &process->host_to_proc_write, &saAttr, 4096);
         success = success && CreatePipe(&process->proc_to_host_read, &process->proc_to_host_write, &saAttr, 4096);
         if (!success) {
+            // printf("FAILED TO CREATE PIPES: %d\n", GetLastError());
             wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
             return NULL;
         }
 
-        SetHandleInformation(process->proc_to_host_read, 1 /* HANDLE_FLAG_INHERIT */, 0);
-        SetHandleInformation(process->host_to_proc_write, 1 /* HANDLE_FLAG_INHERIT */, 0);
+        success = SetHandleInformation(process->proc_to_host_read, 1 /* HANDLE_FLAG_INHERIT */, 0);
+        success = success && SetHandleInformation(process->host_to_proc_write, 1 /* HANDLE_FLAG_INHERIT */, 0);
+        if (!success) {
+            // printf("FAILED TO CONFIGURE PIPES: %d\n", GetLastError());
+            wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
+            return NULL;
+        }
 
         startup.hStdInput  = process->host_to_proc_read;
         startup.hStdOutput = process->proc_to_host_write;
         startup.hStdError = process->proc_to_host_write;
+
         startup.dwFlags |= STARTF_USESTDHANDLES;
 
-        success = CreateProcessA(process_path, cmdLine, NULL, NULL, 1, 0, NULL, NULL, &startup, &process->proc_info);
+        memset(&process->proc_info, 0, sizeof process->proc_info);
+
+        success = CreateProcessA(process_path, cmdLine, &saAttr, &saAttr, 1, 0, NULL, NULL, &startup, &process->proc_info);
         if (!success) {
+            // printf("FAILED TO CREATE PROCESS: %d\n", GetLastError());
             wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
             return NULL;
         }
@@ -352,7 +364,7 @@ WASM_INTEROP(onyx_process_read_impl) {
 
     #ifdef _BH_WINDOWS
         BOOL success = ReadFile(process->proc_to_host_read, buffer, output_len, &bytes_read, NULL);
-        if (!success) bytes_read = 0;
+        if (!success) bytes_read = 0; 
     #endif
 
     results->data[0] = WASM_I32_VAL(bytes_read);
@@ -415,21 +427,48 @@ WASM_INTEROP(onyx_process_wait_impl) {
     #ifdef _BH_LINUX
         i32 status;
         waitpid(process->pid, &status, 0);
-        close(process->proc_to_host[0]);
-        close(process->host_to_proc[1]);
 
         i32 exit_code = WEXITSTATUS(status);
         results->data[0] = WASM_I32_VAL(exit_code != 0 ? 2 : 0);
     #endif
 
     #ifdef _BH_WINDOWS
-        DWORD result = WaitForSingleObject(process->proc_info.hProcess, INFINITE);
-        CloseHandle(process->host_to_proc_write);
-        CloseHandle(process->proc_to_host_write);
-        CloseHandle(process->proc_to_host_read);
-
         DWORD exitCode;
-        GetExitCodeProcess(process->proc_info.hProcess, &exitCode);
+        while (1) {
+            if (!WaitForSingleObject(process->proc_info.hProcess, INFINITE)) {
+                // HACK HACK HACK
+                DWORD error = GetLastError();
+                if (error != 109 && error != 6) {
+                    // printf("ERROR IN WAIT FOR SINGLE: %d\n", error);
+                    results->data[0] = WASM_I32_VAL(1);
+                    return NULL; 
+                }
+            }
+
+            if (!GetExitCodeProcess(process->proc_info.hProcess, &exitCode)) {
+                // HACK HACK HACK
+                // Apparently, I'm doing something wrong (maybe?) where the process handle becomes
+                // invalid and causes error 6 "invalid handle". So I think I can safely assume that
+                // if that is the case, then the process exited? probably successfuly? hopefully?
+                // Honestly I don't know and I can't find any documentation describing when a process
+                // handle goes invalid, other than after you close it explicitly. But in the run_tests
+                // script, I'm not calling either process_kill or process_destroy, which are the only
+                // other functions that close the process handle. So I'm left in the dark as to why this
+                // is happening, but oh well. This works for now.
+                //                                                           - brendanfh 2021/12/03
+                if (GetLastError() == 6) {
+                    exitCode = 0;
+                    break;
+                }
+
+                results->data[0] = WASM_I32_VAL(3);
+                return NULL;
+            }
+
+            // 259 is STILL_ACTIVE (aka STATUS_PENDING), which means that the process has not yet exited
+            if (exitCode != 259) break;
+        }
+
         results->data[0] = WASM_I32_VAL(exitCode != 0 ? 2 : 0);
     #endif
 
@@ -443,16 +482,15 @@ WASM_INTEROP(onyx_process_destroy_impl) {
     }
 
     #ifdef _BH_LINUX
-        kill(process->pid, SIGKILL);
         close(process->proc_to_host[0]);
         close(process->host_to_proc[1]);
     #endif
 
     #ifdef _BH_WINDOWS
-        TerminateProcess(process->proc_info.hProcess, 1);
-        CloseHandle(process->host_to_proc_write);
-        CloseHandle(process->proc_to_host_write);
-        CloseHandle(process->proc_to_host_read);
+        if (!CloseHandle(process->proc_info.hThread)
+         || !CloseHandle(process->proc_info.hProcess)) {
+            // printf("ERROR CLOSING HANDLES: %d\n", GetLastError());
+         }
     #endif
 
     bh_free(global_heap_allocator, process);

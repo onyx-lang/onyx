@@ -312,6 +312,16 @@ GB_DLL_IMPORT BOOL    WINAPI CreatePipe         (HANDLE *hReadPipe, HANDLE *hWri
 GB_DLL_IMPORT BOOL    WINAPI TerminateProcess   (HANDLE hProcess, UINT uExitCode);
 GB_DLL_IMPORT BOOL    WINAPI SetHandleInformation(HANDLE hObject, DWORD dwMask, DWORD dwFlags);
 
+uintptr_t _beginthreadex( // NATIVE CODE
+   void *security,
+   unsigned stack_size,
+   unsigned ( __stdcall *start_address )( void * ),
+   void *arglist,
+   unsigned initflag,
+   unsigned *thrdaddr
+);
+
+
 GB_DLL_IMPORT BOOL      WINAPI GetLogicalProcessorInformation(SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer, DWORD *return_length);
 GB_DLL_IMPORT DWORD_PTR WINAPI SetThreadAffinityMask(HANDLE thread, DWORD_PTR check_mask);
 GB_DLL_IMPORT HANDLE    WINAPI GetCurrentThread(void);

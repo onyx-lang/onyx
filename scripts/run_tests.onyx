@@ -132,7 +132,7 @@ test_cases :: (cases) => {
 
         if exit := io.process_wait(^proc); exit != .Success {
             // Error running the test case
-            print_color(.Red, "[{}]  Error compiling test case {}.\n{}", context.thread_id, it.source_file, output);
+            print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
             at_least_one_test_failed = true;
             continue;
         }
@@ -143,6 +143,8 @@ test_cases :: (cases) => {
 
             if output != expected_output {
                 print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
+                printf("Expected:\n{}\n", expected_output);
+                printf("Got:\n{}\n", output);
                 at_least_one_test_failed = true;
             }
         }

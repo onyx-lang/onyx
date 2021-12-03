@@ -238,6 +238,8 @@ get_freed_size :: () => {
 
         hb_ptr.size |= Allocated_Flag;
         new_ptr := heap_alloc(new_size_, align);
+        #if runtime.Multi_Threading_Enabled do sync.mutex_lock(^heap_mutex);
+        
         memory_copy(new_ptr, ptr, old_size - sizeof heap_block);
         heap_free(ptr);
         return new_ptr;
