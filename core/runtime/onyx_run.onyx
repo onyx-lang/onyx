@@ -17,7 +17,7 @@ use package wasi
     #export "_thread_exit"  _thread_exit
 }
 
-#load "core/io/process"
+#load "core/os/process"
 
 #local ProcessResult :: enum {
     Success     :: 0x00;
@@ -26,9 +26,9 @@ use package wasi
     InternalErr :: 0x03;
 }
 
-__process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> io.Process.Handle #foreign "env" "process_spawn" ---
-__process_read    :: (handle: io.Process.Handle, buffer: [] u8) -> i32 #foreign "env" "process_read" ---
-__process_write   :: (handle: io.Process.Handle, buffer: [] u8) -> i32 #foreign "env" "process_write" ---
-__process_kill    :: (handle: io.Process.Handle) -> bool #foreign "env" "process_kill" ---
-__process_wait    :: (handle: io.Process.Handle) -> ProcessResult #foreign "env" "process_wait" ---
-__process_destroy :: (handle: io.Process.Handle) -> void #foreign "env" "process_destroy" ---
+__process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> os.Process.Handle #foreign "env" "process_spawn" ---
+__process_read    :: (handle: os.Process.Handle, buffer: [] u8) -> i32 #foreign "env" "process_read" ---
+__process_write   :: (handle: os.Process.Handle, buffer: [] u8) -> i32 #foreign "env" "process_write" ---
+__process_kill    :: (handle: os.Process.Handle) -> bool #foreign "env" "process_kill" ---
+__process_wait    :: (handle: os.Process.Handle) -> ProcessResult #foreign "env" "process_wait" ---
+__process_destroy :: (handle: os.Process.Handle) -> void #foreign "env" "process_destroy" ---

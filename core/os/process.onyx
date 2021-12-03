@@ -1,4 +1,4 @@
-package core.io
+package core.os
 
 // Some thoughts about processes and the API.
 //
@@ -8,15 +8,19 @@ package core.io
 //
 
 
-#local runtime :: package runtime
 #if runtime.Runtime != runtime.Runtime_Onyx {
     #error "This file can only be included in the 'onyx' runtime, because Wasi has not defined how to spawn and manage processes.";
+}
+
+#local {
+    runtime :: package runtime
+    io      :: package core.io
 }
 
 Process :: struct {
     Handle :: #distinct i64;
 
-    use stream: Stream;
+    use stream: io.Stream;
     process_handle: Handle;
 }
 
@@ -41,8 +45,8 @@ process_destroy :: (use p: ^Process) => {
     runtime.__process_destroy(process_handle);
 }
 
-#local process_stream_vtable := Stream_Vtable.{
-    read = (use p: ^Process, buffer: [] u8) -> (Error, u32) {
+#local process_stream_vtable := io.Stream_Vtable.{
+    read = (use p: ^Process, buffer: [] u8) -> (io.Error, u32) {
         // Read from the process stdout
         if cast(i64) process_handle == 0 do return .BadFile, 0;
 
@@ -50,7 +54,7 @@ process_destroy :: (use p: ^Process) => {
         return .None, bytes_read;
     },
 
-    write = (use p: ^Process, buffer: [] u8) -> (Error, u32) {
+    write = (use p: ^Process, buffer: [] u8) -> (io.Error, u32) {
         // Write to the process stdin
         if cast(i64) process_handle == 0 do return .BadFile, 0;
 
@@ -58,7 +62,7 @@ process_destroy :: (use p: ^Process) => {
         return .None, bytes_written;
     },
 
-    close = (use p: ^Process) -> Error {
+    close = (use p: ^Process) -> io.Error {
         process_kill(p);
         return .None;
     }

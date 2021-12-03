@@ -123,14 +123,14 @@ test_cases :: (cases) => {
     for #no_close *cases {
         printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
 
-        proc := io.process_spawn(onyx_cmd, .["run", it.source_file]);
-        defer io.process_destroy(^proc);
+        proc := os.process_spawn(onyx_cmd, .["run", it.source_file]);
+        defer os.process_destroy(^proc);
 
         proc_reader := io.reader_make(^proc);
         output := io.read_all(^proc_reader);
         defer memory.free_slice(^output);
 
-        if exit := io.process_wait(^proc); exit != .Success {
+        if exit := os.process_wait(^proc); exit != .Success {
             // Error running the test case
             print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
             at_least_one_test_failed = true;
