@@ -1097,6 +1097,10 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     AstFor* for_node = make_node(AstFor, Ast_Kind_For);
     for_node->token = expect_token(parser, Token_Type_Keyword_For);
 
+    if (parse_possible_directive(parser, "no_close")) {
+        for_node->no_close = 1;
+    }
+
     if (consume_token_if_next(parser, '^')) {
         for_node->by_pointer = 1;
     }

@@ -205,6 +205,8 @@ CheckStatus check_while(AstIfWhile* whilenode) {
 }
 
 CheckStatus check_for(AstFor* fornode) {
+    if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
+
     CHECK(expression, &fornode->iter);
     resolve_expression_type(fornode->iter);
 
@@ -287,6 +289,14 @@ CheckStatus check_for(AstFor* fornode) {
 
     if (fornode->loop_type == For_Loop_Invalid)
         ERROR_(error_loc, "Cannot iterate over a '%s'.", type_get_name(iter_type));
+
+    if (fornode->no_close && fornode->loop_type != For_Loop_Iterator) {
+        onyx_report_warning(error_loc, "Warning: #no_close here is meaningless as the iterable is not an iterator.");
+    }
+
+    fornode->flags |= Ast_Flag_Has_Been_Checked;
+
+fornode_expr_checked:
 
     CHECK(block, fornode->stmt);
 

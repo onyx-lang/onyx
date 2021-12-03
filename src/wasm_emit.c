@@ -334,7 +334,7 @@ EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
         /* SBT_Basic_Loop */        0,
         /* SBT_Continue_Loop */     2,
     };
-    
+
     static const WasmInstructionType block_instrs[SBT_Count] = {
         /* SBT_Basic_Block */       WI_BLOCK_START,
         /* SBT_Breakable_Block */   WI_BLOCK_START,
@@ -553,7 +553,7 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
             emit_expression(mod, &code, al->values[i]);
             emit_store_instruction(mod, &code, elem_type, i * elem_size);
         }
-        
+
         local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
     } else {
@@ -595,7 +595,7 @@ EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
         u64 offset = 0;
         emit_location_return_offset(mod, &code, lval, &offset);
         WIL(WI_LOCAL_GET, expr_tmp);
-        
+
         local_raw_free(mod->local_alloc, wt);
         emit_store_instruction(mod, &code, lval->type, offset);
     }
@@ -1008,22 +1008,24 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     // Enter a deferred statement for the auto-close
     emit_enter_structured_block(mod, &code, SBT_Basic_Block);
 
-    TypeWithOffset close_func_type;
-    type_linear_member_lookup(for_node->iter->type, 2, &close_func_type);
-    i32 close_type_idx = generate_type_idx(mod, close_func_type.type);
+    if (!for_node->no_close) {
+        TypeWithOffset close_func_type;
+        type_linear_member_lookup(for_node->iter->type, 2, &close_func_type);
+        i32 close_type_idx = generate_type_idx(mod, close_func_type.type);
 
-    WasmInstruction* close_instructions = bh_alloc_array(global_heap_allocator, WasmInstruction, 8);
-    close_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
-    close_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = mod->null_proc_func_idx } };
-    close_instructions[2] = (WasmInstruction) { WI_I32_NE,        { .l = 0x00 } };
-    close_instructions[3] = (WasmInstruction) { WI_IF_START,      { .l = 0x40 } };
-    close_instructions[4] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_data_ptr } };
-    close_instructions[5] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
-    close_instructions[6] = (WasmInstruction) { WI_CALL_INDIRECT, { .l = close_type_idx } };
-    close_instructions[7] = (WasmInstruction) { WI_IF_END,        { .l = 0x00 } };
+        WasmInstruction* close_instructions = bh_alloc_array(global_heap_allocator, WasmInstruction, 8);
+        close_instructions[0] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
+        close_instructions[1] = (WasmInstruction) { WI_I32_CONST,     { .l = mod->null_proc_func_idx } };
+        close_instructions[2] = (WasmInstruction) { WI_I32_NE,        { .l = 0x00 } };
+        close_instructions[3] = (WasmInstruction) { WI_IF_START,      { .l = 0x40 } };
+        close_instructions[4] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_data_ptr } };
+        close_instructions[5] = (WasmInstruction) { WI_LOCAL_GET,     { .l = iterator_close_func } };
+        close_instructions[6] = (WasmInstruction) { WI_CALL_INDIRECT, { .l = close_type_idx } };
+        close_instructions[7] = (WasmInstruction) { WI_IF_END,        { .l = 0x00 } };
 
-    emit_defer_code(mod, &code, close_instructions, 8);
-    
+        emit_defer_code(mod, &code, close_instructions, 8);
+    }
+
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
     emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
 
@@ -1035,7 +1037,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
 
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
-        
+
         TypeWithOffset next_func_type;
         type_linear_member_lookup(for_node->iter->type, 1, &next_func_type);
         Type* return_type = next_func_type.type->Function.return_type;
@@ -1046,7 +1048,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
 
         u64 reserve_size = return_size;
         bh_align(reserve_size, 16);
-        
+
         WID(WI_GLOBAL_GET, stack_top_idx);
         WID(WI_PTR_CONST, reserve_size);
         WI(WI_PTR_ADD);
@@ -1074,7 +1076,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     WID(WI_COND_JUMP, 0x01);
 
     emit_block(mod, &code, for_node->stmt, 0);
-    WID(WI_JUMP, 0x00); 
+    WID(WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
@@ -1425,7 +1427,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
 //    simple structs/primitives (y, x)
 //
 // Linear memory stack:
-//  
+//
 //     ... | struct-like arguments (z) | variadic arguments (va) | return space | ...
 //
 // The interesting part from above is the fact that 'y' gets passed on the WASM stack, not the linear memory
@@ -1690,7 +1692,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
                 emit_intrinsic_memory_copy(mod, &code);
             }
             break;
-        case ONYX_INTRINSIC_MEMORY_FILL:        
+        case ONYX_INTRINSIC_MEMORY_FILL:
             if (context.options->use_post_mvp_features) {
                 WIL(WI_MEMORY_FILL, 0x00);
             } else {
@@ -2236,7 +2238,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     fori (i, 0, elem_count) {
         type_linear_member_lookup(type, i, &two);
 
-        u64 tmp_idx = temp_locals[i]; 
+        u64 tmp_idx = temp_locals[i];
         WIL(WI_LOCAL_GET, loc_idx);
         WIL(WI_LOCAL_GET, tmp_idx);
         emit_store_instruction(mod, &code, two.type, offset + two.offset);
@@ -2423,7 +2425,7 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
     b32 result_is_local = (b32) ((result_local & LOCAL_IS_WASM) != 0);
     bh_imap_put(&mod->local_map, (u64) if_expr, result_local);
 
-    emit_expression(mod, &code, if_expr->cond); 
+    emit_expression(mod, &code, if_expr->cond);
 
     emit_enter_structured_block(mod, &code, SBT_Basic_If);
         if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
@@ -2538,7 +2540,7 @@ EMIT_FUNC(location, AstTyped* expr) {
     if (offset != 0) {
         WID(WI_PTR_CONST, offset);
         WI(WI_PTR_ADD);
-    } 
+    }
 
     *pcode = code;
 }
@@ -3344,7 +3346,7 @@ static void emit_export_directive(OnyxWasmModule* mod, AstDirectiveExport* expor
 
     shput(mod->exports, export->export_name->text, wasm_export);
     mod->export_count++;
-    
+
     token_toggle_end(export->export_name);
     return;
 }

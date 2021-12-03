@@ -45,7 +45,8 @@ distributor :: (arr: [] $T) -> Iterator(T) {
     }
 
     close :: (use c: ^Context($T)) {
-        // This will leak because it shouldn't be freed.
+        sync.mutex_destroy(^c.mutex);
+        cfree(c);
     }
 
     c := new(Context(T));
@@ -117,7 +118,7 @@ find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
 }
 
 test_cases :: (cases) => {
-    for *cases {
+    for #no_close *cases {
         printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
 
         proc := io.process_spawn(onyx_cmd, .["run", it.source_file]);
@@ -190,6 +191,8 @@ main :: (args) => {
     } else {
         test_cases(^case_iterator);
     }
+
+    case_iterator->close();
 
     println("Done");
 }
