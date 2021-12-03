@@ -4,7 +4,7 @@ use package core
 
 using_callsite :: (value: $T, site := #callsite) {
     println(value);
-    path := string.split(site.file, #char "/");
+    path := string.split(site.file, ~~(#char "\\" if runtime.OS == runtime.OS_Windows else #char "/"));
     printf("I was called from {}:{}:{}\n", path[path.count - 1], site.line, site.column);
 }
 
@@ -24,3 +24,5 @@ Something :: struct {
         using_callsite(member);
     }
 }
+
+#local runtime :: package runtime
