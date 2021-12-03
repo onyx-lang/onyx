@@ -34,16 +34,15 @@ main :: (args) => {
             nums << read_binary(^reader);
         }
 
-        ones_count: [BITS] i32;   // Every digit is 12-bits
-        for BITS {
-            ones_count[it] = 0;
-            for num: nums {
-                if num & (1 << it) != 0 do ones_count[it] += 1;
-            }
-        }
-
         num1 := 0;
-        for BITS do num1 |= (1 << it) if ones_count[it] >= (nums.count / 2) else 0;
+        for BITS {
+            one_count := 0;
+            for num: nums {
+                if num & (1 << it) != 0 do one_count += 1;
+            }
+
+            if one_count >= (nums.count / 2) do num1 |= (1 << it);
+        }
 
         num2 := ((1 << BITS) - 1) & (~num1);
 

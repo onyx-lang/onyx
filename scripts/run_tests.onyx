@@ -1,91 +1,15 @@
+// To be added to make this complete:
+//     - Fancy display
+
+
+
 #load "core/std"
 
 use package core
-#local wasi :: package wasi
 #local runtime :: package runtime
 
-Directory_Entry :: struct {
-    dirent : wasi.DirEnt;
-    name   : str;
-}
-
-list_directory :: (path: str) -> Iterator(Directory_Entry) {
-    Context :: struct {
-        dir_fd: wasi.FileDescriptor;
-        opened := false;
-        reached_end := false;
-
-        entry_walker: ^u8;
-
-        buffer_used: u32 = 0;
-        buffer: [1024] u8;
-
-        last_cookie: wasi.DirCookie = 0;
-    }
-
-    next :: (use c: ^Context) -> (Directory_Entry, bool) {
-        use package core.intrinsics.onyx {__zero_value}
-        if !opened do return __zero_value(Directory_Entry), false;
-
-        read_more :: macro () {
-            if !reached_end {
-                err := wasi.fd_readdir(dir_fd, ~~buffer, sizeof typeof buffer, last_cookie, ^buffer_used);
-                reached_end = buffer_used != sizeof typeof buffer;
-
-                entry_walker = ~~buffer;
-            } else {
-                return __zero_value(Directory_Entry), false;
-            }
-        }
-
-        if buffer_used < sizeof(wasi.DirEnt) do read_more();
-
-        dirent := cast(^wasi.DirEnt) entry_walker;
-        if buffer_used < sizeof(wasi.DirEnt) + dirent.d_namlen {
-            read_more();
-            dirent = ~~entry_walker;
-        }
-
-        name := str.{~~(dirent + 1), dirent.d_namlen};
-
-        entry_size := sizeof(wasi.DirEnt) + dirent.d_namlen;
-        entry_walker += entry_size;
-        buffer_used -= entry_size;
-        last_cookie = dirent.d_next;
-
-        return .{*dirent, name}, true;
-    }
-
-    close :: (use c: ^Context) {
-        wasi.fd_close(dir_fd);
-        cfree(c);
-    }
-
-    c := new(Context);
-    if err := wasi.path_open(4, 0, path, .Directory, ~~0xffffffff, ~~0xffffffff, .Sync, ^c.dir_fd); err == .Success {
-        c.opened = true;
-    }
-
-    return .{ c, next, close };
-}
-
-find_onyx_files :: (root: str, cases: ^[..] str) {
-    for list_directory(root) {
-        path_buffer: [512] u8;
-        if string.ends_with(it.name, ".onyx") {
-            test_case := string.concat(path_buffer, root, "/", it.name) |> string.alloc_copy();
-            array.push(cases, test_case);
-        }
-
-        if it.dirent.d_type == .Directory {
-            find_onyx_files(string.concat(path_buffer, root, "/", it.name), cases);
-        }
-    }
-
-    return;
-}
-
 #if false {
+    @Relocate
     divide_array :: (arr: [] $T, divisions: [] [] T) {
         if divisions.count == 0 do return;
 
@@ -102,6 +26,7 @@ find_onyx_files :: (root: str, cases: ^[..] str) {
     }
 }
 
+@Relocate
 distributor :: (arr: [] $T) -> Iterator(T) {
     Context :: struct (T: type_expr) {
         mutex: sync.Mutex;
@@ -131,12 +56,102 @@ distributor :: (arr: [] $T) -> Iterator(T) {
     return .{ c, #solidify next {T=T}, #solidify close {T=T}};
 }
 
+Color :: enum {
+    White;
+    Red;
+    Green;
+    Yellow;
+    Blue;
+}
+
+print_color :: (color: Color, format: str, args: ..any) {
+    buffer: [2048] u8;
+    output := conv.str_format_va(buffer, format, args);
+
+    #if runtime.OS == runtime.OS_Linux {
+        color_code: str;
+        switch color {
+            case .Red do color_code = "\x1b[91m";
+            case .Green do color_code ="\x1b[92m";
+            case .Yellow do color_code = "\x1b[93m";
+            case .Blue do color_code ="\x1b[94m";
+            case .White do fallthrough;
+            case #default do color_code = "\x1b[97m";
+        }
+
+        printf("{}{}\x1b[0m", color_code, output);
+        __flush_stdio();
+
+    } else {
+        // No color output on Windows because most windows terminals suck.
+        print(output);
+    }
+}
+
+Test_Case :: struct {
+    source_file   : str;
+    expected_file : str;
+}
+
+find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
+    for os.list_directory(root) {
+        path_buffer: [512] u8;
+        if string.ends_with(it.name, ".onyx") {
+            test_case := string.concat(path_buffer, root, "/", it.name) |> string.alloc_copy();
+            expected_file := test_case[0 .. (test_case.count - 5)];
+
+            if !io.file_exists(expected_file) {
+                print_color(.Yellow, "Skipping test case {} because an expected output file was not found.\n", test_case);
+                continue;
+            }
+
+            array.push(cases, .{ test_case, expected_file });
+        }
+
+        if it.dirent.d_type == .Directory {
+            find_onyx_files(string.concat(path_buffer, root, "/", it.name), cases);
+        }
+    }
+
+    return;
+}
+
+test_cases :: (cases) => {
+    for *cases {
+        printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
+
+        proc := io.process_spawn(onyx_cmd, .["run", it.source_file]);
+        defer io.process_destroy(^proc);
+
+        proc_reader := io.reader_make(^proc);
+        output := io.read_all(^proc_reader);
+        defer memory.free_slice(^output);
+
+        if exit := io.process_wait(^proc); exit != .Success {
+            // Error running the test case
+            print_color(.Red, "[{}]  Error compiling test case {}.\n{}", context.thread_id, it.source_file, output);
+            continue;
+        }
+
+        for expected_file: io.with_file(it.expected_file) {
+            expected_reader := io.reader_make(expected_file);
+            expected_output := io.read_all(^expected_reader);
+
+            if output != expected_output {
+                print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
+            }
+        }
+    }
+}
+
+// The executable to use when compiling
+onyx_cmd: str;
+
 main :: (args) => {
     test_folder := "./tests";
 
-    #persist onyx_cmd: str;
     switch runtime.OS {
-        case runtime.OS_Linux  {
+        case runtime.OS_Linux {
             onyx_cmd = "./bin/onyx";
             if args.count > 1 {
                 if string.from_cstr(args[1]) == "debug" do onyx_cmd = "./bin/onyx-debug";
@@ -145,38 +160,36 @@ main :: (args) => {
         case runtime.OS_Windows do onyx_cmd = "onyx.exe";
     }
 
-    test_cases :: (cases) => {
-        for *cases {
-            printf("[{}]  Running test {}...\n", context.thread_id, it);
+    cases := array.make(Test_Case);
+    find_onyx_files(test_folder, ^cases);
 
-            proc := io.process_spawn(onyx_cmd, .["run", it]);
-            defer io.process_destroy(^proc);
+    thread_count := 3;
+    for args {
+        arg := string.from_cstr(it);
+        if string.starts_with(arg, "--threads=") {
+            string.read_until(^arg, #char "=");
 
-            proc_reader := io.reader_make(^proc);
-            output := io.read_all(^proc_reader);
-            defer memory.free_slice(^output);
-
-            if exit := io.process_wait(^proc); exit != .Success {
-                // Error running the test case
-                println(exit);
-                println(output);
-            }
+            thread_count = ~~ conv.str_to_i64(arg[1 .. arg.count]);
         }
     }
 
-    cases := array.make(str);
-    find_onyx_files(test_folder, ^cases);
-
-    Thread_Count :: 3
-    #persist threads: [Thread_Count] thread.Thread;
-
     case_iterator := distributor(cases);
 
-    for Thread_Count {
-        thread.spawn(^threads[it], ^case_iterator, test_cases);
+    if thread_count > 0 {
+        // Stack allocate this in the future?
+        threads := memory.make_slice(thread.Thread, thread_count);
+
+        for thread_count {
+            thread.spawn(^threads[it], ^case_iterator, test_cases);
+        }
+
+        test_cases(^case_iterator);
+
+        for ^ threads do thread.join(it);
+
+    } else {
+        test_cases(^case_iterator);
     }
 
-    test_cases(^case_iterator);
-    for ^ threads do thread.join(it);
     println("Done");
 }

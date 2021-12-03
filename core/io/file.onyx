@@ -1,3 +1,4 @@
+@TODO // Move this file to the core.os package
 package core.io
 
 #local runtime :: package runtime
@@ -161,6 +162,18 @@ get_contents :: #match {
 
         return get_contents(tmp_file);
     }
+}
+
+file_exists :: (path: str) -> bool {
+    fs: wasi.FileStat;
+
+    exists := false;
+    for .[3, 4] { // Trying both preopened directories
+        err := wasi.path_filestat_get(it, .SymLinkFollow, path, ^fs);
+        if err == .Success do exists = true;
+    }
+
+    return exists;
 }
 
 FileStream :: struct {

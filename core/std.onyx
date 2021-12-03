@@ -42,6 +42,7 @@ package core
     #load "./wasi/env"
     #load "./wasi/clock"
     #load "./io/file"
+    #load "./os/os"
 }
 
 #if runtime.Runtime == runtime.Runtime_Onyx   { #load "./runtime/onyx_run" }
