@@ -20,3 +20,8 @@ Runtime_Onyx   :: 1
 Runtime_Wasi   :: 2
 Runtime_Js     :: 3
 Runtime_Custom :: 4
+
+
+
+OS_Linux       :: 1
+OS_Windows     :: 2

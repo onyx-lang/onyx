@@ -2,6 +2,7 @@
 
 use package core
 #local wasi :: package wasi
+#local runtime :: package runtime
 
 Directory_Entry :: struct {
     dirent : wasi.DirEnt;
@@ -68,7 +69,6 @@ list_directory :: (path: str) -> Iterator(Directory_Entry) {
     return .{ c, next, close };
 }
 
-@Temporary
 find_onyx_files :: (root: str, cases: ^[..] str) {
     for list_directory(root) {
         path_buffer: [512] u8;
@@ -88,12 +88,18 @@ find_onyx_files :: (root: str, cases: ^[..] str) {
 main :: (args) => {
     test_folder := "./tests";
 
+    onyx_cmd: str;
+    switch runtime.OS {
+        case runtime.OS_Linux do onyx_cmd = "./bin/onyx";
+        case runtime.OS_Windows do onyx_cmd = "onyx.exe";
+    }
+
     cases := array.make(str);
     find_onyx_files(test_folder, ^cases);
     for cases {
         printf("Running test {}...\n", it);
 
-        proc := io.process_spawn("./bin/onyx", .["run", it]);
+        proc := io.process_spawn(onyx_cmd, .["run", it]);
         defer io.process_destroy(^proc);
 
         proc_reader := io.reader_make(^proc);

@@ -191,6 +191,15 @@ typedef struct OnyxProcess {
 
     pid_t pid;
 #endif
+
+#ifdef _BH_WINDOWS
+    HANDLE proc_to_host_read;
+    HANDLE proc_to_host_write;
+    HANDLE host_to_proc_read;
+    HANDLE host_to_proc_write;
+
+    PROCESS_INFORMATION proc_info;
+#endif
 } OnyxProcess;
 
 WASM_INTEROP(onyx_process_spawn_impl) {
@@ -225,8 +234,10 @@ WASM_INTEROP(onyx_process_spawn_impl) {
         process_args[0] = process_path;
         process_args[args_len + 1] = NULL;
 
-        pipe(process->proc_to_host);
-        pipe(process->host_to_proc);
+        if (pipe(process->proc_to_host) || pipe(process->host_to_proc)) {
+            wasm_val_init_ptr(&results->data[0], NULL); // Failed to run
+            return NULL;
+        }
 
         pid_t pid;
         switch (pid = fork()) {
@@ -287,17 +298,36 @@ WASM_INTEROP(onyx_process_spawn_impl) {
         memset(&startup, 0, sizeof startup);
         startup.cb = sizeof(startup);
 
-        PROCESS_INFORMATION proc_info;
-        BOOL success = CreateProcessA(process_path, cmdLine, NULL, NULL, 1, 0, NULL, NULL, &startup, &proc_info);
+        SECURITY_ATTRIBUTES saAttr;
+        saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+        saAttr.lpSecurityDescriptor = NULL;
+        saAttr.bInheritHandle = 1;
+
+        BOOL success = 1;
+        success = success && CreatePipe(&process->host_to_proc_read, &process->host_to_proc_write, &saAttr, 4096);
+        success = success && CreatePipe(&process->proc_to_host_read, &process->proc_to_host_write, &saAttr, 4096);
         if (!success) {
-            results->data[0] = WASM_I32_VAL(1); // Failed to run
+            wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
             return NULL;
         }
 
-        DWORD result = WaitForSingleObject(proc_info.hProcess, INFINITE);
-        DWORD exitCode;
-        GetExitCodeProcess(proc_info.hProcess, &exitCode);
-        results->data[0] = WASM_I32_VAL(exitCode != 0 ? 2 : 0);
+        SetHandleInformation(process->proc_to_host_read, 1 /* HANDLE_FLAG_INHERIT */, 0);
+        SetHandleInformation(process->host_to_proc_write, 1 /* HANDLE_FLAG_INHERIT */, 0);
+
+        startup.hStdInput  = process->host_to_proc_read;
+        startup.hStdOutput = process->proc_to_host_write;
+        startup.hStdError = process->proc_to_host_write;
+        startup.dwFlags |= STARTF_USESTDHANDLES;
+
+        success = CreateProcessA(process_path, cmdLine, NULL, NULL, 1, 0, NULL, NULL, &startup, &process->proc_info);
+        if (!success) {
+            wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
+            return NULL;
+        }
+
+        CloseHandle(process->proc_to_host_write);
+        CloseHandle(process->host_to_proc_read);
+        wasm_val_init_ptr(&results->data[0], process);
     #endif
 
     return NULL;
@@ -318,6 +348,11 @@ WASM_INTEROP(onyx_process_read_impl) {
     #ifdef _BH_LINUX
         bytes_read = read(process->proc_to_host[0], buffer, output_len);
         bytes_read = bh_max(bytes_read, 0);  // Silently consume errors
+    #endif
+
+    #ifdef _BH_WINDOWS
+        BOOL success = ReadFile(process->proc_to_host_read, buffer, output_len, &bytes_read, NULL);
+        if (!success) bytes_read = 0;
     #endif
 
     results->data[0] = WASM_I32_VAL(bytes_read);
@@ -341,6 +376,11 @@ WASM_INTEROP(onyx_process_write_impl) {
         bytes_written = bh_max(bytes_written, 0);  // Silently consume errors
     #endif
 
+    #ifdef _BH_WINDOWS
+        BOOL success = WriteFile(process->host_to_proc_write, buffer, input_len, &bytes_written, NULL);
+        if (!success) bytes_written = 0;
+    #endif
+
     results->data[0] = WASM_I32_VAL(bytes_written);
     return NULL;
 }
@@ -355,6 +395,11 @@ WASM_INTEROP(onyx_process_kill_impl) {
     #ifdef _BH_LINUX
         i32 failed = kill(process->pid, SIGKILL);
         results->data[0] = WASM_I32_VAL(!failed);
+    #endif
+
+    #ifdef _BH_WINDOWS
+        BOOL success = TerminateProcess(process->proc_info.hProcess, 1);
+        results->data[0] = WASM_I32_VAL(success ? 1 : 0);
     #endif
 
     return NULL;
@@ -377,6 +422,17 @@ WASM_INTEROP(onyx_process_wait_impl) {
         results->data[0] = WASM_I32_VAL(exit_code != 0 ? 2 : 0);
     #endif
 
+    #ifdef _BH_WINDOWS
+        DWORD result = WaitForSingleObject(process->proc_info.hProcess, INFINITE);
+        CloseHandle(process->host_to_proc_write);
+        CloseHandle(process->proc_to_host_write);
+        CloseHandle(process->proc_to_host_read);
+
+        DWORD exitCode;
+        GetExitCodeProcess(process->proc_info.hProcess, &exitCode);
+        results->data[0] = WASM_I32_VAL(exitCode != 0 ? 2 : 0);
+    #endif
+
     return NULL;
 }
 
@@ -390,8 +446,16 @@ WASM_INTEROP(onyx_process_destroy_impl) {
         kill(process->pid, SIGKILL);
         close(process->proc_to_host[0]);
         close(process->host_to_proc[1]);
-        bh_free(global_heap_allocator, process);
     #endif
+
+    #ifdef _BH_WINDOWS
+        TerminateProcess(process->proc_info.hProcess, 1);
+        CloseHandle(process->host_to_proc_write);
+        CloseHandle(process->proc_to_host_write);
+        CloseHandle(process->proc_to_host_read);
+    #endif
+
+    bh_free(global_heap_allocator, process);
 
     return NULL;
 }

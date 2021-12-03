@@ -285,7 +285,7 @@ typedef struct _PROCESS_INFORMATION {
 
 #define INFINITE 0xffffffffl
 #define INVALID_HANDLE_VALUE ((void *)(intptr_t)(-1))
-
+#define STARTF_USESTDHANDLES 0x00000100
 
 typedef DWORD WINAPI THREAD_START_ROUTINE(void *parameter);
 
@@ -307,6 +307,10 @@ GB_DLL_IMPORT BOOL    WINAPI CreateProcessA     (char const * lpApplicationName,
                                                  char const * lpCurrentDirectory, LPSTARTUPINFOA lpStartupInfo,
                                                  LPPROCESS_INFORMATION lpProcessInformation);
 GB_DLL_IMPORT BOOL    WINAPI GetExitCodeProcess (HANDLE hProcess, DWORD *lpExitCode);
+GB_DLL_IMPORT BOOL    WINAPI CreatePipe         (HANDLE *hReadPipe, HANDLE *hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes,
+                                                 DWORD nSize);
+GB_DLL_IMPORT BOOL    WINAPI TerminateProcess   (HANDLE hProcess, UINT uExitCode);
+GB_DLL_IMPORT BOOL    WINAPI SetHandleInformation(HANDLE hObject, DWORD dwMask, DWORD dwFlags);
 
 GB_DLL_IMPORT BOOL      WINAPI GetLogicalProcessorInformation(SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer, DWORD *return_length);
 GB_DLL_IMPORT DWORD_PTR WINAPI SetThreadAffinityMask(HANDLE thread, DWORD_PTR check_mask);

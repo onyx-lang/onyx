@@ -477,4 +477,14 @@ void introduce_build_options(bh_allocator a) {
     AstNumLit* wait_notify_available = make_int_literal(a, context.options->use_multi_threading && context.options->runtime == Runtime_Js);
     wait_notify_available->type_node = (AstType *) &basic_type_bool;
     symbol_builtin_introduce(p->scope, "Wait_Notify_Available", (AstNode *) wait_notify_available);
+
+    i32 os;
+    #ifdef _BH_LINUX
+        os = 1;
+    #endif
+    #ifdef _BH_WINDOWS
+        os = 2;
+    #endif
+    AstNumLit* os_type = make_int_literal(a, os);
+    symbol_builtin_introduce(p->scope, "OS", (AstNode *) os_type);
 }
