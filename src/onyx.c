@@ -585,14 +585,14 @@ static CompilerProgress onyx_flush_module() {
 }
 
 #ifdef ENABLE_RUN_WITH_WASMER
-static void onyx_run() {
+static b32 onyx_run() {
     bh_buffer code_buffer;
     onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
 
     if (context.options->verbose_output > 0)
         bh_printf("Running program:\n");
 
-    onyx_run_wasm(code_buffer);
+    return onyx_run_wasm(code_buffer);
 }
 #endif
 
@@ -625,7 +625,9 @@ int main(int argc, char *argv[]) {
         case ONYX_COMPILE_ACTION_RUN:
             compiler_progress = onyx_compile();
             if (compiler_progress == ONYX_COMPILER_PROGRESS_SUCCESS) {
-                onyx_run();
+                if (!onyx_run()) {
+                    compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
+                }
             }
             break;
         #endif

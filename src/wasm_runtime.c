@@ -460,9 +460,11 @@ WASM_INTEROP(onyx_process_destroy_impl) {
     return NULL;
 }
 
-void onyx_run_wasm(bh_buffer wasm_bytes) {
+// Returns 1 if successful
+b32 onyx_run_wasm(bh_buffer wasm_bytes) {
     wasm_instance_t* instance = NULL;
     wasmer_features_t* features = NULL;
+    wasm_trap_t* run_trap = NULL;
 
     wasm_config = wasm_config_new();
     if (!wasm_config) goto error_handling;
@@ -631,7 +633,7 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
 
     bad_import:
         bh_printf("Couldn't find import %b.%b.\n", module_name->data, module_name->size, import_name->data, import_name->size);
-        return;
+        return 0;
     }
 
     wasm_trap_t* traps = NULL;
@@ -646,7 +648,7 @@ void onyx_run_wasm(bh_buffer wasm_bytes) {
     wasm_val_vec_t results;
     wasm_val_vec_new_uninitialized(&args, 0);
 
-    wasm_func_call(start_func, &args, &results);
+    run_trap = wasm_func_call(start_func, &args, &results);
 
     goto cleanup;
 
@@ -662,5 +664,5 @@ cleanup:
     if (wasm_module) wasm_module_delete(wasm_module);
     if (wasm_store)  wasm_store_delete(wasm_store);
     if (wasm_engine) wasm_engine_delete(wasm_engine);
-    return;
+    return run_trap == NULL;
 }

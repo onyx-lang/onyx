@@ -117,6 +117,8 @@ find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
     return;
 }
 
+at_least_one_test_failed := false;
+
 test_cases :: (cases) => {
     for #no_close *cases {
         printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
@@ -131,6 +133,7 @@ test_cases :: (cases) => {
         if exit := io.process_wait(^proc); exit != .Success {
             // Error running the test case
             print_color(.Red, "[{}]  Error compiling test case {}.\n{}", context.thread_id, it.source_file, output);
+            at_least_one_test_failed = true;
             continue;
         }
 
@@ -140,6 +143,7 @@ test_cases :: (cases) => {
 
             if output != expected_output {
                 print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
+                at_least_one_test_failed = true;
             }
         }
     }
@@ -194,5 +198,11 @@ main :: (args) => {
 
     case_iterator->close();
 
-    println("Done");
+    if at_least_one_test_failed {
+        print_color(.Red, "FAILED\n");
+        (package wasi).proc_exit(1);
+
+    } else {
+        print_color(.Green, "SUCCESS\n");
+    }
 }
