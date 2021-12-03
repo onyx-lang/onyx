@@ -41,7 +41,7 @@ package core
     #load "./wasi/wasi"
     #load "./wasi/env"
     #load "./wasi/clock"
-    #load "./io/file"
+    #load "./os/file"
     #load "./os/os"
 }
 

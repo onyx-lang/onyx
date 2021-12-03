@@ -26,7 +26,7 @@ read_binary :: (r: ^io.Reader) -> i32 {
 main :: (args) => {
     BITS :: 12
 
-    for io.with_file("./tests/aoc-2021/input/day03.txt") {
+    for os.with_file("./tests/aoc-2021/input/day03.txt") {
         reader := io.reader_make(it);
 
         nums := array.make(i32);

@@ -5,7 +5,7 @@ PART :: 2
 use package core
 
 main :: (args) => {
-    for file: io.with_file("tests/aoc-2021/input/day02.txt") {
+    for file: os.with_file("tests/aoc-2021/input/day02.txt") {
         reader := io.reader_make(file);
 
         #if PART == 1 {

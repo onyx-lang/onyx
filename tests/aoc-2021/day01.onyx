@@ -14,16 +14,10 @@ count_increasing :: (arr: [] $T) -> u32 {
 }
 
 main :: (args) => {
-    #if false {
-        contents := #file_contents "./input/day01.txt";
-        reader, stream := io.reader_from_string(contents);
-        defer cfree(stream);
-    }
-
-    err, file := io.open("./tests/aoc-2021/input/day01.txt");
+    err, file := os.open("./tests/aoc-2021/input/day01.txt");
     assert(err == .None, "Error opening file");
     reader := io.reader_make(^file);
-    defer io.close(^file);
+    defer os.close(^file);
 
     nums := array.make(i32);
     while !io.reader_empty(^reader) {

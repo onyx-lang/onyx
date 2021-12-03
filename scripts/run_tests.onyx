@@ -101,7 +101,7 @@ find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
             test_case := string.concat(path_buffer, root, "/", it.name) |> string.alloc_copy();
             expected_file := test_case[0 .. (test_case.count - 5)];
 
-            if !io.file_exists(expected_file) {
+            if !os.file_exists(expected_file) {
                 print_color(.Yellow, "Skipping test case {} because an expected output file was not found.\n", test_case);
                 continue;
             }
@@ -137,7 +137,7 @@ test_cases :: (cases) => {
             continue;
         }
 
-        for expected_file: io.with_file(it.expected_file) {
+        for expected_file: os.with_file(it.expected_file) {
             expected_reader := io.reader_make(expected_file);
             expected_output := io.read_all(^expected_reader);
 
