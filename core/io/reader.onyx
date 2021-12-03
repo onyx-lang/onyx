@@ -173,7 +173,7 @@ read_i32 :: (use reader: ^Reader) -> i32 {
 
         start += 1;
         curr, err = peek_byte(reader);
-        if err != .None do break;
+        if err != .None || start == end do break;
     }
 
     if is_negative do n = -n;
@@ -199,7 +199,7 @@ read_i64 :: (use reader: ^Reader) -> i64 {
 
         start += 1;
         curr, err = peek_byte(reader);
-        if err != .None do break;
+        if err != .None || start == end do break;
     }
 
     if is_negative do n = -n;
@@ -218,7 +218,7 @@ read_u32 :: (use reader: ^Reader) -> u32 {
 
         start += 1;
         curr, err = peek_byte(reader);
-        if err != .None do break;
+        if err != .None || start == end do break;
     }
 
     return n;
@@ -236,7 +236,7 @@ read_u64 :: (use reader: ^Reader) -> u64 {
 
         start += 1;
         curr, err = peek_byte(reader);
-        if err != .None do break;
+        if err != .None || start == end do break;
     }
 
     return n;
