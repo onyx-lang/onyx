@@ -29,7 +29,7 @@ main :: (args) => {
     for os.with_file("./tests/aoc-2021/input/day03.txt") {
         reader := io.reader_make(it);
 
-        nums := array.make(i32);
+        nums: [..] i32;
         while !io.reader_empty(^reader) {
             nums << read_binary(^reader);
         }
