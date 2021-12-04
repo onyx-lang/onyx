@@ -59,6 +59,7 @@ clear :: (arr: ^[..] $T) {
 
 ensure_capacity :: (arr: ^[..] $T, capacity: u32) -> bool {
     if arr.capacity >= capacity do return true;
+    if arr.data == null do init(arr);
 
     while capacity > arr.capacity do arr.capacity <<= 1;
     new_data := raw_resize(arr.allocator, arr.data, sizeof T * arr.capacity);

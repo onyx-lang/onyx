@@ -1,0 +1,40 @@
+data: 0x0  count: 0
+data: 0x100  count: 100
+Untyped_Array { 
+    data = (null), 
+    count = 0, 
+    capacity = 0, 
+    allocator = Allocator { 
+        data = (null), 
+        func = func[0]
+    }
+}
+Map([] u8, i32) { 
+    allocator = Allocator { 
+        data = 0xB750, 
+        func = func[38]
+    }, 
+    hashes = [
+        -1, 
+        -1, 
+        -1, 
+        1, 
+        -1, 
+        -1, 
+        -1, 
+        -1
+    ], 
+    entries = [
+        Map.Entry([] u8, i32) { 
+            next = -1, 
+            key = "Joe", 
+            value = 12
+        }, 
+        Map.Entry([] u8, i32) { 
+            next = 0, 
+            key = "Jane", 
+            value = 34
+        }
+    ], 
+    default_value = 0
+}

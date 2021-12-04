@@ -69,6 +69,7 @@ free :: (use map: ^Map($K, $V)) {
 }
 
 put :: (use map: ^Map($K, $V), key: K, value: V) {
+    if map.hashes.data == null do init(map);
     lr := lookup(map, key);
 
     if lr.entry_index >= 0 {
@@ -155,6 +156,7 @@ empty :: (use map: ^Map($K, $V)) -> bool {
     }
 
     lookup :: (use map: ^Map($K, $V), key: K) -> MapLookupResult {
+        if hashes.data == null do init(map);
         lr := MapLookupResult.{};
 
         hash_value: u32 = hash.to_u32(key); // You cannot use this type for the key, unless you add an overload.
