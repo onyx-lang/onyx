@@ -27,7 +27,7 @@ main :: (args) => {
         numbers := memory.make_slice(Cell, numbers_str.count);
         for numbers_str.count do numbers[it] = ~~ conv.str_to_i64(numbers_str[it]);
 
-        boards := array.make(Board);
+        boards: [..] Board;
         while !io.reader_empty(^reader) {
             array.insert_empty(^boards, boards.count);
             board := ^boards[boards.count - 1];

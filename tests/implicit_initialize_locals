@@ -9,32 +9,15 @@ Untyped_Array {
         func = func[0]
     }
 }
-Map([] u8, i32) { 
-    allocator = Allocator { 
-        data = 0xB750, 
-        func = func[38]
+[
+    Map.Entry([] u8, i32) { 
+        next = -1, 
+        key = "Joe", 
+        value = 12
     }, 
-    hashes = [
-        -1, 
-        -1, 
-        -1, 
-        1, 
-        -1, 
-        -1, 
-        -1, 
-        -1
-    ], 
-    entries = [
-        Map.Entry([] u8, i32) { 
-            next = -1, 
-            key = "Joe", 
-            value = 12
-        }, 
-        Map.Entry([] u8, i32) { 
-            next = 0, 
-            key = "Jane", 
-            value = 34
-        }
-    ], 
-    default_value = 0
-}
+    Map.Entry([] u8, i32) { 
+        next = 0, 
+        key = "Jane", 
+        value = 34
+    }
+]

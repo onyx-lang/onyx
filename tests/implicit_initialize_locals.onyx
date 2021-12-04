@@ -18,6 +18,6 @@ main :: (args) => {
         people: Map(str, i32);
         people["Joe"] = 12;
         people["Jane"] = 34;
-        printf("{*p}\n", ^people);
+        printf("{*p}\n", ^people.entries);
     }
 }
