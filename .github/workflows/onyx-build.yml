@@ -20,4 +20,4 @@ jobs:
     - name: build onyx
       run: ./build.sh
     - name: run tests
-      run: ./bin/onyx run scripts/run_tests.onyx -- --threads=0
+      run: ./bin/onyx run scripts/run_tests.onyx

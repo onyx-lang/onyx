@@ -69,7 +69,7 @@ print_color :: (color: Color, format: str, args: ..any) {
     buffer: [2048] u8;
     output := conv.str_format_va(buffer, format, args);
 
-    #if runtime.OS == runtime.OS_Linux {
+    if runtime.OS == runtime.OS_Linux && !settings.no_color {
         color_code: str;
         switch color {
             case .Red do color_code = "\x1b[91m";
@@ -153,7 +153,7 @@ test_cases :: (cases) => {
 
 // The executable to use when compiling
 onyx_cmd: str;
-
+settings := Settings.{};
 
 Settings :: struct {
     ["--debug", "-d"]
@@ -169,16 +169,15 @@ Settings :: struct {
     test_folder := "./tests";
 }
 
-// #export "args_parse" args_parse
-args_parse :: (c_args: [] cstr, output: ^$ArgType) -> bool {
+args_parse :: (c_args: [] cstr, output: ^Settings) -> bool {
     arg_iter := iter.as_iterator(c_args)
-            |> iter.map((x) => string.from_cstr(*x));
+             |> iter.map((x) => string.from_cstr(*x));
 
     use type_info;
 
-    arg_type := cast(^Type_Info_Struct) get_type_info(ArgType);
+    arg_type := cast(^Type_Info_Struct) get_type_info(typeof *output);
     if arg_type.kind != .Struct do return false;
-    
+
     for #no_close arg: arg_iter {
         for ^member: arg_type.members {
             for ^tag: member.tags {
@@ -201,8 +200,15 @@ args_parse :: (c_args: [] cstr, output: ^$ArgType) -> bool {
                         *(cast(^i32) (cast(^u8) output + member.offset)) = ~~value;
                     }
 
+                    case str {
+                        value, success := iter.take_one(arg_iter);
+                        if !success do return false;
+
+                        *(cast(^str) (cast(^u8) output + member.offset)) = value;
+                    }
+
                     case #default {
-                        printf("Unsupported argument type.");
+                        println("Unsupported argument type.");
                         return false;
                     }
                 }
@@ -212,16 +218,13 @@ args_parse :: (c_args: [] cstr, output: ^$ArgType) -> bool {
 
     // This has to be done explicitly beacuse the iter.take_one function
     // can close the iterator if it runs out during the taking.
-    arg_iter->close();
+    arg_iter.close(arg_iter.data);
     return true;
 }
 
 main :: (args) => {
-    settings := Settings.{};
     args_parse(args, ^settings);
-    println(settings);
-
-    test_folder := "./tests";
+    printf("Using {p*}\n", ^settings);
 
     switch runtime.OS {
         case runtime.OS_Linux {
@@ -232,7 +235,7 @@ main :: (args) => {
     }
 
     cases := array.make(Test_Case, capacity=256);
-    find_onyx_files(test_folder, ^cases);
+    find_onyx_files(settings.test_folder, ^cases);
 
     thread_count := settings.threads;
     case_iterator := distributor(cases);
