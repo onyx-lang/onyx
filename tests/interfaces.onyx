@@ -29,8 +29,8 @@ cast_able :: #match {
 }
 
 cast_able_to_int :: #match {
-    macro (_: $T)  -> bool where CanCastTo(T, i32) { return true; },
-    macro (_: any) -> bool { return false; },
+    macro (_: $T) -> bool where CanCastTo(T, i32) { return true; },
+    macro (_: $T) -> bool { return false; },
 }
 
 do_math :: macro (x, y: $T) -> T where SemiRing(T) {

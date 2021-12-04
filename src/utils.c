@@ -510,10 +510,16 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
 
     // HACK HACK HACK This is probably very wrong. I don't know what guarentees that
     // the paramters and arguments are going to be in the same order exactly.
-    // Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+    Type *any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
     fori (i, 0, bh_arr_length(call->args.values)) {
         AstNode *value = (AstNode *) ((AstArgument *) call->args.values[i])->value;
-        // assert(template->params[i].local->type);
+        assert(template->params[i].local->type);
+
+        Type *param_type = template->params[i].local->type;
+        if (param_type == any_type
+            || (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type)) {
+            onyx_report_error(macro->token->pos, "Currently, macros do not support arguments of type 'any' or '..any'.");
+        }
 
         symbol_introduce(argument_scope, template->params[i].local->token, value);
     }

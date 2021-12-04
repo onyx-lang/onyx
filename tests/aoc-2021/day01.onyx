@@ -19,7 +19,7 @@ main :: (args) => {
     reader := io.reader_make(^file);
     defer os.close(^file);
 
-    nums := array.make(i32);
+    nums: [..] i32;
     while !io.reader_empty(^reader) {
         nums << io.read_u32(^reader);
         io.skip_whitespace(^reader);
@@ -31,7 +31,7 @@ main :: (args) => {
     }
 
     { // Part 2
-        windows := array.make(i32);
+        windows: [..] i32;
         for i: range.{ 0, nums.count - 2 } {
             sum := 0;
             for k: i .. i+3 do sum += nums[k];
