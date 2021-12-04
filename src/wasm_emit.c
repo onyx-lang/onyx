@@ -2287,6 +2287,9 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     WI(WI_I32_NE);
     emit_enter_structured_block(mod, &code, SBT_Basic_If);
 
+    //
+    // CLEANUP: Most of these cases could be much shorter if they used existing intrinsics.
+    //
     if (elem_count <= 2) {
         // Inline copying for a small number of elements. It still may be faster to do this in a tight loop.
 
