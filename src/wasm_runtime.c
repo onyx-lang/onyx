@@ -688,6 +688,17 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
 
     run_trap = wasm_func_call(start_func, &args, &results);
 
+#if 0
+    if (run_trap != NULL) {
+        wasm_message_t msg;
+        wasm_trap_message(run_trap, &msg);
+        bh_printf("TRAP: %b\n", msg.data, msg.size);
+
+        wasm_frame_t *origin = wasm_trap_origin(run_trap);
+        bh_printf("HERE: func[%d] at %p.\n", wasm_frame_func_index(origin), wasm_frame_module_offset(origin));
+    }
+#endif
+
     goto cleanup;
 
 error_handling:

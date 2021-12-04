@@ -154,32 +154,87 @@ test_cases :: (cases) => {
 // The executable to use when compiling
 onyx_cmd: str;
 
+
+Settings :: struct {
+    ["--debug", "-d"]
+    debug := false;
+
+    ["--threads"]
+    threads := 3;
+
+    ["--no-color"]
+    no_color := false;
+
+    ["--tests"]
+    test_folder := "./tests";
+}
+
+// #export "args_parse" args_parse
+args_parse :: (c_args: [] cstr, output: ^$ArgType) -> bool {
+    arg_iter := iter.as_iterator(c_args)
+            |> iter.map((x) => string.from_cstr(*x));
+
+    use type_info;
+
+    arg_type := cast(^Type_Info_Struct) get_type_info(ArgType);
+    if arg_type.kind != .Struct do return false;
+    
+    for #no_close arg: arg_iter {
+        for ^member: arg_type.members {
+            for ^tag: member.tags {
+                if tag.type != str do continue;
+
+                to_match := *cast(^str) tag.data;
+                if arg != to_match do continue;
+
+                switch member.type {
+                    case bool {
+                        // Should there be a way to specify a variable to be false?
+                        *(cast(^bool) (cast(^u8) output + member.offset)) = true;
+                    }
+
+                    case i32 {
+                        value_str, success := iter.take_one(arg_iter);
+                        if !success do return false;
+
+                        value := conv.str_to_i64(value_str);
+                        *(cast(^i32) (cast(^u8) output + member.offset)) = ~~value;
+                    }
+
+                    case #default {
+                        printf("Unsupported argument type.");
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    // This has to be done explicitly beacuse the iter.take_one function
+    // can close the iterator if it runs out during the taking.
+    arg_iter->close();
+    return true;
+}
+
 main :: (args) => {
+    settings := Settings.{};
+    args_parse(args, ^settings);
+    println(settings);
+
     test_folder := "./tests";
 
     switch runtime.OS {
         case runtime.OS_Linux {
             onyx_cmd = "./bin/onyx";
-            if args.count > 1 {
-                if string.from_cstr(args[1]) == "debug" do onyx_cmd = "./bin/onyx-debug";
-            }
+            if settings.debug do onyx_cmd = "./bin/onyx-debug";
         }
         case runtime.OS_Windows do onyx_cmd = "onyx.exe";
     }
 
-    cases := array.make(Test_Case);
+    cases := array.make(Test_Case, capacity=256);
     find_onyx_files(test_folder, ^cases);
 
-    thread_count := 3;
-    for args {
-        arg := string.from_cstr(it);
-        if string.starts_with(arg, "--threads=") {
-            string.read_until(^arg, #char "=");
-
-            thread_count = ~~ conv.str_to_i64(arg[1 .. arg.count]);
-        }
-    }
-
+    thread_count := settings.threads;
     case_iterator := distributor(cases);
 
     if thread_count > 0 {

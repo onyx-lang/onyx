@@ -892,8 +892,8 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
             TYPE_CHECK(&binop->right, ltype) {
                 ERROR_(binop->token->pos,
                         "Cannot compare '%s' to '%s'.",
-                        type_get_name(ltype),
-                        type_get_name(rtype));
+                        type_get_name(binop->left->type),
+                        type_get_name(binop->right->type));
             }
         }
     }
