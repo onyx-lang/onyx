@@ -99,6 +99,8 @@
     NODE(DirectiveInsert)      \
     NODE(Macro)                \
                                \
+    NODE(ForeignBlock)         \
+                               \
     NODE(Package)          
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
@@ -213,6 +215,8 @@ typedef enum AstKind {
     Ast_Kind_Directive_Insert,
     Ast_Kind_Macro,
     Ast_Kind_Do_Block,
+
+    Ast_Kind_Foreign_Block,
 
     Ast_Kind_Note,
 
@@ -1268,6 +1272,13 @@ struct AstMacro {
     AstTyped* body;
 };
 
+struct AstForeignBlock {
+    AstNode_base;
+
+    OnyxToken *module_name;
+    bh_arr(struct Entity *) captured_entities;
+};
+
 typedef enum EntityState {
     Entity_State_Error,
     
@@ -1309,6 +1320,7 @@ typedef enum EntityType {
     Entity_Type_Polymorphic_Proc,
     Entity_Type_Polymorph_Query,
     Entity_Type_Macro,
+    Entity_Type_Foreign_Block,
     Entity_Type_Foreign_Function_Header,
     Entity_Type_Temp_Function_Header,    // Same as a Function_Header, except it disappears after it checks completely.
     Entity_Type_Function_Header,
@@ -1361,6 +1373,7 @@ typedef struct Entity {
         AstMemRes             *mem_res;
         AstPolyProc           *poly_proc;
         AstPolyQuery          *poly_query;
+        AstForeignBlock       *foreign_block;
         AstMacro              *macro;
         AstUse                *use;
         AstInterface          *interface;

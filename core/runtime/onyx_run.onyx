@@ -26,9 +26,11 @@ use package wasi
     InternalErr :: 0x03;
 }
 
-__process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> os.Process.Handle #foreign "env" "process_spawn" ---
-__process_read    :: (handle: os.Process.Handle, buffer: [] u8) -> i32 #foreign "env" "process_read" ---
-__process_write   :: (handle: os.Process.Handle, buffer: [] u8) -> i32 #foreign "env" "process_write" ---
-__process_kill    :: (handle: os.Process.Handle) -> bool #foreign "env" "process_kill" ---
-__process_wait    :: (handle: os.Process.Handle) -> ProcessResult #foreign "env" "process_wait" ---
-__process_destroy :: (handle: os.Process.Handle) -> void #foreign "env" "process_destroy" ---
+#foreign "env" {
+    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> os.Process.Handle ---
+    __process_read    :: (handle: os.Process.Handle, buffer: [] u8) -> i32 ---
+    __process_write   :: (handle: os.Process.Handle, buffer: [] u8) -> i32 ---
+    __process_kill    :: (handle: os.Process.Handle) -> bool ---
+    __process_wait    :: (handle: os.Process.Handle) -> ProcessResult ---
+    __process_destroy :: (handle: os.Process.Handle) -> void ---
+}
