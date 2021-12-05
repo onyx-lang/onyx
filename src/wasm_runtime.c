@@ -3,6 +3,7 @@
 #include "astnodes.h"
 #include "wasm.h"
 #include "wasmer.h"
+#include "onyx_library.h"
 
 #ifdef _BH_LINUX
     #include <pthread.h>
@@ -107,7 +108,7 @@ static i32 onyx_run_thread(void *data) {
     i32 thread_id = thread->id;
 
     { // Call the _thread_start procedure
-        wasm_val_t args[]    = { WASM_I32_VAL(thread_id), WASM_I32_VAL(thread->tls_base), WASM_I32_VAL (thread->funcidx), WASM_I32_VAL(thread->dataptr) };
+        wasm_val_t args[]    = { WASM_I32_VAL(thread_id), WASM_I32_VAL(thread->tls_base), WASM_I32_VAL(thread->funcidx), WASM_I32_VAL(thread->dataptr) };
         wasm_val_vec_t results;
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
 
@@ -206,7 +207,7 @@ typedef struct OnyxProcess {
 } OnyxProcess;
 
 WASM_INTEROP(onyx_process_spawn_impl) {
-    char* process_str = (char *) wasm_memory_data(wasm_memory) + params->data[0].of.i32;
+    char* process_str = ONYX_PTR(params->data[0].of.i32);
     i32   process_len = params->data[1].of.i32;
     i32   args_ptr    = params->data[2].of.i32;
     i32   args_len    = params->data[3].of.i32;
@@ -217,19 +218,18 @@ WASM_INTEROP(onyx_process_spawn_impl) {
     memcpy(process_path, process_str, process_len);
     process_path[process_len] = '\0';
 
-    OnyxProcess *process = bh_alloc_item(global_heap_allocator, OnyxProcess);
+    OnyxProcess *process = malloc(sizeof(OnyxProcess));
     memset(process, 0, sizeof(*process));
     process->magic_number = ONYX_PROCESS_MAGIC_NUMBER;
 
     #ifdef _BH_LINUX
-        char **process_args = bh_alloc_array(global_scratch_allocator, char *, args_len + 2);
-        byte_t* data = wasm_memory_data(wasm_memory);
-        byte_t* array_loc = data + args_ptr;
+        char **process_args = alloca(sizeof(char *) * (args_len + 2));
+        byte_t* array_loc = ONYX_PTR(args_ptr);
         fori (i, 0, args_len) {
-            char *arg_str = data + *(i32 *) (array_loc + i * 2 * POINTER_SIZE);
+            char *arg_str = ONYX_PTR(*(i32 *) (array_loc + i * 2 * POINTER_SIZE));
             i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + POINTER_SIZE);
 
-            char *arg = bh_alloc_array(global_scratch_allocator, char, arg_len + 1);
+            char *arg = alloca(sizeof(char) * (arg_len + 1));
             memcpy(arg, arg_str, arg_len);
             arg[arg_len] = '\0';
             process_args[i + 1] = arg;
@@ -287,8 +287,7 @@ WASM_INTEROP(onyx_process_spawn_impl) {
         memset(cmdLine, 0, 2048);
         strncat(cmdLine, process_path, 2047);
 
-        byte_t* data = wasm_memory_data(wasm_memory);
-        byte_t* array_loc = data + args_ptr;
+        byte_t* array_loc = ONYX_PTR(args_ptr);
         fori (i, 0, args_len) {
             char *arg_str = data + *(i32 *) (array_loc + i * 2 * POINTER_SIZE);
             i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + 4);
@@ -355,7 +354,7 @@ WASM_INTEROP(onyx_process_read_impl) {
 
     i32 output_ptr = params->data[1].of.i32;
     i32 output_len = params->data[2].of.i32;
-    u8 *buffer = wasm_memory_data(wasm_memory) + output_ptr;
+    u8 *buffer = ONYX_PTR(output_ptr);
 
     i32 bytes_read;
     #ifdef _BH_LINUX
@@ -381,7 +380,7 @@ WASM_INTEROP(onyx_process_write_impl) {
 
     i32 input_ptr = params->data[1].of.i32;
     i32 input_len = params->data[2].of.i32;
-    u8 *buffer = wasm_memory_data(wasm_memory) + input_ptr;
+    u8 *buffer = ONYX_PTR(input_ptr);
 
     i32 bytes_written;
     #ifdef _BH_LINUX
@@ -494,12 +493,10 @@ WASM_INTEROP(onyx_process_destroy_impl) {
          }
     #endif
 
-    bh_free(global_heap_allocator, process);
+    free(process);
 
     return NULL;
 }
-
-#include "onyx_library.h"
 
 typedef void *(*LibraryLinker)();
 static bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
@@ -517,16 +514,30 @@ static void onyx_load_library(char *name) {
     }
 
     library_load = (LibraryLinker) dlsym(handle, library_load_name);
+    if (library_load == NULL) {
+        printf("ERROR RESOLVING '%s': %s\n", library_load_name, dlerror());
+        return;
+    }
     #endif
 
     WasmFuncDefinition** funcs = library_load();
     bh_arr_push(linkable_functions, funcs);
 }
 
+// NOCHECKIN TEMPORARY HACK
+// NOCHECKIN TEMPORARY HACK
+// NOCHECKIN TEMPORARY HACK
+#include "wasm_emit.h"
+
 // Returns 1 if successful
 b32 onyx_run_wasm(bh_buffer wasm_bytes) {
     bh_arr_new(global_heap_allocator, linkable_functions, 4);
-    onyx_load_library("test_library");
+
+    // NOCHECKIN TEMPORARY HACK
+    OnyxWasmModule* onyx_wasm_module = (OnyxWasmModule *) context.wasm_module;
+    bh_arr_each(char *, library_name, onyx_wasm_module->libraries) {
+        onyx_load_library(*library_name);
+    }
 
     wasm_instance_t* instance = NULL;
     wasmer_features_t* features = NULL;

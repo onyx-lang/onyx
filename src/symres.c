@@ -1274,6 +1274,12 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
             break;
         }
+
+        case Ast_Kind_Directive_Library: {
+            AstDirectiveLibrary *library = (AstDirectiveLibrary *) directive;
+            SYMRES(expression, &library->library_symbol);
+            break;
+        }
     }
 
     return Symres_Success;

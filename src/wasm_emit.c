@@ -3746,6 +3746,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .foreign_function_count = 0,
 
         .null_proc_func_idx = -1,
+
+        .libraries = NULL,
     };
 
     bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
@@ -3759,6 +3761,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(alloc, module.globals, 4);
     bh_arr_new(alloc, module.data, 4);
     bh_arr_new(alloc, module.elems, 4);
+    bh_arr_new(alloc, module.libraries, 4);
 
     bh_arr_new(global_heap_allocator, module.return_location_stack, 4);
     bh_arr_new(global_heap_allocator, module.structured_jump_target, 16);
@@ -3873,6 +3876,10 @@ void emit_entity(Entity* ent) {
         case Entity_Type_Process_Directive: {
             if (ent->expr->kind == Ast_Kind_Directive_Export) {
                 emit_export_directive(module, (AstDirectiveExport *) ent->expr);
+            }
+
+            if (ent->expr->kind == Ast_Kind_Directive_Library) {
+                bh_arr_push(module->libraries, ent->library->library_name);
             }
             break;
         }

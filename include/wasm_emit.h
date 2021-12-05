@@ -652,6 +652,7 @@ typedef struct OnyxWasmModule {
     bh_arr(WasmFunc)      funcs;
     bh_arr(WasmDatum)     data;
     bh_arr(i32)           elems;
+    bh_arr(char *)        libraries;
 
     // NOTE: Set of things used when compiling; not part of the actual module
     u32 export_count;

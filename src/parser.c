@@ -3069,6 +3069,15 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 parse_init_directive(parser, parser->curr - 2);
                 return;
             }
+            else if (parse_possible_directive(parser, "library")) {
+                // :LinearTokenDependent
+                AstDirectiveLibrary *library = make_node(AstDirectiveLibrary, Ast_Kind_Directive_Library);
+                library->token = parser->curr - 2;
+                library->library_symbol = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(library);
+                return;
+            }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');
                 OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);

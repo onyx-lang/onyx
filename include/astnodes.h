@@ -41,6 +41,7 @@
     NODE(DirectiveDefined)     \
     NODE(DirectiveTag)         \
     NODE(DirectiveInit)        \
+    NODE(DirectiveLibrary)     \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -207,6 +208,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Defined,
     Ast_Kind_Directive_Tag,
     Ast_Kind_Directive_Init,
+    Ast_Kind_Directive_Library,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1268,6 +1270,13 @@ struct AstMacro {
     AstTyped* body;
 };
 
+struct AstDirectiveLibrary {
+    AstNode_base;
+
+    AstTyped *library_symbol; // This should resolve to a string literal
+    char *library_name;
+};
+
 typedef enum EntityState {
     Entity_State_Error,
     
@@ -1365,6 +1374,7 @@ typedef struct Entity {
         AstUse                *use;
         AstInterface          *interface;
         AstConstraint         *constraint;
+        AstDirectiveLibrary   *library;
     };
 } Entity;
 

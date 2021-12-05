@@ -2495,6 +2495,21 @@ CheckStatus check_process_directive(AstNode* directive) {
         return Check_Complete;
     }
 
+    if (directive->kind == Ast_Kind_Directive_Library) {
+        AstDirectiveLibrary *library = (AstDirectiveLibrary *) directive;
+
+        if (library->library_symbol->kind != Ast_Kind_StrLit) {
+            ERROR_(library->token->pos, "#library directive expected compile-time known string for library name. Got '%s'.",
+                onyx_ast_node_kind_string(library->library_symbol->kind));
+        }
+
+        AstStrLit *symbol = (AstStrLit *) library->library_symbol;
+        char* temp_name     = bh_alloc_array(global_scratch_allocator, char, symbol->token->length);
+        i32   temp_name_len = string_process_escape_seqs(temp_name, symbol->token->text, symbol->token->length);
+        library->library_name = bh_strdup(global_heap_allocator, temp_name);
+        return Check_Success;
+    }
+
     return Check_Success;
 }
 

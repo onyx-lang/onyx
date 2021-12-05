@@ -1,11 +1,19 @@
 #include "onyx_library.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <GLFW/glfw3.h>
 
 #define ONYX_LIBRARY_NAME test_library
 
 ONYX_DEF(foo, (), ()) {
     printf("This worked!\n");
+    glfwInit();
+    GLFWwindow *window = glfwCreateWindow(800, 600, "WOOT!", NULL, NULL);
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        glfwSwapBuffers(window);
+    }
+    glfwDestroyWindow(window);
     return NULL;
 }
 
@@ -17,7 +25,7 @@ ONYX_DEF(add, (INT, INT), (INT)) {
 }
 
 ONYX_DEF(print_string, (PTR, INT), ()) {
-    char *start = wasm_memory_data(wasm_memory) + params->data[0].of.i32;
+    char *start = ONYX_PTR(params->data[0].of.i32);
     int  length = params->data[1].of.i32;
 
     write(1, start, length);
