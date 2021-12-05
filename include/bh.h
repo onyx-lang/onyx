@@ -166,6 +166,7 @@ u8* int_to_leb128(i64 n, i32* output_length);
 u8* float_to_ieee754(f32 f, b32 reverse);
 u8* double_to_ieee754(f64 f, b32 reverse);
 
+u64 uleb128_to_uint(u8* bytes, i32 *byte_walker);
 
 
 
@@ -1217,6 +1218,18 @@ u8* double_to_ieee754(f64 f, b32 reverse) {
     return buffer;
 }
 
+u64 uleb128_to_uint(u8* bytes, i32 *byte_count) {
+    u64 res = 0;
+    u64 shift = 0;
+
+    while (1) {
+        u8 byte = bytes[(*byte_count)++];
+        res |= (byte & 0x7f) << shift;
+        if ((byte & 0x80) == 0) break;
+        shift += 7;
+    }
+    return res;
+}
 
 
 

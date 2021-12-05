@@ -5,6 +5,7 @@
 // BINARY OUPUT
 //-------------------------------------------------
 
+#define WASM_SECTION_ID_CUSTOM 0
 #define WASM_SECTION_ID_TYPE 1
 #define WASM_SECTION_ID_IMPORT 2
 #define WASM_SECTION_ID_FUNCTION 3
@@ -664,6 +665,42 @@ static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
     return buff->length - prev_len;
 }
 
+static i32 output_onyx_libraries_section(OnyxWasmModule* module, bh_buffer* buff) {
+    if (bh_arr_length(module->libraries) == 0) return 0;
+    i32 prev_len = buff->length;
+
+    bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+    bh_buffer libs_buff;
+    bh_buffer_init(&libs_buff, buff->allocator, 128);
+
+    const char *custom_name = "_onyx_libs";
+    i32 leb_len;
+    u8* leb = uint_to_uleb128(strlen(custom_name), &leb_len);
+    bh_buffer_append(&libs_buff, leb, leb_len);
+    bh_buffer_append(&libs_buff, custom_name, strlen(custom_name));
+
+    leb = uint_to_uleb128((u64) bh_arr_length(module->libraries), &leb_len);
+    bh_buffer_append(&libs_buff, leb, leb_len);
+
+    bh_arr_each(char *, lib, module->libraries) {
+        assert(*lib != NULL);
+
+        u32 lib_len = strlen(*lib);
+        leb = uint_to_uleb128((u64) lib_len, &leb_len);
+        bh_buffer_append(&libs_buff, leb, leb_len);
+        bh_buffer_append(&libs_buff, *lib, lib_len);
+    }
+
+    leb = uint_to_uleb128((u64) (libs_buff.length), &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+
+    bh_buffer_concat(buff, libs_buff);
+    bh_buffer_free(&libs_buff);
+
+    return buff->length - prev_len;
+}
+
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
     bh_buffer_init(buffer, global_heap_allocator, 128);
     bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
@@ -681,6 +718,7 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     output_datacountsection(module, buffer);
     output_codesection(module, buffer);
     output_datasection(module, buffer);
+    output_onyx_libraries_section(module, buffer);
 }
 
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {

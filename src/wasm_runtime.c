@@ -524,20 +524,43 @@ static void onyx_load_library(char *name) {
     bh_arr_push(linkable_functions, funcs);
 }
 
-// NOCHECKIN TEMPORARY HACK
-// NOCHECKIN TEMPORARY HACK
-// NOCHECKIN TEMPORARY HACK
-#include "wasm_emit.h"
+static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
+    i32 cursor = 8; // skip the magic number and version
+    while (1) {
+        u64 section_number = uleb128_to_uint(wasm_bytes.data, &cursor);
+        u64 section_size   = uleb128_to_uint(wasm_bytes.data, &cursor);
+
+        i32 section_start = cursor;
+        if (section_number == 0) {
+            u64 name_len = uleb128_to_uint(wasm_bytes.data, &cursor);
+            if (!strncmp(wasm_bytes.data + cursor, "_onyx_libs", name_len)) {
+                cursor += name_len;
+                u64 lib_count = uleb128_to_uint(wasm_bytes.data, &cursor);
+
+                fori (i, 0, (i64) lib_count) {
+                    u64 lib_name_length = uleb128_to_uint(wasm_bytes.data, &cursor);
+                    lib_name_length = bh_min(lib_name_length, 256);
+
+                    char library_name[256];
+                    strncpy(library_name, wasm_bytes.data + cursor, lib_name_length);
+                    library_name[lib_name_length] = '\0';
+                    cursor += lib_name_length;
+
+                    onyx_load_library(library_name);
+                }
+                break;
+            }
+        }
+
+        cursor = section_start + section_size;
+    }
+}
 
 // Returns 1 if successful
 b32 onyx_run_wasm(bh_buffer wasm_bytes) {
     bh_arr_new(global_heap_allocator, linkable_functions, 4);
 
-    // NOCHECKIN TEMPORARY HACK
-    OnyxWasmModule* onyx_wasm_module = (OnyxWasmModule *) context.wasm_module;
-    bh_arr_each(char *, library_name, onyx_wasm_module->libraries) {
-        onyx_load_library(*library_name);
-    }
+    onyx_lookup_and_load_custom_libraries(wasm_bytes);
 
     wasm_instance_t* instance = NULL;
     wasmer_features_t* features = NULL;
