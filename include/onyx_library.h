@@ -49,6 +49,7 @@ typedef struct WasmFuncDefinition {
     struct WasmFuncDefinition *ONYX_MODULE_NAME_GEN(ONYX_LIBRARY_NAME)[] =
 
 // Shorter names
+#define BOOL WASM_I32
 #define INT WASM_I32
 #define LONG WASM_I64
 #define FLOAT WASM_F32

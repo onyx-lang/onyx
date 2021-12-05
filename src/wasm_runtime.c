@@ -502,7 +502,19 @@ typedef void *(*LibraryLinker)();
 static bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
 
 static void onyx_load_library(char *name) {
-    char *library_load_name = bh_aprintf(global_scratch_allocator, "onyx_library_%s", name);
+    #ifdef _BH_LINUX
+        #define DIR_SEPARATOR '/'
+    #endif
+    #ifdef _BH_WINDOWS
+        #define DIR_SEPARATOR '\\'
+    #endif
+
+    char *library = name;
+    fori (i, 0, (i32) strlen(name)) {
+        if (name[i] == DIR_SEPARATOR) library = &name[i + 1];
+    }
+
+    char *library_load_name = bh_aprintf(global_scratch_allocator, "onyx_library_%s", library);
     LibraryLinker library_load;
 
     #ifdef _BH_LINUX
