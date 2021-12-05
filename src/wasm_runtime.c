@@ -21,7 +21,7 @@ static wasm_engine_t*    wasm_engine;
 static wasm_store_t*     wasm_store;
 static wasm_extern_vec_t wasm_imports;
 static wasm_module_t*    wasm_module;
-static wasm_memory_t*    wasm_memory;
+wasm_memory_t*    wasm_memory;
 
 b32 wasm_name_equals(const wasm_name_t* name1, const wasm_name_t* name2) {
     if (name1->size != name2->size) return 0;
@@ -503,16 +503,6 @@ WASM_INTEROP(onyx_process_destroy_impl) {
 // Returns 1 if successful
 b32 onyx_run_wasm(bh_buffer wasm_bytes) {
 
-    // NOCHECKIN
-    void* handle = dlopen("./test_library.so", RTLD_LAZY);
-    printf("HANDLE: %p\n", handle);
-    if (handle == NULL) {
-        printf("ERROR: %s\n", dlerror());
-    }
-    void *wasm_library = dlsym(handle, "__onyx_module_test_library");
-    printf("LOADED: %p %s\n", wasm_library, wasm_library);
-    dlclose(handle);
-
 
     wasm_instance_t* instance = NULL;
     wasmer_features_t* features = NULL;
@@ -689,6 +679,17 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
     }
 
     wasm_trap_t* traps = NULL;
+
+    // NOCHECKIN
+    void* handle = dlopen("./test_library.so", RTLD_LAZY);
+    printf("HANDLE: %p\n", handle);
+    if (handle == NULL) {
+        printf("ERROR: %s\n", dlerror());
+    }
+    void *wasm_library = dlsym(handle, "onyx_library_test_library");
+    printf("LOADED: %p\n", wasm_library);
+    printf("TABLE: %p\n", ((void* (*)()) wasm_library)());
+    dlclose(handle);
 
     instance = wasm_instance_new(wasm_store, wasm_module, &wasm_imports, &traps);
     if (!instance) goto error_handling;

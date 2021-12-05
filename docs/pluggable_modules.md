@@ -69,3 +69,9 @@ The corresponding C file that will be compiled to a so/dll looks like:
 Compiling the C file with:
 
     gcc -o some_useful_code.so -shared -fPIC some_useful_code.c -I ...
+
+
+A couple of questions that need to be answered:
+    - How is the WASM memory object going to be given to the shared object
+        code? Can it just be a public symbol that gets linked against? or
+        does it need to be passed to an initialization function?

@@ -1,13 +1,13 @@
-#include "onyx_module.h"
+#include "onyx_library.h"
 #include <stdio.h>
 
-#define ONYX_MODULE_NAME test_library
+#define ONYX_LIBRARY_NAME test_library
 
 ONYX_DEF(foo, (), ()) {
     printf("This worked!\n");
     return NULL;
 }
 
-ONYX_MODULE {
+ONYX_LIBRARY {
     ONYX_FUNC(foo)
 };
