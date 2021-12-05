@@ -45,7 +45,7 @@ fi
 
 C_FILES="$C_FILES wasm_runtime"
 FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER -rdynamic"
-LIBS="-L$CORE_DIR/lib -lwasmer -Wl,-rpath=$CORE_DIR/lib -lpthread -ldl"
+LIBS="-L$CORE_DIR/lib -lwasmer -Wl,-rpath=$CORE_DIR/lib:./ -lpthread -ldl"
 INCLUDES="-I$WASMER_INCLUDE_DIR"
 
 mkdir -p "$BUILD_DIR"

@@ -8,6 +8,7 @@
     #include <pthread.h>
     #include <signal.h>
     #include <sys/wait.h>
+    #include <dlfcn.h>
 #endif
 
 #ifndef WASMER_VERSION
@@ -498,11 +499,34 @@ WASM_INTEROP(onyx_process_destroy_impl) {
     return NULL;
 }
 
-#include <dlfcn.h>
+#include "onyx_library.h"
+
+typedef void *(*LibraryLinker)();
+static bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
+
+static void onyx_load_library(char *name) {
+    char *library_load_name = bh_aprintf(global_scratch_allocator, "onyx_library_%s", name);
+    LibraryLinker library_load;
+
+    #ifdef _BH_LINUX
+    char *library_name = bh_aprintf(global_scratch_allocator, "%s.so", name);
+    void* handle = dlopen(library_name, RTLD_LAZY);
+    if (handle == NULL) {
+        printf("ERROR LOADING LIBRARY %s: %s\n", name, dlerror());
+        return;
+    }
+
+    library_load = (LibraryLinker) dlsym(handle, library_load_name);
+    #endif
+
+    WasmFuncDefinition** funcs = library_load();
+    bh_arr_push(linkable_functions, funcs);
+}
 
 // Returns 1 if successful
 b32 onyx_run_wasm(bh_buffer wasm_bytes) {
-
+    bh_arr_new(global_heap_allocator, linkable_functions, 4);
+    onyx_load_library("test_library");
 
     wasm_instance_t* instance = NULL;
     wasmer_features_t* features = NULL;
@@ -666,6 +690,30 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
             }
         }
 
+        bh_arr_each(WasmFuncDefinition **, library_funcs, linkable_functions) {
+            WasmFuncDefinition **pcurrent_function = *library_funcs;
+            while (*pcurrent_function != NULL) {
+                WasmFuncDefinition *cf = *pcurrent_function;
+                if (wasm_name_equals_string(module_name, cf->module_name) && wasm_name_equals_string(import_name, cf->import_name)) {
+                    wasm_valtype_vec_t wasm_params;
+                    wasm_valtype_vec_new_uninitialized(&wasm_params, cf->params->count);
+                    fori (k, 0, cf->params->count) wasm_params.data[k] = wasm_valtype_new(cf->params->types[k]);
+
+                    wasm_valtype_vec_t wasm_results;
+                    wasm_valtype_vec_new_uninitialized(&wasm_results, cf->results->count);
+                    fori (k, 0, cf->results->count) wasm_results.data[k] = wasm_valtype_new(cf->results->types[k]);
+
+                    wasm_functype_t* wasm_functype = wasm_functype_new(&wasm_params, &wasm_results);
+
+                    wasm_func_t* wasm_func = wasm_func_new(wasm_store, wasm_functype, cf->func);
+                    import = wasm_func_as_extern(wasm_func);
+                    goto import_found;
+                }
+
+                pcurrent_function += 1;
+            }
+        }
+
         goto bad_import;
 
     import_found:
@@ -679,17 +727,6 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
     }
 
     wasm_trap_t* traps = NULL;
-
-    // NOCHECKIN
-    void* handle = dlopen("./test_library.so", RTLD_LAZY);
-    printf("HANDLE: %p\n", handle);
-    if (handle == NULL) {
-        printf("ERROR: %s\n", dlerror());
-    }
-    void *wasm_library = dlsym(handle, "onyx_library_test_library");
-    printf("LOADED: %p\n", wasm_library);
-    printf("TABLE: %p\n", ((void* (*)()) wasm_library)());
-    dlclose(handle);
 
     instance = wasm_instance_new(wasm_store, wasm_module, &wasm_imports, &traps);
     if (!instance) goto error_handling;

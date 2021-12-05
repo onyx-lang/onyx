@@ -18,6 +18,7 @@ typedef struct WasmFuncDefinition {
 } WasmFuncDefinition;
 
 #define STRINGIFY1(a) #a
+#define STRINGIFY2(a) STRINGIFY1(a)
 #define CONCAT2(a, b) a ## _ ## b
 #define CONCAT3(a, b, c) a ## _ ## b ## _ ## c
 #define ONYX_MODULE_NAME_GEN(m) CONCAT2(__onyx_library, m)
@@ -35,7 +36,7 @@ typedef struct WasmFuncDefinition {
     static wasm_trap_t* ONYX_FUNC_NAME(ONYX_LIBRARY_NAME, name)(const wasm_val_vec_t* params, wasm_val_vec_t* results); \
     static struct WasmValkindBuffer  ONYX_PARAM_NAME(ONYX_LIBRARY_NAME, name) = _VALS params_types; \
     static struct WasmValkindBuffer  ONYX_RESULT_NAME(ONYX_LIBRARY_NAME, name) = _VALS result_types; \
-    static struct WasmFuncDefinition ONYX_DEF_NAME(ONYX_LIBRARY_NAME, name) = { STRINGIFY1(ONYX_LIBRARY_NAME), #name, ONYX_FUNC_NAME(ONYX_LIBRARY_NAME, name), & ONYX_PARAM_NAME(ONYX_LIBRARY_NAME, name), & ONYX_RESULT_NAME(ONYX_LIBRARY_NAME, name) }; \
+    static struct WasmFuncDefinition ONYX_DEF_NAME(ONYX_LIBRARY_NAME, name) = { STRINGIFY2(ONYX_LIBRARY_NAME), #name, ONYX_FUNC_NAME(ONYX_LIBRARY_NAME, name), & ONYX_PARAM_NAME(ONYX_LIBRARY_NAME, name), & ONYX_RESULT_NAME(ONYX_LIBRARY_NAME, name) }; \
     \
     static wasm_trap_t* ONYX_FUNC_NAME(ONYX_LIBRARY_NAME, name)(const wasm_val_vec_t* params, wasm_val_vec_t* results)
 
@@ -48,7 +49,8 @@ typedef struct WasmFuncDefinition {
     struct WasmFuncDefinition *ONYX_MODULE_NAME_GEN(ONYX_LIBRARY_NAME)[] =
 
 // Shorter names
-#define I32 WASM_I32
-#define I64 WASM_I64
-#define F32 WASM_F32
-#define F64 WASM_F64
+#define INT WASM_I32
+#define LONG WASM_I64
+#define FLOAT WASM_F32
+#define DOUBLE WASM_F64
+#define PTR WASM_I32
