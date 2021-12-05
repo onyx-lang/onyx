@@ -1,0 +1,5 @@
+package test_library
+
+#library "test_library"
+
+foo :: () -> void #foreign "test_library" "foo" ---

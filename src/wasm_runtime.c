@@ -498,8 +498,22 @@ WASM_INTEROP(onyx_process_destroy_impl) {
     return NULL;
 }
 
+#include <dlfcn.h>
+
 // Returns 1 if successful
 b32 onyx_run_wasm(bh_buffer wasm_bytes) {
+
+    // NOCHECKIN
+    void* handle = dlopen("./test_library.so", RTLD_LAZY);
+    printf("HANDLE: %p\n", handle);
+    if (handle == NULL) {
+        printf("ERROR: %s\n", dlerror());
+    }
+    void *wasm_library = dlsym(handle, "__onyx_module_test_library");
+    printf("LOADED: %p %s\n", wasm_library, wasm_library);
+    dlclose(handle);
+
+
     wasm_instance_t* instance = NULL;
     wasmer_features_t* features = NULL;
     wasm_trap_t* run_trap = NULL;
