@@ -1354,6 +1354,34 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
     return Symres_Success;
 }
 
+static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
+    bh_arr_each(Entity *, pent, fb->captured_entities) {
+        Entity *ent = *pent;
+        if (ent->type == Entity_Type_Function_Header) {
+            if (ent->function->body->next != NULL) {
+                onyx_report_error(ent->function->token->pos, "Procedures declared in a #foreign block should not have bodies.");
+                return Symres_Error;
+            }
+
+            ent->function->foreign_name = ent->function->intrinsic_name; // Hmm... This might not be right?
+            ent->function->foreign_module = fb->module_name;
+            ent->function->is_foreign = 1;
+            ent->function->entity = NULL;
+            ent->function->entity_header = NULL;
+            ent->function->entity_body = NULL;
+
+            add_entities_for_node(NULL, (AstNode *) ent->function, ent->scope, ent->package);
+            continue;
+        }
+
+        if (ent->type != Entity_Type_Function) {
+            entity_heap_insert_existing(&context.entities, ent);
+        }
+    }
+
+    return Symres_Complete;
+}
+
 void symres_entity(Entity* ent) {
     if (ent->scope) scope_enter(ent->scope);
 
@@ -1400,12 +1428,14 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Macro:                   ss = symres_macro(ent->macro); break;
         case Entity_Type_Constraint_Check:        ss = symres_constraint(ent->constraint); break;
         case Entity_Type_Polymorph_Query:         ss = symres_polyquery(ent->poly_query); break;
+        case Entity_Type_Foreign_Block:           ss = symres_foreign_block(ent->foreign_block); break;
 
         default: break;
     }
 
     if (ss == Symres_Yield_Macro) ent->macro_attempts++;
     if (ss == Symres_Yield_Micro) ent->micro_attempts++;
+    if (ss == Symres_Complete)    ent->state = Entity_State_Finalized;
     if (ss == Symres_Success) {
         ent->macro_attempts = 0;
         ent->micro_attempts = 0;

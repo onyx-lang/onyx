@@ -101,6 +101,8 @@ static const char* ast_node_names[] = {
     "MACRO",
     "DO BLOCK",
 
+    "FOREIGN BLOCK",
+
     "NOTE",
 
     "AST_NODE_KIND_COUNT",
@@ -158,6 +160,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Constraint Check",
     "Polymorphic Proc",
     "Polymorph Query",
+    "Foreign Block",
     "Macro",
     "Foreign_Function Header",
     "Temporary Function Header",

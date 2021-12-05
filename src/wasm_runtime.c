@@ -674,7 +674,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
                 goto import_found;
             }
 
-            if (wasm_name_equals_string(import_name, "process_spawn")) {
+            if (wasm_name_equals_string(import_name, "__process_spawn")) {
                 wasm_valtype_t* ps[5] = {
                     wasm_valtype_new_i32(), wasm_valtype_new_i32(),
                     wasm_valtype_new_i32(), wasm_valtype_new_i32(),
@@ -691,7 +691,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
                 goto import_found;
             }
 
-            if (wasm_name_equals_string(import_name, "process_read")) {
+            if (wasm_name_equals_string(import_name, "__process_read")) {
                 wasm_functype_t* func_type = wasm_functype_new_3_1(
                     wasm_valtype_new_i64(), wasm_valtype_new_i32(), wasm_valtype_new_i32(),
                     wasm_valtype_new_i32());
@@ -701,7 +701,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
                 goto import_found;
             }
 
-            if (wasm_name_equals_string(import_name, "process_write")) {
+            if (wasm_name_equals_string(import_name, "__process_write")) {
                 wasm_functype_t* func_type = wasm_functype_new_3_1(
                     wasm_valtype_new_i64(), wasm_valtype_new_i32(), wasm_valtype_new_i32(),
                     wasm_valtype_new_i32());
@@ -711,7 +711,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
                 goto import_found;
             }
 
-            if (wasm_name_equals_string(import_name, "process_kill")) {
+            if (wasm_name_equals_string(import_name, "__process_kill")) {
                 wasm_functype_t* func_type = wasm_functype_new_1_1(wasm_valtype_new_i64(), wasm_valtype_new_i32());
 
                 wasm_func_t* wasm_func = wasm_func_new(wasm_store, func_type, onyx_process_kill_impl);
@@ -719,7 +719,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
                 goto import_found;
             }
 
-            if (wasm_name_equals_string(import_name, "process_wait")) {
+            if (wasm_name_equals_string(import_name, "__process_wait")) {
                 wasm_functype_t* func_type = wasm_functype_new_1_1(wasm_valtype_new_i64(), wasm_valtype_new_i32());
 
                 wasm_func_t* wasm_func = wasm_func_new(wasm_store, func_type, onyx_process_wait_impl);
@@ -727,7 +727,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
                 goto import_found;
             }
 
-            if (wasm_name_equals_string(import_name, "process_destroy")) {
+            if (wasm_name_equals_string(import_name, "__process_destroy")) {
                 wasm_functype_t* func_type = wasm_functype_new_1_0(wasm_valtype_new_i64());
 
                 wasm_func_t* wasm_func = wasm_func_new(wasm_store, func_type, onyx_process_destroy_impl);

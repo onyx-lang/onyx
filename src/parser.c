@@ -2974,6 +2974,23 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(error);
                 return;
             }
+            else if (parse_possible_directive(parser, "foreign")) {
+                // :LinearTokenDependent
+                AstForeignBlock *fb = make_node(AstForeignBlock, Ast_Kind_Foreign_Block);
+                fb->token = parser->curr - 2;
+                fb->module_name = expect_token(parser, Token_Type_Literal_String);
+
+                bh_arr_new(global_heap_allocator, fb->captured_entities, 4);
+                bh_arr_push(parser->alternate_entity_placement_stack, &fb->captured_entities);
+
+                expect_token(parser, '{');
+                parse_top_level_statements_until(parser, '}');
+                expect_token(parser, '}');
+
+                bh_arr_pop(parser->alternate_entity_placement_stack);
+                ENTITY_SUBMIT(fb);
+                return;
+            }
             else if (parse_possible_directive(parser, "operator")) {
                 AstDirectiveOperator *operator = make_node(AstDirectiveOperator, Ast_Kind_Directive_Operator);
                 operator->token = dir_token;
