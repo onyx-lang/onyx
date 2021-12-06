@@ -12,26 +12,50 @@ GLFWimage :: struct #size 16 {
     pixels: ^u8;
 }
 
-glfwInit         :: () -> bool #foreign "onyx_glfw3" "glfwInit" ---
-glfwTerminate    :: () -> void #foreign "onyx_glfw3" "glfwTerminate" ---
-glfwGetVersion   :: (major, minor, rev: ^i32) -> void #foreign "onyx_glfw3" "glfwGetVersion" ---
-// glfwSetErrorCallback :: (f: (i32, cstr) -> void) -> void #foreign "onyx_glfw3" "glfwSetErrorCallback" ---
+#foreign "onyx_glfw3" {
+    glfwInit         :: () -> bool ---
+    glfwTerminate    :: () -> void ---
+    glfwGetVersion   :: (major, minor, rev: ^i32) -> void ---
+    // glfwSetErrorCallback :: (f: (i32, cstr) -> void) -> void ---
 
-glfwCreateWindow :: (width, height: i32, title: cstr, monitor: GLFWmonitor_p = 0, share: GLFWwindow_p = 0) -> GLFWwindow_p #foreign "onyx_glfw3" "glfwCreateWindow" ---
-glfwDestroyWindow :: (window: GLFWwindow_p) -> void #foreign "onyx_glfw3" "glfwDestroyWindow" ---
-glfwWindowShouldClose :: (window: GLFWwindow_p) -> bool #foreign "onyx_glfw3" "glfwWindowShouldClose" ---
-glfwSetWindowShouldClose :: (window: GLFWwindow_p, value: i32) -> void #foreign "onyx_glfw3" "glfwSetWindowShouldClose" ---
-glfwDefaultWindowHints :: () -> void #foreign "onyx_glfw3" "glfwDefaultWindowHints" ---
-glfwWindowHint :: (hint: i32, value: i32) -> void #foreign "onyx_glfw3" "glfwWindowHint" ---
-glfwSetWindowTitle :: (window: GLFWwindow_p, title: cstr) -> void #foreign "onyx_glfw3" "glfwSetWindowTitle" ---
-glfwGetWindowPos :: (window: GLFWwindow_p, xpos, ypos: ^i32) -> void #foreign "onyx_glfw3" "glfwGetWindowPos" ---
-glfwSetWindowPos :: (window: GLFWwindow_p, xpos, ypos: i32) -> void #foreign "onyx_glfw3" "glfwSetWindowPos" ---
-// ...
-glfwPollEvents :: () -> void #foreign "onyx_glfw3" "glfwPollEvents" ---
-glfwWaitEvents :: () -> void #foreign "onyx_glfw3" "glfwWaitEvents" ---
-glfwWaitEventsTimeout :: (timeout: f64) -> void #foreign "onyx_glfw3" "glfwWaitEventsTimeout" ---
-glfwPostEmptyEvent :: () -> void #foreign "onyx_glfw3" "glfwPostEmptyEvent" ---
-glfwSwapBuffers :: (window: GLFWwindow_p) -> void #foreign "onyx_glfw3" "glfwSwapBuffers" ---
+    glfwMakeContextCurrent :: (window: GLFWwindow_p) -> void ---
+    glfwGetCurrentContext :: () -> GLFWwindow_p ---
+    glfwSwapInterval :: (interval: i32) -> void ---
+    glfwExtensionSupported :: (name: cstr) -> bool ---
+
+    glfwCreateWindow :: (width, height: i32, title: cstr, monitor: GLFWmonitor_p = 0, share: GLFWwindow_p = 0) -> GLFWwindow_p ---
+    glfwDestroyWindow :: (window: GLFWwindow_p) -> void ---
+    glfwWindowShouldClose :: (window: GLFWwindow_p) -> bool ---
+    glfwSetWindowShouldClose :: (window: GLFWwindow_p, value: i32) -> void ---
+    glfwDefaultWindowHints :: () -> void ---
+    glfwWindowHint :: (hint: i32, value: i32) -> void ---
+    glfwSetWindowTitle :: (window: GLFWwindow_p, title: cstr) -> void ---
+    glfwSetWindowIcon :: (window: GLFWwindow_p, count: i32, images: ^GLFWimage) -> void ---
+    glfwGetWindowPos :: (window: GLFWwindow_p, xpos, ypos: ^i32) -> void ---
+    glfwSetWindowPos :: (window: GLFWwindow_p, xpos, ypos: i32) -> void ---
+    glfwGetWindowSize :: (window: GLFWwindow_p, xpos, ypos: ^i32) -> void ---
+    glfwSetWindowSize :: (window: GLFWwindow_p, xpos, ypos: i32) -> void ---
+    glfwSetWindowSizeLimits :: (window: GLFWwindow_p, minwidth, minheight, maxwidth, maxheight: i32) -> void ---
+    glfwSetWindowAspectRatio :: (window: GLFWwindow_p, numer, denom: i32) -> void ---
+    glfwGetFramebufferSize :: (window: GLFWwindow_p, width, height: ^i32) -> void ---
+    glfwGetWindowFrameSize :: (window: GLFWwindow_p, left, top, right, bottom: ^i32) -> void ---
+    glfwIconifyWindow :: (window: GLFWwindow_p) -> void ---
+    glfwRestoreWindow :: (window: GLFWwindow_p) -> void ---
+    glfwMaximizeWindow :: (window: GLFWwindow_p) -> void ---
+    glfwShowWindow :: (window: GLFWwindow_p) -> void ---
+    glfwHideWindow :: (window: GLFWwindow_p) -> void ---
+    glfwFocusWindow :: (window: GLFWwindow_p) -> void ---
+    glfwGetWindowMonitor :: (window: GLFWwindow_p) -> GLFWmonitor_p ---
+    glfwSetWindowMonitor :: (window: GLFWwindow_p, monitor: GLFWmonitor_p, x, y, width, height, refreshRate: i32) -> void ---
+    glfwGetWindowAttrib :: (window: GLFWwindow_p, attrib: i32) -> i32 ---
+    glfwSetWindowUserPointer :: (window: GLFWwindow_p, ptr: rawptr) -> void ---
+    glfwGetWindowUserPointer :: (window: GLFWwindow_p) -> rawptr ---
+    glfwPollEvents :: () -> void ---
+    glfwWaitEvents :: () -> void ---
+    glfwWaitEventsTimeout :: (timeout: f64) -> void ---
+    glfwPostEmptyEvent :: () -> void ---
+    glfwSwapBuffers :: (window: GLFWwindow_p) -> void ---
+}
 
 GLFW_FOCUSED   :: 0x00020001;
 GLFW_ICONIFIED :: 0x00020002;

@@ -20,6 +20,28 @@ ONYX_DEF(glfwGetVersion, (PTR, PTR, PTR), ()) {
     return NULL;
 }
 
+ONYX_DEF(glfwMakeContextCurrent, (LONG), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwMakeContextCurrent(window);
+    return NULL;
+}
+
+ONYX_DEF(glfwGetCurrentContext, (), (LONG)) {
+    GLFWwindow *window = glfwGetCurrentContext();
+    wasm_val_init_ptr(&results->data[0], window);
+    return NULL;
+}
+
+ONYX_DEF(glfwSwapInterval, (INT), ()) {
+    glfwSwapInterval(params->data[0].of.i32);
+    return NULL;
+}
+
+ONYX_DEF(glfwExtensionSupported, (PTR), (BOOL)) {
+    char *ext_name = ONYX_PTR(params->data[0].of.i32);
+    results->data[0] = WASM_I32_VAL(glfwExtensionSupported(ext_name) == GLFW_TRUE);
+}
+
 ONYX_DEF(glfwCreateWindow, (INT, INT, PTR, LONG, LONG), (LONG)) {
     GLFWwindow* window = glfwCreateWindow(
                      params->data[0].of.i32, params->data[1].of.i32,
@@ -77,7 +99,112 @@ ONYX_DEF(glfwSetWindowPos, (LONG, INT, INT), ()) {
     return NULL;
 }
 
-// ...
+ONYX_DEF(glfwGetWindowSize, (LONG, PTR, PTR), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwGetWindowSize(window, (int *) ONYX_PTR(params->data[1].of.i32), (int *) ONYX_PTR(params->data[2].of.i32));
+    return NULL;
+}
+
+ONYX_DEF(glfwSetWindowSize, (LONG, INT, INT), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwSetWindowSize(window, params->data[1].of.i32, params->data[2].of.i32);
+    return NULL;
+}
+
+ONYX_DEF(glfwSetWindowSizeLimits, (LONG, INT, INT, INT, INT), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwSetWindowSizeLimits(window, params->data[1].of.i32, params->data[2].of.i32,
+                                    params->data[3].of.i32, params->data[4].of.i32);
+    return NULL;
+}
+
+ONYX_DEF(glfwSetWindowAspectRatio, (LONG, INT, INT), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwSetWindowAspectRatio(window, params->data[1].of.i32, params->data[2].of.i32);
+    return NULL;
+}
+
+ONYX_DEF(glfwGetFramebufferSize, (LONG, PTR, PTR), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwGetFramebufferSize(window, (int *) ONYX_PTR(params->data[1].of.i32), (int *) ONYX_PTR(params->data[2].of.i32));
+    return NULL;
+}
+
+ONYX_DEF(glfwGetWindowFrameSize, (LONG, PTR, PTR, PTR, PTR), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwGetWindowFrameSize(window, (int *) ONYX_PTR(params->data[1].of.i32), (int *) ONYX_PTR(params->data[2].of.i32),
+                                   (int *) ONYX_PTR(params->data[3].of.i32), (int *) ONYX_PTR(params->data[4].of.i32));
+    return NULL;
+}
+
+ONYX_DEF(glfwIconifyWindow, (LONG), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwIconifyWindow(window);
+    return NULL;
+}
+
+ONYX_DEF(glfwRestoreWindow, (LONG), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwRestoreWindow(window);
+    return NULL;
+}
+
+ONYX_DEF(glfwMaximizeWindow, (LONG), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwMaximizeWindow(window);
+    return NULL;
+}
+
+ONYX_DEF(glfwShowWindow, (LONG), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwShowWindow(window);
+    return NULL;
+}
+
+ONYX_DEF(glfwHideWindow, (LONG), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwHideWindow(window);
+    return NULL;
+}
+
+ONYX_DEF(glfwFocusWindow, (LONG), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwFocusWindow(window);
+    return NULL;
+}
+
+ONYX_DEF(glfwGetWindowMonitor, (LONG), (LONG)) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    GLFWmonitor *monitor = glfwGetWindowMonitor(window);
+    wasm_val_init_ptr(&results->data[0], monitor);
+    return NULL;
+}
+
+ONYX_DEF(glfwSetWindowMonitor, (LONG, LONG, INT, INT, INT, INT, INT), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    GLFWmonitor *monitor = (GLFWmonitor *) params->data[1].of.i64;
+    glfwSetWindowMonitor(window, monitor, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32);
+    return NULL;
+}
+
+ONYX_DEF(glfwGetWindowAttrib, (LONG, INT), (INT)) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    results->data[0] = WASM_I32_VAL(glfwGetWindowAttrib(window, params->data[1].of.i32));
+    return NULL;
+}
+
+ONYX_DEF(glfwSetWindowUserPointer, (LONG, INT), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    glfwSetWindowUserPointer(window, (void *) (unsigned long) params->data[1].of.i32);
+    return NULL;
+}
+
+ONYX_DEF(glfwGetWindowUserPointer, (LONG), (INT)) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+    results->data[0] = WASM_I32_VAL((unsigned int) (unsigned long) glfwGetWindowUserPointer(window));
+    return NULL;
+}
+
 ONYX_DEF(glfwPollEvents, (), ()) {
     glfwPollEvents();
     return NULL;
@@ -108,6 +235,10 @@ ONYX_LIBRARY {
     ONYX_FUNC(glfwInit)
     ONYX_FUNC(glfwTerminate)
     ONYX_FUNC(glfwGetVersion)
+    ONYX_FUNC(glfwMakeContextCurrent)
+    ONYX_FUNC(glfwGetCurrentContext)
+    ONYX_FUNC(glfwSwapInterval)
+    ONYX_FUNC(glfwExtensionSupported)
     ONYX_FUNC(glfwCreateWindow)
     ONYX_FUNC(glfwDestroyWindow)
     ONYX_FUNC(glfwWindowShouldClose)
