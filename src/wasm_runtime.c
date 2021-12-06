@@ -538,7 +538,7 @@ static void onyx_load_library(char *name) {
 
 static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
     i32 cursor = 8; // skip the magic number and version
-    while (1) {
+    while (cursor < wasm_bytes.length) {
         u64 section_number = uleb128_to_uint(wasm_bytes.data, &cursor);
         u64 section_size   = uleb128_to_uint(wasm_bytes.data, &cursor);
 

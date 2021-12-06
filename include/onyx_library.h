@@ -56,4 +56,4 @@ typedef struct WasmFuncDefinition {
 #define DOUBLE WASM_F64
 #define PTR WASM_I32
 
-#define ONYX_PTR(p) (wasm_memory_data(wasm_memory) + p)
+#define ONYX_PTR(p) (p != 0 ? (wasm_memory_data(wasm_memory) + p) : NULL)

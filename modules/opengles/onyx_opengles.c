@@ -10,7 +10,7 @@
     }
 
 #define ONYX_GL_0_RET_INT(name) \
-    ONYX_DEF(name, (), ()) { \
+    ONYX_DEF(name, (), (INT)) { \
         results->data[0] = WASM_I32_VAL( name () ); \
         return NULL;                   \
     }
@@ -24,6 +24,7 @@
 #define ONYX_GL_INT_1_RET_INT(name)             \
     ONYX_DEF(name, (INT), (INT)) {              \
         results->data[0] = WASM_I32_VAL( name (params->data[0].of.i32) ); \
+        return NULL; \
     }
 
 #define ONYX_GL_INT_2(name) \
@@ -50,9 +51,51 @@
         return NULL;                   \
     }
 
+#define ONYX_GL_INT_5(name) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_6(name) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_7(name) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_8(name) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_9(name) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_10(name) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT, INT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, params->data[9].of.i32); \
+        return NULL;                   \
+    }
+
 #define ONYX_GL_FLOAT_1(name)                   \
     ONYX_DEF(name, (FLOAT), ()) {  \
         name (params->data[0].of.f32); \
+        return NULL; \
+    }
+
+#define ONYX_GL_FLOAT_INT(name)                   \
+    ONYX_DEF(name, (FLOAT, INT), ()) {  \
+        name (params->data[0].of.f32, params->data[1].of.i32); \
         return NULL; \
     }
 
@@ -80,6 +123,134 @@
         return NULL; \
     }
 
+#define ONYX_GL_INT_3_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, (ptr_type *) params->data[3].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_4_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, (ptr_type *) params->data[4].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_5_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, (ptr_type *) params->data[5].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_6_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, (ptr_type *) params->data[6].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_7_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, (ptr_type *) params->data[7].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_8_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, (ptr_type *) params->data[8].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_9_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, (ptr_type *) params->data[9].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_10_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, params->data[9].of.i32, (ptr_type *) params->data[10].of.i32); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_FLOAT(name) \
+    ONYX_DEF(name, (INT, FLOAT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.f32); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_FLOAT_2(name) \
+    ONYX_DEF(name, (INT, FLOAT, FLOAT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_FLOAT_3(name) \
+    ONYX_DEF(name, (INT, FLOAT, FLOAT, FLOAT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_FLOAT_4(name) \
+    ONYX_DEF(name, (INT, FLOAT, FLOAT, FLOAT, FLOAT), ()) { \
+        name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32, params->data[4].of.f32); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_2_FLOAT(name)       \
+    ONYX_DEF(name, (INT, INT, FLOAT), ()) {       \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_2_PTR_INT(name, ptr_type)       \
+    ONYX_DEF(name, (INT, INT, PTR, INT), ()) {       \
+        name (params->data[0].of.i32, params->data[1].of.i32, (ptr_type *) ONYX_PTR(params->data[2].of.i32), params->data[3].of.i32); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_2_PTR_2(name, p1, p2)       \
+    ONYX_DEF(name, (INT, INT, PTR, PTR), ()) {       \
+        name (params->data[0].of.i32, params->data[1].of.i32, \
+                (p1 *) ONYX_PTR(params->data[2].of.i32), \
+                (p2 *) ONYX_PTR(params->data[3].of.i32)); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_2_PTR_3(name, p1, p2, p3)       \
+    ONYX_DEF(name, (INT, INT, PTR, PTR, PTR), ()) {       \
+        name (params->data[0].of.i32, params->data[1].of.i32, \
+                (p1 *) ONYX_PTR(params->data[2].of.i32), \
+                (p2 *) ONYX_PTR(params->data[3].of.i32), \
+                (p3 *) ONYX_PTR(params->data[4].of.i32)); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_3_PTR_2(name, p1, p2)       \
+    ONYX_DEF(name, (INT, INT, INT, PTR, PTR), ()) {       \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, \
+                (p1 *) ONYX_PTR(params->data[3].of.i32), \
+                (p2 *) ONYX_PTR(params->data[4].of.i32)); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_3_PTR_4(name, p1, p2, p3, p4)       \
+    ONYX_DEF(name, (INT, INT, INT, PTR, PTR, PTR, PTR), ()) {       \
+        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, \
+                (p1 *) ONYX_PTR(params->data[3].of.i32), \
+                (p2 *) ONYX_PTR(params->data[4].of.i32), \
+                (p3 *) ONYX_PTR(params->data[5].of.i32), \
+                (p4 *) ONYX_PTR(params->data[6].of.i32)); \
+        return NULL; \
+    }
+
+#define ONYX_GL_INT_PTR_INT_PTR_INT(name, p1, p2) \
+    ONYX_DEF(name, (INT, PTR, INT, PTR, INT), ()) { \
+        name (params->data[0].of.i32,                        \
+                (p1 *) ONYX_PTR(params->data[1].of.i32),     \
+                params->data[2].of.i32,                      \
+                (p2 *) ONYX_PTR(params->data[3].of.i32),     \
+                params->data[4].of.i32);                     \
+        return NULL;                                         \
+    }
 
 ONYX_GL_0(glFinish)
 ONYX_GL_0(glFlush)
@@ -181,18 +352,24 @@ ONYX_GL_INT_PTR(glGenTransformFeedbacks, GLuint)
 ONYX_GL_INT_PTR(glGetFragDataLocation, GLchar)
 ONYX_GL_INT_PTR(glVertexAttribI4iv, GLint)
 ONYX_GL_INT_PTR(glVertexAttribI4uiv, GLuint)
+ONYX_GL_INT_PTR(glGetUniformBlockIndex, GLchar)
 ONYX_GL_INT_3(glDrawArrays)
 ONYX_GL_INT_3(glStencilFunc)
 ONYX_GL_INT_3(glStencilOp)
 ONYX_GL_INT_3(glFlushMappedBufferRange)
 ONYX_GL_INT_3(glBindBufferBase)
 ONYX_GL_INT_3(glSamplerParameteri)
+ONYX_GL_INT_3(glProgramParameteri)
+ONYX_GL_INT_3(glTexParameteri)
 ONYX_GL_INT_4(glBlendFuncSeparate)
 ONYX_GL_INT_4(glColorMask)
 ONYX_GL_INT_4(glScissor)
 ONYX_GL_INT_4(glStencilFuncSeparate)
 ONYX_GL_INT_4(glViewport)
 ONYX_GL_INT_4(glMapBufferRange)
+ONYX_GL_INT_4(glFramebufferRenderbuffer)
+ONYX_GL_INT_4(glRenderbufferStorage)
+ONYX_GL_INT_4(glStencilOpSeparate)
 
 ONYX_GL_INT_2_PTR(glBindAttribLocation, GLchar)
 ONYX_GL_INT_2_PTR(glGetBufferParameteriv, GLint)
@@ -223,215 +400,375 @@ ONYX_GL_INT_2_PTR(glSamplerParameteriv, GLint)
 ONYX_GL_INT_2_PTR(glSamplerParameterfv, GLfloat)
 ONYX_GL_INT_2_PTR(glGetSamplerParameteriv, GLint)
 ONYX_GL_INT_2_PTR(glGetSamplerParameterfv, GLfloat)
+ONYX_GL_INT_2_PTR(glGetIntegeri_v, GLint)
+ONYX_GL_INT_2_PTR(glGetVertexAttribIiv, GLint)
+ONYX_GL_INT_2_PTR(glGetVertexAttribIuiv, GLuint)
+ONYX_GL_INT_2_PTR(glGetUniformuiv, GLuint)
+ONYX_GL_INT_2_PTR(glUniform1uiv, GLuint)
+ONYX_GL_INT_2_PTR(glUniform2uiv, GLuint)
+ONYX_GL_INT_2_PTR(glUniform3uiv, GLuint)
+ONYX_GL_INT_2_PTR(glUniform4uiv, GLuint)
+ONYX_GL_INT_2_PTR(glClearBufferiv, GLint)
+ONYX_GL_INT_2_PTR(glClearBufferuiv, GLuint)
+ONYX_GL_INT_2_PTR(glClearBufferfv, GLfloat)
+ONYX_GL_INT_2_PTR(glInvalidateFramebuffer, GLenum)
+ONYX_GL_INT_3_PTR(glBufferSubData, void)
+ONYX_GL_INT_3_PTR(glDrawElements, void)
+ONYX_GL_INT_3_PTR(glGetFramebufferAttachmentParameteriv, GLint)
+ONYX_GL_INT_2_FLOAT(glSamplerParameterf)
+ONYX_GL_INT_2_FLOAT(glTexParameterf)
 
-// glSamplerParameterf :: (sampler: GLuint, pname: GLenum, param: GLfloat) -> void ---
+ONYX_GL_INT_2_PTR_INT(glBufferData, void)
+ONYX_GL_INT_7_PTR(glCompressedTexImage2D, void)
+ONYX_GL_INT_8_PTR(glCompressedTexSubImage2D, void)
+ONYX_GL_INT_8(glCopyTexImage2D)
+ONYX_GL_INT_8(glCopyTexSubImage2D)
+ONYX_GL_INT_5(glFramebufferTexture2D)
+ONYX_GL_INT_3_PTR_4(glGetActiveAttrib, GLsizei, GLint, GLenum, GLchar)
+ONYX_GL_INT_3_PTR_4(glGetActiveUniform, GLsizei, GLint, GLenum, GLchar)
+ONYX_GL_INT_2_PTR_2(glGetAttachedShaders, GLsizei, GLuint)
+ONYX_GL_INT_2_PTR_2(glGetProgramInfoLog, GLsizei, GLchar)
+ONYX_GL_INT_2_PTR_2(glGetShaderInfoLog, GLsizei, GLchar) 
+ONYX_GL_INT_2_PTR_2(glGetShaderPrecisionFormat, GLint, GLint)
+ONYX_GL_INT_2_PTR_2(glGetShaderSource, GLsizei, GLchar)
+ONYX_GL_INT_6_PTR(glReadPixels, void)
+ONYX_GL_FLOAT_INT(glSampleCoverage)
+ONYX_GL_INT_PTR_INT_PTR_INT(glShaderBinary, GLuint, void)
+ONYX_GL_INT_8_PTR(glTexImage2D, void)
+ONYX_GL_INT_8_PTR(glTexSubImage2D, void)
+ONYX_GL_INT_6(glVertexAttribPointer)
+ONYX_GL_INT_FLOAT(glUniform1f)
+ONYX_GL_INT_2(glUniform1i)
+ONYX_GL_INT_FLOAT_2(glUniform2f)
+ONYX_GL_INT_3(glUniform2i)
+ONYX_GL_INT_FLOAT_3(glUniform3f)
+ONYX_GL_INT_4(glUniform3i)
+ONYX_GL_INT_FLOAT_4(glUniform4f)
+ONYX_GL_INT_5(glUniform4i)
+ONYX_GL_INT_2(glUniform1ui)
+ONYX_GL_INT_3(glUniform2ui)
+ONYX_GL_INT_4(glUniform3ui)
+ONYX_GL_INT_5(glUniform4ui)
+ONYX_GL_INT_3_PTR(glUniformMatrix2fv, GLfloat)
+ONYX_GL_INT_3_PTR(glUniformMatrix3fv, GLfloat)
+ONYX_GL_INT_3_PTR(glUniformMatrix4fv, GLfloat)
+ONYX_GL_INT_FLOAT(glVertexAttrib1f)
+ONYX_GL_INT_FLOAT_2(glVertexAttrib2f)
+ONYX_GL_INT_FLOAT_3(glVertexAttrib3f)
+ONYX_GL_INT_FLOAT_4(glVertexAttrib4f)
+ONYX_GL_INT_3_PTR(glUniformMatrix2x3fv, GLfloat)
+ONYX_GL_INT_3_PTR(glUniformMatrix3x2fv, GLfloat)
+ONYX_GL_INT_3_PTR(glUniformMatrix2x4fv, GLfloat)
+ONYX_GL_INT_3_PTR(glUniformMatrix4x2fv, GLfloat)
+ONYX_GL_INT_3_PTR(glUniformMatrix3x4fv, GLfloat)
+ONYX_GL_INT_3_PTR(glUniformMatrix4x3fv, GLfloat)
+
+
+// Open3: GLES
+ONYX_GL_INT_6(glDrawRangeElements)
+ONYX_GL_INT_9_PTR(glTexImage3D, void)
+ONYX_GL_INT_10_PTR(glTexSubImage3D, void)
+ONYX_GL_INT_9(glCopyTexSubImage3D)
+ONYX_GL_INT_8_PTR(glCompressedTexImage3D, void)
+ONYX_GL_INT_10_PTR(glCompressedTexSubImage3D, void)
+ONYX_GL_INT_10(glBlitFramebuffer)
+ONYX_GL_INT_5(glRenderbufferStorageMultisample)
+ONYX_GL_INT_5(glFramebufferTextureLayer)
+ONYX_GL_INT_5(glBindBufferRange)
+ONYX_GL_INT_3_PTR_4(glGetTransformFeedbackVarying, GLsizei, GLsizei, GLenum, GLchar)
+ONYX_GL_INT_5(glVertexAttribIPointer)
+ONYX_GL_INT_5(glVertexAttribI4i)
+ONYX_GL_INT_5(glVertexAttribI4ui)
+// ONYX_GL_INT_2_FLOAT_INT(glClearBufferfi)
+ONYX_GL_INT_5(glCopyBufferSubData)
+// ONYX_GL_INT_2_PTR_INT_PTR(glGetActiveUniformsiv, GLuint, GLint)
+ONYX_GL_INT_3_PTR(glGetActiveUniformBlockiv, GLint)
+ONYX_GL_INT_3_PTR_2(glGetActiveUniformBlockName, GLsizei, GLchar)
+ONYX_GL_INT_3(glUniformBlockBinding)
+ONYX_GL_INT_4(glDrawArraysInstanced)
+ONYX_GL_INT_5(glDrawElementsInstanced)
+ONYX_GL_INT_2_PTR_3(glGetProgramBinary, GLsizei, GLenum, void)
+ONYX_GL_INT_2_PTR_INT(glProgramBinary, void)
+// ONYX_GL_INT_2_PTR_INT_4(glInvalidateSubFramebuffer, GLenum)
+ONYX_GL_INT_5(glTexStorage2D)
+ONYX_GL_INT_6(glTexStorage3D)
+ONYX_GL_INT_4_PTR(glGetInternalformativ, GLint)
+
+ONYX_DEF(glShaderSource, (INT, INT, PTR, PTR), ()) {
+    GLsizei count = params->data[1].of.i32;
+    int base_ptr = *(int *) ONYX_PTR(params->data[2].of.i32);
+    char** strs = alloca(count * sizeof(char *));
+    for (int i=0; i<count; i++) {
+        strs[i] = (char *) ONYX_PTR(base_ptr + i * 4);
+    }
+
+    glShaderSource(params->data[0].of.i32, count, strs, (GLint *) ONYX_PTR(params->data[3].of.i32));
+    return NULL;
+}
 
 // glGetBufferPointerv :: (target: GLenum, pname: GLenum, params: ^rawptr) -> void ---
 // glGetVertexAttribPointerv :: (index: GLuint, pname: GLenum, pointer: ^rawptr) -> void ---
+// glTransformFeedbackVaryings       :: (program: GLuint, count: GLsizei, varyings: ^^GLchar, bufferMode: GLenum) -> void ---
+// glGetUniformIndices               :: (program: GLuint, uniformCount: GLsizei, uniformNames: ^^GLchar, uniformIndices: ^GLuint) -> void ---
 
-// glBufferData :: (target: GLenum, size: GLsizeiptr, data: rawptr, usage: GLenum) -> void ---
-// glBufferSubData :: (target: GLenum, offset: GLintptr, size: GLsizeiptr, data: rawptr) -> void ---
-// glCompressedTexImage2D :: (target: GLenum, level: GLint, internalformat: GLenum, width: GLsizei, height: GLsizei, border: GLint, imageSize: GLsizei, data: rawptr) -> void ---
-// glCompressedTexSubImage2D :: (target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, width: GLsizei, height: GLsizei, format: GLenum, imageSize: GLsizei, data: rawptr) -> void ---
-// glCopyTexImage2D :: (target: GLenum, level: GLint, internalformat: GLenum, x: GLint, y: GLint, width: GLsizei, height: GLsizei, border: GLint) -> void ---
-// glCopyTexSubImage2D :: (target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void ---
-// glDrawElements :: (mode: GLenum, count: GLsizei, type: GLenum, indices: rawptr) -> void ---
-// glFramebufferRenderbuffer :: (target: GLenum, attachment: GLenum, renderbuffertarget: GLenum, renderbuffer: GLuint) -> void ---
-// glFramebufferTexture2D :: (target: GLenum, attachment: GLenum, textarget: GLenum, texture: GLuint, level: GLint) -> void ---
-// glGetActiveAttrib :: (program: GLuint, index: GLuint, bufSize: GLsizei, length: ^GLsizei, size: ^GLint, type: ^GLenum, name: ^GLchar) -> void ---
-// glGetActiveUniform :: (program: GLuint, index: GLuint, bufSize: GLsizei, length: ^GLsizei, size: ^GLint, type: ^GLenum, name: ^GLchar) -> void ---
-// glGetAttachedShaders :: (program: GLuint, maxCount: GLsizei, count: ^GLsizei, shaders: ^GLuint) -> void ---
-// glGetFramebufferAttachmentParameteriv :: (target: GLenum, attachment: GLenum, pname: GLenum, params: ^GLint) -> void ---
-// glGetProgramInfoLog :: (program: GLuint, bufSize: GLsizei, length: ^GLsizei, infoLog: ^GLchar) -> void ---
-// glGetShaderInfoLog :: (shader: GLuint, bufSize: GLsizei, length: ^GLsizei, infoLog: ^GLchar) -> void ---
-// glGetShaderPrecisionFormat :: (shadertype: GLenum, precisiontype: GLenum, range: ^GLint, precision: ^GLint) -> void ---
-// glGetShaderSource :: (shader: GLuint, bufSize: GLsizei, length: ^GLsizei, source: ^GLchar) -> void ---
-// glGetString :: (name: GLenum) -> ^GLubyte ---
-// glReadPixels :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: rawptr) -> void ---
-// glRenderbufferStorage :: (target: GLenum, internalformat: GLenum, width: GLsizei, height: GLsizei) -> void ---
-// glSampleCoverage :: (value: GLfloat, invert: GLboolean) -> void ---
-// glShaderBinary :: (count: GLsizei, shaders: ^GLuint, binaryformat: GLenum, binary: rawptr, length: GLsizei) -> void ---
-// glShaderSource :: (shader: GLuint, count: GLsizei, conststring: ^^GLchar, length: ^GLint) -> void ---
-// glStencilOpSeparate :: (face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) -> void ---
-// glTexImage2D :: (target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, type: GLenum, pixels: rawptr) -> void ---
-// glTexParameterf :: (target: GLenum, pname: GLenum, param: GLfloat) -> void ---
-// glTexParameteri :: (target: GLenum, pname: GLenum, param: GLint) -> void ---
-// glTexSubImage2D :: (target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, width: GLsizei, height: GLsizei, format: GLenum, type: GLenum, pixels: rawptr) -> void ---
-// glUniform1f :: (location: GLint, v0: GLfloat) -> void ---
-// glUniform1i :: (location: GLint, v0: GLint) -> void ---
-// glUniform2f :: (location: GLint, v0: GLfloat, v1: GLfloat) -> void ---
-// glUniform2i :: (location: GLint, v0: GLint, v1: GLint) -> void ---
-// glUniform3f :: (location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat) -> void ---
-// glUniform3i :: (location: GLint, v0: GLint, v1: GLint, v2: GLint) -> void ---
-// glUniform4f :: (location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat) -> void ---
-// glUniform4i :: (location: GLint, v0: GLint, v1: GLint, v2: GLint, v3: GLint) -> void ---
-// glUniformMatrix2fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glUniformMatrix3fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glUniformMatrix4fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glVertexAttrib1f :: (index: GLuint, x: GLfloat) -> void ---
-// glVertexAttrib2f :: (index: GLuint, x: GLfloat, y: GLfloat) -> void ---
-// glVertexAttrib3f :: (index: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) -> void ---
-// glVertexAttrib4f :: (index: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) -> void ---
-// glVertexAttribPointer :: (index: GLuint, size: GLint, type: GLenum, normalized: GLboolean, stride: GLsizei, pointer: rawptr) -> void ---
+// Hmm...
+// glClientWaitSync                  :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> GLenum ---
+// glWaitSync                        :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> void ---
+// glGetSynciv                       :: (sync: GLsync, pname: GLenum, bufSize: GLsizei, length: ^GLsizei, values: ^GLint) -> void ---
+// ONYX_GL_INT_RET_LONG(glGetString)
+// ONYX_GL_INT_2_RET_LONG(glGetStringi)
 
-// glGetIntegeri_v :: (target: GLenum, index: GLuint, data: ^GLint) -> void ---
-// glGetVertexAttribIiv :: (index: GLuint, pname: GLenum, params: ^GLint) -> void ---
-// glGetVertexAttribIuiv :: (index: GLuint, pname: GLenum, params: ^GLuint) -> void ---
-// glGetUniformuiv :: (program: GLuint, location: GLint, params: ^GLuint) -> void ---
-// glUniform1uiv :: (location: GLint, count: GLsizei, value: ^GLuint) -> void ---
-// glUniform2uiv :: (location: GLint, count: GLsizei, value: ^GLuint) -> void ---
-// glUniform3uiv :: (location: GLint, count: GLsizei, value: ^GLuint) -> void ---
-// glUniform4uiv :: (location: GLint, count: GLsizei, value: ^GLuint) -> void ---
-// glClearBufferiv :: (buffer: GLenum, drawbuffer: GLint, value: ^GLint) -> void ---
-// glClearBufferuiv :: (buffer: GLenum, drawbuffer: GLint, value: ^GLuint) -> void ---
-// glClearBufferfv :: (buffer: GLenum, drawbuffer: GLint, value: ^GLfloat) -> void ---
-// Open3: GLES
-// glDrawRangeElements :: (mode: GLenum, start: GLuint, end: GLuint, count: GLsizei, type: GLenum, indices: rawptr) -> void ---
-// glTexImage3D :: (target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, depth: GLsizei, border: GLint, format: GLenum, type: GLenum, pixels: rawptr) -> void ---
-// glTexSubImage3D :: (target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, zoffset: GLint, width: GLsizei, height: GLsizei, depth: GLsizei, format: GLenum, type: GLenum, pixels: rawptr) -> void ---
-// glCopyTexSubImage3D :: (target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, zoffset: GLint, x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void ---
-// glCompressedTexImage3D :: (target: GLenum, level: GLint, internalformat: GLenum, width: GLsizei, height: GLsizei, depth: GLsizei, border: GLint, imageSize: GLsizei, data: rawptr) -> void ---
-// glCompressedTexSubImage3D :: (target: GLenum, level: GLint, xoffset: GLint, yoffset: GLint, zoffset: GLint, width: GLsizei, height: GLsizei, depth: GLsizei, format: GLenum, imageSize: GLsizei, data: rawptr) -> void ---
-// glUniformMatrix2x3fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glUniformMatrix3x2fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glUniformMatrix2x4fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glUniformMatrix4x2fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glUniformMatrix3x4fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glUniformMatrix4x3fv :: (location: GLint, count: GLsizei, transpose: GLboolean, value: ^GLfloat) -> void ---
-// glBlitFramebuffer :: (srcX0: GLint, srcY0: GLint, srcX1: GLint, srcY1: GLint, dstX0: GLint, dstY0: GLint, dstX1: GLint, dstY1: GLint, mask: GLbitfield, filter: GLenum) -> void ---
-// glRenderbufferStorageMultisample :: (target: GLenum, samples: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei) -> void ---
-// glFramebufferTextureLayer :: (target: GLenum, attachment: GLenum, texture: GLuint, level: GLint, layer: GLint) -> void ---
-// glBindBufferRange :: (target: GLenum, index: GLuint, buffer: GLuint, offset: GLintptr, size: GLsizeiptr) -> void ---
-// glTransformFeedbackVaryings :: (program: GLuint, count: GLsizei, varyings: ^^GLchar, bufferMode: GLenum) -> void ---
-// glGetTransformFeedbackVarying :: (program: GLuint, index: GLuint, bufSize: GLsizei, length: ^GLsizei, size: ^GLsizei, type: ^GLenum, name: ^GLchar) -> void ---
-// glVertexAttribIPointer :: (index: GLuint, size: GLint, type: GLenum, stride: GLsizei, pointer: rawptr) -> void ---
-// glVertexAttribI4i :: (index: GLuint, x: GLint, y: GLint, z: GLint, w: GLint) -> void ---
-// glVertexAttribI4ui :: (index: GLuint, x: GLuint, y: GLuint, z: GLuint, w: GLuint) -> void ---
-// glUniform1ui :: (location: GLint, v0: GLuint) -> void ---
-// glUniform2ui :: (location: GLint, v0: GLuint, v1: GLuint) -> void ---
-// glUniform3ui :: (location: GLint, v0: GLuint, v1: GLuint, v2: GLuint) -> void ---
-// glUniform4ui :: (location: GLint, v0: GLuint, v1: GLuint, v2: GLuint, v3: GLuint) -> void ---
-// glClearBufferfi :: (buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint) -> void ---
-// glGetStringi :: (name: GLenum, index: GLuint) -> ^GLubyte ---
-// glCopyBufferSubData :: (readTarget: GLenum, writeTarget: GLenum, readOffset: GLintptr, writeOffset: GLintptr, size: GLsizeiptr) -> void ---
-// glGetUniformIndices :: (program: GLuint, uniformCount: GLsizei, uniformNames: ^^GLchar, uniformIndices: ^GLuint) -> void ---
-// glGetActiveUniformsiv :: (program: GLuint, uniformCount: GLsizei, uniformIndices: ^GLuint, pname: GLenum, params: ^GLint) -> void ---
-// glGetUniformBlockIndex :: (program: GLuint, uniformBlockName: ^GLchar) -> GLuint ---
-// glGetActiveUniformBlockiv :: (program: GLuint, uniformBlockIndex: GLuint, pname: GLenum, params: ^GLint) -> void ---
-// glGetActiveUniformBlockName :: (program: GLuint, uniformBlockIndex: GLuint, bufSize: GLsizei, length: ^GLsizei, uniformBlockName: ^GLchar) -> void ---
-// glUniformBlockBinding :: (program: GLuint, uniformBlockIndex: GLuint, uniformBlockBinding: GLuint) -> void ---
-// glDrawArraysInstanced :: (mode: GLenum, first: GLint, count: GLsizei, instancecount: GLsizei) -> void ---
-// glDrawElementsInstanced :: (mode: GLenum, count: GLsizei, type: GLenum, indices: rawptr, instancecount: GLsizei) -> void ---
-// glClientWaitSync :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> GLenum ---
-// glWaitSync :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> void ---
-// glGetSynciv :: (sync: GLsync, pname: GLenum, bufSize: GLsizei, length: ^GLsizei, values: ^GLint) -> void ---
-// glGetProgramBinary :: (program: GLuint, bufSize: GLsizei, length: ^GLsizei, binaryFormat: ^GLenum, binary: rawptr) -> void ---
-// glProgramBinary :: (program: GLuint, binaryFormat: GLenum, binary: rawptr, length: GLsizei) -> void ---
-// glProgramParameteri :: (program: GLuint, pname: GLenum, value: GLint) -> void ---
-// glInvalidateFramebuffer :: (target: GLenum, numAttachments: GLsizei, attachments: ^GLenum) -> void ---
-// glInvalidateSubFramebuffer :: (target: GLenum, numAttachments: GLsizei, attachments: ^GLenum, x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void ---
-// glTexStorage2D :: (target: GLenum, levels: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei) -> void ---
-// glTexStorage3D :: (target: GLenum, levels: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei, depth: GLsizei) -> void ---
-// glGetInternalformativ :: (target: GLenum, internalformat: GLenum, pname: GLenum, bufSize: GLsizei, params: ^GLint) -> void ---
 
 ONYX_LIBRARY {
-    ONYX_FUNC(glClearColor)
-    ONYX_FUNC(glFinish)
-    ONYX_FUNC(glFlush)
-    ONYX_FUNC(glReleaseShaderCompiler)
-    ONYX_FUNC(glEndTransformFeedback)
-    ONYX_FUNC(glPauseTransformFeedback)
-    ONYX_FUNC(glResumeTransformFeedback)
     ONYX_FUNC(glActiveTexture)
-    ONYX_FUNC(glClear)
-    ONYX_FUNC(glEnable)
-    ONYX_FUNC(glDisable)
-    ONYX_FUNC(glBlendEquation)
-    ONYX_FUNC(glClearStencil)
-    ONYX_FUNC(glCompileShader)
-    ONYX_FUNC(glCullFace)
-    ONYX_FUNC(glDeleteProgram)
-    ONYX_FUNC(glDeleteShader)
-    ONYX_FUNC(glDepthFunc)
-    ONYX_FUNC(glDepthMask)
-    ONYX_FUNC(glDisableVertexAttribArray)
-    ONYX_FUNC(glEnableVertexAttribArray)
-    ONYX_FUNC(glFrontFace)
-    ONYX_FUNC(glGenerateMipmap)
-    ONYX_FUNC(glLineWidth)
-    ONYX_FUNC(glLinkProgram)
-    ONYX_FUNC(glStencilMask)
-    ONYX_FUNC(glUseProgram)
-    ONYX_FUNC(glValidateProgram)
-    ONYX_FUNC(glReadBuffer)
-    ONYX_FUNC(glEndQuery)
-    ONYX_FUNC(glBindVertexArray)
-    ONYX_FUNC(glBeginTransformFeedback)
     ONYX_FUNC(glAttachShader)
+    ONYX_FUNC(glBindAttribLocation)
     ONYX_FUNC(glBindBuffer)
     ONYX_FUNC(glBindFramebuffer)
     ONYX_FUNC(glBindRenderbuffer)
     ONYX_FUNC(glBindTexture)
-    ONYX_FUNC(glCreateProgram)
-    ONYX_FUNC(glGetError)
+    ONYX_FUNC(glBlendColor)
+    ONYX_FUNC(glBlendEquation)
     ONYX_FUNC(glBlendEquationSeparate)
     ONYX_FUNC(glBlendFunc)
-    ONYX_FUNC(glDetachShader)
-    ONYX_FUNC(glHint)
-    ONYX_FUNC(glPixelStorei)
-    ONYX_FUNC(glStencilMaskSeparate)
-    ONYX_FUNC(glBeginQuery)
-    ONYX_FUNC(glBindSampler)
-    ONYX_FUNC(glVertexAttribDivisor)
-    ONYX_FUNC(glBindTransformFeedback)
+    ONYX_FUNC(glBlendFuncSeparate)
+    ONYX_FUNC(glBufferData)
+    ONYX_FUNC(glBufferSubData)
     ONYX_FUNC(glCheckFramebufferStatus)
-    ONYX_FUNC(glCreateShader)
-    ONYX_FUNC(glIsBuffer)
-    ONYX_FUNC(glIsEnabled)
-    ONYX_FUNC(glIsFramebuffer)
-    ONYX_FUNC(glIsProgram )
-    ONYX_FUNC(glIsRenderbuffer)
-    ONYX_FUNC(glIsShader)
-    ONYX_FUNC(glIsTexture)
-    ONYX_FUNC(glIsQuery)
-    ONYX_FUNC(glUnmapBuffer)
-    ONYX_FUNC(glIsVertexArray)
-    ONYX_FUNC(glIsTransformFeedback)
-    ONYX_FUNC(glIsSampler)
-    // ONYX_FUNC(glFenceSync)
-    ONYX_FUNC(glClearDepthf)
-    ONYX_FUNC(glDepthRangef)
-    ONYX_FUNC(glPolygonOffset)
+    ONYX_FUNC(glClear)
     ONYX_FUNC(glClearColor)
-    ONYX_FUNC(glBlendColor)
-
+    ONYX_FUNC(glClearDepthf)
+    ONYX_FUNC(glClearStencil)
+    ONYX_FUNC(glColorMask)
+    ONYX_FUNC(glCompileShader)
+    ONYX_FUNC(glCompressedTexImage2D)
+    ONYX_FUNC(glCompressedTexSubImage2D)
+    ONYX_FUNC(glCopyTexImage2D)
+    ONYX_FUNC(glCopyTexSubImage2D)
+    ONYX_FUNC(glCreateProgram)
+    ONYX_FUNC(glCreateShader)
+    ONYX_FUNC(glCullFace)
     ONYX_FUNC(glDeleteBuffers)
     ONYX_FUNC(glDeleteFramebuffers)
+    ONYX_FUNC(glDeleteProgram)
     ONYX_FUNC(glDeleteRenderbuffers)
+    ONYX_FUNC(glDeleteShader)
     ONYX_FUNC(glDeleteTextures)
+    ONYX_FUNC(glDepthFunc)
+    ONYX_FUNC(glDepthMask)
+    ONYX_FUNC(glDepthRangef)
+    ONYX_FUNC(glDetachShader)
+    ONYX_FUNC(glDisable)
+    ONYX_FUNC(glDisableVertexAttribArray)
+    ONYX_FUNC(glDrawArrays)
+    ONYX_FUNC(glDrawElements)
+    ONYX_FUNC(glEnable)
+    ONYX_FUNC(glEnableVertexAttribArray)
+    ONYX_FUNC(glFinish)
+    ONYX_FUNC(glFlush)
+    ONYX_FUNC(glFramebufferRenderbuffer)
+    ONYX_FUNC(glFramebufferTexture2D)
+    ONYX_FUNC(glFrontFace)
     ONYX_FUNC(glGenBuffers)
+    ONYX_FUNC(glGenerateMipmap)
     ONYX_FUNC(glGenFramebuffers)
     ONYX_FUNC(glGenRenderbuffers)
     ONYX_FUNC(glGenTextures)
+    ONYX_FUNC(glGetActiveAttrib)
+    ONYX_FUNC(glGetActiveUniform)
+    ONYX_FUNC(glGetAttachedShaders)
     ONYX_FUNC(glGetAttribLocation)
     ONYX_FUNC(glGetBooleanv)
+    ONYX_FUNC(glGetBufferParameteriv)
+    ONYX_FUNC(glGetError)
     ONYX_FUNC(glGetFloatv)
+    ONYX_FUNC(glGetFramebufferAttachmentParameteriv)
     ONYX_FUNC(glGetIntegerv)
+    ONYX_FUNC(glGetProgramiv)
+    ONYX_FUNC(glGetProgramInfoLog)
+    ONYX_FUNC(glGetRenderbufferParameteriv)
+    ONYX_FUNC(glGetShaderiv)
+    ONYX_FUNC(glGetShaderInfoLog)
+    ONYX_FUNC(glGetShaderPrecisionFormat)
+    ONYX_FUNC(glGetShaderSource)
+    // ONYX_FUNC(glGetString)
+    ONYX_FUNC(glGetTexParameterfv)
+    ONYX_FUNC(glGetTexParameteriv)
+    ONYX_FUNC(glGetUniformfv)
+    ONYX_FUNC(glGetUniformiv)
     ONYX_FUNC(glGetUniformLocation)
+    ONYX_FUNC(glGetVertexAttribfv)
+    ONYX_FUNC(glGetVertexAttribiv)
+    // ONYX_FUNC(glGetVertexAttribPointerv)
+    ONYX_FUNC(glHint)
+    ONYX_FUNC(glIsBuffer)
+    ONYX_FUNC(glIsEnabled)
+    ONYX_FUNC(glIsFramebuffer)
+    ONYX_FUNC(glIsProgram)
+    ONYX_FUNC(glIsRenderbuffer)
+    ONYX_FUNC(glIsShader)
+    ONYX_FUNC(glIsTexture)
+    ONYX_FUNC(glLineWidth)
+    ONYX_FUNC(glLinkProgram)
+    ONYX_FUNC(glPixelStorei)
+    ONYX_FUNC(glPolygonOffset)
+    ONYX_FUNC(glReadPixels)
+    ONYX_FUNC(glReleaseShaderCompiler)
+    ONYX_FUNC(glRenderbufferStorage)
+    ONYX_FUNC(glSampleCoverage)
+    ONYX_FUNC(glScissor)
+    ONYX_FUNC(glShaderBinary)
+    ONYX_FUNC(glShaderSource)
+    ONYX_FUNC(glStencilFunc)
+    ONYX_FUNC(glStencilFuncSeparate)
+    ONYX_FUNC(glStencilMask)
+    ONYX_FUNC(glStencilMaskSeparate)
+    ONYX_FUNC(glStencilOp)
+    ONYX_FUNC(glStencilOpSeparate)
+    ONYX_FUNC(glTexImage2D)
+    ONYX_FUNC(glTexParameterf)
+    ONYX_FUNC(glTexParameterfv)
+    ONYX_FUNC(glTexParameteri)
+    ONYX_FUNC(glTexParameteriv)
+    ONYX_FUNC(glTexSubImage2D)
+    ONYX_FUNC(glUniform1f)
+    ONYX_FUNC(glUniform1fv)
+    ONYX_FUNC(glUniform1i)
+    ONYX_FUNC(glUniform1iv)
+    ONYX_FUNC(glUniform2f)
+    ONYX_FUNC(glUniform2fv)
+    ONYX_FUNC(glUniform2i)
+    ONYX_FUNC(glUniform2iv)
+    ONYX_FUNC(glUniform3f)
+    ONYX_FUNC(glUniform3fv)
+    ONYX_FUNC(glUniform3i)
+    ONYX_FUNC(glUniform3iv)
+    ONYX_FUNC(glUniform4f)
+    ONYX_FUNC(glUniform4fv)
+    ONYX_FUNC(glUniform4i)
+    ONYX_FUNC(glUniform4iv)
+    ONYX_FUNC(glUniformMatrix2fv)
+    ONYX_FUNC(glUniformMatrix3fv)
+    ONYX_FUNC(glUniformMatrix4fv)
+    ONYX_FUNC(glUseProgram)
+    ONYX_FUNC(glValidateProgram)
+    ONYX_FUNC(glVertexAttrib1f)
     ONYX_FUNC(glVertexAttrib1fv)
+    ONYX_FUNC(glVertexAttrib2f)
     ONYX_FUNC(glVertexAttrib2fv)
+    ONYX_FUNC(glVertexAttrib3f)
     ONYX_FUNC(glVertexAttrib3fv)
+    ONYX_FUNC(glVertexAttrib4f)
     ONYX_FUNC(glVertexAttrib4fv)
+    ONYX_FUNC(glVertexAttribPointer)
+    ONYX_FUNC(glViewport)
+
+
+    // Open3: GLES
+    ONYX_FUNC(glReadBuffer)
+    ONYX_FUNC(glDrawRangeElements)
+    ONYX_FUNC(glTexImage3D)
+    ONYX_FUNC(glTexSubImage3D)
+    ONYX_FUNC(glCopyTexSubImage3D)
+    ONYX_FUNC(glCompressedTexImage3D)
+    ONYX_FUNC(glCompressedTexSubImage3D)
     ONYX_FUNC(glGenQueries)
     ONYX_FUNC(glDeleteQueries)
+    ONYX_FUNC(glIsQuery)
+    ONYX_FUNC(glBeginQuery)
+    ONYX_FUNC(glEndQuery)
+    ONYX_FUNC(glGetQueryiv)
+    ONYX_FUNC(glGetQueryObjectuiv)
+    ONYX_FUNC(glUnmapBuffer)
+    // ONYX_FUNC(glGetBufferPointerv)
     ONYX_FUNC(glDrawBuffers)
+    ONYX_FUNC(glUniformMatrix2x3fv)
+    ONYX_FUNC(glUniformMatrix3x2fv)
+    ONYX_FUNC(glUniformMatrix2x4fv)
+    ONYX_FUNC(glUniformMatrix4x2fv)
+    ONYX_FUNC(glUniformMatrix3x4fv)
+    ONYX_FUNC(glUniformMatrix4x3fv)
+    ONYX_FUNC(glBlitFramebuffer)
+    ONYX_FUNC(glRenderbufferStorageMultisample)
+    ONYX_FUNC(glFramebufferTextureLayer)
+    ONYX_FUNC(glMapBufferRange)
+    ONYX_FUNC(glFlushMappedBufferRange)
+    ONYX_FUNC(glBindVertexArray)
     ONYX_FUNC(glDeleteVertexArrays)
     ONYX_FUNC(glGenVertexArrays)
-    ONYX_FUNC(glGenSamplers)
+    ONYX_FUNC(glIsVertexArray)
+    ONYX_FUNC(glGetIntegeri_v)
+    ONYX_FUNC(glBeginTransformFeedback)
+    ONYX_FUNC(glEndTransformFeedback)
+    ONYX_FUNC(glBindBufferRange)
+    ONYX_FUNC(glBindBufferBase)
+    // ONYX_FUNC(glTransformFeedbackVaryings)
+    ONYX_FUNC(glGetTransformFeedbackVarying)
+    ONYX_FUNC(glVertexAttribIPointer)
+    ONYX_FUNC(glGetVertexAttribIiv)
+    ONYX_FUNC(glGetVertexAttribIuiv)
+    ONYX_FUNC(glVertexAttribI4i)
+    ONYX_FUNC(glVertexAttribI4ui)
+    ONYX_FUNC(glVertexAttribI4iv)
+    ONYX_FUNC(glVertexAttribI4uiv)
+    ONYX_FUNC(glGetUniformuiv)
+    ONYX_FUNC(glGetFragDataLocation)
+    ONYX_FUNC(glUniform1ui)
+    ONYX_FUNC(glUniform2ui)
+    ONYX_FUNC(glUniform3ui)
+    ONYX_FUNC(glUniform4ui)
+    ONYX_FUNC(glUniform1uiv)
+    ONYX_FUNC(glUniform2uiv)
+    ONYX_FUNC(glUniform3uiv)
+    ONYX_FUNC(glUniform4uiv)
+    ONYX_FUNC(glClearBufferiv)
+    ONYX_FUNC(glClearBufferuiv)
+    ONYX_FUNC(glClearBufferfv)
+    // ONYX_FUNC(glClearBufferfi)
+    // ONYX_FUNC(glGetStringi)
+    ONYX_FUNC(glCopyBufferSubData)
+    // ONYX_FUNC(glGetUniformIndices)
+    // ONYX_FUNC(glGetActiveUniformsiv)
+    ONYX_FUNC(glGetUniformBlockIndex)
+    ONYX_FUNC(glGetActiveUniformBlockiv)
+    ONYX_FUNC(glGetActiveUniformBlockName)
+    ONYX_FUNC(glUniformBlockBinding)
+    ONYX_FUNC(glDrawArraysInstanced)
+    ONYX_FUNC(glDrawElementsInstanced)
+    //ONYX_FUNC(glFenceSync)
+    //ONYX_FUNC(glIsSync)
+    //ONYX_FUNC(glDeleteSync)
+    //ONYX_FUNC(glClientWaitSync)
+    //ONYX_FUNC(glWaitSync)
     ONYX_FUNC(glGetInteger64v)
+    // ONYX_FUNC(glGetSynciv)
+    ONYX_FUNC(glGetInteger64i_v)
+    ONYX_FUNC(glGetBufferParameteri64v)
+    ONYX_FUNC(glGenSamplers)
     ONYX_FUNC(glDeleteSamplers)
+    ONYX_FUNC(glIsSampler)
+    ONYX_FUNC(glBindSampler)
+    ONYX_FUNC(glSamplerParameteri)
+    ONYX_FUNC(glSamplerParameteriv)
+    ONYX_FUNC(glSamplerParameterf)
+    ONYX_FUNC(glSamplerParameterfv)
+    ONYX_FUNC(glGetSamplerParameteriv)
+    ONYX_FUNC(glGetSamplerParameterfv)
+    ONYX_FUNC(glVertexAttribDivisor)
+    ONYX_FUNC(glBindTransformFeedback)
     ONYX_FUNC(glDeleteTransformFeedbacks)
     ONYX_FUNC(glGenTransformFeedbacks)
+    ONYX_FUNC(glIsTransformFeedback)
+    ONYX_FUNC(glPauseTransformFeedback)
+    ONYX_FUNC(glResumeTransformFeedback)
+    ONYX_FUNC(glGetProgramBinary)
+    ONYX_FUNC(glProgramBinary)
+    ONYX_FUNC(glProgramParameteri)
+    ONYX_FUNC(glInvalidateFramebuffer)
+    // ONYX_FUNC(glInvalidateSubFramebuffer)
+    ONYX_FUNC(glTexStorage2D)
+    ONYX_FUNC(glTexStorage3D)
+    ONYX_FUNC(glGetInternalformativ)
 
     NULL
 };

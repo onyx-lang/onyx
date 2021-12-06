@@ -2,6 +2,9 @@ package opengles
 
 #library "./modules/opengles/onyx_opengles"
 
+// Reference to an out parameter from OpenGL.
+GLExternRef :: #distinct i64
+
 #foreign "onyx_opengles" {
     glActiveTexture :: (texture: GLenum) -> void ---
     glAttachShader :: (program: GLuint, shader: GLuint) -> void ---
@@ -252,7 +255,6 @@ package opengles
     glTexStorage2D :: (target: GLenum, levels: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei) -> void ---
     glTexStorage3D :: (target: GLenum, levels: GLsizei, internalformat: GLenum, width: GLsizei, height: GLsizei, depth: GLsizei) -> void ---
     glGetInternalformativ :: (target: GLenum, internalformat: GLenum, pname: GLenum, bufSize: GLsizei, params: ^GLint) -> void ---
-
 }
 
 GLbyte :: i8;
