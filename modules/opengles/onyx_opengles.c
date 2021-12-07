@@ -506,10 +506,21 @@ ONYX_DEF(glShaderSource, (INT, INT, PTR, PTR), ()) {
     return NULL;
 }
 
+ONYX_DEF(glGetUniformIndices, (INT, INT, PTR, PTR), ()) {
+    GLsizei count = params->data[1].of.i32;
+    int base_ptr = *(int *) ONYX_PTR(params->data[2].of.i32);
+    char** strs = alloca(count * sizeof(char *));
+    for (int i=0; i<count; i++) {
+        strs[i] = (char *) ONYX_PTR(base_ptr + i * 4);
+    }
+    
+    glGetUniformIndices(params->data[0].of.i32, count, (const char *const*) strs, (int *) ONYX_PTR(params->data[3].of.i32));
+    return NULL;
+}
+
 // glGetBufferPointerv :: (target: GLenum, pname: GLenum, params: ^rawptr) -> void ---
 // glGetVertexAttribPointerv :: (index: GLuint, pname: GLenum, pointer: ^rawptr) -> void ---
 // glTransformFeedbackVaryings       :: (program: GLuint, count: GLsizei, varyings: ^^GLchar, bufferMode: GLenum) -> void ---
-// glGetUniformIndices               :: (program: GLuint, uniformCount: GLsizei, uniformNames: ^^GLchar, uniformIndices: ^GLuint) -> void ---
 
 // Hmm...
 // glClientWaitSync                  :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> GLenum ---
@@ -727,7 +738,7 @@ ONYX_LIBRARY {
     // ONYX_FUNC(glClearBufferfi)
     // ONYX_FUNC(glGetStringi)
     ONYX_FUNC(glCopyBufferSubData)
-    // ONYX_FUNC(glGetUniformIndices)
+    ONYX_FUNC(glGetUniformIndices)
     // ONYX_FUNC(glGetActiveUniformsiv)
     ONYX_FUNC(glGetUniformBlockIndex)
     ONYX_FUNC(glGetActiveUniformBlockiv)
