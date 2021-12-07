@@ -231,9 +231,6 @@ ONYX_DEF(glfwSwapBuffers, (LONG), ()) {
     return NULL;
 }
 
-// glfwGetInputMode :: (window: GLFWwindow_p, mode: i32) -> i32 ---
-// glfwSetInputMode :: (window: GLFWwindow_p, mode, value: i32) -> void ---
-// glfwRawMouseMotionSupported :: () -> i32 ---
 ONYX_DEF(glfwGetInputMode, (LONG, INT), (INT)) {
     GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
     results->data[0] = WASM_I32_VAL(glfwGetInputMode(window, params->data[1].of.i32));
@@ -311,7 +308,28 @@ ONYX_DEF(glfwSetCursor, (LONG, LONG), ()) {
     return NULL;
 }
 
-// // glfwSetKeyCallback
+wasm_func_t* __key_callback_func;
+static void __glfw_key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    wasm_val_t args[] = { WASM_I64_VAL((unsigned long) window), WASM_I32_VAL(key), WASM_I32_VAL(scancode), WASM_I32_VAL(action), WASM_I32_VAL(mods) };
+    wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
+    wasm_val_vec_t results;
+
+    wasm_func_call(__key_callback_func, &args_array, &results);
+}
+
+ONYX_DEF(glfwSetKeyCallback, (LONG, PTR, INT), ()) {
+    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
+
+    char name[512];
+    strncpy(name, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32);
+    name[params->data[2].of.i32] = '\0';
+
+    __key_callback_func = wasm_extern_as_func(wasm_extern_lookup_by_name(wasm_module, wasm_instance, name));
+
+    glfwSetKeyCallback(window, __glfw_key_callback);
+    return NULL;
+}
+
 // // glfwSetCharCallback
 // // glfwSetCharModsCallback
 // // glfwSetMouseButtonCallback
@@ -504,10 +522,10 @@ ONYX_LIBRARY {
     ONYX_FUNC(glfwSetMonitorUserPointer)
     ONYX_FUNC(glfwGetMonitorUserPointer)
 
+    ONYX_FUNC(glfwSetKeyCallback)
 
     // // glfwGetKeyName :: (key, scancode: i32) -> cstr ---
 
-// // glfwSetKeyCallback
 // // glfwSetCharCallback
 // // glfwSetCharModsCallback
 // // glfwSetMouseButtonCallback

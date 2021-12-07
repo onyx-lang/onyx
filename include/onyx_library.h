@@ -1,7 +1,10 @@
 
 #include "wasm.h"
 
+extern wasm_instance_t* wasm_instance;
+extern wasm_module_t* wasm_module;
 extern wasm_memory_t* wasm_memory;
+extern wasm_extern_t* wasm_extern_lookup_by_name(wasm_module_t* module, wasm_instance_t* instance, const char* name);
 
 typedef struct WasmValkindBuffer {
     unsigned int count;

@@ -22,7 +22,8 @@ static wasi_env_t*       wasi_env;
 static wasm_engine_t*    wasm_engine;
 static wasm_store_t*     wasm_store;
 static wasm_extern_vec_t wasm_imports;
-static wasm_module_t*    wasm_module;
+wasm_instance_t*  wasm_instance;
+wasm_module_t*    wasm_module;
 wasm_memory_t*    wasm_memory;
 
 b32 wasm_name_equals(const wasm_name_t* name1, const wasm_name_t* name2) {
@@ -574,7 +575,6 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
 
     onyx_lookup_and_load_custom_libraries(wasm_bytes);
 
-    wasm_instance_t* instance = NULL;
     wasmer_features_t* features = NULL;
     wasm_trap_t* run_trap = NULL;
 
@@ -774,10 +774,10 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
 
     wasm_trap_t* traps = NULL;
 
-    instance = wasm_instance_new(wasm_store, wasm_module, &wasm_imports, &traps);
-    if (!instance) goto error_handling;
+    wasm_instance = wasm_instance_new(wasm_store, wasm_module, &wasm_imports, &traps);
+    if (!wasm_instance) goto error_handling;
 
-    wasm_extern_t* start_extern = wasm_extern_lookup_by_name(wasm_module, instance, "_start");
+    wasm_extern_t* start_extern = wasm_extern_lookup_by_name(wasm_module, wasm_instance, "_start");
     wasm_func_t*   start_func   = wasm_extern_as_func(start_extern);
 
     wasm_val_vec_t args;
@@ -807,7 +807,7 @@ error_handling:
     bh_printf("%b\n", buf, len);
 
 cleanup:
-    if (instance)    wasm_instance_delete(instance);
+    if (wasm_instance) wasm_instance_delete(wasm_instance);
     if (wasm_module) wasm_module_delete(wasm_module);
     if (wasm_store)  wasm_store_delete(wasm_store);
     if (wasm_engine) wasm_engine_delete(wasm_engine);

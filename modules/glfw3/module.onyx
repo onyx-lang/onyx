@@ -56,7 +56,7 @@ GLFWgammaramp :: struct {
     glfwCreateStandardCursor :: (shape: i32) -> GLFWcursor_p ---
     glfwDestroyCursor :: (cursor: GLFWcursor_p) -> void ---
     glfwSetCursor :: (window: GLFWwindow_p, cursor: GLFWcursor_p) -> void ---
-    // glfwSetKeyCallback
+    glfwSetKeyCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
     // glfwSetCharCallback
     // glfwSetCharModsCallback
     // glfwSetMouseButtonCallback
