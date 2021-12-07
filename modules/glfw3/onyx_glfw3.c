@@ -308,35 +308,6 @@ ONYX_DEF(glfwSetCursor, (LONG, LONG), ()) {
     return NULL;
 }
 
-wasm_func_t* __key_callback_func;
-static void __glfw_key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-    wasm_val_t args[] = { WASM_I64_VAL((unsigned long) window), WASM_I32_VAL(key), WASM_I32_VAL(scancode), WASM_I32_VAL(action), WASM_I32_VAL(mods) };
-    wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
-    wasm_val_vec_t results;
-
-    wasm_func_call(__key_callback_func, &args_array, &results);
-}
-
-ONYX_DEF(glfwSetKeyCallback, (LONG, PTR, INT), ()) {
-    GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
-
-    char name[512];
-    strncpy(name, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32);
-    name[params->data[2].of.i32] = '\0';
-
-    __key_callback_func = wasm_extern_as_func(wasm_extern_lookup_by_name(wasm_module, wasm_instance, name));
-
-    glfwSetKeyCallback(window, __glfw_key_callback);
-    return NULL;
-}
-
-// // glfwSetCharCallback
-// // glfwSetCharModsCallback
-// // glfwSetMouseButtonCallback
-// // glfwSetCursorPosCallback
-// // glfwSetCursorEnterCallback
-// // glfwSetScrollCallback
-// // glfwSetDropCallback
 ONYX_DEF(glfwJoystickPresent, (INT), (INT)) {
     results->data[0] = WASM_I32_VAL(glfwJoystickPresent(params->data[0].of.i32));
     return NULL;
@@ -465,6 +436,46 @@ ONYX_DEF(glfwGetMonitorUserPointer, (LONG), (PTR)) {
 // // glfwGetGammaRamp :: (monitor: GLFWmonitor_p, out_ramp: ^GLFWgammramp) -> void ---
 // // glfwSetGammaRamp :: (monitor: GLFWmonitor_p, ramp: ^GLFWgammramp) -> void ---
 
+#define _EXPAND(...) __VA_ARGS__
+#define GLFW_HOOK(callback_name, c_args, wasm_args) \
+    static wasm_func_t* __glfw_callback_##callback_name ; \
+    static void __glfw_##callback_name (GLFWwindow *window, _EXPAND c_args) { \
+        wasm_val_t args[] = { WASM_I64_VAL((unsigned long) window), _EXPAND wasm_args }; \
+        wasm_val_vec_t args_array = WASM_ARRAY_VEC(args); \
+        wasm_val_vec_t results; \
+        wasm_func_call(__glfw_callback_##callback_name , &args_array, &results); \
+    } \
+    ONYX_DEF(callback_name, (LONG, PTR, INT), ()) { \
+        GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64; \
+        char name[512]; \
+        strncpy(name, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32); \
+        name[params->data[2].of.i32] = '\0'; \
+        __glfw_callback_##callback_name = wasm_extern_as_func(wasm_extern_lookup_by_name(wasm_module, wasm_instance, name)); \
+        callback_name(window, __glfw_##callback_name); \
+        return NULL; \
+    }
+
+GLFW_HOOK(glfwSetKeyCallback, (int key, int scancode, int actions, int mods),
+                              (WASM_I32_VAL(key), WASM_I32_VAL(scancode), WASM_I32_VAL(actions), WASM_I32_VAL(mods)))
+
+GLFW_HOOK(glfwSetCharCallback, (unsigned int ch),
+                              (WASM_I32_VAL(ch)))
+
+GLFW_HOOK(glfwSetCharModsCallback, (unsigned int ch, int mods),
+                                   (WASM_I32_VAL(ch), WASM_I32_VAL(mods)))
+
+GLFW_HOOK(glfwSetMouseButtonCallback, (int button, int action, int mods),
+                                      (WASM_I32_VAL(button), WASM_I32_VAL(action), WASM_I32_VAL(mods)))
+
+GLFW_HOOK(glfwSetCursorPosCallback, (double xpos, double ypos),
+                                    (WASM_F64_VAL(xpos), WASM_F64_VAL(ypos)))
+
+GLFW_HOOK(glfwSetCursorEnterCallback, (int entered),
+                                      (WASM_I32_VAL(entered)))
+
+GLFW_HOOK(glfwSetScrollCallback, (double dx, double dy),
+                                 (WASM_F64_VAL(dx), WASM_F64_VAL(dy)))
+// // glfwSetDropCallback
 
 
 ONYX_LIBRARY {
@@ -523,15 +534,15 @@ ONYX_LIBRARY {
     ONYX_FUNC(glfwGetMonitorUserPointer)
 
     ONYX_FUNC(glfwSetKeyCallback)
+    ONYX_FUNC(glfwSetCharCallback)
+    ONYX_FUNC(glfwSetCharModsCallback)
+    ONYX_FUNC(glfwSetMouseButtonCallback)
+    ONYX_FUNC(glfwSetCursorPosCallback)
+    ONYX_FUNC(glfwSetCursorEnterCallback)
+    ONYX_FUNC(glfwSetScrollCallback)
 
     // // glfwGetKeyName :: (key, scancode: i32) -> cstr ---
 
-// // glfwSetCharCallback
-// // glfwSetCharModsCallback
-// // glfwSetMouseButtonCallback
-// // glfwSetCursorPosCallback
-// // glfwSetCursorEnterCallback
-// // glfwSetScrollCallback
 // // glfwSetDropCallback
 // // glfwGetJoystickAxes :: (jid: i32, count: ^i32) -> ^f32 ---
 // // glfwGetJoystickButtons :: (jid: i32, count: ^i32) -> ^u8 ---
