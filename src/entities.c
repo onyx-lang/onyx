@@ -169,6 +169,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             break;
         }
 
+        case Ast_Kind_Library_Path:
         case Ast_Kind_Load_Path: {
             ent.state = Entity_State_Parse;
             ent.type = Entity_Type_Load_Path;

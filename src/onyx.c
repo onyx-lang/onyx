@@ -86,6 +86,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     bh_arr_new(alloc, options.files, 2);
     bh_arr_new(alloc, options.included_folders, 2);
+    bh_arr_new(alloc, options.included_library_folders, 2);
 
     // NOTE: Add the current folder
     bh_arr_push(options.included_folders, CORE_INSTALLATION);
@@ -315,13 +316,16 @@ static void process_load_entity(Entity* ent) {
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
         
-        char* filename = lookup_included_file(include->name, parent_folder, 1, 1);
+        char* filename = lookup_included_file(include->name, parent_folder, ".onyx", 1, context.options->included_folders, 1);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         process_source_file(formatted_name, include->token->pos);
 
     } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(context.options->included_folders, include->name);
+
+    } else if (include->kind == Ast_Kind_Library_Path) {
+        bh_arr_push(context.options->included_library_folders, include->name);
     }
 }
 

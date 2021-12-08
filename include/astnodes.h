@@ -124,6 +124,7 @@ typedef enum AstKind {
     Ast_Kind_Package,
     Ast_Kind_Load_File,
     Ast_Kind_Load_Path,
+    Ast_Kind_Library_Path,
     Ast_Kind_Memres,
 
     Ast_Kind_Binding,
@@ -1467,6 +1468,7 @@ struct CompileOptions {
     Runtime runtime;
 
     bh_arr(const char *) included_folders;
+    bh_arr(const char *) included_library_folders;
     bh_arr(const char *) files;
     const char* target_file;
     const char* documentation_file;

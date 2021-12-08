@@ -521,7 +521,7 @@ static void onyx_load_library(char *name) {
     LibraryLinker library_load;
 
     #ifdef _BH_LINUX
-    char *library_name = bh_aprintf(global_scratch_allocator, "%s.so", name);
+    char *library_name = lookup_included_file(name, ".", ".so", 1, context.options->included_library_folders, 1);
     void* handle = dlopen(library_name, RTLD_LAZY);
     if (handle == NULL) {
         printf("ERROR LOADING LIBRARY %s: %s\n", name, dlerror());
@@ -536,7 +536,7 @@ static void onyx_load_library(char *name) {
     #endif
 
     #ifdef _BH_WINDOWS
-    char *library_name = bh_aprintf(global_scratch_allocator, "%s.dll", name);
+    char *library_name = lookup_included_file(name, ".", ".dll", 1, context.options->included_library_folders, 1);
     HMODULE handle = LoadLibraryA(library_name);
     if (handle == NULL) {
         printf("ERROR LOADING LIBRARY %s: %d\n", name, GetLastError());

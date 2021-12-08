@@ -955,7 +955,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
     return total_len;
 }
 
-char* lookup_included_file(char* filename, char* relative_to, b32 add_onyx_suffix, b32 search_included_folders) {
+char* lookup_included_file(char* filename, char* relative_to, char *suffix, b32 add_suffix, bh_arr(const char *) included_folders, b32 search_included_folders) {
     assert(relative_to != NULL);
 
     static char path[256];
@@ -964,8 +964,8 @@ char* lookup_included_file(char* filename, char* relative_to, b32 add_onyx_suffi
     static char fn[128];
     fori (i, 0, 128) fn[i] = 0;
 
-    if (!bh_str_ends_with(filename, ".onyx") && add_onyx_suffix) {
-        bh_snprintf(fn, 128, "%s.onyx", filename);
+    if (!bh_str_ends_with(filename, suffix) && add_suffix) {
+        bh_snprintf(fn, 128, "%s%s", filename, suffix);
     } else {
         bh_snprintf(fn, 128, "%s", filename);
     }
@@ -990,7 +990,7 @@ char* lookup_included_file(char* filename, char* relative_to, b32 add_onyx_suffi
     }
 
     if (search_included_folders) {
-        bh_arr_each(const char *, folder, context.options->included_folders) {
+        bh_arr_each(const char *, folder, included_folders) {
             if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
                 bh_snprintf(path, 256, "%s%c%s", *folder, DIR_SEPARATOR, fn);
             else

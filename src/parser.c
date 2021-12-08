@@ -2966,6 +2966,20 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(include);
                 return;
             }
+            else if (parse_possible_directive(parser, "library_path")) {
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Library_Path);
+                include->token = dir_token;
+                
+                OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
+                if (str_token != NULL) {
+                    token_toggle_end(str_token);
+                    include->name = bh_strdup(parser->allocator, str_token->text);
+                    token_toggle_end(str_token);
+                }
+
+                ENTITY_SUBMIT(include);
+                return;
+            }
             else if (parse_possible_directive(parser, "error")) {
                 AstDirectiveError *error = make_node(AstDirectiveError, Ast_Kind_Directive_Error);
                 error->token = dir_token;

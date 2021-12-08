@@ -37,7 +37,7 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len);
 // This function can return a static variable which will change if this is called
 // another time.                                        -brendanfh 2020/10/09
 // :RelativeFiles This should lookup for the file relative to "relative_to"
-char* lookup_included_file(char* filename, char* relative_to, b32 add_onyx_suffix, b32 search_included_folders);
+char* lookup_included_file(char* filename, char* relative_to, char *suffix, b32 add_suffix, bh_arr(const char *) included_folders, b32 search_included_folders);
 
 u32 levenshtein_distance(const char *str1, const char *str2);
 char *find_closest_symbol_in_node(AstNode *node, char *sym);
