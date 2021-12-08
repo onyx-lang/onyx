@@ -48,6 +48,7 @@ AstGlobal builtin_tls_base    = { Ast_Kind_Global, 0, &builtin_tls_base_token, N
 AstGlobal builtin_tls_size    = { Ast_Kind_Global, 0, &builtin_tls_size_token, NULL, NULL, (AstType *) &basic_type_u32, NULL };
 
 AstType  *builtin_string_type;
+AstType  *builtin_cstring_type;
 AstType  *builtin_range_type;
 Type     *builtin_range_type_type;
 AstType  *builtin_vararg_type;
@@ -383,6 +384,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
     if (builtin_string_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, "'str' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_cstring_type = (AstType *) symbol_raw_resolve(p->scope, "cstr");
+    if (builtin_cstring_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, "'cstr' type not found in builtin package.");
         return;
     }
 

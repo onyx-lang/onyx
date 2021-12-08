@@ -476,10 +476,18 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(type, &(*expr)->type_node);
             break;
 
-        case Ast_Kind_StrLit:
-            SYMRES(type, &builtin_string_type);
-            (*expr)->type_node = builtin_string_type;
+        case Ast_Kind_StrLit: {
+            AstStrLit* str = (AstStrLit *) *expr;
+            if (str->is_cstr) {
+                SYMRES(type, &builtin_cstring_type);
+                str->type_node = builtin_cstring_type;
+
+            } else {
+                SYMRES(type, &builtin_string_type);
+                str->type_node = builtin_string_type;
+            }
             break;
+        }
 
         case Ast_Kind_Slice:
         case Ast_Kind_Subscript:

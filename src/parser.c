@@ -665,7 +665,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 assert(builtin_code_type != NULL);
                 code_block->type_node = builtin_code_type;
-                
+
                 code_block->code = (AstNode *) parse_expression(parser, 0);
 
                 expect_token(parser, ')');
@@ -679,6 +679,19 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 insert->code_expr = parse_expression(parser, 0);
 
                 retval = (AstTyped *) insert;
+                break;
+            }
+            else if (parse_possible_directive(parser, "cstr")) {
+                // Copy pasted from above.
+                AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
+                str_node->token     = expect_token(parser, Token_Type_Literal_String);
+                str_node->addr      = 0;
+                str_node->flags    |= Ast_Flag_Comptime;
+                str_node->is_cstr   = 1;
+
+                ENTITY_SUBMIT(str_node);
+
+                retval = (AstTyped *) str_node;
                 break;
             }
 

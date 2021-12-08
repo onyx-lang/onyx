@@ -57,12 +57,12 @@ GLFWgammaramp :: struct {
     glfwDestroyCursor :: (cursor: GLFWcursor_p) -> void ---
     glfwSetCursor :: (window: GLFWwindow_p, cursor: GLFWcursor_p) -> void ---
     glfwSetKeyCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
-    // glfwSetCharCallback
-    // glfwSetCharModsCallback
-    // glfwSetMouseButtonCallback
-    // glfwSetCursorPosCallback
-    // glfwSetCursorEnterCallback
-    // glfwSetScrollCallback
+    glfwSetCharCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
+    glfwSetCharModsCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
+    glfwSetMouseButtonCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
+    glfwSetCursorPosCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
+    glfwSetCursorEnterCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
+    glfwSetScrollCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
     // glfwSetDropCallback
     glfwJoystickPresent :: (jid: i32) -> i32 ---
     // glfwGetJoystickAxes :: (jid: i32, count: ^i32) -> ^f32 ---

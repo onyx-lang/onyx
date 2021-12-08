@@ -2676,7 +2676,9 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_StrLit: {
             WID(WI_PTR_CONST, ((AstStrLit *) expr)->addr);
-            WID(WI_I32_CONST, ((AstStrLit *) expr)->length);
+
+            if (((AstStrLit *) expr)->is_cstr == 0)
+                WID(WI_I32_CONST, ((AstStrLit *) expr)->length);
             break;
         }
 
@@ -3424,21 +3426,22 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     if (index != -1) {
         StrLitInfo sti = mod->string_literals[index].value;
         strlit->addr   = sti.addr;
-        strlit->length = sti.len;
+        strlit->length = sti.len + (strlit->is_cstr ? 1 : 0);
 
         bh_free(global_heap_allocator, strdata);
         return;
     }
 
+    u32 actual_length = length + (strlit->is_cstr ? 1 : 0);
     WasmDatum datum = {
         .offset = mod->next_datum_offset,
-        .length = length,
+        .length = actual_length,
         .data = strdata,
     };
 
     strlit->addr = (u32) mod->next_datum_offset,
     strlit->length = length;
-    mod->next_datum_offset += length;
+    mod->next_datum_offset += actual_length;
 
     shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->addr, strlit->length }));
 

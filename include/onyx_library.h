@@ -24,7 +24,7 @@ typedef struct OnyxRuntime {
     char* (*wasm_memory_data)(wasm_memory_t *wasm_memory);
     wasm_extern_t* (*wasm_extern_lookup_by_name)(wasm_module_t* module, wasm_instance_t* instance, const char* name);
     wasm_func_t* (*wasm_extern_as_func)(wasm_extern_t* ext);
-    wasm_trap_t* (*wasm_func_call)(wasm_func_t* wasm_func, wasm_val_vec_t* args, wasm_val_vec_t* results);
+    wasm_trap_t* (*wasm_func_call)(const wasm_func_t* wasm_func, const wasm_val_vec_t* args, wasm_val_vec_t* results);
 } OnyxRuntime;
 
 OnyxRuntime* runtime;
