@@ -1,215 +1,228 @@
-#include "onyx_library.h"
-#include <GLES3/gl3.h>
+
+#define GLAD_GLES2_IMPLEMENTATION
+#include "glad.h"
 
 #define ONYX_LIBRARY_NAME onyx_opengles
+#include "onyx_library.h"
+
+#if defined(_WIN32) || defined(_WIN64)
+    // Why is Windows dumb?
+    #define alloca _alloca
+#endif
 
 #define ONYX_GL_0(name) \
     ONYX_DEF(name, (), ()) { \
-        name (); \
+        glad_##name (); \
         return NULL;                   \
     }
 
 #define ONYX_GL_0_RET_INT(name) \
     ONYX_DEF(name, (), (INT)) { \
-        results->data[0] = WASM_I32_VAL( name () ); \
+        results->data[0] = WASM_I32_VAL( glad_##name () ); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_1(name) \
     ONYX_DEF(name, (INT), ()) { \
-        name (params->data[0].of.i32); \
+        glad_##name (params->data[0].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_1_RET_INT(name)             \
     ONYX_DEF(name, (INT), (INT)) {              \
-        results->data[0] = WASM_I32_VAL( name (params->data[0].of.i32) ); \
+        results->data[0] = WASM_I32_VAL( glad_##name (params->data[0].of.i32) ); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_2(name) \
     ONYX_DEF(name, (INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_2_RET_INT(name) \
     ONYX_DEF(name, (INT, INT), (INT)) { \
-        results->data[0] = WASM_I32_VAL( name (params->data[0].of.i32, params->data[1].of.i32) ); \
+        results->data[0] = WASM_I32_VAL( glad_##name (params->data[0].of.i32, params->data[1].of.i32) ); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_3(name) \
     ONYX_DEF(name, (INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_4(name) \
     ONYX_DEF(name, (INT, INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_5(name) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_6(name) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_7(name) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_8(name) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_9(name) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_10(name) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT, INT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, params->data[9].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, params->data[9].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_FLOAT_1(name)                   \
     ONYX_DEF(name, (FLOAT), ()) {  \
-        name (params->data[0].of.f32); \
+        glad_##name (params->data[0].of.f32); \
         return NULL; \
     }
 
 #define ONYX_GL_FLOAT_INT(name)                   \
     ONYX_DEF(name, (FLOAT, INT), ()) {  \
-        name (params->data[0].of.f32, params->data[1].of.i32); \
+        glad_##name (params->data[0].of.f32, params->data[1].of.i32); \
         return NULL; \
     }
 
 #define ONYX_GL_FLOAT_2(name)                   \
     ONYX_DEF(name, (FLOAT, FLOAT), ()) {  \
-        name (params->data[0].of.f32, params->data[1].of.f32); \
+        glad_##name (params->data[0].of.f32, params->data[1].of.f32); \
         return NULL; \
     }
 
 #define ONYX_GL_FLOAT_4(name)                   \
     ONYX_DEF(name, (FLOAT, FLOAT, FLOAT, FLOAT), ()) {  \
-        name (params->data[0].of.f32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32); \
+        glad_##name (params->data[0].of.f32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_PTR(name, ptr_type)         \
     ONYX_DEF(name, (INT, PTR), ()) {            \
-        name (params->data[0].of.i32, (ptr_type *) ONYX_PTR(params->data[1].of.i32)); \
+        glad_##name (params->data[0].of.i32, (ptr_type *) ONYX_PTR(params->data[1].of.i32)); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_2_PTR(name, ptr_type)       \
     ONYX_DEF(name, (INT, INT, PTR), ()) {       \
-        name (params->data[0].of.i32, params->data[1].of.i32, (ptr_type *) ONYX_PTR(params->data[2].of.i32)); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, (ptr_type *) ONYX_PTR(params->data[2].of.i32)); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_3_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, (ptr_type *) params->data[3].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, (ptr_type *) ONYX_PTR(params->data[3].of.i32)); \
+        return NULL;                   \
+    }
+
+#define ONYX_GL_INT_3_FAUX_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, INT, INT, PTR), ()) { \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, (ptr_type *) (unsigned long long) params->data[3].of.i32); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_4_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, (ptr_type *) params->data[4].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, (ptr_type *) ONYX_PTR(params->data[4].of.i32)); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_5_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, (ptr_type *) params->data[5].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, (ptr_type *) ONYX_PTR(params->data[5].of.i32)); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_6_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, (ptr_type *) params->data[6].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, (ptr_type *) ONYX_PTR(params->data[6].of.i32)); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_7_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, (ptr_type *) params->data[7].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, (ptr_type *) ONYX_PTR(params->data[7].of.i32)); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_8_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, (ptr_type *) params->data[8].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, (ptr_type *) ONYX_PTR(params->data[8].of.i32)); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_9_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, (ptr_type *) params->data[9].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, (ptr_type *) ONYX_PTR(params->data[9].of.i32)); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_10_PTR(name, ptr_type) \
     ONYX_DEF(name, (INT, INT, INT, INT, INT, INT, INT, INT, INT, PTR), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, params->data[9].of.i32, (ptr_type *) params->data[10].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, params->data[3].of.i32, params->data[4].of.i32, params->data[5].of.i32, params->data[6].of.i32, params->data[7].of.i32, params->data[8].of.i32, params->data[9].of.i32, (ptr_type *) ONYX_PTR(params->data[10].of.i32)); \
         return NULL;                   \
     }
 
 #define ONYX_GL_INT_FLOAT(name) \
     ONYX_DEF(name, (INT, FLOAT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.f32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.f32); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_FLOAT_2(name) \
     ONYX_DEF(name, (INT, FLOAT, FLOAT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_FLOAT_3(name) \
     ONYX_DEF(name, (INT, FLOAT, FLOAT, FLOAT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_FLOAT_4(name) \
     ONYX_DEF(name, (INT, FLOAT, FLOAT, FLOAT, FLOAT), ()) { \
-        name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32, params->data[4].of.f32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.f32, params->data[2].of.f32, params->data[3].of.f32, params->data[4].of.f32); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_2_FLOAT(name)       \
     ONYX_DEF(name, (INT, INT, FLOAT), ()) {       \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_2_PTR_INT(name, ptr_type)       \
     ONYX_DEF(name, (INT, INT, PTR, INT), ()) {       \
-        name (params->data[0].of.i32, params->data[1].of.i32, (ptr_type *) ONYX_PTR(params->data[2].of.i32), params->data[3].of.i32); \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, (ptr_type *) ONYX_PTR(params->data[2].of.i32), params->data[3].of.i32); \
         return NULL; \
     }
 
 #define ONYX_GL_INT_2_PTR_2(name, p1, p2)       \
     ONYX_DEF(name, (INT, INT, PTR, PTR), ()) {       \
-        name (params->data[0].of.i32, params->data[1].of.i32, \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, \
                 (p1 *) ONYX_PTR(params->data[2].of.i32), \
                 (p2 *) ONYX_PTR(params->data[3].of.i32)); \
         return NULL; \
@@ -217,7 +230,7 @@
 
 #define ONYX_GL_INT_2_PTR_3(name, p1, p2, p3)       \
     ONYX_DEF(name, (INT, INT, PTR, PTR, PTR), ()) {       \
-        name (params->data[0].of.i32, params->data[1].of.i32, \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, \
                 (p1 *) ONYX_PTR(params->data[2].of.i32), \
                 (p2 *) ONYX_PTR(params->data[3].of.i32), \
                 (p3 *) ONYX_PTR(params->data[4].of.i32)); \
@@ -226,7 +239,7 @@
 
 #define ONYX_GL_INT_3_PTR_2(name, p1, p2)       \
     ONYX_DEF(name, (INT, INT, INT, PTR, PTR), ()) {       \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, \
                 (p1 *) ONYX_PTR(params->data[3].of.i32), \
                 (p2 *) ONYX_PTR(params->data[4].of.i32)); \
         return NULL; \
@@ -234,7 +247,7 @@
 
 #define ONYX_GL_INT_3_PTR_4(name, p1, p2, p3, p4)       \
     ONYX_DEF(name, (INT, INT, INT, PTR, PTR, PTR, PTR), ()) {       \
-        name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, \
+        glad_##name (params->data[0].of.i32, params->data[1].of.i32, params->data[2].of.i32, \
                 (p1 *) ONYX_PTR(params->data[3].of.i32), \
                 (p2 *) ONYX_PTR(params->data[4].of.i32), \
                 (p3 *) ONYX_PTR(params->data[5].of.i32), \
@@ -244,13 +257,19 @@
 
 #define ONYX_GL_INT_PTR_INT_PTR_INT(name, p1, p2) \
     ONYX_DEF(name, (INT, PTR, INT, PTR, INT), ()) { \
-        name (params->data[0].of.i32,                        \
+        glad_##name (params->data[0].of.i32,                        \
                 (p1 *) ONYX_PTR(params->data[1].of.i32),     \
                 params->data[2].of.i32,                      \
                 (p2 *) ONYX_PTR(params->data[3].of.i32),     \
                 params->data[4].of.i32);                     \
         return NULL;                                         \
     }
+
+ONYX_DEF(glInit, (LONG), ()) {
+    GLADloadfunc load_sym = (GLADloadfunc) params->data[0].of.i64;
+    gladLoadGLES2(load_sym);
+    return NULL;
+}
 
 ONYX_GL_0(glFinish)
 ONYX_GL_0(glFlush)
@@ -330,11 +349,11 @@ ONYX_GL_INT_PTR(glGenBuffers, GLuint)
 ONYX_GL_INT_PTR(glGenFramebuffers, GLuint)
 ONYX_GL_INT_PTR(glGenRenderbuffers, GLuint)
 ONYX_GL_INT_PTR(glGenTextures, GLuint)
-ONYX_GL_INT_PTR(glGetAttribLocation, GLchar)
+ONYX_GL_INT_PTR(glGetAttribLocation, char)
 ONYX_GL_INT_PTR(glGetBooleanv, GLboolean)
 ONYX_GL_INT_PTR(glGetFloatv, GLfloat)
 ONYX_GL_INT_PTR(glGetIntegerv, GLint)
-ONYX_GL_INT_PTR(glGetUniformLocation, GLchar)
+ONYX_GL_INT_PTR(glGetUniformLocation, char)
 ONYX_GL_INT_PTR(glVertexAttrib1fv, GLfloat)
 ONYX_GL_INT_PTR(glVertexAttrib2fv, GLfloat)
 ONYX_GL_INT_PTR(glVertexAttrib3fv, GLfloat)
@@ -349,10 +368,10 @@ ONYX_GL_INT_PTR(glGetInteger64v, GLint64)
 ONYX_GL_INT_PTR(glDeleteSamplers, GLuint)
 ONYX_GL_INT_PTR(glDeleteTransformFeedbacks, GLuint)
 ONYX_GL_INT_PTR(glGenTransformFeedbacks, GLuint)
-ONYX_GL_INT_PTR(glGetFragDataLocation, GLchar)
+ONYX_GL_INT_PTR(glGetFragDataLocation, char)
 ONYX_GL_INT_PTR(glVertexAttribI4iv, GLint)
 ONYX_GL_INT_PTR(glVertexAttribI4uiv, GLuint)
-ONYX_GL_INT_PTR(glGetUniformBlockIndex, GLchar)
+ONYX_GL_INT_PTR(glGetUniformBlockIndex, char)
 ONYX_GL_INT_3(glDrawArrays)
 ONYX_GL_INT_3(glStencilFunc)
 ONYX_GL_INT_3(glStencilOp)
@@ -371,7 +390,7 @@ ONYX_GL_INT_4(glFramebufferRenderbuffer)
 ONYX_GL_INT_4(glRenderbufferStorage)
 ONYX_GL_INT_4(glStencilOpSeparate)
 
-ONYX_GL_INT_2_PTR(glBindAttribLocation, GLchar)
+ONYX_GL_INT_2_PTR(glBindAttribLocation, char)
 ONYX_GL_INT_2_PTR(glGetBufferParameteriv, GLint)
 ONYX_GL_INT_2_PTR(glGetProgramiv, GLint)
 ONYX_GL_INT_2_PTR(glGetRenderbufferParameteriv, GLint)
@@ -413,7 +432,7 @@ ONYX_GL_INT_2_PTR(glClearBufferuiv, GLuint)
 ONYX_GL_INT_2_PTR(glClearBufferfv, GLfloat)
 ONYX_GL_INT_2_PTR(glInvalidateFramebuffer, GLenum)
 ONYX_GL_INT_3_PTR(glBufferSubData, void)
-ONYX_GL_INT_3_PTR(glDrawElements, void)
+ONYX_GL_INT_3_FAUX_PTR(glDrawElements, void)
 ONYX_GL_INT_3_PTR(glGetFramebufferAttachmentParameteriv, GLint)
 ONYX_GL_INT_2_FLOAT(glSamplerParameterf)
 ONYX_GL_INT_2_FLOAT(glTexParameterf)
@@ -424,13 +443,13 @@ ONYX_GL_INT_8_PTR(glCompressedTexSubImage2D, void)
 ONYX_GL_INT_8(glCopyTexImage2D)
 ONYX_GL_INT_8(glCopyTexSubImage2D)
 ONYX_GL_INT_5(glFramebufferTexture2D)
-ONYX_GL_INT_3_PTR_4(glGetActiveAttrib, GLsizei, GLint, GLenum, GLchar)
-ONYX_GL_INT_3_PTR_4(glGetActiveUniform, GLsizei, GLint, GLenum, GLchar)
+ONYX_GL_INT_3_PTR_4(glGetActiveAttrib, GLsizei, GLint, GLenum, char)
+ONYX_GL_INT_3_PTR_4(glGetActiveUniform, GLsizei, GLint, GLenum, char)
 ONYX_GL_INT_2_PTR_2(glGetAttachedShaders, GLsizei, GLuint)
-ONYX_GL_INT_2_PTR_2(glGetProgramInfoLog, GLsizei, GLchar)
-ONYX_GL_INT_2_PTR_2(glGetShaderInfoLog, GLsizei, GLchar) 
+ONYX_GL_INT_2_PTR_2(glGetProgramInfoLog, GLsizei, char)
+ONYX_GL_INT_2_PTR_2(glGetShaderInfoLog, GLsizei, char) 
 ONYX_GL_INT_2_PTR_2(glGetShaderPrecisionFormat, GLint, GLint)
-ONYX_GL_INT_2_PTR_2(glGetShaderSource, GLsizei, GLchar)
+ONYX_GL_INT_2_PTR_2(glGetShaderSource, GLsizei, char)
 ONYX_GL_INT_6_PTR(glReadPixels, void)
 ONYX_GL_FLOAT_INT(glSampleCoverage)
 ONYX_GL_INT_PTR_INT_PTR_INT(glShaderBinary, GLuint, void)
@@ -475,7 +494,7 @@ ONYX_GL_INT_10(glBlitFramebuffer)
 ONYX_GL_INT_5(glRenderbufferStorageMultisample)
 ONYX_GL_INT_5(glFramebufferTextureLayer)
 ONYX_GL_INT_5(glBindBufferRange)
-ONYX_GL_INT_3_PTR_4(glGetTransformFeedbackVarying, GLsizei, GLsizei, GLenum, GLchar)
+ONYX_GL_INT_3_PTR_4(glGetTransformFeedbackVarying, GLsizei, GLsizei, GLenum, char)
 ONYX_GL_INT_5(glVertexAttribIPointer)
 ONYX_GL_INT_5(glVertexAttribI4i)
 ONYX_GL_INT_5(glVertexAttribI4ui)
@@ -483,7 +502,7 @@ ONYX_GL_INT_5(glVertexAttribI4ui)
 ONYX_GL_INT_5(glCopyBufferSubData)
 // ONYX_GL_INT_2_PTR_INT_PTR(glGetActiveUniformsiv, GLuint, GLint)
 ONYX_GL_INT_3_PTR(glGetActiveUniformBlockiv, GLint)
-ONYX_GL_INT_3_PTR_2(glGetActiveUniformBlockName, GLsizei, GLchar)
+ONYX_GL_INT_3_PTR_2(glGetActiveUniformBlockName, GLsizei, char)
 ONYX_GL_INT_3(glUniformBlockBinding)
 ONYX_GL_INT_4(glDrawArraysInstanced)
 ONYX_GL_INT_5(glDrawElementsInstanced)
@@ -502,7 +521,7 @@ ONYX_DEF(glShaderSource, (INT, INT, PTR, PTR), ()) {
         strs[i] = (char *) ONYX_PTR(base_ptr + i * 4);
     }
 
-    glShaderSource(params->data[0].of.i32, count, strs, (GLint *) ONYX_PTR(params->data[3].of.i32));
+    glad_glShaderSource(params->data[0].of.i32, count, strs, (GLint *) ONYX_PTR(params->data[3].of.i32));
     return NULL;
 }
 
@@ -514,7 +533,7 @@ ONYX_DEF(glGetUniformIndices, (INT, INT, PTR, PTR), ()) {
         strs[i] = (char *) ONYX_PTR(base_ptr + i * 4);
     }
     
-    glGetUniformIndices(params->data[0].of.i32, count, (const char *const*) strs, (int *) ONYX_PTR(params->data[3].of.i32));
+    glad_glGetUniformIndices(params->data[0].of.i32, count, (const char *const*) strs, (int *) ONYX_PTR(params->data[3].of.i32));
     return NULL;
 }
 
@@ -531,6 +550,7 @@ ONYX_DEF(glGetUniformIndices, (INT, INT, PTR, PTR), ()) {
 
 
 ONYX_LIBRARY {
+    ONYX_FUNC(glInit)
     ONYX_FUNC(glActiveTexture)
     ONYX_FUNC(glAttachShader)
     ONYX_FUNC(glBindAttribLocation)

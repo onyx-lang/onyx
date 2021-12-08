@@ -8,7 +8,7 @@ BIN_DIR='/usr/bin'
 
 # Where the Wasmer library files can be found.
 # They are bundled with the project, but if a different version is available, these can be changed.
-WASMER_INCLUDE_DIR="$(pwd)/lib/linux_x86_64/include"
+WASMER_INCLUDE_DIR="$(pwd)/lib/common/include"
 WASMER_LIBRARY_DIR="$(pwd)/lib/linux_x86_64/lib"
 
 # Where the intermediate build files go.

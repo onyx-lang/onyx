@@ -1,7 +1,7 @@
 package glfw3
 
 // Temporary path
-#library "./modules/glfw3/onyx_glfw3"
+#library "onyx_glfw3"
 
 // Opaque types that are only used by pointer
 GLFWmonitor_p :: #distinct u64
@@ -133,6 +133,12 @@ GLFWgammaramp :: struct {
     glfwWaitEventsTimeout :: (timeout: f64) -> void ---
     glfwPostEmptyEvent :: () -> void ---
     glfwSwapBuffers :: (window: GLFWwindow_p) -> void ---
+}
+
+// This should always be defined right?
+#if #defined(package opengles) {
+    use package opengles { GLGetProcAddress }
+    glfwGetLoadProcAddress :: () -> GLGetProcAddress #foreign "onyx_glfw3" "glfwGetLoadProcAddress" ---
 }
 
 GLFW_FOCUSED   :: 0x00020001;

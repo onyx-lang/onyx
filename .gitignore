@@ -9,6 +9,7 @@ session.vim
 *.ilk
 *.obj
 *.exe
+*.dll
 *.rdbg
 tmp/
 .vimspector.json

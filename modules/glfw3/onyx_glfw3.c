@@ -1,7 +1,6 @@
+#define ONYX_LIBRARY_NAME onyx_glfw3
 #include "onyx_library.h"
 #include <GLFW/glfw3.h>
-
-#define ONYX_LIBRARY_NAME onyx_glfw3
 
 ONYX_DEF(glfwInit, (), (INT)) {
     results->data[0] = WASM_I32_VAL(glfwInit());
@@ -40,6 +39,7 @@ ONYX_DEF(glfwSwapInterval, (INT), ()) {
 ONYX_DEF(glfwExtensionSupported, (PTR), (BOOL)) {
     char *ext_name = ONYX_PTR(params->data[0].of.i32);
     results->data[0] = WASM_I32_VAL(glfwExtensionSupported(ext_name) == GLFW_TRUE);
+    return NULL;
 }
 
 ONYX_DEF(glfwCreateWindow, (INT, INT, PTR, LONG, LONG), (LONG)) {
@@ -195,13 +195,13 @@ ONYX_DEF(glfwGetWindowAttrib, (LONG, INT), (INT)) {
 
 ONYX_DEF(glfwSetWindowUserPointer, (LONG, INT), ()) {
     GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
-    glfwSetWindowUserPointer(window, (void *) (unsigned long) params->data[1].of.i32);
+    glfwSetWindowUserPointer(window, (void *) (unsigned long long) params->data[1].of.i32);
     return NULL;
 }
 
 ONYX_DEF(glfwGetWindowUserPointer, (LONG), (INT)) {
     GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64;
-    results->data[0] = WASM_I32_VAL((unsigned int) (unsigned long) glfwGetWindowUserPointer(window));
+    results->data[0] = WASM_I32_VAL((unsigned int) (unsigned long long) glfwGetWindowUserPointer(window));
     return NULL;
 }
 
@@ -318,12 +318,12 @@ ONYX_DEF(glfwJoystickPresent, (INT), (INT)) {
 // // glfwGetJoystickName :: (jid: i32) -> ^u8 ---
 // // glfwGetJoystickGUID :: (jid: i32) -> ^u8 ---
 ONYX_DEF(glfwSetJoystickUserPointer, (INT, PTR), ()) {
-    glfwSetJoystickUserPointer(params->data[0].of.i32, (void *) (unsigned long) params->data[1].of.i32);
+    glfwSetJoystickUserPointer(params->data[0].of.i32, (void *) (unsigned long long) params->data[1].of.i32);
     return NULL;
 }
 
 ONYX_DEF(glfwGetJoystickUserPointer, (INT), (PTR)) {
-    results->data[0] = WASM_I32_VAL((unsigned int) (unsigned long) glfwGetJoystickUserPointer(params->data[0].of.i32));
+    results->data[0] = WASM_I32_VAL((unsigned int) (unsigned long long) glfwGetJoystickUserPointer(params->data[0].of.i32));
     return NULL;
 }
 
@@ -380,7 +380,7 @@ ONYX_DEF(glfwGetMonitors, (INT, PTR, PTR), ()) {
 
     int count = (actual_count < monitor_count) ? actual_count : monitor_count;
     for (int i=0; i<count; i++) {
-        *(unsigned long *) ONYX_PTR(monitor_ptr + i * 8) = (unsigned long) monitors[i];
+        *(unsigned long long*) ONYX_PTR(monitor_ptr + i * 8) = (unsigned long long) monitors[i];
     }
 
     *(int *) ONYX_PTR(params->data[2].of.i32) = count;
@@ -388,7 +388,7 @@ ONYX_DEF(glfwGetMonitors, (INT, PTR, PTR), ()) {
 }
 
 ONYX_DEF(glfwGetPrimaryMonitor, (), (LONG)) {
-    results->data[0] = WASM_I64_VAL((unsigned long) glfwGetPrimaryMonitor());
+    results->data[0] = WASM_I64_VAL((unsigned long long) glfwGetPrimaryMonitor());
     return NULL;
 }
 
@@ -418,13 +418,13 @@ ONYX_DEF(glfwGetMonitorContentScale, (LONG, PTR, PTR), ()) {
 
 ONYX_DEF(glfwSetMonitorUserPointer, (LONG, PTR), ()) {
     GLFWmonitor *monitor = (GLFWmonitor *) params->data[0].of.i64;
-    glfwSetMonitorUserPointer(monitor, (void *) (unsigned long) params->data[0].of.i32);
+    glfwSetMonitorUserPointer(monitor, (void *) (unsigned long long) params->data[0].of.i32);
     return NULL;
 }
 
 ONYX_DEF(glfwGetMonitorUserPointer, (LONG), (PTR)) {
     GLFWmonitor *monitor = (GLFWmonitor *) params->data[0].of.i64;
-    results->data[0] = WASM_I32_VAL((unsigned int) (unsigned long) glfwGetMonitorUserPointer(monitor));
+    results->data[0] = WASM_I32_VAL((unsigned int) (unsigned long long) glfwGetMonitorUserPointer(monitor));
     return NULL;
 }
 
@@ -440,17 +440,17 @@ ONYX_DEF(glfwGetMonitorUserPointer, (LONG), (PTR)) {
 #define GLFW_HOOK(callback_name, c_args, wasm_args) \
     static wasm_func_t* __glfw_callback_##callback_name ; \
     static void __glfw_##callback_name (GLFWwindow *window, _EXPAND c_args) { \
-        wasm_val_t args[] = { WASM_I64_VAL((unsigned long) window), _EXPAND wasm_args }; \
+        wasm_val_t args[] = { WASM_I64_VAL((unsigned long long) window), _EXPAND wasm_args }; \
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args); \
         wasm_val_vec_t results; \
-        wasm_func_call(__glfw_callback_##callback_name , &args_array, &results); \
+        runtime->wasm_func_call(__glfw_callback_##callback_name , &args_array, &results); \
     } \
     ONYX_DEF(callback_name, (LONG, PTR, INT), ()) { \
         GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64; \
         char name[512]; \
         strncpy(name, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32); \
         name[params->data[2].of.i32] = '\0'; \
-        __glfw_callback_##callback_name = wasm_extern_as_func(wasm_extern_lookup_by_name(wasm_module, wasm_instance, name)); \
+        __glfw_callback_##callback_name = runtime->wasm_extern_as_func(runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, name)); \
         callback_name(window, __glfw_##callback_name); \
         return NULL; \
     }
@@ -477,6 +477,10 @@ GLFW_HOOK(glfwSetScrollCallback, (double dx, double dy),
                                  (WASM_F64_VAL(dx), WASM_F64_VAL(dy)))
 // // glfwSetDropCallback
 
+ONYX_DEF(glfwGetLoadProcAddress, (), (LONG)) {
+    results->data[0].of.i64 = (unsigned long long) &glfwGetProcAddress;
+    return NULL;
+}
 
 ONYX_LIBRARY {
     ONYX_FUNC(glfwInit)
@@ -558,6 +562,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(glfwSetCursorEnterCallback)
     ONYX_FUNC(glfwSetScrollCallback)
 
+    ONYX_FUNC(glfwGetLoadProcAddress)
     // // glfwGetKeyName :: (key, scancode: i32) -> cstr ---
 
 // // glfwSetDropCallback

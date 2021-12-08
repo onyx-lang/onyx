@@ -1,10 +1,33 @@
 
 #include "wasm.h"
 
-extern wasm_instance_t* wasm_instance;
-extern wasm_module_t* wasm_module;
-extern wasm_memory_t* wasm_memory;
-extern wasm_extern_t* wasm_extern_lookup_by_name(wasm_module_t* module, wasm_instance_t* instance, const char* name);
+#if defined(_WIN32) || defined(_WIN64)
+    #define ONYX_EXPORT extern __declspec(dllexport)
+    #define ONYX_IMPORT extern __declspec(dllimport)
+#endif
+
+#if defined(__unix__)
+    #define ONYX_EXPORT
+    #define ONYX_IMPORT
+#endif
+
+typedef struct OnyxRuntime {
+    wasm_instance_t* wasm_instance;
+    wasm_module_t* wasm_module;
+    wasm_memory_t* wasm_memory;
+
+    // HACK HACK HACK
+    // There should need to be this much stuff in here, but because Wasmer doesn't ship a "wasmerdll.lib"
+    // file for windows, it is impossible for it to link successfully against the function provided in onyx.exe.
+    // Therefore, we must serve as the linker and do this manually. Hopefully they that library file
+    // shipped soon so this can go away...
+    char* (*wasm_memory_data)(wasm_memory_t *wasm_memory);
+    wasm_extern_t* (*wasm_extern_lookup_by_name)(wasm_module_t* module, wasm_instance_t* instance, const char* name);
+    wasm_func_t* (*wasm_extern_as_func)(wasm_extern_t* ext);
+    wasm_trap_t* (*wasm_func_call)(wasm_func_t* wasm_func, wasm_val_vec_t* args, wasm_val_vec_t* results);
+} OnyxRuntime;
+
+OnyxRuntime* runtime;
 
 typedef struct WasmValkindBuffer {
     unsigned int count;
@@ -46,12 +69,18 @@ typedef struct WasmFuncDefinition {
 #define ONYX_FUNC(name) & ONYX_DEF_NAME(ONYX_LIBRARY_NAME, name),
 #define ONYX_LIBRARY \
     extern struct WasmFuncDefinition *ONYX_MODULE_NAME_GEN(ONYX_LIBRARY_NAME)[]; \
-    WasmFuncDefinition** ONYX_LINK_NAME_GEN(ONYX_LIBRARY_NAME)() { \
+    ONYX_EXPORT WasmFuncDefinition** ONYX_LINK_NAME_GEN(ONYX_LIBRARY_NAME)(OnyxRuntime* in_runtime) { \
+        runtime = in_runtime; \
         return ONYX_MODULE_NAME_GEN(ONYX_LIBRARY_NAME); \
     } \
     struct WasmFuncDefinition *ONYX_MODULE_NAME_GEN(ONYX_LIBRARY_NAME)[] =
 
 // Shorter names
+#undef  BOOL
+#undef  INT
+#undef  LONG
+#undef  FLOAT
+#undef  DOUBLE
 #define BOOL WASM_I32
 #define INT WASM_I32
 #define LONG WASM_I64
@@ -59,4 +88,4 @@ typedef struct WasmFuncDefinition {
 #define DOUBLE WASM_F64
 #define PTR WASM_I32
 
-#define ONYX_PTR(p) (p != 0 ? (wasm_memory_data(wasm_memory) + p) : NULL)
+#define ONYX_PTR(p) (p != 0 ? (runtime->wasm_memory_data(runtime->wasm_memory) + p) : NULL)

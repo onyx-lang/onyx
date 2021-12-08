@@ -1,11 +1,15 @@
 package opengles
 
-#library "./modules/opengles/onyx_opengles"
+#library "onyx_opengles"
 
-// Reference to an out parameter from OpenGL.
-GLExternRef :: #distinct i64
+GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
 
 #foreign "onyx_opengles" {
+    // glInit MUST be called before any other GL calls, as it initializes all GL function pointers
+    // using the load_function provided. Currently, the only supported library that provides this
+    // is glfwGetLoadProcAddress.
+    glInit :: (load_function: GLGetProcAddress) -> void ---
+
     glActiveTexture :: (texture: GLenum) -> void ---
     glAttachShader :: (program: GLuint, shader: GLuint) -> void ---
     glBindAttribLocation :: (program: GLuint, index: GLuint, name: ^GLchar) -> void ---

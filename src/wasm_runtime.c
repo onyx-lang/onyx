@@ -26,6 +26,8 @@ wasm_instance_t*  wasm_instance;
 wasm_module_t*    wasm_module;
 wasm_memory_t*    wasm_memory;
 
+OnyxRuntime wasm_runtime;
+
 b32 wasm_name_equals(const wasm_name_t* name1, const wasm_name_t* name2) {
     if (name1->size != name2->size) return 0;
     return !strncmp(name1->data, name2->data, name1->size);
@@ -290,7 +292,7 @@ WASM_INTEROP(onyx_process_spawn_impl) {
 
         byte_t* array_loc = ONYX_PTR(args_ptr);
         fori (i, 0, args_len) {
-            char *arg_str = data + *(i32 *) (array_loc + i * 2 * POINTER_SIZE);
+            char *arg_str = ONYX_PTR(*(i32 *) (array_loc + i * 2 * POINTER_SIZE));
             i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + 4);
 
             strncat(cmdLine, " ", 2047);
@@ -306,7 +308,7 @@ WASM_INTEROP(onyx_process_spawn_impl) {
         saAttr.lpSecurityDescriptor = NULL;
         saAttr.bInheritHandle = 1;
 
-        BOOL success = 1;
+        i32 success = 1;
         success = success && CreatePipe(&process->host_to_proc_read, &process->host_to_proc_write, &saAttr, 4096);
         success = success && CreatePipe(&process->proc_to_host_read, &process->proc_to_host_write, &saAttr, 4096);
         if (!success) {
@@ -364,7 +366,7 @@ WASM_INTEROP(onyx_process_read_impl) {
     #endif
 
     #ifdef _BH_WINDOWS
-        BOOL success = ReadFile(process->proc_to_host_read, buffer, output_len, &bytes_read, NULL);
+        i32 success = ReadFile(process->proc_to_host_read, buffer, output_len, &bytes_read, NULL);
         if (!success) bytes_read = 0; 
     #endif
 
@@ -390,7 +392,7 @@ WASM_INTEROP(onyx_process_write_impl) {
     #endif
 
     #ifdef _BH_WINDOWS
-        BOOL success = WriteFile(process->host_to_proc_write, buffer, input_len, &bytes_written, NULL);
+        i32 success = WriteFile(process->host_to_proc_write, buffer, input_len, &bytes_written, NULL);
         if (!success) bytes_written = 0;
     #endif
 
@@ -411,7 +413,7 @@ WASM_INTEROP(onyx_process_kill_impl) {
     #endif
 
     #ifdef _BH_WINDOWS
-        BOOL success = TerminateProcess(process->proc_info.hProcess, 1);
+        i32 success = TerminateProcess(process->proc_info.hProcess, 1);
         results->data[0] = WASM_I32_VAL(success ? 1 : 0);
     #endif
 
@@ -499,7 +501,7 @@ WASM_INTEROP(onyx_process_destroy_impl) {
     return NULL;
 }
 
-typedef void *(*LibraryLinker)();
+typedef void *(*LibraryLinker)(OnyxRuntime *runtime);
 static bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
 
 static void onyx_load_library(char *name) {
@@ -533,7 +535,22 @@ static void onyx_load_library(char *name) {
     }
     #endif
 
-    WasmFuncDefinition** funcs = library_load();
+    #ifdef _BH_WINDOWS
+    char *library_name = bh_aprintf(global_scratch_allocator, "%s.dll", name);
+    HMODULE handle = LoadLibraryA(library_name);
+    if (handle == NULL) {
+        printf("ERROR LOADING LIBRARY %s: %d\n", name, GetLastError());
+        return;
+    }
+
+    library_load = (LibraryLinker) GetProcAddress(handle, library_load_name);
+    if (library_load == NULL) {
+        printf("ERROR RESOLVING '%s': %d\n", library_load_name, GetLastError());
+        return;
+    }
+    #endif
+
+    WasmFuncDefinition** funcs = library_load(runtime);
     bh_arr_push(linkable_functions, funcs);
 }
 
@@ -571,8 +588,9 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
 
 // Returns 1 if successful
 b32 onyx_run_wasm(bh_buffer wasm_bytes) {
-    bh_arr_new(global_heap_allocator, linkable_functions, 4);
+    runtime = &wasm_runtime;
 
+    bh_arr_new(global_heap_allocator, linkable_functions, 4);
     onyx_lookup_and_load_custom_libraries(wasm_bytes);
 
     wasmer_features_t* features = NULL;
@@ -776,6 +794,16 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
 
     wasm_instance = wasm_instance_new(wasm_store, wasm_module, &wasm_imports, &traps);
     if (!wasm_instance) goto error_handling;
+
+    wasm_runtime.wasm_instance = wasm_instance;
+    wasm_runtime.wasm_module = wasm_module;
+    wasm_runtime.wasm_memory = wasm_memory;
+    
+    // See comment in onyx_library.h about us being the linker.
+    wasm_runtime.wasm_memory_data = &wasm_memory_data;
+    wasm_runtime.wasm_extern_lookup_by_name = &wasm_extern_lookup_by_name;
+    wasm_runtime.wasm_extern_as_func = &wasm_extern_as_func;
+    wasm_runtime.wasm_func_call = &wasm_func_call;
 
     wasm_extern_t* start_extern = wasm_extern_lookup_by_name(wasm_module, wasm_instance, "_start");
     wasm_func_t*   start_func   = wasm_extern_as_func(start_extern);
