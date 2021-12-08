@@ -9,7 +9,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activate = void 0;
 const vscode = require("vscode");
 const vsctmls = require("vscode-textmate-languageservice");
 function activate(context) {
@@ -21,7 +20,7 @@ function activate(context) {
         const documentSymbolProvider = new vsctmls.documentSymbols.DocumentSymbolProvider(engine);
         const workspaceSymbolProvider = new vsctmls.workspaceSymbols.WorkspaceSymbolProvider('onyx', documentSymbolProvider);
         // const foldingProvider = new vsctmls.folding.FoldingProvider(engine);
-        const peekFileDefinitionProvider = new vsctmls.peekDefinitions.PeekDefinitionProvider(workspaceSymbolProvider, documentSymbolProvider);
+        const peekFileDefinitionProvider = new vsctmls.peekDefinitions.PeekDefinitionProvider(documentSymbolProvider);
         context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(selector, documentSymbolProvider));
         context.subscriptions.push(vscode.languages.registerWorkspaceSymbolProvider(workspaceSymbolProvider));
         // context.subscriptions.push(vscode.languages.registerFoldingRangeProvider(selector, foldingProvider));

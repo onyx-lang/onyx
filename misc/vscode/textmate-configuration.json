@@ -9,14 +9,19 @@
       "scopeName": "source.onyx",
       "path": "./syntaxes/onyx.tmLanguage"
     },
+    "assignment": {
+      "single": "none",
+      "multiple": "none",
+      "separator": "none"
+    },
     "exclude": "",
     "comments": {
       "lineComment": "comment.line.double-slash.onyx",
       "blockComment": [ "comment.block.onyx" ]
     },
     "declarations": [
-        "entity\\.name\\.function\\.onyx",
-        "entity\\.name\\.type\\.onyx"
+        "entity.name.function.onyx",
+        "entity.name.type.onyx"
     ],
     "indentation": {},
     "dedentation": [],

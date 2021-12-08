@@ -10,7 +10,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const documentSymbolProvider = new vsctmls.documentSymbols.DocumentSymbolProvider(engine);
 	const workspaceSymbolProvider = new vsctmls.workspaceSymbols.WorkspaceSymbolProvider('onyx', documentSymbolProvider);
 	// const foldingProvider = new vsctmls.folding.FoldingProvider(engine);
-	const peekFileDefinitionProvider = new vsctmls.peekDefinitions.PeekDefinitionProvider(workspaceSymbolProvider, documentSymbolProvider);
+	const peekFileDefinitionProvider = new vsctmls.peekDefinitions.PeekDefinitionProvider(documentSymbolProvider);
 
 	context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(selector, documentSymbolProvider));
 	context.subscriptions.push(vscode.languages.registerWorkspaceSymbolProvider(workspaceSymbolProvider));
