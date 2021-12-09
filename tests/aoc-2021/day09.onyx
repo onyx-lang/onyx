@@ -1,0 +1,130 @@
+#load "core/std"
+
+use package core
+
+Pos :: struct {x,y: i32;}
+#match hash.to_u32 (use p: Pos) => x * 5039473 + 59362447 * y;
+#operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
+
+Cell :: struct {
+    height: i32;
+    dx: i32 = 0;  // height - (right of cell).height
+    dy: i32 = 0;  // height - (below cell).height
+}
+
+find_span :: macro (low: Pos) -> u32 {
+    queued:    [..] Pos;
+    included:  [..] Pos;
+    potential: [..] Pos;
+
+    queued << low;
+
+    while queued.count != 0 {
+        t := queued[0];
+        array.delete(^queued, 0);
+
+        top := ^heightmap[t];
+        if top.height == 9 do continue;
+
+        included << t;
+
+        array.clear(^potential);
+        if t.x < width - 1 && top.dx < 0 {
+            potential << Pos.{t.x+1,t.y};
+        }
+        if t.y < height - 1 && top.dy < 0 {
+            potential << Pos.{t.x,t.y+1};
+        }
+        if t.x > 0 {
+            if heightmap[Pos.{t.x-1,t.y}].height > 0 {
+                potential << Pos.{t.x-1,t.y};
+            }
+        }
+        if t.y > 0 {
+            if heightmap[Pos.{t.x,t.y-1}].height > 0 {
+                potential << Pos.{t.x,t.y-1};
+            }
+        }
+
+        for p: potential {
+            if !array.contains(included, p) && !array.contains(queued, p) {
+                queued << p;
+            }
+        }
+    }
+
+    return included.count;
+}
+
+#match io.write (w: ^io.Writer, x: ^Map($K, $V)) {
+    io.write(w, "{\n");
+    for e: x.entries {
+        io.write(w, "    {} => {}\n", e.key, e.value);
+    }
+    io.write(w, "}");
+}
+
+main :: (args) => {
+    for file: os.with_file("./tests/aoc-2021/input/day09.txt") {
+        reader := io.reader_make(file);
+
+        heightmap: Map(Pos, Cell);
+
+        height, width := 0, 0;
+        while !io.reader_empty(^reader) {
+            line := io.read_line(^reader, consume_newline=false, inplace=true);
+            io.skip_whitespace(^reader);
+
+            for line.count {
+                heightmap[Pos.{it, height}] = Cell.{cast(u32) (line[it] - #char "0")};
+            }
+
+            width = line.count;
+            height += 1;
+        }
+
+        for y: height - 1 do for x: width {
+            map.update(^heightmap, .{x,y}) #{
+                it.dy = it.height - heightmap[Pos.{x,y+1}].height;
+            };
+        }
+        for x: width - 1 do for y: height {
+            map.update(^heightmap, .{x,y}) #{
+                it.dx = it.height - heightmap[Pos.{x+1,y}].height;
+            };
+        }
+
+        lowest: [..] Pos;
+        risk_sum := 0;
+        for y: height do for x: width {
+            h := ^heightmap[Pos.{x,y}];
+            if x < width  - 1 && h.dx >= 0 do continue;
+            if y < height - 1 && h.dy >= 0 do continue;
+
+            if x > 0 {
+                if heightmap[Pos.{x-1, y}].dx <= 0 do continue;
+            }
+
+            if y > 0 {
+                if heightmap[Pos.{x, y-1}].dy <= 0 do continue;
+            }
+
+            lowest << .{x, y};
+            risk_sum += h.height + 1;
+        }
+
+        printf("Part 1: {}\n", risk_sum);
+
+        lowest_count: Map(Pos, i32);
+        for low: lowest do lowest_count[low] = find_span(low);
+
+        array.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
+
+        answer := iter.as_iterator(lowest_count.entries)
+               |> iter.map((x) => x.value)
+               |> iter.take(3)
+               |> iter.fold(1, (x, y) => x * y);
+
+        printf("Part 2: {}\n", answer);
+    }
+}
