@@ -86,7 +86,6 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     bh_arr_new(alloc, options.files, 2);
     bh_arr_new(alloc, options.included_folders, 2);
-    bh_arr_new(alloc, options.included_library_folders, 2);
 
     // NOTE: Add the current folder
     bh_arr_push(options.included_folders, CORE_INSTALLATION);
@@ -325,7 +324,7 @@ static void process_load_entity(Entity* ent) {
         bh_arr_push(context.options->included_folders, include->name);
 
     } else if (include->kind == Ast_Kind_Library_Path) {
-        bh_arr_push(context.options->included_library_folders, include->name);
+        bh_arr_push(context.wasm_module->library_paths, include->name);
     }
 }
 
@@ -596,7 +595,7 @@ static b32 onyx_run() {
     if (context.options->verbose_output > 0)
         bh_printf("Running program:\n");
 
-    return onyx_run_wasm(code_buffer);
+    return onyx_run_wasm(code_buffer, context.options->passthrough_argument_count, context.options->passthrough_argument_data);
 }
 #endif
 

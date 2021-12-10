@@ -1468,7 +1468,6 @@ struct CompileOptions {
     Runtime runtime;
 
     bh_arr(const char *) included_folders;
-    bh_arr(const char *) included_library_folders;
     bh_arr(const char *) files;
     const char* target_file;
     const char* documentation_file;

@@ -653,6 +653,7 @@ typedef struct OnyxWasmModule {
     bh_arr(WasmDatum)     data;
     bh_arr(i32)           elems;
     bh_arr(char *)        libraries;
+    bh_arr(char *)        library_paths;
 
     // NOTE: Set of things used when compiling; not part of the actual module
     u32 export_count;
@@ -679,7 +680,7 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 
 #ifdef ENABLE_RUN_WITH_WASMER
-b32 onyx_run_wasm(bh_buffer code_buffer);
+b32 onyx_run_wasm(bh_buffer code_buffer, int argc, char *argv[]);
 #endif
 
 #endif

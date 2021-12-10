@@ -138,7 +138,7 @@ static i32 onyx_run_thread(void *data) {
 }
 
 WASM_INTEROP(onyx_spawn_thread_impl) {
-    if (threads == NULL) bh_arr_new(global_heap_allocator, threads, 128);
+    if (threads == NULL) bh_arr_new(bh_heap_allocator(), threads, 128);
     bh_arr_insert_end(threads, 1);
     OnyxThread *thread = &bh_arr_last(threads);
 
@@ -503,6 +503,7 @@ WASM_INTEROP(onyx_process_destroy_impl) {
 
 typedef void *(*LibraryLinker)(OnyxRuntime *runtime);
 static bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
+static bh_arr(char *) library_paths = NULL;
 
 static void onyx_load_library(char *name) {
     #ifdef _BH_LINUX
@@ -517,11 +518,13 @@ static void onyx_load_library(char *name) {
         if (name[i] == DIR_SEPARATOR) library = &name[i + 1];
     }
 
-    char *library_load_name = bh_aprintf(global_scratch_allocator, "onyx_library_%s", library);
+    char *library_load_name_tmp = bh_bprintf("onyx_library_%s", library);
+    char *library_load_name = alloca(strlen(library_load_name_tmp));
+    strcpy(library_load_name, library_load_name_tmp);
     LibraryLinker library_load;
 
     #ifdef _BH_LINUX
-    char *library_name = lookup_included_file(name, ".", ".so", 1, context.options->included_library_folders, 1);
+    char *library_name = lookup_included_file(name, ".", ".so", 1, (const char **) library_paths, 1);
     void* handle = dlopen(library_name, RTLD_LAZY);
     if (handle == NULL) {
         printf("ERROR LOADING LIBRARY %s: %s\n", name, dlerror());
@@ -536,7 +539,7 @@ static void onyx_load_library(char *name) {
     #endif
 
     #ifdef _BH_WINDOWS
-    char *library_name = lookup_included_file(name, ".", ".dll", 1, context.options->included_library_folders, 1);
+    char *library_name = lookup_included_file(name, ".", ".dll", 1, (const char **) library_paths, 1);
     HMODULE handle = LoadLibraryA(library_name);
     if (handle == NULL) {
         printf("ERROR LOADING LIBRARY %s: %d\n", name, GetLastError());
@@ -568,6 +571,20 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
                 u64 lib_count = uleb128_to_uint(wasm_bytes.data, &cursor);
 
                 fori (i, 0, (i64) lib_count) {
+                    u64 lib_path_length = uleb128_to_uint(wasm_bytes.data, &cursor);
+                    lib_path_length = bh_min(lib_path_length, 512);
+
+                    char *lib_path = malloc(lib_path_length);
+                    strncpy(lib_path, wasm_bytes.data + cursor, lib_path_length);
+                    lib_path[lib_path_length] = '\0';
+                    cursor += lib_path_length;
+
+                    bh_arr_push(library_paths, lib_path);
+                }
+
+                lib_count = uleb128_to_uint(wasm_bytes.data, &cursor);
+
+                fori (i, 0, (i64) lib_count) {
                     u64 lib_name_length = uleb128_to_uint(wasm_bytes.data, &cursor);
                     lib_name_length = bh_min(lib_name_length, 256);
 
@@ -587,10 +604,10 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
 }
 
 // Returns 1 if successful
-b32 onyx_run_wasm(bh_buffer wasm_bytes) {
+b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     runtime = &wasm_runtime;
 
-    bh_arr_new(global_heap_allocator, linkable_functions, 4);
+    bh_arr_new(bh_heap_allocator(), linkable_functions, 4);
     onyx_lookup_and_load_custom_libraries(wasm_bytes);
 
     wasmer_features_t* features = NULL;
@@ -611,9 +628,9 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes) {
     wasm_config_set_features(wasm_config, features);
 
     wasi_config = wasi_config_new("onyx");
-    if (context.options->passthrough_argument_count > 0) {
-        fori (i, 0, context.options->passthrough_argument_count) {
-            wasi_config_arg(wasi_config, context.options->passthrough_argument_data[i]);
+    if (argc > 0) {
+        fori (i, 0, argc) {
+            wasi_config_arg(wasi_config, argv[i]);
         }
     }
 

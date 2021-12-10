@@ -680,6 +680,18 @@ static i32 output_onyx_libraries_section(OnyxWasmModule* module, bh_buffer* buff
     bh_buffer_append(&libs_buff, leb, leb_len);
     bh_buffer_append(&libs_buff, custom_name, strlen(custom_name));
 
+    leb = uint_to_uleb128((u64) bh_arr_length(module->library_paths), &leb_len);
+    bh_buffer_append(&libs_buff, leb, leb_len);
+
+    bh_arr_each(char *, lib, module->library_paths) {
+        assert(*lib != NULL);
+
+        u32 lib_len = strlen(*lib);
+        leb = uint_to_uleb128((u64) lib_len, &leb_len);
+        bh_buffer_append(&libs_buff, leb, leb_len);
+        bh_buffer_append(&libs_buff, *lib, lib_len);
+    }
+
     leb = uint_to_uleb128((u64) bh_arr_length(module->libraries), &leb_len);
     bh_buffer_append(&libs_buff, leb, leb_len);
 
