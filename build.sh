@@ -50,23 +50,33 @@ INCLUDES="-I$WASMER_INCLUDE_DIR"
 
 mkdir -p "$BUILD_DIR"
 
-for file in $C_FILES ; do
-    echo "Compiling $file.c"
-    $CC -o $BUILD_DIR/$file.o \
-        $FLAGS \
-        "-DCORE_INSTALLATION=\"$CORE_DIR\"" \
-        -c src/$file.c \
-        $INCLUDES $LIBS
-done
+compile() {
+    for file in $C_FILES ; do
+        echo "Compiling $file.c"
+        $CC -o $BUILD_DIR/$file.o \
+            $FLAGS \
+            "-DCORE_INSTALLATION=\"$CORE_DIR\"" \
+            -c src/$file.c \
+            $INCLUDES $LIBS
+    done
 
-echo "Linking $TARGET"
-$CC -o $TARGET $FLAGS $(for file in $C_FILES ; do printf "$BUILD_DIR/%s.o " $file ; done) $LIBS
+    echo "Linking $TARGET"
+    $CC -o $TARGET $FLAGS $(for file in $C_FILES ; do printf "$BUILD_DIR/%s.o " $file ; done) $LIBS
 
-echo "Removing object files"
-for file in $C_FILES ; do rm -f "$BUILD_DIR/$file".o 2>/dev/null ; done
+    echo "Removing object files"
+    for file in $C_FILES ; do rm -f "$BUILD_DIR/$file".o 2>/dev/null ; done
+}
 
+compile
 echo "Installing onyx executable"
 sudo cp ./bin/onyx "$BIN_DIR/onyx"
+
+C_FILES="onyxrun wasm_runtime"
+TARGET="./bin/onyxrun"
+
+compile
+echo "Installing onyxrun executable"
+sudo cp ./bin/onyxrun "$BIN_DIR/onyxrun"
 
 # Otherwise the prompt ends on the same line
 printf "\n"
