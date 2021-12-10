@@ -10,8 +10,8 @@ use package wasi
 #load "core/runtime/wasi"
 
 #if Multi_Threading_Enabled {
-    __spawn_thread :: (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "env" "spawn_thread" ---
-    __kill_thread  :: (id: i32) -> i32 #foreign "env" "kill_thread" ---
+    __spawn_thread :: (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "onyx_runtime" "__spawn_thread" ---
+    __kill_thread  :: (id: i32) -> i32 #foreign "onyx_runtime" "__kill_thread" ---
 
     #export "_thread_start" _thread_start
     #export "_thread_exit"  _thread_exit
@@ -26,7 +26,9 @@ use package wasi
     InternalErr :: 0x03;
 }
 
-#foreign "env" {
+#library "onyx_runtime"
+
+#foreign "onyx_runtime" {
     __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> os.Process.Handle ---
     __process_read    :: (handle: os.Process.Handle, buffer: [] u8) -> i32 ---
     __process_write   :: (handle: os.Process.Handle, buffer: [] u8) -> i32 ---

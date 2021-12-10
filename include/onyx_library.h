@@ -15,6 +15,8 @@ typedef struct OnyxRuntime {
     wasm_instance_t* wasm_instance;
     wasm_module_t* wasm_module;
     wasm_memory_t* wasm_memory;
+    wasm_store_t*  wasm_store;
+    wasm_extern_vec_t wasm_imports;
 
     // HACK HACK HACK
     // There should need to be this much stuff in here, but because Wasmer doesn't ship a "wasmerdll.lib"
@@ -25,6 +27,7 @@ typedef struct OnyxRuntime {
     wasm_extern_t* (*wasm_extern_lookup_by_name)(wasm_module_t* module, wasm_instance_t* instance, const char* name);
     wasm_func_t* (*wasm_extern_as_func)(wasm_extern_t* ext);
     wasm_trap_t* (*wasm_func_call)(const wasm_func_t* wasm_func, const wasm_val_vec_t* args, wasm_val_vec_t* results);
+    wasm_instance_t* (*wasm_instance_new)(wasm_store_t* store, const wasm_module_t* module, const wasm_extern_vec_t* imports, wasm_trap_t** traps);
 } OnyxRuntime;
 
 OnyxRuntime* runtime;
@@ -76,6 +79,7 @@ typedef struct WasmFuncDefinition {
     struct WasmFuncDefinition *ONYX_MODULE_NAME_GEN(ONYX_LIBRARY_NAME)[] =
 
 // Shorter names
+#ifndef ONYX_NO_SHORT_NAMES
 #undef  BOOL
 #undef  INT
 #undef  LONG
@@ -87,5 +91,6 @@ typedef struct WasmFuncDefinition {
 #define FLOAT WASM_F32
 #define DOUBLE WASM_F64
 #define PTR WASM_I32
+#endif
 
 #define ONYX_PTR(p) (p != 0 ? (runtime->wasm_memory_data(runtime->wasm_memory) + p) : NULL)

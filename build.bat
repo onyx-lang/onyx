@@ -32,3 +32,5 @@ del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 del *.obj > NUL 2> NUL
 del misc\icon_resource.res
+
+call modules\onyx_runtime\build

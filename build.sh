@@ -78,5 +78,8 @@ compile
 echo "Installing onyxrun executable"
 sudo cp ./bin/onyxrun "$BIN_DIR/onyxrun"
 
+./modules/onyx_runtime/build.sh
+sudo mv "./onyx_runtime.so" "$CORE_DIR/lib/onyx_runtime.so"
+
 # Otherwise the prompt ends on the same line
 printf "\n"
