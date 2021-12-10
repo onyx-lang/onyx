@@ -1,9 +1,48 @@
-// Unfinished Example
+// Since polymorphic procedures allow you to automatically generate a new
+// procedure based on the types of the arguments, and you can automatically
+// determine a return type with #auto, you can write a completely type free
+// procedure like so:
 
-#load "core/std"
+no_types :: (x: $__type_x, y: $__type_y) -> #auto {
+    return x + ~~ y;
+}
 
-use package core
+// This doesn't look the best, but it does show the power of Onyx's type
+// system. With this powerful type system, we are able to write short or
+// "quick" functions and let the type system figure out what the types
+// should be.
+
+// Using the quick-function syntax, the above can be rewritten as so:
+
+quick_no_types :: (x, y) => {
+    return x + ~~y;
+}
+
+// The polymorphic variables for x and y are given the names __type_x and
+// __type_y respectively. The #auto return type is used, so you don't have
+// to explicitly write the return type. In fact, because this function only
+// has one line of code, you can completely omit the {}'s and the return.
+
+quickest_no_types :: (x, y) => x + ~~y;
+
+// This is very useful when passing a procedure as an argument to a higher-order
+// function. The `iter` package is a good example of this, as it designed to let
+// you chain iterator operations with pipes.
 
 main :: (args) => {
-    
+    println(no_types(3, 4.0f));
+    println(quick_no_types(3, 4.0f));
+    println(quickest_no_types(3, 4.0f));
+
+    // This is an example of what the iter package looks like.
+    val := iter.as_iterator(range.{ 20, 1, -1 })
+            |> iter.map((x) => x * 2)
+            |> iter.map((x) => cast(f32) x)
+            |> iter.filter((x) => x > 20)
+            |> iter.take(5)
+            |> iter.fold(0.0f, (x, y) => x + y);
+    println(val);
 }
+
+#load "core/std"
+use package core
