@@ -1,9 +1,47 @@
-// Unfinished Example
-
-#load "core/std"
-
-use package core
+// Sometimes it can be a lot to explicitly write out the
+// return type of a function. In fact, there are times in
+// Onyx where it is actually impossible to write the return
+// type of a function, as you'll see later.
 
 main :: (args: [] cstr) {
-    
+    // If you don't want to explicitly write the return type
+    // of a function, you can use #auto:
+    f :: (x: i32) -> #auto {
+        return x * 2;
+    }
+
+    y := f(10);
+    printf("Y({}): {}\n", typeof y, y);
+
+    // That's really all you need to know... It is just a
+    // convinent shorthand. However, like I said, there are
+    // some cases where it is impossible to actually write
+    // the type so #auto is the only solution. Take this
+    // example. It takes something that is iterable, and
+    // returns an array of whatever that iterable iterates
+    // over. Because the only way to pattern match the V
+    // variable is by using it as a parameter, there is an
+    // inner macro that serves that purpose. It would be
+    // impossible to write the return type of consume, because
+    // it would be "[] V", but where would the V variable
+    // come from? The only way to do this is use an auto-return
+    // type and let the compiler fill it in.
+
+    consume :: (it: $T) -> #auto where iter.Iterable(T) {
+        consume_inner :: macro (it: Iterator($V)) -> [] V {
+            arr: [..] V;
+            for v: it do arr << v;
+            return arr;
+        }
+
+        return consume_inner(iter.as_iterator(it));
+    }
+
+
+    arr := consume(range.{ 10, 1, -1 });
+    println(arr);
 }
+
+#load "core/std"
+use package core
+

@@ -1,9 +1,69 @@
-// Unfinished Example
-
-#load "core/std"
-
-use package core
+// "do"-blocks are a tiny feature found in some programming languages that you might find
+// useful in certain circumstances. They allow you to write a block of code in an expression,
+// and make the type inference system in Onyx even more powerful.
 
 main :: (args: [] cstr) {
-    
+    // Do-blocks are written like so. As you can probabily infer,
+    // the do-block allows you to write any statements you normally
+    // would in a block, except in an expression. As you can also
+    // see to specify the value that the do-block becomes, you
+    // write a "return" statement. The type of thing(s) being returned
+    // dictates the type of the do-block.
+    x := do {
+        a := 10;
+        b := 5;
+        return a * b;
+    };
+
+    printf("x is a {} with value {}.\n", typeof x, x);
+
+
+    // There can be multiple return statements, in which case the
+    // first lexical return statement takes precedence over the rest,
+    // and provides the type. This is the same rule as auto-returned-typed
+    // which will be discussed in a later example.
+    y := do {
+        if x <= 10 do return 10.0f;
+        return 40; // This will cast to a f32, because the first return
+                   // was of type f32.
+    };
+
+    printf("y is a {} with value {}.\n", typeof y, y);
+
+
+    // In all honesty, I barely use this feature of the language because
+    // I forget that it exists. It isn't something that is very useful,
+    // and can lead to some code-smells, if do-blocks are used in strange
+    // places, like as arguments. However, during the Advent of Code 2021
+    // I had a real use-case for them and it looked like this:
+
+#if false {
+    left, right := do {
+        parts := string.split(line, #char "|");
+        defer memory.free_slice(^parts);
+        return parts[0], parts[1];
+    };
 }
+
+    // I had a string that I wanted to split into two parts, but wanted to
+    // free the resulting array, as I only needed the first two results.
+    // I could have written it like this instead:
+
+#if false {
+    left, right: str;
+    {
+        parts := string.split(line, #char "|");
+        left, right = parts[0], parts[1];
+        memory.free_slice(^parts);
+    }
+}
+
+    // As you can see, a normal block would have worked as well. Except,
+    // because left and right need to be declared outside that block, I
+    // would have had to explicitly type them. By using a do-block I did
+    // not have to give them a type, and got to free the memory.
+
+}
+
+#load "core/std"
+use package core
