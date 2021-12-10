@@ -377,6 +377,10 @@ b32 bh_file_exists(char const* filename);
 char* bh_path_get_full_name(char const* filename, bh_allocator a);
 char* bh_path_get_parent(char const* filename, bh_allocator a);
 
+// This function returns a volatile pointer. Do not store it without copying!
+// `included_folders` is bh_arr(const char *).
+char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_suffix, const char ** included_folders, b32 search_included_folders);
+
 #define bh_file_read_contents(allocator_, x) _Generic((x), \
     bh_file*: bh_file_read_contents_bh_file, \
     const char*: bh_file_read_contents_direct, \
@@ -1607,21 +1611,64 @@ char* bh_path_get_full_name(char const* filename, bh_allocator a) {
 }
 
 // NOTE: This assumes the filename is the full path, not relative to anything else.
-char* bh_path_get_parent(char const* filename, bh_allocator a) {
 #if defined(_BH_LINUX)
     #define DIR_SEPARATOR '/'
 #elif defined(_BH_WINDOWS)
     #define DIR_SEPARATOR '\\'
 #endif
+char* bh_path_get_parent(char const* filename, bh_allocator a) {
 
     char* result = bh_strdup(a, (char *) filename);
     char* end = result + strlen(result);
     while (*end != DIR_SEPARATOR && end != result) *end-- = '\0';
 
     return result;
+}
+
+// This function returns a volatile pointer. Do not store it without copying!
+char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_suffix, bh_arr(const char *) included_folders, b32 search_included_folders) {
+    assert(relative_to != NULL);
+
+    static char path[512];
+    fori (i, 0, 512) path[i] = 0;
+
+    static char fn[256];
+    fori (i, 0, 256) fn[i] = 0;
+
+    if (!bh_str_ends_with(filename, suffix) && add_suffix) {
+        bh_snprintf(fn, 256, "%s%s", filename, suffix);
+    } else {
+        bh_snprintf(fn, 256, "%s", filename);
+    }
+
+    fori (i, 0, 256) if (fn[i] == '/') fn[i] = DIR_SEPARATOR;
+
+    if (bh_str_starts_with(filename, "./")) {
+        if (relative_to[strlen(relative_to) - 1] != DIR_SEPARATOR)
+            bh_snprintf(path, 512, "%s%c%s", relative_to, DIR_SEPARATOR, fn + 2);
+        else
+            bh_snprintf(path, 512, "%s%s", relative_to, fn + 2);
+
+        if (bh_file_exists(path)) return bh_path_get_full_name(path, bh_heap_allocator());
+
+        return fn;
+    }
+
+    if (search_included_folders) {
+        bh_arr_each(const char *, folder, included_folders) {
+            if ((*folder)[strlen(*folder) - 1] != DIR_SEPARATOR)
+                bh_snprintf(path, 512, "%s%c%s", *folder, DIR_SEPARATOR, fn);
+            else
+                bh_snprintf(path, 512, "%s%s", *folder, fn);
+
+            if (bh_file_exists(path)) return bh_path_get_full_name(path, bh_heap_allocator());
+        }
+    }
+
+    return fn;
+}
 
 #undef DIR_SEPARATOR
-}
 
 #endif // ifndef BH_NO_FILE
 

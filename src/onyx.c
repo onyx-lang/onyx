@@ -315,7 +315,7 @@ static void process_load_entity(Entity* ent) {
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
         
-        char* filename = lookup_included_file(include->name, parent_folder, ".onyx", 1, context.options->included_folders, 1);
+        char* filename = bh_lookup_file(include->name, parent_folder, ".onyx", 1, context.options->included_folders, 1);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
         process_source_file(formatted_name, include->token->pos);

@@ -3655,7 +3655,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
 
         char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, fc->filename_token->length);
         i32   temp_fn_len = string_process_escape_seqs(temp_fn, fc->filename_token->text, fc->filename_token->length);
-        char* filename    = lookup_included_file(temp_fn, parent_folder, "", 0, NULL, 0);
+        char* filename    = bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0);
         fc->filename      = bh_strdup(global_heap_allocator, filename);
     }
 
