@@ -105,28 +105,36 @@ ONYX_DEF(__file_tell, (WASM_I64), (WASM_I32)) {
 ONYX_DEF(__file_read, (WASM_I64, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     i64 fd = params->data[0].of.i64;
     bh_file file = { (bh_file_descriptor) fd };
+
+    i32 curr_pos = bh_file_tell(&file);
     b32 success = bh_file_read_at(&file,
             bh_file_tell(&file),
             ONYX_PTR(params->data[1].of.i32),
             params->data[2].of.i32,
             (i64 *) ONYX_PTR(params->data[3].of.i32));
 
+    bh_file_seek_to(&file, curr_pos + *(i32 *) ONYX_PTR(params->data[3].of.i32));
+
     results->data[0] = WASM_I32_VAL(0);
-    if (!success) results->data[0] = WASM_I32_VAL(6);
+    if (!success) results->data[0] = WASM_I32_VAL(2);
     return NULL;
 }
 
 ONYX_DEF(__file_write, (WASM_I64, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     i64 fd = params->data[0].of.i64;
     bh_file file = { (bh_file_descriptor) fd };
+
+    i32 curr_pos = bh_file_tell(&file);
     b32 success = bh_file_write_at(&file,
             bh_file_tell(&file),
             ONYX_PTR(params->data[1].of.i32),
             params->data[2].of.i32,
             (i64 *) ONYX_PTR(params->data[3].of.i32));
 
+    bh_file_seek_to(&file, curr_pos + *(i32 *) ONYX_PTR(params->data[3].of.i32));
+
     results->data[0] = WASM_I32_VAL(0);
-    if (!success) results->data[0] = WASM_I32_VAL(6);
+    if (!success) results->data[0] = WASM_I32_VAL(2);
     return NULL;
 }
 
