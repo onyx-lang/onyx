@@ -4,18 +4,19 @@ use package core
 #local fs :: package runtime.fs
 
 FileError :: enum {
-    None;
-    NotFound;
-    Exists;
-    Permission;
-    BadFile;
+    None       :: 0x00;
+    NotFound   :: 0x01;
+    Exists     :: 0x02;
+    Permission :: 0x03;
+    BadFile    :: 0x04;
+    BadMode    :: 0x05;
 }
 
 OpenMode :: enum {
-    Invalid;
-    Read;
-    Write;
-    Append;
+    Invalid :: 0x00;
+    Read    :: 0x01;
+    Write   :: 0x02;
+    Append  :: 0x03;
 }
 
 File :: struct {

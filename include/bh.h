@@ -365,6 +365,7 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
 bh_file_error bh_file_new(bh_file* file, bh_file_descriptor fd, const char* filename);
 b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, isize* bytes_read);
 b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_size, isize* bytes_wrote);
+i64 bh_file_seek(bh_file* file, i64 offset, bh_file_whence whence);
 i64 bh_file_seek_to(bh_file* file, i64 offset);
 i64 bh_file_seek_to_end(bh_file* file);
 i64 bh_file_skip(bh_file* file, i64 bytes);
@@ -372,6 +373,7 @@ i64 bh_file_tell(bh_file* file);
 bh_file_error bh_file_close(bh_file* file);
 i32 bh_file_read(bh_file* file, void* buffer, isize buff_size);
 i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
+void bh_file_flush(bh_file* file);
 i64 bh_file_size(bh_file* file);
 b32 bh_file_exists(char const* filename);
 char* bh_path_get_full_name(char const* filename, bh_allocator a);
@@ -1447,6 +1449,7 @@ b32 bh_file_write_at(bh_file* file, i64 offset, void const* buffer, isize buff_s
     bh__file_seek_wrapper(file->fd, 0, BH_FILE_WHENCE_CURRENT, &current_offset);
 
 #if defined(_BH_WINDOWS)
+    if (current_offset != offset) bh_file_seek_to(file, offset);
     res = (isize) WriteFile(file->fd, buffer, buff_size, (i32 *) bytes_wrote, NULL);
     return res;
 
@@ -1484,6 +1487,12 @@ static b32 bh__file_seek_wrapper(bh_file_descriptor fd, i64 offset, bh_file_when
 }
 
 // Returns new offset
+i64 bh_file_seek(bh_file* file, i64 offset, bh_file_whence whence) {
+    i64 new_offset = -1;
+    bh__file_seek_wrapper(file->fd, offset, whence, &new_offset);
+    return new_offset;
+}
+
 i64 bh_file_seek_to(bh_file* file, i64 offset) {
     i64 new_offset = -1;
     bh__file_seek_wrapper(file->fd, offset, BH_FILE_WHENCE_BEGIN, &new_offset);
@@ -1532,6 +1541,12 @@ b32 bh_file_read(bh_file* file, void* buffer, isize buff_size) {
 
 b32 bh_file_write(bh_file* file, void* buffer, isize buff_size) {
     return bh_file_write_at(file, bh_file_tell(file), buffer, buff_size, NULL);
+}
+
+void bh_file_flush(bh_file* file) {
+    #ifdef _BH_LINUX
+    fdatasync(file->fd);
+    #endif
 }
 
 i64 bh_file_size(bh_file* file) {
