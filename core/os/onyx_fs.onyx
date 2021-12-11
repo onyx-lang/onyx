@@ -1,0 +1,95 @@
+package runtime.fs
+
+use package core
+
+FileData :: struct {
+    Handle :: #distinct i64
+
+    handle: Handle;
+}
+
+__file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
+    handle: FileData.Handle;
+    error := __file_open_impl(path, mode, ^handle);
+
+    fd := FileData.{ handle };
+    return fd, error;
+}
+
+#package {
+    #foreign "onyx_runtime" {
+        __file_open_impl :: (path: str, mode: os.OpenMode, out_handle: ^Handle) -> os.FileError ---
+
+        __file_close :: (fd: FileData) -> os.FileError ---
+        __file_exists :: (path: str) -> bool ---
+
+        __file_seek  :: (handle: Handle, to: i32, whence: io.SeekFrom) -> io.Error ---
+        __file_tell  :: (handle: Handle, out_position: ^u32) -> io.Error ---
+        __file_read  :: (handle: Handle, output_buffer: [] u8, bytes_read: ^u32) -> io.Error ---
+        __file_write :: (handle: Handle, input_buffer: [] u8, bytes_wrote: ^u32) -> io.Error ---
+        __file_flush :: (handle: Handle) -> io.Error;
+    }
+}
+
+__file_stream_vtable := io.Stream_Vtable.{
+    seek = (use fs: ^os.File, to: i32, whence: io.SeekFrom) -> io.Error {
+        return __file_seek(data.handle, to, whence);
+    },
+
+    tell = (use fs: ^os.File) -> (io.Error, u32) {
+        position: u32;
+        error := __file_tell(data.handle, ^position);
+        return error, position;
+    },
+
+    read = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
+        bytes_read: u32;
+        error := __file_read(data.handle, buffer, ^bytes_read);
+        return error, bytes_read;
+    },
+
+    read_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+        __file_seek(data.handle, at, .Start);
+        bytes_read: u32;
+        error := __file_read(data.handle, buffer, ^bytes_read);
+        return error, bytes_read;
+    },
+
+    read_byte = (use fs: ^os.File) -> (io.Error, u8) {
+        byte: u8;
+        error := __file_read(data.handle, ~~ cast([1] u8) ^byte, null);
+        return byte;
+    },
+
+    write = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
+        bytes_wrote: u32;
+        error := __file_write(data.handle, buffer, ^bytes_wrote);
+        return error, bytes_wrote;
+    },
+
+    write_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+        __file_seek(data.handle, at, .Start);
+        bytes_wrote: u32;
+        error := __file_write(data.handle, buffer, ^bytes_wrote);
+        return error, bytes_wrote;
+    },
+
+    write_byte = (use fs: ^os.File, byte: u8) -> io.Error {
+        b := byte;
+        error := __file_write(data.handle, .{ ^b, 1 }, null);
+        return error;
+    },
+
+    close = (use fs: ^os.File) -> io.Error {
+        __file_close(data);
+        return .None;
+    },
+
+    flush = (use fs: ^os.File) -> io.Error {
+        return __file_flush(data.handle);
+    },
+
+    size = (use fs: ^os.File) -> i32 {
+    },
+};
+

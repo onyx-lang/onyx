@@ -1,0 +1,220 @@
+package runtime.fs
+
+#local runtime :: package runtime
+#if runtime.Runtime != runtime.Runtime_Wasi {
+    #error "The file system library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
+}
+
+use package core
+
+#local wasi :: package wasi
+use package wasi {
+    FileDescriptor,
+    FDFlags, OFlags, Rights,
+    LookupFlags, Errno,
+    IOVec, IOVecArray, Size,
+    FileStat, Whence
+}
+
+FileData :: struct {
+    fd     : FileDescriptor = -1;
+
+    mode   : os.OpenMode = .Invalid;
+    rights : Rights   = ~~ 0;
+    flags  : FDFlags  = ~~ 0;
+}
+
+__file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
+    // Requesting all of the rights because why not.
+    rights :=
+        Rights.DataSync
+        | Rights.Read
+        | Rights.Seek
+        | Rights.FdStatSetFlags
+        | Rights.Sync
+        | Rights.Tell
+        | Rights.Write
+        | Rights.Advise
+        | Rights.Allocate
+        | Rights.PathCreateDirectory
+        | Rights.PathCreateFile
+        | Rights.PathLinkSource
+        | Rights.PathLinkTarget
+        | Rights.PathOpen
+        | Rights.ReadDir
+        | Rights.PathReadlink
+        | Rights.PathRenameSource
+        | Rights.PathRenameTarget
+        | Rights.PathFilestatGet
+        | Rights.PathFilestateSetSize
+        | Rights.PathFilestateSetTimes
+        | Rights.FilestatGet
+        | Rights.FilestatSetSize
+        | Rights.FilestatSetTimes
+        | Rights.PathSymlink
+        | Rights.PathRemoveDirectory
+        | Rights.PathUnlinkFile
+        | Rights.PollFDReadWrite;
+
+    open_flags := cast(OFlags) 0;
+    fd_flags := FDFlags.Sync;
+
+    switch mode {
+        case .Write {
+            open_flags |= OFlags.Creat | OFlags.Trunc;
+            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
+        }
+
+        case .Append {
+            open_flags |= OFlags.Creat;
+            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
+            fd_flags   |= FDFlags.Append;
+        }
+
+        case .Read {
+            rights |= Rights.Read | Rights.Seek | Rights.Tell;
+        }
+    }
+
+    file := FileData.{ fd = -1 };
+    file.mode   = mode;
+    file.rights = rights;
+    file.flags  = fd_flags;
+
+    // Currently the directory's file descriptor appears to always be 3
+    // However, this is not necessarily correct, so also try a preopened directory
+    for DIR_FD: .[ 3, 4 ] {
+        if err := wasi.path_open(
+            DIR_FD,
+            .SymLinkFollow,
+            path,
+            open_flags,
+            rights,
+            rights,
+            fd_flags,
+            ^file.fd);
+            err == .Success {
+                return file, .None;
+        }
+    }
+
+    @TODO // provide a better error code.
+    return file, .NotFound;
+}
+
+__file_close :: (file: FileData) -> os.FileError {
+    if wasi.fd_close(file.fd) != .Success {
+        return .BadFile;
+    }
+
+    return .None;
+}
+
+__file_exists :: (path: str) -> bool {
+    fs: wasi.FileStat;
+
+    exists := false;
+    for .[3, 4] { // Trying both preopened directories
+        err := wasi.path_filestat_get(it, .SymLinkFollow, path, ^fs);
+        if err == .Success do exists = true;
+    }
+
+    return exists;
+}
+
+__file_stream_vtable := io.Stream_Vtable.{
+    seek = (use fs: ^os.File, to: i32, whence: io.SeekFrom) -> io.Error {
+        // Currently, the new offset is just ignored.
+        newoffset : wasi.Filesize;
+        error := wasi.fd_seek(data.fd, ~~ to, ~~ whence, ^newoffset);
+        if error != .Success do return .BadFile;
+
+        return .None;
+    },
+
+    tell = (use fs: ^os.File) -> (io.Error, u32) {
+        location : wasi.Filesize;
+        error := wasi.fd_tell(data.fd, ^location);
+        if error != .Success do return .BadFile, 0;
+
+        return .None, ~~location;
+    },
+
+    read = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
+        bytes_read : wasi.Size;
+        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
+        error := wasi.fd_read(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_read);
+        if error != .Success do return .BadFile, 0;
+
+        return .None, bytes_read;
+    },
+
+    read_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+        bytes_read : wasi.Size;
+        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
+        error := wasi.fd_pread(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ~~at, ^bytes_read);
+
+        // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
+        if error != .Success do return .BadFile, 0;
+
+        return .None, bytes_read;
+    },
+
+    read_byte = (use fs: ^os.File) -> (io.Error, u8) {
+        bytes_read : wasi.Size;
+        byte  : u8;
+        vec   := IOVec.{ buf = cast(u32) ^byte, len = 1};
+        error := wasi.fd_read(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_read);
+        if error != .Success do return .BadFile, 0;
+
+        return .None, byte;
+    },
+
+    write = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
+        bytes_written : wasi.Size;
+        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
+        error := wasi.fd_write(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_written);
+        if error != .Success do return .BadFile, 0;
+
+        return .None, bytes_written;
+    },
+
+    write_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
+        bytes_written : wasi.Size;
+        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
+        error := wasi.fd_pwrite(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ~~at, ^bytes_written);
+
+        // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
+        if error != .Success do return .BadFile, 0;
+
+        return .None, bytes_written;
+    },
+
+    write_byte = (use fs: ^os.File, byte: u8) -> io.Error {
+        bytes_written : wasi.Size;
+        byte_to_write := byte;
+        vec   := IOVec.{ buf = cast(u32) ^byte_to_write, len = 1 };
+        error := wasi.fd_write(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_written);
+        if error != .Success do return .BadFile;
+
+        return .None;
+    },
+
+    close = (use fs: ^os.File) -> io.Error {
+        __file_close(data);
+        return .None;
+    },
+
+    flush = (use fs: ^os.File) -> io.Error {
+        wasi.fd_datasync(data.fd);
+        return .None;
+    },
+
+    size = (use fs: ^os.File) -> i32 {
+        file_stat: FileStat;
+        if wasi.fd_filestat_get(data.fd, ^file_stat) != .Success do return 0;
+
+        return ~~ file_stat.size;
+    },
+}
+

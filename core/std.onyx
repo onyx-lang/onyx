@@ -45,8 +45,14 @@ package core
     #load "./os/os"
 }
 
-#if runtime.Runtime == runtime.Runtime_Onyx   { #load "./runtime/onyx_run" }
-#if runtime.Runtime == runtime.Runtime_Wasi   { #load "./runtime/wasi" }
+#if runtime.Runtime == runtime.Runtime_Onyx   {
+    #load "./runtime/onyx_run"
+    #load "core/os/process"
+}
+#if runtime.Runtime == runtime.Runtime_Wasi   {
+    #load "./runtime/wasi"
+    #load "./wasi/wasi_fs"
+}
 #if runtime.Runtime == runtime.Runtime_Js     { #load "./runtime/js" }
 #if runtime.Runtime != runtime.Runtime_Custom { #load "./stdio" }
 

@@ -1,20 +1,14 @@
 package core.os
 
-#local runtime :: package runtime
-#if runtime.Runtime != runtime.Runtime_Wasi 
-    && runtime.Runtime != runtime.Runtime_Onyx {
-    #error "The file system library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
-}
-
 use package core
+#local fs :: package runtime.fs
 
-#local wasi :: package wasi
-use package wasi {
-    FileDescriptor,
-    FDFlags, OFlags, Rights,
-    LookupFlags, Errno,
-    IOVec, IOVecArray, Size,
-    FileStat, Whence
+FileError :: enum {
+    None;
+    NotFound;
+    Exists;
+    Permission;
+    BadFile;
 }
 
 OpenMode :: enum {
@@ -25,185 +19,76 @@ OpenMode :: enum {
 }
 
 File :: struct {
-    fd     : FileDescriptor;
-
-    mode   : OpenMode = .Invalid;
-    rights : Rights   = ~~ 0;
-    flags  : FDFlags  = ~~ 0;
+    use stream : io.Stream;
+    use data   : fs.FileData;
 }
 
-file_open :: (path: str, mode := OpenMode.Read, flags := FDFlags.Sync) -> (File, bool) {
-    // Requesting all of the rights because why not.
-    rights :=
-        Rights.DataSync
-        | Rights.Read
-        | Rights.Seek
-        | Rights.FdStatSetFlags
-        | Rights.Sync
-        | Rights.Tell
-        | Rights.Write
-        | Rights.Advise
-        | Rights.Allocate
-        | Rights.PathCreateDirectory
-        | Rights.PathCreateFile
-        | Rights.PathLinkSource
-        | Rights.PathLinkTarget
-        | Rights.PathOpen
-        | Rights.ReadDir
-        | Rights.PathReadlink
-        | Rights.PathRenameSource
-        | Rights.PathRenameTarget
-        | Rights.PathFilestatGet
-        | Rights.PathFilestateSetSize
-        | Rights.PathFilestateSetTimes
-        | Rights.FilestatGet
-        | Rights.FilestatSetSize
-        | Rights.FilestatSetTimes
-        | Rights.PathSymlink
-        | Rights.PathRemoveDirectory
-        | Rights.PathUnlinkFile
-        | Rights.PollFDReadWrite;
-
-    open_flags := cast(OFlags) 0;
-    fd_flags := flags;
-
-    switch mode {
-        case .Write {
-            open_flags |= OFlags.Creat | OFlags.Trunc;
-            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
-        }
-
-        case .Append {
-            open_flags |= OFlags.Creat;
-            rights     |= Rights.Write | Rights.Seek | Rights.Tell;
-            fd_flags   |= FDFlags.Append;
-        }
-
-        case .Read {
-            rights |= Rights.Read | Rights.Seek | Rights.Tell;
-        }
+// Are these even necessary??
+#local {
+    file_open :: (path: str, mode := OpenMode.Read) -> (fs.FileData, FileError) {
+        return fs.__file_open(path, mode);
     }
 
-    file := File.{ fd = -1 };
-    file.mode   = mode;
-    file.rights = rights;
-    file.flags  = fd_flags;
-
-    // Currently the directory's file descriptor appears to always be 3
-    // However, this is not necessarily correct, so also try a preopened directory
-    for DIR_FD: .[ 3, 4 ] {
-        if err := wasi.path_open(
-            DIR_FD,
-            .SymLinkFollow,
-            path,
-            open_flags,
-            rights,
-            rights,
-            fd_flags,
-            ^file.fd);
-            err == .Success {
-                return file, true;        
-        }
+    file_close :: (file: fs.FileData) -> FileError {
+        return fs.__file_close(file);
     }
-
-    return file, false;
 }
 
-file_close :: (file: File) -> bool {
-    if wasi.fd_close(file.fd) != .Success {
-        return false;
-    }
-
-    return true;
+file_exists :: (path: str) -> bool {
+    return fs.__file_exists(path);
 }
 
-file_write :: (file: File, data: str) {
-    vec := IOVec.{ buf = cast(u32) data.data, len = data.count };
-    tmp : Size;
-    wasi.fd_write(file.fd, .{ cast(u32) ^vec, 1 }, ^tmp);
-    wasi.fd_datasync(file.fd);
-}
-
-file_get_size :: (file: File) -> u64 {
-    fs: FileStat;
-    if wasi.fd_filestat_get(file.fd, ^fs) != Errno.Success do return 0;
-
-    return fs.size;
-}
-
-get_contents_from_file :: (file: File) -> str {
-    size := cast(u32) file_get_size(file);
+get_contents_from_file :: (file: ^File) -> str {
+    size := cast(u32) io.stream_size(file);
 
     data := cast(^u8) raw_alloc(context.allocator, size);
 
-    prev_loc: i64;
-    wasi.fd_tell(file.fd, ^prev_loc);
+    _, prev_loc := io.stream_tell(file);
+    io.stream_seek(file, 0, .Start);
 
-    dummy: i64;
-    wasi.fd_seek(file.fd, 0, .Set, ^dummy);
+    io.stream_read(file, .{ data, size });
 
-    dummy2: u32;
-    buf := IOVec.{ cast(u32) data, size };
-    wasi.fd_pread(file.fd, .{ cast(u32) ^buf, 1 }, 0, ^dummy2);
-
-    wasi.fd_seek(file.fd, prev_loc, .Set, ^dummy);
+    io.stream_seek(file, prev_loc, .Start);
 
     return data[0 .. size];
+}
+
+open :: (path: str, mode := OpenMode.Read) -> (os.FileError, File) {
+    file := File.{
+        stream = .{ vtable = null },
+        data   = .{},
+    };
+
+    file_data, error := file_open(path, mode);
+    if error != .None do return error, file;
+
+    file.data = file_data;
+    file.vtable = ^fs.__file_stream_vtable;
+    return .None, file;
+}
+
+close :: (file: ^File) {
+    file_close(file.data);
+    file.stream.vtable = null;
 }
 
 get_contents :: #match {
     get_contents_from_file,
 
     (path: str) -> str {
-        tmp_file, success := file_open(path, .Read);
-        if !success do return .{ null, 0 };
-        defer file_close(tmp_file);
+        error, file := open(path, .Read);
+        if error != .None do return .{ null, 0 };
+        defer close(^file);
 
-        return get_contents(tmp_file);
+        return get_contents(^file);
     }
 }
 
-file_exists :: (path: str) -> bool {
-    fs: wasi.FileStat;
-
-    exists := false;
-    for .[3, 4] { // Trying both preopened directories
-        err := wasi.path_filestat_get(it, .SymLinkFollow, path, ^fs);
-        if err == .Success do exists = true;
-    }
-
-    return exists;
-}
-
-FileStream :: struct {
-    use stream : io.Stream;
-    use file   : File;
-}
-
-open :: (path: str, mode := OpenMode.Read) -> (io.Error, FileStream) {
-    fs := FileStream.{
-        stream = .{ vtable = null },
-        file   = .{ fd = -1 },
-    };
-
-    file, success := file_open(path, mode);
-    if !success do return .NotFound, fs;
-
-    fs.file = file;
-    fs.vtable = ^wasi_file_stream_vtable;
-    return .None, fs;
-}
-
-close :: (file: ^FileStream) {
-    file_close(file.file);
-    file.stream.vtable = null;
-}
-
-with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^FileStream) {
+with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^File) {
     Context :: struct {
         valid_file_stream := false;
 
-        file_stream: FileStream;
+        file_stream: File;
     }
 
     c := new(Context);
@@ -212,7 +97,7 @@ with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^FileStream) {
         c.valid_file_stream = true;
     }
 
-    next :: (use c: ^Context) -> (^FileStream, bool) {
+    next :: (use c: ^Context) -> (^File, bool) {
         if !valid_file_stream do return null, false;
 
         defer valid_file_stream = false;
@@ -227,118 +112,21 @@ with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^FileStream) {
     return .{ c, next, close_context };
 }
 
-#package
-wasi_file_stream_vtable := io.Stream_Vtable.{
-    seek = (use fs: ^FileStream, to: i32, whence: io.SeekFrom) -> io.Error {
-        // Currently, the new offset is just ignored.
-        newoffset : wasi.Filesize;
-        error := wasi.fd_seek(file.fd, ~~ to, ~~ whence, ^newoffset);
-        if error != .Success do return .BadFile;
-
-        return .None;
-    },
-
-    tell = (use fs: ^FileStream) -> (io.Error, u32) {
-        location : wasi.Filesize;
-        error := wasi.fd_tell(file.fd, ^location);
-        if error != .Success do return .BadFile, 0;
-
-        return .None, ~~location;
-    },
-
-    read = (use fs: ^FileStream, buffer: [] u8) -> (io.Error, u32) {
-        bytes_read : wasi.Size;
-        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_read(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_read);
-        if error != .Success do return .BadFile, 0;
-
-        return .None, bytes_read;
-    },
-
-    read_at = (use fs: ^FileStream, at: u32, buffer: [] u8) -> (io.Error, u32) {
-        bytes_read : wasi.Size;
-        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_pread(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ~~at, ^bytes_read);
-
-        // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
-        if error != .Success do return .BadFile, 0;
-
-        return .None, bytes_read;
-    },
-
-    read_byte = (use fs: ^FileStream) -> (io.Error, u8) {
-        bytes_read : wasi.Size;
-        byte  : u8;
-        vec   := IOVec.{ buf = cast(u32) ^byte, len = 1};
-        error := wasi.fd_read(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_read);
-        if error != .Success do return .BadFile, 0;
-
-        return .None, byte;
-    },
-
-    write = (use fs: ^FileStream, buffer: [] u8) -> (io.Error, u32) {
-        bytes_written : wasi.Size;
-        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_write(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_written);
-        if error != .Success do return .BadFile, 0;
-
-        return .None, bytes_written;
-    },
-
-    write_at = (use fs: ^FileStream, at: u32, buffer: [] u8) -> (io.Error, u32) {
-        bytes_written : wasi.Size;
-        vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_pwrite(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ~~at, ^bytes_written);
-
-        // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
-        if error != .Success do return .BadFile, 0;
-
-        return .None, bytes_written;
-    },
-
-    write_byte = (use fs: ^FileStream, byte: u8) -> io.Error {
-        bytes_written : wasi.Size;
-        byte_to_write := byte;
-        vec   := IOVec.{ buf = cast(u32) ^byte_to_write, len = 1 };
-        error := wasi.fd_write(file.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_written);
-        if error != .Success do return .BadFile;
-
-        return .None;
-    },
-
-    close = (use fs: ^FileStream) -> io.Error {
-        file_close(file);
-        return .None;
-    },
-
-    flush = (use fs: ^FileStream) -> io.Error {
-        wasi.fd_datasync(file.fd);
-        return .None;
-    },
-
-    size = (use fs: ^FileStream) -> i32 {
-        file_stat: FileStat;
-        if wasi.fd_filestat_get(file.fd, ^file_stat) != .Success do return 0;
-
-        return ~~ file_stat.size;
-    },
-}
-
 
 
 
 file_logger_open :: (filename: str, allocator := context.allocator) -> Logger {
     file := new(File, allocator);
-    success := false;
 
-    *file, success = file_open(filename, mode=.Append);
-    assert(success, "Unable to open file for logging.");
+    error := os.FileError.None;
+    error, *file = open(filename, mode=.Append);
+    assert(error != .None, "Unable to open file for logging.");
 
     return .{ file_logger_proc, file };
 }
 
 file_logger_close :: (logger := context.logger) {
-    file_close(*cast(^File) logger.data);
+    close(cast(^File) logger.data);
 
     // @Robustness: this could be the wrong allocator if the context allocator wasn't used.    
     cfree(logger.data);
@@ -346,6 +134,7 @@ file_logger_close :: (logger := context.logger) {
 
 #local
 file_logger_proc :: (data: ^File, msg: str) {
-    file_write(*data, msg);
-    file_write(*data, "\n");
+    writer := io.writer_make(data);
+    io.write(^writer, msg);
+    io.write(^writer, "\n");
 }

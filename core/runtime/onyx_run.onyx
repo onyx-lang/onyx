@@ -17,8 +17,6 @@ use package wasi
     #export "_thread_exit"  _thread_exit
 }
 
-#load "core/os/process"
-
 #local ProcessResult :: enum {
     Success     :: 0x00;
     FailedToRun :: 0x01;

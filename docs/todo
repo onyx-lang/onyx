@@ -208,9 +208,19 @@ Wishlist:
     [X] Complete the set of combinations of procedure declaration syntaxes
         - Currently (x: i32) => { ... } isn't legal.
     [X] #init functions (run before main, added to list at compile time, emitted with __run_init_procedures())
-    [ ] Tests for new language features
+    [X] Tests for new language features
         - Do blocks
         - Code blocks
         - Quick functions
         - Macros
         - Tags
+
+
+Revamping File System:
+    [ ] runtime.fs should contain runtime specific file system API calls
+    [ ] 'os.File' should effectily be 'os.FileStream' and FileStream should go away
+        os.File :: struct {
+            use stream: io.Stream;
+            use data:   runtime.fs.FileData;
+        }
+    [ ] Most file functionality will be provided using the stream API.
