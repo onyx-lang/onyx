@@ -57,6 +57,7 @@ free :: (use set: ^Set($T)) {
 }
 
 insert :: (use set: ^Set($T), value: T) {
+    if hashes.data == null do init(set);
     lr := lookup(set, value);
 
     if lr.entry_index >= 0 do return;
@@ -98,7 +99,7 @@ remove :: (use set: ^Set($T), value: T) {
 }
 
 clear :: (use set: ^Set($T)) {
-    array.fill(^hashes, -1);
+    array.fill(hashes, -1);
     array.clear(^entries);
 }
 
@@ -106,20 +107,21 @@ empty :: (use set: ^Set($T)) -> bool {
     return entries.count == 0;
 }
 
+#match (package core.iter).as_iterator iterator
 iterator :: (set: ^Set($T)) -> Iterator(T) {
     Context :: struct (T: type_expr) {
-        entry_array: [..] Set.Entry(T);
+        set: ^Set(T);
         position: i32;
     }
 
     context := new(Context(T));
-    context.entry_array = set.entries;
+    context.set = set;
     context.position = 0;
 
     next :: ($T: type_expr, use context: ^Context(T)) -> (T, bool) {
-        if position < entry_array.count {
+        if position < set.entries.count {
             defer position += 1;
-            return entry_array[position].value, true;
+            return set.entries[position].value, true;
 
         } else {
             return __zero_value(T), false;
