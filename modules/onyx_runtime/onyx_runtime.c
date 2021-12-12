@@ -148,6 +148,13 @@ ONYX_DEF(__file_flush, (WASM_I64), (WASM_I32)) {
     return NULL;
 }
 
+ONYX_DEF(__file_size, (WASM_I64), (WASM_I32)) {
+    i64 fd = params->data[0].of.i64;
+    bh_file file = { (bh_file_descriptor) fd };
+    results->data[0] = WASM_I32_VAL(bh_file_size(&file));
+    return NULL;
+}
+
 ONYX_DEF(__file_get_standard, (WASM_I32, WASM_I32), (WASM_I32)) {
     bh_file_standard standard = (bh_file_standard) params->data[0].of.i32;
 
@@ -756,6 +763,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_read)
     ONYX_FUNC(__file_write)
     ONYX_FUNC(__file_flush)
+    ONYX_FUNC(__file_size)
     ONYX_FUNC(__file_get_standard)
 
     ONYX_FUNC(__dir_open)

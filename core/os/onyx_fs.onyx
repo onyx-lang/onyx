@@ -29,6 +29,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
     __file_read  :: (handle: FileData.Handle, output_buffer: [] u8, bytes_read: ^u64) -> io.Error ---
     __file_write :: (handle: FileData.Handle, input_buffer: [] u8, bytes_wrote: ^u64) -> io.Error ---
     __file_flush :: (handle: FileData.Handle) -> io.Error ---
+    __file_size  :: (handle: FileData.Handle) -> u32 ---
 
     __dir_open  :: (path: str, dir: ^DirectoryData) -> bool ---
     __dir_close :: (dir: DirectoryData) -> void ---
@@ -93,6 +94,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     },
 
     size = (use fs: ^os.File) -> i32 {
+        return __file_size(data.handle);
     },
 };
 
