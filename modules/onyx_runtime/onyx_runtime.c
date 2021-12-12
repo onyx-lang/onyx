@@ -754,6 +754,35 @@ ONYX_DEF(__process_destroy, (WASM_I64), ()) {
     return NULL;
 }
 
+ONYX_DEF(__args_get, (WASM_I32, WASM_I32), ()) {
+    if (runtime->argc == 0 || runtime->argv == NULL) {
+        return NULL;
+    }
+
+    i32 buffer_base = params->data[1].of.i32;
+
+    for (int i=0; i<runtime->argc; i++) {
+        // Should this be strncpy? What would the length be?
+        strcpy(ONYX_PTR(buffer_base), runtime->argv[i]);
+        *(i32 *) ONYX_PTR(params->data[0].of.i32 + i * 4) = buffer_base;
+        buffer_base += strlen(runtime->argv[i]) + 1;
+    }
+
+    return NULL;
+}
+
+ONYX_DEF(__args_sizes_get, (WASM_I32, WASM_I32), ()) {
+    *(i32 *) ONYX_PTR(params->data[0].of.i32) = runtime->argc;
+
+    i32 argv_size = 0;
+    for (int i=0; i<runtime->argc; i++) {
+        argv_size += strlen(runtime->argv[i]) + 1;
+    }
+
+    *(i32 *) ONYX_PTR(params->data[1].of.i32) = argv_size;
+    return NULL;
+}
+
 ONYX_DEF(__exit, (WASM_I32), ()) {
     exit(params->data[0].of.i32);
     return NULL;
@@ -784,6 +813,9 @@ ONYX_LIBRARY {
     ONYX_FUNC(__process_kill)
     ONYX_FUNC(__process_wait)
     ONYX_FUNC(__process_destroy)
+
+    ONYX_FUNC(__args_get)
+    ONYX_FUNC(__args_sizes_get)
 
     ONYX_FUNC(__exit)
     NULL

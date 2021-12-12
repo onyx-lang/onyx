@@ -274,6 +274,9 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_store = wasm_store;
     wasm_runtime.wasm_imports = wasm_imports;
     
+    wasm_runtime.argc = argc;
+    wasm_runtime.argv = argv;
+
     // See comment in onyx_library.h about us being the linker.
     wasm_runtime.wasm_memory_data = &wasm_memory_data;
     wasm_runtime.wasm_extern_lookup_by_name = &wasm_extern_lookup_by_name;
