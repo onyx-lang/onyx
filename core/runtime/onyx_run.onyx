@@ -1,13 +1,54 @@
 package runtime
 
-#load "core/wasi/wasi"
 #load "core/runtime/common"
 
 use package core
-use package wasi
 
-// The "onyx_run" runtime extends the WASI runtime.
-#load "core/runtime/wasi"
+#local {
+    __stdout: os.File;
+    __stdin:  os.File;
+}
+
+__output_string :: (s: str) -> u32 {
+    err, wrote := io.stream_write(^__stdout, s);
+    return wrote;
+}
+
+__exit :: (status: i32) ---
+
+__read_from_input :: (buffer: [] u8) -> i32 {
+    err, read := io.stream_read(^__stdin, buffer);
+    if err != .None do return -1;
+    return read;
+}
+
+#library "onyx_runtime"
+
+#local __file_get_standard :: (fd: i32, out: ^fs.FileData.Handle) -> bool #foreign "onyx_runtime" "__file_get_standard" ---
+
+#export "_start" () {
+    fd: fs.FileData.Handle;
+    __file_get_standard(1, ^fd);
+    __stdout = .{
+        .{ ^fs.__file_stream_vtable },
+        .{ fd },
+    };
+
+    __file_get_standard(0, ^fd);
+    __stdin = .{
+        .{ ^fs.__file_stream_vtable },
+        .{ fd },
+    };
+
+    __runtime_initialize();
+    context.thread_id = 0;
+
+    args : [] cstr;
+
+    (package main).main(args);
+
+    __flush_stdio();
+}
 
 #if Multi_Threading_Enabled {
     __spawn_thread :: (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) -> bool #foreign "onyx_runtime" "__spawn_thread" ---
@@ -15,22 +56,4 @@ use package wasi
 
     #export "_thread_start" _thread_start
     #export "_thread_exit"  _thread_exit
-}
-
-#local ProcessResult :: enum {
-    Success     :: 0x00;
-    FailedToRun :: 0x01;
-    Error       :: 0x02;
-    InternalErr :: 0x03;
-}
-
-#library "onyx_runtime"
-
-#foreign "onyx_runtime" {
-    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> os.Process.Handle ---
-    __process_read    :: (handle: os.Process.Handle, buffer: [] u8) -> i32 ---
-    __process_write   :: (handle: os.Process.Handle, buffer: [] u8) -> i32 ---
-    __process_kill    :: (handle: os.Process.Handle) -> bool ---
-    __process_wait    :: (handle: os.Process.Handle) -> ProcessResult ---
-    __process_destroy :: (handle: os.Process.Handle) -> void ---
 }

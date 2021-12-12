@@ -10,7 +10,9 @@
     #include <pthread.h>
     #include <signal.h>
     #include <sys/wait.h>
+    #include <sys/types.h>
     #include <dlfcn.h>
+    #include <dirent.h>
 #endif
 
 #include "types.h"  // For POINTER_SIZE
@@ -146,6 +148,153 @@ ONYX_DEF(__file_flush, (WASM_I64), (WASM_I32)) {
     return NULL;
 }
 
+ONYX_DEF(__file_get_standard, (WASM_I32, WASM_I32), (WASM_I32)) {
+    bh_file_standard standard = (bh_file_standard) params->data[0].of.i32;
+
+    bh_file file;
+    bh_file_error error = bh_file_get_standard(&file, standard);
+    if (error == BH_FILE_ERROR_NONE) {
+        *(u64 *) ONYX_PTR(params->data[1].of.i32) = (u64) file.fd;
+    }
+
+    results->data[0] = WASM_I32_VAL(error == BH_FILE_ERROR_NONE);
+    return NULL;
+}
+
+//
+// Directories
+//
+#ifdef _BH_WINDOWS
+typedef struct Windows_Directory_Opened {
+    HANDLE hndl;
+    WIN32_FIND_DATAA found_file;
+} Windows_Directory_Opened;
+#endif
+
+ONYX_DEF(__dir_open, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    char *path_ptr = ONYX_PTR(params->data[0].of.i32);
+    int   path_len = params->data[1].of.i32;
+
+    char path[512] = {0};
+    strncpy(path, path_ptr, path_len);
+    path[path_len] = 0;
+
+#ifdef _BH_WINDOWS
+    for (int i=0; i<path_len; i++) if (path[i] == '/') path[i] = '\\';
+    strncat(path, "\\*.*", 511);
+
+    Windows_Directory_Opened* dir = malloc(sizeof(Windows_Directory_Opened));
+    dir->hndl = FindFirstFileA(path, &dir->found_file);
+    if (dir->hndl == INVALID_HANDLE_VALUE) {
+        results->data[0] = WASM_I32_VAL(0);
+        return NULL;
+    }
+
+    *(u64 *) ONYX_PTR(params->data[2].of.i32) = (u64) dir;
+
+    results->data[0] = WASM_I32_VAL(1);
+    return NULL;
+#endif
+
+#ifdef _BH_LINUX
+    DIR* dir = opendir(path);
+    *(u64 *) ONYX_PTR(params->data[2].of.i32) = (u64) dir;
+    results->data[0] = WASM_I32_VAL(dir != NULL);
+    return NULL;
+#endif
+}
+
+// (DIR*, PTR<DIRENT>) -> BOOL
+ONYX_DEF(__dir_read, (WASM_I64, WASM_I32), (WASM_I32)) {
+#ifdef _BH_WINDOWS
+    Windows_Directory_Opened* dir = (Windows_Directory_Opened *) params->data[0].of.i64;
+    if (dir == NULL) {
+        results->data[0] = WASM_I32_VAL(0);
+        return NULL;
+    }
+
+    do {
+        BOOL success = FindNextFileA(dir->hndl, &dir->found_file);
+        if (!success) {
+            results->data[0] = WASM_I32_VAL(0);
+            return NULL;
+        }
+    } while (!strcmp(dir->found_file.cFileName, ".") || !strcmp(dir->found_file.cFileName, ".."));
+
+    u32 out = params->data[1].of.i32;
+    assert(out != 0);
+
+    *(u32 *) ONYX_PTR(out + 0) = (dir->found_file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 3 : 4;
+    *(u32 *) ONYX_PTR(out + 4) = 0;
+    *(u32 *) ONYX_PTR(out + 8) = strlen(dir->found_file.cFileName);
+    strncpy(ONYX_PTR(out + 12), dir->found_file.cFileName, 256);
+
+    results->data[0] = WASM_I32_VAL(1);
+    return NULL;
+#endif
+
+#ifdef _BH_LINUX
+    DIR* dir = (DIR *) params->data[0].of.i64;
+    if (dir == NULL) {
+        results->data[0] = WASM_I32_VAL(0);
+        return NULL;
+    }
+
+    struct dirent *ent;
+    while (1) {
+        ent = readdir(dir);
+        if (ent == NULL) {
+            results->data[0] = WASM_I32_VAL(0);
+            return NULL;
+        }
+
+        // Skip the current directory and parent directory
+        if (strcmp(ent->d_name, ".") && strcmp(ent->d_name, "..")) break;
+    }
+
+    u32 type = 0;
+    switch (ent->d_type) {
+        case DT_UNKNOWN: break;
+        case DT_BLK: type = 1; break;
+        case DT_CHR: type = 2; break;
+        case DT_DIR: type = 3; break;
+        case DT_LNK: type = 5; break;
+        case DT_REG: type = 4; break;
+        default: type = 6; break;
+    }
+
+    u32 out = params->data[1].of.i32;
+    assert(out != 0);
+
+    *(u32 *) ONYX_PTR(out + 0) = type;
+    *(u32 *) ONYX_PTR(out + 4) = (u32) ent->d_ino;
+    *(u32 *) ONYX_PTR(out + 8) = strlen(ent->d_name);
+    strncpy(ONYX_PTR(out + 12), ent->d_name, 256);
+
+    results->data[0] = WASM_I32_VAL(1);
+    return NULL;
+#endif
+}
+
+ONYX_DEF(__dir_close, (WASM_I64), ()) {
+#ifdef _BH_WINDOWS
+    Windows_Directory_Opened* dir = (Windows_Directory_Opened *) params->data[0].of.i64;
+
+    FindClose(dir->hndl);
+    free(dir);
+
+    return NULL;
+#endif
+
+#ifdef _BH_LINUX
+    DIR* dir = (DIR *) params->data[0].of.i64;
+    if (dir == NULL) return NULL;
+
+    closedir(dir);
+#endif
+    return NULL;
+}
+
 
 //
 // THREADS
@@ -196,7 +345,7 @@ static i32 onyx_run_thread(void *data) {
 
     { // Call the _thread_start procedure
         wasm_val_t args[]    = { WASM_I32_VAL(thread_id), WASM_I32_VAL(thread->tls_base), WASM_I32_VAL(thread->funcidx), WASM_I32_VAL(thread->dataptr) };
-        wasm_val_vec_t results;
+        wasm_val_vec_t results = { 0, 0 };
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
 
         trap = runtime->wasm_func_call(start_func, &args_array, &results);
@@ -607,6 +756,11 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_read)
     ONYX_FUNC(__file_write)
     ONYX_FUNC(__file_flush)
+    ONYX_FUNC(__file_get_standard)
+
+    ONYX_FUNC(__dir_open)
+    ONYX_FUNC(__dir_read)
+    ONYX_FUNC(__dir_close)
 
     ONYX_FUNC(__spawn_thread)
     ONYX_FUNC(__kill_thread)

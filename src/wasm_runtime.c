@@ -17,8 +17,6 @@
 #endif
 
 static wasm_config_t*    wasm_config;
-static wasi_config_t*    wasi_config;
-static wasi_env_t*       wasi_env;
 static wasm_engine_t*    wasm_engine;
 static wasm_store_t*     wasm_store;
 static wasm_extern_vec_t wasm_imports;
@@ -191,18 +189,6 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasmer_features_bulk_memory(features, 1);
     wasm_config_set_features(wasm_config, features);
 
-    wasi_config = wasi_config_new("onyx");
-    if (argc > 0) {
-        fori (i, 0, argc) {
-            wasi_config_arg(wasi_config, argv[i]);
-        }
-    }
-
-    wasi_config_preopen_dir(wasi_config, "./");
-
-    wasi_env  = wasi_env_new(wasi_config);
-    if (!wasi_env) goto error_handling;
-
     wasm_engine = wasm_engine_new_with_config(wasm_config);
     if (!wasm_engine) goto error_handling;
 
@@ -216,9 +202,6 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_module = wasm_module_new(wasm_store, &wasm_data);
     if (!wasm_module) goto error_handling;
 
-    wasmer_named_extern_vec_t wasi_imports;
-    wasi_get_unordered_imports(wasm_store, wasm_module, wasi_env, &wasi_imports);
-
     wasm_importtype_vec_t module_imports;    // @Free
     wasm_module_imports(wasm_module, &module_imports);
 
@@ -230,16 +213,6 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
         const wasm_name_t* import_name = wasm_importtype_name(module_imports.data[i]);
 
         wasm_extern_t* import = NULL;
-
-        // First try WASI
-        fori (j, 0, (i32) wasi_imports.size) {
-            const wasm_name_t* wasi_module_name = wasmer_named_extern_module(wasi_imports.data[j]);
-            const wasm_name_t* wasi_import_name = wasmer_named_extern_name(wasi_imports.data[j]);
-            if (wasm_name_equals(module_name, wasi_module_name) && wasm_name_equals(import_name, wasi_import_name)) {
-                import = (wasm_extern_t *) wasmer_named_extern_unwrap(wasi_imports.data[j]);
-                goto import_found;
-            }
-        }
 
         if (wasm_name_equals_string(module_name, "onyx")) {
             if (wasm_name_equals_string(import_name, "memory")) {

@@ -1,13 +1,5 @@
 package core.os
 
-// Some thoughts about processes and the API.
-//
-// Should processes ever directly dump to standard output?
-// Or should their output always be buffered through a pipe to the user?
-//
-//
-
-
 #if runtime.Runtime != runtime.Runtime_Onyx {
     #error "This file can only be included in the 'onyx' runtime, because Wasi has not defined how to spawn and manage processes.";
 }
@@ -25,7 +17,7 @@ Process :: struct {
 }
 
 process_spawn :: (path: str, args: [] str, non_blocking_io := false) -> Process {
-    handle := runtime.__process_spawn(path, args, non_blocking_io);
+    handle := __process_spawn(path, args, non_blocking_io);
 
     return .{
         .{ ^process_stream_vtable },
@@ -34,15 +26,15 @@ process_spawn :: (path: str, args: [] str, non_blocking_io := false) -> Process 
 }
 
 process_kill :: (use p: ^Process) -> bool {
-    return runtime.__process_kill(process_handle);
+    return __process_kill(process_handle);
 }
 
 process_wait :: (use p: ^Process) => {
-    return runtime.__process_wait(process_handle);
+    return __process_wait(process_handle);
 }
 
 process_destroy :: (use p: ^Process) => {
-    runtime.__process_destroy(process_handle);
+    __process_destroy(process_handle);
 }
 
 #local process_stream_vtable := io.Stream_Vtable.{
@@ -50,7 +42,7 @@ process_destroy :: (use p: ^Process) => {
         // Read from the process stdout
         if cast(i64) process_handle == 0 do return .BadFile, 0;
 
-        bytes_read := runtime.__process_read(process_handle, buffer);
+        bytes_read := __process_read(process_handle, buffer);
         return .None, bytes_read;
     },
 
@@ -58,7 +50,7 @@ process_destroy :: (use p: ^Process) => {
         // Write to the process stdin
         if cast(i64) process_handle == 0 do return .BadFile, 0;
 
-        bytes_written := runtime.__process_write(process_handle, buffer);
+        bytes_written := __process_write(process_handle, buffer);
         return .None, bytes_written;
     },
 
@@ -67,3 +59,20 @@ process_destroy :: (use p: ^Process) => {
         return .None;
     }
 }
+
+#local ProcessResult :: enum {
+    Success     :: 0x00;
+    FailedToRun :: 0x01;
+    Error       :: 0x02;
+    InternalErr :: 0x03;
+}
+
+#foreign "onyx_runtime" {
+    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> Process.Handle ---
+    __process_read    :: (handle: Process.Handle, buffer: [] u8) -> i32 ---
+    __process_write   :: (handle: Process.Handle, buffer: [] u8) -> i32 ---
+    __process_kill    :: (handle: Process.Handle) -> bool ---
+    __process_wait    :: (handle: Process.Handle) -> ProcessResult ---
+    __process_destroy :: (handle: Process.Handle) -> void ---
+}
+

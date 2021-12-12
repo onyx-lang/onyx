@@ -244,6 +244,18 @@ typedef struct _WIN32_FIND_DATAW {
     wchar_t  cFileName[MAX_PATH];
     wchar_t  cAlternateFileName[14];
 } WIN32_FIND_DATAW;
+typedef struct _WIN32_FIND_DATAA {
+    DWORD    dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    DWORD    nFileSizeHigh;
+    DWORD    nFileSizeLow;
+    DWORD    dwReserved0;
+    DWORD    dwReserved1;
+    char  cFileName[MAX_PATH];
+    char  cAlternateFileName[14];
+} WIN32_FIND_DATAA;
 typedef struct _WIN32_FILE_ATTRIBUTE_DATA {
     DWORD    dwFileAttributes;
     FILETIME ftCreationTime;
@@ -374,6 +386,7 @@ GB_DLL_IMPORT void   WINAPI GetSystemInfo(SYSTEM_INFO *system_info);
 #define FILE_ATTRIBUTE_READONLY  0x00000001
 #define FILE_ATTRIBUTE_NORMAL    0x00000080
 #define FILE_ATTRIBUTE_TEMPORARY 0x00000100
+#define FILE_ATTRIBUTE_DIRECTORY 0x00000010
 #define ERROR_FILE_NOT_FOUND     2l
 #define ERROR_ACCESS_DENIED      5L
 #define ERROR_NO_MORE_FILES      18l
@@ -399,6 +412,8 @@ GB_DLL_IMPORT HANDLE WINAPI GetStdHandle    (DWORD std_handle);
 GB_DLL_IMPORT BOOL   WINAPI GetFileSizeEx   (HANDLE file, LARGE_INTEGER *size);
 GB_DLL_IMPORT BOOL   WINAPI SetEndOfFile    (HANDLE file);
 GB_DLL_IMPORT HANDLE WINAPI FindFirstFileW  (wchar_t const *path, WIN32_FIND_DATAW *data);
+GB_DLL_IMPORT HANDLE WINAPI FindFirstFileA  (char const *path, WIN32_FIND_DATAA *data);
+GB_DLL_IMPORT BOOL   WINAPI FindNextFileA   (HANDLE find_find, WIN32_FIND_DATAA *data);
 GB_DLL_IMPORT BOOL   WINAPI FindClose       (HANDLE find_file);
 GB_DLL_IMPORT BOOL   WINAPI GetFileAttributesExW(wchar_t const *path, GET_FILEEX_INFO_LEVELS info_level_id, WIN32_FILE_ATTRIBUTE_DATA *data);
 GB_DLL_IMPORT BOOL   WINAPI CopyFileW(wchar_t const *old_f, wchar_t const *new_f, BOOL fail_if_exists);

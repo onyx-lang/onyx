@@ -8,6 +8,8 @@ FileData :: struct {
     handle: Handle = -1;
 }
 
+DirectoryData :: #distinct u64
+
 __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError) {
     handle: FileData.Handle;
     error := __file_open_impl(path, mode, ^handle);
@@ -27,6 +29,10 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
     __file_read  :: (handle: FileData.Handle, output_buffer: [] u8, bytes_read: ^u64) -> io.Error ---
     __file_write :: (handle: FileData.Handle, input_buffer: [] u8, bytes_wrote: ^u64) -> io.Error ---
     __file_flush :: (handle: FileData.Handle) -> io.Error ---
+
+    __dir_open  :: (path: str, dir: ^DirectoryData) -> bool ---
+    __dir_close :: (dir: DirectoryData) -> void ---
+    __dir_read  :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool ---
 }
 
 __file_stream_vtable := io.Stream_Vtable.{

@@ -7,68 +7,34 @@ package core.os
 
 #local {
     runtime :: package runtime
-    wasi    :: package wasi
 }
 
-Directory_Entry :: struct {
-    dirent : wasi.DirEnt;
-    name   : str;
-}
-
-list_directory :: (path: str) -> Iterator(Directory_Entry) {
+list_directory :: (path: str) -> Iterator(DirectoryEntry) {
     Context :: struct {
-        dir_fd: wasi.FileDescriptor;
+        dir: Directory;
         opened := false;
-        reached_end := false;
-
-        entry_walker: ^u8;
-
-        buffer_used: u32 = 0;
-        buffer: [1024] u8;
-
-        last_cookie: wasi.DirCookie = 0;
     }
 
-    next :: (use c: ^Context) -> (Directory_Entry, bool) {
+    next :: (use c: ^Context) -> (DirectoryEntry, bool) {
         use package core.intrinsics.onyx {__zero_value}
-        if !opened do return __zero_value(Directory_Entry), false;
+        if !opened do return __zero_value(DirectoryEntry), false;
 
-        read_more :: macro () {
-            if !reached_end {
-                err := wasi.fd_readdir(dir_fd, ~~buffer, sizeof typeof buffer, last_cookie, ^buffer_used);
-                reached_end = buffer_used != sizeof typeof buffer;
-
-                entry_walker = ~~buffer;
-            } else {
-                return __zero_value(Directory_Entry), false;
-            }
+        entry: DirectoryEntry;
+        if !dir_read(dir, ^entry) {
+            return __zero_value(DirectoryEntry), false;
         }
 
-        if buffer_used < sizeof(wasi.DirEnt) do read_more();
-
-        dirent := cast(^wasi.DirEnt) entry_walker;
-        if buffer_used < sizeof(wasi.DirEnt) + dirent.d_namlen {
-            read_more();
-            dirent = ~~entry_walker;
-        }
-
-        name := str.{~~(dirent + 1), dirent.d_namlen};
-
-        entry_size := sizeof(wasi.DirEnt) + dirent.d_namlen;
-        entry_walker += entry_size;
-        buffer_used -= entry_size;
-        last_cookie = dirent.d_next;
-
-        return .{*dirent, name}, true;
+        return entry, true;
     }
 
     close :: (use c: ^Context) {
-        wasi.fd_close(dir_fd);
+        dir_close(dir);
         cfree(c);
     }
 
     c := new(Context);
-    if err := wasi.path_open(4, 0, path, .Directory, ~~0xffffffff, ~~0xffffffff, .Sync, ^c.dir_fd); err == .Success {
+    if dir, success := dir_open(path); success {
+        c.dir = dir;
         c.opened = true;
     }
 
