@@ -1,7 +1,0 @@
-package test_library
-
-#library "test_library"
-
-foo :: () -> void #foreign "test_library" "foo" ---
-add :: (a, b: i32) -> i32 #foreign "test_library" "add" ---
-print_string :: (s: str) -> void #foreign "test_library" "print_string" ---
