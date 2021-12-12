@@ -11,3 +11,7 @@ to_u32 :: #match {
         return hash;
     },
 }
+
+Hashable :: interface (T: type_expr) {
+    to_u32(T);
+}

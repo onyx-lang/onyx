@@ -1,0 +1,103 @@
+#load "core/std"
+
+use package core
+
+Communative_Pair :: struct (T: type_expr) where hash.Hashable(T) {
+    a, b: T;
+}
+
+#match hash.to_u32 (p: Communative_Pair($T)) => {
+    return hash.to_u32(p.a) * 13 + hash.to_u32(p.b) * 17;
+}
+
+#operator == (p1, p2: Communative_Pair($T)) => {
+    if p1.a == p2.a && p1.b == p2.b do return true;
+    if p1.a == p2.b && p1.b == p2.a do return true;
+    return false;
+}
+
+main :: (args) => {
+    for file: os.with_file("./tests/aoc-2021/input/day12.txt") {
+        reader := io.reader_make(file);
+
+        verticies: Set(str);
+        edges: Set(Communative_Pair(str));
+        while !io.reader_empty(^reader) {
+            line := io.read_line(^reader, consume_newline=true);
+
+            left, right := do {
+                parts := string.split(line, #char "-");
+                defer memory.free_slice(^parts);
+                return string.strip_whitespace(parts[0]), string.strip_whitespace(parts[1]);
+            };
+
+            edges << .{ left, right };
+            verticies << left;
+            verticies << right;
+        }
+
+        Node :: struct { name: str; child_idx: u32; second_visit: bool; }
+        node_stack: [..] Node; 
+        node_stack << .{ "start", 0, false };
+
+        children_of :: (edges: ^$T, name: str) -> Iterator(str) {
+            #persist NAME_HACK: str;
+            NAME_HACK = name;
+
+            return iter.concat(
+                iter.as_iterator(edges)
+                |> iter.filter((x) => x.a == NAME_HACK)
+                |> iter.map((x) => x.b),
+
+                iter.as_iterator(edges)
+                |> iter.filter((x) => x.b == NAME_HACK)
+                |> iter.map((x) => x.a)
+            );
+        }
+
+        cannot_visit_multiple :: (name) => {
+            c := name[0];
+            return c >= #char "a" && c <= #char "z";
+        }
+
+        edge_map: Map(str, [] str);
+        for v: iter.as_iterator(^verticies) {
+            edge_map[v] = children_of(^edges, v) |> iter.to_array();
+        }
+
+        paths_count := 0;
+        while node_stack.count != 0 {
+            node_idx := node_stack.count - 1;
+            defer node_stack[node_idx].child_idx += 1;
+
+            children := edge_map[node_stack[node_idx].name];
+            valid := node_stack[node_idx].child_idx < children.count;
+
+            if valid {
+                child := children[node_stack[node_idx].child_idx];
+                second_visit := node_stack[node_idx].second_visit;
+
+                if cannot_visit_multiple(child) {
+                    visit_count := 0;
+                    for^ node_stack {
+                        if it.name == child do visit_count += 1;
+                    }
+
+                    if visit_count >= 1 {
+                        if second_visit || child == "start" do continue;
+
+                        second_visit = true;
+                    }
+                }
+
+                if child == "end" do paths_count += 1;
+                else              do node_stack << .{ child, 0, second_visit };
+
+            } else {
+                array.pop(^node_stack);
+            }
+        }
+
+        printf("Part 2: {}\n", paths_count);
+    }
+}

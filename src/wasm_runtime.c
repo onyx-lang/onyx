@@ -293,7 +293,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
 
     run_trap = wasm_func_call(start_func, &args, &results);
 
-#if 0
+#if 1
     if (run_trap != NULL) {
         wasm_message_t msg;
         wasm_trap_message(run_trap, &msg);
