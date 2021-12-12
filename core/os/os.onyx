@@ -41,3 +41,6 @@ list_directory :: (path: str) -> Iterator(DirectoryEntry) {
     return .{ c, next, close };
 }
 
+exit :: (exitcode: i32) {
+    runtime.__exit(exitcode);
+}

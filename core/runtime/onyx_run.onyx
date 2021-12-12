@@ -14,7 +14,7 @@ __output_string :: (s: str) -> u32 {
     return wrote;
 }
 
-__exit :: (status: i32) ---
+__exit :: (status: i32) -> void #foreign "onyx_runtime" "__exit" ---
 
 __read_from_input :: (buffer: [] u8) -> i32 {
     err, read := io.stream_read(^__stdin, buffer);

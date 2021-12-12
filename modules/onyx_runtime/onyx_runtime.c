@@ -754,6 +754,11 @@ ONYX_DEF(__process_destroy, (WASM_I64), ()) {
     return NULL;
 }
 
+ONYX_DEF(__exit, (WASM_I32), ()) {
+    exit(params->data[0].of.i32);
+    return NULL;
+}
+
 ONYX_LIBRARY {
     ONYX_FUNC(__file_open_impl)
     ONYX_FUNC(__file_close)
@@ -780,5 +785,6 @@ ONYX_LIBRARY {
     ONYX_FUNC(__process_wait)
     ONYX_FUNC(__process_destroy)
 
+    ONYX_FUNC(__exit)
     NULL
 };
