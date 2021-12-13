@@ -2956,15 +2956,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
 
-                /* nocheckin
-                OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
-                if (str_token != NULL) {
-                    token_toggle_end(str_token);
-                    include->name = bh_strdup(parser->allocator, str_token->text);
-                    token_toggle_end(str_token);
-                }
-                */
-
                 ENTITY_SUBMIT(include);
                 return;
             }
@@ -2973,15 +2964,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
 
-                /* nocheckin
-                OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
-                if (str_token != NULL) {
-                    token_toggle_end(str_token);
-                    include->name = bh_strdup(parser->allocator, str_token->text);
-                    token_toggle_end(str_token);
-                }
-                */
-
                 ENTITY_SUBMIT(include);
                 return;
             }
@@ -2989,15 +2971,6 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 AstInclude* include = make_node(AstInclude, Ast_Kind_Library_Path);
                 include->token = dir_token;
                 include->name_node = parse_expression(parser, 0);
-
-                /* nocheckin
-                OnyxToken* str_token = expect_token(parser, Token_Type_Literal_String);
-                if (str_token != NULL) {
-                    token_toggle_end(str_token);
-                    include->name = bh_strdup(parser->allocator, str_token->text);
-                    token_toggle_end(str_token);
-                }
-                */
 
                 ENTITY_SUBMIT(include);
                 return;
