@@ -955,7 +955,7 @@ struct AstDistinctType {
 // Top level nodes
 struct AstBinding       { AstTyped_base; AstNode* node; };
 struct AstAlias         { AstTyped_base; AstTyped* alias; };
-struct AstInclude       { AstNode_base;  AstNode* name_node; char* name; };
+struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; };
 struct AstMemRes        {
     AstTyped_base;
     u64 addr;

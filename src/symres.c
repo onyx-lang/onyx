@@ -20,6 +20,7 @@ static Entity* waiting_on         = NULL;
 typedef enum SymresStatus {
     Symres_Success,
     Symres_Complete,
+    Symres_Goto_Parse,
 
     Symres_Errors_Start,
     Symres_Yield_Macro,
@@ -1390,6 +1391,26 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
     return Symres_Complete;
 }
 
+static SymresStatus symres_include(AstInclude* include) {
+    if (include->name != NULL) return Symres_Goto_Parse;
+
+    SYMRES(expression, &include->name_node);
+
+    if (include->name_node->kind != Ast_Kind_StrLit) {
+        onyx_report_error(include->token->pos, "Expected compile-time known string literal here. Got '%s'.", onyx_ast_node_kind_string(include->name_node->kind));
+        return Symres_Error;
+    }
+
+    OnyxToken* str_token = include->name_node->token;
+    if (str_token != NULL) {
+        token_toggle_end(str_token);
+        include->name = bh_strdup(context.ast_alloc, str_token->text);
+        token_toggle_end(str_token);
+    }
+
+    return Symres_Goto_Parse;
+}
+
 void symres_entity(Entity* ent) {
     if (ent->scope) scope_enter(ent->scope);
 
@@ -1407,6 +1428,9 @@ void symres_entity(Entity* ent) {
         }
 
         case Entity_Type_Static_If:               ss = symres_static_if(ent->static_if); break;
+
+        case Entity_Type_Load_Path:
+        case Entity_Type_Load_File:               ss = symres_include(ent->include); break;
 
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Temp_Function_Header:
@@ -1444,6 +1468,7 @@ void symres_entity(Entity* ent) {
     if (ss == Symres_Yield_Macro) ent->macro_attempts++;
     if (ss == Symres_Yield_Micro) ent->micro_attempts++;
     if (ss == Symres_Complete)    ent->state = Entity_State_Finalized;
+    if (ss == Symres_Goto_Parse)  ent->state = Entity_State_Parse;
     if (ss == Symres_Success) {
         ent->macro_attempts = 0;
         ent->micro_attempts = 0;

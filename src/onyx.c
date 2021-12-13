@@ -283,7 +283,7 @@ static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_arr_each(bh_file_contents, fc, context.loaded_files) {
         // Duplicates are detected here and since these filenames will be the full path,
         // string comparing them should be all that is necessary.
-        if (!strcmp(fc->filename, filename)) return;
+        if (!strcmp(fc->filename, filename)) return 1;
     }
 
     bh_file file;

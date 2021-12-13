@@ -162,7 +162,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
 
     switch (node->kind) {
         case Ast_Kind_Load_File: {
-            ent.state = Entity_State_Parse;
             ent.type = Entity_Type_Load_File;
             ent.include = (AstInclude *) node;
             ENTITY_INSERT(ent);
@@ -171,7 +170,6 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
 
         case Ast_Kind_Library_Path:
         case Ast_Kind_Load_Path: {
-            ent.state = Entity_State_Parse;
             ent.type = Entity_Type_Load_Path;
             ent.include = (AstInclude *) node;
             ENTITY_INSERT(ent);
