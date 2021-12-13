@@ -279,7 +279,7 @@ static void parse_source_file(bh_file_contents* file_contents) {
     onyx_parser_free(&parser);
 }
 
-static void process_source_file(char* filename, OnyxFilePos error_pos) {
+static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_arr_each(bh_file_contents, fc, context.loaded_files) {
         // Duplicates are detected here and since these filenames will be the full path,
         // string comparing them should be all that is necessary.
@@ -289,8 +289,10 @@ static void process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_file file;
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
-        onyx_report_error(error_pos, "Failed to open file %s", filename);
-        return;
+        if (context.cycle_detected) {
+            onyx_report_error(error_pos, "Failed to open file %s", filename);
+        }
+        return 0;
     }
 
     bh_file_contents fc = bh_file_read_contents(context.token_alloc, &file);
@@ -302,9 +304,10 @@ static void process_source_file(char* filename, OnyxFilePos error_pos) {
         bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
 
     parse_source_file(&fc);
+    return 1;
 }
 
-static void process_load_entity(Entity* ent) {
+static b32 process_load_entity(Entity* ent) {
     assert(ent->type == Entity_Type_Load_File || ent->type == Entity_Type_Load_Path);
     AstInclude* include = ent->include;
 
@@ -318,7 +321,7 @@ static void process_load_entity(Entity* ent) {
         char* filename = bh_lookup_file(include->name, parent_folder, ".onyx", 1, context.options->included_folders, 1);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
-        process_source_file(formatted_name, include->token->pos);
+        return process_source_file(formatted_name, include->token->pos);
 
     } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(context.options->included_folders, include->name);
@@ -326,6 +329,8 @@ static void process_load_entity(Entity* ent) {
     } else if (include->kind == Ast_Kind_Library_Path) {
         bh_arr_push(context.wasm_module->library_paths, include->name);
     }
+
+    return 1;
 }
 
 static b32 process_entity(Entity* ent) {
@@ -383,8 +388,11 @@ static b32 process_entity(Entity* ent) {
                 introduce_build_options(context.ast_alloc);
             }
          
-            process_load_entity(ent);
-            ent->state = Entity_State_Finalized;
+            if (process_load_entity(ent)) {
+                ent->state = Entity_State_Finalized;
+            } else {
+                ent->macro_attempts++;
+            }
             break;
 
         case Entity_State_Resolve_Symbols: symres_entity(ent); break;

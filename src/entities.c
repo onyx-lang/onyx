@@ -3,7 +3,7 @@
 #include "utils.h"
 
 static inline i32 entity_phase(Entity* e1) {
-    if (e1->state <= Entity_State_Parse) return 1;
+    if (e1->state <= Entity_State_Parse && e1->macro_attempts == 0) return 1;
     if (e1->state <  Entity_State_Code_Gen) return 2;
     return 3;
 }
