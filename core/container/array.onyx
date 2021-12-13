@@ -144,6 +144,26 @@ concat :: (arr: ^[..] $T, other: [] T) {
     for ^o: other do push(arr, *o);
 }
 
+// This assumes that the elements are sorted in some fashion,
+// such that equal elements would be next to each other.
+unique :: (arr: ^[..] $T) {
+    idx := 0;
+    while i := 0; i < arr.count - 1 {
+        defer i += 1;
+
+        if idx != i {
+            arr.data[idx] = arr.data[i];
+        }
+
+        if !(arr.data[i] == arr.data[i + 1]) {
+            idx += 1;
+        }
+    }
+
+    arr.data[idx] = arr.data[arr.count - 1];
+    arr.count = idx + 1;
+}
+
 
 fold_idx_elem :: (arr: [] $T, cmp: (T, T) -> bool) -> (i32, T) {
     idx  := 0;

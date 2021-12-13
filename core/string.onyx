@@ -211,7 +211,7 @@ strip_leading_whitespace :: #match {
 
 strip_trailing_whitespace :: #match {
     (s: ^str) {
-        while true do switch s.data[s.count - 1] {
+        while s.count >= 1 do switch s.data[s.count - 1] {
             case #char " ", #char "\t", #char "\n", #char "\r" {
                 s.count -= 1;
             }

@@ -1,0 +1,73 @@
+#load "core/std"
+
+use package core
+
+Point :: struct {
+    x, y: i32;
+}
+#match hash.to_u32 (use p: Point) => x * 1337 + y * 7331;
+#operator == (p1, p2: Point) => p1.x == p2.x && p1.y == p2.y;
+cmp_point :: (p1, p2: Point) => {
+    if p1.x != p2.x do return p1.x - p2.x;
+    return p1.y - p2.y;
+}
+
+apply_fold :: (dots: ^[..] Point, axis_name: str, axis_value: i32) {
+    for^ *dots do switch axis_name {
+        case "x" do if it.x > axis_value do it.x = 2 * axis_value - it.x;
+        case "y" do if it.y > axis_value do it.y = 2 * axis_value - it.y;
+    }
+
+    array.quicksort(*dots, cmp_point);
+    array.unique(dots);
+}
+
+main :: (args) => {
+    for file: os.with_file("./tests/aoc-2021/input/day13.txt") {
+        reader := io.reader_make(file);
+
+        dots: [..] Point;
+        while true {
+            line := io.read_line(^reader, consume_newline=true, inplace=true);
+            string.strip_whitespace(^line);
+            if line.count == 0 do break;
+
+            parts := string.split(line, #char ",", allocator=context.temp_allocator)
+                    |> iter.as_iterator()
+                    |> iter.map((x) => cast(i32) conv.str_to_i64(*x));
+            
+            x, _ := iter.take_one(parts);
+            y, _ := iter.take_one(parts);
+
+            dots << .{x,y};
+        }
+
+        part_1_answer := -1;
+        while !io.reader_empty(^reader) {
+            line := io.read_line(^reader, consume_newline=true, inplace=true);
+
+            string.read_until(^line, #char " ", 1);
+            string.advance(^line, 1);
+
+            axis_name := string.read_until(^line, #char "=");
+            string.advance(^line, 1);
+            axis_value := cast(i32) conv.str_to_i64(line);
+
+            apply_fold(^dots, axis_name, axis_value);
+            if part_1_answer < 0 {
+                part_1_answer = dots.count;
+            }
+        }
+
+        printf("Part 1: {}\n", part_1_answer);
+
+        printf("Part 2:\n");
+        for y: 7 {
+            for x: 50 {
+                print("X" if array.contains(dots, .{x, y}) else " ");
+            }
+
+            print("\n");
+        }
+    }
+}
