@@ -12,7 +12,7 @@ cmp_point :: (p1, p2: Point) => {
     return p1.y - p2.y;
 }
 
-apply_fold :: (dots: ^[..] Point, axis_name: str, axis_value: i32) {
+apply_fold :: (dots: ^[] Point, axis_name: str, axis_value: i32) {
     for^ *dots do switch axis_name {
         case "x" do if it.x > axis_value do it.x = 2 * axis_value - it.x;
         case "y" do if it.y > axis_value do it.y = 2 * axis_value - it.y;
@@ -53,7 +53,7 @@ main :: (args) => {
             string.advance(^line, 1);
             axis_value := cast(i32) conv.str_to_i64(line);
 
-            apply_fold(^dots, axis_name, axis_value);
+            apply_fold(~~ ^dots, axis_name, axis_value);
             if part_1_answer < 0 {
                 part_1_answer = dots.count;
             }
