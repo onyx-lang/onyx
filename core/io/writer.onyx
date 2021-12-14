@@ -12,6 +12,13 @@ writer_make :: (s: ^Stream) -> Writer {
     return Writer.{ s };
 }
 
+string_builder :: (allocator := context.allocator) -> (Writer, ^DynamicStringStream) {
+    new_stream := new(DynamicStringStream, allocator=allocator);
+    *new_stream = dynamic_string_stream_make();
+
+    return writer_make(new_stream), new_stream;
+}
+
 write_byte :: (use writer: ^Writer, byte: u8) {
     stream_write_byte(stream, byte);
 }

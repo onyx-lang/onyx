@@ -86,6 +86,8 @@ read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
 
 read_byte :: (use reader: ^Reader) -> u8 {
     while start == end {
+        if reader_empty(reader) do return 0;
+
         if error != .None {
             reader_consume_error(reader);
             return 0;
@@ -127,6 +129,7 @@ read_bytes :: (use reader: ^Reader, bytes: [] u8) -> (i32, Error) {
 
     if start == end {
         if error != .None do return 0, reader_consume_error(reader);
+        if reader_empty(reader) do return 0, reader_consume_error(reader);
 
         if n >= buffer.count {
             error, n = stream_read(stream, bytes);

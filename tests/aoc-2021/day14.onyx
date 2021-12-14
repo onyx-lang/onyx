@@ -1,0 +1,98 @@
+#load "core/std"
+
+use package core
+
+Rule :: struct {
+    pair: Pair;
+    insert: u8;
+}
+
+Pair :: struct {a, b:u8;}
+#match hash.to_u32 (p: Pair) => cast(u32) (p.a * 3 + p.b * 7);
+#operator == (p1, p2: Pair) => p1.a == p2.a && p1.b == p2.b;
+
+State :: struct {
+    now, next: u64;
+}
+
+// Nicer way of printing a Map.
+#match io.write (w: ^io.Writer, x: ^Map($K, $V)) {
+    io.write(w, "{\n");
+    for e: x.entries {
+        io.write(w, "    {} => {}\n", e.key, e.value);
+    }
+    io.write(w, "}");
+}
+
+main :: (args) => {
+    for file: os.with_file("./tests/aoc-2021/input/day14.txt") {
+        reader := io.reader_make(file);
+
+        start_polymer := io.read_line(^reader, consume_newline=false);
+        io.skip_whitespace(^reader);
+
+        rules: [..] Rule;
+        while !io.reader_empty(^reader) {
+            r: Rule;
+            io.read_bytes(^reader, .{cast(^u8) ^r.pair, 2});
+            io.skip_bytes(^reader, 4);
+            r.insert = io.read_byte(^reader);
+
+            rules << r;
+            io.skip_whitespace(^reader);
+        }
+
+        polymer_state: Map(Pair, State);
+        add_to_state :: macro (pair: Pair, count: u64) {
+            if polymer_state->has(pair) {
+                (^polymer_state[pair]).next += ~~count;
+            } else {
+                polymer_state[pair] = .{ 0, ~~count };
+            }
+        }
+
+        step_state :: macro () {
+            for^ polymer_state.entries {
+                it.value.now = it.value.next;
+                it.value.next = 0;
+            }
+        }
+
+        for start_polymer.count - 1 {
+            p := Pair.{ start_polymer[it], start_polymer[it + 1] };
+            add_to_state(p, 1);
+        }
+
+        step_state();
+
+        for 40 {
+            for^ rule: rules {
+                pair_count := ^polymer_state[rule.pair];
+                if pair_count != null {
+                    if pair_count.now > 0 {
+                        pair1 := Pair.{ rule.pair.a, rule.insert };
+                        pair2 := Pair.{ rule.insert, rule.pair.b };
+                        add_to_state(pair1, pair_count.now);
+                        add_to_state(pair2, pair_count.now);
+                    }
+                }
+            }
+            step_state();
+        }
+
+        mode: Map(u8, u64);
+        for^ polymer_state.entries {
+            if !mode->has(it.key.b) {
+                mode[it.key.b] = it.value.now;
+            } else {
+                mode[it.key.b] = mode[it.key.b] + it.value.now;
+            }
+        }
+
+        maximum := array.fold(mode.entries, cast(u64) 0, (x, y) => math.max(x.value, y));
+        minimum := array.fold(mode.entries, maximum, (x, y) => math.min(x.value, y));
+
+        println(^mode);
+        printf("Part 2: {}\n", maximum - minimum - 1);
+    }
+}
