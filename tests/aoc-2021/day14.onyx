@@ -82,11 +82,7 @@ main :: (args) => {
 
         mode: Map(u8, u64);
         for^ polymer_state.entries {
-            if !mode->has(it.key.b) {
-                mode[it.key.b] = it.value.now;
-            } else {
-                mode[it.key.b] = mode[it.key.b] + it.value.now;
-            }
+            mode[it.key.b] = mode[it.key.b] + it.value.now;
         }
 
         maximum := array.fold(mode.entries, cast(u64) 0, (x, y) => math.max(x.value, y));
