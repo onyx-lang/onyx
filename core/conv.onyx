@@ -403,6 +403,14 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
                 }
             }
 
+            case i16, u16 {
+                value := *(cast(^i16) v.data);
+
+                ibuf : [128] u8;
+                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
+                output->write(istr);
+            }
+
             case i32, u32 {
                 value := *(cast(^i32) v.data);
 
