@@ -2,8 +2,8 @@
 
 use package core
 
-ugh :: struct { x, y: i32; cost: i32; dist: i32; };
-#operator == (u1, u2: ugh) => u1.x == u2.x && u1.y == u2.y;
+queued :: struct { x, y: i32; cost: i32; };
+#operator == (u1, u2: queued) => u1.x == u2.x && u1.y == u2.y;
 
 pos :: struct { x, y: i32; }
 #match hash.to_u32 (p: pos) => p.x * 12462341 + p.y * 1231247823;
@@ -12,30 +12,27 @@ pos :: struct { x, y: i32; }
 main :: (args) => {
     for file: os.with_file("./tests/aoc-2021/input/day15.txt") {
         reader := io.reader_make(file);
-        
+
         cells: [..] u8;
         height := 0;
         while !io.reader_empty(^reader) {
             line := io.read_line(^reader, consume_newline=false, inplace=true);
             io.skip_whitespace(^reader);
-  
+
             for line do cells << it;
             height += 1;
         }
 
         width := cells.count / height;
 
-        to_try: [..] ugh;
+        to_try: [..] queued;
         tried := set.make(pos);
 
-        to_try << .{ 0, 0, 0, 0 };
+        to_try << .{ 0, 0, -cast(i32) (cells[0] - #char "0") };
 
         minimum := 0;
         while to_try.count != 0 {
             try := array.pop(^to_try);
-            // if tried->has(.{try.x,try.y}) do continue;
-
-            // println(try);
             tried << .{try.x, try.y};
 
             cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - #char "0");
@@ -47,45 +44,24 @@ main :: (args) => {
                 break;
             }
 
-            dist := math.abs(try.x - width * 5 + 1) + math.abs(try.y - height * 5 + 1);
-            if try.x > 0 {
-                if !tried->has(.{try.x - 1, try.y}) {
-                    if found := array.find_ptr(to_try, .{try.x - 1, try.y, 0, 0}); found != null {
-                        found.cost = math.min(cell_value, found.cost);
-                    } else {
-                        to_try << .{try.x - 1, try.y + 0, cell_value, dist + 1 };
-                    }
-                }
-            }
-            if try.x < width * 5 - 1 {
-                if !tried->has(.{try.x + 1, try.y}) {
-                    if found := array.find_ptr(to_try, .{try.x + 1, try.y, 0, 0}); found != null {
-                        found.cost = math.min(cell_value, found.cost);
-                    } else {
-                        to_try << .{try.x + 1, try.y + 0, cell_value, dist - 1 };
-                    }
-                }
-            }
-            if try.y > 0 {
-                if !tried->has(.{try.x, try.y - 1}) {
-                    if found := array.find_ptr(to_try, .{try.x, try.y - 1, 0, 0}); found != null {
-                        found.cost = math.min(cell_value, found.cost);
-                    } else {
-                        to_try << .{try.x, try.y - 1, cell_value, dist + 1 };
-                    }
-                }
-            }
-            if try.y < height * 5 - 1 {
-                if !tried->has(.{try.x, try.y + 1}) {
-                    if found := array.find_ptr(to_try, .{try.x, try.y + 1, 0, 0}); found != null {
-                        found.cost = math.min(cell_value, found.cost);
-                    } else {
-                        to_try << .{try.x, try.y + 1, cell_value, dist - 1 };
+            attempt_add :: macro (cond: Code, dx, dy: i32) {
+                if #insert cond {
+                    if !tried->has(.{try.x + dx, try.y + dy}) {
+                        if found := array.find_ptr(to_try, .{try.x + dx, try.y + dy, 0}); found != null {
+                            found.cost = math.min(cell_value, found.cost);
+                        } else {
+                            to_try << .{try.x + dx, try.y + dy, cell_value };
+                        }
                     }
                 }
             }
 
-            array.sort(to_try, (y,x) => (x.cost + x.dist) - (y.cost + y.dist));
+            attempt_add(#(try.x > 0), -1, 0);
+            attempt_add(#(try.x < width * 5 - 1), 1, 0);
+            attempt_add(#(try.y > 0), 0, -1);
+            attempt_add(#(try.y < height * 5 - 1), 0, 1);
+
+            array.sort(to_try, (y,x) => x.cost - y.cost);
         }
 
         printf("Part 2: {}\n", minimum);// - ~~(cells[0] - #char "0"));
