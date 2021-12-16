@@ -124,6 +124,12 @@
         return NULL; \
     }
 
+#define ONYX_GL_INT_PTR_RET_PTR(name, ptr_type) \
+    ONYX_DEF(name, (INT, PTR), (INT)) {            \
+        results->data[0] = WASM_I32_VAL(glad_##name (params->data[0].of.i32, (ptr_type *) ONYX_PTR(params->data[1].of.i32))); \
+        return NULL; \
+    }
+
 #define ONYX_GL_INT_2_PTR(name, ptr_type)       \
     ONYX_DEF(name, (INT, INT, PTR), ()) {       \
         glad_##name (params->data[0].of.i32, params->data[1].of.i32, (ptr_type *) ONYX_PTR(params->data[2].of.i32)); \
@@ -371,7 +377,7 @@ ONYX_GL_INT_PTR(glGenTransformFeedbacks, GLuint)
 ONYX_GL_INT_PTR(glGetFragDataLocation, char)
 ONYX_GL_INT_PTR(glVertexAttribI4iv, GLint)
 ONYX_GL_INT_PTR(glVertexAttribI4uiv, GLuint)
-ONYX_GL_INT_PTR(glGetUniformBlockIndex, char)
+ONYX_GL_INT_PTR_RET_PTR(glGetUniformBlockIndex, char)
 ONYX_GL_INT_3(glDrawArrays)
 ONYX_GL_INT_3(glStencilFunc)
 ONYX_GL_INT_3(glStencilOp)

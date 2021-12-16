@@ -475,6 +475,9 @@ GLFW_HOOK(glfwSetCursorEnterCallback, (int entered),
 
 GLFW_HOOK(glfwSetScrollCallback, (double dx, double dy),
                                  (WASM_F64_VAL(dx), WASM_F64_VAL(dy)))
+
+GLFW_HOOK(glfwSetWindowSizeCallback, (int width, int height),
+                                     (WASM_I32_VAL(width), WASM_I32_VAL(height)))
 // // glfwSetDropCallback
 
 ONYX_DEF(glfwGetLoadProcAddress, (), (LONG)) {
@@ -561,6 +564,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(glfwSetCursorPosCallback)
     ONYX_FUNC(glfwSetCursorEnterCallback)
     ONYX_FUNC(glfwSetScrollCallback)
+    ONYX_FUNC(glfwSetWindowSizeCallback)
 
     ONYX_FUNC(glfwGetLoadProcAddress)
     // // glfwGetKeyName :: (key, scancode: i32) -> cstr ---

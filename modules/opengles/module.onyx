@@ -13,7 +13,7 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glActiveTexture :: (texture: GLenum) -> void ---
     glAttachShader :: (program: GLuint, shader: GLuint) -> void ---
     glBindAttribLocation :: (program: GLuint, index: GLuint, name: ^GLchar) -> void ---
-    glBindBuffer :: (target: GLenum, buffer: GLuint) -> void ---
+    glBindBuffer :: (target: GLenum, buffer: GLint) -> void ---
     glBindFramebuffer :: (target: GLenum, framebuffer: GLuint) -> void ---
     glBindRenderbuffer :: (target: GLenum, renderbuffer: GLuint) -> void ---
     glBindTexture :: (target: GLenum, texture: GLuint) -> void ---
@@ -183,7 +183,7 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glFramebufferTextureLayer :: (target: GLenum, attachment: GLenum, texture: GLuint, level: GLint, layer: GLint) -> void ---
     glMapBufferRange :: (target: GLenum, offset: GLintptr, length: GLsizeiptr, access: GLbitfield) -> rawptr ---
     glFlushMappedBufferRange :: (target: GLenum, offset: GLintptr, length: GLsizeiptr) -> void ---
-    glBindVertexArray :: (array: GLuint) -> void ---
+    glBindVertexArray :: (array: GLint) -> void ---
     glDeleteVertexArrays :: (n: GLsizei, arrays: ^GLuint) -> void ---
     glGenVertexArrays :: (n: GLsizei, arrays: ^GLuint) -> void ---
     glIsVertexArray :: (array: GLuint) -> GLboolean ---

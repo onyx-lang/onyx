@@ -133,6 +133,7 @@ GLFWgammaramp :: struct {
     glfwWaitEventsTimeout :: (timeout: f64) -> void ---
     glfwPostEmptyEvent :: () -> void ---
     glfwSwapBuffers :: (window: GLFWwindow_p) -> void ---
+    glfwSetWindowSizeCallback :: (window: GLFWwindow_p, name: str) -> void ---
 }
 
 // This should always be defined right?
