@@ -589,7 +589,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 }
             }
 
-            Type* concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos);
+            Type* concrete = polymorphic_struct_lookup(ps_type, slns, pc_type->token->pos, (pc_type->flags & Ast_Flag_Header_Check_No_Error) == 0);
 
             // This should be copied in the previous function.
             // CLEANUP: Maybe don't copy it and just use this one since it is allocated on the heap?

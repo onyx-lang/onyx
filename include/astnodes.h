@@ -1645,7 +1645,7 @@ void report_unable_to_match_overload(AstCall* call);
 void expand_macro(AstCall** pcall, AstFunction* template);
 AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
 
-Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos);
+Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

@@ -890,7 +890,7 @@ char* build_poly_struct_name(AstPolyStructType* ps_type, Type* cs_type) {
     return bh_aprintf(global_heap_allocator, "%s", name_buf);
 }
 
-Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos) {
+Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed) {
     // @Cleanup
     assert(ps_type->scope != NULL);
 
@@ -910,7 +910,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     i32 i = 0;
     bh_arr_each(AstPolySolution, sln, slns) {
         sln->poly_sym = (AstNode *) &ps_type->poly_params[i];
-        
+
         PolySolutionKind expected_kind = PSK_Undefined;
         if ((AstNode *) ps_type->poly_params[i].type_node == (AstNode *) &basic_type_type_expr) {
             expected_kind = PSK_Type;
@@ -974,6 +974,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     insert_poly_slns_into_scope(sln_scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
+    BH_MASK_SET(concrete_struct->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
     shput(ps_type->concrete_structs, unique_key, concrete_struct);
 
     add_entities_for_node(NULL, (AstNode *) concrete_struct, sln_scope, NULL);

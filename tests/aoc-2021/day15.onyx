@@ -28,7 +28,7 @@ main :: (args) => {
         to_try := heap.make(queued, (x, y) => x.cost - y.cost);
         tried := set.make(pos);
 
-        heap.insert(^to_try, .{ 0, 0, -cast(i32) (cells[0] - #char "0") });
+        to_try << .{ 0, 0, -cast(i32) (cells[0] - #char "0") };
 
         minimum := 0;
         while to_try.data.count != 0 {
@@ -50,7 +50,7 @@ main :: (args) => {
                         if found := array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
                             found.cost = math.min(cell_value, found.cost);
                         } else {
-                            heap.insert(^to_try, .{try.x + dx, try.y + dy, cell_value });
+                            to_try << .{try.x + dx, try.y + dy, cell_value };
                         }
                     }
                 }

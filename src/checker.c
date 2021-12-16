@@ -2032,7 +2032,7 @@ CheckStatus check_struct(AstStructType* s_node) {
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
     if (s_node->constraints.constraints) {
-        s_node->constraints.produce_errors = 1;
+        s_node->constraints.produce_errors = (s_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
         CHECK(constraint_context, &s_node->constraints, s_node->scope, s_node->token->pos);
     }
 
@@ -2179,14 +2179,15 @@ CheckStatus check_function_header(AstFunction* func) {
             expect_default_param = 1;
         }
 
-        if (local->type_node != NULL) CHECK(type, local->type_node);
+        if (local->type_node != NULL) {
+            // If the function has the no_error flag, then the type node should have it set too.
+            // This allows for polymorphic structures with constraints to fail gracefully.
+            local->type_node->flags |= (func->flags & Ast_Flag_Header_Check_No_Error);
+            CHECK(type, local->type_node);
+        }
 
         fill_in_type((AstTyped *) local);
         if (local->type == NULL) {
-            // onyx_report_error(param->local->token->pos,
-            //         "Unable to resolve type for parameter, '%b'",
-            //         local->token->text,
-            //         local->token->length);
             YIELD(local->token->pos, "Waiting for parameter type to be known.");
         }
 
@@ -2613,9 +2614,14 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
 
                     onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, "Failed to satisfy constraint where %s.", constraint_map);
                     onyx_report_error(constraint->token->pos, "Here is where the interface was used.");
-                }
 
-                return Check_Error;
+                    return Check_Error;
+
+                } else {
+                    // If no error are suppose to be produced, we still need to signal that 
+                    // the node reached a completed state.
+                    return Check_Failed;
+                }
             }
 
             if (cc->constraint_checks[i] == Constraint_Check_Status_Queued) {
