@@ -64,8 +64,9 @@ main :: (args) => {
             array.sort(to_try, (y,x) => x.cost - y.cost);
         }
 
-        printf("Part 2: {}\n", minimum);// - ~~(cells[0] - #char "0"));
-/*
+        printf("Part 2: {}\n", minimum);
+
+/*      NAIVE SOLUTION
         min_paths := array.make(u32, capacity=cells.count*25);
         min_paths.count = cells.count * 25;
         memory.set(min_paths.data, 0, sizeof u32 * min_paths.count * 25);
