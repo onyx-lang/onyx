@@ -2074,6 +2074,8 @@ CheckStatus check_struct(AstStructType* s_node) {
 CheckStatus check_struct_defaults(AstStructType* s_node) {
     if (s_node->entity_type && s_node->entity_type->state < Entity_State_Code_Gen)
         YIELD(s_node->token->pos, "Waiting for struct type to be constructed before checking defaulted members.");
+    if (s_node->entity_type && s_node->entity_type->state == Entity_State_Failed)
+        return Check_Failed;
 
     if (s_node->meta_tags) {
         bh_arr_each(AstTyped *, meta, s_node->meta_tags) {
@@ -2189,6 +2191,10 @@ CheckStatus check_function_header(AstFunction* func) {
         fill_in_type((AstTyped *) local);
         if (local->type == NULL) {
             YIELD(local->token->pos, "Waiting for parameter type to be known.");
+        }
+
+        if (local->type == (Type *) &node_that_signals_failure) {
+            return Check_Failed;
         }
 
         if (local->type->kind == Type_Kind_Compound) {

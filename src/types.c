@@ -596,6 +596,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_arr_free(slns);
 
             if (!concrete) return NULL;
+            if (concrete == (Type *) &node_that_signals_failure) return concrete;
             concrete->Struct.constructed_from = (AstType *) ps_type;
             return concrete;
         }

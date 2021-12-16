@@ -18,6 +18,7 @@ static b32 doing_nested_polymorph_lookup = 0;
 // like polymorphic_proc_lookup when it is determined that everything works so far, but
 // the caller must yield in order to finish checking this polymorphic procedure.
 AstTyped node_that_signals_a_yield = { Ast_Kind_Function, 0 };
+AstTyped node_that_signals_failure = { Ast_Kind_Error, 0 };
 
 static void ensure_polyproc_cache_is_created(AstPolyProc* pp) {
     if (pp->concrete_funcs == NULL)        sh_new_arena(pp->concrete_funcs);
@@ -959,6 +960,10 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
 
         if (concrete_struct->entity_type->state < Entity_State_Check_Types) {
             return NULL;
+        }
+
+        if (concrete_struct->entity_type->state == Entity_State_Failed) {
+            return (Type *) &node_that_signals_failure;
         }
 
         Type* cs_type = type_build_from_ast(context.ast_alloc, (AstType *) concrete_struct);
