@@ -25,14 +25,14 @@ main :: (args) => {
 
         width := cells.count / height;
 
-        to_try: [..] queued;
+        to_try := heap.make(queued, (x, y) => x.cost - y.cost);
         tried := set.make(pos);
 
-        to_try << .{ 0, 0, -cast(i32) (cells[0] - #char "0") };
+        heap.insert(^to_try, .{ 0, 0, -cast(i32) (cells[0] - #char "0") });
 
         minimum := 0;
-        while to_try.count != 0 {
-            try := array.pop(^to_try);
+        while to_try.data.count != 0 {
+            try := heap.remove_top(^to_try);
             tried << .{try.x, try.y};
 
             cell_value := cast(u32) (cells[(try.y % height) * width + (try.x % width)] - #char "0");
@@ -47,10 +47,10 @@ main :: (args) => {
             attempt_add :: macro (cond: Code, dx, dy: i32) {
                 if #insert cond {
                     if !tried->has(.{try.x + dx, try.y + dy}) {
-                        if found := array.find_ptr(to_try, .{try.x + dx, try.y + dy, 0}); found != null {
+                        if found := array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
                             found.cost = math.min(cell_value, found.cost);
                         } else {
-                            to_try << .{try.x + dx, try.y + dy, cell_value };
+                            heap.insert(^to_try, .{try.x + dx, try.y + dy, cell_value });
                         }
                     }
                 }
@@ -60,8 +60,6 @@ main :: (args) => {
             attempt_add(#(try.x < width * 5 - 1), 1, 0);
             attempt_add(#(try.y > 0), 0, -1);
             attempt_add(#(try.y < height * 5 - 1), 0, 1);
-
-            array.sort(to_try, (y,x) => x.cost - y.cost);
         }
 
         printf("Part 2: {}\n", minimum);

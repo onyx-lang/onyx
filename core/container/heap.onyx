@@ -1,0 +1,80 @@
+package core.heap
+
+#local {
+    array :: package core.array
+}
+
+Heap :: struct (T: type_expr) {
+    data: [..] T;
+    compare: (T, T) -> i32 = null_proc;
+}
+
+make :: ($T: type_expr, cmp: (T, T) -> i32 = null_proc) -> Heap(T) {
+    h: Heap(T);
+    init(^h, cmp);
+    return h;
+}
+
+init :: (use heap: ^Heap($T), cmp: (T, T) -> i32 = null_proc) {
+    array.init(^data);
+    compare = cmp;
+}
+
+insert :: (use heap: ^Heap($T), v: T) {
+    data << v;
+    shift_up(heap, data.count - 1);
+}
+
+#operator << macro (heap: Heap($T), v: T) do (package core.heap).insert(^heap, v);
+
+remove_top :: (use heap: ^Heap($T)) -> T {
+    x := data[0];
+    array.fast_delete(^data, 0);
+    shift_down(heap, 0);
+    return x;
+}
+
+#local {
+    heap_parent :: macro (index) => (index - 1) / 2
+    heap_lchild :: macro (index) => (index * 2) + 1
+    heap_rchild :: macro (index) => (index * 2) + 2
+
+    shift_down :: (use heap: ^Heap($T), idx: i32) {
+        while true {
+            min_index := idx;
+
+            l := heap_lchild(idx);
+            if l < data.count {
+                if compare(data[l], data[min_index]) < 0 {
+                    min_index = l;
+                }
+            }
+
+            r := heap_rchild(idx);
+            if r < data.count {
+                if compare(data[r], data[min_index]) < 0 {
+                    min_index = r;
+                }
+            }
+
+            if idx != min_index {
+                data[min_index], data[idx] = data[idx], data[min_index];
+                idx = min_index;
+                continue;
+            }
+
+            break;
+        }
+    }
+
+    shift_up :: (use heap: ^Heap($T), idx: i32) {
+        while idx > 0 {
+            parent := heap_parent(idx);
+            if compare(data[parent], data[idx]) <= 0 do break;
+
+            data[parent], data[idx] = data[idx], data[parent];
+            idx = parent;
+        }
+    }
+}
+

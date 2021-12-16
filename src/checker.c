@@ -2032,6 +2032,7 @@ CheckStatus check_struct(AstStructType* s_node) {
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
     if (s_node->constraints.constraints) {
+        s_node->constraints.produce_errors = 1;
         CHECK(constraint_context, &s_node->constraints, s_node->scope, s_node->token->pos);
     }
 
@@ -2217,6 +2218,7 @@ CheckStatus check_function_header(AstFunction* func) {
     if (func->return_type != NULL) CHECK(type, func->return_type);
 
     if (func->constraints.constraints != NULL) {
+        func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
         CHECK(constraint_context, &func->constraints, func->scope, func->token->pos);
     }
 
@@ -2593,23 +2595,26 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
 
         fori (i, 0, bh_arr_length(cc->constraints)) {
             if (cc->constraint_checks[i] == Constraint_Check_Status_Failed) {
-                AstConstraint *constraint = cc->constraints[i];
-                char constraint_map[512] = {0};
-                fori (i, 0, bh_arr_length(constraint->type_args)) {
-                    if (i != 0) strncat(constraint_map, ", ", 511);
+                if (cc->produce_errors) {
+                    AstConstraint *constraint = cc->constraints[i];
+                    char constraint_map[512] = {0};
+                    fori (i, 0, bh_arr_length(constraint->type_args)) {
+                        if (i != 0) strncat(constraint_map, ", ", 511);
 
-                    OnyxToken* symbol = constraint->interface->params[i].token;
-                    token_toggle_end(symbol);
-                    strncat(constraint_map, symbol->text, 511);
-                    token_toggle_end(symbol);
+                        OnyxToken* symbol = constraint->interface->params[i].token;
+                        token_toggle_end(symbol);
+                        strncat(constraint_map, symbol->text, 511);
+                        token_toggle_end(symbol);
 
-                    strncat(constraint_map, " is of type '", 511);
-                    strncat(constraint_map, type_get_name(type_build_from_ast(context.ast_alloc, constraint->type_args[i])), 511);
-                    strncat(constraint_map, "'", 511);
+                        strncat(constraint_map, " is of type '", 511);
+                        strncat(constraint_map, type_get_name(type_build_from_ast(context.ast_alloc, constraint->type_args[i])), 511);
+                        strncat(constraint_map, "'", 511);
+                    }
+
+                    onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, "Failed to satisfy constraint where %s.", constraint_map);
+                    onyx_report_error(constraint->token->pos, "Here is where the interface was used.");
                 }
 
-                onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, "Failed to satisfy constraint where %s.", constraint_map);
-                onyx_report_error(constraint->token->pos, "Here is where the interface was used.");
                 return Check_Error;
             }
 

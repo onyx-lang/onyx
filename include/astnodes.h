@@ -540,6 +540,7 @@ typedef struct ConstraintContext {
     bh_arr(AstConstraint *) constraints;
     ConstraintCheckStatus *constraint_checks;
     b32 constraints_met : 1;
+    b32 produce_errors  : 1;
 } ConstraintContext;
 
 
