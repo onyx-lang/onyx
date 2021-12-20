@@ -84,14 +84,14 @@ main :: (args) => {
         }
 
         for y: height - 1 do for x: width {
-            map.update(^heightmap, .{x,y}) #{
+            map.update(^heightmap, .{x,y}) {
                 it.dy = it.height - heightmap[Pos.{x,y+1}].height;
-            };
+            }
         }
         for x: width - 1 do for y: height {
-            map.update(^heightmap, .{x,y}) #{
+            map.update(^heightmap, .{x,y}) {
                 it.dx = it.height - heightmap[Pos.{x+1,y}].height;
-            };
+            }
         }
 
         lowest: [..] Pos;

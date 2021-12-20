@@ -759,18 +759,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 //              foo(x, y, #code {
 //                  // ...
 //              })
-                if (next_tokens_are(parser, 2, '#', '{')) {
-                    consume_token(parser);
-
-                    AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
-                    code_block->token = parser->curr;
-                    code_block->type_node = builtin_code_type;
-
-                    code_block->code = (AstNode *) parse_block(parser, 1, NULL);
-                    ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
-
-                    bh_arr_push(call_node->args.values, (AstTyped *) code_block);
-                }
 
                 // Wrap expressions in AstArgument
                 bh_arr_each(AstTyped *, arg, call_node->args.values) {
@@ -1419,6 +1407,19 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Literal_Float:
         case Token_Type_Literal_String:
             retval = (AstNode *) parse_compound_expression(parser, 1);
+            if (retval->kind == Ast_Kind_Call) {
+                if (parser->curr->type == '{') {
+                    AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
+                    code_block->token = parser->curr;
+                    code_block->type_node = builtin_code_type;
+
+                    code_block->code = (AstNode *) parse_block(parser, 1, NULL);
+                    ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
+
+                    bh_arr_push(((AstCall *) retval)->args.values, (AstTyped *) make_argument(context.ast_alloc, (AstTyped *) code_block));
+                    needs_semicolon = 0;
+                }
+            }
             break;
 
         case Token_Type_Keyword_If:
