@@ -14,9 +14,9 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glAttachShader :: (program: GLuint, shader: GLuint) -> void ---
     glBindAttribLocation :: (program: GLuint, index: GLuint, name: ^GLchar) -> void ---
     glBindBuffer :: (target: GLenum, buffer: GLint) -> void ---
-    glBindFramebuffer :: (target: GLenum, framebuffer: GLuint) -> void ---
-    glBindRenderbuffer :: (target: GLenum, renderbuffer: GLuint) -> void ---
-    glBindTexture :: (target: GLenum, texture: GLuint) -> void ---
+    glBindFramebuffer :: (target: GLenum, framebuffer: GLint) -> void ---
+    glBindRenderbuffer :: (target: GLenum, renderbuffer: GLint) -> void ---
+    glBindTexture :: (target: GLenum, texture: GLint) -> void ---
     glBlendColor :: (red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) -> void ---
     glBlendEquation :: (mode: GLenum) -> void ---
     glBlendEquationSeparate :: (modeRGB: GLenum, modeAlpha: GLenum) -> void ---
