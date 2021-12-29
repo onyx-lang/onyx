@@ -11,6 +11,12 @@ as_allocator :: #match {
     macro (a: Allocator) => a
 }
 
+// This is similar to alloca in C.
+from_stack :: macro (size: u32) -> rawptr {
+    defer __stack_top = ~~(cast(^u8) __stack_top + size);
+    return __stack_top;
+}
+
 TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
 
 // The global heap allocator, set up upon program intialization.
