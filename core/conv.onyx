@@ -397,7 +397,7 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
         }
     }
 
-    if custom_formatters[v.type] != null_proc {
+    if custom_formatters->has(v.type) {
         custom_formatters[v.type](output, formatting, v.data);
         return;
     }

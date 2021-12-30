@@ -408,7 +408,6 @@ u64 build_type_table(OnyxWasmModule* module) {
                 i32 i = 0;
                 bh_arr_each(AstTyped *, tag, type->PolyStruct.meta_tags) {
                     AstTyped* value = *tag;                        
-                    assert(value->type);
 
                     // Polymorphic structs are weird in this case, because the tag might not be constructed generically for
                     // the polymorphic structure so it should only be constructed for actual solidified structures.
@@ -417,6 +416,8 @@ u64 build_type_table(OnyxWasmModule* module) {
                         tags_count--;
                         continue;
                     }
+
+                    assert(value->type);
 
                     u32 size = type_size_of(value->type);
                     bh_buffer_align(&table_buffer, type_alignment_of(value->type));
