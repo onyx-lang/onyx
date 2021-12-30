@@ -5,6 +5,7 @@ package core.map
     hash   :: package core.hash
     memory :: package core.memory
     math   :: package core.math
+    conv   :: package core.conv
 
     use package core.intrinsics.onyx { __zero_value, __initialize }
 }
@@ -142,6 +143,18 @@ clear :: (use map: ^Map($K, $V)) {
 
 empty :: (use map: ^Map($K, $V)) -> bool {
     return entries.count == 0;
+}
+
+format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V)) {
+    output->write("{\n");
+    for^ e: x.entries {
+        output->write("    ");
+        conv.format_any(output, format, .{^e.key, K});
+        output->write(" => ");
+        conv.format_any(output, format, .{^e.value, V});
+        output->write("\n");
+    }
+    output->write("}");
 }
 
 //

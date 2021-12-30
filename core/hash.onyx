@@ -10,6 +10,7 @@ to_u32 :: #match {
         for ch: key do hash += (hash << 5) + ~~ch;
         return hash;
     },
+    (key: type_expr) -> u32 do return to_u32(cast(u32) key);
 }
 
 Hashable :: interface (T: type_expr) {

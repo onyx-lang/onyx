@@ -3,7 +3,7 @@
 use package core
 
 Pos :: struct {x,y: i32;}
-#match hash.to_u32 (use p: Pos) => x * 5039473 + 59362447 * y;
+#match hash.to_u32 (use p: Pos) => x * 13 ^ 17 * y;
 #operator == (p1, p2: Pos) => p1.x == p2.x && p1.y == p2.y;
 
 Cell :: struct {

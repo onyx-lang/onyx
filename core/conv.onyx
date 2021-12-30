@@ -1,5 +1,18 @@
 package core.conv
 
+#local {
+    map :: package core.map
+    custom_formatters: Map(type_expr, (^Format_Output, ^Format, rawptr) -> void);
+}
+
+custom_formatters_initialized :: #init () {
+    map.init(^custom_formatters, default=null_proc);
+}
+
+register_custom_formatter :: (formatter: (^Format_Output, ^Format, ^$T) -> void) {
+    custom_formatters[T] = formatter;
+}
+
 str_to_i64 :: (s: str) -> i64 {
     use package core
 
@@ -158,34 +171,7 @@ i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
     return str.{ data = c + 1, count = len };
 }
 
-#if false {
-@Hack @Cleanup // This is a big hack but it will work for now
-f64_to_str :: (f: f64, buf: [] u8) -> str {
-    f *= 10000.0;
-    v := cast(i64) f;
-
-    len := 0;
-    if v < ~~0 {
-        v = -v;
-
-        buf[0] = #char "-";
-        len += 1;
-    }
-
-    s1 := i64_to_str(v / 10000, 10, buf);
-    for i: 0 .. s1.count do buf.data[i + len] = s1.data[i];
-    buf.data[s1.count + len] = #char ".";
-    len += s1.count + 1;
-
-    s2 := i64_to_str(v % 10000, 10, buf, min_length = 4);
-    for i: 0 .. s2.count do buf.data[len + i] = s2.data[i];
-    len += s2.count;
-
-    return str.{ buf.data, len };
-}
-}
-
-// This is better than the above version, but still relies on converting the integer
+// This is better than what used to be, but still relies on converting the integer
 // part of the float to an integer, which could overflow.
 f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     math :: package core.math
@@ -221,48 +207,52 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     return str.{ buf.data, len };
 }
 
-str_format :: (buffer: [] u8, format: str, va: ..any) -> str {
-    return str_format_va(buffer, format, ~~va); 
-}
+@Remove // old aliases to not break old programs
+str_format :: format
+str_format_va :: format_va
 
-str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
-    Output :: struct {
-        data: ^u8;
-        count: u32;
-        capacity: u32;
+Format_Output :: struct {
+    data: ^u8;
+    count: u32;
+    capacity: u32;
 
-        write :: #match {
-            (use output: ^Output, c: u8) {
+    write :: #match {
+        (use output: ^Format_Output, c: u8) {
+            if count >= capacity do return;
+
+            data[count] = c;
+            count += 1;
+        },
+
+        (use output: ^Format_Output, s: str) {
+            for c: s {
                 if count >= capacity do return;
 
                 data[count] = c;
                 count += 1;
-            },
-
-            (use output: ^Output, s: str) {
-                for c: s {
-                    if count >= capacity do return;
-
-                    data[count] = c;
-                    count += 1;
-                }
             }
         }
     }
+}
 
-    output := Output.{ buffer.data, 0, buffer.count };
+Format :: struct {
+    pretty_printing      := false;
+    quote_strings        := false;
+    dereference          := false;
+    digits_after_decimal := cast(u32) 4;
 
-    Format :: struct {
-        pretty_printing      := false;
-        quote_strings        := false;
-        dereference          := false;
-        digits_after_decimal := cast(u32) 4;
+    indentation   := cast(u32) 0;
+    base          := cast(u64) 10;
+    minimum_width := cast(u32) 0;
+}
 
-        indentation   := cast(u32) 0;
-        base          := cast(u64) 10;
-        minimum_width := cast(u32) 0;
-    }
 
+format :: (buffer: [] u8, format: str, va: ..any) -> str {
+    return format_va(buffer, format, ~~va); 
+}
+
+format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
+    output := Format_Output.{ buffer.data, 0, buffer.count };
     vararg_index := 0;
 
     while i := 0; i < format.count {
@@ -341,7 +331,7 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
                     case #char "}" {
                         arg := va[vararg_index];
                         vararg_index += 1;
-                        print_any(^output, formatting, arg);
+                        format_any(^output, ^formatting, arg);
 
                         break break;
                     }
@@ -365,417 +355,292 @@ str_format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
     }
 
     return .{ output.data, output.count };
+}
 
-    print_any :: (output: ^Output, formatting: Format, v: any) {
-        use package builtin.type_info
-        array :: package core.array;
+format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
+    use package builtin.type_info
+    array :: package core.array;
 
-        if formatting.dereference {
-            ti := get_type_info(v.type);
-            if ti.kind == .Pointer {
-                formatting.dereference = false;
+    if formatting.dereference {
+        ti := get_type_info(v.type);
+        if ti.kind == .Pointer {
+            formatting.dereference = false;
 
-                new_any: any;
-                new_any.type = (cast(^Type_Info_Pointer) ti).to;
-                new_any.data = *(cast(^rawptr) v.data);
-                print_any(output, formatting, new_any);
-                return;
-            }
-        }
-
-        switch v.type {
-            case bool {
-                value := *(cast(^bool) v.data);
-                if value do output->write("true");
-                else     do output->write("false");
-            }
-
-            case u8 {
-                value := *(cast(^u8) v.data);
-
-                if value > 31 {
-                    output->write(value);
-
-                } else {
-                    ibuf : [128] u8;
-                    istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
-                    output->write(istr);
-                }
-            }
-
-            case i16, u16 {
-                value := *(cast(^i16) v.data);
-
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
-                output->write(istr);
-            }
-
-            case i32, u32 {
-                value := *(cast(^i32) v.data);
-
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
-                output->write(istr);
-            }
-
-            case i64, u64 {
-                value := *(cast(^i64) v.data);
-
-                ibuf : [128] u8;
-                istr := i64_to_str(~~value, formatting.base, ~~ibuf);
-                output->write(istr);
-            }
-
-            case f32 {
-                value := *(cast(^f32) v.data);
-
-                fbuf : [128] u8;
-                fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
-                output->write(fstr);
-            }
-
-            case f64 {
-                value := *(cast(^f64) v.data);
-
-                fbuf : [128] u8;
-                fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
-                output->write(fstr);
-            }
-
-            case str {
-                if formatting.quote_strings do output->write("\"");
-                @Todo // escape '"' when quote_strings is enabled.
-                output->write(*(cast(^str) v.data));
-                if formatting.quote_strings do output->write("\"");
-            }
-
-            case rawptr {
-                value := *(cast(^rawptr) v.data);
-
-                if value == null {
-                    output->write("(null)");
-                } else {
-                    ibuf : [128] u8;
-                    istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
-                    output->write(istr);
-                }
-            }
-
-            case type_expr {
-                value := *(cast(^type_expr) v.data);
-
-                io :: package core.io
-
-                buf : [256] u8;          
-
-                // This is a little gross but the only way to output the type name for a type_expr
-                // is through a io.Writer. That should maybe be changed in the future? Also, I think
-                // 256 bytes is enough for the name of a type but I'm not entirely sure...
-                stream := io.string_stream_make(~~buf);
-                writer := io.writer_make(^stream);
-                type_info.write_type_name(^writer, value);
-
-                output->write(io.string_stream_to_str(^stream));
-            }
-
-            case #default {
-                info := get_type_info(v.type);
-
-                if info.kind == .Struct {
-                    s := cast(^Type_Info_Struct) info;
-
-                    if s.name.count > 0 {
-                        output->write(s.name);
-                        output->write(" { ");
-                    } else {
-                        output->write("{ ");
-                    }
-
-                    {
-                        format := formatting;
-                        format.quote_strings = true;
-                        if format.pretty_printing {
-                            format.indentation += 4;
-                        }
-                        
-                        for ^member: s.members {
-                            if member != s.members.data do output->write(", ");
-
-                            if formatting.pretty_printing {
-                                output->write(#char "\n");
-                                for i: format.indentation do output->write(#char " ");
-                            }
-
-                            output->write(member.name);
-                            output->write(" = ");
-
-                            print_any(output, format, .{ ~~(cast(^u8) v.data + member.offset), member.type });
-                        }
-                    }
-                    
-                    if formatting.pretty_printing {
-                        output->write(#char "\n");
-                        for i: formatting.indentation do output->write(#char " ");
-                        output->write("}");
-                        
-                    } else {
-                        output->write(" }");
-                    }
-                }
-
-                if info.kind == .Function {
-                    output->write("func[");
-
-                    value := *(cast(^i32) v.data);
-
-                    ibuf : [128] u8;
-                    istr := i64_to_str(~~value, 10, ~~ibuf);
-                    output->write(istr);
-
-                    output->write("]");
-                }
-
-                if info.kind == .Pointer {
-                    value := *(cast(^rawptr) v.data);
-
-                    ibuf : [128] u8;
-                    istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
-                    output->write(istr);
-                }
-
-                // This assumes that the following type_info kinds are basically the same.
-                if info.kind == .Dynamic_Array || info.kind == .Slice || info.kind == .Variadic_Argument {
-                    if formatting.pretty_printing {
-                        output->write("[");
-                    } else {
-                        output->write("[ ");
-                    }
-
-                    a := cast(^Type_Info_Dynamic_Array) info;
-                    arr := cast(^array.Untyped_Array) v.data;
-                    data  := arr.data;
-                    count := arr.count;
-
-                    format := formatting;
-                    format.quote_strings = true;
-                    if format.pretty_printing do format.indentation += 4;
-
-                    for i: count {
-                        if i != 0 do output->write(", ");
-
-                        if formatting.pretty_printing {
-                            output->write("\n");
-                            for _: format.indentation do output->write(#char " ");
-                        }
-
-                        print_any(output, format, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
-                    }
-
-
-                    if formatting.pretty_printing {
-                        format.indentation -= 4;
-                        output->write("\n");
-                        for _: format.indentation do output->write(#char " ");
-                        output->write(#char "]");
-
-                    } else {
-                        output->write(" ]");
-                    }
-                }
-
-                if info.kind == .Array {
-                    output->write("[ ");
-
-                    a := cast(^Type_Info_Array) info;
-                    data := v.data;
-
-                    for i: a.count {
-                        if i != 0 do output->write(", ");
-
-                        print_any(output, formatting, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
-                    }
-
-                    output->write(" ]");
-                }
-
-                if info.kind == .Enum {
-                    e := cast(^Type_Info_Enum) info;
-
-                    value: u64;
-                    switch e.backing_type {
-                        case i8,  u8  do value = cast(u64) *(cast(^u8) v.data);
-                        case i16, u16 do value = cast(u64) *(cast(^u16) v.data);
-                        case i32, u32 do value = cast(u64) *(cast(^u32) v.data);
-                        case i64, u64 do value = cast(u64) *(cast(^u64) v.data);
-                        case #default do assert(false, "Bad enum backing type");
-                    }
-
-                    if !e.is_flags {
-                        for ^member: e.members {
-                            if value == member.value {
-                                output->write(member.name);
-                                break break;
-                            }
-                        }
-
-                        output->write("UNKNOWN");
-
-                    } else {
-                        first := true;
-                        for ^member: e.members {
-                            if value & member.value != 0 {
-                                if !first do output->write(" | ");
-                                output->write(member.name);
-                                first = false;
-                            }
-                        }
-
-                        if first {
-                            output->write("None");
-                        }
-                    }
-                }
-
-                if info.kind == .Distinct {
-                    d := cast(^Type_Info_Distinct) info;
-
-                    output->write(d.name);
-                    output->write("[");
-                    print_any(output, formatting, any.{ v.data, d.base_type });
-                    output->write("]");
-                }
-            }
+            new_any: any;
+            new_any.type = (cast(^Type_Info_Pointer) ti).to;
+            new_any.data = *(cast(^rawptr) v.data);
+            format_any(output, formatting, new_any);
+            return;
         }
     }
-}
 
+    if custom_formatters[v.type] != null_proc {
+        custom_formatters[v.type](output, formatting, v.data);
+        return;
+    }
 
-// Old % style print formatting
-#if false {
-str_format :: (format: str, buffer: [] u8, va: ...) -> str {
-	return str_format_va(format, buffer, va);
-}
+    switch v.type {
+        case bool {
+            value := *(cast(^bool) v.data);
+            if value do output->write("true");
+            else     do output->write("false");
+        }
 
-str_format_va :: (format: str, buffer: [] u8, va: vararg) -> str {
-    len := 0;
-    state := 0;
+        case u8 {
+            value := *(cast(^u8) v.data);
 
-    for ch: format do switch (state) {
-        case 0 {
-            if ch == #char "%" do state = 1;
-            else {
-                buffer[len] = ch;
-                len += 1;
+            if value > 31 {
+                output->write(value);
+
+            } else {
+                ibuf : [128] u8;
+                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
+                output->write(istr);
             }
+        }
+
+        case i16, u16 {
+            value := *(cast(^i16) v.data);
+
+            ibuf : [128] u8;
+            istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
+            output->write(istr);
+        }
+
+        case i32, u32 {
+            value := *(cast(^i32) v.data);
+
+            ibuf : [128] u8;
+            istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
+            output->write(istr);
+        }
+
+        case i64, u64 {
+            value := *(cast(^i64) v.data);
+
+            ibuf : [128] u8;
+            istr := i64_to_str(~~value, formatting.base, ~~ibuf);
+            output->write(istr);
+        }
+
+        case f32 {
+            value := *(cast(^f32) v.data);
+
+            fbuf : [128] u8;
+            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
+            output->write(fstr);
+        }
+
+        case f64 {
+            value := *(cast(^f64) v.data);
+
+            fbuf : [128] u8;
+            fstr := f64_to_str(~~value, ~~fbuf, formatting.digits_after_decimal);
+            output->write(fstr);
+        }
+
+        case str {
+            if formatting.quote_strings do output->write("\"");
+            @Todo // escape '"' when quote_strings is enabled.
+            output->write(*(cast(^str) v.data));
+            if formatting.quote_strings do output->write("\"");
+        }
+
+        case rawptr {
+            value := *(cast(^rawptr) v.data);
+
+            if value == null {
+                output->write("(null)");
+            } else {
+                ibuf : [128] u8;
+                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
+                output->write(istr);
+            }
+        }
+
+        case type_expr {
+            value := *(cast(^type_expr) v.data);
+
+            io :: package core.io
+
+            buf : [256] u8;          
+
+            // This is a little gross but the only way to output the type name for a type_expr
+            // is through a io.Writer. That should maybe be changed in the future? Also, I think
+            // 256 bytes is enough for the name of a type but I'm not entirely sure...
+            stream := io.string_stream_make(~~buf);
+            writer := io.writer_make(^stream);
+            type_info.write_type_name(^writer, value);
+
+            output->write(io.string_stream_to_str(^stream));
         }
 
         case #default {
-            switch (ch) {
-                case #char "%" { buffer[len] = ch; len += 1; }
+            info := get_type_info(v.type);
 
-                case #char "i" {
-                    n : i32;
-                    if !vararg_get(va, ^n) do return buffer.data[0 .. 0];
+            if info.kind == .Struct {
+                s := cast(^Type_Info_Struct) info;
 
-                    ibuf : [128] u8;
-                    istr := i64_to_str(~~n, 10, ibuf[0 .. 128]);
-
-                    for a: istr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
+                if s.name.count > 0 {
+                    output->write(s.name);
+                    output->write(" { ");
+                } else {
+                    output->write("{ ");
                 }
 
-                case #char "l" {
-                    n : i64;
-                    if !vararg_get(va, ^n) do return buffer.data[0 .. 0];
-
-                    ibuf : [128] u8;
-                    istr := i64_to_str(n, 10, ibuf[0 .. 128]);
-
-                    for a: istr {
-                        buffer[len] = a;
-                        len += 1;
+                {
+                    format := *formatting;
+                    format.quote_strings = true;
+                    if format.pretty_printing {
+                        format.indentation += 4;
                     }
-                }
+                    
+                    for ^member: s.members {
+                        if member != s.members.data do output->write(", ");
 
-                case #char "f" {
-                    n : f32;
-                    if !vararg_get(va, ^n) do return buffer.data[0 .. 0];
+                        if formatting.pretty_printing {
+                            output->write(#char "\n");
+                            for i: format.indentation do output->write(#char " ");
+                        }
 
-                    fbuf : [128] u8;
-                    fstr := f64_to_str(~~n, fbuf[0 .. 128]);
+                        output->write(member.name);
+                        output->write(" = ");
 
-                    for a: fstr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "d" {
-                    n : f64;
-                    if !vararg_get(va, ^n) do return buffer.data[0 .. 0];
-
-                    fbuf : [128] u8;
-                    fstr := f64_to_str(n, fbuf[0 .. 128]);
-
-                    for a: fstr {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "s" {
-                    s : str;
-                    if !vararg_get(va, ^s) do return buffer.data[0 .. 0];
-
-                    for a: s {
-                        buffer[len] = a;
-                        len += 1;
-                    }
-                }
-
-                case #char "p" {
-                    n : rawptr;
-                    if !vararg_get(va, ^n) do return buffer.data[0 .. 0];
-
-                    ibuf : [128] u8;
-                    istr := i64_to_str(~~n, 16, ibuf[0 .. 128]);
-
-                    for a: istr {
-                        buffer[len] = a;
-                        len += 1;
+                        format_any(output, ^format, .{ ~~(cast(^u8) v.data + member.offset), member.type });
                     }
                 }
                 
-                case #char "c" {
-                    c : u8;
-                    if !vararg_get(va, ^c) do return buffer.data[0 .. 0];
+                if formatting.pretty_printing {
+                    output->write(#char "\n");
+                    for i: formatting.indentation do output->write(#char " ");
+                    output->write("}");
+                    
+                } else {
+                    output->write(" }");
+                }
+            }
 
-                    buffer[len] = c;
-                    len += 1;
+            if info.kind == .Function {
+                output->write("func[");
+
+                value := *(cast(^i32) v.data);
+
+                ibuf : [128] u8;
+                istr := i64_to_str(~~value, 10, ~~ibuf);
+                output->write(istr);
+
+                output->write("]");
+            }
+
+            if info.kind == .Pointer {
+                value := *(cast(^rawptr) v.data);
+
+                ibuf : [128] u8;
+                istr := i64_to_str(~~value, 16, ~~ibuf, prefix=true);
+                output->write(istr);
+            }
+
+            // This assumes that the following type_info kinds are basically the same.
+            if info.kind == .Dynamic_Array || info.kind == .Slice || info.kind == .Variadic_Argument {
+                if formatting.pretty_printing {
+                    output->write("[");
+                } else {
+                    output->write("[ ");
                 }
 
-                case #char "b" {
-                    b : bool;
-                    if !vararg_get(va, ^b) do return buffer.data[0 .. 0];
+                a := cast(^Type_Info_Dynamic_Array) info;
+                arr := cast(^array.Untyped_Array) v.data;
+                data  := arr.data;
+                count := arr.count;
 
-                    s := "false";
-                    if b do s = "true";
+                format := *formatting;
+                format.quote_strings = true;
+                if format.pretty_printing do format.indentation += 4;
 
-                    for a: s {
-                        buffer[len] = a;
-                        len += 1;
+                for i: count {
+                    if i != 0 do output->write(", ");
+
+                    if formatting.pretty_printing {
+                        output->write("\n");
+                        for _: format.indentation do output->write(#char " ");
+                    }
+
+                    format_any(output, ^format, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
+                }
+
+
+                if formatting.pretty_printing {
+                    format.indentation -= 4;
+                    output->write("\n");
+                    for _: format.indentation do output->write(#char " ");
+                    output->write(#char "]");
+
+                } else {
+                    output->write(" ]");
+                }
+            }
+
+            if info.kind == .Array {
+                output->write("[ ");
+
+                a := cast(^Type_Info_Array) info;
+                data := v.data;
+
+                for i: a.count {
+                    if i != 0 do output->write(", ");
+
+                    format_any(output, formatting, .{ ~~(cast(^u8) data + get_type_info(a.of).size * i), a.of });
+                }
+
+                output->write(" ]");
+            }
+
+            if info.kind == .Enum {
+                e := cast(^Type_Info_Enum) info;
+
+                value: u64;
+                switch e.backing_type {
+                    case i8,  u8  do value = cast(u64) *(cast(^u8) v.data);
+                    case i16, u16 do value = cast(u64) *(cast(^u16) v.data);
+                    case i32, u32 do value = cast(u64) *(cast(^u32) v.data);
+                    case i64, u64 do value = cast(u64) *(cast(^u64) v.data);
+                    case #default do assert(false, "Bad enum backing type");
+                }
+
+                if !e.is_flags {
+                    for ^member: e.members {
+                        if value == member.value {
+                            output->write(member.name);
+                            break break;
+                        }
+                    }
+
+                    output->write("UNKNOWN");
+
+                } else {
+                    first := true;
+                    for ^member: e.members {
+                        if value & member.value != 0 {
+                            if !first do output->write(" | ");
+                            output->write(member.name);
+                            first = false;
+                        }
+                    }
+
+                    if first {
+                        output->write("None");
                     }
                 }
             }
 
-            state = 0;
+            if info.kind == .Distinct {
+                d := cast(^Type_Info_Distinct) info;
+
+                output->write(d.name);
+                output->write("[");
+                format_any(output, formatting, any.{ v.data, d.base_type });
+                output->write("]");
+            }
         }
     }
-
-    return str.{ ~~buffer.data, len };
 }
-}
-

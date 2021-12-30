@@ -1443,8 +1443,10 @@ CheckStatus check_subscript(AstSubscript** psub) {
     CHECK(expression, &sub->addr);
     CHECK(expression, &sub->expr);
 
+    if (sub->addr->type == NULL) YIELD(sub->token->pos, "Waiting to know type of left-hand side of subscript.");
+
     // NOTE: Try operator overloading before checking everything else.
-    if ((sub->addr->type != NULL && sub->expr->type != NULL) &&
+    if (sub->expr->type != NULL &&
         (sub->addr->type->kind != Type_Kind_Basic || sub->expr->type->kind != Type_Kind_Basic)) {
         // AstSubscript is the same as AstBinaryOp for the first sizeof(AstBinaryOp) bytes
         AstBinaryOp* binop = (AstBinaryOp *) sub;

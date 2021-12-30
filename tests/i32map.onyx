@@ -5,6 +5,10 @@ package main
 use package core
 
 main :: (args: [] cstr) {
+    conv.register_custom_formatter(
+        #solidify map.format_map { K=i32, V=str }
+    );
+
     imap : Map(i32, str);
     map.init(^imap, "");
     defer {
@@ -18,6 +22,8 @@ main :: (args: [] cstr) {
     println(map.has(^imap, 51));
 
     printf("{}{}\n", map.get(^imap, 50), map.get(^imap, 1234));
+
+    printf("{*}\n", ^imap);
 
     map.delete(^imap, 50);
     println(map.has(^imap, 50));

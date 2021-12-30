@@ -932,7 +932,7 @@ const char* type_get_unique_name(Type* type) {
             return bh_aprintf(global_scratch_allocator, "%s@%l", type->Distinct.name, type->id);
         }
 
-        default: return "unknown";
+        default: return "unknown (not null)";
     }
 }
 
