@@ -2,8 +2,8 @@ true
 false
 Hello World!
 {
-    50 => Hello 
-    1234 => World!
+    50 => "Hello "
+    1234 => "World!"
 }
 false
 false
