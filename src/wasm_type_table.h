@@ -404,11 +404,19 @@ u64 build_type_table(OnyxWasmModule* module) {
                 u32 name_length = strlen(type->PolyStruct.name);
                 bh_buffer_append(&table_buffer, type->PolyStruct.name, name_length);
 
+                u32 tags_count = bh_arr_length(type->PolyStruct.meta_tags);
                 i32 i = 0;
                 bh_arr_each(AstTyped *, tag, type->PolyStruct.meta_tags) {
                     AstTyped* value = *tag;                        
-                    assert(value->flags & Ast_Flag_Comptime);
                     assert(value->type);
+
+                    // Polymorphic structs are weird in this case, because the tag might not be constructed generically for
+                    // the polymorphic structure so it should only be constructed for actual solidified structures.
+                    // See core/containers/map.onyx with Custom_Format for an example.
+                    if (!(value->flags & Ast_Flag_Comptime)) {
+                        tags_count--;
+                        continue;
+                    }
 
                     u32 size = type_size_of(value->type);
                     bh_buffer_align(&table_buffer, type_alignment_of(value->type));
@@ -425,7 +433,6 @@ u64 build_type_table(OnyxWasmModule* module) {
 
                 bh_buffer_align(&table_buffer, 8);
                 u32 tags_base = table_buffer.length;
-                u32 tags_count = bh_arr_length(type->PolyStruct.meta_tags);
 
                 fori (i, 0, tags_count) {
                     WRITE_SLICE(tag_locations[i], type->PolyStruct.meta_tags[i]->type->id);

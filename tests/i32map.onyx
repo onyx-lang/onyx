@@ -5,10 +5,6 @@ package main
 use package core
 
 main :: (args: [] cstr) {
-    conv.register_custom_formatter(
-        #solidify map.format_map { K=i32, V=str }
-    );
-
     imap : Map(i32, str);
     map.init(^imap, "");
     defer {

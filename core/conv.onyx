@@ -1,5 +1,7 @@
 package core.conv
 
+Enable_Custom_Formatters :: true
+
 #local {
     map :: package core.map
     custom_formatters: Map(type_expr, (^Format_Output, ^Format, rawptr) -> void);
@@ -7,10 +9,31 @@ package core.conv
 
 custom_formatters_initialized :: #init () {
     map.init(^custom_formatters, default=null_proc);
+
+    #if Enable_Custom_Formatters {
+        use type_info;
+
+        for type_idx: type_table.count {
+            type := type_table[type_idx];
+            if type.kind != .Struct do continue;
+
+            s_info := cast(^Type_Info_Struct) type;
+            for s_info.tags {
+                if it.type != Custom_Format do continue;
+
+                custom_format := cast(^Custom_Format) it.data;
+                custom_formatters[cast(type_expr) type_idx] = custom_format.format;
+            } 
+        }
+    }
 }
 
 register_custom_formatter :: (formatter: (^Format_Output, ^Format, ^$T) -> void) {
     custom_formatters[T] = formatter;
+}
+
+Custom_Format :: struct {
+    format: (^Format_Output, ^Format, rawptr) -> void;
 }
 
 str_to_i64 :: (s: str) -> i64 {

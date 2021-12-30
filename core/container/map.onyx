@@ -21,7 +21,9 @@ package core.map
     }
 }
 
-Map :: struct (K: type_expr, V: type_expr) where ValidKey(K) {
+Map :: struct (K: type_expr, V: type_expr) where ValidKey(K)
+    [conv.Custom_Format.{ #solidify format_map {K=K, V=V} }]
+{
     allocator : Allocator;
 
     hashes  : [] i32;
