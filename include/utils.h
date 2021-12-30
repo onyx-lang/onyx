@@ -34,6 +34,7 @@ u32 char_to_base16_value(char x);
 i32 string_process_escape_seqs(char* dest, char* src, i32 len);
 
 u32 levenshtein_distance(const char *str1, const char *str2);
+char *find_closest_symbol_in_scope_and_parents(Scope *scope, char *sym);
 char *find_closest_symbol_in_node(AstNode *node, char *sym);
 
 extern AstTyped node_that_signals_a_yield;

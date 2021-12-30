@@ -997,6 +997,24 @@ char *find_closest_symbol_in_scope(Scope *scope, char *sym, u32 *out_distance) {
 
     return closest;
 }
+
+char *find_closest_symbol_in_scope_and_parents(Scope *scope, char *sym) {
+    u32 min_dist = 0x7fffffff;
+    u32 tmp_dist; 
+
+    char *closest = NULL;
+    while (scope != NULL) {
+        char *tmp_closest = find_closest_symbol_in_scope(scope, sym, &tmp_dist);
+        if (tmp_dist < min_dist) {
+            min_dist = tmp_dist;
+            closest = tmp_closest;
+        }
+
+        scope = scope->parent;
+    }
+
+    return closest;
+}
         
 char *find_closest_symbol_in_node(AstNode* node, char *sym) {
     b32 used_pointer = 0;

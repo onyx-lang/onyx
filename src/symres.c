@@ -76,10 +76,15 @@ static SymresStatus symres_symbol(AstNode** symbol_node) {
 
     if (!res) { // :SymresStall
         if (report_unresolved_symbols) {
+            token_toggle_end(token);
+            char *closest = find_closest_symbol_in_scope_and_parents(curr_scope, token->text);
+            token_toggle_end(token);
+
             onyx_report_error(token->pos,
-                "Unable to resolve symbol '%b'",
+                "Unable to resolve symbol '%b'. Did you mean '%s'?",
                 token->text,
-                token->length);
+                token->length,
+                closest);
 
             return Symres_Error;
         } else {
