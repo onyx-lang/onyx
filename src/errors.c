@@ -45,6 +45,12 @@ static void print_detailed_message(OnyxError* err, bh_file_contents* fc) {
     if (colored_printing) bh_printf("\033[0m");
 }
 
+static i32 errors_sort(const void* v1, const void* v2) {
+    OnyxError* e1 = (OnyxError *) v1;
+    OnyxError* e2 = (OnyxError *) v2;
+    return e2->rank - e1->rank;
+}
+
 void onyx_errors_print() {
     // NOTE: If the format of the error messages is ever changed,
     // update onyx_compile.vim and onyx.sublime-build to match
@@ -53,7 +59,12 @@ void onyx_errors_print() {
     //
     //                                      - brendanfh   2020/09/03
 
+    qsort(errors.errors, bh_arr_length(errors.errors), sizeof(OnyxError), errors_sort);
+
+    OnyxErrorRank last_rank = errors.errors[0].rank;
     bh_arr_each(OnyxError, err, errors.errors) {
+        if (last_rank != err->rank) break;
+
         if (err->pos.filename) {
             bh_file_contents file_contents = { 0 };
             bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
@@ -68,6 +79,8 @@ void onyx_errors_print() {
         } else {
             bh_printf("(%l,%l) %s\n", err->pos.line, err->pos.column, err->text);
         }
+
+        last_rank = err->rank;
     }
 }
 
@@ -85,7 +98,7 @@ void onyx_submit_error(OnyxError error) {
     bh_arr_push(errors.errors, error);
 }
 
-void onyx_report_error(OnyxFilePos pos, char * format, ...) {
+void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) {
 
     va_list vargs;
     va_start(vargs, format);
@@ -94,6 +107,7 @@ void onyx_report_error(OnyxFilePos pos, char * format, ...) {
 
     OnyxError err = {
         .pos = pos,
+        .rank = rank,
         .text = bh_strdup(errors.msg_alloc, msg),
     };
 
@@ -121,8 +135,13 @@ void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
 
     OnyxError err = {
         .pos = pos,
+        .rank = Error_Warning,
         .text = msg,
     };
+
+    bh_arr_push(errors.errors, err);
+
+    /*
 
     bh_file_contents file_contents = { 0 };
     bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
@@ -133,4 +152,5 @@ void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
     }
 
     print_detailed_message(&err, &file_contents);
+    */
 }

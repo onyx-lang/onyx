@@ -441,7 +441,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
                             }
                 }
                 
-                onyx_report_error(num->token->pos, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
+                onyx_report_error(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
 
@@ -468,7 +468,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
                             } break;
                 }
 
-                onyx_report_error(num->token->pos, "Integer constant with value '%l' does not fit into %d-bits.",
+                onyx_report_error(num->token->pos, Error_Critical, "Integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
             }
@@ -478,7 +478,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
             if (type->Basic.size == 4) {
                 // TODO(Brendan): Check these boundary conditions
                 if (bh_abs(num->value.l) >= (1 << 23)) {
-                    onyx_report_error(num->token->pos, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
+                    onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
                     return 0;
                 }
 
@@ -489,7 +489,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
             if (type->Basic.size == 8) {
                 // TODO(Brendan): Check these boundary conditions
                 if (bh_abs(num->value.l) >= (1ull << 52)) {
-                    onyx_report_error(num->token->pos, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
+                    onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
                     return 0;
                 }
 
@@ -587,7 +587,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 token_toggle_end(node->token);
 
                 if (closest) {
-                    onyx_report_error(node->token->pos, "'%b' does not exist in '%s'. Did you mean '%s'?",
+                    onyx_report_error(node->token->pos, Error_Critical, "'%b' does not exist in '%s'. Did you mean '%s'?",
                         node->token->text, node->token->length,
                         type_get_name(type),
                         closest);

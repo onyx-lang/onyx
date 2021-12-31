@@ -297,7 +297,7 @@ static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     bh_file_error err = bh_file_open(&file, filename);
     if (err != BH_FILE_ERROR_NONE) {
         if (context.cycle_detected) {
-            onyx_report_error(error_pos, "Failed to open file %s", filename);
+            onyx_report_error(error_pos, Error_Critical, "Failed to open file %s", filename);
         }
         return 0;
     }
@@ -371,9 +371,9 @@ static b32 process_entity(Entity* ent) {
     switch (before_state) {
         case Entity_State_Error:
             if (ent->type != Entity_Type_Error) {
-                onyx_report_error(ent->expr->token->pos, "Error entity unexpected. This is definitely a compiler bug");
+                onyx_report_error(ent->expr->token->pos, Error_Critical, "Error entity unexpected. This is definitely a compiler bug");
             } else {
-                onyx_report_error(ent->error->token->pos, "Static error occured: '%b'", ent->error->error_msg->text, ent->error->error_msg->length);
+                onyx_report_error(ent->error->token->pos, Error_Critical, "Static error occured: '%b'", ent->error->error_msg->text, ent->error->error_msg->length);
             }
             break;
 
@@ -462,8 +462,6 @@ static void output_dummy_progress_bar() {
 static void dump_cycles() {
     context.cycle_detected = 1;
     Entity* ent;
-
-    onyx_report_error((OnyxFilePos) { 0 }, "Cycle detected. Dumping all stuck processing units.");
 
     while (1) {
         ent = entity_heap_top(&context.entities);

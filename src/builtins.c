@@ -383,73 +383,73 @@ void initialize_builtins(bh_allocator a) {
 
     builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
     if (builtin_string_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'str' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'str' struct not found in builtin package.");
         return;
     }
 
     builtin_cstring_type = (AstType *) symbol_raw_resolve(p->scope, "cstr");
     if (builtin_cstring_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'cstr' type not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'cstr' type not found in builtin package.");
         return;
     }
 
     builtin_range_type = (AstType *) symbol_raw_resolve(p->scope, "range");
     if (builtin_range_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'range' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'range' struct not found in builtin package.");
         return;
     }
 
     builtin_vararg_type = (AstType *) symbol_raw_resolve(p->scope, "vararg");
     if (builtin_range_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'vararg' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'vararg' struct not found in builtin package.");
         return;
     }
 
     builtin_context_variable = (AstTyped *) symbol_raw_resolve(p->scope, "context");
     if (builtin_context_variable == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'context' variable not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'context' variable not found in builtin package.");
         return;
     }
 
     builtin_allocator_type = (AstType *) symbol_raw_resolve(p->scope, "Allocator");
     if (builtin_allocator_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'Allocator' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Allocator' struct not found in builtin package.");
         return;
     }
 
     builtin_iterator_type = (AstType *) symbol_raw_resolve(p->scope, "Iterator");
     if (builtin_iterator_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'Iterator' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Iterator' struct not found in builtin package.");
         return;
     }
 
     builtin_callsite_type = (AstType *) symbol_raw_resolve(p->scope, "CallSite");
     if (builtin_callsite_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'CallSite' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'CallSite' struct not found in builtin package.");
         return;
     }
 
     builtin_any_type = (AstType *) symbol_raw_resolve(p->scope, "any");
     if (builtin_any_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'any' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'any' struct not found in builtin package.");
         return;
     }
 
     builtin_code_type = (AstType *) symbol_raw_resolve(p->scope, "Code");
     if (builtin_code_type == NULL) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'Code' struct not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Code' struct not found in builtin package.");
         return;
     }
 
     builtin_initialize_data_segments = (AstFunction *) symbol_raw_resolve(p->scope, "__initialize_data_segments");
     if (builtin_initialize_data_segments == NULL || builtin_initialize_data_segments->kind != Ast_Kind_Function) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'__initialize_data_segments' procedure not found in builtin package.");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__initialize_data_segments' procedure not found in builtin package.");
         return;
     }
 
     builtin_run_init_procedures = (AstFunction *) symbol_raw_resolve(p->scope, "__run_init_procedures");
     if (builtin_run_init_procedures == NULL || builtin_run_init_procedures->kind != Ast_Kind_Function) {
-        onyx_report_error((OnyxFilePos) { 0 }, "'__run_init_procedures");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__run_init_procedures");
         return;
     }
 
@@ -476,7 +476,7 @@ void introduce_build_options(bh_allocator a) {
 
     AstType* Runtime_Type = (AstType *) symbol_raw_resolve(p->scope, "Runtime");
     if (Runtime_Type == NULL) {
-        onyx_report_error((OnyxFilePos) {0}, "'Runtime' type not found in package runtime.");
+        onyx_report_error((OnyxFilePos) {0}, Error_Critical, "'Runtime' type not found in package runtime.");
         return;
     }
 
@@ -503,7 +503,7 @@ void introduce_build_options(bh_allocator a) {
 
     AstType* OS_Type = (AstType *) symbol_raw_resolve(p->scope, "OS");
     if (OS_Type == NULL) {
-        onyx_report_error((OnyxFilePos) {0}, "'OS' type not found in package runtime.");
+        onyx_report_error((OnyxFilePos) {0}, Error_Critical, "'OS' type not found in package runtime.");
         return;
     }
 

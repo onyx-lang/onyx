@@ -319,7 +319,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 // NOTE: Currently, the count_expr has to be an I32 literal
                 if (a_node->count_expr->type->kind != Type_Kind_Basic
                     || a_node->count_expr->type->Basic.kind != Basic_Kind_I32) {
-                    onyx_report_error(type_node->token->pos, "Array type expects type 'i32' for size, got '%s'.",
+                    onyx_report_error(type_node->token->pos, Error_Critical, "Array type expects type 'i32' for size, got '%s'.",
                         type_get_name(a_node->count_expr->type));
                     return NULL;
                 }
@@ -383,7 +383,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
-                    onyx_report_error((*member)->token->pos, "Invalid member type: %s. Has alignment %d", type_get_name((*member)->type), mem_alignment); 
+                    onyx_report_error((*member)->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name((*member)->type), mem_alignment); 
                     return NULL;
                 }
 
@@ -392,7 +392,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 token_toggle_end((*member)->token);
                 if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
-                    onyx_report_error((*member)->token->pos, "Duplicate struct member, '%s'.", (*member)->token->text);
+                    onyx_report_error((*member)->token->pos, Error_Critical, "Duplicate struct member, '%s'.", (*member)->token->text);
                     return NULL;
                 }
 
@@ -421,13 +421,13 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     }
 
                     if (used_type->kind != Type_Kind_Struct) {
-                        onyx_report_error((*member)->token->pos, "Can only use things of structure, or pointer to structure type.");
+                        onyx_report_error((*member)->token->pos, Error_Critical, "Can only use things of structure, or pointer to structure type.");
                         return NULL;
                     }
 
                     bh_arr_each(StructMember*, psmem, used_type->Struct.memarr) {
                         if (shgeti(s_type->Struct.members, (*psmem)->name) != -1) {
-                            onyx_report_error((*member)->token->pos, "Used name '%s' conflicts with existing struct member.", (*psmem)->name);
+                            onyx_report_error((*member)->token->pos, Error_Critical, "Used name '%s' conflicts with existing struct member.", (*psmem)->name);
                             return NULL;
                         }
 
@@ -538,10 +538,6 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             return ((AstTypeRawAlias *) type_node)->to;
 
         case Ast_Kind_Poly_Struct_Type: {
-            //onyx_report_error(type_node->token->pos,
-            //    "This structure is polymorphic, which means you need to provide arguments to it to make it a concrete structure. "
-            //    "This error message is probably in the wrong place, so look through your code for uses of this struct.");
-
             if (type_node->type_id != 0) return NULL;
 
             Type* p_type = type_create(Type_Kind_PolyStruct, alloc, 0);
@@ -561,8 +557,8 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 // If it is an unresolved field access or symbol, just return because an error will be printed elsewhere.
                 if (pc_type->callee->kind == Ast_Kind_Field_Access || pc_type->callee->kind == Ast_Kind_Symbol) return NULL;
 
-                onyx_report_error(pc_type->token->pos, "Cannot instantiate a concrete type off of a non-polymorphic type.");
-                onyx_report_error(pc_type->callee->token->pos, "Here is the type trying to be instantiated. (%s)", onyx_ast_node_kind_string(pc_type->callee->kind));
+                onyx_report_error(pc_type->token->pos, Error_Critical, "Cannot instantiate a concrete type off of a non-polymorphic type.");
+                onyx_report_error(pc_type->callee->token->pos, Error_Critical, "Here is the type trying to be instantiated. (%s)", onyx_ast_node_kind_string(pc_type->callee->kind));
                 return NULL;
             }
 
@@ -651,7 +647,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             Type *base_type = type_build_from_ast(alloc, distinct->base_type);
             if (base_type == NULL) return NULL;
             if (base_type->kind != Type_Kind_Basic) {
-                onyx_report_error(distinct->token->pos, "Distinct types can only be made out of primitive types. '%s' is not a primitive type.", type_get_name(base_type));
+                onyx_report_error(distinct->token->pos, Error_Critical, "Distinct types can only be made out of primitive types. '%s' is not a primitive type.", type_get_name(base_type));
                 return NULL;
             }
 

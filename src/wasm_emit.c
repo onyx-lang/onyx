@@ -409,7 +409,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         if (bh_arr_last(code).type != WI_JUMP)
             WID(WI_JUMP, labelidx);
     } else {
-        onyx_report_error(jump->token->pos, "Invalid structured jump.");
+        onyx_report_error(jump->token->pos, Error_Critical, "Invalid structured jump.");
     }
 
     *pcode = code;
@@ -662,7 +662,7 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     } else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
         WID(WI_V128_STORE, ((WasmInstructionData) { alignment, offset }));
     } else {
-        onyx_report_error((OnyxFilePos) { 0 },
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
             "Failed to generate store instruction for type '%s'.",
             type_get_name(type));
     }
@@ -723,7 +723,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     WID(instr, ((WasmInstructionData) { alignment, offset }));
 
     if (instr == WI_NOP) {
-        onyx_report_error((OnyxFilePos) { 0 },
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
             "Failed to generate load instruction for type '%s'.",
             type_get_name(type));
     }
@@ -1131,7 +1131,7 @@ EMIT_FUNC(for, AstFor* for_node) {
         case For_Loop_DynArr:   WI(WI_DROP); WI(WI_DROP); WI(WI_DROP);
         case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local); break;
         case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local); break;
-        default: onyx_report_error(for_node->token->pos, "Invalid for loop type. You should probably not be seeing this...");
+        default: onyx_report_error(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
     }
 
     local_free(mod->local_alloc, (AstTyped *) var);
@@ -1641,7 +1641,7 @@ EMIT_FUNC(call, AstCall* call) {
         bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values; \
         fori (i, 0, count) { \
             if (arg_arr[i]->value->kind != Ast_Kind_NumLit) { \
-                onyx_report_error(arg_arr[i]->token->pos, \
+                onyx_report_error(arg_arr[i]->token->pos, Error_Critical, \
                         "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.", \
                         i, bh_num_suffix(i)); \
                 *pcode = code; \
@@ -1655,7 +1655,7 @@ EMIT_FUNC(call, AstCall* call) {
 #define SIMD_EXTRACT_LANE_INSTR(instr, arg_arr) \
     emit_expression(mod, &code, arg_arr[0]->value);\
     if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
-        onyx_report_error(arg_arr[1]->token->pos, "SIMD lane instructions expect a compile time lane number."); \
+        onyx_report_error(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
         return; \
     } \
@@ -1664,7 +1664,7 @@ EMIT_FUNC(call, AstCall* call) {
 #define SIMD_REPLACE_LANE_INSTR(instr, arg_arr) { \
     emit_expression(mod, &code, arg_arr[0]->value);\
     if (arg_arr[1]->value->kind != Ast_Kind_NumLit) { \
-        onyx_report_error(arg_arr[1]->token->pos, "SIMD lane instructions expect a compile time lane number."); \
+        onyx_report_error(arg_arr[1]->token->pos, Error_Critical, "SIMD lane instructions expect a compile time lane number."); \
         *pcode = code; \
         return; \
     } \
@@ -1788,7 +1788,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 4) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i]->token->pos,
+                    onyx_report_error(arg_arr[i]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -1805,7 +1805,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
             fori (i, 0, 2) {
                 if (arg_arr[i]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i]->token->pos,
+                    onyx_report_error(arg_arr[i]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -1828,7 +1828,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
 
             fori (i, 0, 16) {
                 if (arg_arr[i + 2]->value->kind != Ast_Kind_NumLit) {
-                    onyx_report_error(arg_arr[i + 2]->token->pos,
+                    onyx_report_error(arg_arr[i + 2]->token->pos, Error_Critical,
                             "SIMD constants expect compile time constants as parameters. The %d%s parameter was not.",
                             i, bh_num_suffix(i));
                     *pcode = code;
@@ -2548,7 +2548,7 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
         }
 
         default: {
-            onyx_report_error(expr->token->pos, "Unable to generate locate for '%s'.", onyx_ast_node_kind_string(expr->kind));
+            onyx_report_error(expr->token->pos, Error_Critical, "Unable to generate location for '%s'.", onyx_ast_node_kind_string(expr->kind));
             break;
         }
     }
@@ -2845,7 +2845,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             WasmType backing_type = onyx_type_to_wasm_type(ev->type);
             if      (backing_type == WASM_TYPE_INT32) WID(WI_I32_CONST, num->value.i);
             else if (backing_type == WASM_TYPE_INT64) WID(WI_I64_CONST, num->value.l);
-            else onyx_report_error(ev->token->pos, "Invalid backing type for enum.");
+            else onyx_report_error(ev->token->pos, Error_Critical, "Invalid backing type for enum.");
             break;
         }
 
@@ -3140,7 +3140,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
     else {
         WasmType wt = onyx_type_to_wasm_type(type);
         if (wt == WASM_TYPE_VOID) {
-            onyx_report_error(where->pos, "Cannot produce a zero-value for this type.");
+            onyx_report_error(where->pos, Error_Critical, "Cannot produce a zero-value for this type.");
         }
         emit_zero_value(mod, &code, wt);
     }
@@ -3450,7 +3450,7 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
 
 static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     if (!emit_raw_data_(mod, data, node)) {
-        onyx_report_error(node->token->pos,
+        onyx_report_error(node->token->pos, Error_Critical,
             "Cannot generate constant data for '%s'.",
             onyx_ast_node_kind_string(node->kind));
     }
@@ -3673,7 +3673,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     bh_align(offset, 16);
 
     if (!bh_file_exists(fc->filename)) {
-        onyx_report_error(fc->filename_token->pos,
+        onyx_report_error(fc->filename_token->pos, Error_Critical,
                 "Unable to open file for reading, '%s'.",
                 fc->filename);
         return;

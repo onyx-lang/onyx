@@ -109,7 +109,7 @@ b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* sym
         if (index != -1) {
             AstNode *node = scope->symbols[index].value;
             if (node != symbol) {
-                onyx_report_error(pos, "Redeclaration of symbol '%s'.", name);
+                onyx_report_error(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
                 return 0;
             }
             return 1;
@@ -465,7 +465,7 @@ void report_unable_to_match_overload(AstCall* call) {
         }
     }
 
-    onyx_report_error(call->token->pos, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
+    onyx_report_error(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
 
     bh_free(global_scratch_allocator, arg_str);
 }
@@ -518,7 +518,7 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
         Type *param_type = template->params[i].local->type;
         if (param_type == any_type
             || (param_type->kind == Type_Kind_VarArgs && param_type->VarArgs.elem == any_type)) {
-            onyx_report_error(macro->token->pos, "Currently, macros do not support arguments of type 'any' or '..any'.");
+            onyx_report_error(macro->token->pos, Error_Critical, "Currently, macros do not support arguments of type 'any' or '..any'.");
         }
 
         symbol_introduce(argument_scope, template->params[i].local->token, value);

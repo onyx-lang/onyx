@@ -129,7 +129,7 @@ static OnyxToken* expect_token(OnyxParser* parser, TokenType token_type) {
     consume_token(parser);
 
     if (token->type != token_type) {
-        onyx_report_error(token->pos, "expected token '%s', got '%s'.", token_name(token_type), token_name(token->type));
+        onyx_report_error(token->pos, Error_Critical, "expected token '%s', got '%s'.", token_name(token_type), token_name(token->type));
         parser->hit_unexpected_token = 1;
         // :LinearTokenDependent
         parser->curr = &parser->tokenizer->tokens[bh_arr_length(parser->tokenizer->tokens) - 1];
@@ -505,7 +505,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             do_block->type_node = (AstType *) &basic_type_auto_return;
 
             if (parser->curr->type != '{') {
-                onyx_report_error(parser->curr->pos, "Expected '{' after 'do', got '%s'.", token_name(parser->curr->type));
+                onyx_report_error(parser->curr->pos, Error_Critical, "Expected '{' after 'do', got '%s'.", token_name(parser->curr->type));
                 retval = NULL;
                 break;
             }
@@ -576,7 +576,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 char_lit->value.i = (u32) dest;
 
                 if (length != 1) {
-                    onyx_report_error(char_lit->token->pos, "Expected only a single character in character literal.");
+                    onyx_report_error(char_lit->token->pos, Error_Critical, "Expected only a single character in character literal.");
                 }
 
                 retval = (AstTyped *) char_lit;
@@ -695,13 +695,13 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
-            onyx_report_error(parser->curr->pos, "Invalid directive in expression.");
+            onyx_report_error(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
             return NULL;
         }
 
         default:
         no_match:
-            onyx_report_error(parser->curr->pos, "Unexpected token '%s'.", token_name(parser->curr->type));
+            onyx_report_error(parser->curr->pos, Error_Critical, "Unexpected token '%s'.", token_name(parser->curr->type));
             return NULL;
     }
 
@@ -1171,7 +1171,7 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
             switch_node->default_case = parse_block(parser, 1, NULL);
 
             if (parser->curr->type != '}') {
-                onyx_report_error(parser->curr->pos, "The #default case must be the last case in a switch statement.\n");
+                onyx_report_error(parser->curr->pos, Error_Critical, "The #default case must be the last case in a switch statement.\n");
             }
             break;
         }
@@ -1588,7 +1588,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     bh_arr(AstPolyParam) pv = NULL;
 
     if (parser->polymorph_context.poly_params == NULL)
-        onyx_report_error(parser->curr->pos, "Polymorphic variable not valid here.");
+        onyx_report_error(parser->curr->pos, Error_Critical, "Polymorphic variable not valid here.");
     else
         pv = *parser->polymorph_context.poly_params;
 
@@ -1832,7 +1832,7 @@ static AstType* parse_type(OnyxParser* parser) {
             }
 
             default:
-                onyx_report_error(parser->curr->pos, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
+                onyx_report_error(parser->curr->pos, Error_Critical, "unexpected token '%b'.", parser->curr->text, parser->curr->length);
                 consume_token(parser);
                 break;
         }
@@ -1923,7 +1923,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+            onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -2023,8 +2023,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         //      them out of discussion for now. Initialized members should be treated special and
         //      deserve their own line.
         if (bh_arr_length(member_list_temp) > 1) {
-            if (member_is_used) onyx_report_error((member_list_temp[0] - 1)->pos, "'use' is only allowed for a single struct member declaration. Try splitting this compound declaration into multiple lines.");
-            if (initial_value)  onyx_report_error(initial_value->token->pos, "Intialized values are only allowed on single struct member declarations. Try splitting this compound initializer into multiple lines.");
+            if (member_is_used) onyx_report_error((member_list_temp[0] - 1)->pos, Error_Critical, "'use' is only allowed for a single struct member declaration. Try splitting this compound declaration into multiple lines.");
+            if (initial_value)  onyx_report_error(initial_value->token->pos, Error_Critical, "Intialized values are only allowed on single struct member declarations. Try splitting this compound initializer into multiple lines.");
         }
 
         bh_arr_each(OnyxToken *, member_name, member_list_temp) {
@@ -2365,7 +2365,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+            onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -2596,7 +2596,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
             OnyxToken* directive_token = expect_token(parser, '#');
             OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-            onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+            onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
         }
     }
 
@@ -2709,7 +2709,7 @@ static AstMacro* parse_macro(OnyxParser* parser) {
         return macro;
     }
 
-    onyx_report_error(parser->curr->pos, "'macro' expects to be followed by a producure definition.");
+    onyx_report_error(parser->curr->pos, Error_Critical, "'macro' expects to be followed by a producure definition.");
     return NULL;
 }
 
@@ -3026,7 +3026,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 if (op == Binary_Op_Subscript) expect_token(parser, ']');    // #operator [] ... needs to consume the other ']'
 
                 if (op == Binary_Op_Count) {
-                    onyx_report_error(parser->curr->pos, "Invalid binary operator.");
+                    onyx_report_error(parser->curr->pos, Error_Critical, "Invalid binary operator.");
                 } else {
                     operator->operator = op;
                 }
@@ -3109,7 +3109,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 OnyxToken* directive_token = expect_token(parser, '#');
                 OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
 
-                onyx_report_error(directive_token->pos, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+                onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
                 return;
             }
         }

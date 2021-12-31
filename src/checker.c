@@ -13,7 +13,7 @@
 
 #define YIELD(loc, msg) do { \
     if (context.cycle_detected) { \
-        onyx_report_error(loc, msg); \
+        onyx_report_error(loc, Error_Waiting_On, msg); \
         return Check_Error; \
     } else { \
         return Check_Yield_Macro; \
@@ -22,7 +22,7 @@
 
 #define YIELD_(loc, msg, ...) do { \
     if (context.cycle_detected) { \
-        onyx_report_error(loc, msg, __VA_ARGS__); \
+        onyx_report_error(loc, Error_Waiting_On, msg, __VA_ARGS__); \
         return Check_Error; \
     } else { \
         return Check_Yield_Macro; \
@@ -30,12 +30,12 @@
     } while (0)
 
 #define ERROR(loc, msg) do { \
-    onyx_report_error(loc, msg); \
+    onyx_report_error(loc, Error_Critical, msg); \
     return Check_Error; \
     } while (0)
 
 #define ERROR_(loc, msg, ...) do { \
-    onyx_report_error(loc, msg, __VA_ARGS__); \
+    onyx_report_error(loc, Error_Critical, msg, __VA_ARGS__); \
     return Check_Error; \
     } while (0)
 
@@ -310,7 +310,7 @@ static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, A
     switchnode->max_case = bh_max(switchnode->max_case, case_value);
 
     if (bh_imap_has(&switchnode->case_map, case_value)) {
-        onyx_report_error(pos, "Multiple cases for values '%d'.", case_value);
+        onyx_report_error(pos, Error_Critical, "Multiple cases for values '%d'.", case_value);
         return 1;
     }
 
@@ -632,7 +632,7 @@ CheckStatus check_call(AstCall** pcall) {
 
         i32 index;
         if ((index = shgeti(intrinsic_table, intr_name)) == -1) {
-            onyx_report_error(callee->token->pos, "Intrinsic not supported, '%s'.", intr_name);
+            onyx_report_error(callee->token->pos, Error_Critical, "Intrinsic not supported, '%s'.", intr_name);
             token_toggle_end(callee->intrinsic_name);
             return Check_Error;
         }
@@ -670,7 +670,7 @@ CheckStatus check_call(AstCall** pcall) {
 }
 
 static void report_bad_binaryop(AstBinaryOp* binop) {
-    onyx_report_error(binop->token->pos, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
+    onyx_report_error(binop->token->pos, Error_Critical, "Binary operator '%s' not understood for arguments of type '%s' and '%s'.",
             binaryop_string[binop->operation],
             node_get_type_name(binop->left),
             node_get_type_name(binop->right));
@@ -978,6 +978,8 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
         TYPE_CHECK(&binop->left, binop->right->type) {
             TYPE_CHECK(&binop->right, binop->left->type) {
+                // TODO: This should report a better error about the Unary_Field_Access not be able to be resolved given whatever type.
+                //                                                                        - brendanfh 2021/12/31
                 report_bad_binaryop(binop);
                 return Check_Error;
             }
@@ -1170,7 +1172,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     if ((sl->flags & Ast_Flag_Has_Been_Checked) == 0) {
         char* err_msg = NULL;
         if (!fill_in_arguments(&sl->args, (AstNode *) sl, &err_msg)) {
-            onyx_report_error(sl->token->pos, err_msg);
+            onyx_report_error(sl->token->pos, Error_Critical, err_msg);
 
             bh_arr_each(AstTyped *, value, sl->args.values) {
                 if (*value == NULL) {
@@ -1178,7 +1180,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
                     StructMember smem;
                     type_lookup_member_by_idx(sl->type, member_idx, &smem);
 
-                    onyx_report_error(sl->token->pos,
+                    onyx_report_error(sl->token->pos, Error_Critical,
                         "Value not given for %d%s member, '%s', for type '%s'.",
                         member_idx + 1, bh_num_suffix(member_idx + 1),
                         smem.name, type_get_name(sl->type));
@@ -1707,7 +1709,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Param:
             if (expr->type == NULL) {
-                onyx_report_error(expr->token->pos, "Parameter with bad type.");
+                onyx_report_error(expr->token->pos, Error_Critical, "Parameter with bad type.");
                 retval = Check_Error;
             }
             break;
@@ -1726,7 +1728,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Global:
             if (expr->type == NULL) {
-                onyx_report_error(expr->token->pos, "Global with unknown type.");
+                onyx_report_error(expr->token->pos, Error_Critical, "Global with unknown type.");
                 retval = Check_Error;
             }
             break;
@@ -1820,7 +1822,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         default:
             retval = Check_Error;
-            onyx_report_error(expr->token->pos, "UNEXPECTED INTERNAL COMPILER ERROR");
+            onyx_report_error(expr->token->pos, Error_Critical, "UNEXPECTED INTERNAL COMPILER ERROR");
             DEBUG_HERE;
             break;
     }
@@ -2011,7 +2013,7 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
         if (   node->kind != Ast_Kind_Function
             && node->kind != Ast_Kind_Polymorphic_Proc
             && node->kind != Ast_Kind_Macro) {
-            onyx_report_error(node->token->pos, "Overload option not procedure or macro. Got '%s'",
+            onyx_report_error(node->token->pos, Error_Critical, "Overload option not procedure or macro. Got '%s'",
                 onyx_ast_node_kind_string(node->kind));
 
             bh_imap_free(&all_overloads);
@@ -2089,7 +2091,7 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
             resolve_expression_type(*meta);
 
             if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                onyx_report_error((*meta)->token->pos, "#tag expressions are expected to be compile-time known.");
+                onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
                 return Check_Error;
             }
         }
@@ -2115,7 +2117,7 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
                 resolve_expression_type(*meta);
 
                 if (((*meta)->flags & Ast_Flag_Comptime) == 0) {
-                    onyx_report_error((*meta)->token->pos, "#tag expressions are expected to be compile-time known.");
+                    onyx_report_error((*meta)->token->pos, Error_Critical, "#tag expressions are expected to be compile-time known.");
                     return Check_Error;
                 }
             }
@@ -2254,7 +2256,7 @@ CheckStatus check_memres(AstMemRes* memres) {
 
     if (memres->initial_value != NULL) {
         if (memres->threadlocal) {
-            onyx_report_error(memres->token->pos, "'#thread_local' variables cannot have an initializer at the moment.");
+            onyx_report_error(memres->token->pos, Error_Critical, "'#thread_local' variables cannot have an initializer at the moment.");
             return Check_Error;
         }
 
@@ -2461,7 +2463,7 @@ CheckStatus check_process_directive(AstNode* directive) {
                         }
                     }
 
-                    onyx_report_error(fa->token->pos, "'%b' is not a member of '%s'.",
+                    onyx_report_error(fa->token->pos, Error_Critical, "'%b' is not a member of '%s'.",
                         fa->token->text, fa->token->length,
                         st->name);
                     return Check_Error;
@@ -2469,7 +2471,7 @@ CheckStatus check_process_directive(AstNode* directive) {
             }
 
             default: {
-                onyx_report_error(tag->token->pos, "Cannot tag this.");
+                onyx_report_error(tag->token->pos, Error_Critical, "Cannot tag this.");
                 return Check_Error;
             }
         }
@@ -2627,8 +2629,8 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                         strncat(constraint_map, "'", 511);
                     }
 
-                    onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, "Failed to satisfy constraint where %s.", constraint_map);
-                    onyx_report_error(constraint->token->pos, "Here is where the interface was used.");
+                    onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
+                    onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
 
                     return Check_Error;
 
@@ -2705,9 +2707,9 @@ CheckStatus check_polyquery(AstPolyQuery *query) {
                 if (query->successful_symres || solved_something) continue;
 
                 if (query->error_on_fail || context.cycle_detected) {
-                    onyx_report_error(query->token->pos, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
-                    if (err_msg != NULL)  onyx_report_error(query->token->pos, "%s", err_msg);
-                    if (query->error_loc) onyx_report_error(query->error_loc->pos, "Here is where the call is located."); // :ErrorMessage
+                    onyx_report_error(query->token->pos, Error_Critical, "Error solving for polymorphic variable '%b'.", param->poly_sym->token->text, param->poly_sym->token->length);
+                    if (err_msg != NULL)  onyx_report_error(query->token->pos, Error_Critical, "%s", err_msg);
+                    if (query->error_loc) onyx_report_error(query->error_loc->pos, Error_Critical, "Here is where the call is located."); // :ErrorMessage
                 }
 
                 return Check_Failed;
@@ -2768,7 +2770,7 @@ void check_entity(Entity* ent) {
 
         case Entity_Type_File_Contents: 
             if (context.options->no_file_contents) {
-                onyx_report_error(ent->expr->token->pos, "#file_contents is disabled for this compilation.");
+                onyx_report_error(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
             }
             break;
 

@@ -746,7 +746,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         if (found_match) {
             valid_argument_count++;
         } else {
-            onyx_report_error(tkn->pos, "'%b' is not a type variable of '%b'.",
+            onyx_report_error(tkn->pos, Error_Critical, "'%b' is not a type variable of '%b'.",
                 sln->poly_sym->token->text, sln->poly_sym->token->length,
                 pp->token->text, pp->token->length);
             return (AstNode *) pp;
@@ -900,7 +900,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     }
 
     if (bh_arr_length(slns) != bh_arr_length(ps_type->poly_params)) {
-        onyx_report_error(pos, "Wrong number of arguments for '%s'. Expected %d, got %d",
+        onyx_report_error(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d",
             ps_type->name,
             bh_arr_length(ps_type->poly_params),
             bh_arr_length(slns));
@@ -921,10 +921,10 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
 
         if (sln->kind != expected_kind) {
             if (expected_kind == PSK_Type) 
-                onyx_report_error(pos, "Expected type expression for %d%s argument.", i + 1, bh_num_suffix(i + 1));
+                onyx_report_error(pos, Error_Critical, "Expected type expression for %d%s argument.", i + 1, bh_num_suffix(i + 1));
 
             if (expected_kind == PSK_Value)
-                onyx_report_error(pos, "Expected value expression of type '%s' for %d%s argument.",
+                onyx_report_error(pos, Error_Critical, "Expected value expression of type '%s' for %d%s argument.",
                     type_get_name(ps_type->poly_params[i].type),
                     i + 1, bh_num_suffix(i + 1));
 
@@ -935,7 +935,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
             resolve_expression_type(sln->value);
 
             if ((sln->value->flags & Ast_Flag_Comptime) == 0) {
-                onyx_report_error(pos,
+                onyx_report_error(pos, Error_Critical,
                     "Expected compile-time known argument for '%b'.",
                     sln->poly_sym->token->text,
                     sln->poly_sym->token->length);
@@ -943,7 +943,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
             }
 
             if (!types_are_compatible(sln->value->type, ps_type->poly_params[i].type)) {
-                onyx_report_error(pos, "Expected compile-time argument of type '%s', got '%s'.",
+                onyx_report_error(pos, Error_Critical, "Expected compile-time argument of type '%s', got '%s'.",
                     type_get_name(ps_type->poly_params[i].type),
                     type_get_name(sln->value->type));
                 return NULL;
