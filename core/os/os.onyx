@@ -1,7 +1,7 @@
 package core.os
 
-#if runtime.Runtime != runtime.Runtime_Wasi 
-    && runtime.Runtime != runtime.Runtime_Onyx {
+#if runtime.runtime != .Wasi 
+    && runtime.runtime != .Onyx {
     #error "The os library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
 }
 

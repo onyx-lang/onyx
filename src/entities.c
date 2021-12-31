@@ -293,6 +293,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
             ent.type = Entity_Type_Memory_Reservation_Type;
             ent.mem_res = (AstMemRes *) node;
             ENTITY_INSERT(ent);
+            ((AstMemRes *) node)->type_entity = entity;
 
             ent.id       = entities->next_id++;
             ent.type = Entity_Type_Memory_Reservation;

@@ -4,7 +4,7 @@ package gl
 // There are many things that are missing but this suffices for me.
 
 #local runtime :: package runtime
-#if runtime.Runtime != runtime.Runtime_Js {
+#if runtime.runtime != .Js {
     #error "'webgl' can only be used with the 'js' runtime."
 }
 

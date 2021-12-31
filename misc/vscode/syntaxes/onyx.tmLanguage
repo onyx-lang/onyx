@@ -281,7 +281,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(void)\b</string>
+					<string>\b(void|rawptr)\b</string>
 					<key>name</key>
 					<string>storage.type.onyx</string>
 				</dict>

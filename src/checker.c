@@ -743,6 +743,10 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
         // If a left operand has an unknown type, fill it in with the type of
         // the right hand side.
         if (binop->left->type == NULL) {
+            if (binop->left->type_node != NULL && binop->left->entity && binop->left->entity->state <= Entity_State_Check_Types) {
+                YIELD(binop->token->pos, "Waiting for type to be constructed on left hand side.");
+            }
+
             resolve_expression_type(binop->right);
 
             Type* right_type = get_expression_type(binop->right);
@@ -970,16 +974,6 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     CHECK(expression, &binop->right);
     current_checking_level = current_checking_level_store;
 
-    if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
-        binop->flags |= Ast_Flag_Comptime;
-    }
-
-    if (expression_types_must_be_known) {
-        if (binop->left->type == NULL || binop->right->type == NULL) {
-            ERROR(binop->token->pos, "Internal compiler error: one of the operands types is unknown here.");
-        }
-    }
-
     // :UnaryFieldAccessIsGross
     if (binop->left->kind == Ast_Kind_Unary_Field_Access || binop->right->kind == Ast_Kind_Unary_Field_Access) {
         TYPE_CHECK(&binop->left, binop->right->type) {
@@ -987,6 +981,16 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
                 report_bad_binaryop(binop);
                 return Check_Error;
             }
+        }
+    }
+    
+    if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
+        binop->flags |= Ast_Flag_Comptime;
+    }
+
+    if (expression_types_must_be_known) {
+        if (binop->left->type == NULL || binop->right->type == NULL) {
+            ERROR(binop->token->pos, "Internal compiler error: one of the operands types is unknown here.");
         }
     }
 
@@ -2245,6 +2249,9 @@ CheckStatus check_memres_type(AstMemRes* memres) {
 }
 
 CheckStatus check_memres(AstMemRes* memres) {
+    assert(memres->type_entity);
+    if (memres->type_entity->state < Entity_State_Code_Gen) YIELD(memres->token->pos, "Waiting for global to pass type construction.");
+
     if (memres->initial_value != NULL) {
         if (memres->threadlocal) {
             onyx_report_error(memres->token->pos, "'#thread_local' variables cannot have an initializer at the moment.");
@@ -2368,8 +2375,8 @@ CheckStatus check_type(AstType* type) {
 CheckStatus check_static_if(AstIf* static_if) {
     expression_types_must_be_known = 1;
     CheckStatus result = check_expression(&static_if->cond);
-    if (result == Check_Yield_Macro) return Check_Yield_Macro;
     expression_types_must_be_known = 0;
+    if (result == Check_Yield_Macro) return Check_Yield_Macro;
 
     if (result > Check_Errors_Start || !(static_if->cond->flags & Ast_Flag_Comptime)) {
         ERROR(static_if->token->pos, "Expected this condition to be compile time known.");

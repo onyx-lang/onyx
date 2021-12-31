@@ -1,6 +1,6 @@
 package core.os
 
-#if runtime.Runtime != runtime.Runtime_Onyx {
+#if runtime.runtime != .Onyx {
     #error "This file can only be included in the 'onyx' runtime, because Wasi has not defined how to spawn and manage processes.";
 }
 

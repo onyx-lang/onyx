@@ -38,26 +38,26 @@ package core
 #load "./type_info/helper"
 
 #local runtime :: package runtime
-#if runtime.Runtime == runtime.Runtime_Wasi || runtime.Runtime == runtime.Runtime_Onyx {
+#if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
     #load "./os/file"
     #load "./os/os"
     #load "./os/dir"
 }
 
-#if runtime.Runtime == runtime.Runtime_Onyx   {
+#if runtime.runtime == .Onyx   {
     #load "./runtime/onyx_run"
     #load "./os/process"
     #load "./os/onyx_fs"
 }
-#if runtime.Runtime == runtime.Runtime_Wasi   {
+#if runtime.runtime == .Wasi   {
     #load "./wasi/wasi"
     #load "./runtime/wasi"
     #load "./wasi/clock"
     #load "./wasi/env"
     #load "./wasi/wasi_fs"
 }
-#if runtime.Runtime == runtime.Runtime_Js     { #load "./runtime/js" }
-#if runtime.Runtime != runtime.Runtime_Custom { #load "./stdio" }
+#if runtime.runtime == .Js     { #load "./runtime/js" }
+#if runtime.runtime != .Custom { #load "./stdio" }
 
 #if runtime.Multi_Threading_Enabled {
     #load "./intrinsics/atomics"

@@ -962,6 +962,8 @@ struct AstMemRes        {
     u64 addr;
     AstTyped *initial_value;
 
+    struct Entity *type_entity;
+
     b32 threadlocal : 1;
 };
 struct AstGlobal        {

@@ -1,27 +1,15 @@
-// This following sybmols are not meant to be included in any compilation.
-// Instead, all of the commented out symbols are defined automatically by the compiler
-// and can be used in compile time #if statements.
-
-// Runtime :: Runtime_Wasi   OR   Runtime_Js   OR   Runtime_Custom
-
-
-
-
-
 package runtime
 
+// runtime: Runtime    This is set by the compiler
+Runtime :: enum {
+    Onyx   :: 1;
+    Wasi   :: 2;
+    Js     :: 3;
+    Custom :: 4;
+}
 
-// At some point, these will become an enum. The problem at the moment is that
-// compile-time if statements are not well integrated into other language features
-// such as enums. They can only really handle compile time number math and boolean
-// logic.                                               - brendanfh 2020/02/08
-
-Runtime_Onyx   :: 1
-Runtime_Wasi   :: 2
-Runtime_Js     :: 3
-Runtime_Custom :: 4
-
-
-
-OS_Linux       :: 1
-OS_Windows     :: 2
+// compiler_os        This is set by the compiler. It is not called 'os' because that conflicts with the 'core.os' package.
+OS :: enum {
+    Linux       :: 1;
+    Windows     :: 2;
+}

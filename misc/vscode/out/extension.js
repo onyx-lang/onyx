@@ -9,6 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.activate = void 0;
 const vscode = require("vscode");
 const vsctmls = require("vscode-textmate-languageservice");
 function activate(context) {

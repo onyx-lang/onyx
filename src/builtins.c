@@ -474,8 +474,16 @@ void initialize_builtins(bh_allocator a) {
 void introduce_build_options(bh_allocator a) {
     Package* p = package_lookup_or_create("runtime", context.global_scope, a);
 
+    AstType* Runtime_Type = (AstType *) symbol_raw_resolve(p->scope, "Runtime");
+    if (Runtime_Type == NULL) {
+        onyx_report_error((OnyxFilePos) {0}, "'Runtime' type not found in package runtime.");
+        return;
+    }
+
     AstNumLit* runtime_type = make_int_literal(a, context.options->runtime);
-    symbol_builtin_introduce(p->scope, "Runtime", (AstNode *) runtime_type);
+    runtime_type->type_node = Runtime_Type;
+    add_entities_for_node(NULL, (AstNode *) runtime_type, NULL, NULL);
+    symbol_builtin_introduce(p->scope, "runtime", (AstNode *) runtime_type);
 
     AstNumLit* multi_threaded = make_int_literal(a, context.options->use_multi_threading);
     multi_threaded->type_node = (AstType *) &basic_type_bool;
@@ -492,6 +500,15 @@ void introduce_build_options(bh_allocator a) {
     #ifdef _BH_WINDOWS
         os = 2;
     #endif
+
+    AstType* OS_Type = (AstType *) symbol_raw_resolve(p->scope, "OS");
+    if (OS_Type == NULL) {
+        onyx_report_error((OnyxFilePos) {0}, "'OS' type not found in package runtime.");
+        return;
+    }
+
     AstNumLit* os_type = make_int_literal(a, os);
-    symbol_builtin_introduce(p->scope, "OS", (AstNode *) os_type);
+    os_type->type_node = OS_Type;
+    add_entities_for_node(NULL, (AstNode *) os_type, NULL, NULL);
+    symbol_builtin_introduce(p->scope, "compiler_os", (AstNode *) os_type);
 }

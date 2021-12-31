@@ -251,6 +251,13 @@ static void context_init(CompileOptions* opts) {
         .package = NULL,
         .include = create_load(context.ast_alloc, "core/type_info/type_info"),
     }));
+
+    entity_heap_insert(&context.entities, ((Entity) {
+        .state = Entity_State_Parse_Builtin,
+        .type = Entity_Type_Load_File,
+        .package = NULL,
+        .include = create_load(context.ast_alloc, "core/runtime/build_opts"),
+    }));
     
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);

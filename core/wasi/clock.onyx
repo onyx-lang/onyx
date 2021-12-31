@@ -1,8 +1,8 @@
 package core.clock
 
 #local runtime :: package runtime
-#if runtime.Runtime != runtime.Runtime_Wasi 
-    && runtime.Runtime != runtime.Runtime_Onyx {
+#if runtime.runtime != .Wasi 
+    && runtime.runtime != .Onyx {
     #error "'core.clock' is only available with the 'wasi' or 'onyx' runtimes.";
 }
 
