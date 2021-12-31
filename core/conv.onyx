@@ -262,6 +262,7 @@ Format :: struct {
     pretty_printing      := false;
     quote_strings        := false;
     dereference          := false;
+    custom_format        := true;
     digits_after_decimal := cast(u32) 4;
 
     indentation   := cast(u32) 0;
@@ -351,6 +352,11 @@ format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
                         formatting.minimum_width = ~~digits;
                     }
 
+                    case #char "!" {
+                        i += 1;
+                        formatting.custom_format = false;
+                    }
+
                     case #char "}" {
                         arg := va[vararg_index];
                         vararg_index += 1;
@@ -397,7 +403,7 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
         }
     }
 
-    if custom_formatters->has(v.type) {
+    if formatting.custom_format && custom_formatters->has(v.type) {
         custom_formatters[v.type](output, formatting, v.data);
         return;
     }
