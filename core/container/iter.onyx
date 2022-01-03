@@ -577,23 +577,28 @@ distributor :: #match {}
     return .{c, #solidify next {T=T}, #solidify close {T=T}};
 }
 
-parallel_for :: macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
+parallel_for :: #match {}
+#match parallel_for macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
+    parallel_for :: parallel_for;
+    as_iterator  :: as_iterator;
+
+    parallel_for(as_iterator(iterable), thread_count, thread_data, body);
+}
+
+#match parallel_for macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
     thread :: package core.thread;
     alloc  :: package core.alloc;
     distributor :: distributor;
     as_iterator :: as_iterator;
 
     if thread_count != 0 {
-        dist := distributor(as_iterator(iterable));
-        hacky_crap_to_get_the_type_of_T(dist);
-    }
-
-    hacky_crap_to_get_the_type_of_T :: macro (dist: Iterator($T)) {
-        threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
+        dist := distributor(iter);
         t_data := Thread_Data(T, Ctx).{
             iter = ^dist,
             data = thread_data,
         };
+
+        threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
         for^ threads do thread.spawn(it, ^t_data, #solidify thread_function {body=body, T=T, Ctx=Ctx});
 
         thread_function(body, ^t_data);
