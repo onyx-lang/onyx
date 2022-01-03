@@ -37,11 +37,14 @@ main :: (args: [] cstr) {
     // Hopefully soon, the following will be possible.
 
     {
+        lower_bound := 10;
+        addition    := 42;
+
         quick_iterator :=
                     count_iterator(1.0f, 20.0f)
                     |> iter.map((x) => x * 2)
-                    |> iter.filter((x) => x > 10)
-                    |> iter.map((x) => x + 42)
+                    |> iter.filter(lower_bound, (x, l) => x > ~~l)
+                    |> iter.map(addition, (x, addition) => x + ~~addition)
                     |> iter.take(5);
 
         for v: quick_iterator {

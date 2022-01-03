@@ -13,7 +13,8 @@ close :: (it: Iterator($T)) {
     it.close(it.data);
 }
 
-filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
+filter :: #match {}
+#match filter (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         predicate: (T) -> bool;
@@ -49,7 +50,46 @@ filter :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     };
 }
 
-map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
+#match filter (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) -> Iterator(T) {
+    FilterIterator :: struct (T: type_expr, Ctx: type_expr) {
+        iterator:  Iterator(T);
+        predicate: (T, Ctx) -> bool;
+        ctx: Ctx;
+    }
+
+    filter_iterator := new(FilterIterator(T, Ctx));
+    filter_iterator.iterator = it;
+    filter_iterator.predicate = predicate;
+    filter_iterator.ctx = ctx;
+
+    next :: (fi: ^FilterIterator($T, $_)) -> (T, bool) {
+        value, cont := fi.iterator.next(fi.iterator.data);
+        if cont {
+            while !fi.predicate(value, fi.ctx) {
+                value, cont = fi.iterator.next(fi.iterator.data);
+                if !cont do return value, false;
+            }
+
+            return value, true;
+        } else {
+            return value, false;
+        }
+    }
+
+    close :: (fi: ^FilterIterator($T, $_)) {
+        if fi.iterator.close != null_proc do fi.iterator.close(fi.iterator.data);
+        cfree(fi);
+    }
+
+    return .{
+        data  = filter_iterator,
+        next  = #solidify next  { T=T, _=Ctx },
+        close = #solidify close { T=T, _=Ctx },
+    };
+}
+
+map :: #match {}
+#match map (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
     MapIterator :: struct (T: type_expr, R: type_expr) {
         iterator:  Iterator(T);
         transform: (T) -> R;
@@ -75,6 +115,37 @@ map :: (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
         data  = map_iterator,
         next  = #solidify next  { T=T, R=R },
         close = #solidify close { T=T, R=R },
+    };
+}
+
+#match map (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R) -> Iterator(R) {
+    MapIterator :: struct (T: type_expr, R: type_expr, Ctx: type_expr) {
+        iterator:  Iterator(T);
+        transform: (T, Ctx) -> R;
+        ctx: Ctx;
+    }
+
+    map_iterator := new(MapIterator(T, R, Ctx));
+    map_iterator.iterator = it;
+    map_iterator.transform = transform;
+    map_iterator.ctx = ctx;
+
+    next :: (mi: ^MapIterator($T, $R, $Ctx)) -> (R, bool) {
+        value, cont := mi.iterator.next(mi.iterator.data);
+        if !cont do return __zero_value(R), false;
+
+        return mi.transform(value, mi.ctx), true;
+    }
+
+    close :: (mi: ^MapIterator($T, $R, $Ctx)) {
+        if mi.iterator.close != null_proc do mi.iterator.close(mi.iterator.data);
+        cfree(mi);
+    }
+
+    return .{
+        data  = map_iterator,
+        next  = #solidify next  { T=T, R=R, Ctx=Ctx },
+        close = #solidify close { T=T, R=R, Ctx=Ctx },
     };
 }
 
