@@ -33,6 +33,8 @@ void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln) {
             node = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
             ((AstTypeRawAlias *) node)->token = sln->poly_sym->token;
             ((AstTypeRawAlias *) node)->to = sln->type;
+            ((AstTypeRawAlias *) node)->type = &basic_types[Basic_Kind_Type_Index];
+            ((AstTypeRawAlias *) node)->type_id = sln->type->id;
             break;
 
         case PSK_Value:

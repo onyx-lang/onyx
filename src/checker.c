@@ -500,13 +500,13 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
         callee = new_callee;
     }
 
-    if (!calling_a_macro) call->callee = callee;
-
     // NOTE: Build callee's type
     fill_in_type((AstTyped *) callee);
     if (callee->type == NULL) {
         YIELD(call->token->pos, "Trying to resolve function type for callee.");
     }
+
+    if (!calling_a_macro) call->callee = callee;
 
     if (callee->type->kind != Type_Kind_Function) {
         ERROR_(call->token->pos,
@@ -531,7 +531,7 @@ CheckStatus check_call(AstCall** pcall) {
     //      9. Check types of formal and actual params against each other, handling varargs
     AstCall* call = *pcall;
 
-    {
+    if (call->kind == Ast_Kind_Call) {
         AstNode* callee = strip_aliases((AstNode *) call->callee);
         if (callee->kind == Ast_Kind_Poly_Struct_Type) {
             // HACK HACK HACK
@@ -1699,6 +1699,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Binary_Op: retval = check_binaryop((AstBinaryOp **) pexpr); break;
         case Ast_Kind_Unary_Op:  retval = check_unaryop((AstUnaryOp **) pexpr); break;
 
+        case Ast_Kind_Intrinsic_Call:
         case Ast_Kind_Call:     retval = check_call((AstCall **) pexpr); break;
         case Ast_Kind_Argument: retval = check_argument((AstArgument **) pexpr); break;
         case Ast_Kind_Block:    retval = check_block((AstBlock *) expr); break;
@@ -1815,10 +1816,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Error: break;
         case Ast_Kind_Unary_Field_Access: break;
         case Ast_Kind_Constraint_Sentinel: break;
-
-        // NOTE: The only way to have an Intrinsic_Call node is to have gone through the
-        // checking of a call node at least once.
-        case Ast_Kind_Intrinsic_Call: break;
 
         default:
             retval = Check_Error;
