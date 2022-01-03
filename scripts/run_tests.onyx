@@ -117,42 +117,9 @@ find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
     return;
 }
 
-at_least_one_test_failed := false;
-
-test_cases :: (cases) => {
-    for #no_close *cases {
-        printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
-
-        proc := os.process_spawn(onyx_cmd, .["run", it.source_file]);
-        defer os.process_destroy(^proc);
-
-        proc_reader := io.reader_make(^proc);
-        output := io.read_all(^proc_reader);
-        defer memory.free_slice(^output);
-
-        if exit := os.process_wait(^proc); exit != .Success {
-            // Error running the test case
-            print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
-            at_least_one_test_failed = true;
-            continue;
-        }
-
-        for expected_file: os.with_file(it.expected_file) {
-            expected_reader := io.reader_make(expected_file);
-            expected_output := io.read_all(^expected_reader);
-
-            if output != expected_output {
-                print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
-                printf("Expected:\n{}\n", expected_output);
-                printf("Got:\n{}\n", output);
-                at_least_one_test_failed = true;
-            }
-        }
-    }
-}
-
 // The executable to use when compiling
 onyx_cmd: str;
+at_least_one_test_failed := false;
 settings := Settings.{};
 
 Settings :: struct {
@@ -160,7 +127,7 @@ Settings :: struct {
     debug := false;
 
     ["--threads"]
-    threads := 3;
+    threads := 4;
 
     ["--no-color"]
     no_color := false;
@@ -238,29 +205,46 @@ main :: (args) => {
     find_onyx_files(settings.test_folder, ^cases);
 
     thread_count := settings.threads;
-    case_iterator := distributor(cases);
 
-    if thread_count > 0 {
-        // Stack allocate this in the future?
-        threads := memory.make_slice(thread.Thread, thread_count);
+    iter.parallel_for(cases, settings.threads) {
+        // Weird macros mean I have to forward external names
+        use package core
+        onyx_cmd :: onyx_cmd
+        print_color :: print_color
+        at_least_one_test_failed :: at_least_one_test_failed
 
-        for thread_count {
-            thread.spawn(^threads[it], ^case_iterator, test_cases);
+        printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
+
+        proc := os.process_spawn(onyx_cmd, .["run", it.source_file]);
+        defer os.process_destroy(^proc);
+
+        proc_reader := io.reader_make(^proc);
+        output := io.read_all(^proc_reader);
+        defer memory.free_slice(^output);
+
+        if exit := os.process_wait(^proc); exit != .Success {
+            // Error running the test case
+            print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
+            at_least_one_test_failed = true;
+            continue;
         }
 
-        test_cases(^case_iterator);
+        for expected_file: os.with_file(it.expected_file) {
+            expected_reader := io.reader_make(expected_file);
+            expected_output := io.read_all(^expected_reader);
 
-        for ^ threads do thread.join(it);
-
-    } else {
-        test_cases(^case_iterator);
+            if output != expected_output {
+                print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
+                printf("Expected:\n{}\n", expected_output);
+                printf("Got:\n{}\n", output);
+                at_least_one_test_failed = true;
+            }
+        }
     }
-
-    case_iterator->close();
 
     if at_least_one_test_failed {
         print_color(.Red, "FAILED\n");
-        // (package wasi).proc_exit(1);
+        os.exit(-1);
 
     } else {
         print_color(.Green, "SUCCESS\n");

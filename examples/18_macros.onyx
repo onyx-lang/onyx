@@ -110,6 +110,28 @@ main :: (args: [] cstr) {
     // As another small shorthand, if a code block only contains one expression (like the code block above),
     // then you can write by wrapping the expression in #(...).
     triple_macro(#(println("Short code block!")));
+
+    // As yet another small piece of syntactic sugar, you can pass a code block to a macro or procedure in
+    // the following way:
+
+    cool_block :: macro (param: i32, body: Code) {
+        local_variable := param * 2;
+        #insert body;
+    }
+
+    cool_block(10) {
+        println(local_variable);
+    }
+
+    // Whenever there is a call at the statement level, the compiler will look one token ahead and see if there
+    // is a '{'. If there is, then the compiler will parse the '{' as the start of a code block, and will pass that
+    // code block as the last non-named argument to the function call. This allows you to write blocks of code that are
+    // prefaced by a controlling macro, which enables you do whatever crazy things you can imagine. For example, you
+    // could do something like `#pragma omp parallel for` in Onyx without relying on compiler magic.
+    //
+    //     parallel_for(iterable, thread_count=4) {
+    //         println(it); // Will be automatically assigned from the called macro.
+    //     }
 }
 
 #load "core/std"

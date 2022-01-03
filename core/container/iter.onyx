@@ -506,6 +506,7 @@ count :: #match {}
 some :: #match {}
 #match some macro (it: $T, cond: $F) -> #auto where Iterable(T) {
     some :: some
+    as_iterator :: as_iterator
     return some(as_iterator(it), cond);
 }
 
@@ -517,6 +518,7 @@ some :: #match {}
 every :: #match {}
 #match every macro (it: $T, cond: $F) -> #auto where Iterable(T) {
     every :: every
+    as_iterator :: as_iterator
     return every(as_iterator(it), cond);
 }
 
@@ -532,4 +534,62 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     for v: it do array.push(^arr, v);
 
     return arr;
+}
+
+
+
+distributor :: #match {}
+#match distributor macro (it: $T) -> #auto where Iterable(T) {
+    distributor :: distributor;
+    as_iterator :: as_iterator;
+    return distributor(as_iterator(it));
+}
+
+#match distributor (it: Iterator($T)) -> Iterator(T) {
+    Context :: struct (T: type_expr) {
+        mutex: sync.Mutex;
+        iterator: Iterator(T);
+    }
+
+    next :: (use c: ^Context($T)) -> (T, bool) {
+        sync.scoped_mutex(^mutex);
+        return take_one(iterator);
+    }
+
+    close :: (use c: ^Context($T)) {
+        sync.mutex_destroy(^c.mutex);
+        cfree(c);
+    }
+
+    c := new(Context(T));
+    sync.mutex_init(^c.mutex);
+    c.iterator = it;
+
+    return .{c, #solidify next {T=T}, #solidify close {T=T}};
+}
+
+parallel_for :: macro (iterable: $I, thread_count: u32, body: Code) where Iterable(I) {
+    thread :: package core.thread;
+    alloc  :: package core.alloc;
+
+    if thread_count != 0 {
+        dist := distributor(iterable);
+        hacky_crap_to_get_the_type_of_T(dist);
+    }
+
+    hacky_crap_to_get_the_type_of_T :: macro (dist: Iterator($T)) {
+        threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
+        for^ threads do thread.spawn(it, ^dist, #solidify thread_function {body=body, T=T});
+
+        thread_function(body, ^dist);
+
+        for^ threads do thread.join(it);
+        dist.close(dist.data);
+    }
+
+    thread_function :: ($body: Code, iter: ^Iterator($T)) {
+        for #no_close *iter {
+            #insert body;
+        }
+    }
 }
