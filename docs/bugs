@@ -1,6 +1,7 @@
 List of known bugs:
 
-[ ] switch statements should work with any type that supports '=='.
+[ ] partially solidifying procedures messes up poly param indicies, which causes them to
+    not be solved correctly.
 
 [ ] macros cannot use 'use'.
 
@@ -29,6 +30,8 @@ List of known bugs:
         .{  1, 0 }, .{  1, -1 }, .{ 0, -1 }, 
         .{ -1, 0 }, .{ -1,  1 }, .{ 0,  1 }, 
     ];
+
+[X] switch statements should work with any type that supports '=='.
 
 [X] I don't know why this doesn't work... It is complaining that it couldn't match
     either of these cases, but if I remove the first, it matches the second. This

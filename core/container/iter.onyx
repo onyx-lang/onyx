@@ -601,7 +601,7 @@ parallel_for :: #match {}
         threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
         for^ threads do thread.spawn(it, ^t_data, #solidify thread_function {body=body, T=T, Ctx=Ctx});
 
-        thread_function(body, ^t_data);
+        thread_function(^t_data, body);
 
         for^ threads do thread.join(it);
         dist.close(dist.data);
@@ -612,7 +612,7 @@ parallel_for :: #match {}
         data: ^Ctx;
     }
 
-    thread_function :: ($body: Code, __data: ^Thread_Data($T, $Ctx)) {
+    thread_function :: (__data: ^Thread_Data($T, $Ctx), $body: Code) {
         thread_data := __data.data;
         for #no_close *__data.iter {
             #insert body;

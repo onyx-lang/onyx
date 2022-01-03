@@ -775,7 +775,7 @@ AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) 
         new_pp->token = tkn;
         new_pp->base_func = pp->base_func;
         new_pp->flags = pp->flags;
-        new_pp->poly_params = pp->poly_params;
+        new_pp->poly_params = bh_arr_copy(context.ast_alloc, pp->poly_params);
 
         ensure_polyproc_cache_is_created(pp);
         new_pp->concrete_funcs = pp->concrete_funcs;
