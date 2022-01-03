@@ -2041,7 +2041,12 @@ CheckStatus check_struct(AstStructType* s_node) {
 
     if (s_node->constraints.constraints) {
         s_node->constraints.produce_errors = (s_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
-        CHECK(constraint_context, &s_node->constraints, s_node->scope, s_node->token->pos);
+
+        OnyxFilePos pos = s_node->token->pos;
+        if (s_node->polymorphic_error_loc.filename) {
+            pos = s_node->polymorphic_error_loc;
+        }
+        CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
@@ -2631,6 +2636,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
 
                     onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
                     onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
+                    onyx_report_error(pos, Error_Critical, "Here is the code that caused this constraint to be checked.");
 
                     return Check_Error;
 

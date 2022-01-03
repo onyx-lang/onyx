@@ -500,7 +500,16 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
         default: return;
     }
 
-    *resolved = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
+    PolySolveResult res = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
+    if (res.kind == PSK_Undefined) {
+        *err_msg = bh_aprintf(global_scratch_allocator,
+            "Unable to solve for polymorphic variable '%b', given the type '%s'.",
+            param->poly_sym->token->text,
+            param->poly_sym->token->length,
+            type_get_name(actual_type));
+    }
+
+    *resolved = res;
 }
 
 
@@ -979,6 +988,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     insert_poly_slns_into_scope(sln_scope, slns);
 
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
+    concrete_struct->polymorphic_error_loc = pos;
     BH_MASK_SET(concrete_struct->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
     shput(ps_type->concrete_structs, unique_key, concrete_struct);
 

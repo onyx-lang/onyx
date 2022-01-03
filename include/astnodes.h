@@ -883,6 +883,7 @@ struct AstStructType {
     struct Entity* entity_type;
     struct Entity* entity_defaults;
 
+    OnyxFilePos polymorphic_error_loc;
     ConstraintContext constraints;
 
     b32 stcache_is_valid : 1;
