@@ -148,17 +148,9 @@ empty :: (use map: ^Map($K, $V)) -> bool {
 }
 
 format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V)) {
-    old_quote_strings := format.quote_strings;    
-    format.quote_strings = true;
-    defer format.quote_strings = old_quote_strings;
-
     output->write("{\n");
-    for^ e: x.entries {
-        output->write("    ");
-        conv.format_any(output, format, .{^e.key, K});
-        output->write(" => ");
-        conv.format_any(output, format, .{^e.value, V});
-        output->write("\n");
+    for^ x.entries {
+        conv.format(output, "    {\"} => {\"}\n", it.key, it.value);
     }
     output->write("}");
 }

@@ -271,12 +271,21 @@ Format :: struct {
 }
 
 
-format :: (buffer: [] u8, format: str, va: ..any) -> str {
+format :: #match {}
+#match format (buffer: [] u8, format: str, va: ..any) -> str {
     return format_va(buffer, format, ~~va); 
 }
+#match format (output: ^Format_Output, format: str, va: ..any) -> str {
+    return format_va(output, format, ~~va); 
+}
 
-format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
+format_va :: #match {}
+#match format_va (buffer: [] u8, format: str, va: [] any) -> str {
     output := Format_Output.{ buffer.data, 0, buffer.count };
+    return format_va(^output, format, va);
+}
+
+#match format_va (output: ^Format_Output, format: str, va: [] any) -> str {
     vararg_index := 0;
 
     while i := 0; i < format.count {
@@ -357,10 +366,15 @@ format_va :: (buffer: [] u8, format: str, va: [] any) -> str {
                         formatting.custom_format = false;
                     }
 
+                    case #char "\"" {
+                        i += 1;
+                        formatting.quote_strings = true;
+                    }
+
                     case #char "}" {
                         arg := va[vararg_index];
                         vararg_index += 1;
-                        format_any(^output, ^formatting, arg);
+                        format_any(output, ^formatting, arg);
 
                         break break;
                     }

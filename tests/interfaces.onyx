@@ -53,9 +53,12 @@ BitField :: interface (T: type_expr) {
     T ^ T;
 }
 
-Complex :: struct { x, y: f32; }
-#match io.write (w: ^io.Writer, c: Complex) {
-    io.write_format(w, "{.2} + {.2}i", c.x, c.y);
+Complex :: struct [conv.Custom_Format.{ format }] {
+    x, y: f32;
+
+    format :: (output: ^conv.Format_Output, format: ^conv.Format, c: ^Complex) {
+        conv.format(output, "{.2} + {.2}i", c.x, c.y);
+    }
 }
 
 #operator + (c1, c2: Complex) => Complex.{ c1.x + c2.x, c1.y + c2.y };
