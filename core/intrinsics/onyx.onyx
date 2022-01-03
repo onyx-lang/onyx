@@ -4,6 +4,8 @@ __initialize :: (val: ^$T)      -> void #intrinsic ---
 __zero_value :: ($T: type_expr) -> T    #intrinsic ---
 
 init :: macro ($T: type_expr) -> T {
+    __initialize :: __initialize
+
     val: T;
     __initialize(^val);
     return val;

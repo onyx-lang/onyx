@@ -6,6 +6,7 @@
 #load "core/std"
 
 use package core
+use package core.intrinsics.onyx { init }
 #local runtime :: package runtime
 
 #if false {
@@ -24,37 +25,6 @@ use package core
             i += 1;
         }
     }
-}
-
-@Relocate
-distributor :: (arr: [] $T) -> Iterator(T) {
-    Context :: struct (T: type_expr) {
-        mutex: sync.Mutex;
-        arr: [] T;
-        curr_pos: i32;
-    }
-
-    next :: (use c: ^Context($T)) -> (T, bool) {
-        sync.scoped_mutex(^mutex);
-
-        use package core.intrinsics.onyx {__zero_value}
-        if curr_pos >= arr.count do return __zero_value(T), false;
-
-        defer curr_pos += 1;
-        return arr[curr_pos], true;
-    }
-
-    close :: (use c: ^Context($T)) {
-        sync.mutex_destroy(^c.mutex);
-        cfree(c);
-    }
-
-    c := new(Context(T));
-    sync.mutex_init(^c.mutex);
-    c.arr = arr;
-    c.curr_pos = 0;
-
-    return .{ c, #solidify next {T=T}, #solidify close {T=T}};
 }
 
 Color :: enum {
@@ -117,9 +87,6 @@ find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
     return;
 }
 
-// The executable to use when compiling
-onyx_cmd: str;
-at_least_one_test_failed := false;
 settings := Settings.{};
 
 Settings :: struct {
@@ -193,12 +160,19 @@ main :: (args) => {
     args_parse(args, ^settings);
     printf("Using {p*}\n", ^settings);
 
+    Execution_Context :: struct {
+        // The executable to use when compiling
+        onyx_cmd: str;
+        at_least_one_test_failed := false;
+    }
+    exec_context := init(Execution_Context);
+
     switch runtime.compiler_os {
         case .Linux {
-            onyx_cmd = "./bin/onyx";
-            if settings.debug do onyx_cmd = "./bin/onyx-debug";
+            exec_context.onyx_cmd = "./bin/onyx";
+            if settings.debug do exec_context.onyx_cmd = "./bin/onyx-debug";
         }
-        case .Windows do onyx_cmd = "onyx.exe";
+        case .Windows do exec_context.onyx_cmd = "onyx.exe";
     }
 
     cases := array.make(Test_Case, capacity=256);
@@ -206,16 +180,14 @@ main :: (args) => {
 
     thread_count := settings.threads;
 
-    iter.parallel_for(cases, settings.threads) {
+    iter.parallel_for(cases, settings.threads, ^exec_context) {
         // Weird macros mean I have to forward external names
         use package core
-        onyx_cmd :: onyx_cmd
         print_color :: print_color
-        at_least_one_test_failed :: at_least_one_test_failed
 
         printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
 
-        proc := os.process_spawn(onyx_cmd, .["run", it.source_file]);
+        proc := os.process_spawn(thread_data.onyx_cmd, .["run", it.source_file]);
         defer os.process_destroy(^proc);
 
         proc_reader := io.reader_make(^proc);
@@ -225,7 +197,7 @@ main :: (args) => {
         if exit := os.process_wait(^proc); exit != .Success {
             // Error running the test case
             print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
-            at_least_one_test_failed = true;
+            thread_data.at_least_one_test_failed = true;
             continue;
         }
 
@@ -237,12 +209,12 @@ main :: (args) => {
                 print_color(.Red, "[{}]  Output did not match for {}.\n", context.thread_id, it.source_file);
                 printf("Expected:\n{}\n", expected_output);
                 printf("Got:\n{}\n", output);
-                at_least_one_test_failed = true;
+                thread_data.at_least_one_test_failed = true;
             }
         }
     }
 
-    if at_least_one_test_failed {
+    if exec_context.at_least_one_test_failed {
         print_color(.Red, "FAILED\n");
         os.exit(-1);
 

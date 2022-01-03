@@ -1,6 +1,7 @@
 package core.iter
 
 use package core.intrinsics.onyx { __zero_value }
+#local sync   :: package core.sync
 #local memory :: package core.memory
 
 as_iterator :: #match {}
@@ -549,11 +550,19 @@ distributor :: #match {}
     Context :: struct (T: type_expr) {
         mutex: sync.Mutex;
         iterator: Iterator(T);
+        ended := false;
     }
 
     next :: (use c: ^Context($T)) -> (T, bool) {
+        if ended do return __zero_value(T), false;
         sync.scoped_mutex(^mutex);
-        return take_one(iterator);
+
+        if v, success := take_one(iterator); !success {
+            ended = true;
+            return v, false;
+        } else {
+            return v, true;
+        }
     }
 
     close :: (use c: ^Context($T)) {
@@ -568,27 +577,39 @@ distributor :: #match {}
     return .{c, #solidify next {T=T}, #solidify close {T=T}};
 }
 
-parallel_for :: macro (iterable: $I, thread_count: u32, body: Code) where Iterable(I) {
+parallel_for :: macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
     thread :: package core.thread;
     alloc  :: package core.alloc;
+    distributor :: distributor;
+    as_iterator :: as_iterator;
 
     if thread_count != 0 {
-        dist := distributor(iterable);
+        dist := distributor(as_iterator(iterable));
         hacky_crap_to_get_the_type_of_T(dist);
     }
 
     hacky_crap_to_get_the_type_of_T :: macro (dist: Iterator($T)) {
         threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
-        for^ threads do thread.spawn(it, ^dist, #solidify thread_function {body=body, T=T});
+        t_data := Thread_Data(T, Ctx).{
+            iter = ^dist,
+            data = thread_data,
+        };
+        for^ threads do thread.spawn(it, ^t_data, #solidify thread_function {body=body, T=T, Ctx=Ctx});
 
-        thread_function(body, ^dist);
+        thread_function(body, ^t_data);
 
         for^ threads do thread.join(it);
         dist.close(dist.data);
     }
 
-    thread_function :: ($body: Code, iter: ^Iterator($T)) {
-        for #no_close *iter {
+    Thread_Data :: struct (T: type_expr, Ctx: type_expr) {
+        iter: ^Iterator(T);
+        data: ^Ctx;
+    }
+
+    thread_function :: ($body: Code, __data: ^Thread_Data($T, $Ctx)) {
+        thread_data := __data.data;
+        for #no_close *__data.iter {
             #insert body;
         }
     }
