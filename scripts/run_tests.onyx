@@ -9,24 +9,6 @@ use package core
 use package core.intrinsics.onyx { init }
 #local runtime :: package runtime
 
-#if false {
-    @Relocate
-    divide_array :: (arr: [] $T, divisions: [] [] T) {
-        if divisions.count == 0 do return;
-
-        chunk_size := arr.count / divisions.count;
-
-        i := 0;
-        for ^ divisions {
-            low := i*chunk_size;
-            high := (i+1)*chunk_size;
-            if i == divisions.count - 1 do high = divisions.count;
-            *it = arr[low .. high];
-            i += 1;
-        }
-    }
-}
-
 Color :: enum {
     White;
     Red;

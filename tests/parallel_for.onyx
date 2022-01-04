@@ -1,0 +1,22 @@
+#load "core/std"
+
+use package core
+
+main :: (args) => {
+    sum := 0;
+
+    thread_data: struct {
+        sum : ^i32; 
+        mutex: sync.Mutex;
+    };
+    thread_data.sum = ^sum;
+    sync.mutex_init(^thread_data.mutex);
+
+    iter.parallel_for(0 .. 10000, 4, ^thread_data) {
+        sync.scoped_mutex(^thread_data.mutex);
+        *thread_data.sum += it;
+    }
+
+    println(sum);
+}
+
