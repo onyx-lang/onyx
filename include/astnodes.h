@@ -710,7 +710,7 @@ struct AstDoBlock {
 struct AstDirectiveSolidify {
     AstTyped_base;
 
-    AstPolyProc* poly_proc;
+    AstFunction* poly_proc;
     bh_arr(AstPolySolution) known_polyvars;
 
     AstNode* resolved_proc;
@@ -987,48 +987,6 @@ struct AstParam {
     b32 use_processed : 1;
     b32 is_baked      : 1;
 };
-struct AstFunction {
-    AstTyped_base;
-
-    Scope *scope;
-
-    bh_arr(AstParam) params;
-    AstType* return_type;
-
-    AstBlock *body;
-
-    char* name;
-
-    // NOTE: This is NULL, unless this function was generated from a polymorphic
-    // procedure call. Then it is set to the token of the call node.
-    OnyxToken* generated_from;
-    Scope*     poly_scope;
-
-    // NOTE: This is NULL, unless this function is used in a "#export" directive.
-    // It is undefined which name it will have if there are multiple export directives
-    // for this particular function.
-    OnyxToken* exported_name;
-
-    union {
-        OnyxToken* intrinsic_name;
-
-        // NOTE: Used when the function is declared as foreign
-        struct {
-            OnyxToken* foreign_module;
-            OnyxToken* foreign_name;
-        };
-    };
-
-    struct Entity* entity_header;
-    struct Entity* entity_body;
-
-    ConstraintContext constraints;
-
-    b32 is_exported  : 1;
-    b32 is_foreign   : 1;
-    b32 is_intrinsic : 1;
-};
-
 typedef struct OverloadOption OverloadOption;
 struct OverloadOption {
     // This is u64 because padding will make it that anyway.
@@ -1161,25 +1119,61 @@ struct AstSolidifiedFunction {
     struct Entity *func_header_entity;
 };
 
-struct AstPolyProc {
-    // While the "type" of a polymorphic procedure will never be set, it is necessary
-    // for contexts where it used in an expression.
+struct AstFunction {
     AstTyped_base;
 
-    Scope *poly_scope;
+    Scope *scope;
+
+    bh_arr(AstParam) params;
+    AstType* return_type;
+
+    AstBlock *body;
+
+    char* name;
+
+    // NOTE: This is NULL, unless this function was generated from a polymorphic
+    // procedure call. Then it is set to the token of the call node.
+    OnyxToken* generated_from;
+    Scope*     poly_scope;
+
+    // NOTE: This is NULL, unless this function is used in a "#export" directive.
+    // It is undefined which name it will have if there are multiple export directives
+    // for this particular function.
+    OnyxToken* exported_name;
+
+    union {
+        OnyxToken* intrinsic_name;
+
+        // NOTE: Used when the function is declared as foreign
+        struct {
+            OnyxToken* foreign_module;
+            OnyxToken* foreign_name;
+        };
+    };
+
+    struct Entity* entity_header;
+    struct Entity* entity_body;
+
+    ConstraintContext constraints;
+
+    // Polymorphic procedures use the following fields
+    Scope *parent_scope_of_poly_proc;
     bh_arr(AstPolyParam) poly_params;
 
     bh_arr(AstPolySolution) known_slns;
 
-    AstFunction* base_func;
     Table(AstSolidifiedFunction) concrete_funcs;
     bh_imap active_queries;
+
+    b32 is_exported  : 1;
+    b32 is_foreign   : 1;
+    b32 is_intrinsic : 1;
 };
 
 struct AstPolyQuery {
     AstNode_base;
 
-    AstPolyProc *proc;
+    AstFunction *proc;
     PolyProcLookupMethod pp_lookup;
     ptr given;
     OnyxToken *error_loc;
@@ -1385,7 +1379,7 @@ typedef struct Entity {
         AstEnumType           *enum_type;
         AstEnumValue          *enum_value;
         AstMemRes             *mem_res;
-        AstPolyProc           *poly_proc;
+        AstFunction           *poly_proc;
         AstPolyQuery          *poly_query;
         AstForeignBlock       *foreign_block;
         AstMacro              *macro;
@@ -1634,11 +1628,11 @@ b32 static_if_resolution(AstIf* static_if);
 
 void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln);
 TypeMatch find_polymorphic_sln(AstPolySolution *out, AstPolyParam *param, AstFunction *func, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg);
-AstFunction* polymorphic_proc_lookup(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn);
-AstFunction* polymorphic_proc_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
-AstNode* polymorphic_proc_try_solidify(AstPolyProc* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
-AstFunction* polymorphic_proc_build_only_header(AstPolyProc* pp, PolyProcLookupMethod pp_lookup, ptr actual);
-AstFunction* polymorphic_proc_build_only_header_with_slns(AstPolyProc* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
+AstFunction* polymorphic_proc_lookup(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual, OnyxToken* tkn);
+AstFunction* polymorphic_proc_solidify(AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
+AstNode* polymorphic_proc_try_solidify(AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
+AstFunction* polymorphic_proc_build_only_header(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual);
+AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
 
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
@@ -1712,7 +1706,7 @@ static inline ParamPassType type_get_param_pass(Type* type) {
 
 static inline AstFunction* get_function_from_node(AstNode* node) {
     if (node->kind == Ast_Kind_Function) return (AstFunction *) node;
-    if (node->kind == Ast_Kind_Polymorphic_Proc) return ((AstPolyProc *) node)->base_func;
+    if (node->kind == Ast_Kind_Polymorphic_Proc) return (AstFunction *) node;
     if (node->kind == Ast_Kind_Macro) return get_function_from_node((AstNode*) ((AstMacro *) node)->body);
     return NULL;
 }

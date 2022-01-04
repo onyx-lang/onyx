@@ -758,7 +758,7 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
 
     SYMRES(expression, (AstTyped **) &solid->poly_proc);
     if (solid->poly_proc && solid->poly_proc->kind == Ast_Kind_Directive_Solidify) {
-        AstPolyProc* potentially_resolved_proc = (AstPolyProc *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
+        AstFunction* potentially_resolved_proc = (AstFunction *) ((AstDirectiveSolidify *) solid->poly_proc)->resolved_proc;
         if (!potentially_resolved_proc) return Symres_Yield_Micro;
 
         solid->poly_proc = potentially_resolved_proc;
@@ -1185,9 +1185,9 @@ static SymresStatus symres_struct_defaults(AstType* t) {
     return Symres_Success;
 }
 
-static SymresStatus symres_polyproc(AstPolyProc* pp) {
+static SymresStatus symres_polyproc(AstFunction* pp) {
     pp->flags |= Ast_Flag_Comptime;
-    pp->poly_scope = curr_scope;
+    pp->parent_scope_of_poly_proc = curr_scope;
     return Symres_Success;
 }
 
@@ -1301,7 +1301,7 @@ static SymresStatus symres_macro(AstMacro* macro) {
         SYMRES(function_header, (AstFunction *) macro->body);
     }
     else if (macro->body->kind == Ast_Kind_Polymorphic_Proc) {
-        SYMRES(polyproc, (AstPolyProc *) macro->body);
+        SYMRES(polyproc, (AstFunction *) macro->body);
     }
 
     macro->flags |= Ast_Flag_Comptime;
@@ -1338,7 +1338,7 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
     query->successful_symres = 0;
 
     if (query->function_header->scope == NULL)
-        query->function_header->scope = scope_create(context.ast_alloc, query->proc->poly_scope, query->token->pos);
+        query->function_header->scope = scope_create(context.ast_alloc, query->proc->parent_scope_of_poly_proc, query->token->pos);
 
     scope_enter(query->function_header->scope);
 

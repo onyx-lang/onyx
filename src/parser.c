@@ -594,7 +594,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 // :LinearTokenDependent
                 solid->token = parser->curr - 1;
 
-                solid->poly_proc = (AstPolyProc *) parse_factor(parser);
+                solid->poly_proc = (AstFunction *) parse_factor(parser);
 
                 solid->known_polyvars = NULL;
                 bh_arr_new(global_heap_allocator, solid->known_polyvars, 2);
@@ -2373,17 +2373,14 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
 function_defined:
     if (bh_arr_length(polymorphic_vars) > 0) {
-        AstPolyProc* pp = make_node(AstPolyProc, Ast_Kind_Polymorphic_Proc);
-        pp->token = func_def->token;
-        pp->poly_params = polymorphic_vars;
-        pp->base_func = func_def;
-
-        return (AstFunction *) pp;
+        func_def->kind = Ast_Kind_Polymorphic_Proc;
+        func_def->poly_params = polymorphic_vars;
 
     } else {
         bh_arr_free(polymorphic_vars);
-        return func_def;
     }
+    
+    return func_def;
 }
 
 static b32 parse_possible_function_definition_no_consume(OnyxParser* parser) {
@@ -2497,15 +2494,14 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         bh_arr_push(poly_params, type_node);
     }
 
-    AstFunction* func_node = make_node(AstFunction, Ast_Kind_Function);
-    AstPolyProc* poly_proc = make_node(AstPolyProc, Ast_Kind_Polymorphic_Proc);
+    AstFunction* poly_proc = make_node(AstFunction, Ast_Kind_Polymorphic_Proc);
 
-    bh_arr_new(global_heap_allocator, func_node->params, bh_arr_length(params));
+    bh_arr_new(global_heap_allocator, poly_proc->params, bh_arr_length(params));
     fori (i, 0, bh_arr_length(params)) {
         AstLocal* param_local = make_local(parser->allocator, params[i].token, (AstType *) poly_params[i]);
         param_local->kind = Ast_Kind_Param;
 
-        bh_arr_push(func_node->params, ((AstParam) {
+        bh_arr_push(poly_proc->params, ((AstParam) {
             .local = param_local,
             .default_value = NULL,
 
@@ -2544,9 +2540,9 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
         return_type = (AstType *) return_type_of;
     }
 
-    func_node->token = proc_token;
-    func_node->body = body_block;
-    func_node->return_type = (AstType *) return_type;
+    poly_proc->token = proc_token;
+    poly_proc->body = body_block;
+    poly_proc->return_type = (AstType *) return_type;
 
     poly_proc->token = proc_token;
     bh_arr_new(global_heap_allocator, poly_proc->poly_params, bh_arr_length(params));
@@ -2563,7 +2559,6 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
             // This is not handled currently, as you cannot say f :: ($x: $T) yet, which is what this would have to do.
         }
     }
-    poly_proc->base_func = func_node;
 
     *ret = (AstTyped *) poly_proc;
 
@@ -2803,7 +2798,8 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
         return NULL;
 
     switch (node->kind) {
-        case Ast_Kind_Function: {
+        case Ast_Kind_Function:
+        case Ast_Kind_Polymorphic_Proc: {
             AstFunction* func = (AstFunction *) node;
 
             if (func->intrinsic_name == NULL) func->intrinsic_name = symbol;
@@ -2812,22 +2808,10 @@ static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol
             break;
         }
 
-        case Ast_Kind_Polymorphic_Proc: {
-            AstPolyProc* proc = (AstPolyProc *) node;
-
-            if (proc->base_func->intrinsic_name == NULL) proc->base_func->intrinsic_name = symbol;
-
-            proc->base_func->name = generate_name_within_scope(parser, symbol);
-            break;
-        }
-
         case Ast_Kind_Macro: {
             AstMacro* macro = (AstMacro *) node;
 
             AstFunction* func = (AstFunction *) macro->body;
-            if (func->kind == Ast_Kind_Polymorphic_Proc)
-                func = (AstFunction *) ((AstPolyProc *) func)->base_func;
-
             func->name = generate_name_within_scope(parser, symbol);
             break;
         }

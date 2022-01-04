@@ -616,7 +616,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     }
 
     if (node->kind == Ast_Kind_Polymorphic_Proc) {
-        AstFunction* func = polymorphic_proc_lookup((AstPolyProc *) node, PPLM_By_Function_Type, type, node->token);
+        AstFunction* func = polymorphic_proc_lookup((AstFunction *) node, PPLM_By_Function_Type, type, node->token);
         if (func == NULL) return TYPE_MATCH_FAILED;
         if (func == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
 

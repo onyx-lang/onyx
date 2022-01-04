@@ -14,7 +14,6 @@ static inline b32 should_clone(AstNode* node) {
         case Ast_Kind_Enum_Type:
         case Ast_Kind_Enum_Value:
         case Ast_Kind_Overloaded_Function:
-        case Ast_Kind_Polymorphic_Proc:
         case Ast_Kind_Alias:
         case Ast_Kind_Code_Block:
         case Ast_Kind_Macro:
@@ -36,7 +35,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Binding: return sizeof(AstBinding);
         case Ast_Kind_Function: return sizeof(AstFunction);
         case Ast_Kind_Overloaded_Function: return sizeof(AstOverloadedFunction);
-        case Ast_Kind_Polymorphic_Proc: return sizeof(AstPolyProc);
+        case Ast_Kind_Polymorphic_Proc: return sizeof(AstFunction);
         case Ast_Kind_Block: return sizeof(AstBlock);
         case Ast_Kind_Local: return sizeof(AstLocal);
         case Ast_Kind_Global: return sizeof(AstGlobal);
@@ -395,7 +394,8 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             C(AstBinding, node);
             break;
 
-        case Ast_Kind_Function: {
+        case Ast_Kind_Function:
+        case Ast_Kind_Polymorphic_Proc: {
             if (clone_depth > 1) {
                 clone_depth--;
                 return node;
@@ -403,6 +403,18 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
+
+            if (node->kind == Ast_Kind_Polymorphic_Proc) {
+                df->kind = Ast_Kind_Function;
+                df->parent_scope_of_poly_proc = NULL;
+                df->poly_params = NULL;
+                df->known_slns = NULL;
+                df->concrete_funcs = NULL;
+                df->active_queries.hashes = NULL;
+                df->active_queries.entries = NULL;
+                df->poly_scope = NULL;
+                df->entity = NULL;
+            }
 
             if (sf->is_foreign) return node;
             assert(df->scope == NULL);
@@ -459,7 +471,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstDirectiveSolidify* dd = (AstDirectiveSolidify *) nn;
             AstDirectiveSolidify* sd = (AstDirectiveSolidify *) node;
 
-            dd->poly_proc = (AstPolyProc *) ast_clone(a, (AstNode *) sd->poly_proc);
+            dd->poly_proc = (AstFunction *) ast_clone(a, (AstNode *) sd->poly_proc);
             dd->resolved_proc = NULL;
 
             dd->known_polyvars = NULL;
@@ -521,7 +533,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 #undef C
 
 AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
-    if (func->kind != Ast_Kind_Function) return NULL;
+    if (func->kind != Ast_Kind_Function && func->kind != Ast_Kind_Polymorphic_Proc) return NULL;
 
     if (func->is_foreign) return func;
 
@@ -529,6 +541,19 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
     memmove(new_func, func, sizeof(AstFunction));
     assert(new_func->scope == NULL);
 
+    if (func->kind == Ast_Kind_Polymorphic_Proc) {
+        new_func->kind = Ast_Kind_Function;
+        new_func->parent_scope_of_poly_proc = NULL;
+        new_func->poly_params = NULL;
+        new_func->known_slns = NULL;
+        new_func->concrete_funcs = NULL;
+        new_func->active_queries.hashes = NULL;
+        new_func->active_queries.entries = NULL;
+        new_func->poly_scope = NULL;
+        new_func->entity = NULL;
+    }
+
+    // new_func->body = NULL;
     new_func->return_type = (AstType *) ast_clone(a, func->return_type);
 
     new_func->params = NULL;
@@ -558,7 +583,7 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
 // a function from `clone_function_header`.
 void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source) {
     if (dest->kind != Ast_Kind_Function) return;
-    if (source->kind != Ast_Kind_Function) return;
+    if (source->kind != Ast_Kind_Polymorphic_Proc && source->kind != Ast_Kind_Function) return;
 
     dest->body = (AstBlock *) ast_clone(a, source->body);
 }

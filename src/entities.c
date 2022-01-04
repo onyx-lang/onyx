@@ -311,7 +311,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
 
         case Ast_Kind_Polymorphic_Proc: {
             ent.type = Entity_Type_Polymorphic_Proc;
-            ent.poly_proc = (AstPolyProc *) node;
+            ent.poly_proc = (AstFunction *) node;
             ENTITY_INSERT(ent);
             break;
         }

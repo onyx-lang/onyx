@@ -490,7 +490,7 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
         callee = new_callee;
 
     } else if (callee->kind == Ast_Kind_Polymorphic_Proc) {
-        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstPolyProc *) callee, PPLM_By_Arguments, &call->args, call->token);
+        AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstFunction *) callee, PPLM_By_Arguments, &call->args, call->token);
         if (new_callee == NULL) return Check_Error;
         if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for polymorphic procedure header to pass type-checking.");
@@ -2688,7 +2688,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
 
 CheckStatus check_polyquery(AstPolyQuery *query) {
     if (query->function_header->scope == NULL)
-        query->function_header->scope = scope_create(context.ast_alloc, query->proc->poly_scope, query->token->pos);
+        query->function_header->scope = scope_create(context.ast_alloc, query->proc->parent_scope_of_poly_proc, query->token->pos);
 
     CheckStatus header_check = check_temp_function_header(query->function_header);
     if (header_check == Check_Return_To_Symres) return Check_Return_To_Symres;

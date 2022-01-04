@@ -390,7 +390,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         AstFunction* overload = NULL;
         switch (node->kind) {
             case Ast_Kind_Macro:            overload = macro_resolve_header((AstMacro *) node, param_args, NULL, 0); break;
-            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstPolyProc *) node, PPLM_By_Arguments, param_args); break;
+            case Ast_Kind_Polymorphic_Proc: overload = polymorphic_proc_build_only_header((AstFunction *) node, PPLM_By_Arguments, param_args); break;
             case Ast_Kind_Function:
                 overload = (AstFunction *) node;
                 arguments_clear_baked_flags(&args);
@@ -562,7 +562,7 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
         case Ast_Kind_Function: return (AstFunction *) macro->body;
 
         case Ast_Kind_Polymorphic_Proc: {
-            AstPolyProc* pp = (AstPolyProc *) macro->body;
+            AstFunction* pp = (AstFunction *) macro->body;
             ensure_polyproc_cache_is_created(pp);
 
             bh_arr(AstPolySolution) slns = find_polymorphic_slns(pp, PPLM_By_Arguments, args, callsite, error_if_failed);
@@ -1125,7 +1125,7 @@ all_types_peeled_off:
 
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pcall = (AstPolyCallType *) node;
-            return find_closest_symbol_in_node(pcall->callee, sym);
+            return find_closest_symbol_in_node((AstNode *) pcall->callee, sym);
         }
     }
 
