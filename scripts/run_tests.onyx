@@ -160,8 +160,6 @@ main :: (args) => {
     cases := array.make(Test_Case, capacity=256);
     find_onyx_files(settings.test_folder, ^cases);
 
-    thread_count := settings.threads;
-
     iter.parallel_for(cases, settings.threads, ^exec_context) {
         // Weird macros mean I have to forward external names
         use package core
