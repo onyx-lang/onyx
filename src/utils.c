@@ -253,6 +253,32 @@ AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token) {
     return result;
 }
 
+AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol) {
+    while (type->kind == Type_Kind_Pointer) {
+        type = type->Pointer.elem; 
+    }
+
+    if (type->kind == Type_Kind_Struct) {
+        if (type->Struct.poly_sln == NULL) return NULL;
+
+        bh_arr_each(AstPolySolution, sln, type->Struct.poly_sln) {
+            if (token_text_equals(sln->poly_sym->token, symbol)) {
+                if (sln->kind == PSK_Type) {
+                    AstTypeRawAlias* alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstTypeRawAlias), Ast_Kind_Type_Raw_Alias);
+                    alias->type = &basic_types[Basic_Kind_Type_Index];
+                    alias->to = sln->type;
+                    return (AstNode *) alias;
+
+                } else {
+                    return (AstNode *) sln->value;
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
 void scope_clear(Scope* scope) {
     sh_new_arena(scope->symbols);
 }
@@ -764,6 +790,8 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
     b32 permanent = location != NULL;
     if (func_name == NULL) func_name = "UNKNOWN FUNCTION";
 
+    if (error) error->rank = Error_Critical;
+
     bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) args->values;
     i32 arg_count = get_argument_buffer_size(func_type, args);
 
@@ -796,7 +824,7 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
                 if (tm == TYPE_MATCH_YIELD) return tm;
                 if (tm == TYPE_MATCH_FAILED) {
                     if (error != NULL) {
-                        error->pos = arg_arr[arg_pos]->token->pos,
+                        error->pos = arg_arr[arg_pos]->token->pos;
                         error->text = bh_aprintf(global_heap_allocator,
                                 "The procedure '%s' expects a value of type '%s' for %d%s parameter, got '%s'.",
                                 func_name,
@@ -1076,29 +1104,28 @@ all_types_peeled_off:
         }
 
         case Ast_Kind_Poly_Struct_Type: {
-            AstStructType* stype = ((AstPolyStructType *) node)->base_struct;
+            AstPolyStructType* pstype = (AstPolyStructType *) node;
+            AstStructType* stype = pstype->base_struct;
             u32 dist;
-            return find_closest_symbol_in_scope(stype->scope, sym, &dist);
+            char *closest =  find_closest_symbol_in_scope(stype->scope, sym, &dist);
+
+            bh_arr_each(AstPolyStructParam, param, pstype->poly_params) {
+                token_toggle_end(param->token);
+                u32 d = levenshtein_distance(param->token->text, sym);
+
+                if (d < dist) {
+                    dist = d;
+                    closest = bh_strdup(context.ast_alloc, param->token->text);
+                }
+                token_toggle_end(param->token);
+            }
+
+            return closest;
         }
 
         case Ast_Kind_Poly_Call_Type: {
             AstPolyCallType* pcall = (AstPolyCallType *) node;
-
-            u32 dist = 0x7fffffff;
-            char *closest = NULL;
-
-            Type *type = type_build_from_ast(context.ast_alloc, (AstType *) pcall);
-            assert(type);
-
-            bh_arr_each(StructMember *, mem, type->Struct.memarr) {
-                u32 d = levenshtein_distance((*mem)->name, sym);
-                if (d < dist) {
-                    dist = d;
-                    closest = (*mem)->name;
-                }
-            }
-
-            return closest;
+            return find_closest_symbol_in_node(pcall->callee, sym);
         }
     }
 

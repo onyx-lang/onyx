@@ -21,16 +21,16 @@ package core.map
     }
 }
 
-Map :: struct (K: type_expr, V: type_expr) where ValidKey(K)
-    [conv.Custom_Format.{ #solidify format_map {K=K, V=V} }]
+Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type)
+    [conv.Custom_Format.{ #solidify format_map {K=Key_Type, V=Value_Type} }]
 {
     allocator : Allocator;
 
     hashes  : [] i32;
-    entries : [..] Entry(K, V);
+    entries : [..] Entry(Key_Type, Value_Type);
 
     // The value provided by `map.get`, if nothing was found.
-    default_value : V;
+    default_value : Value_Type;
 
     Entry :: struct (K: type_expr, V: type_expr) {
         next  : i32;
@@ -71,7 +71,7 @@ free :: (use map: ^Map($K, $V)) {
     array.free(^entries);
 }
 
-put :: (use map: ^Map($K, $V), key: K, value: V) {
+put :: (use map: ^Map($K, $V), key: map.Key_Type, value: map.Value_Type) {
     if map.hashes.data == null do init(map);
     lr := lookup(map, key);
 

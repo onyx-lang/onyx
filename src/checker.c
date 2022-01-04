@@ -92,7 +92,7 @@ CheckStatus check_temp_function_header(AstFunction* func);
 CheckStatus check_function_header(AstFunction* func);
 CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
-CheckStatus check_type(AstType* type);
+CheckStatus check_type(AstType** ptype);
 CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
 CheckStatus check_do_block(AstDoBlock** pdoblock);
 CheckStatus check_constraint(AstConstraint *constraint);
@@ -109,7 +109,7 @@ u32 current_checking_level=0;
 
 static inline void fill_in_type(AstTyped* node) {
     if (node->type == NULL) {
-        if (check_type(node->type_node) > Check_Errors_Start) return;
+        if (check_type(&node->type_node) > Check_Errors_Start) return;
 
         node->type = type_build_from_ast(context.ast_alloc, node->type_node);
     }
@@ -1409,7 +1409,7 @@ CheckStatus check_address_of(AstAddressOf** paof) {
         pt->elem      = (AstType *) expr;
         pt->__unused  = aof->next;
         *paof         = (AstAddressOf *) pt;
-        CHECK(type, (AstType *) pt);
+        CHECK(type, (AstType **) &pt);
         return Check_Success;
     }
 
@@ -1557,9 +1557,12 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
                 return Check_Success;
             }
         }
+        
+        AstNode* n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
 
         AstType* type_node = field->expr->type->ast_type;
-        AstNode* n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
+        if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
+
         if (n) {
             *pfield = (AstFieldAccess *) n;
             return Check_Success;
@@ -1631,7 +1634,7 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
 }
 
 CheckStatus check_size_of(AstSizeOf* so) {
-    CHECK(type, so->so_ast_type);
+    CHECK(type, &so->so_ast_type);
 
     so->so_type = type_build_from_ast(context.ast_alloc, so->so_ast_type);
     if (so->so_type == NULL)
@@ -1644,7 +1647,7 @@ CheckStatus check_size_of(AstSizeOf* so) {
 }
 
 CheckStatus check_align_of(AstAlignOf* ao) {
-    CHECK(type, ao->ao_ast_type);
+    CHECK(type, &ao->ao_ast_type);
 
     ao->ao_type = type_build_from_ast(context.ast_alloc, ao->ao_ast_type);
     if (ao->ao_type == NULL)
@@ -1662,7 +1665,8 @@ CheckStatus check_expression(AstTyped** pexpr) {
         // This is to ensure that the type will exist when compiling. For example, a poly-call type
         // would have to wait for the entity to pass through, which the code generation does not know
         // about.
-        CHECK(type, (AstType *) expr);
+        CHECK(type, (AstType **) pexpr);
+        expr = *pexpr;
 
         // Don't try to construct a polystruct ahead of time because you can't.
         if (expr->kind != Ast_Kind_Poly_Struct_Type) {
@@ -1908,7 +1912,7 @@ CheckStatus check_statement(AstNode** pstmt) {
             AstTyped* typed_stmt = (AstTyped *) stmt;
             fill_in_type(typed_stmt);
             if (typed_stmt->type_node != NULL && typed_stmt->type == NULL) {
-                CHECK(type, typed_stmt->type_node);
+                CHECK(type, &typed_stmt->type_node);
 
                 if (!node_is_type((AstNode *) typed_stmt->type_node)) {
                     ERROR(stmt->token->pos, "Local's type is not a type.");
@@ -2048,7 +2052,7 @@ CheckStatus check_struct(AstStructType* s_node) {
 
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
-            CHECK(type, (*smem)->type_node);
+            CHECK(type, &(*smem)->type_node);
         }
 
         if ((*smem)->type_node == NULL && (*smem)->initial_value != NULL) {
@@ -2195,7 +2199,7 @@ CheckStatus check_function_header(AstFunction* func) {
             // If the function has the no_error flag, then the type node should have it set too.
             // This allows for polymorphic structures with constraints to fail gracefully.
             local->type_node->flags |= (func->flags & Ast_Flag_Header_Check_No_Error);
-            CHECK(type, local->type_node);
+            CHECK(type, &local->type_node);
         }
 
         fill_in_type((AstTyped *) local);
@@ -2232,7 +2236,7 @@ CheckStatus check_function_header(AstFunction* func) {
         }
     }
 
-    if (func->return_type != NULL) CHECK(type, func->return_type);
+    if (func->return_type != NULL) CHECK(type, &func->return_type);
 
     if (func->constraints.constraints != NULL) {
         func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
@@ -2246,7 +2250,7 @@ CheckStatus check_function_header(AstFunction* func) {
 }
 
 CheckStatus check_memres_type(AstMemRes* memres) {
-    CHECK(type, memres->type_node);
+    CHECK(type, &memres->type_node);
     fill_in_type((AstTyped *) memres);
     if (memres->type_node && !memres->type) YIELD(memres->token->pos, "Waiting for global type to be constructed.");
     return Check_Success;
@@ -2293,9 +2297,10 @@ CheckStatus check_memres(AstMemRes* memres) {
     return Check_Success;
 }
 
-CheckStatus check_type(AstType* type) {
-    if (type == NULL) return Check_Success;
-    
+CheckStatus check_type(AstType** ptype) {
+    if (ptype == NULL || *ptype == NULL) return Check_Success;
+
+    AstType* type = *ptype;
     AstType* original_type = type;
     while (type->kind == Ast_Kind_Type_Alias)
         type = ((AstTypeAlias *) type)->to;
@@ -2330,19 +2335,19 @@ CheckStatus check_type(AstType* type) {
             break;
         }
 
-        case Ast_Kind_Pointer_Type: CHECK(type, ((AstPointerType *) type)->elem); break;
-        case Ast_Kind_Slice_Type:   CHECK(type, ((AstSliceType *) type)->elem); break;
-        case Ast_Kind_DynArr_Type:  CHECK(type, ((AstDynArrType *) type)->elem); break;
-        case Ast_Kind_VarArg_Type:  CHECK(type, ((AstVarArgType *) type)->elem); break;
+        case Ast_Kind_Pointer_Type: CHECK(type, &((AstPointerType *) type)->elem); break;
+        case Ast_Kind_Slice_Type:   CHECK(type, &((AstSliceType *) type)->elem); break;
+        case Ast_Kind_DynArr_Type:  CHECK(type, &((AstDynArrType *) type)->elem); break;
+        case Ast_Kind_VarArg_Type:  CHECK(type, &((AstVarArgType *) type)->elem); break;
 
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) type;
 
-            CHECK(type, ftype->return_type);
+            CHECK(type, &ftype->return_type);
 
             if (ftype->param_count > 0) {
                 fori (i, 0, (i64) ftype->param_count) {
-                    CHECK(type, ftype->params[i]);
+                    CHECK(type, &ftype->params[i]);
                 }
             }
             break;
@@ -2351,7 +2356,7 @@ CheckStatus check_type(AstType* type) {
         case Ast_Kind_Type_Compound: {
             AstCompoundType* ctype = (AstCompoundType *) type;
 
-            bh_arr_each(AstType *, type, ctype->types) CHECK(type, *type);
+            bh_arr_each(AstType *, type, ctype->types) CHECK(type, type);
             break;
         }
         
@@ -2362,6 +2367,17 @@ CheckStatus check_type(AstType* type) {
                 resolve_expression_type(atype->count_expr);
             }
 
+            break;
+        }
+
+        case Ast_Kind_Field_Access: {
+            CHECK(field_access, (AstFieldAccess **) ptype);
+            type = *ptype;
+            original_type = type;
+
+            if (!node_is_type((AstNode *) type)) {
+                ERROR_(original_type->token->pos, "This field access did not resolve to be a type. It resolved to be a '%s'.", onyx_ast_node_kind_string(type->kind));
+            }
             break;
         }
     }
@@ -2768,7 +2784,7 @@ void check_entity(Entity* ent) {
             if (ent->type_alias->kind == Ast_Kind_Struct_Type)
                 cs = check_struct((AstStructType *) ent->type_alias);
             else
-                cs = check_type(ent->type_alias);
+                cs = check_type(&ent->type_alias);
             break;
 
         case Entity_Type_File_Contents: 

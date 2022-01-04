@@ -151,9 +151,9 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 }
 
 
-Iterator :: struct (T: type_expr) {
+Iterator :: struct (Iter_Type: type_expr) {
     data:  rawptr;
-    next:  (data: rawptr) -> (T, bool);
+    next:  (data: rawptr) -> (Iter_Type, bool);
     close: (data: rawptr) -> void = null_proc;
 }
 

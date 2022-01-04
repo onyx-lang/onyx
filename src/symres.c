@@ -145,9 +145,6 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Type_Alias: SYMRES(type, &((AstTypeAlias *) *type)->to); break;
         case Ast_Kind_Field_Access: {
             SYMRES(field_access, (AstFieldAccess **) type);
-
-            if (!node_is_type((AstNode *) *type))
-                onyx_report_error((*type)->token->pos, Error_Critical, "Field access did not result in a type. (%s)", onyx_ast_node_kind_string((*type)->kind));
             break;
         }
 
