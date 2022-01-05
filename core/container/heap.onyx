@@ -27,7 +27,7 @@ insert :: (use heap: ^Heap($T), v: T) {
 
 #operator << macro (heap: Heap($T), v: T) do (package core.heap).insert(^heap, v);
 
-remove_top :: (use heap: ^Heap($T)) -> T {
+remove_top :: (use heap: ^Heap) -> heap.T {
     x := data[0];
     array.fast_delete(^data, 0);
     shift_down(heap, 0);
@@ -39,7 +39,7 @@ remove_top :: (use heap: ^Heap($T)) -> T {
     heap_lchild :: macro (index) => (index * 2) + 1
     heap_rchild :: macro (index) => (index * 2) + 2
 
-    shift_down :: (use heap: ^Heap($T), idx: i32) {
+    shift_down :: (use heap: ^Heap, idx: i32) {
         while true {
             min_index := idx;
 
@@ -67,7 +67,7 @@ remove_top :: (use heap: ^Heap($T)) -> T {
         }
     }
 
-    shift_up :: (use heap: ^Heap($T), idx: i32) {
+    shift_up :: (use heap: ^Heap, idx: i32) {
         while idx > 0 {
             parent := heap_parent(idx);
             if compare(data[parent], data[idx]) <= 0 do break;

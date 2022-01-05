@@ -29,6 +29,15 @@
     } \
     } while (0)
 
+#define YIELD_ERROR(loc, msg) do { \
+    if (context.cycle_detected) { \
+        onyx_report_error(loc, Error_Critical, msg); \
+        return Check_Error; \
+    } else { \
+        return Check_Yield_Macro; \
+    } \
+    } while (0)
+
 #define ERROR(loc, msg) do { \
     onyx_report_error(loc, Error_Critical, msg); \
     return Check_Error; \
@@ -125,7 +134,7 @@ CheckStatus check_return(AstReturn* retnode) {
         if (*expected_return_type == &type_auto_return) {
             resolve_expression_type(retnode->expr);
             if (retnode->expr->type == NULL)
-                YIELD(retnode->token->pos, "Trying to determine automatic return type.");
+                YIELD_ERROR(retnode->token->pos, "Unable to determine the automatic return type here.");
 
             *expected_return_type = retnode->expr->type;
             return Check_Success;

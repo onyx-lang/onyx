@@ -51,7 +51,7 @@ init :: (use set: ^Set($T), default := __zero_value(T)) {
     array.init(^entries, 4, allocator=allocator); 
 }
 
-free :: (use set: ^Set($T)) {
+free :: (use set: ^Set) {
     memory.free_slice(^hashes, allocator=allocator);
     array.free(^entries);
 }
@@ -98,12 +98,12 @@ remove :: (use set: ^Set($T), value: T) {
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-clear :: (use set: ^Set($T)) {
+clear :: (use set: ^Set) {
     array.fill(hashes, -1);
     array.clear(^entries);
 }
 
-empty :: (use set: ^Set($T)) -> bool {
+empty :: (use set: ^Set) -> bool {
     return entries.count == 0;
 }
 
@@ -168,14 +168,14 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
         return lr;
     }
 
-    full :: (use set: ^Set($T)) => entries.count >= ~~(0.75f * ~~hashes.count);
+    full :: (use set: ^Set) => entries.count >= ~~(0.75f * ~~hashes.count);
 
-    grow :: (use set: ^Set($T)) {
+    grow :: (use set: ^Set) {
         new_size := math.max(hashes.count << 1, 8);
         rehash(set, new_size);
     }
 
-    rehash :: (use set: ^Set($T), new_size: i32) {
+    rehash :: (use set: ^Set, new_size: i32) {
         memory.free_slice(^hashes, allocator);
         memory.alloc_slice(^hashes, new_size, allocator);
         memory.fill_slice(hashes, -1);
