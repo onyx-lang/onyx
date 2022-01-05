@@ -11,14 +11,16 @@ static inline b32 should_clone(AstNode* node) {
         case Ast_Kind_Memres:
         case Ast_Kind_StrLit:
         case Ast_Kind_Package:
-        case Ast_Kind_Enum_Type:
-        case Ast_Kind_Enum_Value:
         case Ast_Kind_Overloaded_Function:
         case Ast_Kind_Alias:
         case Ast_Kind_Code_Block:
         case Ast_Kind_Macro:
         case Ast_Kind_File_Contents:
         case Ast_Kind_Symbol:
+        case Ast_Kind_Poly_Struct_Type:
+        case Ast_Kind_Basic_Type:
+        case Ast_Kind_Enum_Type:
+        case Ast_Kind_Enum_Value:
             return 0;
 
         default: return 1;
@@ -404,17 +406,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             AstFunction* df = (AstFunction *) nn;
             AstFunction* sf = (AstFunction *) node;
 
-            if (node->kind == Ast_Kind_Polymorphic_Proc) {
-                df->kind = Ast_Kind_Function;
-                df->parent_scope_of_poly_proc = NULL;
-                df->poly_params = NULL;
-                df->known_slns = NULL;
-                df->concrete_funcs = NULL;
-                df->active_queries.hashes = NULL;
-                df->active_queries.entries = NULL;
-                df->poly_scope = NULL;
-                df->entity = NULL;
-            }
+            convert_polyproc_to_function(df);
 
             if (sf->is_foreign) return node;
             assert(df->scope == NULL);
@@ -541,19 +533,8 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
     memmove(new_func, func, sizeof(AstFunction));
     assert(new_func->scope == NULL);
 
-    if (func->kind == Ast_Kind_Polymorphic_Proc) {
-        new_func->kind = Ast_Kind_Function;
-        new_func->parent_scope_of_poly_proc = NULL;
-        new_func->poly_params = NULL;
-        new_func->known_slns = NULL;
-        new_func->concrete_funcs = NULL;
-        new_func->active_queries.hashes = NULL;
-        new_func->active_queries.entries = NULL;
-        new_func->poly_scope = NULL;
-        new_func->entity = NULL;
-    }
+    convert_polyproc_to_function(new_func);
 
-    // new_func->body = NULL;
     new_func->return_type = (AstType *) ast_clone(a, func->return_type);
 
     new_func->params = NULL;

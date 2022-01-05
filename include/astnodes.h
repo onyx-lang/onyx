@@ -1407,6 +1407,7 @@ Entity* entity_heap_insert(EntityHeap* entities, Entity e);
 Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
+void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type);
 
 // If target_arr is null, the entities will be placed directly in the heap.
 void add_entities_for_node(bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
@@ -1633,6 +1634,7 @@ AstFunction* polymorphic_proc_solidify(AstFunction* pp, bh_arr(AstPolySolution) 
 AstNode* polymorphic_proc_try_solidify(AstFunction* pp, bh_arr(AstPolySolution) slns, OnyxToken* tkn);
 AstFunction* polymorphic_proc_build_only_header(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual);
 AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
+b32 potentially_convert_function_to_polyproc(AstFunction *func);
 
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
@@ -1709,6 +1711,29 @@ static inline AstFunction* get_function_from_node(AstNode* node) {
     if (node->kind == Ast_Kind_Polymorphic_Proc) return (AstFunction *) node;
     if (node->kind == Ast_Kind_Macro) return get_function_from_node((AstNode*) ((AstMacro *) node)->body);
     return NULL;
+}
+
+static inline void convert_polyproc_to_function(AstFunction *func) {
+    if (func->kind != Ast_Kind_Polymorphic_Proc) return;
+
+    func->kind = Ast_Kind_Function;
+    func->parent_scope_of_poly_proc = NULL;
+    func->poly_params = NULL;
+    func->known_slns = NULL;
+    func->concrete_funcs = NULL;
+    func->active_queries.hashes = NULL;
+    func->active_queries.entries = NULL;
+    func->poly_scope = NULL;
+    func->entity = NULL;
+}
+
+static inline void convert_function_to_polyproc(AstFunction *func) {
+    if (func->kind != Ast_Kind_Function) return;
+
+    func->kind = Ast_Kind_Polymorphic_Proc;
+    func->parent_scope_of_poly_proc = func->scope->parent;
+    func->scope = NULL;
+    if (func->entity) entity_change_type(&context.entities, func->entity, Entity_Type_Polymorphic_Proc);
 }
 
 #endif // #ifndef ONYXASTNODES_H

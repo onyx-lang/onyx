@@ -213,8 +213,10 @@ static SymresStatus symres_type(AstType** type) {
         case Ast_Kind_Alias: {
             AstAlias* alias = (AstAlias *) *type;
             alias->flags |= Ast_Flag_Symbol_Invisible;
-            SYMRES(type, (AstType **) &alias->alias);
+            SymresStatus ss = symres_type((AstType **) &alias->alias);
             alias->flags &= ~Ast_Flag_Symbol_Invisible;
+            if (ss > Symres_Errors_Start) return ss;
+
             break;
         }
 
@@ -457,8 +459,9 @@ static SymresStatus symres_expression(AstTyped** expr) {
         case Ast_Kind_Align_Of:     SYMRES(align_of, (AstAlignOf *)*expr); break;
         case Ast_Kind_Alias: {
             (*expr)->flags |= Ast_Flag_Symbol_Invisible;
-            SYMRES(expression, &((AstAlias *) *expr)->alias);
+            SymresStatus ss = symres_expression((AstTyped **) &((AstAlias *) *expr)->alias);
             (*expr)->flags &= ~Ast_Flag_Symbol_Invisible;
+            if (ss > Symres_Errors_Start) return ss;
             break;
         }
 
@@ -940,13 +943,11 @@ SymresStatus symres_function_header(AstFunction* func) {
         }
     }
 
-    SYMRES(type, &func->return_type);
-    if (!node_is_type((AstNode *) func->return_type)) {
-        AstType* return_type = (AstType *) strip_aliases((AstNode *) func->return_type);
-        if (return_type->kind == Ast_Kind_Symbol) return Symres_Yield_Macro;
-
-        onyx_report_error(func->token->pos, Error_Critical, "Return type is not a type.");
+    if (potentially_convert_function_to_polyproc(func)) {
+        return Symres_Complete;
     }
+
+    SYMRES(type, &func->return_type);
 
     if (func->constraints.constraints != NULL) {
         bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
@@ -961,6 +962,7 @@ SymresStatus symres_function_header(AstFunction* func) {
 
 SymresStatus symres_function(AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Check_Types) return Symres_Yield_Macro;
+    if (func->kind == Ast_Kind_Polymorphic_Proc) return Symres_Complete;
     assert(func->scope);
 
     scope_enter(func->scope);

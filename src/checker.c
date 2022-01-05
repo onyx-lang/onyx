@@ -1714,8 +1714,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_Param:
             if (expr->type == NULL) {
-                onyx_report_error(expr->token->pos, Error_Critical, "Parameter with bad type.");
-                retval = Check_Error;
+                YIELD(expr->token->pos, "Waiting on parameter type.");
             }
             break;
 

@@ -137,6 +137,12 @@ void entity_heap_remove_top(EntityHeap* entities) {
     eh_shift_down(entities, 0);
 }
 
+void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type) {
+    entities->type_count[ent->type]--;
+    entities->type_count[new_type]++;
+    ent->type = new_type;
+}
+
 // NOTE(Brendan Hansen): Uses the entity heap in the context structure
 void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* scope, Package* package) {
 #define ENTITY_INSERT(_ent)                                     \

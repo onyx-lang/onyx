@@ -593,7 +593,7 @@ parallel_for :: #match {}
 
     if thread_count != 0 {
         dist := distributor(iter);
-        t_data := Thread_Data(T, Ctx).{
+        t_data := Thread_Data(iter.Iter_Type, Ctx).{
             iter = ^dist,
             data = thread_data,
         };

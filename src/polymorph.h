@@ -845,6 +845,90 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_ar
     return (AstFunction *) &node_that_signals_a_yield;
 }
 
+typedef struct AutoPolymorphVariable {
+    u32 idx;
+    u32 variable_count;
+    AstType *base_type;
+    AstType **replace;
+} AutoPolymorphVariable;
+
+// This should be called after all the parameter types have been symresed, but before anything
+// happens to the body.
+b32 potentially_convert_function_to_polyproc(AstFunction *func) {
+    bh_arr(AutoPolymorphVariable) auto_vars = NULL;
+    bh_arr_new(global_heap_allocator, auto_vars, 2);
+
+    u32 param_idx = 0;
+    bh_arr_each(AstParam, param, func->params) {
+        AstType **to_replace = &param->local->type_node;
+        AstType *param_type = param->local->type_node;
+
+        b32 done = 0;
+        while (!done && param_type) {
+            switch (param_type->kind) {
+                case Ast_Kind_Pointer_Type: to_replace = &((AstPointerType *) *to_replace)->elem;  param_type = ((AstPointerType *) param_type)->elem;  break;
+                case Ast_Kind_Array_Type:   to_replace = &((AstArrayType *)   *to_replace)->elem;  param_type = ((AstArrayType *)   param_type)->elem;  break;
+                case Ast_Kind_Slice_Type:   to_replace = &((AstSliceType *)   *to_replace)->elem;  param_type = ((AstSliceType *)   param_type)->elem;  break;
+                case Ast_Kind_DynArr_Type:  to_replace = &((AstDynArrType *)  *to_replace)->elem;  param_type = ((AstDynArrType *)  param_type)->elem;  break;
+                case Ast_Kind_Alias:                                                               param_type = ((AstAlias *)       param_type)->alias; break;
+                case Ast_Kind_Type_Alias:                                                          param_type = ((AstTypeAlias *)   param_type)->to;    break;
+                case Ast_Kind_Poly_Struct_Type: {
+                    AutoPolymorphVariable apv;
+                    apv.idx = param_idx;
+                    apv.base_type = param->local->type_node;
+                    apv.variable_count = bh_arr_length(((AstPolyStructType *) param_type)->poly_params);
+                    apv.replace = to_replace;
+
+                    bh_arr_push(auto_vars, apv);
+                    done = 1;
+                    break;
+                }
+
+                default: done = 1; break;
+            }
+        }
+
+        param_idx++;
+    }
+
+    if (bh_arr_length(auto_vars) == 0) return 0;
+
+    param_idx = 0;
+    bh_arr_each(AutoPolymorphVariable, apv, auto_vars) {
+        AstPolyParam pp;
+        pp.idx = apv->idx;
+        pp.kind = PPK_Poly_Type;
+
+        AstPolyCallType* pcall = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
+        pcall->callee = *apv->replace;
+        pcall->token = pcall->callee->token;
+        bh_arr_new(global_heap_allocator, pcall->params, apv->variable_count);
+
+        if (apv->base_type->kind == Ast_Kind_Poly_Struct_Type) {
+            pp.type_expr = (AstType *) pcall;
+        } else {
+            pp.type_expr = apv->base_type;
+        }
+        *apv->replace = (AstType *) pcall;
+
+        fori (i, 0, apv->variable_count) {
+            OnyxToken* name_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+            name_token->text = bh_aprintf(context.ast_alloc, "__autopoly_var_%d\0", param_idx);
+            name_token->length = strlen(name_token->text);
+            name_token->type = Token_Type_Symbol;
+            name_token->pos  = pcall->token->pos;
+
+            pp.poly_sym = make_symbol(context.ast_alloc, name_token);
+            bh_arr_push(pcall->params, pp.poly_sym);
+            bh_arr_push(func->poly_params, pp);
+            param_idx ++;
+        }
+    }
+
+    convert_function_to_polyproc(func);
+    return 1;
+}
+
 //
 // Polymorphic Structures
 //
