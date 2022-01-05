@@ -269,6 +269,8 @@ typedef enum AstFlags {
     Ast_Flag_Header_Check_No_Error = BH_BIT(19),
 
     Ast_Flag_Decl_Followed_By_Init = BH_BIT(20),
+
+    Ast_Flag_Param_Symbol_Dirty    = BH_BIT(21),
 } AstFlags;
 
 typedef enum UnaryOp {

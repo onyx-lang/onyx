@@ -71,7 +71,7 @@ free :: (use map: ^Map) {
     array.free(^entries);
 }
 
-put :: (use map: ^Map($K, $V), key: map.Key_Type, value: map.Value_Type) {
+put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
     if map.hashes.data == null do init(map);
     lr := lookup(map, key);
 
@@ -86,12 +86,12 @@ put :: (use map: ^Map($K, $V), key: map.Key_Type, value: map.Value_Type) {
     if full(map) do grow(map);
 }
 
-has :: (use map: ^Map($K, $V), key: K) -> bool {
+has :: (use map: ^Map, key: map.Key_Type) -> bool {
     lr := lookup(map, key);
     return lr.entry_index >= 0;
 }
 
-get :: (use map: ^Map($K, $V), key: K) -> V {
+get :: (use map: ^Map, key: map.Key_Type) -> map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
 
@@ -102,14 +102,14 @@ get :: (use map: ^Map($K, $V), key: K) -> V {
 #operator []= macro (map: Map($K, $V), key: K, value: V) do (package core.map).put(^map, key, value);
 #operator ^[] macro (map: Map($K, $V), key: K) -> ^V do return (package core.map).get_ptr(^map, key);
 
-get_ptr :: (use map: ^Map($K, $V), key: K) -> ^V {
+get_ptr :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return ^entries[lr.entry_index].value;
 
     return null;
 }
 
-delete :: (use map: ^Map($K, $V), key: K) {
+delete :: (use map: ^Map, key: map.Key_Type) {
     lr := lookup(map, key);
     if lr.entry_index < 0 do return;
 
@@ -127,7 +127,7 @@ delete :: (use map: ^Map($K, $V), key: K) {
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-update :: macro (map: ^Map($K, $V), key: K, body: Code) {
+update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     @Hack // Weird hack because 'lookup' exists at file scope.
     lookup_ :: lookup
 
@@ -166,7 +166,7 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
         entry_prev  : i32 = -1;
     }
 
-    lookup :: (use map: ^Map($K, $V), key: K) -> MapLookupResult {
+    lookup :: (use map: ^Map, key: map.Key_Type) -> MapLookupResult {
         if hashes.data == null do init(map);
         lr := MapLookupResult.{};
 

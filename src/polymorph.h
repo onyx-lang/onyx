@@ -926,6 +926,11 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
     }
 
     convert_function_to_polyproc(func);
+
+    bh_arr_each(AstParam, param, func->params) {
+        param->local->flags |= Ast_Flag_Param_Symbol_Dirty;
+    }
+
     return 1;
 }
 

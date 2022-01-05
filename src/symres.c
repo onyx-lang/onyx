@@ -80,11 +80,8 @@ static SymresStatus symres_symbol(AstNode** symbol_node) {
             char *closest = find_closest_symbol_in_scope_and_parents(curr_scope, token->text);
             token_toggle_end(token);
 
-            onyx_report_error(token->pos, Error_Critical,
-                "Unable to resolve symbol '%b'. Did you mean '%s'?",
-                token->text,
-                token->length,
-                closest);
+            if (closest) onyx_report_error(token->pos, Error_Critical, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
+            else         onyx_report_error(token->pos, Error_Critical, "Unable to resolve symbol '%b'.", token->text, token->length);
 
             return Symres_Error;
         } else {
@@ -535,6 +532,14 @@ static SymresStatus symres_expression(AstTyped** expr) {
 
         case Ast_Kind_Do_Block:
             SYMRES(block, ((AstDoBlock *) *expr)->block);
+            break;
+
+        case Ast_Kind_Param:
+            if ((*expr)->flags & Ast_Flag_Param_Symbol_Dirty) {
+                assert((*expr)->token->type == Token_Type_Symbol);
+                *expr = make_symbol(context.ast_alloc, (*expr)->token);
+                SYMRES(expression, expr);
+            }
             break;
 
         default: break;
