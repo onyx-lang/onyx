@@ -13,13 +13,13 @@ use package core.intrinsics.onyx { __zero_value }
     T == T;
 }
 
-Set :: struct (T: type_expr) where SetValue(T) {
+Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     allocator : Allocator;
 
     hashes  : [] i32;
-    entries : [..] Entry(T);
+    entries : [..] Entry(Elem_Type);
 
-    default_value: T;
+    default_value: Elem_Type;
 
     Entry :: struct (T: type_expr) {
         next  : i32;
@@ -56,7 +56,7 @@ free :: (use set: ^Set) {
     array.free(^entries);
 }
 
-insert :: (use set: ^Set($T), value: T) {
+insert :: (use set: ^Set, value: set.Elem_Type) {
     if hashes.data == null do init(set);
     lr := lookup(set, value);
 
@@ -70,17 +70,17 @@ insert :: (use set: ^Set($T), value: T) {
 
 #operator << macro (set: Set($T), value: T) do (package core.set).insert(^set, value);
 
-has :: (use set: ^Set($T), value: T) -> bool {
+has :: (use set: ^Set, value: set.Elem_Type) -> bool {
     lr := lookup(set, value);
     return lr.entry_index >= 0;
 }
 
-get :: (use set: ^Set($T), value: T) -> T {
+get :: (use set: ^Set, value: set.Elem_Type) -> set.Elem_Type {
     lr := lookup(set, value);
     return entries[lr.entry_index].value if lr.entry_index >= 0 else __zero_value(T);
 }
 
-remove :: (use set: ^Set($T), value: T) {
+remove :: (use set: ^Set, value: set.Elem_Type) {
     lr := lookup(set, value);
     if lr.entry_index < 0 do return;
 
@@ -118,7 +118,7 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
     context.set = set;
     context.position = 0;
 
-    next :: ($T: type_expr, use context: ^Context(T)) -> (T, bool) {
+    next :: (use context: ^Context($T)) -> (T, bool) {
         if position < set.entries.count {
             defer position += 1;
             return set.entries[position].value, true;
@@ -128,14 +128,10 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
         }
     }
 
-    close :: (context: rawptr) {
-        cfree(context);
-    }
-
     return .{
         data = context,
         next = #solidify next { T = T },
-        close = close,
+        close = cfree,
     };
 }
 
@@ -150,7 +146,7 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
         entry_prev  : i32 = -1;
     }
 
-    lookup :: (use set: ^Set($T), value: T) -> SetLookupResult {
+    lookup :: (use set: ^Set, value: set.Elem_Type) -> SetLookupResult {
         lr := SetLookupResult.{};
 
         hash_value: u32 = hash.to_u32(value); // You cannot have a set of this type without defining a to_u32 hash.

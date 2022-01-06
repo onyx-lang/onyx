@@ -1015,6 +1015,8 @@ char *find_closest_symbol_in_scope(Scope *scope, char *sym, u32 *out_distance) {
 
     char* closest = NULL;
     fori (i, 0, shlen(scope->symbols)) {
+        if (scope->symbols[i].value->flags & Ast_Flag_Symbol_Invisible) continue;
+
         char *key = scope->symbols[i].key;
         u32 d = levenshtein_distance(key, sym); 
         if (d < *out_distance) {

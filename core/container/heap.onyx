@@ -15,12 +15,12 @@ make :: ($T: type_expr, cmp: (T, T) -> i32 = null_proc) -> Heap(T) {
     return h;
 }
 
-init :: (use heap: ^Heap($T), cmp: (T, T) -> i32 = null_proc) {
+init :: (use heap: ^Heap, cmp: (heap.T, heap.T) -> i32 = null_proc) {
     array.init(^data);
     compare = cmp;
 }
 
-insert :: (use heap: ^Heap($T), v: T) {
+insert :: (use heap: ^Heap, v: heap.T) {
     data << v;
     shift_up(heap, data.count - 1);
 }

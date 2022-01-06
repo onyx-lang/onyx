@@ -17,6 +17,13 @@ static Entity* waiting_on         = NULL;
     if (ss > Symres_Errors_Start) return ss;         \
     } while (0)
 
+#define SYMRES_INVISIBLE(kind, node, ...) do { \
+    (node)->flags |= Ast_Flag_Symbol_Invisible; \
+    SymresStatus ss = symres_ ## kind (__VA_ARGS__); \
+    (node)->flags &= ~Ast_Flag_Symbol_Invisible; \
+    if (ss > Symres_Errors_Start) return ss;         \
+    } while (0)
+
 typedef enum SymresStatus {
     Symres_Success,
     Symres_Complete,
@@ -209,10 +216,7 @@ static SymresStatus symres_type(AstType** type) {
 
         case Ast_Kind_Alias: {
             AstAlias* alias = (AstAlias *) *type;
-            alias->flags |= Ast_Flag_Symbol_Invisible;
-            SymresStatus ss = symres_type((AstType **) &alias->alias);
-            alias->flags &= ~Ast_Flag_Symbol_Invisible;
-            if (ss > Symres_Errors_Start) return ss;
+            SYMRES_INVISIBLE(type, alias, &alias->alias);
 
             break;
         }
@@ -455,10 +459,8 @@ static SymresStatus symres_expression(AstTyped** expr) {
         case Ast_Kind_Size_Of:      SYMRES(size_of, (AstSizeOf *)*expr); break;
         case Ast_Kind_Align_Of:     SYMRES(align_of, (AstAlignOf *)*expr); break;
         case Ast_Kind_Alias: {
-            (*expr)->flags |= Ast_Flag_Symbol_Invisible;
-            SymresStatus ss = symres_expression((AstTyped **) &((AstAlias *) *expr)->alias);
-            (*expr)->flags &= ~Ast_Flag_Symbol_Invisible;
-            if (ss > Symres_Errors_Start) return ss;
+            AstAlias *alias = (AstAlias *) *expr;
+            SYMRES_INVISIBLE(expression, alias, &alias->alias);
             break;
         }
 
@@ -942,9 +944,11 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     bh_arr_each(AstParam, param, func->params) {
         symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+    }
 
+    bh_arr_each(AstParam, param, func->params) {
         if (param->local->type_node != NULL) {
-            SYMRES(type, &param->local->type_node);
+            SYMRES_INVISIBLE(type, param->local, &param->local->type_node);
         }
     }
 
@@ -1304,14 +1308,14 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 }
 
 static SymresStatus symres_macro(AstMacro* macro) {
+    macro->flags |= Ast_Flag_Comptime;
+
     if (macro->body->kind == Ast_Kind_Function) {
         SYMRES(function_header, (AstFunction *) macro->body);
     }
     else if (macro->body->kind == Ast_Kind_Polymorphic_Proc) {
         SYMRES(polyproc, (AstFunction *) macro->body);
     }
-
-    macro->flags |= Ast_Flag_Comptime;
 
     return Symres_Success;
 }

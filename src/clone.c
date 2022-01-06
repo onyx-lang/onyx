@@ -10,6 +10,8 @@ static inline b32 should_clone(AstNode* node) {
 
     if (dont_copy_structs) {
         if (node->kind == Ast_Kind_Struct_Type) return 0;
+        if (node->kind == Ast_Kind_Function)    return 0;
+        if (node->kind == Ast_Kind_Polymorphic_Proc) return 0;
     }
 
     switch (node->kind) {
@@ -430,9 +432,9 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 dont_copy_structs = 1;
                 new_param.local = (AstLocal *) ast_clone(a, param->local);
                 new_param.local->flags &= ~Ast_Flag_Param_Symbol_Dirty;
+                new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
                 dont_copy_structs = 0;
 
-                new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
                 new_param.vararg_kind = param->vararg_kind;
                 new_param.is_used = param->is_used;
                 bh_arr_push(df->params, new_param);
@@ -557,9 +559,9 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
         dont_copy_structs = 1;
         new_param.local = (AstLocal *) ast_clone(a, param->local);
         new_param.local->flags &= ~Ast_Flag_Param_Symbol_Dirty;
+        new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
         dont_copy_structs = 0;
 
-        new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
         new_param.vararg_kind = param->vararg_kind;
         new_param.is_used = param->is_used;
         bh_arr_push(new_func->params, new_param);

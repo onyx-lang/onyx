@@ -498,7 +498,7 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
         arguments_remove_baked(&call->args);
         callee = new_callee;
 
-    } else if (callee->kind == Ast_Kind_Polymorphic_Proc) {
+    } else while (callee->kind == Ast_Kind_Polymorphic_Proc) {
         AstTyped* new_callee = (AstTyped *) polymorphic_proc_lookup((AstFunction *) callee, PPLM_By_Arguments, &call->args, call->token);
         if (new_callee == NULL) return Check_Error;
         if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
