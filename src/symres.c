@@ -1358,18 +1358,25 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
         bh_arr_each(AstPolyParam, pp, query->proc->poly_params) {
             if (pp->kind == PPK_Baked_Value && pp->idx == idx) goto skip_introducing_symbol;
         }
+
         symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
 
     skip_introducing_symbol:
+        idx++;
+    }
+
+    bh_arr_each(AstParam, param, query->function_header->params) {
         if (param->local->type_node != NULL) {
             resolved_a_symbol = 0;
+
+            param->local->flags |= Ast_Flag_Symbol_Invisible;
             symres_type(&param->local->type_node);
+            param->local->flags &= ~Ast_Flag_Symbol_Invisible;
+
             onyx_clear_errors();
 
             if (resolved_a_symbol) query->successful_symres = 1;
         }
-
-        idx++;
     }
 
     scope_leave();

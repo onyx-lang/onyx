@@ -384,7 +384,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
     AstTyped *matched_overload = NULL;
 
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
-        AstTyped* node = (AstTyped *) entry->key;
+        AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
         arguments_copy(&args, param_args);
 
         AstFunction* overload = NULL;
