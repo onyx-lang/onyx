@@ -103,6 +103,7 @@ CheckStatus check_memres_type(AstMemRes* memres);
 CheckStatus check_memres(AstMemRes* memres);
 CheckStatus check_type(AstType** ptype);
 CheckStatus check_insert_directive(AstDirectiveInsert** pinsert);
+CheckStatus check_directive_solidify(AstDirectiveSolidify** psolid);
 CheckStatus check_do_block(AstDoBlock** pdoblock);
 CheckStatus check_constraint(AstConstraint *constraint);
 CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFilePos pos);
@@ -463,9 +464,7 @@ CheckStatus check_argument(AstArgument** parg) {
 static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_callee) {
     if (call->kind == Ast_Kind_Intrinsic_Call) return Check_Success;
 
-    call->callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
-
-    AstTyped* callee = call->callee;
+    AstTyped* callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
     b32 calling_a_macro = 0;
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
@@ -1777,7 +1776,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
             break;
 
         case Ast_Kind_Directive_Solidify:
-            *pexpr = (AstTyped *) ((AstDirectiveSolidify *) expr)->resolved_proc;
+            CHECK(directive_solidify, (AstDirectiveSolidify **) pexpr);
             break;
 
         case Ast_Kind_Directive_Defined:
@@ -1882,6 +1881,32 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
     insert->flags |= Ast_Flag_Has_Been_Checked;
 
     return Check_Return_To_Symres;
+}
+
+CheckStatus check_directive_solidify(AstDirectiveSolidify** psolid) {
+    AstDirectiveSolidify* solid = *psolid;
+
+    bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
+        CHECK(expression, &sln->value);
+
+        if (node_is_type((AstNode *) sln->value)) {
+            sln->type = type_build_from_ast(context.ast_alloc, sln->ast_type);
+            sln->kind = PSK_Type;
+        } else {
+            sln->kind = PSK_Value;
+        }
+    }
+
+    solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token);
+    if (solid->resolved_proc == (AstNode *) &node_that_signals_a_yield) {
+        solid->resolved_proc = NULL;
+        YIELD(solid->token->pos, "Waiting for partially solidified procedure.");
+    }
+
+    // NOTE: Not a DirectiveSolidify.
+    *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
+
+    return Check_Success;
 }
 
 CheckStatus check_statement(AstNode** pstmt) {

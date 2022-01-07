@@ -83,6 +83,9 @@ Settings :: struct {
 
     ["--tests"]
     test_folder := "./tests";
+
+    ["--compile-only"]
+    compile_only := false;
 }
 
 args_parse :: (c_args: [] cstr, output: ^Settings) -> bool {
@@ -146,8 +149,10 @@ main :: (args) => {
         // The executable to use when compiling
         onyx_cmd: str;
         at_least_one_test_failed := false;
+        compile_only := false;   @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
     }
     exec_context := init(Execution_Context);
+    exec_context.compile_only = settings.compile_only;
 
     switch runtime.compiler_os {
         case .Linux {
@@ -163,11 +168,18 @@ main :: (args) => {
     iter.parallel_for(cases, settings.threads, ^exec_context) {
         // Weird macros mean I have to forward external names
         use package core
-        print_color :: print_color
+        print_color :: print_color;
 
-        printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
+        args: [] str;
+        if thread_data.compile_only {
+            printf("[{}]  Compiling test {}...\n", context.thread_id, it.source_file);
+            args = .[it.source_file];
+        } else {
+            printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
+            args = .["run", it.source_file];
+        }
 
-        proc := os.process_spawn(thread_data.onyx_cmd, .["run", it.source_file]);
+        proc := os.process_spawn(thread_data.onyx_cmd, args);
         defer os.process_destroy(^proc);
 
         proc_reader := io.reader_make(^proc);
@@ -180,6 +192,8 @@ main :: (args) => {
             thread_data.at_least_one_test_failed = true;
             continue;
         }
+
+        if thread_data.compile_only do continue;
 
         for expected_file: os.with_file(it.expected_file) {
             expected_reader := io.reader_make(expected_file);

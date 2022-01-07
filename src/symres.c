@@ -758,13 +758,7 @@ cannot_use:
 }
 
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
-    // @Cleanup: A lot of this code should move to the checker?
-    
     AstDirectiveSolidify* solid = *psolid;
-    if (solid->resolved_proc != NULL) {
-        *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
-        return Symres_Success;
-    }
 
     SYMRES(expression, (AstTyped **) &solid->poly_proc);
     if (solid->poly_proc && solid->poly_proc->kind == Ast_Kind_Directive_Solidify) {
@@ -778,27 +772,12 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
         onyx_report_error(solid->token->pos, Error_Critical, "Expected polymorphic procedure in #solidify directive.");
         return Symres_Error;
     }
-
+    
     bh_arr_each(AstPolySolution, sln, solid->known_polyvars) {
         // HACK: This assumes that 'ast_type' and 'value' are at the same offset.
         SYMRES(expression, &sln->value);
-
-        if (node_is_type((AstNode *) sln->value)) {
-            sln->type = type_build_from_ast(context.ast_alloc, sln->ast_type);
-            sln->kind = PSK_Type;
-        } else {
-            sln->kind = PSK_Value;
-        }
     }
 
-    solid->resolved_proc = polymorphic_proc_try_solidify(solid->poly_proc, solid->known_polyvars, solid->token);
-    if (solid->resolved_proc == (AstNode *) &node_that_signals_a_yield) {
-        solid->resolved_proc = NULL;
-        return Symres_Yield_Macro;
-    }
-
-    // NOTE: Not a DirectiveSolidify.
-    *psolid = (AstDirectiveSolidify *) solid->resolved_proc;
     return Symres_Success;
 }
 

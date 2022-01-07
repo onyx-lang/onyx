@@ -758,9 +758,14 @@ AstNode* polymorphic_proc_try_solidify(AstFunction* pp, bh_arr(AstPolySolution) 
         if (found_match) {
             valid_argument_count++;
         } else {
-            onyx_report_error(tkn->pos, Error_Critical, "'%b' is not a type variable of '%b'.",
-                sln->poly_sym->token->text, sln->poly_sym->token->length,
-                pp->token->text, pp->token->length);
+            if (pp->name) {
+                onyx_report_error(tkn->pos, Error_Critical, "'%b' is not a type variable of '%s'.",
+                    sln->poly_sym->token->text, sln->poly_sym->token->length, pp->name);
+            } else {
+                onyx_report_error(tkn->pos, Error_Critical, "'%b' is not a type variable of '%b'.",
+                    sln->poly_sym->token->text, sln->poly_sym->token->length,
+                    pp->token->text, pp->token->length);
+            }
             return (AstNode *) pp;
         }
     }

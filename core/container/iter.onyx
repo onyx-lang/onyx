@@ -546,7 +546,7 @@ distributor :: #match {}
     return distributor(as_iterator(it));
 }
 
-#match distributor (it: Iterator($T)) -> Iterator(T) {
+#match distributor (it: Iterator) -> Iterator(it.Iter_Type) {
     Context :: struct (T: type_expr) {
         mutex: sync.Mutex;
         iterator: Iterator(T);
@@ -570,11 +570,11 @@ distributor :: #match {}
         cfree(c);
     }
 
-    c := new(Context(T));
+    c := new(Context(it.Iter_Type));
     sync.mutex_init(^c.mutex);
     c.iterator = it;
 
-    return .{c, #solidify next {T=T}, #solidify close {T=T}};
+    return .{c, #solidify next {T=it.Iter_Type}, #solidify close {T=it.Iter_Type}};
 }
 
 parallel_for :: #match {}
