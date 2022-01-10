@@ -1,7 +1,6 @@
 package core.iter
 
 use package core.intrinsics.onyx { __zero_value }
-#local sync   :: package core.sync
 #local memory :: package core.memory
 
 as_iterator :: #match {}
@@ -538,84 +537,87 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
 }
 
 
-
-distributor :: #match {}
-#match distributor macro (it: $T) -> #auto where Iterable(T) {
-    distributor :: distributor;
-    as_iterator :: as_iterator;
-    return distributor(as_iterator(it));
-}
-
-#match distributor (it: Iterator) -> Iterator(it.Iter_Type) {
-    Context :: struct (T: type_expr) {
-        mutex: sync.Mutex;
-        iterator: Iterator(T);
-        ended := false;
+#local runtime :: package runtime
+#if runtime.Multi_Threading_Enabled {
+    #local sync   :: package core.sync
+    distributor :: #match {}
+    #match distributor macro (it: $T) -> #auto where Iterable(T) {
+        distributor :: distributor;
+        as_iterator :: as_iterator;
+        return distributor(as_iterator(it));
     }
 
-    next :: (use c: ^Context($T)) -> (T, bool) {
-        if ended do return __zero_value(T), false;
-        sync.scoped_mutex(^mutex);
-
-        if v, success := take_one(iterator); !success {
-            ended = true;
-            return v, false;
-        } else {
-            return v, true;
+    #match distributor (it: Iterator) -> Iterator(it.Iter_Type) {
+        Context :: struct (T: type_expr) {
+            mutex: sync.Mutex;
+            iterator: Iterator(T);
+            ended := false;
         }
+
+        next :: (use c: ^Context($T)) -> (T, bool) {
+            if ended do return __zero_value(T), false;
+            sync.scoped_mutex(^mutex);
+
+            if v, success := take_one(iterator); !success {
+                ended = true;
+                return v, false;
+            } else {
+                return v, true;
+            }
+        }
+
+        close :: (use c: ^Context($T)) {
+            sync.mutex_destroy(^c.mutex);
+            cfree(c);
+        }
+
+        c := new(Context(it.Iter_Type));
+        sync.mutex_init(^c.mutex);
+        c.iterator = it;
+
+        return .{c, #solidify next {T=it.Iter_Type}, #solidify close {T=it.Iter_Type}};
     }
 
-    close :: (use c: ^Context($T)) {
-        sync.mutex_destroy(^c.mutex);
-        cfree(c);
+    parallel_for :: #match {}
+    #match parallel_for macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
+        parallel_for :: parallel_for;
+        as_iterator  :: as_iterator;
+
+        parallel_for(as_iterator(iterable), thread_count, thread_data, body);
     }
 
-    c := new(Context(it.Iter_Type));
-    sync.mutex_init(^c.mutex);
-    c.iterator = it;
+    #match parallel_for macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
+        thread :: package core.thread;
+        alloc  :: package core.alloc;
+        distributor :: distributor;
+        as_iterator :: as_iterator;
 
-    return .{c, #solidify next {T=it.Iter_Type}, #solidify close {T=it.Iter_Type}};
-}
+        if thread_count != 0 {
+            dist := distributor(iter);
+            t_data := Thread_Data(iter.Iter_Type, Ctx).{
+                iter = ^dist,
+                data = thread_data,
+            };
 
-parallel_for :: #match {}
-#match parallel_for macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
-    parallel_for :: parallel_for;
-    as_iterator  :: as_iterator;
+            threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
+            for^ threads do thread.spawn(it, ^t_data, #solidify thread_function {body=body});
 
-    parallel_for(as_iterator(iterable), thread_count, thread_data, body);
-}
+            thread_function(^t_data, body);
 
-#match parallel_for macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
-    thread :: package core.thread;
-    alloc  :: package core.alloc;
-    distributor :: distributor;
-    as_iterator :: as_iterator;
+            for^ threads do thread.join(it);
+            dist.close(dist.data);
+        }
 
-    if thread_count != 0 {
-        dist := distributor(iter);
-        t_data := Thread_Data(iter.Iter_Type, Ctx).{
-            iter = ^dist,
-            data = thread_data,
-        };
+        Thread_Data :: struct (T: type_expr, Ctx: type_expr) {
+            iter: ^Iterator(T);
+            data: ^Ctx;
+        }
 
-        threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
-        for^ threads do thread.spawn(it, ^t_data, #solidify thread_function {body=body});
-
-        thread_function(^t_data, body);
-
-        for^ threads do thread.join(it);
-        dist.close(dist.data);
-    }
-
-    Thread_Data :: struct (T: type_expr, Ctx: type_expr) {
-        iter: ^Iterator(T);
-        data: ^Ctx;
-    }
-
-    thread_function :: (__data: ^Thread_Data, $body: Code) {
-        thread_data := __data.data;
-        for #no_close *__data.iter {
-            #insert body;
+        thread_function :: (__data: ^Thread_Data, $body: Code) {
+            thread_data := __data.data;
+            for #no_close *__data.iter {
+                #insert body;
+            }
         }
     }
 }
