@@ -8,11 +8,11 @@ ListElem :: struct (T: type_expr) {
     data: T;
 }
 
-List :: struct (T: type_expr) {
+List :: struct (Elem_Type: type_expr) {
     allocator: Allocator;
 
-    first: ^ListElem(T) = null;
-    last:  ^ListElem(T) = null;
+    first: ^ListElem(Elem_Type) = null;
+    last:  ^ListElem(Elem_Type) = null;
 
     // "Method" like things
     free         :: free
@@ -32,7 +32,7 @@ make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
     return .{ allocator = allocator };
 }
 
-free :: (list: ^List($T)) {
+free :: (list: ^List) {
     elem := list.first;
     while elem != null {
         to_delete := elem;
@@ -41,7 +41,7 @@ free :: (list: ^List($T)) {
     }
 }
 
-push_end :: (list: ^List($T), x: T) { 
+push_end :: (list: ^List, x: list.Elem_Type) { 
     new_elem := allocate_elem(list);
     new_elem.data = x;
 
@@ -52,7 +52,7 @@ push_end :: (list: ^List($T), x: T) {
     if list.first == null do list.first = new_elem;
 }
 
-push_begin :: (list: ^List($T), x: T) {
+push_begin :: (list: ^List, x: list.Elem_Type) {
     new_elem := allocate_elem(list);
     new_elem.data = x;
 
@@ -85,7 +85,7 @@ pop_begin :: (list: ^List($T), default: T = __zero_value(T)) -> T {
     return begin.data;
 }
 
-count :: (list: ^List($T)) -> i32 {
+count :: (list: ^List) -> i32 {
     c := 0;
     elem := list.first;
     while elem != null {
@@ -96,7 +96,7 @@ count :: (list: ^List($T)) -> i32 {
     return c;
 }
 
-at :: (list: ^List($T), index: i32) -> ^T {
+at :: (list: ^List, index: i32) -> ^T {
     elem := list.first;
     while elem != null {
         if index == 0 do return ^elem.data;
@@ -107,7 +107,7 @@ at :: (list: ^List($T), index: i32) -> ^T {
     return null;
 }
 
-contains :: (list: ^List($T), x: T) -> bool {
+contains :: (list: ^List, x: list.Elem_Type) -> bool {
     elem := list.first;
     while elem != null {
         if elem.data == x do return true;

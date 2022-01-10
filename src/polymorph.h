@@ -875,7 +875,7 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
                 case Ast_Kind_Array_Type:   to_replace = &((AstArrayType *)   *to_replace)->elem;  param_type = ((AstArrayType *)   param_type)->elem;  break;
                 case Ast_Kind_Slice_Type:   to_replace = &((AstSliceType *)   *to_replace)->elem;  param_type = ((AstSliceType *)   param_type)->elem;  break;
                 case Ast_Kind_DynArr_Type:  to_replace = &((AstDynArrType *)  *to_replace)->elem;  param_type = ((AstDynArrType *)  param_type)->elem;  break;
-                case Ast_Kind_Alias:                                                               param_type = ((AstAlias *)       param_type)->alias; break;
+                case Ast_Kind_Alias:                                                               param_type = (AstType *) ((AstAlias *) param_type)->alias; break;
                 case Ast_Kind_Type_Alias:                                                          param_type = ((AstTypeAlias *)   param_type)->to;    break;
                 case Ast_Kind_Poly_Struct_Type: {
                     AutoPolymorphVariable apv;

@@ -42,7 +42,7 @@ main :: (args: [] cstr) {
 
         quick_iterator :=
                     count_iterator(1.0f, 20.0f)
-                    |> iter.map((x) => x * 2)
+                    |> iter.map(x => x * 2)
                     |> iter.filter(lower_bound, (x, l) => x > ~~l)
                     |> iter.map(addition, (x, addition) => x + ~~addition)
                     |> iter.take(5);
@@ -70,9 +70,9 @@ main :: (args: [] cstr) {
 
     println("\nStarting the zipped iteration...");
     zipped_iterator := count_iterator(1, 10)
-                |> iter.map((x) => x * 2)
-                |> iter.filter((x) => x > 10)
-                |> iter.map((x) => x + 42)
+                |> iter.map(x => x * 2)
+                |> iter.filter(x => x > 10)
+                |> iter.map(x => x + 42)
                 |> iter.zip(iter.const(42.0f));
 
     for value: zipped_iterator {

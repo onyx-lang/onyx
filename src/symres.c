@@ -4,6 +4,8 @@
 #include "astnodes.h"
 #include "errors.h"
 
+// :EliminatingSymres - notes the places where too much work is being done in symbol resolution
+
 // Variables used during the symbol resolution phase.
 static Scope*       curr_scope    = NULL;
 static b32 report_unresolved_symbols = 1;
@@ -216,7 +218,7 @@ static SymresStatus symres_type(AstType** type) {
 
         case Ast_Kind_Alias: {
             AstAlias* alias = (AstAlias *) *type;
-            SYMRES_INVISIBLE(type, alias, &alias->alias);
+            SYMRES_INVISIBLE(type, alias, (AstType **) &alias->alias);
 
             break;
         }
@@ -356,6 +358,7 @@ static SymresStatus symres_pipe(AstBinaryOp** pipe) {
 
     if ((*pipe)->left == NULL) return Symres_Error;
 
+    // :EliminatingSymres
     bh_arr_insertn(call_node->args.values, 0, 1);
     call_node->args.values[0] = (AstTyped *) make_argument(context.ast_alloc, (*pipe)->left);
     call_node->next = (*pipe)->next;
@@ -386,14 +389,15 @@ static SymresStatus symres_method_call(AstBinaryOp** mcall) {
     SYMRES(expression, &(*mcall)->left);
     if ((*mcall)->left == NULL) return Symres_Error;
 
+    // :EliminatingSymres
     if (((*mcall)->flags & Ast_Flag_Has_Been_Symres) == 0) {
         AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
         implicit_field_access->token = call_node->callee->token;
         call_node->callee = (AstTyped *) implicit_field_access;
+        (*mcall)->flags |= Ast_Flag_Has_Been_Symres;
     }
 
     SYMRES(expression, (AstTyped **) &call_node);
-    (*mcall)->flags |= Ast_Flag_Has_Been_Symres;
 
     return Symres_Success;
 }
@@ -411,6 +415,7 @@ static SymresStatus symres_unaryop(AstUnaryOp** unaryop) {
 static SymresStatus symres_struct_literal(AstStructLiteral* sl) {
     if (sl->stnode != NULL) SYMRES(expression, &sl->stnode);
 
+    // :EliminatingSymres
     sl->type_node = (AstType *) sl->stnode;
     while (sl->type_node && sl->type_node->kind == Ast_Kind_Type_Alias)
         sl->type_node = ((AstTypeAlias *) sl->type_node)->to;
@@ -423,6 +428,7 @@ static SymresStatus symres_struct_literal(AstStructLiteral* sl) {
 static SymresStatus symres_array_literal(AstArrayLiteral* al) {
     if (al->atnode != NULL) SYMRES(expression, &al->atnode);
 
+    // :EliminatingSymres
     al->type_node = (AstType *) al->atnode;
     while (al->type_node && al->type_node->kind == Ast_Kind_Type_Alias)
         al->type_node = ((AstTypeAlias *) al->type_node)->to;
@@ -468,6 +474,7 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(expression, &((AstRangeLiteral *)(*expr))->low);
             SYMRES(expression, &((AstRangeLiteral *)(*expr))->high);
 
+            // :EliminatingSymres
             SYMRES(type, &builtin_range_type);
             (*expr)->type_node = builtin_range_type;
 
@@ -539,7 +546,7 @@ static SymresStatus symres_expression(AstTyped** expr) {
         case Ast_Kind_Param:
             if ((*expr)->flags & Ast_Flag_Param_Symbol_Dirty) {
                 assert((*expr)->token->type == Token_Type_Symbol);
-                *expr = make_symbol(context.ast_alloc, (*expr)->token);
+                *expr = (AstTyped *) make_symbol(context.ast_alloc, (*expr)->token);
                 SYMRES(expression, expr);
             }
             break;
@@ -657,6 +664,7 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
 static SymresStatus symres_use(AstUse* use) {
     SYMRES(expression, &use->expr);
 
+    // :EliminatingSymres
     if (use->expr->kind == Ast_Kind_Package) {
         AstPackage* package = (AstPackage *) use->expr;
         SYMRES(package, package);
@@ -728,6 +736,7 @@ static SymresStatus symres_use(AstUse* use) {
 
     if (use->expr->type_node == NULL && use->expr->type == NULL) goto cannot_use;
 
+    // :EliminatingSymres
     AstType* effective_type = use->expr->type_node;
     if (effective_type->kind == Ast_Kind_Pointer_Type)
         effective_type = ((AstPointerType *) effective_type)->elem;
@@ -956,6 +965,7 @@ SymresStatus symres_function(AstFunction* func) {
     scope_enter(func->scope);
 
     if ((func->flags & Ast_Flag_Has_Been_Symres) == 0) {
+        // :EliminatingSymres
         bh_arr_each(AstParam, param, func->params) {
             // CLEANUP: Currently, in order to 'use' parameters, the type must be completely
             // resolved and built. This is excessive because all that should need to be known
@@ -1064,6 +1074,7 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
 
     scope_enter(enum_node->scope);
 
+    // :EliminatingSymres
     u64 next_assign_value = enum_node->is_flags ? 1 : 0;
     bh_arr_each(AstEnumValue *, value, enum_node->values) {
         if ((*value)->flags & Ast_Flag_Has_Been_Checked) continue;
@@ -1187,6 +1198,7 @@ static SymresStatus symres_static_if(AstIf* static_if) {
 }
 
 static SymresStatus symres_process_directive(AstNode* directive) {
+    // :EliminatingSymres
     switch (directive->kind) {
         case Ast_Kind_Directive_Add_Overload: {
             AstDirectiveAddOverload *add_overload = (AstDirectiveAddOverload *) directive;
@@ -1325,6 +1337,7 @@ static SymresStatus symres_constraint(AstConstraint* constraint) {
 }
 
 static SymresStatus symres_polyquery(AstPolyQuery *query) {
+    // :EliminatingSymres
     query->successful_symres = 0;
 
     if (query->function_header->scope == NULL)

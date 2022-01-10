@@ -294,7 +294,13 @@ static void parse_arguments(OnyxParser* parser, TokenType end_token, Arguments* 
     while (!consume_token_if_next(parser, end_token)) {
         if (parser->hit_unexpected_token) return;
 
-        if (next_tokens_are(parser, 2, Token_Type_Symbol, '=')) {
+        //
+        // This has a weird condition to avoid the problem of using a quick function as an argument:
+        //     f(x => x + 1)
+        // This shouldn't be a named argument, but this should:
+        //     f(g = x => x + 1)
+        //
+        if (next_tokens_are(parser, 2, Token_Type_Symbol, '=') && peek_token(2)->type != '>') {
             OnyxToken* name = expect_token(parser, Token_Type_Symbol);
             expect_token(parser, '=');
 
@@ -440,6 +446,11 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         }
 
         case Token_Type_Symbol: {
+            if (parse_possible_quick_function_definition(parser, &retval)) {
+                ENTITY_SUBMIT(retval);
+                break;
+            }
+
             OnyxToken* sym_token = expect_token(parser, Token_Type_Symbol);
             AstTyped* sym_node = make_node(AstTyped, Ast_Kind_Symbol);
             sym_node->token = sym_token;
@@ -2435,6 +2446,12 @@ typedef struct QuickParam {
 } QuickParam;
 
 static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parser) {
+    //
+    // x => x + 1 case.
+    if (next_tokens_are(parser, 3, Token_Type_Symbol, '=', '>')) {
+        return 1;
+    }
+
     if (parser->curr->type != '(') return 0;
 
     OnyxToken* matching_paren = find_matching_paren(parser->curr);
@@ -2451,26 +2468,35 @@ static b32 parse_possible_quick_function_definition_no_consume(OnyxParser* parse
 static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped** ret) {
     if (!parse_possible_quick_function_definition_no_consume(parser)) return 0;
 
-    OnyxToken* proc_token = expect_token(parser, '(');
-
     bh_arr(QuickParam) params=NULL;
     bh_arr_new(global_heap_allocator, params, 4);
+    OnyxToken* proc_token;
 
-    while (parser->curr->type != ')') {
-        if (parser->hit_unexpected_token) return 0;
-
+    if (parser->curr->type == Token_Type_Symbol) {
         QuickParam param = { 0 };
-        if (consume_token_if_next(parser, '$')) param.is_baked = 1;
         param.token = expect_token(parser, Token_Type_Symbol);
-
+        proc_token = param.token;
         bh_arr_push(params, param);
 
-        if (parser->curr->type != ')') {
-            expect_token(parser, ',');
+    } else {
+        proc_token = expect_token(parser, '(');
+        while (parser->curr->type != ')') {
+            if (parser->hit_unexpected_token) return 0;
+
+            QuickParam param = { 0 };
+            if (consume_token_if_next(parser, '$')) param.is_baked = 1;
+            param.token = expect_token(parser, Token_Type_Symbol);
+
+            bh_arr_push(params, param);
+
+            if (parser->curr->type != ')') {
+                expect_token(parser, ',');
+            }
         }
+
+        expect_token(parser, ')');
     }
 
-    expect_token(parser, ')');
     expect_token(parser, '=');
     expect_token(parser, '>');
 
