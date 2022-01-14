@@ -88,61 +88,8 @@ Settings :: struct {
     compile_only := false;
 }
 
-args_parse :: (c_args: [] cstr, output: ^Settings) -> bool {
-    arg_iter := iter.as_iterator(c_args)
-             |> iter.map((x) => string.from_cstr(*x));
-
-    use type_info;
-
-    arg_type := cast(^Type_Info_Struct) get_type_info(typeof *output);
-    if arg_type.kind != .Struct do return false;
-
-    for #no_close arg: arg_iter {
-        for ^member: arg_type.members {
-            for ^tag: member.tags {
-                if tag.type != str do continue;
-
-                to_match := *cast(^str) tag.data;
-                if arg != to_match do continue;
-
-                switch member.type {
-                    case bool {
-                        // Should there be a way to specify a variable to be false?
-                        *(cast(^bool) (cast(^u8) output + member.offset)) = true;
-                    }
-
-                    case i32 {
-                        value_str, success := iter.take_one(arg_iter);
-                        if !success do return false;
-
-                        value := conv.str_to_i64(value_str);
-                        *(cast(^i32) (cast(^u8) output + member.offset)) = ~~value;
-                    }
-
-                    case str {
-                        value, success := iter.take_one(arg_iter);
-                        if !success do return false;
-
-                        *(cast(^str) (cast(^u8) output + member.offset)) = value;
-                    }
-
-                    case #default {
-                        println("Unsupported argument type.");
-                        return false;
-                    }
-                }
-            }
-        }
-    }
-
-    // This has to be done explicitly beacuse the iter.take_one function
-    // can close the iterator if it runs out during the taking.
-    arg_iter.close(arg_iter.data);
-    return true;
-}
-
 main :: (args) => {
-    args_parse(args, ^settings);
+    arg_parse.arg_parse(args, ^settings);
     printf("Using {p*}\n", ^settings);
 
     Execution_Context :: struct {

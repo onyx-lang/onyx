@@ -13,6 +13,8 @@ as_allocator :: #match {
 
 // This is similar to alloca in C.
 from_stack :: macro (size: u32) -> rawptr {
+    // This should do something about the alignment...
+    // Everything so far has assume that the stack is aligned to 16 bytes.
     defer __stack_top = ~~(cast(^u8) __stack_top + size);
     return __stack_top;
 }

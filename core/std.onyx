@@ -37,6 +37,8 @@ package core
 
 #load "./type_info/helper"
 
+#load "./arg_parse"
+
 #local runtime :: package runtime
 #if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
     #load "./os/file"
