@@ -1012,17 +1012,22 @@ struct AstOverloadedFunction {
 
 // @CLEANUP: Is this really necessary?
 typedef struct InterfaceParam {
-    OnyxToken *token;
+    OnyxToken *value_token;
     AstType   *type_node;
-    Type      *type;
 } InterfaceParam;
+
+typedef struct InterfaceConstraint {
+    AstTyped *expr;
+    AstType  *expected_type_expr;
+    Type     *expected_type;
+} InterfaceConstraint;
 
 struct AstInterface {
     AstTyped_base;
     char *name;
 
-    bh_arr(InterfaceParam) params;
-    bh_arr(AstTyped *)  exprs;
+    bh_arr(InterfaceParam)      params;
+    bh_arr(InterfaceConstraint) exprs;
 };
 
 typedef enum ConstraintPhase {
@@ -1043,7 +1048,7 @@ struct AstConstraint {
     ConstraintCheckStatus *report_status;
 
     Scope* scope;
-    bh_arr(AstTyped *) exprs;
+    bh_arr(InterfaceConstraint) exprs;
     u32 expr_idx;
 };
 

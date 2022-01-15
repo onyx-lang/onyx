@@ -8,9 +8,9 @@ package core.set
 }
 use package core.intrinsics.onyx { __zero_value }
 
-#local SetValue :: interface (T: type_expr) {
-    hash.to_u32(T);
-    T == T;
+#local SetValue :: interface (t: $T) {
+    { hash.to_u32(T) } -> u32;
+    { T == T } -> bool;
 }
 
 Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {

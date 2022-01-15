@@ -5,8 +5,8 @@ use package core.intrinsics.onyx { __zero_value }
 
 as_iterator :: #match {}
 
-Iterable :: interface (T: type_expr) {
-    as_iterator(T);
+Iterable :: interface (t: $T) {
+    as_iterator(t);
 }
 
 close :: (it: Iterator($T)) {

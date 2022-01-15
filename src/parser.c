@@ -2078,9 +2078,12 @@ static AstInterface* parse_interface(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return interface;
 
         InterfaceParam ip;
-        ip.token = expect_token(parser, Token_Type_Symbol);
+        ip.value_token = expect_token(parser, Token_Type_Symbol);
         expect_token(parser, ':');
-        ip.type_node = parse_type(parser);
+        expect_token(parser, '$');
+
+        OnyxToken* type_sym = expect_token(parser, Token_Type_Symbol);
+        ip.type_node = (AstType *) make_symbol(parser->allocator, type_sym);
 
         bh_arr_push(interface->params, ip);
 
@@ -2094,8 +2097,20 @@ static AstInterface* parse_interface(OnyxParser* parser) {
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return interface;
 
-        AstTyped *expr = parse_expression(parser, 0);
-        bh_arr_push(interface->exprs, expr);
+        InterfaceConstraint ic = {0};
+        if (consume_token_if_next(parser, '{')) {
+            ic.expr = parse_expression(parser, 0);
+
+            expect_token(parser, '}');
+            expect_token(parser, Token_Type_Right_Arrow);
+
+            ic.expected_type_expr = parse_type(parser);
+
+        } else {
+            ic.expr = parse_expression(parser, 0);
+        }
+
+        bh_arr_push(interface->exprs, ic);
 
         expect_token(parser, ';');
     }

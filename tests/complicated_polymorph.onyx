@@ -14,8 +14,8 @@ main :: (args: [] cstr) {
         return g(f(a));
     }
 
-    Number :: interface (T: type_expr) {
-        T * T;
+    Number :: interface (t: $T) {
+        { t * t } -> T;
     }
 
     dumb :: (ZZZ: $T) -> #auto where Number(T) {

@@ -13,6 +13,6 @@ to_u32 :: #match {
     (key: type_expr) -> u32 do return to_u32(cast(u32) key);
 }
 
-Hashable :: interface (T: type_expr) {
-    to_u32(T);
+Hashable :: interface (t: $T) {
+    { to_u32(t) } -> u32;
 }

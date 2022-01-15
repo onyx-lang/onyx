@@ -2607,8 +2607,11 @@ CheckStatus check_constraint(AstConstraint *constraint) {
             }
 
             bh_arr_new(global_heap_allocator, constraint->exprs, bh_arr_length(constraint->interface->exprs));
-            bh_arr_each(AstTyped *, expr, constraint->interface->exprs) {
-                bh_arr_push(constraint->exprs, (AstTyped *) ast_clone(context.ast_alloc, (AstNode *) *expr));
+            bh_arr_each(InterfaceConstraint, ic, constraint->interface->exprs) {
+                InterfaceConstraint new_ic = {0};
+                new_ic.expr = (AstTyped *) ast_clone(context.ast_alloc, (AstNode *) ic->expr);
+                new_ic.expected_type_expr = (AstType *) ast_clone(context.ast_alloc, (AstNode *) ic->expected_type_expr);
+                bh_arr_push(constraint->exprs, new_ic);
             }
 
             assert(constraint->interface->entity && constraint->interface->entity->scope);
@@ -2619,10 +2622,16 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 InterfaceParam *ip = &constraint->interface->params[i];
 
                 AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
-                sentinel->token = ip->token;
+                sentinel->token = ip->value_token;
                 sentinel->type_node = constraint->type_args[i];
 
-                symbol_introduce(constraint->scope, ip->token, (AstNode *) sentinel);
+                assert(ip->type_node);
+                AstAlias *type_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+                type_alias->token = ip->type_node->token;
+                type_alias->alias = (AstTyped *) constraint->type_args[i];
+
+                symbol_introduce(constraint->scope, ip->value_token, (AstNode *) sentinel);
+                symbol_introduce(constraint->scope, ip->type_node->token, (AstNode *) type_alias);
             }
 
             assert(constraint->entity);
@@ -2634,20 +2643,38 @@ CheckStatus check_constraint(AstConstraint *constraint) {
 
         case Constraint_Phase_Checking_Expressions: {
             fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
-                CheckStatus cs = check_expression(&constraint->exprs[i]);
+                InterfaceConstraint* ic = &constraint->exprs[i];
+
+                CheckStatus cs = check_expression(&ic->expr);
                 if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
                     return cs;
                 }
 
                 if (cs == Check_Error) {
-                    // HACK HACK HACK
-                    onyx_clear_errors();
+                    goto constraint_error;
+                }
 
-                    *constraint->report_status = Constraint_Check_Status_Failed;
-                    return Check_Failed;
+                if (ic->expected_type_expr) {
+                    ic->expected_type = type_build_from_ast(context.ast_alloc, ic->expected_type_expr);
+                    if (ic->expected_type == NULL) {
+                        printf("WEIRD CONDITION THAT SHOULD NEVER HAPPEN!\n");
+                        return Check_Yield_Macro;
+                    }
+
+                    TYPE_CHECK(&ic->expr, ic->expected_type) {
+                        goto constraint_error;
+                    }
                 }
 
                 constraint->expr_idx++;
+                continue;
+
+              constraint_error:
+                // HACK HACK HACK
+                onyx_clear_errors();
+
+                *constraint->report_status = Constraint_Check_Status_Failed;
+                return Check_Failed;
             }
 
             *constraint->report_status = Constraint_Check_Status_Success;
@@ -2670,7 +2697,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                     fori (i, 0, bh_arr_length(constraint->type_args)) {
                         if (i != 0) strncat(constraint_map, ", ", 511);
 
-                        OnyxToken* symbol = constraint->interface->params[i].token;
+                        OnyxToken* symbol = constraint->interface->params[i].value_token;
                         token_toggle_end(symbol);
                         strncat(constraint_map, symbol->text, 511);
                         token_toggle_end(symbol);
@@ -2680,7 +2707,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                         strncat(constraint_map, "'", 511);
                     }
 
-                    onyx_report_error(constraint->exprs[constraint->expr_idx]->token->pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
+                    onyx_report_error(constraint->exprs[constraint->expr_idx].expr->token->pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
                     onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
                     onyx_report_error(pos, Error_Critical, "Here is the code that caused this constraint to be checked.");
 

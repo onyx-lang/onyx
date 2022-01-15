@@ -1326,7 +1326,11 @@ static SymresStatus symres_constraint(AstConstraint* constraint) {
 
         case Constraint_Phase_Checking_Expressions: {
             fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
-                SYMRES(expression, &constraint->exprs[i]);
+                SYMRES(expression, &constraint->exprs[i].expr);
+
+                if (constraint->exprs[i].expected_type_expr) {
+                    SYMRES(type, &constraint->exprs[i].expected_type_expr);
+                }
             }
 
             return Symres_Success;

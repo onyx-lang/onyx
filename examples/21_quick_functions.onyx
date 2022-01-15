@@ -36,9 +36,9 @@ main :: (args) => {
 
     // This is an example of what the iter package looks like.
     val := iter.as_iterator(range.{ 20, 1, -1 })
-            |> iter.map((x) => x * 2)
-            |> iter.map((x) => cast(f32) x)
-            |> iter.filter((x) => x > 20)
+            |> iter.map(x => x * 2)
+            |> iter.map(x => cast(f32) x)
+            |> iter.filter(x => x > 20)
             |> iter.take(5)
             |> iter.fold(0.0f, (x, y) => x + y);
     println(val);

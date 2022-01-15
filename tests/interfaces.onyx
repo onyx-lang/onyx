@@ -2,8 +2,8 @@
 
 use package core
 
-Hashable :: interface (T: type_expr) {
-    hash.to_u32(T);
+Hashable :: interface (t: $T) {
+    { hash.to_u32(t) } -> u32;
 }
 
 try_hash :: #match {
@@ -16,8 +16,8 @@ try_hash :: #match {
     },
 }
 
-CanCastTo :: interface (T: type_expr, D: type_expr) {
-    cast(typeof D) T;
+CanCastTo :: interface (t: $T, d: $D) {
+    { cast(D) t } -> D;
 }
 
 // I don't know why this doesn't work... It is complaining that it couldn't match
@@ -37,20 +37,20 @@ do_math :: macro (x, y: $T) -> T where SemiRing(T) {
     return x + y + x * y;
 }
 
-SemiRing :: interface (T: type_expr) {
-    T + T;
-    T * T;
+SemiRing :: interface (t: $T) {
+    {t + t} -> T;
+    {t * t} -> T;
 }
 
 bit_math :: (x, y: $T) -> T where BitField(T) {
     return (x & y) | (x ^ y);
 }
 
-BitField :: interface (T: type_expr) {
-    ~T;
-    T & T;
-    T | T;
-    T ^ T;
+BitField :: interface (t: $T) {
+    { ~t } -> T;
+    { t & t } -> T;
+    { t | t } -> T;
+    { t ^ t } -> T;
 }
 
 Complex :: struct [conv.Custom_Format.{ format }] {
