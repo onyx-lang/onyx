@@ -5,8 +5,9 @@ use package core.intrinsics.onyx { __zero_value }
 
 as_iterator :: #match {}
 
+#local __iterable_test :: macro (i: Iterator($V)) {}
 Iterable :: interface (t: $T) {
-    as_iterator(t);
+    as_iterator(t) |> __iterable_test();
 }
 
 close :: (it: Iterator($T)) {

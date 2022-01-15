@@ -44,17 +44,4 @@ main :: (args: [] cstr) {
 
     println(map.has(^ages, "Dwight"));
     println(map.has(^ages, "Michael"));
-
-
-
-    // Not now nor ever will Onyx support an "interface" concept to say
-    // which types can do which things. One thing that Onyx does have
-    // however is explicit overloaded procedures. They are talked about
-    // more in 14_overloaded_procs.onyx. For our purposes right now, we
-    // just need to know that Map uses an overloaded procedures to
-    // achieve its implementation, map.hash_function.
-    // To make Map work with any new datatype you come up with, simply
-    // define an overload for map.hash_function and the '==' operator.
-    // If you want to see what this looks like, take a look at
-    // tests/aoc-2020/day17.onyx in this repository.
 }

@@ -24,8 +24,16 @@ add_example :: () {
     // but after programming with it for a while, I think it is the right
     // syntax.
 
-    CanAdd :: interface (T: type_expr) {
-        T + T;
+    // Interfaces are written like polymorphic functions, except *every* parameter
+    // must introduce a single polymorphic variable. Effectively this means for
+    // every parameter you get two things: the parameter value, and the parameter
+    // type. The body of the interface specifies a list of expressions that must
+    // be legal in order for the parameters to meet the interface. If any of the 
+    // expressions do not type check correctly, then the set of parameters does not
+    // satisfy the interface.
+
+    CanAdd :: interface (t: $T) {
+        t + t;
     }
 
     // To use this interface, you must write a "where" clause for a procedure or
@@ -51,14 +59,14 @@ add_example :: () {
 
 // These have to be defined out here because #operator and #match are only allowed
 // as top level expressions currently.
-NumberLike :: interface (T: type_expr) {
-    // The constraints here are a little stricter than before, as you must be
-    // able to cast the result of these operations back to the original type.
-    // This effectively means that T + T must be the same type as (or a compatible
-    // type of) T.
-    cast(typeof T) (T + T);
-    cast(typeof T) (T - T);
-    cast(typeof T) (T * T);
+NumberLike :: interface (t: $T) {
+    // The constraints here are a little stricter than before. This syntax
+    // allows you to specify the expected type of the expression. If the type
+    // of the expression and the type after the arrow do not match, then the
+    // interface check fails.
+    {t + t} -> T;
+    {t - t} -> T;
+    {t * t} -> T;
 }
 
 // Here, Vector2 has the type constraint of NumberLike for T. This constraint
@@ -80,7 +88,7 @@ struct_example :: () {
 
     // This will generate an error because the dot product definition of
     // multiplication of two Vector2(f32) results in a f32, which cannot
-    // be casted to a Vector2(f32).
+    // is not Vector2(f32).
     // v2 := Vector2(Vector2(f32)).{};
     // println(v2);
 }
@@ -93,8 +101,8 @@ overloaded_procedure_example :: () {
     // when the are combined with overloaded procedures.
 
     // Take this example. Here is the same CanAdd interface from before.
-    CanAdd :: interface (T: type_expr) {
-        T + T;
+    CanAdd :: interface (t: $T) {
+        t + t;
     }
 
     // This overloaded procedure has two procedures that have almost identical
