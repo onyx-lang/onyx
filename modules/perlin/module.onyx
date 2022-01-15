@@ -1,0 +1,7 @@
+package perlin
+
+#load "./perlin"
+
+#package {
+    core :: package core
+}

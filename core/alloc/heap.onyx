@@ -3,7 +3,7 @@ package core.alloc.heap
 // Enable this to enable checking for invalid blocks and other corruptions
 // that may happen on the heap, with the added overhead of checking that
 // on every alloc/resize/free.
-Enable_Debug :: false 
+Enable_Debug :: #defined( (package runtime.vars).Enable_Heap_Debug )
 
 // This is the implementation for the general purpose heap allocator.
 // It is a simple bump allocator, with a free list. It is not very good
