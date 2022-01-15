@@ -2655,10 +2655,14 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 }
 
                 if (ic->expected_type_expr) {
+                    cs = check_type(&ic->expected_type_expr);
+                    if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
+                        return cs;
+                    }
+
                     ic->expected_type = type_build_from_ast(context.ast_alloc, ic->expected_type_expr);
                     if (ic->expected_type == NULL) {
-                        printf("WEIRD CONDITION THAT SHOULD NEVER HAPPEN!\n");
-                        return Check_Yield_Macro;
+                        YIELD(ic->expected_type_expr->token->pos, "Waiting on expected type expression to be resolved.");
                     }
 
                     TYPE_CHECK(&ic->expr, ic->expected_type) {
