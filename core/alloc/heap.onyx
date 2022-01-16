@@ -195,7 +195,7 @@ get_freed_size :: () => {
     }
 
     heap_resize :: (ptr: rawptr, new_size_: u32, align: u32) -> rawptr {
-        if ptr == null do return null;
+        if ptr == null do return heap_alloc(new_size_, align);
 
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
 
