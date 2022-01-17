@@ -3251,6 +3251,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     WasmFunc wasm_func = { 0 };
     wasm_func.type_idx = type_idx;
+    wasm_func.location = fd->token;
 
     bh_arr_new(mod->allocator, wasm_func.code, 4);
 

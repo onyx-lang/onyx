@@ -512,3 +512,4 @@ void introduce_build_options(bh_allocator a) {
     add_entities_for_node(NULL, (AstNode *) os_type, NULL, NULL);
     symbol_builtin_introduce(p->scope, "compiler_os", (AstNode *) os_type);
 }
+

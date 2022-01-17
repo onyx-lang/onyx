@@ -543,6 +543,7 @@ typedef struct WasmFunc {
     i32 type_idx;
     LocalAllocator locals;
     bh_arr(WasmInstruction) code;
+    OnyxToken *location;
 } WasmFunc;
 
 typedef struct WasmGlobal {

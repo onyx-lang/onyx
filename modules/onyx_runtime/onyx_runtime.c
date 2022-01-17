@@ -357,19 +357,8 @@ static i32 onyx_run_thread(void *data) {
 
         trap = runtime->wasm_func_call(start_func, &args_array, &results);
         if (trap != NULL) {
-            /*
-            When proper linking is available for Wasmer, re-enable this code. At the moment
-            I don't see too much value in passing all of these functions on the Runtime object
-            especially since it is a hack to pass functions there anyway.
-
-            wasm_message_t msg;
-            wasm_trap_message(trap, &msg);
-            bh_printf("TRAP: %b\n", msg.data, msg.size);
-
-            wasm_frame_t *origin = wasm_trap_origin(trap);
-            bh_printf("HERE: func[%d] at %p.\n", wasm_frame_func_index(origin), wasm_frame_module_offset(origin));
-            */
-            bh_printf("ERROR: WebAssembly trap in thread: %d\n", thread_id);
+            bh_printf("THREAD: %d\n", thread_id);
+            runtime->onyx_print_trap(trap);
         }
     }
 

@@ -20,6 +20,7 @@ static wasm_config_t*    wasm_config;
 static wasm_engine_t*    wasm_engine;
 static wasm_store_t*     wasm_store;
 static wasm_extern_vec_t wasm_imports;
+static bh_buffer         wasm_raw_bytes;
 wasm_instance_t*  wasm_instance;
 wasm_module_t*    wasm_module;
 wasm_memory_t*    wasm_memory;
@@ -165,9 +166,45 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
     }
 }
 
+static void onyx_print_trap(wasm_trap_t* trap) {
+    wasm_message_t msg;
+    wasm_trap_message(trap, &msg);
+    bh_printf("TRAP: %b\n", msg.data, msg.size);
+
+    wasm_frame_t *origin = wasm_trap_origin(trap);
+    i32 index = wasm_frame_func_index(origin);
+
+    i32 cursor = 8; // skip the magic number and version
+    while (cursor < wasm_raw_bytes.length) {
+        u64 section_number = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
+        u64 section_size   = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
+
+        i32 section_start = cursor;
+        if (section_number == 0) {
+            u64 name_len = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
+            if (!strncmp(wasm_raw_bytes.data + cursor, "_onyx_func_offsets", name_len)) {
+                cursor += name_len;
+                i32 section_start = cursor;
+
+                cursor += 4 * index;
+                i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
+                char* func_name = wasm_raw_bytes.data + section_start + func_offset;
+
+                bh_printf("HERE: %s\n", func_name);
+                bh_printf("OFFSET: %p\n", wasm_frame_module_offset(origin));
+                break;
+            }
+        }
+
+        cursor = section_start + section_size;
+    }
+}
+
 // Returns 1 if successful
 b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     runtime = &wasm_runtime;
+
+    wasm_raw_bytes = wasm_bytes;
 
     bh_arr_new(bh_heap_allocator(), linkable_functions, 4);
     onyx_lookup_and_load_custom_libraries(wasm_bytes);
@@ -283,6 +320,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_extern_as_func = &wasm_extern_as_func;
     wasm_runtime.wasm_func_call = &wasm_func_call;
     wasm_runtime.wasm_instance_new = &wasm_instance_new;
+    wasm_runtime.onyx_print_trap = &onyx_print_trap;
 
     wasm_extern_t* start_extern = wasm_extern_lookup_by_name(wasm_module, wasm_instance, "_start");
     wasm_func_t*   start_func   = wasm_extern_as_func(start_extern);
@@ -294,14 +332,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     run_trap = wasm_func_call(start_func, &args, &results);
 
 #if 1
-    if (run_trap != NULL) {
-        wasm_message_t msg;
-        wasm_trap_message(run_trap, &msg);
-        bh_printf("TRAP: %b\n", msg.data, msg.size);
-
-        wasm_frame_t *origin = wasm_trap_origin(run_trap);
-        bh_printf("HERE: func[%d] at %p.\n", wasm_frame_func_index(origin), wasm_frame_module_offset(origin));
-    }
+    if (run_trap != NULL) onyx_print_trap(run_trap);
 #endif
 
     goto cleanup;

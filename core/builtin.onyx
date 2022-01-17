@@ -138,15 +138,21 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 #if runtime.runtime != .Custom {
     new :: ($T: type_expr, allocator := context.allocator) -> ^T {
         use package core.intrinsics.onyx { __initialize }
+        memory :: package core.memory
 
         res := cast(^T) raw_alloc(allocator, sizeof T);
+        memory.set(res, 0, sizeof T);
         __initialize(res);
 
         return res;
     }
 
     make :: ($T: type_expr, allocator := context.allocator) -> ^T {
-        return cast(^T) raw_alloc(allocator, sizeof T);
+        memory :: package core.memory
+
+        res := cast(^T) raw_alloc(allocator, sizeof T);
+        memory.set(res, 0, sizeof T);
+        return res;
     }
 }
 
