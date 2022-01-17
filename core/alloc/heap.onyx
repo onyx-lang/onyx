@@ -65,11 +65,11 @@ get_freed_size :: () => {
 
     heap_block :: struct {
         size         : u32;
-        magic_number : u32;
     }
 
     heap_freed_block :: struct {
         use base: heap_block;
+        magic_number : u32;
         next : ^heap_freed_block;
         prev : ^heap_freed_block;
     }
@@ -197,6 +197,21 @@ get_freed_size :: () => {
 
                 next_block.next = null;
                 next_block.prev = null;
+            }
+        }
+
+        {
+            walker := heap_state.free_list;
+            while walker != null {
+                after_block := cast(^heap_freed_block) (cast(uintptr) walker + walker.size);
+                if after_block == hb_ptr {
+                    hb_ptr.next = null;
+                    hb_ptr.prev = null;
+
+                    walker.size += hb_ptr.size;
+                    return;
+                }
+                walker = walker.next;
             }
         }
 
