@@ -171,8 +171,7 @@ static void onyx_print_trap(wasm_trap_t* trap) {
     wasm_trap_message(trap, &msg);
     bh_printf("TRAP: %b\n", msg.data, msg.size);
 
-    wasm_frame_t *origin = wasm_trap_origin(trap);
-    i32 index = wasm_frame_func_index(origin);
+    i32 func_name_section = 0;
 
     i32 cursor = 8; // skip the magic number and version
     while (cursor < wasm_raw_bytes.length) {
@@ -184,19 +183,26 @@ static void onyx_print_trap(wasm_trap_t* trap) {
             u64 name_len = uleb128_to_uint(wasm_raw_bytes.data, &cursor);
             if (!strncmp(wasm_raw_bytes.data + cursor, "_onyx_func_offsets", name_len)) {
                 cursor += name_len;
-                i32 section_start = cursor;
-
-                cursor += 4 * index;
-                i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
-                char* func_name = wasm_raw_bytes.data + section_start + func_offset;
-
-                bh_printf("HERE: %s\n", func_name);
-                bh_printf("OFFSET: %p\n", wasm_frame_module_offset(origin));
+                func_name_section = cursor;
                 break;
             }
         }
 
         cursor = section_start + section_size;
+    }
+
+    bh_printf("TRACE:\n");
+    wasm_frame_vec_t frames;
+    wasm_trap_trace(trap, &frames);
+    fori (i, 0, (i32) frames.size) {
+        i32 func_idx   = wasm_frame_func_index(frames.data[i]);
+        i32 mod_offset = wasm_frame_module_offset(frames.data[i]);
+
+        i32 cursor = func_name_section + 4 * func_idx;
+        i32 func_offset = *(i32 *) (wasm_raw_bytes.data + cursor);
+        char* func_name = wasm_raw_bytes.data + func_name_section + func_offset;
+
+        bh_printf("    func[%d]:%p at %s\n", func_idx, mod_offset, func_name);
     }
 }
 

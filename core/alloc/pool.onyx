@@ -14,6 +14,9 @@ package core.alloc.pool
 PoolAllocator :: struct (Elem: type_expr) {
     buffer     : [] Elem;
     first_free : ^Elem;
+
+    alloc :: pool_alloc
+    free  :: pool_free
 }
 
 #local

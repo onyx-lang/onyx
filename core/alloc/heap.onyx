@@ -94,38 +94,52 @@ get_freed_size :: () => {
 
         prev := ^heap_state.free_list;
         hb := heap_state.free_list;
+
+        best_extra := 0xffffffff;
+        best: typeof hb = null;
+        best_prev: typeof prev = null;
+
         while hb != null {
             if hb.size >= size {
-                #if Enable_Debug {
-                    assert(hb.size & Allocated_Flag == 0, "Allocated block in free list.");
-                    assert(hb.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.");
+                extra := hb.size - size;
+                if extra < best_extra {
+                    best = hb;
+                    best_prev = prev;
+                    best_extra = extra;
                 }
-
-                if hb.size - size >= Block_Split_Size {
-                    new_block := cast(^heap_freed_block) (cast(uintptr) hb + size);
-                    new_block.size = hb.size - size;
-                    new_block.next = hb.next;
-                    new_block.prev = hb.prev;
-                    new_block.magic_number = Free_Block_Magic_Number;
-                    hb.size = size;
-
-                    if hb.next != null do hb.next.prev = new_block;
-                    *prev = new_block;
-
-                } else {
-                    if hb.next != null do hb.next.prev = hb.prev;
-                    *prev = hb.next;
-                }
-
-                hb.next = null;
-                hb.prev = null;
-                hb.magic_number = 0;
-                hb.size |= Allocated_Flag;
-                return cast(rawptr) (cast(uintptr) hb + sizeof heap_allocated_block);
             }
 
             prev = ^hb.next;
             hb = hb.next;
+        }
+
+        if best != null {
+            #if Enable_Debug {
+                assert(best.size & Allocated_Flag == 0, "Allocated block in free list.");
+                assert(best.magic_number == Free_Block_Magic_Number, "Malformed free block in free list.");
+            }
+
+            if best.size - size >= Block_Split_Size {
+                new_block := cast(^heap_freed_block) (cast(uintptr) best + size);
+                new_block.size = best.size - size;
+                new_block.next = best.next;
+                new_block.prev = best.prev;
+                new_block.magic_number = Free_Block_Magic_Number;
+                best.size = size;
+
+                if best.next != null do best.next.prev = new_block;
+                *best_prev = new_block;
+
+            } else {
+                if best.next != null do best.next.prev = best.prev;
+                *best_prev = best.next;
+            }
+
+            best.next = null;
+            best.prev = null;
+            best.magic_number = 0;
+            best.size |= Allocated_Flag;
+            return cast(rawptr) (cast(uintptr) best + sizeof heap_allocated_block);
         }
 
         if size < heap_state.remaining_space {
