@@ -182,9 +182,6 @@ get_freed_size :: () => {
 
         #if Enable_Debug do memory_fill(ptr, ~~0xcc, orig_size);
 
-        // CLEANUP: This is not complete. This only checks if the block after the freed block is also free.
-        // There are three other cases related to the block before this one that need to be handled for
-        // the best efficiency and minimal fragmentation.
         if cast(uintptr) hb_ptr + hb_ptr.size < cast(uintptr) heap_state.next_alloc {
             next_block := cast(^heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size);
 
@@ -200,6 +197,14 @@ get_freed_size :: () => {
             }
         }
 
+        // This is an awful way to do this, BUT it works for now.
+        // This looks for the block before the block being freed in order
+        // to merge them into one large continuous block. This should just
+        // be able to peek behind the block being freed and see if it is
+        // another freed block, but in order to do that, a footer needs to
+        // be placed every freed block. This sounds like too much work right
+        // now as it will envitably require hours of debugging one incorrect
+        // statement.                               - brendanfh 2022/01/16
         {
             walker := heap_state.free_list;
             while walker != null {
