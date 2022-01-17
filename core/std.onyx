@@ -50,6 +50,7 @@ package core
     #load "./runtime/onyx_run"
     #load "./os/process"
     #load "./os/onyx_fs"
+    #load "./net/net"
 }
 #if runtime.runtime == .Wasi   {
     #load "./wasi/wasi"

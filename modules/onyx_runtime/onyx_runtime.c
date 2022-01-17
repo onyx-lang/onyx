@@ -13,6 +13,8 @@
     #include <sys/types.h>
     #include <dlfcn.h>
     #include <dirent.h>
+    #include <netdb.h>
+    #include <netinet/in.h>
 #endif
 
 #include "types.h"  // For POINTER_SIZE
@@ -777,6 +779,151 @@ ONYX_DEF(__exit, (WASM_I32), ()) {
     return NULL;
 }
 
+
+
+//
+// Networking
+//
+ONYX_DEF(__net_create_socket, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+
+    #ifdef _BH_LINUX
+    int domain = 0;
+    switch (params->data[1].of.i32) {    // :EnumDependent
+        case 0: domain = AF_UNIX;  break;
+        case 1: domain = AF_INET;  break;
+        case 2: domain = AF_INET6; break;
+        default: goto bad_settings;
+    }
+
+    int type = 0;
+    switch (params->data[2].of.i32) {    // :EnumDependent
+        case 0: type = SOCK_STREAM; break;
+        case 1: type = SOCK_DGRAM;  break;
+        default: goto bad_settings;
+    }
+
+    *((int *) ONYX_PTR(params->data[0].of.i32)) = socket(domain, type, 0);
+
+    results->data[0] = WASM_I32_VAL(0);
+    return NULL;
+    #endif 
+
+    #ifdef _BH_WINDOWS
+    #endif
+
+bad_settings:
+    results->data[0] = WASM_I32_VAL(1); // :EnumDependent
+    return NULL;
+}
+
+ONYX_DEF(__net_close_socket, (WASM_I32), ()) {
+    #ifdef _BH_LINUX
+    close(params->data[0].of.i32);
+    #endif
+
+    #ifdef _BH_WINDOWS
+    #endif
+
+    return NULL;
+}
+
+ONYX_DEF(__net_bind, (WASM_I32, WASM_I32), (WASM_I32)) {
+
+    #ifdef _BH_LINUX
+    struct sockaddr_in bind_addr;
+    memset(&bind_addr, 0, sizeof(bind_addr));
+
+    bind_addr.sin_family = AF_INET; // Should this be configurable? Or is binding only ever done for INET? INET6?
+    bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    bind_addr.sin_port = htons(params->data[1].of.i32);
+
+    int res = bind(params->data[0].of.i32, &bind_addr, sizeof(bind_addr));
+    results->data[0] = WASM_I32_VAL(res >= 0);
+    #endif
+
+    #ifdef _BH_WINDOWS
+    #endif
+
+    return NULL;
+}
+
+ONYX_DEF(__net_listen, (WASM_I32, WASM_I32), ()) {
+    #ifdef _BH_LINUX
+    listen(params->data[0].of.i32, params->data[1].of.i32);
+    #endif
+
+    #ifdef _BH_WINDOWS
+    #endif
+
+    return NULL;
+}
+
+ONYX_DEF(__net_accept, (WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
+    struct sockaddr_in client_addr;
+    int client_len = sizeof(client_addr);
+
+    int client_socket = accept(params->data[0].of.i32, &client_addr, &client_len);
+
+    results->data[0] = WASM_I32_VAL(client_socket);
+    #endif
+
+    return NULL;
+}
+
+ONYX_DEF(__net_connect, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
+    int   hostlen  = params->data[2].of.i32;
+    char *hostname = alloca(hostlen + 1);
+    memcpy(hostname, ONYX_PTR(params->data[1].of.i32), hostlen);
+    hostname[hostlen] = '\0';
+
+    struct hostent *host;
+    host = gethostbyname(hostname);
+    if (host == NULL) {
+        results->data[0] = WASM_I32_VAL(2);  // :EnumDependent
+        return NULL;
+    }
+
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    server_addr.sin_family = AF_INET; // See comment above
+    memcpy((char *)&server_addr.sin_addr.s_addr, (char *)host->h_addr, host->h_length);
+    server_addr.sin_port = htons(params->data[3].of.i32);
+
+    int result = connect(params->data[0].of.i32, &server_addr, sizeof(server_addr));
+    if (result == 0) results->data[0] = WASM_I32_VAL(0);
+    else             results->data[0] = WASM_I32_VAL(3); // :EnumDependent
+
+    return NULL;
+    #endif
+
+    #ifdef _BH_WINDOWS
+    #endif
+}
+
+ONYX_DEF(__net_send, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
+    // TODO: The flags at the end should be controllable.
+    int sent = send(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, 0);
+    results->data[0] = WASM_I32_VAL(sent);
+    #endif
+    
+    return NULL;
+}
+
+ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
+    // TODO: The flags at the end should be controllable.
+    int received = recv(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, 0);
+    results->data[0] = WASM_I32_VAL(received);
+    #endif
+
+    return NULL;
+}
+
+
 ONYX_LIBRARY {
     ONYX_FUNC(__file_open_impl)
     ONYX_FUNC(__file_close)
@@ -807,5 +954,15 @@ ONYX_LIBRARY {
     ONYX_FUNC(__args_sizes_get)
 
     ONYX_FUNC(__exit)
+
+    ONYX_FUNC(__net_create_socket)
+    ONYX_FUNC(__net_close_socket)
+    ONYX_FUNC(__net_bind)
+    ONYX_FUNC(__net_listen)
+    ONYX_FUNC(__net_accept)
+    ONYX_FUNC(__net_connect)
+    ONYX_FUNC(__net_send)
+    ONYX_FUNC(__net_recv)
+
     NULL
 };
