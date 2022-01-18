@@ -43,6 +43,23 @@ SocketSetting :: enum {
     NonBlocking :: 0x01;
 }
 
+Socket_Address :: struct {
+    Handle :: #distinct u64
+    addr: Handle;
+
+    get_address :: (s: ^Socket_Address, allocator := context.allocator) -> [] u8 {
+        buf: [256] u8;
+        addr_len := __net_address_get_address(s.addr, buf);
+        
+        ret := memory.copy_slice(buf[0 .. addr_len], allocator=allocator);
+        return ret;
+    }
+
+    get_port :: (s: ^Socket_Address) -> u32 {
+        return __net_address_get_port(s.addr);
+    }
+}
+
 socket_create :: (domain: SocketDomain, type: SocketType) -> (Socket, SocketError) {
     s: Socket;
 
@@ -79,14 +96,16 @@ socket_listen :: (s: ^Socket, backlog := 32) {
     __net_listen(s.handle, backlog);
 }
 
-socket_accept :: (s: ^Socket) -> Socket {
+socket_accept :: (s: ^Socket) -> (Socket, Socket_Address) {
     new_socket: Socket;
-    new_socket.handle = __net_accept(s.handle);
+    new_addr: Socket_Address;
+    new_socket.handle = __net_accept(s.handle, ^new_addr.addr);
+
     if new_socket.handle >= 0 {
         new_socket.vtable = ^__net_socket_vtable;
     }
 
-    return new_socket;
+    return new_socket, new_addr;
 }
 
 socket_poll_all :: (changed: ^[] ^Socket, timeout: i32, sockets: [] ^Socket) {
@@ -174,11 +193,14 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
     #package __net_setting       :: (handle: Socket.Handle, setting: SocketSetting, value: i32) -> void ---
     #package __net_bind          :: (handle: Socket.Handle, port: u16)    -> bool ---
     #package __net_listen        :: (handle: Socket.Handle, backlog: i32) -> void ---
-    #package __net_accept        :: (handle: Socket.Handle)               -> Socket.Handle ---  // This should also return the address, but in what format?
+    #package __net_accept        :: (handle: Socket.Handle, out_address: ^Socket_Address.Handle) -> Socket.Handle ---
     #package __net_connect       :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
     #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
     #package __net_recv          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
     #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_recv: ^Socket.Handle) -> i32 ---
+
+    #package __net_address_get_address :: (address: Socket_Address.Handle, out_buffer: [] u8) -> i32 ---
+    #package __net_address_get_port    :: (address: Socket_Address.Handle) -> i32 ---
 }
 
 #operator >= macro (a, b: Socket.Handle) => cast(u32) a >= cast(u32) b;

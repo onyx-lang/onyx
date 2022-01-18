@@ -13,8 +13,10 @@
     #include <sys/types.h>
     #include <dlfcn.h>
     #include <dirent.h>
+    #include <arpa/inet.h>
     #include <netdb.h>
     #include <netinet/in.h>
+    #include <sys/socket.h>
     #include <poll.h>
 #endif
 
@@ -892,13 +894,15 @@ ONYX_DEF(__net_listen, (WASM_I32, WASM_I32), ()) {
     return NULL;
 }
 
-ONYX_DEF(__net_accept, (WASM_I32), (WASM_I32)) {
+ONYX_DEF(__net_accept, (WASM_I32, WASM_I32), (WASM_I32)) {
     #ifdef _BH_LINUX
-    struct sockaddr_in client_addr;
-    int client_len = sizeof(client_addr);
+    struct sockaddr_in *client_addr = malloc(sizeof(*client_addr));
+    int client_len = sizeof(*client_addr);
+    memset(client_addr, 0, client_len);
 
-    int client_socket = accept(params->data[0].of.i32, &client_addr, &client_len);
+    int client_socket = accept(params->data[0].of.i32, client_addr, &client_len);
 
+    *(i64 *) ONYX_PTR(params->data[1].of.i32) = (i64) client_addr;
     results->data[0] = WASM_I32_VAL(client_socket);
     #endif
 
@@ -986,6 +990,30 @@ ONYX_DEF(__net_poll_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) 
     return NULL;
 }
 
+ONYX_DEF(__net_address_get_address, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+    int maximum_length = params->data[2].of.i32;
+    int address_len = 0;
+
+    struct sockaddr_in *addr = (struct sockaddr_in *) params->data[0].of.i64;
+    if (addr == NULL) goto done;
+
+    char *address = inet_ntoa(addr->sin_addr);
+    if (address) address_len = strnlen(address, maximum_length);
+
+    memcpy(ONYX_PTR(params->data[1].of.i32), address, address_len);
+
+done:
+    results->data[0] = WASM_I32_VAL(address_len);
+    return NULL;
+}
+
+ONYX_DEF(__net_address_get_port, (WASM_I64), (WASM_I32)) {
+    struct sockaddr_in *addr = (struct sockaddr_in *) params->data[0].of.i64;
+    if (addr == NULL) results->data[0] = WASM_I32_VAL(-1);
+    else              results->data[0] = WASM_I32_VAL(addr->sin_port);
+    return NULL;
+}
+
 
 ONYX_LIBRARY {
     ONYX_FUNC(__file_open_impl)
@@ -1029,6 +1057,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_send)
     ONYX_FUNC(__net_recv)
     ONYX_FUNC(__net_poll_recv)
+    ONYX_FUNC(__net_address_get_address)
+    ONYX_FUNC(__net_address_get_port)
 
     NULL
 };
