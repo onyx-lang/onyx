@@ -780,6 +780,11 @@ ONYX_DEF(__exit, (WASM_I32), ()) {
     return NULL;
 }
 
+ONYX_DEF(__sleep, (WASM_I32), ()) {
+    usleep(params->data[0].of.i32 * 1000);
+    return NULL;
+}
+
 
 
 //
@@ -1006,6 +1011,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__args_sizes_get)
 
     ONYX_FUNC(__exit)
+    ONYX_FUNC(__sleep)
 
     ONYX_FUNC(__net_create_socket)
     ONYX_FUNC(__net_close_socket)

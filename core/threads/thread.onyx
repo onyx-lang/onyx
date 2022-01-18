@@ -37,6 +37,9 @@ join :: (t: ^Thread) {
     while t.alive {
         #if runtime.Wait_Notify_Available {
             __atomic_wait(^t.id, t.id);
+        } else {
+            // To not completely kill the CPU.
+            runtime.__sleep(1);
         }
     }
 }

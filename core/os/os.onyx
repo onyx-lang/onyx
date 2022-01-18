@@ -44,3 +44,7 @@ list_directory :: (path: str) -> Iterator(DirectoryEntry) {
 exit :: (exitcode: i32) {
     runtime.__exit(exitcode);
 }
+
+#if #defined(runtime.__sleep) {
+    sleep :: runtime.__sleep
+}
