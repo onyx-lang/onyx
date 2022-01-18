@@ -781,7 +781,13 @@ ONYX_DEF(__exit, (WASM_I32), ()) {
 }
 
 ONYX_DEF(__sleep, (WASM_I32), ()) {
+    #ifdef _BH_LINUX
     usleep(params->data[0].of.i32 * 1000);
+    #endif
+
+    #ifdef _BH_WINDOWS
+    Sleep(params->data[0].of.i32);
+    #endif
     return NULL;
 }
 
