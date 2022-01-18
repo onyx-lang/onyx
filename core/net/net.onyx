@@ -108,6 +108,7 @@ socket_sendall :: (s: ^Socket, data: [] u8) {
 socket_recv :: (s: ^Socket, maxlen := 1024, allocator := context.allocator) -> [] u8 {
     buffer := alloc.from_stack(maxlen);
     received := __net_recv(s.handle, .{ buffer, maxlen });
+    if received < 0 { s.vtable = null; return .[]; }
 
     result := memory.make_slice(u8, received, allocator=allocator);
     memory.copy(result.data, buffer, received);
@@ -116,7 +117,9 @@ socket_recv :: (s: ^Socket, maxlen := 1024, allocator := context.allocator) -> [
 }
 
 socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
-    return __net_recv(s.handle, buffer);
+    received := __net_recv(s.handle, buffer);
+    if received < 0 { s.vtable = null; }
+    return received;
 }
 
 #local __net_socket_vtable := io.Stream_Vtable.{
@@ -124,13 +127,15 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
         if handle == 0 do return .BadFile, 0;
         
         bytes_read := __net_recv(handle, buffer);
+        if bytes_read < 0 { s.vtable = null; }
         return .None, bytes_read;
     },
 
-    write = (use p: ^Socket, buffer: [] u8) -> (io.Error, u32) {
+    write = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
         if handle == 0 do return .BadFile, 0;
         
         bytes_written := __net_send(handle, buffer);
+        if bytes_written < 0 { s.vtable = null; }
         return .None, bytes_written;
     },
 
