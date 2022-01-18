@@ -818,10 +818,32 @@ bad_settings:
 
 ONYX_DEF(__net_close_socket, (WASM_I32), ()) {
     #ifdef _BH_LINUX
+    shutdown(params->data[0].of.i32, SHUT_RDWR);
     close(params->data[0].of.i32);
     #endif
 
     #ifdef _BH_WINDOWS
+    #endif
+
+    return NULL;
+}
+
+ONYX_DEF(__net_setting, (WASM_I32, WASM_I32, WASM_I32), ()) {
+    #ifdef _BH_LINUX
+    switch (params->data[1].of.i32) {
+        case 1: { // :EnumDependent  Non-Blocking
+            int s = params->data[0].of.i32;
+            int flags = fcntl(s, F_GETFL, 0);
+            if (params->data[2].of.i32) {
+                flags |= O_NONBLOCK;
+            } else {
+                flags &= ~O_NONBLOCK;
+            }
+
+            fcntl(s, F_SETFL, flags);
+            break;
+        }
+    }
     #endif
 
     return NULL;
@@ -906,7 +928,7 @@ ONYX_DEF(__net_connect, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 ONYX_DEF(__net_send, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     #ifdef _BH_LINUX
     // TODO: The flags at the end should be controllable.
-    int sent = send(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, 0);
+    int sent = send(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, MSG_NOSIGNAL);
     results->data[0] = WASM_I32_VAL(sent);
     #endif
     
@@ -957,6 +979,7 @@ ONYX_LIBRARY {
 
     ONYX_FUNC(__net_create_socket)
     ONYX_FUNC(__net_close_socket)
+    ONYX_FUNC(__net_setting)
     ONYX_FUNC(__net_bind)
     ONYX_FUNC(__net_listen)
     ONYX_FUNC(__net_accept)

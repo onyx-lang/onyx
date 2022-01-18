@@ -68,6 +68,12 @@ ensure_capacity :: (arr: ^[..] $T, capacity: u32) -> bool {
     return true;
 }
 
+alloc_one :: (arr: ^[..] $T) -> ^T {
+    if !ensure_capacity(arr, arr.count + 1) do return null;
+    arr.count += 1;
+    return ^arr.data[arr.count];
+}
+
 push :: (arr: ^[..] $T, x: T) -> bool {
     if !ensure_capacity(arr, arr.count + 1) do return false;
     arr.data[arr.count] = x;

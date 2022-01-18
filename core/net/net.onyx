@@ -9,6 +9,8 @@ Socket :: struct {
     handle: Handle;
 
     close     :: socket_close
+    setting   :: socket_setting
+    is_alive  :: socket_is_alive
     bind      :: socket_bind
     listen    :: socket_listen
     accept    :: socket_accept
@@ -38,6 +40,7 @@ SocketType :: enum {
 }
 
 SocketSetting :: enum {
+    NonBlocking :: 0x01;
 }
 
 socket_create :: (domain: SocketDomain, type: SocketType) -> (Socket, SocketError) {
@@ -57,6 +60,11 @@ socket_close :: (s: ^Socket) {
 }
 
 socket_setting :: (s: ^Socket, setting: SocketSetting, value: u32) {
+    __net_setting(s.handle, setting, value);
+}
+
+socket_is_alive :: (s: ^Socket) -> bool {
+    return s.vtable != null;
 }
 
 socket_connect :: (s: ^Socket, host: str, port: u16) -> SocketError {
@@ -81,8 +89,9 @@ socket_accept :: (s: ^Socket) -> Socket {
     return new_socket;
 }
 
-socket_send :: (s: ^Socket, data: [] u8) -> u32 {
+socket_send :: (s: ^Socket, data: [] u8) -> i32 {
     sent := __net_send(s.handle, data);
+    if sent < 0 { s.vtable = null; }
     return sent;
 }
 
@@ -91,7 +100,8 @@ socket_sendall :: (s: ^Socket, data: [] u8) {
 
     while to_send.count > 0 {
         sent := __net_send(s.handle, to_send);
-        to_send = to_send[sent .. to_send.count];
+        if sent < 0 { s.vtable = null; return; }
+        else        do to_send = to_send[sent .. to_send.count];
     }
 }
 
@@ -105,7 +115,7 @@ socket_recv :: (s: ^Socket, maxlen := 1024, allocator := context.allocator) -> [
     return result;
 }
 
-socket_recv_into :: (s: ^Socket, buffer: [] u8) -> u32 {
+socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
     return __net_recv(s.handle, buffer);
 }
 
@@ -133,12 +143,13 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> u32 {
 #foreign "onyx_runtime" {
     #package __net_create_socket :: (out_handle: ^Socket.Handle, domain: SocketDomain, type: SocketType) -> SocketError ---
     #package __net_close_socket  :: (handle: Socket.Handle)               -> void ---
+    #package __net_setting       :: (handle: Socket.Handle, setting: SocketSetting, value: i32) -> void ---
     #package __net_bind          :: (handle: Socket.Handle, port: u16)    -> bool ---
     #package __net_listen        :: (handle: Socket.Handle, backlog: i32) -> void ---
     #package __net_accept        :: (handle: Socket.Handle)               -> Socket.Handle ---  // This should also return the address, but in what format?
     #package __net_connect       :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
-    #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> u32 ---
-    #package __net_recv          :: (handle: Socket.Handle, data: [] u8)  -> u32 ---
+    #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
+    #package __net_recv          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
 }
 
 #operator >= macro (a, b: Socket.Handle) => cast(u32) a >= cast(u32) b;
