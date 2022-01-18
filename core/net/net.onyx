@@ -90,8 +90,6 @@ socket_accept :: (s: ^Socket) -> Socket {
 }
 
 socket_poll_all :: (changed: ^[] ^Socket, timeout: i32, sockets: [] ^Socket) {
-    assert(changed.count >= sockets.count, "Not enough space.");
-
     handles := (cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle))[0 .. sockets.count];
     for i: sockets.count {
         handles[i] = sockets[i].handle;
@@ -99,6 +97,8 @@ socket_poll_all :: (changed: ^[] ^Socket, timeout: i32, sockets: [] ^Socket) {
 
     handles_changed := cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle);
     num_changed := __net_poll_recv(handles, timeout, handles_changed);
+
+    if changed == null do return;
 
     changed.count = 0;
     for i: num_changed {
