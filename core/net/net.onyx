@@ -89,6 +89,29 @@ socket_accept :: (s: ^Socket) -> Socket {
     return new_socket;
 }
 
+socket_poll_all :: (changed: ^[] ^Socket, timeout: i32, sockets: [] ^Socket) {
+    assert(changed.count >= sockets.count, "Not enough space.");
+
+    handles := (cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle))[0 .. sockets.count];
+    for i: sockets.count {
+        handles[i] = sockets[i].handle;
+    }
+
+    handles_changed := cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle);
+    num_changed := __net_poll_recv(handles, timeout, handles_changed);
+
+    changed.count = 0;
+    for i: num_changed {
+        for sockets {
+            if handles_changed[i] == it.handle {
+                changed.data[changed.count] = it;
+                changed.count += 1;
+                continue continue;
+            }
+        }
+    }
+}
+
 socket_send :: (s: ^Socket, data: [] u8) -> i32 {
     sent := __net_send(s.handle, data);
     if sent < 0 { s.vtable = null; }
@@ -155,6 +178,7 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
     #package __net_connect       :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
     #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
     #package __net_recv          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
+    #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_recv: ^Socket.Handle) -> i32 ---
 }
 
 #operator >= macro (a, b: Socket.Handle) => cast(u32) a >= cast(u32) b;

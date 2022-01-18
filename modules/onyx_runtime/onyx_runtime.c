@@ -15,6 +15,7 @@
     #include <dirent.h>
     #include <netdb.h>
     #include <netinet/in.h>
+    #include <poll.h>
 #endif
 
 #include "types.h"  // For POINTER_SIZE
@@ -945,6 +946,35 @@ ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
+ONYX_DEF(__net_poll_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
+    int i, res, cursor;
+    struct pollfd* fds;
+
+    fds = alloca(params->data[1].of.i32 * 8); // Guessed size of pollfd
+
+    for (i=0; i<params->data[1].of.i32; i++) {
+        fds[i].fd = *(i32 *) ONYX_PTR(params->data[0].of.i32 + 4 * i);
+        fds[i].events = POLLIN;
+        fds[i].revents = 0;
+    }
+
+    res = poll(fds, params->data[1].of.i32, params->data[2].of.i32);
+
+    cursor = 0;
+    for (i=0; i<params->data[1].of.i32; i++) {
+        if (fds[i].revents & POLLIN) {
+            *(i32 *) ONYX_PTR(params->data[3].of.i32 + 4 * cursor) = fds[i].fd;
+            cursor++;
+        }
+    }
+
+    results->data[0] = WASM_I32_VAL(cursor);
+    #endif
+
+    return NULL;
+}
+
 
 ONYX_LIBRARY {
     ONYX_FUNC(__file_open_impl)
@@ -986,6 +1016,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_connect)
     ONYX_FUNC(__net_send)
     ONYX_FUNC(__net_recv)
+    ONYX_FUNC(__net_poll_recv)
 
     NULL
 };
