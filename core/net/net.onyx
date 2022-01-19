@@ -108,7 +108,7 @@ socket_accept :: (s: ^Socket) -> (Socket, Socket_Address) {
     return new_socket, new_addr;
 }
 
-socket_poll_all :: (changed: ^[] ^Socket, timeout: i32, sockets: [] ^Socket) {
+socket_poll_all :: (sockets: [] ^Socket, timeout := -1, changed_buffer: [] i32 = .[]) -> [] i32 {
     handles := (cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle))[0 .. sockets.count];
     for i: sockets.count {
         handles[i] = sockets[i].handle;
@@ -117,18 +117,24 @@ socket_poll_all :: (changed: ^[] ^Socket, timeout: i32, sockets: [] ^Socket) {
     handles_changed := cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle);
     num_changed := __net_poll_recv(handles, timeout, handles_changed);
 
-    if changed == null do return;
+    if changed_buffer.count == 0 do return .[];
+    assert(changed_buffer.count >= num_changed, "Not enough space to write back changed sockets."); 
 
-    changed.count = 0;
-    for i: num_changed {
-        for sockets {
-            if handles_changed[i] == it.handle {
-                changed.data[changed.count] = it;
-                changed.count += 1;
+    result := changed_buffer;
+    result.count = 0;
+    for handles_changed[0..num_changed] {
+        for si: sockets.count {
+            if it == sockets[si].handle {
+                result.data[result.count] = si;
+                result.count += 1;
                 continue continue;
             }
         }
     }
+
+    assert(result.count == num_changed, "bad.");
+
+    return result;
 }
 
 socket_send :: (s: ^Socket, data: [] u8) -> i32 {
