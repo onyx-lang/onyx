@@ -979,7 +979,7 @@ ONYX_DEF(__net_poll_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) 
     cursor = 0;
     for (i=0; i<params->data[1].of.i32; i++) {
         if (fds[i].revents & POLLIN) {
-            *(i32 *) ONYX_PTR(params->data[3].of.i32 + 4 * cursor) = fds[i].fd;
+            *(i32 *) ONYX_PTR(params->data[3].of.i32 + 4 * cursor) = i;
             cursor++;
         }
     }
