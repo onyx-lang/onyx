@@ -897,8 +897,9 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_DynArray) {
-        if (!types_are_compatible(to->Slice.elem, from->DynArray.elem)) {
-            *err_msg = "Dynmaic array to slice cast is not valid here because the types are different.";
+        //if (!types_are_compatible(to->Slice.elem, from->DynArray.elem)) {
+        if (type_size_of(to->Slice.elem) != type_size_of(from->DynArray.elem)) {
+            *err_msg = "Dynmaic array to slice cast is not valid here because the types are different sizes.";
             return 0;
         } else {
             return 1;
@@ -935,8 +936,14 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     }
 
     if (from->kind == Type_Kind_Slice || to->kind == Type_Kind_Slice) {
-        *err_msg = "Cannot cast to or from a slice.";
-        return 0;
+        if ((from->kind != Type_Kind_Slice || to->kind != Type_Kind_Slice)
+            || to->Slice.elem->kind != Type_Kind_Pointer || from->Slice.elem->kind != Type_Kind_Pointer
+            || !types_are_compatible(from->Slice.elem, to->Slice.elem)) {
+            *err_msg = "Cannot only cast between slice types when both are a slice of compatible pointers.";
+            return 0;
+        } else {
+            return 1;
+        }
     }
 
     if (from->kind == Type_Kind_DynArray || to->kind == Type_Kind_DynArray) {

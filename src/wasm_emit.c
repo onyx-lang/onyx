@@ -2957,6 +2957,12 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
         return;
     }
 
+    if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_Slice) {
+        // Nothing needs to be done because they are identical
+        *pcode = code;
+        return;
+    }
+
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_VarArgs) {
         // Nothing needs to be done because they are identical
         *pcode = code;

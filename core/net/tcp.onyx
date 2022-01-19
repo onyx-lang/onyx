@@ -27,7 +27,7 @@ TCP_Server :: struct {
     use connection: TCP_Connection;
 
     Client :: struct {
-        socket  : Socket;
+        use socket  : Socket;
         address : Socket_Address;
         state   : State;
 
@@ -44,10 +44,15 @@ TCP_Server :: struct {
     client_count: u32;
 
     listener_thread: thread.Thread;
+
+    alive         := true;
+    pulse_time_ms := 500;
     
     get_events :: tcp_get_events
     listen     :: tcp_server_listen
-    alive      :: tcp_server_pulse
+    pulse      :: tcp_server_pulse
+    send       :: tcp_server_send
+    broadcast  :: tcp_server_broadcast
 }
 
 TCP_Client :: struct {
@@ -68,15 +73,24 @@ TCP_Event :: struct {
     }
 
     Connection :: struct {
-        address: ^Socket_Address;
+        address : ^Socket_Address;
+
+        // This is only set when the event is coming from the server.
+        client  : ^TCP_Server.Client;
     }
 
     Disconnection :: struct {
         address: ^Socket_Address;
+
+        // This is only set when the event is coming from the server.
+        client  : ^TCP_Server.Client;
     }
 
     Message :: struct {
         address: ^Socket_Address;
+        // This is only set when the event is coming from the server.
+        client  : ^TCP_Server.Client;
+
         contents: [] u8;
     }
 }
@@ -94,10 +108,6 @@ tcp_get_events :: (use conn: ^TCP_Connection) -> Iterator(TCP_Event) {
             switch it.kind {
                 case .Message {
                     raw_free(event_allocator, (cast(^TCP_Event.Message) it.data).contents.data);
-                }
-
-                case .Disconnection {
-                    // This is a weird place to free the client
                 }
             }
 
@@ -120,7 +130,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_S
     socket, err := socket_create(.Inet, .Stream); // IPv6?
     if err != .None do return null;
 
-    server := make(TCP_Server, allocator=allocator);
+    server := new(TCP_Server, allocator=allocator);
     server.socket = socket;
     server.event_allocator = allocator;
 
@@ -133,8 +143,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_S
 }
 
 #local tcp_server_listener :: (use server: ^TCP_Server) {
-    @ServerAlive
-    while true {
+    while server.alive {
         client_socket, client_addr := socket->accept();
 
         client := new(TCP_Server.Client, allocator=client_allocator);
@@ -147,6 +156,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_S
 
         conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
         conn_event.address = ^client.address;
+        conn_event.client = client;
         server.events << .{ .Connection, conn_event };
     }
 }
@@ -190,6 +200,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
         }
 
         msg_event := new(TCP_Event.Message, allocator=server.event_allocator);
+        msg_event.client  = it;
         msg_event.address = ^it.address;
         msg_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator);
         server.events << .{ .Message, msg_event };
@@ -198,6 +209,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
     for clients {
         if it.state != .Alive {
             disconnect_event := new(TCP_Event.Disconnection, allocator=server.event_allocator);
+            disconnect_event.client  = it;
             disconnect_event.address = ^it.address;
             server.events << .{ .Disconnection, disconnect_event };
         }
@@ -214,7 +226,21 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
 
     client_count = array.count_where(clients, x => x != null);
 
-    return true;
+    return server.alive;
+}
+
+tcp_server_send :: (use server: ^TCP_Server, client: ^TCP_Server.Client, data: [] u8) {
+    client.socket->send(data);
+}
+
+tcp_server_broadcast :: (use server: ^TCP_Server, data: [] u8, except: ^TCP_Server.Client = null) {
+    for clients {
+        if it == null do continue;
+        if it.state != .Alive do continue;
+        if it == except do continue;
+
+        it.socket->send(data);
+    }
 }
 
 #local {
@@ -224,31 +250,23 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
     }
 
     wait_to_get_client_messages :: (use server: ^TCP_Server) -> [] ^TCP_Server.Client {
-        // This mapping was pulled from another code piece. It is entirely
-        // possible that this mapping no longer needs to happen.
+        active_client_memory := alloc.from_stack(client_count * sizeof ^TCP_Server.Client);
+        active_clients: [] ^TCP_Server.Client = .{ ~~active_client_memory, 0 };
+        for clients {
+            if it == null do continue;
 
-        active_clients: [..] i32;
-        for i: clients.count {
-            if clients[i] == null do continue;
-
-            if clients[i].state == .Alive {
-                active_clients << i;
+            if it.state == .Alive {
+                active_clients[active_clients.count] = it;
+                active_clients.count += 1;
             }
         }
-        defer if active_clients.data != null do array.free(^active_clients);
 
-        poll_sockets: [..] ^Socket;
-        for active_clients {
-            poll_sockets << ^clients[it].socket;
-        }
-        defer if poll_sockets.data != null do array.free(^poll_sockets);
-        
         changed_buffer := cast(^i32) alloc.from_stack(client_count * sizeof i32);
-        changed := socket_poll_all(poll_sockets, 500, changed_buffer[0 .. client_count]);
+        changed := socket_poll_all(cast([] ^Socket) active_clients, pulse_time_ms, changed_buffer[0 .. client_count]);
 
         recv_clients: [..] ^TCP_Server.Client;
         for changed {
-            recv_clients << clients[active_clients[it]];
+            recv_clients << active_clients[it];
         }
 
         return recv_clients;
