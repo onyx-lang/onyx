@@ -23,6 +23,76 @@ TCP_Connection :: struct {
     event_cursor := 0;
 }
 
+TCP_Event :: struct {
+    kind: Kind;
+    data: rawptr;
+
+    Kind :: enum {
+        Undefined;
+        Connection;
+        Disconnection;
+        Data;
+    }
+
+    Connection :: struct {
+        address : ^Socket_Address;
+
+        // This is only set when the event is coming from the server.
+        client  : ^TCP_Server.Client;
+    }
+
+    Disconnection :: struct {
+        address: ^Socket_Address;
+
+        // This is only set when the event is coming from the server.
+        client  : ^TCP_Server.Client;
+    }
+
+    Data :: struct {
+        address: ^Socket_Address;
+        // This is only set when the event is coming from the server.
+        client  : ^TCP_Server.Client;
+
+        contents: [] u8;
+    }
+}
+
+tcp_get_events :: (use conn: ^TCP_Connection) -> Iterator(TCP_Event) {
+    next :: (use conn: ^TCP_Connection) -> (TCP_Event, bool) {
+        if event_cursor == events.count do return __zero_value(TCP_Event), false;
+
+        defer event_cursor += 1;
+        return events[event_cursor], true;
+    }
+
+    close :: (use conn: ^TCP_Connection) {
+        for events {
+            switch it.kind {
+                case .Data {
+                    raw_free(event_allocator, (cast(^TCP_Event.Data) it.data).contents.data);
+                }
+            }
+
+            raw_free(event_allocator, it.data);
+        }
+
+        array.clear(^events);
+    }
+
+    conn.event_cursor = 0;
+
+    return .{
+        data  = conn,
+        next  = next,
+        close = close,
+    };
+}
+
+
+//
+// TCP Server
+//
+
 TCP_Server :: struct {
     use connection: TCP_Connection;
 
@@ -48,82 +118,12 @@ TCP_Server :: struct {
     alive         := true;
     pulse_time_ms := 500;
     
-    get_events :: tcp_get_events
-    listen     :: tcp_server_listen
-    pulse      :: tcp_server_pulse
-    send       :: tcp_server_send
-    broadcast  :: tcp_server_broadcast
-}
-
-TCP_Client :: struct {
-    use connection: TCP_Connection;
-
-    get_events :: tcp_get_events
-}
-
-TCP_Event :: struct {
-    kind: Kind;
-    data: rawptr;
-
-    Kind :: enum {
-        Undefined;
-        Connection;
-        Disconnection;
-        Message;
-    }
-
-    Connection :: struct {
-        address : ^Socket_Address;
-
-        // This is only set when the event is coming from the server.
-        client  : ^TCP_Server.Client;
-    }
-
-    Disconnection :: struct {
-        address: ^Socket_Address;
-
-        // This is only set when the event is coming from the server.
-        client  : ^TCP_Server.Client;
-    }
-
-    Message :: struct {
-        address: ^Socket_Address;
-        // This is only set when the event is coming from the server.
-        client  : ^TCP_Server.Client;
-
-        contents: [] u8;
-    }
-}
-
-tcp_get_events :: (use conn: ^TCP_Connection) -> Iterator(TCP_Event) {
-    next :: (use conn: ^TCP_Connection) -> (TCP_Event, bool) {
-        if event_cursor == events.count do return __zero_value(TCP_Event), false;
-
-        defer event_cursor += 1;
-        return events[event_cursor], true;
-    }
-
-    close :: (use conn: ^TCP_Connection) {
-        for events {
-            switch it.kind {
-                case .Message {
-                    raw_free(event_allocator, (cast(^TCP_Event.Message) it.data).contents.data);
-                }
-            }
-
-            raw_free(event_allocator, it.data);
-        }
-
-        array.clear(^events);
-    }
-
-    conn.event_cursor = 0;
-
-    return .{
-        data  = conn,
-        next  = next,
-        close = close,
-    };
+    get_events    :: tcp_get_events
+    listen        :: tcp_server_listen
+    pulse         :: tcp_server_pulse
+    send          :: tcp_server_send
+    broadcast     :: tcp_server_broadcast
+    handle_events :: tcp_server_handle_events
 }
 
 tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_Server {
@@ -199,11 +199,11 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
             continue;
         }
 
-        msg_event := new(TCP_Event.Message, allocator=server.event_allocator);
-        msg_event.client  = it;
-        msg_event.address = ^it.address;
-        msg_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator);
-        server.events << .{ .Message, msg_event };
+        data_event := new(TCP_Event.Data, allocator=server.event_allocator);
+        data_event.client  = it;
+        data_event.address = ^it.address;
+        data_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator);
+        server.events << .{ .Data, data_event };
     }
 
     for clients {
@@ -242,6 +242,28 @@ tcp_server_broadcast :: (use server: ^TCP_Server, data: [] u8, except: ^TCP_Serv
         it.socket->send(data);
     }
 }
+
+tcp_server_handle_events :: macro (server: ^TCP_Server, handler: Code) {
+    while server->pulse() {
+        for server->get_events() {
+            #insert handler;
+        }
+    }
+}
+
+
+//
+// TCP Client
+//
+
+TCP_Client :: struct {
+    use connection: TCP_Connection;
+
+    get_events :: tcp_get_events
+}
+
+
+
 
 #local {
     tcp_server_kill_client :: (use server: ^TCP_Server, client: ^TCP_Server.Client) {
