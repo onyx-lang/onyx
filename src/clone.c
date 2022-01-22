@@ -266,29 +266,30 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             C(AstIfWhile, false_stmt);
             break;
 
+        case Ast_Kind_Switch_Case: {
+            C(AstSwitchCase, block);
+
+            AstSwitchCase *dw = (AstSwitchCase *) nn;
+            AstSwitchCase *sw = (AstSwitchCase *) node;
+
+            dw->values = NULL;
+            bh_arr_new(global_heap_allocator, dw->values, bh_arr_length(sw->values));
+            bh_arr_each(AstTyped *, value, sw->values)
+                bh_arr_push(dw->values, (AstTyped *) ast_clone(a, *value));
+
+            break;
+        }
+
         case Ast_Kind_Switch: {
             AstSwitch* dw = (AstSwitch *) nn;
             AstSwitch* sw = (AstSwitch *) node;
 
-            ((AstSwitch *) nn)->initialization = ast_clone_list(a, ((AstSwitch *) node)->initialization);
-            dw->expr = (AstTyped *) ast_clone(a, sw->expr);
+            dw->initialization = ast_clone_list(a, sw->initialization);
+            C(AstSwitch, expr);
 
-            dw->default_case = (AstBlock *) ast_clone(a, sw->default_case);
 
             dw->cases = NULL;
-            bh_arr_new(global_heap_allocator, dw->cases, bh_arr_length(sw->cases));
-
-            bh_arr_each(AstSwitchCase, c, sw->cases) {
-                bh_arr(AstTyped *) new_values = NULL;
-                bh_arr_new(global_heap_allocator, new_values, bh_arr_length(c->values));
-                bh_arr_each(AstTyped *, value, c->values)
-                    bh_arr_push(new_values, (AstTyped *) ast_clone(a, *value));
-
-                AstSwitchCase sc;
-                sc.values = new_values; 
-                sc.block = (AstBlock *) ast_clone(a, c->block);
-                bh_arr_push(dw->cases, sc);
-            }
+            C(AstSwitch, case_block);
             break;
         }
 

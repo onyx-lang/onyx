@@ -83,7 +83,7 @@ static const char* ast_node_names[] = {
     "USE",
     "DEFER",
     "SWITCH",
-    "SWITCH CASE",
+    "CASE",
 
     "SOLIDIFY",
     "STATIC IF",

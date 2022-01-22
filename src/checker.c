@@ -328,6 +328,40 @@ static b32 add_case_to_switch_statement(AstSwitch* switchnode, u64 case_value, A
     return 0;
 }
 
+static CheckStatus collect_switch_case_blocks(AstSwitch* switchnode, AstBlock* root) {
+    AstNode *walker = root->body;
+    while (walker != NULL) {
+        switch (walker->kind) {
+            case Ast_Kind_Block:
+                collect_switch_case_blocks(switchnode, (AstBlock *) walker);
+                break;
+
+            case Ast_Kind_Switch_Case: {
+                AstSwitchCase *case_node = (AstSwitchCase *) walker;
+                if (case_node->is_default) {
+                    if (switchnode->default_case != NULL && switchnode->default_case != case_node->block) {
+                        ERROR(case_node->token->pos, "Multiple #default cases given");
+                        ERROR(switchnode->default_case->token->pos, "Multiple #default cases given");
+                        return Check_Error;
+                    }
+
+                    switchnode->default_case = case_node->block;
+                } else {
+                    bh_arr_push(switchnode->cases, case_node);
+                }
+                break;
+            }
+
+            default:
+                ERROR(walker->token->pos, "This statement is not allowed here.");
+        }
+
+        walker = walker->next;
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_switch(AstSwitch* switchnode) {
     if (switchnode->initialization != NULL) CHECK(statement_chain, &switchnode->initialization);
 
@@ -345,12 +379,11 @@ CheckStatus check_switch(AstSwitch* switchnode) {
         switch (switchnode->switch_kind) {
             case Switch_Kind_Integer:
                 switchnode->min_case = 0xffffffffffffffff;
-                bh_imap_init(&switchnode->case_map, global_heap_allocator, bh_arr_length(switchnode->cases) * 2);
+                bh_imap_init(&switchnode->case_map, global_heap_allocator, 4);
                 break;
 
             case Switch_Kind_Use_Equals:
-                // Guessing the maximum number of case expressions there will be.
-                bh_arr_new(global_heap_allocator, switchnode->case_exprs, bh_arr_length(switchnode->cases) * 2);
+                bh_arr_new(global_heap_allocator, switchnode->case_exprs, 4);
                 break;
 
             default: assert(0);
@@ -358,8 +391,24 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     }
     switchnode->flags |= Ast_Flag_Has_Been_Checked;
 
+    // Should the case block code be checked here?
+    // Or should this just exist to resolve macros and expand #inserts
+    // then the cases are consumed into the array or cases, THEN the blocks
+    // are actually checked?
+    if (switchnode->cases == NULL) {
+        CHECK(block, switchnode->case_block);
+
+        bh_arr_new(global_heap_allocator, switchnode->cases, 4);
+        if (collect_switch_case_blocks(switchnode, switchnode->case_block) != Check_Success) {
+            return Check_Error;
+        }
+
+        // This is important, otherwise if this block has to return to symbol resolution.
+        switchnode->case_block->statement_idx = 0;
+    }
+
     fori (i, switchnode->yield_return_index, bh_arr_length(switchnode->cases)) {
-        AstSwitchCase *sc = &switchnode->cases[i];
+        AstSwitchCase *sc = switchnode->cases[i];
         CHECK(block, sc->block);
 
         bh_arr_each(AstTyped *, value, sc->values) {
@@ -1827,6 +1876,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Error: break;
         case Ast_Kind_Unary_Field_Access: break;
         case Ast_Kind_Constraint_Sentinel: break;
+        case Ast_Kind_Switch_Case: break;
 
         default:
             retval = Check_Error;

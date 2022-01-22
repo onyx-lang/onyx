@@ -47,6 +47,7 @@ static AstTyped*      parse_expression(OnyxParser* parser, b32 assignment_allowe
 static AstIfWhile*    parse_if_stmt(OnyxParser* parser);
 static AstIfWhile*    parse_while_stmt(OnyxParser* parser);
 static AstFor*        parse_for_stmt(OnyxParser* parser);
+static AstSwitchCase* parse_case_stmt(OnyxParser* parser);
 static AstSwitch*     parse_switch_stmt(OnyxParser* parser);
 static i32            parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret);
 static AstReturn*     parse_return_stmt(OnyxParser* parser);
@@ -1139,11 +1140,34 @@ static AstFor* parse_for_stmt(OnyxParser* parser) {
     return for_node;
 }
 
+static AstSwitchCase* parse_case_stmt(OnyxParser* parser) {
+    AstSwitchCase *sc_node = make_node(AstSwitchCase, Ast_Kind_Switch_Case);
+    sc_node->token = expect_token(parser, Token_Type_Keyword_Case);
+
+    if (parse_possible_directive(parser, "default")) {
+        sc_node->is_default = 1;
+
+    } else {
+        bh_arr_new(global_heap_allocator, sc_node->values, 1);
+
+        AstTyped* value = parse_expression(parser, 1);
+        bh_arr_push(sc_node->values, value);
+        while (consume_token_if_next(parser, ',')) {
+            if (parser->hit_unexpected_token) return sc_node;
+
+            value = parse_expression(parser, 1);
+            bh_arr_push(sc_node->values, value);
+        }
+    }
+
+    sc_node->block = parse_block(parser, 1, NULL);
+
+    return sc_node;
+}
+
 static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
     AstSwitch* switch_node = make_node(AstSwitch, Ast_Kind_Switch);
     switch_node->token = expect_token(parser, Token_Type_Keyword_Switch);
-
-    bh_arr_new(global_heap_allocator, switch_node->cases, 4);
 
     AstTyped* expr;
     AstNode* initialization_or_expr=NULL;
@@ -1170,42 +1194,7 @@ static AstSwitch* parse_switch_stmt(OnyxParser* parser) {
     switch_node->initialization = initialization_or_expr;
     switch_node->expr = expr;
 
-    expect_token(parser, '{');
-
-    while (consume_token_if_next(parser, Token_Type_Keyword_Case)) {
-        if (parser->hit_unexpected_token) return switch_node;
-
-        bh_arr(AstTyped *) case_values = NULL;
-        bh_arr_new(global_heap_allocator, case_values, 1);
-
-        if (parse_possible_directive(parser, "default")) {
-            switch_node->default_case = parse_block(parser, 1, NULL);
-
-            if (parser->curr->type != '}') {
-                onyx_report_error(parser->curr->pos, Error_Critical, "The #default case must be the last case in a switch statement.\n");
-            }
-            break;
-        }
-
-        AstTyped* value = parse_expression(parser, 1);
-        bh_arr_push(case_values, value);
-        while (consume_token_if_next(parser, ',')) {
-            if (parser->hit_unexpected_token) return switch_node;
-
-            value = parse_expression(parser, 1);
-            bh_arr_push(case_values, value);
-        }
-
-        AstBlock* block = parse_block(parser, 1, NULL);
-
-        AstSwitchCase sc_node;
-        sc_node.block  = block;
-        sc_node.values = case_values;
-
-        bh_arr_push(switch_node->cases, sc_node);
-    }
-
-    expect_token(parser, '}');
+    switch_node->case_block = parse_block(parser, 1, NULL);
     return switch_node;
 }
 
@@ -1451,6 +1440,11 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Keyword_Switch:
             needs_semicolon = 0;
             retval = (AstNode *) parse_switch_stmt(parser);
+            break;
+
+        case Token_Type_Keyword_Case:
+            needs_semicolon = 0;
+            retval = (AstNode *) parse_case_stmt(parser);
             break;
 
         case Token_Type_Keyword_Break:

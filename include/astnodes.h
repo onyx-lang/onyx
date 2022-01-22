@@ -797,10 +797,14 @@ typedef struct CaseToBlock {
 } CaseToBlock;
 
 struct AstSwitchCase {
+    AstNode_base;
+
     // NOTE: All expressions that end up in this block
     bh_arr(AstTyped *) values;
     
     AstBlock *block;
+
+    b32 is_default: 1; // Could this be inferred by the values array being null?
 };
 
 struct AstSwitch {
@@ -811,7 +815,9 @@ struct AstSwitch {
 
     AstTyped *expr;
 
-    bh_arr(AstSwitchCase) cases;
+    AstBlock *case_block;
+
+    bh_arr(AstSwitchCase *) cases;
     AstBlock *default_case;
 
     i32 yield_return_index;

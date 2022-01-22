@@ -5,12 +5,18 @@ use package core
 Vector2 :: struct { x, y: i32; }
 #operator == macro (v1: Vector2, v2: Vector2) => v1.x == v2.x && v1.y == v2.y;
 
+none_of_the_above :: #code {
+    case #default {
+        println("Got default!");
+    }
+}
+
 main :: (args: [] cstr) {
     for .[ "Some", "Thing", "Other" ] {
         switch it {
             case "Thing" do println("Got thing!");
             case "Some"  do println("Got some!");
-            case #default do println("Got default!");
+            #insert none_of_the_above;
         }
     }
 
@@ -20,6 +26,7 @@ main :: (args: [] cstr) {
         case .{ 0, 1 } do println("0, 1");
         case .{ 1, 0 } do println("1, 0");
         case .{ 1, 1 } do println("1, 1");
-        case #default do println("none of the above.");
+
+        #insert none_of_the_above;
     }
 }

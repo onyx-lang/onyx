@@ -1154,12 +1154,12 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
 
     u64 block_num = 0;
-    bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
-        if (bh_imap_has(&block_map, (u64) sc->block)) continue;
+    bh_arr_each(AstSwitchCase *, sc, switch_node->cases) {
+        if (bh_imap_has(&block_map, (u64) (*sc)->block)) continue;
 
         emit_enter_structured_block(mod, &code, SBT_Fallthrough_Block);
 
-        bh_imap_put(&block_map, (u64) sc->block, block_num);
+        bh_imap_put(&block_map, (u64) (*sc)->block, block_num);
         block_num++;
     }
 
@@ -1216,7 +1216,8 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         }
     }
 
-    bh_arr_each(AstSwitchCase, sc, switch_node->cases) {
+    bh_arr_each(AstSwitchCase *, psc, switch_node->cases) {
+        AstSwitchCase *sc = *psc;
         if (bh_imap_get(&block_map, (u64) sc->block) == 0xdeadbeef) continue;
 
         u64 bn = bh_imap_get(&block_map, (u64) sc->block);
@@ -2888,6 +2889,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_If_Expression: {
             AstIfExpression* if_expr = (AstIfExpression *) expr;
             emit_if_expression(mod, &code, if_expr);
+            break;
+        }
+
+        case Ast_Kind_Switch_Case: {
+            // This error message should be moved to checking, but this is the
+            // best place to do it right now.
+            onyx_report_error(expr->token->pos, Error_Critical, "'case' statements are only allowed in a 'switch' statement.");
             break;
         }
 

@@ -49,6 +49,7 @@ static SymresStatus symres_return(AstReturn* ret);
 static SymresStatus symres_if(AstIfWhile* ifnode);
 static SymresStatus symres_while(AstIfWhile* whilenode);
 static SymresStatus symres_for(AstFor* fornode);
+static SymresStatus symres_case(AstSwitchCase *casenode);
 static SymresStatus symres_switch(AstSwitch* switchnode);
 static SymresStatus symres_use(AstUse* use);
 static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid);
@@ -626,6 +627,17 @@ static SymresStatus symres_for(AstFor* fornode) {
     return Symres_Success;
 }
 
+static SymresStatus symres_case(AstSwitchCase *casenode) {
+    if (!casenode->is_default) {
+        bh_arr_each(AstTyped *, expr, casenode->values) {
+            SYMRES(expression, expr);
+        }
+    }
+
+    SYMRES(block, casenode->block);
+    return Symres_Success;
+}
+
 static SymresStatus symres_switch(AstSwitch* switchnode) {
     if (switchnode->initialization != NULL) {
         switchnode->scope = scope_create(context.ast_alloc, curr_scope, switchnode->token->pos);
@@ -636,15 +648,7 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
 
     SYMRES(expression, &switchnode->expr);
 
-    bh_arr_each(AstSwitchCase, sc, switchnode->cases) {
-        bh_arr_each(AstTyped *, value, sc->values)
-            SYMRES(expression, value);
-
-        SYMRES(block, sc->block);
-    }
-
-    if (switchnode->default_case)
-        SYMRES(block, switchnode->default_case);
+    SYMRES(block, switchnode->case_block);
 
     if (switchnode->switch_kind == Switch_Kind_Use_Equals && switchnode->case_exprs) {
         bh_arr_each(CaseToBlock, ctb, switchnode->case_exprs) {
@@ -829,6 +833,7 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
         case Ast_Kind_Argument:    SYMRES(expression, (AstTyped **) &((AstArgument *) *stmt)->value); break;
         case Ast_Kind_Block:       SYMRES(block, (AstBlock *) *stmt);                    break;
         case Ast_Kind_Defer:       SYMRES(statement, &((AstDefer *) *stmt)->stmt, NULL); break;
+        case Ast_Kind_Switch_Case: SYMRES(case, (AstSwitchCase *) *stmt);                break;
         case Ast_Kind_Jump:        break;
 
         case Ast_Kind_Local:
