@@ -439,7 +439,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                         new_smem.included_through_use = 1;
 
                         if (type_is_pointer) {
-                            new_smem.offset = offset;
+                            new_smem.offset = (*psmem)->offset;
                             new_smem.idx = (*psmem)->idx;
                             new_smem.initial_value = NULL;
                             new_smem.use_through_pointer_index = idx;

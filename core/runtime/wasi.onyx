@@ -29,6 +29,27 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     return read;
 }
 
+__sleep :: (milliseconds: u32) {
+    tagged: SubscriptionTagged;
+    tagged.tag = .Clock;
+    tagged.clock = .{
+        id = .Realtime,
+        timeout = cast(u64) milliseconds * 1000000,
+        precision = 1,
+        flags = ~~0,
+    };
+
+    subscription := Subscription.{
+        userdata = 0,
+        u = tagged,
+    };
+
+    event: Event;
+    number_of_events: u32;
+
+    error_code := poll_oneoff(^subscription, ^event, 1, ^number_of_events);
+}
+
 
 // The builtin _start proc.
 // Sets up everything needed for execution.
