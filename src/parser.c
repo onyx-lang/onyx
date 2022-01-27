@@ -1507,7 +1507,9 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
             if (next_tokens_are(parser, 2, '#', Token_Type_Keyword_If)) {
                 AstIf* static_if = parse_static_if_stmt(parser, 1);
-                ENTITY_SUBMIT(static_if);
+
+                assert(parser->current_function_stack && bh_arr_length(parser->current_function_stack) > 0);
+                bh_arr_push(bh_arr_last(parser->current_function_stack)->nodes_that_need_entities_after_clone, (AstNode *) static_if);
 
                 needs_semicolon = 0;
                 retval = (AstNode *) static_if;
@@ -2305,6 +2307,7 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
 static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* token) {
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = token;
+    bh_arr_push(parser->current_function_stack, func_def);
 
     bh_arr_new(global_heap_allocator, func_def->params, 4);
 
@@ -2400,6 +2403,7 @@ function_defined:
         bh_arr_free(polymorphic_vars);
     }
     
+    bh_arr_pop(parser->current_function_stack);
     return func_def;
 }
 
@@ -2547,6 +2551,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 
     AstBlock* body_block;
     AstType*  return_type;
+    bh_arr_push(parser->current_function_stack, poly_proc);
 
     if (parser->curr->type == '{') {
         char* name = NULL;
@@ -2597,6 +2602,7 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 
     *ret = (AstTyped *) poly_proc;
 
+    bh_arr_pop(parser->current_function_stack);
     bh_arr_free(params);
     bh_arr_free(poly_params);
     return 1;
@@ -3264,6 +3270,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.current_scope = NULL;
     parser.alternate_entity_placement_stack = NULL;
     parser.current_symbol_stack = NULL;
+    parser.current_function_stack = NULL;
     parser.scope_flags = NULL;
     parser.parse_calls = 1;
 

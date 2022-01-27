@@ -38,6 +38,7 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
         value : V;
     }
 
+    init    :: init
     has     :: has
     get     :: get
     get_ptr :: get_ptr

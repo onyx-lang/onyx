@@ -109,6 +109,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Static_If: return sizeof(AstIfWhile);
         case Ast_Kind_If_Expression: return sizeof(AstIfExpression);
         case Ast_Kind_Directive_Insert: return sizeof(AstDirectiveInsert);
+        case Ast_Kind_Directive_Defined: return sizeof(AstDirectiveDefined);
         case Ast_Kind_Do_Block: return sizeof(AstDoBlock);
         case Ast_Kind_Constraint: return sizeof(AstConstraint);
         case Ast_Kind_Count: return 0;
@@ -134,6 +135,14 @@ AstNode* ast_clone_list(bh_allocator a, void* n) {
 
     return root;
 }
+
+static bh_arr(AstNode *) captured_entities=NULL;
+#define E(ent) do { \
+    assert(captured_entities); \
+    ent->entity = NULL; \
+    bh_arr_push(captured_entities, (AstNode *) ent); \
+    } while (0);
+    
 
 #define C(nt, mname) ((nt *) nn)->mname = (void *) ast_clone(a, ((nt *) node)->mname);
 
@@ -257,13 +266,23 @@ AstNode* ast_clone(bh_allocator a, void* n) {
         case Ast_Kind_If:
         case Ast_Kind_While:
             ((AstIfWhile *) nn)->initialization = ast_clone_list(a, ((AstIfWhile *) node)->initialization);
-
-            C(AstIfWhile, cond);
             //fallthrough
 
         case Ast_Kind_Static_If:
+            C(AstIfWhile, cond);
+
             C(AstIfWhile, true_stmt);
             C(AstIfWhile, false_stmt);
+
+            if (nn->kind == Ast_Kind_Static_If) {
+                ((AstIfWhile *) node)->flags |= Ast_Flag_Dead;
+                ((AstIfWhile *) node)->flags |= Ast_Flag_Static_If_Resolved;
+
+                ((AstIfWhile *) nn)->flags &= ~Ast_Flag_Dead;
+                ((AstIfWhile *) nn)->flags &= ~Ast_Flag_Static_If_Resolved;
+                E(nn);
+            }
+
             break;
 
         case Ast_Kind_Switch_Case: {
@@ -421,8 +440,15 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             if (sf->is_foreign) return node;
             assert(df->scope == NULL);
 
+            df->nodes_that_need_entities_after_clone = NULL;
+            bh_arr_new(global_heap_allocator, df->nodes_that_need_entities_after_clone, 1);
+            captured_entities = df->nodes_that_need_entities_after_clone;
+
             df->return_type = (AstType *) ast_clone(a, sf->return_type);
             df->body = (AstBlock *) ast_clone(a, sf->body);
+
+            df->nodes_that_need_entities_after_clone = captured_entities;
+            captured_entities = NULL;
 
             df->params = NULL;
             bh_arr_new(global_heap_allocator, df->params, bh_arr_length(sf->params));
@@ -522,6 +548,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             C(AstDirectiveInsert, code_expr);
             break;
 
+        case Ast_Kind_Directive_Defined:
+            C(AstDirectiveDefined, expr);
+            ((AstDirectiveDefined *) nn)->is_defined = 0;
+            break;
+
         case Ast_Kind_Typeof:
             C(AstTypeOf, expr);
             ((AstTypeOf *) nn)->resolved_type = NULL;
@@ -586,5 +617,12 @@ void clone_function_body(bh_allocator a, AstFunction* dest, AstFunction* source)
     if (dest->kind != Ast_Kind_Function) return;
     if (source->kind != Ast_Kind_Polymorphic_Proc && source->kind != Ast_Kind_Function) return;
 
+    dest->nodes_that_need_entities_after_clone = NULL;
+    bh_arr_new(global_heap_allocator, dest->nodes_that_need_entities_after_clone, 1);
+    captured_entities = dest->nodes_that_need_entities_after_clone;
+
     dest->body = (AstBlock *) ast_clone(a, source->body);
+    
+    dest->nodes_that_need_entities_after_clone = captured_entities;
+    captured_entities = NULL;
 }

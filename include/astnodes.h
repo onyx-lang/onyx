@@ -271,6 +271,8 @@ typedef enum AstFlags {
     Ast_Flag_Decl_Followed_By_Init = BH_BIT(20),
 
     Ast_Flag_Param_Symbol_Dirty    = BH_BIT(21),
+
+    Ast_Flag_Dead                  = BH_BIT(22),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -1177,6 +1179,8 @@ struct AstFunction {
 
     Table(AstSolidifiedFunction) concrete_funcs;
     bh_imap active_queries;
+
+    bh_arr(AstNode *) nodes_that_need_entities_after_clone;
 
     b32 is_exported  : 1;
     b32 is_foreign   : 1;

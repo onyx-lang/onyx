@@ -25,6 +25,7 @@ typedef struct OnyxParser {
 
     PolymorphicContext polymorph_context;
 
+    bh_arr(AstFunction *) current_function_stack;
     Scope *current_scope;
     bh_arr(bh_arr(Entity *) *) alternate_entity_placement_stack;
     bh_arr(OnyxToken *) current_symbol_stack;

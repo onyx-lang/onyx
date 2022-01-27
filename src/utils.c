@@ -211,7 +211,19 @@ all_types_peeled_off:
 
         case Ast_Kind_Struct_Type: {
             AstStructType* stype = (AstStructType *) node;
-            AstNode* result = symbol_raw_resolve(stype->scope, symbol);
+
+            // HACK HACK
+            // Temporarily disable the parent scope so that you can't access things
+            // "above" the structures scope. This leads to unintended behavior, as when
+            // you are accessing a static element on a structure, you don't expect to
+            // bleed to the top level scope.
+            AstNode *result = NULL;
+            if (stype->scope) {
+                Scope *tmp_parent = stype->scope->parent;
+                stype->scope->parent = NULL;
+                result = symbol_raw_resolve(stype->scope, symbol);
+                stype->scope->parent = tmp_parent;
+            }
 
             if (result == NULL && stype->stcache != NULL) {
                 Type* struct_type = stype->stcache;

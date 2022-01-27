@@ -288,7 +288,7 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) (*fa)->expr);
 
     b32 force_a_lookup = 0;
-    if (expr->kind == Ast_Kind_Enum_Type) {
+    if (expr->kind == Ast_Kind_Enum_Type || expr->kind == Ast_Kind_Type_Raw_Alias) {
         force_a_lookup = 1;
     }
 
@@ -568,7 +568,12 @@ static SymresStatus symres_return(AstReturn* ret) {
 static SymresStatus symres_if(AstIfWhile* ifnode) {
     if (ifnode->kind == Ast_Kind_Static_If) {
         if ((ifnode->flags & Ast_Flag_Static_If_Resolved) == 0) {
-            return Symres_Yield_Macro;
+            if (context.cycle_detected) {
+                onyx_report_error(ifnode->token->pos, Error_Waiting_On, "Waiting on static if resolution.");
+                return Symres_Error;
+            } else {
+                return Symres_Yield_Macro;
+            }
         }
 
         if (static_if_resolution(ifnode)) {
@@ -799,8 +804,9 @@ static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
 
     b32 use_package_count = (context.entities.type_count[Entity_Type_Use_Package] == 0);
 
+    resolved_a_symbol = 0;
     SymresStatus ss = symres_expression(&defined->expr);
-    if (use_package_count && ss != Symres_Success) {
+    if (use_package_count && ss != Symres_Success && !resolved_a_symbol) {
         // The symbol definitely was not found and there is no chance that it could be found.
         defined->is_defined = 0;
         return Symres_Success;
@@ -947,6 +953,15 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     if (potentially_convert_function_to_polyproc(func)) {
         return Symres_Complete;
+    }
+
+    if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0) {
+        bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
+            // Need to curr_scope->parent because curr_scope is the function body scope.
+            add_entities_for_node(NULL, *node, curr_scope->parent, func->entity->package);
+        }
+
+        bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
     }
 
     SYMRES(type, &func->return_type);
@@ -1198,6 +1213,8 @@ static SymresStatus symres_polyproc(AstFunction* pp) {
 }
 
 static SymresStatus symres_static_if(AstIf* static_if) {
+    if (static_if->flags & Ast_Flag_Dead) return Symres_Complete;
+
     SYMRES(expression, &static_if->cond);
     return Symres_Success;
 }
