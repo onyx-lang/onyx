@@ -781,6 +781,7 @@ struct AstIfWhile {
     AstBlock *false_stmt;
 
     // Used by Static_If
+    Scope *defined_in_scope;
     bh_arr(struct Entity *) true_entities;
     bh_arr(struct Entity *) false_entities;
 };

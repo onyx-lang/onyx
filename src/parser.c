@@ -2671,6 +2671,7 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statements) {
     AstIf* static_if_node = make_node(AstIf, Ast_Kind_Static_If);
     static_if_node->token = expect_token(parser, '#');
+    static_if_node->defined_in_scope = parser->current_scope;
     expect_token(parser, Token_Type_Keyword_If);
 
     static_if_node->cond = parse_expression(parser, 0);

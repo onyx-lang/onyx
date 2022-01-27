@@ -957,8 +957,26 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0) {
         bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
+            // This makes a lot of assumptions about how these nodes are being processed,
+            // and I don't want to start using this with other nodes without considering
+            // what the ramifications of that is.
+            assert((*node)->kind == Ast_Kind_Static_If);
+
             // Need to curr_scope->parent because curr_scope is the function body scope.
-            add_entities_for_node(NULL, *node, curr_scope->parent, func->entity->package);
+            Scope *scope = curr_scope->parent;
+
+            if ((*node)->kind == Ast_Kind_Static_If) {
+                AstIf *static_if = (AstIf *) *node;
+                assert(static_if->defined_in_scope);
+                scope = static_if->defined_in_scope;
+
+                if (func->poly_scope) {
+                    scope = scope_create(context.ast_alloc, scope, static_if->token->pos);
+                    scope_include(scope, func->poly_scope, static_if->token->pos);
+                }
+            }
+
+            add_entities_for_node(NULL, *node, scope, func->entity->package);
         }
 
         bh_arr_set_length(func->nodes_that_need_entities_after_clone, 0);
