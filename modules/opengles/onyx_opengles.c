@@ -527,10 +527,10 @@ ONYX_GL_INT_4_PTR(glGetInternalformativ, GLint)
 
 ONYX_DEF(glShaderSource, (INT, INT, PTR, PTR), ()) {
     GLsizei count = params->data[1].of.i32;
-    int base_ptr = *(int *) ONYX_PTR(params->data[2].of.i32);
+    int* base_ptr = (int *) ONYX_PTR(params->data[2].of.i32);
     char** strs = alloca(count * sizeof(char *));
     for (int i=0; i<count; i++) {
-        strs[i] = (char *) ONYX_PTR(base_ptr + i * 4);
+        strs[i] = (char *) ONYX_PTR(*(base_ptr + i));
     }
 
     glad_glShaderSource(params->data[0].of.i32, count, strs, (GLint *) ONYX_PTR(params->data[3].of.i32));
@@ -539,10 +539,10 @@ ONYX_DEF(glShaderSource, (INT, INT, PTR, PTR), ()) {
 
 ONYX_DEF(glGetUniformIndices, (INT, INT, PTR, PTR), ()) {
     GLsizei count = params->data[1].of.i32;
-    int base_ptr = *(int *) ONYX_PTR(params->data[2].of.i32);
+    int* base_ptr = (int *) ONYX_PTR(params->data[2].of.i32);
     char** strs = alloca(count * sizeof(char *));
     for (int i=0; i<count; i++) {
-        strs[i] = (char *) ONYX_PTR(base_ptr + i * 4);
+        strs[i] = (char *) ONYX_PTR(*(base_ptr + i));
     }
     
     glad_glGetUniformIndices(params->data[0].of.i32, count, (const char *const*) strs, (int *) ONYX_PTR(params->data[3].of.i32));
