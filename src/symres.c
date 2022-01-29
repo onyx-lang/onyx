@@ -653,7 +653,15 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
 
     SYMRES(expression, &switchnode->expr);
 
-    SYMRES(block, switchnode->case_block);
+    if (switchnode->cases == NULL) {
+        SYMRES(block, switchnode->case_block);
+    } else {
+        bh_arr_each(AstSwitchCase *, pcase, switchnode->cases) {
+            SYMRES(case, *pcase);
+        }
+
+        if (switchnode->default_case) SYMRES(block, switchnode->default_case);
+    }
 
     if (switchnode->switch_kind == Switch_Kind_Use_Equals && switchnode->case_exprs) {
         bh_arr_each(CaseToBlock, ctb, switchnode->case_exprs) {
@@ -889,9 +897,9 @@ static SymresStatus symres_block(AstBlock* block) {
 
     if (block->body) {
         AstNode** start = &block->body;
-        // fori (i, 0, block->statement_idx) {
-        //     start = &(*start)->next;
-        // }
+        fori (i, 0, block->statement_idx) {
+            start = &(*start)->next;
+        }
 
         b32 remove = 0;
 
