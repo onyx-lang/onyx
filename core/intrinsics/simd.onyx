@@ -1,6 +1,6 @@
 package core.intrinsics.simd
 
-simd :: package simd
+#local simd :: package simd
 
 i8x16 :: #type simd.i8x16
 i16x8 :: #type simd.i16x8
