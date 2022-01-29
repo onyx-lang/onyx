@@ -889,9 +889,9 @@ static SymresStatus symres_block(AstBlock* block) {
 
     if (block->body) {
         AstNode** start = &block->body;
-        fori (i, 0, block->statement_idx) {
-            start = &(*start)->next;
-        }
+        // fori (i, 0, block->statement_idx) {
+        //     start = &(*start)->next;
+        // }
 
         b32 remove = 0;
 

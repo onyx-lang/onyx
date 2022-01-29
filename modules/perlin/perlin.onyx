@@ -72,6 +72,9 @@ noise :: (x, y, z: f64) -> f64 {
         138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
     ]; 
 
-    p :: macro (x: i32) => cast(i32) permutations[x % 256];
+    p :: macro (x: i32) -> i32 {
+        permutations :: permutations;
+        return cast(i32) permutations[x % 256];
+    }
 }
 

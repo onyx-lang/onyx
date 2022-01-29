@@ -161,6 +161,14 @@ struct_constructed_from :: (struct_type: type_expr, base_type: type_expr) -> boo
     return (cast(^Type_Info_Struct) struct_info).constructed_from == base_type;
 }
 
+struct_inherits :: (struct_type: type_expr, base_type: type_expr) -> bool {
+    struct_info := cast(^Type_Info_Struct) get_type_info(struct_type);
+    if struct_info.kind != .Struct do return false;
+
+    first_member := ^struct_info.members[0];
+    return first_member.used && first_member.type == base_type;
+}
+
 #operator == (t1: Type_Info_Function, t2: Type_Info_Function) -> bool {
     if t1.parameter_types.count != t2.parameter_types.count do return false;
     if t1.return_type           != t2.return_type           do return false;
