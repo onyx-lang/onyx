@@ -3088,7 +3088,9 @@ static void parse_top_level_statement(OnyxParser* parser) {
             else if (parse_possible_directive(parser, "export")) {
                 AstDirectiveExport *export = make_node(AstDirectiveExport, Ast_Kind_Directive_Export);
                 export->token = dir_token;
-                export->export_name = expect_token(parser, Token_Type_Literal_String);
+                parser->parse_calls = 0;
+                export->export_name_expr = parse_expression(parser, 0); // expect_token(parser, Token_Type_Literal_String);
+                parser->parse_calls = 1;
 
                 export->export = parse_expression(parser, 0);
 

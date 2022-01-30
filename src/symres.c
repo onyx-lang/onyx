@@ -1289,6 +1289,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
         case Ast_Kind_Directive_Export: {
             AstDirectiveExport *export = (AstDirectiveExport *) directive;
             SYMRES(expression, &export->export);
+            SYMRES(expression, &export->export_name_expr);
 
             if (export->export->kind == Ast_Kind_Polymorphic_Proc) {
                 onyx_report_error(export->token->pos, Error_Critical, "Cannot export a polymorphic function.");

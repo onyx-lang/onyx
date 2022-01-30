@@ -2516,9 +2516,18 @@ CheckStatus check_static_if(AstIf* static_if) {
 
 CheckStatus check_process_directive(AstNode* directive) {
     if (directive->kind == Ast_Kind_Directive_Export) {
-        AstTyped* export = ((AstDirectiveExport *) directive)->export;
-        if (export->entity && export->entity->state <= Entity_State_Check_Types)
-            YIELD(directive->token->pos, "Waiting for export type to be known.");
+        AstDirectiveExport *export = (AstDirectiveExport *) directive;
+        AstTyped *exported = export->export;
+        if (exported->entity && exported->entity->state <= Entity_State_Check_Types)
+            YIELD(directive->token->pos, "Waiting for exported type to be known.");
+
+        CHECK(expression, &export->export_name_expr);
+
+        if (export->export_name_expr->kind != Ast_Kind_StrLit) {
+            ERROR_(export->token->pos, "Expected export name to be a string literal, got '%s'.", onyx_ast_node_kind_string(export->export_name_expr->kind));
+        }
+
+        export->export_name = export->export_name_expr->token;
     }
 
     if (directive->kind == Ast_Kind_Directive_Tag) {

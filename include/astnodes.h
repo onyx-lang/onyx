@@ -1234,6 +1234,7 @@ struct AstDirectiveExport {
     AstNode_base;
 
     OnyxToken* export_name;
+    AstTyped* export_name_expr;
     AstTyped* export;
 };
 
