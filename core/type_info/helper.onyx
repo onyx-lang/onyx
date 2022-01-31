@@ -205,3 +205,10 @@ enum_value :: ($E: type_expr, name: str) -> E {
 
     return ~~0;
 }
+
+enum_values :: (E: type_expr) -> [] Type_Info_Enum.Member {
+    info := cast(^Type_Info_Enum) get_type_info(E);
+    if info.kind != .Enum do return .[];
+
+    return info.members;
+}
