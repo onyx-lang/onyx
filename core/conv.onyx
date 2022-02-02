@@ -36,7 +36,7 @@ Custom_Format :: struct {
     format: (^Format_Output, ^Format, rawptr) -> void;
 }
 
-str_to_i64 :: (s: str) -> i64 {
+str_to_i64 :: (s: str, base: u32 = 10) -> i64 {
     use package core
 
     value: i64 = 0;
@@ -53,8 +53,22 @@ str_to_i64 :: (s: str) -> i64 {
 
     for c: s do switch c {
         case #char "0" .. #char "9" {
-            value *= 10;
+            value *= ~~base;
             value += ~~(c - #char "0");
+        }
+
+        case #char "A" .. #char "Z" {
+            if base <= 10 do fallthrough;
+
+            value *= ~~base;
+            value += ~~(c - #char "A");
+        }
+        
+        case #char "a" .. #char "z" {
+            if base <= 10 do fallthrough;
+
+            value *= ~~base;
+            value += ~~(c - #char "a");
         }
 
         case #default do break break;
