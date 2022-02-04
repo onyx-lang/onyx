@@ -36,4 +36,10 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: executable
-          path: onyx.exe
+          path: |
+            core
+            examples
+            lib/windows_x86_64
+            misc
+            modules
+            onyx.exe
