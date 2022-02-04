@@ -991,6 +991,7 @@ ONYX_DEF(__net_poll_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) 
 }
 
 ONYX_DEF(__net_address_get_address, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
     int maximum_length = params->data[2].of.i32;
     int address_len = 0;
 
@@ -1004,13 +1005,16 @@ ONYX_DEF(__net_address_get_address, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) 
 
 done:
     results->data[0] = WASM_I32_VAL(address_len);
+    #endif
     return NULL;
 }
 
 ONYX_DEF(__net_address_get_port, (WASM_I64), (WASM_I32)) {
+    #ifdef _BH_LINUX
     struct sockaddr_in *addr = (struct sockaddr_in *) params->data[0].of.i64;
     if (addr == NULL) results->data[0] = WASM_I32_VAL(-1);
     else              results->data[0] = WASM_I32_VAL(addr->sin_port);
+    #endif
     return NULL;
 }
 
