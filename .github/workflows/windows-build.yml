@@ -42,4 +42,5 @@ jobs:
             lib/windows_x86_64
             misc
             modules
+            onyx_runtime.dll
             onyx.exe
