@@ -4,11 +4,15 @@ Enable_Custom_Formatters :: true
 
 #local {
     map :: package core.map
+    string :: package core.string
+
     custom_formatters: Map(type_expr, (^Format_Output, ^Format, rawptr) -> void);
+    custom_parsers   : Map(type_expr, (rawptr, str, Allocator) -> bool);
 }
 
 custom_formatters_initialized :: #init () {
     map.init(^custom_formatters, default=null_proc);
+    map.init(^custom_parsers,    default=null_proc);
 
     #if Enable_Custom_Formatters {
         use type_info;
@@ -19,10 +23,15 @@ custom_formatters_initialized :: #init () {
 
             s_info := cast(^Type_Info_Struct) type;
             for s_info.tags {
-                if it.type != Custom_Format do continue;
+                if it.type == Custom_Format {
+                    custom_format := cast(^Custom_Format) it.data;
+                    custom_formatters[cast(type_expr) type_idx] = custom_format.format;
+                }
 
-                custom_format := cast(^Custom_Format) it.data;
-                custom_formatters[cast(type_expr) type_idx] = custom_format.format;
+                if it.type == Custom_Parse {
+                    custom_parse := cast(^Custom_Parse) it.data;
+                    custom_parsers[cast(type_expr) type_idx] = custom_parse.parse;
+                }
             } 
         }
     }
@@ -32,8 +41,16 @@ register_custom_formatter :: (formatter: (^Format_Output, ^Format, ^$T) -> void)
     custom_formatters[T] = formatter;
 }
 
+register_custom_parser :: (parser: (^$T, str, Allocator) -> bool) {
+    custom_parsers[T] = parser;
+}
+
 Custom_Format :: struct {
     format: (^Format_Output, ^Format, rawptr) -> void;
+}
+
+Custom_Parse :: struct {
+    parse: (rawptr, str, Allocator) -> bool;
 }
 
 str_to_i64 :: (s: str, base: u32 = 10) -> i64 {
@@ -277,6 +294,7 @@ Format :: struct {
     quote_strings        := false;
     dereference          := false;
     custom_format        := true;
+    interpret_numbers    := true;
     digits_after_decimal := cast(u32) 4;
 
     indentation   := cast(u32) 0;
@@ -383,6 +401,11 @@ format_va :: #match {}
                     case #char "\"" {
                         i += 1;
                         formatting.quote_strings = true;
+                    }
+
+                    case #char "d" {
+                        i += 1;
+                        formatting.interpret_numbers = false;
                     }
 
                     case #char "}" {
@@ -664,6 +687,11 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
                     case #default do assert(false, "Bad enum backing type");
                 }
 
+                if !formatting.interpret_numbers {
+                    format_any(output, formatting, .{^value, u64});
+                    break;
+                }
+
                 if !e.is_flags {
                     for ^member: e.members {
                         if value == member.value {
@@ -693,11 +721,97 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
             if info.kind == .Distinct {
                 d := cast(^Type_Info_Distinct) info;
 
-                output->write(d.name);
-                output->write("[");
+                if formatting.interpret_numbers {
+                    output->write(d.name);
+                    output->write("[");
+                }
+
                 format_any(output, formatting, any.{ v.data, d.base_type });
-                output->write("]");
+
+                if formatting.interpret_numbers {
+                    output->write("]");
+                }
             }
         }
     }
 }
+
+//
+// This should be called with a pointer for the first argument.
+//
+//      x: i32;
+//      parse_any(^x, "12.34");
+parse_any :: #match {}
+#match parse_any (v: any, to_parse: str, string_allocator := context.allocator) -> bool {
+    use type_info;
+
+    info := get_type_info(v.type);
+    if info.kind != .Pointer do return false;
+
+    data_type := (cast(^Type_Info_Pointer) info).to;
+    target := *cast(^rawptr) v.data;
+    return parse_any(target, data_type, to_parse, string_allocator);
+}
+
+#match parse_any (target: rawptr, data_type: type_expr, to_parse: str, string_allocator := context.allocator) -> bool {
+    if custom_parsers->has(data_type) {
+        return custom_parsers[data_type](target, to_parse, string_allocator);
+    }
+
+    use type_info;
+    info := get_type_info(data_type);
+
+    switch data_type {
+        case bool {
+            dest := cast(^bool) target;
+            *dest = false;
+            if to_parse[0] == #char "t" || to_parse[0] == #char "T" {
+                *dest = true;
+            }
+            return true;
+        }
+
+        case i32, u32 {
+            dest := cast(^i32) target;
+            *dest = ~~ str_to_i64(to_parse);
+            return true;
+        }
+
+        case f32 {
+            dest := cast(^f32) target;
+            *dest = ~~ str_to_f64(to_parse);
+            return true;
+        }
+
+        case f64 {
+            dest := cast(^f64) target;
+            *dest = ~~ str_to_f64(to_parse);
+            return true;
+        }
+
+        case str {
+            if to_parse[0] != #char "\"" do return false;
+            line := to_parse;
+            string.advance(^line);
+
+            //
+            // For now, this will return a substring in the original to_parse.
+            dest := cast(^str) target;
+            *dest = string.read_until(^line, #char "\"") |> string.alloc_copy(string_allocator); @BUG // This does not handle escaped strings!
+            return true;
+        }
+
+        case #default {
+            if info.kind == .Enum {
+                // TEMPORARY this needs to look at the backing type for the
+                // enum in order to know how large this integer should be.
+                *cast(^u32) target = ~~ str_to_i64(to_parse);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+

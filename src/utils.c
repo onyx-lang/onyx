@@ -850,7 +850,9 @@ TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type,
 
                 if (arg_arr[arg_pos]->value->type && arg_arr[arg_pos]->value->type->id != any_type_id && formal_params[arg_pos]->id == any_type_id) {
                     resolve_expression_type(arg_arr[arg_pos]->value);
-                    arg_arr[arg_pos]->pass_as_any = 1;
+                    if (error != NULL) {
+                        arg_arr[arg_pos]->pass_as_any = 1;
+                    }
                 }
 
                 arg_arr[arg_pos]->va_kind = VA_Kind_Not_VA;
