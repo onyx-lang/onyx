@@ -771,11 +771,22 @@ parse_any :: #match {}
             return true;
         }
 
-        case i32, u32 {
-            dest := cast(^i32) target;
-            *dest = ~~ str_to_i64(to_parse);
-            return true;
+        integer_case :: macro (T: type_expr) {
+            case T {
+                dest := cast(^T) target;
+                *dest = cast(T) str_to_i64(to_parse);
+                return true;
+            }
         }
+
+        integer_case(i8);
+        integer_case(i16);
+        integer_case(i32);
+        integer_case(i64);
+        integer_case(u8);
+        integer_case(u16);
+        integer_case(u32);
+        integer_case(u64);
 
         case f32 {
             dest := cast(^f32) target;
