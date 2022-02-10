@@ -466,7 +466,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
                         if (ctb->original_value == *value) {
                             CHECK(expression, (AstTyped **) &ctb->comparison);
                             found = 1;
-                            break; 
+                            break;
                         }
                     }
                     if (found) break;
@@ -997,7 +997,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     if (binop->operation == Binary_Op_Assign && binop->left->kind == Ast_Kind_Subscript && bh_arr_length(operator_overloads[Binary_Op_Subscript_Equals]) > 0) {
         AstSubscript* sub = (AstSubscript *) binop->left;
-        
+
         if (binop->potential_substitute == NULL) {
             u32 current_checking_level_store = current_checking_level;
             CHECK(expression, &sub->addr);
@@ -1042,7 +1042,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
             }
         }
     }
-    
+
     if ((binop->left->flags & Ast_Flag_Comptime) && (binop->right->flags & Ast_Flag_Comptime)) {
         binop->flags |= Ast_Flag_Comptime;
     }
@@ -1074,7 +1074,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(pbinop);
 
     // NOTE: Comparision operators and boolean operators are handled separately.
-    if (binop_is_compare(binop->operation)) 
+    if (binop_is_compare(binop->operation))
         return check_binaryop_compare(pbinop);
     if (binop->operation == Binary_Op_Bool_And || binop->operation == Binary_Op_Bool_Or)
         return check_binaryop_bool(pbinop);
@@ -1614,7 +1614,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
                 return Check_Success;
             }
         }
-        
+
         AstNode* n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
 
         AstType* type_node = field->expr->type->ast_type;
@@ -2442,7 +2442,7 @@ CheckStatus check_type(AstType** ptype) {
             bh_arr_each(AstType *, type, ctype->types) CHECK(type, type);
             break;
         }
-        
+
         case Ast_Kind_Array_Type: {
             AstArrayType* atype = (AstArrayType *) type;
             if (atype->count_expr) {
@@ -2777,7 +2777,7 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                     return Check_Error;
 
                 } else {
-                    // If no error are suppose to be produced, we still need to signal that 
+                    // If no error are suppose to be produced, we still need to signal that
                     // the node reached a completed state.
                     return Check_Failed;
                 }
@@ -2817,7 +2817,7 @@ CheckStatus check_polyquery(AstPolyQuery *query) {
     if (header_check == Check_Return_To_Symres) return Check_Return_To_Symres;
 
     b32 solved_something = 0;
-    i32 solved_count = 0; 
+    i32 solved_count = 0;
     char *err_msg = NULL;
     bh_arr_each(AstPolyParam, param, query->proc->poly_params) {
         AstPolySolution sln;
@@ -2910,7 +2910,7 @@ void check_entity(Entity* ent) {
                 cs = check_type(&ent->type_alias);
             break;
 
-        case Entity_Type_File_Contents: 
+        case Entity_Type_File_Contents:
             if (context.options->no_file_contents) {
                 onyx_report_error(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
             }

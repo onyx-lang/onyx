@@ -214,6 +214,7 @@
  ;; add indent functionality to some characters
  (onyx--add-self-insert-hooks)
 
+ (display-line-numbers-mode nil)
  (font-lock-fontify-buffer))
 
 ;;;###autoload

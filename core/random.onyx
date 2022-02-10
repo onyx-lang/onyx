@@ -25,3 +25,18 @@ float :: (lo := 0.0f, hi := 1.0f) -> f32 {
 choice :: (a: [] $T) -> T {
     return a[between(0, a.count - 1)];
 }
+
+string :: (bytes_long: u32, alpha_numeric := false, allocator := context.allocator) -> str {
+    memory :: package core.memory
+
+    s := memory.make_slice(u8, bytes_long, allocator=allocator);
+    for^ s {
+        if alpha_numeric {
+            #persist alpha_numeral := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            *it = choice(alpha_numeral);
+        } else {
+            *it = ~~between(32, 127);
+        }
+    }
+    return s;
+}
