@@ -11,7 +11,7 @@ if "%1" == "1" (
 
 for /f "delims=" %%i in ('cd') do set PWD=%%i
 
-set LINK_OPTIONS="%PWD%\lib\windows_x86_64\lib\wasmer.lib" ws2_32.lib Advapi32.lib userenv.lib bcrypt.lib /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmtd.lib /NODEFAULTLIB:msvcrtd.lib
+set LINK_OPTIONS="%PWD%\lib\windows_x86_64\lib\wasmer.lib" ws2_32.lib Advapi32.lib userenv.lib bcrypt.lib kernel32.lib /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmtd.lib /NODEFAULTLIB:msvcrtd.lib
 set FLAGS=%FLAGS% "/I%PWD%\lib\common\include" /DENABLE_RUN_WITH_WASMER=1
 
 rc.exe misc/icon_resource.rc
