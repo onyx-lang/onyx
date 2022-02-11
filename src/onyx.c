@@ -93,7 +93,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     #endif
     #ifdef _BH_WINDOWS
     core_installation = bh_alloc_array(global_heap_allocator, u8, 512);
-    GetEnvironmentVariable("ONYX_PATH", core_installation, 512);
+    GetEnvironmentVariableA("ONYX_PATH", core_installation, 512);
     #endif
 
     // NOTE: Add the current folder

@@ -324,8 +324,6 @@ GB_DLL_IMPORT BOOL    WINAPI CreatePipe         (HANDLE *hReadPipe, HANDLE *hWri
 GB_DLL_IMPORT BOOL    WINAPI TerminateProcess   (HANDLE hProcess, UINT uExitCode);
 GB_DLL_IMPORT BOOL    WINAPI SetHandleInformation(HANDLE hObject, DWORD dwMask, DWORD dwFlags);
 
-GB_DLL_IMPORT BOOL    WINAPI GetEnvironmentVariable(char const * lpName, char * lpBuffer, DWORD nSize);
-
 uintptr_t _beginthreadex( // NATIVE CODE
    void *security,
    unsigned stack_size,
@@ -433,4 +431,5 @@ GB_DLL_IMPORT void WINAPI GetSystemTimeAsFileTime  (FILETIME *system_time_as_fil
 GB_DLL_IMPORT void WINAPI Sleep(DWORD milliseconds);
 GB_DLL_IMPORT void WINAPI ExitProcess(UINT exit_code);
 
-GB_DLL_IMPORT BOOL WINAPI SetEnvironmentVariableA(char const *name, char const *value);
+GB_DLL_IMPORT BOOL  WINAPI SetEnvironmentVariableA(char const *name, char const *value);
+GB_DLL_IMPORT DWORD WINAPI GetEnvironmentVariableA(char const * lpName, char * lpBuffer, DWORD nSize);
