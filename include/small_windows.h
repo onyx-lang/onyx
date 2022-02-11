@@ -324,6 +324,8 @@ GB_DLL_IMPORT BOOL    WINAPI CreatePipe         (HANDLE *hReadPipe, HANDLE *hWri
 GB_DLL_IMPORT BOOL    WINAPI TerminateProcess   (HANDLE hProcess, UINT uExitCode);
 GB_DLL_IMPORT BOOL    WINAPI SetHandleInformation(HANDLE hObject, DWORD dwMask, DWORD dwFlags);
 
+GB_DLL_IMPORT BOOL    WINAPI GetEnvironmentVariable(char const * lpName, char * lpBuffer, DWORD nSize);
+
 uintptr_t _beginthreadex( // NATIVE CODE
    void *security,
    unsigned stack_size,

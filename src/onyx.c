@@ -14,13 +14,13 @@
 #define VERSION "v0.1.0"
 
 
-#ifndef CORE_INSTALLATION
-    #ifdef _BH_LINUX
-    #define CORE_INSTALLATION "/usr/share/onyx"
-    #elif defined(_WIN32) || defined(_WIN64)
-    #define CORE_INSTALLATION "\\dev\\onyx\\"
-    #endif
-#endif
+// #ifndef CORE_INSTALLATION
+//     #ifdef _BH_LINUX
+//     #define CORE_INSTALLATION "/usr/share/onyx"
+//     #elif defined(_WIN32) || defined(_WIN64)
+//     #define CORE_INSTALLATION "\\dev\\onyx\\"
+//     #endif
+// #endif
 
 
 
@@ -87,8 +87,17 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     bh_arr_new(alloc, options.files, 2);
     bh_arr_new(alloc, options.included_folders, 2);
 
+    char* core_installation;
+    #ifdef _BH_LINUX
+    core_installation = "/usr/share/onyx";
+    #endif
+    #ifdef _BH_WINDOWS
+    core_installation = bh_alloc_array(global_heap_allocator, u8, 512);
+    GetEnvironmentVariable("ONYX_PATH", core_installation, 512);
+    #endif
+
     // NOTE: Add the current folder
-    bh_arr_push(options.included_folders, CORE_INSTALLATION);
+    bh_arr_push(options.included_folders, core_installation);
     bh_arr_push(options.included_folders, ".");
 
     if (argc == 1) return options;
@@ -258,7 +267,7 @@ static void context_init(CompileOptions* opts) {
         .package = NULL,
         .include = create_load(context.ast_alloc, "core/runtime/build_opts"),
     }));
-    
+
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
 
@@ -324,7 +333,7 @@ static b32 process_load_entity(Entity* ent) {
         if (parent_file == NULL) parent_file = ".";
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
-        
+
         char* filename = bh_lookup_file(include->name, parent_folder, ".onyx", 1, context.options->included_folders, 1);
         char* formatted_name = bh_strdup(global_heap_allocator, filename);
 
@@ -353,7 +362,7 @@ static b32 process_entity(Entity* ent) {
                    ent->expr->token->pos.filename,
                    ent->expr->token->pos.line,
                    ent->expr->token->pos.column);
-        
+
         else if (ent->expr)
             snprintf(verbose_output_buffer, 511,
                     "%20s | %24s (%d, %d) \n",
@@ -362,7 +371,7 @@ static b32 process_entity(Entity* ent) {
                    (u32) ent->macro_attempts,
                    (u32) ent->micro_attempts);
     }
-    
+
     // CLEANUP: There should be a nicer way to track if the builtins have
     // already been initialized.
     static b32 builtins_initialized = 0;
@@ -387,14 +396,14 @@ static b32 process_entity(Entity* ent) {
             // function. Maybe there should be a different place where that happens?
             symres_entity(ent);
             break;
-        
+
         case Entity_State_Parse:
             if (!builtins_initialized) {
                 builtins_initialized = 1;
                 initialize_builtins(context.ast_alloc);
                 introduce_build_options(context.ast_alloc);
             }
-         
+
             if (process_load_entity(ent)) {
                 ent->state = Entity_State_Finalized;
             } else {
@@ -423,7 +432,7 @@ static void output_dummy_progress_bar() {
     if (bh_arr_length(eh->entities) == 0) return;
 
     static const char* state_colors[] = {
-        "\e[91m", "\e[93m", "\e[94m", "\e[93m", 
+        "\e[91m", "\e[93m", "\e[94m", "\e[93m",
         "\e[97m", "\e[95m", "\e[96m", "\e[92m", "\e[91m",
     };
 
@@ -435,7 +444,7 @@ static void output_dummy_progress_bar() {
     }
 
     printf("\n\n");
-    
+
     for (i32 i = 0; i < Entity_Type_Count; i++) {
         if      (eh->type_count[i] == 0)           printf("\e[90m");
         else if ((i32) eh->entities[0]->type == i) printf("\e[92m");
@@ -487,12 +496,12 @@ static i32 onyx_compile() {
 #if defined(_BH_LINUX)
         if (context.options->fun_output) {
             output_dummy_progress_bar();
-            
+
             if (ent->expr->token) {
                 OnyxFilePos pos = ent->expr->token->pos;
                 printf("\e[0K%s on %s in %s:%d:%d\n", entity_state_strings[ent->state], entity_type_strings[ent->type], pos.filename, pos.line, pos.column);
             }
-            
+
             // Slowing things down for the effect
             usleep(1000);
         }
@@ -540,7 +549,7 @@ static i32 onyx_compile() {
     }
 
     u64 duration = bh_time_duration(start_time);
-    
+
     if (context.options->verbose_output > 0) {
         // TODO: Replace these with bh_printf when padded formatting is added.
         printf("\nStatistics:\n");
