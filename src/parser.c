@@ -1203,6 +1203,8 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
     while (peek_token(token_offset)->type == Token_Type_Symbol) {
         token_offset += 1;
 
+        if (peek_token(token_offset)->type == '\'') token_offset += 1;
+
         if (peek_token(token_offset)->type != ',') break;
         token_offset += 1;
     }
@@ -1220,17 +1222,18 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
         if (parser->hit_unexpected_token) return 1;
 
         OnyxToken* local_sym = expect_token(parser, Token_Type_Symbol);
-        AstLocal* new_local = make_local(parser->allocator, local_sym, NULL);
-
-        if (prev_local == NULL) {
-            first_local = new_local;
-        } else {
-            prev_local->next = (AstNode *) new_local;
-        }
-        prev_local = new_local;
-
         AstNode* sym_node = make_symbol(parser->allocator, local_sym);
         bh_arr_push(local_compound->exprs, (AstTyped *) sym_node);
+
+        if (!consume_token_if_next(parser, '\'')) {
+            AstLocal* new_local = make_local(parser->allocator, local_sym, NULL);
+            if (prev_local == NULL) {
+                first_local = new_local;
+            } else {
+                prev_local->next = (AstNode *) new_local;
+            }
+            prev_local = new_local;
+        }
 
         consume_token_if_next(parser, ',');
     }
@@ -1265,7 +1268,8 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
     if (parser->curr->type != Token_Type_Symbol) return 0;
 
     // If the token after the symbol is a comma, assume this is a compound declaration.
-    if (peek_token(1)->type == ',') {
+    if (peek_token(1)->type == ',' ||
+        (peek_token(1)->type == '\'' && peek_token(2)->type == ',')) {
         return parse_possible_compound_symbol_declaration(parser, ret);
     }
 
@@ -2159,7 +2163,7 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 
     u32 param_idx = 0;
     assert(parser->polymorph_context.poly_params != NULL);
-    
+
     bh_arr(AstParam) param_buffer=NULL;
     bh_arr_new(global_heap_allocator, param_buffer, 2);
 
@@ -2402,7 +2406,7 @@ function_defined:
     } else {
         bh_arr_free(polymorphic_vars);
     }
-    
+
     bh_arr_pop(parser->current_function_stack);
     return func_def;
 }

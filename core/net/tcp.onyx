@@ -120,7 +120,7 @@ TCP_Server :: struct {
 
     alive         := true;
     pulse_time_ms := 500;
-    
+
     get_events    :: tcp_get_events
     listen        :: tcp_server_listen
     pulse         :: tcp_server_pulse
@@ -160,7 +160,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_S
         conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
         conn_event.address = ^client.address;
         conn_event.client = client;
-        server.events << .{ .Connection, conn_event };
+        server.events << .{ .Connection, conn_event }; @Threading // This operation should be protected by a mutex?
     }
 }
 
@@ -184,6 +184,8 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
     }
 
     if client_count == 0 {
+        // This is bad because if the pulse_time_ms is large, the server
+        // will have a unnecessary delay for the first client to connect.
         os.sleep(pulse_time_ms);
         return true;
     }
@@ -197,7 +199,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
         msg_buffer: [1024] u8;
         bytes_read := it.socket->recv_into(msg_buffer);
 
-        // If exactly 0 bytes are read from the buffer, it means that the 
+        // If exactly 0 bytes are read from the buffer, it means that the
         // client has shutdown and future communication should be terminated.
         //
         // If a negative number of bytes are read, then an error has occured
@@ -211,7 +213,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
         data_event.client  = it;
         data_event.address = ^it.address;
         data_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator);
-        server.events << .{ .Data, data_event };
+        server.events << .{ .Data, data_event }; @Threading // See comment above.
     }
 
     for clients {
@@ -219,16 +221,16 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
             disconnect_event := new(TCP_Event.Disconnection, allocator=server.event_allocator);
             disconnect_event.client  = it;
             disconnect_event.address = ^it.address;
-            server.events << .{ .Disconnection, disconnect_event };
+            server.events << .{ .Disconnection, disconnect_event }; @Threading // See comment above.
         }
     }
 
     array.sort(clients, (a, b) => {
-        a_val := 1 if a == null else 0; 
-        b_val := 1 if b == null else 0; 
+        a_val := 1 if a == null else 0;
+        b_val := 1 if b == null else 0;
 
         if a_val != b_val do return b_val - a_val;
-        
+
         return cast(i32) a.state - cast(i32) b.state;
     });
 

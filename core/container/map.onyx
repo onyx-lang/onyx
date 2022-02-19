@@ -117,7 +117,7 @@ delete :: (use map: ^Map, key: map.Key_Type) {
     if lr.entry_prev < 0   do hashes[lr.hash_index]       = entries[lr.entry_index].next;
     else                   do entries[lr.entry_prev].next = entries[lr.entry_index].next;
 
-    if lr.entry_index == entries.count - 1{
+    if lr.entry_index == entries.count - 1 {
         array.pop(^entries);
         return;
     }
@@ -204,7 +204,7 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
         for ^entry: entries {
             defer index += 1;
 
-            lr := lookup(map, entry.key); 
+            lr := lookup(map, entry.key);
             entries[index].next = hashes[lr.hash_index];
             hashes[lr.hash_index] = index;
         }
