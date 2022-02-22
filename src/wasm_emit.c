@@ -2899,6 +2899,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Code_Block: {
+            // Like above, this error message should be moved to checking, but
+            // this is the best place to do it right now.
+            onyx_report_error(expr->token->pos, Error_Critical, "'#code' blocks are only to be used at compile-time. Using them as a runtime value is not allowed.");
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;

@@ -37,7 +37,7 @@ main :: (args) => {
         }
 
         Node :: struct { name: str; child_idx: u32; second_visit: bool; }
-        node_stack: [..] Node; 
+        node_stack: [..] Node;
         node_stack << .{ "start", 0, false };
 
         children_of :: (edges: ^$T, name: str) -> Iterator(str) {

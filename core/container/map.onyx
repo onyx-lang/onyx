@@ -73,7 +73,6 @@ free :: (use map: ^Map) {
 }
 
 put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
-    if map.hashes.data == null do init(map);
     lr := lookup(map, key);
 
     if lr.entry_index >= 0 {
