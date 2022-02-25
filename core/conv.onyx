@@ -521,8 +521,15 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
 
         case str {
             if formatting.quote_strings do output->write("\"");
+            width := formatting.minimum_width;
+            to_output := *cast(^str) v.data;
+
             @Todo // escape '"' when quote_strings is enabled.
-            output->write(*(cast(^str) v.data));
+            output->write(to_output);
+            if to_output.count < width && !formatting.quote_strings {
+                for width - to_output.count do output->write(#char " ");
+            }
+
             if formatting.quote_strings do output->write("\"");
         }
 

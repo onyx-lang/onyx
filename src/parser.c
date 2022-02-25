@@ -1411,7 +1411,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Literal_Float:
         case Token_Type_Literal_String:
             retval = (AstNode *) parse_compound_expression(parser, 1);
-            if (retval->kind == Ast_Kind_Call) {
+            if (retval->kind == Ast_Kind_Call || retval->kind == Ast_Kind_Method_Call) {
                 if (parser->curr->type == '{') {
                     AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
                     code_block->token = parser->curr;
@@ -1420,7 +1420,17 @@ static AstNode* parse_statement(OnyxParser* parser) {
                     code_block->code = (AstNode *) parse_block(parser, 1, NULL);
                     ((AstBlock *) code_block->code)->rules = Block_Rule_Code_Block;
 
-                    bh_arr_push(((AstCall *) retval)->args.values, (AstTyped *) make_argument(context.ast_alloc, (AstTyped *) code_block));
+                    AstCall *dest = (AstCall *) retval;
+                    if (dest->kind == Ast_Kind_Method_Call) {
+                        dest = (AstCall *) ((AstBinaryOp *) dest)->right;
+                        if (dest->kind != Ast_Kind_Call) {
+                            onyx_report_error(retval->token->pos, Error_Critical, "Expected function call on right side of '->'.");
+                            needs_semicolon = 0;
+                            break;
+                        }
+                    }
+
+                    bh_arr_push(dest->args.values, (AstTyped *) make_argument(context.ast_alloc, (AstTyped *) code_block));
                     needs_semicolon = 0;
                 }
             }

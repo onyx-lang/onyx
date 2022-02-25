@@ -381,24 +381,24 @@ static SymresStatus symres_pipe(AstBinaryOp** pipe) {
 //
 //     foo->member_function(...)
 static SymresStatus symres_method_call(AstBinaryOp** mcall) {
-    AstCall* call_node = (AstCall *) (*mcall)->right;
-    if (call_node->kind != Ast_Kind_Call) {
-        onyx_report_error((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
-        return Symres_Error;
-    }
-
     SYMRES(expression, &(*mcall)->left);
     if ((*mcall)->left == NULL) return Symres_Error;
 
     // :EliminatingSymres
     if (((*mcall)->flags & Ast_Flag_Has_Been_Symres) == 0) {
+        if ((*mcall)->right->kind != Ast_Kind_Call) {
+            onyx_report_error((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
+            return Symres_Error;
+        }
+
         AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
-        implicit_field_access->token = call_node->callee->token;
-        call_node->callee = (AstTyped *) implicit_field_access;
+        implicit_field_access->token = ((AstCall *) (*mcall)->right)->callee->token;
+        ((AstCall *) (*mcall)->right)->callee = (AstTyped *) implicit_field_access;
         (*mcall)->flags |= Ast_Flag_Has_Been_Symres;
     }
 
-    SYMRES(expression, (AstTyped **) &call_node);
+    assert((*mcall)->right->kind == Ast_Kind_Call);
+    SYMRES(expression, (AstTyped **) &(*mcall)->right);
 
     return Symres_Success;
 }

@@ -1680,13 +1680,13 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
 
         bh_arr_insertn(call_node->args.values, 0, 1);
         call_node->args.values[0] = implicit_argument;
+
+        *pmcall = (AstBinaryOp *) mcall->right;
+        mcall->right->next = mcall->next;
     }
     mcall->flags |= Ast_Flag_Has_Been_Checked;
 
-    CHECK(call, &call_node);
-    call_node->next = mcall->next;
-
-    *pmcall = (AstBinaryOp *) call_node;
+    CHECK(call, (AstCall **) pmcall);
     return Check_Success;
 }
 
