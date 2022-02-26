@@ -212,3 +212,15 @@ enum_values :: (E: type_expr) -> [] Type_Info_Enum.Member {
 
     return info.members;
 }
+
+get_struct_by_name :: (name: str) -> type_expr {
+    index := 0;
+    for type_table {
+        defer index += 1;
+        if it.kind != .Struct do continue;
+
+        if (cast(^Type_Info_Struct) it).name == name do return cast(type_expr) index;
+    }
+
+    return void;
+}
