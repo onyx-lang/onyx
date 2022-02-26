@@ -152,6 +152,12 @@ Type_Info_Struct :: struct {
     members: [] Member;
     parameters: [] any;
     tags: [] any;
+
+    Method :: struct {
+        name: str;
+        func: any;
+    }
+    methods: [] Method;
 }
 
 Type_Info_Polymorphic_Struct :: struct {

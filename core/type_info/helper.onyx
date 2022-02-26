@@ -224,3 +224,32 @@ get_struct_by_name :: (name: str) -> type_expr {
 
     return void;
 }
+
+get_struct_method :: (type: type_expr, method_name: str) -> ^any {
+    info := cast(^Type_Info_Struct) get_type_info(type);
+    if info.kind != .Struct do return null;
+
+    for ^method: info.methods {
+        if method.name == method_name {
+            return ^method.func;
+        }
+    }
+
+    return null;
+}
+
+populate_struct_vtable :: (table: ^$Table_Type, struct_type: type_expr, safe := true) {
+    v_info := cast(^Type_Info_Struct) get_type_info(Table_Type);
+    if v_info.kind != .Struct do return;
+
+    for^ member: v_info.members {
+        if get_type_info(member.type).kind != .Function do continue;
+
+        struct_method := get_struct_method(struct_type, member.name);
+        if struct_method == null do continue;
+        if safe && struct_method.type != member.type do continue;
+
+        dest := cast(^()->void) (cast(^u8) table + member.offset);
+        *dest = *cast(^()->void) struct_method.data;
+    }
+}

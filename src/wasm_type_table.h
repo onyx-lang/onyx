@@ -1,6 +1,12 @@
 // This file is directly included in src/onxywasm.c
 // It is here purely to decrease the amount of clutter in the main file.
 
+typedef struct StructMethodData {
+    u32 name_loc;
+    u32 name_len;
+    u32 type;
+    u32 data_loc;
+} StructMethodData;
 
 u64 build_type_table(OnyxWasmModule* module) {
 
@@ -186,6 +192,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 memset(meta_locations, 0, s->mem_count * sizeof(u32));
                 memset(struct_tag_locations, 0, bh_arr_length(s->meta_tags) * sizeof(u32));
 
+                // Member names
                 u32 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
                     StructMember* mem = *pmem;
@@ -196,6 +203,7 @@ u64 build_type_table(OnyxWasmModule* module) {
 
                 bh_buffer_align(&table_buffer, 8);
 
+                // Polymorphic solutions
                 i = 0;
                 bh_arr_each(AstPolySolution, sln, s->poly_sln) {
                     bh_buffer_align(&table_buffer, 8);
@@ -229,6 +237,7 @@ u64 build_type_table(OnyxWasmModule* module) {
 
                 bh_buffer_align(&table_buffer, 8);
 
+                // Member default values
                 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
                     StructMember* mem = *pmem;
@@ -265,6 +274,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                     }
                 }
 
+                // Member tags
                 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
                     StructMember* mem = *pmem;
@@ -313,6 +323,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_align(&table_buffer, 8);
                 u32 members_base = table_buffer.length;
 
+                // Member array
                 i = 0;
                 bh_arr_each(StructMember*, pmem, s->memarr) {
                     StructMember* mem = *pmem;
@@ -334,6 +345,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                 bh_buffer_align(&table_buffer, 8);
                 u32 params_base = table_buffer.length;
 
+                // Polymorphic solution any array
                 i = 0;
                 bh_arr_each(AstPolySolution, sln, s->poly_sln) {
                     WRITE_PTR(param_locations[i++]);
@@ -342,6 +354,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                     else                       bh_buffer_write_u32(&table_buffer, sln->value->type->id);
                 }
 
+                // Struct tag array
                 i = 0;
                 bh_arr_each(AstTyped *, tag, s->meta_tags) {
                     AstTyped* value = *tag;                        
@@ -361,6 +374,54 @@ u64 build_type_table(OnyxWasmModule* module) {
                     i += 1;
                 }
 
+                // Struct methods
+                bh_arr(StructMethodData) method_data=NULL;
+                AstType *ast_type = type->ast_type;
+                if (ast_type->kind == Ast_Kind_Struct_Type) {
+                    AstStructType *struct_type  = (AstStructType *) ast_type;
+                    Scope*         struct_scope = struct_type->scope;
+
+                    if (struct_scope == NULL) goto no_methods;
+
+                    fori (i, 0, shlen(struct_scope->symbols)) {
+                        AstFunction* node = (AstFunction *) struct_scope->symbols[i].value;
+                        if (node->kind != Ast_Kind_Function) continue;
+                        assert(node->entity);
+                        assert(node->entity->function == node);
+
+                        // Name
+                        char *name = struct_scope->symbols[i].key;
+                        u32 name_loc = table_buffer.length;
+                        u32 name_len = strlen(name);
+                        bh_buffer_append(&table_buffer, name, name_len);
+
+                        // any data member
+                        bh_buffer_align(&table_buffer, 4);
+                        u32 data_loc = table_buffer.length;
+                        u32 func_idx = get_element_idx(module, node);
+                        bh_buffer_write_u32(&table_buffer, func_idx);
+                        
+                        bh_arr_push(method_data, ((StructMethodData) {
+                            .name_loc = name_loc,
+                            .name_len = name_len,
+                            .type     = node->type->id,
+                            .data_loc = data_loc,
+                        }));
+                    }
+                }
+
+                no_methods:
+
+                bh_buffer_align(&table_buffer, 4);
+                u32 method_data_base = table_buffer.length;
+
+                i = 0;
+                bh_arr_each(StructMethodData, method, method_data) {
+                    WRITE_SLICE(method->name_loc, method->name_len);
+                    WRITE_PTR(method->data_loc); 
+                    bh_buffer_write_u32(&table_buffer, method->type);
+                }
+
                 bh_buffer_align(&table_buffer, 8);
                 u32 struct_tag_base = table_buffer.length;
 
@@ -368,6 +429,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                     WRITE_SLICE(struct_tag_locations[i], s->meta_tags[i]->type->id);
                 }
 
+                // Struct name
                 u32 name_base = 0;
                 u32 name_length = 0;
                 if (s->name) {
@@ -392,7 +454,9 @@ u64 build_type_table(OnyxWasmModule* module) {
                 WRITE_SLICE(members_base, s->mem_count);
                 WRITE_SLICE(params_base, bh_arr_length(s->poly_sln));
                 WRITE_SLICE(struct_tag_base, bh_arr_length(s->meta_tags));
+                WRITE_SLICE(method_data_base, bh_arr_length(method_data));
 
+                bh_arr_free(method_data);
                 break;
             }
 

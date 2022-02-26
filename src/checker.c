@@ -2133,6 +2133,15 @@ CheckStatus check_struct(AstStructType* s_node) {
         CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
 
+    if (s_node->scope) {
+        fori (i, 0, shlen(s_node->scope->symbols)) {
+            AstNode* node = s_node->scope->symbols[i].value;
+            if (node->kind == Ast_Kind_Function) {
+                node->flags |= Ast_Flag_Function_Used;
+            }
+        }
+    }
+
     bh_arr_each(AstStructMember *, smem, s_node->members) {
         if ((*smem)->type_node != NULL) {
             CHECK(type, &(*smem)->type_node);
