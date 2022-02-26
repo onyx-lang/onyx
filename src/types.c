@@ -115,8 +115,9 @@ b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
                     Type* t1_struct = t1->Pointer.elem;
                     Type* t2_struct = t2->Pointer.elem;
 
-                    if (t1_struct->Struct.memarr[0]->used)
-                        return types_are_compatible(t2_struct, t1_struct->Struct.memarr[0]->type);
+                    bh_arr(StructMember *) members = t1_struct->Struct.memarr;
+                    if (bh_arr_length(members) > 0 && members[0]->used)
+                        return types_are_compatible(t2_struct,members[0]->type);
                 }
             }
 
