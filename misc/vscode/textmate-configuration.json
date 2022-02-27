@@ -23,7 +23,10 @@
         "entity.name.function.onyx",
         "entity.name.type.onyx"
     ],
-    "indentation": {},
+    "indentation": {
+      "punctuation.block.begin.onyx": 1,
+      "punctuation.block.end.onyx": -1
+    },
     "dedentation": [],
     "punctuation": {
       "continuation": ""

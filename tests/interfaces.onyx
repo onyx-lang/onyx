@@ -53,9 +53,10 @@ BitField :: interface (t: $T) {
     { t ^ t } -> T;
 }
 
-Complex :: struct [conv.Custom_Format.{ format }] {
+Complex :: struct {
     x, y: f32;
 
+    #struct_tag conv.Custom_Format.{ format }
     format :: (output: ^conv.Format_Output, format: ^conv.Format, c: ^Complex) {
         conv.format(output, "{.2} + {.2}i", c.x, c.y);
     }

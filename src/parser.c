@@ -1948,26 +1948,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
     }
 
-    // Parse tags
     bh_arr(AstTyped *) struct_meta_tags=NULL;
-    if (parser->curr->type == '[') {
-        expect_token(parser, '[');
-        if (struct_meta_tags == NULL) bh_arr_new(global_heap_allocator, struct_meta_tags, 1);
-
-        while (parser->curr->type != ']') {
-            if (parser->hit_unexpected_token) return s_node;
-
-            AstTyped* expr = parse_expression(parser, 0);
-            bh_arr_push(struct_meta_tags, expr);
-
-            if (parser->curr->type != ']')
-                expect_token(parser, ',');
-        }
-
-        expect_token(parser, ']');
-    }
-
-    s_node->meta_tags = struct_meta_tags;
 
     expect_token(parser, '{');
 
@@ -1977,6 +1958,15 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return s_node;
+
+        if (parse_possible_directive(parser, "struct_tag")) {
+            if (struct_meta_tags == NULL) bh_arr_new(global_heap_allocator, struct_meta_tags, 1);
+            AstTyped* expr = parse_expression(parser, 0);
+            bh_arr_push(struct_meta_tags, expr);
+
+            consume_token_if_next(parser, ';');
+            continue;
+        }
 
         if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
             if (!s_node->scope) {
@@ -2063,6 +2053,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         expect_token(parser, ';');
     }
 
+    s_node->meta_tags = struct_meta_tags;
     if (s_node->scope) parser->current_scope = parser->current_scope->parent;
 
     bh_arr_free(member_list_temp);
