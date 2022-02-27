@@ -125,6 +125,63 @@ write_type_name :: (writer: ^io.Writer, t: type_expr) {
     }
 }
 
+size_of :: (t: type_expr) -> u32 {
+    info := get_type_info(t);
+    if info == null do return 0;
+
+    switch info.kind {
+        case .Basic {
+            basic := cast(^Type_Info_Basic) info;
+
+            switch basic.basic_kind {
+                case .Void do return 0;
+                case .Bool, .U8, .I8 do return 1;
+                case .U16, .I16 do return 2;
+                case .U32, .I32, .F32, .Type_Index do return 4;
+                case .U64, .I64, .F64 do return 8;
+                case .I8X16, .I16X8, .I32X4, .I64X2, .F32X4, .F64X2, .V128 do return 16;
+                case .Rawptr do return sizeof rawptr;
+
+                case .Unsized_Int do return 0;
+                case .Unsized_Float do return 0;
+            }
+        }
+
+        case .Pointer do return sizeof rawptr;
+
+        case .Array {
+            arr := cast(^Type_Info_Array) info;
+            return size_of(arr.of) * arr.count;
+        }
+
+        case .Slice do return sizeof str;
+        case .Dynamic_Array do return sizeof [..] void;
+        case .Variadic_Argument do return sizeof str;
+        case .Enum {
+            e := cast(^Type_Info_Enum) info;
+            return e.size;
+        }
+
+        case .Struct {
+            s := cast(^Type_Info_Struct) info;
+            return s.size;
+        }
+
+        case .Polymorphic_Struct do return 0;
+
+        case .Compound do return 0;
+
+        case .Function do return 4;
+
+        case .Distinct {
+            d := cast(^Type_Info_Distinct) info;
+            return size_of(d.base_type);
+        }
+    }
+
+    return 0;
+}
+
 offset_of :: (T: type_expr, member: str) -> u32 {
     info := get_type_info(T);
     if info == null         do return 0;

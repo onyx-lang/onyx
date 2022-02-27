@@ -1988,20 +1988,13 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         bh_arr(AstTyped *) meta_tags=NULL;
-        while (parser->curr->type == '[') {
+        while (parse_possible_directive(parser, "tag")) {
             if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
 
-            expect_token(parser, '[');
-            while (parser->curr->type != ']') {
+            do {
                 AstTyped* expr = parse_expression(parser, 0);
                 bh_arr_push(meta_tags, expr);
-
-                if (parser->curr->type != ']') {
-                    expect_token(parser, ',');
-                }
-            }
-
-            expect_token(parser, ']');
+            } while (consume_token_if_next(parser, ','));
         }
 
         member_is_used = consume_token_if_next(parser, Token_Type_Keyword_Use);

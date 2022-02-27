@@ -136,15 +136,40 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
 // CLEANUP: Does this really need to be limited to a non-custom runtime?
 #if runtime.runtime != .Custom {
-    new :: ($T: type_expr, allocator := context.allocator) -> ^T {
-        use package core.intrinsics.onyx { __initialize }
-        memory :: package core.memory
+    new :: #match {
+        ($T: type_expr, allocator := context.allocator) -> ^T {
+            use package core.intrinsics.onyx { __initialize }
+            memory :: package core.memory
 
-        res := cast(^T) raw_alloc(allocator, sizeof T);
-        memory.set(res, 0, sizeof T);
-        __initialize(res);
+            res := cast(^T) raw_alloc(allocator, sizeof T);
+            memory.set(res, 0, sizeof T);
+            __initialize(res);
 
-        return res;
+            return res;
+        },
+
+        (T: type_expr, allocator := context.allocator) -> rawptr {
+            memory :: package core.memory
+
+            info := type_info.get_type_info(T);
+            size := type_info.size_of(T);
+            if size == 0 do return null;
+
+            res := raw_alloc(allocator, size);
+            memory.set(res, 0, size);
+
+            if info.kind == .Struct {
+                s_info := cast(^type_info.Type_Info_Struct) info;
+                for s_info.members {
+                    if it.default != null {
+                        member_size := type_info.size_of(it.type);
+                        memory.copy(cast(^u8) res + it.offset, it.default, member_size);
+                    }
+                }
+            }
+
+            return res;
+        }
     }
 
     make :: ($T: type_expr, allocator := context.allocator) -> ^T {

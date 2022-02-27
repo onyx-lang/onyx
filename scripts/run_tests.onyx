@@ -72,19 +72,19 @@ find_onyx_files :: (root: str, cases: ^[..] Test_Case) {
 settings := Settings.{};
 
 Settings :: struct {
-    ["--debug", "-d"]
+    #tag "--debug", "-d"
     debug := false;
 
-    ["--threads"]
+    #tag "--threads"
     threads := 4;
 
-    ["--no-color"]
+    #tag "--no-color"
     no_color := false;
 
-    ["--tests"]
+    #tag "--tests"
     test_folder := "./tests";
 
-    ["--compile-only"]
+    #tag "--compile-only"
     compile_only := false;
 }
 
