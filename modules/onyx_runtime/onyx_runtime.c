@@ -176,12 +176,6 @@ ONYX_DEF(__file_get_standard, (WASM_I32, WASM_I32), (WASM_I32)) {
 //
 // Directories
 //
-#ifdef _BH_WINDOWS
-typedef struct Windows_Directory_Opened {
-    HANDLE hndl;
-    WIN32_FIND_DATAA found_file;
-} Windows_Directory_Opened;
-#endif
 
 ONYX_DEF(__dir_open, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     char *path_ptr = ONYX_PTR(params->data[0].of.i32);
