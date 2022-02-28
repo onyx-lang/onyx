@@ -1720,7 +1720,7 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
 
 bh_dir bh_dir_open(char* path) {
 #ifdef _BH_WINDOWS
-    for (int i=0; i<path_len; i++) if (path[i] == '/') path[i] = '\\';
+    for (int i=0; i<strlen(path); i++) if (path[i] == '/') path[i] = '\\';
     strncat(path, "\\*.*", 511);
 
     Windows_Directory_Opened* dir = malloc(sizeof(Windows_Directory_Opened));
@@ -1741,9 +1741,6 @@ bh_dir bh_dir_open(char* path) {
 b32 bh_dir_read(bh_dir dir, bh_dirent* out) {
 
 #ifdef _BH_WINDOWS
-    Windows_Directory_Opened* dir = (Windows_Directory_Opened *) params->data[0].of.i64;
-    if (dir == NULL) return 0;
-
     do {
         BOOL success = FindNextFileA(dir->hndl, &dir->found_file);
         if (!success) return 0;
