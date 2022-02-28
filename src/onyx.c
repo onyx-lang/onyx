@@ -339,6 +339,41 @@ static b32 process_load_entity(Entity* ent) {
 
         return process_source_file(formatted_name, include->token->pos);
 
+    } else if (include->kind == Ast_Kind_Load_All) {
+        const char* parent_file = include->token->pos.filename;
+        if (parent_file == NULL) parent_file = ".";
+
+        char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        char folder[512];
+        if (bh_str_starts_with(include->name, "./")) {
+            bh_snprintf(folder, 511, "%s/%s", parent_folder, include->name + 2);
+        } else {
+            bh_snprintf(folder, 511, "%s", include->name);
+        }
+
+        // This does not take into account #load_path'd folders...
+
+        bh_dir dir = bh_dir_open(folder);
+        if (dir == NULL) {
+            onyx_report_error(include->token->pos, Error_Critical, "Could not find folder '%s'.", folder);
+            return 0;
+        }
+
+        bh_dirent entry;
+        b32 success = 1;
+        char fullpath[512];
+        while (bh_dir_read(dir, &entry)) {
+            if (entry.type == BH_DIRENT_FILE && bh_str_ends_with(entry.name, ".onyx")) {
+                bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                u8* formatted_name = bh_path_get_full_name(fullpath, global_heap_allocator);
+                success = process_source_file(formatted_name, include->token->pos);
+                if (!success) break;
+            }
+        }
+
+        bh_dir_close(dir);
+        return success;
+        
     } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(context.options->included_folders, include->name);
 

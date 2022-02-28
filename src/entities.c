@@ -170,6 +170,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
     ent.scope   = scope;
 
     switch (node->kind) {
+        case Ast_Kind_Load_All:
         case Ast_Kind_Load_File: {
             ent.type = Entity_Type_Load_File;
             ent.include = (AstInclude *) node;

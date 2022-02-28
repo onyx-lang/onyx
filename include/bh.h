@@ -20,6 +20,7 @@
     #include <errno.h>
     #include <fcntl.h>
     #include <unistd.h>
+    #include <dirent.h>
 #endif
 
 #include <stdlib.h>
@@ -391,6 +392,39 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
 bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file);
 bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* filename);
 i32 bh_file_contents_free(bh_file_contents* contents);
+
+
+#ifdef _BH_WINDOWS
+    typedef struct Windows_Directory_Opened {
+        HANDLE hndl;
+        WIN32_FIND_DATAA found_file;
+    } Windows_Directory_Opened;
+
+    typedef Windows_Directory_Opened *bh_dir;
+#else
+    typedef DIR *bh_dir;
+#endif
+
+typedef enum bh_dirent_type {
+    BH_DIRENT_UNKNOWN,
+    BH_DIRENT_BLOCK,
+    BH_DIRENT_CHAR,
+    BH_DIRENT_DIRECTORY,
+    BH_DIRENT_FILE,
+    BH_DIRENT_SYMLINK,
+    BH_DIRENT_OTHER,
+} bh_dirent_type;
+
+typedef struct bh_dirent {
+    bh_dirent_type type;
+    u32 id;
+    u32 name_length;
+    char name[256];
+} bh_dirent;
+
+bh_dir bh_dir_open(char* path);
+b32    bh_dir_read(bh_dir dir, bh_dirent* out);
+void   bh_dir_close(bh_dir dir);
 
 #endif
 
@@ -1681,6 +1715,95 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
     }
 
     return fn;
+}
+
+
+bh_dir bh_dir_open(char* path) {
+#ifdef _BH_WINDOWS
+    for (int i=0; i<path_len; i++) if (path[i] == '/') path[i] = '\\';
+    strncat(path, "\\*.*", 511);
+
+    Windows_Directory_Opened* dir = malloc(sizeof(Windows_Directory_Opened));
+    dir->hndl = FindFirstFileA(path, &dir->found_file);
+    if (dir->hndl == INVALID_HANDLE_VALUE) {
+        return NULL;
+    }
+
+    return dir;
+#endif
+
+#ifdef _BH_LINUX
+    DIR* dir = opendir(path);
+    return dir;
+#endif
+}
+
+b32 bh_dir_read(bh_dir dir, bh_dirent* out) {
+
+#ifdef _BH_WINDOWS
+    Windows_Directory_Opened* dir = (Windows_Directory_Opened *) params->data[0].of.i64;
+    if (dir == NULL) return 0;
+
+    do {
+        BOOL success = FindNextFileA(dir->hndl, &dir->found_file);
+        if (!success) return 0;
+    } while (!strcmp(dir->found_file.cFileName, ".") || !strcmp(dir->found_file.cFileName, ".."));
+
+    if (out == NULL) return 1;
+
+    out->type = (dir->found_file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        ? BH_DIRENT_DIRECTORY : BH_DIRENT_FILE;
+    out->id = 0;
+    out->name_length = strlen(dir->found_file.cFileName);
+    strncpy(out->name, dir->found_file.cFileName, 256);
+
+    return 1;
+#endif
+
+#ifdef _BH_LINUX
+    struct dirent *ent;
+    while (1) {
+        ent = readdir(dir);
+        if (ent == NULL) return 0;
+
+        // Skip the current directory and parent directory
+        if (strcmp(ent->d_name, ".") && strcmp(ent->d_name, "..")) break;
+    }
+
+    bh_dirent_type type = 0;
+    switch (ent->d_type) {
+        case DT_UNKNOWN: break;
+        case DT_BLK: type = BH_DIRENT_BLOCK; break;
+        case DT_CHR: type = BH_DIRENT_CHAR; break;
+        case DT_DIR: type = BH_DIRENT_DIRECTORY; break;
+        case DT_LNK: type = BH_DIRENT_SYMLINK; break;
+        case DT_REG: type = BH_DIRENT_FILE; break;
+        default: type = BH_DIRENT_OTHER; break;
+    }
+
+    if (out == NULL) return 1;
+
+    out->type = type;
+    out->id = (u32) ent->d_ino;
+    out->name_length = strlen(ent->d_name);
+    strncpy(out->name, ent->d_name, 256);
+
+    return 1;
+#endif
+}
+
+void bh_dir_close(bh_dir dir) {
+#ifdef _BH_WINDOWS
+    if (dir == NULL) return;
+
+    FindClose(dir->hndl);
+    free(dir);
+#endif
+
+#ifdef _BH_LINUX
+    if (dir == NULL) return;
+    closedir(dir);
+#endif
 }
 
 #undef DIR_SEPARATOR

@@ -124,6 +124,7 @@ typedef enum AstKind {
     Ast_Kind_Package,
     Ast_Kind_Load_File,
     Ast_Kind_Load_Path,
+    Ast_Kind_Load_All,
     Ast_Kind_Library_Path,
     Ast_Kind_Memres,
 

@@ -2984,6 +2984,14 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(include);
                 return;
             }
+            else if (parse_possible_directive(parser, "load_all")) {
+                AstInclude* include = make_node(AstInclude, Ast_Kind_Load_All);
+                include->token = dir_token;
+                include->name_node = parse_expression(parser, 0);
+
+                ENTITY_SUBMIT(include);
+                return;
+            }
             else if (parse_possible_directive(parser, "load_path")) {
                 AstInclude* include = make_node(AstInclude, Ast_Kind_Load_Path);
                 include->token = dir_token;

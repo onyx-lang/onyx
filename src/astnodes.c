@@ -7,6 +7,7 @@ static const char* ast_node_names[] = {
     "PACKAGE",
     "INCLUDE FILE",
     "INCLUDE FOLDER",
+    "INCLUDE ALL IN FOLDER",
     "INCLUDE LIBRARY PATH",
     "MEMORY RESERVATION",
 
