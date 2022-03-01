@@ -68,8 +68,8 @@ init :: (use map: ^Map($K, $V), default := __zero_value(V)) {
 }
 
 free :: (use map: ^Map) {
-    memory.free_slice(^hashes, allocator=allocator);
-    array.free(^entries);
+    if map.hashes.data != null do memory.free_slice(^hashes, allocator=allocator);
+    if map.entries.data != null do array.free(^entries);
 }
 
 put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {

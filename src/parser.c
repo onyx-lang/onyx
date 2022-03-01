@@ -1968,6 +1968,19 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             continue;
         }
 
+        if (parse_possible_directive(parser, "persist")) {
+            b32 thread_local = parse_possible_directive(parser, "thread_local");
+
+            OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
+            AstMemRes* memres = parse_memory_reservation(parser, symbol, thread_local);
+
+            AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
+            binding->token = memres->token;
+            binding->node = (AstNode *) memres;
+            ENTITY_SUBMIT(binding);
+            continue;
+        }
+
         if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
             if (!s_node->scope) {
                 s_node->scope = scope_create(context.ast_alloc, parser->current_scope, s_node->token->pos);
