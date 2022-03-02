@@ -32,6 +32,8 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     __exit :: (status: i32) -> void ---
 
     __sleep :: (milliseconds: i32) -> void ---
+
+    __time :: () -> u64 ---
 }
 
 #export "_start" () {

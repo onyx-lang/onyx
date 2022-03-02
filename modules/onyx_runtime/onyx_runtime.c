@@ -787,6 +787,11 @@ ONYX_DEF(__sleep, (WASM_I32), ()) {
     return NULL;
 }
 
+ONYX_DEF(__time, (), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL(bh_time_curr());
+    return NULL;
+}
+
 
 
 //
@@ -1044,6 +1049,7 @@ ONYX_LIBRARY {
 
     ONYX_FUNC(__exit)
     ONYX_FUNC(__sleep)
+    ONYX_FUNC(__time)
 
     ONYX_FUNC(__net_create_socket)
     ONYX_FUNC(__net_close_socket)

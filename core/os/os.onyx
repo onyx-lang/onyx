@@ -48,3 +48,7 @@ exit :: (exitcode: i32) {
 #if #defined(runtime.__sleep) {
     sleep :: runtime.__sleep
 }
+
+#if #defined(runtime.__time) {
+    time :: runtime.__time
+}
