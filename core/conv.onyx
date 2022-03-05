@@ -310,11 +310,21 @@ format :: #match {}
 #match format (output: ^Format_Output, format: str, va: ..any) -> str {
     return format_va(output, format, ~~va); 
 }
+#match format (buffer: ^[..] u8, format: str, va: ..any) {
+    buffer.count = buffer.capacity;
+    out := format_va(*buffer, format, ~~va);
+    buffer.count = out.count;
+}
 
 format_va :: #match {}
 #match format_va (buffer: [] u8, format: str, va: [] any) -> str {
     output := Format_Output.{ buffer.data, 0, buffer.count };
     return format_va(^output, format, va);
+}
+#match format_va (buffer: ^[..] u8, format: str, va: [] any) {
+    buffer.count = buffer.capacity;
+    out := format_va(*buffer, format, va);
+    buffer.count = out.count;
 }
 
 #match format_va (output: ^Format_Output, format: str, va: [] any) -> str {

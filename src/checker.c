@@ -2548,8 +2548,12 @@ CheckStatus check_process_directive(AstNode* directive) {
             case Ast_Kind_Struct_Type: {
                 AstStructType* st = (AstStructType *) tag->expr;
 
-                if (st->meta_tags == NULL) bh_arr_new(global_heap_allocator, st->meta_tags, 1);
-                bh_arr_push(st->meta_tags, tag->tag);
+                bh_arr(AstTyped *) tags = st->meta_tags;
+
+                if (tags == NULL) bh_arr_new(global_heap_allocator, tags, 1);
+                bh_arr_push(tags, tag->tag);
+
+                st->meta_tags = tags;
 
                 return Check_Complete;
             }
