@@ -6,10 +6,12 @@ CORE_DIR='/usr/share/onyx'
 # Where the onyx executable will be placed.
 BIN_DIR='/usr/bin'
 
+ARCH="$(uname -m)"
+
 # Where the Wasmer library files can be found.
 # They are bundled with the project, but if a different version is available, these can be changed.
 WASMER_INCLUDE_DIR="$(pwd)/lib/common/include"
-WASMER_LIBRARY_DIR="$(pwd)/lib/linux_x86_64/lib"
+WASMER_LIBRARY_DIR="$(pwd)/lib/linux_$ARCH/lib"
 
 # Where the intermediate build files go.
 BUILD_DIR='./build'
