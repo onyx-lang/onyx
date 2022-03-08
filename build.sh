@@ -24,6 +24,7 @@ if [ ! -f "$CORE_DIR/lib/libwasmer.so" ]; then
     sudo mkdir -p "$CORE_DIR/lib"
 
     echo "Copying libwasmer to $CORE_DIR/lib (first install)"
+    # sudo cp "$WASMER_LIBRARY_DIR/libiwasm.so" "$CORE_DIR/lib/libiwasm.so"
     sudo cp "$WASMER_LIBRARY_DIR/libwasmer.so" "$CORE_DIR/lib/libwasmer.so"
     sudo cp "$WASMER_LIBRARY_DIR/libwasmer.a" "$CORE_DIR/lib/libwasmer.a"
 fi

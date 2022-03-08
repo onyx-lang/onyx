@@ -11,10 +11,10 @@
     #include <sys/wait.h>
     #include <dlfcn.h>
 #endif
-
-#ifndef WASMER_VERSION
-    #error "Currently, building the Onyx compiler with built-in execution support requires the Wasmer library to be compiled and linked."
-#endif
+// 
+// #ifndef WASMER_VERSION
+//     #error "Currently, building the Onyx compiler with built-in execution support requires the Wasmer library to be compiled and linked."
+// #endif
 
 static wasm_config_t*    wasm_config;
 static wasm_engine_t*    wasm_engine;
@@ -215,6 +215,9 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     bh_arr_new(bh_heap_allocator(), linkable_functions, 4);
     onyx_lookup_and_load_custom_libraries(wasm_bytes);
 
+    // void wasm_runtime_init();
+    // wasm_runtime_init();
+
     wasmer_features_t* features = NULL;
     wasm_trap_t* run_trap = NULL;
 
@@ -249,6 +252,8 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_module_imports(wasm_module, &module_imports);
 
     wasm_imports = (wasm_extern_vec_t) WASM_EMPTY_VEC;
+    // wasm_imports.data = malloc(module_imports.size * 64);
+    // wasm_imports.size = module_imports.size;
     wasm_extern_vec_new_uninitialized(&wasm_imports, module_imports.size); // @Free
 
     fori (i, 0, (i32) module_imports.size) {
