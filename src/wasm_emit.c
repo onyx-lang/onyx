@@ -633,6 +633,11 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
         return;
     }
 
+    if (type->kind == Type_Kind_Struct) {
+        assert(bh_arr_length(type->Struct.linear_members) == 1);
+        type = type->Struct.linear_members[0].type;
+    }
+
     if (type->kind == Type_Kind_Array) {
         emit_array_store(mod, pcode, type, offset);
         return;
@@ -676,6 +681,11 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     if (type_is_compound(type)) {
         emit_compound_load(mod, pcode, type, offset);
         return;
+    }
+
+    if (type->kind == Type_Kind_Struct) {
+        assert(bh_arr_length(type->Struct.linear_members) == 1);
+        type = type->Struct.linear_members[0].type;
     }
 
     if (type->kind == Type_Kind_Array) {
@@ -3205,6 +3215,10 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
 
     // HACK: Slightly: the wasm type for structs has to be 0x00
     WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
+    if (ft->Function.return_type->kind == Type_Kind_Struct && !type_is_compound(ft->Function.return_type)) {
+        return_type = onyx_type_to_wasm_type(ft->Function.return_type->Struct.linear_members[0].type);
+    }
+
     *(t++) = (char) return_type;
     *t = '\0';
 

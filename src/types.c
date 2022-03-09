@@ -1284,6 +1284,18 @@ b32 type_is_numeric(Type* type) {
 
 b32 type_is_compound(Type* type) {
     if (type == NULL) return 0;
+
+    if (type->kind == Type_Kind_Struct) {
+        //
+        // This is for the kind of common case where a structure simply wraps a
+        // single non-compound value; in this situation, the structure can be
+        // "dissolved" at compile-time and turn into the underlying type.
+        //
+        
+        if (bh_arr_length(type->Struct.linear_members) != 1) return 1;
+        return type_is_compound(type->Struct.linear_members[0].type);
+    }
+
     return type->kind != Type_Kind_Basic
         && type->kind != Type_Kind_Pointer
         && type->kind != Type_Kind_Enum
