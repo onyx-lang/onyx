@@ -1,5 +1,7 @@
 package opengles
 
+use package core { cptr }
+
 #library "onyx_opengles"
 
 GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
@@ -108,7 +110,7 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glSampleCoverage :: (value: GLfloat, invert: GLboolean) -> void ---
     glScissor :: (x: GLint, y: GLint, width: GLsizei, height: GLsizei) -> void ---
     glShaderBinary :: (count: GLsizei, shaders: ^GLuint, binaryformat: GLenum, binary: rawptr, length: GLsizei) -> void ---
-    glShaderSource :: (shader: GLuint, count: GLsizei, string: ^^GLchar, length: ^GLint) -> void ---
+    glShaderSource :: (shader: GLuint, count: GLsizei, string: ^cptr(GLchar), length: ^GLint) -> void ---
     glStencilFunc :: (func: GLenum, ref: GLint, mask: GLuint) -> void ---
     glStencilFuncSeparate :: (face: GLenum, func: GLenum, ref: GLint, mask: GLuint) -> void ---
     glStencilMask :: (mask: GLuint) -> void ---
@@ -217,7 +219,7 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glClearBufferfi :: (buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint) -> void ---
     glGetStringi :: (name: GLenum, index: GLuint) -> ^GLubyte ---
     glCopyBufferSubData :: (readTarget: GLenum, writeTarget: GLenum, readOffset: GLintptr, writeOffset: GLintptr, size: GLsizeiptr) -> void ---
-    glGetUniformIndices :: (program: GLuint, uniformCount: GLsizei, uniformNames: ^^GLchar, uniformIndices: ^GLuint) -> void ---
+    glGetUniformIndices :: (program: GLuint, uniformCount: GLsizei, uniformNames: ^cptr(GLchar), uniformIndices: ^GLuint) -> void ---
     glGetActiveUniformsiv :: (program: GLuint, uniformCount: GLsizei, uniformIndices: ^GLuint, pname: GLenum, params: ^GLint) -> void ---
     glGetUniformBlockIndex :: (program: GLuint, uniformBlockName: ^GLchar) -> GLuint ---
     glGetActiveUniformBlockiv :: (program: GLuint, uniformBlockIndex: GLuint, pname: GLenum, params: ^GLint) -> void ---
