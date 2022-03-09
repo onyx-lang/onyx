@@ -49,10 +49,12 @@ package core
 #if runtime.runtime == .Onyx   {
     #load "./runtime/onyx_run"
     #load "./os/process"
-    #load "./os/onyx_fs"
 
     #load "./net/net"
     #load "./net/tcp"
+
+    #load "./onyx/fs"
+    #load "./onyx/cptr"
 }
 #if runtime.runtime == .Wasi   {
     #load "./wasi/wasi"

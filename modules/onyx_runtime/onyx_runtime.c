@@ -1018,6 +1018,45 @@ ONYX_DEF(__net_address_get_port, (WASM_I64), (WASM_I32)) {
 }
 
 
+
+
+//
+// C-Pointers
+//
+// These are wildly unsafe and break the core principles of the security
+// of WebAssembly, so there should be a way to turn them off!
+//
+ONYX_DEF(__cptr_make, (WASM_I32), (WASM_I64)) {
+    wasm_val_init_ptr(&results->data[0], ONYX_PTR(params->data[0].of.i32));
+    return NULL;
+}
+
+ONYX_DEF(__cptr_read, (WASM_I64, WASM_I32, WASM_I32), ()) {
+    memcpy(ONYX_PTR(params->data[1].of.i32), (void *) params->data[0].of.i64, params->data[2].of.i32);
+    return NULL;
+}
+
+ONYX_DEF(__cptr_read_u8, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(*(u8 *) params->data[0].of.i64);
+    return NULL;
+}
+
+ONYX_DEF(__cptr_read_u16, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(*(u16 *) params->data[0].of.i64);
+    return NULL;
+}
+
+ONYX_DEF(__cptr_read_u32, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(*(u32 *) params->data[0].of.i64);
+    return NULL;
+}
+
+ONYX_DEF(__cptr_read_u64, (WASM_I64), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL(*(u64 *) params->data[0].of.i64);
+    return NULL;
+}
+
+
 ONYX_LIBRARY {
     ONYX_FUNC(__file_open_impl)
     ONYX_FUNC(__file_close)
@@ -1063,6 +1102,13 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_poll_recv)
     ONYX_FUNC(__net_address_get_address)
     ONYX_FUNC(__net_address_get_port)
+
+    ONYX_FUNC(__cptr_make)
+    ONYX_FUNC(__cptr_read)
+    ONYX_FUNC(__cptr_read_u8)
+    ONYX_FUNC(__cptr_read_u16)
+    ONYX_FUNC(__cptr_read_u32)
+    ONYX_FUNC(__cptr_read_u64)
 
     NULL
 };
