@@ -1,5 +1,7 @@
 package glfw3
 
+use package core { cptr }
+
 // Temporary path
 #library "onyx_glfw3"
 
@@ -46,7 +48,7 @@ GLFWgammaramp :: struct {
     glfwGetInputMode :: (window: GLFWwindow_p, mode: i32) -> i32 ---
     glfwSetInputMode :: (window: GLFWwindow_p, mode, value: i32) -> void ---
     glfwRawMouseMotionSupported :: () -> i32 ---
-    // glfwGetKeyName :: (key, scancode: i32) -> cstr ---
+    glfwGetKeyName :: (key, scancode: i32) -> cptr(u8) ---
     glfwGetKeyScancode :: (key: i32) -> i32 ---
     glfwGetKey :: (window: GLFWwindow_p, key: i32) -> i32 ---
     glfwGetMouseButton :: (window: GLFWwindow_p, button: i32) -> i32 ---

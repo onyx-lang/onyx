@@ -248,7 +248,11 @@ ONYX_DEF(glfwRawMouseMotionSupported, (), (INT)) {
     return NULL;
 }
 
-// // glfwGetKeyName :: (key, scancode: i32) -> cstr ---
+ONYX_DEF(glfwGetKeyName, (INT, INT), (LONG)) {
+    wasm_val_init_ptr(&results->data[0], glfwGetKeyName(params->data[0].of.i32, params->data[1].of.i32));
+    return NULL;
+}
+
 ONYX_DEF(glfwGetKeyScancode, (INT), (INT)) {
     results->data[0] = WASM_I32_VAL(params->data[0].of.i32);
     return NULL;
@@ -528,6 +532,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(glfwGetInputMode)
     ONYX_FUNC(glfwSetInputMode)
     ONYX_FUNC(glfwRawMouseMotionSupported)
+    ONYX_FUNC(glfwGetKeyName)
     ONYX_FUNC(glfwGetKeyScancode)
     ONYX_FUNC(glfwGetKey)
     ONYX_FUNC(glfwGetMouseButton)
