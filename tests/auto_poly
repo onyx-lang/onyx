@@ -1,0 +1,15 @@
+i32
+i32
+Map(i32, [] u8)
+Vector2(i32) { x = 1, y = 1 }
+i32 to [] u8
+1234
+WOOT WOOT!!!
+type of thing is ^Thing(f32)
+thing is Thing(f32) { value = 0.0000 }
+0
+2
+4
+6
+8
+10

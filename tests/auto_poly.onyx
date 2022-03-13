@@ -1,0 +1,49 @@
+#load "core/std"
+
+use package core
+
+dumb :: (it: Iterator, m: ^Map) {
+    println(it.Iter_Type);
+    println(__autopoly_var_0);
+    println(typeof *m);
+}
+
+Vector2 :: struct (T: type_expr) {
+    x, y: T;
+}
+
+vec_add :: (v1: Vector2, v2: typeof v1) => (typeof v1).{ v1.x + v2.x, v1.y + v2.y };
+
+mappable :: (k: m.Key_Type, m: ^Map, x: $T) {
+    printf("{} to {}\n", m.Key_Type, m.Value_Type);
+    println(k);
+    println(x);
+}
+
+Thing :: struct (type: type_expr) {
+    value: type;
+}
+
+f :: (thing: ^Thing, other: typeof thing) {
+    printf("type of thing is {}\n", typeof thing);
+    printf("thing is {}\n", *thing);
+}
+
+main :: (args) => {
+    m: Map(i32, str);
+    dumb(iter.as_iterator(1 .. 10), ^m);
+
+    V :: Vector2(i32)
+    v1 := V.{ 1, 0 };
+    v2 := V.{ 0, 1 };
+    println(vec_add(v1, v2));
+
+    mappable(1234, ^m, "WOOT WOOT!!!");
+
+    t: Thing(f32);
+    f(^t, ^t);
+
+    for iter.as_iterator(0 .. 100) |> iter.map(x => x * 2) |> iter.filter(x => x <= 10) {
+        println(it);
+    }
+}
