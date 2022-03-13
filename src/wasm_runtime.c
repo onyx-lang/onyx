@@ -210,6 +210,18 @@ static void onyx_print_trap(wasm_trap_t* trap) {
 b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     runtime = &wasm_runtime;
 
+    if (wasm_bytes.data[0] != 'O'
+        || wasm_bytes.data[1] != 'N'
+        || wasm_bytes.data[2] != 'Y'
+        || wasm_bytes.data[3] != 'X') {
+        printf("Bad magic bytes for Onyx binary.\n");
+        return 0;
+    } else {
+        wasm_bytes.data[0] = '\0';
+        wasm_bytes.data[1] = 'a';
+        wasm_bytes.data[2] = 's';
+        wasm_bytes.data[3] = 'm';
+    }
     wasm_raw_bytes = wasm_bytes;
 
     bh_arr_new(bh_heap_allocator(), linkable_functions, 4);

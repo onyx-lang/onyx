@@ -21,6 +21,7 @@
 
 typedef i32 vector_func(void*, bh_buffer*);
 
+static const u8 ONYX_MAGIC_STRING[] = "ONYX";
 static const u8 WASM_MAGIC_STRING[] = { 0x00, 0x61, 0x73, 0x6D };
 static const u8 WASM_VERSION[] = { 0x01, 0x00, 0x00, 0x00 };
 
@@ -761,7 +762,11 @@ static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* bu
 
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
     bh_buffer_init(buffer, global_heap_allocator, 128);
-    bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
+    if (context.options->runtime == Runtime_Onyx) {
+        bh_buffer_append(buffer, ONYX_MAGIC_STRING, 4);
+    } else {
+        bh_buffer_append(buffer, WASM_MAGIC_STRING, 4);
+    }
     bh_buffer_append(buffer, WASM_VERSION, 4);
 
     output_typesection(module, buffer);

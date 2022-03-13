@@ -227,6 +227,26 @@ strip_trailing_whitespace :: #match {
     },
 }
 
+to_uppercase :: (s: str) -> str {
+    for^ ch: s {
+        if *ch >= #char "a" && *ch <= #char "z" {
+            *ch -= 32;
+        }
+    }
+
+    return s;
+}
+
+to_lowercase :: (s: str) -> str {
+    for^ ch: s {
+        if *ch >= #char "A" && *ch <= #char "Z" {
+            *ch += 32;
+        }
+    }
+
+    return s;
+}
+
 trim_start :: #match {
     (s: ^str, char: u8) {
         while s.data[0] == char {
@@ -337,4 +357,8 @@ advance_line :: (s: ^str) {
 
     s.data += adv + 1;
     s.count -= adv + 1;
+}
+
+as_str :: #match {
+    from_cstr
 }

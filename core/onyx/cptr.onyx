@@ -23,6 +23,10 @@ cptr :: struct (T: type_expr) {
     read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data);
 }
 
+#operator + macro (p: cptr($T), v: i32) -> cptr(T) {
+    return .{ p.data + ~~(v * sizeof T) };
+}
+
 #local {
     #foreign "onyx_runtime" {
         __cptr_make     :: (x: rawptr) -> u64 ---
@@ -34,9 +38,9 @@ cptr :: struct (T: type_expr) {
 
         //
         // The equivalent write instructions are pusposefully left out.
-        // Until a VERY CONVINCING REASON as to why the must be included
-        // arises, having them in is more of a security vulnerability than
-        // I want to have.
+        // Until a VERY CONVINCING REASON as to why they must be included
+        // arises, including them is more of a security vulnerability than
+        // I am willing to have.
         //
     }
 }
