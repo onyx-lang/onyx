@@ -1744,6 +1744,7 @@ bh_dir bh_dir_open(char* path) {
     char new_path[512] = { 0 };
     strncpy(new_path, path, 511);
     bh_path_convert_separators(new_path);
+    strncat(new_path, "\\*.*", 511);
 
     Windows_Directory_Opened* dir = malloc(sizeof(Windows_Directory_Opened));
     dir->hndl = FindFirstFileA(new_path, &dir->found_file);
