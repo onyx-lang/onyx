@@ -1470,6 +1470,7 @@ static SymresStatus symres_include(AstInclude* include) {
     if (str_token != NULL) {
         token_toggle_end(str_token);
         include->name = bh_strdup(context.ast_alloc, str_token->text);
+        string_process_escape_seqs(include->name, include->name, strlen(include->name));
         token_toggle_end(str_token);
     }
 
