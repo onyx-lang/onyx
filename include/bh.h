@@ -1741,11 +1741,12 @@ char* bh_path_convert_separators(char* path) {
 
 bh_dir bh_dir_open(char* path) {
 #ifdef _BH_WINDOWS
-    for (int i=0; i<strlen(path); i++) if (path[i] == '/') path[i] = '\\';
-    strncat(path, "\\*.*", 511);
+    char new_path[512] = { 0 };
+    strncpy(new_path, path, 511);
+    bh_path_convert_separators(new_path);
 
     Windows_Directory_Opened* dir = malloc(sizeof(Windows_Directory_Opened));
-    dir->hndl = FindFirstFileA(path, &dir->found_file);
+    dir->hndl = FindFirstFileA(new_path, &dir->found_file);
     if (dir->hndl == INVALID_HANDLE_VALUE) {
         return NULL;
     }
