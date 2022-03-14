@@ -379,6 +379,7 @@ i64 bh_file_size(bh_file* file);
 b32 bh_file_exists(char const* filename);
 char* bh_path_get_full_name(char const* filename, bh_allocator a);
 char* bh_path_get_parent(char const* filename, bh_allocator a);
+char* bh_path_convert_separators(char* path);
 
 // This function returns a volatile pointer. Do not store it without copying!
 // `included_folders` is bh_arr(const char *).
@@ -1715,6 +1716,26 @@ char* bh_lookup_file(char* filename, char* relative_to, char *suffix, b32 add_su
     }
 
     return fn;
+}
+
+//
+// Modifies the path in-place.
+char* bh_path_convert_separators(char* path) {
+#if defined(_BH_LINUX)
+    #define DIR_SEPARATOR '/'
+    #define OTHER_SEPARATOR '\\'
+#elif defined(_BH_WINDOWS)
+    #define DIR_SEPARATOR '\\'
+    #define OTHER_SEPARATOR '/'
+#endif
+
+    fori (i, 0, (i64) strlen(path)) {
+        if (path[i] == OTHER_SEPARATOR) {
+            path[i] = DIR_SEPARATOR;
+        }
+    }
+
+    return path;
 }
 
 

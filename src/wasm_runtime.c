@@ -140,6 +140,7 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
                     char *lib_path = malloc(lib_path_length);
                     strncpy(lib_path, wasm_bytes.data + cursor, lib_path_length);
                     lib_path[lib_path_length] = '\0';
+                    bh_path_convert_separators(lib_path);
                     cursor += lib_path_length;
 
                     bh_arr_push(library_paths, lib_path);

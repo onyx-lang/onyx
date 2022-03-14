@@ -1,10 +1,12 @@
 #!/bin/sh
 
+INSTALL_DIR="/usr"
+
 # Where the core libraries for Onyx will go. 
-CORE_DIR='/usr/share/onyx'
+CORE_DIR="$INSTALL_DIR/share/onyx"
 
 # Where the onyx executable will be placed.
-BIN_DIR='/usr/bin'
+BIN_DIR="$INSTALL_DIR/bin"
 
 ARCH="$(uname -m)"
 
@@ -72,6 +74,7 @@ compile() {
 
 compile
 echo "Installing onyx executable"
+sudo mkdir -p "$BIN_DIR"
 sudo cp ./bin/onyx "$BIN_DIR/onyx"
 
 C_FILES="onyxrun wasm_runtime"

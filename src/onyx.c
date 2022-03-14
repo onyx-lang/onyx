@@ -353,6 +353,7 @@ static b32 process_load_entity(Entity* ent) {
 
         // This does not take into account #load_path'd folders...
 
+        bh_path_convert_separators(folder);
         bh_dir dir = bh_dir_open(folder);
         if (dir == NULL) {
             onyx_report_error(include->token->pos, Error_Critical, "Could not find folder '%s'.", folder);
@@ -365,6 +366,7 @@ static b32 process_load_entity(Entity* ent) {
         while (bh_dir_read(dir, &entry)) {
             if (entry.type == BH_DIRENT_FILE && bh_str_ends_with(entry.name, ".onyx")) {
                 bh_snprintf(fullpath, 511, "%s/%s", folder, entry.name);
+                bh_path_convert_separators(fullpath);
                 u8* formatted_name = bh_path_get_full_name(fullpath, global_heap_allocator);
                 success = process_source_file(formatted_name, include->token->pos);
                 if (!success) break;
