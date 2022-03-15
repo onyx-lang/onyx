@@ -39,7 +39,7 @@ jobs:
           path: |
             core
             examples
-            lib/windows_x86_64
+            lib/windows_x86_64/lib/wasmer.dll
             misc
             modules
             onyx_runtime.dll
