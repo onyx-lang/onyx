@@ -89,7 +89,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
     char* core_installation;
     #ifdef _BH_LINUX
-    core_installation = "/usr/share/onyx";
+    core_installation = CORE_INSTALLATION;
     #endif
     #ifdef _BH_WINDOWS
     core_installation = bh_alloc_array(global_heap_allocator, u8, 512);
