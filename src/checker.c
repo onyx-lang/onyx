@@ -1606,6 +1606,12 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         token_toggle_end(field->token);
     }
 
+    if (field->expr->type->kind == Type_Kind_Struct) {
+        if (field->expr->type->Struct.status != SPS_Uses_Done) {
+            YIELD(field->token->pos, "Waiting for struct type to be completed before looking up members.");
+        }
+    }
+
     StructMember smem;
     if (!type_lookup_member(field->expr->type, field->field, &smem)) {
         if (field->expr->type->kind == Type_Kind_Array) {
