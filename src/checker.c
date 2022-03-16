@@ -2163,16 +2163,25 @@ CheckStatus check_struct(AstStructType* s_node) {
         }
     }
 
-    // NOTE: fills in the stcache
+    // NOTE: fills in the pending_type.
     type_build_from_ast(context.ast_alloc, (AstType *) s_node);
-    if (s_node->stcache == NULL || !s_node->stcache_is_valid)
+    if (s_node->pending_type == NULL || !s_node->pending_type_is_valid)
         YIELD(s_node->token->pos, "Waiting for type to be constructed.");
 
-    bh_arr_each(StructMember *, smem, s_node->stcache->Struct.memarr) {
+    bh_arr_each(StructMember *, smem, s_node->pending_type->Struct.memarr) {
         if ((*smem)->type->kind == Type_Kind_Compound) {
             ERROR(s_node->token->pos, "Compound types are not allowed as struct member types.");
         }
+
+        if ((*smem)->used) {
+            if (!type_struct_member_apply_use(context.ast_alloc, s_node->pending_type, *smem)) {
+                YIELD((*smem)->token->pos, "Waiting for use to be applied.");
+            }
+        }
     }
+
+    s_node->stcache = s_node->pending_type;
+    s_node->stcache->Struct.status = SPS_Uses_Done;
 
     return Check_Success;
 }

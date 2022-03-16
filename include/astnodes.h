@@ -888,6 +888,11 @@ struct AstStructType {
     // a struct type is kind of complicated and should
     // only happen once.
     Type *stcache;
+
+    // NOTE: This type is used when the structure has not been
+    // completely generated, but is a valid pointer to where the
+    // type will be generated to.
+    Type *pending_type;
     
     // NOTE: Used to store statically bound expressions in the struct.
     Scope* scope;
@@ -898,8 +903,8 @@ struct AstStructType {
     OnyxFilePos polymorphic_error_loc;
     ConstraintContext constraints;
 
-    b32 stcache_is_valid : 1;
-    b32 is_union         : 1;
+    b32 pending_type_is_valid : 1;
+    b32 is_union              : 1;
 };
 struct AstStructMember {
     AstTyped_base;

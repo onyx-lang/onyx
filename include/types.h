@@ -76,6 +76,7 @@ typedef struct StructMember {
     // be many struct members, and iterating through an array would be
     // easier and less costly.                  - brendanfh 2020/09/17
     char *name;
+    struct OnyxToken* token;
 
     struct AstTyped** initial_value;
     i32 use_through_pointer_index;
@@ -91,6 +92,12 @@ struct TypeWithOffset {
     u32   offset;
 };
 
+typedef enum StructProcessingStatus {
+    SPS_Start,
+    SPS_Members_Done,
+    SPS_Uses_Done,
+} StructProcessingStatus;
+
 #define TYPE_KINDS \
     TYPE_KIND(Basic, TypeBasic)                                   \
     TYPE_KIND(Pointer, struct { TypeBasic base; Type *elem; })    \
@@ -105,12 +112,13 @@ struct TypeWithOffset {
         char* name;                                               \
         u32 size;                                                 \
         u16 alignment, mem_count;                                 \
-        Table(StructMember) members;                              \
+        Table(StructMember *) members;                            \
         bh_arr(StructMember *) memarr;                            \
         bh_arr(struct AstPolySolution) poly_sln;                  \
         bh_arr(TypeWithOffset) linear_members;                    \
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
+        StructProcessingStatus status;                            \
     })                                                            \
     TYPE_KIND(PolyStruct, struct {                                \
         char* name;                                               \
@@ -199,6 +207,7 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of);
 Type* type_make_varargs(bh_allocator alloc, Type* of);
 
 void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset);
+b32  type_struct_member_apply_use(bh_allocator alloc, Type *s_type, StructMember *smem);
 
 const char* type_get_unique_name(Type* type);
 const char* type_get_name(Type* type);

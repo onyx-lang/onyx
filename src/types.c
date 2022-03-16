@@ -337,18 +337,20 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
         case Ast_Kind_Struct_Type: {
             AstStructType* s_node = (AstStructType *) type_node;
-            if (s_node->stcache != NULL && s_node->stcache_is_valid) return s_node->stcache;
+            if (s_node->stcache != NULL) return s_node->stcache;
+            if (s_node->pending_type != NULL && s_node->pending_type_is_valid) return s_node->pending_type;
 
             Type* s_type;
-            if (s_node->stcache == NULL) {
+            if (s_node->pending_type == NULL) {
                 s_type = type_create(Type_Kind_Struct, alloc, 0);
-                s_node->stcache = s_type;
+                s_node->pending_type = s_type;
 
                 s_type->ast_type = type_node;
                 s_type->Struct.name = s_node->name;
                 s_type->Struct.mem_count = bh_arr_length(s_node->members);
                 s_type->Struct.meta_tags = s_node->meta_tags;
                 s_type->Struct.constructed_from = NULL;
+                s_type->Struct.status = SPS_Start;
                 type_register(s_type);
 
                 s_type->Struct.memarr = NULL;
@@ -356,17 +358,16 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 bh_arr_new(global_heap_allocator, s_type->Struct.memarr, s_type->Struct.mem_count);
 
             } else {
-                s_type = s_node->stcache;
+                s_type = s_node->pending_type;
             }
 
             s_type->Struct.poly_sln = NULL;
 
             bh_arr_clear(s_type->Struct.memarr);
-            // bh_table_clear(s_type->Struct.members);
             shfree(s_type->Struct.members);
             sh_new_arena(s_type->Struct.members);
 
-            s_node->stcache_is_valid = 1;
+            s_node->pending_type_is_valid = 1;
 
             b32 is_union = s_node->is_union;
             u32 size = 0;
@@ -378,7 +379,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 if ((*member)->type == NULL) {
-                    s_node->stcache_is_valid = 0;
+                    s_node->pending_type_is_valid = 0;
                     return NULL;
                 }
 
@@ -397,63 +398,21 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     return NULL;
                 }
 
-                StructMember smem = {
-                    .offset = offset,
-                    .type = (*member)->type,
-                    .idx = idx,
-                    .name = bh_strdup(alloc, (*member)->token->text),
-                    .initial_value = &(*member)->initial_value,
-                    .meta_tags = (*member)->meta_tags,
+                StructMember* smem = bh_alloc_item(alloc, StructMember);
+                smem->offset = offset;
+                smem->type = (*member)->type;
+                smem->idx = idx;
+                smem->name = bh_strdup(alloc, (*member)->token->text);
+                smem->token = (*member)->token;
+                smem->initial_value = &(*member)->initial_value;
+                smem->meta_tags = (*member)->meta_tags;
 
-                    .included_through_use = 0,
-                    .used = (*member)->is_used,
-                    .use_through_pointer_index = -1,
-                };
+                smem->included_through_use = 0;
+                smem->used = (*member)->is_used;
+                smem->use_through_pointer_index = -1;
                 shput(s_type->Struct.members, (*member)->token->text, smem);
+                bh_arr_push(s_type->Struct.memarr, smem);
                 token_toggle_end((*member)->token);
-
-                if (smem.used) {
-                    Type* used_type = (*member)->type;
-
-                    b32 type_is_pointer = 0;
-                    if (used_type->kind == Type_Kind_Pointer) {
-                        type_is_pointer = 1;
-                        used_type = type_get_contained_type(used_type);
-                    }
-
-                    if (used_type->kind != Type_Kind_Struct) {
-                        onyx_report_error((*member)->token->pos, Error_Critical, "Can only use things of structure, or pointer to structure type.");
-                        return NULL;
-                    }
-
-                    bh_arr_each(StructMember*, psmem, used_type->Struct.memarr) {
-                        if (shgeti(s_type->Struct.members, (*psmem)->name) != -1) {
-                            onyx_report_error((*member)->token->pos, Error_Critical, "Used name '%s' conflicts with existing struct member.", (*psmem)->name);
-                            return NULL;
-                        }
-
-                        StructMember new_smem;
-                        new_smem.type   = (*psmem)->type;
-                        new_smem.name   = (*psmem)->name;
-                        new_smem.meta_tags = (*psmem)->meta_tags;
-                        new_smem.used = 0;
-                        new_smem.included_through_use = 1;
-
-                        if (type_is_pointer) {
-                            new_smem.offset = (*psmem)->offset;
-                            new_smem.idx = (*psmem)->idx;
-                            new_smem.initial_value = NULL;
-                            new_smem.use_through_pointer_index = idx;
-                        } else {
-                            new_smem.offset = offset + (*psmem)->offset;
-                            new_smem.idx    = -1; // Dummy value because I don't think this is needed.
-                            new_smem.initial_value = (*psmem)->initial_value;
-                            new_smem.use_through_pointer_index = -1;
-                        }
-
-                        shput(s_type->Struct.members, (*psmem)->name, new_smem);
-                    }
-                }
 
                 u32 type_size = type_size_of((*member)->type);
 
@@ -467,15 +426,6 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 idx++;
             }
 
-            // NOTE: Need to do a second pass because the references to the
-            // elements of the table may change if the internal arrays of the
-            // table need to be resized.
-            bh_arr_each(AstStructMember *, member, s_node->members) {
-                token_toggle_end((*member)->token);
-                bh_arr_push(s_type->Struct.memarr, &s_type->Struct.members[shgeti(s_type->Struct.members, (*member)->token->text)].value);
-                token_toggle_end((*member)->token);
-            }
-
             alignment = bh_max(s_node->min_alignment, alignment);
             bh_align(size, alignment);
             size = bh_max(s_node->min_size, size);
@@ -487,6 +437,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_arr_new(global_heap_allocator, s_type->Struct.linear_members, s_type->Struct.mem_count);
             build_linear_types_with_offset(s_type, &s_type->Struct.linear_members, 0);
 
+            s_type->Struct.status = SPS_Members_Done;
             return s_type;
         }
 
@@ -867,6 +818,53 @@ void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u
     }
 }
 
+b32 type_struct_member_apply_use(bh_allocator alloc, Type *s_type, StructMember *smem) {
+    Type* used_type = smem->type;
+
+    b32 type_is_pointer = 0;
+    if (used_type->kind == Type_Kind_Pointer) {
+        type_is_pointer = 1;
+        used_type = type_get_contained_type(used_type);
+    }
+
+    if (used_type->kind != Type_Kind_Struct) {
+        onyx_report_error(smem->token->pos, Error_Critical, "Can only use things of structure, or pointer to structure type.");
+        return 0;
+    }
+
+    if (used_type->Struct.status == SPS_Start) return 0;
+
+    bh_arr_each(StructMember*, psmem, used_type->Struct.memarr) {
+        if (shgeti(s_type->Struct.members, (*psmem)->name) != -1) {
+            onyx_report_error(smem->token->pos, Error_Critical, "Used name '%s' conflicts with existing struct member.", (*psmem)->name);
+            return 0;
+        }
+
+        StructMember* new_smem = bh_alloc_item(alloc, StructMember);
+        new_smem->type   = (*psmem)->type;
+        new_smem->name   = (*psmem)->name;
+        new_smem->meta_tags = (*psmem)->meta_tags;
+        new_smem->used = 0;
+        new_smem->included_through_use = 1;
+
+        if (type_is_pointer) {
+            new_smem->offset = (*psmem)->offset;
+            new_smem->idx = (*psmem)->idx;
+            new_smem->initial_value = NULL;
+            new_smem->use_through_pointer_index = smem->idx;
+        } else {
+            new_smem->offset = smem->offset + (*psmem)->offset;
+            new_smem->idx    = -1; // Dummy value because I don't think this is needed.
+            new_smem->initial_value = (*psmem)->initial_value;
+            new_smem->use_through_pointer_index = -1;
+        }
+
+        shput(s_type->Struct.members, (*psmem)->name, new_smem);
+    }
+
+    return 1;
+}
+
 const char* type_get_unique_name(Type* type) {
     if (type == NULL) return "unknown";
 
@@ -1018,15 +1016,15 @@ Type* type_get_contained_type(Type* type) {
 }
 
 static const StructMember slice_members[] = {
-    { 0,            0, NULL,                         "data",  NULL, -1, 0, 0 },
-    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "count", NULL, -1, 0, 0 },
+    { 0,            0, NULL,                         "data",  NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "count", NULL, NULL, -1, 0, 0 },
 };
 
 static const StructMember array_members[] = {
-    { 0,                0, NULL,                         "data",      NULL, -1, 0, 0 },
-    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "count",     NULL, -1, 0, 0 },
-    { POINTER_SIZE + 4, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, -1, 0, 0 },
-    { POINTER_SIZE + 8, 3, NULL,                         "allocator", NULL, -1, 0, 0 },
+    { 0,                0, NULL,                         "data",      NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "count",     NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE + 4, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE + 8, 3, NULL,                         "allocator", NULL, NULL, -1, 0, 0 },
 };
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
@@ -1038,7 +1036,7 @@ b32 type_lookup_member(Type* type, char* member, StructMember* smem) {
 
             i32 index = shgeti(stype->members, member);
             if (index == -1) return 0;
-            *smem = stype->members[index].value;
+            *smem = *stype->members[index].value;
             return 1;
         }
 

@@ -770,9 +770,9 @@ static SymresStatus symres_use(AstUse* use) {
             st = st->Pointer.elem;
 
         fori (i, 0, shlen(st->Struct.members)) {
-            StructMember value = st->Struct.members[i].value;
-            AstFieldAccess* fa = make_field_access(context.ast_alloc, use->expr, value.name);
-            symbol_raw_introduce(curr_scope, value.name, use->token->pos, (AstNode *) fa);
+            StructMember* value = st->Struct.members[i].value;
+            AstFieldAccess* fa = make_field_access(context.ast_alloc, use->expr, value->name);
+            symbol_raw_introduce(curr_scope, value->name, use->token->pos, (AstNode *) fa);
         }
 
         return Symres_Success;
@@ -1045,10 +1045,12 @@ SymresStatus symres_function(AstFunction* func) {
                         st = param->local->type->Pointer.elem;
                     }
 
+                    if (st->Struct.status != SPS_Uses_Done) return Symres_Yield_Macro;
+
                     fori (i, 0, shlen(st->Struct.members)) {
-                        StructMember value = st->Struct.members[i].value;
-                        AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value.name);
-                        symbol_raw_introduce(curr_scope, value.name, param->local->token->pos, (AstNode *) fa);
+                        StructMember* value = st->Struct.members[i].value;
+                        AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value->name);
+                        symbol_raw_introduce(curr_scope, value->name, param->local->token->pos, (AstNode *) fa);
                     }
 
                     param->use_processed = 1;
