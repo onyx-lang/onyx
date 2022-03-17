@@ -245,10 +245,17 @@ set :: (arr: [] $T, idx: i32, value: T) {
     arr.data[idx] = value;
 }
 
-// Uses '==' to compare for equality.
-contains :: (arr: [] $T, x: T) -> bool {
-    for it: arr do if it == x do return true;
-    return false;
+contains :: #match {
+    // Uses '==' to compare for equality.
+    (arr: [] $T, x: T) -> bool {
+        for it: arr do if it == x do return true;
+        return false;
+    },
+
+    macro (arr: [] $T, $cmp: Code) -> bool {
+        for it: arr do if #insert cmp do return true;
+        return false;
+    }
 }
 
 // Uses '+' to sum.
@@ -269,6 +276,12 @@ average :: (arr: [] $T) -> T {
     for it: *arr do sum += it;
 
     return sum / cast(T) arr.count;
+}
+
+reverse :: (arr: [] $T) {
+    for i: arr.count / 2 {
+        arr[i], arr[arr.count - 1 - i] = arr[arr.count - 1 - i], arr[i];
+    }
 }
 
 //
