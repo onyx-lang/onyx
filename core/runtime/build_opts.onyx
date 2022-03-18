@@ -13,3 +13,11 @@ OS :: enum {
     Linux       :: 1;
     Windows     :: 2;
 }
+
+// arch: Arch         This is set by the compiler.
+Arch :: enum {
+    Unknown     :: 0;
+    X86_64      :: 1;
+    X86_32      :: 2;
+    AARCH64     :: 3;
+}

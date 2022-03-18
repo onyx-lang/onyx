@@ -511,5 +511,25 @@ void introduce_build_options(bh_allocator a) {
     os_type->type_node = OS_Type;
     add_entities_for_node(NULL, (AstNode *) os_type, NULL, NULL);
     symbol_builtin_introduce(p->scope, "compiler_os", (AstNode *) os_type);
+
+    i32 arch = 0;
+    #if defined(__x86_64__) || defined(_M_X64)
+        arch = 1; // X86_64;
+    #elif defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)
+        arch = 2; // X86_32;
+    #elif defined(__aarch64__) || defined(_M_ARM64)
+        arch = 3; // AARCH64;
+    #endif
+
+    AstType* Arch_Type = (AstType *) symbol_raw_resolve(p->scope, "Arch");
+    if (Arch_Type == NULL) {
+        onyx_report_error((OnyxFilePos) {0}, Error_Critical, "'Arch' type not found in package runtime.");
+        return;
+    }
+
+    AstNumLit* arch_type = make_int_literal(a, arch);
+    arch_type->type_node = Arch_Type;
+    add_entities_for_node(NULL, (AstNode *) arch_type, NULL, NULL);
+    symbol_builtin_introduce(p->scope, "arch", (AstNode *) arch_type);
 }
 
