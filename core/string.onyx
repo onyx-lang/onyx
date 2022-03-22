@@ -86,10 +86,12 @@ concat :: #match {
         return buffer[0 .. total_copied];
     },
 
-    (into: ^[..] u8, s: str) -> str {
-        array.ensure_capacity(into, into.count + s.count);
-        memory.copy(into.data, s.data, into.count);
-        into.count += s.count;
+    (into: ^[..] u8, strings: ..str) -> str {
+        for s: strings {
+            array.ensure_capacity(into, into.count + s.count);
+            memory.copy(into.data + into.count, s.data, s.count);
+            into.count += s.count;
+        }
         return .{ into.data, into.count };
     }
 }

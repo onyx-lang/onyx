@@ -1,0 +1,182 @@
+package http
+
+#local {
+    HTTP_VERSION_STRING :: "HTTP/1.1"
+    USER_AGENT :: "onyx/0.1.0"
+}
+
+Request :: struct {
+    method: Method;
+    headers := __zero_value(Map(str, str));
+    host: str;
+    resource: str;
+    body: [] u8;
+
+    //
+    // Methods
+    //
+    // Send a request to a writer
+    send :: request_write;
+
+
+
+    //
+    // "Factory" that constructs a GET request
+    get :: (resource: str, params: [] struct {key, value: str;}) -> Request {
+        req := init(Request);
+        req.method = .GET;
+
+        res: [..] u8;
+        string.concat(^res, resource);
+        if params.count > 0 {
+            string.concat(^res, "?");
+
+            for^ p: params {
+                string.concat(^res, p.key, "=", p.value, "&");
+            }
+        }
+
+        req.resource = res;
+        req.body = null_str;
+        return req;
+    }
+}
+
+request_write :: (use req: ^Request, writer: ^io.Writer) {
+    io.write_format(writer, "{} {} {}\r\n", method, resource, HTTP_VERSION_STRING);
+    io.write_format(writer, "User-Agent: {}\r\n", USER_AGENT);
+    io.write_format(writer, "Host: {}\r\n", host);
+    io.write_format(writer, "Accept-Language: en\r\n");
+
+    for^ headers.entries {
+        io.write_format(writer, "{}: {}\r\n", it.key, it.value);
+    }
+
+    io.write(writer, "\r\n");
+    if body.count > 0 {
+        io.write(writer, body);
+    }
+}
+
+
+Response :: struct {
+    status: i32;
+    headers: HTTP_Headers;
+    body: [] u8;
+}
+
+
+
+Connection :: struct {
+    url: str;
+    port: u16;
+    socket: ^net.Socket;
+    r: io.Reader;
+    w: io.Writer;
+}
+
+Connection_Error :: enum {
+    None;
+    Protocol_Not_Supported;
+    Socket_Creation_Failed;
+    Connection_Failed;
+}
+
+connect :: (url_: str, port: u16 = 80) -> (Connection, Connection_Error) {
+    url := url_;
+    //
+    // HTTPS is strictly not supported.
+    if string.starts_with(url, "https://") {
+        return __zero_value(Connection), .Protocol_Not_Supported;
+    }
+
+    //
+    // Remove HTTP specifier if given.
+    if string.starts_with(url, "http://") {
+        url = url[7 .. url.count];
+    }
+
+    conn: Connection;
+    conn.url = url;
+    conn.port = port;
+    conn.socket = new(net.Socket);
+
+    err: net.SocketError;
+    *conn.socket, err = net.socket_create(.Inet, .Stream);
+    if err != .None {
+        return conn, .Socket_Creation_Failed;
+    }
+
+    if err := conn.socket->connect(url, port); err != .None {
+        return conn, .Connection_Failed;
+    }
+
+    // When using the io.Reader on a net.Socket, non-blocking reads must be enabled,
+    // because Reader assumes that it can call stream_read in a non-blocking way.
+    // If no data is available to read, but the stream is still alive, stream_read should
+    // return io.Error.ReadPending. If this is not set, the program can hang waiting for
+    // data to arrive on the socket when reading.
+    conn.socket->setting(.NonBlocking, 1);
+
+    conn.r = io.reader_make(conn.socket);
+    conn.w = io.writer_make(conn.socket);
+
+    return conn, .None;
+}
+
+request :: (connection: ^Connection, req: ^Request) -> Response {
+    req.host = connection.url;
+    req->send(^connection.w);
+
+    res: Response;
+    res.status = 500;
+
+    status_line := io.read_line(^connection.r, consume_newline=true, inplace=true);
+    if string.starts_with(status_line, "HTTP/1.1")
+        || string.starts_with(status_line, "HTTP/1.0") {
+        res.status = ~~ conv.str_to_i64(status_line[HTTP_VERSION_STRING.count+1 .. status_line.count]);
+    }
+
+    while true {
+        line := io.read_line(^connection.r, consume_newline=true);
+        if line == "\r\n" do break;
+        res.headers->parse_header_line(line);
+    }
+
+    data: [..] u8;
+    if res.headers.chunked {
+        read_chunked_body();
+    } else {
+        read_simple_body();
+    }
+
+    res.body = data;
+    return res;
+
+    read_chunked_body :: macro () {
+        while true {
+            line := io.read_line(^connection.r, consume_newline=true, inplace=true);
+            chunk_size := cast(u32) (line |> conv.str_to_i64(base=16));
+            if chunk_size == 0 do break;
+
+            array.ensure_capacity(^data, data.count + chunk_size);
+            read_n_bytes(chunk_size);
+
+            io.advance_line(^connection.r);
+        }
+    }
+
+    read_simple_body :: macro () {
+        array.ensure_capacity(^data, res.headers.content_length);
+        read_n_bytes(res.headers.content_length);
+    }
+
+    read_n_bytes :: macro (n: u32) {
+        to_read := n;
+        while to_read > 0 {
+            bytes_read, err := io.read_bytes(^connection.r, data.data[data.count .. data.count + to_read]);
+            to_read -= bytes_read;
+            data.count += bytes_read;
+        }
+    }
+}

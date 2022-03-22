@@ -16,6 +16,23 @@ Reader :: struct {
     error: Error;
 
     done : bool; // If an .EOF was reached.
+
+    read_all :: read_all;
+    read_byte :: read_byte;
+    unread_byte :: unread_byte;
+    read_bytes :: read_bytes;
+    read_string :: read_string;
+    read_i32 :: read_i32;
+    read_i64 :: read_i64;
+    read_u32 :: read_u32;
+    read_u64 :: read_u64;
+    read_line :: read_line;
+    read_word :: read_word;
+    read_until :: read_until;
+    peek_byte :: peek_byte;
+    advance_line :: advance_line;
+    skip_whitespace :: skip_whitespace;
+    skip_bytes :: skip_bytes;
 }
 
 reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
@@ -66,8 +83,11 @@ read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
     output := array.make(u8, 128, allocator=allocator);
 
     while !reader_empty(reader) {
-        if err := reader_read_next_chunk(reader); err != .None do break;
-        if error != .None {
+        if err := reader_read_next_chunk(reader); err != .None && err != .ReadPending {
+            break;
+        }
+
+        if error != .None && error != .ReadPending {
             reader_consume_error(reader);
             break;
         }
@@ -408,8 +428,6 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
 }
 
 #local reader_read_next_chunk :: (use reader: ^Reader) -> Error {
-    if done do return .None;
-
     if start > 0 {
         // This assumes that memory.copy behaves like memmove, in that the
         // buffer may overlap, but it should do the right thing.
@@ -417,6 +435,8 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
         end -= start;
         start = 0;
     }
+
+    if done do return .None;
 
     if end >= buffer.count {
         return .BufferFull;
