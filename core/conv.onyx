@@ -78,14 +78,14 @@ str_to_i64 :: (s: str, base: u32 = 10) -> i64 {
             if base <= 10 do fallthrough;
 
             value *= ~~base;
-            value += ~~(c - #char "A");
+            value += ~~((c - #char "A") + 10);
         }
         
         case #char "a" .. #char "z" {
             if base <= 10 do fallthrough;
 
             value *= ~~base;
-            value += ~~(c - #char "a");
+            value += ~~((c - #char "a") + 10);
         }
 
         case #default do break break;

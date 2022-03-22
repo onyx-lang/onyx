@@ -29,4 +29,7 @@ Error :: enum {
 
     // Not possible to unread.
     InvalidUnread  :: 0x09;
+
+    // When reading from a stream, no data was read.
+    ReadPending    :: 0x0a;
 }

@@ -112,6 +112,10 @@ ONYX_DEF(alDopplerFactor, (FLOAT), ()) { alDistanceModel(P(0, f32)); return NULL
 ONYX_DEF(alSpeedOfSound, (FLOAT), ()) { alDistanceModel(P(0, f32)); return NULL; }
 
 ONYX_DEF(alGetError, (), (INT)) { results->data[0] = WASM_I32_VAL(alGetError()); return NULL; }
+ONYX_DEF(alGetString, (INT), (LONG)) {
+    wasm_val_init_ptr(&results->data[0], (void *) alGetString(P(0, i32)));
+    return NULL;
+}
 
 ONYX_DEF(alcCreateContext, (LONG, PTR), (LONG)) { wasm_val_init_ptr(&results->data[0], alcCreateContext((ALCdevice *) P(0, i64), ONYX_PTR(P(1, i32)))); return NULL; }
 ONYX_DEF(alcMakeContextCurrent, (LONG), (BOOL)) { results->data[0] = WASM_I32_VAL(alcMakeContextCurrent((ALCcontext *) P(0, i64))); return NULL; }
@@ -137,7 +141,10 @@ ONYX_DEF(alcCaptureCloseDevice, (LONG), (BOOL)) { results->data[0] = WASM_I32_VA
 ONYX_DEF(alcCaptureStart, (LONG), ()) { alcCaptureStart((ALCdevice *) P(0, i64)); return NULL; }
 ONYX_DEF(alcCaptureStop, (LONG), ()) { alcCaptureStop((ALCdevice *) P(0, i64)); return NULL; }
 ONYX_DEF(alcCaptureSamples, (LONG, PTR, INT), ()) { alcCaptureSamples((ALCdevice *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32)); return NULL; }
-
+ONYX_DEF(alcGetString, (LONG, INT), (LONG)) {
+    wasm_val_init_ptr(&results->data[0], (void *) alcGetString((ALCdevice *) P(0, i64), P(1, i32)));
+    return NULL;
+}
 
 ONYX_LIBRARY {
     ONYX_FUNC(alGenBuffers)

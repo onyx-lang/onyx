@@ -144,8 +144,12 @@ socket_sendall :: (s: ^Socket, data: [] u8) {
 
 socket_recv :: (s: ^Socket, maxlen := 1024, allocator := context.allocator) -> [] u8 {
     buffer := alloc.from_stack(maxlen);
-    received := __net_recv(s.handle, .{ buffer, maxlen });
-    if received < 0 { s.vtable = null; return .[]; }
+    would_block: bool;
+    received := __net_recv(s.handle, .{ buffer, maxlen }, ^would_block);
+    if received < 0 { 
+        if !would_block do s.vtable = null;
+        return .[];
+    }
 
     result := memory.make_slice(u8, received, allocator=allocator);
     memory.copy(result.data, buffer, received);
@@ -154,8 +158,11 @@ socket_recv :: (s: ^Socket, maxlen := 1024, allocator := context.allocator) -> [
 }
 
 socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
-    received := __net_recv(s.handle, buffer);
-    if received < 0 { s.vtable = null; }
+    would_block: bool;
+    received := __net_recv(s.handle, buffer, ^would_block);
+    if received < 0 && !would_block do s.vtable = null;
+    if would_block do return 0;
+
     return received;
 }
 
@@ -163,8 +170,12 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
     read = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
         if handle == 0 do return .BadFile, 0;
         
-        bytes_read := __net_recv(handle, buffer);
-        if bytes_read < 0 { s.vtable = null; }
+        would_block := false;
+        bytes_read := __net_recv(handle, buffer, ^would_block);
+        if bytes_read < 0 && !would_block do s.vtable = null;
+
+        if would_block do return .ReadPending, bytes_read;
+
         return .None, bytes_read;
     },
 
@@ -191,7 +202,7 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
     #package __net_accept        :: (handle: Socket.Handle, out_address: ^Socket_Address.Handle) -> Socket.Handle ---
     #package __net_connect       :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
     #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
-    #package __net_recv          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
+    #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool)  -> i32 ---
     #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_recv_indicies: ^i32) -> i32 ---
 
     #package __net_address_get_address :: (address: Socket_Address.Handle, out_buffer: [] u8) -> i32 ---

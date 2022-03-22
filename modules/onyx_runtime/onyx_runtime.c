@@ -950,11 +950,19 @@ ONYX_DEF(__net_send, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    *(i32 *) ONYX_PTR(params->data[3].of.i32) = 0;
+
     #ifdef _BH_LINUX
     // TODO: The flags at the end should be controllable.
     int received = recv(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, 0);
     results->data[0] = WASM_I32_VAL(received);
+
+    if (received < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            *(i32 *) ONYX_PTR(params->data[3].of.i32) = 1;
+        }
+    }
     #endif
 
     return NULL;

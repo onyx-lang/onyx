@@ -217,10 +217,10 @@ Wishlist:
 
 
 Revamping File System:
-    [ ] runtime.fs should contain runtime specific file system API calls
-    [ ] 'os.File' should effectily be 'os.FileStream' and FileStream should go away
+    [x] runtime.fs should contain runtime specific file system API calls
+    [x] 'os.File' should effectily be 'os.FileStream' and FileStream should go away
         os.File :: struct {
             use stream: io.Stream;
             use data:   runtime.fs.FileData;
         }
-    [ ] Most file functionality will be provided using the stream API.
+    [x] Most file functionality will be provided using the stream API.

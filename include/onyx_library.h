@@ -24,7 +24,7 @@ typedef struct OnyxRuntime {
     // HACK HACK HACK
     // There should need to be this much stuff in here, but because Wasmer doesn't ship a "wasmerdll.lib"
     // file for windows, it is impossible for it to link successfully against the function provided in onyx.exe.
-    // Therefore, we must serve as the linker and do this manually. Hopefully they that library file
+    // Therefore, we must serve as the linker and do this manually. Hopefully that library file will be
     // shipped soon so this can go away...
     char* (*wasm_memory_data)(wasm_memory_t *wasm_memory);
     wasm_extern_t* (*wasm_extern_lookup_by_name)(wasm_module_t* module, wasm_instance_t* instance, const char* name);
