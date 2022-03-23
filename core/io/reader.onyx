@@ -2,6 +2,7 @@ package core.io
 
 memory :: package core.memory
 math   :: package core.math
+array  :: package core.array
 
 Reader :: struct {
     stream : ^Stream;
@@ -79,7 +80,6 @@ reader_empty :: (use reader: ^Reader) -> bool {
 }
 
 read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
-    array :: package core.array
     output := array.make(u8, 128, allocator=allocator);
 
     while !reader_empty(reader) {
@@ -140,7 +140,12 @@ unread_byte :: (use reader: ^Reader) -> Error {
     return .None;
 }
 
-
+//
+// This function tries to fill the bytes buffer full of data.
+// However, if the reader is empty or if the underlying stream
+// returns ReadPending, this function may only fill part / none
+// of the buffer. If the function exits with a .None error, the
+// buffer is filled completely.
 read_bytes :: (use reader: ^Reader, bytes: [] u8) -> (i32, Error) {
     n := bytes.count;
     if n == 0 {
@@ -148,23 +153,8 @@ read_bytes :: (use reader: ^Reader, bytes: [] u8) -> (i32, Error) {
         return 0, reader_consume_error(reader);
     }
 
-    if start == end {
-        if error != .None do return 0, reader_consume_error(reader);
-        if reader_empty(reader) do return 0, reader_consume_error(reader);
-
-        if n >= buffer.count {
-            while true {
-                error, n = stream_read(stream, bytes);
-                if error != .ReadPending do break;
-            }
-
-            if n > 0 do last_byte = cast(i32) bytes[n - 1];
-            return n, reader_consume_error(reader);
-        }
-    }
-
     write_index := 0;
-    while n > 0 {
+    while n > 0 && !reader_empty(reader) {
         if reader_read_next_chunk(reader) == .ReadPending {
             return write_index, .ReadPending;
         }
@@ -274,84 +264,195 @@ read_u64 :: (use reader: ^Reader) -> u64 {
     return n;
 }
 
-read_line :: (use reader: ^Reader, consume_newline := true, allocator := context.allocator, inplace := false, shift_buffer := true) -> str {
-    if shift_buffer {
+read_line :: (use reader: ^Reader, consume_newline := true, allocator := context.allocator, inplace := false) -> str {
+    //
+    // Reading in place is special. It does not make a special allocation for the data,
+    // instead just return a pointer to the internal data.
+    if inplace {
+        // If reading is done inplace, the start of the buffer should be the start
+        // of the data known. This makes the longest possible line be buffer.count
+        // in length.
         while reader_read_next_chunk(reader) == .ReadPending ---
+
+        count := start;
+        defer start = count;
+
+        while count < end && buffer[count] != #char "\n" {
+            count += 1;
+        }
+
+        if consume_newline && count < end {
+            count += 1;
+        }
+
+        return buffer[start .. count];
     }
 
-    count := start;
-    defer start = count;
+    out: [..] u8;
+    array.init(^out, allocator=allocator);
 
-    while count < end && buffer[count] != #char "\n" {
-        count += 1;
+    while done := false; !done {
+        count := start;
+        while count < end && buffer[count] != #char "\n" {
+            count += 1;
+        }
+
+        if buffer[count] == #char "\n" {
+            if consume_newline && count < end do count += 1;
+            done = true;
+        }
+
+        if count != start {
+            array.ensure_capacity(^out, out.count + (count - start));
+            memory.copy(out.data + out.count, buffer.data + start, count - start);
+            out.count += count - start;
+            start = count;
+        }
+
+        while reader_read_next_chunk(reader) == .ReadPending ---
+
+        if reader_empty(reader) do done = true;
     }
 
-    if consume_newline && count < end {
-        count += 1;
-    }
-
-    if inplace do return buffer[start .. count];
-
-    out := memory.make_slice(u8, count - start);
-    memory.copy(out.data, buffer.data + start, count - start);
     return out;
 }
 
-read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := context.allocator, inplace := false, shift_buffer := true) -> str {
+read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := context.allocator, inplace := false) -> str {
     skip_whitespace(reader);
-    if shift_buffer {
+    while reader_read_next_chunk(reader) == .ReadPending {
+        skip_whitespace(reader);
+    }
+
+    //
+    // Reading in place is special. It does not make a special allocation for the data,
+    // instead just return a pointer to the internal data.
+    if inplace {
+        // If reading is done inplace, the start of the buffer should be the start
+        // of the data known. This makes the longest possible line be buffer.count
+        // in length.
         while reader_read_next_chunk(reader) == .ReadPending ---
-    }
 
-    count := start;
-    defer start = count;
-    while count < end {
-        curr := buffer[count];
-        if     (curr >= #char "a" && curr <= #char "z")
-            || (curr >= #char "A" && curr <= #char "Z")
-            || curr == #char "_" {
-            count += 1;
-        } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
-            count += 1;
-        } else {
-            break;
+        count := start;
+        defer start = count;
+
+        while count < end {
+            curr := buffer[count];
+            if     (curr >= #char "a" && curr <= #char "z")
+                || (curr >= #char "A" && curr <= #char "Z")
+                || curr == #char "_" {
+                count += 1;
+            } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
+                count += 1;
+            } else {
+                break;
+            }
         }
+
+        return buffer[start .. count];
     }
 
-    if inplace do return buffer[start .. count];
+    out: [..] u8;
+    array.init(^out, allocator=allocator);
 
-    out := memory.make_slice(u8, count - start);
-    memory.copy(out.data, buffer.data + start, count - start);
+    while done := false; !done {
+        count := start;
+        while count < end {
+            curr := buffer[count];
+            if     (curr >= #char "a" && curr <= #char "z")
+                || (curr >= #char "A" && curr <= #char "Z")
+                || curr == #char "_" {
+                count += 1;
+            } elseif numeric_allowed && (curr >= #char "0" && curr <= #char "9") {
+                count += 1;
+            } else {
+                done = true;
+                break;
+            }
+        }
+
+        if count != start {
+            array.ensure_capacity(^out, out.count + (count - start));
+            memory.copy(out.data + out.count, buffer.data + start, count - start);
+            out.count += count - start;
+            start = count;
+        }
+
+        while reader_read_next_chunk(reader) == .ReadPending ---
+
+        if reader_empty(reader) do done = true;
+    }
+
     return out;
 }
 
 read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false, shift_buffer := true) -> str {
-    if shift_buffer {
+    //
+    // Reading in place is special. It does not make a special allocation for the data,
+    // instead just return a pointer to the internal data.
+    if inplace {
+        // If reading is done inplace, the start of the buffer should be the start
+        // of the data known. This makes the longest possible line be buffer.count
+        // in length.
         while reader_read_next_chunk(reader) == .ReadPending ---
-    }
 
-    count := start;
-    defer start = count;
-    while count < end {
-        curr := buffer[count];
-        if curr != until {
-            count += 1;
-        } else {
-            if skip == 0 do break;
-            else do skip -= 1;
+        count := start;
+        defer start = count;
+
+        while count < end {
+            curr := buffer[count];
+            if curr != until {
+                count += 1;
+            } else {
+                if skip == 0 do break;
+                else do skip -= 1;
+            }
         }
+
+        if consume_end && count < end {
+            count += 1;
+        }
+
+        return buffer[start .. count];
     }
 
-    if consume_end && count < end do count += 1;
+    out: [..] u8;
+    array.init(^out, allocator=allocator);
 
-    if inplace do return buffer[start .. count];
+    while done := false; !done {
+        count := start;
+        while count < end {
+            curr := buffer[count];
+            if curr != until {
+                count += 1;
+            } else {
+                if skip == 0 do break;
+                else do skip -= 1;
+            }
+        }
 
-    out := memory.make_slice(u8, count - start);
-    memory.copy(out.data, buffer.data + start, count - start);
+        if buffer[count] == until {
+            if consume_end && count < end do count += 1;
+            done = true;
+        }
+
+        if count != start {
+            array.ensure_capacity(^out, out.count + (count - start));
+            memory.copy(out.data + out.count, buffer.data + start, count - start);
+            out.count += count - start;
+            start = count;
+        }
+
+        while reader_read_next_chunk(reader) == .ReadPending ---
+
+        if reader_empty(reader) do done = true;
+    }
+
     return out;
 }
 
 peek_byte :: (use reader: ^Reader) -> (u8, Error) {
+    if reader_empty(reader) do return 0, .EOF;
+
     if start == end {
         if fill_err := reader_read_next_chunk(reader); fill_err != .None {
             return 0, fill_err;
@@ -362,6 +463,8 @@ peek_byte :: (use reader: ^Reader) -> (u8, Error) {
 }
 
 advance_line :: (use reader: ^Reader) {
+    if reader_empty(reader) do return;
+
     while true {
         if start == end {
             if fill_err := reader_read_next_chunk(reader); fill_err != .None {
@@ -377,6 +480,8 @@ advance_line :: (use reader: ^Reader) {
 }
 
 skip_whitespace :: (use reader: ^Reader) {
+    if reader_empty(reader) do return;
+
     while start < end {
         if start == end {
             if fill_err := reader_read_next_chunk(reader); fill_err != .None {
@@ -396,6 +501,7 @@ skip_whitespace :: (use reader: ^Reader) {
 
 skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
     if bytes == 0 do return 0, .None;
+    if reader_empty(reader) do return 0, .EOF;
 
     remaining := bytes;
     while true {
@@ -427,6 +533,18 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
     return error;
 }
 
+
+//
+// This function serves two purposes:
+//     - Shifting the remaining data in the buffer to the start.
+//       This ensures the start member will be equal to 0.
+//     - Filling the empty space left in the buffer after the shift.
+//
+// There are only two cases where the buffer will not be filled completely.
+//     - The stream returns ReadPending. This is not an critical error, but
+//       does mean that the reading process should stop and be tried again later.
+//     - The stream returns anything other than None. This error is silently stored
+//       and be fetched using reader_consume_error later.
 #local reader_read_next_chunk :: (use reader: ^Reader) -> Error {
     if start > 0 {
         // This assumes that memory.copy behaves like memmove, in that the
@@ -442,25 +560,28 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
         return .BufferFull;
     }
 
-    // Try to re-read multiple times
-    for 16 {
-        err, n := stream_read(stream, buffer[end .. buffer.count]);
-        if err == .ReadPending {
-            error = err;
-            return err if end == 0 else .None;
-        }
+    err, n := stream_read(stream, buffer[end .. buffer.count]);
+    
+    //
+    // ReadPending is not an error, just a signal that data is not ready
+    // to be read, so this should try again later. This has to return None
+    // if the end is equal to start because that means that the buffer is
+    // completely empty.
+    if err == .ReadPending {
+        error = err;
+        return err if end == 0 else .None;
+    }
 
-        end += n;
-        if err != .None {
-            if err == .EOF do done = true;
+    end += n;
+    if err != .None {
+        if err == .EOF do done = true;
 
-            error = err;
-            return .None;
-        }
+        error = err;
+        return .None;
+    }
 
-        if n > 0 {
-            return .None;
-        }
+    if n > 0 {
+        return .None;
     }
 
     done = true;

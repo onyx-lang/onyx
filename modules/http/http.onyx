@@ -34,6 +34,8 @@ Request :: struct {
             for^ p: params {
                 string.concat(^res, p.key, "=", p.value, "&");
             }
+
+            res.count -= 1;
         }
 
         req.resource = res;

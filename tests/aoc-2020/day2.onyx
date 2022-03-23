@@ -11,9 +11,8 @@ main :: (args: [] cstr) {
 
     valid := 0;
 
-    while true {
+    while !io.reader_empty(^reader) {
         lo := io.read_u32(^reader);
-        if lo == 0 do break;
 
         io.read_byte(^reader);
         hi := io.read_u32(^reader);
