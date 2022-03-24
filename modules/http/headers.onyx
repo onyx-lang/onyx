@@ -1,20 +1,5 @@
 package http
 
-//
-// These are named so that the string version of these values
-// will be valid request methods.
-Method :: enum {
-    GET;
-    HEAD;
-    POST;
-    PUT;
-    DELETE;
-    CONNECT;
-    OPTIONS;
-    TRACE;
-    PATCH;
-}
-
 HTTP_Header :: enum {
     Content_Length;
     Content_Type;
@@ -74,6 +59,7 @@ media_type_from_str :: (s: str) -> (MediaType, success: bool) {
 
 HTTP_Headers :: struct {
     content_length: u32;
+    content_type: MediaType;
     expect: bool;
     chunked: bool;
     accept: MediaType;
@@ -101,7 +87,7 @@ HTTP_Headers :: struct {
             }
 
             case .Content_Type {
-                _, success := media_type_from_str(content);
+                content_type', success := media_type_from_str(content);
                 return success;
             }
 

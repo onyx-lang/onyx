@@ -280,8 +280,9 @@ TCP_Client :: struct {
     }
 
     wait_to_get_client_messages :: (use server: ^TCP_Server) -> [] ^TCP_Server.Client {
-        active_client_memory := alloc.from_stack(client_count * sizeof ^TCP_Server.Client);
-        active_clients: [] ^TCP_Server.Client = .{ ~~active_client_memory, 0 };
+        active_clients := alloc.array_from_stack(^TCP_Server.Client, client_count);
+        active_clients.count = 0;
+
         for clients {
             if it == null do continue;
 
@@ -291,8 +292,8 @@ TCP_Client :: struct {
             }
         }
 
-        changed_buffer := cast(^i32) alloc.from_stack(client_count * sizeof i32);
-        changed := socket_poll_all(cast([] ^Socket) active_clients, pulse_time_ms, changed_buffer[0 .. client_count]);
+        changed_buffer := alloc.array_from_stack(i32, client_count);
+        changed := socket_poll_all(cast([] ^Socket) active_clients, pulse_time_ms, changed_buffer);
 
         recv_clients: [..] ^TCP_Server.Client;
         for changed {

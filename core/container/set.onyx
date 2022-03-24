@@ -26,6 +26,8 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
         value : T;
     }
 
+    init     :: init
+    free     :: free
     has      :: has
     get      :: get
     insert   :: insert
@@ -35,20 +37,20 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     iterator :: iterator
 }
 
-make :: ($T: type_expr, default := __zero_value(T)) -> Set(T) {
+make :: ($T: type_expr, default := __zero_value(T), allocator := context.allocator) -> Set(T) {
     set : Set(T);
-    init(^set, default=default);
+    init(^set, default=default, allocator=allocator);
     return set;
 }
 
-init :: (use set: ^Set($T), default := __zero_value(T)) {
-    allocator = context.allocator;
-    default_value = default;
+init :: (set: ^Set($T), default := __zero_value(T), allocator := context.allocator) {
+    set.allocator = allocator;
+    set.default_value = default;
 
-    memory.alloc_slice(^hashes, 8, allocator=allocator);
-    memory.fill_slice(hashes, -1);
+    memory.alloc_slice(^set.hashes, 8, allocator=allocator);
+    memory.fill_slice(set.hashes, -1);
 
-    array.init(^entries, 4, allocator=allocator); 
+    array.init(^set.entries, 4, allocator=allocator); 
 }
 
 free :: (use set: ^Set) {

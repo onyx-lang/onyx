@@ -309,7 +309,9 @@ read_line :: (use reader: ^Reader, consume_newline := true, allocator := context
             start = count;
         }
 
-        while reader_read_next_chunk(reader) == .ReadPending ---
+        if !done {
+            while reader_read_next_chunk(reader) == .ReadPending ---
+        }
 
         if reader_empty(reader) do done = true;
     }
@@ -377,7 +379,9 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
             start = count;
         }
 
-        while reader_read_next_chunk(reader) == .ReadPending ---
+        if !done {
+            while reader_read_next_chunk(reader) == .ReadPending ---
+        }
 
         if reader_empty(reader) do done = true;
     }
@@ -442,7 +446,9 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
             start = count;
         }
 
-        while reader_read_next_chunk(reader) == .ReadPending ---
+        if !done {
+            while reader_read_next_chunk(reader) == .ReadPending ---
+        }
 
         if reader_empty(reader) do done = true;
     }

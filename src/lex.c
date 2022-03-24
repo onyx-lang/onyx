@@ -168,6 +168,19 @@ whitespace_skipped:
         goto token_parsed;
     }
 
+    // She-bang
+    if (tokenizer->curr == tokenizer->start) {
+        if (*tokenizer->curr == '#' && *(tokenizer->curr + 1) == '!') {
+            tk.type = Token_Type_Comment;
+
+            tokenizer->curr += 2;
+            while (*tokenizer->curr++ != '\n' && tokenizer->curr != tokenizer->end);
+
+            tk.length = tokenizer->curr - tk.text;
+            goto token_parsed;
+        }
+    }
+
     // Comments
     if (*tokenizer->curr == '/' && *(tokenizer->curr + 1) == '/') {
         tokenizer->curr += 2;

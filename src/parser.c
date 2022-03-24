@@ -1493,29 +1493,43 @@ static AstNode* parse_statement(OnyxParser* parser) {
 
         case '#': {
             if (parse_possible_directive(parser, "context_scope")) {
-                AstLocal* context_tmp = make_local(parser->allocator, NULL, builtin_context_variable->type_node);
+                // :LinearTokenDependent
+                OnyxToken* directive_token = parser->curr - 2;
+
+                OnyxToken* sym_token = bh_alloc_item(parser->allocator, OnyxToken);
+                sym_token->type = Token_Type_Symbol;
+                sym_token->length = 15;
+                sym_token->text = bh_strdup(parser->allocator, "__saved_context ");
+                sym_token->pos = ((OnyxFilePos) {0});
+
+                AstNode *sym_node = make_symbol(parser->allocator, sym_token);
+
+                AstLocal* context_tmp = make_local(parser->allocator, sym_token, NULL);
+                retval = (AstNode *) context_tmp;
 
                 AstBinaryOp* assignment = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+                assignment->token = directive_token;
                 assignment->operation = Binary_Op_Assign;
-                assignment->left = (AstTyped *) context_tmp;
+                assignment->left = (AstTyped *) sym_node;
                 assignment->right = builtin_context_variable;
                 context_tmp->next = (AstNode *) assignment;
 
                 AstBinaryOp* assignment2 = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+                assignment2->token = directive_token + 1;
                 assignment2->operation = Binary_Op_Assign;
                 assignment2->left = builtin_context_variable;
-                assignment2->right = (AstTyped *) context_tmp;
-
-                AstBlock* context_block = parse_block(parser, 1, NULL);
-                assignment->next = (AstNode *) context_block;
+                assignment2->right = (AstTyped *) sym_node;
 
                 AstDefer* defer_node = make_node(AstDefer, Ast_Kind_Defer);
+                defer_node->token = directive_token;
                 defer_node->stmt = (AstNode *) assignment2;
+                assignment->next = (AstNode *) defer_node;
+
+                AstBlock* context_block = parse_block(parser, 1, NULL);
                 defer_node->next = context_block->body;
-                context_block->body = (AstNode *) defer_node;
+                context_block->body = (AstNode *) context_tmp;
 
                 needs_semicolon = 0;
-                retval = (AstNode *) context_tmp;
                 break;
             }
 

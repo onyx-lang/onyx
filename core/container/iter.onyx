@@ -600,7 +600,7 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
                 data = thread_data,
             };
 
-            threads := (cast(^thread.Thread) alloc.from_stack(thread_count * sizeof thread.Thread))[0 .. (thread_count - 1)];
+            threads := alloc.array_from_stack(thread.Thread, thread_count - 1);
             for^ threads do thread.spawn(it, ^t_data, #solidify thread_function {body=body});
 
             thread_function(^t_data, body);

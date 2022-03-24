@@ -1,8 +1,18 @@
 package http
 
-#local {
-    HTTP_VERSION_STRING :: "HTTP/1.1"
-    USER_AGENT :: "onyx/0.1.0"
+//
+// These are named so that the string version of these values
+// will be valid request methods.
+Method :: enum {
+    GET;
+    HEAD;
+    POST;
+    PUT;
+    DELETE;
+    CONNECT;
+    OPTIONS;
+    TRACE;
+    PATCH;
 }
 
 Request :: struct {
@@ -22,7 +32,7 @@ Request :: struct {
 
     //
     // "Factory" that constructs a GET request
-    get :: (resource: str, params: [] struct {key, value: str;}) -> Request {
+    get :: (resource: str, params: [] Key_Value_Pair, headers: [] Key_Value_Pair = .[]) -> Request {
         req := init(Request);
         req.method = .GET;
 
@@ -38,9 +48,56 @@ Request :: struct {
             res.count -= 1;
         }
 
+        for headers {
+            req.headers[it.key] = it.value;
+        }
+
         req.resource = res;
         req.body = null_str;
         return req;
+    }
+
+    post :: #match {
+        (resource: str, data: [] Key_Value_Pair, encoding := Post_Data_Encoding.Url_Encoded, headers: [] Key_Value_Pair = .[]) -> Request {
+            req := init(Request);
+            req.method = .POST;
+            req.resource = resource;
+
+            for headers {
+                req.headers[it.key] = it.value;
+            }
+
+            body: [..] u8;
+            switch encoding {
+                case .Json {
+                    string.concat(^body, "{");
+                    for data {
+                        string.concat(^body, "\"", it.key, "\":\"", it.value, "\",");
+                    }
+
+                    body.count -= 1;
+                    string.concat(^body, "}");
+                }
+
+                case .Url_Encoded {
+                    for data {
+                        key   := urlencode(it.key);
+                        value := urlencode(it.value);
+                        defer {
+                            string.free(key);
+                            string.free(value);
+                        }
+
+                        string.concat(^body, key, "=", value, "&");
+                    }
+
+                    body.count -= 1;
+                }
+            }
+            
+            req.body = body;
+            return req;
+        }
     }
 }
 
@@ -57,6 +114,7 @@ request_write :: (use req: ^Request, writer: ^io.Writer) {
     io.write(writer, "\r\n");
     if body.count > 0 {
         io.write(writer, body);
+        io.write(writer, "\r\n");
     }
 }
 
@@ -65,6 +123,11 @@ Response :: struct {
     status: i32;
     headers: HTTP_Headers;
     body: [] u8;
+
+    json :: (use this: ^Response) => {
+        json :: package json
+        return json.decode(body);
+    }
 }
 
 
@@ -75,6 +138,11 @@ Connection :: struct {
     socket: ^net.Socket;
     r: io.Reader;
     w: io.Writer;
+
+    get :: (this: ^Connection, resource: str, params: [] Key_Value_Pair, headers: [] Key_Value_Pair = .[]) -> Response {
+        req := Request.get(resource, params, headers);
+        return send_request(this, ^req);
+    }
 }
 
 Connection_Error :: enum {
@@ -126,7 +194,7 @@ connect :: (url_: str, port: u16 = 80) -> (Connection, Connection_Error) {
     return conn, .None;
 }
 
-request :: (connection: ^Connection, req: ^Request) -> Response {
+send_request :: (connection: ^Connection, req: ^Request) -> Response {
     req.host = connection.url;
     req->send(^connection.w);
 
@@ -148,9 +216,13 @@ request :: (connection: ^Connection, req: ^Request) -> Response {
     data: [..] u8;
     if res.headers.chunked {
         read_chunked_body();
-    } else {
+    } elseif res.headers.content_length > 0 {
         read_simple_body();
     }
+
+    @HACK @HACK @HACK
+    connection.r.start = 0;
+    connection.r.end = 0;
 
     res.body = data;
     return res;
@@ -182,3 +254,19 @@ request :: (connection: ^Connection, req: ^Request) -> Response {
         }
     }
 }
+
+
+
+#local {
+    HTTP_VERSION_STRING :: "HTTP/1.1"
+    USER_AGENT :: "onyx/0.1.0"
+
+    Key_Value_Pair :: struct { key, value: str; }
+
+    Post_Data_Encoding :: enum {
+        Json;
+        Url_Encoded;
+        Form_Data;
+    }
+}
+

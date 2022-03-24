@@ -1,0 +1,73 @@
+package core.alloc.heap
+
+#local _Z :: (package core.intrinsics.onyx).__zero_value
+
+AutoHeapState :: struct {
+    backing_allocator: Allocator;
+    set := _Z(Set(rawptr));
+}
+
+#local auto_heap_alloc_proc :: (data: ^AutoHeapState, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+    newptr := data.backing_allocator.func(data.backing_allocator.data, aa, size, align, oldptr);
+
+    switch aa {
+        case .Alloc {
+            data.set->insert(newptr);
+        }
+
+        case .Resize {
+            data.set->remove(oldptr);
+            data.set->insert(newptr);
+        }
+
+        case .Free {
+            data.set->remove(oldptr);
+        }
+    }
+
+    return newptr;
+}
+
+auto_heap_make :: (backing := context.allocator) -> AutoHeapState {
+    hs: AutoHeapState;
+    hs.backing_allocator = backing;
+    hs.set->init(allocator = backing);
+    return hs;
+}
+
+auto_heap_free :: (hs: ^AutoHeapState) {
+    for^ hs.set.entries {
+        raw_free(hs.backing_allocator, it.value);
+    }
+
+    hs.set->free();
+}
+
+#match (package core.alloc).as_allocator auto_heap_make_allocator
+auto_heap_make_allocator :: (hs: ^AutoHeapState) -> Allocator {
+    return Allocator.{
+        func = auto_heap_alloc_proc,
+        data = hs
+    };
+}
+
+auto :: #match {
+    macro () {
+        alloc :: package core.alloc
+        
+        auto_heap := alloc.heap.auto_heap_make();
+        context.allocator = alloc.heap.auto_heap_make_allocator(^auto_heap);
+        defer alloc.heap.auto_heap_free(^auto_heap);
+    },
+
+    macro (body: Code) -> i32 {
+        auto :: auto
+
+        #context_scope {
+            auto(); 
+            #insert body;
+        }
+
+        return 0;
+    }
+}

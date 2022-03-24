@@ -56,6 +56,22 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
         return retval;
     }
 
+    if aa == .Resize {
+        // An allocation of this size does not fit into a single arena.
+        if size > alloc_arena.arena_size - sizeof rawptr {
+            return null;
+        }
+
+        newptr := arena_alloc_proc(data, .Alloc, size, align, oldptr);
+
+        // This is incorrect, but because there is not an "old size",
+        // this is the best possible.
+        memory :: package core.memory
+        memory.copy(newptr, oldptr, size);
+
+        return newptr;
+    }
+
     return null;
 }
 
@@ -96,4 +112,25 @@ free :: (arena: ^ArenaState) {
     arena.first_arena   = null;
     arena.current_arena = null;
     arena.size          = 0;
+}
+
+auto :: #match {
+    macro (size := 32 * 1024) {
+        alloc :: package core.alloc
+
+        arena := alloc.arena.make(alloc.heap_allocator, size);
+        context.allocator = alloc.arena.make_allocator(^arena);
+        defer alloc.arena.free(^arena);
+    },
+
+    macro (body: Code, size := 32 * 1024) -> i32 {
+        auto :: auto
+
+        #context_scope {
+            auto(size); 
+            #insert body;
+        }
+
+        return 0;
+    }
 }
