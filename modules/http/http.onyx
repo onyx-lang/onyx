@@ -139,6 +139,12 @@ Connection :: struct {
     r: io.Reader;
     w: io.Writer;
 
+    close :: (this: ^Connection) {
+        this.socket->close();
+        io.reader_free(^this.r);
+        io.writer_free(^this.w);
+    }
+
     get :: (this: ^Connection, resource: str, params: [] Key_Value_Pair, headers: [] Key_Value_Pair = .[]) -> Response {
         req := Request.get(resource, params, headers);
         return send_request(this, ^req);

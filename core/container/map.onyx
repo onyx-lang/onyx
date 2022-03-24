@@ -34,6 +34,7 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
 
     Entry :: struct (K: type_expr, V: type_expr) {
         next  : i32;
+        hash  : u32;
         key   : K;
         value : V;
     }
@@ -80,7 +81,7 @@ put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
         return;
     }
 
-    entries << .{ hashes[lr.hash_index], key, value };
+    entries << .{ hashes[lr.hash_index], lr.hash, key, value };
     hashes[lr.hash_index] = entries.count - 1;
 
     if full(map) do grow(map);
@@ -164,6 +165,7 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
         hash_index  : i32 = -1;
         entry_index : i32 = -1;
         entry_prev  : i32 = -1;
+        hash        : u32 = 0;
     }
 
     lookup :: (use map: ^Map, key: map.Key_Type) -> MapLookupResult {
@@ -171,12 +173,15 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
         lr := MapLookupResult.{};
 
         hash_value: u32 = hash.to_u32(key); // You cannot use this type for the key, unless you add an overload.
+        lr.hash = hash_value;
 
         lr.hash_index = hash_value % hashes.count;
         lr.entry_index = hashes[lr.hash_index];
 
         while lr.entry_index >= 0 {
-            if entries[lr.entry_index].key == key do return lr;
+            if entries[lr.entry_index].hash == hash_value {
+                if entries[lr.entry_index].key == key do return lr;
+            }
 
             lr.entry_prev = lr.entry_index;
             lr.entry_index = entries[lr.entry_index].next;

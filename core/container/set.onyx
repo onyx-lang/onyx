@@ -23,6 +23,7 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
 
     Entry :: struct (T: type_expr) {
         next  : i32;
+        hash  : u32;
         value : T;
     }
 
@@ -64,7 +65,7 @@ insert :: (use set: ^Set, value: set.Elem_Type) {
 
     if lr.entry_index >= 0 do return;
 
-    entries << .{ hashes[lr.hash_index], value };
+    entries << .{ hashes[lr.hash_index], lr.hash, value };
     hashes[lr.hash_index] = entries.count - 1;
 
     if full(set) do grow(set);
@@ -146,18 +147,22 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
         hash_index  : i32 = -1;
         entry_index : i32 = -1;
         entry_prev  : i32 = -1;
+        hash        : u32 = 0;
     }
 
     lookup :: (use set: ^Set, value: set.Elem_Type) -> SetLookupResult {
         lr := SetLookupResult.{};
 
         hash_value: u32 = hash.to_u32(value); // You cannot have a set of this type without defining a to_u32 hash.
+        lr.hash = hash_value;
 
         lr.hash_index = hash_value % hashes.count;
         lr.entry_index = hashes[lr.hash_index];
 
         while lr.entry_index >= 0 {
-            if entries[lr.entry_index].value == value do return lr;
+            if entries[lr.entry_index].hash == hash_value {
+                if entries[lr.entry_index].value == value do return lr;
+            }
 
             lr.entry_prev = lr.entry_index;
             lr.entry_index = entries[lr.entry_index].next;

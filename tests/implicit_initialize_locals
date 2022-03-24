@@ -12,11 +12,13 @@ Untyped_Array {
 [
     Map.Entry([] u8, i32) { 
         next = -1, 
+        hash = 193461347, 
         key = "Joe", 
         value = 12
     }, 
     Map.Entry([] u8, i32) { 
         next = 0, 
+        hash = 2089242307, 
         key = "Jane", 
         value = 34
     }

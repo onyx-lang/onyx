@@ -219,6 +219,8 @@ DynamicStringStream :: struct {
 
     curr_pos : i32;
     data  : [..] u8;
+
+    to_str :: dynamic_string_stream_to_str;
 }
 
 dynamic_string_stream_make :: (init_size := 128, a := context.allocator) -> DynamicStringStream {
