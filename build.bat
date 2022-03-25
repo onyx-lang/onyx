@@ -33,4 +33,8 @@ del *.ilk > NUL 2> NUL
 del *.obj > NUL 2> NUL
 del misc\icon_resource.res
 
-call modules\onyx_runtime\build
+cl /MT /std:c17 /TC /I include /I lib/common/include /D_USRDLL /D_WINDLL src\onyx_runtime.c /link /DLL /OUT:onyx_runtime.dll
+
+del onyx_runtime.obj
+del onyx_runtime.lib
+del onyx_runtime.exp
