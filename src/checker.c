@@ -392,7 +392,7 @@ CheckStatus check_switch(AstSwitch* switchnode) {
     switchnode->flags |= Ast_Flag_Has_Been_Checked;
 
     // Should the case block code be checked here?
-    // Or should this just exist to resolve macros and expand #inserts
+    // Or should this just exist to resolve macros and expand #unquotes
     // then the cases are consumed into the array or cases, THEN the blocks
     // are actually checked?
     if (switchnode->cases == NULL) {
@@ -1921,7 +1921,7 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
     Type* code_type = type_build_from_ast(context.ast_alloc, builtin_code_type);
 
     TYPE_CHECK(&insert->code_expr, code_type) {
-        ERROR_(insert->token->pos, "#insert expected a value of type 'Code', got '%s'.",
+        ERROR_(insert->token->pos, "#unquote expected a value of type 'Code', got '%s'.",
             type_get_name(insert->code_expr->type));
     }
 

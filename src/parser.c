@@ -648,7 +648,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) defined;
                 break;
             }
-            else if (parse_possible_directive(parser, "code")) {
+            else if (parse_possible_directive(parser, "quote")) {
                 OnyxToken* code_token = parser->curr - 1;
 
                 AstCodeBlock* code_block = make_node(AstCodeBlock, Ast_Kind_Code_Block);
@@ -685,7 +685,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) code_block;
                 break;
             }
-            else if (parse_possible_directive(parser, "insert")) {
+            else if (parse_possible_directive(parser, "unquote")) {
                 AstDirectiveInsert* insert = make_node(AstDirectiveInsert, Ast_Kind_Directive_Insert);
                 insert->token = parser->curr - 1;
                 insert->code_expr = parse_expression(parser, 0);
@@ -759,18 +759,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 arguments_initialize(&call_node->args);
 
                 parse_arguments(parser, ')', &call_node->args);
-
-//              This could be a cool feature where you can write:
-//
-//              foo(x, y) #{
-//                  // ...
-//              }
-//
-//              which just desugars into
-//
-//              foo(x, y, #code {
-//                  // ...
-//              })
 
                 // Wrap expressions in AstArgument
                 bh_arr_each(AstTyped *, arg, call_node->args.values) {

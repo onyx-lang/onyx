@@ -253,7 +253,7 @@ contains :: #match {
     },
 
     macro (arr: [] $T, $cmp: Code) -> bool {
-        for it: arr do if #insert cmp do return true;
+        for it: arr do if #unquote cmp do return true;
         return false;
     }
 }
@@ -400,7 +400,7 @@ fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
 map :: #match {
     macro (arr: [] $T, f: (^T) -> void)                do for ^it: arr do f(it);,
     macro (arr: [] $T, f: (T) -> T)                    do for ^it: arr do *it = f(*it);,
-    macro (arr: [] $T, body: Code)                     do for ^it: arr do #insert body;,
+    macro (arr: [] $T, body: Code)                     do for ^it: arr do #unquote body;,
     macro (arr: [] $T, data: $R, f: (^T, R) -> void)   do for ^it: arr do f(it, data);,
     macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
 }

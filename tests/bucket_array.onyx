@@ -9,7 +9,7 @@ main :: (args: [] cstr) {
     printf("ba[10] is {}.\n", ba[10]);
 
     sum := 0;
-    bucket_array.for_each(ba, #code {
+    bucket_array.for_each(ba, #quote {
         printf("[{}] -> {}\n", bucket_index, *it);
         sum += *it;
     });

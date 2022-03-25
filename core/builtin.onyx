@@ -207,7 +207,7 @@ any :: struct {
 }
 
 
-// Represents a code block. Not constructable outside of using a '#code' directive.
+// Represents a code block. Not constructable outside of using a '#quote' directive.
 Code :: struct {_:i32;}
 
 

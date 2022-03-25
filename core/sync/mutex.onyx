@@ -75,7 +75,7 @@ critical_section :: macro (m: ^Mutex, body: Code) -> i32 {
     scoped_mutex :: scoped_mutex;
     scoped_mutex(m);
 
-    #insert body;
+    #unquote body;
 
     return 0;
 }

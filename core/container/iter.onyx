@@ -168,7 +168,7 @@ take_one :: (it: Iterator($T), no_close := false) -> (T, bool) {
     take_one :: take_one
 
     cont: bool;
-    (#insert dest), cont = take_one(it);
+    (#unquote dest), cont = take_one(it);
     return !cont;
 }
 
@@ -617,7 +617,7 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
         thread_function :: (__data: ^Thread_Data, $body: Code) {
             thread_data := __data.data;
             for #no_close *__data.iter {
-                #insert body;
+                #unquote body;
             }
         }
     }

@@ -128,7 +128,7 @@ auto :: #match {
 
         #context_scope {
             auto(size); 
-            #insert body;
+            #unquote body;
         }
 
         return 0;

@@ -135,7 +135,7 @@ update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     lr := lookup_(map, key);
     if lr.entry_index >= 0 {
         it := ^map.entries[lr.entry_index].value;
-        #insert body;
+        #unquote body;
     }
 }
 

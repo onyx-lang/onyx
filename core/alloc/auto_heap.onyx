@@ -65,7 +65,7 @@ auto :: #match {
 
         #context_scope {
             auto(); 
-            #insert body;
+            #unquote body;
         }
 
         return 0;

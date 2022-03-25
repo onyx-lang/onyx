@@ -73,25 +73,25 @@ main :: (args: [] cstr) {
 
     // A powerful feature of Onyx that enables macros to be very useful is code blocks.
     // Code blocks allow you to capture code and treat it as a compile-time object that can
-    // be passed around. To create a code blocks, simply put '#code' in front of the block
+    // be passed around. To create a code blocks, simply put '#quote' in front of the block
     // of code you want to capture. Notice that this uses '::' because this is a compile-time
     // value.
-    simple_code :: #code {
+    simple_code :: #quote {
         println("This is a code block!");
     }
 
-    // You can then use the '#insert' directive to place the code wherever you need it.
+    // You can then use the '#unquote' directive to place the code wherever you need it.
     // We can paste it 3 times for examples:
-    #insert simple_code;
-    #insert simple_code;
-    #insert simple_code;
+    #unquote simple_code;
+    #unquote simple_code;
+    #unquote simple_code;
 
     // Because simple_code is a compile-time value, it can be passed to procedures as so:
     triple :: ($body: Code) {
         println("Running 3 times!");
-        #insert body;
-        #insert body;
-        #insert body;
+        #unquote body;
+        #unquote body;
+        #unquote body;
     }
 
     triple(simple_code);
@@ -100,9 +100,9 @@ main :: (args: [] cstr) {
     // compile-time parameter (the '$').
     triple_macro :: macro (body: Code) {
         println("Running 3 times in a macro!");
-        #insert body;
-        #insert body;
-        #insert body;
+        #unquote body;
+        #unquote body;
+        #unquote body;
     }
 
     triple_macro(simple_code);
@@ -116,7 +116,7 @@ main :: (args: [] cstr) {
 
     cool_block :: macro (param: i32, body: Code) {
         local_variable := param * 2;
-        #insert body;
+        #unquote body;
     }
 
     cool_block(10) {

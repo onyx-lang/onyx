@@ -45,7 +45,7 @@ main :: (args) => {
             }
 
             attempt_add :: macro (cond: Code, dx, dy: i32) {
-                if #insert cond {
+                if #unquote cond {
                     if !tried->has(.{try.x + dx, try.y + dy}) {
                         if found := array.find_ptr(to_try.data, .{try.x + dx, try.y + dy, 0}); found != null {
                             found.cost = math.min(cell_value, found.cost);

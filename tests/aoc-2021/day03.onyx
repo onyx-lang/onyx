@@ -60,7 +60,7 @@ main :: (args) => {
                 if (it & (1 << index)) != 0 do A += 1;
             }
 
-            expected := (1 << index) if (#insert comparison) else 0;
+            expected := (1 << index) if (#unquote comparison) else 0;
 
             while i := 0; i < arr.count {
                 defer i += 1;
