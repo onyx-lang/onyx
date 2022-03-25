@@ -15,8 +15,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: make build.sh executable
       run: chmod +x build.sh
-    - name: make runtime build.sh executable
-      run: chmod +x modules/onyx_runtime/build.sh
     - name: make build directory
       run: mkdir -p build
     - name: build onyx
