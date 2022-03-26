@@ -103,7 +103,6 @@ if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
     echo "Installing onyxrun executable"
     sudo cp ./bin/onyxrun "$BIN_DIR/onyxrun"
 
-    ./modules/onyx_runtime/build.sh
     $CC -shared -fpic -I include -I lib/common/include src/onyx_runtime.c -o onyx_runtime.so -lpthread
     sudo mv "./onyx_runtime.so" "$CORE_DIR/lib/onyx_runtime.so"
 fi
