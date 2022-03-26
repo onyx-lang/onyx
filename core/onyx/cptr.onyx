@@ -21,6 +21,18 @@ cptr :: struct (T: type_expr) {
     read_i16 :: (this: cptr(i16)) => cast(i16) __cptr_read_u16(this.data);
     read_i32 :: (this: cptr(i32)) => cast(i32) __cptr_read_u32(this.data);
     read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data);
+
+    to_rawptr :: (this: cptr($T)) -> ^T {
+        // I'm treating NULL as more of a concept, than as an actual value here,
+        // because if something returns a NULL pointer, it should logically map
+        // to the same idea as 'null' in Onyx.
+        if this.data == 0 do return null;
+
+        wasm :: package core.intrinsics.wasm
+        mem_base_ptr := __cptr_make(0);
+        assert(mem_base_ptr <= this.data && this.data <= mem_base_ptr + (wasm.memory_size() << 16), "Invalid conversion from cptr to rawptr: pointer value out of Onyx memory range.");
+        return ~~(this.data - mem_base_ptr);
+    }
 }
 
 #operator + macro (p: cptr($T), v: i32) -> cptr(T) {

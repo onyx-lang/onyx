@@ -1,0 +1,16 @@
+package stb_image
+
+#library "stb_image"
+
+#foreign "stb_image" {
+    stbi_load                 :: (filename: cstr, width: ^i32, height: ^i32, channels: ^i32, desired_channels: i32) -> ^u8 ---
+    stbi_load_from_memory     :: (buffer: [] u8, width: ^i32, height: ^i32, channels: ^i32, desired_channels: i32) -> ^u8 ---
+    stbi_load_gif_from_memory :: (buffer: [] u8, delays: ^cptr(i32), width: ^i32, height: ^i32, frames: ^i32, comp: ^i32, req_comp: i32) -> ^u8 ---
+
+    stbi_image_free :: (image_data: ^u8) -> void ---
+}
+
+#export "stbi_heap_alloc"  calloc
+#export "stbi_heap_resize" cresize
+#export "stbi_heap_free"   cfree
+

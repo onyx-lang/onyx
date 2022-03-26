@@ -1,0 +1,10 @@
+#load "scripts/c_library"
+use package core
+
+main :: (args) => {
+    path := module_path(#file);
+
+    compile_c_file(
+        string.concat(path, "stb_truetype.c"),
+        string.concat(path, "stb_truetype.so"));
+}

@@ -37,13 +37,23 @@ header_from_str :: (s: str) -> (HTTP_Header, success: bool) {
 
 MediaType :: enum {
     PlainText;
+
     ApplicationJson;
+
+    Png;
+    Bmp;
+    Gif;
+    Jpeg;
 }
 
 media_type_from_str :: (s: str) -> (MediaType, success: bool) {
     switch s |> string.strip_whitespace() |> string.to_lowercase() {
         case "text/plain"       do return .PlainText, true;
         case "application/json" do return .ApplicationJson, true;
+        case "image/png"        do return .Png, true;
+        case "image/bmp"        do return .Bmp, true;
+        case "image/gif"        do return .Gif, true;
+        case "image/jpeg"       do return .Jpeg, true;
         case #default do return ~~ -1, false;
     }
 }
@@ -52,6 +62,10 @@ media_type_from_str :: (s: str) -> (MediaType, success: bool) {
     switch v {
         case .PlainText do return "text/plain";
         case .ApplicationJson do return "application/json";
+        case .Png do return "image/png";
+        case .Bmp do return "image/bmp";
+        case .Gif do return "image/gif";
+        case .Jpeg do return "image/jpeg";
         case #default do return "";
     }
 }
