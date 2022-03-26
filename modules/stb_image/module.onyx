@@ -1,5 +1,7 @@
 package stb_image
 
+use package core { cptr }
+
 #library "stb_image"
 
 #foreign "stb_image" {
