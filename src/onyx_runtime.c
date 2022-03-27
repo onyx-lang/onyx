@@ -797,6 +797,12 @@ ONYX_DEF(__time, (), (WASM_I64)) {
 //
 // Networking
 //
+struct onyx_socket_addr {
+    unsigned short family;
+    unsigned short port;
+    unsigned int   addr;
+};
+
 ONYX_DEF(__net_create_socket, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
     #ifdef _BH_LINUX
@@ -895,13 +901,17 @@ ONYX_DEF(__net_listen, (WASM_I32, WASM_I32), ()) {
 
 ONYX_DEF(__net_accept, (WASM_I32, WASM_I32), (WASM_I32)) {
     #ifdef _BH_LINUX
-    struct sockaddr_in *client_addr = malloc(sizeof(*client_addr));
-    int client_len = sizeof(*client_addr);
-    memset(client_addr, 0, client_len);
+    struct sockaddr_in client_addr;
+    int client_len = sizeof(client_addr);
+    memset(&client_addr, 0, client_len);
 
-    int client_socket = accept(params->data[0].of.i32, client_addr, &client_len);
+    int client_socket = accept(params->data[0].of.i32, &client_addr, &client_len);
 
-    *(i64 *) ONYX_PTR(params->data[1].of.i32) = (i64) client_addr;
+    struct onyx_socket_addr* out_addr = (struct onyx_socket_addr *) ONYX_PTR(params->data[1].of.i32); 
+    out_addr->family = client_addr.sin_family;
+    out_addr->port   = ntohs(client_addr.sin_port);
+    out_addr->addr   = ntohl(client_addr.sin_addr.s_addr);
+
     results->data[0] = WASM_I32_VAL(client_socket);
     #endif
 
@@ -950,12 +960,58 @@ ONYX_DEF(__net_send, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
+ONYX_DEF(__net_sendto, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
+    struct sockaddr_in dest_addr;
+    int dest_addr_len = sizeof(dest_addr);
+    memset(&dest_addr, 0, dest_addr_len);
+
+    struct onyx_socket_addr *o_addr = (struct onyx_socket_addr *) ONYX_PTR(params->data[3].of.i32);
+    dest_addr.sin_family = AF_INET; // TODO: See other comments related to AF_NET above.
+    dest_addr.sin_port = htons(o_addr->port);
+    dest_addr.sin_addr.s_addr = htonl(o_addr->addr);
+
+    // TODO: The flags at the end should be controllable.
+    int sent = sendto(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, MSG_NOSIGNAL, &dest_addr, dest_addr_len);
+    results->data[0] = WASM_I32_VAL(sent);
+    #endif
+    
+    return NULL;
+}
+
 ONYX_DEF(__net_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     *(i32 *) ONYX_PTR(params->data[3].of.i32) = 0;
 
     #ifdef _BH_LINUX
     // TODO: The flags at the end should be controllable.
     int received = recv(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, 0);
+    results->data[0] = WASM_I32_VAL(received);
+
+    if (received < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            *(i32 *) ONYX_PTR(params->data[3].of.i32) = 1;
+        }
+    }
+    #endif
+
+    return NULL;
+}
+
+ONYX_DEF(__net_recvfrom, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    *(i32 *) ONYX_PTR(params->data[4].of.i32) = 0;
+
+    #ifdef _BH_LINUX
+    struct onyx_socket_addr *out_addr = (struct onyx_socket_addr *) ONYX_PTR(params->data[3].of.i32);
+
+    struct sockaddr_in client_addr;
+    int socket_len = sizeof(client_addr);
+    memset(&client_addr, 0, socket_len);
+
+    int received = recvfrom(params->data[0].of.i32, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32, 0, &client_addr, &socket_len);
+    out_addr->family = client_addr.sin_family;
+    out_addr->port   = ntohs(client_addr.sin_port);
+    out_addr->addr   = ntohl(client_addr.sin_addr.s_addr);
+
     results->data[0] = WASM_I32_VAL(received);
 
     if (received < 0) {
@@ -1106,10 +1162,10 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_accept)
     ONYX_FUNC(__net_connect)
     ONYX_FUNC(__net_send)
+    ONYX_FUNC(__net_sendto)
     ONYX_FUNC(__net_recv)
+    ONYX_FUNC(__net_recvfrom)
     ONYX_FUNC(__net_poll_recv)
-    ONYX_FUNC(__net_address_get_address)
-    ONYX_FUNC(__net_address_get_port)
 
     ONYX_FUNC(__cptr_make)
     ONYX_FUNC(__cptr_read)

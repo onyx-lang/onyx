@@ -489,29 +489,23 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
             }
         }
 
-        case i16, u16 {
-            value := *(cast(^i16) v.data);
+        int_case :: macro (T: type_expr) {
+            case T {
+                value := *(cast(^T) v.data);
 
-            ibuf : [128] u8;
-            istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
-            output->write(istr);
+                ibuf : [128] u8;
+                istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
+                output->write(istr);
+            }
         }
 
-        case i32, u32 {
-            value := *(cast(^i32) v.data);
-
-            ibuf : [128] u8;
-            istr := i64_to_str(~~value, formatting.base, ~~ibuf, min_length=formatting.minimum_width);
-            output->write(istr);
-        }
-
-        case i64, u64 {
-            value := *(cast(^i64) v.data);
-
-            ibuf : [128] u8;
-            istr := i64_to_str(~~value, formatting.base, ~~ibuf);
-            output->write(istr);
-        }
+        int_case(i8);
+        int_case(i16);
+        int_case(u16);
+        int_case(i32);
+        int_case(u32);
+        int_case(i64);
+        int_case(u64);
 
         case f32 {
             value := *(cast(^f32) v.data);

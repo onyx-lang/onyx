@@ -16,9 +16,11 @@ Socket :: struct {
     accept    :: socket_accept
     connect   :: socket_connect
     send      :: socket_send
+    sendto    :: socket_sendto
     sendall   :: socket_sendall
     recv      :: socket_recv
     recv_into :: socket_recv_into
+    recvfrom  :: socket_recvfrom
 }
 
 SocketError :: enum {
@@ -43,20 +45,21 @@ SocketSetting :: enum {
     NonBlocking :: 0x01;
 }
 
-Socket_Address :: struct {
-    Handle :: #distinct u64
-    addr: Handle;
+// This structure is twenty bytes in size to accommodate IPV6 addresses.
+Socket_Address :: struct #size 20 {
+    family: u16;
+    port: u16;
+    addr: u32;
 
-    get_address :: (s: ^Socket_Address, allocator := context.allocator) -> [] u8 {
-        buf: [256] u8;
-        addr_len := __net_address_get_address(s.addr, buf);
-        
-        ret := memory.copy_slice(buf[0 .. addr_len], allocator=allocator);
-        return ret;
-    }
+    addr_as_str :: (use this: ^Socket_Address, allocator := context.allocator) -> str {
+        out: [64] u8; 
+        str_addr := conv.format(out, "{}.{}.{}.{}",
+            (addr >> 24) & 0xff,
+            (addr >> 16) & 0xff,
+            (addr >>  8) & 0xff,
+            (addr >>  0) & 0xff);
 
-    get_port :: (s: ^Socket_Address) -> u32 {
-        return __net_address_get_port(s.addr);
+        return string.alloc_copy(str_addr, allocator=allocator);
     }
 }
 
@@ -99,7 +102,7 @@ socket_listen :: (s: ^Socket, backlog := 32) {
 socket_accept :: (s: ^Socket) -> (Socket, Socket_Address) {
     new_socket: Socket;
     new_addr: Socket_Address;
-    new_socket.handle = __net_accept(s.handle, ^new_addr.addr);
+    new_socket.handle = __net_accept(s.handle, ^new_addr);
 
     if new_socket.handle >= 0 {
         new_socket.vtable = ^__net_socket_vtable;
@@ -128,6 +131,12 @@ socket_poll_all :: (sockets: [] ^Socket, timeout := -1, changed_buffer: [] i32 =
 
 socket_send :: (s: ^Socket, data: [] u8) -> i32 {
     sent := __net_send(s.handle, data);
+    if sent < 0 { s.vtable = null; }
+    return sent;
+}
+
+socket_sendto :: (s: ^Socket, data: [] u8, addr: ^Socket_Address) -> i32 {
+    sent := __net_sendto(s.handle, data, addr);
     if sent < 0 { s.vtable = null; }
     return sent;
 }
@@ -166,6 +175,17 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
     return received;
 }
 
+socket_recvfrom :: (s: ^Socket, buffer: [] u8) -> (Socket_Address, i32) {
+    would_block: bool;
+    sa: Socket_Address;
+
+    received := __net_recvfrom(s.handle, buffer, ^sa, ^would_block);
+    if received < 0 && !would_block do s.vtable = null;
+    if would_block do return sa, 0;
+
+    return sa, received;
+}
+
 #local __net_socket_vtable := io.Stream_Vtable.{
     read = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
         if handle == 0 do return .BadFile, 0;
@@ -199,14 +219,13 @@ socket_recv_into :: (s: ^Socket, buffer: [] u8) -> i32 {
     #package __net_setting       :: (handle: Socket.Handle, setting: SocketSetting, value: i32) -> void ---
     #package __net_bind          :: (handle: Socket.Handle, port: u16)    -> bool ---
     #package __net_listen        :: (handle: Socket.Handle, backlog: i32) -> void ---
-    #package __net_accept        :: (handle: Socket.Handle, out_address: ^Socket_Address.Handle) -> Socket.Handle ---
+    #package __net_accept        :: (handle: Socket.Handle, out_address: ^Socket_Address) -> Socket.Handle ---
     #package __net_connect       :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
     #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
-    #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool)  -> i32 ---
+    #package __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: ^Socket_Address)  -> i32 ---
+    #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool) -> i32 ---
+    #package __net_recvfrom      :: (handle: Socket.Handle, data: [] u8, out_recv_addr: ^Socket_Address, async_would_block: ^bool) -> i32 ---
     #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_recv_indicies: ^i32) -> i32 ---
-
-    #package __net_address_get_address :: (address: Socket_Address.Handle, out_buffer: [] u8) -> i32 ---
-    #package __net_address_get_port    :: (address: Socket_Address.Handle) -> i32 ---
 }
 
 #operator >= macro (a, b: Socket.Handle) => cast(u32) a >= cast(u32) b;
