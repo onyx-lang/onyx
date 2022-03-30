@@ -1928,6 +1928,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
         if (parse_possible_directive(parser, "union")) s_node->is_union = 1;
 
+        else if (parse_possible_directive(parser, "pack")) s_node->is_packed = 1;
+
         else if (parse_possible_directive(parser, "align")) {
             AstNumLit* numlit = parse_int_literal(parser);
             if (numlit == NULL) return NULL;

@@ -862,6 +862,12 @@ ONYX_DEF(__net_setting, (WASM_I32, WASM_I32, WASM_I32), ()) {
             fcntl(s, F_SETFL, flags);
             break;
         }
+
+        case 2: { // :EnumDependent  Broadcast
+            int s = params->data[0].of.i32;
+            setsockopt(s, SOL_SOCKET, SO_BROADCAST, (void *) &params->data[2].of.i32, sizeof(int));
+            break;
+        }
     }
     #endif
 
@@ -1053,35 +1059,25 @@ ONYX_DEF(__net_poll_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) 
     return NULL;
 }
 
-ONYX_DEF(__net_address_get_address, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
-    #ifdef _BH_LINUX
-    int maximum_length = params->data[2].of.i32;
-    int address_len = 0;
-
-    struct sockaddr_in *addr = (struct sockaddr_in *) params->data[0].of.i64;
-    if (addr == NULL) goto done;
-
-    char *address = inet_ntoa(addr->sin_addr);
-    if (address) address_len = strnlen(address, maximum_length);
-
-    memcpy(ONYX_PTR(params->data[1].of.i32), address, address_len);
-
-done:
-    results->data[0] = WASM_I32_VAL(address_len);
-    #endif
+ONYX_DEF(__net_host_to_net_s, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(htons(params->data[0].of.i32));
     return NULL;
 }
 
-ONYX_DEF(__net_address_get_port, (WASM_I64), (WASM_I32)) {
-    #ifdef _BH_LINUX
-    struct sockaddr_in *addr = (struct sockaddr_in *) params->data[0].of.i64;
-    if (addr == NULL) results->data[0] = WASM_I32_VAL(-1);
-    else              results->data[0] = WASM_I32_VAL(addr->sin_port);
-    #endif
+ONYX_DEF(__net_host_to_net_l, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(htonl(params->data[0].of.i32));
     return NULL;
 }
 
+ONYX_DEF(__net_net_to_host_s, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(ntohs(params->data[0].of.i32));
+    return NULL;
+}
 
+ONYX_DEF(__net_net_to_host_l, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(ntohl(params->data[0].of.i32));
+    return NULL;
+}
 
 
 //
@@ -1166,6 +1162,10 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_recv)
     ONYX_FUNC(__net_recvfrom)
     ONYX_FUNC(__net_poll_recv)
+    ONYX_FUNC(__net_host_to_net_s)
+    ONYX_FUNC(__net_host_to_net_l)
+    ONYX_FUNC(__net_net_to_host_s)
+    ONYX_FUNC(__net_net_to_host_l)
 
     ONYX_FUNC(__cptr_make)
     ONYX_FUNC(__cptr_read)

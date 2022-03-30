@@ -905,6 +905,7 @@ struct AstStructType {
 
     b32 pending_type_is_valid : 1;
     b32 is_union              : 1;
+    b32 is_packed             : 1;
 };
 struct AstStructMember {
     AstTyped_base;

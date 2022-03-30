@@ -150,6 +150,18 @@ concat :: (arr: ^[..] $T, other: [] T) {
     for ^o: other do push(arr, *o);
 }
 
+filter :: macro (arr: ^[..] $T, body: Code) {
+    move := 0;
+
+    while i := 0; i < arr.count - move {
+        defer i += 1;
+
+        if !(#unquote body) do move += 1;
+        if move != 0 do arr.data[i] = arr.data[i + move];
+    }
+
+    arr.count -= move;
+}
 
 fold_idx_elem :: (arr: [] $T, cmp: (T, T) -> bool) -> (i32, T) {
     idx  := 0;

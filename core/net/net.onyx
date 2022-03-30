@@ -7,6 +7,7 @@ Socket :: struct {
 
     use stream : io.Stream;
     handle: Handle;
+    type: SocketType;
 
     close     :: socket_close
     setting   :: socket_setting
@@ -43,6 +44,7 @@ SocketType :: enum {
 
 SocketSetting :: enum {
     NonBlocking :: 0x01;
+    Broadcast   :: 0x02;
 }
 
 // This structure is twenty bytes in size to accommodate IPV6 addresses.
@@ -65,6 +67,7 @@ Socket_Address :: struct #size 20 {
 
 socket_create :: (domain: SocketDomain, type: SocketType) -> (Socket, SocketError) {
     s: Socket;
+    s.type = type;
 
     err := __net_create_socket(^s.handle, domain, type);
     if err == .None {
@@ -137,7 +140,7 @@ socket_send :: (s: ^Socket, data: [] u8) -> i32 {
 
 socket_sendto :: (s: ^Socket, data: [] u8, addr: ^Socket_Address) -> i32 {
     sent := __net_sendto(s.handle, data, addr);
-    if sent < 0 { s.vtable = null; }
+    // if sent < 0 s.{ s.vtable = null; }
     return sent;
 }
 
@@ -186,6 +189,14 @@ socket_recvfrom :: (s: ^Socket, buffer: [] u8) -> (Socket_Address, i32) {
     return sa, received;
 }
 
+host_to_network :: #match {}
+#match host_to_network (x: u16) => __net_host_to_net_s(x);
+#match host_to_network (x: u32) => __net_host_to_net_l(x);
+
+network_to_host :: #match {}
+#match network_to_host (x: u16) => __net_net_to_host_s(x);
+#match network_to_host (x: u32) => __net_net_to_host_l(x);
+
 #local __net_socket_vtable := io.Stream_Vtable.{
     read = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
         if handle == 0 do return .BadFile, 0;
@@ -226,6 +237,11 @@ socket_recvfrom :: (s: ^Socket, buffer: [] u8) -> (Socket_Address, i32) {
     #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool) -> i32 ---
     #package __net_recvfrom      :: (handle: Socket.Handle, data: [] u8, out_recv_addr: ^Socket_Address, async_would_block: ^bool) -> i32 ---
     #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_recv_indicies: ^i32) -> i32 ---
+
+    #package __net_host_to_net_s :: (s: u16) -> u16 ---
+    #package __net_host_to_net_l :: (s: u32) -> u32 ---
+    #package __net_net_to_host_s :: (s: u16) -> u16 ---
+    #package __net_net_to_host_l :: (s: u32) -> u32 ---
 }
 
 #operator >= macro (a, b: Socket.Handle) => cast(u32) a >= cast(u32) b;

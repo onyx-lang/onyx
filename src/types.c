@@ -390,7 +390,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 }
 
                 if (mem_alignment > alignment) alignment = mem_alignment;
-                bh_align(offset, mem_alignment);
+
+                if (!s_node->is_packed) {
+                    bh_align(offset, mem_alignment);
+                }
 
                 token_toggle_end((*member)->token);
                 if (shgeti(s_type->Struct.members, (*member)->token->text) != -1) {
@@ -427,7 +430,10 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             }
 
             alignment = bh_max(s_node->min_alignment, alignment);
-            bh_align(size, alignment);
+            if (!s_node->is_packed) {
+                bh_align(size, alignment);
+            }
+
             size = bh_max(s_node->min_size, size);
 
             s_type->Struct.alignment = alignment;
