@@ -315,9 +315,12 @@ fornode_expr_checked:
         inside_for_iterator = 1;
     }
 
-    CHECK(block, fornode->stmt);
+    do {
+        CheckStatus cs = check_block(fornode->stmt);
+        inside_for_iterator = old_inside_for_iterator;
+        if (cs > Check_Errors_Start) return cs; 
+    } while(0);
 
-    inside_for_iterator = old_inside_for_iterator;
     return Check_Success;
 }
 
@@ -2086,6 +2089,7 @@ CheckStatus check_function(AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
 
+    inside_for_iterator = 0;
     expected_return_type = &func->type->Function.return_type;
     if (func->body) {
         CheckStatus status = check_block(func->body);
