@@ -112,6 +112,7 @@ CheckStatus check_polyquery(AstPolyQuery *query);
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
 b32 all_checks_are_final           = 1;
+b32 inside_for_iterator            = 0;
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
@@ -307,9 +308,16 @@ CheckStatus check_for(AstFor* fornode) {
     fornode->flags |= Ast_Flag_Has_Been_Checked;
 
 fornode_expr_checked:
+    b32 old_inside_for_iterator = inside_for_iterator;
+    inside_for_iterator = 0;
+    iter_type = fornode->iter->type;
+    if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
+        inside_for_iterator = 1;
+    }
 
     CHECK(block, fornode->stmt);
 
+    inside_for_iterator = old_inside_for_iterator;
     return Check_Success;
 }
 
@@ -1965,6 +1973,14 @@ CheckStatus check_directive_solidify(AstDirectiveSolidify** psolid) {
     return Check_Success;
 }
 
+CheckStatus check_remove_directive(AstDirectiveRemove *remove) {
+    if (!inside_for_iterator) {
+        ERROR(remove->token->pos, "#remove is only allowed in the body of a for-loop over an iterator.");
+    }
+
+    return Check_Success;
+}
+
 CheckStatus check_statement(AstNode** pstmt) {
     AstNode* stmt = *pstmt;
 
@@ -1981,6 +1997,7 @@ CheckStatus check_statement(AstNode** pstmt) {
         case Ast_Kind_Switch:     return check_switch((AstSwitch *) stmt);
         case Ast_Kind_Block:      return check_block((AstBlock *) stmt);
         case Ast_Kind_Defer:      return check_statement(&((AstDefer *) stmt)->stmt);
+        case Ast_Kind_Directive_Remove: return check_remove_directive((AstDirectiveRemove *) stmt);
         case Ast_Kind_Call: {
             CHECK(call, (AstCall **) pstmt);
             (*pstmt)->flags |= Ast_Flag_Expr_Ignored;

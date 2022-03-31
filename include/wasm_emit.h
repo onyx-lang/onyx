@@ -613,6 +613,14 @@ typedef struct PatchInfo {
     u32 instruction_index;
 } PatchInfo;
 
+typedef struct ForRemoveInfo {
+    // These are WASM locals
+    u64 iterator_remove_func;
+    u64 iterator_data_ptr;
+
+    i32 remove_func_type_idx;
+} ForRemoveInfo;
+
 typedef struct OnyxWasmModule {
     bh_allocator allocator;
 
@@ -634,6 +642,8 @@ typedef struct OnyxWasmModule {
     bh_arr(AllocatedSpace) local_allocations; 
 
     bh_arr(PatchInfo) stack_leave_patches;
+
+    bh_arr(ForRemoveInfo) for_remove_info;
 
     // NOTE: Used internally as a map from strings that represent function types,
     // 0x7f 0x7f : 0x7f ( (i32, i32) -> i32 )

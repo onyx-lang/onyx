@@ -437,6 +437,46 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     };
 }
 
+#match as_iterator (x: ^[..] $T) -> Iterator(^T) {
+    Context :: struct (T: type_expr) {
+        arr: ^[..] T;
+        current: u32;
+    }
+
+    c := make(Context(T));
+    c.arr = x;
+    c.current = 0;
+
+    next :: (use _: ^Context($T)) -> (^T, bool) {
+        if current < arr.count {
+            defer current += 1;
+            return ^arr.data[current], true;
+
+        } else {
+            return null, false;
+        }
+    }
+
+    close :: (data: rawptr) {
+        cfree(data);
+    }
+
+    remove :: (use _: ^Context($T)) {
+        //
+        // This is current - 1 because current will have already
+        // been incremented by the time this element calls #remove.
+        array :: package core.array
+        array.delete(arr, current - 1);
+    }
+
+    return .{
+        data  = c,
+        next  = #solidify next { T = T },
+        close = close,
+        remove = #solidify remove { T = T },
+    };
+}
+
 #match as_iterator (r: range) -> Iterator(i32) {
     Context :: struct {
         r: range;

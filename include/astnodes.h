@@ -42,6 +42,7 @@
     NODE(DirectiveTag)         \
     NODE(DirectiveInit)        \
     NODE(DirectiveLibrary)     \
+    NODE(DirectiveRemove)      \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -213,6 +214,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Tag,
     Ast_Kind_Directive_Init,
     Ast_Kind_Directive_Library,
+    Ast_Kind_Directive_Remove,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1257,6 +1259,10 @@ struct AstDirectiveTag {
 
     AstTyped* expr;
     AstTyped* tag;
+};
+
+struct AstDirectiveRemove {
+    AstNode_base;
 };
 
 struct AstNote {

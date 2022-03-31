@@ -1545,6 +1545,14 @@ static AstNode* parse_statement(OnyxParser* parser) {
                 break;
             }
 
+            if (parse_possible_directive(parser, "remove")) {
+                // :LinearTokenDependent
+                AstDirectiveRemove *remove = make_node(AstDirectiveRemove, Ast_Kind_Directive_Remove);
+                remove->token = parser->curr - 2;
+                retval = (AstNode *) remove;
+                break;
+            }
+
             if (next_tokens_are(parser, 2, '#', Token_Type_Symbol)) {
                 retval = (AstNode *) parse_factor(parser);
                 break;

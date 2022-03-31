@@ -243,6 +243,7 @@ EMIT_FUNC(defer,                         AstDefer* defer);
 EMIT_FUNC(defer_code,                    WasmInstruction* deferred_code, u32 code_count);
 EMIT_FUNC(deferred_stmt,                 DeferredStmt deferred_stmt);
 EMIT_FUNC_NO_ARGS(deferred_stmts);
+EMIT_FUNC(remove_directive,              AstDirectiveRemove* remove);
 EMIT_FUNC(binop,                         AstBinaryOp* binop);
 EMIT_FUNC(unaryop,                       AstUnaryOp* unop);
 EMIT_FUNC(call,                          AstCall* call);
@@ -430,6 +431,7 @@ EMIT_FUNC(statement, AstNode* stmt) {
         case Ast_Kind_Defer:      emit_defer(mod, &code, (AstDefer *) stmt); break;
         case Ast_Kind_Local:      emit_local_allocation(mod, &code, (AstTyped *) stmt); break;
 
+        case Ast_Kind_Directive_Remove: emit_remove_directive(mod, &code, (AstDirectiveRemove *) stmt); break;
         case Ast_Kind_Directive_Insert: break;
 
         default:                  emit_expression(mod, &code, (AstTyped *) stmt); break;
@@ -1024,13 +1026,31 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     // Allocate temporaries for iterator contents
-    u64 iterator_data_ptr   = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    u64 iterator_next_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
-    u64 iterator_close_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
-    u64 iterator_done_bool  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    u64 iterator_data_ptr    = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    u64 iterator_next_func   = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
+    u64 iterator_close_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
+    u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
+    u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+    WIL(WI_LOCAL_SET, iterator_remove_func);
     WIL(WI_LOCAL_SET, iterator_close_func);
     WIL(WI_LOCAL_SET, iterator_next_func);
     WIL(WI_LOCAL_SET, iterator_data_ptr);
+
+
+    {
+        //
+        // This pushes an entry onto the stack of for loops that have
+        // are iterator that can have a '#remove' directive in them.
+        ForRemoveInfo remove_info;
+        remove_info.iterator_data_ptr = iterator_data_ptr;
+        remove_info.iterator_remove_func = iterator_remove_func;
+
+        TypeWithOffset remove_func_type;
+        type_linear_member_lookup(for_node->iter->type, 3, &remove_func_type);
+        remove_info.remove_func_type_idx = generate_type_idx(mod, remove_func_type.type);
+
+        bh_arr_push(mod->for_remove_info, remove_info);
+    }
 
     AstLocal* var = for_node->var;
     b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
@@ -1114,6 +1134,8 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
 
     emit_deferred_stmts(mod, &code);
     emit_leave_structured_block(mod, &code);
+
+    bh_arr_pop(mod->for_remove_info);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
@@ -1294,6 +1316,25 @@ EMIT_FUNC_NO_ARGS(deferred_stmts) {
         DeferredStmt stmt = bh_arr_pop(mod->deferred_stmts);
         emit_deferred_stmt(mod, pcode, stmt);
     }
+}
+
+EMIT_FUNC(remove_directive, AstDirectiveRemove* remove) {
+    assert(bh_arr_length(mod->for_remove_info) > 0);
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    ForRemoveInfo remove_info = bh_arr_last(mod->for_remove_info);
+
+    WIL(WI_LOCAL_GET, remove_info.iterator_remove_func);
+    WIL(WI_I32_CONST, mod->null_proc_func_idx);
+    WI(WI_I32_NE);
+    WID(WI_IF_START, 0x40);
+    WIL(WI_LOCAL_GET, remove_info.iterator_data_ptr);
+    WIL(WI_LOCAL_GET, remove_info.iterator_remove_func);
+    WIL(WI_CALL_INDIRECT, remove_info.remove_func_type_idx);
+    WI(WI_IF_END);
+
+    *pcode = code;
 }
 
 // NOTE: These need to be in the same order as

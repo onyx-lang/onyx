@@ -849,6 +849,7 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
         case Ast_Kind_Defer:       SYMRES(statement, &((AstDefer *) *stmt)->stmt, NULL); break;
         case Ast_Kind_Switch_Case: SYMRES(case, (AstSwitchCase *) *stmt);                break;
         case Ast_Kind_Jump:        break;
+        case Ast_Kind_Directive_Remove: break;
 
         case Ast_Kind_Local:
             // if (remove) *remove = 1;
