@@ -535,6 +535,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         // been incremented by the time this element calls #remove.
         array :: package core.array
         array.delete(arr, current - 1);
+        current -= 1;
     }
 
     return .{
