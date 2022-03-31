@@ -13,7 +13,7 @@ package core.alloc.ring
 RingState :: struct {
     base_ptr : rawptr;
     size     : u32;
-    curr_ptr : rawptr;
+    curr     : u32;
 }
 
 #local
@@ -22,14 +22,13 @@ ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, o
 
     if aa == .Alloc {
         retval := null;
-        rem := ss.size - cast(u32) ss.curr_ptr + cast(u32) ss.base_ptr;
-
-        if size <= rem {
-            retval = ss.curr_ptr;
-            ss.curr_ptr = cast(rawptr) (cast(u32) ss.curr_ptr + size);
-        } else {
-            ss.curr_ptr = ss.base_ptr;
+        if ss.curr + size < ss.size {
+            retval = cast(^u8) ss.base_ptr + ss.curr;
+            ss.curr += size;
+        }
+        elseif size <= ss.size {
             retval = ss.base_ptr;
+            ss.curr = size;
         }
 
         return retval;
@@ -38,11 +37,11 @@ ring_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, o
     return null;
 }
 
-make :: (buffer: rawptr, length: u32) -> RingState {
+make :: (buffer: [] u8) -> RingState {
     return .{
-        base_ptr = buffer,
-        curr_ptr = buffer,
-        size     = length,
+        base_ptr = buffer.data,
+        size     = buffer.count,
+        curr     = 0,
     };
 }
 

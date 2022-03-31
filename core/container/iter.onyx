@@ -2,6 +2,30 @@ package core.iter
 
 use package core.intrinsics.onyx { __zero_value }
 #local memory :: package core.memory
+#local alloc  :: package core.alloc
+
+#local {
+    //
+    // After struggling to think of a good way for iterators to manage their context
+    // data in a way that is completely degradative to the heap memory, I decided that
+    // the easiest and most programmer friendly way to do it was to completely remove
+    // their dependence on the heap. ALL iterators allocated in this file use the
+    // buffer below to store their data. This data is never "freed", but because it
+    // is a ring buffer, the data will be reused eventually. I think that 1024 bytes
+    // should be plently for the normal number of active iterators. However, it is
+    // possible that this *could* overrun, and unexpected behavior could ensue. For
+    // this reason, most allocator also support allocating their data from the context's
+    // allocator simply by passing that allocator as an arugment.
+
+    iter_ring_buffer: [1024] u8;
+    iter_ring: alloc.ring.RingState;
+    iter_allocator: Allocator;
+
+    #init () {
+        iter_ring = alloc.ring.make(iter_ring_buffer);
+        iter_allocator = alloc.as_allocator(^iter_ring);
+    }
+}
 
 as_iterator :: #match {}
 
@@ -15,15 +39,17 @@ close :: (it: Iterator($T)) {
 }
 
 filter :: #match {}
-#match filter (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
+#match filter (it: Iterator($T), predicate: (T) -> bool, allocator := iter_allocator) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         predicate: (T) -> bool;
+        allocator: Allocator;
     }
 
-    filter_iterator := new(FilterIterator(T));
+    filter_iterator := new(FilterIterator(T), allocator=allocator);
     filter_iterator.iterator = it;
     filter_iterator.predicate = predicate;
+    filter_iterator.allocator = allocator;
 
     next :: (fi: ^FilterIterator($T)) -> (T, bool) {
         value, cont := fi.iterator.next(fi.iterator.data);
@@ -41,7 +67,7 @@ filter :: #match {}
 
     close :: (fi: ^FilterIterator($T)) {
         if fi.iterator.close != null_proc do fi.iterator.close(fi.iterator.data);
-        cfree(fi);
+        raw_free(fi.allocator, fi);
     }
 
     return .{
@@ -51,17 +77,19 @@ filter :: #match {}
     };
 }
 
-#match filter (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) -> Iterator(T) {
+#match filter (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocator := iter_allocator) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr, Ctx: type_expr) {
         iterator:  Iterator(T);
         predicate: (T, Ctx) -> bool;
         ctx: Ctx;
+        allocator: Allocator;
     }
 
-    filter_iterator := new(FilterIterator(T, Ctx));
+    filter_iterator := new(FilterIterator(T, Ctx), allocator=allocator);
     filter_iterator.iterator = it;
     filter_iterator.predicate = predicate;
     filter_iterator.ctx = ctx;
+    filter_iterator.allocator = allocator;
 
     next :: (fi: ^FilterIterator($T, $_)) -> (T, bool) {
         value, cont := fi.iterator.next(fi.iterator.data);
@@ -79,7 +107,7 @@ filter :: #match {}
 
     close :: (fi: ^FilterIterator($T, $_)) {
         if fi.iterator.close != null_proc do fi.iterator.close(fi.iterator.data);
-        cfree(fi);
+        raw_free(fi.allocator, fi);
     }
 
     return .{
@@ -90,15 +118,17 @@ filter :: #match {}
 }
 
 map :: #match {}
-#match map (it: Iterator($T), transform: (T) -> $R) -> Iterator(R) {
+#match map (it: Iterator($T), transform: (T) -> $R, allocator := iter_allocator) -> Iterator(R) {
     MapIterator :: struct (T: type_expr, R: type_expr) {
         iterator:  Iterator(T);
         transform: (T) -> R;
+        allocator: Allocator;
     }
 
-    map_iterator := new(MapIterator(T, R));
+    map_iterator := new(MapIterator(T, R), allocator=allocator);
     map_iterator.iterator = it;
     map_iterator.transform = transform;
+    map_iterator.allocator = allocator;
 
     next :: (mi: ^MapIterator($T, $R)) -> (R, bool) {
         value, cont := mi.iterator.next(mi.iterator.data);
@@ -109,7 +139,7 @@ map :: #match {}
 
     close :: (mi: ^MapIterator($T, $R)) {
         if mi.iterator.close != null_proc do mi.iterator.close(mi.iterator.data);
-        cfree(mi);
+        raw_free(mi.allocator, mi);
     }
 
     return .{
@@ -119,17 +149,19 @@ map :: #match {}
     };
 }
 
-#match map (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R) -> Iterator(R) {
+#match map (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R, allocator := iter_allocator) -> Iterator(R) {
     MapIterator :: struct (T: type_expr, R: type_expr, Ctx: type_expr) {
         iterator:  Iterator(T);
         transform: (T, Ctx) -> R;
         ctx: Ctx;
+        allocator: Allocator;
     }
 
-    map_iterator := new(MapIterator(T, R, Ctx));
+    map_iterator := new(MapIterator(T, R, Ctx), allocator=allocator);
     map_iterator.iterator = it;
     map_iterator.transform = transform;
     map_iterator.ctx = ctx;
+    map_iterator.allocator = allocator;
 
     next :: (mi: ^MapIterator($T, $R, $Ctx)) -> (R, bool) {
         value, cont := mi.iterator.next(mi.iterator.data);
@@ -140,7 +172,7 @@ map :: #match {}
 
     close :: (mi: ^MapIterator($T, $R, $Ctx)) {
         if mi.iterator.close != null_proc do mi.iterator.close(mi.iterator.data);
-        cfree(mi);
+        raw_free(mi.allocator, mi);
     }
 
     return .{
@@ -152,7 +184,9 @@ map :: #match {}
 
 take_one :: (it: Iterator($T), no_close := false) -> (T, bool) {
     ret, cont := it.next(it.data);
-    if !cont && !no_close do it.close(it.data);
+    if !cont && !no_close {
+        if it.close != null_proc do it.close(it.data);
+    }
     return ret, cont;
 }
 
@@ -172,15 +206,17 @@ take_one :: (it: Iterator($T), no_close := false) -> (T, bool) {
     return !cont;
 }
 
-take :: (it: Iterator($T), count: u32) -> Iterator(T) {
+take :: (it: Iterator($T), count: u32, allocator := iter_allocator) -> Iterator(T) {
     TakeIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         remaining: u32;
+        allocator: Allocator;
     }
 
-    take_iterator := new(TakeIterator(T));
+    take_iterator := new(TakeIterator(T), allocator=allocator);
     take_iterator.iterator = it;
     take_iterator.remaining = count;
+    take_iterator.allocator = allocator;
 
     next :: ($T: type_expr, ti: ^TakeIterator(T)) -> (T, bool) {
         if ti.remaining == 0 do return __zero_value(T), false;
@@ -191,7 +227,7 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
 
     close :: ($T: type_expr, ti: ^TakeIterator(T)) {
         ti.iterator.close(ti.iterator.data);
-        cfree(ti);
+        raw_free(ti.allocator, ti);
     }
 
     return .{
@@ -201,15 +237,17 @@ take :: (it: Iterator($T), count: u32) -> Iterator(T) {
     };
 }
 
-take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
+take_while :: (it: Iterator($T), predicate: (T) -> bool, allocator := iter_allocator) -> Iterator(T) {
     TakeIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         predicate: (T) -> bool;
+        allocator: Allocator;
     }
 
-    take_iterator := new(TakeIterator(T));
+    take_iterator := new(TakeIterator(T), allocator=allocator);
     take_iterator.iterator = it;
     take_iterator.predicate = predicate;
+    take_iterator.allocator = allocator;
 
     next :: ($T: type_expr, ti: ^TakeIterator(T)) -> (T, bool) {
         value, cont := ti.iterator.next(ti.iterator.data);
@@ -220,7 +258,7 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
 
     close :: ($T: type_expr, ti: ^TakeIterator(T)) {
         if ti.iterator.close != null_proc do ti.iterator.close(ti.iterator.data);
-        cfree(ti);
+        raw_free(ti.allocator, ti);
     }
 
     return .{
@@ -230,16 +268,18 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
     };
 }
 
-skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
+skip :: (it: Iterator($T), count: u32, allocator := iter_allocator) -> Iterator(T) {
     SkipIterator :: struct (T: type_expr) {
         iterator: Iterator(T);
         to_skip:  i32;
         skipped:  bool = false;
+        allocator: Allocator;
     }
 
-    skip_iterator := new(SkipIterator(T));
+    skip_iterator := new(SkipIterator(T), allocator=allocator);
     skip_iterator.iterator = it;
     skip_iterator.to_skip = count;
+    skip_iterator.allocator = allocator;
 
     next :: (si: ^SkipIterator($T)) -> (T, bool) {
         while !si.skipped && si.to_skip > 0 {
@@ -257,7 +297,7 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
 
     close :: (si: ^SkipIterator($T)) {
         if si.iterator.close != null_proc do si.iterator.close(si.iterator.data);
-        cfree(si);
+        raw_free(si.allocator, si);
     }
 
     return .{
@@ -272,15 +312,17 @@ skip :: (it: Iterator($T), count: u32) -> Iterator(T) {
     second: R;
 }
 
-zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Zipped(T, R)) {
+zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R), allocator := iter_allocator) -> Iterator(Zipped(T, R)) {
     ZippedIterator :: struct (T: type_expr, R: type_expr) {
         iterator1: Iterator(T);
         iterator2: Iterator(R);
+        allocator: Allocator;
     }
 
-    zipped_iterator := new(ZippedIterator(T, R));
+    zipped_iterator := new(ZippedIterator(T, R), allocator=allocator);
     zipped_iterator.iterator1 = left_iterator;
     zipped_iterator.iterator2 = right_iterator;
+    zipped_iterator.allocator = allocator;
 
     next :: (zi: ^ZippedIterator($T, $R)) -> (Zipped(T, R), bool) {
         v1, cont1 := zi.iterator1.next(zi.iterator1.data);
@@ -292,7 +334,7 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R)) -> Iterator(Z
     close :: (zi: ^ZippedIterator($T, $R)) {
         if zi.iterator1.close != null_proc do zi.iterator1.close(zi.iterator1.data);
         if zi.iterator2.close != null_proc do zi.iterator2.close(zi.iterator2.data);
-        cfree(zi);
+        raw_free(zi.allocator, zi);
     }
 
     return .{
@@ -308,8 +350,8 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
         idx:   u32;
     }
 
-    c := new(Context(T));
-    c.iters = memory.copy_slice(iters);
+    c := new(Context(T), allocator=iter_allocator);
+    c.iters = memory.copy_slice(iters, allocator=iter_allocator);
     c.idx = 0;
 
     next :: (use c: ^Context($T)) -> (T, bool) {
@@ -334,8 +376,8 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
             it.close(it.data);
         }
 
-        memory.free_slice(^iters);
-        cfree(c);
+        // memory.free_slice(^iters);
+        // cfree(c);
     }
 
     return .{
@@ -350,13 +392,12 @@ const :: (value: $T) -> Iterator(T) {
         return *(cast(^T) data), true;
     }
 
-    allocated := cast(^T) calloc(sizeof T);
+    allocated := cast(^T) raw_alloc(iter_allocator, sizeof T);
     *allocated = value;
 
     return .{
         data = allocated,
         next = #solidify next { T=T },
-        close = cfree,
     };
 }
 
@@ -378,7 +419,7 @@ enumerate :: #match {}
         current_index: i32;
     }
 
-    ec := make(Enumeration_Context(T));
+    ec := make(Enumeration_Context(T), allocator=iter_allocator);
     ec.iterator = it;
     ec.current_index = start_index;
 
@@ -393,7 +434,7 @@ enumerate :: #match {}
 
     close :: (use data: ^Enumeration_Context($T)) {
         if iterator.close != null_proc do iterator.close(iterator.data);
-        cfree(data);
+        // cfree(data);
     }
 
     return .{
@@ -411,7 +452,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         current: u32;
     }
 
-    c := make(Context(T));
+    c := make(Context(T), allocator=iter_allocator);
     c.data = arr.data;
     c.count = arr.count;
     c.current = 0;
@@ -426,14 +467,9 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         }
     }
 
-    close :: (data: rawptr) {
-        cfree(data);
-    }
-
     return .{
         data  = c,
         next  = #solidify next { T = T },
-        close = close,
     };
 }
 
@@ -443,7 +479,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         current: u32;
     }
 
-    c := make(Context(T));
+    c := make(Context(T), allocator=iter_allocator);
     c.arr = x;
     c.current = 0;
 
@@ -453,12 +489,8 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
             return arr.data[current], true;
 
         } else {
-            return null, false;
+            return __zero_value(T), false;
         }
-    }
-
-    close :: (data: rawptr) {
-        cfree(data);
     }
 
     remove :: (use _: ^Context($T)) {
@@ -467,12 +499,12 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         // been incremented by the time this element calls #remove.
         array :: package core.array
         array.delete(arr, current - 1);
+        current -= 1;
     }
 
     return .{
         data  = c,
         next  = #solidify next { T = T },
-        close = close,
         remove = #solidify remove { T = T },
     };
 }
@@ -483,7 +515,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         current: u32;
     }
 
-    c := make(Context(T));
+    c := make(Context(T), allocator=iter_allocator);
     c.arr = x;
     c.current = 0;
 
@@ -497,10 +529,6 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         }
     }
 
-    close :: (data: rawptr) {
-        cfree(data);
-    }
-
     remove :: (use _: ^Context($T)) {
         //
         // This is current - 1 because current will have already
@@ -512,7 +540,6 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     return .{
         data  = c,
         next  = #solidify next { T = T },
-        close = close,
         remove = #solidify remove { T = T },
     };
 }
@@ -542,18 +569,13 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         }
     }
 
-    close :: (c: ^Context) {
-        cfree(c);
-    }
-
-    c := new(Context);
+    c := new(Context, allocator=iter_allocator);
     c.r = r;
     c.v = r.low;
 
     return .{
         data  = c,
         next  = next,
-        close = close,
     };
 }
 
@@ -652,6 +674,11 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
             cfree(c);
         }
 
+        // This iterator's context is allocated from the heap because
+        // generally, a distributor iterator will be used across theads
+        // in parallel programs. Programs such as those *might* make
+        // a lot of iterators in their theads and I don't want to cause
+        // the distributor's context be overwritten.
         c := new(Context(it.Iter_Type));
         sync.mutex_init(^c.mutex);
         c.iterator = it;

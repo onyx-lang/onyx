@@ -38,7 +38,7 @@ temp_allocator : Allocator;
 init :: () {
     heap.init();
 
-    temp_buffer := raw_alloc(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
-    temp_state = ring.make(temp_buffer, TEMPORARY_ALLOCATOR_SIZE);
+    temp_buffer := cast(^u8) raw_alloc(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
+    temp_state = ring.make(temp_buffer[0 .. TEMPORARY_ALLOCATOR_SIZE]);
     temp_allocator = ring.make_allocator(^temp_state);
 }

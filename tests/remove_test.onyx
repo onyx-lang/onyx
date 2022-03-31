@@ -1,0 +1,18 @@
+#load "core/std"
+
+use package core
+
+main :: (args) => {
+    x: [..] i32;
+    for 25 do x << it;
+
+    println(x);
+
+    for iter.as_iterator(^x) {
+        if it % 2 == 0 {
+            #remove;
+        }
+    }
+
+    println(x);
+}
