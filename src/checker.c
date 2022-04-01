@@ -216,6 +216,7 @@ CheckStatus check_while(AstIfWhile* whilenode) {
 }
 
 CheckStatus check_for(AstFor* fornode) {
+    b32 old_inside_for_iterator;
     if (fornode->flags & Ast_Flag_Has_Been_Checked) goto fornode_expr_checked;
 
     CHECK(expression, &fornode->iter);

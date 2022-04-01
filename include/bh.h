@@ -1471,6 +1471,13 @@ b32 bh_file_read_at(bh_file* file, i64 offset, void* buffer, isize buff_size, is
     else     return 0;
 
 #elif defined(_BH_LINUX)
+    if (file->fd == 0) {
+        isize res = read(file->fd, buffer, buff_size);
+        if (res < 0) return 0;
+        if (bytes_read) *bytes_read = res;
+        return 1;
+    }
+
     isize res = pread(file->fd, buffer, buff_size, offset);
     if (res < 0) return 0;
     if (bytes_read) *bytes_read = res;

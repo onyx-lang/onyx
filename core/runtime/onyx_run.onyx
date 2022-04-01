@@ -17,6 +17,7 @@ __output_string :: (s: str) -> u32 {
 
 __read_from_input :: (buffer: [] u8) -> i32 {
     err, read := io.stream_read(^__stdin, buffer);
+    if err == .ReadPending do return 0;
     if err != .None do return -1;
     return read;
 }
