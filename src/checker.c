@@ -309,7 +309,7 @@ CheckStatus check_for(AstFor* fornode) {
     fornode->flags |= Ast_Flag_Has_Been_Checked;
 
 fornode_expr_checked:
-    b32 old_inside_for_iterator = inside_for_iterator;
+    old_inside_for_iterator = inside_for_iterator;
     inside_for_iterator = 0;
     iter_type = fornode->iter->type;
     if (type_struct_constructed_from_poly_struct(iter_type, builtin_iterator_type)) {
