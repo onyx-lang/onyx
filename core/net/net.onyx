@@ -54,13 +54,7 @@ Socket_Address :: struct #size 20 {
     addr: u32;
 
     addr_as_str :: (use this: ^Socket_Address, allocator := context.allocator) -> str {
-        out: [64] u8; 
-        str_addr := conv.format(out, "{}.{}.{}.{}",
-            (addr >> 24) & 0xff,
-            (addr >> 16) & 0xff,
-            (addr >>  8) & 0xff,
-            (addr >>  0) & 0xff);
-
+        str_addr := ipv4_to_str(this.addr);
         return string.alloc_copy(str_addr, allocator=allocator);
     }
 }
@@ -246,3 +240,35 @@ network_to_host :: #match {}
 
 #operator >= macro (a, b: Socket.Handle) => cast(u32) a >= cast(u32) b;
 #operator == macro (a, b: Socket.Handle) => cast(u32) a == cast(u32) b;
+
+
+
+//
+// Non-socket related helper functions
+//
+
+str_to_ipv4 :: (ip: str) -> u32 {
+    ip_ := ip;
+
+    res: u32;
+    for 4 {
+        octet := string.read_until(^ip_, #char ".");
+        string.advance(^ip_, 1);
+
+        res = res << 8;
+        res |= ~~(conv.str_to_i64(octet) & cast(i64) 0xFF);
+    }
+
+    return res;
+}
+
+// This returns a volatile buffer that should be copied.
+ipv4_to_str :: (addr: u32) -> str {
+    #persist out: [64] u8;
+    str_addr := conv.format(out, "{}.{}.{}.{}",
+        (addr >> 24) & 0xff,
+        (addr >> 16) & 0xff,
+        (addr >>  8) & 0xff,
+        (addr >>  0) & 0xff);
+    return str_addr;
+}
