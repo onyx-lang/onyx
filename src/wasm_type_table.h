@@ -384,7 +384,7 @@ u64 build_type_table(OnyxWasmModule* module) {
                     if (struct_scope == NULL) goto no_methods;
 
                     fori (i, 0, shlen(struct_scope->symbols)) {
-                        AstFunction* node = (AstFunction *) struct_scope->symbols[i].value;
+                        AstFunction* node = (AstFunction *) strip_aliases(struct_scope->symbols[i].value);
                         if (node->kind != Ast_Kind_Function) continue;
                         assert(node->entity);
                         assert(node->entity->function == node);

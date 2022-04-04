@@ -34,6 +34,12 @@ printf :: (format: str, va: ..any) {
     print(conv.str_format_va(buffer, format, va));
 }
 
+aprintf :: (format: str, va: ..any) -> str {
+    buffer: [8196] u8;
+    out := conv.str_format_va(buffer, format, va);
+    return string.alloc_copy(out);
+}
+
 // This works on both slices and arrays
 print_array :: #match {
     (arr: [$N] $T, sep := " ") {

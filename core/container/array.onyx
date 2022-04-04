@@ -31,7 +31,7 @@ free :: (arr: ^[..] $T) {
     arr.count = 0;
     arr.capacity = 0;
 
-    raw_free(arr.allocator, arr.data);
+    if arr.data != null do raw_free(arr.allocator, arr.data);
     arr.data = null;
 }
 

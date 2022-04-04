@@ -85,7 +85,7 @@ contexts:
 
     - match: '([a-zA-Z_][a-zA-Z0-9_\.]+)\s*\('
       captures:
-        1: meta.function-call.onyx
+        1: variable.function.onyx
 
     # - match: '([a-zA-Z_][a-zA-Z0-9_]*)(,\s*([a-zA-Z_][a-zA-Z0-9_]*))*\s*:'
     #   captures:
