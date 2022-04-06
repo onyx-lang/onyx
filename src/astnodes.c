@@ -735,6 +735,19 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         return unify_node_and_type_(&alias->alias, type, permanent);
     }
 
+    else if (node->kind == Ast_Kind_Address_Of) {
+        AstAddressOf *address_of = (AstAddressOf *) node;
+        if (address_of->can_be_removed) {
+            if (!permanent) {
+                return unify_node_and_type_(&address_of->expr, type, permanent);
+                
+            } else {
+                *pnode = (AstTyped *) address_of->expr;
+                return unify_node_and_type_(pnode, type, permanent);
+            }
+        }
+    }
+
     return TYPE_MATCH_FAILED;
 }
 

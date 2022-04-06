@@ -781,7 +781,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 method_call->left = retval;
                 method_call->right = parse_factor(parser);
 
-                retval = (AstTyped *) method_call;
+                if (method_call->right->kind == Ast_Kind_Method_Call) {
+                    AstBinaryOp *inner_method_call = (AstBinaryOp *) method_call->right;
+                    method_call->right = inner_method_call->left;
+                    inner_method_call->left = (AstTyped *) method_call;
+
+                    retval = (AstTyped *) inner_method_call;
+
+                } else {
+                    retval = (AstTyped *) method_call;
+                }
                 break;
             }
 
@@ -1267,7 +1276,9 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
     expect_token(parser, ':');
 
     if (parser->curr->type == ':') {
+        bh_arr_push(parser->current_symbol_stack, symbol);
         AstBinding* binding = parse_top_level_binding(parser, symbol);
+        bh_arr_pop(parser->current_symbol_stack);
         if (parser->hit_unexpected_token) return 2;
 
         ENTITY_SUBMIT(binding);

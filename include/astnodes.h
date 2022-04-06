@@ -610,6 +610,13 @@ struct AstAddressOf     {
     AstTyped *expr;
 
     AstBinaryOp *potential_substitute;
+
+    // This is set by check_method_call.
+    // If set, the address of node can be removed if the
+    // type checking does not pass for it. This makes it
+    // possible to have something that will optionally
+    // have its address taken, if necessary.
+    b32 can_be_removed : 1;
 };
 struct AstArgument      {
     AstTyped_base;

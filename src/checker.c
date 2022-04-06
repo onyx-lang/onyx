@@ -1489,6 +1489,12 @@ CheckStatus check_address_of(AstAddressOf** paof) {
             && expr->kind != Ast_Kind_Local
             && expr->kind != Ast_Kind_Constraint_Sentinel)
             || (expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
+
+        if (aof->can_be_removed) {
+            *(AstTyped **) paof = aof->expr;
+            return Check_Yield_Macro;
+        }
+
         ERROR_(aof->token->pos, "Cannot take the address of something that is not an l-value. %s", onyx_ast_node_kind_string(expr->kind));
     }
 
@@ -1691,8 +1697,11 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
         // Implicitly take the address of the value if it is not already a pointer type.
         // This could be weird to think about semantically so some testing with real code
         // would be good.                                      - brendanfh 2020/02/05
-        if (implicit_argument->type->kind != Type_Kind_Pointer)
-            implicit_argument = (AstTyped *) make_address_of(context.ast_alloc, implicit_argument);
+        if (implicit_argument->type->kind != Type_Kind_Pointer) {
+            AstAddressOf *address_of = make_address_of(context.ast_alloc, implicit_argument);
+            address_of->can_be_removed = 1;
+            implicit_argument = (AstTyped *) address_of;
+        }
 
         implicit_argument = (AstTyped *) make_argument(context.ast_alloc, implicit_argument);
 

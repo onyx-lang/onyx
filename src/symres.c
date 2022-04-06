@@ -391,6 +391,11 @@ static SymresStatus symres_method_call(AstBinaryOp** mcall) {
             return Symres_Error;
         }
 
+        // AstAlias *left_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+        // left_alias->token = (*mcall)->left->token;
+        // left_alias->alias = (*mcall)->left;
+        // (*mcall)->left = (AstTyped *) left_alias;
+
         AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);
         implicit_field_access->token = ((AstCall *) (*mcall)->right)->callee->token;
         ((AstCall *) (*mcall)->right)->callee = (AstTyped *) implicit_field_access;
