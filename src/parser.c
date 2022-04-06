@@ -1885,6 +1885,16 @@ static AstTypeOf* parse_typeof(OnyxParser* parser) {
     return type_of;
 }
 
+static void struct_type_create_scope(OnyxParser *parser, AstStructType *s_node) {
+    if (!s_node->scope) {
+        s_node->scope = scope_create(context.ast_alloc, parser->current_scope, s_node->token->pos);
+        parser->current_scope = s_node->scope;
+
+        OnyxToken* current_symbol = bh_arr_last(parser->current_symbol_stack);
+        s_node->scope->name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
+    }
+}
+
 static AstStructType* parse_struct(OnyxParser* parser) {
     OnyxToken *s_token = expect_token(parser, Token_Type_Keyword_Struct);
 
@@ -1981,10 +1991,13 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         if (parse_possible_directive(parser, "persist")) {
+            struct_type_create_scope(parser, s_node);
+            
             b32 thread_local = parse_possible_directive(parser, "thread_local");
 
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
             AstMemRes* memres = parse_memory_reservation(parser, symbol, thread_local);
+            consume_token_if_next(parser, ';');
 
             AstBinding* binding = make_node(AstBinding, Ast_Kind_Binding);
             binding->token = memres->token;
@@ -1994,13 +2007,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
-            if (!s_node->scope) {
-                s_node->scope = scope_create(context.ast_alloc, parser->current_scope, s_node->token->pos);
-                parser->current_scope = s_node->scope;
-
-                OnyxToken* current_symbol = bh_arr_last(parser->current_symbol_stack);
-                s_node->scope->name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
-            }
+            struct_type_create_scope(parser, s_node);
 
             OnyxToken* binding_name = expect_token(parser, Token_Type_Symbol);
             consume_token(parser);
