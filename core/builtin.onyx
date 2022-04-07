@@ -134,51 +134,63 @@ calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
 cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
-// CLEANUP: Does this really need to be limited to a non-custom runtime?
-#if runtime.runtime != .Custom {
-    new :: #match {
-        ($T: type_expr, allocator := context.allocator) -> ^T {
-            use package core.intrinsics.onyx { __initialize }
-            memory :: package core.memory
+new :: #match {
+    ($T: type_expr, allocator := context.allocator) -> ^T {
+        use package core.intrinsics.onyx { __initialize }
+        memory :: package core.memory
 
-            res := cast(^T) raw_alloc(allocator, sizeof T);
-            memory.set(res, 0, sizeof T);
-            __initialize(res);
+        res := cast(^T) raw_alloc(allocator, sizeof T);
+        memory.set(res, 0, sizeof T);
+        __initialize(res);
 
-            return res;
-        },
+        return res;
+    },
 
-        (T: type_expr, allocator := context.allocator) -> rawptr {
-            memory :: package core.memory
+    (T: type_expr, allocator := context.allocator) -> rawptr {
+        memory :: package core.memory
 
-            info := type_info.get_type_info(T);
-            size := type_info.size_of(T);
-            if size == 0 do return null;
+        info := type_info.get_type_info(T);
+        size := type_info.size_of(T);
+        if size == 0 do return null;
 
-            res := raw_alloc(allocator, size);
-            memory.set(res, 0, size);
+        res := raw_alloc(allocator, size);
+        memory.set(res, 0, size);
 
-            if info.kind == .Struct {
-                s_info := cast(^type_info.Type_Info_Struct) info;
-                for s_info.members {
-                    if it.default != null {
-                        member_size := type_info.size_of(it.type);
-                        memory.copy(cast(^u8) res + it.offset, it.default, member_size);
-                    }
+        if info.kind == .Struct {
+            s_info := cast(^type_info.Type_Info_Struct) info;
+            for s_info.members {
+                if it.default != null {
+                    member_size := type_info.size_of(it.type);
+                    memory.copy(cast(^u8) res + it.offset, it.default, member_size);
                 }
             }
-
-            return res;
         }
-    }
 
-    make :: ($T: type_expr, allocator := context.allocator) -> ^T {
+        return res;
+    }
+}
+
+make :: #match {
+    macro ($T: type_expr, allocator := context.allocator) => {
+        return __make_overload(cast(^T) null, allocator=allocator);
+    },
+
+    macro ($T: type_expr, n: u32, allocator := context.allocator) => {
+        return __make_overload(cast(^T) null, n, allocator=allocator);
+    },
+}
+
+__make_overload :: #match {
+    //
+    // This is the fallback option for make. It simply allocates a zero-intialized
+    // element of type T.
+    #precedence 1000 (_: ^$T, allocator := context.allocator) -> ^T {
         memory :: package core.memory
 
         res := cast(^T) raw_alloc(allocator, sizeof T);
         memory.set(res, 0, sizeof T);
         return res;
-    }
+    },
 }
 
 

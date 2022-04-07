@@ -29,6 +29,10 @@ make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] 
     };
 }
 
+#match __make_overload macro (_: ^[] $T, count: u32, allocator := context.allocator) -> [] T {
+    return (package core.memory).make_slice(T, count, allocator);
+}
+
 free_slice :: (sl: ^[] $T, allocator := context.allocator) {
     if sl.data == null do return;
 

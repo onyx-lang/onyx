@@ -20,6 +20,14 @@ make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T
     return arr;
 }
 
+#match __make_overload macro (_: ^[..] $T, allocator := context.allocator) -> [..] T {
+    return (package core.array).make(T, allocator=allocator);
+}
+
+#match __make_overload macro (_: ^[..] $T, capacity: u32, allocator := context.allocator) -> [..] T {
+    return (package core.array).make(T, capacity, allocator);
+}
+
 init :: (arr: ^[..] $T, capacity := 4, allocator := context.allocator) {
     arr.count = 0;
     arr.capacity = capacity;
