@@ -193,6 +193,12 @@ __make_overload :: #match {
     },
 }
 
+delete :: #match {
+    #precedence 1000 macro (x: ^$T, allocator := context.allocator) -> ^T {
+        raw_free(allocator, x);
+    }
+}
+
 
 Iterator :: struct (Iter_Type: type_expr) {
     data:   rawptr;

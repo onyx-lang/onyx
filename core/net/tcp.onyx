@@ -139,8 +139,8 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_S
 
     server.client_count = 0;
     server.client_allocator = allocator;
-    memory.alloc_slice(^server.clients, max_clients, allocator=allocator);
-    memory.fill_slice(server.clients, null);
+    server.clients = make([] ^TCP_Server.Client, max_clients, allocator=allocator);
+    array.fill(server.clients, null);
 
     return server;
 }

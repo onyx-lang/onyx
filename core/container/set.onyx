@@ -49,7 +49,7 @@ init :: (set: ^Set($T), default := __zero_value(T), allocator := context.allocat
     set.default_value = default;
 
     memory.alloc_slice(^set.hashes, 8, allocator=allocator);
-    memory.fill_slice(set.hashes, -1);
+    array.fill(set.hashes, -1);
 
     array.init(^set.entries, 4, allocator=allocator); 
 }
@@ -180,8 +180,8 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
 
     rehash :: (use set: ^Set, new_size: i32) {
         memory.free_slice(^hashes, allocator);
-        memory.alloc_slice(^hashes, new_size, allocator);
-        memory.fill_slice(hashes, -1);
+        hashes = make([] u32, new_size, allocator=allocator);
+        array.fill(hashes, -1);
 
         for ^entry: entries do entry.next = -1;
 

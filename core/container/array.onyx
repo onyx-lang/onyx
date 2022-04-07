@@ -43,13 +43,25 @@ free :: (arr: ^[..] $T) {
     arr.data = null;
 }
 
-copy :: (arr: ^[..] $T, allocator := context.allocator) -> [..] T {
-    new_arr : [..] T;
-    init(^new_arr, arr.count, allocator);
-    new_arr.count = arr.count;
+#match (package builtin).delete macro (x: ^[..] $T) {
+    (package core.array).free(x);
+}
 
-    for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
-    return new_arr;
+copy :: #match {
+    (arr: ^[..] $T, allocator := context.allocator) -> [..] T {
+        new_arr : [..] T;
+        init(^new_arr, arr.count, allocator);
+        new_arr.count = arr.count;
+
+        for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
+        return new_arr;
+    }, 
+
+    (arr: [] $T, allocator := context.allocator) -> [] T {
+        new_arr := make([] T, arr.count);       
+        for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
+        return new_arr;
+    }
 }
 
 copy_range :: (arr: ^[..] $T, r: range, allocator := context.allocator) -> [..] T {

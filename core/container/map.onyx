@@ -39,15 +39,19 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
         value : V;
     }
 
-    init    :: init
-    has     :: has
-    get     :: get
-    get_ptr :: get_ptr
-    put     :: put
-    delete  :: delete
-    update  :: update
-    clear   :: clear
-    empty   :: empty
+    //
+    // These need to have aliases because some of them like
+    // 'delete', collide with the global 'delete', which
+    // causes it to map to the wrong function.
+    init    :: (package core.map).init
+    has     :: (package core.map).has
+    get     :: (package core.map).get
+    get_ptr :: (package core.map).get_ptr
+    put     :: (package core.map).put
+    delete  :: (package core.map).delete
+    update  :: (package core.map).update
+    clear   :: (package core.map).clear
+    empty   :: (package core.map).empty
 }
 
 make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value)) -> Map(Key, Value) {
@@ -63,7 +67,7 @@ init :: (use map: ^Map($K, $V), default := __zero_value(V)) {
     default_value = default;
 
     memory.alloc_slice(^hashes, 8, allocator=allocator);
-    memory.fill_slice(hashes, -1);
+    array.fill(hashes, -1);
 
     array.init(^entries, allocator=allocator);
 }
@@ -72,6 +76,8 @@ free :: (use map: ^Map) {
     if map.hashes.data != null do memory.free_slice(^hashes, allocator=allocator);
     if map.entries.data != null do array.free(^entries);
 }
+
+#match (package builtin).delete (package core.map).free
 
 put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
     lr := lookup(map, key);
@@ -199,8 +205,8 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
 
     rehash :: (use map: ^Map, new_size: i32) {
         memory.free_slice(^hashes, allocator);
-        memory.alloc_slice(^hashes, new_size, allocator);
-        memory.fill_slice(hashes, -1);
+        hashes = make([] u32, new_size, allocator=allocator);
+        array.fill(hashes, -1);
 
         for ^entry: entries do entry.next = -1;
 

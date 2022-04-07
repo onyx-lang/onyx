@@ -41,6 +41,10 @@ free_slice :: (sl: ^[] $T, allocator := context.allocator) {
     sl.count = 0;
 }
 
+#match (package builtin).delete macro (x: ^[] $T) {
+    (package core.memory).free_slice(x);
+}
+
 copy_slice :: (sl: [] $T, allocator := context.allocator) -> [] T {
     data := raw_alloc(allocator, sl.count * sizeof T);
     copy(data, sl.data, sl.count * sizeof T);
@@ -56,10 +60,6 @@ resize_slice :: (sl: [] $T, new_size: i32, allocator := context.allocator) -> []
     copy(new_slice.data, sl.data, sl.count * sizeof T);
 
     return new_slice;
-}
-
-fill_slice :: macro (sl: [] $T, v: T) {
-    for ^it: sl do *it = v;
 }
 
 align :: #match {

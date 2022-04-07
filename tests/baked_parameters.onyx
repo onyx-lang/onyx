@@ -32,7 +32,7 @@ main :: (args: [] cstr) {
 
     // This is so much cleaner than the alternative.
     ages := map.make(str, u32, default=0);
-    defer map.free(^ages);
+    defer delete(^ages);
 
     map.put(^ages, "Dwight", 32);
     map.put(^ages, "Jim", 25);
