@@ -60,13 +60,15 @@ make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value)) -> 
     return map;
 }
 
+#match (package builtin).__make_overload macro (x: ^Map($K, $V), allocator := context.allocator) => (package core.map).make(K, V);
+
 init :: (use map: ^Map($K, $V), default := __zero_value(V)) {
     __initialize(map);
 
     allocator = context.allocator;
     default_value = default;
 
-    memory.alloc_slice(^hashes, 8, allocator=allocator);
+    hashes = make([] u32, 8, allocator=allocator);
     array.fill(hashes, -1);
 
     array.init(^entries, allocator=allocator);

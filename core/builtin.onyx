@@ -194,7 +194,7 @@ __make_overload :: #match {
 }
 
 delete :: #match {
-    #precedence 1000 macro (x: ^$T, allocator := context.allocator) -> ^T {
+    #precedence 1000 macro (x: ^$T, allocator := context.allocator) {
         raw_free(allocator, x);
     }
 }

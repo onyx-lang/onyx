@@ -534,7 +534,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (type == NULL) return TYPE_MATCH_FAILED;
     if (node == NULL) return TYPE_MATCH_FAILED;
 
-    if (node->kind == Ast_Kind_Struct_Literal && node->type_node == NULL) {
+    if (node->kind == Ast_Kind_Struct_Literal && (node->type_node == NULL && node->type == NULL)) {
         if (node->entity != NULL) return TYPE_MATCH_SUCCESS;
         if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.elem;
         if (!type_is_sl_constructable(type)) return TYPE_MATCH_FAILED;

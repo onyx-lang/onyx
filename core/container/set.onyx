@@ -44,6 +44,8 @@ make :: ($T: type_expr, default := __zero_value(T), allocator := context.allocat
     return set;
 }
 
+#match (package builtin).__make_overload macro (x: ^Set, allocator: Allocator) => (package core.set).make(x.Elem_Type, allocator = allocator);
+
 init :: (set: ^Set($T), default := __zero_value(T), allocator := context.allocator) {
     set.allocator = allocator;
     set.default_value = default;
@@ -58,6 +60,8 @@ free :: (use set: ^Set) {
     memory.free_slice(^hashes, allocator=allocator);
     array.free(^entries);
 }
+
+#match (package builtin).delete (package core.set).free
 
 insert :: (use set: ^Set, value: set.Elem_Type) {
     if hashes.data == null do init(set);
