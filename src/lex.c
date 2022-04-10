@@ -471,7 +471,7 @@ whitespace_skipped:
     // Symbols
     if (char_is_alpha(*tk.text) || *tokenizer->curr == '_') {
         u64 len = 0;
-        while (char_is_alphanum(*tokenizer->curr) || charset_contains("_$", *tokenizer->curr)) {
+        while (char_is_alphanum(*tokenizer->curr) || *tokenizer->curr == '_') {
             len++;
             INCREMENT_CURR_TOKEN(tokenizer);
         }

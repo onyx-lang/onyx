@@ -10,7 +10,7 @@ endif
 let s:cpo_save = &cpo
 set cpo&vim
 
-syn keyword onyxKeyword package struct enum proc use global macro
+syn keyword onyxKeyword package struct enum use global macro
 syn keyword onyxKeyword if elseif else where interface
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword switch case
@@ -27,7 +27,7 @@ syn keyword onyxType str cstr
 syn keyword onyxType i8x16 i16x8 i32x4 i64x2 f32x4 f64x2 v128
 syn keyword onyxType type_expr any
 
-syn keyword onyxConstant        true false null null_proc
+syn keyword onyxConstant        true false null null_proc it
 
 syn match onyxNumber            "\<0x[a-fA-F0-9]\+\>"
 syn match onyxNumber            "\<\d\+[lf]\=\>"
