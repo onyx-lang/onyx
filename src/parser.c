@@ -781,7 +781,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 method_call->left = retval;
                 method_call->right = parse_factor(parser);
 
-                if (method_call->right->kind == Ast_Kind_Method_Call) {
+                if (method_call->right && method_call->right->kind == Ast_Kind_Method_Call) {
                     AstBinaryOp *inner_method_call = (AstBinaryOp *) method_call->right;
                     method_call->right = inner_method_call->left;
                     inner_method_call->left = (AstTyped *) method_call;

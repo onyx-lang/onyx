@@ -14,10 +14,19 @@ use package core.intrinsics.onyx { __zero_value }
 // ---------------------------------
 //           Dynamic Arrays
 // ---------------------------------
-make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
-    arr : [..] T;
-    init(^arr, capacity, allocator);
-    return arr;
+make :: #match {
+    ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
+        arr : [..] T;
+        init(^arr, capacity, allocator);
+        return arr;
+    },
+    
+    (base: [] $T, allocator := context.allocator) -> [..] T {
+        arr: [..] T;
+        init(^arr, base.count, allocator);
+        for^ base do arr << *it;
+        return arr;
+    }
 }
 
 #match __make_overload macro (_: ^[..] $T, allocator := context.allocator) -> [..] T {

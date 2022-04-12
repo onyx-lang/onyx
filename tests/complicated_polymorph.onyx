@@ -30,11 +30,11 @@ main :: (args: [] cstr) {
     map     :: macro (x: $T, f: (T) -> $R) => f(x);
 
     5 |> double()
-      |> map((x) => x * 3) 
+      |> map(x => x * 3) 
       |> add(2)
       |> double()
       |> convert(f32)
-      |> map((x) => x * 4 + 2)
+      |> map(x => x * 4 + 2)
       |> println();
 
 
