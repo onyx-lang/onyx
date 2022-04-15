@@ -57,29 +57,34 @@ __sleep :: (milliseconds: u32) {
     __runtime_initialize();
     context.thread_id = 0;
 
-    args : [] cstr;
-    argv_buf_size : Size;
-    args_sizes_get(^args.count, ^argv_buf_size);
+    #if (typeof (package main).main) == #type () -> void {
+        (package main).main();
 
-    args = memory.make_slice(cstr, args.count);
-    argv_buf := cast(cstr) calloc(argv_buf_size);
-    args_get(args.data, argv_buf);
+    } else {
+        args : [] cstr;
+        argv_buf_size : Size;
+        args_sizes_get(^args.count, ^argv_buf_size);
+
+        args = memory.make_slice(cstr, args.count);
+        argv_buf := cast(cstr) calloc(argv_buf_size);
+        args_get(args.data, argv_buf);
 
 
-    // This post processing of the argv array needs to happen if the target is using
-    // 32-bit pointers, instead of 64-bits. Right now, Onyx pointers take up 64-bits,
-    // but in most circumstances, only the lower 32-bits are used. When webassembly
-    // standardizes the 64-bit address space, it will be an easy conversion over.
-    // But for right now, WASI will give the argv array 32-bit pointers, instead of
-    // 64-bit pointers. This loops expands the 32-bit pointers into 64-bit pointers
-    // while not clobbering any of them.
-    while i := cast(i32) (args.count - 1); i >= 0 {
-        defer i -= 1;
+        // This post processing of the argv array needs to happen if the target is using
+        // 32-bit pointers, instead of 64-bits. Right now, Onyx pointers take up 64-bits,
+        // but in most circumstances, only the lower 32-bits are used. When webassembly
+        // standardizes the 64-bit address space, it will be an easy conversion over.
+        // But for right now, WASI will give the argv array 32-bit pointers, instead of
+        // 64-bit pointers. This loops expands the 32-bit pointers into 64-bit pointers
+        // while not clobbering any of them.
+        while i := cast(i32) (args.count - 1); i >= 0 {
+            defer i -= 1;
 
-        args[i] = cast(cstr) (cast(^u32) args.data)[i];
+            args[i] = cast(cstr) (cast(^u32) args.data)[i];
+        }
+
+        (package main).main(args);
     }
-
-    (package main).main(args);
 
     __flush_stdio();
 }

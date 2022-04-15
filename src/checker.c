@@ -2521,6 +2521,7 @@ CheckStatus check_type(AstType** ptype) {
     }
 
     type = original_type;
+    type->flags |= Ast_Flag_Comptime;
     while (type->kind == Ast_Kind_Type_Alias) {
         type->flags |= Ast_Flag_Comptime;
         type = ((AstTypeAlias *) type)->to;

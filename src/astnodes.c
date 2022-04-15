@@ -178,6 +178,30 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Function",
 };
 
+AstNumLit* ast_reduce_type_compare(bh_allocator a, AstBinaryOp* node) {
+    AstType* left =  (AstType *) ast_reduce(a, node->left);
+    AstType* right = (AstType *) ast_reduce(a, node->right);
+
+    Type* left_type  = type_build_from_ast(context.ast_alloc, left);
+    Type* right_type = type_build_from_ast(context.ast_alloc, right);
+
+    AstNumLit* res = onyx_ast_node_new(a, sizeof(AstNumLit), Ast_Kind_NumLit);
+    res->token = node->token;
+    res->flags |= node->flags;
+    res->flags |= Ast_Flag_Comptime;
+    res->type_node = (AstType *) &basic_type_bool;
+    res->type = &basic_types[Basic_Kind_Bool];
+    res->next = node->next;
+
+    switch (node->operation) {
+        case Binary_Op_Equal:     res->value.l = left_type->id == right_type->id; break;
+        case Binary_Op_Not_Equal: res->value.l = left_type->id != right_type->id; break;
+        default: assert(("Bad case in ast_reduce_type_compare", 0));
+    }
+
+    return res;
+}
+
 #define REDUCE_BINOP_ALL(op) \
     if (type_is_small_integer(res->type) || type_is_bool(res->type)) { \
         res->value.i = left->value.i op right->value.i; \
@@ -211,6 +235,12 @@ const char* entity_type_strings[Entity_Type_Count] = {
 AstNumLit* ast_reduce_binop(bh_allocator a, AstBinaryOp* node) {
     AstNumLit* left =  (AstNumLit *) ast_reduce(a, node->left);
     AstNumLit* right = (AstNumLit *) ast_reduce(a, node->right);
+
+    if (node_is_type((AstNode *) left) && node_is_type((AstNode *) right)) {
+        if (node->operation == Binary_Op_Equal || node->operation == Binary_Op_Not_Equal) {
+            return (AstNumLit *) ast_reduce_type_compare(a, node);
+        }
+    }
 
     if (left->kind != Ast_Kind_NumLit || right->kind != Ast_Kind_NumLit) {
         node->left  = (AstTyped *) left;
@@ -800,6 +830,14 @@ Type* resolve_expression_type(AstTyped* node) {
                 add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
             }
         }
+    }
+
+    // If polymorphic procedures HAVE to have a type, most likely
+    // because they are part of a `typeof` expression, they are
+    // assigned a void type. This is cleared before the procedure
+    // is solidified.
+    if (node->kind == Ast_Kind_Polymorphic_Proc) {
+        node->type = &basic_types[Basic_Kind_Void];
     }
 
     if (node->type == NULL)

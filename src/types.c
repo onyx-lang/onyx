@@ -41,6 +41,7 @@ Type basic_types[] = {
 // TODO: Document this!!
        bh_imap type_map;
 static bh_imap type_pointer_map;
+static bh_imap type_array_map;
 static bh_imap type_slice_map;
 static bh_imap type_dynarr_map;
 static bh_imap type_vararg_map;
@@ -64,6 +65,7 @@ static void type_register(Type* type) {
 void types_init() {
     bh_imap_init(&type_map,         global_heap_allocator, 255);
     bh_imap_init(&type_pointer_map, global_heap_allocator, 255);
+    bh_imap_init(&type_array_map,   global_heap_allocator, 255);
     bh_imap_init(&type_slice_map,   global_heap_allocator, 255);
     bh_imap_init(&type_dynarr_map,  global_heap_allocator, 255);
     bh_imap_init(&type_vararg_map,  global_heap_allocator, 255);
@@ -303,9 +305,6 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             Type *elem_type = type_build_from_ast(alloc, a_node->elem);
             if (elem_type == NULL)  return NULL;
 
-            Type* a_type = type_create(Type_Kind_Array, alloc, 0);
-            a_type->Array.elem = elem_type;
-
             u32 count = 0;
             if (a_node->count_expr) {
                 if (a_node->count_expr->type == NULL)
@@ -328,11 +327,9 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 count = get_expression_integer_value(a_node->count_expr, NULL);
             }
 
-            a_type->Array.count = count;
-            a_type->Array.size = type_size_of(a_type->Array.elem) * count;
-
-            type_register(a_type);
-            return a_type;
+            Type* array_type = type_make_array(alloc, elem_type, count);
+            if (array_type) array_type->ast_type = type_node;
+            return array_type;
         }
 
         case Ast_Kind_Struct_Type: {
@@ -723,14 +720,24 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
     if (to == NULL) return NULL;
 
-    Type* arr_type = type_create(Type_Kind_Array, alloc, 0);
-    arr_type->Array.count = count;
-    arr_type->Array.elem = to;
-    arr_type->Array.size = count * type_size_of(to);
+    assert(to->id > 0);
+    u64 key = ((((u64) to->id) << 32) | (u64) count);
+    u64 array_id = bh_imap_get(&type_array_map, key);
+    if (array_id > 0) {
+        Type* array_type = (Type *) bh_imap_get(&type_map, array_id);
+        return array_type;
 
-    // :TypeCanBeDuplicated
-    type_register(arr_type);
-    return arr_type;
+    } else {
+        Type* arr_type = type_create(Type_Kind_Array, alloc, 0);
+        arr_type->Array.count = count;
+        arr_type->Array.elem = to;
+        arr_type->Array.size = count * type_size_of(to);
+
+        type_register(arr_type);
+        bh_imap_put(&type_array_map, key, arr_type->id);
+
+        return arr_type;
+    }
 }
 
 Type* type_make_slice(bh_allocator alloc, Type* of) {

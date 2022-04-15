@@ -14,8 +14,13 @@ __read_from_input :: (buf: [] u8)  -> u32 do return 0;
     __runtime_initialize();
     context.thread_id = 0;
 
-    args: [] cstr = .{ null, 0 };
-    (package main).main(args);
+    #if (typeof (package main).main) == #type () -> void {
+        (package main).main();
+
+    } else {
+        args: [] cstr = .{ null, 0 };
+        (package main).main(args);
+    }
 
     __flush_stdio();
 }

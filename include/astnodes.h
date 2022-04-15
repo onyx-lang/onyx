@@ -1764,6 +1764,7 @@ static inline void convert_polyproc_to_function(AstFunction *func) {
     func->active_queries.entries = NULL;
     func->poly_scope = NULL;
     func->entity = NULL;
+    func->type = NULL;
 }
 
 static inline void convert_function_to_polyproc(AstFunction *func) {

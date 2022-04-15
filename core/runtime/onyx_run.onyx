@@ -54,15 +54,20 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     __runtime_initialize();
     context.thread_id = 0;
 
-    args : [] cstr;
-    argv_buf_size : i32;
-    __args_sizes_get(^args.count, ^argv_buf_size);
+    #if (typeof (package main).main) == #type () -> void {
+        (package main).main();
 
-    args = memory.make_slice(cstr, args.count);
-    argv_buf := cast(cstr) calloc(argv_buf_size);
-    __args_get(args.data, argv_buf);
+    } else {
+        args : [] cstr;
+        argv_buf_size : i32;
+        __args_sizes_get(^args.count, ^argv_buf_size);
 
-    (package main).main(args);
+        args = memory.make_slice(cstr, args.count);
+        argv_buf := cast(cstr) calloc(argv_buf_size);
+        __args_get(args.data, argv_buf);
+
+        (package main).main(args);
+    }
 
     __flush_stdio();
 }
