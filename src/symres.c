@@ -191,6 +191,14 @@ static SymresStatus symres_type(AstType** type) {
             bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
                 SYMRES(type, &param->type_node);
                 param->type = type_build_from_ast(context.ast_alloc, param->type_node);
+                if (param->type == NULL) {
+                    if (context.cycle_detected) {
+                        onyx_report_error(param->token->pos, Error_Waiting_On, "Waiting for parameter type to be known.");
+                        return Symres_Error;
+                    } else {
+                        return Symres_Yield_Macro;
+                    }
+                }
             }
             break;
         }
