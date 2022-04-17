@@ -16,7 +16,7 @@ main :: (args: [] cstr) {
 
     poly_named :: (x: $T, y: [$N] T) {
         println(x);
-        print_array(y);
+        println(y);
     }
 
     poly_named(10, u32.[ 10, 20, 30 ]);
@@ -26,7 +26,7 @@ main :: (args: [] cstr) {
     println("\n\n=========================");
 
     poly_overloaded :: #match {
-        (y: [$N] $T) { print("MATCHED Y: "); print_array(y); },
+        (y: [$N] $T) { print("MATCHED Y: "); println(y); },
         (x: $T)      { print("MATCHED X: "); println(x); },
         (z: $T)      { print("MATCHED Z: "); println(z); },
     }

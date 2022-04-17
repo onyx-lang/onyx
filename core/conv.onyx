@@ -265,14 +265,28 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
 str_format :: format
 str_format_va :: format_va
 
+Format_Flush_Callback :: struct {
+    data: rawptr = null;
+    func: (rawptr, str) -> bool = null_proc;
+}
+
 Format_Output :: struct {
     data: ^u8;
     count: u32;
     capacity: u32;
 
+    // When the data buffer fills, this procedure
+    // is called with the data, allowing for the
+    // buffer to be cleared and more to be written.
+    flush: Format_Flush_Callback;
+
     write :: #match {
         (use output: ^Format_Output, c: u8) {
-            if count >= capacity do return;
+            if count >= capacity {
+                if flush.func == null_proc                   do return;
+                if !flush.func(flush.data, data[0 .. count]) do return;
+                count = 0;
+            }
 
             data[count] = c;
             count += 1;
@@ -280,7 +294,11 @@ Format_Output :: struct {
 
         (use output: ^Format_Output, s: str) {
             for c: s {
-                if count >= capacity do return;
+                if count >= capacity {
+                    if flush.func == null_proc                   do return;
+                    if !flush.func(flush.data, data[0 .. count]) do return;
+                    count = 0;
+                }
 
                 data[count] = c;
                 count += 1;
@@ -317,13 +335,13 @@ format :: #match {}
 }
 
 format_va :: #match {}
-#match format_va (buffer: [] u8, format: str, va: [] any) -> str {
-    output := Format_Output.{ buffer.data, 0, buffer.count };
+#match format_va (buffer: [] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) -> str {
+    output := Format_Output.{ buffer.data, 0, buffer.count, flush };
     return format_va(^output, format, va);
 }
-#match format_va (buffer: ^[..] u8, format: str, va: [] any) {
+#match format_va (buffer: ^[..] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) {
     buffer.count = buffer.capacity;
-    out := format_va(*buffer, format, va);
+    out := format_va(*buffer, format, va, flush);
     buffer.count = out.count;
 }
 

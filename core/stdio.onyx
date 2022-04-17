@@ -30,35 +30,20 @@ println :: (x) => {
 }
 
 printf :: (format: str, va: ..any) {
-    buffer: [8196] u8;
-    print(conv.str_format_va(buffer, format, va));
+    flush :: (_, to_output) => {
+        io.write(^stdio.print_writer, to_output);
+        __flush_stdio();
+        return true;
+    }
+
+    buffer: [1024] u8;
+    print(conv.format_va(buffer, format, va, .{null, flush}));
 }
 
 aprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
-    out := conv.str_format_va(buffer, format, va);
+    out := conv.format_va(buffer, format, va);
     return string.alloc_copy(out);
-}
-
-// This works on both slices and arrays
-print_array :: #match {
-    (arr: [$N] $T, sep := " ") {
-        for i: 0 .. N {
-            print(arr[i]);
-            if i != N - 1 do print(sep);
-        }
-
-        print("\n");
-    },
-
-    (arr: $T, sep := " ") {
-        for i: 0 .. arr.count {
-            print(arr.data[i]);
-            if i != arr.count - 1 do print(sep);
-        }
-
-        print("\n");
-    }
 }
 
 byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {

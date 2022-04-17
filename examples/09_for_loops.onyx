@@ -39,7 +39,7 @@ main :: (args: [] cstr) {
     }
 
     print("Doubled primes: ");
-    print_array(primes);
+    println(primes);
 
     // There is also support for custom iterators using the built-in Iterator type.
     // You have to specify a next, close, and data member. The semantics are roughly
