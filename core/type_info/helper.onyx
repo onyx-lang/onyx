@@ -310,3 +310,12 @@ populate_struct_vtable :: (table: ^$Table_Type, struct_type: type_expr, safe := 
         *dest = *cast(^()->void) struct_method.data;
     }
 }
+
+for_all_types :: macro (body: Code) {
+    for (package builtin.type_info).type_table.count {
+        type_info := (package builtin.type_info).type_table[it];
+        type_idx  : type_expr = ~~ it;
+
+        #unquote body;
+    }
+}

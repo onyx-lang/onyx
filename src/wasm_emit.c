@@ -840,7 +840,8 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     // but it is important to change the code here.
     //                                              -brendanfh   2020/09/04
 
-    AstLocal* var = for_node->var;
+    // NOTE: This might not be a range literal
+    AstStructLiteral *range = (AstStructLiteral *) for_node->iter;
     u64 offset = 0;
 
     StructMember low_mem, high_mem, step_mem;
@@ -860,10 +861,39 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block);
 
-    WIL(WI_LOCAL_GET, iter_local);
-    WIL(WI_LOCAL_GET, high_local);
-    WI(WI_I32_GE_S);
-    WID(WI_COND_JUMP, 0x02);
+    if (range->kind == Ast_Kind_Struct_Literal && (range->args.values[2]->flags & Ast_Flag_Comptime) != 0) {
+        AstNumLit *step_value = (AstNumLit *) range->args.values[2];
+        assert(step_value->kind == Ast_Kind_NumLit);
+
+        if (step_value->value.l >= 0) {
+            WIL(WI_LOCAL_GET, iter_local);
+            WIL(WI_LOCAL_GET, high_local);
+            WI(WI_I32_GE_S);
+            WID(WI_COND_JUMP, 0x02);
+        } else {
+            WIL(WI_LOCAL_GET, iter_local);
+            WIL(WI_LOCAL_GET, high_local);
+            WI(WI_I32_LT_S);
+            WID(WI_COND_JUMP, 0x02);
+        }
+
+    } else {
+        WIL(WI_LOCAL_GET, step_local);
+        WID(WI_I32_CONST, 0);
+        WI(WI_I32_GE_S);
+        WID(WI_IF_START, 0x40);
+            WIL(WI_LOCAL_GET, iter_local);
+            WIL(WI_LOCAL_GET, high_local);
+            WI(WI_I32_GE_S);
+            WID(WI_COND_JUMP, 0x03);
+        WI(WI_ELSE);
+            WIL(WI_LOCAL_GET, iter_local);
+            WIL(WI_LOCAL_GET, high_local);
+            WI(WI_I32_LT_S);
+            WID(WI_COND_JUMP, 0x03);
+        WI(WI_IF_END);
+    }
+
 
     emit_block(mod, &code, for_node->stmt, 0);
 
