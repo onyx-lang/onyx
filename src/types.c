@@ -253,6 +253,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
     switch (type_node->kind) {
         case Ast_Kind_Pointer_Type: {
+            // ((AstPointerType *) type_node)->elem->flags |= type_node->flags & Ast_Flag_Header_Check_No_Error;
             Type* ptr_type = type_make_pointer(alloc, type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem));
             if (ptr_type) ptr_type->ast_type = type_node;
             return ptr_type;
@@ -697,6 +698,7 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
 
 Type* type_make_pointer(bh_allocator alloc, Type* to) {
     if (to == NULL) return NULL;
+    if (to == (Type *) &node_that_signals_failure) return to;
 
     assert(to->id > 0);
     u64 ptr_id = bh_imap_get(&type_pointer_map, to->id);
@@ -719,6 +721,7 @@ Type* type_make_pointer(bh_allocator alloc, Type* to) {
 
 Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
     if (to == NULL) return NULL;
+    if (to == (Type *) &node_that_signals_failure) return to;
 
     assert(to->id > 0);
     u64 key = ((((u64) to->id) << 32) | (u64) count);
@@ -742,6 +745,7 @@ Type* type_make_array(bh_allocator alloc, Type* to, u32 count) {
 
 Type* type_make_slice(bh_allocator alloc, Type* of) {
     if (of == NULL) return NULL;
+    if (of == (Type *) &node_that_signals_failure) return of;
 
     assert(of->id > 0);
     u64 slice_id = bh_imap_get(&type_slice_map, of->id);
@@ -763,6 +767,7 @@ Type* type_make_slice(bh_allocator alloc, Type* of) {
 
 Type* type_make_dynarray(bh_allocator alloc, Type* of) {
     if (of == NULL) return NULL;
+    if (of == (Type *) &node_that_signals_failure) return of;
 
     assert(of->id > 0);
     u64 dynarr_id = bh_imap_get(&type_dynarr_map, of->id);
@@ -784,6 +789,7 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
 
 Type* type_make_varargs(bh_allocator alloc, Type* of) {
     if (of == NULL) return NULL;
+    if (of == (Type *) &node_that_signals_failure) return of;
     
     assert(of->id > 0);
     u64 vararg_id = bh_imap_get(&type_vararg_map, of->id);

@@ -2473,10 +2473,10 @@ CheckStatus check_type(AstType** ptype) {
             break;
         }
 
-        case Ast_Kind_Pointer_Type: CHECK(type, &((AstPointerType *) type)->elem); break;
-        case Ast_Kind_Slice_Type:   CHECK(type, &((AstSliceType *) type)->elem); break;
-        case Ast_Kind_DynArr_Type:  CHECK(type, &((AstDynArrType *) type)->elem); break;
-        case Ast_Kind_VarArg_Type:  CHECK(type, &((AstVarArgType *) type)->elem); break;
+        case Ast_Kind_Pointer_Type: ((AstPointerType *) type)->elem->flags |= type->flags & Ast_Flag_Header_Check_No_Error; CHECK(type, &((AstPointerType *) type)->elem); break;
+        case Ast_Kind_Slice_Type:   ((AstSliceType *) type)->elem->flags |= type->flags & Ast_Flag_Header_Check_No_Error; CHECK(type, &((AstSliceType *) type)->elem); break;
+        case Ast_Kind_DynArr_Type:  ((AstDynArrType *) type)->elem->flags |= type->flags & Ast_Flag_Header_Check_No_Error; CHECK(type, &((AstDynArrType *) type)->elem); break;
+        case Ast_Kind_VarArg_Type:  ((AstVarArgType *) type)->elem->flags |= type->flags & Ast_Flag_Header_Check_No_Error; CHECK(type, &((AstVarArgType *) type)->elem); break;
 
         case Ast_Kind_Function_Type: {
             AstFunctionType* ftype = (AstFunctionType *) type;
