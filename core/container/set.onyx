@@ -31,6 +31,7 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     free     :: free
     has      :: has
     get      :: get
+    get_ptr  :: get_ptr
     insert   :: insert
     remove   :: remove
     clear    :: clear
@@ -85,6 +86,11 @@ has :: (use set: ^Set, value: set.Elem_Type) -> bool {
 get :: (use set: ^Set, value: set.Elem_Type) -> set.Elem_Type {
     lr := lookup(set, value);
     return entries[lr.entry_index].value if lr.entry_index >= 0 else __zero_value(T);
+}
+
+get_ptr :: (use set: ^Set, value: set.Elem_Type) -> ^set.Elem_Type {
+    lr := lookup(set, value);
+    return entries[lr.entry_index].value if lr.entry_index >= 0 else null;
 }
 
 remove :: (use set: ^Set, value: set.Elem_Type) {
