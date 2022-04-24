@@ -85,7 +85,7 @@ has :: (use set: ^Set, value: set.Elem_Type) -> bool {
 
 get :: (use set: ^Set, value: set.Elem_Type) -> set.Elem_Type {
     lr := lookup(set, value);
-    return entries[lr.entry_index].value if lr.entry_index >= 0 else __zero_value(T);
+    return entries[lr.entry_index].value if lr.entry_index >= 0 else __zero_value(set.Elem_Type);
 }
 
 get_ptr :: (use set: ^Set, value: set.Elem_Type) -> ^set.Elem_Type {
