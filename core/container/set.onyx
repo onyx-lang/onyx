@@ -90,7 +90,7 @@ get :: (use set: ^Set, value: set.Elem_Type) -> set.Elem_Type {
 
 get_ptr :: (use set: ^Set, value: set.Elem_Type) -> ^set.Elem_Type {
     lr := lookup(set, value);
-    return ^entries[lr.entry_index].value if lr.entry_index >= 0 else null;
+    return (^entries[lr.entry_index].value) if lr.entry_index >= 0 else null;
 }
 
 remove :: (use set: ^Set, value: set.Elem_Type) {
