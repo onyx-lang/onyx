@@ -1,0 +1,352 @@
+package ncurses
+
+use package core {cptr, conv, string}
+
+
+WINDOW :: #distinct u64
+SCREEN :: #distinct u64
+
+chtype :: u32
+
+attr_t :: u32
+A_NORMAL :: 0
+A_ATTRIBUTES :: 0xffffff00
+A_CHARTEXT   :: 0xff
+A_COLOR      :: 0xff00
+A_STANDOUT   :: 0x00010000
+A_UNDERLINE  :: 0x00020000
+A_REVERSE    :: 0x00040000
+A_BLINK      :: 0x00080000
+A_DIM        :: 0x00100000
+A_BOLD       :: 0x00200000
+A_ALTCHARSET :: 0x00400000
+A_INVIS      :: 0x00800000
+A_PROTECT    :: 0x01000000
+A_HORIZONTAL :: 0x02000000
+A_LEFT       :: 0x04000000
+A_LOW        :: 0x08000000
+A_RIGHT      :: 0x10000000
+A_TOP        :: 0x20000000
+A_VERTICAL   :: 0x40000000
+A_ITALIC     :: 0x80000000
+
+#library "onyx_ncurses"
+#foreign "onyx_ncurses" {
+
+/*
+use CBindings
+CBindings :: struct {
+    name :: "onyx_ncurses"
+    file_prefix :: """
+#include "ncurses.h"
+
+WINDOW *__get_stdscr() {
+    return stdscr;
+}
+
+void __get_yx    (WINDOW *w, int *y, int *x) { getyx(w, *y, *x); }
+void __get_par_yx(WINDOW *w, int *y, int *x) { getparyx(w, *y, *x); }
+void __get_beg_yx(WINDOW *w, int *y, int *x) { getbegyx(w, *y, *x); }
+void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
+
+chtype __ACS_LOOKUP(int a) { return NCURSES_ACS(a); }
+
+"""
+    cast_map :: (#type struct {type: type_expr; name: str;}).[
+        .{ WINDOW, "WINDOW *" },
+    ]
+*/
+
+    // initscr
+    initscr   :: () -> WINDOW ---
+    endwin    :: () -> i32    ---
+    isendwin  :: () -> bool   ---
+    newterm   :: (type: cstr, out_fd, in_fd: ^u32) -> SCREEN ---
+    set_term  :: (new: SCREEN) -> SCREEN ---
+    delscreen :: (sp: SCREEN) -> void ---
+
+    // color
+    start_color :: () -> i32 ---
+    has_colors  :: () -> bool ---
+    can_change_color :: () -> bool ---
+    init_pair  :: (pair: i32, foreground: i32, background: i32) -> i32 ---
+    init_color :: (color: i32, r, g, b: i32) -> i32 ---
+    color_content :: (color: i32, r, g, b: ^i32) -> i32 ---
+    pair_content  :: (pair: i32, f, b: ^i32) -> i32 ---
+    reset_color_pairs :: () -> void ---
+    COLOR_PAIR :: (color: i32) -> i32 ---
+    PAIR_NUMBER :: (pair: i32) -> i32 ---
+
+    // inopts
+    cbreak :: () -> i32 ---
+    nocbreak :: () -> i32 ---
+    echo :: () -> i32 ---
+    noecho :: () -> i32 ---
+    intrflush :: (w: WINDOW, bf: bool) -> i32 ---
+    keypad :: (w: WINDOW, bf: bool) -> i32 ---
+    meta :: (w: WINDOW, bf: bool) -> i32 ---
+    nodelay :: (w: WINDOW, bf: bool) -> i32 ---
+    notimeout :: (w: WINDOW, bf: bool) -> i32 ---
+    nl :: () -> i32 ---
+    nonl :: () -> i32 ---
+    raw :: () -> i32 ---
+    noraw :: () -> i32 ---
+    qiflush :: () -> void ---
+    noqiflush :: () -> void ---
+    halfdelay :: (tenths: i32) -> i32 ---
+    timeout :: (delay: i32) -> void ---
+    wtimeout :: (w: WINDOW, delay: i32) -> void ---
+    typeahead :: (fd: i32) -> i32 ---
+
+    // outopts
+    clearkok :: (w: WINDOW, bf: bool) -> i32 ---
+    idlok :: (w: WINDOW, bf: bool) -> i32 ---
+    idcok :: (w: WINDOW, bf: bool) -> void ---
+    immedok :: (w: WINDOW, bf: bool) -> void ---
+    leaveok :: (w: WINDOW, bf: bool) -> i32 ---
+    scrollok :: (w: WINDOW, bf: bool) -> i32 ---
+    setscrreg :: (top, bot: i32) -> i32 ---
+    wsetscrreg :: (w: WINDOW, top, bot: i32) -> i32 ---
+
+    // attr
+    attr_get  :: (attr: ^attr_t, pair: ^u16, opts: ^void) -> i32 ---
+    wattr_get :: (w: WINDOW, attr: ^attr_t, pair: ^u16, opts: ^void) -> i32 ---
+    attr_set  :: (attr: ^attr_t, pair: u16, opts: ^void) -> i32 ---
+    wattr_set :: (w: WINDOW, attr: attr_t, pair: u16, opts: ^void) -> i32 ---
+    attr_off  :: (attr: attr_t, opts: ^void) -> i32 ---
+    wattr_off :: (w: WINDOW, attr: attr_t, opts: ^void) -> i32 ---
+    attr_on   :: (attr: attr_t, opts: ^void) -> i32 ---
+    wattr_on  :: (w: WINDOW, attr: attr_t, opts: ^void) -> i32 ---
+    attroff   :: (attr: attr_t) -> i32 ---
+    wattroff  :: (w: WINDOW, attr: attr_t) -> i32 ---
+    attron    :: (attr: attr_t) -> i32 ---
+    wattron   :: (w: WINDOW, attr: attr_t) -> i32 ---
+    attrset   :: (attr: attr_t) -> i32 ---
+    wattrset  :: (w: WINDOW, attr: attr_t) -> i32 ---
+    chgat     :: (n: i32, attr: attr_t, pair: u16, opts: ^void) -> i32 ---
+    wchgat    :: (w: WINDOW, n: i32, attr: attr_t, pair: u16, opts: ^void) -> i32 ---
+    mvchgat   :: (y, x: i32, n: i32, attr: attr_t, pair: u16, opts: ^void) -> i32 ---
+    mvmchgat  :: (w: WINDOW, y, x: i32, n: i32, attr: attr_t, pair: u16, opts: ^void) -> i32 ---
+    color_set  :: (pair: u16, opts: ^void) -> i32 ---
+    wcolor_set :: (w: WINDOW, pair: u16, opts: ^void) -> i32 ---
+    standend  :: () -> i32 ---
+    wstandend :: (w: WINDOW) -> i32 ---
+    standout  :: () -> i32 ---
+    wstandout :: (w: WINDOW) -> i32 ---
+
+    // util
+    unctrl     :: (c: chtype) -> cptr(u8) ---
+    // wunctrl   :: (c: ^u8) -> cptr(u8) ---
+    keyname    :: (c: i32) -> cptr(u8) ---
+    key_name   :: (w: i32) -> cptr(u8) ---
+    filter     :: () -> void ---
+    nofilter   :: () -> void ---
+    use_env    :: (f: bool) -> void ---
+    use_tioctl :: (f: bool) -> void ---
+    // putwin     :: (w: WINDOW, filep: u32) -> i32 ---
+    getwin     :: (filep: u32) -> WINDOW ---
+    delay_output :: (ms: i32) -> i32 ---
+    flushinp   :: () -> i32 ---
+
+    // kernel
+    def_prog_mode :: () -> i32 ---
+    def_shell_mode :: () -> i32 ---
+    reset_prog_mode :: () -> i32 ---
+    reset_shell_mode :: () -> i32 ---
+    resetty :: () -> i32 ---
+    savetty :: () -> i32 ---
+    getsyx  :: (y, x: i32) -> void ---
+    setsyx  :: (y, x: i32) -> void ---
+    // ripoffline :: (line: i32, init: (WINDOW, i32) -> i32) -> i32 ---
+    curs_set :: (visibility: i32) -> i32 ---
+    napms :: (ms: i32) -> i32 ---
+
+    // refresh
+    refresh :: () -> i32 ---
+    wrefresh :: (w: WINDOW) -> i32 ---
+    wnoutrefresh :: (w: WINDOW) -> i32 ---
+    doupdate :: () -> i32 ---
+    redrawwin :: (w: WINDOW) -> i32 ---
+    wredrawln :: (w: WINDOW, beg_line, num_lines: i32) -> i32 ---
+
+    // addch
+    addch :: (ch: chtype) -> i32 ---
+    waddch :: (w: WINDOW, ch: chtype) -> i32 ---
+    mvaddch :: (y, x: i32, ch: chtype) -> i32 ---
+    mvwaddch :: (w: WINDOW, y, x: i32, ch: chtype) -> i32 ---
+    echochar :: (ch: chtype) -> i32 ---
+    wechochar :: (w: WINDOW, ch: chtype) -> i32 ---
+
+    // addchstr
+    addchstr :: (chstr: ^chtype) -> i32 ---
+    addchnstr :: (chstr: [] chtype) -> i32 ---
+    waddchstr :: (w: WINDOW, chstr: ^chtype) -> i32 ---
+    waddchnstr :: (w: WINDOW, chstr: [] chtype) -> i32 ---
+    mvaddchstr :: (y, x: i32, chstr: ^chtype) -> i32 ---
+    mvaddchnstr :: (y, x: i32, chstr: [] chtype) -> i32 ---
+    mvwaddchstr :: (w: WINDOW, y, x: i32, chstr: ^chtype) -> i32 ---
+    mvwaddchnstr :: (w: WINDOW, y, x: i32, chstr: [] chtype) -> i32 ---
+
+    // addstr
+    addstr :: (chstr: cstr) -> i32 ---
+    addnstr :: (chstr: str) -> i32 ---
+    waddstr :: (w: WINDOW, chstr: cstr) -> i32 ---
+    waddnstr :: (w: WINDOW, chstr: str) -> i32 ---
+    mvaddstr :: (y, x: i32, chstr: cstr) -> i32 ---
+    mvaddnstr :: (y, x: i32, chstr: str) -> i32 ---
+    mvwaddstr :: (w: WINDOW, y, x: i32, chstr: cstr) -> i32 ---
+    mvwaddnstr :: (w: WINDOW, y, x: i32, chstr: str) -> i32 ---
+
+    // clear
+    erase :: () -> i32 ---
+    werase :: (w: WINDOW) -> i32 ---
+    clear :: () -> i32 ---
+    wclear :: (w: WINDOW) -> i32 ---
+    clrtobot :: () -> i32 ---
+    wclrtobot :: (w: WINDOW) -> i32 ---
+    clrtoeol :: () -> i32 ---
+    wclrtoeol :: (w: WINDOW) -> i32 ---
+
+    // opaque
+    is_cleared :: (w: WINDOW) -> bool ---
+    is_idcok :: (w: WINDOW) -> bool ---
+    is_idlok :: (w: WINDOW) -> bool ---
+    is_immedok :: (w: WINDOW) -> bool ---
+    is_keypad :: (w: WINDOW) -> bool ---
+    is_leaveok :: (w: WINDOW) -> bool ---
+    is_nodelay :: (w: WINDOW) -> bool ---
+    is_notimeout :: (w: WINDOW) -> bool ---
+    is_pad :: (w: WINDOW) -> bool ---
+    is_scrollok :: (w: WINDOW) -> bool ---
+    is_subwin :: (w: WINDOW) -> bool ---
+    is_syncok :: (w: WINDOW) -> bool ---
+    wgetparent :: (w: WINDOW) -> WINDOW ---
+    wgetdelay  :: (w: WINDOW) -> i32 ---
+    @TODO // Why doesn't this one work?
+    // wgetscrreg :: (w: WINDOW, top, bottom: ^i32) -> void ---
+
+    // window
+    newwin :: (nlines, ncols, y, x: i32) -> WINDOW ---
+    delwin :: (w: WINDOW) -> i32 ---
+    mvwin  :: (w: WINDOW, y, x: i32) -> i32 ---
+    subwin :: (w: WINDOW, nlines, ncols, y, x: i32) -> WINDOW ---
+    derwin :: (w: WINDOW, nlines, ncols, y, x: i32) -> WINDOW ---
+    mvderwin :: (w: WINDOW, parent_y, parent_x: i32) -> i32 ---
+    dupwin :: (w: WINDOW) -> WINDOW ---
+    wsyncup :: (w: WINDOW) -> void ---
+    syncok :: (w: WINDOW, bf: bool) -> i32 ---
+    wcursyncup :: (w: WINDOW) -> void ---
+    wsyncdown :: (w: WINDOW) -> void ---
+
+    // touch
+    touchline :: (w: WINDOW, start, count: i32) -> i32 ---
+    touchwin  :: (w: WINDOW) -> i32 ---
+    wtouchln  :: (w: WINDOW, y, b, changed: i32) -> i32 ---
+    untouchwin :: (w: WINDOW) -> i32 ---
+    is_linetouched :: (w: WINDOW, line: i32) -> bool ---
+    is_wintouched :: (w: WINDOW) -> bool ---
+
+    // bkgd
+    bkgdset :: (ch: chtype) -> void ---
+    wbkgdset :: (w: WINDOW, ch: chtype) -> void ---
+    bkgd :: (bh: chtype) -> i32 ---
+    wbkgd :: (w: WINDOW, ch: chtype) -> i32 ---
+    getbkgd :: (w: WINDOW) -> chtype ---
+
+    // inch
+    inch :: () -> chtype ---
+    winch :: (w: WINDOW) -> chtype ---
+    mvinch :: (y, x: i32) -> chtype ---
+    mvwinch :: (w: WINDOW, y, x: i32) -> chtype ---
+
+    // getch
+    getch :: () -> i32 ---
+    wgetch :: (w: WINDOW) -> i32 ---
+    mvgetch :: (y, x: i32) -> i32 ---
+    mvwgetch :: (y, x: i32, w: WINDOW) -> i32 ---
+    ungetch :: (ch: i32) -> i32 ---
+    has_key :: (ch: i32) -> i32 ---
+
+    // getyx
+    __get_yx     :: (w: WINDOW, y, x: ^i32) -> void ---
+    __get_par_yx :: (w: WINDOW, y, x: ^i32) -> void --- 
+    __get_beg_yx :: (w: WINDOW, y, x: ^i32) -> void --- 
+    __get_max_yx :: (w: WINDOW, y, x: ^i32) -> void --- 
+
+    // getstr
+    // The API for these is horrible for use in Onyx.
+    // Use ogetstr and family for a better API.
+    getstr   :: (s: cstr) -> i32 ---  // Wildly unsafe!
+    getnstr  :: (s: str) -> i32 ---
+    wgetstr  :: (w: WINDOW, s: cstr) -> i32 ---
+    wgetnstr :: (w: WINDOW, s: str) -> i32 ---
+    mvgetstr   :: (y, x: i32, s: cstr) -> i32 ---  // Wildly unsafe!
+    mvgetnstr  :: (y, x: i32, s: str) -> i32 ---
+    mvwgetstr  :: (w: WINDOW, y, x: i32, s: cstr) -> i32 ---
+    mvwgetnstr :: (w: WINDOW, y, x: i32, s: str) -> i32 ---
+
+    // border
+    border :: (ls, rs, ts, bs, tl, tr, bl, br: chtype) -> i32 ---
+    wborder :: (w: WINDOW, ls, rs, ts, bs, tl, tr, bl, br: chtype) -> i32 ---
+    box :: (w: WINDOW, verch, horch: chtype) -> i32 ---
+    hline  :: (ch: chtype, n: i32) -> i32 ---
+    whline :: (w: WINDOW, ch: chtype, n: i32) -> i32 ---
+    vline  :: (ch: chtype, n: i32) -> i32 ---
+    wvline :: (w: WINDOW, ch: chtype, n: i32) -> i32 ---
+    mvhline  :: (y, x: i32, ch: chtype, n: i32) -> i32 ---
+    mvwhline :: (w: WINDOW, y, x: i32, ch: chtype, n: i32) -> i32 ---
+    mvvline  :: (y, x: i32, ch: chtype, n: i32) -> i32 ---
+    mvwvline :: (w: WINDOW, y, x: i32, ch: chtype, n: i32) -> i32 ---
+
+
+    // variables
+    __get_stdscr :: () -> WINDOW ---
+    NCURSES_ACS  :: (a: i32) -> chtype ---
+}
+
+stdscr    :: __get_stdscr
+getyx     :: __get_yx
+getparyx  :: __get_par_yx
+getbegyx  :: __get_beg_yx
+getmaxyx  :: __get_max_yx
+
+ogetstr :: ($max_length: i32) -> str {
+    buf: [max_length] u8;
+    err := getnstr(buf);
+    return string.alloc_copy(string.from_cstr(~~ buf));
+}
+
+printw :: (fmt: str, args: ..any) {
+    buf: [1024] u8;
+    to_output := conv.format_va(buf, fmt, args);
+    addnstr(to_output);
+}
+
+wprintw :: (w: WINDOW, fmt: str, args: ..any) {
+    buf: [1024] u8;
+    to_output := conv.format_va(buf, fmt, args);
+    waddnstr(w, to_output);
+}
+
+mvprintw :: (y, x: i32, fmt: str, args: ..any) {
+    buf: [1024] u8;
+    to_output := conv.format_va(buf, fmt, args);
+    mvaddnstr(y, x, to_output);
+}
+
+mvwprintw :: (w: WINDOW, y, x: i32, fmt: str, args: ..any) {
+    buf: [1024] u8;
+    to_output := conv.format_va(buf, fmt, args);
+    mvwaddnstr(w, y, x, to_output);
+}
+
+
+COLOR_BLACK	:: 0
+COLOR_RED	:: 1
+COLOR_GREEN	:: 2
+COLOR_YELLOW :: 3
+COLOR_BLUE :: 4
+COLOR_MAGENTA :: 5
+COLOR_CYAN :: 6
+COLOR_WHITE :: 7
+
