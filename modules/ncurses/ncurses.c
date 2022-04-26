@@ -10,8 +10,6 @@ void __get_par_yx(WINDOW *w, int *y, int *x) { getparyx(w, *y, *x); }
 void __get_beg_yx(WINDOW *w, int *y, int *x) { getbegyx(w, *y, *x); }
 void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
 
-chtype __ACS_LOOKUP(int a) { return NCURSES_ACS(a); }
-
 
 
 #define ONYX_LIBRARY_NAME onyx_ncurses
