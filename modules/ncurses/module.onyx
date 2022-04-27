@@ -25,7 +25,7 @@ void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
 """
     cast_map :: (#type struct {type: type_expr; name: str;}).[
         .{ WINDOW, "WINDOW *" },
-    ]
+   ]
 */
 
     // initscr
@@ -35,6 +35,7 @@ void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
     newterm   :: (type: cstr, out_fd, in_fd: ^u32) -> SCREEN ---
     set_term  :: (new: SCREEN) -> SCREEN ---
     delscreen :: (sp: SCREEN) -> void ---
+    exit_curses :: (code: i32) -> void ---
 
     // color
     start_color :: () -> i32 ---
@@ -269,11 +270,112 @@ void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
     mvvline  :: (y, x: i32, ch: chtype, n: i32) -> i32 ---
     mvwvline :: (w: WINDOW, y, x: i32, ch: chtype, n: i32) -> i32 ---
 
+    // new_pair
+    allow_pair :: (fg, bg: i32) -> i32 ---
+    find_pair  :: (fg, bg: i32) -> i32 ---
+    free_pair  :: (pair: i32)   -> i32 ---
+
+    // default_colors
+    use_default_colors :: () -> i32 ---
+    assume_default_colors :: (fg, bg: i32) -> i32 ---
+
+    // termattrs
+    buadrate :: () -> i32 ---
+    erasechar :: () -> u8 ---
+    has_ic :: () -> bool ---
+    has_il :: () -> bool ---
+    killchar :: () -> u8 ---
+    longname :: () -> cptr(u8) ---
+    term_attrs :: () -> attr_t ---
+    termattrs :: () -> chtype ---
+    termname :: () -> void ---
+
+    // beep
+    beep :: () -> void ---
+    flash :: () -> void ---
+
+    // overlay
+    overlay :: (srcwin: WINDOW, dstwin: WINDOW) -> i32 ---
+    overwrite :: (srcwin: WINDOW, dstwin: WINDOW) -> i32 ---
+    copywin :: (srcwin: WINDOW, dstwin: WINDOW, sminrow, smincol, dminrow, dmincol, dmaxrow, dmaxcol, overlay: i32) -> i32 ---
+
+    // pad
+    newpad :: (nlines, ncols: i32) -> WINDOW ---
+    subpad :: (orig: WINDOW, nlines, ncols: i32, begin_y, begin_x: i32) -> WINDOW ---
+    prefresh :: (pad: WINDOW, pminrow, pmincol, sminrow, smincol, smaxrow, smaxcol: i32) -> i32 ---
+    pnoutrefresh :: (pad: WINDOW, pminrow, pmincol, sminrow, smincol, smaxrow, smaxcol: i32) -> i32 ---
+    pechochar :: (pad: WINDOW, ch: chtype) -> i32 ---
+
+    // define_key
+    define_key :: (definition: cstr, keycode: i32) -> i32 ---
+    keyok      :: (keycode: i32, enable: bool) -> i32 ---
+    key_defined :: (definition: cstr) -> i32 ---
+
+    // delch
+    delch :: () -> i32 ---
+    wdelch :: (w: WINDOW) -> i32 ---
+    mvdelch :: (y, x: i32) -> i32 ---
+    mvwdelch :: (w: WINDOW, y, x: i32) -> i32 ---
+
+    // deleteln
+    deleteln :: () -> i32 ---
+    wdeleteln :: (w: WINDOW) -> i32 ---
+    insdelln :: (n: i32) -> i32 ---
+    winsdelln :: (w: WINDOW, n: i32) -> i32 ---
+    insertln :: () -> i32 ---
+    winsertln :: (w: WINDOW) -> i32 ---
+
+    // slk
+    slk_init :: (fmt: i32) -> i32 ---
+    slk_set :: (labnum: i32, label: cstr, fmt: i32) -> i32 ---
+    slk_label :: (labnum: i32) -> cptr(u8) ---
+    slk_refresh :: () -> i32 ---
+    slk_noutrefresh :: () -> i32 ---
+    slk_clear :: () -> i32 ---
+    slk_restore :: () -> i32 ---
+    slk_touch :: () -> i32 ---
+    slk_attron  :: (attrs: chtype) -> i32 ---
+    slk_attroff :: (attrs: chtype) -> i32 ---
+    slk_attrset :: (attrs: chtype) -> i32 ---
+    slk_attr :: () -> attr_t ---
+    slk_color :: (pair: i32) -> i32 ---
+
+    // legacy
+    getattrs :: (w: WINDOW) -> i32 ---
+    getbegx :: (w: WINDOW) -> i32 ---
+    getbegy :: (w: WINDOW) -> i32 ---
+    getcurx :: (w: WINDOW) -> i32 ---
+    getcury :: (w: WINDOW) -> i32 ---
+    getmaxx :: (w: WINDOW) -> i32 ---
+    getmaxy :: (w: WINDOW) -> i32 ---
+    getparx :: (w: WINDOW) -> i32 ---
+    getpary :: (w: WINDOW) -> i32 ---
+
+    // mouse
+    has_mouse :: () -> bool ---
+    getmouse :: (@out event: ^MEvent) -> i32 ---
+    ungetmouse :: (@out event: ^MEvent) -> i32 ---
+    mousemask :: (newmask: mmask_t, @out oldmask: ^mmask_t) -> mmask_t ---
+    wenclone :: (w: WINDOW, y, x: i32) -> bool ---
+    mouse_trafo :: (py, px: ^i32, to_screen: bool) -> bool ---
+    wmouse_trafo :: (w: WINDOW, py, px: ^i32, to_screen: bool) -> bool ---
+    mouseinterval :: (erval: i32) -> i32 ---
+
+    // resizeterm
+    is_term_resized :: (lines, columns: i32) -> bool ---
+    resize_term :: (lines, columns: i32) -> bool ---
+    resizeterm :: (lines, columns: i32) -> bool ---
+
+    // scroll
+    scroll :: (w: WINDOW) -> i32 ---
+    scrl   :: (n: i32) -> i32 ---
+    wscrl  :: (w: WINDOW, n: i32) -> i32 ---
 
     // variables
     __get_stdscr :: () -> WINDOW ---
     NCURSES_ACS  :: (a: i32) -> chtype ---
 }
+
 
 stdscr    :: __get_stdscr
 getyx     :: __get_yx
@@ -334,6 +436,51 @@ SCREEN :: #distinct u64
 chtype :: u32
 attr_t :: u32
 
+mmask_t :: u64
+MEvent :: struct {
+    id: u16;
+    x, y, z: i32;
+    bstate: mmask_t;
+}
+
+BUTTON1_RELEASED       :: 0x01 << (0 * 6)
+BUTTON1_PRESSED        :: 0x02 << (0 * 6)
+BUTTON1_CLICKED        :: 0x04 << (0 * 6)
+BUTTON1_DOUBLE_CLICKED :: 0x08 << (0 * 6)
+BUTTON1_TRIPLE_CLICKED :: 0x10 << (0 * 6)
+BUTTON2_RELEASED       :: 0x01 << (1 * 6)
+BUTTON2_PRESSED        :: 0x02 << (1 * 6)
+BUTTON2_CLICKED        :: 0x04 << (1 * 6)
+BUTTON2_DOUBLE_CLICKED :: 0x08 << (1 * 6)
+BUTTON2_TRIPLE_CLICKED :: 0x10 << (1 * 6)
+BUTTON3_RELEASED       :: 0x01 << (2 * 6)
+BUTTON3_PRESSED        :: 0x02 << (2 * 6)
+BUTTON3_CLICKED        :: 0x04 << (2 * 6)
+BUTTON3_DOUBLE_CLICKED :: 0x08 << (2 * 6)
+BUTTON3_TRIPLE_CLICKED :: 0x10 << (2 * 6)
+BUTTON4_RELEASED       :: 0x01 << (3 * 6)
+BUTTON4_PRESSED        :: 0x02 << (3 * 6)
+BUTTON4_CLICKED        :: 0x04 << (3 * 6)
+BUTTON4_DOUBLE_CLICKED :: 0x08 << (3 * 6)
+BUTTON4_TRIPLE_CLICKED :: 0x10 << (3 * 6)
+BUTTON5_RELEASED       :: 0x01 << (4 * 6)
+BUTTON5_PRESSED        :: 0x02 << (4 * 6)
+BUTTON5_CLICKED        :: 0x04 << (4 * 6)
+BUTTON5_DOUBLE_CLICKED :: 0x08 << (4 * 6)
+BUTTON5_TRIPLE_CLICKED :: 0x10 << (4 * 6)
+BUTTON_CTRL            :: 0x01 << (6 * 6)
+BUTTON_SHIFT           :: 0x02 << (6 * 6)
+BUTTON_ALT             :: 0x04 << (6 * 6)
+REPORT_MOUSE_POSITION  :: 0x08 << (6 * 6)
+
+BUTTON_RELEASE      :: macro (e: mmask_t, button: i32) => (e & (1  << (button * 6))) != 0;
+BUTTON_PRESS        :: macro (e: mmask_t, button: i32) => (e & (2  << (button * 6))) != 0;
+BUTTON_CLICK        :: macro (e: mmask_t, button: i32) => (e & (4  << (button * 6))) != 0;
+BUTTON_DOUBLE_CLICK :: macro (e: mmask_t, button: i32) => (e & (8  << (button * 6))) != 0;
+BUTTON_TRIPLE_CLICK :: macro (e: mmask_t, button: i32) => (e & (16 << (button * 6))) != 0;
+
+ALL_MOUSE_EVENTS :: (1 << (7 * 6)) - 1
+
 A_NORMAL :: 0
 A_ATTRIBUTES :: 0xffffff00
 A_CHARTEXT   :: 0xff
@@ -363,4 +510,94 @@ COLOR_BLUE :: 4
 COLOR_MAGENTA :: 5
 COLOR_CYAN :: 6
 COLOR_WHITE :: 7
+
+
+KEY_DOWN :: 0402		/* down-arrow key */
+KEY_UP :: 0403		/* up-arrow key */
+KEY_LEFT :: 0404		/* left-arrow key */
+KEY_RIGHT :: 0405		/* right-arrow key */
+KEY_HOME :: 0406		/* home key */
+KEY_BACKSPACE :: 0407		/* backspace key */
+KEY_F0 :: 0410		/* Function keys.  Space for 64 */
+KEY_F :: macro (n) => KEY_FO + n /* Value of function key n */
+KEY_DL :: 0510		/* delete-line key */
+KEY_IL :: 0511		/* insert-line key */
+KEY_DC :: 0512		/* delete-character key */
+KEY_IC :: 0513		/* insert-character key */
+KEY_EIC :: 0514		/* sent by rmir or smir in insert mode */
+KEY_CLEAR :: 0515		/* clear-screen or erase key */
+KEY_EOS :: 0516		/* clear-to-end-of-screen key */
+KEY_EOL :: 0517		/* clear-to-end-of-line key */
+KEY_SF :: 0520		/* scroll-forward key */
+KEY_SR :: 0521		/* scroll-backward key */
+KEY_NPAGE :: 0522		/* next-page key */
+KEY_PPAGE :: 0523		/* previous-page key */
+KEY_STAB :: 0524		/* set-tab key */
+KEY_CTAB :: 0525		/* clear-tab key */
+KEY_CATAB :: 0526		/* clear-all-tabs key */
+KEY_ENTER :: 0527		/* enter/send key */
+KEY_PRINT :: 0532		/* print key */
+KEY_LL :: 0533		/* lower-left key (home down) */
+KEY_A1 :: 0534		/* upper left of keypad */
+KEY_A3 :: 0535		/* upper right of keypad */
+KEY_B2 :: 0536		/* center of keypad */
+KEY_C1 :: 0537		/* lower left of keypad */
+KEY_C3 :: 0540		/* lower right of keypad */
+KEY_BTAB :: 0541		/* back-tab key */
+KEY_BEG :: 0542		/* begin key */
+KEY_CANCEL :: 0543		/* cancel key */
+KEY_CLOSE :: 0544		/* close key */
+KEY_COMMAND :: 0545		/* command key */
+KEY_COPY :: 0546		/* copy key */
+KEY_CREATE :: 0547		/* create key */
+KEY_END :: 0550		/* end key */
+KEY_EXIT :: 0551		/* exit key */
+KEY_FIND :: 0552		/* find key */
+KEY_HELP :: 0553		/* help key */
+KEY_MARK :: 0554		/* mark key */
+KEY_MESSAGE :: 0555		/* message key */
+KEY_MOVE :: 0556		/* move key */
+KEY_NEXT :: 0557		/* next key */
+KEY_OPEN :: 0560		/* open key */
+KEY_OPTIONS :: 0561		/* options key */
+KEY_PREVIOUS :: 0562		/* previous key */
+KEY_REDO :: 0563		/* redo key */
+KEY_REFERENCE :: 0564		/* reference key */
+KEY_REFRESH :: 0565		/* refresh key */
+KEY_REPLACE :: 0566		/* replace key */
+KEY_RESTART :: 0567		/* restart key */
+KEY_RESUME :: 0570		/* resume key */
+KEY_SAVE :: 0571		/* save key */
+KEY_SBEG :: 0572		/* shifted begin key */
+KEY_SCANCEL :: 0573		/* shifted cancel key */
+KEY_SCOMMAND :: 0574		/* shifted command key */
+KEY_SCOPY :: 0575		/* shifted copy key */
+KEY_SCREATE :: 0576		/* shifted create key */
+KEY_SDC :: 0577		/* shifted delete-character key */
+KEY_SDL :: 0600		/* shifted delete-line key */
+KEY_SELECT :: 0601		/* select key */
+KEY_SEND :: 0602		/* shifted end key */
+KEY_SEOL :: 0603		/* shifted clear-to-end-of-line key */
+KEY_SEXIT :: 0604		/* shifted exit key */
+KEY_SFIND :: 0605		/* shifted find key */
+KEY_SHELP :: 0606		/* shifted help key */
+KEY_SHOME :: 0607		/* shifted home key */
+KEY_SIC :: 0610		/* shifted insert-character key */
+KEY_SLEFT :: 0611		/* shifted left-arrow key */
+KEY_SMESSAGE :: 0612		/* shifted message key */
+KEY_SMOVE :: 0613		/* shifted move key */
+KEY_SNEXT :: 0614		/* shifted next key */
+KEY_SOPTIONS :: 0615		/* shifted options key */
+KEY_SPREVIOUS :: 0616		/* shifted previous key */
+KEY_SPRINT :: 0617		/* shifted print key */
+KEY_SREDO :: 0620		/* shifted redo key */
+KEY_SREPLACE :: 0621		/* shifted replace key */
+KEY_SRIGHT :: 0622		/* shifted right-arrow key */
+KEY_SRSUME :: 0623		/* shifted resume key */
+KEY_SSAVE :: 0624		/* shifted save key */
+KEY_SSUSPEND :: 0625		/* shifted suspend key */
+KEY_SUNDO :: 0626		/* shifted undo key */
+KEY_SUSPEND :: 0627		/* suspend key */
+KEY_UNDO :: 0630		/* undo key */
+KEY_MOUSE :: 0631		/* Mouse event has occurred */
 

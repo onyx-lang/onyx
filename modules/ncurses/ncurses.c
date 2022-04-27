@@ -47,6 +47,11 @@ ONYX_DEF(delscreen, (WASM_I64), ()) {
     return NULL;
 }
 
+ONYX_DEF(exit_curses, (WASM_I32), ()) {
+    exit_curses(P(0, i32));
+    return NULL;
+}
+
 ONYX_DEF(start_color, (), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(start_color());
     return NULL;
@@ -977,6 +982,371 @@ ONYX_DEF(mvwvline, (WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32
     return NULL;
 }
 
+ONYX_DEF(allow_pair, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(allow_pair(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(find_pair, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(find_pair(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(free_pair, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(free_pair(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(use_default_colors, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(use_default_colors());
+    return NULL;
+}
+
+ONYX_DEF(assume_default_colors, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(assume_default_colors(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(buadrate, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(buadrate());
+    return NULL;
+}
+
+ONYX_DEF(erasechar, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(erasechar());
+    return NULL;
+}
+
+ONYX_DEF(has_ic, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(has_ic());
+    return NULL;
+}
+
+ONYX_DEF(has_il, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(has_il());
+    return NULL;
+}
+
+ONYX_DEF(killchar, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(killchar());
+    return NULL;
+}
+
+ONYX_DEF(longname, (), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL(longname());
+    return NULL;
+}
+
+ONYX_DEF(term_attrs, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(term_attrs());
+    return NULL;
+}
+
+ONYX_DEF(termattrs, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(termattrs());
+    return NULL;
+}
+
+ONYX_DEF(termname, (), ()) {
+    termname();
+    return NULL;
+}
+
+ONYX_DEF(beep, (), ()) {
+    beep();
+    return NULL;
+}
+
+ONYX_DEF(flash, (), ()) {
+    flash();
+    return NULL;
+}
+
+ONYX_DEF(overlay, (WASM_I64, WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(overlay((WINDOW *) P(0, i64), (WINDOW *) P(1, i64)));
+    return NULL;
+}
+
+ONYX_DEF(overwrite, (WASM_I64, WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(overwrite((WINDOW *) P(0, i64), (WINDOW *) P(1, i64)));
+    return NULL;
+}
+
+ONYX_DEF(copywin, (WASM_I64, WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(copywin((WINDOW *) P(0, i64), (WINDOW *) P(1, i64), P(2, i32), P(3, i32), P(4, i32), P(5, i32), P(6, i32), P(7, i32), P(8, i32)));
+    return NULL;
+}
+
+ONYX_DEF(newpad, (WASM_I32, WASM_I32), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL(newpad(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(subpad, (WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL(subpad((WINDOW *) P(0, i64), P(1, i32), P(2, i32), P(3, i32), P(4, i32)));
+    return NULL;
+}
+
+ONYX_DEF(prefresh, (WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(prefresh((WINDOW *) P(0, i64), P(1, i32), P(2, i32), P(3, i32), P(4, i32), P(5, i32), P(6, i32)));
+    return NULL;
+}
+
+ONYX_DEF(pnoutrefresh, (WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(pnoutrefresh((WINDOW *) P(0, i64), P(1, i32), P(2, i32), P(3, i32), P(4, i32), P(5, i32), P(6, i32)));
+    return NULL;
+}
+
+ONYX_DEF(pechochar, (WASM_I64, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(pechochar((WINDOW *) P(0, i64), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(define_key, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(define_key(ONYX_PTR(P(0, i32)), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(keyok, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(keyok(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(key_defined, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(key_defined(ONYX_PTR(P(0, i32))));
+    return NULL;
+}
+
+ONYX_DEF(delch, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(delch());
+    return NULL;
+}
+
+ONYX_DEF(wdelch, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(wdelch((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(mvdelch, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(mvdelch(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(mvwdelch, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(mvwdelch((WINDOW *) P(0, i64), P(1, i32), P(2, i32)));
+    return NULL;
+}
+
+ONYX_DEF(deleteln, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(deleteln());
+    return NULL;
+}
+
+ONYX_DEF(wdeleteln, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(wdeleteln((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(insdelln, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(insdelln(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(winsdelln, (WASM_I64, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(winsdelln((WINDOW *) P(0, i64), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(insertln, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(insertln());
+    return NULL;
+}
+
+ONYX_DEF(winsertln, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(winsertln((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(slk_init, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_init(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(slk_set, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_set(P(0, i32), ONYX_PTR(P(1, i32)), P(2, i32)));
+    return NULL;
+}
+
+ONYX_DEF(slk_label, (WASM_I32), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL(slk_label(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(slk_refresh, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_refresh());
+    return NULL;
+}
+
+ONYX_DEF(slk_noutrefresh, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_noutrefresh());
+    return NULL;
+}
+
+ONYX_DEF(slk_clear, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_clear());
+    return NULL;
+}
+
+ONYX_DEF(slk_restore, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_restore());
+    return NULL;
+}
+
+ONYX_DEF(slk_touch, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_touch());
+    return NULL;
+}
+
+ONYX_DEF(slk_attron, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_attron(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(slk_attroff, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_attroff(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(slk_attrset, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_attrset(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(slk_attr, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_attr());
+    return NULL;
+}
+
+ONYX_DEF(slk_color, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(slk_color(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(getattrs, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getattrs((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getbegx, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getbegx((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getbegy, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getbegy((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getcurx, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getcurx((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getcury, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getcury((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getmaxx, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getmaxx((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getmaxy, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getmaxy((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getparx, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getparx((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(getpary, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getpary((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(has_mouse, (), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(has_mouse());
+    return NULL;
+}
+
+ONYX_DEF(getmouse, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(getmouse(ONYX_PTR(P(0, i32))));
+    return NULL;
+}
+
+ONYX_DEF(ungetmouse, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(ungetmouse(ONYX_PTR(P(0, i32))));
+    return NULL;
+}
+
+ONYX_DEF(mousemask, (WASM_I64, WASM_I32), (WASM_I64)) {
+    results->data[0] = WASM_I64_VAL(mousemask(P(0, i64), ONYX_PTR(P(1, i32))));
+    return NULL;
+}
+
+ONYX_DEF(wenclone, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(wenclone((WINDOW *) P(0, i64), P(1, i32), P(2, i32)));
+    return NULL;
+}
+
+ONYX_DEF(mouse_trafo, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(mouse_trafo(ONYX_PTR(P(0, i32)), ONYX_PTR(P(1, i32)), P(2, i32)));
+    return NULL;
+}
+
+ONYX_DEF(wmouse_trafo, (WASM_I64, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(wmouse_trafo((WINDOW *) P(0, i64), ONYX_PTR(P(1, i32)), ONYX_PTR(P(2, i32)), P(3, i32)));
+    return NULL;
+}
+
+ONYX_DEF(mouseinterval, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(mouseinterval(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(is_term_resized, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(is_term_resized(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(resize_term, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(resize_term(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(resizeterm, (WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(resizeterm(P(0, i32), P(1, i32)));
+    return NULL;
+}
+
+ONYX_DEF(scroll, (WASM_I64), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(scroll((WINDOW *) P(0, i64)));
+    return NULL;
+}
+
+ONYX_DEF(scrl, (WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(scrl(P(0, i32)));
+    return NULL;
+}
+
+ONYX_DEF(wscrl, (WASM_I64, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(wscrl((WINDOW *) P(0, i64), P(1, i32)));
+    return NULL;
+}
+
 ONYX_DEF(__get_stdscr, (), (WASM_I64)) {
     results->data[0] = WASM_I64_VAL(__get_stdscr());
     return NULL;
@@ -996,6 +1366,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(newterm)
     ONYX_FUNC(set_term)
     ONYX_FUNC(delscreen)
+    ONYX_FUNC(exit_curses)
     ONYX_FUNC(start_color)
     ONYX_FUNC(has_colors)
     ONYX_FUNC(can_change_color)
@@ -1182,6 +1553,79 @@ ONYX_LIBRARY {
     ONYX_FUNC(mvwhline)
     ONYX_FUNC(mvvline)
     ONYX_FUNC(mvwvline)
+    ONYX_FUNC(allow_pair)
+    ONYX_FUNC(find_pair)
+    ONYX_FUNC(free_pair)
+    ONYX_FUNC(use_default_colors)
+    ONYX_FUNC(assume_default_colors)
+    ONYX_FUNC(buadrate)
+    ONYX_FUNC(erasechar)
+    ONYX_FUNC(has_ic)
+    ONYX_FUNC(has_il)
+    ONYX_FUNC(killchar)
+    ONYX_FUNC(longname)
+    ONYX_FUNC(term_attrs)
+    ONYX_FUNC(termattrs)
+    ONYX_FUNC(termname)
+    ONYX_FUNC(beep)
+    ONYX_FUNC(flash)
+    ONYX_FUNC(overlay)
+    ONYX_FUNC(overwrite)
+    ONYX_FUNC(copywin)
+    ONYX_FUNC(newpad)
+    ONYX_FUNC(subpad)
+    ONYX_FUNC(prefresh)
+    ONYX_FUNC(pnoutrefresh)
+    ONYX_FUNC(pechochar)
+    ONYX_FUNC(define_key)
+    ONYX_FUNC(keyok)
+    ONYX_FUNC(key_defined)
+    ONYX_FUNC(delch)
+    ONYX_FUNC(wdelch)
+    ONYX_FUNC(mvdelch)
+    ONYX_FUNC(mvwdelch)
+    ONYX_FUNC(deleteln)
+    ONYX_FUNC(wdeleteln)
+    ONYX_FUNC(insdelln)
+    ONYX_FUNC(winsdelln)
+    ONYX_FUNC(insertln)
+    ONYX_FUNC(winsertln)
+    ONYX_FUNC(slk_init)
+    ONYX_FUNC(slk_set)
+    ONYX_FUNC(slk_label)
+    ONYX_FUNC(slk_refresh)
+    ONYX_FUNC(slk_noutrefresh)
+    ONYX_FUNC(slk_clear)
+    ONYX_FUNC(slk_restore)
+    ONYX_FUNC(slk_touch)
+    ONYX_FUNC(slk_attron)
+    ONYX_FUNC(slk_attroff)
+    ONYX_FUNC(slk_attrset)
+    ONYX_FUNC(slk_attr)
+    ONYX_FUNC(slk_color)
+    ONYX_FUNC(getattrs)
+    ONYX_FUNC(getbegx)
+    ONYX_FUNC(getbegy)
+    ONYX_FUNC(getcurx)
+    ONYX_FUNC(getcury)
+    ONYX_FUNC(getmaxx)
+    ONYX_FUNC(getmaxy)
+    ONYX_FUNC(getparx)
+    ONYX_FUNC(getpary)
+    ONYX_FUNC(has_mouse)
+    ONYX_FUNC(getmouse)
+    ONYX_FUNC(ungetmouse)
+    ONYX_FUNC(mousemask)
+    ONYX_FUNC(wenclone)
+    ONYX_FUNC(mouse_trafo)
+    ONYX_FUNC(wmouse_trafo)
+    ONYX_FUNC(mouseinterval)
+    ONYX_FUNC(is_term_resized)
+    ONYX_FUNC(resize_term)
+    ONYX_FUNC(resizeterm)
+    ONYX_FUNC(scroll)
+    ONYX_FUNC(scrl)
+    ONYX_FUNC(wscrl)
     ONYX_FUNC(__get_stdscr)
     ONYX_FUNC(NCURSES_ACS)
     NULL
