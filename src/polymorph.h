@@ -408,6 +408,12 @@ static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* para
             }
         }
 
+        if (param->idx <= (u64) bh_arr_length(func->params)) {
+            if (func->params[param->idx].default_value) {
+                return (AstTyped *) func->params[param->idx].default_value;
+            }
+        }
+
         // CLEANUP
         if (err_msg) *err_msg = "Not enough arguments to polymorphic procedure. This error message may not be entirely right.";
 

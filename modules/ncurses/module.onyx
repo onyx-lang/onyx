@@ -3,33 +3,6 @@ package ncurses
 use package core {cptr, conv, string}
 
 
-WINDOW :: #distinct u64
-SCREEN :: #distinct u64
-
-chtype :: u32
-
-attr_t :: u32
-A_NORMAL :: 0
-A_ATTRIBUTES :: 0xffffff00
-A_CHARTEXT   :: 0xff
-A_COLOR      :: 0xff00
-A_STANDOUT   :: 0x00010000
-A_UNDERLINE  :: 0x00020000
-A_REVERSE    :: 0x00040000
-A_BLINK      :: 0x00080000
-A_DIM        :: 0x00100000
-A_BOLD       :: 0x00200000
-A_ALTCHARSET :: 0x00400000
-A_INVIS      :: 0x00800000
-A_PROTECT    :: 0x01000000
-A_HORIZONTAL :: 0x02000000
-A_LEFT       :: 0x04000000
-A_LOW        :: 0x08000000
-A_RIGHT      :: 0x10000000
-A_TOP        :: 0x20000000
-A_VERTICAL   :: 0x40000000
-A_ITALIC     :: 0x80000000
-
 #library "onyx_ncurses"
 #foreign "onyx_ncurses" {
 
@@ -308,9 +281,27 @@ getparyx  :: __get_par_yx
 getbegyx  :: __get_beg_yx
 getmaxyx  :: __get_max_yx
 
-ogetstr :: ($max_length: i32) -> str {
+ogetstr :: ($max_length: i32 = 1024) => {
     buf: [max_length] u8;
     err := getnstr(buf);
+    return string.alloc_copy(string.from_cstr(~~ buf));
+}
+
+mvogetstr :: (y, x: i32, $max_length: i32 = 1024) => {
+    buf: [max_length] u8;
+    err := mvgetnstr(y, x, buf);
+    return string.alloc_copy(string.from_cstr(~~ buf));
+}
+
+wogetstr :: (w: WINDOW, $max_length: i32 = 1024) => {
+    buf: [max_length] u8;
+    err := wgetnstr(w, buf);
+    return string.alloc_copy(string.from_cstr(~~ buf));
+}
+
+mvwogetstr :: (w: WINDOW, y, x: i32, $max_length: i32 = 1024) => {
+    buf: [max_length] u8;
+    err := mvwgetnstr(w, y, x, buf);
     return string.alloc_copy(string.from_cstr(~~ buf));
 }
 
@@ -338,6 +329,31 @@ mvwprintw :: (w: WINDOW, y, x: i32, fmt: str, args: ..any) {
     mvwaddnstr(w, y, x, to_output);
 }
 
+WINDOW :: #distinct u64
+SCREEN :: #distinct u64
+chtype :: u32
+attr_t :: u32
+
+A_NORMAL :: 0
+A_ATTRIBUTES :: 0xffffff00
+A_CHARTEXT   :: 0xff
+A_COLOR      :: 0xff00
+A_STANDOUT   :: 0x00010000
+A_UNDERLINE  :: 0x00020000
+A_REVERSE    :: 0x00040000
+A_BLINK      :: 0x00080000
+A_DIM        :: 0x00100000
+A_BOLD       :: 0x00200000
+A_ALTCHARSET :: 0x00400000
+A_INVIS      :: 0x00800000
+A_PROTECT    :: 0x01000000
+A_HORIZONTAL :: 0x02000000
+A_LEFT       :: 0x04000000
+A_LOW        :: 0x08000000
+A_RIGHT      :: 0x10000000
+A_TOP        :: 0x20000000
+A_VERTICAL   :: 0x40000000
+A_ITALIC     :: 0x80000000
 
 COLOR_BLACK	:: 0
 COLOR_RED	:: 1

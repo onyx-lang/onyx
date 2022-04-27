@@ -402,6 +402,8 @@ ONYX_DEF(__kill_thread, (WASM_I32), (WASM_I32)) {
     bh_arr_each(OnyxThread, thread, threads) {
         if (thread->id == thread_id) {
             #ifdef _BH_LINUX
+            // This leads to some weirdness and bugs...
+            //
             pthread_kill(thread->thread, SIGKILL);
             #endif
 
