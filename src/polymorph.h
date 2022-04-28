@@ -1043,45 +1043,6 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     i32 i = 0;
     bh_arr_each(AstPolySolution, sln, slns) {
         sln->poly_sym = (AstNode *) &ps_type->poly_params[i];
-
-        PolySolutionKind expected_kind = PSK_Undefined;
-        if ((AstNode *) ps_type->poly_params[i].type_node == (AstNode *) &basic_type_type_expr) {
-            expected_kind = PSK_Type;
-        } else {
-            expected_kind = PSK_Value;
-        }
-
-        if (sln->kind != expected_kind) {
-            if (expected_kind == PSK_Type) 
-                onyx_report_error(pos, Error_Critical, "Expected type expression for %d%s argument.", i + 1, bh_num_suffix(i + 1));
-
-            if (expected_kind == PSK_Value)
-                onyx_report_error(pos, Error_Critical, "Expected value expression of type '%s' for %d%s argument.",
-                    type_get_name(ps_type->poly_params[i].type),
-                    i + 1, bh_num_suffix(i + 1));
-
-            return NULL;
-        }
-
-        if (sln->kind == PSK_Value) {
-            resolve_expression_type(sln->value);
-
-            if ((sln->value->flags & Ast_Flag_Comptime) == 0) {
-                onyx_report_error(pos, Error_Critical,
-                    "Expected compile-time known argument for '%b'.",
-                    sln->poly_sym->token->text,
-                    sln->poly_sym->token->length);
-                return NULL;
-            }
-
-            if (!types_are_compatible(sln->value->type, ps_type->poly_params[i].type)) {
-                onyx_report_error(pos, Error_Critical, "Expected compile-time argument of type '%s', got '%s'.",
-                    type_get_name(ps_type->poly_params[i].type),
-                    type_get_name(sln->value->type));
-                return NULL;
-            }
-        }
-
         i++;
     }
 
@@ -1113,8 +1074,18 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     AstStructType* concrete_struct = (AstStructType *) ast_clone(context.ast_alloc, ps_type->base_struct);
     concrete_struct->polymorphic_error_loc = pos;
     BH_MASK_SET(concrete_struct->flags, !error_if_failed, Ast_Flag_Header_Check_No_Error);
-    shput(ps_type->concrete_structs, unique_key, concrete_struct);
 
+
+    i64 arg_count = bh_arr_length(ps_type->poly_params);
+    bh_arr_new(global_heap_allocator, concrete_struct->polymorphic_argument_types, arg_count);
+    bh_arr_set_length(concrete_struct->polymorphic_argument_types, arg_count);
+    concrete_struct->polymorphic_arguments = bh_arr_copy(global_heap_allocator, slns);
+
+    fori (i, 0, (i64) bh_arr_length(ps_type->poly_params)) {
+        concrete_struct->polymorphic_argument_types[i] = (AstType *) ast_clone(context.ast_alloc, ps_type->poly_params[i].type_node);
+    }
+
+    shput(ps_type->concrete_structs, unique_key, concrete_struct);
     add_entities_for_node(NULL, (AstNode *) concrete_struct, sln_scope, NULL);
     return NULL;
 }

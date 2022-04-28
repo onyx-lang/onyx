@@ -1350,6 +1350,9 @@ CheckStatus check_range_literal(AstRangeLiteral** prange) {
     CHECK(expression, &range->low);
     CHECK(expression, &range->high);
 
+    builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
+    if (builtin_range_type_type == NULL) YIELD(range->token->pos, "Waiting for 'range' structure to be built.");
+
     Type* expected_range_type = builtin_range_type_type;
     StructMember smem;
 
@@ -2151,6 +2154,24 @@ CheckStatus check_struct(AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
+    if (s_node->polymorphic_argument_types) {
+        assert(s_node->polymorphic_arguments);
+
+        fori (i, 0, (i64) bh_arr_length(s_node->polymorphic_argument_types)) {
+            Type *arg_type = type_build_from_ast(context.ast_alloc, s_node->polymorphic_argument_types[i]);
+            if (arg_type == NULL) YIELD(s_node->polymorphic_argument_types[i]->token->pos, "Waiting to build type for polymorph argument.");
+
+            // nocheckin this is wrong...
+            if (s_node->polymorphic_arguments[i].value) {
+                TYPE_CHECK(&s_node->polymorphic_arguments[i].value, arg_type) {
+                    ERROR_(s_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
+                        type_get_name(arg_type),
+                        type_get_name(s_node->polymorphic_arguments[i].value->type));
+                }
+            }
+        }
+    }
+
     if (s_node->constraints.constraints) {
         s_node->constraints.produce_errors = (s_node->flags & Ast_Flag_Header_Check_No_Error) == 0;
 
@@ -2192,6 +2213,7 @@ CheckStatus check_struct(AstStructType* s_node) {
     }
 
     // NOTE: fills in the pending_type.
+    s_node->ready_to_build_type = 1;
     type_build_from_ast(context.ast_alloc, (AstType *) s_node);
     if (s_node->pending_type == NULL || !s_node->pending_type_is_valid)
         YIELD(s_node->token->pos, "Waiting for type to be constructed.");

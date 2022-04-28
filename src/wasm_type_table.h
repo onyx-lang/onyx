@@ -222,9 +222,12 @@ u64 build_type_table(OnyxWasmModule* module) {
 
                             bh_buffer_grow(&table_buffer, table_buffer.length + size);
                             u8* buffer = table_buffer.data + table_buffer.length;
-                            emit_raw_data(module, buffer, sln->value);
-                            table_buffer.length += size;
-                            break;
+                            if (emit_raw_data_(module, buffer, sln->value)) {
+                                table_buffer.length += size;
+                                break;
+                            }
+
+                            // fallthrough
                         }
 
                         default: {

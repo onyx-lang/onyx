@@ -119,6 +119,21 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
         scope_enter(s_node->scope);
     }
 
+    if (s_node->polymorphic_argument_types) {
+        assert(s_node->polymorphic_arguments);
+
+        SymresStatus ss = Symres_Success, result;
+        fori (i, 0, (i64) bh_arr_length(s_node->polymorphic_argument_types)) {
+            result = symres_type(&s_node->polymorphic_argument_types[i]);
+            if (result > ss) ss = result;
+
+            if (s_node->polymorphic_arguments[i].value) {
+                result = symres_expression(&s_node->polymorphic_arguments[i].value);
+                if (result > ss) ss = result;
+            }
+        }
+    }
+
     if (s_node->constraints.constraints) {
         bh_arr_each(AstConstraint *, constraint, s_node->constraints.constraints) {
             SYMRES(constraint, *constraint);
@@ -189,19 +204,6 @@ static SymresStatus symres_type(AstType** type) {
 
             if (pst_node->scope == NULL) {
                 pst_node->scope = scope_create(context.ast_alloc, pst_node->entity->scope, pst_node->token->pos);
-            }
-
-            bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
-                SYMRES(type, &param->type_node);
-                param->type = type_build_from_ast(context.ast_alloc, param->type_node);
-                if (param->type == NULL) {
-                    if (context.cycle_detected) {
-                        onyx_report_error(param->token->pos, Error_Waiting_On, "Waiting for parameter type to be known.");
-                        return Symres_Error;
-                    } else {
-                        return Symres_Yield_Macro;
-                    }
-                }
             }
             break;
         }
@@ -494,10 +496,6 @@ static SymresStatus symres_expression(AstTyped** expr) {
             // :EliminatingSymres
             SYMRES(type, &builtin_range_type);
             (*expr)->type_node = builtin_range_type;
-
-            // NOTE: This is a weird place to put this so maybe put it somewhere else eventually
-            //                                                  - brendanfh   2020/09/04
-            builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
             break;
 
         case Ast_Kind_Function:

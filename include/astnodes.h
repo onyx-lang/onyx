@@ -912,9 +912,13 @@ struct AstStructType {
     OnyxFilePos polymorphic_error_loc;
     ConstraintContext constraints;
 
+    bh_arr(AstType *)       polymorphic_argument_types;
+    bh_arr(AstPolySolution) polymorphic_arguments;
+
     b32 pending_type_is_valid : 1;
     b32 is_union              : 1;
     b32 is_packed             : 1;
+    b32 ready_to_build_type   : 1;
 };
 struct AstStructMember {
     AstTyped_base;

@@ -337,6 +337,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             AstStructType* s_node = (AstStructType *) type_node;
             if (s_node->stcache != NULL) return s_node->stcache;
             if (s_node->pending_type != NULL && s_node->pending_type_is_valid) return s_node->pending_type;
+            if (!s_node->ready_to_build_type) return NULL;
 
             Type* s_type;
             if (s_node->pending_type == NULL) {
