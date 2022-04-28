@@ -1904,6 +1904,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Unary_Field_Access: break;
         case Ast_Kind_Constraint_Sentinel: break;
         case Ast_Kind_Switch_Case: break;
+        case Ast_Kind_Foreign_Block: break;
 
         default:
             retval = Check_Error;

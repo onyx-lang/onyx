@@ -694,9 +694,11 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
 static SymresStatus symres_use(AstUse* use) {
     SYMRES(expression, &use->expr);
 
+    AstTyped *use_expr = (AstTyped *) strip_aliases((AstNode *) use->expr);
+
     // :EliminatingSymres
-    if (use->expr->kind == Ast_Kind_Package) {
-        AstPackage* package = (AstPackage *) use->expr;
+    if (use_expr->kind == Ast_Kind_Package) {
+        AstPackage* package = (AstPackage *) use_expr;
         SYMRES(package, package);
 
         if (package->package->scope == curr_scope) return Symres_Success;
@@ -731,8 +733,42 @@ static SymresStatus symres_use(AstUse* use) {
         return Symres_Success;
     }
 
-    if (use->expr->kind == Ast_Kind_Enum_Type) {
-        AstEnumType* et = (AstEnumType *) use->expr;
+    if (use_expr->kind == Ast_Kind_Foreign_Block) {
+        AstForeignBlock* fb = (AstForeignBlock *) use_expr;
+        if (fb->entity->state <= Entity_State_Resolve_Symbols) return Symres_Yield_Macro;
+
+        if (fb->scope == curr_scope) return Symres_Success;
+
+        if (use->only == NULL) {
+            OnyxFilePos pos = { 0 };
+            if (use->token != NULL)
+                pos = use->token->pos;
+
+            scope_include(curr_scope, fb->scope, pos);
+
+        } else {
+            bh_arr_each(QualifiedUse, qu, use->only) {
+                AstNode* thing = symbol_resolve(fb->scope, qu->symbol_name);
+                if (thing == NULL) { // :SymresStall
+                    if (report_unresolved_symbols) {
+                        onyx_report_error(qu->symbol_name->pos, Error_Critical, 
+                                "The symbol '%b' was not found in this package.",
+                                qu->symbol_name->text, qu->symbol_name->length);
+                        return Symres_Error;
+                    } else {
+                        return Symres_Yield_Macro;
+                    }
+                }
+
+                symbol_introduce(curr_scope, qu->as_name, thing);
+            }
+        }
+
+        return Symres_Success;
+    }
+
+    if (use_expr->kind == Ast_Kind_Enum_Type) {
+        AstEnumType* et = (AstEnumType *) use_expr;
 
         bh_arr_each(AstEnumValue *, ev, et->values)
             symbol_introduce(curr_scope, (*ev)->token, (AstNode *) *ev);
@@ -740,8 +776,8 @@ static SymresStatus symres_use(AstUse* use) {
         return Symres_Success;
     }
 
-    if (use->expr->kind == Ast_Kind_Struct_Type) {
-        AstStructType* st = (AstStructType *) use->expr;
+    if (use_expr->kind == Ast_Kind_Struct_Type) {
+        AstStructType* st = (AstStructType *) use_expr;
         if (!st->scope) return Symres_Success;
 
         if (use->only == NULL) {
@@ -764,27 +800,27 @@ static SymresStatus symres_use(AstUse* use) {
         return Symres_Success;
     }
 
-    if (use->expr->type_node == NULL && use->expr->type == NULL) goto cannot_use;
+    if (use_expr->type_node == NULL && use_expr->type == NULL) goto cannot_use;
 
     // :EliminatingSymres
-    AstType* effective_type = use->expr->type_node;
+    AstType* effective_type = use_expr->type_node;
     if (effective_type->kind == Ast_Kind_Pointer_Type)
         effective_type = ((AstPointerType *) effective_type)->elem;
 
     if (effective_type->kind == Ast_Kind_Struct_Type ||
             effective_type->kind == Ast_Kind_Poly_Call_Type) {
 
-        if (use->expr->type == NULL)
-            use->expr->type = type_build_from_ast(context.ast_alloc, use->expr->type_node);
-        if (use->expr->type == NULL) goto cannot_use;
+        if (use_expr->type == NULL)
+            use_expr->type = type_build_from_ast(context.ast_alloc, use_expr->type_node);
+        if (use_expr->type == NULL) goto cannot_use;
 
-        Type* st = use->expr->type;
+        Type* st = use_expr->type;
         if (st->kind == Type_Kind_Pointer)
             st = st->Pointer.elem;
 
         fori (i, 0, shlen(st->Struct.members)) {
             StructMember* value = st->Struct.members[i].value;
-            AstFieldAccess* fa = make_field_access(context.ast_alloc, use->expr, value->name);
+            AstFieldAccess* fa = make_field_access(context.ast_alloc, use_expr, value->name);
             symbol_raw_introduce(curr_scope, value->name, use->token->pos, (AstNode *) fa);
         }
 
@@ -1445,6 +1481,9 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
 }
 
 static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
+    if (fb->scope == NULL)
+        fb->scope = scope_create(context.ast_alloc, curr_scope, fb->token->pos);
+
     bh_arr_each(Entity *, pent, fb->captured_entities) {
         Entity *ent = *pent;
         if (ent->type == Entity_Type_Function_Header) {
@@ -1462,6 +1501,22 @@ static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
 
             add_entities_for_node(NULL, (AstNode *) ent->function, ent->scope, ent->package);
             continue;
+        }
+
+        if (ent->type == Entity_Type_Binding) {
+            AstBinding* new_binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+            new_binding->token = ent->binding->token;
+            new_binding->node = ent->binding->node;
+
+            Entity e;
+            memset(&e, 0, sizeof(e));
+            e.type = Entity_Type_Binding;
+            e.state = Entity_State_Introduce_Symbols;
+            e.binding = new_binding;
+            e.scope = fb->scope;
+            e.package = ent->package;
+
+            entity_heap_insert(&context.entities, e);
         }
 
         if (ent->type != Entity_Type_Function) {

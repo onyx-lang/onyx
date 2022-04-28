@@ -3565,6 +3565,7 @@ static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
 static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     b32 retval = 1;
+    node = (AstTyped *) strip_aliases((AstNode *) node);
 
     if (node_is_type((AstNode *) node)) {
         Type* constructed_type = type_build_from_ast(context.ast_alloc, (AstType *) node);

@@ -1294,7 +1294,7 @@ struct AstCodeBlock {
 };
 
 struct AstDirectiveInsert {
-    AstNode_base;
+    AstTyped_base;
 
     AstTyped *code_expr;
 };
@@ -1320,8 +1320,9 @@ struct AstDirectiveLibrary {
 };
 
 struct AstForeignBlock {
-    AstNode_base;
+    AstTyped_base;
 
+    Scope* scope;
     OnyxToken *module_name;
     bh_arr(struct Entity *) captured_entities;
 };

@@ -2810,6 +2810,25 @@ static AstDirectiveInit* parse_init_directive(OnyxParser *parser, OnyxToken *tok
     return init;
 }
 
+static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token) {
+    // :LinearTokenDependent
+    AstForeignBlock *fb = make_node(AstForeignBlock, Ast_Kind_Foreign_Block);
+    fb->token = token;
+    fb->module_name = expect_token(parser, Token_Type_Literal_String);
+
+    bh_arr_new(global_heap_allocator, fb->captured_entities, 4);
+    bh_arr_push(parser->alternate_entity_placement_stack, &fb->captured_entities);
+
+    expect_token(parser, '{');
+    parse_top_level_statements_until(parser, '}');
+    expect_token(parser, '}');
+
+    bh_arr_pop(parser->alternate_entity_placement_stack);
+    ENTITY_SUBMIT(fb);
+
+    return fb;
+}
+
 static AstTyped* parse_top_level_expression(OnyxParser* parser) {
     if (parser->curr->type == Token_Type_Keyword_Global)    return parse_global_declaration(parser);
     if (parser->curr->type == Token_Type_Keyword_Struct)    return (AstTyped *) parse_struct(parser);
@@ -2843,6 +2862,11 @@ static AstTyped* parse_top_level_expression(OnyxParser* parser) {
             distinct->token = parser->curr - 2;
             distinct->base_type = parse_type(parser);
             return (AstTyped *) distinct;
+        }
+
+        if (parse_possible_directive(parser, "foreign")) {
+            AstForeignBlock *foreign = parse_foreign_block(parser, parser->curr - 2);
+            return (AstTyped *) foreign;
         }
     }
 
@@ -3060,20 +3084,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 return;
             }
             else if (parse_possible_directive(parser, "foreign")) {
-                // :LinearTokenDependent
-                AstForeignBlock *fb = make_node(AstForeignBlock, Ast_Kind_Foreign_Block);
-                fb->token = parser->curr - 2;
-                fb->module_name = expect_token(parser, Token_Type_Literal_String);
-
-                bh_arr_new(global_heap_allocator, fb->captured_entities, 4);
-                bh_arr_push(parser->alternate_entity_placement_stack, &fb->captured_entities);
-
-                expect_token(parser, '{');
-                parse_top_level_statements_until(parser, '}');
-                expect_token(parser, '}');
-
-                bh_arr_pop(parser->alternate_entity_placement_stack);
-                ENTITY_SUBMIT(fb);
+                parse_foreign_block(parser, parser->curr - 2);
                 return;
             }
             else if (parse_possible_directive(parser, "operator")) {

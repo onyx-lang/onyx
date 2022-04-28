@@ -204,6 +204,15 @@ all_types_peeled_off:
             return symbol_raw_resolve(package->package->scope, symbol);
         } 
 
+        case Ast_Kind_Foreign_Block: {
+            AstForeignBlock* fb = (AstForeignBlock *) node;
+
+            if (fb->scope == NULL)
+                return NULL;
+
+            return symbol_raw_resolve(fb->scope, symbol);
+        }
+
         case Ast_Kind_Enum_Type: {
             AstEnumType* etype = (AstEnumType *) node;
             return symbol_raw_resolve(etype->scope, symbol);
