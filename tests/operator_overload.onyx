@@ -51,8 +51,8 @@ Vec :: struct (T: type_expr, N: i32) {
     return res;
 }
 
-join :: (a: Vec($T, $N), b: Vec(T, $M)) -> Vec(T, #value N + M) {
-    out : Vec(T, #value N + M);
+join :: (a: Vec($T, $N), b: Vec(T, $M)) -> Vec(T, N + M) {
+    out : Vec(T, N + M);
     for i: 0 .. N do out.data[i]     = a.data[i]; 
     for i: 0 .. M do out.data[i + N] = b.data[i]; 
     return out;

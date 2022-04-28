@@ -1303,3 +1303,19 @@ b32 static_if_resolution(AstIf* static_if) {
 
     return value != 0;
 }
+
+AstPolyCallType* convert_call_to_polycall(AstCall* call) {
+    // HACK HACK HACK
+    AstPolyCallType *pct = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
+    pct->token = call->token;
+    pct->__unused = call->next;
+    pct->callee = (AstType *) call->callee;
+    pct->params = (AstNode **) call->args.values;
+    bh_arr_each(AstNode *, pp, pct->params) {
+        if ((*pp)->kind == Ast_Kind_Argument) {
+            *pp = (AstNode *) (*(AstArgument **) pp)->value;
+        }
+    }
+
+    return pct;
+}

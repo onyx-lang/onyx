@@ -5,7 +5,7 @@ reader :: package core.string.reader
 
 BagGraph :: struct {
     nodes    : [..] ^BagNode;
-    node_map : map.Map(str, ^BagNode);
+    node_map : map.Map(str, #type ^BagNode);
 }
 
 BagNode :: struct {

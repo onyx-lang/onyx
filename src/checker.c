@@ -603,17 +603,7 @@ CheckStatus check_call(AstCall** pcall) {
     if (call->kind == Ast_Kind_Call) {
         AstNode* callee = strip_aliases((AstNode *) call->callee);
         if (callee->kind == Ast_Kind_Poly_Struct_Type) {
-            // HACK HACK HACK
-            AstPolyCallType *pct = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
-            pct->token = call->token;
-            pct->__unused = call->next;
-            pct->callee = (AstType *) callee;
-            pct->params = (AstNode **) call->args.values;
-            bh_arr_each(AstNode *, pp, pct->params) {
-                *pp = (AstNode *) (*(AstArgument **) pp)->value;
-            }
-
-            *pcall = (AstCall *) pct;
+            *pcall = (AstCall *) convert_call_to_polycall(call);
             CHECK(expression, (AstTyped **) pcall);
             return Check_Success;
         }

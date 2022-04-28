@@ -186,7 +186,10 @@ static SymresStatus symres_type(AstType** type) {
 
         case Ast_Kind_Poly_Struct_Type: {
             AstPolyStructType* pst_node = (AstPolyStructType *) *type;
-            pst_node->scope = scope_create(context.ast_alloc, pst_node->entity->scope, pst_node->token->pos);
+
+            if (pst_node->scope == NULL) {
+                pst_node->scope = scope_create(context.ast_alloc, pst_node->entity->scope, pst_node->token->pos);
+            }
 
             bh_arr_each(AstPolyStructParam, param, pst_node->poly_params) {
                 SYMRES(type, &param->type_node);

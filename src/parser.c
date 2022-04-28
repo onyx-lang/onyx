@@ -54,6 +54,7 @@ static AstReturn*     parse_return_stmt(OnyxParser* parser);
 static AstNode*       parse_use_stmt(OnyxParser* parser);
 static AstBlock*      parse_block(OnyxParser* parser, b32 make_a_new_scope, char* block_name);
 static AstNode*       parse_statement(OnyxParser* parser);
+static void           parse_polymorphic_variable(OnyxParser* parser, AstType*** next_insertion);
 static AstType*       parse_type(OnyxParser* parser);
 static AstTypeOf*     parse_typeof(OnyxParser* parser);
 static AstStructType* parse_struct(OnyxParser* parser);
@@ -534,6 +535,12 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '$': {
+            AstType **tmp = (AstType **) &retval;
+            parse_polymorphic_variable(parser, &tmp);
+            break;
+        }
+
         case '#': {
             if (parse_possible_directive(parser, "file_contents")) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
@@ -619,7 +626,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     poly_var->token = expect_token(parser, Token_Type_Symbol);
 
                     expect_token(parser, '=');
-                    AstType* poly_type = parse_type(parser);
+                    AstType* poly_type = (AstType *) parse_expression(parser, 0);
 
                     bh_arr_push(solid->known_polyvars, ((AstPolySolution) {
                         .kind     = PSK_Undefined,
@@ -1805,7 +1812,7 @@ static AstType* parse_type(OnyxParser* parser) {
                     while (!consume_token_if_next(parser, ')')) {
                         if (parser->hit_unexpected_token) break;
 
-                        AstNode* t = (AstNode *) parse_type(parser);
+                        AstNode* t = (AstNode *) parse_expression(parser, 0);
                         bh_arr_push(params, t);
 
                         if (parser->curr->type != ')')
@@ -1831,21 +1838,15 @@ static AstType* parse_type(OnyxParser* parser) {
                 break;
             }
 
-            case '#': {
-                // :ValueDirectiveHack
-                if (parse_possible_directive(parser, "value")) {
-                // It is very weird to put these here.
-                case Token_Type_Literal_Integer:
-                case Token_Type_Literal_String:
-                case Token_Type_Literal_Float:
-                case Token_Type_Literal_True:
-                case Token_Type_Literal_False:
-                case '-':
-                    *next_insertion = (AstType *) parse_expression(parser, 0);
-                    next_insertion = NULL;
-                    break;
-                }
-
+            //
+            // I don't think any of these cases are necesary any more?
+            case Token_Type_Literal_Integer:
+            case Token_Type_Literal_String:
+            case Token_Type_Literal_Float:
+            case Token_Type_Literal_True:
+            case Token_Type_Literal_False:
+            case '-': {
+                *next_insertion = (AstType *) parse_expression(parser, 0);
                 next_insertion = NULL;
                 break;
             }

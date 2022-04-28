@@ -12,7 +12,7 @@ alloc_slice :: ($T: type_expr, N: i32) -> [] T {
     return .{ data, N };
 }
 
-count_to_30 :: #solidify count_to { N = #value 30 };
+count_to_30 :: #solidify count_to { N = 30 };
 
 main :: (args: [] cstr) {
     count_to(5);

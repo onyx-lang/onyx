@@ -8,7 +8,7 @@ main :: (args: [] cstr) {
         y : [N] f32;
     }
 
-    nps : NewPolyStruct(i32, #value 4);
+    nps : NewPolyStruct(i32, 4);
 
     for ^x: nps.x do *x = 12345;
     for ^y: nps.y do *y = 67890;

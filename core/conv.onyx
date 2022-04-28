@@ -6,8 +6,8 @@ Enable_Custom_Formatters :: true
     map :: package core.map
     string :: package core.string
 
-    custom_formatters: Map(type_expr, (^Format_Output, ^Format, rawptr) -> void);
-    custom_parsers   : Map(type_expr, (rawptr, str, Allocator) -> bool);
+    custom_formatters: Map(type_expr, #type (^Format_Output, ^Format, rawptr) -> void);
+    custom_parsers   : Map(type_expr, #type (rawptr, str, Allocator) -> bool);
 }
 
 custom_formatters_initialized :: #init () {

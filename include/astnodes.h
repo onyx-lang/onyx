@@ -1675,6 +1675,7 @@ AstNode* polymorphic_proc_try_solidify(AstFunction* pp, bh_arr(AstPolySolution) 
 AstFunction* polymorphic_proc_build_only_header(AstFunction* pp, PolyProcLookupMethod pp_lookup, ptr actual);
 AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_arr(AstPolySolution) slns, b32 error_if_failed);
 b32 potentially_convert_function_to_polyproc(AstFunction *func);
+AstPolyCallType* convert_call_to_polycall(AstCall* call);
 
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);

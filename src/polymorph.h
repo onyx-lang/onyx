@@ -262,6 +262,17 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                 break;
             }
 
+            case Ast_Kind_Address_Of: {
+                if (elem.actual->kind != Type_Kind_Pointer) break;
+
+                bh_arr_push(elem_queue, ((PolySolveElem) {
+                    .type_expr = (AstType *) ((AstAddressOf *) elem.type_expr)->expr,
+                    .kind = PSK_Type,
+                    .actual = elem.actual->Pointer.elem,
+                }));
+                break;
+            }
+
             case Ast_Kind_Array_Type: {
                 if (elem.actual->kind != Type_Kind_Array) break;
 
@@ -337,6 +348,13 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
                 break;
             }
 
+            case Ast_Kind_Call: {
+                AstPolyCallType *pct = convert_call_to_polycall((AstCall *) elem.type_expr);
+                elem.type_expr = (AstType *) pct;
+
+                // fallthrough
+            }
+
             case Ast_Kind_Poly_Call_Type: {
                 if (elem.actual->kind != Type_Kind_Struct) break;
                 if (bh_arr_length(elem.actual->Struct.poly_sln) != bh_arr_length(((AstPolyCallType *) elem.type_expr)->params)) break;
@@ -396,6 +414,9 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
 static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* param, Arguments* args, char** err_msg) {
     bh_arr(AstTyped *) arg_arr = args->values;
     bh_arr(AstNamedValue *) named_values = args->named_values;
+
+    if ((i32) param->idx < 0)
+        return NULL;
 
     // NOTE: This check is safe because currently the arguments given without a name
     // always map to the beginning indidies of the argument array.
@@ -1011,7 +1032,7 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
     }
 
     if (bh_arr_length(slns) != bh_arr_length(ps_type->poly_params)) {
-        onyx_report_error(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d",
+        onyx_report_error(pos, Error_Critical, "Wrong number of arguments for '%s'. Expected %d, got %d.",
             ps_type->name,
             bh_arr_length(ps_type->poly_params),
             bh_arr_length(slns));
