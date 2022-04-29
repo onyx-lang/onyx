@@ -1075,6 +1075,13 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
 
     if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(pbinop);
 
+    if (binop->left->type == NULL && binop->left->entity && binop->left->entity->state <= Entity_State_Check_Types) {
+        YIELD(binop->left->token->pos, "Waiting for this type to be known");
+    }
+    if (binop->right->type == NULL && binop->right->entity && binop->right->entity->state <= Entity_State_Check_Types) {
+        YIELD(binop->right->token->pos, "Waiting for this type to be known");
+    }
+
     // NOTE: Comparision operators and boolean operators are handled separately.
     if (binop_is_compare(binop->operation))
         return check_binaryop_compare(pbinop);

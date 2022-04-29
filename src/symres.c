@@ -39,7 +39,7 @@ typedef enum SymresStatus {
 
 static SymresStatus symres_type(AstType** type);
 static SymresStatus symres_local(AstLocal** local);
-static SymresStatus symres_call(AstCall* call);
+static SymresStatus symres_call(AstCall** pcall);
 static SymresStatus symres_size_of(AstSizeOf* so);
 static SymresStatus symres_align_of(AstAlignOf* so);
 static SymresStatus symres_field_access(AstFieldAccess** fa);
@@ -272,9 +272,17 @@ static SymresStatus symres_arguments(Arguments* args) {
     return Symres_Success;
 }
 
-static SymresStatus symres_call(AstCall* call) {
+static SymresStatus symres_call(AstCall** pcall) {
+    AstCall *call = *pcall;
     SYMRES(expression, (AstTyped **) &call->callee);
     SYMRES(arguments, &call->args);
+
+    AstNode* callee = strip_aliases((AstNode *) call->callee);
+    if (callee->kind == Ast_Kind_Poly_Struct_Type) {
+        *pcall = (AstCall *) convert_call_to_polycall(call);
+        SYMRES(type, (AstType **) pcall);
+        return Symres_Success;
+    }
 
     return Symres_Success;
 }
@@ -458,6 +466,24 @@ static SymresStatus symres_array_literal(AstArrayLiteral* al) {
     return Symres_Success;
 }
 
+static SymresStatus symres_address_of(AstAddressOf** paof) {
+    AstAddressOf *aof = (AstAddressOf *) *paof;
+    SYMRES(expression, &aof->expr);
+
+    AstTyped *expr = (AstTyped *) strip_aliases((AstNode *) aof->expr);
+    if (node_is_type((AstNode *) expr)) {
+        AstPointerType *pt = onyx_ast_node_new(context.ast_alloc, sizeof(AstPointerType), Ast_Kind_Pointer_Type);
+        pt->token     = aof->token;
+        pt->elem      = (AstType *) expr;
+        pt->__unused  = aof->next;
+        *paof         = (AstAddressOf *) pt;
+        SYMRES(type, (AstType **) &pt);
+        return Symres_Success;
+    }
+
+    return Symres_Success;
+}
+
 static SymresStatus symres_expression(AstTyped** expr) {
     if (node_is_type((AstNode *) *expr)) {
         SYMRES(type, (AstType **) expr);
@@ -473,16 +499,16 @@ static SymresStatus symres_expression(AstTyped** expr) {
             break;
 
         case Ast_Kind_Unary_Op:     SYMRES(unaryop, (AstUnaryOp **) expr); break;
-        case Ast_Kind_Call:         SYMRES(call, (AstCall *) *expr); break;
+        case Ast_Kind_Call:         SYMRES(call, (AstCall **) expr); break;
         case Ast_Kind_Argument:     SYMRES(expression, &((AstArgument *) *expr)->value); break;
         case Ast_Kind_Block:        SYMRES(block, (AstBlock *) *expr); break;
-        case Ast_Kind_Address_Of:   SYMRES(expression, &((AstAddressOf *)(*expr))->expr); break;
         case Ast_Kind_Dereference:  SYMRES(expression, &((AstDereference *)(*expr))->expr); break;
         case Ast_Kind_Field_Access: SYMRES(field_access, (AstFieldAccess **) expr); break;
         case Ast_Kind_Pipe:         SYMRES(pipe, (AstBinaryOp **) expr); break;
         case Ast_Kind_Method_Call:  SYMRES(method_call, (AstBinaryOp **) expr); break;
         case Ast_Kind_Size_Of:      SYMRES(size_of, (AstSizeOf *)*expr); break;
         case Ast_Kind_Align_Of:     SYMRES(align_of, (AstAlignOf *)*expr); break;
+        case Ast_Kind_Address_Of:   SYMRES(address_of, (AstAddressOf **) expr); break;
         case Ast_Kind_Alias: {
             AstAlias *alias = (AstAlias *) *expr;
             SYMRES_INVISIBLE(expression, alias, &alias->alias);
@@ -893,7 +919,7 @@ static SymresStatus symres_statement(AstNode** stmt, b32 *remove) {
         case Ast_Kind_While:       SYMRES(while, (AstIfWhile *) *stmt);                  break;
         case Ast_Kind_For:         SYMRES(for, (AstFor *) *stmt);                        break;
         case Ast_Kind_Switch:      SYMRES(switch, (AstSwitch *) *stmt);                  break;
-        case Ast_Kind_Call:        SYMRES(call, (AstCall *) *stmt);                      break;
+        case Ast_Kind_Call:        SYMRES(call, (AstCall **) stmt);                      break;
         case Ast_Kind_Argument:    SYMRES(expression, (AstTyped **) &((AstArgument *) *stmt)->value); break;
         case Ast_Kind_Block:       SYMRES(block, (AstBlock *) *stmt);                    break;
         case Ast_Kind_Defer:       SYMRES(statement, &((AstDefer *) *stmt)->stmt, NULL); break;
