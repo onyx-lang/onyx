@@ -2987,6 +2987,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Foreign_Block: {
+            AstForeignBlock *fb = (AstForeignBlock *) expr;
+            WID(WI_I32_CONST, fb->foreign_block_number);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -3721,6 +3727,13 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
         return;
     }
 
+    if (foreign_blocks_node != NULL && (AstMemRes *) foreign_blocks_node == memres) {
+        u64 foreign_blocks_location = build_foreign_blocks(mod);
+        memres->addr = foreign_blocks_location;
+
+        return;
+    }
+
     if (memres->threadlocal) {
         memres->addr = mod->next_tls_offset;
         bh_align(memres->addr, alignment);
@@ -3860,6 +3873,9 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .libraries = NULL,
         .library_paths = NULL,
+
+        .foreign_blocks = NULL,
+        .next_foreign_block_idx = 0,
     };
 
     bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
@@ -3892,6 +3908,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.deferred_stmts, 4);
     bh_arr_new(global_heap_allocator, module.local_allocations, 4);
     bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
+    bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
 
     if (context.options->use_multi_threading) {
         WasmImport mem_import = {
@@ -3994,6 +4011,12 @@ void emit_entity(Entity* ent) {
             if (ent->expr->kind == Ast_Kind_Directive_Library) {
                 bh_arr_push(module->libraries, ent->library->library_name);
             }
+            break;
+        }
+
+        case Entity_Type_Foreign_Block: {
+            ent->foreign_block->foreign_block_number = module->next_foreign_block_idx++;
+            bh_arr_push(module->foreign_blocks, (AstForeignBlock *) ent->foreign_block);
             break;
         }
 

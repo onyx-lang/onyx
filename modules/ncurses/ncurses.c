@@ -1,15 +1,12 @@
 
 #include "ncurses.h"
 
-WINDOW *__get_stdscr() {
-    return stdscr;
-}
+#define __get_stdscr() ((unsigned long int) stdscr)
 
 void __get_yx    (WINDOW *w, int *y, int *x) { getyx(w, *y, *x); }
 void __get_par_yx(WINDOW *w, int *y, int *x) { getparyx(w, *y, *x); }
 void __get_beg_yx(WINDOW *w, int *y, int *x) { getbegyx(w, *y, *x); }
 void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
-
 
 
 #define ONYX_LIBRARY_NAME onyx_ncurses
@@ -522,7 +519,7 @@ ONYX_DEF(addchstr, (WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(addchnstr, (WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(addchnstr, (WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(addchnstr(ONYX_PTR(P(0, i32)), P(1, i32)));
     return NULL;
 }
@@ -532,7 +529,7 @@ ONYX_DEF(waddchstr, (WASM_I64, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(waddchnstr, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(waddchnstr, (WASM_I64, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(waddchnstr((WINDOW *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32)));
     return NULL;
 }
@@ -542,7 +539,7 @@ ONYX_DEF(mvaddchstr, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(mvaddchnstr, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(mvaddchnstr, (WASM_I32, WASM_I32, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(mvaddchnstr(P(0, i32), P(1, i32), ONYX_PTR(P(2, i32)), P(3, i32)));
     return NULL;
 }
@@ -552,7 +549,7 @@ ONYX_DEF(mvwaddchstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(mvwaddchnstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(mvwaddchnstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(mvwaddchnstr((WINDOW *) P(0, i64), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32)));
     return NULL;
 }
@@ -562,7 +559,7 @@ ONYX_DEF(addstr, (WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(addnstr, (WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(addnstr, (WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(addnstr(ONYX_PTR(P(0, i32)), P(1, i32)));
     return NULL;
 }
@@ -572,7 +569,7 @@ ONYX_DEF(waddstr, (WASM_I64, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(waddnstr, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(waddnstr, (WASM_I64, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(waddnstr((WINDOW *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32)));
     return NULL;
 }
@@ -582,7 +579,7 @@ ONYX_DEF(mvaddstr, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(mvaddnstr, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(mvaddnstr, (WASM_I32, WASM_I32, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(mvaddnstr(P(0, i32), P(1, i32), ONYX_PTR(P(2, i32)), P(3, i32)));
     return NULL;
 }
@@ -592,7 +589,7 @@ ONYX_DEF(mvwaddstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(mvwaddnstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(mvwaddnstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(mvwaddnstr((WINDOW *) P(0, i64), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32)));
     return NULL;
 }
@@ -892,7 +889,7 @@ ONYX_DEF(getstr, (WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(getnstr, (WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(getnstr, (WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(getnstr(ONYX_PTR(P(0, i32)), P(1, i32)));
     return NULL;
 }
@@ -902,7 +899,7 @@ ONYX_DEF(wgetstr, (WASM_I64, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(wgetnstr, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(wgetnstr, (WASM_I64, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(wgetnstr((WINDOW *) P(0, i64), ONYX_PTR(P(1, i32)), P(2, i32)));
     return NULL;
 }
@@ -912,7 +909,7 @@ ONYX_DEF(mvgetstr, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(mvgetnstr, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(mvgetnstr, (WASM_I32, WASM_I32, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(mvgetnstr(P(0, i32), P(1, i32), ONYX_PTR(P(2, i32)), P(3, i32)));
     return NULL;
 }
@@ -922,7 +919,7 @@ ONYX_DEF(mvwgetstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(mvwgetnstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(mvwgetnstr, (WASM_I64, WASM_I32, WASM_I32, WASM_I32,WASM_I32), (WASM_I32)) {
     results->data[0] = WASM_I32_VAL(mvwgetnstr((WINDOW *) P(0, i64), P(1, i32), P(2, i32), ONYX_PTR(P(3, i32)), P(4, i32)));
     return NULL;
 }
@@ -1297,8 +1294,8 @@ ONYX_DEF(mousemask, (WASM_I64, WASM_I32), (WASM_I64)) {
     return NULL;
 }
 
-ONYX_DEF(wenclone, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
-    results->data[0] = WASM_I32_VAL(wenclone((WINDOW *) P(0, i64), P(1, i32), P(2, i32)));
+ONYX_DEF(wenclose, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
+    results->data[0] = WASM_I32_VAL(wenclose((WINDOW *) P(0, i64), P(1, i32), P(2, i32)));
     return NULL;
 }
 
@@ -1616,7 +1613,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(getmouse)
     ONYX_FUNC(ungetmouse)
     ONYX_FUNC(mousemask)
-    ONYX_FUNC(wenclone)
+    ONYX_FUNC(wenclose)
     ONYX_FUNC(mouse_trafo)
     ONYX_FUNC(wmouse_trafo)
     ONYX_FUNC(mouseinterval)

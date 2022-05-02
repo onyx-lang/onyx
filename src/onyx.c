@@ -50,6 +50,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\t--multi-threaded        Enables multi-threading for this compilation.\n"
     "\t--doc <doc_file>\n"
+    "\t--generate-foreign-info\n"
     "\n"
     "Developer flags:\n"
     "\t--print-function-mappings Prints a mapping from WASM function index to source location.\n"
@@ -150,6 +151,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--multi-threaded")) {
                 options.use_multi_threading = 1;
+            }
+            else if (!strcmp(argv[i], "--generate-foreign-info")) {
+                options.generate_foreign_info = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);

@@ -1624,7 +1624,12 @@ void symres_entity(Entity* ent) {
         case Entity_Type_Macro:                   ss = symres_macro(ent->macro); break;
         case Entity_Type_Constraint_Check:        ss = symres_constraint(ent->constraint); break;
         case Entity_Type_Polymorph_Query:         ss = symres_polyquery(ent->poly_query); break;
-        case Entity_Type_Foreign_Block:           ss = symres_foreign_block(ent->foreign_block); break;
+        case Entity_Type_Foreign_Block:           ss = symres_foreign_block(ent->foreign_block);
+                                                  if (context.options->generate_foreign_info) {
+                                                      next_state = Entity_State_Check_Types;
+                                                      ss = Symres_Success;
+                                                  }
+                                                  break;
 
         default: break;
     }

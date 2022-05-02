@@ -596,5 +596,153 @@ u64 build_type_table(OnyxWasmModule* module) {
 
     return global_data_ptr;
 
+#undef WRITE_SLICE
+#undef WRITE_PTR
+#undef PATCH
+}
+
+
+
+static b32 build_foreign_blocks(OnyxWasmModule* module) {
+    bh_arr(u32) base_patch_locations=NULL;
+    bh_arr_new(global_heap_allocator, base_patch_locations, 256);
+
+#define PATCH (bh_arr_push(base_patch_locations, foreign_buffer.length))
+#define WRITE_PTR(val) \
+    bh_buffer_align(&foreign_buffer, POINTER_SIZE); \
+    PATCH; \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&foreign_buffer, val); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&foreign_buffer, val); 
+#define WRITE_SLICE(ptr, count) \
+    WRITE_PTR(ptr); \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&foreign_buffer, count); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&foreign_buffer, count); 
+
+    // This is the data behind the "type_table" slice in type_info.onyx
+    #if (POINTER_SIZE == 4)
+        #define Foreign_Block_Type u32
+    #else
+        #define Foreign_Block_Type u64
+    #endif
+    u32 block_count = bh_arr_length(module->foreign_blocks);
+    Foreign_Block_Type* foreign_info = bh_alloc_array(global_heap_allocator, Foreign_Block_Type, block_count); // HACK
+    memset(foreign_info, 0, block_count * sizeof(Foreign_Block_Type));
+
+    bh_buffer foreign_buffer;
+    bh_buffer_init(&foreign_buffer, global_heap_allocator, 4096);
+
+    // 
+    // This is necessary because 0 is an invalid offset to store in this
+    // buffer, as 0 will map to NULL. This could be a single byte insertion,
+    // but 64 bytes keeps better alignment.
+    bh_buffer_write_u64(&foreign_buffer, 0);
+
+    u32 index = 0;
+    bh_arr_each(AstForeignBlock *, pfb, module->foreign_blocks) {
+        AstForeignBlock *fb = *pfb;
+
+        u32 funcs_length = 0;
+
+        u32 *name_offsets = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
+        u32 *name_lengths = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
+        u32 *func_types   = bh_alloc_array(global_scratch_allocator, u32, shlen(fb->scope->symbols));
+
+        fori (i, 0, shlen(fb->scope->symbols)) {
+            AstFunction *func = (AstFunction *) fb->scope->symbols[i].value;
+            if (func->kind != Ast_Kind_Function) continue;
+
+            u32 func_name_base = foreign_buffer.length;
+            u32 func_name_length = func->foreign_name->length;
+            bh_buffer_append(&foreign_buffer, func->foreign_name->text, func_name_length);
+
+            name_offsets[funcs_length] = func_name_base;
+            name_lengths[funcs_length] = func_name_length;
+            func_types[funcs_length]   = func->type->id;
+            funcs_length++;
+        }
+
+        bh_buffer_align(&foreign_buffer, 8);
+        u32 funcs_base = foreign_buffer.length;
+
+        fori (i, 0, (i64) funcs_length) {
+            bh_buffer_align(&foreign_buffer, POINTER_SIZE);
+            WRITE_SLICE(name_offsets[i], name_lengths[i]);
+            bh_buffer_write_u32(&foreign_buffer, func_types[i]);
+        }
+
+        u32 name_base = foreign_buffer.length;
+        u32 name_length = fb->module_name->length;
+        bh_buffer_append(&foreign_buffer, fb->module_name->text, name_length);
+        bh_buffer_align(&foreign_buffer, 8);
+
+        foreign_info[index] = foreign_buffer.length;
+        WRITE_SLICE(name_base, name_length);
+        WRITE_SLICE(funcs_base, funcs_length);
+        index++;
+    }
+
+
+    if (context.options->verbose_output == 1) {
+        bh_printf("Foreign blocks size: %d bytes.\n", foreign_buffer.length);
+    }
+
+    u32 offset = module->next_datum_offset;
+    bh_align(offset, 8);
+
+    u64 foreign_blocks_location = offset;
+
+    WasmDatum foreign_blocks_data = {
+        .offset = offset,
+        .length = block_count * POINTER_SIZE,
+        .data = foreign_info,
+    };
+    bh_arr_push(module->data, foreign_blocks_data);
+
+    offset += foreign_blocks_data.length;
+
+    fori (i, 0, block_count) {
+        foreign_info[i] += offset;
+    }
+
+    bh_arr_each(u32, patch_loc, base_patch_locations) {
+        if (POINTER_SIZE == 4) {
+            u32* loc = bh_pointer_add(foreign_buffer.data, *patch_loc);
+            if (*loc == 0) continue;
+            
+            *loc += offset;
+        }
+        if (POINTER_SIZE == 8) {
+            u64* loc = bh_pointer_add(foreign_buffer.data, *patch_loc);
+            if (*loc == 0) continue;
+            
+            *loc += offset;
+        }
+    }
+
+    WasmDatum foreign_blocks_info_data = {
+        .offset = offset,
+        .length = foreign_buffer.length,
+        .data = foreign_buffer.data,
+    };
+    bh_arr_push(module->data, foreign_blocks_info_data);
+    offset += foreign_blocks_info_data.length;
+
+    u64 global_data_ptr = offset;
+
+    Foreign_Block_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+    tmp_data[0] = foreign_blocks_location;
+    tmp_data[1] = block_count;
+    WasmDatum foreign_blocks_global_data = {
+        .offset = offset,
+        .length = 2 * POINTER_SIZE,
+        .data = tmp_data,
+    };
+    bh_arr_push(module->data, foreign_blocks_global_data);
+    offset += foreign_blocks_global_data.length;
+
+    module->next_datum_offset = offset;
+
+    return global_data_ptr;
+
 #undef PATCH
 }

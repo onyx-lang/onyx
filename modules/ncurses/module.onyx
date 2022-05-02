@@ -2,32 +2,18 @@ package ncurses
 
 use package core {cptr, conv, string}
 
+#local Building_Library :: #defined ((package runtime).Generated_Foreign_Info)
 
-#library "onyx_ncurses"
-#foreign "onyx_ncurses" {
-
-/*
-use CBindings
-CBindings :: struct {
-    name :: "onyx_ncurses"
-    file_prefix :: """
-#include "ncurses.h"
-
-WINDOW *__get_stdscr() {
-    return stdscr;
+#if Building_Library {
+    // "Forward" the foreign block info to the public scope
+    // if foreign block information was generated.
+    foreign_block :: __foreign_block
+} else {
+    // Otherwise, require the library to be included.
+    #library "onyx_ncurses"
 }
 
-void __get_yx    (WINDOW *w, int *y, int *x) { getyx(w, *y, *x); }
-void __get_par_yx(WINDOW *w, int *y, int *x) { getparyx(w, *y, *x); }
-void __get_beg_yx(WINDOW *w, int *y, int *x) { getbegyx(w, *y, *x); }
-void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
-
-"""
-    cast_map :: (#type struct {type: type_expr; name: str;}).[
-        .{ WINDOW, "WINDOW *" },
-   ]
-*/
-
+#local __foreign_block :: #foreign "onyx_ncurses" {
     // initscr
     initscr   :: () -> WINDOW ---
     endwin    :: () -> i32    ---
@@ -356,7 +342,7 @@ void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
     getmouse :: (@out event: ^MEvent) -> i32 ---
     ungetmouse :: (@out event: ^MEvent) -> i32 ---
     mousemask :: (newmask: mmask_t, @out oldmask: ^mmask_t) -> mmask_t ---
-    wenclone :: (w: WINDOW, y, x: i32) -> bool ---
+    wenclose :: (w: WINDOW, y, x: i32) -> bool ---
     mouse_trafo :: (py, px: ^i32, to_screen: bool) -> bool ---
     wmouse_trafo :: (w: WINDOW, py, px: ^i32, to_screen: bool) -> bool ---
     mouseinterval :: (erval: i32) -> i32 ---
@@ -376,6 +362,21 @@ void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
     NCURSES_ACS  :: (a: i32) -> chtype ---
 }
 
+// Types have to always be included
+WINDOW :: #distinct u64
+SCREEN :: #distinct u64
+chtype :: u32
+attr_t :: u32
+
+mmask_t :: u64
+MEvent :: struct {
+    id: u16;
+    x, y, z: i32;
+    bstate: mmask_t;
+}
+
+
+#if !Building_Library {
 
 stdscr    :: __get_stdscr
 getyx     :: __get_yx
@@ -429,18 +430,6 @@ mvwprintw :: (w: WINDOW, y, x: i32, fmt: str, args: ..any) {
     buf: [1024] u8;
     to_output := conv.format_va(buf, fmt, args);
     mvwaddnstr(w, y, x, to_output);
-}
-
-WINDOW :: #distinct u64
-SCREEN :: #distinct u64
-chtype :: u32
-attr_t :: u32
-
-mmask_t :: u64
-MEvent :: struct {
-    id: u16;
-    x, y, z: i32;
-    bstate: mmask_t;
 }
 
 BUTTON1_RELEASED       :: 0x01 << (0 * 6)
@@ -601,3 +590,6 @@ KEY_SUSPEND :: 0627		/* suspend key */
 KEY_UNDO :: 0630		/* undo key */
 KEY_MOUSE :: 0631		/* Mouse event has occurred */
 
+
+
+} // !Building_Library

@@ -1329,6 +1329,8 @@ struct AstForeignBlock {
     Scope* scope;
     OnyxToken *module_name;
     bh_arr(struct Entity *) captured_entities;
+
+    u32 foreign_block_number;
 };
 
 typedef enum EntityState {
@@ -1507,6 +1509,7 @@ struct CompileOptions {
     
     b32 use_post_mvp_features : 1;
     b32 use_multi_threading   : 1;
+    b32 generate_foreign_info : 1;
 
     Runtime runtime;
 
@@ -1591,6 +1594,8 @@ extern AstType  *builtin_callsite_type;
 extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
 extern AstTyped *type_table_node;
+extern AstTyped *foreign_blocks_node;
+extern AstType  *foreign_block_type;
 extern AstFunction *builtin_initialize_data_segments;
 extern AstFunction *builtin_run_init_procedures;
 extern bh_arr(AstFunction *) init_procedures;

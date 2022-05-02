@@ -1,62 +1,91 @@
-#load "core/std"
+package c_binding
 
 use package core
 use package simd
 
-CBindings :: (package ncurses).CBindings
-
-#if !#defined(CBindings) {
-    #error "Expected to find CBindings structure";
+#if !#defined((package runtime).Generated_Foreign_Info) {
+    #error "Please run this script with the '--generate-foreign-info' flag."
 }
 
+Cast_Mapping :: struct {
+    type: type_expr;
+    name: str;
+}
 
+Binding_Config :: struct {
+    foreign_block: type_info.foreign_block;
+    preamble: [] str;
+    output_file: str;
+    cast_map: [] Cast_Mapping;
+}
 
-main :: (args: [] cstr) {
-    println(CBindings.file_prefix);
+build_c_binding :: (use binding_config: Binding_Config) -> bool {
+    for file: os.with_file(output_file, .Write) {
+        writer := io.writer_make(file);
+        fb := type_info.get_foreign_block(foreign_block);
 
-    printf("""
+        write_file_introduction(^writer, preamble, fb.module_name);
+
+        for fb.funcs {
+            write_function_body(^writer, it, cast_map);
+        }
+
+        write_library_block(^writer, fb.funcs);
+    }
+
+    return true;
+}
+
+write_file_introduction :: (writer: ^io.Writer, preamble: [] str, name: str) {
+    for text: preamble {
+        io.write_format(writer, "{}\n", text);
+    }
+
+    io.write_format(writer, """
 #define ONYX_LIBRARY_NAME {}
 #include "onyx_library.h"
 
 #define P(i, k) (params->data[i].of.k)
 
-""", CBindings.name);
-
-    use type_info;
-    bind_info := cast(^Type_Info_Struct) get_type_info(CBindings);
-    for bind_info.methods {
-        method_type := it.func.type;
-        method_info := cast (^Type_Info_Function) get_type_info(method_type);
-        assert(method_info.kind == .Function, "Expected function type.");
-
-        printf("ONYX_DEF({}, (", it.name);
-        i := 0;
-        for method_info.parameter_types {
-            print_type_encoding(it);
-
-            if i != method_info.parameter_types.count - 1 {
-                print(", ");
-            }
-            i += 1;
-        }
-
-        print("), (");
-        print_type_encoding(method_info.return_type);
-        print(")) {\n");
-        print_body(it.name, method_info);
-        print("}\n\n");
-    }
-
-    print("\n\n");
-    print("ONYX_LIBRARY {\n");
-    for bind_info.methods {
-        printf("    ONYX_FUNC({})\n", it.name);
-    }
-    print("    NULL\n");
-    print("};");
+""", name);
 }
 
-print_body :: (method_name, method_info) => {
+write_function_body :: (writer, ff, cast_map) => {
+    use type_info;
+
+    method_type := ff.type;
+    method_info := cast (^Type_Info_Function) get_type_info(method_type);
+    assert(method_info.kind == .Function, "Expected function type.");
+
+    io.write_format(writer, "ONYX_DEF({}, (", ff.name);
+    i := 0;
+    for method_info.parameter_types {
+        io.write(writer, type_encoding(it));
+
+        if i != method_info.parameter_types.count - 1 {
+            io.write(writer, ", ");
+        }
+        i += 1;
+    }
+
+    io.write(writer, "), (");
+    io.write(writer, type_encoding(method_info.return_type));
+    io.write(writer, ")) {\n");
+    print_body(writer, ff.name, method_info, cast_map);
+    io.write(writer, "}\n\n");
+}
+
+write_library_block :: (writer, funcs) => {
+    io.write(writer, "\n\n");
+    io.write(writer, "ONYX_LIBRARY {\n");
+    for funcs {
+        io.write_format(writer, "    ONYX_FUNC({})\n", it.name);
+    }
+    io.write(writer, "    NULL\n");
+    io.write(writer, "};");
+}
+
+print_body :: (writer, method_name, method_info, cast_map) => {
     use type_info;
     call := io.dynamic_string_stream_make();
     defer io.dynamic_string_stream_free(^call);
@@ -73,7 +102,7 @@ print_body :: (method_name, method_info) => {
 
         } else {
             matched := false;
-            for^ m: CBindings.cast_map {
+            for^ m: cast_map {
                 if m.type == it {
                     io.write_format(^callw, "({}) P({}, {})", m.name, param_num, type_to_wasm_type(it));
                     matched = true;
@@ -91,14 +120,14 @@ print_body :: (method_name, method_info) => {
     call_str := call->to_str();
     wasm_return_type := type_to_wasm_type(method_info.return_type);
     switch wasm_return_type {
-        case ""    do printf("    {}({});\n", method_name, call_str[0..call_str.count-2]);
-        case "i32" do printf("    results->data[0] = WASM_I32_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
-        case "i64" do printf("    results->data[0] = WASM_I64_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
-        case "f32" do printf("    results->data[0] = WASM_F32_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
-        case "f64" do printf("    results->data[0] = WASM_F64_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
+        case ""    do io.write_format(writer, "    {}({});\n", method_name, call_str[0..call_str.count-2]);
+        case "i32" do io.write_format(writer, "    results->data[0] = WASM_I32_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
+        case "i64" do io.write_format(writer, "    results->data[0] = WASM_I64_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
+        case "f32" do io.write_format(writer, "    results->data[0] = WASM_F32_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
+        case "f64" do io.write_format(writer, "    results->data[0] = WASM_F64_VAL({}({}));\n", method_name, call_str[0..call_str.count-2]);
     }
 
-    printf("    return NULL;\n");
+    io.write_format(writer, "    return NULL;\n");
 }
 
 type_to_wasm_type :: (t: type_expr) -> str {
@@ -147,47 +176,49 @@ type_to_wasm_type :: (t: type_expr) -> str {
     return "";
 }
 
-print_type_encoding :: (t: type_expr) {
+type_encoding :: (t: type_expr) -> str {
     use type_info;
 
     param_info := get_type_info(t);
     switch param_info.kind {
         case .Basic do switch t {
-            case bool do print("WASM_I32");
-            case i8   do print("WASM_I32");
-            case u8   do print("WASM_I32");
-            case i16  do print("WASM_I32");
-            case u16  do print("WASM_I32");
-            case i32  do print("WASM_I32");
-            case u32  do print("WASM_I32");
-            case i64  do print("WASM_I64");
-            case u64  do print("WASM_I64");
+            case bool do return "WASM_I32";
+            case i8   do return "WASM_I32";
+            case u8   do return "WASM_I32";
+            case i16  do return "WASM_I32";
+            case u16  do return "WASM_I32";
+            case i32  do return "WASM_I32";
+            case u32  do return "WASM_I32";
+            case i64  do return "WASM_I64";
+            case u64  do return "WASM_I64";
 
-            case f32  do print("WASM_F32");
-            case f64  do print("WASM_F64");
+            case f32  do return "WASM_F32";
+            case f64  do return "WASM_F64";
 
-            case rawptr do print("WASM_I32"); // This will have to depend on the pointer size...
+            case rawptr do return "WASM_I32"; // This will have to depend on the pointer size...
             
-            case i8x16, i16x8, i32x4, i64x2, f32x4, f64x2, v128 do print("WASM_V128");
+            case i8x16, i16x8, i32x4, i64x2, f32x4, f64x2, v128 do return "WASM_V128";
 
-            case type_expr do print("WASM_I32");
+            case type_expr do return "WASM_I32";
         }
 
-        case .Pointer do print("WASM_I32"); // This will also have to depend on the pointer size...
+        case .Pointer do return "WASM_I32"; // This will also have to depend on the pointer size...
         case .Function do assert(false, "Passing functions between wasm and c is not yet supported.");
-        case .Array do print("WASM_I32");
-        case .Slice do print("WASM_I32, WASM_I32");
-        case .Enum do print_type_encoding((cast(^Type_Info_Enum) param_info).backing_type);
-        case .Distinct do print_type_encoding((cast(^Type_Info_Distinct) param_info).base_type);
+        case .Array do return "WASM_I32";
+        case .Slice do return "WASM_I32,WASM_I32";
+        case .Enum do return type_encoding((cast(^Type_Info_Enum) param_info).backing_type);
+        case .Distinct do return type_encoding((cast(^Type_Info_Distinct) param_info).base_type);
 
         case .Struct {
             s_info := cast(^Type_Info_Struct) param_info;
             if s_info.members.count == 1 {
-                print_type_encoding(s_info.members[0].type);
+                return type_encoding(s_info.members[0].type);
                 return;
             }
 
             assert(false, "Passing structures between wasm and c is not yet supported.");
         }
     }
+
+    return "";
 }

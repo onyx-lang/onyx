@@ -2817,6 +2817,11 @@ static AstForeignBlock* parse_foreign_block(OnyxParser* parser, OnyxToken *token
     fb->token = token;
     fb->module_name = expect_token(parser, Token_Type_Literal_String);
 
+    //
+    // This has a fun implication that there cannot be foreign blocks in the builtin
+    // or type_info packages, as those are loaded before foreign_block_type has a value.
+    fb->type_node = foreign_block_type;
+
     bh_arr_new(global_heap_allocator, fb->captured_entities, 4);
     bh_arr_push(parser->alternate_entity_placement_stack, &fb->captured_entities);
 

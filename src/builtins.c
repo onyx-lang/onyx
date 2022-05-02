@@ -61,6 +61,8 @@ AstType  *builtin_any_type;
 AstType  *builtin_code_type;
 
 AstTyped    *type_table_node = NULL;
+AstTyped    *foreign_blocks_node = NULL;
+AstType     *foreign_block_type = NULL;
 AstFunction *builtin_initialize_data_segments = NULL;
 AstFunction *builtin_run_init_procedures = NULL;
 bh_arr(AstFunction *) init_procedures = NULL;
@@ -457,7 +459,9 @@ void initialize_builtins(bh_allocator a) {
 
     p = package_lookup("builtin.type_info");
     if (p != NULL) {
-        type_table_node = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
+        type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
+        foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
+        foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
     }
 
     fori (i, 0, Binary_Op_Count) {
@@ -531,5 +535,11 @@ void introduce_build_options(bh_allocator a) {
     arch_type->type_node = Arch_Type;
     add_entities_for_node(NULL, (AstNode *) arch_type, NULL, NULL);
     symbol_builtin_introduce(p->scope, "arch", (AstNode *) arch_type);
+
+    if (context.options->generate_foreign_info) {
+        AstNumLit* foreign_info = make_int_literal(a, 1);
+        foreign_info->type_node = (AstType *) &basic_type_bool;
+        symbol_builtin_introduce(p->scope, "Generated_Foreign_Info", (AstNode *) foreign_info);
+    }
 }
 
