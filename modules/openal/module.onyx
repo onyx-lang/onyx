@@ -2,7 +2,7 @@ package openal
 
 use package core { cptr }
 
-#if ((package runtime).Generated_Foreign_Info) {
+#if #defined((package runtime).Generated_Foreign_Info) {
     foreign_block :: __foreign_block
 } else {
     #library "onyx_openal"
