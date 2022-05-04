@@ -2,13 +2,17 @@ package openal
 
 use package core { cptr }
 
-#library "onyx_openal"
+#if ((package runtime).Generated_Foreign_Info) {
+    foreign_block :: __foreign_block
+} else {
+    #library "onyx_openal"
+}
 
 ALCdevice :: #distinct u64
 ALCcontext :: #distinct u64
 ALCextfunc :: #distinct u64
 
-#foreign "onyx_openal" {
+#local __foreign_block :: #foreign "onyx_openal" {
     alGenBuffers :: (n: i32, buffers: ^u32) -> void ---
     alDeleteBuffers :: (n: i32, buffers: ^u32) -> void ---
     alIsBuffer :: (buffer: u32) -> bool ---
@@ -106,7 +110,7 @@ ALCextfunc :: #distinct u64
     alcCaptureSamples :: (device: ALCdevice, buf: rawptr, samples: i32) -> void ---
 
     // This returns a C-allocated string, which is not supported at the moment.
-    alGetString  :: (device: ALCdevice, param: i32) -> cptr(u8) ---
+    alGetString  :: (param: i32) -> cptr(u8) ---
     alcGetString :: (device: ALCdevice, param: i32) -> cptr(u8) ---
 }
 

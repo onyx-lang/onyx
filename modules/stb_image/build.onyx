@@ -1,7 +1,7 @@
 #load "scripts/c_library"
 use package core
 
-main :: (args) => {
+main :: () {
     path := module_path(#file);
 
     compile_c_file(

@@ -2,8 +2,11 @@ package glfw3
 
 use package core { cptr }
 
-// Temporary path
-#library "onyx_glfw3"
+#if #defined((package runtime).Generated_Foreign_Info) {
+    foreign_block :: __foreign_block
+} else {
+    #library "onyx_glfw3"
+}
 
 // Opaque types that are only used by pointer
 GLFWmonitor_p :: #distinct u64
@@ -32,12 +35,12 @@ GLFWgammaramp :: struct {
      size: i32;
 }
 
-#foreign "onyx_glfw3" {
+#local __foreign_block :: #foreign "onyx_glfw3" {
     glfwInit         :: () -> bool ---
     glfwTerminate    :: () -> void ---
     glfwInitHint     :: (hint, value: i32) -> void ---
     glfwGetVersion   :: (major, minor, rev: ^i32) -> void ---
-    // glfwGetError     :: (description: ^^u8) -> void ---
+    glfwGetError     :: (description: ^cptr(u8)) -> void ---
     // glfwSetErrorCallback :: (f: (i32, cstr) -> void) -> void ---
 
     glfwMakeContextCurrent :: (window: GLFWwindow_p) -> void ---
@@ -67,37 +70,37 @@ GLFWgammaramp :: struct {
     glfwSetScrollCallback :: (window: GLFWwindow_p, export_name: str) -> void ---
     // glfwSetDropCallback
     glfwJoystickPresent :: (jid: i32) -> i32 ---
-    // glfwGetJoystickAxes :: (jid: i32, count: ^i32) -> ^f32 ---
-    // glfwGetJoystickButtons :: (jid: i32, count: ^i32) -> ^u8 ---
-    // glfwGetJoystickHats :: (jid: i32, count: ^i32) -> ^u8 ---
-    // glfwGetJoystickName :: (jid: i32) -> ^u8 ---
-    // glfwGetJoystickGUID :: (jid: i32) -> ^u8 ---
+    glfwGetJoystickAxes :: (jid: i32, count: ^i32) -> cptr(f32) ---
+    glfwGetJoystickButtons :: (jid: i32, count: ^i32) -> cptr(u8) ---
+    glfwGetJoystickHats :: (jid: i32, count: ^i32) -> cptr(u8) ---
+    glfwGetJoystickName :: (jid: i32) -> cptr(u8) ---
+    glfwGetJoystickGUID :: (jid: i32) -> cptr(u8) ---
     glfwSetJoystickUserPointer :: (jid: i32, pointer: rawptr) -> void ---
     glfwGetJoystickUserPointer :: (jid: i32) -> rawptr ---
     glfwJoystickIsGamepad :: (jid: i32) -> i32 ---
     // glfwSetJoystickCallback
     glfwUpdateGamepadMappings :: (string: cstr) -> i32 ---
-    // glfwGetGamepadName :: (jid: i32) -> cstr ---
+    glfwGetGamepadName :: (jid: i32) -> cptr(u8) ---
     glfwGetGamepadState :: (jid: i32, state: ^GLFWgamepadstate) -> i32 ---
     glfwSetClipboardString :: (window: GLFWwindow_p, string: cstr) -> void ---
-    // glfwGetClipboardString :: (window: GLFWwindow_p) -> cstr ---
+    glfwGetClipboardString :: (window: GLFWwindow_p) -> cptr(u8) ---
     glfwGetTime :: () -> f64 ---
     glfwSetTime :: (time: f64) -> void ---
     glfwGetTimerValue :: () -> u64 ---
     glfwGetTimerFrequency :: () -> u64 ---
 
-    glfwGetMonitors :: (max_monitors: i32, out_monitors: ^GLFWmonitor_p, out_count: ^i32) -> void ---
+    glfwGetMonitors :: (out_count: ^i32) -> cptr(GLFWmonitor_p) ---
     glfwGetPrimaryMonitor :: () -> GLFWmonitor_p ---
     glfwGetMonitorPos :: (monitor: GLFWmonitor_p, xpos, ypos: ^i32) -> void ---
     glfwGetMonitorWorkarea :: (monitor: GLFWmonitor_p, xpos, ypos, width, height: ^i32) -> void ---
     glfwGetMonitorPhysicalSize :: (monitor: GLFWmonitor_p, widthMM, heightMM: ^i32) -> void ---
     glfwGetMonitorContentScale :: (monitor: GLFWmonitor_p, xscale, yscale: ^f32) -> void ---
-    // glfwGetMonitorName :: (monitor: GLFWmonitor_p) -> cstr ---
+    glfwGetMonitorName :: (monitor: GLFWmonitor_p) -> cptr(u8) ---
     glfwSetMonitorUserPointer :: (monitor: GLFWmonitor_p, pointer: rawptr) -> void ---
     glfwGetMonitorUserPointer :: (monitor: GLFWmonitor_p) -> rawptr ---
     // glfwSetMonitorCallback
-    glfwGetVideoModes :: (monitor: GLFWmonitor_p, max_modes: i32, out_modes: ^GLFWvidmode, out_count: ^i32) -> void ---
-    glfwGetVideoMode :: (monitor: GLFWmonitor_p, out_mode: ^GLFWvidmode) -> void ---
+    glfwGetVideoModes :: (monitor: GLFWmonitor_p, out_count: ^i32) -> cptr(GLFWvidmode) ---
+    glfwGetVideoMode :: (monitor: GLFWmonitor_p) -> cptr(GLFWvidmode) ---
     glfwSetGamma :: (monitor: GLFWmonitor_p, gamma: f32) -> void ---
     // glfwGetGammaRamp :: (monitor: GLFWmonitor_p, out_ramp: ^GLFWgammramp) -> void ---
     // glfwSetGammaRamp :: (monitor: GLFWmonitor_p, ramp: ^GLFWgammramp) -> void ---
@@ -136,13 +139,18 @@ GLFWgammaramp :: struct {
     glfwPostEmptyEvent :: () -> void ---
     glfwSwapBuffers :: (window: GLFWwindow_p) -> void ---
     glfwSetWindowSizeCallback :: (window: GLFWwindow_p, name: str) -> void ---
+    #local __glfwGetLoadProcAddress :: () -> u64 ---
 }
 
 // This should always be defined right?
 #if #defined(package opengles) {
     use package opengles { GLGetProcAddress }
-    glfwGetLoadProcAddress :: () -> GLGetProcAddress #foreign "onyx_glfw3" "glfwGetLoadProcAddress" ---
+    glfwGetLoadProcAddress :: macro () -> GLGetProcAddress {
+        __glfwGetLoadProcAddress :: __glfwGetLoadProcAddress
+        return ~~ __glfwGetLoadProcAddress();
+    }
 }
+
 
 GLFW_FOCUSED   :: 0x00020001;
 GLFW_ICONIFIED :: 0x00020002;

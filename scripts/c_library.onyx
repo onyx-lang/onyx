@@ -11,7 +11,8 @@ Linux_Compiler :: "/usr/bin/gcc"
 // Call as module_path(#file)
 module_path :: (file_path: str) -> str {
     out := file_path;
-    while out.count > 0 && (out[out.count - 1] != #char "/" && out[out.count - 1] != #char "\\") {
+    while out.count > 0 {
+        if out[out.count - 1] == #char "/" || out[out.count - 1] == #char "\\" do break;
         out.count -= 1;
     }
 

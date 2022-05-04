@@ -217,6 +217,7 @@ send_request :: (connection: ^Connection, req: ^Request) -> Response {
         line := io.read_line(^connection.r, consume_newline=true);
         if line == "\r\n" do break;
         res.headers->parse_header_line(line);
+        delete(^line);
     }
 
     data: [..] u8;
@@ -262,12 +263,12 @@ send_request :: (connection: ^Connection, req: ^Request) -> Response {
 }
 
 
+Key_Value_Pair :: struct { key, value: str; }
+
 
 #local {
     HTTP_VERSION_STRING :: "HTTP/1.1"
     USER_AGENT :: "onyx/0.1.0"
-
-    Key_Value_Pair :: struct { key, value: str; }
 
     Post_Data_Encoding :: enum {
         Json;

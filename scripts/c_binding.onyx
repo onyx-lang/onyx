@@ -12,11 +12,17 @@ Cast_Mapping :: struct {
     name: str;
 }
 
+Impl_Mapping :: struct {
+    name: str;
+    impl: str;
+}
+
 Binding_Config :: struct {
     foreign_block: type_info.foreign_block;
     preamble: [] str;
     output_file: str;
     cast_map: [] Cast_Mapping;
+    custom_implementations: [] Impl_Mapping;
 }
 
 build_c_binding :: (use binding_config: Binding_Config) -> bool {
@@ -27,6 +33,14 @@ build_c_binding :: (use binding_config: Binding_Config) -> bool {
         write_file_introduction(^writer, preamble, fb.module_name);
 
         for fb.funcs {
+            for impl: custom_implementations {
+                if impl.name == it.name {
+                    io.write(^writer, impl.impl);
+                    io.write(^writer, "\n");
+                    continue continue;
+                }
+            }
+
             write_function_body(^writer, it, cast_map);
         }
 
@@ -37,6 +51,10 @@ build_c_binding :: (use binding_config: Binding_Config) -> bool {
 }
 
 write_file_introduction :: (writer: ^io.Writer, preamble: [] str, name: str) {
+    io.write_format(writer, "//\n");
+    io.write_format(writer, "// THIS FILE WAS AUTOMATICALLY GENERATED.\n");
+    io.write_format(writer, "//\n");
+
     for text: preamble {
         io.write_format(writer, "{}\n", text);
     }
