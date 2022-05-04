@@ -35,7 +35,7 @@ main :: () {
         GLFWwindow *window = (GLFWwindow *) params->data[0].of.i64; \
         char name[512]; \
         strncpy(name, ONYX_PTR(params->data[1].of.i32), params->data[2].of.i32); \
-        name[params->data[2].of.i32] = '\0'; \
+        name[params->data[2].of.i32] = '\\0'; \
         __glfw_callback_##callback_name = runtime->wasm_extern_as_func(runtime->wasm_extern_lookup_by_name(runtime->wasm_module, runtime->wasm_instance, name)); \
         callback_name(window, __glfw_##callback_name); \
         return NULL; \
