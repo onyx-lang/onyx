@@ -20,10 +20,6 @@
     #include <poll.h>
 #endif
 
-#ifdef _BH_WINDOWS
-    #include <winsock.h>
-#endif
-
 #include "types.h"  // For POINTER_SIZE
 
 #define ONYX_FILE_ERROR_NONE 0

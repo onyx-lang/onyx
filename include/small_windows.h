@@ -433,3 +433,8 @@ GB_DLL_IMPORT void WINAPI ExitProcess(UINT exit_code);
 
 GB_DLL_IMPORT BOOL  WINAPI SetEnvironmentVariableA(char const *name, char const *value);
 GB_DLL_IMPORT DWORD WINAPI GetEnvironmentVariableA(char const * lpName, char * lpBuffer, DWORD nSize);
+
+GB_DLL_IMPORT short WINAPI htons(short hostshort);
+GB_DLL_IMPORT int   WINAPI htonl(int   hostint);
+GB_DLL_IMPORT short WINAPI ntohs(short netshort);
+GB_DLL_IMPORT int   WINAPI ntohl(int   netint);
