@@ -1045,7 +1045,7 @@ SymresStatus symres_function_header(AstFunction* func) {
             // This makes a lot of assumptions about how these nodes are being processed,
             // and I don't want to start using this with other nodes without considering
             // what the ramifications of that is.
-            assert((*node)->kind == Ast_Kind_Static_If);
+            assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
 
             // Need to curr_scope->parent because curr_scope is the function body scope.
             Scope *scope = curr_scope->parent;
@@ -1575,6 +1575,17 @@ static SymresStatus symres_include(AstInclude* include) {
     return Symres_Goto_Parse;
 }
 
+static SymresStatus symres_file_contents(AstFileContents* fc) {
+    SYMRES(expression, &fc->filename_expr);
+
+    if (fc->filename_expr->kind != Ast_Kind_StrLit) {
+        onyx_report_error(fc->token->pos, Error_Critical, "Expected given expression to be a compile-time stirng literal.");
+        return Symres_Error;
+    }
+
+    return Symres_Success;
+}
+
 void symres_entity(Entity* ent) {
     if (ent->scope) scope_enter(ent->scope);
 
@@ -1595,6 +1606,7 @@ void symres_entity(Entity* ent) {
 
         case Entity_Type_Load_Path:
         case Entity_Type_Load_File:               ss = symres_include(ent->include); break;
+        case Entity_Type_File_Contents:           ss = symres_file_contents(ent->file_contents); break;
 
         case Entity_Type_Foreign_Function_Header:
         case Entity_Type_Temp_Function_Header:

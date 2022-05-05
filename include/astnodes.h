@@ -649,7 +649,7 @@ struct AstFieldAccess   {
 struct AstFileContents  {
     AstTyped_base;
 
-    OnyxToken *filename_token;
+    AstTyped *filename_expr;
     char *filename; // The parsed file name, with '\' sequences removed and resolved to a particular file if possible.
 
     u32 addr, size;

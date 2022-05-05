@@ -24,7 +24,6 @@ static inline b32 should_clone(AstNode* node) {
         case Ast_Kind_Alias:
         case Ast_Kind_Code_Block:
         case Ast_Kind_Macro:
-        case Ast_Kind_File_Contents:
         case Ast_Kind_Symbol:
         case Ast_Kind_Poly_Struct_Type:
         case Ast_Kind_Basic_Type:
@@ -563,6 +562,11 @@ AstNode* ast_clone(bh_allocator a, void* n) {
         case Ast_Kind_Do_Block:
             C(AstDoBlock, block);
             ((AstDoBlock *) nn)->type_node = (AstType *) &basic_type_auto_return;
+            break;
+
+        case Ast_Kind_File_Contents:
+            C(AstFileContents, filename_expr);
+            E(nn);
             break;
     }
 

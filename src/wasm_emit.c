@@ -3762,8 +3762,6 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
 }
 
 static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
-    token_toggle_end(fc->filename_token);
-
     // INVESTIGATE: I think that filename should always be NULL when this function starts because
     // a file contents entity is only processed once and therefore should only go through this step
     // once. But somehow filename isn't NULL occasionally so I have to check for that...
@@ -3773,14 +3771,16 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
         if (parent_file == NULL) parent_file = ".";
 
         char* parent_folder = bh_path_get_parent(parent_file, global_scratch_allocator);
+        
+        OnyxToken *filename_token = fc->filename_expr->token;
 
-        char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, fc->filename_token->length);
-        i32   temp_fn_len = string_process_escape_seqs(temp_fn, fc->filename_token->text, fc->filename_token->length);
+        token_toggle_end(filename_token);
+        char* temp_fn     = bh_alloc_array(global_scratch_allocator, char, filename_token->length);
+        i32   temp_fn_len = string_process_escape_seqs(temp_fn, filename_token->text, filename_token->length);
         char* filename    = bh_lookup_file(temp_fn, parent_folder, "", 0, NULL, 0);
         fc->filename      = bh_strdup(global_heap_allocator, filename);
+        token_toggle_end(filename_token);
     }
-
-    token_toggle_end(fc->filename_token);
 
     i32 index = shgeti(mod->loaded_file_info, fc->filename);
     if (index != -1) {
@@ -3794,7 +3794,7 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     bh_align(offset, 16);
 
     if (!bh_file_exists(fc->filename)) {
-        onyx_report_error(fc->filename_token->pos, Error_Critical,
+        onyx_report_error(fc->token->pos, Error_Critical,
                 "Unable to open file for reading, '%s'.",
                 fc->filename);
         return;

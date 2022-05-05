@@ -545,10 +545,15 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             if (parse_possible_directive(parser, "file_contents")) {
                 AstFileContents* fc = make_node(AstFileContents, Ast_Kind_File_Contents);
                 fc->token = parser->prev - 1;
-                fc->filename_token = expect_token(parser, Token_Type_Literal_String);
+                fc->filename_expr = parse_expression(parser, 0);
                 fc->type = type_make_slice(parser->allocator, &basic_types[Basic_Kind_U8]);
 
-                ENTITY_SUBMIT(fc);
+                if (parser->current_function_stack && bh_arr_length(parser->current_function_stack) > 0) {
+                    bh_arr_push(bh_arr_last(parser->current_function_stack)->nodes_that_need_entities_after_clone, (AstNode *) fc);
+                    
+                } else {
+                    ENTITY_SUBMIT(fc);
+                }
 
                 retval = (AstTyped *) fc;
                 break;

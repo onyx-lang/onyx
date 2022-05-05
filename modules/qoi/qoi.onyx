@@ -1,0 +1,165 @@
+package qoi
+
+Image :: struct {
+    width: u32;
+    height: u32;
+    channels: u32;
+
+    // This is dynamic so it can be freed.
+    data: [] u8;
+}
+
+#local Header :: struct #pack {
+    magic: [4] u8;
+    be_width: u32;
+    be_height: u32;
+    channels: u8;
+    colorspace: u8;
+}
+
+#local Color :: struct {
+    r, g, b, a: u8;
+}
+
+image_free :: (img: Image) {
+    delete(^img.data);
+}
+
+decode_image :: (buf: [] u8, allocator := context.allocator) -> Image {
+    img: Image;
+
+    pos := 0;
+    header := cast(^Header) buf.data;
+    pos += sizeof Header;
+
+    img.width  = swap_endian(header.be_width);
+    img.height = swap_endian(header.be_height);
+    img.channels = ~~header.channels;
+    img.data = make([] u8, img.width * img.height * img.channels, allocator=allocator);
+
+    out_pos := 0;
+
+    prev_pixel := Color.{0, 0, 0, 255};
+    prev_pixels: [64] Color;
+
+    while out_pos < img.data.count {
+        tag := buf[pos];
+        if tag == OP_RGB {
+            prev_pixel.r = buf[pos + 1];
+            prev_pixel.g = buf[pos + 2];
+            prev_pixel.b = buf[pos + 3];
+            output_color(prev_pixel);
+            pos += 4;
+
+        } elseif tag == OP_RGBA {
+            prev_pixel.r = buf[pos + 1];
+            prev_pixel.g = buf[pos + 2];
+            prev_pixel.b = buf[pos + 3];
+            prev_pixel.a = buf[pos + 4];
+            output_color(prev_pixel);
+            pos += 5;
+
+        } elseif tag & OP_MASK == OP_INDEX {
+            index := tag & ~~0x3f;
+
+            p := prev_pixels[index];
+            output_color(p);
+
+            pos += 1;
+            prev_pixel = p;
+
+        } elseif tag & OP_MASK == OP_DIFF {
+            dr := cast(i32) ((tag & ~~0x30) >> 4) - 2;
+            dg := cast(i32) ((tag & ~~0x0c) >> 2) - 2;
+            db := cast(i32) ((tag & ~~0x03)     ) - 2;
+
+            p := prev_pixel;
+            p.r = ~~(~~p.r + dr); @TODO // check that these wrap properly
+            p.g = ~~(~~p.g + dg); @TODO // check that these wrap properly
+            p.b = ~~(~~p.b + db); @TODO // check that these wrap properly
+
+            output_color(p);
+
+            pos += 1;
+            prev_pixel = p;
+
+        } elseif tag & OP_MASK == OP_LUMA {
+            dg    := cast(i32) ((buf[pos + 0] & ~~0x3f)     ) - 32;
+            dr_dg := cast(i32) ((buf[pos + 1] & ~~0xf0) >> 4) - 8;
+            db_dg := cast(i32) ((buf[pos + 1] & ~~0x0f)     ) - 8;
+
+            p := prev_pixel;
+            p.r = ~~(~~p.r + dr_dg + dg); @TODO // check that these wrap properly
+            p.g = ~~(~~p.g + dg); @TODO // check that these wrap properly
+            p.b = ~~(~~p.b + db_dg + dg); @TODO // check that these wrap properly
+
+            output_color(p);
+
+            pos += 2;
+            prev_pixel = p;
+
+        } elseif tag & OP_MASK == OP_RUN {
+            len := (tag & ~~0x3f) + 1;
+            for cast(u32) len {
+                output_color(prev_pixel);
+            }
+            pos += 1;
+        }
+
+        prev_pixels[hash_for_index(prev_pixel)] = prev_pixel;
+    }
+
+    return img;
+}
+
+#local {
+    OP_RGB   :: cast(u8) 0xfe
+    OP_RGBA  :: cast(u8) 0xff
+
+    OP_MASK  :: cast(u8) 0xc0
+    OP_INDEX :: cast(u8) 0x00
+    OP_DIFF  :: cast(u8) 0x40
+    OP_LUMA  :: cast(u8) 0x80
+    OP_RUN   :: cast(u8) 0xc0
+}
+
+#local hash_for_index :: macro (c: Color) -> u32 {
+    return ~~ ((c.r * 3 + c.g * 5 + c.b * 7 + c.a * 11) % 64);
+}
+
+#local swap_endian :: macro (x: u32) -> u32 {
+    y := x;
+    return (((y >> 24) & 0xff)      )
+        |  (((y >> 16) & 0xff) << 8 )
+        |  (((y >>  8) & 0xff) << 16)
+        |  (((y >>  0) & 0xff) << 24);
+}
+
+#local output_color :: macro (c: Color) {
+    if header.colorspace == 1 {
+        img.data[out_pos+0], img.data[out_pos+1], img.data[out_pos+2] = srgb_to_rgb(c);
+
+    } else {
+        img.data[out_pos + 0] = c.r;
+        img.data[out_pos + 1] = c.g;
+        img.data[out_pos + 2] = c.b;
+    }
+
+    if img.channels == 4 do img.data[out_pos + 3] = c.a;
+    out_pos += img.channels;
+}
+
+#local srgb_to_rgb :: macro (c: Color) -> (r: u8, g: u8, b: u8) {
+    sr := cast(f32) cast(u32) c.r / 255;
+    sg := cast(f32) cast(u32) c.g / 255;
+    sb := cast(f32) cast(u32) c.b / 255;
+
+    r := (sr / 12.92) if sr <= 0.0405 else math.pow((sr + 0.055)/1.055, 2.4);
+    g := (sg / 12.92) if sg <= 0.0405 else math.pow((sg + 0.055)/1.055, 2.4);
+    b := (sb / 12.92) if sb <= 0.0405 else math.pow((sb + 0.055)/1.055, 2.4);
+
+    or := cast(u8) cast(u32) math.floor(r * 255);
+    og := cast(u8) cast(u32) math.floor(g * 255);
+    ob := cast(u8) cast(u32) math.floor(b * 255);
+    return or, og, ob;
+}

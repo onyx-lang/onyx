@@ -665,7 +665,10 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     Type* node_type = get_expression_type(node);
     if (types_are_compatible(node_type, type)) return TYPE_MATCH_SUCCESS;
 
-    i64 any_id = type_build_from_ast(context.ast_alloc, builtin_any_type)->id;
+    Type* any_type = type_build_from_ast(context.ast_alloc, builtin_any_type);
+    if (any_type == NULL) return TYPE_MATCH_YIELD;
+    i64 any_id = any_type->id;
+
     if (node_type && node_type->id != any_id && type->id == any_id) return TYPE_MATCH_SUCCESS;
 
     // Here are some of the ways you can unify a node with a type if the type of the
