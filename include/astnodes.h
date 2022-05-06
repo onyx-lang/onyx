@@ -1049,6 +1049,8 @@ typedef struct InterfaceConstraint {
     AstTyped *expr;
     AstType  *expected_type_expr;
     Type     *expected_type;
+
+    b32 invert_condition: 1;
 } InterfaceConstraint;
 
 struct AstInterface {

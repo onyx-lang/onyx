@@ -2141,6 +2141,10 @@ static AstInterface* parse_interface(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return interface;
 
         InterfaceConstraint ic = {0};
+        if (parse_possible_directive(parser, "not")) {
+            ic.invert_condition = 1;
+        }
+
         if (consume_token_if_next(parser, '{')) {
             ic.expr = parse_expression(parser, 0);
 

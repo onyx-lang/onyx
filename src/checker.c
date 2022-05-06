@@ -2754,6 +2754,7 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 InterfaceConstraint new_ic = {0};
                 new_ic.expr = (AstTyped *) ast_clone(context.ast_alloc, (AstNode *) ic->expr);
                 new_ic.expected_type_expr = (AstType *) ast_clone(context.ast_alloc, (AstNode *) ic->expected_type_expr);
+                new_ic.invert_condition = ic->invert_condition;
                 bh_arr_push(constraint->exprs, new_ic);
             }
 
@@ -2793,7 +2794,11 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                     return cs;
                 }
 
-                if (cs == Check_Error) {
+                if (cs == Check_Error && !ic->invert_condition) {
+                    goto constraint_error;
+                }
+
+                if (cs == Check_Success && ic->invert_condition) {
                     goto constraint_error;
                 }
 
@@ -2809,7 +2814,8 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                     }
 
                     TYPE_CHECK(&ic->expr, ic->expected_type) {
-                        goto constraint_error;
+                        if (!ic->invert_condition)
+                            goto constraint_error;
                     }
                 }
 
@@ -2819,11 +2825,12 @@ CheckStatus check_constraint(AstConstraint *constraint) {
               constraint_error:
                 // HACK HACK HACK
                 onyx_clear_errors();
-
                 *constraint->report_status = Constraint_Check_Status_Failed;
                 return Check_Failed;
             }
 
+            // HACK HACK HACK
+            onyx_clear_errors();
             *constraint->report_status = Constraint_Check_Status_Success;
             return Check_Complete;
         }
