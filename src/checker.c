@@ -534,7 +534,7 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
             &call->args);
 
         if (new_callee == NULL) {
-            report_unable_to_match_overload(call);
+            report_unable_to_match_overload(call, ((AstOverloadedFunction *) callee)->overloads);
             return Check_Error;
         }
 

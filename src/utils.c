@@ -483,7 +483,7 @@ AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type*
     return matched_overload;
 }
 
-void report_unable_to_match_overload(AstCall* call) {
+void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overloads) {
     char* arg_str = bh_alloc(global_scratch_allocator, 1024);
     arg_str[0] = '\0';
 
@@ -515,6 +515,20 @@ void report_unable_to_match_overload(AstCall* call) {
     onyx_report_error(call->token->pos, Error_Critical, "Unable to match overloaded function with provided argument types: (%s)", arg_str);
 
     bh_free(global_scratch_allocator, arg_str);
+
+    // CLEANUP SPEED: This currently rebuilds the complete set of overloads every time one is looked up.
+    // This should be cached in the AstOverloadedFunction or somewhere like that.
+    bh_imap all_overloads;
+    bh_imap_init(&all_overloads, global_heap_allocator, bh_arr_length(overloads) * 2);
+    build_all_overload_options(overloads, &all_overloads);
+
+    i32 i = 1;
+    bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+        AstTyped* node = (AstTyped *) strip_aliases((AstNode *) entry->key);
+        onyx_report_error(node->token->pos, Error_Critical, "Here is one of the overloads. %d/%d", i++, bh_arr_length(all_overloads.entries));
+    }
+
+    bh_imap_free(&all_overloads);
 }
 
 

@@ -1689,7 +1689,7 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call);
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
 AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type);
-void report_unable_to_match_overload(AstCall* call);
+void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overloads);
 
 void expand_macro(AstCall** pcall, AstFunction* template);
 AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
