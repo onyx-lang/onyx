@@ -12,7 +12,7 @@
     static void __glfw_##callback_name (GLFWwindow *window, _EXPAND c_args) { \
         wasm_val_t args[] = { WASM_I64_VAL((unsigned long long) window), _EXPAND wasm_args }; \
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args); \
-        wasm_val_vec_t results; \
+        wasm_val_vec_t results = WASM_EMPTY_VEC; \
         runtime->wasm_func_call(__glfw_callback_##callback_name , &args_array, &results); \
     } \
     ONYX_DEF(callback_name, (LONG, PTR, INT), ()) { \

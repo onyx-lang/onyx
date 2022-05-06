@@ -1019,6 +1019,16 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     scope_enter(func->scope);
 
+    if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
+        bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
+            SYMRES(constraint, *constraint);
+        }
+
+        // Return early here to finish checking constraints in the checker.
+        // Will resume here after constraints have been met.
+        return Symres_Success;
+    }
+
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
             SYMRES(expression, &param->default_value);
@@ -1040,7 +1050,7 @@ SymresStatus symres_function_header(AstFunction* func) {
         return Symres_Complete;
     }
 
-    if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0) {
+    if (func->nodes_that_need_entities_after_clone && bh_arr_length(func->nodes_that_need_entities_after_clone) > 0 && func->entity) {
         bh_arr_each(AstNode *, node, func->nodes_that_need_entities_after_clone) {
             // This makes a lot of assumptions about how these nodes are being processed,
             // and I don't want to start using this with other nodes without considering
@@ -1068,12 +1078,6 @@ SymresStatus symres_function_header(AstFunction* func) {
     }
 
     SYMRES(type, &func->return_type);
-
-    if (func->constraints.constraints != NULL) {
-        bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
-            SYMRES(constraint, *constraint);
-        }
-    }
 
     scope_leave();
 

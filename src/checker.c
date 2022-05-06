@@ -2313,6 +2313,15 @@ CheckStatus check_function_header(AstFunction* func) {
     b32 expect_default_param = 0;
     b32 has_had_varargs = 0;
 
+    if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
+        func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
+        CHECK(constraint_context, &func->constraints, func->scope, func->token->pos);
+
+        // All constraints have been met. Return to symbol resolution to finish
+        // looking up all symbols in the function.
+        return Check_Return_To_Symres;
+    }
+
     bh_arr_each(AstParam, param, func->params) {
         AstLocal* local = param->local;
 
@@ -2395,11 +2404,6 @@ CheckStatus check_function_header(AstFunction* func) {
     }
 
     if (func->return_type != NULL) CHECK(type, &func->return_type);
-
-    if (func->constraints.constraints != NULL) {
-        func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
-        CHECK(constraint_context, &func->constraints, func->scope, func->token->pos);
-    }
 
     func->type = type_build_function_type(context.ast_alloc, func);
     if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
