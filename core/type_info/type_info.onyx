@@ -195,6 +195,14 @@ get_type_info :: (t: type_expr) -> ^Type_Info {
 // I have a small feeling I am going to rename "type_info" at some point soon,
 // which makes including this here make even more sense.
 //
+// Alternate names for "type_info" could be:
+//
+//    - reflect
+//    - introspect
+//    - runtime.info   I kind of like this so then things are in the runtime package.
+//                     runtime can be for things defined in the language, whil core
+//                     core can be for standard library like functionality.
+
 
 //
 // Foreign Blocks
