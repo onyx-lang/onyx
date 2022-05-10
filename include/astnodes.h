@@ -39,7 +39,6 @@
     NODE(DirectiveOperator)    \
     NODE(DirectiveExport)      \
     NODE(DirectiveDefined)     \
-    NODE(DirectiveTag)         \
     NODE(DirectiveInit)        \
     NODE(DirectiveLibrary)     \
     NODE(DirectiveRemove)      \
@@ -211,7 +210,6 @@ typedef enum AstKind {
     Ast_Kind_Directive_Operator,
     Ast_Kind_Directive_Export,
     Ast_Kind_Directive_Defined,
-    Ast_Kind_Directive_Tag,
     Ast_Kind_Directive_Init,
     Ast_Kind_Directive_Library,
     Ast_Kind_Directive_Remove,
@@ -1265,13 +1263,6 @@ struct AstDirectiveDefined {
     AstTyped *expr;
 
     b32 is_defined: 1;
-};
-
-struct AstDirectiveTag {
-    AstNode_base;
-
-    AstTyped* expr;
-    AstTyped* tag;
 };
 
 struct AstDirectiveRemove {

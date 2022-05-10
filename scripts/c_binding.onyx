@@ -2,6 +2,7 @@ package c_binding
 
 use package core
 use package simd
+#local info :: package runtime.info
 
 #if !#defined((package runtime).Generated_Foreign_Info) {
     #error "Please run this script with the '--generate-foreign-info' flag."
@@ -18,7 +19,7 @@ Impl_Mapping :: struct {
 }
 
 Binding_Config :: struct {
-    foreign_block: type_info.foreign_block;
+    foreign_block: info.foreign_block;
     preamble: [] str;
     output_file: str;
     cast_map: [] Cast_Mapping;
@@ -28,7 +29,7 @@ Binding_Config :: struct {
 build_c_binding :: (use binding_config: Binding_Config) -> bool {
     for file: os.with_file(output_file, .Write) {
         writer := io.writer_make(file);
-        fb := type_info.get_foreign_block(foreign_block);
+        fb := info.get_foreign_block(foreign_block);
 
         write_file_introduction(^writer, preamble, fb.module_name);
 
@@ -69,7 +70,7 @@ write_file_introduction :: (writer: ^io.Writer, preamble: [] str, name: str) {
 }
 
 write_function_body :: (writer, ff, cast_map) => {
-    use type_info;
+    use info;
 
     method_type := ff.type;
     method_info := cast (^Type_Info_Function) get_type_info(method_type);
@@ -104,7 +105,7 @@ write_library_block :: (writer, funcs) => {
 }
 
 print_body :: (writer, method_name, method_info, cast_map) => {
-    use type_info;
+    use info;
     call := io.dynamic_string_stream_make();
     defer io.dynamic_string_stream_free(^call);
     callw := io.writer_make(^call);
@@ -149,7 +150,7 @@ print_body :: (writer, method_name, method_info, cast_map) => {
 }
 
 type_to_wasm_type :: (t: type_expr) -> str {
-    use type_info;
+    use info;
 
     param_info := get_type_info(t);
     switch param_info.kind {
@@ -195,7 +196,7 @@ type_to_wasm_type :: (t: type_expr) -> str {
 }
 
 type_encoding :: (t: type_expr) -> str {
-    use type_info;
+    use info;
 
     param_info := get_type_info(t);
     switch param_info.kind {

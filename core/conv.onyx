@@ -15,7 +15,7 @@ custom_formatters_initialized :: #init () {
     map.init(^custom_parsers,    default=null_proc);
 
     #if Enable_Custom_Formatters {
-        use type_info;
+        use package runtime.info;
 
         for type_idx: type_table.count {
             type := type_table[type_idx];
@@ -466,7 +466,7 @@ format_va :: #match {}
 }
 
 format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
-    use package builtin.type_info
+    use package runtime.info
     array :: package core.array;
 
     if formatting.dereference {
@@ -579,7 +579,7 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
             // 256 bytes is enough for the name of a type but I'm not entirely sure...
             stream := io.string_stream_make(~~buf);
             writer := io.writer_make(^stream);
-            type_info.write_type_name(^writer, value);
+            write_type_name(^writer, value);
 
             output->write(io.string_stream_to_str(^stream));
         }
@@ -772,7 +772,7 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
 //      parse_any(^x, "12.34");
 parse_any :: #match {}
 #match parse_any (v: any, to_parse: str, string_allocator := context.allocator) -> bool {
-    use type_info;
+    use package runtime.info;
 
     info := get_type_info(v.type);
     if info.kind != .Pointer do return false;
@@ -787,7 +787,7 @@ parse_any :: #match {}
         return custom_parsers[data_type](target, to_parse, string_allocator);
     }
 
-    use type_info;
+    use package runtime.info;
     info := get_type_info(data_type);
 
     switch data_type {

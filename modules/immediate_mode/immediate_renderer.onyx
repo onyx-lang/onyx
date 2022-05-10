@@ -111,7 +111,7 @@ Immediate_Renderer :: struct {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
 
-        offset_of :: (package builtin.type_info).offset_of;
+        offset_of :: (package runtime.info).offset_of;
         IV :: Immediate_Vertex;
 
         // Position

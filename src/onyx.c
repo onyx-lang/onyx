@@ -262,7 +262,13 @@ static void context_init(CompileOptions* opts) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
-        .include = create_load(context.ast_alloc, "core/type_info/type_info"),
+        .include = create_load(context.ast_alloc, "core/runtime/info/types"),
+    }));
+    entity_heap_insert(&context.entities, ((Entity) {
+        .state = Entity_State_Parse_Builtin,
+        .type = Entity_Type_Load_File,
+        .package = NULL,
+        .include = create_load(context.ast_alloc, "core/runtime/info/foreign_blocks"),
     }));
 
     entity_heap_insert(&context.entities, ((Entity) {

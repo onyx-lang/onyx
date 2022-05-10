@@ -2610,67 +2610,6 @@ CheckStatus check_process_directive(AstNode* directive) {
         export->export_name = export->export_name_expr->token;
     }
 
-    if (directive->kind == Ast_Kind_Directive_Tag) {
-        AstDirectiveTag *tag = (AstDirectiveTag *) directive;
-
-        CHECK(expression, &tag->tag);
-
-        switch (tag->expr->kind) {
-            case Ast_Kind_Struct_Type: {
-                AstStructType* st = (AstStructType *) tag->expr;
-
-                bh_arr(AstTyped *) tags = st->meta_tags;
-
-                if (tags == NULL) bh_arr_new(global_heap_allocator, tags, 1);
-                bh_arr_push(tags, tag->tag);
-
-                st->meta_tags = tags;
-
-                return Check_Complete;
-            }
-
-            case Ast_Kind_Field_Access: {
-                AstFieldAccess* fa = (AstFieldAccess *) tag->expr;
-
-                if (fa->expr->kind == Ast_Kind_Struct_Type) {
-                    // CLEANUP: Everything in this case is handled very poorly.
-                    AstStructType* st = (AstStructType *) fa->expr;
-                    Type* s_type = type_build_from_ast(context.ast_alloc, (AstType *) st);
-
-                    bh_arr_each(AstStructMember *, smem, st->members) {
-                        if (token_equals((*smem)->token, fa->token)) {
-                            bh_arr(AstTyped *) tags = (*smem)->meta_tags;
-
-                            if (tags == NULL) bh_arr_new(global_heap_allocator, tags, 1);
-                            bh_arr_push(tags, tag->tag);
-
-                            (*smem)->meta_tags = tags;
-
-                            bh_arr_each(StructMember *, smem_type, s_type->Struct.memarr) {
-                                if (token_text_equals((*smem)->token, (*smem_type)->name)) {
-                                    (*smem_type)->meta_tags = tags;
-                                    break;
-                                }
-                            }
-
-                            return Check_Complete;
-                        }
-                    }
-
-                    onyx_report_error(fa->token->pos, Error_Critical, "'%b' is not a member of '%s'.",
-                        fa->token->text, fa->token->length,
-                        st->name);
-                    return Check_Error;
-                }
-            }
-
-            default: {
-                onyx_report_error(tag->token->pos, Error_Critical, "Cannot tag this.");
-                return Check_Error;
-            }
-        }
-    }
-
     if (directive->kind == Ast_Kind_Directive_Init) {
         AstDirectiveInit *init = (AstDirectiveInit *) directive;
         if ((init->flags & Ast_Flag_Has_Been_Checked) == 0) {

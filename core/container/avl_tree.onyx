@@ -1,0 +1,14 @@
+package core.avl_tree
+
+AVL_Tree :: struct (T: type_expr) {
+    data: T;
+    left, right: ^AVL_Tree(T);
+
+    insert :: (tree: ^AVL_Tree, data: tree.T) {
+        node := new(typeof *tree);
+        node.data = data;
+        node.left = null;
+        node.right = null;
+    }
+}
+

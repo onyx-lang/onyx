@@ -67,7 +67,7 @@ This type represents a custom iterator that can be iterated over using a `for` l
 This type represents the value given by the `#callsite` expression. In practice, you will never use this type because you will just do something like: `f :: (site := #callsite)`
 
 - `any` -
-This type represents any value. It does this by using a data pointer and a type expression. Using the `builtin.type_info` package, you can introspect that type expression to retrieve data about the type, and from there reconstruct how to use the data pointer. See `conv.onyx` for how this works with `printf`.
+This type represents any value. It does this by using a data pointer and a type expression. Using the `runtime.info` package, you can introspect that type expression to retrieve data about the type, and from there reconstruct how to use the data pointer. See `conv.onyx` for how this works with `printf`.
 
 - `Code` -
 This is a dummy type that represents the type of a `#unquote {}` block. It is used when passing code around to macros or procedures, i.e. `f :: macro (body: Code)`

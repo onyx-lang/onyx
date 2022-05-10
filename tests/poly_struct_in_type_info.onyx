@@ -1,5 +1,6 @@
 #load "core/std"
 use package core
+info :: package runtime.info
 
 Base :: struct (T: type_expr) {
     const: i32;
@@ -11,8 +12,8 @@ main :: (args) => {
 
     x := Base(str).{ 10, "Hello" };
     printf("{}\n", x);
-    printf("{}\n", type_info.struct_constructed_from(typeof x, Base));
+    printf("{}\n", info.struct_constructed_from(typeof x, Base));
 
     y: Allocator;
-    printf("{}\n", type_info.struct_constructed_from(typeof y, Base));
+    printf("{}\n", info.struct_constructed_from(typeof y, Base));
 }

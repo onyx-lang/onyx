@@ -24,7 +24,7 @@ u64 build_type_table(OnyxWasmModule* module) {
     if (POINTER_SIZE == 4) bh_buffer_write_u32(&table_buffer, count); \
     if (POINTER_SIZE == 8) bh_buffer_write_u64(&table_buffer, count); 
 
-    // This is the data behind the "type_table" slice in type_info.onyx
+    // This is the data behind the "type_table" slice in runtime/info/types.onyx
     #if (POINTER_SIZE == 4)
         #define Table_Info_Type u32
     #else

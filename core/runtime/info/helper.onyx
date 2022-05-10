@@ -1,4 +1,4 @@
-package builtin.type_info
+package runtime.info
 
 #local io :: package core.io
 
@@ -203,8 +203,6 @@ offset_of :: (T: type_expr, member: str) -> u32 {
 }
 
 get_tags_for_member :: (S: type_expr, member_name: str) -> [] any {
-    use type_info;
-    
     ti := get_type_info(S);
     if ti.kind != .Struct do return .[];
     
@@ -318,8 +316,8 @@ populate_struct_vtable :: (table: ^$Table_Type, struct_type: type_expr, safe := 
 }
 
 for_all_types :: macro (body: Code) {
-    for (package builtin.type_info).type_table.count {
-        type_info := (package builtin.type_info).type_table[it];
+    for (package runtime.info).type_table.count {
+        type_info := (package runtime.info).type_table[it];
         type_idx  : type_expr = ~~ it;
 
         #unquote body;

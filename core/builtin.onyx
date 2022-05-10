@@ -148,6 +148,7 @@ new :: #match {
 
     (T: type_expr, allocator := context.allocator) -> rawptr {
         memory :: package core.memory
+        type_info :: package runtime.info
 
         info := type_info.get_type_info(T);
         size := type_info.size_of(T);

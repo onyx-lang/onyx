@@ -457,7 +457,7 @@ void initialize_builtins(bh_allocator a) {
 
     bh_arr_new(global_heap_allocator, init_procedures, 4);
 
-    p = package_lookup("builtin.type_info");
+    p = package_lookup("runtime.info");
     if (p != NULL) {
         type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
         foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");

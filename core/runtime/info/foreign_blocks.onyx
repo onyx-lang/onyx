@@ -1,0 +1,29 @@
+
+package runtime.info
+
+//
+// Foreign Blocks
+// Because foreign blocks can generate a lot of data, and their data is only
+// really helpful in a handful of cases, you need to pass "--generate-foreign-bindings"
+// to have these arrays filled out.
+//
+
+foreign_block :: #distinct u32
+
+foreign_blocks: [] ^Foreign_Block;
+
+Foreign_Block :: struct {
+    module_name: str;
+    funcs: [] Foreign_Function;
+
+    Foreign_Function :: struct {
+        name: str;
+        type: type_expr;
+    }
+}
+
+get_foreign_block :: (f: foreign_block) -> ^Foreign_Block {
+    if ~~f < cast(i32) 0 || ~~f >= cast(i32) foreign_blocks.count do return null;
+
+    return foreign_blocks[cast(i32) f];
+}

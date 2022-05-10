@@ -1,7 +1,7 @@
 // A lot of these names have been copied from JAI's introspection system. This is just because
 // I don't want to mentally bike-shed about the names; I just want to get something working.
 
-package builtin.type_info
+package runtime.info
 
 type_table : [] ^Type_Info;
 
@@ -189,44 +189,3 @@ get_type_info :: (t: type_expr) -> ^Type_Info {
 }
 
 
-
-
-//
-// I have a small feeling I am going to rename "type_info" at some point soon,
-// which makes including this here make even more sense.
-//
-// Alternate names for "type_info" could be:
-//
-//    - reflect
-//    - introspect
-//    - runtime.info   I kind of like this so then things are in the runtime package.
-//                     runtime can be for things defined in the language, whil core
-//                     core can be for standard library like functionality.
-
-
-//
-// Foreign Blocks
-// Because foreign blocks can generate a lot of data, and their data is only
-// really helpful in a handful of cases, you need to pass "--generate-foreign-bindings"
-// to have these arrays filled out.
-//
-
-foreign_block :: #distinct u32
-
-foreign_blocks: [] ^Foreign_Block;
-
-Foreign_Block :: struct {
-    module_name: str;
-    funcs: [] Foreign_Function;
-
-    Foreign_Function :: struct {
-        name: str;
-        type: type_expr;
-    }
-}
-
-get_foreign_block :: (f: foreign_block) -> ^Foreign_Block {
-    if ~~f < cast(i32) 0 || ~~f >= cast(i32) foreign_blocks.count do return null;
-
-    return foreign_blocks[cast(i32) f];
-}
