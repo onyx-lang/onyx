@@ -32,6 +32,8 @@ typedef struct OnyxParser {
 
     bh_arr(AstFlags) scope_flags;
 
+    bh_arr(AstTyped *) stored_tags;
+
     b32 hit_unexpected_token : 1;
 
     b32 parse_calls : 1;

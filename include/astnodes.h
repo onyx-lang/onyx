@@ -1192,6 +1192,8 @@ struct AstFunction {
 
     ConstraintContext constraints;
 
+    bh_arr(AstTyped *) tags;
+
     // Polymorphic procedures use the following fields
     Scope *parent_scope_of_poly_proc;
     bh_arr(AstPolyParam) poly_params;
@@ -1589,6 +1591,7 @@ extern AstType  *builtin_code_type;
 extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;
+extern AstTyped *tagged_procedures_node;
 extern AstFunction *builtin_initialize_data_segments;
 extern AstFunction *builtin_run_init_procedures;
 extern bh_arr(AstFunction *) init_procedures;
@@ -1769,6 +1772,7 @@ static inline void convert_polyproc_to_function(AstFunction *func) {
     func->poly_scope = NULL;
     func->entity = NULL;
     func->type = NULL;
+    func->tags = NULL;
 }
 
 static inline void convert_function_to_polyproc(AstFunction *func) {

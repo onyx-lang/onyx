@@ -187,6 +187,24 @@ static u64 local_lookup_idx(LocalAllocator* la, u64 value) {
 }
 
 
+static inline b32 should_emit_function(AstFunction* fd) {
+    // NOTE: Don't output intrinsic functions
+    if (fd->is_intrinsic) return 0;
+
+    // NOTE: Don't output functions that are not used, only if
+    // they are also not exported.
+    if ((fd->flags & Ast_Flag_Function_Used) == 0) {
+        if (fd->is_exported || bh_arr_length(fd->tags) > 0) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
 typedef enum StructuredBlockType StructuredBlockType;
 enum StructuredBlockType {
     SBT_Basic_Block,       // Cannot be targeted using jump
@@ -3338,23 +3356,6 @@ static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
     }
 }
 
-static inline b32 should_emit_function(AstFunction* fd) {
-    // NOTE: Don't output intrinsic functions
-    if (fd->is_intrinsic) return 0;
-
-    // NOTE: Don't output functions that are not used, only if
-    // they are also not exported.
-    if ((fd->flags & Ast_Flag_Function_Used) == 0) {
-        if (fd->is_exported) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
 
 static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (!should_emit_function(fd)) return;
@@ -3734,6 +3735,13 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
         return;
     }
 
+    if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
+        u64 tagged_procedures_location = build_tagged_procedures(mod);
+        memres->addr = tagged_procedures_location;
+
+        return;
+    }
+
     if (memres->threadlocal) {
         memres->addr = mod->next_tls_offset;
         bh_align(memres->addr, alignment);
@@ -3876,6 +3884,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
         .foreign_blocks = NULL,
         .next_foreign_block_idx = 0,
+
+        .procedures_with_tags = NULL
     };
 
     bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
@@ -3909,6 +3919,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.local_allocations, 4);
     bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
     bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
+    bh_arr_new(global_heap_allocator, module.procedures_with_tags, 4);
 
     if (context.options->use_multi_threading) {
         WasmImport mem_import = {
@@ -3981,6 +3992,10 @@ void emit_entity(Entity* ent) {
 
             if (ent->function->flags & Ast_Flag_Proc_Is_Null) {
                 if (module->null_proc_func_idx == -1) module->null_proc_func_idx = get_element_idx(module, ent->function);
+            }
+
+            if (ent->function->tags != NULL) {
+                bh_arr_push(module->procedures_with_tags, ent->function);
             }
             break;
 

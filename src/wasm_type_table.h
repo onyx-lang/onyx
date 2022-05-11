@@ -8,7 +8,7 @@ typedef struct StructMethodData {
     u32 data_loc;
 } StructMethodData;
 
-u64 build_type_table(OnyxWasmModule* module) {
+static u64 build_type_table(OnyxWasmModule* module) {
 
     bh_arr(u32) base_patch_locations=NULL;
     bh_arr_new(global_heap_allocator, base_patch_locations, 256);
@@ -603,7 +603,7 @@ u64 build_type_table(OnyxWasmModule* module) {
 
 
 
-static b32 build_foreign_blocks(OnyxWasmModule* module) {
+static u64 build_foreign_blocks(OnyxWasmModule* module) {
     bh_arr(u32) base_patch_locations=NULL;
     bh_arr_new(global_heap_allocator, base_patch_locations, 256);
 
@@ -744,5 +744,153 @@ static b32 build_foreign_blocks(OnyxWasmModule* module) {
 
     return global_data_ptr;
 
+#undef WRITE_SLICE
+#undef WRITE_PTR
 #undef PATCH
 }
+
+
+
+static u64 build_tagged_procedures(OnyxWasmModule *module) {
+    bh_arr(u32) base_patch_locations=NULL;
+    bh_arr_new(global_heap_allocator, base_patch_locations, 256);
+
+#define PATCH (bh_arr_push(base_patch_locations, tag_proc_buffer.length))
+#define WRITE_PTR(val) \
+    bh_buffer_align(&tag_proc_buffer, POINTER_SIZE); \
+    PATCH; \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&tag_proc_buffer, val); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&tag_proc_buffer, val); 
+#define WRITE_SLICE(ptr, count) \
+    WRITE_PTR(ptr); \
+    if (POINTER_SIZE == 4) bh_buffer_write_u32(&tag_proc_buffer, count); \
+    if (POINTER_SIZE == 8) bh_buffer_write_u64(&tag_proc_buffer, count); 
+
+    #if (POINTER_SIZE == 4)
+        #define Tagged_Procedure_Type u32
+    #else
+        #define Tagged_Procedure_Type u64
+    #endif
+    u32 proc_count = bh_arr_length(module->procedures_with_tags);
+    Tagged_Procedure_Type* tag_proc_info = bh_alloc_array(global_heap_allocator, Tagged_Procedure_Type, proc_count); // HACK
+    memset(tag_proc_info, 0, proc_count * sizeof(Tagged_Procedure_Type));
+
+    bh_buffer tag_proc_buffer;
+    bh_buffer_init(&tag_proc_buffer, global_heap_allocator, 4096);
+
+    // 
+    // This is necessary because 0 is an invalid offset to store in this
+    // buffer, as 0 will map to NULL. This could be a single byte insertion,
+    // but 64 bytes keeps better alignment.
+    bh_buffer_write_u64(&tag_proc_buffer, 0);
+
+    u32 index = 0;
+    bh_arr_each(AstFunction *, pfunc, module->procedures_with_tags) {
+        AstFunction *func = *pfunc;
+        if (!should_emit_function(func)) {
+            proc_count--;
+            continue;
+        }
+
+        u32 tag_count = bh_arr_length(func->tags);
+        u32 *tag_data_offsets = bh_alloc_array(global_scratch_allocator, u32, tag_count);
+        u32 *tag_data_types   = bh_alloc_array(global_scratch_allocator, u32, tag_count);
+
+        u32 tag_index = 0;
+        bh_arr_each(AstTyped *, ptag, func->tags) {
+            AstTyped *tag = *ptag;
+            bh_buffer_align(&tag_proc_buffer, type_alignment_of(tag->type));
+
+            tag_data_offsets[tag_index  ] = tag_proc_buffer.length;
+            tag_data_types  [tag_index++] = tag->type->id;
+
+            u32 size = type_size_of(tag->type);
+            bh_buffer_grow(&tag_proc_buffer, tag_proc_buffer.length + size);
+            u8* buffer = tag_proc_buffer.data + tag_proc_buffer.length;
+            emit_raw_data(module, buffer, tag);
+            tag_proc_buffer.length += size;
+        }
+
+        bh_buffer_align(&tag_proc_buffer, 4);
+        u32 tag_array_base = tag_proc_buffer.length;
+        fori (i, 0, tag_count) {
+            PATCH;
+            bh_buffer_write_u32(&tag_proc_buffer, tag_data_offsets[i]);
+            bh_buffer_write_u32(&tag_proc_buffer, tag_data_types[i]);
+        }
+
+        bh_buffer_align(&tag_proc_buffer, 4);
+        tag_proc_info[index++] = tag_proc_buffer.length;
+
+        bh_buffer_write_u32(&tag_proc_buffer, get_element_idx(module, func));
+        bh_buffer_write_u32(&tag_proc_buffer, func->type->id);
+        WRITE_SLICE(tag_array_base, tag_count);
+    }    
+
+    if (context.options->verbose_output == 1) {
+        bh_printf("Foreign blocks size: %d bytes.\n", tag_proc_buffer.length);
+    }
+
+    u32 offset = module->next_datum_offset;
+    bh_align(offset, 8);
+
+    u64 tagged_procedures_location = offset;
+
+    WasmDatum tagged_procedures_data = {
+        .offset = offset,
+        .length = proc_count * POINTER_SIZE,
+        .data = tag_proc_info,
+    };
+    bh_arr_push(module->data, tagged_procedures_data);
+
+    offset += tagged_procedures_data.length;
+
+    fori (i, 0, proc_count) {
+        tag_proc_info[i] += offset;
+    }
+
+    bh_arr_each(u32, patch_loc, base_patch_locations) {
+        if (POINTER_SIZE == 4) {
+            u32* loc = bh_pointer_add(tag_proc_buffer.data, *patch_loc);
+            if (*loc == 0) continue;
+            
+            *loc += offset;
+        }
+        if (POINTER_SIZE == 8) {
+            u64* loc = bh_pointer_add(tag_proc_buffer.data, *patch_loc);
+            if (*loc == 0) continue;
+            
+            *loc += offset;
+        }
+    }
+
+    WasmDatum tagged_procedures_info_data = {
+        .offset = offset,
+        .length = tag_proc_buffer.length,
+        .data = tag_proc_buffer.data,
+    };
+    bh_arr_push(module->data, tagged_procedures_info_data);
+    offset += tagged_procedures_info_data.length;
+
+    u64 global_data_ptr = offset;
+
+    Tagged_Procedure_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
+    tmp_data[0] = tagged_procedures_location;
+    tmp_data[1] = proc_count;
+    WasmDatum tagged_procedures_global_data = {
+        .offset = offset,
+        .length = 2 * POINTER_SIZE,
+        .data = tmp_data,
+    };
+    bh_arr_push(module->data, tagged_procedures_global_data);
+    offset += tagged_procedures_global_data.length;
+
+    module->next_datum_offset = offset;
+
+    return global_data_ptr;
+
+#undef WRITE_SLICE
+#undef WRITE_PTR
+#undef PATCH
+}
+

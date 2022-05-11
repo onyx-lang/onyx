@@ -1,0 +1,12 @@
+
+package runtime.info
+
+tagged_procedures: [] ^Tagged_Procedure
+
+Tagged_Procedure :: struct {
+    // This should be cast to the correct function type.
+    // i.e.  *cast(^(i32, i32) -> i32) ^tagged_procedures[0].func;
+    func: () -> void;
+    type: type_expr;
+    tags: [] any;
+}

@@ -36,8 +36,6 @@ package core
 #load "./runtime/common"
 
 #load "./runtime/info/helper"
-#load "./runtime/info/types"
-#load "./runtime/info/foreign_blocks"
 
 #load "./arg_parse"
 

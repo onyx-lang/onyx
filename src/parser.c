@@ -176,6 +176,36 @@ static b32 next_tokens_are(OnyxParser* parser, i32 n, ...) {
 }
 
 
+static void expect_no_stored_tags_pos(OnyxParser *parser, OnyxFilePos pos) {
+    if (bh_arr_length(parser->stored_tags) > 0) {
+        onyx_report_error(pos, Error_Critical, "#tag is not allowed on this element.");
+        parser->hit_unexpected_token = 1;
+    }
+}
+
+static void expect_no_stored_tags(OnyxParser *parser) {
+    expect_no_stored_tags_pos(parser, parser->curr->pos);
+}
+
+static void flush_stored_tags(OnyxParser *parser, bh_arr(AstTyped *) *out_arr) {
+    if (bh_arr_length(parser->stored_tags) == 0) return;
+
+    bh_arr(AstTyped *) arr = *out_arr;
+
+    if (arr == NULL) {
+        bh_arr_new(parser->allocator, arr, bh_arr_length(parser->stored_tags));
+    }
+
+    bh_arr_each(AstTyped *, pexpr, parser->stored_tags) {
+        bh_arr_push(arr, *pexpr);
+    }
+
+    bh_arr_clear(parser->stored_tags);
+
+    *out_arr = arr;
+}
+
+
 // TODO: Make parsing numeric literals not rely on the C standard libary.
 static AstNumLit* parse_int_literal(OnyxParser* parser) {
     AstNumLit* int_node = make_node(AstNumLit, Ast_Kind_NumLit);
@@ -1921,6 +1951,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
     s_node = make_node(AstStructType, Ast_Kind_Struct_Type);
     s_node->token = s_token;
 
+    flush_stored_tags(parser, &s_node->meta_tags);
+
     // Parse polymorphic parameters
     if (consume_token_if_next(parser, '(')) {
         bh_arr(AstPolyStructParam) poly_params = NULL;
@@ -1987,8 +2019,6 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
     }
 
-    bh_arr(AstTyped *) struct_meta_tags=NULL;
-
     expect_token(parser, '{');
 
     b32 member_is_used = 0;
@@ -1997,15 +2027,6 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return s_node;
-
-        if (parse_possible_directive(parser, "struct_tag")) {
-            if (struct_meta_tags == NULL) bh_arr_new(global_heap_allocator, struct_meta_tags, 1);
-            AstTyped* expr = parse_expression(parser, 0);
-            bh_arr_push(struct_meta_tags, expr);
-
-            consume_token_if_next(parser, ';');
-            continue;
-        }
 
         if (parse_possible_directive(parser, "persist")) {
             struct_type_create_scope(parser, s_node);
@@ -2095,7 +2116,6 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         expect_token(parser, ';');
     }
 
-    s_node->meta_tags = struct_meta_tags;
     if (s_node->scope) parser->current_scope = parser->current_scope->parent;
 
     bh_arr_free(member_list_temp);
@@ -2359,6 +2379,8 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
     AstFunction* func_def = make_node(AstFunction, Ast_Kind_Function);
     func_def->token = token;
     bh_arr_push(parser->current_function_stack, func_def);
+
+    flush_stored_tags(parser, &func_def->tags);
 
     bh_arr_new(global_heap_allocator, func_def->params, 4);
 
@@ -2660,6 +2682,8 @@ static b32 parse_possible_quick_function_definition(OnyxParser* parser, AstTyped
 }
 
 static AstTyped* parse_global_declaration(OnyxParser* parser) {
+    expect_no_stored_tags(parser);
+
     AstGlobal* global_node = make_node(AstGlobal, Ast_Kind_Global);
     global_node->token = expect_token(parser, Token_Type_Keyword_Global);
 
@@ -2671,12 +2695,16 @@ static AstTyped* parse_global_declaration(OnyxParser* parser) {
 }
 
 static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
+    expect_no_stored_tags(parser);
+
     AstEnumType* enum_node = make_node(AstEnumType, Ast_Kind_Enum_Type);
     enum_node->token = expect_token(parser, Token_Type_Keyword_Enum);
 
     bh_arr_new(global_heap_allocator, enum_node->values, 4);
 
     while (parser->curr->type == '#') {
+        if (parser->hit_unexpected_token) return enum_node;
+
         if (parse_possible_directive(parser, "flags")) {
             enum_node->is_flags = 1;
         } else {
@@ -2720,6 +2748,8 @@ static AstEnumType* parse_enum_declaration(OnyxParser* parser) {
 }
 
 static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statements) {
+    expect_no_stored_tags(parser);
+
     AstIf* static_if_node = make_node(AstIf, Ast_Kind_Static_If);
     static_if_node->token = expect_token(parser, '#');
     static_if_node->defined_in_scope = parser->current_scope;
@@ -2769,6 +2799,8 @@ static AstIf* parse_static_if_stmt(OnyxParser* parser, b32 parse_block_as_statem
 static AstMemRes* parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol, b32 threadlocal) {
     expect_token(parser, ':');
 
+    expect_no_stored_tags(parser);
+
     AstMemRes* memres = make_node(AstMemRes, Ast_Kind_Memres);
     memres->threadlocal = threadlocal;
     memres->token = symbol;
@@ -2784,6 +2816,8 @@ static AstMemRes* parse_memory_reservation(OnyxParser* parser, OnyxToken* symbol
 }
 
 static AstMacro* parse_macro(OnyxParser* parser) {
+    expect_no_stored_tags(parser);
+
     AstMacro* macro = make_node(AstMacro, Ast_Kind_Macro);
     macro->token = expect_token(parser, Token_Type_Keyword_Macro);
 
@@ -2913,7 +2947,8 @@ static char* generate_name_within_scope(OnyxParser* parser, OnyxToken* symbol) {
 }
 
 static AstBinding* parse_top_level_binding(OnyxParser* parser, OnyxToken* symbol) {
-    expect_token(parser, ':');
+    OnyxToken *after_second_colon = expect_token(parser, ':');
+    if (after_second_colon) after_second_colon += 1;
 
     AstTyped* node = parse_top_level_expression(parser);
     if (parser->hit_unexpected_token || node == NULL)
@@ -2978,6 +3013,7 @@ default_case:
     binding->token = symbol;
     binding->node = (AstNode *) node;
 
+    if (after_second_colon) expect_no_stored_tags_pos(parser, after_second_colon->pos);
     return binding;
 }
 
@@ -3197,6 +3233,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(library);
                 return;
             }
+            else if (parse_possible_directive(parser, "tag")) {
+                AstTyped *expr = parse_expression(parser, 0);
+                bh_arr_push(parser->stored_tags, expr);
+                return;
+            }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');
                 OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
@@ -3339,6 +3380,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.current_symbol_stack = NULL;
     parser.current_function_stack = NULL;
     parser.scope_flags = NULL;
+    parser.stored_tags = NULL;
     parser.parse_calls = 1;
 
     parser.polymorph_context = (PolymorphicContext) {
@@ -3349,6 +3391,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     bh_arr_new(global_heap_allocator, parser.alternate_entity_placement_stack, 4);
     bh_arr_new(global_heap_allocator, parser.current_symbol_stack, 4);
     bh_arr_new(global_heap_allocator, parser.scope_flags, 4);
+    bh_arr_new(global_heap_allocator, parser.stored_tags, 4);
 
     return parser;
 }

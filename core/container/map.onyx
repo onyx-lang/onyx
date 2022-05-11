@@ -21,9 +21,10 @@ package core.map
     }
 }
 
+#tag conv.Custom_Format.{
+    #solidify format_map {K=Key_Type, V=Value_Type}
+}
 Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type) {
-    #struct_tag conv.Custom_Format.{ #solidify format_map {K=Key_Type, V=Value_Type} };
-
     allocator : Allocator;
 
     hashes  : [] i32;

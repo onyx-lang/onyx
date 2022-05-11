@@ -2100,6 +2100,14 @@ CheckStatus check_function(AstFunction* func) {
     if (func->entity_header && func->entity_header->state < Entity_State_Code_Gen)
         YIELD(func->token->pos, "Waiting for procedure header to pass type-checking");
 
+    bh_arr_each(AstTyped *, pexpr, func->tags) {
+        CHECK(expression, pexpr);
+
+        if (((*pexpr)->flags & Ast_Flag_Comptime) == 0) {
+            ERROR((*pexpr)->token->pos, "#tag expressions should be compile time known.");
+        }
+    }
+
     inside_for_iterator = 0;
     expected_return_type = &func->type->Function.return_type;
     if (func->body) {

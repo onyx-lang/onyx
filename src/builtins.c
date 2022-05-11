@@ -63,6 +63,7 @@ AstType  *builtin_code_type;
 AstTyped    *type_table_node = NULL;
 AstTyped    *foreign_blocks_node = NULL;
 AstType     *foreign_block_type = NULL;
+AstTyped    *tagged_procedures_node = NULL;
 AstFunction *builtin_initialize_data_segments = NULL;
 AstFunction *builtin_run_init_procedures = NULL;
 bh_arr(AstFunction *) init_procedures = NULL;
@@ -462,6 +463,7 @@ void initialize_builtins(bh_allocator a) {
         type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
         foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
         foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
+        tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
     }
 
     fori (i, 0, Binary_Op_Count) {

@@ -1148,6 +1148,10 @@ SymresStatus symres_function(AstFunction* func) {
             }
         }
 
+        bh_arr_each(AstTyped *, pexpr, func->tags) {
+            SYMRES(expression, pexpr);
+        }
+
         func->flags |= Ast_Flag_Has_Been_Symres;
     }
 

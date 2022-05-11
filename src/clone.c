@@ -452,7 +452,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
             captured_entities = NULL;
 
             df->params = NULL;
-            bh_arr_new(global_heap_allocator, df->params, bh_arr_length(sf->params));
+            bh_arr_new(context.ast_alloc, df->params, bh_arr_length(sf->params));
 
             bh_arr_each(AstParam, param, sf->params) {
                 AstParam new_param = { 0 };
@@ -470,11 +470,18 @@ AstNode* ast_clone(bh_allocator a, void* n) {
 
             if (sf->constraints.constraints) {
                 memset(&df->constraints, 0, sizeof(ConstraintContext));
-                bh_arr_new(global_heap_allocator, df->constraints.constraints, bh_arr_length(sf->constraints.constraints));
+                bh_arr_new(context.ast_alloc, df->constraints.constraints, bh_arr_length(sf->constraints.constraints));
 
                 bh_arr_each(AstConstraint *, constraint, sf->constraints.constraints) {
                     bh_arr_push(df->constraints.constraints, (AstConstraint *) ast_clone(a, (AstNode *) *constraint));
                 }
+            }
+
+            if (sf->tags) {
+                bh_arr_new(context.ast_alloc, df->tags, bh_arr_length(sf->tags));
+                bh_arr_each(AstTyped *, pexpr, sf->tags) {
+                    bh_arr_push(df->tags, (AstTyped *) ast_clone(a, (AstNode *) *pexpr));
+                }    
             }
 
             break;
