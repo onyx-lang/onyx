@@ -28,10 +28,18 @@
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
     if (type->kind == Type_Kind_Struct) {
+        if (type_linear_member_count(type) == 1) {
+            return onyx_type_to_wasm_type(type->Struct.linear_members[0].type);
+        }
+        
         return WASM_TYPE_VOID;
     }
 
     if (type->kind == Type_Kind_Slice) {
+        return WASM_TYPE_VOID;
+    }
+
+    if (type->kind == Type_Kind_Compound) {
         return WASM_TYPE_VOID;
     }
 
@@ -3327,8 +3335,9 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
         type->return_type = return_type;
         type->param_count = param_count;
 
-        // HACK ish thing
-        memcpy(type->param_types, type_repr_buf, type->param_count);
+        fori (i, 0, type->param_count) {
+            type->param_types[i] = type_repr_buf[i];
+        }
 
         bh_arr_push(mod->types, type);
 

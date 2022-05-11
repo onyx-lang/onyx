@@ -458,14 +458,6 @@ void initialize_builtins(bh_allocator a) {
 
     bh_arr_new(global_heap_allocator, init_procedures, 4);
 
-    p = package_lookup("runtime.info");
-    if (p != NULL) {
-        type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
-        foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
-        foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
-        tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
-    }
-
     fori (i, 0, Binary_Op_Count) {
         bh_arr_new(global_heap_allocator, operator_overloads[i], 4); 
     }
@@ -474,6 +466,16 @@ void initialize_builtins(bh_allocator a) {
     while (intrinsic->name != NULL) {
         shput(intrinsic_table, intrinsic->name, intrinsic->intrinsic);
         intrinsic++;
+    }
+}
+
+void initalize_special_globals() {
+    Package *p = package_lookup("runtime.info");
+    if (p != NULL) {
+        type_table_node     = (AstTyped *) symbol_raw_resolve(p->scope, "type_table");
+        foreign_blocks_node = (AstTyped *) symbol_raw_resolve(p->scope, "foreign_blocks");
+        foreign_block_type  = (AstType *)  symbol_raw_resolve(p->scope, "foreign_block");
+        tagged_procedures_node = (AstTyped *) symbol_raw_resolve(p->scope, "tagged_procedures");
     }
 }
 

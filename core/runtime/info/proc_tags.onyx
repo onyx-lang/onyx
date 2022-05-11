@@ -10,3 +10,36 @@ Tagged_Procedure :: struct {
     type: type_expr;
     tags: [] any;
 }
+
+get_tags_for_procedure :: (func: $T) -> [] any {
+    if get_type_info(T).kind != .Function do return .[];
+
+    for tagged_procedures {
+        if it.func == func do return it.tags;
+    }
+
+    return .[];
+}
+
+#local GPWT_Result :: struct (T: type_expr) {
+    func: () -> void;
+    type: type_expr;
+    tag : ^T;
+}
+
+get_procedures_with_tag :: ($tag_type: type_expr) -> [] GPWT_Result(tag_type) {
+    array :: package core.array
+    results := make([..] GPWT_Result(tag_type));
+
+    for proc: tagged_procedures {
+        if tag := array.first_where(proc.tags, #(it.type == tag_type)); tag != null {
+            array.push(^results, .{
+                func = proc.func,
+                type = proc.type,
+                tag = cast(^tag_type) tag.data
+            });
+        }
+    }
+
+    return results;
+}

@@ -828,7 +828,7 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
     }    
 
     if (context.options->verbose_output == 1) {
-        bh_printf("Foreign blocks size: %d bytes.\n", tag_proc_buffer.length);
+        bh_printf("Tagged procedure size: %d bytes.\n", tag_proc_buffer.length);
     }
 
     u32 offset = module->next_datum_offset;

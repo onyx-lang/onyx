@@ -287,14 +287,14 @@ set :: (arr: [] $T, idx: i32, value: T) {
 }
 
 contains :: #match {
-    // Uses '==' to compare for equality.
-    (arr: [] $T, x: T) -> bool {
-        for it: arr do if it == x do return true;
+    macro (arr: [] $T, $cmp: Code) -> bool {
+        for it: arr do if #unquote cmp do return true;
         return false;
     },
 
-    macro (arr: [] $T, $cmp: Code) -> bool {
-        for it: arr do if #unquote cmp do return true;
+    // Uses '==' to compare for equality.
+    (arr: [] $T, x: T) -> bool {
+        for it: arr do if it == x do return true;
         return false;
     }
 }
@@ -503,6 +503,17 @@ find_ptr :: (arr: [] $T, value: T) -> ^T {
 first :: (arr: [] $T, predicate: (T) -> bool) -> ^T {
     for ^it: arr {
         if predicate(*it) do return it;
+    }
+
+    return null;
+}
+
+first_where :: macro (arr: [] $T, cond: Code) -> ^T {
+    // This is to preserve the semantics that "it" is
+    // not a pointer (same as contains)
+    for^ it_: arr {
+        it := *it_;
+        if #unquote cond do return it_;
     }
 
     return null;

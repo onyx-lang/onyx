@@ -223,6 +223,12 @@ static AstInclude* create_load(bh_allocator alloc, char* filename) {
     return include_node;
 }
 
+// HACK
+static u32 special_global_entities_remaining = 3;
+static Entity *runtime_info_types_entity;
+static Entity *runtime_info_foreign_entity;
+static Entity *runtime_info_proc_tags_entity;
+
 static void context_init(CompileOptions* opts) {
     types_init();
 
@@ -262,26 +268,26 @@ static void context_init(CompileOptions* opts) {
         .state = Entity_State_Parse_Builtin,
         .type = Entity_Type_Load_File,
         .package = NULL,
+        .include = create_load(context.ast_alloc, "core/runtime/build_opts"),
+    }));
+
+    runtime_info_types_entity = entity_heap_insert(&context.entities, ((Entity) {
+        .state = Entity_State_Parse,
+        .type = Entity_Type_Load_File,
+        .package = NULL,
         .include = create_load(context.ast_alloc, "core/runtime/info/types"),
     }));
-    entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Parse_Builtin,
+    runtime_info_foreign_entity = entity_heap_insert(&context.entities, ((Entity) {
+        .state = Entity_State_Parse,
         .type = Entity_Type_Load_File,
         .package = NULL,
         .include = create_load(context.ast_alloc, "core/runtime/info/foreign_blocks"),
     }));
-    entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Parse_Builtin,
+    runtime_info_proc_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
+        .state = Entity_State_Parse,
         .type = Entity_Type_Load_File,
         .package = NULL,
         .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
-    }));
-
-    entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Parse_Builtin,
-        .type = Entity_Type_Load_File,
-        .package = NULL,
-        .include = create_load(context.ast_alloc, "core/runtime/build_opts"),
     }));
 
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
@@ -457,7 +463,20 @@ static b32 process_entity(Entity* ent) {
                 introduce_build_options(context.ast_alloc);
             }
 
+            // GROSS
+            if (special_global_entities_remaining == 0) {
+                special_global_entities_remaining--;
+                initalize_special_globals();
+            }
+
             if (process_load_entity(ent)) {
+                // GROSS
+                if (ent == runtime_info_types_entity
+                    || ent == runtime_info_proc_tags_entity
+                    || ent == runtime_info_foreign_entity) {
+                    special_global_entities_remaining--;
+                }
+
                 ent->state = Entity_State_Finalized;
             } else {
                 ent->macro_attempts++;

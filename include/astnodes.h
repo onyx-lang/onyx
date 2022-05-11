@@ -1615,6 +1615,7 @@ extern IntrinsicTable intrinsic_table;
 extern bh_arr(OverloadOption) operator_overloads[Binary_Op_Count];
 
 void initialize_builtins(bh_allocator a);
+void initalize_special_globals();
 void introduce_build_options(bh_allocator a);
 
 
