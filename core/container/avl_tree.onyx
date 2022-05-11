@@ -1,14 +1,107 @@
 package core.avl_tree
 
+#local math :: package core.math
+
 AVL_Tree :: struct (T: type_expr) {
     data: T;
     left, right: ^AVL_Tree(T);
+    height: i32;
+}
 
-    insert :: (tree: ^AVL_Tree, data: tree.T) {
+insert :: (ptree: ^^AVL_Tree($T), data: T) {
+    tree := *ptree;
+    if tree == null {
         node := new(typeof *tree);
         node.data = data;
         node.left = null;
         node.right = null;
+        node.height = 0;
+        *ptree = node;
+        return;
+    }
+
+    if data < tree.data {
+        insert(^tree.left, data);
+    } else {
+        insert(^tree.right, data);
+    }
+
+    tree.height = math.max(get_height(tree.left), get_height(tree.right)) + 1;
+
+    bf := get_height(tree.left) - get_height(tree.right);
+    if bf < -1 {
+        child_bf := get_height(tree.right.left) - get_height(tree.right.right);
+        if child_bf < 0 {
+            rotate_left(ptree);
+        } else {
+            rotate_right(^tree.right);
+            rotate_left(ptree);
+        }
+
+    } elseif bf > 1 {
+        child_bf := get_height(tree.left.left) - get_height(tree.left.right);
+        if child_bf < 0 {
+            rotate_right(ptree);
+        } else {
+            rotate_left(^tree.left);
+            rotate_right(ptree);
+        }
     }
 }
 
+delete :: (tree: ^AVL_Tree, data: tree.T) {
+
+}
+
+contains :: (tree: ^AVL_Tree, data: tree.T) -> bool {
+    if tree == null do return false;
+
+    if tree.data == data do return true;
+
+    if data < tree.data do return contains(tree.left, data);
+    else                do return contains(tree.right, data);
+}
+
+print :: (tree: ^AVL_Tree) {
+    use package core {print as std_print, printf}
+
+    if tree == null {
+        std_print("_ ");
+        return;
+    }
+
+    printf("{}[{}] ", tree.data, tree.height);
+    if tree.left != null || tree.right != null {
+        std_print("( ");
+        print(tree.left);
+        print(tree.right);
+        std_print(") ");
+    }
+}
+
+#local get_height :: (tree: ^AVL_Tree) -> i32 {
+    if tree == null do return -1;
+    return tree.height;
+}
+
+#local rotate_left :: (tree: ^^AVL_Tree) {
+    A := *tree;
+    B := A.right;
+    A.right = B.left;
+    B.left = A;
+    *tree = B;
+
+    A.height = math.max(get_height(A.left), get_height(A.right)) + 1;
+    B.height = math.max(get_height(B.left), get_height(B.right)) + 1;
+}
+
+#local rotate_right :: (tree: ^^AVL_Tree) {
+    A := *tree;
+    B := A.left;
+    A.left = B.right;
+    B.right = A;
+    *tree = B;
+
+    A.height = math.max(get_height(A.left), get_height(A.right)) + 1;
+    B.height = math.max(get_height(B.left), get_height(B.right)) + 1;
+}

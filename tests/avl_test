@@ -1,0 +1,4 @@
+8[3] ( 5[1] ( 0[0] _ ) 20[2] ( 15[1] ( 10[0] _ ) 25[0] ) ) 
+Contains 7? false
+Contains 15? true
+Contains 0? true

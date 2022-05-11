@@ -5,6 +5,7 @@ package core
 #load "./memory"
 
 #load "./container/array"
+#load "./container/avl_tree"
 #load "./container/map"
 #load "./container/list"
 #load "./container/iter"
