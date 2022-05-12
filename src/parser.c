@@ -846,8 +846,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 if_expression->false_expr = parse_expression(parser, 0);
 
                 retval = (AstTyped *) if_expression;
-
-                // nocheckin This should maybe be goto factor_parsed; ??
                 break;
             }
 
