@@ -2176,7 +2176,7 @@ CheckStatus check_struct(AstStructType* s_node) {
             Type *arg_type = type_build_from_ast(context.ast_alloc, s_node->polymorphic_argument_types[i]);
             if (arg_type == NULL) YIELD(s_node->polymorphic_argument_types[i]->token->pos, "Waiting to build type for polymorph argument.");
 
-            // nocheckin this is wrong...
+            // CLEANUP: This might be wrong...
             if (s_node->polymorphic_arguments[i].value) {
                 TYPE_CHECK(&s_node->polymorphic_arguments[i].value, arg_type) {
                     ERROR_(s_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
