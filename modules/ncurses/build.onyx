@@ -1,13 +1,18 @@
 #load "core/std"
 #load "scripts/c_binding"
+#load "scripts/c_library"
 #load "./module"
 
 use package core
 use package c_binding
 
 main :: () {
+    path := module_path(#file);
+
+    c_file_path := string.concat(path, "ncurses.c");
+
     result := build_c_binding(.{
-        output_file = "modules/ncurses/ncurses.c",
+        output_file = c_file_path,
         foreign_block = (package ncurses).foreign_block,
 
         cast_map = .[
@@ -26,6 +31,8 @@ void __get_beg_yx(WINDOW *w, int *y, int *x) { getbegyx(w, *y, *x); }
 void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
 """
         ],
+
+        custom_implementations = .[],
     });
 
     if !result {
@@ -33,5 +40,13 @@ void __get_max_yx(WINDOW *w, int *y, int *x) { getmaxyx(w, *y, *x); }
         os.exit(1);
     } else {
         println("Sucessfully made ncurses.c");
+    }
+
+    result = compile_c_file(c_file_path, string.concat(path, "onyx_ncurses.so"), libraries=.["ncurses"]);
+    if !result {
+        println("Failed to compile ncurses.c");
+        os.exit(1);
+    } else {
+        println("Sucessfully made onyx_ncurses.so");
     }
 }

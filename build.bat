@@ -22,11 +22,11 @@ del *.ilk > NUL 2> NUL
 del *.obj > NUL 2> NUL
 del misc\icon_resource.res
 
-REM Compile the onyxrun tool
+REM Compile the onyx-run tool
 set SOURCE_FILES=src/onyxrun.c src/wasm_runtime.c
 
 rc.exe misc/icon_resource.rc
-cl.exe %FLAGS% /Iinclude /std:c17 /TC %SOURCE_FILES% /link /IGNORE:4217 %LINK_OPTIONS% /DEBUG /OUT:onyxrun.exe /incremental:no /opt:ref /subsystem:console misc\icon_resource.res
+cl.exe %FLAGS% /Iinclude /std:c17 /TC %SOURCE_FILES% /link /IGNORE:4217 %LINK_OPTIONS% /DEBUG /OUT:onyx-run.exe /incremental:no /opt:ref /subsystem:console misc\icon_resource.res
 
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL

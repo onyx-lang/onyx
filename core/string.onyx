@@ -187,6 +187,8 @@ ends_with :: (s: str, suffix: str) -> bool {
     return true;
 }
 
+is_empty :: macro (s: str) => s.count == 0 || s.data == null;
+
 strip_whitespace :: #match {
     (s: ^str) { strip_leading_whitespace(s); strip_trailing_whitespace(s); },
     (s:  str) => s |> strip_leading_whitespace() |> strip_trailing_whitespace()

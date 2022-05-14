@@ -24,6 +24,7 @@ Binding_Config :: struct {
     output_file: str;
     cast_map: [] Cast_Mapping;
     custom_implementations: [] Impl_Mapping;
+    name_map: (str) -> str = null_proc;
 }
 
 build_c_binding :: (use binding_config: Binding_Config) -> bool {
@@ -42,7 +43,7 @@ build_c_binding :: (use binding_config: Binding_Config) -> bool {
                 }
             }
 
-            write_function_body(^writer, it, cast_map);
+            write_function_body(^writer, it, cast_map, name_map);
         }
 
         write_library_block(^writer, fb.funcs);
@@ -69,7 +70,7 @@ write_file_introduction :: (writer: ^io.Writer, preamble: [] str, name: str) {
 """, name);
 }
 
-write_function_body :: (writer, ff, cast_map) => {
+write_function_body :: (writer, ff, cast_map, name_map) => {
     use info;
 
     method_type := ff.type;
@@ -90,7 +91,14 @@ write_function_body :: (writer, ff, cast_map) => {
     io.write(writer, "), (");
     io.write(writer, type_encoding(method_info.return_type));
     io.write(writer, ")) {\n");
-    print_body(writer, ff.name, method_info, cast_map);
+
+    method_name := ff.name;
+    if name_map != null_proc {
+        method_name = name_map(method_name);
+    }
+
+    print_body(writer, method_name, method_info, cast_map);
+
     io.write(writer, "}\n\n");
 }
 

@@ -2,11 +2,15 @@ package opengles
 
 use package core { cptr }
 
-#library "onyx_opengles"
+#if #defined((package runtime).Generated_Foreign_Info) {
+    foreign_block :: __foreign_block
+} else {
+    #library "onyx_opengles"
+}
 
 GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
 
-#foreign "onyx_opengles" {
+#local __foreign_block :: #foreign "onyx_opengles" {
     // glInit MUST be called before any other GL calls, as it initializes all GL function pointers
     // using the load_function provided. Currently, the only supported library that provides this
     // is glfwGetLoadProcAddress.
@@ -83,7 +87,7 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glGetShaderInfoLog :: (shader: GLuint, bufSize: GLsizei, length: ^GLsizei, infoLog: ^GLchar) -> void ---
     glGetShaderPrecisionFormat :: (shadertype: GLenum, precisiontype: GLenum, range: ^GLint, precision: ^GLint) -> void ---
     glGetShaderSource :: (shader: GLuint, bufSize: GLsizei, length: ^GLsizei, source: ^GLchar) -> void ---
-    glGetString :: (name: GLenum) -> ^GLubyte ---
+    glGetString :: (name: GLenum) -> cptr(GLubyte) ---
     glGetTexParameterfv :: (target: GLenum, pname: GLenum, params: ^GLfloat) -> void ---
     glGetTexParameteriv :: (target: GLenum, pname: GLenum, params: ^GLint) -> void ---
     glGetUniformfv :: (program: GLuint, location: GLint, params: ^GLfloat) -> void ---
@@ -217,7 +221,7 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glClearBufferuiv :: (buffer: GLenum, drawbuffer: GLint, value: ^GLuint) -> void ---
     glClearBufferfv :: (buffer: GLenum, drawbuffer: GLint, value: ^GLfloat) -> void ---
     glClearBufferfi :: (buffer: GLenum, drawbuffer: GLint, depth: GLfloat, stencil: GLint) -> void ---
-    glGetStringi :: (name: GLenum, index: GLuint) -> ^GLubyte ---
+    glGetStringi :: (name: GLenum, index: GLuint) -> cptr(GLubyte) ---
     glCopyBufferSubData :: (readTarget: GLenum, writeTarget: GLenum, readOffset: GLintptr, writeOffset: GLintptr, size: GLsizeiptr) -> void ---
     glGetUniformIndices :: (program: GLuint, uniformCount: GLsizei, uniformNames: ^cptr(GLchar), uniformIndices: ^GLuint) -> void ---
     glGetActiveUniformsiv :: (program: GLuint, uniformCount: GLsizei, uniformIndices: ^GLuint, pname: GLenum, params: ^GLint) -> void ---
@@ -227,13 +231,13 @@ GLGetProcAddress :: #distinct i64 // (name: cstr) -> ^void
     glUniformBlockBinding :: (program: GLuint, uniformBlockIndex: GLuint, uniformBlockBinding: GLuint) -> void ---
     glDrawArraysInstanced :: (mode: GLenum, first: GLint, count: GLsizei, instancecount: GLsizei) -> void ---
     glDrawElementsInstanced :: (mode: GLenum, count: GLsizei, type: GLenum, indices: rawptr, instancecount: GLsizei) -> void ---
-    glFenceSync :: (condition: GLenum, flags: GLbitfield) -> GLsync ---
-    glIsSync :: (sync: GLsync) -> GLboolean ---
-    glDeleteSync :: (sync: GLsync) -> void ---
-    glClientWaitSync :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> GLenum ---
-    glWaitSync :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> void ---
+    // glFenceSync :: (condition: GLenum, flags: GLbitfield) -> GLsync ---
+    // glIsSync :: (sync: GLsync) -> GLboolean ---
+    // glDeleteSync :: (sync: GLsync) -> void ---
+    // glClientWaitSync :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> GLenum ---
+    // glWaitSync :: (sync: GLsync, flags: GLbitfield, timeout: GLuint64) -> void ---
     glGetInteger64v :: (pname: GLenum, data: ^GLint64) -> void ---
-    glGetSynciv :: (sync: GLsync, pname: GLenum, bufSize: GLsizei, length: ^GLsizei, values: ^GLint) -> void ---
+    // glGetSynciv :: (sync: GLsync, pname: GLenum, bufSize: GLsizei, length: ^GLsizei, values: ^GLint) -> void ---
     glGetInteger64i_v :: (target: GLenum, index: GLuint, data: ^GLint64) -> void ---
     glGetBufferParameteri64v :: (target: GLenum, pname: GLenum, params: ^GLint64) -> void ---
     glGenSamplers :: (count: GLsizei, samplers: ^GLuint) -> void ---

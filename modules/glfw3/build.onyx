@@ -1,13 +1,18 @@
 #load "core/std"
 #load "scripts/c_binding"
+#load "scripts/c_library"
 #load "./module"
 
 use package core
 use package c_binding
 
 main :: () {
+    path := module_path(#file);
+
+    c_file_path := string.concat(path, "onyx_glfw3.c");
+
     result := build_c_binding(.{
-        output_file = "modules/glfw3/onyx_glfw3.c",
+        output_file = c_file_path,
         foreign_block = (package glfw3).foreign_block,
 
         cast_map = .[
@@ -84,5 +89,13 @@ main :: () {
         os.exit(1);
     } else {
         println("Sucessfully made glfw3.c");
+    }
+
+    result = compile_c_file(c_file_path, string.concat(path, "onyx_glfw3.so"), libraries=.["glfw"]);
+    if !result {
+        println("Failed to compile glfw3.c");
+        os.exit(1);
+    } else {
+        println("Successfully made onyx_glfw3.so");
     }
 }

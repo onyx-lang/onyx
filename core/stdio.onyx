@@ -29,6 +29,7 @@ println :: (x) => {
     print("\n");
 }
 
+// Standard formatted print.
 printf :: (format: str, va: ..any) {
     flush :: (_, to_output) => {
         io.write(^stdio.print_writer, to_output);
@@ -40,6 +41,20 @@ printf :: (format: str, va: ..any) {
     print(conv.format_va(buffer, format, va, .{null, flush}));
 }
 
+// Print to standard error, if available.
+#if #defined((package runtime).__output_error) {
+    eprintf :: (format: str, va: ..any) -> str {
+        flush :: (_, to_output) => {
+            (package runtime).__output_error(to_output);
+            return true;
+        }
+
+        buffer: [1024] u8;
+        print(conv.format_va(buffer, format, va, .{null, flush}));
+    }
+}
+
+// Print to a dynamically allocated string.
 aprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);

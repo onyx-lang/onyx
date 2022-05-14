@@ -1,3 +1,6 @@
+//
+// THIS FILE WAS AUTOMATICALLY GENERATED.
+//
 
 #include "ncurses.h"
 

@@ -6,6 +6,7 @@ use package core
 
 #local {
     __stdout: os.File;
+    __stderr: os.File;
     __stdin:  os.File;
 }
 
@@ -14,6 +15,10 @@ __output_string :: (s: str) -> u32 {
     return wrote;
 }
 
+__output_error :: (s: str) -> u32 {
+    err, wrote := io.stream_write(^__stderr, s);
+    return wrote;
+}
 
 __read_from_input :: (buffer: [] u8) -> i32 {
     err, read := io.stream_read(^__stdin, buffer);
@@ -41,6 +46,12 @@ __read_from_input :: (buffer: [] u8) -> i32 {
     fd: fs.FileData.Handle;
     __file_get_standard(1, ^fd);
     __stdout = .{
+        .{ ^fs.__file_stream_vtable },
+        .{ fd },
+    };
+    
+    __file_get_standard(2, ^fd);
+    __stderr = .{
         .{ ^fs.__file_stream_vtable },
         .{ fd },
     };

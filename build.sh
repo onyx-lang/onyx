@@ -62,12 +62,17 @@ if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
     INCLUDES="$INCLUDES -I$WASMER_INCLUDE_DIR"
 
     if [ ! -f "$CORE_DIR/lib/libwasmer.so" ]; then
-        sudo mkdir -p "$CORE_DIR/lib"
-
         echo "Copying libwasmer to $CORE_DIR/lib (first install)"
+
+        sudo mkdir -p "$CORE_DIR/lib"
+        sudo mkdir -p "$CORE_DIR/include"
+
         # sudo cp "$WASMER_LIBRARY_DIR/libiwasm.so" "$CORE_DIR/lib/libiwasm.so"
         sudo cp "$WASMER_LIBRARY_DIR/libwasmer.so" "$CORE_DIR/lib/libwasmer.so"
         sudo cp "$WASMER_LIBRARY_DIR/libwasmer.a" "$CORE_DIR/lib/libwasmer.a"
+
+        sudo cp "include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
+        sudo cp "lib/common/include/wasm.h" "$CORE_DIR/include/wasm.h"
     fi
 fi
 
@@ -97,11 +102,11 @@ sudo cp ./bin/onyx "$BIN_DIR/onyx"
 
 if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
     C_FILES="onyxrun wasm_runtime"
-    TARGET="./bin/onyxrun"
+    TARGET="./bin/onyx-run"
 
     compile
     echo "Installing onyxrun executable"
-    sudo cp ./bin/onyxrun "$BIN_DIR/onyxrun"
+    sudo cp ./bin/onyx-run "$BIN_DIR/onyx-run"
 
     $CC -shared -fpic -I include -I lib/common/include src/onyx_runtime.c -o onyx_runtime.so -lpthread
     sudo mv "./onyx_runtime.so" "$CORE_DIR/lib/onyx_runtime.so"

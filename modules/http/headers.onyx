@@ -8,6 +8,7 @@ HTTP_Header :: enum {
     Server;
     Accept;
     AcceptEncoding;
+    Location;
 }
 
 header_from_str :: (s: str) -> (HTTP_Header, success: bool) {
@@ -18,6 +19,7 @@ header_from_str :: (s: str) -> (HTTP_Header, success: bool) {
         case "transfer-encoding"    do return .TransferEncoding, true;
         case "accept"               do return .Accept, true;
         case "accept-encoding"      do return .AcceptEncoding, true;
+        case "location"             do return .Location, true;
         case #default do return ~~ -1, false;
     }
 }
@@ -31,6 +33,7 @@ header_from_str :: (s: str) -> (HTTP_Header, success: bool) {
         case .Server           do return "Server";
         case .Accept           do return "Accept";
         case .AcceptEncoding   do return "Accept-Encoding";
+        case .Location         do return "Location";
         case #default          do return "";
     }
 }
@@ -77,6 +80,7 @@ HTTP_Headers :: struct {
     expect: bool;
     chunked: bool;
     accept: MediaType;
+    location: str;
     custom_entries: Map(str, str);
 
     parse_header_line :: (use this: ^HTTP_Headers, line_: [] u8) -> bool {
@@ -133,6 +137,11 @@ HTTP_Headers :: struct {
 
             case .AcceptEncoding {
                 @TODO // This needs to be limited.
+                return true;
+            }
+
+            case .Location {
+                location = content |> string.strip_whitespace();
                 return true;
             }
 

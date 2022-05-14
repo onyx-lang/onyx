@@ -19,7 +19,7 @@ module_path :: (file_path: str) -> str {
     return out;
 }
 
-compile_c_file :: (path: str, dest: str, includes: [] str = .[], flags := "") -> bool {
+compile_c_file :: (path: str, dest: str, includes: [] str = .[], libraries: [] str = .[], flags := "") -> bool {
     printf("Compiling '{}' -> '{}'.\n", path, dest);
 
     #if runtime.compiler_os == .Linux {
@@ -29,9 +29,7 @@ compile_c_file :: (path: str, dest: str, includes: [] str = .[], flags := "") ->
         args << path;
 
         args << "-I";
-        args << "include";
-        args << "-I";
-        args << "lib/common/include";
+        args << "/usr/share/onyx/include";
 
         for includes {
             args << "-I";
@@ -45,6 +43,10 @@ compile_c_file :: (path: str, dest: str, includes: [] str = .[], flags := "") ->
         args << "-o";
         args << dest;
 
+        for libraries {
+            args << aprintf("-l{}", it);
+        }
+
         proc := os.process_spawn(Linux_Compiler, args);
         defer os.process_destroy(^proc);
 
@@ -55,9 +57,10 @@ compile_c_file :: (path: str, dest: str, includes: [] str = .[], flags := "") ->
         exit := os.process_wait(^proc);
         println(exit);
         println(output);
+        return exit == .Success;
     }
 
     #if runtime.compiler_os == .Windows {
-        
+        return true;
     }
 }
