@@ -114,12 +114,23 @@ free :: (arena: ^ArenaState) {
     arena.size          = 0;
 }
 
+// Clears and frees every page, except for first page.
+clear :: (arena: ^ArenaState) {
+    walker := arena.first_arena.next;
+    while walker != null {
+        raw_free(arena.backing_allocator, walker);
+        walker = walker.next;
+    }
+
+    arena.size = sizeof rawptr;
+}
+
 auto :: #match {
-    macro (size := 32 * 1024) {
+    macro (size := 32 * 1024, $dest: Code = #(context.allocator)) {
         alloc :: package core.alloc
 
         arena := alloc.arena.make(alloc.heap_allocator, size);
-        context.allocator = alloc.arena.make_allocator(^arena);
+        (#unquote dest) = alloc.arena.make_allocator(^arena);
         defer alloc.arena.free(^arena);
     },
 

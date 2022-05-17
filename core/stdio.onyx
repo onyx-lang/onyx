@@ -50,7 +50,7 @@ printf :: (format: str, va: ..any) {
         }
 
         buffer: [1024] u8;
-        print(conv.format_va(buffer, format, va, .{null, flush}));
+        (package runtime).__output_error(conv.format_va(buffer, format, va, .{null, flush}));
     }
 }
 
@@ -59,6 +59,13 @@ aprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);
     return string.alloc_copy(out);
+}
+
+// Print to a TEMPORARY dynamically allocated string.
+tprintf :: (format: str, va: ..any) -> str {
+    buffer: [8196] u8;
+    out := conv.format_va(buffer, format, va);
+    return string.alloc_copy(out, allocator=context.temp_allocator);
 }
 
 byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
@@ -133,6 +140,7 @@ __flush_stdio :: () {
 
 #local stdin_vtable := io.Stream_Vtable.{
     read = (_: ^io.Stream, buffer: [] u8) -> (io.Error, u32) {
+        __flush_stdio();
         bytes_read := runtime.__read_from_input(buffer);
         if bytes_read == 0 do return .ReadPending, 0;
         if bytes_read <  0 do return .EOF, 0;
@@ -141,6 +149,7 @@ __flush_stdio :: () {
     },
 
     read_byte = (_: ^io.Stream) -> (io.Error, u8) {
+        __flush_stdio();
         buf: [1] u8;
         bytes_read := runtime.__read_from_input(buf);
         if bytes_read <= 0 do return .EOF, 0;

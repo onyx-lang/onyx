@@ -18,6 +18,7 @@ Reader :: struct {
 
     done : bool; // If an .EOF was reached.
 
+    is_empty :: reader_empty;
     read_all :: read_all;
     read_byte :: read_byte;
     unread_byte :: unread_byte;
@@ -389,7 +390,7 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
     return out;
 }
 
-read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false, shift_buffer := true) -> str {
+read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := context.allocator, consume_end := false, inplace := false) -> str {
     //
     // Reading in place is special. It does not make a special allocation for the data,
     // instead just return a pointer to the internal data.

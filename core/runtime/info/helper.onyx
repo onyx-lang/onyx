@@ -188,18 +188,30 @@ size_of :: (t: type_expr) -> u32 {
     return 0;
 }
 
-offset_of :: (T: type_expr, member: str) -> u32 {
+offset_of :: (T: type_expr, member_name: str) -> u32 {
     info := get_type_info(T);
     if info == null         do return 0;
     if info.kind != .Struct do return 0;
 
     struct_info := cast(^Type_Info_Struct) info;
     for ^m: struct_info.members {
-        if m.name == member do return m.offset;
+        if m.name == member_name do return m.offset;
     }
 
     // Should this return something else if the member was not found?
     return 0;
+}
+
+get_struct_member :: (S: type_expr, member_name: str) -> ^Type_Info_Struct.Member {
+    info := cast(^Type_Info_Struct) get_type_info(S);
+    if info == null do return null;
+    if info.kind != .Struct do return null;
+
+    for^ info.members {
+        if it.name == member_name do return it;
+    }
+
+    return null;
 }
 
 get_tags_for_member :: (S: type_expr, member_name: str) -> [] any {

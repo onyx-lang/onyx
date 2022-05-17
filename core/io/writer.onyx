@@ -87,6 +87,10 @@ write_range :: (use writer: ^Writer, r: range, sep := " ") {
 }
 
 write_format :: (use writer: ^Writer, format: str, va: ..any) {
+    write_format_va(writer, format, ~~ va);
+}
+
+write_format_va :: (use writer: ^Writer, format: str, va: [] any) {
     flush :: (writer, to_output) => {
         write_str(writer, to_output);
         return true;

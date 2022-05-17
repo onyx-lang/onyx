@@ -35,9 +35,7 @@ File :: struct {
     }
 }
 
-file_exists :: (path: str) -> bool {
-    return fs.__file_exists(path);
-}
+file_exists :: fs.__file_exists
 
 get_contents_from_file :: (file: ^File) -> str {
     size := cast(u32) io.stream_size(file);

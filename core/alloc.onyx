@@ -25,20 +25,24 @@ array_from_stack :: macro ($T: type_expr, size: u32) -> [] T {
     return (cast(^T) __stack_top)[0 .. size];
 }
 
-TEMPORARY_ALLOCATOR_SIZE :: 1 << 12; // 4Kb
+TEMPORARY_ALLOCATOR_SIZE :: 1 << 16; // 16Kb
 
 // The global heap allocator, set up upon program intialization.
 heap_allocator : Allocator;
 
 // The global temp allocator, set up upon program intialization.
 #local
-temp_state     : ring.RingState;
+temp_state     : arena.ArenaState;
 temp_allocator : Allocator;
 
 init :: () {
     heap.init();
 
-    temp_buffer := cast(^u8) raw_alloc(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
-    temp_state = ring.make(temp_buffer[0 .. TEMPORARY_ALLOCATOR_SIZE]);
-    temp_allocator = ring.make_allocator(^temp_state);
+    temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
+    temp_allocator = as_allocator(^temp_state);
 }
+
+clear_temp_allocator :: () {
+    arena.clear(^temp_state);
+}
+

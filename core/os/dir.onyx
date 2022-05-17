@@ -39,3 +39,5 @@ dir_close :: (dir: Directory) {
 dir_read :: (dir: Directory, out_entry: ^DirectoryEntry) -> bool {
     return fs.__dir_read(dir, out_entry);
 }
+
+dir_exists :: fs.__file_exists
