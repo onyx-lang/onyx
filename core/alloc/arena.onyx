@@ -130,8 +130,12 @@ auto :: #match {
         alloc :: package core.alloc
 
         arena := alloc.arena.make(alloc.heap_allocator, size);
+        old_allocator := #unquote dest;
         (#unquote dest) = alloc.arena.make_allocator(^arena);
-        defer alloc.arena.free(^arena);
+        defer {
+            alloc.arena.free(^arena);
+            (#unquote dest) = old_allocator;
+        }
     },
 
     macro (body: Code, size := 32 * 1024) -> i32 {

@@ -11,6 +11,12 @@ alloc_copy :: (original: str, allocator := context.allocator) -> str {
     return new_str;
 }
 
+temp_copy :: (original: str) -> str {
+    new_str := make([] u8, original.count, allocator=context.temp_allocator);
+    copy(original, new_str);
+    return new_str;
+}
+
 copy :: (orig: str, dest: str) {
     len := orig.count;
     if dest.count < len do len = dest.count;
@@ -188,6 +194,20 @@ ends_with :: (s: str, suffix: str) -> bool {
 }
 
 is_empty :: macro (s: str) => s.count == 0 || s.data == null;
+
+index_of :: (s: str, c: u8) -> i32 {
+    for s.count {
+        if s[it] == c do return it;
+    }
+    return -1;
+}
+
+last_index_of :: (s: str, c: u8) -> i32 {
+    for range.{s.count, 0, -1} {
+        if s[it] == c do return it;
+    }
+    return -1;
+}
 
 strip_whitespace :: #match {
     (s: ^str) { strip_leading_whitespace(s); strip_trailing_whitespace(s); },

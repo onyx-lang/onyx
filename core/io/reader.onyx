@@ -35,6 +35,8 @@ Reader :: struct {
     advance_line :: advance_line;
     skip_whitespace :: skip_whitespace;
     skip_bytes :: skip_bytes;
+
+    lines :: lines;
 }
 
 reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
@@ -534,6 +536,27 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
 
     return 0, .None;
 }
+
+lines :: (r: ^Reader, inplace := false) -> Iterator(str) {
+    Context :: struct {
+        r: ^Reader;
+        inplace: bool;
+    }
+
+    c := new(Context, allocator=context.temp_allocator);
+    c.r = r;
+    c.inplace = inplace;
+
+    next :: (use c: ^Context) -> (str, bool) {
+        line := r->read_line(consume_newline=true, inplace=inplace);
+
+        if line.count > 0 do return line, true;
+        else do return "", false;
+    }
+
+    return .{ c, next };
+}
+
 
 #local reader_consume_error :: (use reader: ^Reader) -> Error {
     defer error = .None;

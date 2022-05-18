@@ -122,6 +122,16 @@ __file_exists :: (path: str) -> bool {
     return exists;
 }
 
+__file_remove :: (path: str) -> bool {
+    removed := false;
+    for .[3, 4] { // Trying both preopened directories
+        err := wasi.path_unlink_file(it, path);
+        if err == .Success do removed = true;
+    }
+
+    return removed;
+}
+
 __file_stream_vtable := io.Stream_Vtable.{
     seek = (use fs: ^os.File, to: i32, whence: io.SeekFrom) -> io.Error {
         // Currently, the new offset is just ignored.

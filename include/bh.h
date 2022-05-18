@@ -377,6 +377,7 @@ i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
 void bh_file_flush(bh_file* file);
 i64 bh_file_size(bh_file* file);
 b32 bh_file_exists(char const* filename);
+b32 bh_file_remove(char const* filename);
 char* bh_path_get_full_name(char const* filename, bh_allocator a);
 char* bh_path_get_parent(char const* filename, bh_allocator a);
 char* bh_path_convert_separators(char* path);
@@ -1635,6 +1636,15 @@ b32 bh_file_contents_free(bh_file_contents* contents) {
 b32 bh_file_exists(char const* filename) {
     struct stat s;
     return stat(filename, &s) != -1;
+}
+
+b32 bh_file_remove(char const* filename) {
+#if defined(_BH_WINDOWS)
+    return DeleteFileA(filename);
+
+#elif defined(_BH_LINUX)
+    return unlink(filename) == 0;
+#endif
 }
 
 char* bh_path_get_full_name(char const* filename, bh_allocator a) {

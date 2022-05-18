@@ -24,18 +24,9 @@ File :: struct {
     use data   : fs.FileData;
 }
 
-// Are these even necessary??
-#local {
-    file_open :: (path: str, mode := OpenMode.Read) -> (fs.FileData, FileError) {
-        return fs.__file_open(path, mode);
-    }
-
-    file_close :: (file: fs.FileData) -> FileError {
-        return fs.__file_close(file);
-    }
-}
-
 file_exists :: fs.__file_exists
+remove_file :: fs.__file_remove
+rename_file :: fs.__file_rename
 
 get_contents_from_file :: (file: ^File) -> str {
     size := cast(u32) io.stream_size(file);
@@ -58,7 +49,7 @@ open :: (path: str, mode := OpenMode.Read) -> (os.FileError, File) {
         data   = .{},
     };
 
-    file_data, error := file_open(path, mode);
+    file_data, error := fs.__file_open(path, mode);
     if error != .None do return error, file;
 
     file.data = file_data;
@@ -67,7 +58,7 @@ open :: (path: str, mode := OpenMode.Read) -> (os.FileError, File) {
 }
 
 close :: (file: ^File) {
-    file_close(file.data);
+    fs.__file_close(file.data);
     file.stream.vtable = null;
 }
 

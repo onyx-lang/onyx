@@ -19,7 +19,7 @@ nice_person := Person_Vtable.{
 
 mean_person := Person_Vtable.{
     greet = (use p: ^Person) {
-        printf("Go away!! {}\n", greet);
+        printf("Go away!! {}\n", ^greet);
     }
 }
 

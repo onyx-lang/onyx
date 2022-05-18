@@ -418,6 +418,9 @@ GB_DLL_IMPORT BOOL   WINAPI FindClose       (HANDLE find_file);
 GB_DLL_IMPORT BOOL   WINAPI GetFileAttributesExW(wchar_t const *path, GET_FILEEX_INFO_LEVELS info_level_id, WIN32_FILE_ATTRIBUTE_DATA *data);
 GB_DLL_IMPORT BOOL   WINAPI CopyFileW(wchar_t const *old_f, wchar_t const *new_f, BOOL fail_if_exists);
 GB_DLL_IMPORT BOOL   WINAPI MoveFileW(wchar_t const *old_f, wchar_t const *new_f);
+GB_DLL_IMPORT BOOL   WINAPI DeleteFileA     (char const *path);
+GB_DLL_IMPORT BOOL   WINAPI RemoveDirectoryA(char const *path);
+GB_DLL_IMPORT BOOL   WINAPI MoveFileA       (char const *old_path, char const *new_path);
 
 GB_DLL_IMPORT DWORD  WINAPI GetFullPathNameA(char const *lpFileName, DWORD nBufferLength, char *lpBuffer, char **lpFilePart);
 

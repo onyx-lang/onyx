@@ -84,6 +84,18 @@ ONYX_DEF(__file_exists, (WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
+ONYX_DEF(__file_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
+    char *path_ptr = ONYX_PTR(params->data[0].of.i32);
+    int   path_len = params->data[1].of.i32;
+
+    char path[512] = {0};
+    strncpy(path, path_ptr, path_len);
+    path[path_len] = 0;
+
+    results->data[0] = WASM_I32_VAL(bh_file_remove(path));
+    return NULL;
+}
+
 ONYX_DEF(__file_seek, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
     i64 fd = params->data[0].of.i64;
     i32 offset = params->data[1].of.i32;
@@ -171,6 +183,32 @@ ONYX_DEF(__file_get_standard, (WASM_I32, WASM_I32), (WASM_I32)) {
 
     results->data[0] = WASM_I32_VAL(error == BH_FILE_ERROR_NONE);
     return NULL;
+}
+
+ONYX_DEF(__file_rename, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    char *old_path_ptr = ONYX_PTR(params->data[0].of.i32);
+    int   old_path_len = params->data[1].of.i32;
+
+    char old_path[512] = {0};
+    strncpy(old_path, old_path_ptr, old_path_len);
+    old_path[old_path_len] = 0;
+
+    char *new_path_ptr = ONYX_PTR(params->data[2].of.i32);
+    int   new_path_len = params->data[3].of.i32;
+
+    char new_path[512] = {0};
+    strncpy(new_path, new_path_ptr, new_path_len);
+    new_path[new_path_len] = 0;
+
+#ifdef _BH_WINDOWS
+    results->data[0] = WASM_I32_VAL(MoveFileA(old_path, new_path));
+    return NULL;
+#endif
+
+#ifdef _BH_LINUX
+    results->data[0] = WASM_I32_VAL(rename(old_path, new_path) == 0);
+    return NULL;
+#endif
 }
 
 //
@@ -301,6 +339,24 @@ ONYX_DEF(__dir_close, (WASM_I64), ()) {
     return NULL;
 }
 
+ONYX_DEF(__dir_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
+    char *path_ptr = ONYX_PTR(params->data[0].of.i32);
+    int   path_len = params->data[1].of.i32;
+
+    char path[512] = {0};
+    strncpy(path, path_ptr, path_len);
+    path[path_len] = 0;
+
+#ifdef _BH_WINDOWS
+    results->data[0] = WASM_I32_VAL(RemoveDirectoryA(path));
+    return NULL;
+#endif
+
+#ifdef _BH_LINUX
+    results->data[0] = WASM_I32_VAL(rmdir(path) == 0);
+    return NULL;
+#endif
+}
 
 //
 // THREADS
@@ -469,6 +525,7 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (W
     process->magic_number = ONYX_PROCESS_MAGIC_NUMBER;
 
     #ifdef _BH_LINUX
+        // :Security - alloca a user controlled string.
         char **process_args = alloca(sizeof(char *) * (args_len + 2));
         byte_t* array_loc = ONYX_PTR(args_ptr);
         fori (i, 0, args_len) {
@@ -605,12 +662,20 @@ ONYX_DEF(__process_read, (WASM_I64, WASM_I32, WASM_I32), (WASM_I32)) {
     i32 bytes_read;
     #ifdef _BH_LINUX
         bytes_read = read(process->proc_to_host[0], buffer, output_len);
-        bytes_read = bh_max(bytes_read, 0);  // Silently consume errors
+        if (bytes_read < 0) {
+            switch (errno) {
+                case EAGAIN: bytes_read =  0; break;
+                case EBADF:  bytes_read = -1; break;
+                default:     bytes_read = -2; break;
+            }
+        }
     #endif
 
     #ifdef _BH_WINDOWS
         i32 success = ReadFile(process->proc_to_host_read, buffer, output_len, &bytes_read, NULL);
-        if (!success) bytes_read = 0;
+        if (!success) {
+            bytes_read = -1;
+        }
     #endif
 
     results->data[0] = WASM_I32_VAL(bytes_read);
@@ -1123,6 +1188,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_open_impl)
     ONYX_FUNC(__file_close)
     ONYX_FUNC(__file_exists)
+    ONYX_FUNC(__file_remove)
     ONYX_FUNC(__file_seek)
     ONYX_FUNC(__file_tell)
     ONYX_FUNC(__file_read)
@@ -1130,10 +1196,12 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_flush)
     ONYX_FUNC(__file_size)
     ONYX_FUNC(__file_get_standard)
+    ONYX_FUNC(__file_rename)
 
     ONYX_FUNC(__dir_open)
     ONYX_FUNC(__dir_read)
     ONYX_FUNC(__dir_close)
+    ONYX_FUNC(__dir_remove)
 
     ONYX_FUNC(__spawn_thread)
     ONYX_FUNC(__kill_thread)

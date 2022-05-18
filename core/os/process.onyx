@@ -37,12 +37,25 @@ process_destroy :: (use p: ^Process) => {
     __process_destroy(process_handle);
 }
 
+#local Process_Read_Error :: enum {
+    None         :: 0x00;
+    Process_Dead :: 0x01;
+    Unknown      :: 0x02; 
+}
+
 #local process_stream_vtable := io.Stream_Vtable.{
     read = (use p: ^Process, buffer: [] u8) -> (io.Error, u32) {
         // Read from the process stdout
         if cast(i64) process_handle == 0 do return .BadFile, 0;
 
         bytes_read := __process_read(process_handle, buffer);
+        if bytes_read < 0 {
+            switch cast(Process_Read_Error) -bytes_read {
+                case .None do return .None, 0;
+                case .Process_Dead do return .EOF, 0;
+                case .Unknown do return .BadFile, 0;
+            }
+        }
         return .None, bytes_read;
     },
 

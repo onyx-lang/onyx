@@ -23,6 +23,8 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
 
     __file_close :: (fd: FileData) -> os.FileError ---
     __file_exists :: (path: str) -> bool ---
+    __file_remove :: (path: str) -> bool ---
+    __file_rename :: (old_path: str, new_path: str) -> bool ---
 
     __file_seek  :: (handle: FileData.Handle, to: i32, whence: io.SeekFrom) -> i32 ---
     __file_tell  :: (handle: FileData.Handle) -> u32 ---
@@ -31,9 +33,10 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
     __file_flush :: (handle: FileData.Handle) -> io.Error ---
     __file_size  :: (handle: FileData.Handle) -> u32 ---
 
-    __dir_open  :: (path: str, dir: ^DirectoryData) -> bool ---
-    __dir_close :: (dir: DirectoryData) -> void ---
-    __dir_read  :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool ---
+    __dir_open   :: (path: str, dir: ^DirectoryData) -> bool ---
+    __dir_close  :: (dir: DirectoryData) -> void ---
+    __dir_read   :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool ---
+    __dir_remove :: (path: str) -> bool ---
 }
 
 __file_stream_vtable := io.Stream_Vtable.{

@@ -41,3 +41,5 @@ dir_read :: (dir: Directory, out_entry: ^DirectoryEntry) -> bool {
 }
 
 dir_exists :: fs.__file_exists
+dir_remove :: fs.__dir_remove
+dir_rename :: fs.__file_rename
