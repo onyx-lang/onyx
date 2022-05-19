@@ -1,0 +1,807 @@
+
+#load "core/std"
+
+Version :: SemVer.{0, 1, 0}
+
+use package core
+use package core.intrinsics.onyx {__initialize, __zero_value}
+
+global_arguments: struct {
+    #tag "--config-file"
+    config_file := "./onyx-pkg.ini";
+} = .{};
+
+main :: (args: [] cstr) {
+    __initialize(^config);
+
+    arg_parse.arg_parse(args, ^global_arguments);
+
+    command   := args[0] |> string.as_str();
+    arguments := args[1..args.count];
+
+    if command == "init" {
+        run_init_command(arguments);
+        store_config_file();
+        return;
+    }
+
+
+    loaded_config_file := false;
+    defer if loaded_config_file do store_config_file();
+
+    info :: package runtime.info
+    command_procedures := info.get_procedures_with_tag(Command);
+    defer delete(^command_procedures);
+    for command_procedures {
+        if it.tag.command == command {
+            if it.tag.require_config_file {
+                if !load_config_file() {
+                    eprintf("Failed to open {}.\n", global_arguments.config_file);
+                    os.exit(1);
+                }
+
+                loaded_config_file = true;
+            }
+
+            assert(it.type == #type ([] cstr) -> void, "BAD TYPE FOR COMMAND PROCEDURE!");
+            (*cast(^([] cstr) -> void) ^it.func)(arguments);
+            break;
+        }
+    }
+}
+
+Command :: struct {
+    command: str;
+    description: str;
+    arguments: str;
+
+    argument_descriptions: str = "";
+
+    require_config_file := true;
+}
+
+#tag Command.{ "help", "Show help.", "", require_config_file=false }
+run_help_command :: (args: [] cstr) {
+    printf("onyx-pkg version {}\n", Version);
+    printf("Package dependency resolver and synchronizer for Onyx.\n\nUsage:\n");
+
+    info :: package runtime.info
+    command_procedures := info.get_procedures_with_tag(Command);
+    defer delete(^command_procedures);
+    for command_procedures {
+        printf("{}\n", it.tag.description);
+        printf("        onyx-pkg {} {}\n", it.tag.command, it.tag.arguments);
+
+        if it.tag.argument_descriptions.count > 0 {
+            lines := string.split(it.tag.argument_descriptions, #char "\n", context.temp_allocator);
+
+            print("\n");
+            for line: lines {
+                if line.count == 0 do continue;
+                printf("        {}\n", line);
+            }
+            print("\n");
+        }
+
+        print("\n");
+    }
+}
+
+#tag Command.{ "init", "Initialize a new project.", "", require_config_file=false }
+run_init_command :: (args: [] cstr) {
+    if os.file_exists(global_arguments.config_file) {
+        eprintf("Config file present; project already initialized.\n");
+        return;
+    }
+
+    printf("Creating new project manifest in {}.\n\n", global_arguments.config_file);
+
+    read_field :: macro (f: str, dest: ^$T) {
+        while true {
+            print(f);
+            r->skip_whitespace();
+            line := r->read_line(consume_newline=true, allocator=context.temp_allocator)
+                    |> string.strip_whitespace();
+
+            if conv.parse_any(dest, T, line, context.allocator) do break;
+            if T == str {
+                *cast(^str) dest = string.alloc_copy(line);
+                break;
+            }
+        }
+    }
+
+    @TODO // Validation for these fields.
+    r := io.reader_make(^stdin);
+    read_field("Package name: ", ^config.metadata.name);
+    read_field("Package description: ", ^config.metadata.description);
+    read_field("Package url: ", ^config.metadata.url);
+    read_field("Package author: ", ^config.metadata.author);
+    read_field("Package version (X.Y.Z): ", ^config.metadata.version);
+}
+
+#tag Command.{ "add", "Add a new dependency to the project.", "package-url [version]",
+"""
+package-url      Git repository to clone for the package. This can be anything that
+                 git knows how to clone.
+verion           Semantic version number (Major.Minor.Patch). If omitted, the most recent
+                 version is used.
+"""
+}
+run_add_command :: (args: [] cstr) {
+    if args.count < 1 {
+        eprintf("Expected package name.");
+        return;
+    }
+
+    dep     := string.as_str(args[0]);
+    version: SemVer;
+    if args.count > 1 {
+        if !conv.parse_any(^version, string.as_str(args[1])) {
+            eprintf("Failed to parse version number given: {}\n", string.as_str(args[1]));
+            return;
+        }
+
+    } else {
+        version = Git.get_latest_version(dep);
+    }
+
+    if config.dependencies.dependencies->has(dep) {
+        eprintf("Dependency '{}' already specified at version '{}'.\n", dep, config.dependencies.dependencies[dep]);
+
+    } elseif version->is_zero() {
+        printf("Unable to find latest version of '{}'.\n", dep);
+
+    } else {
+        config.dependencies.dependencies[dep] = version;
+        printf("Added dependency '{}' at version {}.\n", dep, version);
+    }
+}
+
+#tag Command.{ "remove", "Remove a dependency.", "package-or-url", 
+"""
+package-or-url   Git repository name or package name on disk to remove.
+"""
+}
+run_remove_command :: (args: [] cstr) {
+    if args.count < 1 {
+        eprintf("Expected package name.");
+        return;
+    }
+
+    dep := string.as_str(args[0]);
+
+    if config.dependencies.dependencies->has(dep) {
+        config.dependencies.dependencies->delete(dep);
+        config.dependency_folders.folders->delete(dep);
+        return;
+    }
+
+    for^ config.dependency_folders.folders.entries {
+        if it.value == dep {
+            config.dependencies.dependencies->delete(it.key);
+            config.dependency_folders.folders->delete(it.key);
+            return;
+        }
+    }
+
+    eprintf("Dependency '{}' is not currently used.\n", dep);
+}
+
+#tag Command.{ "show", "Show dependencies and versions.", "" }
+run_show_command :: (args: [] cstr) {
+    printf("Package name        : {}\n", config.metadata.name);
+    printf("Package description : {}\n", config.metadata.description);
+    printf("Package url         : {}\n", config.metadata.url);
+    printf("Package author      : {}\n", config.metadata.author);
+    printf("Package version     : {}\n", config.metadata.version);
+    print("\n");
+
+    max_width := array.fold(config.dependencies.dependencies.entries, 0, (d, w) => {
+        return math.max(d.key.count, w);
+    });
+    format_str := tprintf("    {{w{}}} | {{}}\n", max_width);
+
+    print("Dependencies:\n");
+    for config.dependencies.dependencies.entries {
+        printf(format_str, it.key, it.value);
+    }
+    print("\n");
+}
+
+#tag Command.{ "update", "Update dependencies to newest compatible versions.", "" }
+@Feature // Add "locked" dependencies that will never update?
+run_update_command :: (args: [] cstr) {
+    printf("Updating dependencies to newest compatible versions.\n");
+    for^ config.dependencies.dependencies.entries {
+        new_version := Git.get_latest_compatible_version(it.key, it.value);
+
+        printf("{}: {} -> {}\n", it.key, it.value, new_version);
+
+        it.value = new_version;
+    }
+}
+
+#tag Command.{ "sync", "Synchronize local dependency folder.", "[--clean]",
+"""
+--clean          Remove directories of unneeded dependencies. This is not the default
+                 behavior, as it could break builds.
+"""
+}
+run_sync_command :: (args: [] cstr) {
+    Sync_Options :: struct {
+        #tag "--clean"
+        clean := false;
+    }
+    options: Sync_Options;
+    arg_parse.arg_parse(args, ^options);
+
+    To_Install :: struct {
+        use pack: Package;
+        downgrade_if_necessary: bool;
+    }
+
+    dependencies_to_install   := make([..] To_Install);
+    dependencies_installed    := make(Map(str, SemVer));
+    needed_dependency_folders := make([..] str);
+    defer {
+        delete(^dependencies_to_install);
+        delete(^dependencies_installed);
+        delete(^needed_dependency_folders);
+    }
+
+    for^ config.dependencies.dependencies.entries {
+        dependencies_to_install << .{ .{it.key, it.value}, true };
+    }
+
+    while dependencies_to_install.count > 0 {
+        alloc.clear_temp_allocator();
+        to_install := array.delete(^dependencies_to_install, 0);
+
+        if dependencies_installed->has(to_install.repo) {
+            continue;
+        }
+
+        success, installed_folder := install_package(to_install.pack, to_install.downgrade_if_necessary);
+        if !success {
+            eprintf("Aborting sync.\n");
+            return;
+        }
+
+        needed_dependency_folders << installed_folder;
+
+        inner_config: Config;
+        package_path := config.dependency_folders.folders[to_install.repo];
+        for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
+            r := io.reader_make(it);
+            result, error := parse_ini_file(^r, ^inner_config);
+
+            if result != .Success {
+                eprintf("Failed to parse onyx-pkg.ini in {}. Skipping...\n", to_install.repo);
+                continue;
+            }
+        }
+
+        if inner_config.metadata.version->is_zero() {
+            eprintf("Failed to parse onyx-pkg.ini in {}. Skipping...\n", to_install.repo);
+            continue;
+        }
+
+        for^ inner_config.dependencies.dependencies.entries {
+            if dependencies_installed->has(it.key) {
+                if it.value->is_newer(dependencies_installed[it.key]) {
+                    uninstall_package(.{it.key, it.value});
+                    dependencies_installed->delete(it.key);
+                    dependencies_to_install << .{ .{it.key, it.value}, false };
+                }
+            } else {
+                dependencies_to_install << .{ .{it.key, it.value}, false };
+            }
+        }
+
+        dependencies_installed[to_install.repo] = to_install.version;
+    }
+
+    if options.clean {
+        for os.list_directory(config.config.lib_source_directory) {
+            if it.type != .Directory do continue;
+
+            if !array.contains(needed_dependency_folders, it->name()) {
+                os.remove_directory(tprintf("{}/{}", config.config.lib_source_directory, it->name()));
+            }
+        }
+    }
+}
+
+install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, installed_folder: str) {
+    if config.dependency_folders.folders->has(pack.repo) {
+        folder_name := config.dependency_folders.folders[pack.repo];
+        package_folder := tprintf("{}/{}", config.config.lib_source_directory, folder_name);
+
+        if os.file_exists(package_folder) {
+            installed_version := get_installed_version_of_package(folder_name);
+
+            if installed_version == pack.version {
+                printf("{} is already installed at version {}.\n", pack.repo, installed_version);
+                return true, folder_name;
+            }
+
+            if installed_version->is_newer(pack.version) && !downgrade_if_necessary {
+                eprintf("Refusing to downgrade package {} from version {} to {}.\n", pack.repo, installed_version, pack.version);
+            }
+
+            verb := "Upgrading" if pack.version->is_newer(installed_version) else "Downgrading";
+            printf("{} package {} from version {} to {}.\n", verb, pack.repo, installed_version, pack.version);
+            uninstall_package(pack);
+        }
+    }
+
+    if !Git.clone_version(pack.repo, pack.version) {
+        eprintf("Failed to fetch {} version {}.\n", pack.repo, pack.version);
+        return false, "";
+    }
+
+    assert(config.dependency_folders.folders->has(pack.repo), "");
+    folder_name := config.dependency_folders.folders[pack.repo];
+    return true, folder_name;
+}
+
+uninstall_package :: (pack: Package) -> bool {
+    if config.dependency_folders.folders->has(pack.repo) {
+        folder_name := config.dependency_folders.folders[pack.repo];
+        package_folder := tprintf("{}/{}", config.config.lib_source_directory, folder_name);
+
+        if os.file_exists(package_folder) {
+            // Should this check if the version to be deleted is the one that is actually installed?
+            os.remove_directory(package_folder);
+        }
+    }
+}
+
+get_installed_version_of_package :: (package_path: str) -> SemVer {
+    inner_config: Config;
+    for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
+        r := io.reader_make(it);
+        result, error := parse_ini_file(^r, ^inner_config);
+
+        if result == .Success {
+            return inner_config.metadata.version;
+        }
+    }
+
+    return .{0, 0, 0};
+}
+
+
+#tag conv.Custom_Parse.{parse}
+#tag conv.Custom_Format.{format}
+SemVer :: struct {
+    major, minor, patch: i32;
+
+    format :: (output: ^conv.Format_Output, formatting: ^conv.Format, semver: ^SemVer) {
+        conv.format(output, "{}.{}.{}", semver.major, semver.minor, semver.patch);
+    }
+
+    parse :: (semver: ^SemVer, to_parse_: str, _: Allocator) -> bool {
+        to_parse := to_parse_;
+        
+        major := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
+        string.advance(^to_parse);
+        minor := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
+        string.advance(^to_parse);
+        patch := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
+
+        if major == 0 && minor == 0 && patch == 0 do return false;
+
+        semver.major = ~~ major;
+        semver.minor = ~~ minor;
+        semver.patch = ~~ patch;
+        return true;
+    }
+
+    is_zero :: (use this: SemVer) => major == 0 && minor == 0 && patch == 0;
+
+    // -1 if a < b
+    //  0 if a == b
+    //  1 if a > b
+    compare :: (a, b: SemVer) -> i32 {
+        if a.major != b.major do return math.sign(b.major - a.major);
+        if a.minor != b.minor do return math.sign(b.minor - a.minor);
+        return math.sign(b.patch - a.patch);
+    }
+
+    is_newer :: macro (from, to: SemVer) => from->compare(to) == -1;
+
+    is_compatible :: (from, to: SemVer) -> bool {
+        return from.major == to.major;
+    }
+}
+
+#operator == macro (s1, s2: SemVer) => s1.major == s2.major && s1.minor == s2.minor && s1.patch == s2.patch;
+#operator != macro (s1, s2: SemVer) => !(s1 == s2);
+
+Package :: struct {
+    repo: str;
+    version: SemVer;
+}
+
+#local runtime :: package runtime
+#if runtime.compiler_os == .Linux {
+    git_path :: "/usr/bin/git"
+}
+#if runtime.compiler_os == .Windows {
+    git_path :: "git.exe"
+}
+
+Git :: struct {
+    get_available_versions :: (repo: str) -> [] SemVer {
+        versions := make([..] SemVer);
+
+        git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", repo]);
+        r := io.reader_make(^git_proc);
+        for r->lines(inplace=true) {
+            last_slash := string.last_index_of(it, #char "/");
+            tag_name   := it[last_slash+1 .. it.count-1];
+
+            if tag_name[0] != #char "v" do continue;
+            string.advance(^tag_name);
+
+            version: SemVer;
+            if conv.parse_any(^version, tag_name) {
+                versions << version;
+            }
+        }
+
+        if os.process_wait(^git_proc) == .Error {
+            eprintf("Encountered error running 'git' command.");
+        }
+
+        return versions;
+    }
+
+    get_latest_version :: (repo: str) -> SemVer {
+        versions := get_available_versions(repo);
+        if versions.count == 0 {
+            return .{0, 0, 0};
+        }
+        defer delete(^versions);
+
+        array.sort(versions, SemVer.compare);
+        return versions[0];
+    }
+
+    get_latest_compatible_version :: (repo: str, current_version: SemVer) -> SemVer {
+        versions := get_available_versions(repo);
+        if versions.count == 0 {
+            return .{0, 0, 0};
+        }
+        defer delete(^versions);
+
+        array.sort(versions, SemVer.compare);
+        for versions {
+            if current_version->is_compatible(it) do return it;
+        }
+        return .{0, 0, 0};
+    }
+
+    clone_version :: (repo: str, version: SemVer) -> bool {
+        printf("Fetching {} version {}...\n", repo, version);
+
+        version_str := tprintf("v{}", version);
+        full_dest   := tprintf("{}/{}", config.config.lib_source_directory, ".cloned");
+
+        // Use 'git clone' to clone the bare minimum amount to get the released version.
+        git_proc    := os.process_spawn(git_path, .["clone", "--depth", "1", "-b", version_str, repo, full_dest]);
+        result      := os.process_wait(^git_proc);
+
+        if result == .Success {
+            install_dest: str;
+
+            if config.dependency_folders.folders->has(repo) {
+                install_dest = config.dependency_folders.folders[repo];
+
+            } else {
+                // Read the onyx-pkg.ini file in the cloned package, if available.
+                // This will be used to extract the desired name for the repository.
+                new_config: Config;
+                successfully_parsed := false;
+                for os.with_file(tprintf("{}/onyx-pkg.ini", full_dest)) {
+                    r := io.reader_make(it);
+                    result, error := parse_ini_file(^r, ^new_config);
+
+                    if result == .Success {
+                        successfully_parsed = true;
+                    }
+                }
+
+                if !successfully_parsed {
+                    eprintf("Unknown destination directory and failed to find onyx-pkg.ini in {}.\n", repo);
+                    os.remove_directory(full_dest);
+                    return false;
+                }
+
+                install_dest = new_config.metadata.name;
+                config.dependency_folders.folders[repo] = install_dest;
+            }
+
+            // Move the cloned repository to its permanent location.
+            actual_dest := tprintf("{}/{}", config.config.lib_source_directory, install_dest);
+            if os.dir_exists(actual_dest) {
+                eprintf("Expected {} to not exist when fetching {}.\n", actual_dest, repo);
+                return false;
+            }
+
+            if !os.dir_rename(full_dest, actual_dest) do return false;
+
+            // Remove the .git folder, as it is unneeded.
+            unnecessary_git_dir := tprintf("{}/.git", actual_dest);
+            return os.remove_directory(unnecessary_git_dir);
+        }
+
+        return false;
+    }
+}
+
+
+
+config: Config;
+Config :: struct {
+    Metadata :: struct {
+        name:        str;
+        description: str;
+        url:         str;
+        author:      str;
+        version:     SemVer;
+    }
+    metadata: Metadata;
+
+    Config :: struct {
+        lib_source_directory: str = "./lib";
+        lib_bin_directory: str    = "./bin";
+    }
+    config: Config = .{};
+
+    Dependencies :: struct {
+        dependencies: Map(str, SemVer);
+
+        parse_ini :: parse_dependencies;
+        write_ini :: write_dependencies;
+    }
+    dependencies: Dependencies;
+
+    Dependency_Folders :: struct {
+        // Dependency to folder
+        folders: Map(str, str);
+
+        parse_ini :: parse_dependency_folders;
+        write_ini :: write_dependency_folders;
+    }
+    dependency_folders: Dependency_Folders;
+}
+
+#local parse_dependencies :: (dependencies: ^Config.Dependencies, r: ^io.Reader) -> bool {
+    while true {
+        r->skip_whitespace();
+        if r->is_empty() do return true;
+        if p, _ := r->peek_byte(); p == #char "[" do return true;
+
+        dep := r->read_until(#char "=") |> string.strip_trailing_whitespace();
+        r->read_byte();
+        r->skip_whitespace();
+
+        version_str := r->read_until(#char "\n") |> string.strip_trailing_whitespace();
+        version: SemVer;
+        conv.parse_any(^version, version_str);
+        dependencies.dependencies[dep] = version;
+    }
+
+    return true;
+}
+
+#local write_dependencies :: (dependencies: ^Config.Dependencies, w: ^io.Writer) -> bool {
+    for^ dependencies.dependencies.entries {
+        io.write_format(w, "{}={}\n", it.key, it.value);
+    }
+
+    return true;
+}
+
+#local parse_dependency_folders :: (dependencies: ^Config.Dependency_Folders, r: ^io.Reader) -> bool {
+    while true {
+        r->skip_whitespace();
+        if r->is_empty() do return true;
+        if p, _ := r->peek_byte(); p == #char "[" do return true;
+        
+        dep := r->read_until(#char "=") |> string.strip_trailing_whitespace();
+        r->read_byte();
+        r->skip_whitespace();
+
+        folder := r->read_until(#char "\n") |> string.strip_trailing_whitespace();
+        dependencies.folders[dep] = folder;
+    }
+
+    return true;
+}
+
+#local write_dependency_folders :: (dependencies: ^Config.Dependency_Folders, w: ^io.Writer) -> bool {
+    for^ dependencies.folders.entries {
+        io.write_format(w, "{}={}\n", it.key, it.value);
+    }
+
+    return true;
+}
+
+
+load_config_file :: () -> bool {
+    file_data := os.get_contents(global_arguments.config_file);
+    if string.is_empty(file_data) {
+        return false;
+    }
+
+    reader, stream := io.reader_from_string(file_data);
+    defer cfree(stream);
+
+    result, error := parse_ini_file(^reader, ^config);
+    if result != .Success {
+        eprintf("{w5} | {}\n", error.line, error.msg);
+        return false;
+    }
+
+    return true;
+}
+
+store_config_file :: () -> bool {
+    for os.with_file(global_arguments.config_file, .Write) {
+        writer := io.writer_make(it);
+        return write_ini_file(^writer, config);
+    }
+}
+
+
+
+#local {
+    IniParseResult :: enum {
+        Success;
+        Error;
+    }
+
+    IniParseError :: struct {
+        msg: str;
+        line: u32;
+    }
+}
+
+parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
+    info :: package runtime.info
+
+    line := 1;
+    error :: macro (msg: str) {
+        return .Error, .{ msg, line };
+    }
+
+    next_line :: macro () {
+        r->advance_line();
+        line += 1;
+    }
+
+    output: any;
+    if t := info.get_type_info(output_ptr.type); t.kind != .Pointer {
+        error("Expected pointer type for parameter.");
+    } else {
+        output.data = *cast(^rawptr) output_ptr.data;
+        output.type = (cast(^info.Type_Info_Pointer) t).to;
+    }
+
+    // Set the temporary allocator to an arena that will be freed at the end.
+    alloc.arena.auto(32 * 1024,  #(context.temp_allocator));
+
+    active_item_ptr  := null;
+    active_item_type := void;
+
+    r->skip_whitespace();
+    while !r->is_empty() {
+        defer r->skip_whitespace();
+
+        if b, e := r->peek_byte(); b == #char "[" {
+            assert(r->read_byte() == #char "[", "expected [");
+            section_name := r->read_until(#char "]", allocator=context.temp_allocator);
+            assert(r->read_byte() == #char "]", "expected ]");
+
+            stripped_section_name := string.strip_whitespace(section_name);
+            member := info.get_struct_member(output.type, stripped_section_name);
+            if member == null {
+                error(msg = aprintf("'{}' is not a valid section name.", stripped_section_name));
+            }
+
+            active_item_ptr  = cast(^u8) output.data + member.offset;
+            active_item_type = member.type;
+
+            parse_method := info.get_struct_method(active_item_type, "parse_ini");
+            if parse_method != null {
+                next_line();
+
+                f := *cast(^(rawptr, ^io.Reader) -> bool) parse_method.data;
+                if !f(active_item_ptr, r) {
+                    error(msg = aprintf("Failed parsing."));
+                }
+
+                r->read_until(#char "[", inplace=true);
+            }
+
+            continue;
+
+        } elseif e != .None {
+            if e == .EOF do break;
+            error(msg = aprintf("Error reading file: {}", e));
+        }
+
+        defer next_line();
+
+        field_name := r->read_until(#char "=", allocator=context.temp_allocator);
+        assert(r->read_byte() == #char "=", "expected =");
+        r->skip_whitespace();
+
+        field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name));
+        target := cast(^u8) active_item_ptr + field.offset;
+        value_string := r->read_until(#char "\n", allocator=context.temp_allocator);
+        parsed_successfully := conv.parse_any(target, field.type, value_string);
+
+        if !parsed_successfully {
+            //
+            // If the type is a string, then the value can be the entire line
+            // of text. No need to force the quotes.
+            if field.type == str {
+                *cast(^str) target = string.alloc_copy(value_string)
+                                  |> string.strip_whitespace();
+
+            } else {
+                error(aprintf("Failed to parse value."));
+            }
+        }
+
+    } else {
+        error("Empty file");
+    }
+
+    return .Success, .{"",0};
+}
+
+write_ini_file :: (w: ^io.Writer, output: any) -> bool {
+    info :: package runtime.info
+
+    output_info := cast(^info.Type_Info_Struct) info.get_type_info(output.type);
+    if output_info.kind != .Struct do return false;
+
+    for^ output_info.members {
+        io.write_format(w, "[{}]\n", it.name);
+        defer io.write(w, "\n");
+
+        member_info := cast(^info.Type_Info_Struct) info.get_type_info(it.type);
+        if member_info.kind != .Struct do continue;
+
+        member_data := cast(^u8) output.data + it.offset;
+
+        if write_method := info.get_struct_method(it.type, "write_ini"); write_method != null {
+            wm := *cast(^(rawptr, ^io.Writer) -> bool) write_method.data;
+            if !wm(member_data, w) {
+                return false;
+            }
+
+            continue;
+        }
+
+        for^ prop: member_info.members {
+            io.write_format_va(w, "{}={}\n", .[
+                .{^prop.name, str},
+                .{member_data + prop.offset, prop.type}
+            ]);
+        }
+    }
+
+    return true;
+}
+
+
+
+
+

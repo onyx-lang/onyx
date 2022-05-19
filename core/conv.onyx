@@ -830,6 +830,7 @@ parse_any :: #match {}
         }
 
         case str {
+            if to_parse.count == 0       do return false;
             if to_parse[0] != #char "\"" do return false;
             line := to_parse;
             string.advance(^line);

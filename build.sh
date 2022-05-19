@@ -110,6 +110,11 @@ if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
 
     $CC -shared -fpic -I include -I lib/common/include src/onyx_runtime.c -o onyx_runtime.so -lpthread
     sudo mv "./onyx_runtime.so" "$CORE_DIR/lib/onyx_runtime.so"
+
+
+    sudo cp ./bin/onyx-pkg "$BIN_DIR/onyx-pkg"
+    sudo mkdir -p "$CORE_DIR/tools"
+    sudo cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
 fi
 
 # Otherwise the prompt ends on the same line

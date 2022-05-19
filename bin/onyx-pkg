@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# @Cleanup  this assumes that this is the path, but it could be modified.
+onyx run /usr/share/onyx/tools/onyx-pkg.onyx -- $@

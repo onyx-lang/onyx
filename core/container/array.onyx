@@ -151,21 +151,26 @@ remove :: (arr: ^[..] $T, elem: T) {
     arr.count -= move;
 }
 
-delete :: (arr: ^[..] $T, idx: u32) {
-    if idx >= arr.count do return;
+delete :: (arr: ^[..] $T, idx: u32) -> T {
+    if idx >= arr.count do return __zero_value(T);
 
+    to_return := arr.data[idx];
     for i: idx .. arr.count - 1 {
         arr.data[i] = arr.data[i + 1];
     }
 
     arr.count -= 1;
+    return to_return;
 }
 
-fast_delete :: (arr: ^[..] $T, idx: u32) {
-    if idx >= arr.count do return;
+fast_delete :: (arr: ^[..] $T, idx: u32) -> T {
+    if idx >= arr.count do return __zero_value(T);
 
+    to_return := arr.data[idx];
     if idx != arr.count - 1 do arr.data[idx] = arr.data[arr.count - 1];
     arr.count -= 1;
+
+    return to_return;
 }
 
 pop :: (arr: ^[..] $T) -> T {
