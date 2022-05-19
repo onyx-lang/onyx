@@ -1,7 +1,7 @@
 
 #load "core/std"
 
-Version :: SemVer.{0, 1, 0}
+Version :: SemVer.{0, 1, 1}
 
 use package core
 use package core.intrinsics.onyx {__initialize, __zero_value}
@@ -528,10 +528,14 @@ Git :: struct {
             actual_dest := tprintf("{}/{}", config.config.lib_source_directory, install_dest);
             if os.dir_exists(actual_dest) {
                 eprintf("Expected {} to not exist when fetching {}.\n", actual_dest, repo);
+                os.remove_directory(full_dest);
                 return false;
             }
 
-            if !os.dir_rename(full_dest, actual_dest) do return false;
+            if !os.dir_rename(full_dest, actual_dest) {
+                os.remove_directory(full_dest);
+                return false;
+            }
 
             // Remove the .git folder, as it is unneeded.
             unnecessary_git_dir := tprintf("{}/.git", actual_dest);
