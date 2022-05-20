@@ -235,7 +235,11 @@ static void context_init(CompileOptions* opts) {
     context.options = opts;
     context.cycle_detected = 0;
 
-    context.global_scope = scope_create(global_heap_allocator, NULL, (OnyxFilePos) { 0 });
+    OnyxFilePos internal_location = { 0 };
+    internal_location.filename = "<compiler internal>";
+    internal_location.line     = 1;
+    internal_location.column   = 1;
+    context.global_scope = scope_create(global_heap_allocator, NULL, internal_location);
     sh_new_arena(context.packages);
 
     // NOTE: This will be initialized upon the first call to entity_heap_insert.

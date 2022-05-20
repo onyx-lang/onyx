@@ -36,6 +36,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
     __dir_open   :: (path: str, dir: ^DirectoryData) -> bool ---
     __dir_close  :: (dir: DirectoryData) -> void ---
     __dir_read   :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool ---
+    __dir_create :: (path: str) -> bool ---
     __dir_remove :: (path: str) -> bool ---
 }
 

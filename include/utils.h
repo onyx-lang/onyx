@@ -11,7 +11,7 @@ extern bh_allocator global_heap_allocator;
 const char* onyx_ast_node_kind_string(AstKind kind);
 
 Package* package_lookup(char* package_name);
-Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_allocator alloc);
+Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_allocator alloc, OnyxFilePos pos);
 void package_track_use_package(Package* package, Entity* entity);
 void package_reinsert_use_packages(Package* package);
 

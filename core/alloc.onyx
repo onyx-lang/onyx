@@ -31,13 +31,11 @@ TEMPORARY_ALLOCATOR_SIZE :: 1 << 16; // 16Kb
 heap_allocator : Allocator;
 
 // The global temp allocator, set up upon program intialization.
-#local
+#local #thread_local
 temp_state     : arena.ArenaState;
 temp_allocator : Allocator;
 
-init :: () {
-    heap.init();
-
+init_temp_allocator :: () {
     temp_state = arena.make(heap_allocator, TEMPORARY_ALLOCATOR_SIZE);
     temp_allocator = as_allocator(^temp_state);
 }

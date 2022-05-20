@@ -26,7 +26,7 @@ Package* package_lookup(char* package_name) {
     }
 }
 
-Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_allocator alloc) {
+Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_allocator alloc, OnyxFilePos pos) {
     i32 index = shgeti(context.packages, package_name);
     if (index != -1) {
         return context.packages[index].value;
@@ -44,6 +44,14 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         package->use_package_entities = NULL;
 
         shput(context.packages, pac_name, package);
+
+        if (!charset_contains(pac_name, '.')) {
+            AstPackage* package_node = onyx_ast_node_new(alloc, sizeof(AstPackage), Ast_Kind_Package);
+            package_node->package_name = package->name;
+            package_node->package = package;
+
+            symbol_raw_introduce(context.global_scope, pac_name, pos, (AstNode *) package_node);
+        }
 
         return package;
     }
@@ -110,6 +118,11 @@ b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* sym
             AstNode *node = scope->symbols[index].value;
             if (node != symbol) {
                 onyx_report_error(pos, Error_Critical, "Redeclaration of symbol '%s'.", name);
+
+                if (node->token) {
+                    onyx_report_error(node->token->pos, Error_Critical, "Previous declaration was here.");
+                }
+
                 return 0;
             }
             return 1;

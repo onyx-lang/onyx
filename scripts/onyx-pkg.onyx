@@ -3,8 +3,8 @@
 
 Version :: SemVer.{0, 1, 1}
 
-use package core
-use package core.intrinsics.onyx {__initialize, __zero_value}
+use core
+use core.intrinsics.onyx {__initialize, __zero_value}
 
 global_arguments: struct {
     #tag "--config-file"
@@ -29,8 +29,7 @@ main :: (args: [] cstr) {
     loaded_config_file := false;
     defer if loaded_config_file do store_config_file();
 
-    info :: package runtime.info
-    command_procedures := info.get_procedures_with_tag(Command);
+    command_procedures := runtime.info.get_procedures_with_tag(Command);
     defer delete(^command_procedures);
     for command_procedures {
         if it.tag.command == command {
@@ -65,8 +64,7 @@ run_help_command :: (args: [] cstr) {
     printf("onyx-pkg version {}\n", Version);
     printf("Package dependency resolver and synchronizer for Onyx.\n\nUsage:\n");
 
-    info :: package runtime.info
-    command_procedures := info.get_procedures_with_tag(Command);
+    command_procedures := runtime.info.get_procedures_with_tag(Command);
     defer delete(^command_procedures);
     for command_procedures {
         printf("{}\n", it.tag.description);
@@ -307,11 +305,49 @@ run_sync_command :: (args: [] cstr) {
             if it.type != .Directory do continue;
 
             if !array.contains(needed_dependency_folders, it->name()) {
-                os.remove_directory(tprintf("{}/{}", config.config.lib_source_directory, it->name()));
+                package_folder := tprintf("{}/{}", config.config.lib_source_directory, it->name());
+                attempt_remove_native_library(package_folder);
+                os.remove_directory(package_folder);
             }
         }
     }
 }
+
+#tag Command.{ "rebuild", "Rebuild native library for a package", "package-or-url",
+"""
+package-or-url   Git repository name or package name on disk to remove.
+"""
+}
+run_rebuild_command :: (args: [] cstr) {
+    if args.count < 1 {
+        eprintf("Expected package name.");
+        return;
+    }
+
+    dep := string.as_str(args[0]);
+
+    folder := dep;
+    if config.dependency_folders.folders->has(dep) {
+        folder = config.dependency_folders.folders[dep];
+    }
+
+    if rebuild_native_library(folder) {
+        printf("Successfully rebuilt {}.\n", dep);
+    } else {
+        printf("Failed to rebuild {}.\n", dep);
+        os.exit(1);
+    }
+}
+
+#local {
+    #if runtime.compiler_os == .Linux {
+        native_library_suffix :: ".so"
+    }
+    #if runtime.compiler_os == .Windows {
+        native_library_suffix :: ".dll"
+    }
+}
+
 
 install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, installed_folder: str) {
     if config.dependency_folders.folders->has(pack.repo) {
@@ -342,8 +378,9 @@ install_package :: (pack: Package, downgrade_if_necessary := false) -> (bool, in
     }
 
     assert(config.dependency_folders.folders->has(pack.repo), "");
-    folder_name := config.dependency_folders.folders[pack.repo];
-    return true, folder_name;
+    folder_name     := config.dependency_folders.folders[pack.repo];
+    install_success := run_native_library_installation(folder_name);
+    return install_success, folder_name;
 }
 
 uninstall_package :: (pack: Package) -> bool {
@@ -353,9 +390,34 @@ uninstall_package :: (pack: Package) -> bool {
 
         if os.file_exists(package_folder) {
             // Should this check if the version to be deleted is the one that is actually installed?
+            attempt_remove_native_library(package_folder);
             os.remove_directory(package_folder);
         }
+        
+        return true;
     }
+
+    return false;
+}
+
+attempt_remove_native_library :: (package_folder: str) -> bool {
+    inner_config: Config;
+    for os.with_file(tprintf("{}/onyx-pkg.ini", package_folder)) {
+        r := io.reader_make(it);
+        result, error := parse_ini_file(^r, ^inner_config);
+
+        if result != .Success do return false;
+        if string.is_empty(inner_config.native_library.library) do return false;
+
+        os.remove_file(tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix));             
+    }
+
+    return true;
+}
+
+rebuild_native_library :: (folder: str) -> bool {
+    attempt_remove_native_library(tprintf("{}/{}", config.config.lib_source_directory, folder));
+    return run_native_library_installation(folder);
 }
 
 get_installed_version_of_package :: (package_path: str) -> SemVer {
@@ -370,6 +432,47 @@ get_installed_version_of_package :: (package_path: str) -> SemVer {
     }
 
     return .{0, 0, 0};
+}
+
+run_native_library_installation :: (folder: str) -> bool {
+    inner_config: Config;
+    for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, folder)) {
+        r := io.reader_make(it);
+        result, error := parse_ini_file(^r, ^inner_config);
+
+        if result != .Success do return false;
+        if string.is_empty(inner_config.native_library.build_cmd) do return true;
+
+        args := string.split(inner_config.native_library.build_cmd, #char " ", context.temp_allocator);
+        cmd  := args[0];
+        args  = args[1 .. args.count];
+
+        installed_dest := tprintf("{}/{}", config.config.lib_source_directory, folder);
+        build_proc     := os.process_spawn(cmd, args, starting_directory=installed_dest);
+        build_result   := os.process_wait(^build_proc);
+
+        if build_result != .Success {
+            eprintf("Failed to build native library in {}.\n", folder);
+            return false;
+        }
+        
+        if !os.dir_exists(config.config.lib_bin_directory) {
+            if !os.dir_create(config.config.lib_bin_directory) {
+                eprintf("Failed to create native library directory, {}.\n", config.config.lib_bin_directory);
+                return false;
+            }
+        }
+
+        source_path := tprintf("{}/{}{}", installed_dest, inner_config.native_library.library, native_library_suffix);
+        dest_path   := tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix);
+        success := os.rename_file(source_path, dest_path);
+                                  
+        if !success {
+            eprintf("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path);
+        }
+
+        return success;
+    }
 }
 
 
@@ -425,9 +528,8 @@ Package :: struct {
     version: SemVer;
 }
 
-#local runtime :: package runtime
 #if runtime.compiler_os == .Linux {
-    git_path :: "/usr/bin/git"
+    git_path :: "git"
 }
 #if runtime.compiler_os == .Windows {
     git_path :: "git.exe"
@@ -452,9 +554,7 @@ Git :: struct {
             }
         }
 
-        if os.process_wait(^git_proc) == .Error {
-            eprintf("Encountered error running 'git' command.");
-        }
+        os.process_wait(^git_proc);
 
         return versions;
     }
@@ -564,6 +664,12 @@ Config :: struct {
         lib_bin_directory: str    = "./bin";
     }
     config: Config = .{};
+
+    Native_Library :: struct {
+        build_cmd: str;
+        library:   str;
+    }
+    native_library: Native_Library;
 
     Dependencies :: struct {
         dependencies: Map(str, SemVer);
@@ -676,7 +782,7 @@ store_config_file :: () -> bool {
 }
 
 parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
-    info :: package runtime.info
+    info :: runtime.info
 
     line := 1;
     error :: macro (msg: str) {
@@ -743,7 +849,6 @@ parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseE
 
         field_name := r->read_until(#char "=", allocator=context.temp_allocator);
         assert(r->read_byte() == #char "=", "expected =");
-        r->skip_whitespace();
 
         field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name));
         target := cast(^u8) active_item_ptr + field.offset;
@@ -755,8 +860,9 @@ parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseE
             // If the type is a string, then the value can be the entire line
             // of text. No need to force the quotes.
             if field.type == str {
-                *cast(^str) target = string.alloc_copy(value_string)
-                                  |> string.strip_whitespace();
+                *cast(^str) target = value_string
+                                  |> string.strip_whitespace()
+                                  |> string.alloc_copy();
 
             } else {
                 error(aprintf("Failed to parse value."));
@@ -771,7 +877,7 @@ parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseE
 }
 
 write_ini_file :: (w: ^io.Writer, output: any) -> bool {
-    info :: package runtime.info
+    info :: runtime.info
 
     output_info := cast(^info.Type_Info_Struct) info.get_type_info(output.type);
     if output_info.kind != .Struct do return false;

@@ -15,7 +15,7 @@ get_tags_for_procedure :: (func: $T) -> [] any {
     if get_type_info(T).kind != .Function do return .[];
 
     for tagged_procedures {
-        if it.func == func do return it.tags;
+        if (*cast(^T) ^it.func) == func do return it.tags;
     }
 
     return .[];

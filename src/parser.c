@@ -3309,7 +3309,7 @@ static AstPackage* parse_package_expression(OnyxParser* parser) {
 
 static Package* parse_file_package(OnyxParser* parser) {
     if (parser->curr->type != Token_Type_Keyword_Package) {
-        return package_lookup_or_create("main", context.global_scope, parser->allocator);
+        return package_lookup_or_create("main", context.global_scope, parser->allocator, parser->curr->pos);
     }
 
     AstPackage* package_node = parse_package_expression(parser);
@@ -3323,7 +3323,7 @@ static Package* parse_file_package(OnyxParser* parser) {
         token_toggle_end(*symbol);
 
         strncat(aggregate_name, (*symbol)->text, 2047);
-        Package* newpackage = package_lookup_or_create(aggregate_name, context.global_scope, parser->allocator);
+        Package* newpackage = package_lookup_or_create(aggregate_name, context.global_scope, parser->allocator, package_node->token->pos);
 
         AstPackage* pnode = make_node(AstPackage, Ast_Kind_Package);
         pnode->token = *symbol;

@@ -40,6 +40,7 @@ dir_read :: (dir: Directory, out_entry: ^DirectoryEntry) -> bool {
     return fs.__dir_read(dir, out_entry);
 }
 
+dir_create :: fs.__dir_create
 dir_exists :: fs.__file_exists
 dir_remove :: fs.__dir_remove
 dir_rename :: fs.__file_rename

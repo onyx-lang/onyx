@@ -28,7 +28,7 @@ __assert_handler :: (msg: str, site: CallSite) {
 __runtime_initialize :: () {
     __initialize_data_segments();
 
-    alloc.init();
+    alloc.heap.init();
     __thread_initialize();
 
     #if Multi_Threading_Enabled do thread.__initialize();
@@ -46,6 +46,8 @@ __thread_initialize :: macro () {
         __tls_base = raw_alloc(alloc.heap_allocator, __tls_size);
         memory.set(__tls_base, 0, __tls_size);
     }
+
+    alloc.init_temp_allocator();
 
     __initialize(^context);
     context.allocator = alloc.heap_allocator;

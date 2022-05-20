@@ -374,7 +374,7 @@ void initialize_builtins(bh_allocator a) {
         if (bsym->package == NULL)
             symbol_builtin_introduce(context.global_scope, bsym->sym, bsym->node);
         else {
-            Package* p = package_lookup_or_create(bsym->package, context.global_scope, a);
+            Package* p = package_lookup_or_create(bsym->package, context.global_scope, a, context.global_scope->created_at);
             assert(p);
 
             symbol_builtin_introduce(p->scope, bsym->sym, bsym->node);
@@ -382,7 +382,7 @@ void initialize_builtins(bh_allocator a) {
         bsym++;
     }
 
-    Package* p = package_lookup_or_create("builtin", context.global_scope, a);
+    Package* p = package_lookup_or_create("builtin", context.global_scope, a, context.global_scope->created_at);
 
     builtin_string_type = (AstType *) symbol_raw_resolve(p->scope, "str");
     if (builtin_string_type == NULL) {
@@ -480,7 +480,7 @@ void initalize_special_globals() {
 }
 
 void introduce_build_options(bh_allocator a) {
-    Package* p = package_lookup_or_create("runtime", context.global_scope, a);
+    Package* p = package_lookup_or_create("runtime", context.global_scope, a, context.global_scope->created_at);
 
     AstType* Runtime_Type = (AstType *) symbol_raw_resolve(p->scope, "Runtime");
     if (Runtime_Type == NULL) {

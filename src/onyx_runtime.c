@@ -34,6 +34,7 @@ ONYX_DEF(__file_open_impl, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32))
     int   path_len = params->data[1].of.i32;
 
     char path[512] = {0};
+    path_len = bh_min(path_len, 511);
     strncpy(path, path_ptr, path_len);
     path[path_len] = 0;
 
@@ -77,6 +78,7 @@ ONYX_DEF(__file_exists, (WASM_I32, WASM_I32), (WASM_I32)) {
     int   path_len = params->data[1].of.i32;
 
     char path[512] = {0};
+    path_len = bh_min(path_len, 511);
     strncpy(path, path_ptr, path_len);
     path[path_len] = 0;
 
@@ -89,6 +91,7 @@ ONYX_DEF(__file_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
     int   path_len = params->data[1].of.i32;
 
     char path[512] = {0};
+    path_len = bh_min(path_len, 511);
     strncpy(path, path_ptr, path_len);
     path[path_len] = 0;
 
@@ -190,6 +193,7 @@ ONYX_DEF(__file_rename, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     int   old_path_len = params->data[1].of.i32;
 
     char old_path[512] = {0};
+    old_path_len = bh_min(old_path_len, 511);
     strncpy(old_path, old_path_ptr, old_path_len);
     old_path[old_path_len] = 0;
 
@@ -197,6 +201,7 @@ ONYX_DEF(__file_rename, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     int   new_path_len = params->data[3].of.i32;
 
     char new_path[512] = {0};
+    new_path_len = bh_min(new_path_len, 511);
     strncpy(new_path, new_path_ptr, new_path_len);
     new_path[new_path_len] = 0;
 
@@ -220,6 +225,7 @@ ONYX_DEF(__dir_open, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     int   path_len = params->data[1].of.i32;
 
     char path[512] = {0};
+    path_len = bh_min(path_len, 511);
     strncpy(path, path_ptr, path_len);
     path[path_len] = 0;
 
@@ -339,11 +345,32 @@ ONYX_DEF(__dir_close, (WASM_I64), ()) {
     return NULL;
 }
 
+ONYX_DEF(__dir_create, (WASM_I32, WASM_I32), (WASM_I32)) {
+    char *path_ptr = ONYX_PTR(params->data[0].of.i32);
+    int   path_len = params->data[1].of.i32;
+
+    char path[512] = {0};
+    path_len = bh_min(path_len, 511);
+    strncpy(path, path_ptr, path_len);
+    path[path_len] = 0;
+
+#ifdef _BH_WINDOWS
+    results->data[0] = WASM_I32_VAL(CreateDirectoryA(path, NULL));
+    return NULL;
+#endif
+
+#ifdef _BH_LINUX
+    results->data[0] = WASM_I32_VAL(mkdir(path, 0777) == 0);
+    return NULL;
+#endif
+}
+
 ONYX_DEF(__dir_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
     char *path_ptr = ONYX_PTR(params->data[0].of.i32);
     int   path_len = params->data[1].of.i32;
 
     char path[512] = {0};
+    path_len = bh_min(path_len, 511);
     strncpy(path, path_ptr, path_len);
     path[path_len] = 0;
 
@@ -508,17 +535,26 @@ typedef struct OnyxProcess {
 #endif
 } OnyxProcess;
 
-ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I64)) {
+ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I64)) {
     char* process_str = ONYX_PTR(params->data[0].of.i32);
     i32   process_len = params->data[1].of.i32;
     i32   args_ptr    = params->data[2].of.i32;
     i32   args_len    = params->data[3].of.i32;
     b32   blocking_io = !params->data[4].of.i32;
+    char *cwd_str     = ONYX_PTR(params->data[5].of.i32);
+    i32   cwd_len     = params->data[6].of.i32;
 
     char process_path[1024];
     process_len = bh_min(1023, process_len);
     memcpy(process_path, process_str, process_len);
     process_path[process_len] = '\0';
+
+    char starting_dir[1024];
+    if (cwd_len > 0) {
+        cwd_len = bh_min(1023, cwd_len);
+        memcpy(starting_dir, cwd_str, cwd_len);
+        starting_dir[cwd_len] = '\0';
+    }
 
     OnyxProcess *process = malloc(sizeof(OnyxProcess));
     memset(process, 0, sizeof(*process));
@@ -568,7 +604,11 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (W
                     fcntl(1, F_SETFL, O_NONBLOCK);
                 }
 
-                execv(process_path, process_args);
+                if (cwd_len > 0) {
+                    chdir(starting_dir); // Switch current working directory.
+                }
+
+                execvp(process_path, process_args);
                 exit(-1);
                 break;
 
@@ -633,7 +673,12 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (W
 
         memset(&process->proc_info, 0, sizeof process->proc_info);
 
-        success = CreateProcessA(process_path, cmdLine, &saAttr, &saAttr, 1, 0, NULL, NULL, &startup, &process->proc_info);
+        char *working_dir = NULL;
+        if (cwd_len > 0) {
+            working_dir = starting_dir;
+        }
+
+        success = CreateProcessA(process_path, cmdLine, &saAttr, &saAttr, 1, 0, NULL, working_dir, &startup, &process->proc_info);
         if (!success) {
             printf("FAILED TO CREATE PROCESS: %d\n", GetLastError());
             wasm_val_init_ptr(&results->data[0], NULL); // Failed to run @LEAK
@@ -1201,6 +1246,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__dir_open)
     ONYX_FUNC(__dir_read)
     ONYX_FUNC(__dir_close)
+    ONYX_FUNC(__dir_create)
     ONYX_FUNC(__dir_remove)
 
     ONYX_FUNC(__spawn_thread)

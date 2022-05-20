@@ -16,8 +16,8 @@ Process :: struct {
     process_handle: Handle;
 }
 
-process_spawn :: (path: str, args: [] str, non_blocking_io := false) -> Process {
-    handle := __process_spawn(path, args, non_blocking_io);
+process_spawn :: (path: str, args: [] str, non_blocking_io := false, starting_directory := "") -> Process {
+    handle := __process_spawn(path, args, non_blocking_io, starting_directory);
 
     return .{
         .{ ^process_stream_vtable },
@@ -81,7 +81,7 @@ process_destroy :: (use p: ^Process) => {
 }
 
 #foreign "onyx_runtime" {
-    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool) -> Process.Handle ---
+    __process_spawn   :: (path: str, args: [] str, non_blocking_io: bool, starting_directory: str) -> Process.Handle ---
     __process_read    :: (handle: Process.Handle, buffer: [] u8) -> i32 ---
     __process_write   :: (handle: Process.Handle, buffer: [] u8) -> i32 ---
     __process_kill    :: (handle: Process.Handle) -> bool ---

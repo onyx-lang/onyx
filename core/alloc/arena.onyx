@@ -118,8 +118,9 @@ free :: (arena: ^ArenaState) {
 clear :: (arena: ^ArenaState) {
     walker := arena.first_arena.next;
     while walker != null {
+        next := walker.next;
         raw_free(arena.backing_allocator, walker);
-        walker = walker.next;
+        walker = next;
     }
 
     arena.size = sizeof rawptr;

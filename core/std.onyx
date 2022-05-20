@@ -55,6 +55,7 @@ package core
 
     #load "./onyx/fs"
     #load "./onyx/cptr"
+    #load "./onyx/cbindgen"
 }
 #if runtime.runtime == .Wasi   {
     #load "./wasi/wasi"
