@@ -1,7 +1,0 @@
-package qoi
-
-#package {
-    math :: package core.math    
-}
-
-#load "./qoi"

@@ -291,6 +291,10 @@ run_sync_command :: (args: [] cstr) {
                     uninstall_package(.{it.key, it.value});
                     dependencies_installed->delete(it.key);
                     dependencies_to_install << .{ .{it.key, it.value}, false };
+
+                } elseif !it.value->is_compatible(dependencies_installed[it.key]) {
+                    eprintf("Different major versions of {} being used!\n", it.key);
+                    os.exit(1);
                 }
             } else {
                 dependencies_to_install << .{ .{it.key, it.value}, false };
