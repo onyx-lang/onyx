@@ -1437,7 +1437,7 @@ bh_file_error bh_file_open_mode(bh_file* file, bh_file_mode mode, const char* fi
     switch (mode & BH_FILE_MODE_MODES) {
     case BH_FILE_MODE_READ:                       os_mode = O_RDONLY; break;
     case BH_FILE_MODE_WRITE:                      os_mode = O_WRONLY | O_CREAT | O_TRUNC; break;
-    case BH_FILE_MODE_APPEND:                     os_mode = O_RDONLY | O_APPEND | O_CREAT; break;
+    case BH_FILE_MODE_APPEND:                     os_mode = O_WRONLY | O_APPEND | O_CREAT; break;
     case BH_FILE_MODE_READ   | BH_FILE_MODE_RW:   os_mode = O_RDWR; break;
     case BH_FILE_MODE_WRITE  | BH_FILE_MODE_RW:   os_mode = O_RDWR | O_CREAT | O_TRUNC; break;
     case BH_FILE_MODE_APPEND | BH_FILE_MODE_RW:   os_mode = O_RDWR | O_APPEND | O_CREAT; break;
