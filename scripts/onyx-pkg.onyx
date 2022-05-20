@@ -339,6 +339,61 @@ run_rebuild_command :: (args: [] cstr) {
     }
 }
 
+#tag Command.{ "publish", "Bump version number and create a publishable version of the package", "" }
+run_publish_command :: (args: [] cstr) {
+    @TODO // Better error handling and reporting, as this is a delicate process.
+
+    if !os.dir_exists(".git") {
+        printf("It does not look like you are in a Git repository. In order to publish packages\n");
+        printf("with onyx-pkg, you have to initailize a Git repository in the current directory.\n\n");
+        return;
+    }
+
+    r := io.reader_make(^stdin);
+
+    while true {
+        printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ");
+        input := r->read_line(consume_newline=true, inplace=true)
+                 |> string.strip_whitespace()
+                 |> string.to_lowercase();
+
+        switch input {
+            case "a" {
+                // Major version bump
+                config.metadata.version->bump_major();
+            }
+
+            case "i" {
+                // Minor version bump
+                config.metadata.version->bump_minor();
+            }
+
+            case "p" {
+                // Patch version bump
+                config.metadata.version->bump_patch();
+            }
+
+            case "c" {
+                return;
+            }
+
+            case #default do continue;
+        }
+
+        break;
+    }
+
+    store_config_file();
+
+    printf("Creating new published version...\n");
+    if Git.publish_version() {
+        printf("Successfully published new version.\n");
+    } else {
+        printf("Failed to publish new version.\n");
+    }
+}
+
+
 #local {
     #if runtime.compiler_os == .Linux {
         native_library_suffix :: ".so"
@@ -518,6 +573,21 @@ SemVer :: struct {
     is_compatible :: (from, to: SemVer) -> bool {
         return from.major == to.major;
     }
+
+    bump_major :: (use this: ^SemVer) {
+        major += 1;
+        minor  = 0;
+        patch  = 0;
+    }
+
+    bump_minor :: (use this: ^SemVer) {
+        minor += 1;
+        patch  = 0;
+    }
+
+    bump_patch :: (use this: ^SemVer) {
+        patch += 1;
+    }
 }
 
 #operator == macro (s1, s2: SemVer) => s1.major == s2.major && s1.minor == s2.minor && s1.patch == s2.patch;
@@ -643,6 +713,21 @@ Git :: struct {
         }
 
         return false;
+    }
+
+    publish_version :: () -> bool {
+        run_command :: macro (cmd: str, args: [] str) {
+            p := os.process_spawn(cmd, args);
+            if os.process_wait(^p) != .Success {
+                return false;
+            }
+        }
+
+        run_command(git_path, .["add", global_arguments.config_file]);
+        run_command(git_path, .["commit", "-m", tprintf("version {}", config.metadata.version)]);
+        run_command(git_path, .["tag", tprintf("v{}", config.metadata.version)]);
+        run_command(git_path, .["push", "--tags"]);
+        return true;
     }
 }
 
