@@ -309,8 +309,21 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     AstTyped* expr = (AstTyped *) strip_aliases((AstNode *) (*fa)->expr);
 
     b32 force_a_lookup = 0;
+
     if (expr->kind == Ast_Kind_Enum_Type || expr->kind == Ast_Kind_Type_Raw_Alias) {
         force_a_lookup = 1;
+    }
+
+    //
+    // If we are trying to access a field on an alias, we have to make sure
+    // the alias is "ready" to have a symbol looked up inside of it. This means
+    // the alias should have passed symbol resolution. If not, force a lookup
+    // and yield if the alias was not ready.
+    if ((*fa)->expr->kind == Ast_Kind_Alias) {
+        assert((*fa)->expr->entity);
+        if ((*fa)->expr->entity->state < Entity_State_Check_Types) {
+            force_a_lookup = 1;
+        }
     }
 
     AstNode* resolution = try_symbol_resolve_from_node((AstNode *) expr, (*fa)->token);
