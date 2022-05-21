@@ -132,6 +132,16 @@ __file_remove :: (path: str) -> bool {
     return removed;
 }
 
+__file_rename :: (old_path: str, new_path: str) -> bool {
+    renamed := false;
+    for .[3, 4] { // Trying both preopened directories
+        err := wasi.path_rename(it, old_path, it, new_path);
+        if err == .Success do renamed = true;
+    }
+
+    return renamed;
+}
+
 __file_stream_vtable := io.Stream_Vtable.{
     seek = (use fs: ^os.File, to: i32, whence: io.SeekFrom) -> io.Error {
         // Currently, the new offset is just ignored.
@@ -281,4 +291,24 @@ __dir_read :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool {
 
     dir.last_cookie = dirent.d_next;
     return true;
+}
+
+__dir_create :: (path: str) -> bool {
+    created := false;
+    for .[3, 4] { // Trying both preopened directories
+        err := wasi.path_create_directory(it, path);
+        if err == .Success do created = true;
+    }
+
+    return created;
+}
+
+__dir_remove :: (path: str) -> bool {
+    removed := false;
+    for .[3, 4] { // Trying both preopened directories
+        err := wasi.path_remove_directory(it, path);
+        if err == .Success do removed = true;
+    }
+
+    return removed;
 }

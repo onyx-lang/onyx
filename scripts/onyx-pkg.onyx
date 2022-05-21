@@ -97,7 +97,6 @@ run_init_command :: (args: [] cstr) {
     read_field :: macro (f: str, dest: ^$T) {
         while true {
             print(f);
-            r->skip_whitespace();
             line := r->read_line(consume_newline=true, allocator=context.temp_allocator)
                     |> string.strip_whitespace();
 
