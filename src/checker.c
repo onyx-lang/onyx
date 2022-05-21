@@ -1893,11 +1893,14 @@ CheckStatus check_expression(AstTyped** pexpr) {
             retval = check_do_block((AstDoBlock **) pexpr);
             break;
 
+        case Ast_Kind_Memres:
+            if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know globals type.");
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;
-        case Ast_Kind_Memres: break;
         case Ast_Kind_Polymorphic_Proc: break;
         case Ast_Kind_Package: break;
         case Ast_Kind_Error: break;
