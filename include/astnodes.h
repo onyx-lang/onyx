@@ -1534,6 +1534,7 @@ struct Context {
     // NOTE: This is defined in onyxwasm.h
     struct OnyxWasmModule* wasm_module;
 
+    b32 cycle_almost_detected : 1;
     b32 cycle_detected : 1;
 };
 

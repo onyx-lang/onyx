@@ -899,11 +899,11 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
 static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
     AstDirectiveDefined* defined = *pdefined;
 
-    b32 use_package_count = (context.entities.type_count[Entity_Type_Use_Package] == 0);
+    b32 has_to_be_resolved = context.cycle_almost_detected;
 
     resolved_a_symbol = 0;
     SymresStatus ss = symres_expression(&defined->expr);
-    if (use_package_count && ss != Symres_Success && !resolved_a_symbol) {
+    if (has_to_be_resolved && ss != Symres_Success && !resolved_a_symbol) {
         // The symbol definitely was not found and there is no chance that it could be found.
         defined->is_defined = 0;
         return Symres_Success;

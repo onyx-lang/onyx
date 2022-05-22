@@ -234,6 +234,7 @@ static void context_init(CompileOptions* opts) {
 
     context.options = opts;
     context.cycle_detected = 0;
+    context.cycle_almost_detected = 0;
 
     OnyxFilePos internal_location = { 0 };
     internal_location.filename = "<compiler internal>";
@@ -607,7 +608,12 @@ static i32 onyx_compile() {
             else if (watermarked_node == ent) {
                 if (ent->macro_attempts > highest_watermark) {
                     entity_heap_insert_existing(&context.entities, ent);
-                    dump_cycles();
+
+                    if (context.cycle_almost_detected) {
+                        dump_cycles();
+                    } else {
+                        context.cycle_almost_detected = 1;
+                    }
                 }
             }
             else if (watermarked_node->macro_attempts < ent->macro_attempts) {
@@ -616,6 +622,7 @@ static i32 onyx_compile() {
             }
         } else {
             watermarked_node = NULL;
+            context.cycle_almost_detected = 0;
         }
 
         if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
