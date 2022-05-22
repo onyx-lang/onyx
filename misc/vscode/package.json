@@ -2,7 +2,7 @@
     "name": "onyx",
     "displayName": "Onyx",
     "description": "Onyx syntax highlighting.",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "publisher": "brendanfh",
     "engines": {
         "vscode": "^1.51.0"
@@ -52,7 +52,9 @@
             }
         ]
     },
-    "files": ["./textmate-configuration.json"],
+    "files": [
+        "./textmate-configuration.json"
+    ],
     "dependencies": {
         "vscode-textmate-languageservice": "0.2.1"
     },
