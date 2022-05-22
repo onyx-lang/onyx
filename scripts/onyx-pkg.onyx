@@ -396,6 +396,22 @@ run_publish_command :: (args: [] cstr) {
     }
 }
 
+#tag Command.{ "list-versions", "List all installable versions of a remote package.", "[package-url]", require_config_file=false }
+run_list_versions :: (args: [] cstr) {
+    if args.count < 1 {
+        return;
+    }
+
+    pack := string.as_str(args[0]);
+
+    versions := Git.get_available_versions(pack);
+    defer delete(^versions);
+
+    for versions {
+        printf("- {}\n", it);
+    }
+}
+
 
 #local {
     #if runtime.compiler_os == .Linux {
