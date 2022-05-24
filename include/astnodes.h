@@ -695,7 +695,6 @@ struct AstRangeLiteral {
 struct AstCall {
     AstTyped_base;
 
-    Arguments original_args;
     Arguments args;
 
     union {

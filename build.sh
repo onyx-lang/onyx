@@ -69,7 +69,6 @@ if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
 
         # sudo cp "$WASMER_LIBRARY_DIR/libiwasm.so" "$CORE_DIR/lib/libiwasm.so"
         sudo cp "$WASMER_LIBRARY_DIR/libwasmer.so" "$CORE_DIR/lib/libwasmer.so"
-        sudo cp "$WASMER_LIBRARY_DIR/libwasmer.a" "$CORE_DIR/lib/libwasmer.a"
 
         sudo cp "include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
         sudo cp "lib/common/include/wasm.h" "$CORE_DIR/include/wasm.h"

@@ -616,12 +616,6 @@ CheckStatus check_call(AstCall** pcall) {
     CHECK(arguments, &call->args);
     current_checking_level = current_checking_level_store;
 
-    // SPEED CLEANUP: Keeping an original copy for basically no reason except that sometimes you
-    // need to know the baked argument values in code generation.
-    // This should only be done once, but right now it is being done everytime this is checked,
-    // which can be multiple if we have to yield on a callee's type.
-    arguments_clone(&call->original_args, &call->args);
-
     AstFunction* callee=NULL;
     CHECK(resolve_callee, call, (AstTyped **) &callee);
 
