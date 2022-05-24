@@ -1,7 +1,7 @@
 package ui
 
 use package core
-use package core.intrinsics.onyx { __zero_value, __initialize }
+use package core.intrinsics.onyx { __initialize }
 
 Workspace_State :: struct {
     transform: gfx.Transform = .{

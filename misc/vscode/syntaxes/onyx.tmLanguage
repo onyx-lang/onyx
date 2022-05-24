@@ -406,6 +406,18 @@
 				</dict>
 				<dict>
 					<key>match</key>
+					<string>\b([#]\s*foreign)</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.tag.onyx entity.name.block.onyx</string>
+						</dict>
+					</dict>
+				</dict>
+				<dict>
+					<key>match</key>
 					<string>\b(\b[[:alpha:]_]+[[:alnum:]_\.]*\b)\s*[\(]</string>
 					<key>captures</key>
 					<dict>
@@ -465,10 +477,6 @@
 					<string>string.quoted.double.onyx</string>
 					<key>patterns</key>
 					<array>
-						<dict>
-							<key>include</key>
-							<string>#string_placeholder</string>
-						</dict>
 						<dict>
 							<key>include</key>
 							<string>#string_escaped_char</string>

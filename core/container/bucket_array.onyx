@@ -121,7 +121,7 @@ iterator :: (b: ^Bucket_Array($T)) -> Iterator(T) {
         bucket := ^ba.buckets[bucket_idx];
         while elem_idx == bucket.count {
             bucket_idx += 1;
-            if bucket_idx == ba.buckets.count do return __zero_value(T), false;
+            if bucket_idx == ba.buckets.count do return .{}, false;
 
             bucket = ^ba.buckets[bucket_idx];
             elem_idx = 0;

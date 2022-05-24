@@ -105,6 +105,7 @@ static const char* ast_node_names[] = {
     "DO BLOCK",
 
     "FOREIGN BLOCK",
+    "ZERO VALUE",
 
     "NOTE",
 
@@ -567,7 +568,18 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     if (node->kind == Ast_Kind_Struct_Literal && (node->type_node == NULL && node->type == NULL)) {
         if (node->entity != NULL) return TYPE_MATCH_SUCCESS;
         if (type->kind == Type_Kind_VarArgs) type = type->VarArgs.elem;
-        if (!type_is_sl_constructable(type)) return TYPE_MATCH_FAILED;
+
+        //
+        // If the structure literal has arguments, and the type is not constructable
+        // using a struct literal, then they cannot be unified. However, if no arguments
+        // are given, e.g. .{}, then any type should be matched, as that is the universal
+        // zero-value.
+        if (!type_is_sl_constructable(type)) {
+            AstStructLiteral *sl = (AstStructLiteral *) node;
+            if (bh_arr_length(sl->args.values) != 0 || bh_arr_length(sl->args.named_values) != 0) {
+                return TYPE_MATCH_FAILED;
+            }
+        }
 
         // If this shouldn't make permanent changes and submit entities,
         // just assume that it works and don't submit the entities.
@@ -778,6 +790,13 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 *pnode = (AstTyped *) address_of->expr;
                 return unify_node_and_type_(pnode, type, permanent);
             }
+        }
+    }
+
+    else if (node->kind == Ast_Kind_Zero_Value) {
+        if (node_type == NULL) {
+            node->type = type;
+            return TYPE_MATCH_SUCCESS;
         }
     }
 
@@ -1193,6 +1212,14 @@ AstUnaryOp* make_cast(bh_allocator a, AstTyped* expr, Type* to) {
     cast->expr = expr;
     cast->type = to;
     return cast;
+}
+
+AstZeroValue* make_zero_value(bh_allocator a, OnyxToken* token, Type* type) {
+    AstZeroValue* zero_value = onyx_ast_node_new(a, sizeof(AstZeroValue), Ast_Kind_Zero_Value);
+    zero_value->token = token;
+    zero_value->flags |= Ast_Flag_Comptime;
+    zero_value->type = type;
+    return zero_value;
 }
 
 void arguments_initialize(Arguments* args) {

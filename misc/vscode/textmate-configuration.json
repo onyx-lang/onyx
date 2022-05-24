@@ -21,7 +21,8 @@
     },
     "declarations": [
         "entity.name.function.onyx",
-        "entity.name.type.onyx"
+        "entity.name.type.onyx",
+        "entity.name.block.onyx"
     ],
     "indentation": {
       "punctuation.block.begin.onyx": 1,

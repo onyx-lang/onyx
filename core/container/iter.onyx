@@ -1,6 +1,5 @@
 package core.iter
 
-use package core.intrinsics.onyx { __zero_value }
 #local memory :: package core.memory
 #local alloc  :: package core.alloc
 
@@ -132,7 +131,7 @@ map :: #match {}
 
     next :: (mi: ^MapIterator($T, $R)) -> (R, bool) {
         value, cont := mi.iterator.next(mi.iterator.data);
-        if !cont do return __zero_value(R), false;
+        if !cont do return .{}, false;
 
         return mi.transform(value), true;
     }
@@ -165,7 +164,7 @@ map :: #match {}
 
     next :: (mi: ^MapIterator($T, $R, $Ctx)) -> (R, bool) {
         value, cont := mi.iterator.next(mi.iterator.data);
-        if !cont do return __zero_value(R), false;
+        if !cont do return .{}, false;
 
         return mi.transform(value, mi.ctx), true;
     }
@@ -219,7 +218,7 @@ take :: (it: Iterator($T), count: u32, allocator := iter_allocator) -> Iterator(
     take_iterator.allocator = allocator;
 
     next :: ($T: type_expr, ti: ^TakeIterator(T)) -> (T, bool) {
-        if ti.remaining == 0 do return __zero_value(T), false;
+        if ti.remaining == 0 do return .{}, false;
 
         ti.remaining -= 1;
         return ti.iterator.next(ti.iterator.data);
@@ -356,7 +355,7 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
 
     next :: (use c: ^Context($T)) -> (T, bool) {
         while true {
-            if idx >= iters.count do return __zero_value(T), false;        
+            if idx >= iters.count do return .{}, false;        
 
             curr_iter := ^iters[idx];
             value, valid := curr_iter.next(curr_iter.data);
@@ -426,7 +425,7 @@ enumerate :: #match {}
     next :: (use data: ^Enumeration_Context($T)) -> (Enumeration_Value(T), bool) {
         value, cont := iterator.next(iterator.data);
 
-        if !cont do return .{ current_index, __zero_value(T) }, false;
+        if !cont do return .{ current_index, .{} }, false;
 
         defer current_index += 1;
         return .{ current_index, value }, true;
@@ -489,7 +488,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
             return arr.data[current], true;
 
         } else {
-            return __zero_value(T), false;
+            return .{}, false;
         }
     }
 
@@ -659,7 +658,7 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
         }
 
         next :: (use c: ^Context($T)) -> (T, bool) {
-            if ended do return __zero_value(T), false;
+            if ended do return .{}, false;
             sync.scoped_mutex(^mutex);
 
             if v, success := take_one(iterator); !success {

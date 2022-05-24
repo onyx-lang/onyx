@@ -6,7 +6,6 @@ package core.set
     memory :: package core.memory
     math :: package core.math
 }
-use package core.intrinsics.onyx { __zero_value }
 
 #local SetValue :: interface (t: $T) {
     { hash.to_u32(t) } -> u32;
@@ -39,7 +38,7 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     iterator :: iterator
 }
 
-make :: ($T: type_expr, default := __zero_value(T), allocator := context.allocator) -> Set(T) {
+make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(T) {
     set : Set(T);
     init(^set, default=default, allocator=allocator);
     return set;
@@ -47,7 +46,7 @@ make :: ($T: type_expr, default := __zero_value(T), allocator := context.allocat
 
 #match (package builtin).__make_overload macro (x: ^Set, allocator: Allocator) => (package core.set).make(x.Elem_Type, allocator = allocator);
 
-init :: (set: ^Set($T), default := __zero_value(T), allocator := context.allocator) {
+init :: (set: ^Set($T), default := T.{}, allocator := context.allocator) {
     set.allocator = allocator;
     set.default_value = default;
 
@@ -85,7 +84,7 @@ has :: (use set: ^Set, value: set.Elem_Type) -> bool {
 
 get :: (use set: ^Set, value: set.Elem_Type) -> set.Elem_Type {
     lr := lookup(set, value);
-    return entries[lr.entry_index].value if lr.entry_index >= 0 else __zero_value(set.Elem_Type);
+    return entries[lr.entry_index].value if lr.entry_index >= 0 else set.Elem_Type.{};
 }
 
 get_ptr :: (use set: ^Set, value: set.Elem_Type) -> ^set.Elem_Type {
@@ -137,7 +136,7 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
             return set.entries[position].value, true;
 
         } else {
-            return __zero_value(T), false;
+            return .{}, false;
         }
     }
 

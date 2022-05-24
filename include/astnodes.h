@@ -102,7 +102,9 @@
                                \
     NODE(ForeignBlock)         \
                                \
-    NODE(Package)          
+    NODE(Package)              \
+                               \
+    NODE(ZeroValue)
 
 #define NODE(name) typedef struct Ast ## name Ast ## name;
 AST_NODES
@@ -221,6 +223,8 @@ typedef enum AstKind {
     Ast_Kind_Do_Block,
 
     Ast_Kind_Foreign_Block,
+
+    Ast_Kind_Zero_Value,
 
     Ast_Kind_Note,
 
@@ -342,7 +346,7 @@ typedef enum OnyxIntrinsic {
     ONYX_INTRINSIC_MEMORY_SIZE, ONYX_INTRINSIC_MEMORY_GROW,
     ONYX_INTRINSIC_MEMORY_COPY, ONYX_INTRINSIC_MEMORY_FILL,
 
-    ONYX_INTRINSIC_INITIALIZE, ONYX_INTRINSIC_ZERO_VALUE,
+    ONYX_INTRINSIC_INITIALIZE,
 
     ONYX_INTRINSIC_I32_CLZ,   ONYX_INTRINSIC_I32_CTZ, ONYX_INTRINSIC_I32_POPCNT,
     ONYX_INTRINSIC_I32_AND,   ONYX_INTRINSIC_I32_OR,  ONYX_INTRINSIC_I32_XOR,
@@ -717,6 +721,9 @@ struct AstDoBlock {
     AstTyped_base;
 
     AstBlock* block;
+};
+struct AstZeroValue {
+    AstTyped_base;
 };
 
 struct AstDirectiveSolidify {
@@ -1656,9 +1663,10 @@ AstAddressOf*    make_address_of(bh_allocator a, AstTyped* node);
 AstLocal*        make_local(bh_allocator a, OnyxToken* token, AstType* type_node);
 AstNode*         make_symbol(bh_allocator a, OnyxToken* sym);
 AstUnaryOp*      make_cast(bh_allocator a, AstTyped* expr, Type* to);
+AstZeroValue*    make_zero_value(bh_allocator a, OnyxToken *token, Type* type);
 
 void arguments_initialize(Arguments* args);
-b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg);
+b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values);
 void arguments_ensure_length(Arguments* args, u32 count);
 void arguments_copy(Arguments* dest, Arguments* src);
 void arguments_clone(Arguments* dest, Arguments* src);

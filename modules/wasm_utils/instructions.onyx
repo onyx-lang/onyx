@@ -1,7 +1,5 @@
 package wasm_utils
 
-Z :: (package core.intrinsics.onyx).__zero_value
-
 WasmInstructionCode :: enum {
     unreachable   :: 0x00;
     nop           :: 0x01;
@@ -252,7 +250,7 @@ instruction_iterator :: (binary: ^WasmBinary, code: ^WasmCode, allocator := cont
     data.reader = io.reader_make(^data.stream);
 
     next :: (use c: ^CodeContext) -> (WasmInstruction, bool) {
-        if current_block_depth == 0 do return Z(WasmInstruction), false;
+        if current_block_depth == 0 do return .{}, false;
 
         return parse_instruction(^reader, binary, code.code_offset, ^current_block_depth), true;
     }

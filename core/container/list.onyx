@@ -1,7 +1,5 @@
 package core.list
 
-use package core.intrinsics.onyx { __zero_value }
-
 ListElem :: struct (T: type_expr) {
     next: ^ListElem(T) = null;
     prev: ^ListElem(T) = null;
@@ -63,7 +61,7 @@ push_begin :: (list: ^List, x: list.Elem_Type) {
     if list.last == null do list.last = new_elem;
 }
 
-pop_end :: (list: ^List($T), default: T = __zero_value(T)) -> T {
+pop_end :: (list: ^List($T), default: T = .{}) -> T {
     if list.last == null do return default;
 
     end := list.last;
@@ -74,7 +72,7 @@ pop_end :: (list: ^List($T), default: T = __zero_value(T)) -> T {
     return end.data;
 }
 
-pop_begin :: (list: ^List($T), default: T = __zero_value(T)) -> T {
+pop_begin :: (list: ^List($T), default: T = .{}) -> T {
     if list.last == null do return default;
 
     begin := list.first;
@@ -151,8 +149,7 @@ map :: #match {}
 #match iter.as_iterator get_iterator
 get_iterator :: (list: ^List($T)) -> Iterator(T) {
     iterator_next :: (list_iter: ^ListIterator($T)) -> (T, bool) {
-        use package core.intrinsics.onyx { __zero_value }
-        if list_iter.current == null do return __zero_value(T), false;
+        if list_iter.current == null do return .{}, false;
 
         defer list_iter.current = list_iter.current.next;
         return list_iter.current.data, true;

@@ -4,7 +4,7 @@
 Version :: SemVer.{0, 1, 1}
 
 use core
-use core.intrinsics.onyx {__initialize, __zero_value}
+use core.intrinsics.onyx {__initialize}
 
 global_arguments: struct {
     #tag "--config-file"

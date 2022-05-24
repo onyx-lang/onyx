@@ -72,8 +72,8 @@ NumberLike :: interface (t: $T) {
 // Here, Vector2 has the type constraint of NumberLike for T. This constraint
 // is checked when Vector2 is constructed with any parameters.
 Vector2 :: struct (T: type_expr) where NumberLike(T) {
-    x := __zero_value(T);
-    y := __zero_value(T);
+    x := T.{};
+    y := T.{};
 }
 
 #operator + (x, y: Vector2($T)) => Vector2(T).{ x.x + y.x, x.y + y.y };

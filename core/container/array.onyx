@@ -1,7 +1,5 @@
 package core.array
 
-use package core.intrinsics.onyx { __zero_value }
-
 // [..] T == Array(T)
 //   where
 // Array :: struct (T: type_expr) {
@@ -152,7 +150,7 @@ remove :: (arr: ^[..] $T, elem: T) {
 }
 
 delete :: (arr: ^[..] $T, idx: u32) -> T {
-    if idx >= arr.count do return __zero_value(T);
+    if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
     for i: idx .. arr.count - 1 {
@@ -164,7 +162,7 @@ delete :: (arr: ^[..] $T, idx: u32) -> T {
 }
 
 fast_delete :: (arr: ^[..] $T, idx: u32) -> T {
-    if idx >= arr.count do return __zero_value(T);
+    if idx >= arr.count do return .{};
 
     to_return := arr.data[idx];
     if idx != arr.count - 1 do arr.data[idx] = arr.data[arr.count - 1];
@@ -174,7 +172,7 @@ fast_delete :: (arr: ^[..] $T, idx: u32) -> T {
 }
 
 pop :: (arr: ^[..] $T) -> T {
-    if arr.count == 0 do return __zero_value(T);
+    if arr.count == 0 do return .{};
 
     arr.count -= 1;
     return arr.data[arr.count];
@@ -265,7 +263,7 @@ transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
 }
 
 get :: (arr: [] $T, idx: i32) -> T {
-    if arr.count == 0 do return __zero_value(T);
+    if arr.count == 0 do return .{};
 
     while idx < 0          do idx += arr.count;
     while idx >= arr.count do idx -= arr.count;

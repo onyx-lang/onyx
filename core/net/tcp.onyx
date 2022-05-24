@@ -8,8 +8,6 @@ package core.net
     memory  :: package core.memory
     alloc   :: package core.alloc
     os      :: package core.os
-
-    use package core.intrinsics.onyx { __zero_value }
 }
 
 #if !runtime.Multi_Threading_Enabled {
@@ -62,7 +60,7 @@ TCP_Event :: struct {
 
 tcp_get_events :: (use conn: ^TCP_Connection) -> Iterator(TCP_Event) {
     next :: (use conn: ^TCP_Connection) -> (TCP_Event, bool) {
-        if event_cursor == events.count do return __zero_value(TCP_Event), false;
+        if event_cursor == events.count do return .{}, false;
 
         defer event_cursor += 1;
         return events[event_cursor], true;

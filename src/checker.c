@@ -635,7 +635,7 @@ CheckStatus check_call(AstCall** pcall) {
     arguments_ensure_length(&call->args, arg_count);
 
     char* err_msg = NULL;
-    fill_in_arguments(&call->args, (AstNode *) callee, &err_msg);
+    fill_in_arguments(&call->args, (AstNode *) callee, &err_msg, 0);
     if (err_msg != NULL) ERROR(call->token->pos, err_msg);
 
     bh_arr(AstArgument *) arg_arr = (bh_arr(AstArgument *)) call->args.values;
@@ -1226,6 +1226,26 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     }
 
     if (!type_is_structlike_strict(sl->type)) {
+        //
+        // If there are no given arguments to a structure literal, it is treated as a 'zero-value',
+        // and can be used to create a completely zeroed value of any type.
+        if (bh_arr_length(sl->args.values) == 0 && bh_arr_length(sl->args.named_values) == 0) {
+            AstZeroValue *zv = make_zero_value(context.ast_alloc, sl->token, sl->type);
+            bh_arr_push(sl->args.values, (AstTyped *) zv);
+
+            sl->flags |= Ast_Flag_Has_Been_Checked;
+            return Check_Success;
+        }
+
+        if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) {
+            assert(sl->args.values);
+            assert(sl->args.values[0]);
+            assert(sl->args.values[0]->kind == Ast_Kind_Zero_Value);
+            return Check_Success;
+        }
+
+        //
+        // Otherwise, it is not possible to construct the type if it is not a structure.
         ERROR_(sl->token->pos,
                 "'%s' is not constructable using a struct literal.",
                 type_get_name(sl->type));
@@ -1237,7 +1257,7 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
     // :Idempotency
     if ((sl->flags & Ast_Flag_Has_Been_Checked) == 0) {
         char* err_msg = NULL;
-        if (!fill_in_arguments(&sl->args, (AstNode *) sl, &err_msg)) {
+        if (!fill_in_arguments(&sl->args, (AstNode *) sl, &err_msg, 1)) {
             onyx_report_error(sl->token->pos, Error_Critical, err_msg);
 
             bh_arr_each(AstTyped *, value, sl->args.values) {
@@ -1908,6 +1928,7 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Constraint_Sentinel: break;
         case Ast_Kind_Switch_Case: break;
         case Ast_Kind_Foreign_Block: break;
+        case Ast_Kind_Zero_Value: break;
 
         default:
             retval = Check_Error;

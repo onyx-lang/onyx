@@ -7,7 +7,7 @@ package core.map
     math   :: package core.math
     conv   :: package core.conv
 
-    use package core.intrinsics.onyx { __zero_value, __initialize }
+    use package core.intrinsics.onyx { __initialize }
 }
 
 #local {
@@ -55,7 +55,7 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     empty   :: (package core.map).empty
 }
 
-make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value)) -> Map(Key, Value) {
+make :: ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {
     map : Map(Key, Value);
     init(^map, default = default);
     return map;
@@ -63,7 +63,7 @@ make :: ($Key: type_expr, $Value: type_expr, default := __zero_value(Value)) -> 
 
 #match (package builtin).__make_overload macro (x: ^Map($K, $V), allocator := context.allocator) => (package core.map).make(K, V);
 
-init :: (use map: ^Map($K, $V), default := __zero_value(V)) {
+init :: (use map: ^Map($K, $V), default := V.{}) {
     __initialize(map);
 
     allocator = context.allocator;

@@ -449,7 +449,7 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         arguments_ensure_length(&args, get_argument_buffer_size(&overload->type->Function, &args));
 
         // NOTE: If the arguments cannot be placed successfully in the parameters list
-        if (!fill_in_arguments(&args, (AstNode *) overload, NULL)) continue;
+        if (!fill_in_arguments(&args, (AstNode *) overload, NULL, 0)) continue;
         
         VarArgKind va_kind;
         TypeMatch tm = check_arguments_against_type(&args, &overload->type->Function, &va_kind, NULL, NULL, NULL);
@@ -747,7 +747,7 @@ i32 get_argument_buffer_size(TypeFunction* type, Arguments* args) {
 
 // NOTE: The values array can be partially filled out, and is the resulting array.
 // Returns if all the values were filled in.
-b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
+b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg, b32 insert_zero_values) {
 
     { // Delete baked arguments
         // :ArgumentResolvingIsComplicated
@@ -808,8 +808,13 @@ b32 fill_in_arguments(Arguments* args, AstNode* provider, char** err_msg) {
     fori (idx, 0, bh_arr_length(args->values)) {
         if (args->values[idx] == NULL) args->values[idx] = (AstTyped *) lookup_default_value_by_idx(provider, idx);
         if (args->values[idx] == NULL) {
-            if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
-            success = 0;
+            if (insert_zero_values) {
+                assert(provider->token);
+                args->values[idx] = (AstTyped *) make_zero_value(context.ast_alloc, provider->token, NULL);
+            } else {
+                if (err_msg) *err_msg = bh_aprintf(global_scratch_allocator, "No value given for %d%s argument.", idx + 1, bh_num_suffix(idx + 1));
+                success = 0;
+            }
         }
     }
 

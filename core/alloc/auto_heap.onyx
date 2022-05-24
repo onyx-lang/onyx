@@ -1,10 +1,8 @@
 package core.alloc.heap
 
-#local _Z :: (package core.intrinsics.onyx).__zero_value
-
 AutoHeapState :: struct {
     backing_allocator: Allocator;
-    set := _Z(Set(rawptr));
+    set := Set(rawptr).{};
 }
 
 #local auto_heap_alloc_proc :: (data: ^AutoHeapState, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {

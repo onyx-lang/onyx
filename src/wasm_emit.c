@@ -1835,13 +1835,6 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             break;
         }
 
-        case ONYX_INTRINSIC_ZERO_VALUE: {
-            // NOTE: This probably will not have to make an allocation.
-            Type* zero_type = type_build_from_ast(context.ast_alloc, (AstType *) ((AstArgument *) call->original_args.values[0])->value);
-            emit_zero_value_for_type(mod, &code, zero_type, call->token);
-            break;
-        }
-
         case ONYX_INTRINSIC_I32_CLZ:      WI(WI_I32_CLZ); break;
         case ONYX_INTRINSIC_I32_CTZ:      WI(WI_I32_CTZ); break;
         case ONYX_INTRINSIC_I32_POPCNT:   WI(WI_I32_POPCNT); break;
@@ -3019,6 +3012,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Zero_Value: {
+            AstZeroValue *zv = (AstZeroValue *) expr;
+            assert(zv->type);
+            emit_zero_value_for_type(mod, &code, zv->type, zv->token);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -3664,6 +3664,11 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     case Ast_Kind_Align_Of: {
         AstAlignOf* ao = (AstAlignOf *) node;
         *((u32 *) data) = ao->alignment;
+        break;
+    }
+
+    case Ast_Kind_Zero_Value: {
+        memset(data, 0, type_size_of(node->type));
         break;
     }
 

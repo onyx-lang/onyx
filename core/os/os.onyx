@@ -17,12 +17,11 @@ list_directory :: (path: str) -> Iterator(DirectoryEntry) {
     }
 
     next :: (use c: ^Context) -> (DirectoryEntry, bool) {
-        use package core.intrinsics.onyx {__zero_value}
-        if !opened do return __zero_value(DirectoryEntry), false;
+        if !opened do return .{}, false;
 
         entry: DirectoryEntry;
         if !dir_read(dir, ^entry) {
-            return __zero_value(DirectoryEntry), false;
+            return .{}, false;
         }
 
         return entry, true;
