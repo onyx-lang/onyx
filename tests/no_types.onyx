@@ -1,0 +1,33 @@
+//
+// No types are written throughout this entire program.
+//
+
+#load "core/std"
+
+use core
+
+main :: () {
+    object := .{
+        x  = 0.0,    y = 0.0,
+        vx = 10.0,  vy = 10.0,
+        ax = -20.0, ay = -100.0
+    };
+
+    for 40 {
+        step_physics(^object, 0.01);
+        printf("{}\n", object);
+    }
+}
+
+step_physics :: (obj, dt) => {
+    obj.x += 0.5 * obj.ax * dt * dt + obj.vx * dt;
+    obj.y += 0.5 * obj.ay * dt * dt + obj.vy * dt;
+    obj.vx += obj.ax * dt;
+    obj.vy += obj.ay * dt;
+
+    if obj.y < 0 {
+        obj.y = 0;
+        obj.vy = 0;
+        obj.vx *= 0.05;
+    }
+}

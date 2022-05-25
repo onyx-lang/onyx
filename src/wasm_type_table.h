@@ -380,7 +380,7 @@ static u64 build_type_table(OnyxWasmModule* module) {
                 // Struct methods
                 bh_arr(StructMethodData) method_data=NULL;
                 AstType *ast_type = type->ast_type;
-                if (ast_type->kind == Ast_Kind_Struct_Type) {
+                if (ast_type && ast_type->kind == Ast_Kind_Struct_Type) {
                     AstStructType *struct_type  = (AstStructType *) ast_type;
                     Scope*         struct_scope = struct_type->scope;
 

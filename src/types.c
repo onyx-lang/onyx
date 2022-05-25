@@ -697,6 +697,80 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
     return comp_type;
 }
 
+Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLiteral* lit) {
+    Type* type = type_create(Type_Kind_Struct, alloc, 0);
+    type->ast_type = NULL;
+    type->Struct.name = NULL;
+    type->Struct.mem_count = bh_arr_length(lit->args.named_values);
+    type->Struct.meta_tags = NULL;
+    type->Struct.constructed_from = NULL;
+    type->Struct.status = SPS_Start;
+    type->Struct.poly_sln = NULL;
+    type_register(type);
+
+    type->Struct.memarr = NULL;
+    sh_new_arena(type->Struct.members);
+    bh_arr_new(global_heap_allocator, type->Struct.memarr, type->Struct.mem_count);
+
+    u32 size = 0;
+    u32 offset = 0;
+    u32 alignment = 1;
+    u32 idx = 0;
+    bh_arr_each(AstNamedValue *, pnv, lit->args.named_values) {
+        AstNamedValue *nv = *pnv;
+
+        Type* member_type = resolve_expression_type(nv->value);
+        if (member_type == NULL) {
+            return NULL;
+        }
+
+        u32 mem_alignment = type_alignment_of(member_type);
+        if (mem_alignment <= 0) {
+            return NULL;
+        }
+
+        alignment = bh_max(alignment, mem_alignment);
+        
+        // Should these structs be packed or not?
+        bh_align(offset, mem_alignment);
+
+        token_toggle_end(nv->token);
+        if (shgeti(type->Struct.members, nv->token->text) != -1) {
+            token_toggle_end(nv->token);
+            return NULL;
+        }
+
+        StructMember *smem = bh_alloc_item(alloc, StructMember);
+        smem->offset = offset;
+        smem->type = member_type;
+        smem->idx = idx;
+        smem->name = bh_strdup(alloc, nv->token->text);
+        smem->token = nv->token;
+        smem->initial_value = &nv->value;
+        smem->meta_tags = NULL;
+        smem->included_through_use = 0;
+        smem->used = 0;
+        smem->use_through_pointer_index = -1;
+        shput(type->Struct.members, nv->token->text, smem);
+        bh_arr_push(type->Struct.memarr, smem);
+        token_toggle_end(nv->token);
+
+        u32 type_size = type_size_of(member_type);
+        offset += type_size;
+        size = offset;
+        idx++;
+    }
+
+    type->Struct.alignment = alignment;
+    type->Struct.size = size;
+    type->Struct.linear_members = NULL;
+    bh_arr_new(global_heap_allocator, type->Struct.linear_members, type->Struct.mem_count);
+    build_linear_types_with_offset(type, &type->Struct.linear_members, 0);
+
+    type->Struct.status = SPS_Uses_Done;
+    return type;
+}
+
 Type* type_make_pointer(bh_allocator alloc, Type* to) {
     if (to == NULL) return NULL;
     if (to == (Type *) &node_that_signals_failure) return to;

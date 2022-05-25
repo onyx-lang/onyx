@@ -1202,12 +1202,17 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
 }
 
 CheckStatus check_struct_literal(AstStructLiteral* sl) {
+
     if (sl->type == NULL) {
         // NOTE: This is used for automatically typed struct literals. If there is no provided
         // type for the struct literal, assume that it is passes successfully. When it is used
         // elsewhere, it will be added as an expression entity that will be processed once the
         // stnode is filled out.
-        if (sl->stnode == NULL) return Check_Success;
+        if (sl->stnode == NULL) {
+            CHECK(arguments, &sl->args);
+
+            return Check_Success;
+        }
 
         CHECK(expression, &sl->stnode);
         if (!node_is_type((AstNode *) sl->stnode)) {
@@ -1288,12 +1293,8 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
         Type* formal = smem.type;
 
         CHECK(expression, actual);
-
-        // HACK HACK HACK
-        if ((*actual)->type == NULL &&
-            (*actual)->entity != NULL &&
-            (*actual)->entity->state <= Entity_State_Check_Types) {
-            YIELD_((*actual)->token->pos, "Trying to resolve type of expression for member '%s'.", smem.name);
+        if ((*actual)->type == NULL && (*actual)->entity != NULL && (*actual)->entity->state <= Entity_State_Check_Types) {
+            YIELD((*actual)->token->pos, "Trying to resolve type of expression for member.");
         }
 
         TYPE_CHECK(actual, formal) {

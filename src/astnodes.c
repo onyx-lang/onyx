@@ -854,6 +854,26 @@ Type* resolve_expression_type(AstTyped* node) {
         }
     }
 
+    if (node->kind == Ast_Kind_Struct_Literal && node->type == NULL) {
+        AstStructLiteral* sl = (AstStructLiteral *) node;
+        assert(sl->stnode == NULL);
+        assert(sl->type_node == NULL);
+
+        // If values without names are given to a struct literal without
+        // a type, then we cannot implicitly build the type of the struct
+        // literal, as the name of every member cannot be known. Maybe we
+        // could implicitly do something like _1, _2, ... for the members
+        // that we not given names?
+        if (bh_arr_length(sl->args.values) > 0) {
+            return NULL;
+        }
+
+        sl->type = type_build_implicit_type_of_struct_literal(context.ast_alloc, sl);
+        if (sl->type) {
+            add_entities_for_node(NULL, (AstNode *) sl, NULL, NULL);
+        }
+    }
+
     // If polymorphic procedures HAVE to have a type, most likely
     // because they are part of a `typeof` expression, they are
     // assigned a void type. This is cleared before the procedure
