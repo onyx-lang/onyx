@@ -167,6 +167,7 @@ tcp_server_listen :: (use server: ^TCP_Server, port: u16) -> bool {
 
     socket->listen();
     thread.spawn(^listener_thread, server, tcp_server_listener);
+    return true;
 }
 
 tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
@@ -215,6 +216,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
     }
 
     for clients {
+        if it == null do continue;
         if it.state != .Alive {
             disconnect_event := new(TCP_Event.Disconnection, allocator=server.event_allocator);
             disconnect_event.client  = it;

@@ -746,7 +746,7 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
         smem->idx = idx;
         smem->name = bh_strdup(alloc, nv->token->text);
         smem->token = nv->token;
-        smem->initial_value = &nv->value;
+        smem->initial_value = NULL;
         smem->meta_tags = NULL;
         smem->included_through_use = 0;
         smem->used = 0;
