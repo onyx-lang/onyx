@@ -628,7 +628,9 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
         // CLEANUP CLEANUP CLEANUP: This is so freaking bad...
         char cmdLine[2048];
         memset(cmdLine, 0, 2048);
+        strncat(cmdLine, "\"", 2047);
         strncat(cmdLine, process_path, 2047);
+        strncat(cmdLine, "\"", 2047);
 
         byte_t* array_loc = ONYX_PTR(args_ptr);
         fori (i, 0, args_len) {
