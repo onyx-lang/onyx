@@ -635,8 +635,9 @@ ONYX_DEF(__process_spawn, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32, WAS
             char *arg_str = ONYX_PTR(*(i32 *) (array_loc + i * 2 * POINTER_SIZE));
             i32   arg_len = *(i32 *) (array_loc + i * 2 * POINTER_SIZE + 4);
 
-            strncat(cmdLine, " ", 2047);
+            strncat(cmdLine, " \"", 2047);
             strncat(cmdLine, arg_str, arg_len);
+            strncat(cmdLine, "\"", 2047);
         }
 
         STARTUPINFOA startup;
