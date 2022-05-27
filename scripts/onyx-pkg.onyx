@@ -4,7 +4,6 @@
 Version :: SemVer.{0, 1, 1}
 
 use core
-use core.intrinsics.onyx {__initialize}
 
 global_arguments: struct {
     #tag "--config-file"
@@ -12,7 +11,7 @@ global_arguments: struct {
 } = .{};
 
 main :: (args: [] cstr) {
-    __initialize(^config);
+    config = .{};
 
     arg_parse.arg_parse(args, ^global_arguments);
 
@@ -155,7 +154,7 @@ run_add_command :: (args: [] cstr) {
     }
 }
 
-#tag Command.{ "remove", "Remove a dependency.", "package-or-url", 
+#tag Command.{ "remove", "Remove a dependency.", "package-or-url",
 """
 package-or-url   Git repository name or package name on disk to remove.
 """
@@ -467,7 +466,7 @@ uninstall_package :: (pack: Package) -> bool {
             attempt_remove_native_library(package_folder);
             os.remove_directory(package_folder);
         }
-        
+
         return true;
     }
 
@@ -483,7 +482,7 @@ attempt_remove_native_library :: (package_folder: str) -> bool {
         if result != .Success do return false;
         if string.is_empty(inner_config.native_library.library) do return false;
 
-        os.remove_file(tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix));             
+        os.remove_file(tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix));
     }
 
     return true;
@@ -529,7 +528,7 @@ run_native_library_installation :: (folder: str) -> bool {
             eprintf("Failed to build native library in {}.\n", folder);
             return false;
         }
-        
+
         if !os.dir_exists(config.config.lib_bin_directory) {
             if !os.dir_create(config.config.lib_bin_directory) {
                 eprintf("Failed to create native library directory, {}.\n", config.config.lib_bin_directory);
@@ -540,7 +539,7 @@ run_native_library_installation :: (folder: str) -> bool {
         source_path := tprintf("{}/{}{}", installed_dest, inner_config.native_library.library, native_library_suffix);
         dest_path   := tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix);
         success := os.rename_file(source_path, dest_path);
-                                  
+
         if !success {
             eprintf("Failed to move native library to final destination.\n {} -> {}\n", source_path, dest_path);
         }
@@ -561,7 +560,7 @@ SemVer :: struct {
 
     parse :: (semver: ^SemVer, to_parse_: str, _: Allocator) -> bool {
         to_parse := to_parse_;
-        
+
         major := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
         string.advance(^to_parse);
         minor := string.read_until(^to_parse, #char ".") |> conv.str_to_i64();
@@ -825,7 +824,7 @@ Config :: struct {
         r->skip_whitespace();
         if r->is_empty() do return true;
         if p, _ := r->peek_byte(); p == #char "[" do return true;
-        
+
         dep := r->read_until(#char "=") |> string.strip_trailing_whitespace();
         r->read_byte();
         r->skip_whitespace();
@@ -1014,8 +1013,3 @@ write_ini_file :: (w: ^io.Writer, output: any) -> bool {
 
     return true;
 }
-
-
-
-
-

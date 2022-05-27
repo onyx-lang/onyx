@@ -402,7 +402,7 @@ static b32 process_load_entity(Entity* ent) {
 
         bh_dir_close(dir);
         return success;
-        
+
     } else if (include->kind == Ast_Kind_Load_Path) {
         bh_arr_push(context.options->included_folders, include->name);
 

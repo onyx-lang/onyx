@@ -204,6 +204,14 @@ network_to_host :: #match {}
         return .None, bytes_read;
     },
 
+    write_byte = (use s: ^Socket, byte: u8) -> io.Error {
+        if handle == 0 do return .BadFile;
+
+        bytes_written := __net_send(handle, .[ byte ]);
+        if bytes_written < 0 { s.vtable = null; return .BufferFull; }
+        return .None;
+    },
+
     write = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
         if handle == 0 do return .BadFile, 0;
         

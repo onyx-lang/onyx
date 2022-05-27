@@ -39,7 +39,7 @@ free :: (list: ^List) {
     }
 }
 
-push_end :: (list: ^List, x: list.Elem_Type) { 
+push_end :: (list: ^List, x: list.Elem_Type) {
     new_elem := allocate_elem(list);
     new_elem.data = x;
 
@@ -145,8 +145,7 @@ map :: #match {}
     }
 }
 
-#local iter :: package core.iter
-#match iter.as_iterator get_iterator
+#match core.iter.as_iterator get_iterator
 get_iterator :: (list: ^List($T)) -> Iterator(T) {
     iterator_next :: (list_iter: ^ListIterator($T)) -> (T, bool) {
         if list_iter.current == null do return .{}, false;

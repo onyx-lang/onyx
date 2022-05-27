@@ -473,7 +473,7 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
                                 return 1;
                             }
                 }
-                
+
                 onyx_report_error(num->token->pos, Error_Critical, "Unsigned integer constant with value '%l' does not fit into %d-bits.",
                         num->value.l,
                         type->Basic.size * 8);
@@ -685,7 +685,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
     // Here are some of the ways you can unify a node with a type if the type of the
     // node does not match the given type:
-    // 
+    //
     // If the nodes type is a function type and that function has an automatic return
     // value placeholder, fill in that placeholder with the actual type.
     // :AutoReturnType
@@ -753,7 +753,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         }
 
         compound->type = type_build_compound_type(context.ast_alloc, compound);
-        
+
         return TYPE_MATCH_SUCCESS;
     }
 
@@ -785,7 +785,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         if (address_of->can_be_removed) {
             if (!permanent) {
                 return unify_node_and_type_(&address_of->expr, type, permanent);
-                
+
             } else {
                 *pnode = (AstTyped *) address_of->expr;
                 return unify_node_and_type_(pnode, type, permanent);
@@ -847,7 +847,7 @@ Type* resolve_expression_type(AstTyped* node) {
         if (elem_type) {
             node->type = type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
             node->flags |= Ast_Flag_Array_Literal_Typed;
-            
+
             if (node->entity == NULL) {
                 add_entities_for_node(NULL, (AstNode *) node, NULL, NULL);
             }
@@ -856,8 +856,7 @@ Type* resolve_expression_type(AstTyped* node) {
 
     if (node->kind == Ast_Kind_Struct_Literal && node->type == NULL) {
         AstStructLiteral* sl = (AstStructLiteral *) node;
-        assert(sl->stnode == NULL);
-        assert(sl->type_node == NULL);
+        if (sl->stnode || sl->type_node) return NULL;
 
         // If values without names are given to a struct literal without
         // a type, then we cannot implicitly build the type of the struct
@@ -1208,7 +1207,7 @@ AstAddressOf* make_address_of(bh_allocator a, AstTyped* node) {
     if (node->token) ao->token = node->token;
     ao->expr = node;
 
-    return ao; 
+    return ao;
 }
 
 AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node) {
@@ -1269,7 +1268,7 @@ void arguments_ensure_length(Arguments* args, u32 count) {
 void arguments_copy(Arguments* dest, Arguments* src) {
     dest->used_argument_count = -1;
     dest->named_values = src->named_values;
-    
+
     bh_arr_grow(dest->values, (u32) bh_arr_length(src->values));
     bh_arr_set_length(dest->values, (u32) bh_arr_length(src->values));
     bh_arr_each(AstTyped*, arg, dest->values) *arg = NULL;
