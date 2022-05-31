@@ -1,9 +1,11 @@
 package core
 
+#tag conv.Custom_Format.{ #solidify cptr.format {T=T} }
 cptr :: struct (T: type_expr) {
     data: u64;
 
-    make :: (ptr: ^$T) -> cptr(T) {
+    make :: macro (ptr: ^$T) -> cptr(T) {
+        __cptr_make :: __cptr_make
         return .{ __cptr_make(ptr) };
     }
 
@@ -35,6 +37,10 @@ cptr :: struct (T: type_expr) {
         mem_base_ptr := __cptr_make(cast(rawptr) 1);
         assert(mem_base_ptr <= this.data + 1 && this.data + 1 <= mem_base_ptr + ~~(wasm.memory_size() << 16), "Invalid conversion from cptr to rawptr: pointer value out of Onyx memory range.");
         return ~~(this.data - mem_base_ptr + 1);
+    }
+
+    format :: (output: ^conv.Format_Output, format: ^conv.Format, p: ^cptr($T)) {
+        conv.format(output, "cptr({})[0x{b16}]", T, p.data);
     }
 }
 

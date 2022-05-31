@@ -2618,7 +2618,9 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
 
     switch (expr->kind) {
         case Ast_Kind_Param:
-        case Ast_Kind_Local: {
+        case Ast_Kind_Local:
+        case Ast_Kind_Array_Literal:
+        case Ast_Kind_Struct_Literal: {
             emit_local_location(mod, &code, (AstLocal *) expr, offset_return);
             break;
         }
@@ -2817,6 +2819,16 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Address_Of: {
             AstAddressOf* aof = (AstAddressOf *) expr;
+
+            if (node_is_addressable_literal((AstNode *) aof->expr)) {
+                aof->expr->flags |= Ast_Flag_Decl_Followed_By_Init;
+                aof->expr->flags |= Ast_Flag_Address_Taken;
+                emit_local_allocation(mod, &code, aof->expr);
+                emit_location(mod, &code, aof->expr);
+                emit_expression(mod, &code, aof->expr);
+                emit_store_instruction(mod, &code, aof->expr->type, 0);
+            }
+
             emit_location(mod, &code, aof->expr);
             break;
         }

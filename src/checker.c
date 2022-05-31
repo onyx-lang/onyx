@@ -149,6 +149,16 @@ CheckStatus check_return(AstReturn* retnode) {
                     node_get_type_name(retnode->expr));
         }
 
+        //
+        // Catch the obvious case of return '^.{ ... }', as that will never
+        // be legal.
+        if (retnode->expr->kind == Ast_Kind_Address_Of) {
+            AstAddressOf *aof = (AstAddressOf *) retnode->expr;
+            if (node_is_addressable_literal((AstNode *) aof->expr)) {
+                ERROR(retnode->token->pos, "Cannot return a pointer to a literal, as the space reserved for the literal will be freed upon returning.");
+            }
+        }
+
     } else {
         if (*expected_return_type == &type_auto_return) {
             *expected_return_type = &basic_types[Basic_Kind_Void];
@@ -1482,6 +1492,10 @@ CheckStatus check_address_of(AstAddressOf** paof) {
     }
 
     CHECK(expression, &aof->expr);
+    if (node_is_addressable_literal((AstNode *) aof->expr)) {
+        resolve_expression_type(aof->expr);
+    }
+    
     if (aof->expr->type == NULL) {
         YIELD(aof->token->pos, "Trying to resolve type of expression to take a reference.");
     }
@@ -1502,7 +1516,8 @@ CheckStatus check_address_of(AstAddressOf** paof) {
             && expr->kind != Ast_Kind_Field_Access
             && expr->kind != Ast_Kind_Memres
             && expr->kind != Ast_Kind_Local
-            && expr->kind != Ast_Kind_Constraint_Sentinel)
+            && expr->kind != Ast_Kind_Constraint_Sentinel
+            && !node_is_addressable_literal((AstNode *) expr))
             || (expr->flags & Ast_Flag_Cannot_Take_Addr) != 0) {
 
         if (aof->can_be_removed) {

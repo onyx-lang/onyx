@@ -1742,6 +1742,11 @@ static inline b32 node_is_auto_cast(AstNode* node) {
     return (node->kind == Ast_Kind_Unary_Op) && (((AstUnaryOp *) node)->operation == Unary_Op_Auto_Cast);
 }
 
+static inline b32 node_is_addressable_literal(AstNode* node) {
+    return (node->kind == Ast_Kind_Struct_Literal)
+        || (node->kind == Ast_Kind_Array_Literal);
+}
+
 static inline Type* get_expression_type(AstTyped* expr) {
     switch (expr->kind) {
         case Ast_Kind_Block: case Ast_Kind_If: case Ast_Kind_While: return NULL;
