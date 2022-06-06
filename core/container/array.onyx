@@ -188,6 +188,7 @@ filter :: macro (arr: ^[..] $T, body: Code) {
     while i := 0; i < arr.count - move {
         defer i += 1;
 
+        it := arr[i];
         if !(#unquote body) do move += 1;
         if move != 0 do arr.data[i] = arr.data[i + move];
     }
@@ -195,12 +196,14 @@ filter :: macro (arr: ^[..] $T, body: Code) {
     arr.count -= move;
 }
 
-fold_idx_elem :: (arr: [] $T, cmp: (T, T) -> bool) -> (i32, T) {
+#local fold_idx_elem :: (arr: [] $T, $cmp: Code) -> (i32, T) {
     idx  := 0;
     elem := arr[0];
 
     for i: 1 .. arr.count {
-        if cmp(arr[i], elem) {
+        A := ^arr[i];
+        B := ^elem;
+        if #unquote cmp {
             idx  = i;
             elem = arr[i];
         }
@@ -209,19 +212,12 @@ fold_idx_elem :: (arr: [] $T, cmp: (T, T) -> bool) -> (i32, T) {
     return idx, elem;
 }
 
-#local cmp_greater :: (x, y) => x > y;
-#local cmp_less    :: (x, y) => x < y;
-
-greatest :: #match {
-    (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr, cmp_greater); },
-    (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr, cmp_greater); },
-    (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(.{ cast(^T) arr, N }, cmp_greater); },
+greatest :: macro (arr: [] $T) -> (i32, T) {
+    return fold_idx_elem(arr, #(*A > *B));
 }
 
-least :: #match {
-    (arr: [..] $T) -> (i32, T) { return fold_idx_elem(arr, cmp_less); },
-    (arr: [] $T)   -> (i32, T) { return fold_idx_elem(arr, cmp_less); },
-    (arr: [$N] $T) -> (i32, T) { return fold_idx_elem(.{ cast(^T) arr, N }, cmp_less); },
+least :: macro (arr: [] $T) -> (i32, T) {
+    return fold_idx_elem(arr, #(*A < *B));
 }
 
 
@@ -449,19 +445,30 @@ map :: #match {
     macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
 }
 
-every :: (arr: [] $T, predicate: (T) -> bool) -> bool {
-    val := true;
-    for ^it: arr do val = val && predicate(*it);
-    return val;
+every :: #match {}
+#match every macro (arr: [] $T, predicate: (T) -> bool) -> bool {
+    every :: every
+    return every(arr, #(predicate(it)));
 }
 
-some :: (arr: [] $T, predicate: (T) -> bool) -> bool {
-    val := false;
-    for ^it: arr {
-        val = val || predicate(*it);
-        if val do break;
+#match every macro (arr: [] $T, predicate_body: Code) -> bool {
+    for arr {
+        if !(#unquote predicate_body) do return false;
     }
-    return val;
+    return true;
+}
+
+some :: #match {}
+#match some macro (arr: [] $T, predicate: (T) -> bool) -> bool {
+    some :: some
+    return every(arr, #(predicate(it)));
+}
+
+#match some macro (arr: [] $T, predicate_body: Code) -> bool {
+    for arr {
+        if #unquote predicate_body do return false;
+    }
+    return true;
 }
 
 fill :: (arr: [] $T, value: T) {
@@ -503,35 +510,33 @@ find_ptr :: (arr: [] $T, value: T) -> ^T {
     return null;
 }
 
-first :: (arr: [] $T, predicate: (T) -> bool) -> ^T {
-    for ^it: arr {
-        if predicate(*it) do return it;
-    }
-
-    return null;
+first :: #match {}
+#match first macro (arr: [] $T, predicate: (T) -> bool) -> ^T {
+    first :: first
+    return first(arr, #(predicate(it)));
 }
 
-first_where :: macro (arr: [] $T, cond: Code) -> ^T {
+#match first macro (arr: [] $T, predicate_body: Code) -> ^T {
     // This is to preserve the semantics that "it" is
     // not a pointer (same as contains)
-    for^ it_: arr {
-        it := *it_;
-        if #unquote cond do return it_;
+    for ^it_ptr: arr {
+        it := *it_ptr;
+        if #unquote predicate_body do return it_ptr;
     }
 
     return null;
 }
 
-count_where :: #match {
-    (arr: [] $T, predicate: (T) -> bool) -> u32 {
-        count: u32 = 0;
-        for ^it: arr do if predicate(*it) do count += 1;
-        return count;
-    },
+count_where :: #match {}
+#match count_where macro (arr: [] $T, predicate: (T) -> bool) -> u32 {
+    count_where :: count_where
+    return count_where(arr, #(predicate(it)));
+}
 
-    (arr: [] $T, predicate: (^T) -> bool) -> u32 {
-        count: u32 = 0;
-        for ^it: arr do if predicate(it) do count += 1;
-        return count;
-    },
+#match count_where macro (arr: [] $T, predicate_body: Code) -> u32 {
+    count: u32 = 0;
+    for arr {
+        if #unquote predicate_body do count += 1;
+    }
+    return count;
 }
