@@ -302,12 +302,8 @@ get_struct_method :: (type: type_expr, method_name: str) -> ^any {
     info := cast(^Type_Info_Struct) get_type_info(type);
     if info.kind != .Struct do return null;
 
-    for ^method: info.methods {
-        if method.name == method_name {
-            return ^method.func;
-        }
-    }
-
+    method := core.array.first(info.methods, #(it.name == method_name));
+    if method != null do return ^method.func;
     return null;
 }
 

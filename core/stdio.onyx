@@ -14,7 +14,7 @@ package core
 
 auto_flush_stdio := true
 
-print :: #match {
+print :: #match #locked {
     (x: str) {
         io.write(^stdio.print_writer, x);
         if x[x.count - 1] == #char "\n" && auto_flush_stdio do __flush_stdio();

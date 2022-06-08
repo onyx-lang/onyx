@@ -220,7 +220,13 @@ CheckStatus check_while(AstIfWhile* whilenode) {
     }
 
     if (whilenode->true_stmt)  CHECK(statement, (AstNode **) &whilenode->true_stmt);
-    if (whilenode->false_stmt) CHECK(statement, (AstNode **) &whilenode->false_stmt);
+    if (whilenode->false_stmt) {
+        if (whilenode->bottom_test) {
+            ERROR(whilenode->token->pos, "while-loops with an 'else' clause cannot be bottom tested.");
+        }
+
+        CHECK(statement, (AstNode **) &whilenode->false_stmt);
+    }
 
     return Check_Success;
 }
@@ -2750,13 +2756,12 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 sentinel->token = ip->value_token;
                 sentinel->type_node = constraint->type_args[i];
 
-                assert(ip->type_node);
                 AstAlias *type_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
-                type_alias->token = ip->type_node->token;
+                type_alias->token = ip->type_token;
                 type_alias->alias = (AstTyped *) constraint->type_args[i];
 
                 symbol_introduce(constraint->scope, ip->value_token, (AstNode *) sentinel);
-                symbol_introduce(constraint->scope, ip->type_node->token, (AstNode *) type_alias);
+                symbol_introduce(constraint->scope, ip->type_token, (AstNode *) type_alias);
             }
 
             assert(constraint->entity);

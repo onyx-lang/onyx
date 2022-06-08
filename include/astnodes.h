@@ -794,10 +794,17 @@ struct AstIfWhile {
     AstBlock *true_stmt;
     AstBlock *false_stmt;
 
-    // Used by Static_If
-    Scope *defined_in_scope;
-    bh_arr(struct Entity *) true_entities;
-    bh_arr(struct Entity *) false_entities;
+    union {
+        // Used by Static_If
+        struct {
+            Scope *defined_in_scope;
+            bh_arr(struct Entity *) true_entities;
+            bh_arr(struct Entity *) false_entities;
+        };
+
+        // Used by While
+        b32 bottom_test;
+    };
 };
 typedef struct AstIfWhile AstIf;
 typedef struct AstIfWhile AstWhile;
@@ -1041,12 +1048,14 @@ struct AstOverloadedFunction {
     // the complete set of overloads that can be used by an overloaded
     // function.
     bh_imap            all_overloads;
+
+    b32 locked : 1;
 };
 
 // @CLEANUP: Is this really necessary?
 typedef struct InterfaceParam {
     OnyxToken *value_token;
-    AstType   *type_node;
+    OnyxToken *type_token;
 } InterfaceParam;
 
 typedef struct InterfaceConstraint {

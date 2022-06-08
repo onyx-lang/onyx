@@ -12,7 +12,7 @@ package core.array
 // ---------------------------------
 //           Dynamic Arrays
 // ---------------------------------
-make :: #match {
+make :: #match #locked {
     ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
         arr : [..] T;
         init(^arr, capacity, allocator);
@@ -54,7 +54,7 @@ free :: (arr: ^[..] $T) {
     (package core.array).free(x);
 }
 
-copy :: #match {
+copy :: #match #locked {
     (arr: ^[..] $T, allocator := context.allocator) -> [..] T {
         new_arr : [..] T;
         init(^new_arr, arr.count, allocator);
@@ -285,7 +285,7 @@ set :: (arr: [] $T, idx: i32, value: T) {
     arr.data[idx] = value;
 }
 
-contains :: #match {
+contains :: #match #locked {
     macro (arr: [] $T, $cmp: Code) -> bool {
         for it: arr do if #unquote cmp do return true;
         return false;
@@ -328,7 +328,7 @@ reverse :: (arr: [] $T) {
 // Simple insertion sort
 //    cmp should return >0 if left > right
 //
-sort :: #match {
+sort :: #match #locked {
     (arr: [] $T, cmp: (T, T) -> i32) {
         for i: 1 .. arr.count {
             x := arr.data[i];
@@ -364,7 +364,7 @@ sort :: #match {
     }
 }
 
-quicksort :: #match {
+quicksort :: #match #locked {
     (arr: [] $T, cmp: ( T,  T) -> i32) do quicksort_impl(arr, cmp, 0, arr.count - 1); ,
     (arr: [] $T, cmp: (^T, ^T) -> i32) do quicksort_impl(arr, cmp, 0, arr.count - 1); ,
 }
@@ -379,7 +379,7 @@ quicksort :: #match {
         quicksort_impl(arr, cmp, pivot + 1, hi);
     }
 
-    quicksort_partition :: #match {
+    quicksort_partition :: #match #locked {
         (arr: [] $T, cmp: (T, T) -> i32, lo, hi: i32) -> i32 {
             pivot := arr[hi];
             i := lo - 1;
@@ -437,7 +437,7 @@ fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
     return val;
 }
 
-map :: #match {
+map :: #match #locked {
     macro (arr: [] $T, f: (^T) -> void)                do for ^it: arr do f(it);,
     macro (arr: [] $T, f: (T) -> T)                    do for ^it: arr do *it = f(*it);,
     macro (arr: [] $T, body: Code)                     do for ^it: arr do #unquote body;,
@@ -445,30 +445,32 @@ map :: #match {
     macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
 }
 
-every :: #match {}
-#match every macro (arr: [] $T, predicate: (T) -> bool) -> bool {
-    every :: every
-    return every(arr, #(predicate(it)));
-}
+every :: #match #locked {
+    macro (arr: [] $T, predicate: (T) -> bool) -> bool {
+        every :: every
+        return every(arr, #(predicate(it)));
+    },
 
-#match every macro (arr: [] $T, predicate_body: Code) -> bool {
-    for arr {
-        if !(#unquote predicate_body) do return false;
+    macro (arr: [] $T, predicate_body: Code) -> bool {
+        for arr {
+            if !(#unquote predicate_body) do return false;
+        }
+        return true;
     }
-    return true;
 }
 
-some :: #match {}
-#match some macro (arr: [] $T, predicate: (T) -> bool) -> bool {
-    some :: some
-    return every(arr, #(predicate(it)));
-}
+some :: #match #locked {
+    macro (arr: [] $T, predicate: (T) -> bool) -> bool {
+        some :: some
+        return every(arr, #(predicate(it)));
+    },
 
-#match some macro (arr: [] $T, predicate_body: Code) -> bool {
-    for arr {
-        if #unquote predicate_body do return false;
+    macro (arr: [] $T, predicate_body: Code) -> bool {
+        for arr {
+            if #unquote predicate_body do return false;
+        }
+        return true;
     }
-    return true;
 }
 
 fill :: (arr: [] $T, value: T) {
@@ -510,33 +512,35 @@ find_ptr :: (arr: [] $T, value: T) -> ^T {
     return null;
 }
 
-first :: #match {}
-#match first macro (arr: [] $T, predicate: (T) -> bool) -> ^T {
-    first :: first
-    return first(arr, #(predicate(it)));
-}
+first :: #match #locked {
+    macro (arr: [] $T, predicate: (T) -> bool) -> ^T {
+        first :: first
+        return first(arr, #(predicate(it)));
+    },
 
-#match first macro (arr: [] $T, predicate_body: Code) -> ^T {
-    // This is to preserve the semantics that "it" is
-    // not a pointer (same as contains)
-    for ^it_ptr: arr {
-        it := *it_ptr;
-        if #unquote predicate_body do return it_ptr;
+    macro (arr: [] $T, predicate_body: Code) -> ^T {
+        // This is to preserve the semantics that "it" is
+        // not a pointer (same as contains)
+        for ^it_ptr: arr {
+            it := *it_ptr;
+            if #unquote predicate_body do return it_ptr;
+        }
+
+        return null;
     }
-
-    return null;
 }
 
-count_where :: #match {}
-#match count_where macro (arr: [] $T, predicate: (T) -> bool) -> u32 {
-    count_where :: count_where
-    return count_where(arr, #(predicate(it)));
-}
+count_where :: #match #locked {
+    macro (arr: [] $T, predicate: (T) -> bool) -> u32 {
+        count_where :: count_where
+        return count_where(arr, #(predicate(it)));
+    },
 
-#match count_where macro (arr: [] $T, predicate_body: Code) -> u32 {
-    count: u32 = 0;
-    for arr {
-        if #unquote predicate_body do count += 1;
+    macro (arr: [] $T, predicate_body: Code) -> u32 {
+        count: u32 = 0;
+        for arr {
+            if #unquote predicate_body do count += 1;
+        }
+        return count;
     }
-    return count;
 }

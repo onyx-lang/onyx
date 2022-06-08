@@ -2,7 +2,7 @@
 
 use package core
 
-Hashable :: interface (t: $T) {
+Hashable :: interface (T as t) {
     { hash.to_u32(t) } -> u32;
 }
 
@@ -16,7 +16,7 @@ try_hash :: #match {
     },
 }
 
-CanCastTo :: interface (t: $T, d: $D) {
+CanCastTo :: interface (T as t, D as d) {
     { cast(D) t } -> D;
 }
 
@@ -37,7 +37,7 @@ do_math :: macro (x, y: $T) -> T where SemiRing(T) {
     return x + y + x * y;
 }
 
-SemiRing :: interface (t: $T) {
+SemiRing :: interface (T as t) {
     {t + t} -> T;
     {t * t} -> T;
 }
@@ -46,7 +46,7 @@ bit_math :: (x, y: $T) -> T where BitField(T) {
     return (x & y) | (x ^ y);
 }
 
-BitField :: interface (t: $T) {
+BitField :: interface (T as t) {
     { ~t } -> T;
     { t & t } -> T;
     { t | t } -> T;

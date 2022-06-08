@@ -1111,6 +1111,10 @@ static AstIfWhile* parse_while_stmt(OnyxParser* parser) {
     AstIfWhile* while_node = make_node(AstIfWhile, Ast_Kind_While);
     while_node->token = while_token;
 
+    if (parse_possible_directive(parser, "bottom_test")) {
+        while_node->bottom_test = 1;
+    }
+
     AstTyped* cond;
     AstNode* initialization_or_cond=NULL;
     b32 had_initialization = 0;
@@ -2139,12 +2143,9 @@ static AstInterface* parse_interface(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return interface;
 
         InterfaceParam ip;
+        ip.type_token  = expect_token(parser, Token_Type_Symbol);
+        expect_token(parser, Token_Type_Keyword_As);
         ip.value_token = expect_token(parser, Token_Type_Symbol);
-        expect_token(parser, ':');
-        expect_token(parser, '$');
-
-        OnyxToken* type_sym = expect_token(parser, Token_Type_Symbol);
-        ip.type_node = (AstType *) make_symbol(parser->allocator, type_sym);
 
         bh_arr_push(interface->params, ip);
 
@@ -2343,11 +2344,17 @@ static void parse_function_params(OnyxParser* parser, AstFunction* func) {
 }
 
 static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, OnyxToken* token) {
+    b32 locked = 0;
+    if (parse_possible_directive(parser, "locked")) {
+        locked = 1;
+    }
+
     expect_token(parser, '{');
 
     AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
     ofunc->token = token;
     ofunc->flags |= Ast_Flag_Comptime;
+    ofunc->locked = locked;
 
     bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
 

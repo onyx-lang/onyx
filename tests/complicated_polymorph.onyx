@@ -14,7 +14,7 @@ main :: (args: [] cstr) {
         return g(f(a));
     }
 
-    Number :: interface (t: $T) {
+    Number :: interface (T as t) {
         { t * t } -> T;
     }
 

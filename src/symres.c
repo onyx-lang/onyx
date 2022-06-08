@@ -1355,14 +1355,19 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             if (add_overload->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
 
             if (add_overload->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
-                onyx_report_error(add_overload->token->pos, Error_Critical, "#add_overload directive did not resolve to an overloaded function.");
-
-            } else {
-                AstOverloadedFunction* ofunc = (AstOverloadedFunction *) add_overload->overloaded_function;
-                SYMRES(expression, (AstTyped **) &add_overload->overload);
-                add_overload_option(&ofunc->overloads, add_overload->precedence, add_overload->overload);
+                onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure.");
+                return Symres_Error;
             }
 
+            AstOverloadedFunction* ofunc = (AstOverloadedFunction *) add_overload->overloaded_function;
+            if (ofunc->locked) {
+                onyx_report_error(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
+                onyx_report_error(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+                return Symres_Error;
+            }
+
+            SYMRES(expression, (AstTyped **) &add_overload->overload);
+            add_overload_option(&ofunc->overloads, add_overload->precedence, add_overload->overload);
             break;
         }
 

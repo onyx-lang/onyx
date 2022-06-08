@@ -824,14 +824,22 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
         emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
         emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
 
-        emit_expression(mod, &code, while_node->cond);
-        WI(WI_I32_EQZ);
-        WID(WI_COND_JUMP, 0x01);
+        if (!while_node->bottom_test) {
+            emit_expression(mod, &code, while_node->cond);
+            WI(WI_I32_EQZ);
+            WID(WI_COND_JUMP, 0x01);
+        }
 
         emit_block(mod, &code, while_node->true_stmt, 0);
 
-        if (bh_arr_last(code).type != WI_JUMP)
-            WID(WI_JUMP, 0x00);
+        if (while_node->bottom_test) {
+            emit_expression(mod, &code, while_node->cond);
+            WID(WI_COND_JUMP, 0x00);
+
+        } else {
+            if (bh_arr_last(code).type != WI_JUMP)
+                WID(WI_JUMP, 0x00);
+        }
 
         emit_leave_structured_block(mod, &code);
         emit_leave_structured_block(mod, &code);

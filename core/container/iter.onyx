@@ -29,7 +29,7 @@ package core.iter
 as_iterator :: #match {}
 
 #local __iterable_test :: macro (i: Iterator($V)) {}
-Iterable :: interface (t: $T) {
+Iterable :: interface (T as t) {
     as_iterator(t) |> __iterable_test();
 }
 
