@@ -2115,7 +2115,9 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             bh_arr_push(s_node->members, mem);
         }
 
-        expect_token(parser, ';');
+        if (peek_token(0)->type != '}') {
+            expect_token(parser, ';');
+        }
     }
 
     if (s_node->scope) parser->current_scope = parser->current_scope->parent;
