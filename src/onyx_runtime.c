@@ -415,8 +415,10 @@ static i32 onyx_run_thread(void *data) {
 #endif
     OnyxThread *thread = (OnyxThread *) data;
 
+    wasm_store_t *wasm_store = runtime->wasm_store_new(runtime->wasm_engine);
+
     wasm_trap_t* traps = NULL;
-    thread->instance = runtime->wasm_instance_new(runtime->wasm_store, runtime->wasm_module, &runtime->wasm_imports, &traps);
+    thread->instance = runtime->wasm_instance_new(wasm_store, runtime->wasm_module, &runtime->wasm_imports, &traps);
 
     wasm_extern_t* start_extern = runtime->wasm_extern_lookup_by_name(runtime->wasm_module, thread->instance, "_thread_start");
     wasm_func_t*   start_func   = runtime->wasm_extern_as_func(start_extern);
@@ -451,6 +453,8 @@ static i32 onyx_run_thread(void *data) {
 
         trap = runtime->wasm_func_call(exit_func, &args_array, &results);
     }
+
+    runtime->wasm_store_delete(wasm_store);
 
     return 0;
 }

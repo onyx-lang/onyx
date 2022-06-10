@@ -332,7 +332,7 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_instance = wasm_instance;
     wasm_runtime.wasm_module = wasm_module;
     wasm_runtime.wasm_memory = wasm_memory;
-    wasm_runtime.wasm_store = wasm_store;
+    wasm_runtime.wasm_engine = wasm_engine;
     wasm_runtime.wasm_imports = wasm_imports;
     
     wasm_runtime.argc = argc;
@@ -344,6 +344,8 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_extern_as_func = &wasm_extern_as_func;
     wasm_runtime.wasm_func_call = &wasm_func_call;
     wasm_runtime.wasm_instance_new = &wasm_instance_new;
+    wasm_runtime.wasm_store_new = &wasm_store_new;
+    wasm_runtime.wasm_store_delete = &wasm_store_delete;
     wasm_runtime.onyx_print_trap = &onyx_print_trap;
 
     wasm_extern_t* start_extern = wasm_extern_lookup_by_name(wasm_module, wasm_instance, "_start");
