@@ -276,27 +276,30 @@ static void context_init(CompileOptions* opts) {
         .include = create_load(context.ast_alloc, "core/runtime/build_opts"),
     }));
 
-    runtime_info_types_entity = entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Parse,
-        .type = Entity_Type_Load_File,
-        .package = NULL,
-        .include = create_load(context.ast_alloc, "core/runtime/info/types"),
-    }));
-    runtime_info_foreign_entity = entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Parse,
-        .type = Entity_Type_Load_File,
-        .package = NULL,
-        .include = create_load(context.ast_alloc, "core/runtime/info/foreign_blocks"),
-    }));
-    runtime_info_proc_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
-        .state = Entity_State_Parse,
-        .type = Entity_Type_Load_File,
-        .package = NULL,
-        .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
-    }));
+    if (context.options->runtime != Runtime_Custom) {
+        runtime_info_types_entity = entity_heap_insert(&context.entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context.ast_alloc, "core/runtime/info/types"),
+        }));
+        runtime_info_foreign_entity = entity_heap_insert(&context.entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context.ast_alloc, "core/runtime/info/foreign_blocks"),
+        }));
+        runtime_info_proc_tags_entity = entity_heap_insert(&context.entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context.ast_alloc, "core/runtime/info/proc_tags"),
+        }));
+    }
 
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
 
     // NOTE: Add all files passed by command line to the queue
     bh_arr_each(const char *, filename, opts->files) {

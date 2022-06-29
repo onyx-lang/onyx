@@ -3546,8 +3546,10 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
 
     if (global == &builtin_stack_top)
         module->stack_top_ptr = &module->globals[global_idx].initial_value[0].data.i1;
-    if (global == &builtin_tls_size)
-        module->tls_size_ptr  = &module->globals[global_idx].initial_value[0].data.i1;
+
+    if (global == &builtin_tls_size) {
+        module->globals[global_idx].initial_value[0].data.i1 =  module->next_tls_offset;
+    }
 }
 
 static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
@@ -3896,6 +3898,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
                                  // break constant data.       - brendanfh 2020/12/16
 
         .next_tls_offset = 0,
+        .tls_size_ptr = NULL,
 
         .elems = NULL,
         .next_elem_idx = 0,

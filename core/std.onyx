@@ -34,9 +34,6 @@ package core
 
 #load "./runtime/build_opts"
 #load "./runtime/common"
-
-#load "./runtime/info/helper"
-
 #load "./arg_parse"
 
 #local runtime :: package runtime
@@ -65,7 +62,10 @@ package core
     #load "./wasi/wasi_fs"
 }
 #if runtime.runtime == .Js     { #load "./runtime/js" }
-#if runtime.runtime != .Custom { #load "./stdio" }
+#if runtime.runtime != .Custom {
+    #load "./runtime/info/helper"
+    #load "./stdio"
+}
 
 #if runtime.Multi_Threading_Enabled {
     #load "./intrinsics/atomics"

@@ -2,14 +2,13 @@
 
 use package core
 
-main :: (args) => {
+main :: () {
     sum := 0;
 
-    thread_data: struct {
-        sum : ^i32; 
-        mutex: sync.Mutex;
+    thread_data := .{
+        sum = ^sum,
+        mutex = sync.Mutex.{},
     };
-    thread_data.sum = ^sum;
     sync.mutex_init(^thread_data.mutex);
 
     iter.parallel_for(0 .. 10000, 4, ^thread_data) {

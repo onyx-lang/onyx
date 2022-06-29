@@ -134,87 +134,92 @@ calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
 cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
 cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
-new :: #match {
-    ($T: type_expr, allocator := context.allocator) -> ^T {
-        use package core.intrinsics.onyx { __initialize }
-        memory :: package core.memory
+//
+// This cannot be used in a custom runtime, as the other core
+// packages are not included.
+#if runtime.runtime != .Custom {
+    new :: #match {
+        ($T: type_expr, allocator := context.allocator) -> ^T {
+            use package core.intrinsics.onyx { __initialize }
+            memory :: package core.memory
 
-        res := cast(^T) raw_alloc(allocator, sizeof T);
-        memory.set(res, 0, sizeof T);
-        __initialize(res);
+            res := cast(^T) raw_alloc(allocator, sizeof T);
+            memory.set(res, 0, sizeof T);
+            __initialize(res);
 
-        return res;
-    },
+            return res;
+        },
 
-    (T: type_expr, allocator := context.allocator) -> rawptr {
-        memory :: package core.memory
-        type_info :: package runtime.info
+        (T: type_expr, allocator := context.allocator) -> rawptr {
+            memory :: package core.memory
+            type_info :: package runtime.info
 
-        info := type_info.get_type_info(T);
-        size := type_info.size_of(T);
-        if size == 0 do return null;
+            info := type_info.get_type_info(T);
+            size := type_info.size_of(T);
+            if size == 0 do return null;
 
-        res := raw_alloc(allocator, size);
-        memory.set(res, 0, size);
+            res := raw_alloc(allocator, size);
+            memory.set(res, 0, size);
 
-        if info.kind == .Struct {
-            s_info := cast(^type_info.Type_Info_Struct) info;
-            for s_info.members {
-                if it.default != null {
-                    member_size := type_info.size_of(it.type);
-                    memory.copy(cast(^u8) res + it.offset, it.default, member_size);
+            if info.kind == .Struct {
+                s_info := cast(^type_info.Type_Info_Struct) info;
+                for s_info.members {
+                    if it.default != null {
+                        member_size := type_info.size_of(it.type);
+                        memory.copy(cast(^u8) res + it.offset, it.default, member_size);
+                    }
                 }
             }
+
+            return res;
         }
-
-        return res;
     }
-}
 
-make :: #match {
-    macro ($T: type_expr, allocator := context.allocator) => {
-        return __make_overload(cast(^T) null, allocator=allocator);
-    },
+    make :: #match {
+        macro ($T: type_expr, allocator := context.allocator) => {
+            return __make_overload(cast(^T) null, allocator=allocator);
+        },
 
-    macro ($T: type_expr, n: u32, allocator := context.allocator) => {
-        return __make_overload(cast(^T) null, n, allocator=allocator);
-    },
-}
+        macro ($T: type_expr, n: u32, allocator := context.allocator) => {
+            return __make_overload(cast(^T) null, n, allocator=allocator);
+        },
+    }
 
-//
-// This is a rather unique way of using the type matching system
-// to select an overload. What is desired here is that when you say:
-//
-//    make(Foo)
-//
-// You match the overload for make that is designed for making a Foo.
-// However, you cannot use the type matching system to match by value.
-// In order to get around this, `make` will pass a null pointer to this
-// match procedure, that is casted to be a *pointer* to the desired type.
-// Therefore, if you want to add your own make overload, you have to add
-// a match to `__make_overload` that takes a *pointer* to the desired
-// type as the first argument, and then an allocator as the second.
-// Optionally, you can take a parameter between them that is an integer,
-// useful when constructing things like arrays.
-//
-// See core/container/array.onyx for an example.
-//
-__make_overload :: #match {
     //
-    // This is the fallback option for make. It simply allocates a zero-intialized
-    // element of type T.
-    #precedence 1000 (_: ^$T, allocator := context.allocator) -> ^T {
-        memory :: package core.memory
+    // This is a rather unique way of using the type matching system
+    // to select an overload. What is desired here is that when you say:
+    //
+    //    make(Foo)
+    //
+    // You match the overload for make that is designed for making a Foo.
+    // However, you cannot use the type matching system to match by value.
+    // In order to get around this, `make` will pass a null pointer to this
+    // match procedure, that is casted to be a *pointer* to the desired type.
+    // Therefore, if you want to add your own make overload, you have to add
+    // a match to `__make_overload` that takes a *pointer* to the desired
+    // type as the first argument, and then an allocator as the second.
+    // Optionally, you can take a parameter between them that is an integer,
+    // useful when constructing things like arrays.
+    //
+    // See core/container/array.onyx for an example.
+    //
+    __make_overload :: #match {
+        //
+        // This is the fallback option for make. It simply allocates a zero-intialized
+        // element of type T.
+        #precedence 1000 (_: ^$T, allocator := context.allocator) -> ^T {
+            memory :: package core.memory
 
-        res := cast(^T) raw_alloc(allocator, sizeof T);
-        memory.set(res, 0, sizeof T);
-        return res;
-    },
-}
+            res := cast(^T) raw_alloc(allocator, sizeof T);
+            memory.set(res, 0, sizeof T);
+            return res;
+        },
+    }
 
-delete :: #match {
-    #precedence 1000 macro (x: ^$T, allocator := context.allocator) {
-        raw_free(allocator, x);
+    delete :: #match {
+        #precedence 1000 macro (x: ^$T, allocator := context.allocator) {
+            raw_free(allocator, x);
+        }
     }
 }
 
