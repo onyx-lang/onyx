@@ -141,7 +141,7 @@ static i32 output_funcsection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
-    if (bh_arr_length(module->elems) == 0) return 0;
+    // if (bh_arr_length(module->elems) == 0) return 0;
 
     i32 prev_len = buff->length;
     bh_buffer_write_byte(buff, WASM_SECTION_ID_TABLE);

@@ -768,8 +768,11 @@ static SymresStatus symres_use(AstUse* use) {
             }
         }
 
-        package_track_use_package(package->package, use->entity);
+        if (!use->entity) {
+            add_entities_for_node(NULL, (AstNode *) use, curr_scope, NULL);
+        }
 
+        package_track_use_package(package->package, use->entity);
         return Symres_Success;
     }
 

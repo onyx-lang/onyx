@@ -58,6 +58,8 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
 }
 
 void package_track_use_package(Package* package, Entity* entity) {
+    assert(entity);
+
     if (package->use_package_entities == NULL) {
         bh_arr_new(global_heap_allocator, package->use_package_entities, 4);
     }
