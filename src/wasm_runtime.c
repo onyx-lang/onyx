@@ -228,9 +228,6 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     bh_arr_new(bh_heap_allocator(), linkable_functions, 4);
     onyx_lookup_and_load_custom_libraries(wasm_bytes);
 
-    // void wasm_runtime_init();
-    // wasm_runtime_init();
-
     wasmer_features_t* features = NULL;
     wasm_trap_t* run_trap = NULL;
 

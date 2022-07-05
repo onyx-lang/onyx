@@ -16,6 +16,8 @@ CC='gcc'
 # The architecture of your system. If your not sure, leave this alone.
 ARCH="$(uname -m)"
 
+RUNTIME_LIBRARY="wasmer"
+
 # Comment this line if you do not want the Wamser libraries installed,
 # and do not with to have the Onyx runtime.
 ENABLE_BUNDLING_WASMER=1
@@ -58,17 +60,18 @@ fi
 if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
     C_FILES="$C_FILES wasm_runtime"
     FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
-    LIBS="$LIBS -L$CORE_DIR/lib -lwasmer -Wl,-rpath=$CORE_DIR/lib:./ -lpthread -ldl"
+    LIBS="$LIBS -L$CORE_DIR/lib -l$RUNTIME_LIBRARY -Wl,-rpath=$CORE_DIR/lib:./ -lpthread -ldl -lm"
     INCLUDES="$INCLUDES -I$WASMER_INCLUDE_DIR"
 
-    if [ ! -f "$CORE_DIR/lib/libwasmer.so" ]; then
-        echo "Copying libwasmer to $CORE_DIR/lib (first install)"
+    if [ ! -f "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so" ] || true; then
+        echo "Copying lib$RUNTIME_LIBRARY to $CORE_DIR/lib (first install)"
 
         sudo mkdir -p "$CORE_DIR/lib"
         sudo mkdir -p "$CORE_DIR/include"
 
         # sudo cp "$WASMER_LIBRARY_DIR/libiwasm.so" "$CORE_DIR/lib/libiwasm.so"
-        sudo cp "$WASMER_LIBRARY_DIR/libwasmer.so" "$CORE_DIR/lib/libwasmer.so"
+        # sudo cp "$WASMER_LIBRARY_DIR/libwasmer.so" "$CORE_DIR/lib/libwasmer.so"
+        sudo cp "$WASMER_LIBRARY_DIR/lib$RUNTIME_LIBRARY.so" "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so"
 
         sudo cp "include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
         sudo cp "lib/common/include/wasm.h" "$CORE_DIR/include/wasm.h"
