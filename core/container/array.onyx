@@ -213,10 +213,12 @@ filter :: macro (arr: ^[..] $T, body: Code) {
 }
 
 greatest :: macro (arr: [] $T) -> (i32, T) {
+    fold_idx_elem :: fold_idx_elem
     return fold_idx_elem(arr, #(*A > *B));
 }
 
 least :: macro (arr: [] $T) -> (i32, T) {
+    fold_idx_elem :: fold_idx_elem
     return fold_idx_elem(arr, #(*A < *B));
 }
 

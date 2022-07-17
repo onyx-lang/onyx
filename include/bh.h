@@ -180,7 +180,7 @@ u64 uleb128_to_uint(u8* bytes, i32 *byte_walker);
 
 #define bh_align(x, a) if ((x) % (a) != 0) (x) += (a) - ((x) % (a));
 
-#define bh_pointer_add(ptr, amm)        ((void *)((u8 *) ptr + amm))
+#define bh_pointer_add(ptr, amm)        ((void *)((u8 *) (ptr) + (amm)))
 #define BH_BIT(x)                        (1 << (x))
 #define BH_MASK_SET(var, set, mask)     ((set) ? ((var) |= (mask)) : ((var) &= ~(mask)))
 

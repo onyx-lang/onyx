@@ -682,9 +682,12 @@ static CompilerProgress onyx_flush_module() {
         onyx_wasm_module_write_to_file(data_module, data_file);
         onyx_wasm_module_write_to_file(context.wasm_module, output_file);
 
+        bh_file_close(&data_file);
     } else {
         onyx_wasm_module_write_to_file(context.wasm_module, output_file);
     }
+
+    bh_file_close(&output_file);
 
     if (context.options->documentation_file != NULL) {
         OnyxDocumentation docs = onyx_docs_generate();

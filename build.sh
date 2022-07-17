@@ -16,11 +16,12 @@ CC='gcc'
 # The architecture of your system. If your not sure, leave this alone.
 ARCH="$(uname -m)"
 
-RUNTIME_LIBRARY="wasmer"
+RUNTIME_LIBRARY="ovmwasm"
+# RUNTIME_LIBRARY="wasmer"
 
-# Comment this line if you do not want the Wamser libraries installed,
+# Comment this line if you do not want the above library installed,
 # and do not with to have the Onyx runtime.
-ENABLE_BUNDLING_WASMER=1
+ENABLE_BUNDLING_WASM_RUNTIME=1
 
 # Where the Wasmer library files can be found.
 # They are bundled with the project, but if a different version is available, these can be changed.
@@ -44,20 +45,23 @@ sudo cp -r ./core/ "$CORE_DIR"
 
 C_FILES="onyx astnodes builtins checker clone doc entities errors lex parser symres types utils wasm_emit"
 LIBS=
-INCLUDES=
+INCLUDES="-I./include"
 
 WARNINGS='-Wimplicit -Wmisleading-indentation -Wparentheses -Wsequence-point -Wreturn-type -Wshift-negative-value -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-function -Wunused-label -Wmaybe-uninitialized -Wsign-compare -Wstrict-overflow -Wduplicated-branches -Wduplicated-cond -Wtrigraphs -Waddress -Wlogical-op'
 
+TARGET="./bin/onyx"
 if [ "$1" = "debug" ]; then
-    FLAGS="$WARNINGS -g3 -I./include"
-    TARGET="./bin/onyx-debug"
+    FLAGS="$WARNINGS -g3"
 else
-    FLAGS="$WARNINGS -O3 -I./include"
-    TARGET='./bin/onyx'
+    FLAGS="$WARNINGS -O3"
+fi
+
+if [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
+    FLAGS="$FLAGS -DUSE_OVM_DEBUGGER"
 fi
 
 
-if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
+if [ ! -z "$ENABLE_BUNDLING_WASM_RUNTIME" ]; then
     C_FILES="$C_FILES wasm_runtime"
     FLAGS="$FLAGS -DENABLE_RUN_WITH_WASMER"
     LIBS="$LIBS -L$CORE_DIR/lib -l$RUNTIME_LIBRARY -Wl,-rpath=$CORE_DIR/lib:./ -lpthread -ldl -lm"
@@ -69,8 +73,6 @@ if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
         sudo mkdir -p "$CORE_DIR/lib"
         sudo mkdir -p "$CORE_DIR/include"
 
-        # sudo cp "$WASMER_LIBRARY_DIR/libiwasm.so" "$CORE_DIR/lib/libiwasm.so"
-        # sudo cp "$WASMER_LIBRARY_DIR/libwasmer.so" "$CORE_DIR/lib/libwasmer.so"
         sudo cp "$WASMER_LIBRARY_DIR/lib$RUNTIME_LIBRARY.so" "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so"
 
         sudo cp "include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
@@ -102,7 +104,7 @@ echo "Installing onyx executable"
 sudo mkdir -p "$BIN_DIR"
 sudo cp ./bin/onyx "$BIN_DIR/onyx"
 
-if [ ! -z "$ENABLE_BUNDLING_WASMER" ]; then
+if [ ! -z "$ENABLE_BUNDLING_WASM_RUNTIME" ]; then
     C_FILES="onyxrun wasm_runtime"
     TARGET="./bin/onyx-run"
 
