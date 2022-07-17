@@ -593,7 +593,7 @@ struct AstTyped { AstTyped_base; };
 struct AstNamedValue    { AstTyped_base; AstTyped* value; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
 struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
-struct AstStrLit        { AstTyped_base; u64 addr; u64 length; b32 is_cstr: 1; };
+struct AstStrLit        { AstTyped_base; u64 data_id; u64 length; b32 is_cstr: 1; };
 struct AstLocal         { AstTyped_base; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
@@ -654,7 +654,7 @@ struct AstFileContents  {
     AstTyped *filename_expr;
     char *filename; // The parsed file name, with '\' sequences removed and resolved to a particular file if possible.
 
-    u32 addr, size;
+    u32 data_id, size;
 };
 struct AstUnaryFieldAccess {
     AstTyped_base;
@@ -1002,12 +1002,15 @@ struct AstAlias         { AstTyped_base; AstTyped* alias; };
 struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; };
 struct AstMemRes        {
     AstTyped_base;
-    u64 addr;
     AstTyped *initial_value;
 
     struct Entity *type_entity;
 
     b32 threadlocal : 1;
+
+    // Set and used in the wasm emission.
+    u32 data_id;
+    u32 tls_offset;
 };
 struct AstGlobal        {
     AstTyped_base;
@@ -1588,7 +1591,7 @@ extern Type type_auto_return;
 extern AstBasicType basic_type_auto_return;
 
 extern OnyxToken builtin_package_token;
-extern AstNumLit builtin_heap_start;
+extern AstGlobal builtin_heap_start;
 extern AstGlobal builtin_stack_top;
 extern AstGlobal builtin_tls_base;
 extern AstGlobal builtin_tls_size;

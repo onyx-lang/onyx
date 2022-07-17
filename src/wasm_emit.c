@@ -250,12 +250,14 @@ enum StructuredBlockType {
     local_raw_free(mod->local_alloc, type2);              \
     }
 #define SUBMIT_PATCH(patch_arr, offset) bh_arr_push((patch_arr), ((PatchInfo) { bh_arr_length(code) - offset }))
+#define NEXT_DATA_ID(mod)               ((u32) bh_arr_length((mod)->data) + 1)
 
 EMIT_FUNC(function_body,                 AstFunction* fd);
 EMIT_FUNC(block,                         AstBlock* block, b32 generate_block_headers);
 EMIT_FUNC(statement,                     AstNode* stmt);
 EMIT_FUNC(local_allocation,              AstTyped* stmt);
 EMIT_FUNC_NO_ARGS(free_local_allocations);
+EMIT_FUNC(data_relocation,               u32 data_id);
 EMIT_FUNC(assignment,                    AstBinaryOp* assign);
 EMIT_FUNC(assignment_of_array,           AstTyped* left, AstTyped* right);
 EMIT_FUNC(compound_assignment,           AstBinaryOp* assign);
@@ -299,8 +301,10 @@ EMIT_FUNC(zero_value_for_type,           Type* type, OnyxToken* where);
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
 
-static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node);
-static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node);
+static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum);
+
+static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset);
+static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset);
 
 #include "wasm_intrinsics.h"
 #include "wasm_type_table.h"
@@ -507,6 +511,24 @@ EMIT_FUNC_NO_ARGS(free_local_allocations) {
         local_free(mod->local_alloc, bh_arr_last(mod->local_allocations).expr);
         bh_arr_pop(mod->local_allocations);
     }
+}
+
+EMIT_FUNC(data_relocation, u32 data_id) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u32 instr_idx = bh_arr_length(code);
+    WID(WI_PTR_CONST, 0);
+    assert(mod->current_func_idx >= 0);
+
+    DatumPatchInfo patch;
+    patch.kind = Datum_Patch_Instruction;
+    patch.index = mod->current_func_idx;
+    patch.location = instr_idx;
+    patch.data_id = data_id;
+    patch.offset = 0;
+    bh_arr_push(mod->data_patches, patch);
+
+    *pcode = code;
 }
 
 EMIT_FUNC(assignment, AstBinaryOp* assign) {
@@ -2277,12 +2299,17 @@ EMIT_FUNC(field_access_location, AstFieldAccess* field, u64* offset_return) {
 
 EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
     bh_arr(WasmInstruction) code = *pcode;
-    WID(WI_PTR_CONST, memres->addr);
 
     if (memres->threadlocal) {
         u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_tls_base);
+        WID(WI_PTR_CONST, memres->tls_offset);
         WIL(WI_GLOBAL_GET, tls_base_idx);
         WI(WI_PTR_ADD);
+
+    } else {
+        // :ProperLinking
+        assert(memres->data_id != 0);
+        emit_data_relocation(mod, &code, memres->data_id);
     }
 
     *pcode = code;
@@ -2786,10 +2813,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_StrLit: {
-            WID(WI_PTR_CONST, ((AstStrLit *) expr)->addr);
+            // :ProperLinking
+            AstStrLit *strlit = (AstStrLit *) expr;
+            assert(strlit->data_id > 0);
+            emit_data_relocation(mod, &code, strlit->data_id);
 
-            if (((AstStrLit *) expr)->is_cstr == 0)
-                WID(WI_I32_CONST, ((AstStrLit *) expr)->length);
+            if (strlit->is_cstr == 0)
+                WID(WI_I32_CONST, strlit->length);
             break;
         }
 
@@ -2980,10 +3010,11 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_File_Contents: {
             AstFileContents* fc = (AstFileContents *) expr;
 
-            assert(fc->addr > 0);
+            assert(fc->data_id > 0);
             assert(fc->size > 0);
 
-            WID(WI_PTR_CONST, fc->addr);
+            // :ProperLinking
+            emit_data_relocation(mod, &code, fc->data_id);
             WID(WI_I32_CONST, fc->size);
             break;
         }
@@ -3398,11 +3429,13 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     bh_arr_new(mod->allocator, wasm_func.code, 4);
 
     i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) fd);
+    mod->current_func_idx = func_idx;
 
     if (fd == builtin_initialize_data_segments && context.options->use_post_mvp_features) {
         emit_initialize_data_segments_body(mod, &wasm_func.code);
         bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
         bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
+        mod->current_func_idx = -1;
         return;
     }
 
@@ -3410,6 +3443,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         emit_run_init_procedures(mod, &wasm_func.code);
         bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
         bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
+        mod->current_func_idx = -1;
         return;
     }
 
@@ -3476,6 +3510,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     bh_imap_clear(&mod->local_map);
 
     bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
+    mod->current_func_idx = -1;
 }
 
 static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
@@ -3547,9 +3582,11 @@ static void emit_global(OnyxWasmModule* module, AstGlobal* global) {
     if (global == &builtin_stack_top)
         module->stack_top_ptr = &module->globals[global_idx].initial_value[0].data.i1;
 
-    if (global == &builtin_tls_size) {
+    if (global == &builtin_heap_start)
+        module->heap_start_ptr = &module->globals[global_idx].initial_value[0].data.i1;
+
+    if (global == &builtin_tls_size)
         module->globals[global_idx].initial_value[0].data.i1 =  module->next_tls_offset;
-    }
 }
 
 static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
@@ -3560,54 +3597,57 @@ static void emit_string_literal(OnyxWasmModule* mod, AstStrLit* strlit) {
     i8* strdata = bh_alloc_array(global_heap_allocator, i8, strlit->token->length + 1);
     i32 length  = string_process_escape_seqs(strdata, strlit->token->text, strlit->token->length);
 
-    // Warning for having '%' in a string literal (because that probably is being used for a old print format)
-    /*
-    if (charset_contains((const char *) strdata, '%')) {
-        onyx_report_warning(strlit->token->pos, "Found string literal with '%%'");
-    }
-    */
-
     i32 index = shgeti(mod->string_literals, (char *) strdata);
     if (index != -1) {
         StrLitInfo sti = mod->string_literals[index].value;
-        strlit->addr   = sti.addr;
-        strlit->length = sti.len + (strlit->is_cstr ? 1 : 0);
+        strlit->data_id = sti.data_id;
+        strlit->length  = sti.len;
 
         bh_free(global_heap_allocator, strdata);
         return;
     }
-
+    
+    // :ProperLinking
     u32 actual_length = length + (strlit->is_cstr ? 1 : 0);
     WasmDatum datum = {
-        .offset = mod->next_datum_offset,
+        .alignment = 1,
         .length = actual_length,
         .data = strdata,
     };
 
-    strlit->addr = (u32) mod->next_datum_offset,
-    strlit->length = length;
-    mod->next_datum_offset += actual_length;
+    strlit->data_id = emit_data_entry(mod, &datum);
+    strlit->length  = length;
 
-    shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->addr, strlit->length }));
-
-    bh_arr_push(mod->data, datum);
+    // :ProperLinking
+    shput(mod->string_literals, (char *) strdata, ((StrLitInfo) { strlit->data_id, strlit->length }));
 }
 
-static void emit_raw_data(OnyxWasmModule* mod, ptr data, AstTyped* node) {
-    if (!emit_raw_data_(mod, data, node)) {
+static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum) {
+    datum->offset_ = 0;
+    datum->id = NEXT_DATA_ID(mod); 
+    bh_arr_push(mod->data, *datum);
+    return datum->id;
+}
+
+static void emit_constexpr(ConstExprContext *ctx, AstTyped *node, u32 offset) {
+    if (!emit_constexpr_(ctx, node, offset)) {
         onyx_report_error(node->token->pos, Error_Critical,
             "Cannot generate constant data for '%s'.",
             onyx_ast_node_kind_string(node->kind));
     }
 }
 
-static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
+static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
+#define CE(type, off) (*((type *) bh_pointer_add(ctx->data, offset + (off))))
+    assert(ctx->data_id);
+    assert(ctx->data);
+
     b32 retval = 1;
     node = (AstTyped *) strip_aliases((AstNode *) node);
 
     if (node_is_type((AstNode *) node)) {
         Type* constructed_type = type_build_from_ast(context.ast_alloc, (AstType *) node);
-        ((i32 *) data)[0] = constructed_type->id;
+        CE(i32, 0) = constructed_type->id;
         return 1;
     }
 
@@ -3619,7 +3659,7 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         i32 elem_size = type_size_of(al->type->Array.elem);
 
         bh_arr_each(AstTyped *, expr, al->values) {
-            retval &= emit_raw_data_(mod, bh_pointer_add(data, i * elem_size), *expr);
+            retval &= emit_constexpr_(ctx, *expr, i * elem_size + offset);
             i++;
         }
 
@@ -3641,7 +3681,7 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
 
         fori (i, 0, mem_count) {
             type_lookup_member_by_idx(sl_type, i, &smem);
-            retval &= emit_raw_data_(mod, bh_pointer_add(data, smem.offset), sl->args.values[i]);
+            retval &= emit_constexpr_(ctx, sl->args.values[i], smem.offset + offset);
         }
 
         break;
@@ -3650,47 +3690,55 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     case Ast_Kind_StrLit: {
         AstStrLit* sl = (AstStrLit *) node;
 
-        // NOTE: This assumes the address and the length fields have been filled out
+        // NOTE: This assumes the data_id and the length fields have been filled out
         // by emit_string_literal.
-        u32* sdata = (u32 *) data;
         if (POINTER_SIZE == 4) {
-            sdata[0] = sl->addr;
-            sdata[1] = sl->length;
+            CE(u32, 0) = 0;
+            CE(u32, 4) = sl->length;
         } else {
-            sdata[0] = sl->addr;
-            sdata[1] = 0;
-            sdata[2] = sl->length;
-            sdata[3] = 0;
+            CE(u64, 0) = 0;
+            CE(u64, 8) = sl->length;
         }
+
+        assert(sl->data_id > 0);
+
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.index = ctx->data_id;
+        patch.location = offset;
+        patch.data_id = sl->data_id;
+        patch.offset = 0;
+        bh_arr_push(ctx->module->data_patches, patch);
+
         break;
     }
 
     case Ast_Kind_Enum_Value: {
         AstEnumValue* ev = (AstEnumValue *) node;
-        retval &= emit_raw_data_(mod, data, (AstTyped *) ev->value);
+        retval &= emit_constexpr_(ctx, (AstTyped *) ev->value, offset);
         break;
     }
 
     case Ast_Kind_Function: {
         AstFunction* func = (AstFunction *) node;
-        *((u32 *) data) = get_element_idx(mod, func);
+        CE(u32, 0) = get_element_idx(ctx->module, func);
         break;
     }
 
     case Ast_Kind_Size_Of: {
         AstSizeOf* so = (AstSizeOf *) node;
-        *((u32 *) data) = so->size;
+        CE(u32, 0) = so->size;
         break;
     }
 
     case Ast_Kind_Align_Of: {
         AstAlignOf* ao = (AstAlignOf *) node;
-        *((u32 *) data) = ao->alignment;
+        CE(u32, 0) = ao->alignment;
         break;
     }
 
     case Ast_Kind_Zero_Value: {
-        memset(data, 0, type_size_of(node->type));
+        memset(bh_pointer_add(ctx->data, offset), 0, type_size_of(node->type));
         break;
     }
 
@@ -3710,31 +3758,31 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
         case Basic_Kind_Bool:
         case Basic_Kind_I8:
         case Basic_Kind_U8:
-            *((i8 *) data) = (i8) ((AstNumLit *) node)->value.i;
+            CE(i8, 0) = (i8) ((AstNumLit *) node)->value.i;
             return retval;
 
         case Basic_Kind_I16:
         case Basic_Kind_U16:
-            *((i16 *) data) = (i16) ((AstNumLit *) node)->value.i;
+            CE(i16, 0) = (i16) ((AstNumLit *) node)->value.i;
             return retval;
 
         case Basic_Kind_I32:
         case Basic_Kind_U32:
         case Basic_Kind_Rawptr:
-            *((i32 *) data) = ((AstNumLit *) node)->value.i;
+            CE(i32, 0) = ((AstNumLit *) node)->value.i;
             return retval;
 
         case Basic_Kind_I64:
         case Basic_Kind_U64:
-            *((i64 *) data) = ((AstNumLit *) node)->value.l;
+            CE(i64, 0) = ((AstNumLit *) node)->value.l;
             return retval;
 
         case Basic_Kind_F32:
-            *((f32 *) data) = ((AstNumLit *) node)->value.f;
+            CE(f32, 0) = ((AstNumLit *) node)->value.f;
             return retval;
 
         case Basic_Kind_F64:
-            *((f64 *) data) = ((AstNumLit *) node)->value.d;
+            CE(f64, 0) = ((AstNumLit *) node)->value.d;
             return retval;
 
         default: break;
@@ -3749,9 +3797,12 @@ static b32 emit_raw_data_(OnyxWasmModule* mod, ptr data, AstTyped* node) {
     }
 
     return retval;
+
+#undef CE
 }
 
 static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
+    // :ProperLinking
     Type* effective_type = memres->type;
 
     u64 alignment = type_alignment_of(effective_type);
@@ -3759,49 +3810,49 @@ static void emit_memory_reservation(OnyxWasmModule* mod, AstMemRes* memres) {
 
     if (type_table_node != NULL && (AstMemRes *) type_table_node == memres) {
         u64 table_location = build_type_table(mod);
-        memres->addr = table_location;
-
+        memres->data_id = table_location;
         return;
     }
 
     if (foreign_blocks_node != NULL && (AstMemRes *) foreign_blocks_node == memres) {
         u64 foreign_blocks_location = build_foreign_blocks(mod);
-        memres->addr = foreign_blocks_location;
-
+        memres->data_id = foreign_blocks_location;
         return;
     }
 
     if (tagged_procedures_node != NULL && (AstMemRes *) tagged_procedures_node == memres) {
         u64 tagged_procedures_location = build_tagged_procedures(mod);
-        memres->addr = tagged_procedures_location;
-
+        memres->data_id = tagged_procedures_location;
         return;
     }
 
     if (memres->threadlocal) {
-        memres->addr = mod->next_tls_offset;
-        bh_align(memres->addr, alignment);
-        mod->next_tls_offset = memres->addr + size;
+        memres->tls_offset = mod->next_tls_offset;
+        bh_align(memres->tls_offset, alignment);
+        mod->next_tls_offset = memres->tls_offset + size;
 
     } else {
-        memres->addr = mod->next_datum_offset;
-        bh_align(memres->addr, alignment);
-        mod->next_datum_offset = memres->addr + size;
-    }
-
-    if (memres->initial_value != NULL) {
-        assert(!memres->threadlocal);
-
-        u8* data = bh_alloc(global_heap_allocator, size);
-        emit_raw_data(mod, data, memres->initial_value);
+        // :ProperLinking
+        u8* data = NULL;
+        if (memres->initial_value != NULL) {
+            assert(!memres->threadlocal);
+            data = bh_alloc(global_heap_allocator, size);
+        }
 
         WasmDatum datum = {
-            .offset = memres->addr,
+            .alignment = alignment,
             .length = size,
             .data = data,
         };
+        memres->data_id = emit_data_entry(mod, &datum);
 
-        bh_arr_push(mod->data, datum);
+        if (memres->initial_value != NULL) {
+            ConstExprContext constexpr_ctx;
+            constexpr_ctx.module = mod;
+            constexpr_ctx.data = data;
+            constexpr_ctx.data_id = memres->data_id;
+            emit_constexpr(&constexpr_ctx, memres->initial_value, 0);
+        }
     }
 }
 
@@ -3829,13 +3880,10 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     i32 index = shgeti(mod->loaded_file_info, fc->filename);
     if (index != -1) {
         StrLitInfo info = mod->loaded_file_info[index].value;
-        fc->addr = info.addr;
-        fc->size = info.len;
+        fc->data_id = info.data_id;
+        fc->size    = info.len;
         return;
     }
-
-    u32 offset = mod->next_datum_offset;
-    bh_align(offset, 16);
 
     if (!bh_file_exists(fc->filename)) {
         onyx_report_error(fc->token->pos, Error_Critical,
@@ -3855,23 +3903,18 @@ static void emit_file_contents(OnyxWasmModule* mod, AstFileContents* fc) {
     actual_data[contents.length] = 0;
     bh_file_contents_free(&contents);
 
-    shput(mod->loaded_file_info, fc->filename, ((StrLitInfo) {
-        .addr = offset,
-        .len  = length - 1,
-    }));
-
-    fc->addr = offset;
-    fc->size = length - 1;
-
     WasmDatum datum = {
-        .offset = offset,
+        .alignment = 16,
         .length = length,
         .data = actual_data,
     };
+    fc->data_id = emit_data_entry(mod, &datum);
+    fc->size = length - 1;
 
-    bh_arr_push(mod->data, datum);
-
-    mod->next_datum_offset = offset + length;
+    shput(mod->loaded_file_info, fc->filename, ((StrLitInfo) {
+        .data_id = fc->data_id,
+        .len = fc->size,
+    }));
 }
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
@@ -3894,8 +3937,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .next_global_idx = 0,
 
         .data = NULL,
-        .next_datum_offset = 32, // Starting offset so null pointers don't immediately
-                                 // break constant data.       - brendanfh 2020/12/16
+        .data_patches = NULL,
 
         .next_tls_offset = 0,
         .tls_size_ptr = NULL,
@@ -3908,6 +3950,8 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .local_allocations = NULL,
         .stack_leave_patches = NULL,
         .deferred_stmts = NULL,
+
+        .heap_start_ptr = NULL,
 
         .stack_top_ptr = NULL,
         .stack_base_idx = 0,
@@ -3957,54 +4001,14 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.stack_leave_patches, 4);
     bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
     bh_arr_new(global_heap_allocator, module.procedures_with_tags, 4);
-
-    if (context.options->use_multi_threading) {
-        WasmImport mem_import = {
-            .kind   = WASM_FOREIGN_MEMORY,
-            .min    = 1024,
-            .max    = 65536, // NOTE: Why not use all 4 Gigs of memory?
-            .shared = context.options->runtime == Runtime_Js,
-
-            .mod    = "onyx",
-            .name   = "memory",
-        };
-
-        bh_arr_push(module.imports, mem_import);
-    }
-
-    WasmExport mem_export = {
-        .kind = WASM_FOREIGN_MEMORY,
-        .idx = 0,
-    };
-
-    shput(module.exports, "memory", mem_export);
-    module.export_count++;
-
-    WasmExport func_table_export = {
-        .kind = WASM_FOREIGN_TABLE,
-        .idx  = 0,
-    };
-    shput(module.exports, "func_type", func_table_export);
-    module.export_count++;
+    bh_arr_new(global_heap_allocator, module.data_patches, 4);
 
     return module;
 }
 
 void emit_entity(Entity* ent) {
     OnyxWasmModule* module = context.wasm_module;
-
-    if (module->stack_top_ptr) {
-        *module->stack_top_ptr = module->next_datum_offset;
-
-        if (*module->stack_top_ptr % 16 != 0) {
-            *module->stack_top_ptr += 16 - (*module->stack_top_ptr % 16);
-        }
-
-        builtin_heap_start.value.i = *module->stack_top_ptr + (1 << 20);
-        if (builtin_heap_start.value.i % 16 != 0) {
-            builtin_heap_start.value.i += 16 - (builtin_heap_start.value.i % 16);
-        }
-    }
+    module->current_func_idx = -1;
 
     switch (ent->type) {
         case Entity_Type_Foreign_Function_Header:
@@ -4092,6 +4096,101 @@ void emit_entity(Entity* ent) {
     }
 
     ent->state = Entity_State_Finalized;
+}
+
+void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
+    // If the pointer size is going to change,
+    // the code will probably need to be altered.
+    static_assert(POINTER_SIZE == 4);
+
+    if (context.options->use_multi_threading) {
+        WasmImport mem_import = {
+            .kind   = WASM_FOREIGN_MEMORY,
+            .min    = 1024,
+            .max    = 65536, // NOTE: Why not use all 4 Gigs of memory?
+            .shared = context.options->runtime == Runtime_Js,
+
+            .mod    = "onyx",
+            .name   = "memory",
+        };
+
+        bh_arr_push(module->imports, mem_import);
+    }
+
+    WasmExport mem_export = {
+        .kind = WASM_FOREIGN_MEMORY,
+        .idx = 0,
+    };
+
+    shput(module->exports, "memory", mem_export);
+    module->export_count++;
+
+    WasmExport func_table_export = {
+        .kind = WASM_FOREIGN_TABLE,
+        .idx  = 0,
+    };
+    shput(module->exports, "func_type", func_table_export);
+    module->export_count++;
+
+    u32 datum_offset = 32; // :LinkOption
+    bh_arr_each(WasmDatum, datum, module->data) {
+        assert(datum->id > 0);
+
+        bh_align(datum_offset, datum->alignment);
+        datum->offset_ = datum_offset;
+
+        // printf("Data ID %d -> %d\n", datum->id, datum->offset);
+
+        datum_offset += datum->length;
+    }
+
+    bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
+        assert(patch->data_id > 0);
+        WasmDatum *datum = &module->data[patch->data_id - 1];
+        assert(datum->id == patch->data_id);
+
+        switch (patch->kind) {
+            case Datum_Patch_Instruction: {
+                WasmFunc *func = &module->funcs[patch->index - module->foreign_function_count];
+                // printf("Patching instruction %d in func[%d] with %d\n", patch->location, patch->index, datum->offset);
+
+                assert(func->code[patch->location].type == WI_PTR_CONST);
+                func->code[patch->location].data.l = (u64) datum->offset_ + patch->offset;
+                break;
+            }
+
+            case Datum_Patch_Data: {
+                WasmDatum *datum_to_alter = &module->data[patch->index - 1];
+                assert(datum_to_alter->id == patch->index);
+                // printf("Patching data %d in data[%d] with %d + %d\n", patch->location, patch->index, target_datum->offset, patch->offset);
+
+                *((u32 *) bh_pointer_add(datum_to_alter->data, patch->location)) = (u32) datum->offset_ + patch->offset;
+                break;
+            }
+
+            case Datum_Patch_Relative: {
+                WasmDatum *datum_to_alter = &module->data[patch->index - 1];
+                assert(datum_to_alter->id == patch->index);
+
+                u32 *addr = (u32 *) bh_pointer_add(datum_to_alter->data, patch->location);
+                if (*addr != 0) {
+                    // printf("Patching data %d in data[%d] with %d + %d + %d\n", patch->location, patch->index, target_datum->offset, *addr, patch->offset);
+                    *addr += (u32) datum->offset_ + patch->offset;
+                }
+                break;
+            }
+
+            default: assert(0);
+        }
+    }
+
+    assert(module->stack_top_ptr && module->heap_start_ptr);
+
+    *module->stack_top_ptr = datum_offset;
+    bh_align(*module->stack_top_ptr, 16); // :LinkOption
+
+    *module->heap_start_ptr = *module->stack_top_ptr + (1 << 20); // :LinkOption
+    bh_align(*module->heap_start_ptr, 16);
 }
 
 void onyx_wasm_module_free(OnyxWasmModule* module) {

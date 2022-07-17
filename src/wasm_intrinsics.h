@@ -412,13 +412,23 @@ bad_type:
 }
 
 EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
+    // :ProperLinking
     if (!context.options->use_multi_threading || !context.options->use_post_mvp_features) return;
 
     bh_arr(WasmInstruction) code = *pcode;
 
+    //
+    // Because this code is generated direction in the function
+    // it is assumed that EVERY data entry will be entered by
+    // this point. If data section entries can be entered after
+    // function body generation starts, this code will have to
+    // move to a link phase thing.
     i32 index = 0;
     bh_arr_each(WasmDatum, datum, mod->data) {
-        WID(WI_PTR_CONST,   datum->offset);
+        assert(datum->id > 0);
+        if (datum->data == NULL) { index++; continue; }
+
+        emit_data_relocation(mod, &code, datum->id);
         WID(WI_PTR_CONST,   0);
         WID(WI_I32_CONST,   datum->length);
         WID(WI_MEMORY_INIT, ((WasmInstructionData) { index, 0 }));

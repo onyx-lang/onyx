@@ -502,7 +502,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
         case Token_Type_Literal_String: {
             AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
             str_node->token     = expect_token(parser, Token_Type_Literal_String);
-            str_node->addr      = 0;
+            str_node->data_id   = 0;
             str_node->flags    |= Ast_Flag_Comptime;
 
             ENTITY_SUBMIT(str_node);
@@ -599,7 +599,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
                 AstStrLit* filename = make_node(AstStrLit, Ast_Kind_StrLit);
                 filename->token = str_token;
-                filename->addr  = 0;
+                filename->data_id = 0;
 
                 ENTITY_SUBMIT(filename);
                 retval = (AstTyped *) filename;
@@ -739,7 +739,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 // Copy pasted from above.
                 AstStrLit* str_node = make_node(AstStrLit, Ast_Kind_StrLit);
                 str_node->token     = expect_token(parser, Token_Type_Literal_String);
-                str_node->addr      = 0;
+                str_node->data_id   = 0;
                 str_node->flags    |= Ast_Flag_Comptime;
                 str_node->is_cstr   = 1;
 

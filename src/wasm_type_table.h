@@ -37,6 +37,12 @@ static u64 build_type_table(OnyxWasmModule* module) {
     bh_buffer table_buffer;
     bh_buffer_init(&table_buffer, global_heap_allocator, 4096);
 
+    u32 type_table_info_data_id = NEXT_DATA_ID(module);
+
+    ConstExprContext constexpr_ctx;
+    constexpr_ctx.module = module;
+    constexpr_ctx.data_id = type_table_info_data_id;
+
     // Write a "NULL" at the beginning so nothing will have to point to the first byte of the buffer.
     bh_buffer_write_u64(&table_buffer, 0);
 
@@ -221,8 +227,8 @@ static u64 build_type_table(OnyxWasmModule* module) {
                             u32 size = type_size_of(sln->value->type);
 
                             bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                            u8* buffer = table_buffer.data + table_buffer.length;
-                            if (emit_raw_data_(module, buffer, sln->value)) {
+                            constexpr_ctx.data = table_buffer.data;
+                            if (emit_constexpr_(&constexpr_ctx, sln->value, table_buffer.length)) {
                                 table_buffer.length += size;
                                 break;
                             }
@@ -263,9 +269,8 @@ static u64 build_type_table(OnyxWasmModule* module) {
                     bh_buffer_align(&table_buffer, type_alignment_of(value->type));
 
                     bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                    u8* buffer = table_buffer.data + table_buffer.length;
-
-                    if (!emit_raw_data_(module, buffer, value)) {
+                    constexpr_ctx.data = table_buffer.data;
+                    if (!emit_constexpr_(&constexpr_ctx, value, table_buffer.length)) {
                         // Failed to generate raw data
                         // onyx_report_warning(value->token->pos, "Warning: failed to generate default value for '%s' in '%s'.\n", mem->name, s->name);
                         value_locations[i++] = 0;
@@ -304,9 +309,8 @@ static u64 build_type_table(OnyxWasmModule* module) {
                         meta_tag_locations[j] = table_buffer.length;
 
                         bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                        u8* buffer = table_buffer.data + table_buffer.length;
-
-                        assert(emit_raw_data_(module, buffer, value));
+                        constexpr_ctx.data = table_buffer.data;
+                        assert(emit_constexpr_(&constexpr_ctx, value, table_buffer.length));
                         table_buffer.length += size;
 
                         j += 1;
@@ -369,9 +373,8 @@ static u64 build_type_table(OnyxWasmModule* module) {
                     struct_tag_locations[i] = table_buffer.length;
 
                     bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                    u8* buffer = table_buffer.data + table_buffer.length;
-
-                    assert(emit_raw_data_(module, buffer, value));
+                    constexpr_ctx.data = table_buffer.data;
+                    assert(emit_constexpr_(&constexpr_ctx, value, table_buffer.length));
                     table_buffer.length += size;
 
                     i += 1;
@@ -491,9 +494,9 @@ static u64 build_type_table(OnyxWasmModule* module) {
                     tag_locations[i] = table_buffer.length;
 
                     bh_buffer_grow(&table_buffer, table_buffer.length + size);
-                    u8* buffer = table_buffer.data + table_buffer.length;
 
-                    assert(emit_raw_data_(module, buffer, value));
+                    constexpr_ctx.data = table_buffer.data;
+                    assert(emit_constexpr_(&constexpr_ctx, value, table_buffer.length));
                     table_buffer.length += size;
 
                     i += 1;
@@ -538,63 +541,62 @@ static u64 build_type_table(OnyxWasmModule* module) {
         bh_printf("Type table size: %d bytes.\n", table_buffer.length);
     }
 
-    u32 offset = module->next_datum_offset;
-    bh_align(offset, 8);
-
-    u64 type_table_location = offset;
-
-    WasmDatum type_table_data = {
-        .offset = offset,
-        .length = type_count * POINTER_SIZE,
-        .data = table_info,
-    };
-    bh_arr_push(module->data, type_table_data);
-
-    offset += type_table_data.length;
-
-    fori (i, 0, type_count) {
-        table_info[i] += offset;
-    }
-
-    bh_arr_each(u32, patch_loc, base_patch_locations) {
-        if (POINTER_SIZE == 4) {
-            u32* loc = bh_pointer_add(table_buffer.data, *patch_loc);
-            if (*loc == 0) continue;
-            
-            *loc += offset;
-        }
-        if (POINTER_SIZE == 8) {
-            u64* loc = bh_pointer_add(table_buffer.data, *patch_loc);
-            if (*loc == 0) continue;
-            
-            *loc += offset;
-        }
-    }
-
     WasmDatum type_info_data = {
-        .offset = offset,
+        .alignment = 8,
         .length = table_buffer.length,
         .data = table_buffer.data,
     };
-    bh_arr_push(module->data, type_info_data);
-    offset += type_info_data.length;
+    emit_data_entry(module, &type_info_data);
+    assert(type_info_data.id == type_table_info_data_id);
 
-    u64 global_data_ptr = offset;
+    bh_arr_each(u32, patch_loc, base_patch_locations) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Relative;
+        patch.data_id = type_info_data.id;
+        patch.offset = 0;
+        patch.index = type_info_data.id;
+        patch.location = *patch_loc;
+        bh_arr_push(module->data_patches, patch);
+    }
+
+    WasmDatum type_table_data = {
+        .alignment = POINTER_SIZE,
+        .length = type_count * POINTER_SIZE,
+        .data = table_info,
+    };
+    emit_data_entry(module, &type_table_data);
+
+    fori (i, 0, type_count) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.data_id = type_info_data.id;
+        patch.offset = table_info[i];
+        patch.index = type_table_data.id;
+        patch.location = i * POINTER_SIZE;
+        bh_arr_push(module->data_patches, patch);
+    }
 
     Table_Info_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
-    tmp_data[0] = type_table_location;
+    tmp_data[0] = 0;
     tmp_data[1] = type_count;
     WasmDatum type_table_global_data = {
-        .offset = offset,
+        .alignment = POINTER_SIZE,
         .length = 2 * POINTER_SIZE,
         .data = tmp_data,
     };
-    bh_arr_push(module->data, type_table_global_data);
-    offset += type_table_global_data.length;
+    emit_data_entry(module, &type_table_global_data);
 
-    module->next_datum_offset = offset;
+    {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.data_id = type_table_data.id;
+        patch.offset = 0;
+        patch.index = type_table_global_data.id;
+        patch.location = 0;
+        bh_arr_push(module->data_patches, patch);
+    }
 
-    return global_data_ptr;
+    return type_table_global_data.id;
 
 #undef WRITE_SLICE
 #undef WRITE_PTR
@@ -686,63 +688,61 @@ static u64 build_foreign_blocks(OnyxWasmModule* module) {
         bh_printf("Foreign blocks size: %d bytes.\n", foreign_buffer.length);
     }
 
-    u32 offset = module->next_datum_offset;
-    bh_align(offset, 8);
-
-    u64 foreign_blocks_location = offset;
-
-    WasmDatum foreign_blocks_data = {
-        .offset = offset,
-        .length = block_count * POINTER_SIZE,
-        .data = foreign_info,
-    };
-    bh_arr_push(module->data, foreign_blocks_data);
-
-    offset += foreign_blocks_data.length;
-
-    fori (i, 0, block_count) {
-        foreign_info[i] += offset;
-    }
-
-    bh_arr_each(u32, patch_loc, base_patch_locations) {
-        if (POINTER_SIZE == 4) {
-            u32* loc = bh_pointer_add(foreign_buffer.data, *patch_loc);
-            if (*loc == 0) continue;
-            
-            *loc += offset;
-        }
-        if (POINTER_SIZE == 8) {
-            u64* loc = bh_pointer_add(foreign_buffer.data, *patch_loc);
-            if (*loc == 0) continue;
-            
-            *loc += offset;
-        }
-    }
-
-    WasmDatum foreign_blocks_info_data = {
-        .offset = offset,
+    WasmDatum foreign_info_data = {
+        .alignment = 8,
         .length = foreign_buffer.length,
         .data = foreign_buffer.data,
     };
-    bh_arr_push(module->data, foreign_blocks_info_data);
-    offset += foreign_blocks_info_data.length;
+    emit_data_entry(module, &foreign_info_data);
 
-    u64 global_data_ptr = offset;
+    bh_arr_each(u32, patch_loc, base_patch_locations) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Relative;
+        patch.data_id = foreign_info_data.id;
+        patch.offset = 0;
+        patch.index = foreign_info_data.id;
+        patch.location = *patch_loc;
+        bh_arr_push(module->data_patches, patch);
+    }
+
+    WasmDatum foreign_table_data = {
+        .alignment = POINTER_SIZE,
+        .length = block_count * POINTER_SIZE,
+        .data = foreign_info,
+    };
+    emit_data_entry(module, &foreign_table_data);
+
+    fori (i, 0, block_count) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.data_id = foreign_info_data.id;
+        patch.offset = foreign_info[i];
+        patch.index = foreign_table_data.id;
+        patch.location = i * POINTER_SIZE;
+        bh_arr_push(module->data_patches, patch);
+    }
 
     Foreign_Block_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
-    tmp_data[0] = foreign_blocks_location;
+    tmp_data[0] = 0;
     tmp_data[1] = block_count;
-    WasmDatum foreign_blocks_global_data = {
-        .offset = offset,
+    WasmDatum foreign_table_global_data = {
+        .alignment = POINTER_SIZE,
         .length = 2 * POINTER_SIZE,
         .data = tmp_data,
     };
-    bh_arr_push(module->data, foreign_blocks_global_data);
-    offset += foreign_blocks_global_data.length;
+    emit_data_entry(module, &foreign_table_global_data);
 
-    module->next_datum_offset = offset;
+    {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.data_id = foreign_table_data.id;
+        patch.location = 0;
+        patch.index = foreign_table_global_data.id;
+        patch.offset = 0;
+        bh_arr_push(module->data_patches, patch);
+    }
 
-    return global_data_ptr;
+    return foreign_table_global_data.id;
 
 #undef WRITE_SLICE
 #undef WRITE_PTR
@@ -778,6 +778,12 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
     bh_buffer tag_proc_buffer;
     bh_buffer_init(&tag_proc_buffer, global_heap_allocator, 4096);
 
+    u32 proc_info_data_id = NEXT_DATA_ID(module);
+
+    ConstExprContext constexpr_ctx;
+    constexpr_ctx.module = module;
+    constexpr_ctx.data_id = proc_info_data_id;
+
     // 
     // This is necessary because 0 is an invalid offset to store in this
     // buffer, as 0 will map to NULL. This could be a single byte insertion,
@@ -806,8 +812,9 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
 
             u32 size = type_size_of(tag->type);
             bh_buffer_grow(&tag_proc_buffer, tag_proc_buffer.length + size);
-            u8* buffer = tag_proc_buffer.data + tag_proc_buffer.length;
-            emit_raw_data(module, buffer, tag);
+
+            constexpr_ctx.data = tag_proc_buffer.data;
+            emit_constexpr(&constexpr_ctx, tag, tag_proc_buffer.length);
             tag_proc_buffer.length += size;
         }
 
@@ -831,63 +838,62 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         bh_printf("Tagged procedure size: %d bytes.\n", tag_proc_buffer.length);
     }
 
-    u32 offset = module->next_datum_offset;
-    bh_align(offset, 8);
-
-    u64 tagged_procedures_location = offset;
-
-    WasmDatum tagged_procedures_data = {
-        .offset = offset,
-        .length = proc_count * POINTER_SIZE,
-        .data = tag_proc_info,
-    };
-    bh_arr_push(module->data, tagged_procedures_data);
-
-    offset += tagged_procedures_data.length;
-
-    fori (i, 0, proc_count) {
-        tag_proc_info[i] += offset;
-    }
-
-    bh_arr_each(u32, patch_loc, base_patch_locations) {
-        if (POINTER_SIZE == 4) {
-            u32* loc = bh_pointer_add(tag_proc_buffer.data, *patch_loc);
-            if (*loc == 0) continue;
-            
-            *loc += offset;
-        }
-        if (POINTER_SIZE == 8) {
-            u64* loc = bh_pointer_add(tag_proc_buffer.data, *patch_loc);
-            if (*loc == 0) continue;
-            
-            *loc += offset;
-        }
-    }
-
-    WasmDatum tagged_procedures_info_data = {
-        .offset = offset,
+    WasmDatum proc_info_data = {
+        .alignment = 8,
         .length = tag_proc_buffer.length,
         .data = tag_proc_buffer.data,
     };
-    bh_arr_push(module->data, tagged_procedures_info_data);
-    offset += tagged_procedures_info_data.length;
+    emit_data_entry(module, &proc_info_data);
+    assert(proc_info_data.id == proc_info_data_id);
 
-    u64 global_data_ptr = offset;
+    bh_arr_each(u32, patch_loc, base_patch_locations) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Relative;
+        patch.data_id = proc_info_data.id;
+        patch.location = *patch_loc;
+        patch.index = proc_info_data.id;
+        patch.offset = 0;
+        bh_arr_push(module->data_patches, patch);
+    }
+
+    WasmDatum proc_table_data = {
+        .alignment = POINTER_SIZE,
+        .length = proc_count * POINTER_SIZE,
+        .data = tag_proc_info,
+    };
+    emit_data_entry(module, &proc_table_data);
+
+    fori (i, 0, proc_count) {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.data_id = proc_info_data.id;
+        patch.offset = tag_proc_info[i];
+        patch.index = proc_table_data.id;
+        patch.location = i * POINTER_SIZE;
+        bh_arr_push(module->data_patches, patch);
+    }
 
     Tagged_Procedure_Type* tmp_data = bh_alloc(global_heap_allocator, 2 * POINTER_SIZE);
-    tmp_data[0] = tagged_procedures_location;
+    tmp_data[0] = 0;
     tmp_data[1] = proc_count;
-    WasmDatum tagged_procedures_global_data = {
-        .offset = offset,
+    WasmDatum proc_table_global_data = {
+        .alignment = POINTER_SIZE,
         .length = 2 * POINTER_SIZE,
         .data = tmp_data,
     };
-    bh_arr_push(module->data, tagged_procedures_global_data);
-    offset += tagged_procedures_global_data.length;
+    emit_data_entry(module, &proc_table_global_data);
 
-    module->next_datum_offset = offset;
+    {
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.offset = 0;
+        patch.data_id = proc_table_data.id;
+        patch.index = proc_table_global_data.id;
+        patch.location = 0;
+        bh_arr_push(module->data_patches, patch);
+    }
 
-    return global_data_ptr;
+    return proc_table_global_data.id;
 
 #undef WRITE_SLICE
 #undef WRITE_PTR

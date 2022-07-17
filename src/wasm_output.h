@@ -167,6 +167,7 @@ static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
 }
 
 static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
+    // :ProperLinking
     if (context.options->use_multi_threading) return 0;
 
     i32 prev_len = buff->length;
@@ -181,7 +182,7 @@ static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
 
     // FIXME: This needs to be dynamically chosen depending on the size of
     // the data section and stack size pre-requeseted.
-    // :WasmMemory
+    // :WasmMemory :ProperLinking
     output_limits(1024, -1, 0, &vec_buff);
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
@@ -638,23 +639,28 @@ static i32 output_datasection(OnyxWasmModule* module, bh_buffer* buff) {
     bh_buffer_append(&vec_buff, leb, leb_len);
 
     bh_arr_each(WasmDatum, datum, module->data) {
-        assert(datum->data != NULL);
-
         i32 memory_flags = 0x00;
+        // :ProperLinking
         if (context.options->use_multi_threading) memory_flags |= 0x01;
 
         bh_buffer_write_byte(&vec_buff, memory_flags);
 
+        // :ProperLinking
         if (!context.options->use_multi_threading) {
             bh_buffer_write_byte(&vec_buff, WI_I32_CONST);
-            leb = int_to_leb128((i64) datum->offset, &leb_len);
+            leb = int_to_leb128((i64) datum->offset_, &leb_len);
             bh_buffer_append(&vec_buff, leb, leb_len);
             bh_buffer_write_byte(&vec_buff, WI_BLOCK_END);
         }
 
-        leb = uint_to_uleb128((u64) datum->length, &leb_len);
-        bh_buffer_append(&vec_buff, leb, leb_len);
-        fori (i, 0, datum->length) bh_buffer_write_byte(&vec_buff, ((u8 *) datum->data)[i]);
+        if (datum->data != NULL) {
+            leb = uint_to_uleb128((u64) datum->length, &leb_len);
+            bh_buffer_append(&vec_buff, leb, leb_len);
+            fori (i, 0, datum->length) bh_buffer_write_byte(&vec_buff, ((u8 *) datum->data)[i]);
+        } else {
+            leb = uint_to_uleb128(0, &leb_len);
+            bh_buffer_append(&vec_buff, leb, leb_len);
+        }
     }
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);

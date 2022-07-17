@@ -577,9 +577,65 @@ typedef struct WasmImport {
 } WasmImport;
 
 typedef struct WasmDatum {
-    u32 offset, length;
+    u32 id;
+    u32 offset_, alignment;
+    u32 length;
     ptr data;
 } WasmDatum;
+
+typedef enum DatumPatchInfoKind {
+    Datum_Patch_Instruction,
+    Datum_Patch_Data,
+    Datum_Patch_Relative,
+} DatumPatchInfoKind;
+
+//
+// This represents a pointer that should be filled in
+// later when the corresponding data element is placed.
+//
+// There are three kinds of patches:
+//   - Instruction
+//   - Data
+//   - Relative
+//
+// In all cases, the `data_id` member is set to the id
+// of the WasmDatum entry that will be the base address,
+// and then the `offset` member will be added to that.
+//
+// In instruction patches, the `index` member is set
+// to the index of the function where the instruction should
+// be patched. The `location` member is set to the instruction
+// that needs to have its data changed.
+//
+// In data patches, the `index` member is set to the id
+// of the WasmDatum entry that needs to have a part of it
+// updated. The `location` member is the offset into the
+// data to update. It is assumed that 4 bytes will be reserved
+// to be replaced with the pointer value.
+//
+// In relative patches, `index` member is set to the id
+// of the WasmDatum entry that needs to have a part of it
+// updated. The `location` member is the offset into the
+// data to update. The difference between `Data` and `Relative`
+// is that `Relative` *adds* the base address to the current
+// value in the 4 bytes, as opposed to replacing it. As a
+// convenience, if the value is 0 (null), it will remain as
+// 0.
+//
+typedef struct DatumPatchInfo {
+    DatumPatchInfoKind kind;
+    u32 data_id;
+    u32 offset;
+    u32 location;
+    u32 index;
+} DatumPatchInfo;
+
+// Context used when building a constexpr buffer
+typedef struct ConstExprContext {
+   struct OnyxWasmModule *module;
+   ptr data;
+   u32 data_id;
+} ConstExprContext;
 
 typedef enum DeferredStmtType {
     Deferred_Stmt_Node,
@@ -605,7 +661,7 @@ typedef struct AllocatedSpace {
 } AllocatedSpace;
 
 typedef struct StrLitInfo {
-    u32 addr;
+    u32 data_id;
     u32 len;
 } StrLitInfo;
 
@@ -633,6 +689,7 @@ typedef struct OnyxWasmModule {
     // NOTE: Mapping from local ast node ptrs to indicies or offsets, depending on the mode
     bh_imap local_map;
 
+    i32 current_func_idx;
     LocalAllocator* local_alloc;
 
     // NOTE: Mapping ptrs to elements
@@ -642,6 +699,7 @@ typedef struct OnyxWasmModule {
     bh_arr(AllocatedSpace) local_allocations; 
 
     bh_arr(PatchInfo) stack_leave_patches;
+    bh_arr(DatumPatchInfo) data_patches;
 
     bh_arr(ForRemoveInfo) for_remove_info;
 
@@ -676,13 +734,13 @@ typedef struct OnyxWasmModule {
     u32 next_type_idx;
     u32 next_func_idx;
     u32 next_global_idx;
-    u32 next_datum_offset;
     u32 next_tls_offset;
     u32 next_elem_idx;
     u32 foreign_function_count;
 
     i32 *stack_top_ptr;
     i32 *tls_size_ptr;
+    i32 *heap_start_ptr;
     u64 stack_base_idx;
     CallingConvention curr_cc;
     i32 null_proc_func_idx;
@@ -690,7 +748,11 @@ typedef struct OnyxWasmModule {
     b32 has_stack_locals : 1;
 } OnyxWasmModule;
 
+typedef struct OnyxWasmLinkOptions {
+} OnyxWasmLinkOptions;
+
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
+void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options);
 void onyx_wasm_module_free(OnyxWasmModule* module);
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer);
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);

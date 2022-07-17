@@ -298,6 +298,7 @@ static void context_init(CompileOptions* opts) {
     }
 
     add_entities_for_node(NULL, (AstNode *) &builtin_stack_top, context.global_scope, NULL);
+    add_entities_for_node(NULL, (AstNode *) &builtin_heap_start, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_base, context.global_scope, NULL);
     add_entities_for_node(NULL, (AstNode *) &builtin_tls_size, context.global_scope, NULL);
 
@@ -649,6 +650,7 @@ static i32 onyx_compile() {
 }
 
 static CompilerProgress onyx_flush_module() {
+    onyx_wasm_module_link(context.wasm_module, NULL);
 
     // NOTE: Output to file
     bh_file output_file;
@@ -700,6 +702,8 @@ static CompilerProgress onyx_flush_module() {
 
 #ifdef ENABLE_RUN_WITH_WASMER
 static b32 onyx_run() {
+    onyx_wasm_module_link(context.wasm_module, NULL);
+
     bh_buffer code_buffer;
     onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
 

@@ -675,7 +675,7 @@ CheckStatus check_call(AstCall** pcall) {
             memset(filename, 0, sizeof(AstStrLit));
             filename->kind  = Ast_Kind_StrLit;
             filename->token = str_token;
-            filename->addr  = 0;
+            filename->data_id = 0;
 
             add_entities_for_node(NULL, (AstNode *) filename, NULL, NULL);
             callsite->filename = filename;
