@@ -728,6 +728,9 @@ typedef struct OnyxWasmModule {
     bh_arr(i32)           elems;
     bh_arr(char *)        libraries;
     bh_arr(char *)        library_paths;
+    b32 needs_memory_section;
+    u32 memory_min_size;
+    u32 memory_max_size;
 
     // NOTE: Set of things used when compiling; not part of the actual module
     u32 export_count;
@@ -749,7 +752,27 @@ typedef struct OnyxWasmModule {
 } OnyxWasmModule;
 
 typedef struct OnyxWasmLinkOptions {
+    b32 stack_first;
+    u32 stack_size;
+    u32 stack_alignment;
+
+    u32 null_reserve_size;
+
+    b32 import_memory;
+    char *import_memory_module_name;
+    char *import_memory_import_name;
+
+    b32 export_memory;
+    char *export_memory_name;
+
+    b32 export_func_table;
+    char *export_func_table_name;
+
+    u32 memory_min_size;
+    u32 memory_max_size;
 } OnyxWasmLinkOptions;
+
+b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, struct AstTyped *node);
 
 OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc);
 void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options);

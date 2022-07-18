@@ -224,3 +224,13 @@ Revamping File System:
             use data:   runtime.fs.FileData;
         }
     [x] Most file functionality will be provided using the stream API.
+
+
+Making a proper "linkage" phase of the compiler:  :ProperLinking
+    [x] References to data section entries should be patched after compilation
+        Should just be leaving 4-bytes blank to be filled in later
+    [x] Be able to specify the start address:
+        - The stack
+        - The data section
+        - The stack size
+        - The memory constraints (in pages)

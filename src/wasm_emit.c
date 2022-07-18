@@ -3945,6 +3945,10 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
         .elems = NULL,
         .next_elem_idx = 0,
 
+        .needs_memory_section = 0,
+        .memory_min_size = 0,
+        .memory_max_size = 0,
+
         .structured_jump_target = NULL,
         .return_location_stack = NULL,
         .local_allocations = NULL,
@@ -4103,43 +4107,54 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     // the code will probably need to be altered.
     static_assert(POINTER_SIZE == 4);
 
-    if (context.options->use_multi_threading) {
+    module->memory_min_size = options->memory_min_size;
+    module->memory_max_size = options->memory_max_size;
+
+    if (context.options->use_multi_threading || options->import_memory) {
+        module->needs_memory_section = 0;
+
         WasmImport mem_import = {
             .kind   = WASM_FOREIGN_MEMORY,
-            .min    = 1024,
-            .max    = 65536, // NOTE: Why not use all 4 Gigs of memory?
+            .min    = options->memory_min_size,
+            .max    = options->memory_max_size, // NOTE: Why not use all 4 Gigs of memory?
             .shared = context.options->runtime == Runtime_Js,
 
-            .mod    = "onyx",
-            .name   = "memory",
+            .mod    = options->import_memory_module_name,
+            .name   = options->import_memory_import_name,
         };
 
         bh_arr_push(module->imports, mem_import);
+
+    } else {
+        module->needs_memory_section = 1;
     }
 
-    WasmExport mem_export = {
-        .kind = WASM_FOREIGN_MEMORY,
-        .idx = 0,
-    };
+    if (options->export_memory) {
+        WasmExport mem_export = {
+            .kind = WASM_FOREIGN_MEMORY,
+            .idx = 0,
+        };
 
-    shput(module->exports, "memory", mem_export);
-    module->export_count++;
+        shput(module->exports, options->export_memory_name, mem_export);
+        module->export_count++;
+    }
 
-    WasmExport func_table_export = {
-        .kind = WASM_FOREIGN_TABLE,
-        .idx  = 0,
-    };
-    shput(module->exports, "func_type", func_table_export);
-    module->export_count++;
+    if (options->export_func_table) {
+        WasmExport func_table_export = {
+            .kind = WASM_FOREIGN_TABLE,
+            .idx  = 0,
+        };
 
-    u32 datum_offset = 32; // :LinkOption
+        shput(module->exports, options->export_func_table_name, func_table_export);
+        module->export_count++;
+    }
+
+    u32 datum_offset = options->null_reserve_size;
     bh_arr_each(WasmDatum, datum, module->data) {
         assert(datum->id > 0);
 
         bh_align(datum_offset, datum->alignment);
         datum->offset_ = datum_offset;
-
-        // printf("Data ID %d -> %d\n", datum->id, datum->offset);
 
         datum_offset += datum->length;
     }
@@ -4152,7 +4167,6 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
         switch (patch->kind) {
             case Datum_Patch_Instruction: {
                 WasmFunc *func = &module->funcs[patch->index - module->foreign_function_count];
-                // printf("Patching instruction %d in func[%d] with %d\n", patch->location, patch->index, datum->offset);
 
                 assert(func->code[patch->location].type == WI_PTR_CONST);
                 func->code[patch->location].data.l = (u64) datum->offset_ + patch->offset;
@@ -4162,7 +4176,6 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
             case Datum_Patch_Data: {
                 WasmDatum *datum_to_alter = &module->data[patch->index - 1];
                 assert(datum_to_alter->id == patch->index);
-                // printf("Patching data %d in data[%d] with %d + %d\n", patch->location, patch->index, target_datum->offset, patch->offset);
 
                 *((u32 *) bh_pointer_add(datum_to_alter->data, patch->location)) = (u32) datum->offset_ + patch->offset;
                 break;
@@ -4174,9 +4187,9 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
 
                 u32 *addr = (u32 *) bh_pointer_add(datum_to_alter->data, patch->location);
                 if (*addr != 0) {
-                    // printf("Patching data %d in data[%d] with %d + %d + %d\n", patch->location, patch->index, target_datum->offset, *addr, patch->offset);
                     *addr += (u32) datum->offset_ + patch->offset;
                 }
+
                 break;
             }
 
@@ -4187,9 +4200,9 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     assert(module->stack_top_ptr && module->heap_start_ptr);
 
     *module->stack_top_ptr = datum_offset;
-    bh_align(*module->stack_top_ptr, 16); // :LinkOption
+    bh_align(*module->stack_top_ptr, options->stack_alignment);
 
-    *module->heap_start_ptr = *module->stack_top_ptr + (1 << 20); // :LinkOption
+    *module->heap_start_ptr = *module->stack_top_ptr + (options->stack_size << 16);
     bh_align(*module->heap_start_ptr, 16);
 }
 
@@ -4205,5 +4218,74 @@ void onyx_wasm_module_free(OnyxWasmModule* module) {
     shfree(module->exports);
 }
 
+
+b32 onyx_wasm_build_link_options_from_node(OnyxWasmLinkOptions *opts, AstTyped *node) {
+    node = (AstTyped *) strip_aliases((AstNode *) node);
+
+    assert(node && node->kind == Ast_Kind_Struct_Literal);
+    assert(builtin_link_options_type);
+
+    Type *link_options_type = type_build_from_ast(context.ast_alloc, builtin_link_options_type);
+    
+    AstStructLiteral *input = (AstStructLiteral *) node;
+
+    StructMember smem;
+    b32 out_is_valid;
+
+    // TODO: These should be properly error handled.
+    assert(type_lookup_member(link_options_type, "stack_first", &smem));
+    opts->stack_first = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "stack_size", &smem));
+    opts->stack_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "stack_alignment", &smem));
+    opts->stack_alignment = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "null_reserve_size", &smem));
+    opts->null_reserve_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "import_memory", &smem));
+    opts->import_memory = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "import_memory_module_name", &smem));
+    opts->import_memory_module_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "import_memory_import_name", &smem));
+    opts->import_memory_import_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "export_memory", &smem));
+    opts->export_memory = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "export_memory_name", &smem));
+    opts->export_memory_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "export_func_table", &smem));
+    opts->export_func_table = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid) != 0;
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "export_func_table_name", &smem));
+    opts->export_func_table_name = get_expression_string_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "memory_min_size", &smem));
+    opts->memory_min_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    assert(type_lookup_member(link_options_type, "memory_max_size", &smem));
+    opts->memory_max_size = get_expression_integer_value(input->args.values[smem.idx], &out_is_valid);
+    if (!out_is_valid) return 0;
+
+    return 1;
+}
 
 #include "wasm_output.h"

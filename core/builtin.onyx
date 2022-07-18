@@ -278,3 +278,39 @@ __initialize_data_segments :: () -> void ---
 // This is also a special compiler generated procedure that calls all procedures specified with
 // #init, in the specified order. It should theoritically only be called once on the main thread.
 __run_init_procedures :: () -> void ---
+
+
+#local {
+    #if runtime.runtime == .Onyx {
+        IMPORT_MEMORY_DEFAULT :: true;
+        IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "onyx";
+        IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "memory";
+
+    } else {
+        IMPORT_MEMORY_DEFAULT :: false;
+        IMPORT_MEMORY_MODULE_NAME_DEFAULT :: "";
+        IMPORT_MEMORY_IMPORT_NAME_DEFAULT :: "";
+    }
+}
+
+// Should this be here? and/or should its name be so generic?
+Link_Options :: struct {
+    stack_first     := false;
+    stack_size      := 16;  // 16 pages * 65536 bytes per page = 1 MiB stack
+    stack_alignment := 16;
+
+    null_reserve_size := 16;
+
+    import_memory := IMPORT_MEMORY_DEFAULT;
+    import_memory_module_name := IMPORT_MEMORY_MODULE_NAME_DEFAULT;
+    import_memory_import_name := IMPORT_MEMORY_IMPORT_NAME_DEFAULT;
+
+    export_memory := true;
+    export_memory_name := "memory";
+
+    export_func_table := true;
+    export_func_table_name := "func_table";
+
+    memory_min_size := 1024;
+    memory_max_size := 65536;
+}

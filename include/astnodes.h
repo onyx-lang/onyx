@@ -1607,6 +1607,7 @@ extern AstType  *builtin_iterator_type;
 extern AstType  *builtin_callsite_type;
 extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
+extern AstType  *builtin_link_options_type;
 extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;
@@ -1656,7 +1657,9 @@ typedef enum TypeMatch {
 #define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
 TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
 Type* resolve_expression_type(AstTyped* node);
-i64 get_expression_integer_value(AstTyped* node, b32 *out_is_valid);
+
+i64   get_expression_integer_value(AstTyped* node, b32 *out_is_valid);
+char *get_expression_string_value(AstTyped* node, b32 *out_is_valid);
 
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);

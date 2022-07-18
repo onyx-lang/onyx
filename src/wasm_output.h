@@ -168,7 +168,8 @@ static i32 output_tablesection(OnyxWasmModule* module, bh_buffer* buff) {
 
 static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
     // :ProperLinking
-    if (context.options->use_multi_threading) return 0;
+    // if (context.options->use_multi_threading) return 0;
+    if (!module->needs_memory_section) return 0;
 
     i32 prev_len = buff->length;
     bh_buffer_write_byte(buff, WASM_SECTION_ID_MEMORY);
@@ -180,10 +181,7 @@ static i32 output_memorysection(OnyxWasmModule* module, bh_buffer* buff) {
     u8* leb = uint_to_uleb128((u64) 1, &leb_len);
     bh_buffer_append(&vec_buff, leb, leb_len);
 
-    // FIXME: This needs to be dynamically chosen depending on the size of
-    // the data section and stack size pre-requeseted.
-    // :WasmMemory :ProperLinking
-    output_limits(1024, -1, 0, &vec_buff);
+    output_limits(module->memory_min_size, -1, 0, &vec_buff);
 
     leb = uint_to_uleb128((u64) (vec_buff.length), &leb_len);
     bh_buffer_append(buff, leb, leb_len);
@@ -589,8 +587,6 @@ static i32 output_codesection(OnyxWasmModule* module, bh_buffer* buff) {
     i32 leb_len;
     u8* leb = uint_to_uleb128((u64) bh_arr_length(module->funcs), &leb_len);
     bh_buffer_append(&vec_buff, leb, leb_len);
-
-    // DEBUG_HERE;
 
     bh_arr_each(WasmFunc, func, module->funcs) output_code(func, &vec_buff);
 

@@ -941,6 +941,32 @@ i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
     return 0;
 }
 
+char *get_expression_string_value(AstTyped* node, b32 *out_is_valid) {
+    resolve_expression_type(node);
+
+    if (out_is_valid) *out_is_valid = 1;
+
+    if (node->kind == Ast_Kind_StrLit) {
+        AstStrLit *str = (AstStrLit *) node;
+
+        // CLEANUP: Maybe this should allocate on the heap?
+        // I guess if in all cases the memory is allocated on the heap,
+        // then the caller can free the memory.
+        i8* strdata = bh_alloc_array(global_heap_allocator, i8, str->token->length + 1);
+        i32 length  = string_process_escape_seqs(strdata, str->token->text, str->token->length);
+        strdata[length] = '\0';
+
+        return strdata;
+    }
+
+    if (node->kind == Ast_Kind_Alias) {
+        return get_expression_string_value(((AstAlias *) node)->alias, out_is_valid);
+    }
+
+    if (out_is_valid) *out_is_valid = 0;
+    return NULL;
+}
+
 static const b32 cast_legality[][12] = {
     /* I8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },
     /* U8  */ { 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },

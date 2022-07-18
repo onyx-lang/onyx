@@ -59,6 +59,7 @@ AstType  *builtin_iterator_type;
 AstType  *builtin_callsite_type;
 AstType  *builtin_any_type;
 AstType  *builtin_code_type;
+AstType  *builtin_link_options_type;
 
 AstTyped    *type_table_node = NULL;
 AstTyped    *foreign_blocks_node = NULL;
@@ -451,7 +452,13 @@ void initialize_builtins(bh_allocator a) {
 
     builtin_run_init_procedures = (AstFunction *) symbol_raw_resolve(p->scope, "__run_init_procedures");
     if (builtin_run_init_procedures == NULL || builtin_run_init_procedures->kind != Ast_Kind_Function) {
-        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__run_init_procedures");
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__run_init_procedures' procedure not found.");
+        return;
+    }
+
+    builtin_link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
+    if (builtin_link_options_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Link_Options' type not found.");
         return;
     }
 

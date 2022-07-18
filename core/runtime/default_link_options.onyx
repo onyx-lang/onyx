@@ -1,0 +1,5 @@
+package runtime.vars
+
+#if !#defined(link_options)  {
+    link_options :: Link_Options.{}
+}

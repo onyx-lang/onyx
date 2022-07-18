@@ -649,8 +649,22 @@ static i32 onyx_compile() {
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
+static void link_wasm_module() {
+    Package *runtime_var_package = package_lookup("runtime.vars");
+    assert(runtime_var_package);
+
+    AstTyped *link_options_node = (AstTyped *) symbol_raw_resolve(runtime_var_package->scope, "link_options");
+    Type *link_options_type = type_build_from_ast(context.ast_alloc, builtin_link_options_type);
+
+    assert(unify_node_and_type(&link_options_node, link_options_type) == TYPE_MATCH_SUCCESS);
+
+    OnyxWasmLinkOptions link_opts;
+    onyx_wasm_build_link_options_from_node(&link_opts, link_options_node);
+    onyx_wasm_module_link(context.wasm_module, &link_opts);
+}
+
 static CompilerProgress onyx_flush_module() {
-    onyx_wasm_module_link(context.wasm_module, NULL);
+    link_wasm_module();
 
     // NOTE: Output to file
     bh_file output_file;
@@ -702,7 +716,7 @@ static CompilerProgress onyx_flush_module() {
 
 #ifdef ENABLE_RUN_WITH_WASMER
 static b32 onyx_run() {
-    onyx_wasm_module_link(context.wasm_module, NULL);
+    link_wasm_module();
 
     bh_buffer code_buffer;
     onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
