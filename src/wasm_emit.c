@@ -4105,7 +4105,7 @@ void emit_entity(Entity* ent) {
 void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options) {
     // If the pointer size is going to change,
     // the code will probably need to be altered.
-    static_assert(POINTER_SIZE == 4);
+    assert(POINTER_SIZE == 4);
 
     module->memory_min_size = options->memory_min_size;
     module->memory_max_size = options->memory_max_size;

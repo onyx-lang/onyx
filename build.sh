@@ -16,8 +16,8 @@ CC='gcc'
 # The architecture of your system. If your not sure, leave this alone.
 ARCH="$(uname -m)"
 
-RUNTIME_LIBRARY="ovmwasm"
-# RUNTIME_LIBRARY="wasmer"
+# RUNTIME_LIBRARY="ovmwasm"
+RUNTIME_LIBRARY="wasmer"
 
 # Comment this line if you do not want the above library installed,
 # and do not with to have the Onyx runtime.
