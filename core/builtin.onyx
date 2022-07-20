@@ -296,7 +296,7 @@ __run_init_procedures :: () -> void ---
 // Should this be here? and/or should its name be so generic?
 Link_Options :: struct {
     stack_first     := false;
-    stack_size      := 16;  // 16 pages * 65536 bytes per page = 1 MiB stack
+    stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
     stack_alignment := 16;
 
     null_reserve_size := 16;

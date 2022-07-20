@@ -4202,7 +4202,7 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     *module->stack_top_ptr = datum_offset;
     bh_align(*module->stack_top_ptr, options->stack_alignment);
 
-    *module->heap_start_ptr = *module->stack_top_ptr + (options->stack_size << 16);
+    *module->heap_start_ptr = *module->stack_top_ptr + options->stack_size;
     bh_align(*module->heap_start_ptr, 16);
 }
 

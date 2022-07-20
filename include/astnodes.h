@@ -592,12 +592,22 @@ struct AstTyped { AstTyped_base; };
 // Expression Nodes
 struct AstNamedValue    { AstTyped_base; AstTyped* value; };
 struct AstUnaryOp       { AstTyped_base; UnaryOp operation; AstTyped *expr; };
-struct AstNumLit        { AstTyped_base; union { i32 i; i64 l; f32 f; f64 d; } value; };
 struct AstStrLit        { AstTyped_base; u64 data_id; u64 length; b32 is_cstr: 1; };
 struct AstLocal         { AstTyped_base; };
 struct AstDereference   { AstTyped_base; AstTyped *expr; };
 struct AstSizeOf        { AstTyped_base; AstType *so_ast_type; Type *so_type; u64 size; };
 struct AstAlignOf       { AstTyped_base; AstType *ao_ast_type; Type *ao_type; u64 alignment; };
+struct AstNumLit        {
+    AstTyped_base;
+    union {
+        i32 i;
+        i64 l;
+        f32 f;
+        f64 d;
+    } value;
+
+    b32 was_hex_literal : 1;
+};
 struct AstBinaryOp      {
     AstTyped_base;
     BinaryOp operation;

@@ -886,10 +886,13 @@ Type* resolve_expression_type(AstTyped* node) {
 
     if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
         if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
-            if (bh_abs(((AstNumLit *) node)->value.l) >= (1ull << 32))
-                convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);
-            else
-                convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
+            b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ull << 32);
+            b32 unsign = ((AstNumLit *) node)->was_hex_literal;
+
+            if      ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);
+            else if ( big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U64]);
+            else if (!big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
+            else if (!big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U32]);
         }
         else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
             convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_F64]);

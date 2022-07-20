@@ -220,14 +220,11 @@ static AstNumLit* parse_int_literal(OnyxParser* parser) {
 
     int_node->value.l = value;
 
+    int_node->type_node = (AstType *) &basic_type_int_unsized;
+
     // NOTE: Hex literals are unsigned.
     if (int_node->token->length >= 2 && int_node->token->text[1] == 'x') {
-        if ((u64) value >= ((u64) 1 << 32))
-            int_node->type_node = (AstType *) &basic_type_u64;
-        else
-            int_node->type_node = (AstType *) &basic_type_u32;
-    } else {
-        int_node->type_node = (AstType *) &basic_type_int_unsized;
+        int_node->was_hex_literal = 1;
     }
 
     token_toggle_end(int_node->token);
