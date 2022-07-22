@@ -213,6 +213,35 @@ static inline b32 should_emit_function(AstFunction* fd) {
 }
 
 
+//
+// Debug Info Generation
+//
+
+#ifdef ENABLE_DEBUG_INFO
+
+static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
+    mod->debug_context->last_token = token;
+}
+
+// Called for every instruction being emitted
+static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
+    DebugContext *ctx = mod->debug_context; 
+    assert(ctx);
+
+    DebugFuncContext *func_ctx = ctx->current_func;
+    assert(func_ctx);
+
+    if ()
+
+    if (shgeti(ctx->file_ids, ctx->last_token->pos.filename) == -1) {
+        // File name has not been seen before, allocate a slot for it.
+
+    }
+}
+
+#endif
+
+
 typedef enum StructuredBlockType StructuredBlockType;
 enum StructuredBlockType {
     SBT_Basic_Block,       // Cannot be targeted using jump
@@ -230,21 +259,28 @@ enum StructuredBlockType {
     SBT_Count,
 };
 
+#ifdef ENABLE_DEBUG_INFO
+    #define WI(token, instr) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, 0x00 })))
+    #define WID(token, instr, data) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, data })))
+    #define WIL(token, instr, data) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } })))
+    #define WIP(token, instr, data) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } })))
+#else
+    #define WI(token, instr) (bh_arr_push(code, ((WasmInstruction){ instr, 0x00 })))
+    #define WID(token, instr, data) (bh_arr_push(code, ((WasmInstruction){ instr, data })))
+    #define WIL(token, instr, data) (bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } })))
+    #define WIP(token, instr, data) (bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } })))
+#endif
 
-#define WI(instr) bh_arr_push(code, ((WasmInstruction){ instr, 0x00 }))
-#define WID(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, data }))
-#define WIL(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } }))
-#define WIP(instr, data) bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } }))
 #define EMIT_FUNC(kind, ...) static void emit_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
 #define EMIT_FUNC_NO_ARGS(kind) static void emit_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode)
-#define STACK_SWAP(type1, type2) { \
+#define STACK_SWAP(token, type1, type2) { \
     u64 t0 = local_raw_allocate(mod->local_alloc, type1); \
     u64 t1 = local_raw_allocate(mod->local_alloc, type2); \
                                                           \
-    WIL(WI_LOCAL_SET, t0);                                \
-    WIL(WI_LOCAL_SET, t1);                                \
-    WIL(WI_LOCAL_GET, t0);                                \
-    WIL(WI_LOCAL_GET, t1);                                \
+    WIL(token, WI_LOCAL_SET, t0);                         \
+    WIL(token, WI_LOCAL_SET, t1);                         \
+    WIL(token, WI_LOCAL_GET, t0);                         \
+    WIL(token, WI_LOCAL_GET, t1);                         \
                                                           \
     local_raw_free(mod->local_alloc, type1);              \
     local_raw_free(mod->local_alloc, type2);              \
@@ -298,7 +334,7 @@ EMIT_FUNC(stack_enter,                   u64 stacksize);
 EMIT_FUNC(zero_value,                    WasmType wt);
 EMIT_FUNC(zero_value_for_type,           Type* type, OnyxToken* where);
 
-EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt);
+EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt, OnyxToken* block_token);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
 
 static u32 emit_data_entry(OnyxWasmModule *mod, WasmDatum *datum);
@@ -323,7 +359,8 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     if (generate_block_headers) {
         emit_enter_structured_block(mod, &code, (block->rules & Block_Rule_Override_Return)
                                                 ? SBT_Return_Block
-                                                : SBT_Breakable_Block);
+                                                : SBT_Breakable_Block,
+                                                block->token);
     }
 
     forll (AstNode, stmt, block->body, next) {
@@ -349,7 +386,7 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
     *pcode = code;
 }
 
-EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
+EMIT_FUNC(enter_structured_block, StructuredBlockType sbt, OnyxToken* token) {
     bh_arr(WasmInstruction) code = *pcode;
 
     static const StructuredBlockType jump_numbers[SBT_Count] = {
@@ -381,7 +418,7 @@ EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
     };
 
 
-    WID(block_instrs[sbt], 0x40);
+    WID(token, block_instrs[sbt], 0x40);
     bh_arr_push(mod->structured_jump_target, jump_numbers[sbt]);
 
     *pcode = code;
@@ -390,7 +427,7 @@ EMIT_FUNC(enter_structured_block, StructuredBlockType sbt) {
 EMIT_FUNC_NO_ARGS(leave_structured_block) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    WI(WI_BLOCK_END);
+    WI(NULL, WI_BLOCK_END);
     bh_arr_pop(mod->structured_jump_target);
 
     *pcode = code;
@@ -438,7 +475,7 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
         // NOTE: If the previous instruction was a non conditional jump,
         // don't emit another jump since it will never be reached.
         if (bh_arr_last(code).type != WI_JUMP)
-            WID(WI_JUMP, labelidx);
+            WID(jump->token, WI_JUMP, labelidx);
     } else {
         onyx_report_error(jump->token->pos, Error_Critical, "Invalid structured jump.");
     }
@@ -448,6 +485,10 @@ EMIT_FUNC(structured_jump, AstJump* jump) {
 
 EMIT_FUNC(statement, AstNode* stmt) {
     bh_arr(WasmInstruction) code = *pcode;
+
+#ifdef ENABLE_DEBUG_INFO
+    debug_set_position(stmt->token);
+#endif
 
     switch (stmt->kind) {
         case Ast_Kind_Return:     emit_return(mod, &code, (AstReturn *) stmt); break;
@@ -478,14 +519,14 @@ EMIT_FUNC(local_allocation, AstTyped* stmt) {
         bh_arr(WasmInstruction) code = *pcode;
         if (local_is_wasm_local(stmt)) {
             emit_zero_value(mod, &code, onyx_type_to_wasm_type(stmt->type));
-            WIL(WI_LOCAL_SET, local_idx);
+            WIL(stmt->token, WI_LOCAL_SET, local_idx);
 
         } else {
             emit_location(mod, &code, stmt);
-            WID(WI_I32_CONST, 0);
-            WID(WI_I32_CONST, type_size_of(stmt->type));
+            WID(stmt->token, WI_I32_CONST, 0);
+            WID(stmt->token, WI_I32_CONST, type_size_of(stmt->type));
             if (context.options->use_post_mvp_features) {
-                WID(WI_MEMORY_FILL, 0x00);
+                WID(stmt->token, WI_MEMORY_FILL, 0x00);
             } else {
                 emit_intrinsic_memory_fill(mod, &code);
             }
@@ -517,7 +558,7 @@ EMIT_FUNC(data_relocation, u32 data_id) {
     bh_arr(WasmInstruction) code = *pcode;
 
     u32 instr_idx = bh_arr_length(code);
-    WID(WI_PTR_CONST, 0);
+    WID(NULL, WI_PTR_CONST, 0);
     assert(mod->current_func_idx >= 0);
 
     DatumPatchInfo patch;
@@ -556,10 +597,10 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
 
             if (lval->kind == Ast_Kind_Param && type_is_structlike_strict(lval->type)) {
                 u32 mem_count = type_structlike_mem_count(lval->type);
-                fori (i, 0, mem_count) WIL(WI_LOCAL_SET, localidx + i);
+                fori (i, 0, mem_count) WIL(assign->token, WI_LOCAL_SET, localidx + i);
 
             } else {
-                WIL(WI_LOCAL_SET, localidx);
+                WIL(assign->token, WI_LOCAL_SET, localidx);
             }
 
             *pcode = code;
@@ -573,7 +614,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
             emit_expression(mod, &code, assign->right);
 
             u64 localidx = bh_imap_get(&mod->local_map, (u64) fa->expr);
-            WIL(WI_LOCAL_SET, localidx + fa->idx);
+            WIL(assign->token, WI_LOCAL_SET, localidx + fa->idx);
 
             *pcode = code;
             return;
@@ -584,7 +625,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
         emit_expression(mod, &code, assign->right);
 
         i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) lval);
-        WID(WI_GLOBAL_SET, globalidx);
+        WID(assign->token, WI_GLOBAL_SET, globalidx);
 
         *pcode = code;
         return;
@@ -616,11 +657,11 @@ EMIT_FUNC(assignment_of_array, AstTyped* left, AstTyped* right) {
         u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
         emit_location(mod, &code, left);
-        WIL(WI_LOCAL_SET, lptr_local);
+        WIL(left->token, WI_LOCAL_SET, lptr_local);
 
         AstArrayLiteral* al = (AstArrayLiteral *) right;
         fori (i, 0, elem_count) {
-            WIL(WI_LOCAL_GET, lptr_local);
+            WIL(left->token, WI_LOCAL_GET, lptr_local);
             emit_expression(mod, &code, al->values[i]);
             emit_store_instruction(mod, &code, elem_type, i * elem_size);
         }
@@ -655,17 +696,17 @@ EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
         if (lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param) {
             if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
                 u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
-                WIL(WI_LOCAL_SET, localidx);
+                WIL(assign->token, WI_LOCAL_SET, localidx);
                 continue;
             }
         }
 
         WasmType wt = onyx_type_to_wasm_type(lval->type);
         u64 expr_tmp = local_raw_allocate(mod->local_alloc, wt);
-        WIL(WI_LOCAL_SET, expr_tmp);
+        WIL(assign->token, WI_LOCAL_SET, expr_tmp);
         u64 offset = 0;
         emit_location_return_offset(mod, &code, lval, &offset);
-        WIL(WI_LOCAL_GET, expr_tmp);
+        WIL(assign->token, WI_LOCAL_GET, expr_tmp);
 
         local_raw_free(mod->local_alloc, wt);
         emit_store_instruction(mod, &code, lval->type, offset);
@@ -703,19 +744,19 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
 
     if (is_basic && (type->Basic.flags & Basic_Flag_Pointer)) {
-        WID(WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
+        WID(NULL, WI_I32_STORE, ((WasmInstructionData) { 2, offset }));
     } else if (is_basic && ((type->Basic.flags & Basic_Flag_Integer)
                          || (type->Basic.flags & Basic_Flag_Boolean)
                          || (type->Basic.flags & Basic_Flag_Type_Index))) {
-        if      (store_size == 1)   WID(WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
-        else if (store_size == 2)   WID(WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
-        else if (store_size == 4)   WID(WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
-        else if (store_size == 8)   WID(WI_I64_STORE,    ((WasmInstructionData) { alignment, offset }));
+        if      (store_size == 1)   WID(NULL, WI_I32_STORE_8,  ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 2)   WID(NULL, WI_I32_STORE_16, ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 4)   WID(NULL, WI_I32_STORE,    ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 8)   WID(NULL, WI_I64_STORE,    ((WasmInstructionData) { alignment, offset }));
     } else if (is_basic && (type->Basic.flags & Basic_Flag_Float)) {
-        if      (store_size == 4)   WID(WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
-        else if (store_size == 8)   WID(WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
+        if      (store_size == 4)   WID(NULL, WI_F32_STORE, ((WasmInstructionData) { alignment, offset }));
+        else if (store_size == 8)   WID(NULL, WI_F64_STORE, ((WasmInstructionData) { alignment, offset }));
     } else if (is_basic && (type->Basic.flags & Basic_Flag_SIMD)) {
-        WID(WI_V128_STORE, ((WasmInstructionData) { alignment, offset }));
+        WID(NULL, WI_V128_STORE, ((WasmInstructionData) { alignment, offset }));
     } else {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
             "Failed to generate store instruction for type '%s'.",
@@ -740,8 +781,8 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
 
     if (type->kind == Type_Kind_Array) {
         if (offset != 0) {
-            WID(WI_PTR_CONST, offset);
-            WI(WI_PTR_ADD);
+            WID(NULL, WI_PTR_CONST, offset);
+            WI(NULL, WI_PTR_ADD);
         }
 
         *pcode = code;
@@ -780,7 +821,7 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
         instr = WI_V128_LOAD;
     }
 
-    WID(instr, ((WasmInstructionData) { alignment, offset }));
+    WID(NULL, instr, ((WasmInstructionData) { alignment, offset }));
 
     if (instr == WI_NOP) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical,
@@ -815,11 +856,11 @@ EMIT_FUNC(if, AstIfWhile* if_node) {
 
     emit_expression(mod, &code, if_node->cond);
 
-    emit_enter_structured_block(mod, &code, SBT_Basic_If);
+    emit_enter_structured_block(mod, &code, SBT_Basic_If, if_node->token);
     if (if_node->true_stmt) emit_block(mod, &code, if_node->true_stmt, 0);
 
     if (if_node->false_stmt) {
-        WI(WI_ELSE);
+        WI(if_node->false_stmt->token, WI_ELSE);
 
         if (if_node->false_stmt->kind == Ast_Kind_If) {
             emit_if(mod, &code, (AstIfWhile *) if_node->false_stmt);
@@ -843,24 +884,24 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     }
 
     if (while_node->false_stmt == NULL) {
-        emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
-        emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
+        emit_enter_structured_block(mod, &code, SBT_Breakable_Block, while_node->token);
+        emit_enter_structured_block(mod, &code, SBT_Continue_Loop, while_node->token);
 
         if (!while_node->bottom_test) {
             emit_expression(mod, &code, while_node->cond);
-            WI(WI_I32_EQZ);
-            WID(WI_COND_JUMP, 0x01);
+            WI(while_cond->token, WI_I32_EQZ);
+            WID(while_cond->token, WI_COND_JUMP, 0x01);
         }
 
         emit_block(mod, &code, while_node->true_stmt, 0);
 
         if (while_node->bottom_test) {
             emit_expression(mod, &code, while_node->cond);
-            WID(WI_COND_JUMP, 0x00);
+            WID(while_node->cond, WI_COND_JUMP, 0x00);
 
         } else {
             if (bh_arr_last(code).type != WI_JUMP)
-                WID(WI_JUMP, 0x00);
+                WID(while_node->cond, WI_JUMP, 0x00);
         }
 
         emit_leave_structured_block(mod, &code);
@@ -869,16 +910,16 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
     } else {
         emit_expression(mod, &code, while_node->cond);
 
-        emit_enter_structured_block(mod, &code, SBT_Breakable_If);
-        emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
+        emit_enter_structured_block(mod, &code, SBT_Breakable_If, while_node->token);
+        emit_enter_structured_block(mod, &code, SBT_Continue_Loop, while_node->token);
 
         emit_block(mod, &code, while_node->true_stmt, 0);
 
         emit_expression(mod, &code, while_node->cond);
-        WID(WI_COND_JUMP, 0x00);
+        WID(while_node->cond->token, WI_COND_JUMP, 0x00);
 
         emit_leave_structured_block(mod, &code);
-        WI(WI_ELSE);
+        WI(while_node->false_stmt->token, WI_ELSE);
 
         emit_block(mod, &code, while_node->false_stmt, 0);
 
@@ -908,46 +949,46 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
     u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
-    WIL(WI_LOCAL_SET, step_local);
-    WIL(WI_LOCAL_SET, high_local);
-    WIL(WI_LOCAL_TEE, low_local);
-    WIL(WI_LOCAL_SET, iter_local);
+    WIL(for_node->token, WI_LOCAL_SET, step_local);
+    WIL(for_node->token, WI_LOCAL_SET, high_local);
+    WIL(for_node->token, WI_LOCAL_TEE, low_local);
+    WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
-    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
-    emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Block);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
     if (range->kind == Ast_Kind_Struct_Literal && (range->args.values[2]->flags & Ast_Flag_Comptime) != 0) {
         AstNumLit *step_value = (AstNumLit *) range->args.values[2];
         assert(step_value->kind == Ast_Kind_NumLit);
 
         if (step_value->value.l >= 0) {
-            WIL(WI_LOCAL_GET, iter_local);
-            WIL(WI_LOCAL_GET, high_local);
-            WI(WI_I32_GE_S);
-            WID(WI_COND_JUMP, 0x02);
+            WIL(for_node->token, WI_LOCAL_GET, iter_local);
+            WIL(for_node->token, WI_LOCAL_GET, high_local);
+            WI(for_node->token, WI_I32_GE_S);
+            WID(for_node->token, WI_COND_JUMP, 0x02);
         } else {
-            WIL(WI_LOCAL_GET, iter_local);
-            WIL(WI_LOCAL_GET, high_local);
-            WI(WI_I32_LT_S);
-            WID(WI_COND_JUMP, 0x02);
+            WIL(for_node->token, WI_LOCAL_GET, iter_local);
+            WIL(for_node->token, WI_LOCAL_GET, high_local);
+            WI(for_node->token, WI_I32_LT_S);
+            WID(for_node->token, WI_COND_JUMP, 0x02);
         }
 
     } else {
-        WIL(WI_LOCAL_GET, step_local);
-        WID(WI_I32_CONST, 0);
-        WI(WI_I32_GE_S);
-        WID(WI_IF_START, 0x40);
-            WIL(WI_LOCAL_GET, iter_local);
-            WIL(WI_LOCAL_GET, high_local);
-            WI(WI_I32_GE_S);
-            WID(WI_COND_JUMP, 0x03);
-        WI(WI_ELSE);
-            WIL(WI_LOCAL_GET, iter_local);
-            WIL(WI_LOCAL_GET, high_local);
-            WI(WI_I32_LT_S);
-            WID(WI_COND_JUMP, 0x03);
-        WI(WI_IF_END);
+        WIL(for_node->token, WI_LOCAL_GET, step_local);
+        WID(for_node->token, WI_I32_CONST, 0);
+        WI(for_node->token, WI_I32_GE_S);
+        WID(for_node->token, WI_IF_START, 0x40);
+            WIL(for_node->token, WI_LOCAL_GET, iter_local);
+            WIL(for_node->token, WI_LOCAL_GET, high_local);
+            WI(for_node->token, WI_I32_GE_S);
+            WID(for_node->token, WI_COND_JUMP, 0x03);
+        WI(for_node->token, WI_ELSE);
+            WIL(for_node->token, WI_LOCAL_GET, iter_local);
+            WIL(for_node->token, WI_LOCAL_GET, high_local);
+            WI(for_node->token, WI_I32_LT_S);
+            WID(for_node->token, WI_COND_JUMP, 0x03);
+        WI(for_node->token, WI_IF_END);
     }
 
 
@@ -955,13 +996,13 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
 
     emit_leave_structured_block(mod, &code);
 
-    WIL(WI_LOCAL_GET, iter_local);
-    WIL(WI_LOCAL_GET, step_local);
-    WI(WI_I32_ADD);
-    WIL(WI_LOCAL_SET, iter_local);
+    WIL(for_node->token, WI_LOCAL_GET, iter_local);
+    WIL(for_node->token, WI_LOCAL_GET, step_local);
+    WI(for_node->token, WI_I32_ADD);
+    WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
-        WID(WI_JUMP, 0x00);
+        WID(for_node->token, WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
@@ -993,41 +1034,41 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     if (for_node->by_pointer) elem_size = type_size_of(var->type->Pointer.elem);
     else                      elem_size = type_size_of(var->type);
 
-    WIL(WI_LOCAL_TEE, ptr_local);
-    WIL(WI_PTR_CONST, for_node->iter->type->Array.count * elem_size);
-    WI(WI_PTR_ADD);
-    WIL(WI_LOCAL_SET, end_ptr_local);
+    WIL(for_node->token, WI_LOCAL_TEE, ptr_local);
+    WIL(for_node->token, WI_PTR_CONST, for_node->iter->type->Array.count * elem_size);
+    WI(for_node->token, WI_PTR_ADD);
+    WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
 
-    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
-    emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Block);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
-    WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_LOCAL_GET, end_ptr_local);
-    WI(WI_PTR_GE);
-    WID(WI_COND_JUMP, 0x02);
+    WIL(for_node->token, WI_LOCAL_GET, ptr_local);
+    WIL(for_node->token, WI_LOCAL_GET, end_ptr_local);
+    WI(for_node->token, WI_PTR_GE);
+    WID(for_node->token, WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
         if (!it_is_local) emit_local_location(mod, &code, var, &offset);
 
-        WIL(WI_LOCAL_GET, ptr_local);
+        WIL(for_node->token, WI_LOCAL_GET, ptr_local);
         emit_load_instruction(mod, &code, var->type, 0);
 
         if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
-        else              WIL(WI_LOCAL_SET, iter_local);
+        else              WIL(for_node->token, WI_LOCAL_SET, iter_local);
     }
 
     emit_block(mod, &code, for_node->stmt, 0);
 
     emit_leave_structured_block(mod, &code);
 
-    WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_PTR_CONST, elem_size);
-    WI(WI_PTR_ADD);
-    WIL(WI_LOCAL_SET, ptr_local);
+    WIL(for_node->token, WI_LOCAL_GET, ptr_local);
+    WIL(for_node->token, WI_PTR_CONST, elem_size);
+    WI(for_node->token, WI_PTR_ADD);
+    WIL(for_node->token, WI_LOCAL_SET, ptr_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
-        WID(WI_JUMP, 0x00);
+        WID(for_node->token, WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
@@ -1058,46 +1099,46 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     if (for_node->by_pointer) elem_size = type_size_of(var->type->Pointer.elem);
     else                      elem_size = type_size_of(var->type);
 
-    WIL(WI_LOCAL_SET, end_ptr_local);
-    WIL(WI_LOCAL_TEE, ptr_local);
-    WIL(WI_LOCAL_GET, end_ptr_local);
+    WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
+    WIL(for_node->token, WI_LOCAL_TEE, ptr_local);
+    WIL(for_node->token, WI_LOCAL_GET, end_ptr_local);
     if (elem_size != 1) {
-        WID(WI_PTR_CONST, elem_size);
-        WI(WI_PTR_MUL);
+        WID(for_node->token, WI_PTR_CONST, elem_size);
+        WI(for_node->token, WI_PTR_MUL);
     }
-    WI(WI_PTR_ADD);
-    WIL(WI_LOCAL_SET, end_ptr_local);
+    WI(for_node->token, WI_PTR_ADD);
+    WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
 
-    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
-    emit_enter_structured_block(mod, &code, SBT_Basic_Loop);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Block);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
 
-    WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_LOCAL_GET, end_ptr_local);
-    WI(WI_PTR_GE);
-    WID(WI_COND_JUMP, 0x02);
+    WIL(for_node->token, WI_LOCAL_GET, ptr_local);
+    WIL(for_node->token, WI_LOCAL_GET, end_ptr_local);
+    WI(for_node->token, WI_PTR_GE);
+    WID(for_node->token, WI_COND_JUMP, 0x02);
 
     if (!for_node->by_pointer) {
         if (!it_is_local) emit_local_location(mod, &code, var, &offset);
 
-        WIL(WI_LOCAL_GET, ptr_local);
+        WIL(for_node->token, WI_LOCAL_GET, ptr_local);
         emit_load_instruction(mod, &code, var->type, 0);
 
         if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
-        else              WIL(WI_LOCAL_SET, iter_local);
+        else              WIL(for_node->token, WI_LOCAL_SET, iter_local);
     }
 
     emit_block(mod, &code, for_node->stmt, 0);
 
     emit_leave_structured_block(mod, &code);
 
-    WIL(WI_LOCAL_GET, ptr_local);
-    WIL(WI_PTR_CONST, elem_size);
-    WI(WI_PTR_ADD);
-    WIL(WI_LOCAL_SET, ptr_local);
+    WIL(for_node->token, WI_LOCAL_GET, ptr_local);
+    WIL(for_node->token, WI_PTR_CONST, elem_size);
+    WI(for_node->token, WI_PTR_ADD);
+    WIL(for_node->token, WI_LOCAL_SET, ptr_local);
 
     if (bh_arr_last(code).type != WI_JUMP)
-        WID(WI_JUMP, 0x00);
+        WID(for_node->token, WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
@@ -1117,10 +1158,10 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     u64 iterator_close_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_remove_func = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_done_bool   = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-    WIL(WI_LOCAL_SET, iterator_remove_func);
-    WIL(WI_LOCAL_SET, iterator_close_func);
-    WIL(WI_LOCAL_SET, iterator_next_func);
-    WIL(WI_LOCAL_SET, iterator_data_ptr);
+    WIL(for_node->token, WI_LOCAL_SET, iterator_remove_func);
+    WIL(for_node->token, WI_LOCAL_SET, iterator_close_func);
+    WIL(for_node->token, WI_LOCAL_SET, iterator_next_func);
+    WIL(for_node->token, WI_LOCAL_SET, iterator_data_ptr);
 
 
     {
@@ -1143,7 +1184,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     u64 offset = 0;
 
     // Enter a deferred statement for the auto-close
-    emit_enter_structured_block(mod, &code, SBT_Basic_Block);
+    emit_enter_structured_block(mod, &code, SBT_Basic_Block, for_node->token);
 
     if (!for_node->no_close) {
         TypeWithOffset close_func_type;
@@ -1163,14 +1204,14 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
         emit_defer_code(mod, &code, close_instructions, 8);
     }
 
-    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Loop);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
+    emit_enter_structured_block(mod, &code, SBT_Continue_Loop, for_node->token);
 
     if (!it_is_local) emit_local_location(mod, &code, var, &offset);
 
     {
-        WIL(WI_LOCAL_GET, iterator_data_ptr);
-        WIL(WI_LOCAL_GET, iterator_next_func);
+        WIL(for_node->token, WI_LOCAL_GET, iterator_data_ptr);
+        WIL(for_node->token, WI_LOCAL_GET, iterator_next_func);
 
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
@@ -1186,34 +1227,34 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
         u64 reserve_size = return_size;
         bh_align(reserve_size, 16);
 
-        WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_PTR_CONST, reserve_size);
-        WI(WI_PTR_ADD);
-        WID(WI_GLOBAL_SET, stack_top_idx);
+        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
+        WID(for_node->token, WI_PTR_CONST, reserve_size);
+        WI(for_node->token, WI_PTR_ADD);
+        WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
         i32 type_idx = generate_type_idx(mod, next_func_type.type);
-        WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
+        WID(for_node->token, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
 
-        WID(WI_GLOBAL_GET, stack_top_idx);
-        WID(WI_PTR_CONST, reserve_size);
-        WI(WI_PTR_SUB);
-        WID(WI_GLOBAL_SET, stack_top_idx);
+        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
+        WID(for_node->token, WI_PTR_CONST, reserve_size);
+        WI(for_node->token, WI_PTR_SUB);
+        WID(for_node->token, WI_GLOBAL_SET, stack_top_idx);
 
-        WID(WI_GLOBAL_GET, stack_top_idx);
+        WID(for_node->token, WI_GLOBAL_GET, stack_top_idx);
         emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
     }
 
-    WIL(WI_LOCAL_SET, iterator_done_bool);
+    WIL(for_node->token, WI_LOCAL_SET, iterator_done_bool);
 
     if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
-    else              WIL(WI_LOCAL_SET, iter_local);
+    else              WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
-    WIL(WI_LOCAL_GET, iterator_done_bool);
-    WI(WI_I32_EQZ);
-    WID(WI_COND_JUMP, 0x01);
+    WIL(for_node->token, WI_LOCAL_GET, iterator_done_bool);
+    WI(for_node->token, WI_I32_EQZ);
+    WID(for_node->token, WI_COND_JUMP, 0x01);
 
     emit_block(mod, &code, for_node->stmt, 0);
-    WID(WI_JUMP, 0x00);
+    WID(for_node->token, WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
@@ -1246,7 +1287,7 @@ EMIT_FUNC(for, AstFor* for_node) {
         // Just dropping the extra fields will mean we can just use the slice implementation.
         //                                                  - brendanfh   2020/09/04
         //                                                  - brendanfh   2021/04/13
-        case For_Loop_DynArr:   WI(WI_DROP); WI(WI_DROP); WI(WI_DROP);
+        case For_Loop_DynArr:   WI(for_node->token, WI_DROP); WI(for_node->token, WI_DROP); WI(for_node->token, WI_DROP);
         case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local); break;
         case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local); break;
         default: onyx_report_error(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
@@ -1269,13 +1310,13 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         }
     }
 
-    emit_enter_structured_block(mod, &code, SBT_Breakable_Block);
+    emit_enter_structured_block(mod, &code, SBT_Breakable_Block, switch_node->token);
 
     u64 block_num = 0;
     bh_arr_each(AstSwitchCase *, sc, switch_node->cases) {
         if (bh_imap_has(&block_map, (u64) (*sc)->block)) continue;
 
-        emit_enter_structured_block(mod, &code, SBT_Fallthrough_Block);
+        emit_enter_structured_block(mod, &code, SBT_Fallthrough_Block, (*sc)->block->token);
 
         bh_imap_put(&block_map, (u64) (*sc)->block, block_num);
         block_num++;
@@ -1305,31 +1346,31 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             //
             // If we didn't enter a new block, then jumping to label 0, would jump
             // to the second block, and so on.
-            WID(WI_BLOCK_START, 0x40);
+            WID(switch_node->expr->token, WI_BLOCK_START, 0x40);
             emit_expression(mod, &code, switch_node->expr);
             if (switch_node->min_case != 0) {
-                WID(WI_I32_CONST, switch_node->min_case);
-                WI(WI_I32_SUB);
+                WID(switch_node->expr->token, WI_I32_CONST, switch_node->min_case);
+                WI(switch_node->expr->token, WI_I32_SUB);
             }
-            WIP(WI_JUMP_TABLE, bt);
-            WI(WI_BLOCK_END);
+            WIP(switch_node->expr->token, WI_JUMP_TABLE, bt);
+            WI(switch_node->expr->token, WI_BLOCK_END);
             break;
         }
 
         case Switch_Kind_Use_Equals: {
-            WID(WI_BLOCK_START, 0x40);
+            WID(switch_node->expr->token, WI_BLOCK_START, 0x40);
 
             bh_arr_each(CaseToBlock, ctb, switch_node->case_exprs) {
                 emit_expression(mod, &code, (AstTyped *) ctb->comparison);
 
                 u64 bn = bh_imap_get(&block_map, (u64) ctb->block);
-                WID(WI_IF_START, 0x40);
-                WID(WI_JUMP, bn + 1);
-                WI(WI_IF_END);
+                WID(switch_node->expr->token, WI_IF_START, 0x40);
+                WID(switch_node->expr->token, WI_JUMP, bn + 1);
+                WI(switch_node->expr->token, WI_IF_END);
             }
 
-            WID(WI_JUMP, block_num);
-            WI(WI_BLOCK_END);
+            WID(switch_node->expr->token, WI_JUMP, block_num);
+            WI(switch_node->expr->token, WI_BLOCK_END);
             break;
         }
     }
@@ -1343,7 +1384,7 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
         emit_block(mod, &code, sc->block, 0);
 
         if (bh_arr_last(code).type != WI_JUMP)
-            WID(WI_JUMP, block_num - bn);
+            WID(NULL, WI_JUMP, block_num - bn);
 
         emit_leave_structured_block(mod, &code);
 
@@ -1411,14 +1452,14 @@ EMIT_FUNC(remove_directive, AstDirectiveRemove* remove) {
 
     ForRemoveInfo remove_info = bh_arr_last(mod->for_remove_info);
 
-    WIL(WI_LOCAL_GET, remove_info.iterator_remove_func);
-    WIL(WI_I32_CONST, mod->null_proc_func_idx);
-    WI(WI_I32_NE);
-    WID(WI_IF_START, 0x40);
-    WIL(WI_LOCAL_GET, remove_info.iterator_data_ptr);
-    WIL(WI_LOCAL_GET, remove_info.iterator_remove_func);
-    WIL(WI_CALL_INDIRECT, remove_info.remove_func_type_idx);
-    WI(WI_IF_END);
+    WIL(remote->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
+    WIL(remote->token, WI_I32_CONST, mod->null_proc_func_idx);
+    WI(remote->token, WI_I32_NE);
+    WID(remote->token, WI_IF_START, 0x40);
+    WIL(remote->token, WI_LOCAL_GET, remove_info.iterator_data_ptr);
+    WIL(remote->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
+    WIL(remote->token, WI_CALL_INDIRECT, remove_info.remove_func_type_idx);
+    WI(remote->token, WI_IF_END);
 
     *pcode = code;
 }
@@ -1491,7 +1532,7 @@ EMIT_FUNC(binop, AstBinaryOp* binop) {
     emit_expression(mod, &code, binop->left);
     emit_expression(mod, &code, binop->right);
 
-    WI(binop_instr);
+    WI(binop->token, binop_instr);
 
     *pcode = code;
 }
@@ -1506,22 +1547,22 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
             if (type->kind == Basic_Kind_I32
                     || type->kind == Basic_Kind_I16
                     || type->kind == Basic_Kind_I8) {
-                WID(WI_I32_CONST, 0x00);
+                WID(unop->token, WI_I32_CONST, 0x00);
                 emit_expression(mod, &code, unop->expr);
-                WI(WI_I32_SUB);
+                WI(unop->token, WI_I32_SUB);
 
             }
             else if (type->kind == Basic_Kind_I64) {
-                WID(WI_I64_CONST, 0x00);
+                WID(unop->token, WI_I64_CONST, 0x00);
                 emit_expression(mod, &code, unop->expr);
-                WI(WI_I64_SUB);
+                WI(unop->token, WI_I64_SUB);
 
             }
             else {
                 emit_expression(mod, &code, unop->expr);
 
-                if (type->kind == Basic_Kind_F32) WI(WI_F32_NEG);
-                if (type->kind == Basic_Kind_F64) WI(WI_F64_NEG);
+                if (type->kind == Basic_Kind_F32) WI(unop->token, WI_F32_NEG);
+                if (type->kind == Basic_Kind_F64) WI(unop->token, WI_F64_NEG);
             }
 
             break;
@@ -1530,7 +1571,7 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
         case Unary_Op_Not:
             emit_expression(mod, &code, unop->expr);
 
-            WI(WI_I32_EQZ);
+            WI(unop->token, WI_I32_EQZ);
             break;
 
         case Unary_Op_Bitwise_Not: {
@@ -1539,20 +1580,20 @@ EMIT_FUNC(unaryop, AstUnaryOp* unop) {
             TypeBasic* type = &unop->type->Basic;
 
             if (type->kind == Basic_Kind_I8 || type->kind == Basic_Kind_U8) {
-                WID(WI_I32_CONST, 0xff);
-                WI(WI_I32_XOR);
+                WID(unop->token, WI_I32_CONST, 0xff);
+                WI(unop->token, WI_I32_XOR);
             }
             else if (type->kind == Basic_Kind_I16 || type->kind == Basic_Kind_U16) {
-                WID(WI_I32_CONST, 0xffff);
-                WI(WI_I32_XOR);
+                WID(unop->token, WI_I32_CONST, 0xffff);
+                WI(unop->token, WI_I32_XOR);
             }
             else if (type->kind == Basic_Kind_I32 || type->kind == Basic_Kind_U32) {
-                WID(WI_I32_CONST, 0xffffffff);
-                WI(WI_I32_XOR);
+                WID(unop->token, WI_I32_CONST, 0xffffffff);
+                WI(unop->token, WI_I32_XOR);
             }
             else if (type->kind == Basic_Kind_I64 || type->kind == Basic_Kind_U64) {
-                WIL(WI_I64_CONST, 0xffffffffffffffff);
-                WI(WI_I64_XOR);
+                WIL(unop->token, WI_I64_CONST, 0xffffffffffffffff);
+                WI(unop->token, WI_I64_XOR);
             }
 
             break;
@@ -1600,16 +1641,18 @@ EMIT_FUNC(call, AstCall* call) {
     u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
     u64 stack_top_store_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
+    OnyxToken* call_token = call->token;
+
     // Because it would be inefficient to increment and decrement the global stack pointer for every argument,
     // a simple set of instructions increments it once to the size it will need to be. However, because it is
     // impossible to know what size the reserved memory will be, a location patch is taken in order to fill it
     // in later.
     u32 reserve_space_patch = bh_arr_length(code);
-    WID(WI_GLOBAL_GET, stack_top_idx);
-    WIL(WI_LOCAL_TEE, stack_top_store_local);
-    WID(WI_PTR_CONST, 0);                           // This will be filled in later.
-    WI(WI_PTR_ADD);
-    WID(WI_GLOBAL_SET, stack_top_idx);
+    WID(call_token, WI_GLOBAL_GET, stack_top_idx);
+    WIL(call_token, WI_LOCAL_TEE, stack_top_store_local);
+    WID(call_token, WI_PTR_CONST, 0);                           // This will be filled in later.
+    WI(call_token, WI_PTR_ADD);
+    WID(call_token, WI_GLOBAL_SET, stack_top_idx);
 
     u32 reserve_size  = 0;
     u32 vararg_count  = 0;
@@ -1646,7 +1689,7 @@ EMIT_FUNC(call, AstCall* call) {
             place_on_stack = 1;
         }
 
-        if (place_on_stack) WIL(WI_LOCAL_GET, stack_top_store_local);
+        if (place_on_stack) WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
 
         emit_expression(mod, &code, arg->value);
 
@@ -1655,9 +1698,9 @@ EMIT_FUNC(call, AstCall* call) {
 
             if (arg->va_kind == VA_Kind_Not_VA) {
                 // Non-variadic arguments on the stack need a pointer to them placed on the WASM stack.
-                WIL(WI_LOCAL_GET, stack_top_store_local);
-                WID(WI_PTR_CONST, reserve_size);
-                WI(WI_PTR_ADD);
+                WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+                WID(call_token, WI_PTR_CONST, reserve_size);
+                WI(call_token, WI_PTR_ADD);
             }
 
             if (arg->va_kind == VA_Kind_Any) {
@@ -1666,7 +1709,7 @@ EMIT_FUNC(call, AstCall* call) {
             }
 
             if (arg->pass_as_any) {
-                WIL(WI_I32_CONST, arg->value->type->id);
+                WIL(call_token, WI_I32_CONST, arg->value->type->id);
             }
 
             reserve_size += type_size_of(arg->value->type);
@@ -1680,14 +1723,14 @@ EMIT_FUNC(call, AstCall* call) {
             i32 any_size = type_size_of(type_build_from_ast(context.ast_alloc, builtin_any_type));
 
             fori (i, 0, vararg_count) {
-                WIL(WI_LOCAL_GET, stack_top_store_local);
-                WIL(WI_LOCAL_GET, stack_top_store_local);
-                WID(WI_PTR_CONST, vararg_any_offsets[i]);
-                WI(WI_PTR_ADD);
+                WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+                WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+                WID(call_token, WI_PTR_CONST, vararg_any_offsets[i]);
+                WI(call_token, WI_PTR_ADD);
                 emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], vararg_offset + i * any_size);
 
-                WIL(WI_LOCAL_GET, stack_top_store_local);
-                WID(WI_I32_CONST, vararg_any_types[i]);
+                WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+                WID(call_token, WI_I32_CONST, vararg_any_types[i]);
                 emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], vararg_offset + i * any_size + POINTER_SIZE);
 
                 reserve_size += any_size;
@@ -1697,34 +1740,34 @@ EMIT_FUNC(call, AstCall* call) {
         }
 
         case VA_Kind_Typed: {
-            WIL(WI_LOCAL_GET, stack_top_store_local);
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
             if (vararg_offset > 0) {
-                WID(WI_PTR_CONST, vararg_offset);
-                WI(WI_PTR_ADD);
+                WID(call_token, WI_PTR_CONST, vararg_offset);
+                WI(call_token, WI_PTR_ADD);
             }
-            WID(WI_I32_CONST, vararg_count);
+            WID(call_token, WI_I32_CONST, vararg_count);
             break;
         }
 
         case VA_Kind_Untyped: {
-            WIL(WI_LOCAL_GET, stack_top_store_local);
-            WIL(WI_LOCAL_GET, stack_top_store_local);
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
             if (vararg_offset > 0) {
-                WID(WI_PTR_CONST, vararg_offset);
-                WI(WI_PTR_ADD);
+                WID(call_token, WI_PTR_CONST, vararg_offset);
+                WI(call_token, WI_PTR_ADD);
             }
             emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], reserve_size);
 
             // NOTE: There may be 4 uninitialized bytes here, because pointers are only 4 bytes in WASM.
 
-            WIL(WI_LOCAL_GET, stack_top_store_local);
-            WID(WI_I32_CONST, vararg_count);
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+            WID(call_token, WI_I32_CONST, vararg_count);
             emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], reserve_size + POINTER_SIZE);
 
-            WIL(WI_LOCAL_GET, stack_top_store_local);
+            WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
             if (reserve_size > 0) {
-                WID(WI_PTR_CONST, reserve_size);
-                WI(WI_PTR_ADD);
+                WID(call_token, WI_PTR_CONST, reserve_size);
+                WI(call_token, WI_PTR_ADD);
             }
 
             reserve_size += 4 + POINTER_SIZE;
@@ -1749,12 +1792,12 @@ EMIT_FUNC(call, AstCall* call) {
         emit_expression(mod, &code, call->callee);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
-        WID(WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
+        WID(call_token, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
     }
 
     if (reserve_size > 0) {
-        WIL(WI_LOCAL_GET,  stack_top_store_local);
-        WID(WI_GLOBAL_SET, stack_top_idx);
+        WIL(call_token, WI_LOCAL_GET,  stack_top_store_local);
+        WID(call_token, WI_GLOBAL_SET, stack_top_idx);
 
         bh_align(reserve_size, 16);
         code[reserve_space_patch + 2].data.l = reserve_size;
@@ -1764,7 +1807,7 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
     if (cc == CC_Return_Stack) {
-        WID(WI_GLOBAL_GET, stack_top_idx);
+        WID(call_token, WI_GLOBAL_GET, stack_top_idx);
         emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
     }
 
@@ -1787,7 +1830,7 @@ EMIT_FUNC(call, AstCall* call) {
             } \
             byte_buffer[i] = (type) ((AstNumLit *) arg_arr[i]->value)->value.l; \
         } \
-        WIP(WI_V128_CONST, byte_buffer); \
+        WIP(call->token, WI_V128_CONST, byte_buffer); \
     }
 
 #define SIMD_EXTRACT_LANE_INSTR(instr, arg_arr) \
@@ -1797,7 +1840,7 @@ EMIT_FUNC(call, AstCall* call) {
         *pcode = code; \
         return; \
     } \
-    WID(instr, (u8) ((AstNumLit *) arg_arr[1]->value)->value.i);
+    WID(call->token, instr, (u8) ((AstNumLit *) arg_arr[1]->value)->value.i);
 
 #define SIMD_REPLACE_LANE_INSTR(instr, arg_arr) { \
     emit_expression(mod, &code, arg_arr[0]->value);\
@@ -1808,7 +1851,7 @@ EMIT_FUNC(call, AstCall* call) {
     } \
     u8 lane = (u8) ((AstNumLit *) arg_arr[1]->value)->value.i; \
     emit_expression(mod, &code, arg_arr[2]->value); \
-    WID(instr, lane); \
+    WID(call->token, instr, lane); \
 }
 
 
@@ -1842,18 +1885,18 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
     }
 
     switch (call->intrinsic) {
-        case ONYX_INTRINSIC_MEMORY_SIZE:  WID(WI_MEMORY_SIZE, 0x00); break;
-        case ONYX_INTRINSIC_MEMORY_GROW:  WID(WI_MEMORY_GROW, 0x00); break;
+        case ONYX_INTRINSIC_MEMORY_SIZE:  WID(call->token, WI_MEMORY_SIZE, 0x00); break;
+        case ONYX_INTRINSIC_MEMORY_GROW:  WID(call->token, WI_MEMORY_GROW, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_COPY:
             if (context.options->use_post_mvp_features) {
-                WIL(WI_MEMORY_COPY, 0x00);
+                WIL(call->token, WI_MEMORY_COPY, 0x00);
             } else {
                 emit_intrinsic_memory_copy(mod, &code);
             }
             break;
         case ONYX_INTRINSIC_MEMORY_FILL:
             if (context.options->use_post_mvp_features) {
-                WIL(WI_MEMORY_FILL, 0x00);
+                WIL(call->token, WI_MEMORY_FILL, 0x00);
             } else {
                 emit_intrinsic_memory_fill(mod, &code);
             }
@@ -1865,49 +1908,49 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             break;
         }
 
-        case ONYX_INTRINSIC_I32_CLZ:      WI(WI_I32_CLZ); break;
-        case ONYX_INTRINSIC_I32_CTZ:      WI(WI_I32_CTZ); break;
-        case ONYX_INTRINSIC_I32_POPCNT:   WI(WI_I32_POPCNT); break;
-        case ONYX_INTRINSIC_I32_AND:      WI(WI_I32_AND); break;
-        case ONYX_INTRINSIC_I32_OR:       WI(WI_I32_OR); break;
-        case ONYX_INTRINSIC_I32_XOR:      WI(WI_I32_XOR); break;
-        case ONYX_INTRINSIC_I32_SHL:      WI(WI_I32_SHL); break;
-        case ONYX_INTRINSIC_I32_SLR:      WI(WI_I32_SHR_U); break;
-        case ONYX_INTRINSIC_I32_SAR:      WI(WI_I32_SHR_S); break;
-        case ONYX_INTRINSIC_I32_ROTL:     WI(WI_I32_ROTL); break;
-        case ONYX_INTRINSIC_I32_ROTR:     WI(WI_I32_ROTR); break;
+        case ONYX_INTRINSIC_I32_CLZ:      WI(call->token, WI_I32_CLZ); break;
+        case ONYX_INTRINSIC_I32_CTZ:      WI(call->token, WI_I32_CTZ); break;
+        case ONYX_INTRINSIC_I32_POPCNT:   WI(call->token, WI_I32_POPCNT); break;
+        case ONYX_INTRINSIC_I32_AND:      WI(call->token, WI_I32_AND); break;
+        case ONYX_INTRINSIC_I32_OR:       WI(call->token, WI_I32_OR); break;
+        case ONYX_INTRINSIC_I32_XOR:      WI(call->token, WI_I32_XOR); break;
+        case ONYX_INTRINSIC_I32_SHL:      WI(call->token, WI_I32_SHL); break;
+        case ONYX_INTRINSIC_I32_SLR:      WI(call->token, WI_I32_SHR_U); break;
+        case ONYX_INTRINSIC_I32_SAR:      WI(call->token, WI_I32_SHR_S); break;
+        case ONYX_INTRINSIC_I32_ROTL:     WI(call->token, WI_I32_ROTL); break;
+        case ONYX_INTRINSIC_I32_ROTR:     WI(call->token, WI_I32_ROTR); break;
 
-        case ONYX_INTRINSIC_I64_CLZ:      WI(WI_I64_CLZ); break;
-        case ONYX_INTRINSIC_I64_CTZ:      WI(WI_I64_CTZ); break;
-        case ONYX_INTRINSIC_I64_POPCNT:   WI(WI_I64_POPCNT); break;
-        case ONYX_INTRINSIC_I64_AND:      WI(WI_I64_AND); break;
-        case ONYX_INTRINSIC_I64_OR:       WI(WI_I64_OR); break;
-        case ONYX_INTRINSIC_I64_XOR:      WI(WI_I64_XOR); break;
-        case ONYX_INTRINSIC_I64_SHL:      WI(WI_I64_SHL); break;
-        case ONYX_INTRINSIC_I64_SLR:      WI(WI_I64_SHR_U); break;
-        case ONYX_INTRINSIC_I64_SAR:      WI(WI_I64_SHR_S); break;
-        case ONYX_INTRINSIC_I64_ROTL:     WI(WI_I64_ROTL); break;
-        case ONYX_INTRINSIC_I64_ROTR:     WI(WI_I64_ROTR); break;
+        case ONYX_INTRINSIC_I64_CLZ:      WI(call->token, WI_I64_CLZ); break;
+        case ONYX_INTRINSIC_I64_CTZ:      WI(call->token, WI_I64_CTZ); break;
+        case ONYX_INTRINSIC_I64_POPCNT:   WI(call->token, WI_I64_POPCNT); break;
+        case ONYX_INTRINSIC_I64_AND:      WI(call->token, WI_I64_AND); break;
+        case ONYX_INTRINSIC_I64_OR:       WI(call->token, WI_I64_OR); break;
+        case ONYX_INTRINSIC_I64_XOR:      WI(call->token, WI_I64_XOR); break;
+        case ONYX_INTRINSIC_I64_SHL:      WI(call->token, WI_I64_SHL); break;
+        case ONYX_INTRINSIC_I64_SLR:      WI(call->token, WI_I64_SHR_U); break;
+        case ONYX_INTRINSIC_I64_SAR:      WI(call->token, WI_I64_SHR_S); break;
+        case ONYX_INTRINSIC_I64_ROTL:     WI(call->token, WI_I64_ROTL); break;
+        case ONYX_INTRINSIC_I64_ROTR:     WI(call->token, WI_I64_ROTR); break;
 
-        case ONYX_INTRINSIC_F32_ABS:      WI(WI_F32_ABS); break;
-        case ONYX_INTRINSIC_F32_CEIL:     WI(WI_F32_CEIL); break;
-        case ONYX_INTRINSIC_F32_FLOOR:    WI(WI_F32_FLOOR); break;
-        case ONYX_INTRINSIC_F32_TRUNC:    WI(WI_F32_TRUNC); break;
-        case ONYX_INTRINSIC_F32_NEAREST:  WI(WI_F32_NEAREST); break;
-        case ONYX_INTRINSIC_F32_SQRT:     WI(WI_F32_SQRT); break;
-        case ONYX_INTRINSIC_F32_MIN:      WI(WI_F32_MIN); break;
-        case ONYX_INTRINSIC_F32_MAX:      WI(WI_F32_MAX); break;
-        case ONYX_INTRINSIC_F32_COPYSIGN: WI(WI_F32_COPYSIGN); break;
+        case ONYX_INTRINSIC_F32_ABS:      WI(call->token, WI_F32_ABS); break;
+        case ONYX_INTRINSIC_F32_CEIL:     WI(call->token, WI_F32_CEIL); break;
+        case ONYX_INTRINSIC_F32_FLOOR:    WI(call->token, WI_F32_FLOOR); break;
+        case ONYX_INTRINSIC_F32_TRUNC:    WI(call->token, WI_F32_TRUNC); break;
+        case ONYX_INTRINSIC_F32_NEAREST:  WI(call->token, WI_F32_NEAREST); break;
+        case ONYX_INTRINSIC_F32_SQRT:     WI(call->token, WI_F32_SQRT); break;
+        case ONYX_INTRINSIC_F32_MIN:      WI(call->token, WI_F32_MIN); break;
+        case ONYX_INTRINSIC_F32_MAX:      WI(call->token, WI_F32_MAX); break;
+        case ONYX_INTRINSIC_F32_COPYSIGN: WI(call->token, WI_F32_COPYSIGN); break;
 
-        case ONYX_INTRINSIC_F64_ABS:      WI(WI_F64_ABS); break;
-        case ONYX_INTRINSIC_F64_CEIL:     WI(WI_F64_CEIL); break;
-        case ONYX_INTRINSIC_F64_FLOOR:    WI(WI_F64_FLOOR); break;
-        case ONYX_INTRINSIC_F64_TRUNC:    WI(WI_F64_TRUNC); break;
-        case ONYX_INTRINSIC_F64_NEAREST:  WI(WI_F64_NEAREST); break;
-        case ONYX_INTRINSIC_F64_SQRT:     WI(WI_F64_SQRT); break;
-        case ONYX_INTRINSIC_F64_MIN:      WI(WI_F64_MIN); break;
-        case ONYX_INTRINSIC_F64_MAX:      WI(WI_F64_MAX); break;
-        case ONYX_INTRINSIC_F64_COPYSIGN: WI(WI_F64_COPYSIGN); break;
+        case ONYX_INTRINSIC_F64_ABS:      WI(call->token, WI_F64_ABS); break;
+        case ONYX_INTRINSIC_F64_CEIL:     WI(call->token, WI_F64_CEIL); break;
+        case ONYX_INTRINSIC_F64_FLOOR:    WI(call->token, WI_F64_FLOOR); break;
+        case ONYX_INTRINSIC_F64_TRUNC:    WI(call->token, WI_F64_TRUNC); break;
+        case ONYX_INTRINSIC_F64_NEAREST:  WI(call->token, WI_F64_NEAREST); break;
+        case ONYX_INTRINSIC_F64_SQRT:     WI(call->token, WI_F64_SQRT); break;
+        case ONYX_INTRINSIC_F64_MIN:      WI(call->token, WI_F64_MIN); break;
+        case ONYX_INTRINSIC_F64_MAX:      WI(call->token, WI_F64_MAX); break;
+        case ONYX_INTRINSIC_F64_COPYSIGN: WI(call->token, WI_F64_COPYSIGN); break;
 
         case ONYX_INTRINSIC_I8X16_CONST:
         case ONYX_INTRINSIC_V128_CONST:   SIMD_INT_CONST_INTRINSIC(u8, 16);   break;
@@ -1927,7 +1970,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
                 }
                 byte_buffer[i] = (f32) ((AstNumLit *) arg_arr[i]->value)->value.f;
             }
-            WIP(WI_V128_CONST, byte_buffer);
+            WIP(call->token, WI_V128_CONST, byte_buffer);
             break;
         }
 
@@ -1944,7 +1987,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
                 }
                 byte_buffer[i] = (f64) ((AstNumLit *) arg_arr[i]->value)->value.d;
             }
-            WIP(WI_V128_CONST, byte_buffer);
+            WIP(call->token, WI_V128_CONST, byte_buffer);
             break;
         }
 
@@ -1967,7 +2010,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
                 }
                 byte_buffer[i] = (u8) ((AstNumLit *) arg_arr[i + 2]->value)->value.i;
             }
-            WIP(WI_I8X16_SHUFFLE, byte_buffer);
+            WIP(call->token, WI_I8X16_SHUFFLE, byte_buffer);
             break;
         }
 
@@ -1987,169 +2030,169 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
         case ONYX_INTRINSIC_F64X2_EXTRACT_LANE:   SIMD_EXTRACT_LANE_INSTR(WI_F64X2_EXTRACT_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
         case ONYX_INTRINSIC_F64X2_REPLACE_LANE:   SIMD_REPLACE_LANE_INSTR(WI_F64X2_REPLACE_LANE, ((bh_arr(AstArgument *)) call->args.values)); break;
 
-        case ONYX_INTRINSIC_I8X16_SWIZZLE: WI(WI_I8X16_SWIZZLE); break;
-        case ONYX_INTRINSIC_I8X16_SPLAT:   WI(WI_I8X16_SPLAT); break;
-        case ONYX_INTRINSIC_I16X8_SPLAT:   WI(WI_I16X8_SPLAT); break;
-        case ONYX_INTRINSIC_I32X4_SPLAT:   WI(WI_I32X4_SPLAT); break;
-        case ONYX_INTRINSIC_I64X2_SPLAT:   WI(WI_I64X2_SPLAT); break;
-        case ONYX_INTRINSIC_F32X4_SPLAT:   WI(WI_F32X4_SPLAT); break;
-        case ONYX_INTRINSIC_F64X2_SPLAT:   WI(WI_F64X2_SPLAT); break;
+        case ONYX_INTRINSIC_I8X16_SWIZZLE: WI(call->token, WI_I8X16_SWIZZLE); break;
+        case ONYX_INTRINSIC_I8X16_SPLAT:   WI(call->token, WI_I8X16_SPLAT); break;
+        case ONYX_INTRINSIC_I16X8_SPLAT:   WI(call->token, WI_I16X8_SPLAT); break;
+        case ONYX_INTRINSIC_I32X4_SPLAT:   WI(call->token, WI_I32X4_SPLAT); break;
+        case ONYX_INTRINSIC_I64X2_SPLAT:   WI(call->token, WI_I64X2_SPLAT); break;
+        case ONYX_INTRINSIC_F32X4_SPLAT:   WI(call->token, WI_F32X4_SPLAT); break;
+        case ONYX_INTRINSIC_F64X2_SPLAT:   WI(call->token, WI_F64X2_SPLAT); break;
 
-        case ONYX_INTRINSIC_I8X16_EQ:   WI(WI_I8X16_EQ); break;
-        case ONYX_INTRINSIC_I8X16_NEQ:  WI(WI_I8X16_NEQ); break;
-        case ONYX_INTRINSIC_I8X16_LT_S: WI(WI_I8X16_LT_S); break;
-        case ONYX_INTRINSIC_I8X16_LT_U: WI(WI_I8X16_LT_U); break;
-        case ONYX_INTRINSIC_I8X16_GT_S: WI(WI_I8X16_GT_S); break;
-        case ONYX_INTRINSIC_I8X16_GT_U: WI(WI_I8X16_GT_U); break;
-        case ONYX_INTRINSIC_I8X16_LE_S: WI(WI_I8X16_LE_S); break;
-        case ONYX_INTRINSIC_I8X16_LE_U: WI(WI_I8X16_LE_U); break;
-        case ONYX_INTRINSIC_I8X16_GE_S: WI(WI_I8X16_GE_S); break;
-        case ONYX_INTRINSIC_I8X16_GE_U: WI(WI_I8X16_GE_U); break;
+        case ONYX_INTRINSIC_I8X16_EQ:   WI(call->token, WI_I8X16_EQ); break;
+        case ONYX_INTRINSIC_I8X16_NEQ:  WI(call->token, WI_I8X16_NEQ); break;
+        case ONYX_INTRINSIC_I8X16_LT_S: WI(call->token, WI_I8X16_LT_S); break;
+        case ONYX_INTRINSIC_I8X16_LT_U: WI(call->token, WI_I8X16_LT_U); break;
+        case ONYX_INTRINSIC_I8X16_GT_S: WI(call->token, WI_I8X16_GT_S); break;
+        case ONYX_INTRINSIC_I8X16_GT_U: WI(call->token, WI_I8X16_GT_U); break;
+        case ONYX_INTRINSIC_I8X16_LE_S: WI(call->token, WI_I8X16_LE_S); break;
+        case ONYX_INTRINSIC_I8X16_LE_U: WI(call->token, WI_I8X16_LE_U); break;
+        case ONYX_INTRINSIC_I8X16_GE_S: WI(call->token, WI_I8X16_GE_S); break;
+        case ONYX_INTRINSIC_I8X16_GE_U: WI(call->token, WI_I8X16_GE_U); break;
 
-        case ONYX_INTRINSIC_I16X8_EQ:   WI(WI_I16X8_EQ); break;
-        case ONYX_INTRINSIC_I16X8_NEQ:  WI(WI_I16X8_NEQ); break;
-        case ONYX_INTRINSIC_I16X8_LT_S: WI(WI_I16X8_LT_S); break;
-        case ONYX_INTRINSIC_I16X8_LT_U: WI(WI_I16X8_LT_U); break;
-        case ONYX_INTRINSIC_I16X8_GT_S: WI(WI_I16X8_GT_S); break;
-        case ONYX_INTRINSIC_I16X8_GT_U: WI(WI_I16X8_GT_U); break;
-        case ONYX_INTRINSIC_I16X8_LE_S: WI(WI_I16X8_LE_S); break;
-        case ONYX_INTRINSIC_I16X8_LE_U: WI(WI_I16X8_LE_U); break;
-        case ONYX_INTRINSIC_I16X8_GE_S: WI(WI_I16X8_GE_S); break;
-        case ONYX_INTRINSIC_I16X8_GE_U: WI(WI_I16X8_GE_U); break;
+        case ONYX_INTRINSIC_I16X8_EQ:   WI(call->token, WI_I16X8_EQ); break;
+        case ONYX_INTRINSIC_I16X8_NEQ:  WI(call->token, WI_I16X8_NEQ); break;
+        case ONYX_INTRINSIC_I16X8_LT_S: WI(call->token, WI_I16X8_LT_S); break;
+        case ONYX_INTRINSIC_I16X8_LT_U: WI(call->token, WI_I16X8_LT_U); break;
+        case ONYX_INTRINSIC_I16X8_GT_S: WI(call->token, WI_I16X8_GT_S); break;
+        case ONYX_INTRINSIC_I16X8_GT_U: WI(call->token, WI_I16X8_GT_U); break;
+        case ONYX_INTRINSIC_I16X8_LE_S: WI(call->token, WI_I16X8_LE_S); break;
+        case ONYX_INTRINSIC_I16X8_LE_U: WI(call->token, WI_I16X8_LE_U); break;
+        case ONYX_INTRINSIC_I16X8_GE_S: WI(call->token, WI_I16X8_GE_S); break;
+        case ONYX_INTRINSIC_I16X8_GE_U: WI(call->token, WI_I16X8_GE_U); break;
 
-        case ONYX_INTRINSIC_I32X4_EQ:   WI(WI_I32X4_EQ); break;
-        case ONYX_INTRINSIC_I32X4_NEQ:  WI(WI_I32X4_NEQ); break;
-        case ONYX_INTRINSIC_I32X4_LT_S: WI(WI_I32X4_LT_S); break;
-        case ONYX_INTRINSIC_I32X4_LT_U: WI(WI_I32X4_LT_U); break;
-        case ONYX_INTRINSIC_I32X4_GT_S: WI(WI_I32X4_GT_S); break;
-        case ONYX_INTRINSIC_I32X4_GT_U: WI(WI_I32X4_GT_U); break;
-        case ONYX_INTRINSIC_I32X4_LE_S: WI(WI_I32X4_LE_S); break;
-        case ONYX_INTRINSIC_I32X4_LE_U: WI(WI_I32X4_LE_U); break;
-        case ONYX_INTRINSIC_I32X4_GE_S: WI(WI_I32X4_GE_S); break;
-        case ONYX_INTRINSIC_I32X4_GE_U: WI(WI_I32X4_GE_U); break;
+        case ONYX_INTRINSIC_I32X4_EQ:   WI(call->token, WI_I32X4_EQ); break;
+        case ONYX_INTRINSIC_I32X4_NEQ:  WI(call->token, WI_I32X4_NEQ); break;
+        case ONYX_INTRINSIC_I32X4_LT_S: WI(call->token, WI_I32X4_LT_S); break;
+        case ONYX_INTRINSIC_I32X4_LT_U: WI(call->token, WI_I32X4_LT_U); break;
+        case ONYX_INTRINSIC_I32X4_GT_S: WI(call->token, WI_I32X4_GT_S); break;
+        case ONYX_INTRINSIC_I32X4_GT_U: WI(call->token, WI_I32X4_GT_U); break;
+        case ONYX_INTRINSIC_I32X4_LE_S: WI(call->token, WI_I32X4_LE_S); break;
+        case ONYX_INTRINSIC_I32X4_LE_U: WI(call->token, WI_I32X4_LE_U); break;
+        case ONYX_INTRINSIC_I32X4_GE_S: WI(call->token, WI_I32X4_GE_S); break;
+        case ONYX_INTRINSIC_I32X4_GE_U: WI(call->token, WI_I32X4_GE_U); break;
 
-        case ONYX_INTRINSIC_F32X4_EQ:  WI(WI_F32X4_EQ); break;
-        case ONYX_INTRINSIC_F32X4_NEQ: WI(WI_F32X4_NEQ); break;
-        case ONYX_INTRINSIC_F32X4_LT:  WI(WI_F32X4_LT); break;
-        case ONYX_INTRINSIC_F32X4_GT:  WI(WI_F32X4_GT); break;
-        case ONYX_INTRINSIC_F32X4_LE:  WI(WI_F32X4_LE); break;
-        case ONYX_INTRINSIC_F32X4_GE:  WI(WI_F32X4_GE); break;
+        case ONYX_INTRINSIC_F32X4_EQ:  WI(call->token, WI_F32X4_EQ); break;
+        case ONYX_INTRINSIC_F32X4_NEQ: WI(call->token, WI_F32X4_NEQ); break;
+        case ONYX_INTRINSIC_F32X4_LT:  WI(call->token, WI_F32X4_LT); break;
+        case ONYX_INTRINSIC_F32X4_GT:  WI(call->token, WI_F32X4_GT); break;
+        case ONYX_INTRINSIC_F32X4_LE:  WI(call->token, WI_F32X4_LE); break;
+        case ONYX_INTRINSIC_F32X4_GE:  WI(call->token, WI_F32X4_GE); break;
 
-        case ONYX_INTRINSIC_F64X2_EQ:  WI(WI_F64X2_EQ); break;
-        case ONYX_INTRINSIC_F64X2_NEQ: WI(WI_F64X2_NEQ); break;
-        case ONYX_INTRINSIC_F64X2_LT:  WI(WI_F64X2_LT); break;
-        case ONYX_INTRINSIC_F64X2_GT:  WI(WI_F64X2_GT); break;
-        case ONYX_INTRINSIC_F64X2_LE:  WI(WI_F64X2_LE); break;
-        case ONYX_INTRINSIC_F64X2_GE:  WI(WI_F64X2_GE); break;
+        case ONYX_INTRINSIC_F64X2_EQ:  WI(call->token, WI_F64X2_EQ); break;
+        case ONYX_INTRINSIC_F64X2_NEQ: WI(call->token, WI_F64X2_NEQ); break;
+        case ONYX_INTRINSIC_F64X2_LT:  WI(call->token, WI_F64X2_LT); break;
+        case ONYX_INTRINSIC_F64X2_GT:  WI(call->token, WI_F64X2_GT); break;
+        case ONYX_INTRINSIC_F64X2_LE:  WI(call->token, WI_F64X2_LE); break;
+        case ONYX_INTRINSIC_F64X2_GE:  WI(call->token, WI_F64X2_GE); break;
 
-        case ONYX_INTRINSIC_V128_NOT:       WI(WI_V128_NOT); break;
-        case ONYX_INTRINSIC_V128_AND:       WI(WI_V128_AND); break;
-        case ONYX_INTRINSIC_V128_ANDNOT:    WI(WI_V128_ANDNOT); break;
-        case ONYX_INTRINSIC_V128_OR:        WI(WI_V128_OR); break;
-        case ONYX_INTRINSIC_V128_XOR:       WI(WI_V128_XOR); break;
-        case ONYX_INTRINSIC_V128_BITSELECT: WI(WI_V128_BITSELECT); break;
+        case ONYX_INTRINSIC_V128_NOT:       WI(call->token, WI_V128_NOT); break;
+        case ONYX_INTRINSIC_V128_AND:       WI(call->token, WI_V128_AND); break;
+        case ONYX_INTRINSIC_V128_ANDNOT:    WI(call->token, WI_V128_ANDNOT); break;
+        case ONYX_INTRINSIC_V128_OR:        WI(call->token, WI_V128_OR); break;
+        case ONYX_INTRINSIC_V128_XOR:       WI(call->token, WI_V128_XOR); break;
+        case ONYX_INTRINSIC_V128_BITSELECT: WI(call->token, WI_V128_BITSELECT); break;
 
-        case ONYX_INTRINSIC_I8X16_ABS:            WI(WI_I8X16_ABS); break;
-        case ONYX_INTRINSIC_I8X16_NEG:            WI(WI_I8X16_NEG); break;
-        case ONYX_INTRINSIC_I8X16_ANY_TRUE:       WI(WI_I8X16_ANY_TRUE); break;
-        case ONYX_INTRINSIC_I8X16_ALL_TRUE:       WI(WI_I8X16_ALL_TRUE); break;
-        case ONYX_INTRINSIC_I8X16_BITMASK:        WI(WI_I8X16_BITMASK); break;
-        case ONYX_INTRINSIC_I8X16_NARROW_I16X8_S: WI(WI_I8X16_NARROW_I16X8_S); break;
-        case ONYX_INTRINSIC_I8X16_NARROW_I16X8_U: WI(WI_I8X16_NARROW_I16X8_U); break;
-        case ONYX_INTRINSIC_I8X16_SHL:            WI(WI_I8X16_SHL); break;
-        case ONYX_INTRINSIC_I8X16_SHR_S:          WI(WI_I8X16_SHR_S); break;
-        case ONYX_INTRINSIC_I8X16_SHR_U:          WI(WI_I8X16_SHR_U); break;
-        case ONYX_INTRINSIC_I8X16_ADD:            WI(WI_I8X16_ADD); break;
-        case ONYX_INTRINSIC_I8X16_ADD_SAT_S:      WI(WI_I8X16_ADD_SAT_S); break;
-        case ONYX_INTRINSIC_I8X16_ADD_SAT_U:      WI(WI_I8X16_ADD_SAT_U); break;
-        case ONYX_INTRINSIC_I8X16_SUB:            WI(WI_I8X16_SUB); break;
-        case ONYX_INTRINSIC_I8X16_SUB_SAT_S:      WI(WI_I8X16_SUB_SAT_S); break;
-        case ONYX_INTRINSIC_I8X16_SUB_SAT_U:      WI(WI_I8X16_SUB_SAT_U); break;
-        case ONYX_INTRINSIC_I8X16_MIN_S:          WI(WI_I8X16_MIN_S); break;
-        case ONYX_INTRINSIC_I8X16_MIN_U:          WI(WI_I8X16_MIN_U); break;
-        case ONYX_INTRINSIC_I8X16_MAX_S:          WI(WI_I8X16_MAX_S); break;
-        case ONYX_INTRINSIC_I8X16_MAX_U:          WI(WI_I8X16_MAX_U); break;
-        case ONYX_INTRINSIC_I8X16_AVGR_U:         WI(WI_I8X16_AVGR_U); break;
+        case ONYX_INTRINSIC_I8X16_ABS:            WI(call->token, WI_I8X16_ABS); break;
+        case ONYX_INTRINSIC_I8X16_NEG:            WI(call->token, WI_I8X16_NEG); break;
+        case ONYX_INTRINSIC_I8X16_ANY_TRUE:       WI(call->token, WI_I8X16_ANY_TRUE); break;
+        case ONYX_INTRINSIC_I8X16_ALL_TRUE:       WI(call->token, WI_I8X16_ALL_TRUE); break;
+        case ONYX_INTRINSIC_I8X16_BITMASK:        WI(call->token, WI_I8X16_BITMASK); break;
+        case ONYX_INTRINSIC_I8X16_NARROW_I16X8_S: WI(call->token, WI_I8X16_NARROW_I16X8_S); break;
+        case ONYX_INTRINSIC_I8X16_NARROW_I16X8_U: WI(call->token, WI_I8X16_NARROW_I16X8_U); break;
+        case ONYX_INTRINSIC_I8X16_SHL:            WI(call->token, WI_I8X16_SHL); break;
+        case ONYX_INTRINSIC_I8X16_SHR_S:          WI(call->token, WI_I8X16_SHR_S); break;
+        case ONYX_INTRINSIC_I8X16_SHR_U:          WI(call->token, WI_I8X16_SHR_U); break;
+        case ONYX_INTRINSIC_I8X16_ADD:            WI(call->token, WI_I8X16_ADD); break;
+        case ONYX_INTRINSIC_I8X16_ADD_SAT_S:      WI(call->token, WI_I8X16_ADD_SAT_S); break;
+        case ONYX_INTRINSIC_I8X16_ADD_SAT_U:      WI(call->token, WI_I8X16_ADD_SAT_U); break;
+        case ONYX_INTRINSIC_I8X16_SUB:            WI(call->token, WI_I8X16_SUB); break;
+        case ONYX_INTRINSIC_I8X16_SUB_SAT_S:      WI(call->token, WI_I8X16_SUB_SAT_S); break;
+        case ONYX_INTRINSIC_I8X16_SUB_SAT_U:      WI(call->token, WI_I8X16_SUB_SAT_U); break;
+        case ONYX_INTRINSIC_I8X16_MIN_S:          WI(call->token, WI_I8X16_MIN_S); break;
+        case ONYX_INTRINSIC_I8X16_MIN_U:          WI(call->token, WI_I8X16_MIN_U); break;
+        case ONYX_INTRINSIC_I8X16_MAX_S:          WI(call->token, WI_I8X16_MAX_S); break;
+        case ONYX_INTRINSIC_I8X16_MAX_U:          WI(call->token, WI_I8X16_MAX_U); break;
+        case ONYX_INTRINSIC_I8X16_AVGR_U:         WI(call->token, WI_I8X16_AVGR_U); break;
 
-        case ONYX_INTRINSIC_I16X8_ABS:                WI(WI_I16X8_ABS); break;
-        case ONYX_INTRINSIC_I16X8_NEG:                WI(WI_I16X8_NEG); break;
-        case ONYX_INTRINSIC_I16X8_ANY_TRUE:           WI(WI_I16X8_ANY_TRUE); break;
-        case ONYX_INTRINSIC_I16X8_ALL_TRUE:           WI(WI_I16X8_ALL_TRUE); break;
-        case ONYX_INTRINSIC_I16X8_BITMASK:            WI(WI_I16X8_BITMASK); break;
-        case ONYX_INTRINSIC_I16X8_NARROW_I32X4_S:     WI(WI_I16X8_NARROW_I32X4_S); break;
-        case ONYX_INTRINSIC_I16X8_NARROW_I32X4_U:     WI(WI_I16X8_NARROW_I32X4_U); break;
-        case ONYX_INTRINSIC_I16X8_WIDEN_LOW_I8X16_S:  WI(WI_I16X8_WIDEN_LOW_I8X16_S); break;
-        case ONYX_INTRINSIC_I16X8_WIDEN_HIGH_I8X16_S: WI(WI_I16X8_WIDEN_HIGH_I8X16_S); break;
-        case ONYX_INTRINSIC_I16X8_WIDEN_LOW_I8X16_U:  WI(WI_I16X8_WIDEN_LOW_I8X16_U); break;
-        case ONYX_INTRINSIC_I16X8_WIDEN_HIGH_I8X16_U: WI(WI_I16X8_WIDEN_HIGH_I8X16_U); break;
-        case ONYX_INTRINSIC_I16X8_SHL:                WI(WI_I16X8_SHL); break;
-        case ONYX_INTRINSIC_I16X8_SHR_S:              WI(WI_I16X8_SHR_S); break;
-        case ONYX_INTRINSIC_I16X8_SHR_U:              WI(WI_I16X8_SHR_U); break;
-        case ONYX_INTRINSIC_I16X8_ADD:                WI(WI_I16X8_ADD); break;
-        case ONYX_INTRINSIC_I16X8_ADD_SAT_S:          WI(WI_I16X8_ADD_SAT_S); break;
-        case ONYX_INTRINSIC_I16X8_ADD_SAT_U:          WI(WI_I16X8_ADD_SAT_U); break;
-        case ONYX_INTRINSIC_I16X8_SUB:                WI(WI_I16X8_SUB); break;
-        case ONYX_INTRINSIC_I16X8_SUB_SAT_S:          WI(WI_I16X8_SUB_SAT_S); break;
-        case ONYX_INTRINSIC_I16X8_SUB_SAT_U:          WI(WI_I16X8_SUB_SAT_U); break;
-        case ONYX_INTRINSIC_I16X8_MUL:                WI(WI_I16X8_MUL); break;
-        case ONYX_INTRINSIC_I16X8_MIN_S:              WI(WI_I16X8_MIN_S); break;
-        case ONYX_INTRINSIC_I16X8_MIN_U:              WI(WI_I16X8_MIN_U); break;
-        case ONYX_INTRINSIC_I16X8_MAX_S:              WI(WI_I16X8_MAX_S); break;
-        case ONYX_INTRINSIC_I16X8_MAX_U:              WI(WI_I16X8_MAX_U); break;
-        case ONYX_INTRINSIC_I16X8_AVGR_U:             WI(WI_I16X8_AVGR_U); break;
+        case ONYX_INTRINSIC_I16X8_ABS:                WI(call->token, WI_I16X8_ABS); break;
+        case ONYX_INTRINSIC_I16X8_NEG:                WI(call->token, WI_I16X8_NEG); break;
+        case ONYX_INTRINSIC_I16X8_ANY_TRUE:           WI(call->token, WI_I16X8_ANY_TRUE); break;
+        case ONYX_INTRINSIC_I16X8_ALL_TRUE:           WI(call->token, WI_I16X8_ALL_TRUE); break;
+        case ONYX_INTRINSIC_I16X8_BITMASK:            WI(call->token, WI_I16X8_BITMASK); break;
+        case ONYX_INTRINSIC_I16X8_NARROW_I32X4_S:     WI(call->token, WI_I16X8_NARROW_I32X4_S); break;
+        case ONYX_INTRINSIC_I16X8_NARROW_I32X4_U:     WI(call->token, WI_I16X8_NARROW_I32X4_U); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_LOW_I8X16_S:  WI(call->token, WI_I16X8_WIDEN_LOW_I8X16_S); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_HIGH_I8X16_S: WI(call->token, WI_I16X8_WIDEN_HIGH_I8X16_S); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_LOW_I8X16_U:  WI(call->token, WI_I16X8_WIDEN_LOW_I8X16_U); break;
+        case ONYX_INTRINSIC_I16X8_WIDEN_HIGH_I8X16_U: WI(call->token, WI_I16X8_WIDEN_HIGH_I8X16_U); break;
+        case ONYX_INTRINSIC_I16X8_SHL:                WI(call->token, WI_I16X8_SHL); break;
+        case ONYX_INTRINSIC_I16X8_SHR_S:              WI(call->token, WI_I16X8_SHR_S); break;
+        case ONYX_INTRINSIC_I16X8_SHR_U:              WI(call->token, WI_I16X8_SHR_U); break;
+        case ONYX_INTRINSIC_I16X8_ADD:                WI(call->token, WI_I16X8_ADD); break;
+        case ONYX_INTRINSIC_I16X8_ADD_SAT_S:          WI(call->token, WI_I16X8_ADD_SAT_S); break;
+        case ONYX_INTRINSIC_I16X8_ADD_SAT_U:          WI(call->token, WI_I16X8_ADD_SAT_U); break;
+        case ONYX_INTRINSIC_I16X8_SUB:                WI(call->token, WI_I16X8_SUB); break;
+        case ONYX_INTRINSIC_I16X8_SUB_SAT_S:          WI(call->token, WI_I16X8_SUB_SAT_S); break;
+        case ONYX_INTRINSIC_I16X8_SUB_SAT_U:          WI(call->token, WI_I16X8_SUB_SAT_U); break;
+        case ONYX_INTRINSIC_I16X8_MUL:                WI(call->token, WI_I16X8_MUL); break;
+        case ONYX_INTRINSIC_I16X8_MIN_S:              WI(call->token, WI_I16X8_MIN_S); break;
+        case ONYX_INTRINSIC_I16X8_MIN_U:              WI(call->token, WI_I16X8_MIN_U); break;
+        case ONYX_INTRINSIC_I16X8_MAX_S:              WI(call->token, WI_I16X8_MAX_S); break;
+        case ONYX_INTRINSIC_I16X8_MAX_U:              WI(call->token, WI_I16X8_MAX_U); break;
+        case ONYX_INTRINSIC_I16X8_AVGR_U:             WI(call->token, WI_I16X8_AVGR_U); break;
 
-        case ONYX_INTRINSIC_I32X4_ABS:                WI(WI_I32X4_ABS); break;
-        case ONYX_INTRINSIC_I32X4_NEG:                WI(WI_I32X4_NEG); break;
-        case ONYX_INTRINSIC_I32X4_ANY_TRUE:           WI(WI_I32X4_ANY_TRUE); break;
-        case ONYX_INTRINSIC_I32X4_ALL_TRUE:           WI(WI_I32X4_ALL_TRUE); break;
-        case ONYX_INTRINSIC_I32X4_BITMASK:            WI(WI_I32X4_BITMASK); break;
-        case ONYX_INTRINSIC_I32X4_WIDEN_LOW_I16X8_S:  WI(WI_I32X4_WIDEN_LOW_I16X8_S); break;
-        case ONYX_INTRINSIC_I32X4_WIDEN_HIGH_I16X8_S: WI(WI_I32X4_WIDEN_HIGH_I16X8_S); break;
-        case ONYX_INTRINSIC_I32X4_WIDEN_LOW_I16X8_U:  WI(WI_I32X4_WIDEN_LOW_I16X8_U); break;
-        case ONYX_INTRINSIC_I32X4_WIDEN_HIGH_I16X8_U: WI(WI_I32X4_WIDEN_HIGH_I16X8_U); break;
-        case ONYX_INTRINSIC_I32X4_SHL:                WI(WI_I32X4_SHL); break;
-        case ONYX_INTRINSIC_I32X4_SHR_S:              WI(WI_I32X4_SHR_S); break;
-        case ONYX_INTRINSIC_I32X4_SHR_U:              WI(WI_I32X4_SHR_U); break;
-        case ONYX_INTRINSIC_I32X4_ADD:                WI(WI_I32X4_ADD); break;
-        case ONYX_INTRINSIC_I32X4_SUB:                WI(WI_I32X4_SUB); break;
-        case ONYX_INTRINSIC_I32X4_MUL:                WI(WI_I32X4_MUL); break;
-        case ONYX_INTRINSIC_I32X4_MIN_S:              WI(WI_I32X4_MIN_S); break;
-        case ONYX_INTRINSIC_I32X4_MIN_U:              WI(WI_I32X4_MIN_U); break;
-        case ONYX_INTRINSIC_I32X4_MAX_S:              WI(WI_I32X4_MAX_S); break;
-        case ONYX_INTRINSIC_I32X4_MAX_U:              WI(WI_I32X4_MAX_U); break;
+        case ONYX_INTRINSIC_I32X4_ABS:                WI(call->token, WI_I32X4_ABS); break;
+        case ONYX_INTRINSIC_I32X4_NEG:                WI(call->token, WI_I32X4_NEG); break;
+        case ONYX_INTRINSIC_I32X4_ANY_TRUE:           WI(call->token, WI_I32X4_ANY_TRUE); break;
+        case ONYX_INTRINSIC_I32X4_ALL_TRUE:           WI(call->token, WI_I32X4_ALL_TRUE); break;
+        case ONYX_INTRINSIC_I32X4_BITMASK:            WI(call->token, WI_I32X4_BITMASK); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_LOW_I16X8_S:  WI(call->token, WI_I32X4_WIDEN_LOW_I16X8_S); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_HIGH_I16X8_S: WI(call->token, WI_I32X4_WIDEN_HIGH_I16X8_S); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_LOW_I16X8_U:  WI(call->token, WI_I32X4_WIDEN_LOW_I16X8_U); break;
+        case ONYX_INTRINSIC_I32X4_WIDEN_HIGH_I16X8_U: WI(call->token, WI_I32X4_WIDEN_HIGH_I16X8_U); break;
+        case ONYX_INTRINSIC_I32X4_SHL:                WI(call->token, WI_I32X4_SHL); break;
+        case ONYX_INTRINSIC_I32X4_SHR_S:              WI(call->token, WI_I32X4_SHR_S); break;
+        case ONYX_INTRINSIC_I32X4_SHR_U:              WI(call->token, WI_I32X4_SHR_U); break;
+        case ONYX_INTRINSIC_I32X4_ADD:                WI(call->token, WI_I32X4_ADD); break;
+        case ONYX_INTRINSIC_I32X4_SUB:                WI(call->token, WI_I32X4_SUB); break;
+        case ONYX_INTRINSIC_I32X4_MUL:                WI(call->token, WI_I32X4_MUL); break;
+        case ONYX_INTRINSIC_I32X4_MIN_S:              WI(call->token, WI_I32X4_MIN_S); break;
+        case ONYX_INTRINSIC_I32X4_MIN_U:              WI(call->token, WI_I32X4_MIN_U); break;
+        case ONYX_INTRINSIC_I32X4_MAX_S:              WI(call->token, WI_I32X4_MAX_S); break;
+        case ONYX_INTRINSIC_I32X4_MAX_U:              WI(call->token, WI_I32X4_MAX_U); break;
 
-        case ONYX_INTRINSIC_I64X2_NEG:   WI(WI_I64X2_NEG); break;
-        case ONYX_INTRINSIC_I64X2_SHL:   WI(WI_I64X2_SHL); break;
-        case ONYX_INTRINSIC_I64X2_SHR_S: WI(WI_I64X2_SHR_S); break;
-        case ONYX_INTRINSIC_I64X2_SHR_U: WI(WI_I64X2_SHR_U); break;
-        case ONYX_INTRINSIC_I64X2_ADD:   WI(WI_I64X2_ADD); break;
-        case ONYX_INTRINSIC_I64X2_SUB:   WI(WI_I64X2_SUB); break;
-        case ONYX_INTRINSIC_I64X2_MUL:   WI(WI_I64X2_MUL); break;
+        case ONYX_INTRINSIC_I64X2_NEG:   WI(call->token, WI_I64X2_NEG); break;
+        case ONYX_INTRINSIC_I64X2_SHL:   WI(call->token, WI_I64X2_SHL); break;
+        case ONYX_INTRINSIC_I64X2_SHR_S: WI(call->token, WI_I64X2_SHR_S); break;
+        case ONYX_INTRINSIC_I64X2_SHR_U: WI(call->token, WI_I64X2_SHR_U); break;
+        case ONYX_INTRINSIC_I64X2_ADD:   WI(call->token, WI_I64X2_ADD); break;
+        case ONYX_INTRINSIC_I64X2_SUB:   WI(call->token, WI_I64X2_SUB); break;
+        case ONYX_INTRINSIC_I64X2_MUL:   WI(call->token, WI_I64X2_MUL); break;
 
-        case ONYX_INTRINSIC_F32X4_ABS:  WI(WI_F32X4_ABS); break;
-        case ONYX_INTRINSIC_F32X4_NEG:  WI(WI_F32X4_NEG); break;
-        case ONYX_INTRINSIC_F32X4_SQRT: WI(WI_F32X4_SQRT); break;
-        case ONYX_INTRINSIC_F32X4_ADD:  WI(WI_F32X4_ADD); break;
-        case ONYX_INTRINSIC_F32X4_SUB:  WI(WI_F32X4_SUB); break;
-        case ONYX_INTRINSIC_F32X4_MUL:  WI(WI_F32X4_MUL); break;
-        case ONYX_INTRINSIC_F32X4_DIV:  WI(WI_F32X4_DIV); break;
-        case ONYX_INTRINSIC_F32X4_MIN:  WI(WI_F32X4_MIN); break;
-        case ONYX_INTRINSIC_F32X4_MAX:  WI(WI_F32X4_MAX); break;
+        case ONYX_INTRINSIC_F32X4_ABS:  WI(call->token, WI_F32X4_ABS); break;
+        case ONYX_INTRINSIC_F32X4_NEG:  WI(call->token, WI_F32X4_NEG); break;
+        case ONYX_INTRINSIC_F32X4_SQRT: WI(call->token, WI_F32X4_SQRT); break;
+        case ONYX_INTRINSIC_F32X4_ADD:  WI(call->token, WI_F32X4_ADD); break;
+        case ONYX_INTRINSIC_F32X4_SUB:  WI(call->token, WI_F32X4_SUB); break;
+        case ONYX_INTRINSIC_F32X4_MUL:  WI(call->token, WI_F32X4_MUL); break;
+        case ONYX_INTRINSIC_F32X4_DIV:  WI(call->token, WI_F32X4_DIV); break;
+        case ONYX_INTRINSIC_F32X4_MIN:  WI(call->token, WI_F32X4_MIN); break;
+        case ONYX_INTRINSIC_F32X4_MAX:  WI(call->token, WI_F32X4_MAX); break;
 
-        case ONYX_INTRINSIC_F64X2_ABS:  WI(WI_F64X2_ABS); break;
-        case ONYX_INTRINSIC_F64X2_NEG:  WI(WI_F64X2_NEG); break;
-        case ONYX_INTRINSIC_F64X2_SQRT: WI(WI_F64X2_SQRT); break;
-        case ONYX_INTRINSIC_F64X2_ADD:  WI(WI_F64X2_ADD); break;
-        case ONYX_INTRINSIC_F64X2_SUB:  WI(WI_F64X2_SUB); break;
-        case ONYX_INTRINSIC_F64X2_MUL:  WI(WI_F64X2_MUL); break;
-        case ONYX_INTRINSIC_F64X2_DIV:  WI(WI_F64X2_DIV); break;
-        case ONYX_INTRINSIC_F64X2_MIN:  WI(WI_F64X2_MIN); break;
-        case ONYX_INTRINSIC_F64X2_MAX:  WI(WI_F64X2_MAX); break;
+        case ONYX_INTRINSIC_F64X2_ABS:  WI(call->token, WI_F64X2_ABS); break;
+        case ONYX_INTRINSIC_F64X2_NEG:  WI(call->token, WI_F64X2_NEG); break;
+        case ONYX_INTRINSIC_F64X2_SQRT: WI(call->token, WI_F64X2_SQRT); break;
+        case ONYX_INTRINSIC_F64X2_ADD:  WI(call->token, WI_F64X2_ADD); break;
+        case ONYX_INTRINSIC_F64X2_SUB:  WI(call->token, WI_F64X2_SUB); break;
+        case ONYX_INTRINSIC_F64X2_MUL:  WI(call->token, WI_F64X2_MUL); break;
+        case ONYX_INTRINSIC_F64X2_DIV:  WI(call->token, WI_F64X2_DIV); break;
+        case ONYX_INTRINSIC_F64X2_MIN:  WI(call->token, WI_F64X2_MIN); break;
+        case ONYX_INTRINSIC_F64X2_MAX:  WI(call->token, WI_F64X2_MAX); break;
 
-        case ONYX_INTRINSIC_I32X4_TRUNC_SAT_F32X4_S: WI(WI_I32X4_TRUNC_SAT_F32X4_S); break;
-        case ONYX_INTRINSIC_I32X4_TRUNC_SAT_F32X4_U: WI(WI_I32X4_TRUNC_SAT_F32X4_U); break;
-        case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_S:   WI(WI_F32X4_CONVERT_I32X4_S); break;
-        case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_U:   WI(WI_F32X4_CONVERT_I32X4_U); break;
+        case ONYX_INTRINSIC_I32X4_TRUNC_SAT_F32X4_S: WI(call->token, WI_I32X4_TRUNC_SAT_F32X4_S); break;
+        case ONYX_INTRINSIC_I32X4_TRUNC_SAT_F32X4_U: WI(call->token, WI_I32X4_TRUNC_SAT_F32X4_U); break;
+        case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_S:   WI(call->token, WI_F32X4_CONVERT_I32X4_S); break;
+        case ONYX_INTRINSIC_F32X4_CONVERT_I32X4_U:   WI(call->token, WI_F32X4_CONVERT_I32X4_U); break;
 
         case ONYX_INTRINSIC_ATOMIC_WAIT: {
             Type* atomic_type = ((AstArgument *) call->args.values[0])->value->type->Pointer.elem;
@@ -2232,8 +2275,8 @@ EMIT_FUNC(subscript_location, AstSubscript* sub, u64* offset_return) {
 
     emit_expression(mod, &code, sub->expr);
     if (sub->elem_size != 1) {
-        WID(WI_PTR_CONST, sub->elem_size);
-        WI(WI_PTR_MUL);
+        WID(sub->token, WI_PTR_CONST, sub->elem_size);
+        WI(sub->token, WI_PTR_MUL);
     }
 
     // CLEANUP: This is one dense clusterf**k of code...
@@ -2254,7 +2297,7 @@ EMIT_FUNC(subscript_location, AstSubscript* sub, u64* offset_return) {
         emit_expression(mod, &code, sub->addr);
     }
 
-    WI(WI_PTR_ADD);
+    WI(sub->token, WI_PTR_ADD);
 
     *offset_return += offset;
 
@@ -2302,9 +2345,9 @@ EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
 
     if (memres->threadlocal) {
         u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_tls_base);
-        WID(WI_PTR_CONST, memres->tls_offset);
-        WIL(WI_GLOBAL_GET, tls_base_idx);
-        WI(WI_PTR_ADD);
+        WID(memres->token, WI_PTR_CONST, memres->tls_offset);
+        WIL(memres->token, WI_GLOBAL_GET, tls_base_idx);
+        WI(memres->token, WI_PTR_ADD);
 
     } else {
         // :ProperLinking
@@ -2323,10 +2366,10 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
     if (local_offset & LOCAL_IS_WASM) {
         // This is a weird condition but it is relied on in a couple places including
         // passing non-simple structs by value.             -brendanfh 2020/09/18
-        WIL(WI_LOCAL_GET, local_offset);
+        WIL(NULL, WI_LOCAL_GET, local_offset);
 
     } else {
-        WIL(WI_LOCAL_GET, mod->stack_base_idx);
+        WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
 
         *offset_return += local_offset;
     }
@@ -2356,11 +2399,11 @@ EMIT_FUNC(compound_load, Type* type, u64 offset) {
         emit_load_instruction(mod, &code, two.type, offset + two.offset); // two.offset should be 0
     } else {
         u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-        WIL(WI_LOCAL_TEE, tmp_idx);
+        WIL(NULL, WI_LOCAL_TEE, tmp_idx);
 
         fori (i, 0, mem_count) {
             type_linear_member_lookup(type, i, &two);
-            if (i != 0) WIL(WI_LOCAL_GET, tmp_idx);
+            if (i != 0) WIL(NULL, WI_LOCAL_GET, tmp_idx);
             emit_load_instruction(mod, &code, two.type, offset + two.offset);
         }
 
@@ -2377,7 +2420,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     TypeWithOffset two;
 
     u64 loc_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    if (location_first) WIL(WI_LOCAL_SET, loc_idx);
+    if (location_first) WIL(NULL, WI_LOCAL_SET, loc_idx);
 
     i32 elem_count = type_linear_member_count(type);
     u64 *temp_locals = bh_alloc_array(global_scratch_allocator, u64, elem_count);
@@ -2387,17 +2430,17 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
 
         WasmType wt = onyx_type_to_wasm_type(two.type);
         temp_locals[i] = local_raw_allocate(mod->local_alloc, wt);
-        WIL(WI_LOCAL_SET, temp_locals[i]);
+        WIL(NULL, WI_LOCAL_SET, temp_locals[i]);
     }
 
-    if (!location_first) WIL(WI_LOCAL_SET, loc_idx);
+    if (!location_first) WIL(NULL, WI_LOCAL_SET, loc_idx);
 
     fori (i, 0, elem_count) {
         type_linear_member_lookup(type, i, &two);
 
         u64 tmp_idx = temp_locals[i];
-        WIL(WI_LOCAL_GET, loc_idx);
-        WIL(WI_LOCAL_GET, tmp_idx);
+        WIL(NULL, WI_LOCAL_GET, loc_idx);
+        WIL(NULL, WI_LOCAL_GET, tmp_idx);
         emit_store_instruction(mod, &code, two.type, offset + two.offset);
 
         WasmType wt = onyx_type_to_wasm_type(two.type);
@@ -2436,13 +2479,13 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
 
     u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    WIL(WI_LOCAL_SET, rptr_local);
-    WIL(WI_LOCAL_SET, lptr_local);
+    WIL(NULL, WI_LOCAL_SET, rptr_local);
+    WIL(NULL, WI_LOCAL_SET, lptr_local);
 
-    WIL(WI_LOCAL_GET, rptr_local);
-    WID(WI_I32_CONST, 0);
-    WI(WI_I32_NE);
-    emit_enter_structured_block(mod, &code, SBT_Basic_If);
+    WIL(NULL, WI_LOCAL_GET, rptr_local);
+    WID(NULL, WI_I32_CONST, 0);
+    WI(NULL, WI_I32_NE);
+    emit_enter_structured_block(mod, &code, SBT_Basic_If, NULL);
 
     //
     // CLEANUP: Most of these cases could be much shorter if they used existing intrinsics.
@@ -2454,9 +2497,9 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
             if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == lptr_local)
                 bh_arr_last(code).type = WI_LOCAL_TEE;
             else
-                WIL(WI_LOCAL_GET, lptr_local);
+                WIL(NULL, WI_LOCAL_GET, lptr_local);
 
-            WIL(WI_LOCAL_GET, rptr_local);
+            WIL(NULL, WI_LOCAL_GET, rptr_local);
             emit_load_instruction(mod, &code, elem_type, i * elem_size);
 
             emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
@@ -2468,69 +2511,69 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
         if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == lptr_local)
             bh_arr_last(code).type = WI_LOCAL_TEE;
         else
-            WIL(WI_LOCAL_GET, lptr_local);
+            WIL(NULL, WI_LOCAL_GET, lptr_local);
 
         if (offset != 0) {
-            WIL(WI_PTR_CONST, offset);
-            WI(WI_PTR_ADD);
+            WIL(NULL, WI_PTR_CONST, offset);
+            WI(NULL, WI_PTR_ADD);
         }
 
-        WIL(WI_LOCAL_GET, rptr_local);
-        WIL(WI_I32_CONST, elem_count * elem_size);
-        WI(WI_MEMORY_COPY);
+        WIL(NULL, WI_LOCAL_GET, rptr_local);
+        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
+        WI(NULL, WI_MEMORY_COPY);
 
     } else {
         // Emit a loop that copies the memory. This could be switched to a tight loop that just copies word per word.
 
         u64 offset_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-        WIL(WI_PTR_CONST, 0);
-        WIL(WI_LOCAL_SET, offset_local);
+        WIL(NULL, WI_PTR_CONST, 0);
+        WIL(NULL, WI_LOCAL_SET, offset_local);
 
-        WID(WI_BLOCK_START, 0x40);
-        WID(WI_LOOP_START, 0x40);
-            WIL(WI_LOCAL_GET, offset_local);
-            WIL(WI_LOCAL_GET, lptr_local);
-            WI(WI_PTR_ADD);
+        WID(NULL, WI_BLOCK_START, 0x40);
+        WID(NULL, WI_LOOP_START, 0x40);
+            WIL(NULL, WI_LOCAL_GET, offset_local);
+            WIL(NULL, WI_LOCAL_GET, lptr_local);
+            WI(NULL, WI_PTR_ADD);
 
-            WIL(WI_LOCAL_GET, offset_local);
-            WIL(WI_LOCAL_GET, rptr_local);
-            WI(WI_PTR_ADD);
+            WIL(NULL, WI_LOCAL_GET, offset_local);
+            WIL(NULL, WI_LOCAL_GET, rptr_local);
+            WI(NULL, WI_PTR_ADD);
 
             emit_load_instruction(mod, &code, elem_type, 0);
             emit_store_instruction(mod, &code, elem_type, offset);
 
-            WIL(WI_LOCAL_GET, offset_local);
-            WIL(WI_PTR_CONST, elem_size);
-            WI(WI_PTR_ADD);
-            WIL(WI_LOCAL_TEE, offset_local);
+            WIL(NULL, WI_LOCAL_GET, offset_local);
+            WIL(NULL, WI_PTR_CONST, elem_size);
+            WI(NULL, WI_PTR_ADD);
+            WIL(NULL, WI_LOCAL_TEE, offset_local);
 
-            WIL(WI_PTR_CONST, elem_count * elem_size);
-            WI(WI_PTR_GE);
-            WID(WI_COND_JUMP, 0x01);
+            WIL(NULL, WI_PTR_CONST, elem_count * elem_size);
+            WI(NULL, WI_PTR_GE);
+            WID(NULL, WI_COND_JUMP, 0x01);
 
-            WID(WI_JUMP, 0x00);
+            WID(NULL, WI_JUMP, 0x00);
 
-        WI(WI_LOOP_END);
-        WI(WI_BLOCK_END);
+        WI(NULL, WI_LOOP_END);
+        WI(NULL, WI_BLOCK_END);
 
         local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     }
 
-    WI(WI_ELSE);
+    WI(NULL, WI_ELSE);
 
     { // If the source ptr is null (0), then just copy in 0 bytes.
-        WIL(WI_LOCAL_GET, lptr_local);
+        WIL(NULL, WI_LOCAL_GET, lptr_local);
         if (offset != 0) {
-            WIL(WI_PTR_CONST, offset);
-            WI(WI_PTR_ADD);
+            WIL(NULL, WI_PTR_CONST, offset);
+            WI(NULL, WI_PTR_ADD);
         }
 
-        WIL(WI_I32_CONST, 0);
+        WIL(NULL, WI_I32_CONST, 0);
 
-        WIL(WI_I32_CONST, elem_count * elem_size);
+        WIL(NULL, WI_I32_CONST, elem_count * elem_size);
 
         if (context.options->use_post_mvp_features) {
-            WI(WI_MEMORY_FILL);
+            WI(NULL, WI_MEMORY_FILL);
         } else {
             emit_intrinsic_memory_fill(mod, &code);
         }
@@ -2555,14 +2598,14 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     u32 elem_size = type_size_of(al->type->Array.elem);
 
     fori (i, 0, al->type->Array.count) {
-        WIL(WI_LOCAL_GET, mod->stack_base_idx);
+        WIL(al->token, WI_LOCAL_GET, mod->stack_base_idx);
         emit_expression(mod, &code, al->values[i]);
         emit_store_instruction(mod, &code, al->type->Array.elem, local_offset + i * elem_size);
     }
 
-    WIL(WI_LOCAL_GET, mod->stack_base_idx);
-    WIL(WI_PTR_CONST, local_offset);
-    WI(WI_PTR_ADD);
+    WIL(al->token, WI_LOCAL_GET, mod->stack_base_idx);
+    WIL(al->token, WI_PTR_CONST, local_offset);
+    WI(al->token, WI_PTR_ADD);
 
     *pcode = code;
 }
@@ -2587,22 +2630,22 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
 
     emit_expression(mod, &code, if_expr->cond);
 
-    emit_enter_structured_block(mod, &code, SBT_Basic_If);
+    emit_enter_structured_block(mod, &code, SBT_Basic_If, if_expr->token);
         if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
 
         emit_expression(mod, &code, if_expr->true_expr);
 
         if (!result_is_local) emit_store_instruction(mod, &code, if_expr->type, offset);
-        else                  WIL(WI_LOCAL_SET, result_local);
+        else                  WIL(if_expr->token, WI_LOCAL_SET, result_local);
 
     offset = 0;
-    WI(WI_ELSE);
+    WI(if_expr->token, WI_ELSE);
         if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
 
         emit_expression(mod, &code, if_expr->false_expr);
 
         if (!result_is_local) emit_store_instruction(mod, &code, if_expr->type, offset);
-        else                  WIL(WI_LOCAL_SET, result_local);
+        else                  WIL(if_expr->token, WI_LOCAL_SET, result_local);
 
     emit_leave_structured_block(mod, &code);
 
@@ -2612,7 +2655,7 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
         emit_load_instruction(mod, &code, if_expr->type, offset);
 
     } else {
-        WIL(WI_LOCAL_GET, result_local);
+        WIL(if_expr->token, WI_LOCAL_GET, result_local);
     }
 
     local_free(mod->local_alloc, (AstTyped *) if_expr);
@@ -2637,7 +2680,7 @@ EMIT_FUNC(do_block, AstDoBlock* doblock) {
         emit_load_instruction(mod, &code, doblock->type, offset);
 
     } else {
-        WIL(WI_LOCAL_GET, result_local);
+        WIL(doblock->block->token, WI_LOCAL_GET, result_local);
     }
 
     bh_arr_pop(mod->return_location_stack);
@@ -2700,8 +2743,8 @@ EMIT_FUNC(location, AstTyped* expr) {
     u64 offset = 0;
     emit_location_return_offset(mod, &code, expr, &offset);
     if (offset != 0) {
-        WID(WI_PTR_CONST, offset);
-        WI(WI_PTR_ADD);
+        WID(NULL, WI_PTR_CONST, offset);
+        WI(NULL, WI_PTR_ADD);
     }
 
     *pcode = code;
@@ -2715,10 +2758,10 @@ EMIT_FUNC(expression, AstTyped* expr) {
         if (type->flags & Ast_Flag_Expr_Ignored) return;
 
         if (type->type_id != 0) {
-            WID(WI_I32_CONST, ((AstType *) expr)->type_id);
+            WID(NULL, WI_I32_CONST, ((AstType *) expr)->type_id);
         } else {
             Type* t = type_build_from_ast(context.ast_alloc, type);
-            WID(WI_I32_CONST, t->id);
+            WID(NULL, WI_I32_CONST, t->id);
         }
 
 
@@ -2735,18 +2778,18 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 case Param_Pass_By_Value: {
                     if (type_is_structlike_strict(expr->type)) {
                         u32 mem_count = type_structlike_mem_count(expr->type);
-                        fori (idx, 0, mem_count) WIL(WI_LOCAL_GET, localidx + idx);
+                        fori (idx, 0, mem_count) WIL(NULL, WI_LOCAL_GET, localidx + idx);
 
                     } else {
                         assert(localidx & LOCAL_IS_WASM);
-                        WIL(WI_LOCAL_GET, localidx);
+                        WIL(NULL, WI_LOCAL_GET, localidx);
                     }
                     break;
                 }
 
                 case Param_Pass_By_Implicit_Pointer: {
                     assert(localidx & LOCAL_IS_WASM);
-                    WIL(WI_LOCAL_GET, localidx);
+                    WIL(NULL, WI_LOCAL_GET, localidx);
                     emit_load_instruction(mod, &code, expr->type, 0);
                     break;
                 }
@@ -2764,7 +2807,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == tmp) {
                     bh_arr_last(code).type = WI_LOCAL_TEE;
                 } else {
-                    WIL(WI_LOCAL_GET, tmp);
+                    WIL(NULL, WI_LOCAL_GET, tmp);
                 }
 
             } else {
@@ -2774,8 +2817,8 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 if (expr->type->kind != Type_Kind_Array) {
                     emit_load_instruction(mod, &code, expr->type, offset);
                 } else if (offset != 0) {
-                    WID(WI_PTR_CONST, offset);
-                    WI(WI_PTR_ADD);
+                    WID(NULL, WI_PTR_CONST, offset);
+                    WI(NULL, WI_PTR_ADD);
                 }
             }
 
@@ -2785,7 +2828,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Global: {
             i32 globalidx = (i32) bh_imap_get(&mod->index_map, (u64) expr);
 
-            WID(WI_GLOBAL_GET, globalidx);
+            WID(NULL, WI_GLOBAL_GET, globalidx);
             break;
         }
 
@@ -2819,7 +2862,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             emit_data_relocation(mod, &code, strlit->data_id);
 
             if (strlit->is_cstr == 0)
-                WID(WI_I32_CONST, strlit->length);
+                WID(NULL, WI_I32_CONST, strlit->length);
             break;
         }
 
@@ -2842,7 +2885,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Function: {
             i32 elemidx = get_element_idx(mod, (AstFunction *) expr);
 
-            WID(WI_I32_CONST, elemidx);
+            WID(NULL, WI_I32_CONST, elemidx);
             break;
         }
 
@@ -2893,7 +2936,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 if (type_get_param_pass(field->expr->type) == Param_Pass_By_Value && !type_is_pointer(field->expr->type)) {
                     u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
                     assert(localidx & LOCAL_IS_WASM);
-                    WIL(WI_LOCAL_GET, localidx);
+                    WIL(NULL, WI_LOCAL_GET, localidx);
                     break;
                 }
             }
@@ -2912,13 +2955,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                 if (idx == 0) {
                     // Easy case: the member is the first one and all other members just have to be dropped.
-                    fori (i, 0, total_linear_members - field_linear_members) WI(WI_DROP);
+                    fori (i, 0, total_linear_members - field_linear_members) WI(NULL, WI_DROP);
 
                 } else {
                     // Tough case: Stack shuffling to make the member the only thing on the stack.
                     // This is very similar to the compound_load/compound_store procedures but it is different enough
                     // that I cannot find a good way to factor them all without just introducing a ton of complexity.
-                    fori (i, 0, total_linear_members - idx - field_linear_members) WI(WI_DROP);
+                    fori (i, 0, total_linear_members - idx - field_linear_members) WI(NULL, WI_DROP);
 
                     u64 *temporaries = bh_alloc_array(global_scratch_allocator, u64, field_linear_members);
                     fori (i, 0, field_linear_members) temporaries[i] = 0;
@@ -2929,15 +2972,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
                         WasmType wt = onyx_type_to_wasm_type(two.type);
                         temporaries[i] = local_raw_allocate(mod->local_alloc, wt);
-                        WIL(WI_LOCAL_SET, temporaries[i]);
+                        WIL(NULL, WI_LOCAL_SET, temporaries[i]);
                     }
 
-                    fori (i, 0, idx) WI(WI_DROP);
+                    fori (i, 0, idx) WI(NULL, WI_DROP);
 
                     fori (i, 0, field_linear_members) {
                         type_linear_member_lookup(field->type, i, &two);
 
-                        WIL(WI_LOCAL_GET, temporaries[i]);
+                        WIL(NULL, WI_LOCAL_GET, temporaries[i]);
 
                         WasmType wt = onyx_type_to_wasm_type(two.type);
                         local_raw_free(mod->local_alloc, wt);
@@ -2958,18 +3001,18 @@ EMIT_FUNC(expression, AstTyped* expr) {
             u64 lo_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
             u64 hi_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
 
-            WI(WI_DROP);
-            WIL(WI_LOCAL_SET, hi_local);
-            WIL(WI_LOCAL_TEE, lo_local);
+            WI(NULL, WI_DROP);
+            WIL(NULL, WI_LOCAL_SET, hi_local);
+            WIL(NULL, WI_LOCAL_TEE, lo_local);
             if (sl->elem_size != 1) {
-                WID(WI_I32_CONST, sl->elem_size);
-                WI(WI_I32_MUL);
+                WID(NULL, WI_I32_CONST, sl->elem_size);
+                WI(NULL, WI_I32_MUL);
             }
             emit_expression(mod, &code, sl->addr);
-            WI(WI_I32_ADD);
-            WIL(WI_LOCAL_GET, hi_local);
-            WIL(WI_LOCAL_GET, lo_local);
-            WI(WI_I32_SUB);
+            WI(NULL, WI_I32_ADD);
+            WIL(NULL, WI_LOCAL_GET, hi_local);
+            WIL(NULL, WI_LOCAL_GET, lo_local);
+            WI(NULL, WI_I32_SUB);
 
             local_raw_free(mod->local_alloc, lo_local);
             local_raw_free(mod->local_alloc, hi_local);
@@ -2978,13 +3021,13 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Size_Of: {
             AstSizeOf* so = (AstSizeOf *) expr;
-            WID(WI_I32_CONST, so->size);
+            WID(NULL, WI_I32_CONST, so->size);
             break;
         }
 
         case Ast_Kind_Align_Of: {
             AstAlignOf* ao = (AstAlignOf *) expr;
-            WID(WI_I32_CONST, ao->alignment);
+            WID(NULL, WI_I32_CONST, ao->alignment);
             break;
         }
 
@@ -2994,8 +3037,8 @@ EMIT_FUNC(expression, AstTyped* expr) {
             assert(num->kind == Ast_Kind_NumLit);
 
             WasmType backing_type = onyx_type_to_wasm_type(ev->type);
-            if      (backing_type == WASM_TYPE_INT32) WID(WI_I32_CONST, num->value.i);
-            else if (backing_type == WASM_TYPE_INT64) WID(WI_I64_CONST, num->value.l);
+            if      (backing_type == WASM_TYPE_INT32) WID(NULL, WI_I32_CONST, num->value.i);
+            else if (backing_type == WASM_TYPE_INT64) WID(NULL, WI_I64_CONST, num->value.l);
             else onyx_report_error(ev->token->pos, Error_Critical, "Invalid backing type for enum.");
             break;
         }
@@ -3015,7 +3058,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
             // :ProperLinking
             emit_data_relocation(mod, &code, fc->data_id);
-            WID(WI_I32_CONST, fc->size);
+            WID(NULL, WI_I32_CONST, fc->size);
             break;
         }
 
@@ -3059,7 +3102,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
         case Ast_Kind_Foreign_Block: {
             AstForeignBlock *fb = (AstForeignBlock *) expr;
-            WID(WI_I32_CONST, fb->foreign_block_number);
+            WID(NULL, WI_I32_CONST, fb->foreign_block_number);
             break;
         }
 
@@ -3079,7 +3122,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
     if ((expr->flags & Ast_Flag_Expr_Ignored) != 0 && !type_results_in_void(expr->type)) {
         i32 mem_count = 1;
         if (type_is_compound(expr->type)) mem_count = type_linear_member_count(expr->type);
-        fori (i, 0, mem_count) WI(WI_DROP);
+        fori (i, 0, mem_count) WI(NULL, WI_DROP);
     }
 
     *pcode = code;
@@ -3117,21 +3160,21 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
     }
 
     if (to->kind == Type_Kind_Basic && to->Basic.kind == Basic_Kind_Void) {
-        WI(WI_DROP);
+        WI(NULL, WI_DROP);
         *pcode = code;
         return;
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_Array) {
-        WID(WI_I32_CONST, from->Array.count);
+        WID(NULL, WI_I32_CONST, from->Array.count);
         *pcode = code;
         return;
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_DynArray) {
-        WI(WI_DROP);
-        WI(WI_DROP);
-        WI(WI_DROP);
+        WI(NULL, WI_DROP);
+        WI(NULL, WI_DROP);
+        WI(NULL, WI_DROP);
         *pcode = code;
         return;
     }
@@ -3198,7 +3241,7 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
         assert(cast_op != WI_UNREACHABLE);
 
         if (cast_op != WI_NOP) {
-            WI(cast_op);
+            WI(NULL, cast_op);
         }
     }
 
@@ -3221,12 +3264,12 @@ EMIT_FUNC(return, AstReturn* ret) {
             emit_expression(mod, &code, ret->expr);
 
             if (!dest_is_local) emit_store_instruction(mod, &code, dest->type, offset);
-            else                WIL(WI_LOCAL_SET, dest_loc);
+            else                WIL(NULL, WI_LOCAL_SET, dest_loc);
 
         } else if (mod->curr_cc == CC_Return_Stack) {
-            WIL(WI_LOCAL_GET, mod->stack_base_idx);
-            WID(WI_I32_CONST, type_size_of(ret->expr->type));
-            WI(WI_I32_SUB);
+            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
+            WID(NULL, WI_I32_CONST, type_size_of(ret->expr->type));
+            WI(NULL, WI_I32_SUB);
 
             emit_expression(mod, &code, ret->expr);
             emit_store_instruction(mod, &code, ret->expr->type, 0);
@@ -3241,7 +3284,7 @@ EMIT_FUNC(return, AstReturn* ret) {
 
     i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, 1);
     if (jump_label >= 0) {
-        WIL(WI_JUMP, jump_label);
+        WIL(NULL, WI_JUMP, jump_label);
 
     } else {
         // Clear the rest of the deferred statements
@@ -3255,10 +3298,10 @@ EMIT_FUNC(return, AstReturn* ret) {
 
         // Make a patch for the two instructions needed to restore the stack pointer
         SUBMIT_PATCH(mod->stack_leave_patches, 0);
-        WI(WI_NOP);
-        WI(WI_NOP);
+        WI(NULL, WI_NOP);
+        WI(NULL, WI_NOP);
 
-        WI(WI_RETURN);
+        WI(NULL, WI_RETURN);
     }
 
     *pcode = code;
@@ -3293,13 +3336,13 @@ EMIT_FUNC(zero_value, WasmType wt) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (wt) {
-        case WASM_TYPE_INT32:   WIL(WI_I32_CONST, 0); break;
-        case WASM_TYPE_INT64:   WIL(WI_I64_CONST, 0); break;
-        case WASM_TYPE_FLOAT32: WIL(WI_F32_CONST, 0); break;
-        case WASM_TYPE_FLOAT64: WIL(WI_F64_CONST, 0); break;
+        case WASM_TYPE_INT32:   WIL(NULL, WI_I32_CONST, 0); break;
+        case WASM_TYPE_INT64:   WIL(NULL, WI_I64_CONST, 0); break;
+        case WASM_TYPE_FLOAT32: WIL(NULL, WI_F32_CONST, 0); break;
+        case WASM_TYPE_FLOAT64: WIL(NULL, WI_F64_CONST, 0); break;
         case WASM_TYPE_VAR128:  {
             static u8 zero_v128[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-            WIP(WI_V128_CONST, &zero_v128);
+            WIP(NULL, WI_V128_CONST, &zero_v128);
             break;
         }
     }
@@ -3320,7 +3363,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
         }
     }
     else if (type->kind == Type_Kind_Function) {
-        WID(WI_I32_CONST, mod->null_proc_func_idx);
+        WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
     }
     else {
         WasmType wt = onyx_type_to_wasm_type(type);

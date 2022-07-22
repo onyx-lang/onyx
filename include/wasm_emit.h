@@ -749,6 +749,11 @@ typedef struct OnyxWasmModule {
     i32 null_proc_func_idx;
 
     b32 has_stack_locals : 1;
+
+#ifdef ENABLE_DEBUG_INFO
+    struct DebugContext *debug_context;
+#endif
+
 } OnyxWasmModule;
 
 typedef struct OnyxWasmLinkOptions {
@@ -782,6 +787,37 @@ void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file);
 
 #ifdef ENABLE_RUN_WITH_WASMER
 b32 onyx_run_wasm(bh_buffer code_buffer, int argc, char *argv[]);
+#endif
+
+#ifdef ENABLE_DEBUG_INFO
+
+typedef struct DebugLocation {
+    u32 file_id;
+    u32 line;
+    u32 repeat;
+} DebugLocation;
+
+typedef struct DebugFuncContext {
+    u32 func_index;
+    bh_arr_each(DebugLocation) locations;
+} DebugFuncContext;
+
+typedef struct DebugContext {
+    bh_allocator allocator;
+
+    // file_names[file_ids["file"]] == "file"
+    // file_ids[file_name[123]] == 123
+    Table(u32)          file_ids;
+    bh_arr_each(char *) file_names;
+
+    bh_arr_each(DebugFuncContext *) 
+
+    // Used during building the debug info
+    OnyxToken *last_token;
+    DebugFucnContext *current_func;
+    
+} DebugContext;
+
 #endif
 
 #endif

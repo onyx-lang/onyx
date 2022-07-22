@@ -19,41 +19,41 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_copy) {
     u64 source_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 dest_local   = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     
-    WIL(WI_LOCAL_SET, count_local);
-    WIL(WI_LOCAL_SET, source_local);
-    WIL(WI_LOCAL_SET, dest_local);
+    WIL(NULL, WI_LOCAL_SET, count_local);
+    WIL(NULL, WI_LOCAL_SET, source_local);
+    WIL(NULL, WI_LOCAL_SET, dest_local);
     
     // count is greater than 0
-    WIL(WI_LOCAL_GET, count_local);
-    WID(WI_I32_CONST, 0);
-    WI(WI_I32_GT_S);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WID(NULL, WI_I32_CONST, 0);
+    WI(NULL, WI_I32_GT_S);
     
-    WID(WI_IF_START, 0x40);
-    WID(WI_LOOP_START, 0x40);
+    WID(NULL, WI_IF_START, 0x40);
+    WID(NULL, WI_LOOP_START, 0x40);
     
-    WIL(WI_LOCAL_GET, count_local);
-    WID(WI_I32_CONST, 1);
-    WI(WI_I32_SUB);
-    WIL(WI_LOCAL_SET, count_local);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WID(NULL, WI_I32_CONST, 1);
+    WI(NULL, WI_I32_SUB);
+    WIL(NULL, WI_LOCAL_SET, count_local);
     
-    WIL(WI_LOCAL_GET, dest_local);
-    WIL(WI_LOCAL_GET, count_local);
-    WI(WI_PTR_ADD);
+    WIL(NULL, WI_LOCAL_GET, dest_local);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WI(NULL, WI_PTR_ADD);
     
-    WIL(WI_LOCAL_GET, source_local);
-    WIL(WI_LOCAL_GET, count_local);
-    WI(WI_PTR_ADD);
+    WIL(NULL, WI_LOCAL_GET, source_local);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WI(NULL, WI_PTR_ADD);
     
-    WID(WI_I32_LOAD_8_U, ((WasmInstructionData) { 0, 0 }));
-    WID(WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
+    WID(NULL, WI_I32_LOAD_8_U, ((WasmInstructionData) { 0, 0 }));
+    WID(NULL, WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
     
-    WIL(WI_LOCAL_GET, count_local);
-    WID(WI_I32_CONST, 0);
-    WI(WI_I32_GT_S);
-    WID(WI_COND_JUMP, 0x00);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WID(NULL, WI_I32_CONST, 0);
+    WI(NULL, WI_I32_GT_S);
+    WID(NULL, WI_COND_JUMP, 0x00);
     
-    WI(WI_LOOP_END);
-    WI(WI_IF_END);
+    WI(NULL, WI_LOOP_END);
+    WI(NULL, WI_IF_END);
     
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -74,37 +74,37 @@ EMIT_FUNC_NO_ARGS(intrinsic_memory_fill) {
     u64 byte_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
     u64 dest_local  = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     
-    WIL(WI_LOCAL_SET, count_local);
-    WIL(WI_LOCAL_SET, byte_local);
-    WIL(WI_LOCAL_SET, dest_local);
+    WIL(NULL, WI_LOCAL_SET, count_local);
+    WIL(NULL, WI_LOCAL_SET, byte_local);
+    WIL(NULL, WI_LOCAL_SET, dest_local);
     
     // count is greater than 0
-    WIL(WI_LOCAL_GET, count_local);
-    WID(WI_I32_CONST, 0);
-    WI(WI_I32_GT_S);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WID(NULL, WI_I32_CONST, 0);
+    WI(NULL, WI_I32_GT_S);
     
-    WID(WI_IF_START, 0x40);
-    WID(WI_LOOP_START, 0x40);
+    WID(NULL, WI_IF_START, 0x40);
+    WID(NULL, WI_LOOP_START, 0x40);
     
-    WIL(WI_LOCAL_GET, count_local);
-    WID(WI_I32_CONST, 1);
-    WI(WI_I32_SUB);
-    WIL(WI_LOCAL_SET, count_local);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WID(NULL, WI_I32_CONST, 1);
+    WI(NULL, WI_I32_SUB);
+    WIL(NULL, WI_LOCAL_SET, count_local);
     
-    WIL(WI_LOCAL_GET, dest_local);
-    WIL(WI_LOCAL_GET, count_local);
-    WI(WI_PTR_ADD);
+    WIL(NULL, WI_LOCAL_GET, dest_local);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WI(NULL, WI_PTR_ADD);
     
-    WIL(WI_LOCAL_GET, byte_local);
-    WID(WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
+    WIL(NULL, WI_LOCAL_GET, byte_local);
+    WID(NULL, WI_I32_STORE_8, ((WasmInstructionData) { 0, 0 }));
     
-    WIL(WI_LOCAL_GET, count_local);
-    WID(WI_I32_CONST, 0);
-    WI(WI_I32_GT_S);
-    WID(WI_COND_JUMP, 0x00);
+    WIL(NULL, WI_LOCAL_GET, count_local);
+    WID(NULL, WI_I32_CONST, 0);
+    WI(NULL, WI_I32_GT_S);
+    WID(NULL, WI_COND_JUMP, 0x00);
     
-    WI(WI_LOOP_END);
-    WI(WI_IF_END);
+    WI(NULL, WI_LOOP_END);
+    WI(NULL, WI_IF_END);
     
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
@@ -127,13 +127,13 @@ EMIT_FUNC(initialize_type, Type* type, OnyxToken* where) {
 
         case Type_Kind_Struct: {
             u64 value_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-            WIL(WI_LOCAL_SET, value_ptr);
+            WIL(NULL, WI_LOCAL_SET, value_ptr);
 
             bh_arr_each(StructMember *, psmem, type->Struct.memarr) {
                 StructMember* smem = *psmem;
                 if (smem->initial_value == NULL || *smem->initial_value == NULL) continue;
 
-                WIL(WI_LOCAL_GET, value_ptr);
+                WIL(NULL, WI_LOCAL_GET, value_ptr);
                 emit_expression(mod, &code, *smem->initial_value);
                 emit_store_instruction(mod, &code, smem->type, smem->offset);
             }
@@ -159,10 +159,10 @@ EMIT_FUNC(intrinsic_atomic_wait, Type* type, OnyxToken* where) {
 
     switch (type->Basic.kind) {
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_WAIT32, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_WAIT32, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_WAIT64, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_WAIT64, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -176,13 +176,13 @@ bad_type:
 
 EMIT_FUNC_NO_ARGS(intrinsic_atomic_notify) {
     bh_arr(WasmInstruction) code = *pcode;
-    WID(WI_ATOMIC_NOTIFY, ((WasmInstructionData) { 2, 0 }));
+    WID(NULL, WI_ATOMIC_NOTIFY, ((WasmInstructionData) { 2, 0 }));
     *pcode = code;
 }
 
 EMIT_FUNC_NO_ARGS(intrinsic_atomic_fence) {
     bh_arr(WasmInstruction) code = *pcode;
-    WI(WI_ATOMIC_FENCE);
+    WI(NULL, WI_ATOMIC_FENCE);
     *pcode = code;
 }
 
@@ -192,14 +192,14 @@ EMIT_FUNC(intrinsic_atomic_load, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_LOAD8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_LOAD16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_LOAD8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_LOAD16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_LOAD, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_LOAD, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_LOAD, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_LOAD, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -217,14 +217,14 @@ EMIT_FUNC(intrinsic_atomic_store, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_STORE8, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_STORE16, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_STORE8, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_STORE16, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_STORE, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_STORE, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_STORE, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_STORE, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -242,14 +242,14 @@ EMIT_FUNC(intrinsic_atomic_add, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_ADD8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_ADD16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_ADD8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_ADD16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_ADD, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_ADD, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_ADD, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_ADD, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -267,14 +267,14 @@ EMIT_FUNC(intrinsic_atomic_sub, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_SUB8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_SUB16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_SUB8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_SUB16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_SUB, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_SUB, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_SUB, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_SUB, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -292,14 +292,14 @@ EMIT_FUNC(intrinsic_atomic_and, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_AND8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_AND16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_AND8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_AND16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_AND, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_AND, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_AND, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_AND, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -317,14 +317,14 @@ EMIT_FUNC(intrinsic_atomic_or, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_OR8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_OR16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_OR8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_OR16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_OR, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_OR, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_OR, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_OR, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -342,14 +342,14 @@ EMIT_FUNC(intrinsic_atomic_xor, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_XOR8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_XOR16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_XOR8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_XOR16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_XOR, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_XOR, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_XOR, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_XOR, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -367,14 +367,14 @@ EMIT_FUNC(intrinsic_atomic_xchg, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_XCHG8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_XCHG16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_XCHG8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_XCHG16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_XCHG, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_XCHG, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_XCHG, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_XCHG, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -392,14 +392,14 @@ EMIT_FUNC(intrinsic_atomic_cmpxchg, Type* type, OnyxToken* where) {
     bh_arr(WasmInstruction) code = *pcode;
 
     switch (type->Basic.kind) {
-        case Basic_Kind_U8:  WID(WI_ATOMIC_I32_CMPXCHG8_U, ((WasmInstructionData) { 0, 0 })); break;
-        case Basic_Kind_U16: WID(WI_ATOMIC_I32_CMPXCHG16_U, ((WasmInstructionData) { 1, 0 })); break;
+        case Basic_Kind_U8:  WID(NULL, WI_ATOMIC_I32_CMPXCHG8_U, ((WasmInstructionData) { 0, 0 })); break;
+        case Basic_Kind_U16: WID(NULL, WI_ATOMIC_I32_CMPXCHG16_U, ((WasmInstructionData) { 1, 0 })); break;
 
         case Basic_Kind_I32:
-        case Basic_Kind_U32: WID(WI_ATOMIC_I32_CMPXCHG, ((WasmInstructionData) { 2, 0 })); break;
+        case Basic_Kind_U32: WID(NULL, WI_ATOMIC_I32_CMPXCHG, ((WasmInstructionData) { 2, 0 })); break;
 
         case Basic_Kind_I64:
-        case Basic_Kind_U64: WID(WI_ATOMIC_I64_CMPXCHG, ((WasmInstructionData) { 3, 0 })); break;
+        case Basic_Kind_U64: WID(NULL, WI_ATOMIC_I64_CMPXCHG, ((WasmInstructionData) { 3, 0 })); break;
 
         default: goto bad_type;
     }
@@ -429,9 +429,9 @@ EMIT_FUNC_NO_ARGS(initialize_data_segments_body) {
         if (datum->data == NULL) { index++; continue; }
 
         emit_data_relocation(mod, &code, datum->id);
-        WID(WI_PTR_CONST,   0);
-        WID(WI_I32_CONST,   datum->length);
-        WID(WI_MEMORY_INIT, ((WasmInstructionData) { index, 0 }));
+        WID(NULL, WI_PTR_CONST,   0);
+        WID(NULL, WI_I32_CONST,   datum->length);
+        WID(NULL, WI_MEMORY_INIT, ((WasmInstructionData) { index, 0 }));
 
         index += 1;
     }

@@ -659,7 +659,9 @@ static void link_wasm_module() {
     assert(unify_node_and_type(&link_options_node, link_options_type) == TYPE_MATCH_SUCCESS);
 
     OnyxWasmLinkOptions link_opts;
-    onyx_wasm_build_link_options_from_node(&link_opts, link_options_node);
+    // CLEANUP: Properly handle this case.
+    assert(onyx_wasm_build_link_options_from_node(&link_opts, link_options_node));
+
     onyx_wasm_module_link(context.wasm_module, &link_opts);
 }
 

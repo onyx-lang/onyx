@@ -31,6 +31,9 @@ WASMER_LIBRARY_DIR="$(pwd)/lib/linux_$ARCH/lib"
 # Where the intermediate build files go.
 BUILD_DIR='./build'
 
+# Temporary flag
+ENABLE_DEBUG_INFO=0
+
 
 
 
@@ -58,6 +61,10 @@ fi
 
 if [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
     FLAGS="$FLAGS -DUSE_OVM_DEBUGGER"
+fi
+
+if [ "$ENABLE_DEBUG_INFO" = "1" ]; then
+    FLAGS="$FLAGS -DENABLE_DEBUG_INFO"
 fi
 
 
