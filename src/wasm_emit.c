@@ -219,25 +219,145 @@ static inline b32 should_emit_function(AstFunction* fd) {
 
 #ifdef ENABLE_DEBUG_INFO
 
+static u32 debug_get_file_id(OnyxWasmModule *mod, const char *name) {
+    assert(mod && mod->debug_context);
+
+    i32 index = shgeti(mod->debug_context->file_ids, name);
+    if (index == -1) {
+        u32 id = mod->debug_context->next_file_id++;
+        shput(mod->debug_context->file_ids, name, id);
+
+        return id;
+    }
+
+    return mod->debug_context->file_ids[index].value;
+}
+
 static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
+    i32 file_id = debug_get_file_id(mod, token->pos.filename);
+
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_SET);
+    mod->debug_context->last_op_was_rep = 0;
+
+    u32 leb_len=0;
+    u8 *bytes = uint_to_uleb128(file_id, &leb_len);
+    bh_buffer_append(&mod->debug_context->op_buffer, bytes, leb_len);
+
+    bytes = uint_to_uleb128(token->pos.line, &leb_len);
+    bh_buffer_append(&mod->debug_context->op_buffer, bytes, leb_len);
+
     mod->debug_context->last_token = token;
 }
 
 // Called for every instruction being emitted
+// This has to emit either:
+//    - INC
+//    - DEC
+//    - REP
+//    - SET, REP 0
 static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
     DebugContext *ctx = mod->debug_context; 
-    assert(ctx);
+    assert(ctx && ctx->last_token);
 
-    DebugFuncContext *func_ctx = ctx->current_func;
-    assert(func_ctx);
-
-    if ()
-
-    if (shgeti(ctx->file_ids, ctx->last_token->pos.filename) == -1) {
-        // File name has not been seen before, allocate a slot for it.
-
+    // Sanity check
+    if (ctx->last_op_was_rep) {
+        assert((ctx->op_buffer.data[ctx->op_buffer.length - 1] & DOT_REP) == DOT_REP);
     }
+    i32 file_id, old_file_id;
+
+    b32 repeat_previous = 0;
+    if (!token || !token->pos.filename) {
+        repeat_previous = 1;
+
+    } else {
+        file_id = debug_get_file_id(mod, token->pos.filename);
+        old_file_id = debug_get_file_id(mod, ctx->last_token->pos.filename);
+        if (old_file_id == file_id && token->pos.line == ctx->last_token->pos.line) {
+            repeat_previous = 1;
+        }
+    }
+    
+    if (repeat_previous) {
+        // Output / increment REP instruction
+        if (ctx->last_op_was_rep) {
+            u8 rep_count = ctx->op_buffer.data[ctx->op_buffer.length - 1] & 0b00111111;
+            if (rep_count != 63) {
+                rep_count += 1;
+                ctx->op_buffer.data[ctx->op_buffer.length - 1] = DOT_REP | rep_count;
+                return;
+            }
+        }
+
+        bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_REP);
+        ctx->last_op_was_rep = 1;
+        return;
+    }
+
+    // At this point, token is definitely non-null.
+    ctx->last_op_was_rep = 0;
+
+    if (old_file_id == file_id) {
+        // We see if we can INC/DEC to get to the line number
+        if (ctx->last_token->pos.line < token->pos.line) {
+            u32 diff = token->pos.line - ctx->last_token->pos.line;
+            if (diff <= 64) {
+                bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_INC | (diff - 1));
+                goto done;
+            }
+        }
+
+        if (ctx->last_token->pos.line > token->pos.line) {
+            u32 diff = ctx->last_token->pos.line - token->pos.line;
+            if (diff <= 64) {
+                bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_DEC | (diff - 1));
+                goto done;
+            }
+        }
+    }
+
+    // Otherwise, we need to output a SET, followed by a REP 0,
+    // which is what set_position does.
+    debug_set_position(mod, token);
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_REP);
+    ctx->last_op_was_rep = 1;
+
+  done:
+    ctx->last_token = token;
 }
+
+static void debug_begin_function(OnyxWasmModule *mod, u32 func_idx, OnyxToken *token, char *name) {
+    u32 file_id = debug_get_file_id(mod, token->pos.filename);
+    u32 line    = token->pos.line;
+
+    assert(mod->debug_context);
+
+    DebugFuncContext func;
+    func.func_index = func_idx;
+    func.file_id = file_id;
+    func.line    = line;
+    func.op_offset = mod->debug_context->op_buffer.length;
+    func.stack_ptr_idx = 0;
+    func.name_length = strlen(name);
+    func.name = name;
+    bh_arr_push(mod->debug_context->funcs, func);
+
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_PUSHF);
+    debug_set_position(mod, token);
+}
+
+static void debug_end_function(OnyxWasmModule *mod) {
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_POPF);
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_END);
+    mod->debug_context->last_op_was_rep = 0;
+}
+
+#else
+
+#define debug_get_file_id(mod, name) (void)0
+#define debug_set_position(mod, token) (void)0
+#define debug_emit_instruction(mod, token) (void)0
+#define debug_begin_function(mod, idx, token, name) (void)0
+#define debug_end_function(mod) (void)0
 
 #endif
 
@@ -487,7 +607,7 @@ EMIT_FUNC(statement, AstNode* stmt) {
     bh_arr(WasmInstruction) code = *pcode;
 
 #ifdef ENABLE_DEBUG_INFO
-    debug_set_position(stmt->token);
+    debug_set_position(mod, stmt->token);
 #endif
 
     switch (stmt->kind) {
@@ -889,19 +1009,19 @@ EMIT_FUNC(while, AstIfWhile* while_node) {
 
         if (!while_node->bottom_test) {
             emit_expression(mod, &code, while_node->cond);
-            WI(while_cond->token, WI_I32_EQZ);
-            WID(while_cond->token, WI_COND_JUMP, 0x01);
+            WI(NULL, WI_I32_EQZ);
+            WID(NULL, WI_COND_JUMP, 0x01);
         }
 
         emit_block(mod, &code, while_node->true_stmt, 0);
 
         if (while_node->bottom_test) {
             emit_expression(mod, &code, while_node->cond);
-            WID(while_node->cond, WI_COND_JUMP, 0x00);
+            WID(while_node->cond->token, WI_COND_JUMP, 0x00);
 
         } else {
             if (bh_arr_last(code).type != WI_JUMP)
-                WID(while_node->cond, WI_JUMP, 0x00);
+                WID(while_node->cond->token, WI_JUMP, 0x00);
         }
 
         emit_leave_structured_block(mod, &code);
@@ -1452,14 +1572,14 @@ EMIT_FUNC(remove_directive, AstDirectiveRemove* remove) {
 
     ForRemoveInfo remove_info = bh_arr_last(mod->for_remove_info);
 
-    WIL(remote->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
-    WIL(remote->token, WI_I32_CONST, mod->null_proc_func_idx);
-    WI(remote->token, WI_I32_NE);
-    WID(remote->token, WI_IF_START, 0x40);
-    WIL(remote->token, WI_LOCAL_GET, remove_info.iterator_data_ptr);
-    WIL(remote->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
-    WIL(remote->token, WI_CALL_INDIRECT, remove_info.remove_func_type_idx);
-    WI(remote->token, WI_IF_END);
+    WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
+    WIL(remove->token, WI_I32_CONST, mod->null_proc_func_idx);
+    WI(remove->token, WI_I32_NE);
+    WID(remove->token, WI_IF_START, 0x40);
+    WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_data_ptr);
+    WIL(remove->token, WI_LOCAL_GET, remove_info.iterator_remove_func);
+    WIL(remove->token, WI_CALL_INDIRECT, remove_info.remove_func_type_idx);
+    WI(remove->token, WI_IF_END);
 
     *pcode = code;
 }
@@ -3459,7 +3579,6 @@ static i32 get_element_idx(OnyxWasmModule* mod, AstFunction* func) {
     }
 }
 
-
 static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     if (!should_emit_function(fd)) return;
 
@@ -3474,19 +3593,31 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) fd);
     mod->current_func_idx = func_idx;
 
+    debug_begin_function(mod, func_idx, fd->token, get_function_name(fd));
+
     if (fd == builtin_initialize_data_segments && context.options->use_post_mvp_features) {
         emit_initialize_data_segments_body(mod, &wasm_func.code);
+
+        debug_emit_instruction(mod, NULL);
         bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+
         bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
         mod->current_func_idx = -1;
+
+        debug_end_function(mod);
         return;
     }
 
     if (fd == builtin_run_init_procedures) {
         emit_run_init_procedures(mod, &wasm_func.code);
+
+        debug_emit_instruction(mod, NULL);
         bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
+
         bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
         mod->current_func_idx = -1;
+
+        debug_end_function(mod);
         return;
     }
 
@@ -3525,6 +3656,8 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         bh_arr_insert_end(wasm_func.code, 5);
         fori (i, 0, 5) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
 
+        // TODO: Emit debug info for the above instructions
+
         mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
 
         // Generate code
@@ -3535,6 +3668,9 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
             // Place all stack leaves in patch locations. These will (probably) all be
             // right before a "return" instruction.
+            debug_emit_instruction(mod, NULL);
+            debug_emit_instruction(mod, NULL);
+
             u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_LOCAL_GET,  { .l = mod->stack_base_idx } }));
             bh_arr_push(wasm_func.code, ((WasmInstruction) { WI_GLOBAL_SET, { .l = stack_top_idx } }));
@@ -3548,12 +3684,16 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     WasmFuncType* ft = mod->types[type_idx];
     emit_zero_value(mod, &wasm_func.code, ft->return_type);
+
+    debug_emit_instruction(mod, NULL);
     bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
 
     bh_imap_clear(&mod->local_map);
 
     bh_arr_set_at(mod->funcs, func_idx - mod->foreign_function_count, wasm_func);
     mod->current_func_idx = -1;
+
+    debug_end_function(mod);
 }
 
 static void emit_foreign_function(OnyxWasmModule* mod, AstFunction* fd) {
@@ -4049,6 +4189,18 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     bh_arr_new(global_heap_allocator, module.foreign_blocks, 4);
     bh_arr_new(global_heap_allocator, module.procedures_with_tags, 4);
     bh_arr_new(global_heap_allocator, module.data_patches, 4);
+
+#ifdef ENABLE_DEBUG_INFO
+    module.debug_context = bh_alloc_item(context.ast_alloc, DebugContext);
+    module.debug_context->allocator = global_heap_allocator;
+    module.debug_context->next_file_id = 0;
+    module.debug_context->last_token = NULL;
+
+    sh_new_arena(module.debug_context->file_ids);
+    bh_arr_new(global_heap_allocator, module.debug_context->funcs, 16);
+
+    bh_buffer_init(&module.debug_context->op_buffer, global_heap_allocator, 1024);
+#endif
 
     return module;
 }

@@ -509,6 +509,7 @@ typedef struct bh_buffer {
 
 void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 length);
 void bh_buffer_free(bh_buffer* buffer);
+void bh_buffer_clear(bh_buffer* buffer);
 void bh_buffer_grow(bh_buffer* buffer, i32 length);
 void bh_buffer_append(bh_buffer* buffer, const void * data, i32 length);
 void bh_buffer_concat(bh_buffer* buffer, bh_buffer other);
@@ -2151,6 +2152,10 @@ void bh_buffer_free(bh_buffer* buffer) {
     bh_free(buffer->allocator, buffer->data);
     buffer->length = 0;
     buffer->capacity = 0;
+}
+
+void bh_buffer_clear(bh_buffer* buffer) {
+    buffer->length = 0;
 }
 
 void bh_buffer_grow(bh_buffer* buffer, i32 length) {

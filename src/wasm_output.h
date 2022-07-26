@@ -25,6 +25,20 @@ static const u8 ONYX_MAGIC_STRING[] = "ONYX";
 static const u8 WASM_MAGIC_STRING[] = { 0x00, 0x61, 0x73, 0x6D };
 static const u8 WASM_VERSION[] = { 0x01, 0x00, 0x00, 0x00 };
 
+static inline i32 output_unsigned_integer(u64 i, bh_buffer *buff) {
+    i32 leb_len;
+    u8* leb = uint_to_uleb128(i, &leb_len);
+    bh_buffer_append(buff, leb, leb_len);
+    return leb_len;
+}
+
+static inline i32 output_custom_section_name(char *name, bh_buffer *buff) {
+    u32 len = strlen(name);
+    i32 len_len = output_unsigned_integer(len, buff);
+    bh_buffer_append(buff, name, len);
+    return len_len + len;
+}
+
 static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer* buff);
 
 static i32 output_vector(void** arr, i32 stride, i32 arrlen, vector_func elem, bh_buffer* vec_buff) {
@@ -414,7 +428,6 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
     i32 leb_len;
     u8* leb;
 
-    if (instr->type == WI_NOP) return;
     if (instr->type == WI_UNREACHABLE) assert(("EMITTING UNREACHABLE!!", 0));
 
     if (instr->type & SIMD_INSTR_MASK) {
@@ -677,38 +690,29 @@ static i32 output_onyx_libraries_section(OnyxWasmModule* module, bh_buffer* buff
     bh_buffer libs_buff;
     bh_buffer_init(&libs_buff, buff->allocator, 128);
 
-    const char *custom_name = "_onyx_libs";
-    i32 leb_len;
-    u8* leb = uint_to_uleb128(strlen(custom_name), &leb_len);
-    bh_buffer_append(&libs_buff, leb, leb_len);
-    bh_buffer_append(&libs_buff, custom_name, strlen(custom_name));
+    output_custom_section_name("_onyx_libs", &libs_buff);
 
-    leb = uint_to_uleb128((u64) bh_arr_length(module->library_paths), &leb_len);
-    bh_buffer_append(&libs_buff, leb, leb_len);
+    output_unsigned_integer(bh_arr_length(module->library_paths), &libs_buff);
 
     bh_arr_each(char *, lib, module->library_paths) {
         assert(*lib != NULL);
 
         u32 lib_len = strlen(*lib);
-        leb = uint_to_uleb128((u64) lib_len, &leb_len);
-        bh_buffer_append(&libs_buff, leb, leb_len);
+        output_unsigned_integer(lib_len, &libs_buff);
         bh_buffer_append(&libs_buff, *lib, lib_len);
     }
 
-    leb = uint_to_uleb128((u64) bh_arr_length(module->libraries), &leb_len);
-    bh_buffer_append(&libs_buff, leb, leb_len);
+    output_unsigned_integer(bh_arr_length(module->libraries), &libs_buff);
 
     bh_arr_each(char *, lib, module->libraries) {
         assert(*lib != NULL);
 
         u32 lib_len = strlen(*lib);
-        leb = uint_to_uleb128((u64) lib_len, &leb_len);
-        bh_buffer_append(&libs_buff, leb, leb_len);
+        output_unsigned_integer(lib_len, &libs_buff);
         bh_buffer_append(&libs_buff, *lib, lib_len);
     }
 
-    leb = uint_to_uleb128((u64) (libs_buff.length), &leb_len);
-    bh_buffer_append(buff, leb, leb_len);
+    output_unsigned_integer(libs_buff.length, buff);
 
     bh_buffer_concat(buff, libs_buff);
     bh_buffer_free(&libs_buff);
@@ -724,11 +728,7 @@ static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* bu
     bh_buffer section_buff;
     bh_buffer_init(&section_buff, buff->allocator, 128);
 
-    const char *custom_name = "_onyx_func_offsets";
-    i32 leb_len;
-    u8* leb = uint_to_uleb128(strlen(custom_name), &leb_len);
-    bh_buffer_append(&section_buff, leb, leb_len);
-    bh_buffer_append(&section_buff, custom_name, strlen(custom_name));
+    output_custom_section_name("_onyx_func_offsets", &section_buff);
 
     i32 func_count = bh_arr_length(module->funcs) + module->foreign_function_count;
 
@@ -753,14 +753,88 @@ static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* bu
 
     bh_buffer_concat(&section_buff, name_buff);
 
-    leb = uint_to_uleb128((u64) (section_buff.length), &leb_len);
-    bh_buffer_append(buff, leb, leb_len);
+    output_unsigned_integer(section_buff.length, buff);
 
     bh_buffer_concat(buff, section_buff);
     bh_buffer_free(&section_buff);
 
     return buff->length - prev_len;
 }
+
+#ifdef ENABLE_DEBUG_INFO
+static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
+    if (!module->debug_context) return 0;
+
+    DebugContext *ctx = module->debug_context;
+
+    bh_buffer section_buff;
+    bh_buffer_init(&section_buff, buff->allocator, 128);
+
+    {
+        // ovm_debug_files section
+        bh_buffer_clear(&section_buff);
+        bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+        output_custom_section_name("ovm_debug_files", &section_buff);
+
+        i32 file_count = shlenu(ctx->file_ids);
+        output_unsigned_integer(file_count, &section_buff);
+
+        fori (i, 0, file_count) {
+            Table(u32) entry = (void *) &ctx->file_ids[i];
+            output_unsigned_integer(entry->value, &section_buff);
+            output_name(entry->key, strlen(entry->key), &section_buff);
+        }
+
+        output_unsigned_integer(section_buff.length, buff);
+
+        bh_buffer_concat(buff, section_buff);
+    }
+
+    {
+        // ovm_debug_funcs section
+        bh_buffer_clear(&section_buff);
+        bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+        output_custom_section_name("ovm_debug_funcs", &section_buff);
+
+        i32 func_count = bh_arr_length(ctx->funcs);
+        output_unsigned_integer(func_count, &section_buff);
+
+        fori (i, 0, func_count) {
+            DebugFuncContext *func = &ctx->funcs[i];
+            output_unsigned_integer(func->func_index, &section_buff);
+            output_unsigned_integer(func->file_id, &section_buff);
+            output_unsigned_integer(func->line, &section_buff);
+            output_name(func->name, func->name_length, &section_buff);
+            output_unsigned_integer(1, &section_buff);
+            output_unsigned_integer(func->op_offset, &section_buff);
+            output_unsigned_integer(func->stack_ptr_idx, &section_buff);
+            output_unsigned_integer(0, &section_buff);
+        }
+
+        output_unsigned_integer(section_buff.length, buff);
+
+        bh_buffer_concat(buff, section_buff);
+    }
+
+    {
+        // ovm_debug_ops section
+        bh_buffer_clear(&section_buff);
+        bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+        output_custom_section_name("ovm_debug_ops", &section_buff);
+        bh_buffer_concat(&section_buff, ctx->op_buffer);
+
+        output_unsigned_integer(section_buff.length, buff);
+
+        bh_buffer_concat(buff, section_buff);
+    }
+
+    bh_buffer_free(&section_buff);
+    return 0;
+}
+#endif
 
 void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer) {
     bh_buffer_init(buffer, global_heap_allocator, 128);
@@ -771,6 +845,9 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     }
     bh_buffer_append(buffer, WASM_VERSION, 4);
 
+#ifdef ENABLE_DEBUG_INFO
+    output_ovm_debug_sections(module, buffer);
+#endif
     output_typesection(module, buffer);
     output_importsection(module, buffer);
     output_funcsection(module, buffer);

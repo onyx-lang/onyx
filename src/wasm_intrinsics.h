@@ -444,6 +444,7 @@ EMIT_FUNC_NO_ARGS(run_init_procedures) {
 
     bh_arr_each(AstFunction *, func, init_procedures) {
         i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) *func);
+        debug_emit_instruction(mod, NULL);
         bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
     }
 

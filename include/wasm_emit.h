@@ -791,31 +791,41 @@ b32 onyx_run_wasm(bh_buffer code_buffer, int argc, char *argv[]);
 
 #ifdef ENABLE_DEBUG_INFO
 
-typedef struct DebugLocation {
-    u32 file_id;
-    u32 line;
-    u32 repeat;
-} DebugLocation;
+typedef enum DebugOpType {
+    DOT_END   = 0b00000000,
+    DOT_SET   = 0b00000001,
+    DOT_PUSHF = 0b00000010,
+    DOT_POPF  = 0b00000011,
+    DOT_SYM   = 0b00000100,
+
+    DOT_INC   = 0b01000000,
+    DOT_DEC   = 0b10000000,
+    DOT_REP   = 0b11000000,
+} DebugOpType;
 
 typedef struct DebugFuncContext {
     u32 func_index;
-    bh_arr_each(DebugLocation) locations;
+    u32 file_id;
+    u32 line;
+    u32 op_offset;
+    u32 stack_ptr_idx;
+
+    u32 name_length;
+    char *name;
 } DebugFuncContext;
 
 typedef struct DebugContext {
     bh_allocator allocator;
 
-    // file_names[file_ids["file"]] == "file"
-    // file_ids[file_name[123]] == 123
-    Table(u32)          file_ids;
-    bh_arr_each(char *) file_names;
+    Table(u32) file_ids;
+    u32 next_file_id;
 
-    bh_arr_each(DebugFuncContext *) 
+    bh_arr(DebugFuncContext) funcs;
+    bh_buffer                op_buffer;
 
     // Used during building the debug info
     OnyxToken *last_token;
-    DebugFucnContext *current_func;
-    
+    b32 last_op_was_rep : 1;
 } DebugContext;
 
 #endif
