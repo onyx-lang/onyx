@@ -14,10 +14,6 @@
     #include <sys/wait.h>
     #include <dlfcn.h>
 #endif
-// 
-// #ifndef WASMER_VERSION
-//     #error "Currently, building the Onyx compiler with built-in execution support requires the Wasmer library to be compiled and linked."
-// #endif
 
 static wasm_config_t*    wasm_config;
 static wasm_engine_t*    wasm_engine;
@@ -236,7 +232,16 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_config = wasm_config_new();
     if (!wasm_config) goto error_handling;
 
+#ifdef USE_OVM_DEBUGGER
+    void wasm_config_enable_debug(wasm_config_t *config, int value);
+    wasm_config_enable_debug(wasm_config, context.options->debug_enabled);
+#endif
+
 #ifndef USE_OVM_DEBUGGER
+    if (context.options->debug_enabled) {
+        printf("Warning: --debug does nothing if libovmwasm.so is not being used!\n");
+    }
+
     // Prefer the LLVM compile because it is faster. This should be configurable from the command line and/or a top-level directive.
     if (wasmer_is_compiler_available(LLVM)) {
         wasm_config_set_compiler(wasm_config, LLVM);

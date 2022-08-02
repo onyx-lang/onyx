@@ -814,10 +814,15 @@ typedef struct DebugFuncContext {
     char *name;
 } DebugFuncContext;
 
+typedef struct DebugFileInfo {
+    u32 file_id;
+    u32 line_count;
+} DebugFileInfo;
+
 typedef struct DebugContext {
     bh_allocator allocator;
 
-    Table(u32) file_ids;
+    Table(DebugFileInfo) file_info;
     u32 next_file_id;
 
     bh_arr(DebugFuncContext) funcs;

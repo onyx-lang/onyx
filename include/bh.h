@@ -356,6 +356,7 @@ typedef struct bh_file_contents {
     const char *filename;
     isize length;
     void* data;
+    isize line_count;
 } bh_file_contents;
 
 bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand);
@@ -1606,7 +1607,7 @@ bh_file_contents bh_file_read_contents_bh_file(bh_allocator alloc, bh_file* file
     bh_file_contents fc = {
         .allocator = alloc,
         .filename  = bh_strdup(alloc, (char *) file->filename),
-        .length = 0, .data = NULL
+        .length = 0, .data = NULL, .line_count = 0,
     };
 
     isize size = bh_file_size(file);

@@ -81,6 +81,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .documentation_file = NULL,
 
+        .debug_enabled = 0,
+
         .passthrough_argument_count = 0,
         .passthrough_argument_data  = NULL,
     };
@@ -171,6 +173,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--doc")) {
                 options.documentation_file = argv[++i];
+            }
+            else if (!strcmp(argv[i], "--debug")) {
+                options.debug_enabled = 1;
             }
             else if (!strcmp(argv[i], "--")) {
                 options.passthrough_argument_count = argc - i - 1;
@@ -321,6 +326,8 @@ static void parse_source_file(bh_file_contents* file_contents) {
     OnyxTokenizer tokenizer = onyx_tokenizer_create(context.token_alloc, file_contents);
     onyx_lex_tokens(&tokenizer);
 
+    file_contents->line_count = tokenizer.line_number;
+
     OnyxParser parser = onyx_parser_create(context.ast_alloc, &tokenizer);
     onyx_parse(&parser);
     onyx_parser_free(&parser);
@@ -350,7 +357,7 @@ static b32 process_source_file(char* filename, OnyxFilePos error_pos) {
     if (context.options->verbose_output == 2)
         bh_printf("Processing source file:    %s (%d bytes)\n", file.filename, fc.length);
 
-    parse_source_file(&fc);
+    parse_source_file(&bh_arr_last(context.loaded_files));
     return 1;
 }
 

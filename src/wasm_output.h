@@ -777,12 +777,13 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
 
         output_custom_section_name("ovm_debug_files", &section_buff);
 
-        i32 file_count = shlenu(ctx->file_ids);
+        i32 file_count = shlenu(ctx->file_info);
         output_unsigned_integer(file_count, &section_buff);
 
         fori (i, 0, file_count) {
-            Table(u32) entry = (void *) &ctx->file_ids[i];
-            output_unsigned_integer(entry->value, &section_buff);
+            Table(DebugFileInfo) entry = (void *) &ctx->file_info[i];
+            output_unsigned_integer(entry->value.file_id, &section_buff);
+            output_unsigned_integer(entry->value.line_count, &section_buff);
             output_name(entry->key, strlen(entry->key), &section_buff);
         }
 

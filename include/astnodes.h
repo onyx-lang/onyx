@@ -1541,6 +1541,8 @@ struct CompileOptions {
     const char* target_file;
     const char* documentation_file;
 
+    b32 debug_enabled;
+
     i32    passthrough_argument_count;
     char** passthrough_argument_data;
 };

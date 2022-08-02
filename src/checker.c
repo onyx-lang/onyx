@@ -816,6 +816,10 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                 YIELD(binop->token->pos, "Waiting for type to be constructed on left hand side.");
             }
 
+            // NOTE: There is a subtlety here. You cannot use the result of `resolve_expression_type` directly,
+            // as in some cases (especially with macros and polyprocs), the result is not "correct". The result
+            // makes them appears as though they are runtime-known values, which they are not. Using the following
+            // pattern does prevent this issue.
             resolve_expression_type(binop->right);
 
             Type* right_type = get_expression_type(binop->right);

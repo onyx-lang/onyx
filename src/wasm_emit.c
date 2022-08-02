@@ -222,15 +222,23 @@ static inline b32 should_emit_function(AstFunction* fd) {
 static u32 debug_get_file_id(OnyxWasmModule *mod, const char *name) {
     assert(mod && mod->debug_context);
 
-    i32 index = shgeti(mod->debug_context->file_ids, name);
+    i32 index = shgeti(mod->debug_context->file_info, name);
     if (index == -1) {
         u32 id = mod->debug_context->next_file_id++;
-        shput(mod->debug_context->file_ids, name, id);
+        DebugFileInfo file_info;
+        file_info.file_id = id;
+
+        bh_arr_each(bh_file_contents, fc, context.loaded_files) {
+            if (!strcmp(fc->filename, name)) {
+                file_info.line_count = fc->line_count;
+            }
+        }
+        shput(mod->debug_context->file_info, name, file_info);
 
         return id;
     }
 
-    return mod->debug_context->file_ids[index].value;
+    return mod->debug_context->file_info[index].value.file_id;
 }
 
 static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
@@ -349,6 +357,7 @@ static void debug_end_function(OnyxWasmModule *mod) {
     bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_POPF);
     bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_END);
     mod->debug_context->last_op_was_rep = 0;
+    mod->debug_context->last_token = NULL;
 }
 
 #else
@@ -380,15 +389,17 @@ enum StructuredBlockType {
 };
 
 #ifdef ENABLE_DEBUG_INFO
-    #define WI(token, instr) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, 0x00 })))
+    #define WI(token, instr) (debug_emit_instruction(mod, token),        bh_arr_push(code, ((WasmInstruction){ instr, 0x00 })))
     #define WID(token, instr, data) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, data })))
     #define WIL(token, instr, data) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } })))
     #define WIP(token, instr, data) (debug_emit_instruction(mod, token), bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } })))
+    #define WIR(token, full_instr)  (debug_emit_instruction(mod, token), bh_arr_push(code, full_instr))
 #else
     #define WI(token, instr) (bh_arr_push(code, ((WasmInstruction){ instr, 0x00 })))
     #define WID(token, instr, data) (bh_arr_push(code, ((WasmInstruction){ instr, data })))
     #define WIL(token, instr, data) (bh_arr_push(code, ((WasmInstruction){ instr, { .l = data } })))
     #define WIP(token, instr, data) (bh_arr_push(code, ((WasmInstruction){ instr, { .p = data } })))
+    #define WIR(token, full_instr)  (bh_arr_push(code, full_instr))
 #endif
 
 #define EMIT_FUNC(kind, ...) static void emit_ ## kind (OnyxWasmModule* mod, bh_arr(WasmInstruction)* pcode, __VA_ARGS__)
@@ -1545,7 +1556,7 @@ EMIT_FUNC(deferred_stmt, DeferredStmt deferred_stmt) {
         case Deferred_Stmt_Node: emit_statement(mod, &code, deferred_stmt.stmt); break;
         case Deferred_Stmt_Code: {
             fori (i, 0, deferred_stmt.instruction_count) {
-                bh_arr_push(code, deferred_stmt.instructions[i]);
+                WIR(NULL, deferred_stmt.instructions[i]);
             }
             break;
         }
@@ -1906,13 +1917,13 @@ EMIT_FUNC(call, AstCall* call) {
 
     if (call->callee->kind == Ast_Kind_Function) {
         i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) call->callee);
-        bh_arr_push(code, ((WasmInstruction){ WI_CALL, func_idx }));
+        WIL(NULL, WI_CALL, func_idx);
 
     } else {
         emit_expression(mod, &code, call->callee);
 
         i32 type_idx = generate_type_idx(mod, call->callee->type);
-        WID(call_token, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
+        WID(NULL, WI_CALL_INDIRECT, ((WasmInstructionData) { type_idx, 0x00 }));
     }
 
     if (reserve_size > 0) {
@@ -2465,9 +2476,9 @@ EMIT_FUNC(memory_reservation_location, AstMemRes* memres) {
 
     if (memres->threadlocal) {
         u64 tls_base_idx = bh_imap_get(&mod->index_map, (u64) &builtin_tls_base);
-        WID(memres->token, WI_PTR_CONST, memres->tls_offset);
-        WIL(memres->token, WI_GLOBAL_GET, tls_base_idx);
-        WI(memres->token, WI_PTR_ADD);
+        WID(NULL, WI_PTR_CONST, memres->tls_offset);
+        WIL(NULL, WI_GLOBAL_GET, tls_base_idx);
+        WI(NULL, WI_PTR_ADD);
 
     } else {
         // :ProperLinking
@@ -2971,7 +2982,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 instr.data.d = lit->value.d;
             }
 
-            bh_arr_push(code, instr);
+            WIR(NULL, instr);
             break;
         }
 
@@ -3588,7 +3599,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     wasm_func.type_idx = type_idx;
     wasm_func.location = fd->token;
 
-    bh_arr_new(mod->allocator, wasm_func.code, 4);
+    bh_arr_new(mod->allocator, wasm_func.code, 16);
 
     i32 func_idx = (i32) bh_imap_get(&mod->index_map, (u64) fd);
     mod->current_func_idx = func_idx;
@@ -3653,6 +3664,11 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
         bh_arr_clear(mod->stack_leave_patches);
 
+        debug_emit_instruction(mod, fd->token);
+        debug_emit_instruction(mod, fd->token);
+        debug_emit_instruction(mod, fd->token);
+        debug_emit_instruction(mod, fd->token);
+        debug_emit_instruction(mod, fd->token);
         bh_arr_insert_end(wasm_func.code, 5);
         fori (i, 0, 5) wasm_func.code[i] = (WasmInstruction) { WI_NOP, 0 };
 
@@ -4196,7 +4212,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     module.debug_context->next_file_id = 0;
     module.debug_context->last_token = NULL;
 
-    sh_new_arena(module.debug_context->file_ids);
+    sh_new_arena(module.debug_context->file_info);
     bh_arr_new(global_heap_allocator, module.debug_context->funcs, 16);
 
     bh_buffer_init(&module.debug_context->op_buffer, global_heap_allocator, 1024);

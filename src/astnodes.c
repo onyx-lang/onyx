@@ -881,6 +881,10 @@ Type* resolve_expression_type(AstTyped* node) {
         node->type = &basic_types[Basic_Kind_Void];
     }
 
+    if (node->kind == Ast_Kind_Macro) {
+        return resolve_expression_type((AstTyped *) ((AstMacro *) node)->body);
+    }
+
     if (node->type == NULL)
         node->type = type_build_from_ast(context.ast_alloc, node->type_node);
 
