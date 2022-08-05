@@ -1,6 +1,6 @@
 package core.net
 
-use package core
+use core
 
 Socket :: struct {
     Handle :: #distinct i32
@@ -8,6 +8,7 @@ Socket :: struct {
     use stream : io.Stream;
     handle: Handle;
     type: SocketType;
+    family: SocketDomain;
 
     close     :: socket_close
     setting   :: socket_setting
@@ -47,8 +48,9 @@ SocketSetting :: enum {
     Broadcast   :: 0x02;
 }
 
-// This structure is twenty bytes in size to accommodate IPV6 addresses.
-Socket_Address :: struct #size 20 {
+#local UNIX_SOCKET_PATH_LEN :: 256
+
+Socket_Address :: struct #size (8 + UNIX_SOCKET_PATH_LEN) {
     family: u16;
     port: u16;
     addr: u32;
@@ -59,9 +61,36 @@ Socket_Address :: struct #size 20 {
     }
 }
 
+make_ipv4_address :: (out: ^Socket_Address, addr: u32, port: u16) {
+    out.family = ~~ SocketDomain.Inet;
+    out.port = port;
+    out.addr = addr;
+}
+
+make_unix_address :: (out: ^Socket_Address, path: str) {
+    out.family = ~~ SocketDomain.Unix;
+    out.port   = 0;
+
+    //
+    // If we are constructing a unix socket, we have to write the path
+    // at the address where the addr field is in the Socket_Address.
+    // We also have to append a null-terminator, as that is what will
+    // be expected from any C function.
+    out_path := cast(^u8) ^out.addr;
+    offset   := 0;
+    while offset < math.min(path.count, UNIX_SOCKET_PATH_LEN - 1) {
+        defer offset += 1;
+
+        out_path[offset] = path[offset];
+    }
+
+    out_path[offset] = 0;
+}
+
 socket_create :: (domain: SocketDomain, type: SocketType) -> (Socket, SocketError) {
     s: Socket;
     s.type = type;
+    s.family = domain;
 
     err := __net_create_socket(^s.handle, domain, type);
     if err == .None {
@@ -84,12 +113,16 @@ socket_is_alive :: (s: ^Socket) -> bool {
     return s.vtable != null;
 }
 
-socket_connect :: (s: ^Socket, host: str, port: u16) -> SocketError {
-    return __net_connect(s.handle, host, port);
+socket_connect :: (s: ^Socket, host: str, port: u16 = 0) -> SocketError {
+    switch s.family {
+        case .Inet do return __net_connect_ipv4(s.handle, host, port);
+        case .Unix do return __net_connect_unix(s.handle, host);
+        case #default do return .BadSettings;
+    }
 }
 
-socket_bind :: (s: ^Socket, port: u16) -> bool {
-    return __net_bind(s.handle, port);
+socket_bind :: (s: ^Socket, bind_address: ^Socket_Address) -> bool {
+    return __net_bind(s.handle, bind_address);
 }
 
 socket_listen :: (s: ^Socket, backlog := 32) {
@@ -230,10 +263,11 @@ network_to_host :: #match {}
     #package __net_create_socket :: (out_handle: ^Socket.Handle, domain: SocketDomain, type: SocketType) -> SocketError ---
     #package __net_close_socket  :: (handle: Socket.Handle)               -> void ---
     #package __net_setting       :: (handle: Socket.Handle, setting: SocketSetting, value: i32) -> void ---
-    #package __net_bind          :: (handle: Socket.Handle, port: u16)    -> bool ---
+    #package __net_bind          :: (handle: Socket.Handle, bind_address: ^Socket_Address)    -> bool ---
     #package __net_listen        :: (handle: Socket.Handle, backlog: i32) -> void ---
     #package __net_accept        :: (handle: Socket.Handle, out_address: ^Socket_Address) -> Socket.Handle ---
-    #package __net_connect       :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
+    #package __net_connect_unix  :: (handle: Socket.Handle, path: str) -> SocketError ---
+    #package __net_connect_ipv4  :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
     #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
     #package __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: ^Socket_Address)  -> i32 ---
     #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool) -> i32 ---

@@ -17,6 +17,7 @@
     #include <netdb.h>
     #include <netinet/in.h>
     #include <sys/socket.h>
+    #include <sys/un.h>
     #include <poll.h>
 #endif
 
@@ -922,23 +923,31 @@ struct onyx_socket_addr {
     unsigned int   addr;
 };
 
+static inline int onyx_socket_domain(int i) {
+    switch (i) {    // :EnumDependent
+        case 0: return AF_UNIX;
+        case 1: return AF_INET;
+        case 2: return AF_INET6;
+        default: return -1;
+    }
+}
+
+static inline int onyx_socket_protocol(int i) {
+    switch (i) {    // :EnumDependent
+        case 0: return SOCK_STREAM;
+        case 1: return SOCK_DGRAM;
+        default: return -1;
+    }
+}
+
 ONYX_DEF(__net_create_socket, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
 
     #ifdef _BH_LINUX
-    int domain = 0;
-    switch (params->data[1].of.i32) {    // :EnumDependent
-        case 0: domain = AF_UNIX;  break;
-        case 1: domain = AF_INET;  break;
-        case 2: domain = AF_INET6; break;
-        default: goto bad_settings;
-    }
+    int domain = onyx_socket_domain(params->data[1].of.i32);
+    if (domain == -1) goto bad_settings;
 
-    int type = 0;
-    switch (params->data[2].of.i32) {    // :EnumDependent
-        case 0: type = SOCK_STREAM; break;
-        case 1: type = SOCK_DGRAM;  break;
-        default: goto bad_settings;
-    }
+    int type = onyx_socket_protocol(params->data[2].of.i32);
+    if (type == -1) goto bad_settings;
 
     *((int *) ONYX_PTR(params->data[0].of.i32)) = socket(domain, type, 0);
 
@@ -996,14 +1005,49 @@ ONYX_DEF(__net_setting, (WASM_I32, WASM_I32, WASM_I32), ()) {
 ONYX_DEF(__net_bind, (WASM_I32, WASM_I32), (WASM_I32)) {
 
     #ifdef _BH_LINUX
-    struct sockaddr_in bind_addr;
-    memset(&bind_addr, 0, sizeof(bind_addr));
+    int res = -1;
 
-    bind_addr.sin_family = AF_INET; // Should this be configurable? Or is binding only ever done for INET? INET6?
-    bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    bind_addr.sin_port = htons(params->data[1].of.i32);
+    struct onyx_socket_addr *oaddr = (void *) ONYX_PTR(params->data[1].of.i32);
+    int family = onyx_socket_domain(oaddr->family);
+    int port   = oaddr->port;
 
-    int res = bind(params->data[0].of.i32, &bind_addr, sizeof(bind_addr));
+    switch (family) {
+        case AF_INET: {
+            struct sockaddr_in bind_addr;
+            memset(&bind_addr, 0, sizeof(bind_addr));
+
+            bind_addr.sin_family = AF_INET;
+            bind_addr.sin_addr.s_addr = htonl(oaddr->addr);
+            bind_addr.sin_port = htons(port);
+
+            res = bind(params->data[0].of.i32, &bind_addr, sizeof(bind_addr));
+            break;
+        }
+
+        case AF_INET6: {
+            struct sockaddr_in6 bind_addr;
+            memset(&bind_addr, 0, sizeof(bind_addr));
+
+            bind_addr.sin6_family = AF_INET6;
+            memcpy(&bind_addr.sin6_addr.s6_addr, (void *) &oaddr->addr, 16);
+            bind_addr.sin6_port = htons(port);
+            
+            res = bind(params->data[0].of.i32, &bind_addr, sizeof(bind_addr));
+            break;
+        }
+
+        case AF_UNIX: {
+            struct sockaddr_un bind_addr;
+            memset(&bind_addr, 0, sizeof(bind_addr));
+
+            bind_addr.sun_family = AF_UNIX;
+            strncpy(&bind_addr.sun_path, (char *) &oaddr->addr, 108);
+            
+            res = bind(params->data[0].of.i32, &bind_addr, sizeof(bind_addr));
+            break;
+        }
+    }
+
     results->data[0] = WASM_I32_VAL(res >= 0);
     #endif
 
@@ -1043,7 +1087,26 @@ ONYX_DEF(__net_accept, (WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
-ONYX_DEF(__net_connect, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(__net_connect_unix, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    int   hostlen  = params->data[2].of.i32;
+    char *hostname = alloca(hostlen + 1);
+    memcpy(hostname, ONYX_PTR(params->data[1].of.i32), hostlen);
+    hostname[hostlen] = '\0';
+
+    struct sockaddr_un server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    server_addr.sun_family = AF_UNIX; // See comment above
+    memcpy((char *)&server_addr.sun_path, hostname, hostlen);
+
+    int result = connect(params->data[0].of.i32, &server_addr, sizeof(server_addr));
+    if (result == 0) results->data[0] = WASM_I32_VAL(0);
+    else             results->data[0] = WASM_I32_VAL(3); // :EnumDependent
+    
+    return NULL;
+}
+
+ONYX_DEF(__net_connect_ipv4, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     #ifdef _BH_LINUX
     int   hostlen  = params->data[2].of.i32;
     char *hostname = alloca(hostlen + 1);
@@ -1051,7 +1114,7 @@ ONYX_DEF(__net_connect, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     hostname[hostlen] = '\0';
 
     struct hostent *host;
-    host = gethostbyname(hostname);
+    host = gethostbyname(hostname); // TODO: Replace this call, as it is obselete.
     if (host == NULL) {
         results->data[0] = WASM_I32_VAL(2);  // :EnumDependent
         return NULL;
@@ -1279,7 +1342,8 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_bind)
     ONYX_FUNC(__net_listen)
     ONYX_FUNC(__net_accept)
-    ONYX_FUNC(__net_connect)
+    ONYX_FUNC(__net_connect_unix)
+    ONYX_FUNC(__net_connect_ipv4)
     ONYX_FUNC(__net_send)
     ONYX_FUNC(__net_sendto)
     ONYX_FUNC(__net_recv)

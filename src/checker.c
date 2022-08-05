@@ -2213,6 +2213,9 @@ CheckStatus check_struct(AstStructType* s_node) {
     if (s_node->entity_defaults && s_node->entity_defaults->state < Entity_State_Check_Types)
         YIELD(s_node->token->pos, "Waiting for struct member defaults to pass symbol resolution.");
 
+    if (s_node->min_size_)      CHECK(expression, &s_node->min_size_);
+    if (s_node->min_alignment_) CHECK(expression, &s_node->min_alignment_);
+
     if (s_node->polymorphic_argument_types) {
         assert(s_node->polymorphic_arguments);
 

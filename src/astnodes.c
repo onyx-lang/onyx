@@ -907,6 +907,8 @@ Type* resolve_expression_type(AstTyped* node) {
 }
 
 i64 get_expression_integer_value(AstTyped* node, b32 *is_valid) {
+    if (!node) return 0;
+
     resolve_expression_type(node);
 
     if (is_valid) *is_valid = 1;

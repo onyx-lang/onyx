@@ -428,12 +428,14 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 idx++;
             }
 
-            alignment = bh_max(s_node->min_alignment, alignment);
+            u32 min_alignment = get_expression_integer_value(s_node->min_alignment_, NULL);
+            alignment = bh_max(min_alignment, alignment);
             if (!s_node->is_packed) {
                 bh_align(size, alignment);
             }
 
-            size = bh_max(s_node->min_size, size);
+            u32 min_size = get_expression_integer_value(s_node->min_size_, NULL);
+            size = bh_max(min_size, size);
 
             s_type->Struct.alignment = alignment;
             s_type->Struct.size = size;

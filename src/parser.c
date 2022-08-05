@@ -1997,17 +1997,11 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         else if (parse_possible_directive(parser, "pack")) s_node->is_packed = 1;
 
         else if (parse_possible_directive(parser, "align")) {
-            AstNumLit* numlit = parse_int_literal(parser);
-            if (numlit == NULL) return NULL;
-
-            s_node->min_alignment = numlit->value.i;
+            s_node->min_alignment_ = parse_expression(parser, 0);
         }
 
         else if (parse_possible_directive(parser, "size")) {
-            AstNumLit* numlit = parse_int_literal(parser);
-            if (numlit == NULL) return NULL;
-
-            s_node->min_size = numlit->value.i;
+            s_node->min_size_ = parse_expression(parser, 0);
         }
 
         else {

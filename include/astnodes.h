@@ -912,7 +912,8 @@ struct AstStructType {
     bh_arr(AstStructMember *) members;
     bh_arr(AstTyped *) meta_tags;
 
-    u32 min_alignment, min_size;
+    // u32 min_alignment, min_size;
+    AstTyped *min_alignment_, *min_size_;
 
     // NOTE: Used to cache the actual type, since building
     // a struct type is kind of complicated and should

@@ -118,6 +118,9 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
 
         scope_enter(s_node->scope);
     }
+    
+    if (s_node->min_size_)      SYMRES(expression, &s_node->min_size_);
+    if (s_node->min_alignment_) SYMRES(expression, &s_node->min_alignment_);
 
     if (s_node->polymorphic_argument_types) {
         assert(s_node->polymorphic_arguments);
