@@ -730,6 +730,8 @@ static b32 onyx_run() {
     bh_buffer code_buffer;
     onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
 
+    onyx_run_initialize(context.options->debug_enabled);
+
     if (context.options->verbose_output > 0)
         bh_printf("Running program:\n");
 

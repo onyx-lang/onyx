@@ -763,7 +763,7 @@ static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* bu
 
 #ifdef ENABLE_DEBUG_INFO
 static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
-    if (!module->debug_context) return 0;
+    if (!module->debug_context || !context.options->debug_enabled) return 0;
 
     DebugContext *ctx = module->debug_context;
 
@@ -862,6 +862,9 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     output_codesection(module, buffer);
     output_datasection(module, buffer);
     output_onyx_libraries_section(module, buffer);
+
+    // TODO: Consider if this should always be included?
+    // It can amount to a lot of extra data.
     output_onyx_func_offset_section(module, buffer);
 }
 

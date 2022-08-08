@@ -64,10 +64,13 @@ wasm_extern_t* wasm_extern_lookup_by_name(wasm_module_t* module, wasm_instance_t
 
 
 typedef void *(*LibraryLinker)(OnyxRuntime *runtime);
-static bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
-static bh_arr(char *) library_paths = NULL;
 
-static void onyx_load_library(char *name) {
+typedef struct LibraryLinkContext {
+    bh_buffer wasm_bytes;
+    bh_arr(char *) library_paths;
+} LibraryLinkContext;
+
+static WasmFuncDefinition** onyx_load_library(LibraryLinkContext *ctx, char *name) {
     #ifdef _BH_LINUX
         #define DIR_SEPARATOR '/'
     #endif
@@ -86,40 +89,43 @@ static void onyx_load_library(char *name) {
     LibraryLinker library_load;
 
     #ifdef _BH_LINUX
-    char *library_name = bh_lookup_file(name, ".", ".so", 1, (const char **) library_paths, 1);
+    char *library_name = bh_lookup_file(name, ".", ".so", 1, (const char **) ctx->library_paths, 1);
     void* handle = dlopen(library_name, RTLD_LAZY);
     if (handle == NULL) {
         printf("ERROR LOADING LIBRARY %s: %s\n", name, dlerror());
-        return;
+        return NULL;
     }
 
     library_load = (LibraryLinker) dlsym(handle, library_load_name);
     if (library_load == NULL) {
         printf("ERROR RESOLVING '%s': %s\n", library_load_name, dlerror());
-        return;
+        return NULL;
     }
     #endif
 
     #ifdef _BH_WINDOWS
-    char *library_name = bh_lookup_file(name, ".", ".dll", 1, (const char **) library_paths, 1);
+    char *library_name = bh_lookup_file(name, ".", ".dll", 1, (const char **) ctx->library_paths, 1);
     HMODULE handle = LoadLibraryA(library_name);
     if (handle == NULL) {
         printf("ERROR LOADING LIBRARY %s: %d\n", name, GetLastError());
-        return;
+        return NULL;
     }
 
     library_load = (LibraryLinker) GetProcAddress(handle, library_load_name);
     if (library_load == NULL) {
         printf("ERROR RESOLVING '%s': %d\n", library_load_name, GetLastError());
-        return;
+        return NULL;
     }
     #endif
 
-    WasmFuncDefinition** funcs = library_load(runtime);
-    bh_arr_push(linkable_functions, funcs);
+    return library_load(runtime);
 }
 
-static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
+static void lookup_and_load_custom_libraries(LibraryLinkContext *ctx, bh_arr(WasmFuncDefinition **)* p_out) {
+    bh_arr(WasmFuncDefinition **) out = *p_out;
+
+    bh_buffer wasm_bytes = ctx->wasm_bytes;
+
     i32 cursor = 8; // skip the magic number and version
     while (cursor < wasm_bytes.length) {
         u64 section_number = uleb128_to_uint(wasm_bytes.data, &cursor);
@@ -142,7 +148,7 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
                     bh_path_convert_separators(lib_path);
                     cursor += lib_path_length;
 
-                    bh_arr_push(library_paths, lib_path);
+                    bh_arr_push(ctx->library_paths, lib_path);
                 }
 
                 lib_count = uleb128_to_uint(wasm_bytes.data, &cursor);
@@ -156,7 +162,10 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
                     library_name[lib_name_length] = '\0';
                     cursor += lib_name_length;
 
-                    onyx_load_library(library_name);
+                    WasmFuncDefinition** lib = onyx_load_library(ctx, library_name);
+                    if (lib) {
+                        bh_arr_push(out, lib);
+                    }
                 }
                 break;
             }
@@ -164,6 +173,8 @@ static void onyx_lookup_and_load_custom_libraries(bh_buffer wasm_bytes) {
 
         cursor = section_start + section_size;
     }
+
+    *p_out = out;
 }
 
 static void onyx_print_trap(wasm_trap_t* trap) {
@@ -191,6 +202,8 @@ static void onyx_print_trap(wasm_trap_t* trap) {
         cursor = section_start + section_size;
     }
 
+    if (func_name_section == 0) return;
+
     bh_printf("TRACE:\n");
     wasm_frame_vec_t frames;
     wasm_trap_trace(trap, &frames);
@@ -206,71 +219,21 @@ static void onyx_print_trap(wasm_trap_t* trap) {
     }
 }
 
-// Returns 1 if successful
-b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
-    runtime = &wasm_runtime;
+static void cleanup_wasm_objects() {
+    if (wasm_instance) wasm_instance_delete(wasm_instance);
+    if (wasm_module) wasm_module_delete(wasm_module);
+    if (wasm_store)  wasm_store_delete(wasm_store);
+    if (wasm_engine) wasm_engine_delete(wasm_engine);
+    if (wasm_config) wasm_config_delete(wasm_config);
+}
 
-    if (wasm_bytes.data[0] != 'O'
-        || wasm_bytes.data[1] != 'N'
-        || wasm_bytes.data[2] != 'Y'
-        || wasm_bytes.data[3] != 'X') {
-        printf("Bad magic bytes for Onyx binary.\n");
-        return 0;
-    } else {
-        wasm_bytes.data[0] = '\0';
-        wasm_bytes.data[1] = 'a';
-        wasm_bytes.data[2] = 's';
-        wasm_bytes.data[3] = 'm';
-    }
-    wasm_raw_bytes = wasm_bytes;
-
-    bh_arr_new(bh_heap_allocator(), linkable_functions, 4);
-    onyx_lookup_and_load_custom_libraries(wasm_bytes);
-
-    wasm_trap_t* run_trap = NULL;
-
-    wasm_config = wasm_config_new();
-    if (!wasm_config) goto error_handling;
-
-#ifdef USE_OVM_DEBUGGER
-    void wasm_config_enable_debug(wasm_config_t *config, int value);
-    wasm_config_enable_debug(wasm_config, context.options->debug_enabled);
-#endif
-
-#ifndef USE_OVM_DEBUGGER
-    if (context.options->debug_enabled) {
-        printf("Warning: --debug does nothing if libovmwasm.so is not being used!\n");
-    }
-
-    // Prefer the LLVM compile because it is faster. This should be configurable from the command line and/or a top-level directive.
-    if (wasmer_is_compiler_available(LLVM)) {
-        wasm_config_set_compiler(wasm_config, LLVM);
-    }
-
-    wasmer_features_t* features = wasmer_features_new();
-    wasmer_features_simd(features, 1);
-    wasmer_features_threads(features, 1);
-    wasmer_features_bulk_memory(features, 1);
-    wasm_config_set_features(wasm_config, features);
-#endif
-
-    wasm_engine = wasm_engine_new_with_config(wasm_config);
-    if (!wasm_engine) goto error_handling;
-
-    wasm_store  = wasm_store_new(wasm_engine);
-    if (!wasm_store) goto error_handling;
-
-    wasm_byte_vec_t wasm_data;
-    wasm_data.size = wasm_bytes.length;
-    wasm_data.data = wasm_bytes.data;
-
-    wasm_module = wasm_module_new(wasm_store, &wasm_data);
-    if (!wasm_module) goto error_handling;
-
-    wasm_importtype_vec_t module_imports;    // @Free
+//
+// This could be cleaned up a bit, as this function directly modifies various global variables.
+// Those being wasm_memory and wasm_imports.
+static b32 link_wasm_imports(bh_arr(WasmFuncDefinition **) linkable_functions, wasm_module_t *wasm_module) {
+    wasm_importtype_vec_t module_imports;
     wasm_module_imports(wasm_module, &module_imports);
 
-    wasm_imports = (wasm_extern_vec_t) WASM_EMPTY_VEC;
     wasm_extern_vec_new_uninitialized(&wasm_imports, module_imports.size); // @Free
 
     fori (i, 0, (i32) module_imports.size) {
@@ -328,19 +291,49 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
         return 0;
     }
 
-    wasm_trap_t* traps = NULL;
+    return 1;
+}
 
-    wasm_instance = wasm_instance_new(wasm_store, wasm_module, &wasm_imports, &traps);
-    if (!wasm_instance) goto error_handling;
+void onyx_run_initialize(b32 debug_enabled) {
+    wasm_config = wasm_config_new();
+    if (!wasm_config) {
+        cleanup_wasm_objects();
+        return;
+    }
 
-    wasm_runtime.wasm_instance = wasm_instance;
-    wasm_runtime.wasm_module = wasm_module;
-    wasm_runtime.wasm_memory = wasm_memory;
-    wasm_runtime.wasm_engine = wasm_engine;
-    wasm_runtime.wasm_imports = wasm_imports;
-    
-    wasm_runtime.argc = argc;
-    wasm_runtime.argv = argv;
+#ifdef USE_OVM_DEBUGGER
+    void wasm_config_enable_debug(wasm_config_t *config, int value);
+    wasm_config_enable_debug(wasm_config, debug_enabled);
+#endif
+
+#ifndef USE_OVM_DEBUGGER
+    if (debug_enabled) {
+        printf("Warning: --debug does nothing if libovmwasm.so is not being used!\n");
+    }
+
+    // Prefer the LLVM compile because it is faster. This should be configurable from the command line and/or a top-level directive.
+    if (wasmer_is_compiler_available(LLVM)) {
+        wasm_config_set_compiler(wasm_config, LLVM);
+    }
+
+    wasmer_features_t* features = wasmer_features_new();
+    wasmer_features_simd(features, 1);
+    wasmer_features_threads(features, 1);
+    wasmer_features_bulk_memory(features, 1);
+    wasm_config_set_features(wasm_config, features);
+#endif
+
+    wasm_engine = wasm_engine_new_with_config(wasm_config);
+    if (!wasm_engine) {
+        cleanup_wasm_objects();
+        return;
+    }
+
+    wasm_store  = wasm_store_new(wasm_engine);
+    if (!wasm_store) {
+        cleanup_wasm_objects();
+        return;
+    }
 
     // See comment in onyx_library.h about us being the linker.
     wasm_runtime.wasm_memory_data = &wasm_memory_data;
@@ -351,6 +344,65 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_runtime.wasm_store_new = &wasm_store_new;
     wasm_runtime.wasm_store_delete = &wasm_store_delete;
     wasm_runtime.onyx_print_trap = &onyx_print_trap;
+}
+
+b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
+    runtime = &wasm_runtime;
+
+    if (strncmp(wasm_bytes.data, "ONYX", 4)) {
+        printf("Bad magic bytes for Onyx binary.\n");
+        return 0;
+    }
+
+    wasm_bytes.data[0] = '\0';
+    wasm_bytes.data[1] = 'a';
+    wasm_bytes.data[2] = 's';
+    wasm_bytes.data[3] = 'm';
+    wasm_raw_bytes = wasm_bytes;
+
+    bh_arr(WasmFuncDefinition **) linkable_functions = NULL;
+    bh_arr_new(bh_heap_allocator(), linkable_functions, 4);
+
+    {
+        LibraryLinkContext lib_ctx;
+        lib_ctx.wasm_bytes = wasm_bytes;
+        lib_ctx.library_paths = NULL;
+        lookup_and_load_custom_libraries(&lib_ctx, &linkable_functions);
+
+        bh_arr_free(lib_ctx.library_paths);
+    }
+
+    wasm_byte_vec_t wasm_data;
+    wasm_data.size = wasm_bytes.length;
+    wasm_data.data = wasm_bytes.data;
+
+    wasm_module = wasm_module_new(wasm_store, &wasm_data);
+    if (!wasm_module) {
+        cleanup_wasm_objects();
+        return 0;
+    }
+
+    wasm_imports = (wasm_extern_vec_t) WASM_EMPTY_VEC;
+    if (!link_wasm_imports(linkable_functions, wasm_module)) {
+        return 0;
+    }
+
+    wasm_trap_t* traps = NULL;
+
+    wasm_instance = wasm_instance_new(wasm_store, wasm_module, &wasm_imports, &traps);
+    if (!wasm_instance) {
+        cleanup_wasm_objects();
+        return 0;
+    }
+
+    wasm_runtime.wasm_engine = wasm_engine;
+    wasm_runtime.wasm_module = wasm_module;
+    wasm_runtime.wasm_imports = wasm_imports;
+    wasm_runtime.wasm_memory = wasm_memory;
+    wasm_runtime.wasm_instance = wasm_instance;
+    
+    wasm_runtime.argc = argc;
+    wasm_runtime.argv = argv;
 
     wasm_extern_t* start_extern = wasm_extern_lookup_by_name(wasm_module, wasm_instance, "_start");
     wasm_func_t*   start_func   = wasm_extern_as_func(start_extern);
@@ -360,15 +412,14 @@ b32 onyx_run_wasm(bh_buffer wasm_bytes, int argc, char *argv[]) {
     wasm_val_vec_new_uninitialized(&args, 0);
     wasm_val_vec_new_uninitialized(&results, 1);
 
-    run_trap = wasm_func_call(start_func, &args, &results);
+    wasm_trap_t *run_trap = wasm_func_call(start_func, &args, &results);
 
 #if 1
     if (run_trap != NULL) onyx_print_trap(run_trap);
 #endif
 
-    goto cleanup;
+    goto end;
 
-error_handling:
     bh_printf("An error occured trying to run the WASM module...\n");
 
 #ifndef USE_OVM_DEBUGGER
@@ -378,10 +429,7 @@ error_handling:
     bh_printf("%b\n", buf, len);
 #endif
 
-cleanup:
-    if (wasm_instance) wasm_instance_delete(wasm_instance);
-    if (wasm_module) wasm_module_delete(wasm_module);
-    if (wasm_store)  wasm_store_delete(wasm_store);
-    if (wasm_engine) wasm_engine_delete(wasm_engine);
+end:
+    cleanup_wasm_objects();
     return run_trap == NULL;
 }
