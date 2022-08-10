@@ -4,6 +4,7 @@
     "description": "Onyx syntax highlighting.",
     "version": "0.0.3",
     "publisher": "brendanfh",
+    "license": "BSD-2-Clause",
     "engines": {
         "vscode": "^1.51.0"
     },
@@ -50,15 +51,58 @@
                     "loop": true
                 }
             }
+        ],
+        "breakpoints": [
+            {
+                "language": "onyx"
+            }
+        ],
+        "debuggers": [
+            {
+                "type": "onyx",
+                "languages": [
+                    "onyx"
+                ],
+                "label": "Onyx Debug",
+                "program": "./out/debugAdapter.js",
+                "runtime": "node",
+                "configurationAttributes": {
+                    "attach": {
+                        "properties": {
+                            "socketPath": {
+                                "type": "string",
+                                "description": "Path to UNIX socket for attaching to debugger",
+                                "default": "/tmp/ovm-debug.0000"
+                            },
+                            "stopOnEntry": {
+                                "type": "boolean",
+                                "description": "Automatically stop after launch.",
+                                "default": true
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "onyx",
+                        "request": "attach",
+                        "stopOnEntry": true
+                    }
+                ]
+            }
         ]
     },
     "files": [
         "./textmate-configuration.json"
     ],
     "dependencies": {
+        "@types/node": "^18.6.4",
+        "@vscode/debugadapter": "^1.57.0",
+        "await-notify": "^1.0.1",
         "vscode-textmate-languageservice": "0.2.1"
     },
     "devDependencies": {
-        "vscode": "^1.1.37"
+        "vscode": "^1.1.37",
+        "vscode-debugadapter": "^1.51.0"
     }
 }

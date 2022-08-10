@@ -6,7 +6,10 @@
 		"moduleResolution": "node",
 		"lib": ["es6", "es2016"],
 		"sourceMap": false,
-		"rootDir": "."
+		"rootDir": ".",
+		"typeRoots": [
+			"node_modules/@types"
+		]
 	},
 	"exclude": ["node_modules", ".vscode-test"]
 }
