@@ -10,6 +10,9 @@ import EventEmitter = require('node:events');
 
 import { Subject } from "await-notify";
 import * as net from "node:net";
+import * as child_process from "node:child_process";
+import { ChildProcess } from 'node:child_process';
+import { Message } from '@vscode/debugadapter/lib/messages';
 
 
 interface IOVMAttachRequestArguments extends DebugProtocol.AttachRequestArguments {
@@ -17,9 +20,16 @@ interface IOVMAttachRequestArguments extends DebugProtocol.AttachRequestArgument
     stopOnEntry?: boolean;
 }
 
+interface IOVMLaunchRequestArguments extends DebugProtocol.AttachRequestArguments {
+    wasmFile: string;
+	workingDir: string;
+    stopOnEntry?: boolean;
+}
+
 export class OVMDebugSession extends LoggingDebugSession {
 
 	private debugger: OVMDebugger;
+	private running_process: ChildProcess;
 
 	private _configurationDone: Subject = new Subject();
 	private _clientConnectedNotifier: Subject = new Subject();
@@ -141,6 +151,16 @@ export class OVMDebugSession extends LoggingDebugSession {
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments, request?: DebugProtocol.Request): void {
 		console.log(`disconnectRequest suspend: ${args.suspendDebuggee}, terminate: ${args.terminateDebuggee}`);
+
+		if (args.terminateDebuggee) {
+			console.log("TERMINATE");
+
+			if (this.running_process) {
+				this.running_process.kill('SIGTERM');
+			}
+		}
+
+		this.sendResponse(response);
 	}
 
     protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments, request?: DebugProtocol.Request): void {
@@ -222,9 +242,16 @@ export class OVMDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);	
 	}
 
-    protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments, request?: DebugProtocol.Request): void {
-		console.log("LAUNCH");
-        // console.error(`Unable to launch a new Onyx debugging session. Please use { "request": "attach" } instead.`);
+    protected launchRequest(response: DebugProtocol.LaunchResponse, args: IOVMLaunchRequestArguments, request?: DebugProtocol.Request): void {
+		this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
+			"cwd": args.workingDir,	
+		});
+
+		this.running_process.stdout.setEncoding("utf-8");
+		this.running_process.stdout.on("data", (chunk) => {
+			this.sendEvent(new OutputEvent(chunk, "console"));
+		});
+
 		this.attachRequest(response, {"socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": true});
     }
 

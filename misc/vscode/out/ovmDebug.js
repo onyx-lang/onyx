@@ -14,6 +14,7 @@ const debugadapter_1 = require("@vscode/debugadapter");
 const EventEmitter = require("node:events");
 const await_notify_1 = require("await-notify");
 const net = require("node:net");
+const child_process = require("node:child_process");
 class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     constructor() {
         super("ovm-debug-log.txt");
@@ -103,6 +104,13 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     }
     disconnectRequest(response, args, request) {
         console.log(`disconnectRequest suspend: ${args.suspendDebuggee}, terminate: ${args.terminateDebuggee}`);
+        if (args.terminateDebuggee) {
+            console.log("TERMINATE");
+            if (this.running_process) {
+                this.running_process.kill('SIGTERM');
+            }
+        }
+        this.sendResponse(response);
     }
     cancelRequest(response, args, request) {
         this.sendResponse(response);
@@ -165,8 +173,13 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         this.sendResponse(response);
     }
     launchRequest(response, args, request) {
-        console.log("LAUNCH");
-        // console.error(`Unable to launch a new Onyx debugging session. Please use { "request": "attach" } instead.`);
+        this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
+            "cwd": args.workingDir,
+        });
+        this.running_process.stdout.setEncoding("utf-8");
+        this.running_process.stdout.on("data", (chunk) => {
+            this.sendEvent(new debugadapter_1.OutputEvent(chunk, "console"));
+        });
         this.attachRequest(response, { "socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": true });
     }
     attachRequest(response, args, request) {
