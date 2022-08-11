@@ -224,7 +224,6 @@ static void cleanup_wasm_objects() {
     if (wasm_module) wasm_module_delete(wasm_module);
     if (wasm_store)  wasm_store_delete(wasm_store);
     if (wasm_engine) wasm_engine_delete(wasm_engine);
-    if (wasm_config) wasm_config_delete(wasm_config);
 }
 
 //

@@ -195,13 +195,16 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         this.sendResponse(response);
     }
     nextRequest(response, args, request) {
-        this.debugger.step("line", args.threadId);
+        this.debugger.step("over", args.threadId);
+        this.sendResponse(response);
     }
     stepOutRequest(response, args, request) {
-        console.log("STEP OUT");
+        this.debugger.step("out", args.threadId);
+        this.sendResponse(response);
     }
     stepInRequest(response, args, request) {
-        console.log("STEP IN");
+        this.debugger.step("line", args.threadId);
+        this.sendResponse(response);
     }
     fileNameToShortName(filename) {
         return filename.substring(filename.lastIndexOf("/") + 1);
@@ -214,7 +217,6 @@ var OVMCommand;
     OVMCommand[OVMCommand["RES"] = 1] = "RES";
     OVMCommand[OVMCommand["BRK"] = 2] = "BRK";
     OVMCommand[OVMCommand["CLR_BRK"] = 3] = "CLR_BRK";
-    OVMCommand[OVMCommand["LOC"] = 4] = "LOC";
     OVMCommand[OVMCommand["STEP"] = 5] = "STEP";
     OVMCommand[OVMCommand["TRACE"] = 6] = "TRACE";
 })(OVMCommand || (OVMCommand = {}));
@@ -285,17 +287,6 @@ class OVMDebugger extends EventEmitter {
             return this.preparePromise(cmd_id);
         });
     }
-    request_location(thread_id) {
-        let data = new ArrayBuffer(12);
-        let view = new DataView(data);
-        let cmd_id = this.next_command_id;
-        view.setUint32(0, cmd_id, true);
-        view.setUint32(4, OVMCommand.LOC, true);
-        view.setUint32(8, thread_id, true);
-        this.client.write(new Uint8Array(data));
-        this.pending_responses[cmd_id] = OVMCommand.LOC;
-        return this.preparePromise(cmd_id);
-    }
     step(granularity, thread_id) {
         let data = new ArrayBuffer(16);
         let view = new DataView(data);
@@ -308,7 +299,13 @@ class OVMDebugger extends EventEmitter {
                 view.setUint32(8, 1, true);
                 break;
             case "instruction":
-                view.setUint32(8, 1, true);
+                view.setUint32(8, 2, true);
+                break;
+            case "over":
+                view.setUint32(8, 3, true);
+                break;
+            case "out":
+                view.setUint32(8, 4, true);
                 break;
         }
         this.client.write(new Uint8Array(data));
@@ -388,15 +385,6 @@ class OVMDebugger extends EventEmitter {
             case OVMCommand.CLR_BRK: {
                 let success = parser.parseBool();
                 this.resolvePromise(msg_id, success);
-                break;
-            }
-            case OVMCommand.LOC: {
-                let success = parser.parseBool();
-                let filename = parser.parseString();
-                let line = parser.parseInt32();
-                if (!success)
-                    break;
-                this.resolvePromise(msg_id, { funcname: "unknown", filename, line });
                 break;
             }
             case OVMCommand.STEP: break;
