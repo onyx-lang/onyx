@@ -18,18 +18,17 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     constructor() {
         super("ovm-debug-log.txt");
         this._configurationDone = new await_notify_1.Subject();
-        this._clientConnected = new await_notify_1.Subject();
+        this._clientConnectedNotifier = new await_notify_1.Subject();
         this.setDebuggerLinesStartAt1(true);
         this.setDebuggerColumnsStartAt1(true);
         this._loadedSources = new Map();
+        this._clientConnected = false;
         this.debugger = new OVMDebugger();
         this.debugger.on("breakpointHit", (ev) => {
-            console.log("BREAKPOINT HIT");
             this.sendEvent(new debugadapter_1.StoppedEvent("breakpoint", ev.threadId));
         });
         this.debugger.on("paused", (ev) => {
-            console.log("PAUSED");
-            this.sendEvent(new debugadapter_1.StoppedEvent("pause", ev.threadId));
+            this.sendEvent(new debugadapter_1.StoppedEvent(ev.reason, ev.threadId));
         });
         this.debugger.on("terminated", () => {
             this.sendEvent(new debugadapter_1.TerminatedEvent());
@@ -82,7 +81,7 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         response.body.supportsSetExpression = false;
         // make VS Code send disassemble request
         response.body.supportsDisassembleRequest = false;
-        response.body.supportsSteppingGranularity = false;
+        response.body.supportsSteppingGranularity = true;
         response.body.supportsInstructionBreakpoints = false;
         // make VS Code able to read and write variable memory
         response.body.supportsReadMemoryRequest = false;
@@ -90,6 +89,7 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         response.body.supportSuspendDebuggee = false;
         response.body.supportTerminateDebuggee = true;
         response.body.supportsFunctionBreakpoints = true;
+        response.body.supportsSingleThreadExecutionRequests = true;
         this.sendResponse(response);
         // since this debug adapter can accept configuration requests like 'setBreakpoint' at any time,
         // we request them early by sending an 'initializeRequest' to the frontend.
@@ -110,10 +110,12 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     setBreakPointsRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
             console.log("BREAKPOINTS", args, response);
-            yield this._clientConnected.wait(1000);
+            while (!this._clientConnected) {
+                yield this._clientConnectedNotifier.wait();
+            }
             const path = args.source.path;
             const clientLines = args.lines || [];
-            // TODO: In theory, breakpoints should be cleared here
+            yield this.debugger.remove_breakpoints_in_file(path);
             const actualBreakpointsPromise = clientLines.map((line) => __awaiter(this, void 0, void 0, function* () {
                 const res = yield this.debugger.set_breakpoint(path, line);
                 const bp = new debugadapter_1.Breakpoint(res.verified, this.convertDebuggerLineToClient(res.line));
@@ -129,18 +131,16 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     }
     stackTraceRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log("LOCATION");
-            let location = yield this.debugger.request_location(1);
-            let source = new debugadapter_1.Source(this.fileNameToShortName(location.filename), this.convertDebuggerPathToClient(location.filename), undefined, undefined, "ovm-debug-src");
-            console.log(source);
-            if (!this._loadedSources.has(source.name)) {
-                this._loadedSources.set(source.name, source);
-                this.sendEvent(new debugadapter_1.LoadedSourceEvent("new", source));
-            }
+            let frames = yield this.debugger.trace(args.threadId);
             response.body = {
-                stackFrames: [
-                    new debugadapter_1.StackFrame(1, "test frame", source, location.line)
-                ]
+                stackFrames: frames.map((f, i) => {
+                    let source = new debugadapter_1.Source(this.fileNameToShortName(f.filename), this.convertDebuggerPathToClient(f.filename), undefined, undefined, "ovm-debug-src");
+                    if (!this._loadedSources.has(source.name)) {
+                        this._loadedSources.set(source.name, source);
+                        this.sendEvent(new debugadapter_1.LoadedSourceEvent("new", source));
+                    }
+                    return new debugadapter_1.StackFrame(i, f.funcname, source, f.line);
+                })
             };
             this.sendResponse(response);
         });
@@ -174,7 +174,8 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
             console.log("ATTACH");
             yield this._configurationDone.wait(1000);
             yield this.debugger.connect(args.socketPath);
-            this._clientConnected.notify();
+            this._clientConnected = true;
+            this._clientConnectedNotifier.notify();
             this.sendResponse(response);
             this.sendEvent(new debugadapter_1.ThreadEvent("started", 1));
             if (!args.stopOnEntry) {
@@ -193,8 +194,17 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         this.debugger.resume(thread_id);
         this.sendResponse(response);
     }
+    nextRequest(response, args, request) {
+        this.debugger.step("line", args.threadId);
+    }
+    stepOutRequest(response, args, request) {
+        console.log("STEP OUT");
+    }
+    stepInRequest(response, args, request) {
+        console.log("STEP IN");
+    }
     fileNameToShortName(filename) {
-        return filename.substring(filename.lastIndexOf("/"));
+        return filename.substring(filename.lastIndexOf("/") + 1);
     }
 }
 exports.OVMDebugSession = OVMDebugSession;
@@ -203,7 +213,10 @@ var OVMCommand;
     OVMCommand[OVMCommand["NOP"] = 0] = "NOP";
     OVMCommand[OVMCommand["RES"] = 1] = "RES";
     OVMCommand[OVMCommand["BRK"] = 2] = "BRK";
-    OVMCommand[OVMCommand["LOC"] = 3] = "LOC";
+    OVMCommand[OVMCommand["CLR_BRK"] = 3] = "CLR_BRK";
+    OVMCommand[OVMCommand["LOC"] = 4] = "LOC";
+    OVMCommand[OVMCommand["STEP"] = 5] = "STEP";
+    OVMCommand[OVMCommand["TRACE"] = 6] = "TRACE";
 })(OVMCommand || (OVMCommand = {}));
 var OVMEvent;
 (function (OVMEvent) {
@@ -223,7 +236,6 @@ class OVMDebugger extends EventEmitter {
         this.client = net.connect(path);
         this.client.on("data", this.parseIncoming.bind(this));
         this.client.on("end", () => {
-            console.log("terminated connection.");
             this.sendEvent("terminated");
         });
         return new Promise((res, rej) => {
@@ -257,6 +269,22 @@ class OVMDebugger extends EventEmitter {
             return this.preparePromise(cmd_id);
         });
     }
+    remove_breakpoints_in_file(filename) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let data = new ArrayBuffer(12 + filename.length);
+            let view = new DataView(data);
+            let cmd_id = this.next_command_id;
+            view.setUint32(0, cmd_id, true);
+            view.setUint32(4, OVMCommand.CLR_BRK, true);
+            view.setUint32(8, filename.length, true);
+            for (let i = 0; i < filename.length; i++) {
+                view.setUint8(i + 12, filename.charCodeAt(i));
+            }
+            this.client.write(new Uint8Array(data));
+            this.pending_responses[cmd_id] = OVMCommand.CLR_BRK;
+            return this.preparePromise(cmd_id);
+        });
+    }
     request_location(thread_id) {
         let data = new ArrayBuffer(12);
         let view = new DataView(data);
@@ -266,6 +294,35 @@ class OVMDebugger extends EventEmitter {
         view.setUint32(8, thread_id, true);
         this.client.write(new Uint8Array(data));
         this.pending_responses[cmd_id] = OVMCommand.LOC;
+        return this.preparePromise(cmd_id);
+    }
+    step(granularity, thread_id) {
+        let data = new ArrayBuffer(16);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.STEP, true);
+        view.setUint32(12, thread_id, true);
+        switch (granularity) {
+            case "line":
+                view.setUint32(8, 1, true);
+                break;
+            case "instruction":
+                view.setUint32(8, 1, true);
+                break;
+        }
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.STEP;
+    }
+    trace(thread_id) {
+        let data = new ArrayBuffer(12);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.TRACE, true);
+        view.setUint32(8, thread_id, true);
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.TRACE;
         return this.preparePromise(cmd_id);
     }
     parseIncoming(data) {
@@ -285,7 +342,17 @@ class OVMDebugger extends EventEmitter {
                 }
                 case OVMEvent.PAUSED: {
                     let thread_id = parser.parseUint32();
-                    this.sendEvent("paused", { threadId: thread_id });
+                    let reason_id = parser.parseUint32();
+                    let reason = "unknown";
+                    switch (reason_id) {
+                        case 1:
+                            reason = "entry";
+                            break;
+                        case 2:
+                            reason = "step";
+                            break;
+                    }
+                    this.sendEvent("paused", { reason, threadId: thread_id });
                     break;
                 }
                 case OVMEvent.RESPONSE: {
@@ -300,6 +367,7 @@ class OVMDebugger extends EventEmitter {
     handleResponse(parser) {
         let msg_id = parser.parseUint32();
         let cmd_id = this.pending_responses[msg_id] || OVMCommand.NOP;
+        delete this.pending_responses[msg_id];
         switch (cmd_id) {
             case OVMCommand.NOP: break;
             case OVMCommand.RES: {
@@ -317,14 +385,31 @@ class OVMDebugger extends EventEmitter {
                 });
                 break;
             }
+            case OVMCommand.CLR_BRK: {
+                let success = parser.parseBool();
+                this.resolvePromise(msg_id, success);
+                break;
+            }
             case OVMCommand.LOC: {
-                console.log("Recv loc");
                 let success = parser.parseBool();
                 let filename = parser.parseString();
                 let line = parser.parseInt32();
                 if (!success)
                     break;
-                this.resolvePromise(msg_id, { filename, line });
+                this.resolvePromise(msg_id, { funcname: "unknown", filename, line });
+                break;
+            }
+            case OVMCommand.STEP: break;
+            case OVMCommand.TRACE: {
+                let result = new Array();
+                let count = parser.parseUint32();
+                for (let i = 0; i < count; i++) {
+                    let funcname = parser.parseString();
+                    let filename = parser.parseString();
+                    let line = parser.parseInt32();
+                    result.push({ funcname, filename, line });
+                }
+                this.resolvePromise(msg_id, result);
                 break;
             }
             default:
