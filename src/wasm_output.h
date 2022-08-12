@@ -822,6 +822,34 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
     }
 
     {
+        // ovm_debug_syms sections
+        bh_buffer_clear(&section_buff);
+        bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+        output_custom_section_name("ovm_debug_syms", &section_buff);
+
+        i32 sym_count = bh_arr_length(ctx->sym_info);
+        output_unsigned_integer(sym_count, &section_buff);
+
+        fori (i, 0, sym_count) {
+            DebugSymInfo *sym = &ctx->sym_info[i];
+            output_unsigned_integer(sym->sym_id, &section_buff);
+            if (sym->name) {
+                output_name(sym->name, strlen(sym->name), &section_buff);
+            } else {
+                output_unsigned_integer(0, &section_buff);
+            }
+            output_unsigned_integer(sym->location_type, &section_buff);
+            output_unsigned_integer(sym->location_num, &section_buff);
+            output_unsigned_integer(sym->type, &section_buff);
+        }
+
+        output_unsigned_integer(section_buff.length, buff);
+
+        bh_buffer_concat(buff, section_buff);
+    }
+
+    {
         // ovm_debug_ops section
         bh_buffer_clear(&section_buff);
         bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);

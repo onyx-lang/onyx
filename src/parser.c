@@ -2465,6 +2465,9 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
     func_def->body = parse_block(parser, 1, name);
 
+    // :LinearTokenDependent
+    func_def->closing_brace = parser->curr - 1;
+
 function_defined:
     if (bh_arr_length(polymorphic_vars) > 0) {
         func_def->kind = Ast_Kind_Polymorphic_Proc;

@@ -20,6 +20,8 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         super("ovm-debug-log.txt");
         this._configurationDone = new await_notify_1.Subject();
         this._clientConnectedNotifier = new await_notify_1.Subject();
+        this._variableReferences = new debugadapter_1.Handles();
+        this._frameReferences = new debugadapter_1.Handles();
         this.setDebuggerLinesStartAt1(true);
         this.setDebuggerColumnsStartAt1(true);
         this._loadedSources = new Map();
@@ -98,14 +100,11 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         this.sendEvent(new debugadapter_1.InitializedEvent());
     }
     configurationDoneRequest(response, args, request) {
-        console.log("CONFIGURATION DONE");
         super.configurationDoneRequest(response, args);
         this._configurationDone.notify();
     }
     disconnectRequest(response, args, request) {
-        console.log(`disconnectRequest suspend: ${args.suspendDebuggee}, terminate: ${args.terminateDebuggee}`);
         if (args.terminateDebuggee) {
-            console.log("TERMINATE");
             if (this.running_process) {
                 this.running_process.kill('SIGTERM');
             }
@@ -117,7 +116,6 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     }
     setBreakPointsRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log("BREAKPOINTS", args, response);
             while (!this._clientConnected) {
                 yield this._clientConnectedNotifier.wait();
             }
@@ -147,30 +145,48 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
                         this._loadedSources.set(source.name, source);
                         this.sendEvent(new debugadapter_1.LoadedSourceEvent("new", source));
                     }
-                    return new debugadapter_1.StackFrame(i, f.funcname, source, f.line);
+                    let frameRef = this._frameReferences.create({
+                        threadId: args.threadId,
+                        frameIndex: i
+                    });
+                    return new debugadapter_1.StackFrame(frameRef, f.funcname, source, f.line);
                 })
             };
             this.sendResponse(response);
         });
     }
     threadsRequest(response, request) {
-        console.log("THREADS");
+        return __awaiter(this, void 0, void 0, function* () {
+            let threads = yield this.debugger.threads();
+            response.body = {
+                threads: threads.map(t => new debugadapter_1.Thread(t.id, t.name))
+            };
+            this.sendResponse(response);
+        });
+    }
+    scopesRequest(response, args, request) {
+        let frameId = args.frameId;
+        let frameRef = this._frameReferences.get(frameId);
+        let varRef = this._variableReferences.create(frameRef);
         response.body = {
-            threads: [
-                new debugadapter_1.Thread(1, "main thread"),
+            scopes: [
+                new debugadapter_1.Scope("Locals", varRef, false),
             ]
         };
         this.sendResponse(response);
     }
-    scopesRequest(response, args, request) {
-        console.log("SCOPES");
-        response.body = {
-            scopes: [
-                new debugadapter_1.Scope("Locals", 1, false),
-                new debugadapter_1.Scope("Globals", 2, true)
-            ]
-        };
-        this.sendResponse(response);
+    variablesRequest(response, args, request) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const frameRef = this._variableReferences.get(args.variablesReference, { frameIndex: 0, threadId: 0 });
+            let vs = (yield this.debugger.variables(frameRef.frameIndex, frameRef.threadId))
+                .map(v => {
+                let nv = new debugadapter_1.Variable(v.name, v.value);
+                nv.type = v.type;
+                return nv;
+            });
+            response.body = { variables: vs };
+            this.sendResponse(response);
+        });
     }
     launchRequest(response, args, request) {
         this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
@@ -184,7 +200,6 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     }
     attachRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log("ATTACH");
             yield this._configurationDone.wait(1000);
             yield this.debugger.connect(args.socketPath);
             this._clientConnected = true;
@@ -232,6 +247,8 @@ var OVMCommand;
     OVMCommand[OVMCommand["CLR_BRK"] = 3] = "CLR_BRK";
     OVMCommand[OVMCommand["STEP"] = 5] = "STEP";
     OVMCommand[OVMCommand["TRACE"] = 6] = "TRACE";
+    OVMCommand[OVMCommand["THREADS"] = 7] = "THREADS";
+    OVMCommand[OVMCommand["VARS"] = 8] = "VARS";
 })(OVMCommand || (OVMCommand = {}));
 var OVMEvent;
 (function (OVMEvent) {
@@ -335,6 +352,28 @@ class OVMDebugger extends EventEmitter {
         this.pending_responses[cmd_id] = OVMCommand.TRACE;
         return this.preparePromise(cmd_id);
     }
+    threads() {
+        let data = new ArrayBuffer(8);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.THREADS, true);
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.THREADS;
+        return this.preparePromise(cmd_id);
+    }
+    variables(frame_index, thread_id) {
+        let data = new ArrayBuffer(16);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.VARS, true);
+        view.setUint32(8, frame_index, true);
+        view.setUint32(12, thread_id, true);
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.VARS;
+        return this.preparePromise(cmd_id);
+    }
     parseIncoming(data) {
         let parser = new DataParser(data);
         while (parser.offset != data.length) {
@@ -413,6 +452,28 @@ class OVMDebugger extends EventEmitter {
                 this.resolvePromise(msg_id, result);
                 break;
             }
+            case OVMCommand.THREADS: {
+                let result = new Array();
+                let count = parser.parseUint32();
+                for (let i = 0; i < count; i++) {
+                    let id = parser.parseUint32();
+                    let name = parser.parseString();
+                    result.push({ id, name });
+                }
+                this.resolvePromise(msg_id, result);
+                break;
+            }
+            case OVMCommand.VARS: {
+                let result = new Array();
+                while (parser.parseInt32() == 0) {
+                    let name = parser.parseString();
+                    let value = parser.parseString();
+                    let type = parser.parseString();
+                    result.push({ name, value, type });
+                }
+                this.resolvePromise(msg_id, result);
+                break;
+            }
             default:
                 console.log("Unrecognized command. ", cmd_id, msg_id);
         }
@@ -449,14 +510,17 @@ class DataParser {
     constructor(data) {
         this.data = data;
         this.view = new DataView(data.buffer);
-        console.log("PARSING", this.data);
         this.offset = 0;
     }
     parseInt32() {
+        if (this.offset >= this.data.length)
+            return 0;
         this.offset += 4;
         return this.view.getInt32(this.offset - 4, true);
     }
     parseUint32() {
+        if (this.offset >= this.data.length)
+            return 0;
         this.offset += 4;
         return this.view.getUint32(this.offset - 4, true);
     }
@@ -470,6 +534,8 @@ class DataParser {
         return str;
     }
     parseBool() {
+        if (this.offset >= this.data.length)
+            return 0;
         this.offset += 1;
         return this.view.getUint8(this.offset - 1) != 0;
     }

@@ -1206,6 +1206,8 @@ struct AstFunction {
     // for this particular function.
     OnyxToken* exported_name;
 
+    OnyxToken* closing_brace;
+
     union {
         OnyxToken* intrinsic_name;
 

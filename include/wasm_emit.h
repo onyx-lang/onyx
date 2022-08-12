@@ -645,6 +645,7 @@ typedef enum DeferredStmtType {
 typedef struct DeferredStmt {
     DeferredStmtType type;
     u32 depth;
+    AstDefer *defer_node;
 
     union {
         AstNode *stmt;
@@ -820,11 +821,28 @@ typedef struct DebugFileInfo {
     u32 line_count;
 } DebugFileInfo;
 
+typedef enum DebugSymLoc {
+    DSL_REGISTER = 1,
+    DSL_STACK    = 2,
+    DSL_GLOBAL   = 3,
+} DebugSymLoc;
+
+typedef struct DebugSymInfo {
+    u32 sym_id;
+    u32 location_type;
+    u32 location_num;
+    char *name;
+    u32 type;
+} DebugSymInfo;
+
 typedef struct DebugContext {
     bh_allocator allocator;
 
     Table(DebugFileInfo) file_info;
     u32 next_file_id;
+
+    bh_arr(DebugSymInfo) sym_info;
+    u32 next_sym_id;
 
     bh_arr(DebugFuncContext) funcs;
     bh_buffer                op_buffer;

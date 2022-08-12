@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
         wasm_file_idx = 2;
     }
 
-    if (argc < 3) {
+    if (debug && argc < 3) {
         fprintf(stderr, "Expected a WASM file to run.\n");
         return 1;
     }
@@ -38,5 +38,5 @@ int main(int argc, char *argv[]) {
     bh_buffer data;
     data.data = wasm_data.data;
     data.length = wasm_data.length;
-    return onyx_run_wasm(data, argc - 1, argv + 1);
+    return onyx_run_wasm(data, argc - 1 - debug, argv + 1 + debug);
 }

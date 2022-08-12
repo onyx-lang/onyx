@@ -3,7 +3,7 @@ import {
 	LoggingDebugSession,
 	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, OutputEvent,
 	ProgressStartEvent, ProgressUpdateEvent, ProgressEndEvent, InvalidatedEvent,
-	Thread, StackFrame, Scope, Source, Handles, Breakpoint, MemoryEvent, ThreadEvent, LoadedSourceEvent
+	Thread, StackFrame, Scope, Source, Handles, Breakpoint, MemoryEvent, ThreadEvent, LoadedSourceEvent, Variable
 } from '@vscode/debugadapter';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import EventEmitter = require('node:events');
@@ -12,7 +12,6 @@ import { Subject } from "await-notify";
 import * as net from "node:net";
 import * as child_process from "node:child_process";
 import { ChildProcess } from 'node:child_process';
-import { Message } from '@vscode/debugadapter/lib/messages';
 
 
 interface IOVMAttachRequestArguments extends DebugProtocol.AttachRequestArguments {
@@ -26,6 +25,11 @@ interface IOVMLaunchRequestArguments extends DebugProtocol.AttachRequestArgument
     stopOnEntry?: boolean;
 }
 
+interface IFrameReference {
+	frameIndex: number;
+	threadId: number;
+}
+
 export class OVMDebugSession extends LoggingDebugSession {
 
 	private debugger: OVMDebugger;
@@ -36,6 +40,9 @@ export class OVMDebugSession extends LoggingDebugSession {
 	private _clientConnected: boolean;
 
 	private _loadedSources: Map<string, Source>;
+
+	private _variableReferences = new Handles<IFrameReference>();
+	private _frameReferences = new Handles<IFrameReference>();
 
     public constructor() {
         super("ovm-debug-log.txt");
@@ -143,18 +150,13 @@ export class OVMDebugSession extends LoggingDebugSession {
     }
 
     protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments, request?: DebugProtocol.Request): void {
-		console.log("CONFIGURATION DONE");
         super.configurationDoneRequest(response, args);
 
 		this._configurationDone.notify();
     }
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments, request?: DebugProtocol.Request): void {
-		console.log(`disconnectRequest suspend: ${args.suspendDebuggee}, terminate: ${args.terminateDebuggee}`);
-
 		if (args.terminateDebuggee) {
-			console.log("TERMINATE");
-
 			if (this.running_process) {
 				this.running_process.kill('SIGTERM');
 			}
@@ -168,8 +170,6 @@ export class OVMDebugSession extends LoggingDebugSession {
     }
 
 	protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request): Promise<void> {
-		console.log("BREAKPOINTS", args, response);
-
 		while (!this._clientConnected) {
 			await this._clientConnectedNotifier.wait();
 		}
@@ -211,35 +211,52 @@ export class OVMDebugSession extends LoggingDebugSession {
 					this.sendEvent(new LoadedSourceEvent("new", source));
 				}
 				
-				return new StackFrame(i, f.funcname, source, f.line);
+				let frameRef = this._frameReferences.create({
+					threadId: args.threadId,
+					frameIndex: i
+				});
+				return new StackFrame(frameRef, f.funcname, source, f.line);
 			})
 		};
 
 		this.sendResponse(response);
 	}
 
-	protected threadsRequest(response: DebugProtocol.ThreadsResponse, request?: DebugProtocol.Request): void {
-		console.log("THREADS");
+	protected async threadsRequest(response: DebugProtocol.ThreadsResponse, request?: DebugProtocol.Request): Promise<void> {
+		let threads = await this.debugger.threads();
 
 		response.body = {
-			threads: [
-				new Thread(1, "main thread"),
-			]
+			threads: threads.map(t => new Thread(t.id, t.name))
 		};
 
 		this.sendResponse(response);
 	}
 
 	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments, request?: DebugProtocol.Request): void {
-		console.log("SCOPES");
+		let frameId = args.frameId;
+
+		let frameRef = this._frameReferences.get(frameId);
+		let varRef   = this._variableReferences.create(frameRef);
 
 		response.body = {
 			scopes: [
-				new Scope("Locals", 1, false),
-				new Scope("Globals", 2, true)
+				new Scope("Locals", varRef, false),
 			]
 		};
 		this.sendResponse(response);	
+	}
+
+	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request): Promise<void> {
+		const frameRef = this._variableReferences.get(args.variablesReference, {frameIndex: 0, threadId: 0});
+		let vs: Variable[] = (await this.debugger.variables(frameRef.frameIndex, frameRef.threadId))
+			.map(v => {
+				let nv = new Variable(v.name, v.value) as DebugProtocol.Variable;
+				nv.type = v.type;
+				return nv;
+			});
+
+		response.body = { variables: vs };
+		this.sendResponse(response);
 	}
 
     protected launchRequest(response: DebugProtocol.LaunchResponse, args: IOVMLaunchRequestArguments, request?: DebugProtocol.Request): void {
@@ -256,7 +273,6 @@ export class OVMDebugSession extends LoggingDebugSession {
     }
 
     protected async attachRequest(response: DebugProtocol.AttachResponse, args: IOVMAttachRequestArguments, request?: DebugProtocol.Request): Promise<void> {
-		console.log("ATTACH");
 		await this._configurationDone.wait(1000);
 
 		await this.debugger.connect(args.socketPath);
@@ -318,13 +334,26 @@ interface IBreakpointValidation {
 	line: number;
 }
 
+interface IThreadInfo {
+	id: number;
+	name: string;
+}
+
+interface IVariableInfo {
+	name: string;
+	value: string;
+	type: string;
+}
+
 enum OVMCommand {
 	NOP     = 0,
 	RES     = 1,
 	BRK     = 2,
 	CLR_BRK = 3,
 	STEP    = 5,
-	TRACE   = 6
+	TRACE   = 6,
+	THREADS = 7,
+	VARS    = 8
 }
 
 enum OVMEvent {
@@ -461,6 +490,40 @@ class OVMDebugger extends EventEmitter {
 		return this.preparePromise(cmd_id);
 	}
 
+	threads(): Promise<IThreadInfo[]> {
+        let data = new ArrayBuffer(8);
+        let view = new DataView(data);
+
+        let cmd_id = this.next_command_id;
+
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.THREADS, true);
+
+        this.client.write(new Uint8Array(data));
+
+        this.pending_responses[cmd_id] = OVMCommand.THREADS;
+
+		return this.preparePromise(cmd_id);
+	}
+
+	variables(frame_index: number, thread_id: number): Promise<IVariableInfo[]> {
+        let data = new ArrayBuffer(16);
+        let view = new DataView(data);
+
+        let cmd_id = this.next_command_id;
+
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.VARS, true);
+        view.setUint32(8, frame_index, true);
+        view.setUint32(12, thread_id, true);
+
+        this.client.write(new Uint8Array(data));
+
+        this.pending_responses[cmd_id] = OVMCommand.VARS;
+
+		return this.preparePromise(cmd_id);
+	}
+
 	private parseIncoming(data: Buffer): void {
 		let parser = new DataParser(data);
 
@@ -557,6 +620,34 @@ class OVMDebugger extends EventEmitter {
 				break;
 			}
 
+			case OVMCommand.THREADS: {
+				let result = new Array<IThreadInfo>();
+
+				let count = parser.parseUint32();
+				for (let i = 0; i < count; i++) {
+					let id   = parser.parseUint32();
+					let name = parser.parseString();
+					result.push({id, name});
+				}
+
+				this.resolvePromise(msg_id, result);
+				break;
+			}
+
+			case OVMCommand.VARS: {
+				let result = new Array<IVariableInfo>();
+
+				while (parser.parseInt32() == 0) {
+					let name  = parser.parseString();
+					let value = parser.parseString();
+					let type  = parser.parseString();
+					result.push({name, value, type});
+				}
+
+				this.resolvePromise(msg_id, result);
+				break;
+			}
+
 			default:
 				console.log("Unrecognized command. ", cmd_id, msg_id);
 		}
@@ -604,16 +695,19 @@ class DataParser {
     constructor(data: Buffer) {
         this.data = data;
         this.view = new DataView(data.buffer);
-		console.log("PARSING", this.data);
         this.offset = 0;
     }
 
     parseInt32() {
+		if (this.offset >= this.data.length) return 0;
+
         this.offset += 4;
         return this.view.getInt32(this.offset - 4, true);
     }
 
     parseUint32() {
+		if (this.offset >= this.data.length) return 0;
+
         this.offset += 4;
         return this.view.getUint32(this.offset - 4, true);
     }
@@ -630,6 +724,8 @@ class DataParser {
     }
 
     parseBool() {
+		if (this.offset >= this.data.length) return 0;
+
         this.offset += 1;
         return this.view.getUint8(this.offset - 1) != 0;
     }

@@ -219,6 +219,35 @@ static inline b32 should_emit_function(AstFunction* fd) {
 
 #ifdef ENABLE_DEBUG_INFO
 
+static u32 debug_introduce_symbol(OnyxWasmModule *mod, OnyxToken *token, DebugSymLoc loc, u32 num, Type* type) {
+
+    u32 id = mod->debug_context->next_sym_id++;
+
+    DebugSymInfo sym_info;
+    sym_info.sym_id = id;
+    sym_info.location_type = loc;
+    sym_info.location_num  = num;
+    sym_info.type          = type->id;
+
+    if (token) {
+        token_toggle_end(token);
+        sym_info.name = bh_strdup(context.ast_alloc, token->text);
+        token_toggle_end(token);
+    } else {
+        sym_info.name = NULL;
+    }
+
+    bh_arr_push(mod->debug_context->sym_info, sym_info);
+
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_SYM);
+    u32 leb_len=0;
+    u8 *bytes = uint_to_uleb128(id, &leb_len);
+    bh_buffer_append(&mod->debug_context->op_buffer, bytes, leb_len);
+
+    mod->debug_context->last_op_was_rep = 0;
+    return id;
+}
+
 static u32 debug_get_file_id(OnyxWasmModule *mod, const char *name) {
     assert(mod && mod->debug_context);
 
@@ -360,13 +389,26 @@ static void debug_end_function(OnyxWasmModule *mod) {
     mod->debug_context->last_token = NULL;
 }
 
+static void debug_enter_symbol_frame(OnyxWasmModule *mod) {
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_PUSHF);
+    mod->debug_context->last_op_was_rep = 0;
+}
+
+static void debug_leave_symbol_frame(OnyxWasmModule *mod) {
+    bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_POPF);
+    mod->debug_context->last_op_was_rep = 0;
+}
+
 #else
 
+#define debug_introduce_symbol(mod, name, loc, num, type) (void)0
 #define debug_get_file_id(mod, name) (void)0
 #define debug_set_position(mod, token) (void)0
 #define debug_emit_instruction(mod, token) (void)0
 #define debug_begin_function(mod, idx, token, name) (void)0
 #define debug_end_function(mod) (void)0
+#define debug_enter_symbol_frame(mod) (void)0
+#define debug_leave_symbol_frame(mod) (void)0
 
 #endif
 
@@ -492,6 +534,7 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
                                                 ? SBT_Return_Block
                                                 : SBT_Breakable_Block,
                                                 block->token);
+        debug_enter_symbol_frame(mod);
     }
 
     forll (AstNode, stmt, block->body, next) {
@@ -511,8 +554,10 @@ EMIT_FUNC(block, AstBlock* block, b32 generate_block_headers) {
         emit_free_local_allocations(mod, &code);
     }
 
-    if (generate_block_headers)
+    if (generate_block_headers) {
         emit_leave_structured_block(mod, &code);
+        debug_leave_symbol_frame(mod);
+    }
 
     *pcode = code;
 }
@@ -645,6 +690,12 @@ EMIT_FUNC(statement, AstNode* stmt) {
 EMIT_FUNC(local_allocation, AstTyped* stmt) {
     u64 local_idx = local_allocate(mod->local_alloc, stmt);
     bh_imap_put(&mod->local_map, (u64) stmt, local_idx);
+
+    if (local_is_wasm_local(stmt)) {
+        debug_introduce_symbol(mod, stmt->token, DSL_REGISTER, local_idx, stmt->type);
+    } else {
+        debug_introduce_symbol(mod, stmt->token, DSL_STACK, local_idx, stmt->type);
+    }
 
     if (stmt->kind == Ast_Kind_Local && !(stmt->flags & Ast_Flag_Decl_Followed_By_Init)) {
         bh_arr(WasmInstruction) code = *pcode;
@@ -1409,6 +1460,11 @@ EMIT_FUNC(for, AstFor* for_node) {
     u64 iter_local = local_allocate(mod->local_alloc, (AstTyped *) var);
     bh_imap_put(&mod->local_map, (u64) var, iter_local);
 
+    debug_enter_symbol_frame(mod);
+    debug_introduce_symbol(mod, var->token,
+        local_is_wasm_local((AstTyped *) var) ? DSL_REGISTER : DSL_STACK,
+        iter_local, var->type);
+
     emit_expression(mod, &code, for_node->iter);
 
     switch (for_node->loop_type) {
@@ -1425,6 +1481,7 @@ EMIT_FUNC(for, AstFor* for_node) {
     }
 
     local_free(mod->local_alloc, (AstTyped *) var);
+    debug_leave_symbol_frame(mod);
 
     *pcode = code;
 }
@@ -1512,7 +1569,10 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
 
         u64 bn = bh_imap_get(&block_map, (u64) sc->block);
 
+        // Maybe the Symbol Frame idea should be controlled as a block_flag?
+        debug_enter_symbol_frame(mod);
         emit_block(mod, &code, sc->block, 0);
+        debug_leave_symbol_frame(mod);
 
         if (bh_arr_last(code).type != WI_JUMP)
             WID(NULL, WI_JUMP, block_num - bn);
@@ -1536,6 +1596,7 @@ EMIT_FUNC(defer, AstDefer* defer) {
     bh_arr_push(mod->deferred_stmts, ((DeferredStmt) {
         .type = Deferred_Stmt_Node,
         .depth = bh_arr_length(mod->structured_jump_target),
+        .defer_node= defer,
         .stmt = defer->stmt,
     }));
 }
@@ -1544,6 +1605,7 @@ EMIT_FUNC(defer_code, WasmInstruction* deferred_code, u32 code_count) {
     bh_arr_push(mod->deferred_stmts, ((DeferredStmt) {
         .type = Deferred_Stmt_Code,
         .depth = bh_arr_length(mod->structured_jump_target),
+        .defer_node= NULL,
         .instructions = deferred_code,
         .instruction_count = code_count,
     }));
@@ -1551,6 +1613,10 @@ EMIT_FUNC(defer_code, WasmInstruction* deferred_code, u32 code_count) {
 
 EMIT_FUNC(deferred_stmt, DeferredStmt deferred_stmt) {
     bh_arr(WasmInstruction) code = *pcode;
+
+    if (deferred_stmt.defer_node) {
+        WI(deferred_stmt.defer_node->token, WI_NOP);
+    }
 
     switch (deferred_stmt.type) {
         case Deferred_Stmt_Node: emit_statement(mod, &code, deferred_stmt.stmt); break;
@@ -3639,6 +3705,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             switch (type_get_param_pass(param->local->type)) {
                 case Param_Pass_By_Value: {
                     if (type_is_structlike_strict(param->local->type)) {
+                        debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx, param->local->type);
                         bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
                         localidx += type_structlike_mem_count(param->local->type);
 
@@ -3648,6 +3715,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
                 }
 
                 case Param_Pass_By_Implicit_Pointer: {
+                    debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx, param->local->type);
                     bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);
                     break;
                 }
@@ -3700,6 +3768,11 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
 
     WasmFuncType* ft = mod->types[type_idx];
     emit_zero_value(mod, &wasm_func.code, ft->return_type);
+
+    if (fd->closing_brace) {
+        debug_emit_instruction(mod, fd->closing_brace);
+        bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_NOP, 0x00 }));
+    }
 
     debug_emit_instruction(mod, NULL);
     bh_arr_push(wasm_func.code, ((WasmInstruction){ WI_BLOCK_END, 0x00 }));
@@ -4210,9 +4283,11 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     module.debug_context = bh_alloc_item(context.ast_alloc, DebugContext);
     module.debug_context->allocator = global_heap_allocator;
     module.debug_context->next_file_id = 0;
+    module.debug_context->next_sym_id = 0;
     module.debug_context->last_token = NULL;
 
     sh_new_arena(module.debug_context->file_info);
+    bh_arr_new(global_heap_allocator, module.debug_context->sym_info, 32);
     bh_arr_new(global_heap_allocator, module.debug_context->funcs, 16);
 
     bh_buffer_init(&module.debug_context->op_buffer, global_heap_allocator, 1024);
