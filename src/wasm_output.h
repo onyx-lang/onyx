@@ -812,7 +812,15 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             output_name(func->name, func->name_length, &section_buff);
             output_unsigned_integer(1, &section_buff);
             output_unsigned_integer(func->op_offset, &section_buff);
-            output_unsigned_integer(func->stack_ptr_idx, &section_buff);
+
+            LocalAllocator *locals = &module->funcs[i].locals;
+            if (func->stack_ptr_idx > 0) {
+                u32 local_idx = local_lookup_idx(locals, func->stack_ptr_idx);
+                output_unsigned_integer(local_idx, &section_buff);
+            } else {
+                output_unsigned_integer(0, &section_buff);
+            }
+
             output_unsigned_integer(0, &section_buff);
         }
 
@@ -822,7 +830,19 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
     }
 
     {
-        // ovm_debug_syms sections
+        // ovm_debug_syms section
+
+        // First, apply patches for register locations
+        bh_arr_each(DebugSymPatch, patch, ctx->sym_patches) {
+            // CLEANUP: This is (kind of) incorrect, as there is nothing guarenteeing
+            // that the symbol with id a will be a position a, other than the way
+            // that this has been implemented right now.
+            assert(ctx->sym_info[patch->sym_id].location_type == DSL_REGISTER);
+
+            LocalAllocator *locals = &module->funcs[patch->func_idx - module->foreign_function_count].locals;
+            ctx->sym_info[patch->sym_id].location_num = local_lookup_idx(locals, patch->local_idx);
+        }
+
         bh_buffer_clear(&section_buff);
         bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
 
@@ -842,6 +862,141 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             output_unsigned_integer(sym->location_type, &section_buff);
             output_unsigned_integer(sym->location_num, &section_buff);
             output_unsigned_integer(sym->type, &section_buff);
+        }
+
+        output_unsigned_integer(section_buff.length, buff);
+
+        bh_buffer_concat(buff, section_buff);
+    }
+
+    {
+        // ovm_debug_types section
+        bh_buffer_clear(&section_buff);
+        bh_buffer_write_byte(buff, WASM_SECTION_ID_CUSTOM);
+
+        output_custom_section_name("ovm_debug_types", &section_buff);
+
+        i32 type_count = bh_arr_length(type_map.entries);
+        output_unsigned_integer(type_count, &section_buff);
+
+        bh_arr_each(bh__imap_entry, entry, type_map.entries) {
+            u32 id     = entry->key;
+            Type *type = (Type *) entry->value;
+            const char *name = type_get_name(type);
+
+            output_unsigned_integer(id, &section_buff);
+            output_name(name, strlen(name), &section_buff);
+            output_unsigned_integer(type_size_of(type), &section_buff);
+
+            if (type->kind == Type_Kind_Basic) {
+                // Type indicies are special because they are encoded
+                // as a "distinct" unsigned 32-bit integer, which is
+                // effectively how they are used in the code anyway.
+                //
+                // This is probably a change that will be made throughout
+                // the entire compiler, but for now they will remain as
+                // a special type.
+                if (type->Basic.kind == Basic_Kind_Type_Index) {
+                    output_unsigned_integer(5, &section_buff);
+                    output_unsigned_integer(2, &section_buff);
+                    output_unsigned_integer(basic_types[Basic_Kind_U32].id, &section_buff);
+                    continue;
+                }
+
+                if (type->Basic.kind == Basic_Kind_Rawptr) {
+                    // rawptr -> ^void
+                    output_unsigned_integer(2, &section_buff);
+                    output_unsigned_integer(1, &section_buff);
+                    output_unsigned_integer(basic_types[Basic_Kind_Void].id, &section_buff);
+                    continue;
+                }
+
+                output_unsigned_integer(1, &section_buff);
+                if      (type->Basic.kind == Basic_Kind_Void) output_unsigned_integer(0, &section_buff);
+                else if (type_is_bool(type))                  output_unsigned_integer(4, &section_buff);
+                else if (type_is_integer(type)) {
+                    if (type->Basic.flags & Basic_Flag_Unsigned) output_unsigned_integer(2, &section_buff);
+                    else                                         output_unsigned_integer(1, &section_buff);
+                }
+                else if (type->Basic.flags & Basic_Flag_Float)   output_unsigned_integer(3, &section_buff);
+                else if (type_is_simd(type))                     output_unsigned_integer(6, &section_buff);
+                else {
+                    output_unsigned_integer(0, &section_buff);
+                }
+
+                continue;
+            }
+
+            if (type->kind == Type_Kind_Pointer) {
+                output_unsigned_integer(2, &section_buff);
+                output_unsigned_integer(1, &section_buff);
+                output_unsigned_integer(type->Pointer.elem->id, &section_buff);
+                continue; 
+            }
+
+            if (type->kind == Type_Kind_Enum) {
+                output_unsigned_integer(5, &section_buff);
+                output_unsigned_integer(2, &section_buff);
+                output_unsigned_integer(type->Enum.backing->id, &section_buff);
+                continue;
+            }
+
+            if (type->kind == Type_Kind_Array) {
+                output_unsigned_integer(4, &section_buff);
+                output_unsigned_integer(type->Array.count, &section_buff);
+                output_unsigned_integer(type->Array.elem->id, &section_buff);
+                continue;
+            }
+
+            if (type_is_structlike_strict(type)) {
+                output_unsigned_integer(3, &section_buff);
+
+                i32 mem_count = type_structlike_mem_count(type);
+                output_unsigned_integer(mem_count, &section_buff);
+
+                fori (i, 0, mem_count) {
+                    StructMember smem;
+                    type_lookup_member_by_idx(type, i, &smem);
+
+                    output_unsigned_integer(smem.offset, &section_buff);
+                    output_unsigned_integer(smem.type->id, &section_buff);
+                    output_name(smem.name, strlen(smem.name), &section_buff);
+                }
+
+                continue;
+            }
+
+            if (type->kind == Type_Kind_Function) {
+                output_unsigned_integer(6, &section_buff);
+                output_unsigned_integer(type->Function.param_count, &section_buff);
+
+                fori (i, 0, (i32) type->Function.param_count) {
+                    output_unsigned_integer(type->Function.params[i]->id, &section_buff);
+                }
+
+                output_unsigned_integer(type->Function.return_type->id, &section_buff);
+                continue;
+            }
+
+            if (type->kind == Type_Kind_Distinct) {
+                output_unsigned_integer(5, &section_buff);
+                output_unsigned_integer(2, &section_buff);
+                output_unsigned_integer(type->Distinct.base_type->id, &section_buff);
+                continue;
+            }
+
+            // No debug information will be given about the poly struct
+            // or compound types.
+            // Outside of runtime type information, they provide no useful
+            // debugging information (I don't think at least...).
+            if (type->kind == Type_Kind_PolyStruct ||
+                type->kind == Type_Kind_Compound) {
+                output_unsigned_integer(1, &section_buff);
+                output_unsigned_integer(0, &section_buff);
+                continue;
+            }
+
+            assert(("Unhandled type", 0));
         }
 
         output_unsigned_integer(section_buff.length, buff);

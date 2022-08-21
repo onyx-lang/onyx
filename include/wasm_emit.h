@@ -830,10 +830,16 @@ typedef enum DebugSymLoc {
 typedef struct DebugSymInfo {
     u32 sym_id;
     u32 location_type;
-    u32 location_num;
+    u64 location_num;
     char *name;
     u32 type;
 } DebugSymInfo;
+
+typedef struct DebugSymPatch {
+    u32 func_idx;
+    u32 sym_id;
+    u64 local_idx;
+} DebugSymPatch;
 
 typedef struct DebugContext {
     bh_allocator allocator;
@@ -841,7 +847,8 @@ typedef struct DebugContext {
     Table(DebugFileInfo) file_info;
     u32 next_file_id;
 
-    bh_arr(DebugSymInfo) sym_info;
+    bh_arr(DebugSymInfo)  sym_info;
+    bh_arr(DebugSymPatch) sym_patches;
     u32 next_sym_id;
 
     bh_arr(DebugFuncContext) funcs;

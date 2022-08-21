@@ -69,8 +69,6 @@ export class OVMDebugSession extends LoggingDebugSession {
     }
 
     protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
-		console.log("INITIALIZE");
-
         response.body = response.body || {};
 
         // the adapter implements the configurationDone request.
@@ -288,6 +286,11 @@ export class OVMDebugSession extends LoggingDebugSession {
 		}
     }
 
+    protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request): void {
+    	this.debugger.pause(args.threadId);
+    	this.sendResponse(response);
+    }
+
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments, request?: DebugProtocol.Request): void {
 		let thread_id = args.threadId;
 		if (!args.singleThread) {
@@ -348,8 +351,9 @@ interface IVariableInfo {
 enum OVMCommand {
 	NOP     = 0,
 	RES     = 1,
-	BRK     = 2,
-	CLR_BRK = 3,
+	PAUSE   = 2,
+	BRK     = 3,
+	CLR_BRK = 4,
 	STEP    = 5,
 	TRACE   = 6,
 	THREADS = 7,
@@ -391,6 +395,21 @@ class OVMDebugger extends EventEmitter {
 		return new Promise((res, rej) => {
 			this.client.on("connect", res);
 		});
+	}
+
+	pause(thread_id: number = 0xffffffff): void {
+        let data = new ArrayBuffer(12);
+        let view = new DataView(data);
+
+        let cmd_id = this.next_command_id;
+
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.PAUSE, true);
+        view.setUint32(8, thread_id, true);
+
+        this.client.write(new Uint8Array(data));
+
+        this.pending_responses[cmd_id] = OVMCommand.PAUSE;
 	}
 
     resume(thread_id: number = 0xffffffff): void {
@@ -564,7 +583,7 @@ class OVMDebugger extends EventEmitter {
 				}
 
 				default:
-					console.log("Unknown event: ", event_id, data);
+					// console.log("Unknown event: ", event_id, data);
 			}
 		}
 	}
@@ -649,7 +668,7 @@ class OVMDebugger extends EventEmitter {
 			}
 
 			default:
-				console.log("Unrecognized command. ", cmd_id, msg_id);
+				// console.log("Unrecognized command. ", cmd_id, msg_id);
 		}
 	}
 

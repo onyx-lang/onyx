@@ -2244,6 +2244,11 @@ CheckStatus check_struct(AstStructType* s_node) {
         CHECK(constraint_context, &s_node->constraints, s_node->scope, pos);
     }
 
+    //
+    // This ensures that all procedures defined inside of a structure are
+    // not pruned and omitted from the binary. This is because a large
+    // use-case of procedures in structures is dynamically linking them
+    // using the type info data.
     if (s_node->scope) {
         fori (i, 0, shlen(s_node->scope->symbols)) {
             AstNode* node = s_node->scope->symbols[i].value;

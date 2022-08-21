@@ -236,7 +236,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
         return cast(i32) a.state - cast(i32) b.state;
     });
 
-    client_count = array.count_where(clients, x => x != null);
+    client_count = array.count_where(clients, #(it != null));
 
     return server.alive;
 }

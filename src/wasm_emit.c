@@ -219,7 +219,7 @@ static inline b32 should_emit_function(AstFunction* fd) {
 
 #ifdef ENABLE_DEBUG_INFO
 
-static u32 debug_introduce_symbol(OnyxWasmModule *mod, OnyxToken *token, DebugSymLoc loc, u32 num, Type* type) {
+static u32 debug_introduce_symbol(OnyxWasmModule *mod, OnyxToken *token, DebugSymLoc loc, u64 num, Type* type) {
 
     u32 id = mod->debug_context->next_sym_id++;
 
@@ -238,6 +238,15 @@ static u32 debug_introduce_symbol(OnyxWasmModule *mod, OnyxToken *token, DebugSy
     }
 
     bh_arr_push(mod->debug_context->sym_info, sym_info);
+
+    if (loc == DSL_REGISTER) {
+        assert(mod->local_alloc);
+        DebugSymPatch patch;
+        patch.func_idx = mod->current_func_idx;
+        patch.sym_id = id;
+        patch.local_idx = num;
+        bh_arr_push(mod->debug_context->sym_patches, patch);
+    }
 
     bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_SYM);
     u32 leb_len=0;
@@ -3699,13 +3708,15 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
     }
 
     if (fd->body != NULL) {
+        mod->local_alloc = &wasm_func.locals;
+
         // NOTE: Generate the local map
         u64 localidx = 0;
         bh_arr_each(AstParam, param, fd->params) {
             switch (type_get_param_pass(param->local->type)) {
                 case Param_Pass_By_Value: {
                     if (type_is_structlike_strict(param->local->type)) {
-                        debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx, param->local->type);
+                        debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
                         bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
                         localidx += type_structlike_mem_count(param->local->type);
 
@@ -3715,7 +3726,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
                 }
 
                 case Param_Pass_By_Implicit_Pointer: {
-                    debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx, param->local->type);
+                    debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
                     bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);
                     break;
                 }
@@ -3724,7 +3735,6 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
             }
         }
 
-        mod->local_alloc = &wasm_func.locals;
         mod->local_alloc->param_count = localidx;
 
         mod->curr_cc = type_function_get_cc(fd->type);
@@ -4288,6 +4298,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
 
     sh_new_arena(module.debug_context->file_info);
     bh_arr_new(global_heap_allocator, module.debug_context->sym_info, 32);
+    bh_arr_new(global_heap_allocator, module.debug_context->sym_patches, 32);
     bh_arr_new(global_heap_allocator, module.debug_context->funcs, 16);
 
     bh_buffer_init(&module.debug_context->op_buffer, global_heap_allocator, 1024);

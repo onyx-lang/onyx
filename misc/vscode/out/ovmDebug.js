@@ -38,7 +38,6 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         });
     }
     initializeRequest(response, args) {
-        console.log("INITIALIZE");
         response.body = response.body || {};
         // the adapter implements the configurationDone request.
         response.body.supportsConfigurationDoneRequest = true;
@@ -211,6 +210,10 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
             }
         });
     }
+    pauseRequest(response, args, request) {
+        this.debugger.pause(args.threadId);
+        this.sendResponse(response);
+    }
     continueRequest(response, args, request) {
         let thread_id = args.threadId;
         if (!args.singleThread) {
@@ -243,8 +246,9 @@ var OVMCommand;
 (function (OVMCommand) {
     OVMCommand[OVMCommand["NOP"] = 0] = "NOP";
     OVMCommand[OVMCommand["RES"] = 1] = "RES";
-    OVMCommand[OVMCommand["BRK"] = 2] = "BRK";
-    OVMCommand[OVMCommand["CLR_BRK"] = 3] = "CLR_BRK";
+    OVMCommand[OVMCommand["PAUSE"] = 2] = "PAUSE";
+    OVMCommand[OVMCommand["BRK"] = 3] = "BRK";
+    OVMCommand[OVMCommand["CLR_BRK"] = 4] = "CLR_BRK";
     OVMCommand[OVMCommand["STEP"] = 5] = "STEP";
     OVMCommand[OVMCommand["TRACE"] = 6] = "TRACE";
     OVMCommand[OVMCommand["THREADS"] = 7] = "THREADS";
@@ -273,6 +277,16 @@ class OVMDebugger extends EventEmitter {
         return new Promise((res, rej) => {
             this.client.on("connect", res);
         });
+    }
+    pause(thread_id = 0xffffffff) {
+        let data = new ArrayBuffer(12);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.PAUSE, true);
+        view.setUint32(8, thread_id, true);
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.PAUSE;
     }
     resume(thread_id = 0xffffffff) {
         let data = new ArrayBuffer(12);
@@ -409,7 +423,7 @@ class OVMDebugger extends EventEmitter {
                     break;
                 }
                 default:
-                    console.log("Unknown event: ", event_id, data);
+                // console.log("Unknown event: ", event_id, data);
             }
         }
     }
@@ -475,7 +489,7 @@ class OVMDebugger extends EventEmitter {
                 break;
             }
             default:
-                console.log("Unrecognized command. ", cmd_id, msg_id);
+            // console.log("Unrecognized command. ", cmd_id, msg_id);
         }
     }
     preparePromise(msg_id) {
