@@ -325,27 +325,70 @@ replace :: (s: str, to_replace: u8, replace_with: u8) {
     }
 }
 
-read_until :: (s: ^str, upto: u8, skip := 0) -> str {
-    if s.count == 0 do return "";
+read_until :: #match #locked {
+    (s: ^str, upto: u8, skip := 0) -> str {
+        if s.count == 0 do return "";
 
-    out : str;
-    out.data = s.data;
-    out.count = 0;
+        out : str;
+        out.data = s.data;
+        out.count = 0;
 
-    rem := skip;
-    for ch: *s {
-        if ch == upto {
-            if rem <= 0 do break;
-            else do rem -= 1;
+        rem := skip;
+        for ch: *s {
+            if ch == upto {
+                if rem <= 0 do break;
+                else do rem -= 1;
+            }
+
+            out.count += 1;
         }
 
-        out.count += 1;
+        s.data += out.count;
+        s.count -= out.count;
+
+        return out;
+    },
+
+    (s: ^str, upto: str, skip := 0) -> str {
+        if s.count == 0 do return "";
+
+        out := str.{ data = s.data };
+
+        rem := skip;
+        i := 0;
+        while i <= s.count - upto.count {
+            match := true;
+            j := i;
+            for upto {
+                if s.data[j] != it {
+                    match = false;
+                    break;
+                }
+
+                j += 1;
+            }
+
+            if match {
+                if rem <= 0 do break;
+                else do rem -= 1;
+            }
+
+            i += 1;
+        }
+
+        if i > s.count - upto.count {
+            out = *s;
+            s.data  += out.count;
+            s.count  = 0;
+
+        } else {
+            out.count = i - 1;
+            s.data  += out.count + (upto.count - 1);
+            s.count -= out.count + (upto.count - 1);
+        }
+
+        return out;
     }
-
-    s.data += out.count;
-    s.count -= out.count;
-
-    return out;
 }
 
 read_until_any :: (s: ^str, skip: u32, uptos: ..u8) -> str {
