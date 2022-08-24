@@ -76,8 +76,8 @@ init :: (use map: ^Map($K, $V), default := V.{}) {
 }
 
 free :: (use map: ^Map) {
-    if map.hashes.data != null do memory.free_slice(^hashes, allocator=allocator);
-    if map.entries.data != null do array.free(^entries);
+    if hashes.data != null  do memory.free_slice(^hashes, allocator=allocator);
+    if entries.data != null do array.free(^entries);
 }
 
 #match (package builtin).delete (package core.map).free

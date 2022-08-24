@@ -461,6 +461,7 @@ AstNode* ast_clone(bh_allocator a, void* n) {
                 new_param.local = (AstLocal *) ast_clone(a, param->local);
                 new_param.local->flags &= ~Ast_Flag_Param_Symbol_Dirty;
                 new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
+                new_param.use_processed = 0;
                 dont_copy_structs = 0;
 
                 new_param.vararg_kind = param->vararg_kind;
@@ -605,6 +606,7 @@ AstFunction* clone_function_header(bh_allocator a, AstFunction* func) {
         new_param.local = (AstLocal *) ast_clone(a, param->local);
         new_param.local->flags &= ~Ast_Flag_Param_Symbol_Dirty;
         new_param.default_value = (AstTyped *) ast_clone(a, param->default_value);
+        new_param.use_processed = 0;
         dont_copy_structs = 0;
 
         new_param.vararg_kind = param->vararg_kind;

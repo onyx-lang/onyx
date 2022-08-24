@@ -67,9 +67,9 @@ reader_free :: (use reader: ^Reader) {
 // You need to free the StringStream from the context.allocator when you use this. For example,
 //      reader, stream := reader_from_string(s);
 //      defer cfree(stream);
-reader_from_string :: (s: str) -> (Reader, ^StringStream) {
-    stream_ptr := new(StringStream);
-    *stream_ptr = string_stream_make(s);
+reader_from_string :: (s: str) -> (Reader, ^BufferStream) {
+    stream_ptr := new(BufferStream);
+    *stream_ptr = buffer_stream_make(s, fixed=true, write_enabled=false);
 
     return reader_make(stream_ptr), stream_ptr;
 }

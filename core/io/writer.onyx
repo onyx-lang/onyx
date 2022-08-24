@@ -16,9 +16,9 @@ writer_make :: (s: ^Stream) -> Writer {
 // Future-proofing the API
 writer_free :: (w: ^Writer) {}
 
-string_builder :: (allocator := context.allocator) -> (Writer, ^DynamicStringStream) {
-    new_stream := new(DynamicStringStream, allocator=allocator);
-    *new_stream = dynamic_string_stream_make();
+string_builder :: (allocator := context.allocator) -> (Writer, ^BufferStream) {
+    new_stream := new(BufferStream, allocator=allocator);
+    *new_stream = buffer_stream_make();
 
     return writer_make(new_stream), new_stream;
 }

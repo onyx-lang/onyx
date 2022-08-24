@@ -114,12 +114,12 @@ byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 //
 
 #thread_local stdio : struct {
-    print_stream : io.DynamicStringStream;
+    print_stream : io.BufferStream;
     print_writer : io.Writer;
 }
 
 __stdio_init :: () {
-    stdio.print_stream = io.dynamic_string_stream_make(2048, context.allocator);
+    stdio.print_stream = io.buffer_stream_make(2048, context.allocator);
     stdio.print_writer = io.writer_make(^stdio.print_stream);
     
     // This shouldn't need to be here, but because ^stdin_vtable is not a compile-time
@@ -132,7 +132,7 @@ __flush_stdio :: () {
     if stdio.print_stream.data.count == 0 do return;
 
     ^stdio.print_stream
-        |> io.dynamic_string_stream_to_str()
+        |> io.buffer_stream_to_str()
         |> runtime.__output_string();
 
     ^stdio.print_stream |> io.stream_flush();

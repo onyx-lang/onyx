@@ -218,7 +218,7 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 
     delete :: #match {
         #precedence 1000 macro (x: ^$T, allocator := context.allocator) {
-            raw_free(allocator, x);
+            if x != null do raw_free(allocator, x);
         }
     }
 }

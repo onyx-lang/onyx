@@ -28,7 +28,7 @@ Cell :: struct {
 main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day24.txt";
 
-    file_stream := io.string_stream_make(contents);
+    file_stream := io.buffer_stream_make(contents);
 	file := io.reader_make(^file_stream);
 
 	grid := map.make(Vec2, Cell, .{}); // `true` is black

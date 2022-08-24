@@ -110,32 +110,110 @@ stream_size :: (use s: ^Stream) -> i32 {
 
 
 //
-// StringStream
+// BufferStream
 //
-StringStream :: struct {
+// In older times of the standard library, there were two string
+// streams that existed for different purposes: StringStream and
+// DynamicStringStream. I have since merged them into one stream
+// called, BufferStream. Besides the names being confusing and
+// long, I thought it was needlessly complicated to have two
+// kinds of streams for what feels like the same task.
+//
+// When creating a BufferStream, there are two options:
+//      - You can pass a single integer, will which represent
+//          the initial size of the buffer. An initial buffer
+//          will be allocated using the allocator provided.
+//          This buffer will be write enabled, and not fixed,
+//          so it can grow to as (theoretically) large as
+//          necessary.
+//
+//      - You can pass an existing slice. The behavior of this
+//          buffer depend on the other arguments. If you set
+//          write_enabled to false, then writing will be allowed
+//          into this buffer. This is good practice if you only
+//          plan on using the stream as a read-only output for
+//          io.Reader.  If you enable writing, then you can
+//          decided if the buffer is fixed or not. If the buffer
+//          is fixed, the provided buffer will be used without
+//          allocating anything, and the data written will go
+//          directly into the provided slice. Obviously, when
+//          fixed is true, the buffer cannot grow and might result
+//          in filling the buffer and losing information. An .EOF
+//          error is returned in that case. If you pass fixed as
+//          false, the provided buffer will be copied into a new
+//          dynamic array. Note, the cursor still starts at index
+//          0, so you have to use stream_tell to move the cursor
+//          to the correct spot (This behavior might change in the
+//          future). 
+//                 
+// Remember to free the buffer using buffer_stream_free or delete.
+//
+// Note, if write_enabled is false, buffer_stream_to_str will return
+// the null string, as convert a non-writable buffer to a string does
+// not have a great natural definition.
+
+
+BufferStream :: struct {
     use stream : Stream;
 
-    curr_pos : i32;
-    data : str;
+    data: [..] u8;
+    curr_pos := 0;
+
+    write_enabled := true;
+    fixed         := false;
 }
 
-string_stream_make :: (s: str) -> StringStream {
-    return StringStream.{
-        stream = Stream.{
-            vtable   = ^string_stream_vtable,
-        },
-        data     = s,
-        curr_pos = 0,
-    };
+buffer_stream_make :: #match #locked {
+    (initial_data: [] u8, allocator := context.allocator, fixed := false, write_enabled := true) -> BufferStream {
+        if !write_enabled {
+            return .{
+                .{ vtable = ^buffer_stream_vtable },
+                data = .{
+                    data = initial_data.data,
+                    count = initial_data.count
+                    // This does not specify the allocator,
+                    // but since write_enabled is false,
+                    // this should never be resized.
+                },
+                write_enabled = false,
+                fixed         = true
+            };
+        }
+
+        // Make a copy of the data using the provided allocator.
+        data: [..] u8 = .{ initial_data.data, initial_data.count, initial_data.count };
+        if !fixed {
+            data = array.make(initial_data, allocator);
+        }
+
+        return .{ .{ vtable = ^buffer_stream_vtable }, data, fixed=fixed };
+    },
+
+    (initial_size := 1024, allocator := context.allocator) -> BufferStream {
+        return .{
+            .{ vtable = ^buffer_stream_vtable },
+            make([..] u8, 1024, allocator = allocator)
+        };
+    }
 }
 
-string_stream_to_str :: (use ss: ^StringStream) -> str {
-    return .{ data.data, curr_pos };
+buffer_stream_free :: (use bs: ^BufferStream) {
+    if write_enabled && !fixed {
+        delete(^data);
+    }
+}
+
+#match builtin.delete buffer_stream_free
+
+buffer_stream_to_str :: (use bs: ^BufferStream) -> str {
+    if !write_enabled do return null_str;
+
+    return data[0 .. curr_pos];
 }
 
 #package
-string_stream_vtable := Stream_Vtable.{
-    seek = (use ss: ^StringStream, to: i32, whence: SeekFrom) -> Error {
+buffer_stream_vtable := Stream_Vtable.{
+    seek = (use ss: ^BufferStream, to: i32, whence: SeekFrom) -> Error {
         if to >= data.count do return .OutOfBounds;
 
         switch whence {
@@ -147,11 +225,11 @@ string_stream_vtable := Stream_Vtable.{
         return .None;
     },
 
-    tell = (use ss: ^StringStream) -> (Error, u32) {
+    tell = (use ss: ^BufferStream) -> (Error, u32) {
         return .None, curr_pos;
     },
 
-    read = (use ss: ^StringStream, buffer: [] u8) -> (Error, u32) {
+    read = (use ss: ^BufferStream, buffer: [] u8) -> (Error, u32) {
         if curr_pos >= data.count do return .EOF, 0;
 
         bytes_to_read := math.min(buffer.count, data.count - curr_pos);
@@ -161,7 +239,7 @@ string_stream_vtable := Stream_Vtable.{
         return .None, bytes_to_read;
     },
 
-    read_at = (use ss: ^StringStream, at: u32, buffer: [] u8) -> (Error, u32) {
+    read_at = (use ss: ^BufferStream, at: u32, buffer: [] u8) -> (Error, u32) {
         if at >= data.count do return .EOF, 0;
 
         bytes_to_read := math.min(buffer.count, data.count - at);
@@ -170,143 +248,33 @@ string_stream_vtable := Stream_Vtable.{
         return .None, bytes_to_read;
     },
 
-    read_byte = (use ss: ^StringStream) -> (Error, u8) {
+    read_byte = (use ss: ^BufferStream) -> (Error, u8) {
         if curr_pos >= data.count do return .EOF, 0;
 
         defer curr_pos += 1;
         return .None, data[curr_pos];
     },
 
-    write = (use ss: ^StringStream, buffer: [] u8) -> (Error, u32) {
-        if curr_pos >= data.count do return .EOF, 0;
+    write = (use dss: ^BufferStream, buffer: [] u8) -> (Error, u32) {
+        if !write_enabled do return .NotImplemented, 0;
 
-        bytes_to_write := math.min(buffer.count, data.count - curr_pos);
-        memory.copy(^data.data[curr_pos], buffer.data, bytes_to_write);
-        curr_pos += bytes_to_write;
-
-        return .None, bytes_to_write;
-    },
-
-    write_at = (use ss: ^StringStream, at: u32, buffer: [] u8) -> (Error, u32) {
-        if at >= data.count do return .EOF, 0;
-
-        bytes_to_write := math.min(buffer.count, data.count - at);
-        memory.copy(^data.data[at], buffer.data, bytes_to_write);
-
-        return .None, bytes_to_write;
-    },
-
-    write_byte = (use ss: ^StringStream, byte: u8) -> Error {
-        if curr_pos >= data.count do return .EOF;
-
-        data[curr_pos] = byte;
-        curr_pos += 1;
-
-        return .None;
-    },
-
-    size = (use ss: ^StringStream) -> i32 {
-        return data.count;
-    }
-}
-
-
-//
-// DynamicStringStream
-//
-DynamicStringStream :: struct {
-    use stream : Stream;
-
-    curr_pos : i32;
-    data  : [..] u8;
-
-    to_str :: dynamic_string_stream_to_str;
-}
-
-dynamic_string_stream_make :: (init_size := 128, a := context.allocator) -> DynamicStringStream {
-    data : [..] u8;
-    array.init(^data, init_size, allocator=a);
-
-    return DynamicStringStream.{
-        stream = Stream.{
-            vtable = ^dynamic_string_stream_vtable,
-        },
-
-        curr_pos = 0,
-        data = data,
-    };
-}
-
-dynamic_string_stream_free :: (use dds: ^DynamicStringStream) {
-    array.free(^data);
-}
-
-dynamic_string_stream_to_str :: (use dds: ^DynamicStringStream) -> str {
-    return data.data[0 .. curr_pos];
-}
-
-#package
-dynamic_string_stream_vtable := Stream_Vtable.{
-    seek = (use dss: ^DynamicStringStream, to: i32, whence: SeekFrom) -> Error {
-        dest : i32;
-        switch whence {
-            case SeekFrom.Start   do dest = to;
-            case SeekFrom.Current do dest = curr_pos + to;
-            case SeekFrom.End     do dest = data.count - to; // CHECK: Off by one?
-        }
-
-        if dest >= data.count {
-            if !array.ensure_capacity(^data, dest) do return .OutOfBounds;
-        }
-
-        curr_pos = dest;
-        return .None;
-    },
-
-    tell = (use dss: ^DynamicStringStream) -> (Error, u32) {
-        return .None, curr_pos;
-    },
-
-    read = (use dss: ^DynamicStringStream, buffer: [] u8) -> (Error, u32) {
-        if curr_pos >= data.count do return .EOF, 0;
-
-        bytes_to_read := math.min(buffer.count, data.count - curr_pos);
-        memory.copy(buffer.data, ^data.data[curr_pos], bytes_to_read);
-        curr_pos += bytes_to_read;
-
-        return .None, bytes_to_read;
-    },
-
-    read_at = (use dss: ^DynamicStringStream, at: u32, buffer: [] u8) -> (Error, u32) {
-        if at >= data.count do return .EOF, 0;
-
-        bytes_to_read := math.min(buffer.count, data.count - at);
-        memory.copy(buffer.data, ^data.data[at], bytes_to_read);
-
-        return .None, bytes_to_read;
-    },
-
-    read_byte = (use dss: ^DynamicStringStream) -> (Error, u8) {
-        if curr_pos >= data.count do return .EOF, 0;
-
-        defer curr_pos += 1;
-        return .None, data[curr_pos];
-    },
-
-    write = (use dss: ^DynamicStringStream, buffer: [] u8) -> (Error, u32) {
         if curr_pos + buffer.count >= data.capacity {
+            if fixed do return .EOF, 0;
             if !array.ensure_capacity(^data, curr_pos + buffer.count) do return .EOF, 0;
         }
 
         memory.copy(^data.data[curr_pos], buffer.data, buffer.count);
         curr_pos   += buffer.count;
-        data.count += buffer.count;
+        data.count  = math.max(data.count, curr_pos);
 
         return .None, buffer.count;
     },
 
-    write_at = (use dss: ^DynamicStringStream, at: u32, buffer: [] u8) -> (Error, u32) {
+    write_at = (use dss: ^BufferStream, at: u32, buffer: [] u8) -> (Error, u32) {
+        if !write_enabled do return .NotImplemented, 0;
+
         if at + buffer.count >= data.capacity {
+            if fixed do return .EOF, 0;
             if !array.ensure_capacity(^data, at + buffer.count) do return .EOF, 0;
         }
 
@@ -316,24 +284,32 @@ dynamic_string_stream_vtable := Stream_Vtable.{
         return .None, buffer.count;
     },
 
-    write_byte = (use dss: ^DynamicStringStream, byte: u8) -> Error {
-        if !array.ensure_capacity(^data, data.count + 1) do return .EOF;
+    write_byte = (use dss: ^BufferStream, byte: u8) -> Error {
+        if !write_enabled do return .NotImplemented;
+
+        if curr_pos + 1 >= data.capacity {
+            if fixed do return .EOF;
+            if !array.ensure_capacity(^data, data.count + 1) do return .EOF;
+        }
 
         data[curr_pos] = byte;
         curr_pos   += 1;
-        data.count += 1;
+        data.count  = math.max(data.count, curr_pos);
 
         return .None;
     },
 
-    size = (use dss: ^DynamicStringStream) -> i32 {
+    size = (use dss: ^BufferStream) -> i32 {
         return data.count;
     },
 
-    flush = (use dss: ^DynamicStringStream) -> Error {
+    flush = (use dss: ^BufferStream) -> Error {
+        if !write_enabled || fixed do return .NotImplemented;
+
         curr_pos = 0;
         array.clear(^data);
 
         return .None;
     },
 }
+

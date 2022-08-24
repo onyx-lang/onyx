@@ -1112,8 +1112,10 @@ Type* type_get_contained_type(Type* type) {
 }
 
 static const StructMember slice_members[] = {
-    { 0,            0, NULL,                         "data",  NULL, NULL, -1, 0, 0 },
-    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "count", NULL, NULL, -1, 0, 0 },
+    { 0,            0, NULL,                         "data",   NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "count",  NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "size",   NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE, 1, &basic_types[Basic_Kind_U32], "length", NULL, NULL, -1, 0, 0 },
 };
 
 static const StructMember array_members[] = {
@@ -1121,6 +1123,8 @@ static const StructMember array_members[] = {
     { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "count",     NULL, NULL, -1, 0, 0 },
     { POINTER_SIZE + 4, 2, &basic_types[Basic_Kind_U32], "capacity",  NULL, NULL, -1, 0, 0 },
     { POINTER_SIZE + 8, 3, NULL,                         "allocator", NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "size",      NULL, NULL, -1, 0, 0 },
+    { POINTER_SIZE,     1, &basic_types[Basic_Kind_U32], "length",    NULL, NULL, -1, 0, 0 },
 };
 
 b32 type_lookup_member(Type* type, char* member, StructMember* smem) {

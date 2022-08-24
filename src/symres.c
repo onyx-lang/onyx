@@ -337,17 +337,19 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
             char *closest = find_closest_symbol_in_node((AstNode *) expr, (*fa)->token->text);
             token_toggle_end((*fa)->token);
 
+            AstPackage *package = (AstPackage *) strip_aliases((AstNode *) (*fa)->expr);
+
             if (closest) {
                 onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Did you mean '%s'?",
                     (*fa)->token->text,
                     (*fa)->token->length,
-                    ((AstPackage *) (*fa)->expr)->package->name,
+                    package->package->name,
                     closest);
             } else {
                 onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' was not found in package '%s'. Perhaps it is defined in a file that wasn't loaded?",
                     (*fa)->token->text,
                     (*fa)->token->length,
-                    ((AstPackage *) (*fa)->expr)->package->name);
+                    package->package->name);
             }
             return Symres_Error;
 

@@ -43,7 +43,7 @@ combat :: (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
 //   4,5,2,8,|1,3,9,7,
 // Larger numbers are encoded in base 64.
 encode_hands :: (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
-    stream := io.dynamic_string_stream_make(256, alloc);
+    stream := io.buffer_stream_make(256, alloc);
     writer := io.writer_make(^stream);
 
     for n: *p1 {
@@ -56,7 +56,7 @@ encode_hands :: (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
         io.write_str(^writer, ",");
     }
 
-    return io.dynamic_string_stream_to_str(^stream);
+    return io.buffer_stream_to_str(^stream);
 }
 
 recursive_combat :: (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
