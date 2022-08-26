@@ -37,8 +37,9 @@ close :: (it: Iterator($T)) {
     it.close(it.data);
 }
 
-filter :: #match {}
-#match filter (it: Iterator($T), predicate: (T) -> bool, allocator := iter_allocator) -> Iterator(T) {
+filter :: #match #local {}
+#overload
+filter :: (it: Iterator($T), predicate: (T) -> bool, allocator := iter_allocator) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         predicate: (T) -> bool;
@@ -76,7 +77,8 @@ filter :: #match {}
     };
 }
 
-#match filter (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocator := iter_allocator) -> Iterator(T) {
+#overload
+filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocator := iter_allocator) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr, Ctx: type_expr) {
         iterator:  Iterator(T);
         predicate: (T, Ctx) -> bool;
@@ -116,8 +118,10 @@ filter :: #match {}
     };
 }
 
-map :: #match {}
-#match map (it: Iterator($T), transform: (T) -> $R, allocator := iter_allocator) -> Iterator(R) {
+map :: #match #local {}
+
+#overload
+map :: (it: Iterator($T), transform: (T) -> $R, allocator := iter_allocator) -> Iterator(R) {
     MapIterator :: struct (T: type_expr, R: type_expr) {
         iterator:  Iterator(T);
         transform: (T) -> R;
@@ -148,7 +152,8 @@ map :: #match {}
     };
 }
 
-#match map (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R, allocator := iter_allocator) -> Iterator(R) {
+#overload
+map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R, allocator := iter_allocator) -> Iterator(R) {
     MapIterator :: struct (T: type_expr, R: type_expr, Ctx: type_expr) {
         iterator:  Iterator(T);
         transform: (T, Ctx) -> R;
@@ -405,14 +410,17 @@ const :: (value: $T) -> Iterator(T) {
     value: T;
 }
 
-enumerate :: #match {}
-#match enumerate macro (it: $T, start_index: i32 = 0) -> #auto where Iterable(T) {
+enumerate :: #match #local {}
+
+#overload
+enumerate :: macro (it: $T, start_index: i32 = 0) -> #auto where Iterable(T) {
     as_iterator :: as_iterator
     enumerate :: enumerate
     return enumerate(as_iterator(it), start_index);
 }
 
-#match enumerate (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Value(T)) {
+#overload
+enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Value(T)) {
     Enumeration_Context :: struct (T: type_expr) {
         iterator:      Iterator(T);
         current_index: i32;
@@ -443,7 +451,8 @@ enumerate :: #match {}
     };
 }
 
-#match as_iterator from_array
+#overload
+as_iterator :: from_array
 from_array :: (arr: [] $T) -> Iterator(^T) {
     Context :: struct (T: type_expr) {
         data: ^T;
@@ -472,7 +481,8 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     };
 }
 
-#match as_iterator (x: ^[..] $T) -> Iterator(T) {
+#overload
+as_iterator :: (x: ^[..] $T) -> Iterator(T) {
     Context :: struct (T: type_expr) {
         arr: ^[..] T;
         current: u32;
@@ -508,7 +518,8 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     };
 }
 
-#match as_iterator (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
+#overload
+as_iterator :: (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
     Context :: struct (T: type_expr) {
         arr: ^[..] T;
         current: u32;
@@ -544,7 +555,8 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     };
 }
 
-#match as_iterator (r: range) -> Iterator(i32) {
+#overload
+as_iterator :: (r: range) -> Iterator(i32) {
     Context :: struct {
         r: range;
         v: i32;
@@ -579,14 +591,17 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
     };
 }
 
-fold :: #match {}
+fold :: #match #local {}
+
 @Cleanup // some way to shorten this would be nice
-#match fold macro (it: $T, init: $R, combine: $S) -> #auto where Iterable(T) {
+#overload
+fold :: macro (it: $T, init: $R, combine: $S) -> #auto where Iterable(T) {
     fold :: fold
     return fold(as_iterator(it), init, combine);
 }
 
-#match fold (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
+#overload
+fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
     for value: it {
         initial_value = combine(value, initial_value);
     }
@@ -594,38 +609,47 @@ fold :: #match {}
     return initial_value;
 }
 
-count :: #match {}
-#match count macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+count :: #match #local {}
+
+#overload
+count :: macro (it: $T, cond: $F) -> #auto where Iterable(T) {
     count :: count
     return count(as_iterator(it), cond);
 }
 
-#match count (it: Iterator($T), cond: (T) -> bool) -> i32 {
+#overload
+count :: (it: Iterator($T), cond: (T) -> bool) -> i32 {
     c := 0;
     for value: it do if cond(value) do c += 1;
     return c;
 }
 
-some :: #match {}
-#match some macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+some :: #match #local {}
+
+#overload
+some :: macro (it: $T, cond: $F) -> #auto where Iterable(T) {
     some :: some
     as_iterator :: as_iterator
     return some(as_iterator(it), cond);
 }
 
-#match some (it: Iterator($T), cond: (T) -> bool) -> bool {
+#overload
+some :: (it: Iterator($T), cond: (T) -> bool) -> bool {
     for value: it do if cond(value) do return true;
     return false;
 }
 
-every :: #match {}
-#match every macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+every :: #match #local {}
+
+#overload
+every :: macro (it: $T, cond: $F) -> #auto where Iterable(T) {
     every :: every
     as_iterator :: as_iterator
     return every(as_iterator(it), cond);
 }
 
-#match every (it: Iterator($T), cond: (T) -> bool) -> bool {
+#overload
+every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
     for value: it do if !cond(value) do return false;
     return true;
 }
@@ -640,17 +664,20 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
 }
 
 
-#local runtime :: package runtime
 #if runtime.Multi_Threading_Enabled {
-    #local sync   :: package core.sync
-    distributor :: #match {}
-    #match distributor macro (it: $T) -> #auto where Iterable(T) {
+    #local sync :: core.sync
+
+    distributor :: #match #local {}
+
+    #overload
+    distributor :: macro (it: $T) -> #auto where Iterable(T) {
         distributor :: distributor;
         as_iterator :: as_iterator;
         return distributor(as_iterator(it));
     }
 
-    #match distributor (it: Iterator) -> Iterator(it.Iter_Type) {
+    #overload
+    distributor :: (it: Iterator) -> Iterator(it.Iter_Type) {
         Context :: struct (T: type_expr) {
             mutex: sync.Mutex;
             iterator: Iterator(T);
@@ -686,15 +713,18 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
         return .{c, #solidify next {T=it.Iter_Type}, #solidify close {T=it.Iter_Type}};
     }
 
-    parallel_for :: #match {}
-    #match parallel_for macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
+    parallel_for :: #match #local {}
+
+    #overload
+    parallel_for :: macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
         parallel_for :: parallel_for;
         as_iterator  :: as_iterator;
 
         parallel_for(as_iterator(iterable), thread_count, thread_data, body);
     }
 
-    #match parallel_for macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
+    #overload
+    parallel_for :: macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
         thread :: package core.thread;
         alloc  :: package core.alloc;
         distributor :: distributor;

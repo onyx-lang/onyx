@@ -796,7 +796,7 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     else if (node->kind == Ast_Kind_Zero_Value) {
         if (node_type == NULL) {
             node->type = type;
-            return TYPE_MATCH_SUCCESS;
+            return TYPE_MATCH_SUCCESS; // Shouldn't this be on the next line? And have node_type == node->type checked?
         }
     }
 

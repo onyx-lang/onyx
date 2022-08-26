@@ -33,11 +33,16 @@ auto_heap_make :: (backing := context.allocator) -> AutoHeapState {
     return hs;
 }
 
-auto_heap_free :: (hs: ^AutoHeapState) {
+auto_heap_clear :: (hs: ^AutoHeapState) {
     for^ hs.set.entries {
         raw_free(hs.backing_allocator, it.value);
     }
 
+    hs.set->clear();
+}
+
+auto_heap_free :: (hs: ^AutoHeapState) {
+    auto_heap_clear(hs);
     hs.set->free();
 }
 

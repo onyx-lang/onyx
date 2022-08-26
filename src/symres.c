@@ -1374,6 +1374,13 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
+            if (ofunc->only_local_functions) {
+                if (!token_same_file(add_overload->token, ofunc->token)) {
+                    onyx_report_error(add_overload->token->pos, Error_Critical, "Cannot add match option here as this option is not within the same file as the original #match declared with #local.");
+                    onyx_report_error(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+                }
+            }
+
             SYMRES(expression, (AstTyped **) &add_overload->overload);
             add_overload_option(&ofunc->overloads, add_overload->precedence, add_overload->overload);
             break;

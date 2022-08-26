@@ -46,7 +46,9 @@ package core
 
 #if runtime.runtime == .Onyx   {
     #load "./runtime/onyx_run"
+
     #load "./os/process"
+    #load "./time/time"
 
     #load "./net/net"
     #load "./net/tcp"

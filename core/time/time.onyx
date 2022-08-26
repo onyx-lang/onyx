@@ -1,0 +1,57 @@
+package core.time
+
+//
+// This module provides a thin wrapper for the builtin POSIX
+// time functionality of:
+//      - localtime, gmtime
+//      - strptime, strftime
+//
+
+#if runtime.runtime != .Onyx {
+    #error "'core.time' should only be used with the Onyx runtime.";
+}
+
+//
+// This structure has to match the 'struct tm'
+// defined in time.h of POSIX.
+Timestamp :: struct #size (sizeof u32 * 12) {
+    sec:   u32;
+    min:   u32;
+    hour:  u32;
+    mday:  u32;
+    mon:   u32;
+    year:  u32;
+    wday:  u32;
+    yday:  u32;
+    isdst: u32;
+}
+
+localtime :: __time_localtime
+gmtime    :: __time_gmtime
+
+strftime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> str {
+    f := cast(cstr) core.alloc.from_stack(format.length + 1);
+    core.memory.copy(f, format.data, format.length);
+    f[format.length] = 0;
+
+    len := __time_strftime(buf, f, tm);
+    return buf[0..len];
+}
+
+strptime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> bool {
+    f := cast(cstr) core.alloc.from_stack(format.length + 1);
+    core.memory.copy(f, format.data, format.length);
+    f[format.length] = 0;
+
+    return __time_strptime(buf, f, tm); 
+}
+
+#local {
+    #foreign "onyx_runtime" {
+        __time_localtime :: (time: u64, tm: ^Timestamp) -> void ---
+        __time_gmtime    :: (time: u64, tm: ^Timestamp) -> void ---
+        __time_strftime  :: (buf: [] u8, format: cstr, tm: ^Timestamp) -> u32 ---
+        __time_strptime  :: (buf: [] u8, format: cstr, tm: ^Timestamp) -> bool ---
+    }
+}
+

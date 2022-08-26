@@ -2,6 +2,9 @@ package core.string
 
 use package core
 
+as_str :: #match {}
+
+free :: (s: str, allocator := context.allocator) do raw_free(allocator, s.data);
 
 alloc_copy :: (original: str, allocator := context.allocator) -> str {
     new_str : str;
@@ -24,130 +27,116 @@ copy :: (orig: str, dest: str) {
     memory.copy(dest.data, orig.data, len);
 }
 
+#match as_str from_cstr
 from_cstr :: (s: cstr) -> str {
     return .{ data = s, count = length(s) };
 }
 
-free :: (s: str, allocator := context.allocator) do raw_free(allocator, s.data);
 
-length :: #match {
-    (s: str) -> u32 {
-        return s.count;
-    },
+length :: #match #local {}
 
-    (s: cstr) -> u32 {
-        len := 0;
-        c := s;
-        while *c != #char "\0" {
-            len += 1;
-            c += 1;
-        }
+#overload
+length :: (s: str) => s.count;
 
-        return len;
-    },
-}
-
-concat :: #match {
-    (s1: str, s2: str, allocator := context.allocator) -> str {
-        len1 := length(s1);
-        len2 := length(s2);
-
-        data := cast(^u8) raw_alloc(allocator, len1 + len2);
-        memory.copy(data, s1.data, len1);
-        memory.copy(data + len1, s2.data, len2);
-
-        return str.{ data, len1 + len2 };
-    },
-
-    @Cleanup // Don't love that the allocator is necessary here,
-    // but it is impossible to specify a default value for the
-    // allocator while having a variadic number of strings. This
-    // is only due to the languages constraints however. This
-    // could easily be changed since there is no ambiguity.
-    (allocator: Allocator, strings: ..str) -> str {
-        total_length := 0;
-        for s: strings do total_length += s.count;
-
-        data := cast(^u8) raw_alloc(allocator, total_length);
-        offset := 0;
-        for s: strings {
-            memory.copy(data + offset, s.data, s.count);
-            offset += s.count;
-        }
-
-        return str.{ data, total_length };
-    },
-
-    (buffer: [] u8, strings: ..str) -> str {
-        total_copied := 0;
-        for s: strings {
-            // Should never greater than, but better safe than sorry.
-            if total_copied >= buffer.count do break;
-
-            bytes_to_copy := math.min(s.count, buffer.count - total_copied);
-            memory.copy(buffer.data + total_copied, s.data, bytes_to_copy);
-            total_copied += bytes_to_copy;
-        }
-
-        return buffer[0 .. total_copied];
-    },
-
-    (into: ^[..] u8, strings: ..str) -> str {
-        for s: strings {
-            array.ensure_capacity(into, into.count + s.count);
-            memory.copy(into.data + into.count, s.data, s.count);
-            into.count += s.count;
-        }
-        return .{ into.data, into.count };
-    }
-}
-
-
-split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
-    delim_count := 0;
-    for i: 0 .. s.count do if s[i] == delim do delim_count += 1;
-
-    strarr := cast(^str) raw_alloc(allocator, sizeof str * (delim_count + 1));
-
-    curr_str := 0;
-    begin := 0;
-
-    for i: 0 .. s.count {
-        if s[i] == delim {
-            strarr[curr_str] = s.data[begin .. i];
-            begin = i + 1;
-            curr_str += 1;
-        }
+#overload
+length :: (s: cstr) -> u32 {
+    len := 0;
+    c := s;
+    while *c != #char "\0" {
+        len += 1;
+        c += 1;
     }
 
-    strarr[curr_str] = s.data[begin .. s.count];
-
-    return strarr[0 .. delim_count + 1];
+    return len;
 }
 
-contains :: #match {
-    (s: str, c: u8) -> bool {
-        for ch: s do if ch == c do return true;
-        return false;
-    },
 
-    (s: str, substr: str) -> bool {
-        while i := 0; i < s.count {
-            while j := 0; j < substr.count {
-                if s[i + j] != substr[j] {
-                    i += j + 1;
-                    continue continue;
-                }
+concat :: #match #local {}
 
-                j += 1;
+#overload
+concat :: (s1: str, s2: str, allocator := context.allocator) -> str {
+    len1 := length(s1);
+    len2 := length(s2);
+
+    data := cast(^u8) raw_alloc(allocator, len1 + len2);
+    memory.copy(data, s1.data, len1);
+    memory.copy(data + len1, s2.data, len2);
+
+    return str.{ data, len1 + len2 };
+}
+
+@Cleanup // Don't love that the allocator is necessary here,
+// but it is impossible to specify a default value for the
+// allocator while having a variadic number of strings. This
+// is only due to the languages constraints however. This
+// could easily be changed since there is no ambiguity.
+#overload
+concat :: (allocator: Allocator, strings: ..str) -> str {
+    total_length := 0;
+    for s: strings do total_length += s.count;
+
+    data := cast(^u8) raw_alloc(allocator, total_length);
+    offset := 0;
+    for s: strings {
+        memory.copy(data + offset, s.data, s.count);
+        offset += s.count;
+    }
+
+    return str.{ data, total_length };
+}
+
+#overload
+concat :: (buffer: [] u8, strings: ..str) -> str {
+    total_copied := 0;
+    for s: strings {
+        // Should never greater than, but better safe than sorry.
+        if total_copied >= buffer.count do break;
+
+        bytes_to_copy := math.min(s.count, buffer.count - total_copied);
+        memory.copy(buffer.data + total_copied, s.data, bytes_to_copy);
+        total_copied += bytes_to_copy;
+    }
+
+    return buffer[0 .. total_copied];
+}
+
+#overload
+concat :: (into: ^[..] u8, strings: ..str) -> str {
+    for s: strings {
+        array.ensure_capacity(into, into.count + s.count);
+        memory.copy(into.data + into.count, s.data, s.count);
+        into.count += s.count;
+    }
+    return .{ into.data, into.count };
+}
+
+
+contains :: #match #local {}
+
+#overload
+contains :: (s: str, c: u8) -> bool {
+    for ch: s do if ch == c do return true;
+    return false;
+}
+
+#overload
+contains :: (s: str, substr: str) -> bool {
+    while i := 0; i < s.count {
+        while j := 0; j < substr.count {
+            if s[i + j] != substr[j] {
+                i += j + 1;
+                continue continue;
             }
 
-            return true;
+            j += 1;
         }
 
-        return false;
-    },
+        return true;
+    }
+
+    return false;
 }
+
 
 @TODO
 // Check this for edge cases and other bugs. I'm not confident
@@ -209,46 +198,61 @@ last_index_of :: (s: str, c: u8) -> i32 {
     return -1;
 }
 
-strip_whitespace :: #match {
-    (s: ^str) { strip_leading_whitespace(s); strip_trailing_whitespace(s); },
-    (s:  str) => s |> strip_leading_whitespace() |> strip_trailing_whitespace()
+
+strip_whitespace :: #match #local {}
+
+#overload
+strip_whitespace :: (s: ^str) {
+    strip_leading_whitespace(s);
+    strip_trailing_whitespace(s);
 }
 
-strip_leading_whitespace :: #match {
-    (s: ^str) {
-        while s.count > 0 do switch s.data[0] {
-            case #char " ", #char "\t", #char "\n", #char "\r" {
-                s.data += 1;
-                s.count -= 1;
-            }
+#overload
+strip_whitespace :: (s:  str) =>
+    s |> strip_leading_whitespace()
+      |> strip_trailing_whitespace()
 
-            case #default do return;
+
+strip_leading_whitespace :: #match #local {}
+
+#overload
+strip_leading_whitespace :: (s: ^str) {
+    while s.count > 0 do switch s.data[0] {
+        case #char " ", #char "\t", #char "\n", #char "\r" {
+            s.data += 1;
+            s.count -= 1;
         }
-    },
-    
-    (s: str) -> str {
-        out := s;
-        strip_leading_whitespace(^out);
-        return out;
-    },
+
+        case #default do return;
+    }
 }
 
-strip_trailing_whitespace :: #match {
-    (s: ^str) {
-        while s.count >= 1 do switch s.data[s.count - 1] {
-            case #char " ", #char "\t", #char "\n", #char "\r" {
-                s.count -= 1;
-            }
+#overload
+strip_leading_whitespace :: (s: str) -> str {
+    out := s;
+    strip_leading_whitespace(^out);
+    return out;
+}
 
-            case #default do return;
+
+strip_trailing_whitespace :: #match #local {}
+
+#overload
+strip_trailing_whitespace :: (s: ^str) {
+    while s.count >= 1 do switch s.data[s.count - 1] {
+        case #char " ", #char "\t", #char "\n", #char "\r" {
+            s.count -= 1;
         }
-    },
 
-    (s: str) -> str {
-        out := s;
-        strip_trailing_whitespace(^out);
-        return out;
-    },
+        case #default do return;
+    }
+}
+
+#overload
+strip_trailing_whitespace :: (s: str) -> str {
+    out := s;
+    strip_trailing_whitespace(^out);
+    return out;
 }
 
 to_uppercase :: (s: str) -> str {
@@ -271,52 +275,61 @@ to_lowercase :: (s: str) -> str {
     return s;
 }
 
-trim_start :: #match {
-    (s: ^str, char: u8) {
-        while s.data[0] == char {
-            s.data += 1;
-            s.count -= 1;
-        }
-    },
 
-    (s: str, char: u8) -> str {
-        out := s;
-        trim_start(^out, char);
-        return out;
+trim_start :: #match #local {}
+
+#overload
+trim_start :: (s: ^str, char: u8) {
+    while s.data[0] == char {
+        s.data += 1;
+        s.count -= 1;
     }
 }
 
-trim_end :: #match {
-    (s: ^str, char: u8) {
-        while s.data[s.count - 1] == char {
-            s.count -= 1;
-        }
-    },
+#overload
+trim_start :: (s: str, char: u8) -> str {
+    out := s;
+    trim_start(^out, char);
+    return out;
+}
 
-    (s: str, char: u8) -> str {
-        out := s;
-        trim_end(^out, char);
-        return out;
+
+trim_end :: #match #local {}
+
+#overload
+trim_end :: (s: ^str, char: u8) {
+    while s.data[s.count - 1] == char {
+        s.count -= 1;
     }
 }
 
-advance :: #match {
-    (s: ^str, chars := 1) {
-        chars = math.min(chars, s.count);
+#overload
+trim_end :: (s: str, char: u8) -> str {
+    out := s;
+    trim_end(^out, char);
+    return out;
+}
 
-        s.data += chars;
-        s.count -= chars;
-    },
 
-    (s: str, chars := 1) -> str {
-        chars = math.min(chars, s.count);
-        out := s;
+advance :: #match #local {}
 
-        out.data += chars;
-        out.count -= chars;
+#overload
+advance :: (s: ^str, chars := 1) {
+    chars = math.min(chars, s.count);
 
-        return out;
-    }
+    s.data += chars;
+    s.count -= chars;
+}
+
+#overload
+advance :: (s: str, chars := 1) -> str {
+    chars = math.min(chars, s.count);
+    out := s;
+
+    out.data += chars;
+    out.count -= chars;
+
+    return out;
 }
 
 replace :: (s: str, to_replace: u8, replace_with: u8) {
@@ -325,70 +338,72 @@ replace :: (s: str, to_replace: u8, replace_with: u8) {
     }
 }
 
-read_until :: #match #locked {
-    (s: ^str, upto: u8, skip := 0) -> str {
-        if s.count == 0 do return "";
+read_until :: #match #local {}
 
-        out : str;
-        out.data = s.data;
-        out.count = 0;
+#overload
+read_until :: (s: ^str, upto: u8, skip := 0) -> str {
+    if s.count == 0 do return "";
 
-        rem := skip;
-        for ch: *s {
-            if ch == upto {
-                if rem <= 0 do break;
-                else do rem -= 1;
-            }
+    out : str;
+    out.data = s.data;
+    out.count = 0;
 
-            out.count += 1;
+    rem := skip;
+    for ch: *s {
+        if ch == upto {
+            if rem <= 0 do break;
+            else do rem -= 1;
         }
 
-        s.data += out.count;
-        s.count -= out.count;
-
-        return out;
-    },
-
-    (s: ^str, upto: str, skip := 0) -> str {
-        if s.count == 0 do return "";
-
-        out := str.{ data = s.data };
-
-        rem := skip;
-        i := 0;
-        while i <= s.count - upto.count {
-            match := true;
-            j := i;
-            for upto {
-                if s.data[j] != it {
-                    match = false;
-                    break;
-                }
-
-                j += 1;
-            }
-
-            if match {
-                if rem <= 0 do break;
-                else do rem -= 1;
-            }
-
-            i += 1;
-        }
-
-        if i > s.count - upto.count {
-            out = *s;
-            s.data  += out.count;
-            s.count  = 0;
-
-        } else {
-            out.count = i - 1;
-            s.data  += out.count + (upto.count - 1);
-            s.count -= out.count + (upto.count - 1);
-        }
-
-        return out;
+        out.count += 1;
     }
+
+    s.data += out.count;
+    s.count -= out.count;
+
+    return out;
+}
+
+#overload
+read_until :: (s: ^str, upto: str, skip := 0) -> str {
+    if s.count == 0 do return "";
+
+    out := str.{ data = s.data };
+
+    rem := skip;
+    i := 0;
+    while i <= s.count - upto.count {
+        match := true;
+        j := i;
+        for upto {
+            if s.data[j] != it {
+                match = false;
+                break;
+            }
+
+            j += 1;
+        }
+
+        if match {
+            if rem <= 0 do break;
+            else do rem -= 1;
+        }
+
+        i += 1;
+    }
+
+    if i > s.count - upto.count {
+        out = *s;
+        s.data  += out.count;
+        s.count  = 0;
+
+    } else {
+        out.count = i - 1;
+        s.data  += out.count + (upto.count - 1);
+        s.count -= out.count + (upto.count - 1);
+    }
+
+    return out;
 }
 
 read_until_any :: (s: ^str, skip: u32, uptos: ..u8) -> str {
@@ -426,6 +441,24 @@ advance_line :: (s: ^str) {
     s.count -= adv + 1;
 }
 
-as_str :: #match {
-    from_cstr
+split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
+    delim_count := 0;
+    for i: 0 .. s.count do if s[i] == delim do delim_count += 1;
+
+    strarr := cast(^str) raw_alloc(allocator, sizeof str * (delim_count + 1));
+
+    curr_str := 0;
+    begin := 0;
+
+    for i: 0 .. s.count {
+        if s[i] == delim {
+            strarr[curr_str] = s.data[begin .. i];
+            begin = i + 1;
+            curr_str += 1;
+        }
+    }
+
+    strarr[curr_str] = s.data[begin .. s.count];
+
+    return strarr[0 .. delim_count + 1];
 }

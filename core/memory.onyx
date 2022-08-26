@@ -1,21 +1,22 @@
 package core.memory
 
-use package core.intrinsics.wasm { memory_copy, memory_fill }
+align :: #match {
+    (size: ^u64, align: u64) {
+        if *size % align != 0 {
+            *size += align - (*size % align);
+        }
+    },
 
-copy :: (dest: rawptr, src: rawptr, count: i32) do memory_copy(dest, src, count);
-set  :: (dest: rawptr, byte: u8, count: i32)    do memory_fill(dest, byte, count);
-
-// Old and slow copy and set
-copy_ :: (dst_: rawptr, src_: rawptr, len: u32) {
-    dst := cast(^u8) dst_;
-    src := cast(^u8) src_;
-    for i: 0 .. len do dst[i] = src[i];
+    (size: u64, align: u64) -> u64 {
+        if size % align != 0 {
+            size += align - (size % align);
+        }
+        return size;
+    }        
 }
 
-set_ :: (start: rawptr, value: u8, length: u32) {
-    s := cast(^u8) start;
-    for i: 0 .. length do s[i] = value;
-}
+copy :: core.intrinsics.wasm.memory_copy
+set  :: core.intrinsics.wasm.memory_fill
 
 alloc_slice :: (sl: ^[] $T, count: i32, allocator := context.allocator) {
     sl.data  = raw_alloc(allocator, sizeof T * count);
@@ -29,20 +30,12 @@ make_slice :: ($T: type_expr, count: i32, allocator := context.allocator) -> [] 
     };
 }
 
-#match __make_overload macro (_: ^[] $T, count: u32, allocator := context.allocator) -> [] T {
-    return (package core.memory).make_slice(T, count, allocator);
-}
-
 free_slice :: (sl: ^[] $T, allocator := context.allocator) {
     if sl.data == null do return;
 
     raw_free(allocator, sl.data);
     sl.data = null;
     sl.count = 0;
-}
-
-#match (package builtin).delete macro (x: ^[] $T) {
-    (package core.memory).free_slice(x);
 }
 
 copy_slice :: (sl: [] $T, allocator := context.allocator) -> [] T {
@@ -62,17 +55,13 @@ resize_slice :: (sl: [] $T, new_size: i32, allocator := context.allocator) -> []
     return new_slice;
 }
 
-align :: #match {
-    (size: ^u64, align: u64) {
-        if *size % align != 0 {
-            *size += align - (*size % align);
-        }
-    },
 
-    (size: u64, align: u64) -> u64 {
-        if size % align != 0 {
-            size += align - (size % align);
-        }
-        return size;
-    }        
+#overload
+builtin.__make_overload :: macro (_: ^[] $T, count: u32, allocator := context.allocator) -> [] T {
+    return (package core.memory).make_slice(T, count, allocator);
+}
+
+#overload
+builtin.delete :: macro (x: ^[] $T) {
+    core.memory.free_slice(x);
 }

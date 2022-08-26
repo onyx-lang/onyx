@@ -7,10 +7,11 @@ package core
 // in anyway.
 
 
-#local runtime :: package runtime
 #if runtime.runtime == .Custom {
     #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
 }
+
+stdin: io.Stream;
 
 auto_flush_stdio := true
 
@@ -42,15 +43,15 @@ printf :: (format: str, va: ..any) {
 }
 
 // Print to standard error, if available.
-#if #defined((package runtime).__output_error) {
+#if #defined(runtime.__output_error) {
     eprintf :: (format: str, va: ..any) -> str {
         flush :: (_, to_output) => {
-            (package runtime).__output_error(to_output);
+            runtime.__output_error(to_output);
             return true;
         }
 
         buffer: [1024] u8;
-        (package runtime).__output_error(conv.format_va(buffer, format, va, .{null, flush}));
+        runtime.__output_error(conv.format_va(buffer, format, va, .{null, flush}));
     }
 }
 
@@ -157,5 +158,3 @@ __flush_stdio :: () {
         return .None, buf[0];
     }
 }
-
-stdin: io.Stream;

@@ -1064,6 +1064,7 @@ struct AstOverloadedFunction {
     bh_imap            all_overloads;
 
     b32 locked : 1;
+    b32 only_local_functions : 1;
 };
 
 // @CLEANUP: Is this really necessary?

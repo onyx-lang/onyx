@@ -246,12 +246,12 @@ log :: (a: $T, base: $R) -> T {
 // they would be however, the fact that these overloads are intrinsic means they cannot
 // be reference from the element section and therefore cannot be passed around or used
 // as values.
-max :: #match { wasm.max_f32, wasm.max_f64, max_poly }
+max :: #match #local { wasm.max_f32, wasm.max_f64, max_poly }
 max_poly :: (a: $T, b: T) -> T {
     return a if a >= b else b;
 }
 
-min :: #match { wasm.min_f32, wasm.min_f64, min_poly }
+min :: #match #local { wasm.min_f32, wasm.min_f64, min_poly }
 min_poly :: (a: $T, b: T) -> T {
     return a if a <= b else b;
 }
@@ -262,12 +262,12 @@ clamp :: (v: $T, lo: T, hi: T) -> T {
     return v;
 }
 
-sqrt :: #match { wasm.sqrt_f32, wasm.sqrt_f64, sqrt_poly }
+sqrt :: #match #local { wasm.sqrt_f32, wasm.sqrt_f64, sqrt_poly }
 sqrt_poly :: (x: $T) -> T {
     return ~~ wasm.sqrt_f64(~~ x);
 }
 
-abs :: #match { wasm.abs_f32, wasm.abs_f64, abs_poly }
+abs :: #match #local { wasm.abs_f32, wasm.abs_f64, abs_poly }
 abs_poly :: (x: $T) -> T {
     return x if x >= 0 else -x;
 }
@@ -278,7 +278,7 @@ sign :: (x: $T) -> T {
     return 0;
 }
 
-copysign :: #match { wasm.copysign_f32, wasm.copysign_f64, copysign_poly }
+copysign :: #match #local { wasm.copysign_f32, wasm.copysign_f64, copysign_poly }
 copysign_poly :: (x: $T, y: T) -> T {
     return abs(x) * sign(y);
 }
@@ -290,10 +290,10 @@ copysign_poly :: (x: $T, y: T) -> T {
 // Floating point rounding
 //
 
-ceil    :: #match { wasm.ceil_f32,    wasm.ceil_f64    }
-floor   :: #match { wasm.floor_f32,   wasm.floor_f64   }
-trunc   :: #match { wasm.trunc_f32,   wasm.trunc_f64   }
-nearest :: #match { wasm.nearest_f32, wasm.nearest_f64 }
+ceil    :: #match #local { wasm.ceil_f32,    wasm.ceil_f64    }
+floor   :: #match #local { wasm.floor_f32,   wasm.floor_f64   }
+trunc   :: #match #local { wasm.trunc_f32,   wasm.trunc_f64   }
+nearest :: #match #local { wasm.nearest_f32, wasm.nearest_f64 }
 
 
 
@@ -301,11 +301,11 @@ nearest :: #match { wasm.nearest_f32, wasm.nearest_f64 }
 // Integer operations
 //
 
-clz          :: #match { wasm.clz_i32,    wasm.clz_i64    }
-ctz          :: #match { wasm.ctz_i32,    wasm.ctz_i64    }
-popcnt       :: #match { wasm.popcnt_i32, wasm.popcnt_i64 }
-rotate_left  :: #match { wasm.rotl_i32,   wasm.rotl_i64   }
-rotate_right :: #match { wasm.rotr_i32,   wasm.rotr_i64   }
+clz          :: #match #local { wasm.clz_i32,    wasm.clz_i64    }
+ctz          :: #match #local { wasm.ctz_i32,    wasm.ctz_i64    }
+popcnt       :: #match #local { wasm.popcnt_i32, wasm.popcnt_i64 }
+rotate_left  :: #match #local { wasm.rotl_i32,   wasm.rotl_i64   }
+rotate_right :: #match #local { wasm.rotr_i32,   wasm.rotr_i64   }
 
 
 

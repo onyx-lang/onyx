@@ -539,3 +539,12 @@ b32 token_text_equals(OnyxToken* tkn, char* text) {
         
     return 1;
 }
+
+b32 token_same_file(OnyxToken *tkn1, OnyxToken *tkn2) {
+    if (!tkn1 || !tkn2) return 0;
+    
+    if (tkn1->pos.filename == tkn2->pos.filename) return 1;
+
+    // :Security?
+    return strcmp(tkn1->pos.filename, tkn2->pos.filename) == 0;
+}

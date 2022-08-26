@@ -12,26 +12,30 @@ package core.array
 // ---------------------------------
 //           Dynamic Arrays
 // ---------------------------------
-make :: #match #locked {
-    ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
-        arr : [..] T;
-        init(^arr, capacity, allocator);
-        return arr;
-    },
-    
-    (base: [] $T, allocator := context.allocator) -> [..] T {
-        arr: [..] T;
-        init(^arr, base.count, allocator);
-        for^ base do arr << *it;
-        return arr;
-    }
+make :: #match #local {}
+
+#overload
+make :: ($T: type_expr, capacity := 4, allocator := context.allocator) -> [..] T {
+    arr : [..] T;
+    init(^arr, capacity, allocator);
+    return arr;
 }
 
-#match __make_overload macro (_: ^[..] $T, allocator := context.allocator) -> [..] T {
+#overload
+make :: (base: [] $T, allocator := context.allocator) -> [..] T {
+    arr: [..] T;
+    init(^arr, base.count, allocator);
+    for^ base do arr << *it;
+    return arr;
+}
+
+#overload
+__make_overload :: macro (_: ^[..] $T, allocator := context.allocator) -> [..] T {
     return (package core.array).make(T, allocator=allocator);
 }
 
-#match __make_overload macro (_: ^[..] $T, capacity: u32, allocator := context.allocator) -> [..] T {
+#overload
+__make_overload :: macro (_: ^[..] $T, capacity: u32, allocator := context.allocator) -> [..] T {
     return (package core.array).make(T, capacity, allocator);
 }
 
@@ -50,8 +54,9 @@ free :: (arr: ^[..] $T) {
     arr.data = null;
 }
 
-#match (package builtin).delete macro (x: ^[..] $T) {
-    (package core.array).free(x);
+#overload
+builtin.delete :: macro (x: ^[..] $T) {
+    core.array.free(x);
 }
 
 copy :: #match #locked {
@@ -330,37 +335,39 @@ reverse :: (arr: [] $T) {
 // Simple insertion sort
 //    cmp should return >0 if left > right
 //
-sort :: #match #locked {
-    (arr: [] $T, cmp: (T, T) -> i32) {
-        for i: 1 .. arr.count {
-            x := arr.data[i];
-            j := i - 1;
+sort :: #match #local {}
 
-            @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
-            while j >= 0 {
-                if cmp(arr.data[j], x) > 0 {
-                    arr.data[j + 1] = arr.data[j];
-                    j -= 1;
-                } else {
-                    break;
-                }
+#overload
+sort :: (arr: [] $T, cmp: (T, T) -> i32) {
+    for i: 1 .. arr.count {
+        x := arr.data[i];
+        j := i - 1;
+
+        @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
+        while j >= 0 {
+            if cmp(arr.data[j], x) > 0 {
+                arr.data[j + 1] = arr.data[j];
+                j -= 1;
+            } else {
+                break;
             }
-
-            arr.data[j + 1] = x;
         }
-    },
 
-    (arr: [] $T, cmp: (^T, ^T) -> i32) {
-        for i: 1 .. arr.count {
-            j := i;
+        arr.data[j + 1] = x;
+    }
+}
 
-            while j > 0 {
-                if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
-                    arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
-                    j -= 1;
-                } else {
-                    break;
-                }
+#overload
+sort :: (arr: [] $T, cmp: (^T, ^T) -> i32) {
+    for i: 1 .. arr.count {
+        j := i;
+
+        while j > 0 {
+            if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
+                arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
+                j -= 1;
+            } else {
+                break;
             }
         }
     }
@@ -381,34 +388,36 @@ quicksort :: #match #locked {
         quicksort_impl(arr, cmp, pivot + 1, hi);
     }
 
-    quicksort_partition :: #match #locked {
-        (arr: [] $T, cmp: (T, T) -> i32, lo, hi: i32) -> i32 {
-            pivot := arr[hi];
-            i := lo - 1;
+    quicksort_partition :: #match #local {}
 
-            for j: lo .. hi+1 {
-                if cmp(arr[j], pivot) <= 0 {
-                    i += 1;
-                    arr[i], arr[j] = arr[j], arr[i];
-                }
+    #overload
+    quicksort_partition :: (arr: [] $T, cmp: (T, T) -> i32, lo, hi: i32) -> i32 {
+        pivot := arr[hi];
+        i := lo - 1;
+
+        for j: lo .. hi+1 {
+            if cmp(arr[j], pivot) <= 0 {
+                i += 1;
+                arr[i], arr[j] = arr[j], arr[i];
             }
-
-            return i;
-        },
-
-        (arr: [] $T, cmp: (^T, ^T) -> i32, lo, hi: i32) -> i32 {
-            pivot := ^arr[hi];
-            i := lo - 1;
-
-            for j: lo .. hi+1 {
-                if cmp(^arr[j], pivot) <= 0 {
-                    i += 1;
-                    arr[i], arr[j] = arr[j], arr[i];
-                }
-            }
-
-            return i;
         }
+
+        return i;
+    }
+
+    #overload
+    quicksort_partition :: (arr: [] $T, cmp: (^T, ^T) -> i32, lo, hi: i32) -> i32 {
+        pivot := ^arr[hi];
+        i := lo - 1;
+
+        for j: lo .. hi+1 {
+            if cmp(^arr[j], pivot) <= 0 {
+                i += 1;
+                arr[i], arr[j] = arr[j], arr[i];
+            }
+        }
+
+        return i;
     }
 }
 

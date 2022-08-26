@@ -2342,12 +2342,23 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
         locked = 1;
     }
 
+    b32 local = 0;
+    if (parse_possible_directive(parser, "local")) {
+        local = 1;
+    }
+
+    // This could be checked elsewhere?
+    if (locked && local) {
+        onyx_report_error(token->pos, Error_Critical, "Only one of '#locked' and '#local' can because use at a time.");
+    }
+
     expect_token(parser, '{');
 
     AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
     ofunc->token = token;
     ofunc->flags |= Ast_Flag_Comptime;
     ofunc->locked = locked;
+    ofunc->only_local_functions = local;
 
     bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
 
@@ -3175,13 +3186,9 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 ENTITY_SUBMIT(operator);
                 return;
             }
-            else if (parse_possible_directive(parser, "match")) {
+            else if (parse_possible_directive(parser, "match") || parse_possible_directive(parser, "overload")) {
                 AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
                 add_overload->token = dir_token;
-
-                parser->parse_calls = 0;
-                add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);
-                parser->parse_calls = 1;
 
                 if (parse_possible_directive(parser, "precedence")) {
                     AstNumLit* pre = parse_int_literal(parser);
@@ -3190,6 +3197,21 @@ static void parse_top_level_statement(OnyxParser* parser) {
                     add_overload->precedence = bh_max(pre->value.l, 0);
                 } else {
                     add_overload->precedence = 0;
+                }
+
+                parser->parse_calls = 0;
+                add_overload->overloaded_function = (AstNode *) parse_expression(parser, 0);
+                parser->parse_calls = 1;
+
+                // Allow for
+                //      #match
+                //      something :: (....) {
+                //      }
+                // 
+                // This will make converting something to a overloaded
+                // function easier and require less copying by the programmer.
+                if (next_tokens_are(parser, 2, ':', ':')) {
+                    consume_tokens(parser, 2);
                 }
 
                 add_overload->overload = parse_expression(parser, 0);

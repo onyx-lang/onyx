@@ -8,7 +8,7 @@ test_macro :: macro () {
     }
 }
 
-time :: macro (name: str) {
+time_block :: macro (name: str) {
     start := 10;
     defer {
         end := 1010;
@@ -18,5 +18,5 @@ time :: macro (name: str) {
 
 main :: (args) => {
     test_macro();
-    time("main");
+    time_block("main");
 }
