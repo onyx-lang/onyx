@@ -24,7 +24,28 @@ File :: struct {
     use data   : fs.FileData;
 }
 
+// Most of these types were stollen directly from
+// man readdir(3), and the most reasonable types
+// were used for Windows.
+FileType :: enum {
+    Unknown     :: 0x00;
+    Block       :: 0x01;
+    Char        :: 0x02;
+    Directory   :: 0x03;
+    RegularFile :: 0x04;
+    SymLink     :: 0x05;
+    Other       :: 0x06;
+}
+
+//
+// This is fairly minimal for right now.
+FileStat :: struct {
+    size: i64;
+    type: FileType;
+}
+
 file_exists :: fs.__file_exists
+file_stat   :: fs.__file_stat
 remove_file :: fs.__file_remove
 rename_file :: fs.__file_rename
 
@@ -102,7 +123,17 @@ with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^File) {
     return .{ c, next, close_context };
 }
 
+is_file :: (path: str) -> bool {
+    s: FileStat;
+    if !file_stat(path, ^s) do return false;
+    return s.type == .RegularFile;
+}
 
+is_directory :: (path: str) -> bool {
+    s: FileStat;
+    if !file_stat(path, ^s) do return false;
+    return s.type == .Directory;
+}
 
 
 file_logger_open :: (filename: str, allocator := context.allocator) -> Logger {

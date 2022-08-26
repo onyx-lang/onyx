@@ -22,6 +22,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
     __file_open_impl :: (path: str, mode: os.OpenMode, out_handle: ^FileData.Handle) -> os.FileError ---
 
     __file_close :: (fd: FileData) -> os.FileError ---
+    __file_stat   :: (path: str, stat: ^os.FileStat) -> bool ---
     __file_exists :: (path: str) -> bool ---
     __file_remove :: (path: str) -> bool ---
     __file_rename :: (old_path: str, new_path: str) -> bool ---

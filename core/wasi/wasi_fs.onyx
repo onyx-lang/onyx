@@ -110,6 +110,28 @@ __file_close :: (file: FileData) -> os.FileError {
     return .None;
 }
 
+__file_stat :: (path: str, out: ^os.FileStat) -> bool {
+    fs: wasi.FileStat;
+
+    exists := false;
+    for .[3, 4] { // Trying both preopened directories
+        err := wasi.path_filestat_get(it, .SymLinkFollow, path, ^fs);
+        if err == .Success {
+            exists = true;
+            out.size = ~~ fs.size;
+
+            switch fs.filetype {
+                case .RegularFile do out.type = .RegularFile;
+                case .Directory do out.type = .Directory;
+                case .SymLink do out.type = .SymLink;
+                case #default do out.type = .Unknown;
+            }
+        }
+    }
+
+    return exists;
+}
+
 __file_exists :: (path: str) -> bool {
     fs: wasi.FileStat;
 

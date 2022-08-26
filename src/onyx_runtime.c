@@ -87,6 +87,19 @@ ONYX_DEF(__file_exists, (WASM_I32, WASM_I32), (WASM_I32)) {
     return NULL;
 }
 
+ONYX_DEF(__file_stat, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    char *path_ptr = ONYX_PTR(params->data[0].of.i32);
+    int   path_len = params->data[1].of.i32;
+
+    char path[512] = {0};
+    path_len = bh_min(path_len, 511);
+    strncpy(path, path_ptr, path_len);
+    path[path_len] = 0;
+
+    results->data[0] = WASM_I32_VAL(bh_file_stat(path, ONYX_PTR(params->data[2].of.i32)));
+    return NULL;
+}
+
 ONYX_DEF(__file_remove, (WASM_I32, WASM_I32), (WASM_I32)) {
     char *path_ptr = ONYX_PTR(params->data[0].of.i32);
     int   path_len = params->data[1].of.i32;
@@ -1333,6 +1346,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__file_open_impl)
     ONYX_FUNC(__file_close)
     ONYX_FUNC(__file_exists)
+    ONYX_FUNC(__file_stat)
     ONYX_FUNC(__file_remove)
     ONYX_FUNC(__file_seek)
     ONYX_FUNC(__file_tell)

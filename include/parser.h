@@ -37,6 +37,7 @@ typedef struct OnyxParser {
     b32 hit_unexpected_token : 1;
 
     b32 parse_calls : 1;
+    b32 inside_tag  : 1;
 } OnyxParser;
 
 const char* onyx_ast_node_kind_string(AstKind kind);

@@ -188,7 +188,18 @@ static void expect_no_stored_tags(OnyxParser *parser) {
 }
 
 static void flush_stored_tags(OnyxParser *parser, bh_arr(AstTyped *) *out_arr) {
-    if (bh_arr_length(parser->stored_tags) == 0) return;
+    //
+    // When inside_tag is true, no tags will be added to the element.
+    // This happens if you have a something like so,
+    //
+    // #tag "asdf"
+    // #tag handler.{ (x: i32) => x * 2 }
+    // foo :: () { ... }
+    //
+    // In this situation, the inner procedure defined in the second
+    // tag should NOT consume the "asdf" tag.
+    //
+    if (bh_arr_length(parser->stored_tags) == 0 || parser->inside_tag) return;
 
     bh_arr(AstTyped *) arr = *out_arr;
 
@@ -2054,10 +2065,14 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         while (parse_possible_directive(parser, "tag")) {
             if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
 
+            parser->inside_tag = 1;
+
             do {
                 AstTyped* expr = parse_expression(parser, 0);
                 bh_arr_push(meta_tags, expr);
             } while (consume_token_if_next(parser, ','));
+
+            parser->inside_tag = 0;
         }
 
         member_is_used = consume_token_if_next(parser, Token_Type_Keyword_Use);
@@ -3257,8 +3272,12 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 return;
             }
             else if (parse_possible_directive(parser, "tag")) {
+                parser->inside_tag = 1;
+
                 AstTyped *expr = parse_expression(parser, 0);
                 bh_arr_push(parser->stored_tags, expr);
+
+                parser->inside_tag = 0;
                 return;
             }
             else {

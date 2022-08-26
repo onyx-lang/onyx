@@ -462,3 +462,20 @@ split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
 
     return strarr[0 .. delim_count + 1];
 }
+
+//
+// Splits a string into two parts, divided by the
+// first instance of the provided character. Either
+// string can be empty if the first instance of the
+// character occurs at the very beginning or end of
+// the string, or if it does not occur at all.
+//
+bisect :: (s: str, c: u8) -> (str, str) {
+    index := index_of(s, c); 
+    if index == -1 {
+        return s, "";
+    }
+
+    return s[0 .. index], s[index+1 .. s.length];
+}
+

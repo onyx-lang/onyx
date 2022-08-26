@@ -359,6 +359,15 @@ typedef struct bh_file_contents {
     isize line_count;
 } bh_file_contents;
 
+
+#define BH_FILE_TYPE_DIRECTORY 3
+#define BH_FILE_TYPE_FILE      4
+#define BH_FILE_TYPE_LINK      5
+typedef struct bh_file_stats {
+    isize size;
+    u32 file_type;
+} bh_file_stats;
+
 bh_file_error bh_file_get_standard(bh_file* file, bh_file_standard stand);
 
 bh_file_error bh_file_create(bh_file* file, char const* filename);
@@ -377,6 +386,7 @@ i32 bh_file_read(bh_file* file, void* buffer, isize buff_size);
 i32 bh_file_write(bh_file* file, void* buffer, isize buff_size);
 void bh_file_flush(bh_file* file);
 i64 bh_file_size(bh_file* file);
+b32 bh_file_stat(char const* filename, bh_file_stats* stat);
 b32 bh_file_exists(char const* filename);
 b32 bh_file_remove(char const* filename);
 char* bh_path_get_full_name(char const* filename, bh_allocator a);
@@ -1632,6 +1642,21 @@ bh_file_contents bh_file_read_contents_direct(bh_allocator alloc, const char* fi
 b32 bh_file_contents_free(bh_file_contents* contents) {
     bh_free(contents->allocator, contents->data);
     contents->length = 0;
+    return 1;
+}
+
+b32 bh_file_stat(char const* filename, bh_file_stats* out) {
+    struct stat s;
+    if (stat(filename, &s) == -1) {
+        return 0;
+    }
+
+    out->size = s.st_size;
+
+    if ((s.st_mode & S_IFMT) == S_IFDIR) out->file_type = BH_FILE_TYPE_DIRECTORY;
+    if ((s.st_mode & S_IFMT) == S_IFREG) out->file_type = BH_FILE_TYPE_FILE;
+    if ((s.st_mode & S_IFMT) == S_IFLNK) out->file_type = BH_FILE_TYPE_LINK;
+
     return 1;
 }
 

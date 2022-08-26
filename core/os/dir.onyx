@@ -5,20 +5,7 @@ package core.os
 Directory :: fs.DirectoryData;
 
 DirectoryEntry :: struct {
-    // Most of these types were stollen directly from
-    // man readdir(3), and the most reasonable types
-    // were used for Windows.
-    Type :: enum {
-        Unknown     :: 0x00;
-        Block       :: 0x01;
-        Char        :: 0x02;
-        Directory   :: 0x03;
-        RegularFile :: 0x04;
-        SymLink     :: 0x05;
-        Other       :: 0x06;
-    }
-
-    type        : Type;
+    type        : FileType;
     identifier  : u32;
     name_length : u32;
     name_data   : [256] u8;
