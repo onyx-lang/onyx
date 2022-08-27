@@ -11,7 +11,7 @@ package core
     #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
 }
 
-stdin: io.Stream;
+stdio_stream: io.Stream;
 
 auto_flush_stdio := true
 
@@ -125,7 +125,7 @@ __stdio_init :: () {
     
     // This shouldn't need to be here, but because ^stdin_vtable is not a compile-time
     // known value (even through it should be).
-    stdin.vtable = ^stdin_vtable;
+    stdio_stream.vtable = ^stdio_vtable;
 }
 
 
@@ -139,7 +139,7 @@ __flush_stdio :: () {
     ^stdio.print_stream |> io.stream_flush();
 }
 
-#local stdin_vtable := io.Stream_Vtable.{
+#local stdio_vtable := io.Stream_Vtable.{
     read = (_: ^io.Stream, buffer: [] u8) -> (io.Error, u32) {
         __flush_stdio();
         bytes_read := runtime.__read_from_input(buffer);
@@ -156,5 +156,18 @@ __flush_stdio :: () {
         if bytes_read <= 0 do return .EOF, 0;
 
         return .None, buf[0];
+    },
+
+    write = (_: ^io.Stream, buffer: [] u8) -> (io.Error, u32) {
+        return io.stream_write(^stdio.print_stream, buffer);
+    },
+
+    write_byte = (_: ^io.Stream, byte: u8) -> io.Error {
+        return io.stream_write_byte(^stdio.print_stream, byte);
+    },
+
+    flush = (_: ^io.Stream) -> io.Error {
+        __flush_stdio();
+        return .None;
     }
 }

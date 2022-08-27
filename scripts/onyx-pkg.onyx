@@ -108,7 +108,7 @@ run_init_command :: (args: [] cstr) {
     }
 
     @TODO // Validation for these fields.
-    r := io.reader_make(^stdin);
+    r := io.reader_make(^stdio_stream);
     read_field("Package name: ", ^config.metadata.name);
     read_field("Package description: ", ^config.metadata.description);
     read_field("Package url: ", ^config.metadata.url);
@@ -351,7 +351,7 @@ run_publish_command :: (args: [] cstr) {
         return;
     }
 
-    r := io.reader_make(^stdin);
+    r := io.reader_make(^stdio_stream);
 
     while true {
         printf("Is this a m[a]jor, m[i]nor, or [p]atch release? or [c]ancel? (a/i/p/c) ");
