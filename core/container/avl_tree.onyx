@@ -63,7 +63,10 @@ contains :: (tree: ^AVL_Tree, data: tree.T) -> bool {
 }
 
 print :: (tree: ^AVL_Tree) {
-    use package core {print as std_print, printf}
+    use core {
+        std_print :: print,
+        printf
+    }
 
     if tree == null {
         std_print("_ ");

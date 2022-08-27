@@ -21,7 +21,6 @@ static const char* token_type_names[] = {
     "elseif",
     "return",
     "global",
-    "as",
     "cast",
     "while",
     "for",
@@ -342,7 +341,6 @@ whitespace_skipped:
     switch (curr) {
     case 'a':
         LITERAL_TOKEN("alignof",     1, Token_Type_Keyword_Alignof);
-        LITERAL_TOKEN("as",          1, Token_Type_Keyword_As);
         break;
     case 'b':
         LITERAL_TOKEN("break",       1, Token_Type_Keyword_Break);

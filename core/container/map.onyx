@@ -11,7 +11,7 @@ package core.map
 }
 
 #local {
-    ValidKey :: interface (T as t) {
+    ValidKey :: interface (t: $T) {
         // In order to use a certain type as a key in a Map, you must
         // provide an implementation of core.hash.to_u32() for that type,
         // and you must provide an operator overload for ==.

@@ -32,7 +32,7 @@ add_example :: () {
     // expressions do not type check correctly, then the set of parameters does not
     // satisfy the interface.
 
-    CanAdd :: interface (T as t) {
+    CanAdd :: interface (t: $T) {
         t + t;
     }
 
@@ -59,7 +59,7 @@ add_example :: () {
 
 // These have to be defined out here because #operator and #match are only allowed
 // as top level expressions currently.
-NumberLike :: interface (T as t) {
+NumberLike :: interface (t: $T) {
     // The constraints here are a little stricter than before. This syntax
     // allows you to specify the expected type of the expression. If the type
     // of the expression and the type after the arrow do not match, then the
@@ -101,7 +101,7 @@ overloaded_procedure_example :: () {
     // when the are combined with overloaded procedures.
 
     // Take this example. Here is the same CanAdd interface from before.
-    CanAdd :: interface (T as t) {
+    CanAdd :: interface (t: $T) {
         t + t;
     }
 

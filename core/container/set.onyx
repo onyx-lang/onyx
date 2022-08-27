@@ -7,7 +7,7 @@ package core.set
     math :: package core.math
 }
 
-#local SetValue :: interface (T as t) {
+#local SetValue :: interface (t: $T) {
     { hash.to_u32(t) } -> u32;
     { t == t } -> bool;
 }

@@ -28,7 +28,7 @@ main :: (args: [] cstr) {
         use package core.alloc
 
         // You can also restrict and partially rename the symbols that collide
-        use package core.string { free as string_free }
+        use package core.string { string_free :: free }
     }
 
     {

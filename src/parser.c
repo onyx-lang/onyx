@@ -1398,12 +1398,13 @@ static AstNode* parse_use_stmt(OnyxParser* parser) {
             if (parser->hit_unexpected_token) return NULL;
 
             QualifiedUse qu;
-            qu.symbol_name = expect_token(parser, Token_Type_Symbol);
+            qu.as_name = expect_token(parser, Token_Type_Symbol);
+            qu.symbol_name = qu.as_name;
 
-            if (consume_token_if_next(parser, Token_Type_Keyword_As))
-                qu.as_name = expect_token(parser, Token_Type_Symbol);
-            else
-                qu.as_name = qu.symbol_name;
+            if (consume_token_if_next(parser, ':')) {
+                expect_token(parser, ':');
+                qu.symbol_name = expect_token(parser, Token_Type_Symbol);
+            }
 
             bh_arr_push(use_node->only, qu);
 
@@ -2151,9 +2152,10 @@ static AstInterface* parse_interface(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return interface;
 
         InterfaceParam ip;
-        ip.type_token  = expect_token(parser, Token_Type_Symbol);
-        expect_token(parser, Token_Type_Keyword_As);
         ip.value_token = expect_token(parser, Token_Type_Symbol);
+        expect_token(parser, ':');
+        expect_token(parser, '$');
+        ip.type_token  = expect_token(parser, Token_Type_Symbol);
 
         bh_arr_push(interface->params, ip);
 
@@ -3110,6 +3112,19 @@ static void parse_top_level_statement(OnyxParser* parser) {
             binding->node = (AstNode *) memres;
 
             goto submit_binding_to_entities;
+        }
+
+        case '(': {
+            AstTyped *retval = NULL;
+            if (parse_possible_function_definition(parser, &retval)) {
+                ENTITY_SUBMIT(retval);
+                return;
+            }
+            if (parse_possible_quick_function_definition(parser, &retval)) {
+                ENTITY_SUBMIT(retval);
+                return;
+            }
+            break;
         }
 
         case '#': {
