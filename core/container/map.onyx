@@ -61,7 +61,7 @@ make :: ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Va
     return map;
 }
 
-#match (package builtin).__make_overload macro (x: ^Map($K, $V), allocator := context.allocator) => (package core.map).make(K, V);
+#match __make_overload macro (x: ^Map($K, $V), allocator := context.allocator) => core.map.make(K, V);
 
 init :: (use map: ^Map($K, $V), default := V.{}) {
     __initialize(map);
@@ -69,7 +69,7 @@ init :: (use map: ^Map($K, $V), default := V.{}) {
     allocator = context.allocator;
     default_value = default;
 
-    hashes = make([] u32, 8, allocator=allocator);
+    hashes = builtin.make([] u32, 8, allocator=allocator);
     array.fill(hashes, -1);
 
     array.init(^entries, allocator=allocator);
@@ -208,7 +208,7 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
 
     rehash :: (use map: ^Map, new_size: i32) {
         memory.free_slice(^hashes, allocator);
-        hashes = make([] u32, new_size, allocator=allocator);
+        hashes = builtin.make([] u32, new_size, allocator=allocator);
         array.fill(hashes, -1);
 
         for ^entry: entries do entry.next = -1;

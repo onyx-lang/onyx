@@ -3,7 +3,6 @@ package builtin
 // CLEANUP: Should builtin.onyx really be including other files in the compilation?
 // Does that complicate things too much?
 #load "core/runtime/build_opts"
-#local runtime :: package runtime
 
 str  :: #type []u8;
 cstr :: #type ^u8;

@@ -70,7 +70,7 @@ copy :: #match #locked {
     },
 
     (arr: [] $T, allocator := context.allocator) -> [] T {
-        new_arr := make([] T, arr.count);
+        new_arr := builtin.make([] T, arr.count);
         for i: 0 .. arr.count do new_arr.data[i] = arr.data[i];
         return new_arr;
     }

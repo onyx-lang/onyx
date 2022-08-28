@@ -3464,12 +3464,6 @@ void onyx_parse(OnyxParser *parser) {
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);
     parser->current_scope = parser->file_scope;
 
-    AstUse* implicit_use_builtin = make_node(AstUse, Ast_Kind_Use);
-    AstPackage* implicit_builtin_package = make_node(AstPackage, Ast_Kind_Package);
-    implicit_builtin_package->package_name = "builtin";
-    implicit_use_builtin->expr = (AstTyped *) implicit_builtin_package;
-    ENTITY_SUBMIT(implicit_use_builtin);
-
     parse_top_level_statements_until(parser, Token_Type_End_Stream);
 
     parser->current_scope = parser->current_scope->parent;

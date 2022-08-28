@@ -195,7 +195,7 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         this.running_process.stdout.on("data", (chunk) => {
             this.sendEvent(new debugadapter_1.OutputEvent(chunk, "console"));
         });
-        this.attachRequest(response, { "socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": true });
+        this.attachRequest(response, { "socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": args.stopOnEntry });
     }
     attachRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {

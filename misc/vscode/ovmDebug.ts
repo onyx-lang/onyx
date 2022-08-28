@@ -267,7 +267,7 @@ export class OVMDebugSession extends LoggingDebugSession {
 			this.sendEvent(new OutputEvent(chunk, "console"));
 		});
 
-		this.attachRequest(response, {"socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": true});
+		this.attachRequest(response, {"socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": args.stopOnEntry});
     }
 
     protected async attachRequest(response: DebugProtocol.AttachResponse, args: IOVMAttachRequestArguments, request?: DebugProtocol.Request): Promise<void> {

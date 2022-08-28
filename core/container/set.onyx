@@ -189,7 +189,7 @@ iterator :: (set: ^Set($T)) -> Iterator(T) {
 
     rehash :: (use set: ^Set, new_size: i32) {
         memory.free_slice(^hashes, allocator);
-        hashes = make([] u32, new_size, allocator=allocator);
+        hashes = builtin.make([] u32, new_size, allocator=allocator);
         array.fill(hashes, -1);
 
         for ^entry: entries do entry.next = -1;

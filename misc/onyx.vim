@@ -15,7 +15,7 @@ syn keyword onyxKeyword if elseif else where interface
 syn keyword onyxKeyword for while do
 syn keyword onyxKeyword switch case
 syn keyword onyxKeyword break continue return defer fallthrough
-syn keyword onyxKeyword as cast sizeof alignof typeof
+syn keyword onyxKeyword cast sizeof alignof typeof
 syn keyword onyxType bool void
 syn keyword onyxType i8 u8
 syn keyword onyxType i16 u16

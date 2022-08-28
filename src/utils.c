@@ -39,9 +39,15 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         pac_name[strlen(package_name)] = '\0';
 
         package->name = pac_name;
-        package->scope = scope_create(alloc, parent_scope, (OnyxFilePos) { 0 });
-        package->private_scope = scope_create(alloc, package->scope, (OnyxFilePos) { 0 });
         package->use_package_entities = NULL;
+
+        if (!strcmp(pac_name, "builtin")) {
+            package->private_scope = scope_create(alloc, context.global_scope, pos);
+            package->scope = context.global_scope;
+        } else {
+            package->scope = scope_create(alloc, parent_scope, pos);
+            package->private_scope = scope_create(alloc, package->scope, pos);
+        }
 
         shput(context.packages, pac_name, package);
 
