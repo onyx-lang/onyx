@@ -1455,6 +1455,44 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             SYMRES(expression, &library->library_symbol);
             break;
         }
+
+        case Ast_Kind_Injection: {
+            AstInjection *inject = (AstInjection *) directive;
+
+            if (inject->dest == NULL) {
+                if (inject->full_loc == NULL) return Symres_Error;
+
+                if (inject->full_loc->kind != Ast_Kind_Field_Access) {
+                    onyx_report_error(inject->token->pos, Error_Critical, "#inject expects a dot (a.b) expression for the injection point.");
+                    return Symres_Error;
+                }
+
+                AstFieldAccess *acc = (AstFieldAccess *) inject->full_loc;
+                inject->dest = acc->expr;
+                inject->symbol = acc->token;
+            }
+
+            SYMRES(expression, &inject->dest);
+            SYMRES(expression, &inject->to_inject);
+
+            Scope *scope = get_scope_from_node_or_create((AstNode *) inject->dest);
+            if (scope == NULL) {
+                onyx_report_error(inject->token->pos, Error_Critical, "Cannot #inject here.");
+                return Symres_Error;
+            }
+
+            AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
+            binding->token = inject->symbol;
+            binding->node = (AstNode *) inject->to_inject;
+
+            Package *pac = NULL;
+            if (inject->dest->kind == Ast_Kind_Package) {
+                pac = ((AstPackage *) inject->dest)->package;
+            }
+
+            add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
+            return Symres_Complete;
+        }
     }
 
     return Symres_Success;

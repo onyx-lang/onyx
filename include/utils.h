@@ -26,6 +26,8 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn);
 AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol);
 AstNode* try_symbol_resolve_from_node(AstNode* node, OnyxToken* token);
 AstNode* try_symbol_raw_resolve_from_type(Type *type, char* symbol);
+Scope *get_scope_from_node(AstNode *node);
+Scope *get_scope_from_node_or_create(AstNode *node);
 
 void build_all_overload_options(bh_arr(OverloadOption) overloads, bh_imap* all_overloads);
 

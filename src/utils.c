@@ -74,6 +74,7 @@ void package_track_use_package(Package* package, Entity* entity) {
 }
 
 void package_reinsert_use_packages(Package* package) {
+    if (!package) return;
     if (!package->use_package_entities) return;
 
     bh_arr_each(Entity *, use_package, package->use_package_entities) {
@@ -1046,6 +1047,85 @@ i32 string_process_escape_seqs(char* dest, char* src, i32 len) {
     return total_len;
 }
 
+static Scope **get_scope_from_node_helper(AstNode *node) {
+    b32 used_pointer = 0;
+
+    while (1) {
+        if (!node) return NULL;
+
+        switch (node->kind) {
+            case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
+            case Ast_Kind_Type_Alias:     node = (AstNode *) ((AstTypeAlias *) node)->to; break;
+            case Ast_Kind_Alias:          node = (AstNode *) ((AstAlias *) node)->alias; break;
+            case Ast_Kind_Pointer_Type: {
+                if (used_pointer) goto all_types_peeled_off;
+                used_pointer = 1;
+
+                node = (AstNode *) ((AstPointerType *) node)->elem;
+                break;
+            }
+
+            default: goto all_types_peeled_off;
+        }
+    }
+
+all_types_peeled_off:
+    if (!node) return NULL;
+
+    switch (node->kind) {
+        case Ast_Kind_Package: {
+            AstPackage* package = (AstPackage *) node;
+            if (package->package == NULL) return NULL;
+
+            return &package->package->scope;
+        } 
+
+        case Ast_Kind_Enum_Type: {
+            AstEnumType* etype = (AstEnumType *) node;
+            return &etype->scope;
+        }
+
+        case Ast_Kind_Struct_Type: {
+            AstStructType* stype = (AstStructType *) node;
+            return &stype->scope;
+        }
+
+        case Ast_Kind_Poly_Struct_Type: {
+            AstPolyStructType* pstype = (AstPolyStructType *) node;
+            AstStructType* stype = pstype->base_struct;
+            return &stype->scope;
+        }
+    }
+
+    return NULL;
+}
+
+Scope *get_scope_from_node(AstNode *node) {
+    if (!node) return NULL;
+
+    Scope **pscope = get_scope_from_node_helper(node);
+    if (!pscope) return NULL;
+    return *pscope;
+}
+
+Scope *get_scope_from_node_or_create(AstNode *node) {
+    if (!node) return NULL;
+
+    Scope **pscope = get_scope_from_node_helper(node);
+    if (!pscope) return NULL;
+
+    // Create the scope if it does not exist.
+    // This uses a NULL parent, which I think is what 
+    // is used in other parts of the compiler for struct/enum
+    // scopes?
+    if (!*pscope) {
+        assert(node->token);
+        *pscope = scope_create(context.ast_alloc, NULL, node->token->pos);
+    }
+
+    return *pscope;
+}
+
 u32 levenshtein_distance(const char *str1, const char *str2) {
     i32 m = strlen(str1) + 1;
     i32 n = strlen(str2) + 1;
@@ -1110,90 +1190,17 @@ char *find_closest_symbol_in_scope_and_parents(Scope *scope, char *sym) {
 }
         
 char *find_closest_symbol_in_node(AstNode* node, char *sym) {
-    b32 used_pointer = 0;
-
-    while (1) {
-        if (!node) return NULL;
-
-        switch (node->kind) {
-            case Ast_Kind_Type_Raw_Alias: node = (AstNode *) ((AstTypeRawAlias *) node)->to->ast_type; break;
-            case Ast_Kind_Type_Alias:     node = (AstNode *) ((AstTypeAlias *) node)->to; break;
-            case Ast_Kind_Alias:          node = (AstNode *) ((AstAlias *) node)->alias; break;
-            case Ast_Kind_Pointer_Type: {
-                if (used_pointer) goto all_types_peeled_off;
-                used_pointer = 1;
-
-                node = (AstNode *) ((AstPointerType *) node)->elem;
-                break;
-            }
-
-            default: goto all_types_peeled_off;
-        }
-    }
-
-all_types_peeled_off:
-    if (!node) return NULL;
-
-    switch (node->kind) {
-        case Ast_Kind_Package: {
-            AstPackage* package = (AstPackage *) node;
-            if (package->package == NULL) return NULL;
-
-            u32 dist;
-            return find_closest_symbol_in_scope(package->package->scope, sym, &dist);
-        } 
-
-        case Ast_Kind_Enum_Type: {
-            AstEnumType* etype = (AstEnumType *) node;
-            u32 dist;
-            return find_closest_symbol_in_scope(etype->scope, sym, &dist);
-        }
-
-        case Ast_Kind_Struct_Type: {
-            AstStructType* stype = (AstStructType *) node;
-
-            u32 dist;
-            char *closest = find_closest_symbol_in_scope(stype->scope, sym, &dist);
-
-            Type *type = type_build_from_ast(context.ast_alloc, (AstType *) stype);
-            assert(type);
-            bh_arr_each(StructMember *, mem, type->Struct.memarr) {
-                u32 d = levenshtein_distance((*mem)->name, sym);
-                if (d < dist) {
-                    dist = d;
-                    closest = (*mem)->name;
-                }
-            }
-
-            return closest;
-        }
-
-        case Ast_Kind_Poly_Struct_Type: {
-            AstPolyStructType* pstype = (AstPolyStructType *) node;
-            AstStructType* stype = pstype->base_struct;
-            u32 dist;
-            char *closest =  find_closest_symbol_in_scope(stype->scope, sym, &dist);
-
-            bh_arr_each(AstPolyStructParam, param, pstype->poly_params) {
-                token_toggle_end(param->token);
-                u32 d = levenshtein_distance(param->token->text, sym);
-
-                if (d < dist) {
-                    dist = d;
-                    closest = bh_strdup(context.ast_alloc, param->token->text);
-                }
-                token_toggle_end(param->token);
-            }
-
-            return closest;
-        }
-
-        case Ast_Kind_Poly_Call_Type: {
+    Scope *scope = get_scope_from_node(node);
+    if (!scope) {
+        if (node->kind == Ast_Kind_Poly_Call_Type) {
             AstPolyCallType* pcall = (AstPolyCallType *) node;
             return find_closest_symbol_in_node((AstNode *) pcall->callee, sym);
         }
+
+        return NULL;
     }
 
-    return NULL;
+    u32 dist;
+    return find_closest_symbol_in_scope(scope, sym, &dist);
 }
 

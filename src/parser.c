@@ -2435,6 +2435,7 @@ static AstFunction* parse_function_definition(OnyxParser* parser, OnyxToken* tok
 
         } else {
             AstTyped* returned_value = parse_compound_expression(parser, 0);
+            if (returned_value == NULL) goto function_defined;
 
             AstReturn* return_node = make_node(AstReturn, Ast_Kind_Return);
             return_node->token = returned_value->token;
@@ -3247,6 +3248,24 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 add_overload->overload = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(add_overload);
+                return;
+            }
+            else if (parse_possible_directive(parser, "inject")) {
+                AstInjection *inject = make_node(AstInjection, Ast_Kind_Injection);
+                inject->token = dir_token;
+
+                parser->parse_calls = 0;
+                inject->full_loc = parse_expression(parser, 0);
+                parser->parse_calls = 1;
+
+                // See comment above
+                if (next_tokens_are(parser, 2, ':', ':')) {
+                    consume_tokens(parser, 2);
+                }
+
+                inject->to_inject = parse_expression(parser, 0);
+                
+                ENTITY_SUBMIT(inject);
                 return;
             }
             else if (parse_possible_directive(parser, "export")) {

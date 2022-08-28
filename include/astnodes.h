@@ -77,6 +77,7 @@
                                \
     NODE(Binding)              \
     NODE(Alias)                \
+    NODE(Injection)            \
     NODE(MemRes)               \
     NODE(Include)              \
     NODE(UsePackage)           \
@@ -132,6 +133,7 @@ typedef enum AstKind {
 
     Ast_Kind_Binding,
     Ast_Kind_Alias,
+    Ast_Kind_Injection,
     Ast_Kind_Function,
     Ast_Kind_Overloaded_Function,
     Ast_Kind_Polymorphic_Proc,
@@ -1011,6 +1013,13 @@ struct AstDistinctType {
 struct AstBinding       { AstTyped_base; AstNode* node; };
 struct AstAlias         { AstTyped_base; AstTyped* alias; };
 struct AstInclude       { AstNode_base;  AstTyped* name_node; char* name; };
+struct AstInjection     {
+    AstTyped_base;
+    AstTyped* full_loc;
+    AstTyped* to_inject;
+    AstTyped* dest;
+    OnyxToken *symbol;
+};
 struct AstMemRes        {
     AstTyped_base;
     AstTyped *initial_value;

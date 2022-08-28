@@ -13,6 +13,7 @@ static const char* ast_node_names[] = {
 
     "BINDING",
     "ALIAS",
+    "INJECTION",
     "FUNCTION",
     "OVERLOADED_FUNCTION",
     "POLYMORPHIC PROC",
