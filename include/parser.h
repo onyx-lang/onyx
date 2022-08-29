@@ -34,10 +34,10 @@ typedef struct OnyxParser {
 
     bh_arr(AstTyped *) stored_tags;
 
-    b32 hit_unexpected_token : 1;
+    u16 tag_depth : 16;
 
+    b32 hit_unexpected_token : 1;
     b32 parse_calls : 1;
-    b32 inside_tag  : 1;
 } OnyxParser;
 
 const char* onyx_ast_node_kind_string(AstKind kind);
