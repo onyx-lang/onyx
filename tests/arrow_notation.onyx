@@ -1,0 +1,43 @@
+#load "core/std"
+
+use core
+
+#tag conv.Custom_Format.{format}
+V2 :: struct {
+    x, y: i32;
+
+    add :: (v1, v2: V2) => V2.{v1.x+v2.x, v1.y+v2.y};
+
+    add_inplace :: (v1: ^V2, v2: V2) {
+        v1.x += v2.x;
+        v1.y += v2.y;
+    }
+
+    format :: (output: ^conv.Format_Output, _: ^conv.Format, v: ^V2) {
+        conv.format(output, "({}, {})", v.x, v.y); 
+    }
+}
+
+main :: () {
+    {
+        // L-Values
+
+        v := V2.{1, 2};
+        println(v->add(.{3, 4}));
+
+
+        v->add_inplace(.{3, 4});
+        println(v);
+    }
+
+    {
+        // R-Value
+        out := (V2.{1, 2})->add(.{3, 4});
+        println(out);
+
+        // This does work because you can take the address of a struct literal.
+        // However, there is no way to retrieve the value of the sturct literal
+        // after this operation, so nothing can be printed.
+        (V2.{1, 2})->add_inplace(.{3, 4});
+    }
+}
