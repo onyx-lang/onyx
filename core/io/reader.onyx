@@ -90,7 +90,7 @@ read_all :: (use reader: ^Reader, allocator := context.allocator) -> [] u8 {
             break;
         }
 
-        if error != .None && error != .ReadPending {
+        if error != .None && error != .ReadPending && error != .EOF {
             reader_consume_error(reader);
             break;
         }

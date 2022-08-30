@@ -1,7 +1,19 @@
 
 #load "core/std"
 
+//
+// A list of repository URLs to get packages from.
+// These should be formatted to have one formatted
+// argument, which the package name.
+Known_Repositories :: str.[
+    "{}",
+    "git://onyxlang.io/repo/{}"
+]
+
 Version :: SemVer.{0, 1, 1}
+
+
+
 
 use core
 
@@ -131,6 +143,8 @@ run_add_command :: (args: [] cstr) {
     }
 
     dep     := string.as_str(args[0]);
+    dep      = Git.get_full_repo_uri(dep);
+
     version: SemVer;
     if args.count > 1 {
         if !conv.parse_any(^version, string.as_str(args[1])) {
@@ -624,6 +638,18 @@ Package :: struct {
 }
 
 Git :: struct {
+    get_full_repo_uri :: (repo: str) -> str {
+        for Known_Repositories {
+            r := tprintf(it, repo);
+            git_proc := os.process_spawn(git_path, .["ls-remote", "--tags", r]);
+            if os.process_wait(^git_proc) == .Success {
+                return r |> string.alloc_copy();
+            }
+        }
+
+        return "";
+    }
+
     get_available_versions :: (repo: str) -> [] SemVer {
         versions := make([..] SemVer);
 
