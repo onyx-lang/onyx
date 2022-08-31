@@ -24,6 +24,14 @@ cptr :: struct (T: type_expr) {
     read_i32 :: (this: cptr(i32)) => cast(i32) __cptr_read_u32(this.data);
     read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data);
 
+    // When given a non-zero-sized dest, this procedure
+    // fills the dest buffer with the contents of the string
+    // up to the number bytes in the dest buffer. This
+    // procedure returns the length of the string as given
+    // by strlen(). This exists because iterating byte by byte
+    // using __cptr_read_u8 would be slow compared to strlen().
+    extract_str :: (this: cptr(u8), dest: [] u8) => __cptr_extract_str(this.data, dest);
+
     to_rawptr :: (this: cptr($T)) -> ^T {
         // I'm treating NULL as more of a concept, than as an actual value here,
         // because if something returns a NULL pointer, it should logically map
@@ -50,12 +58,13 @@ cptr :: struct (T: type_expr) {
 
 #local {
     #foreign "onyx_runtime" {
-        __cptr_make     :: (x: rawptr) -> u64 ---
-        __cptr_read     :: (x: u64, dest: rawptr, size: u32) -> void ---
-        __cptr_read_u8  :: (x: u64) -> u8 ---
-        __cptr_read_u16 :: (x: u64) -> u16 ---
-        __cptr_read_u32 :: (x: u64) -> u32 ---
-        __cptr_read_u64 :: (x: u64) -> u64 ---
+        __cptr_make        :: (x: rawptr) -> u64 ---
+        __cptr_read        :: (x: u64, dest: rawptr, size: u32) -> void ---
+        __cptr_read_u8     :: (x: u64) -> u8 ---
+        __cptr_read_u16    :: (x: u64) -> u16 ---
+        __cptr_read_u32    :: (x: u64) -> u32 ---
+        __cptr_read_u64    :: (x: u64) -> u64 ---
+        __cptr_extract_str :: (x: u64, dest: [] u8) -> u32 ---
 
         //
         // The equivalent write instructions are pusposefully left out.
