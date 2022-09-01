@@ -310,6 +310,7 @@ Format_Output :: struct {
 Format :: struct {
     pretty_printing      := false;
     quote_strings        := false;
+    single_quote_strings := false;
     dereference          := false;
     custom_format        := true;
     interpret_numbers    := true;
@@ -431,6 +432,11 @@ format_va :: #match {}
                         formatting.quote_strings = true;
                     }
 
+                    case #char "'" {
+                        i += 1;
+                        formatting.single_quote_strings = true;
+                    }
+
                     case #char "d" {
                         i += 1;
                         formatting.interpret_numbers = false;
@@ -543,16 +549,18 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
 
         case str {
             if formatting.quote_strings do output->write("\"");
+            if formatting.single_quote_strings do output->write("'");
             width := formatting.minimum_width;
             to_output := *cast(^str) v.data;
 
             @Todo // escape '"' when quote_strings is enabled.
             output->write(to_output);
-            if to_output.count < width && !formatting.quote_strings {
+            if to_output.count < width && !(formatting.quote_strings || formatting.single_quote_strings) {
                 for width - to_output.count do output->write(#char " ");
             }
 
             if formatting.quote_strings do output->write("\"");
+            if formatting.single_quote_strings do output->write("'");
         }
 
         case rawptr {
