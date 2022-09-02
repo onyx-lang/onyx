@@ -33,6 +33,8 @@ heap_allocator : Allocator;
 // The global temp allocator, set up upon program intialization.
 #local #thread_local
 temp_state     : arena.ArenaState;
+
+#thread_local
 temp_allocator : Allocator;
 
 init_temp_allocator :: () {
