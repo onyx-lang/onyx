@@ -1726,6 +1726,7 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
     CHECK(expression, &mcall->left);
     if (mcall->left->type == NULL) YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
 
+    mcall->type = mcall->left->type;
     AstTyped* implicit_argument = mcall->left;
 
     // Symbol resolution should have ensured that this is call node.

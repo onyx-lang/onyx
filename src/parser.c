@@ -825,25 +825,6 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 break;
             }
 
-            case Token_Type_Right_Arrow: {
-                AstBinaryOp* method_call = make_node(AstBinaryOp, Ast_Kind_Method_Call);
-                method_call->token = expect_token(parser, Token_Type_Right_Arrow);
-                method_call->left = retval;
-                method_call->right = parse_factor(parser);
-
-                if (method_call->right && method_call->right->kind == Ast_Kind_Method_Call) {
-                    AstBinaryOp *inner_method_call = (AstBinaryOp *) method_call->right;
-                    method_call->right = inner_method_call->left;
-                    inner_method_call->left = (AstTyped *) method_call;
-
-                    retval = (AstTyped *) inner_method_call;
-
-                } else {
-                    retval = (AstTyped *) method_call;
-                }
-                break;
-            }
-
             case Token_Type_Keyword_If: {
                 AstIfExpression* if_expression = make_node(AstIfExpression, Ast_Kind_If_Expression);
                 if_expression->token = expect_token(parser, Token_Type_Keyword_If);
@@ -909,6 +890,8 @@ static inline i32 get_precedence(BinaryOp kind) {
         case Binary_Op_Divide:          return 8;
 
         case Binary_Op_Modulus:         return 9;
+        
+        case Binary_Op_Method_Call:     return 10;
 
         default:                        return -1;
     }
@@ -955,6 +938,7 @@ static BinaryOp binary_op_from_token_type(TokenType t) {
         case Token_Type_Pipe:              return Binary_Op_Pipe;
         case Token_Type_Dot_Dot:           return Binary_Op_Range;
         case '[':                          return Binary_Op_Subscript;
+        case Token_Type_Right_Arrow:       return Binary_Op_Method_Call;
         default: return Binary_Op_Count;
     }
 }
@@ -1023,9 +1007,10 @@ static AstTyped* parse_expression(OnyxParser* parser, b32 assignment_allowed) {
         consume_token(parser);
 
         AstBinaryOp* bin_op;
-        if      (bin_op_kind == Binary_Op_Pipe)  bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
-        else if (bin_op_kind == Binary_Op_Range) bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
-        else                                     bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
+        if      (bin_op_kind == Binary_Op_Pipe)        bin_op = make_node(AstBinaryOp, Ast_Kind_Pipe);
+        else if (bin_op_kind == Binary_Op_Method_Call) bin_op = make_node(AstBinaryOp, Ast_Kind_Method_Call);
+        else if (bin_op_kind == Binary_Op_Range)       bin_op = (AstBinaryOp *) make_node(AstRangeLiteral, Ast_Kind_Range_Literal);
+        else                                           bin_op = make_node(AstBinaryOp, Ast_Kind_Binary_Op);
 
         bin_op->token = bin_op_tok;
         bin_op->operation = bin_op_kind;
