@@ -18,6 +18,11 @@ Reader :: struct {
 
     done : bool; // If an .EOF was reached.
 
+    // If a .ReadPending was reached, still work with the data
+    // that is available. Only set this if you know that the data
+    // will always be available.
+    greedy : bool;
+
     is_empty :: reader_empty;
     read_all :: read_all;
     read_byte :: read_byte;
@@ -39,12 +44,13 @@ Reader :: struct {
     lines :: lines;
 }
 
-reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
+reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator, greedy := false) -> Reader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     reader: Reader;
     reader.stream = s;
     reader.error = .None;
+    reader.greedy = greedy;
 
     memory.alloc_slice(^reader.buffer, buffer_size, allocator);
     reader.buffer_allocator = allocator;
@@ -598,6 +604,7 @@ lines :: (r: ^Reader, inplace := false) -> Iterator(str) {
     // if the end is equal to start because that means that the buffer is
     // completely empty.
     if err == .ReadPending {
+        if greedy do err = .BufferFull;
         error = err;
         return err if end == 0 else .None;
     }
