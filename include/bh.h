@@ -1655,7 +1655,10 @@ b32 bh_file_stat(char const* filename, bh_file_stats* out) {
 
     if ((s.st_mode & S_IFMT) == S_IFDIR) out->file_type = BH_FILE_TYPE_DIRECTORY;
     if ((s.st_mode & S_IFMT) == S_IFREG) out->file_type = BH_FILE_TYPE_FILE;
+
+#if defined(_BH_LINUX) 
     if ((s.st_mode & S_IFMT) == S_IFLNK) out->file_type = BH_FILE_TYPE_LINK;
+#endif
 
     return 1;
 }

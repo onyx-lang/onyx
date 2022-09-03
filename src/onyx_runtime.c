@@ -369,7 +369,7 @@ ONYX_DEF(__dir_create, (WASM_I32, WASM_I32), (WASM_I32)) {
     path[path_len] = 0;
 
 #ifdef _BH_WINDOWS
-    results->data[0] = WASM_I32_VAL(CreateDirectoryA(path, NULL));
+    results->data[0] = WASM_I32_VAL(CreateDirectoryA(path));
     return NULL;
 #endif
 
@@ -950,8 +950,12 @@ ONYX_DEF(__time_strftime, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) 
 }
 
 ONYX_DEF(__time_strptime, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #if defined(_BH_LINUX)
     char *rem = strptime(ONYX_PTR(params->data[0].of.i32), params->data[1].of.i32, ONYX_PTR(params->data[2].of.i32), ONYX_PTR(params->data[3].of.i32));
     results->data[0] = WASM_I32_VAL(rem != NULL); 
+    #else
+    results->data[0] = WASM_I32_VAL(0);
+    #endif
     return NULL;
 }
 
@@ -967,20 +971,28 @@ struct onyx_socket_addr {
 };
 
 static inline int onyx_socket_domain(int i) {
+    #if defined(_BH_LINUX)
     switch (i) {    // :EnumDependent
         case 0: return AF_UNIX;
         case 1: return AF_INET;
         case 2: return AF_INET6;
         default: return -1;
     }
+    #elif defined(_BH_WINDOWS)
+    return -1;
+    #endif
 }
 
 static inline int onyx_socket_protocol(int i) {
+    #if defined(_BH_LINUX)
     switch (i) {    // :EnumDependent
         case 0: return SOCK_STREAM;
         case 1: return SOCK_DGRAM;
         default: return -1;
     }
+    #elif defined(_BH_WINDOWS)
+    return -1;
+    #endif
 }
 
 ONYX_DEF(__net_create_socket, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
@@ -1131,6 +1143,7 @@ ONYX_DEF(__net_accept, (WASM_I32, WASM_I32), (WASM_I32)) {
 }
 
 ONYX_DEF(__net_connect_unix, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+    #ifdef _BH_LINUX
     int   hostlen  = params->data[2].of.i32;
     char *hostname = alloca(hostlen + 1);
     memcpy(hostname, ONYX_PTR(params->data[1].of.i32), hostlen);
@@ -1145,6 +1158,7 @@ ONYX_DEF(__net_connect_unix, (WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     int result = connect(params->data[0].of.i32, &server_addr, sizeof(server_addr));
     if (result == 0) results->data[0] = WASM_I32_VAL(0);
     else             results->data[0] = WASM_I32_VAL(3); // :EnumDependent
+    #endif
     
     return NULL;
 }
