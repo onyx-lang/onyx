@@ -1260,11 +1260,11 @@ ONYX_DEF(__net_poll_recv, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), ()) {
     int i, res, cursor;
     struct pollfd* fds;
 
-    fds = alloca(params->data[1].of.i32 * sizeof(struct pollfd)); // Guessed size of pollfd
+    fds = alloca(params->data[1].of.i32 * sizeof(struct pollfd));
 
     for (i=0; i<params->data[1].of.i32; i++) {
         fds[i].fd = *(i32 *) ONYX_PTR(params->data[0].of.i32 + 4 * i);
-        fds[i].events = -1;
+        fds[i].events = POLLIN;
         fds[i].revents = 0;
     }
 

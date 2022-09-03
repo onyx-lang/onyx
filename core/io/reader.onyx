@@ -320,6 +320,7 @@ read_line :: (use reader: ^Reader, consume_newline := true, allocator := context
 
         if !done {
             while reader_read_next_chunk(reader) == .ReadPending ---
+            if error == .NoProgress do done = true;
         }
 
         if reader_empty(reader) do done = true;
@@ -390,6 +391,7 @@ read_word :: (use reader: ^Reader, numeric_allowed := false, allocator := contex
 
         if !done {
             while reader_read_next_chunk(reader) == .ReadPending ---
+            if error == .NoProgress do done = true;
         }
 
         if reader_empty(reader) do done = true;
@@ -457,6 +459,7 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
 
         if !done {
             while reader_read_next_chunk(reader) == .ReadPending ---
+            if error == .NoProgress do done = true;
         }
 
         if reader_empty(reader) do done = true;
@@ -604,14 +607,15 @@ lines :: (r: ^Reader, inplace := false) -> Iterator(str) {
     // if the end is equal to start because that means that the buffer is
     // completely empty.
     if err == .ReadPending {
-        if greedy do err = .BufferFull;
+        if greedy do err = .NoProgress;
         error = err;
         return err if end == 0 else .None;
     }
 
     end += n;
     if err != .None {
-        if err == .EOF do done = true;
+        if err == .EOF     do done = true;
+        if err == .BadFile do done = true;
 
         error = err;
         return .None;
