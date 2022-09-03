@@ -304,7 +304,7 @@ run_sync_command :: (args: [] cstr) {
                     dependencies_installed->delete(it.key);
                     dependencies_to_install << .{ .{it.key, it.value}, false };
 
-                } elseif !it.value->is_compatible(dependencies_installed[it.key]) {
+                } elseif !(it.value->is_compatible(dependencies_installed[it.key])) {
                     eprintf("Different major versions of {} being used!\n", it.key);
                     os.exit(1);
                 }
@@ -938,7 +938,7 @@ parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseE
     active_item_type := void;
 
     r->skip_whitespace();
-    while !r->is_empty() {
+    while !(r->is_empty()) {
         defer r->skip_whitespace();
 
         if b, e := r->peek_byte(); b == #char "[" {
