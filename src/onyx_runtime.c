@@ -933,13 +933,13 @@ ONYX_DEF(__time, (), (WASM_I64)) {
 //
 ONYX_DEF(__time_localtime, (WASM_I64, WASM_I32), ()) {
     u64 t = params->data[0].of.i64;
-    localtime_r(&t, ONYX_PTR(params->data[1].of.i32));
+    *(struct tm *) ONYX_PTR(params->data[1].of.i32) = *localtime(&t);
     return NULL;
 }
 
 ONYX_DEF(__time_gmtime, (WASM_I64, WASM_I32), ()) {
     u64 t = params->data[0].of.i64;
-    gmtime_r(&t, ONYX_PTR(params->data[1].of.i32));
+    *(struct tm *) ONYX_PTR(params->data[1].of.i32) = *gmtime(&t);
     return NULL;
 }
 
