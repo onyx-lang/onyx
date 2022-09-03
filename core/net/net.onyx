@@ -141,22 +141,21 @@ socket_accept :: (s: ^Socket) -> (Socket, Socket_Address) {
     return new_socket, new_addr;
 }
 
-socket_poll_all :: (sockets: [] ^Socket, timeout := -1, changed_buffer: [] i32 = .[]) -> [] i32 {
+Socket_Poll_Status :: enum {
+    No_Change :: 0;
+    Readable  :: 1;
+    Closed    :: 2;
+}
+
+socket_poll_all :: (sockets: [] ^Socket, timeout := -1, stat_buff: [] Socket_Poll_Status = .[]) {
+    if sockets.count > stat_buff.count do return;
+
     handles := (cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle))[0 .. sockets.count];
     for i: sockets.count {
         handles[i] = sockets[i].handle;
     }
 
-    handles_changed := cast(^i32) alloc.from_stack(sockets.count * sizeof i32);
-    num_changed := __net_poll_recv(handles, timeout, handles_changed);
-
-    if changed_buffer.count == 0 do return .[];
-    assert(changed_buffer.count >= num_changed, "Not enough space to write back changed sockets."); 
-
-    changed_buffer.count = num_changed;
-    memory.copy(changed_buffer.data, handles_changed, num_changed * sizeof i32);
-
-    return changed_buffer;
+    __net_poll_recv(handles, timeout, stat_buff.data);
 }
 
 socket_send :: (s: ^Socket, data: [] u8) -> i32 {
@@ -272,7 +271,7 @@ network_to_host :: #match {}
     #package __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: ^Socket_Address)  -> i32 ---
     #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool) -> i32 ---
     #package __net_recvfrom      :: (handle: Socket.Handle, data: [] u8, out_recv_addr: ^Socket_Address, async_would_block: ^bool) -> i32 ---
-    #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_recv_indicies: ^i32) -> i32 ---
+    #package __net_poll_recv     :: (handle: [] Socket.Handle, timeout: i32, out_statuses: ^Socket_Poll_Status) -> void ---
 
     #package __net_host_to_net_s :: (s: u16) -> u16 ---
     #package __net_host_to_net_l :: (s: u32) -> u32 ---

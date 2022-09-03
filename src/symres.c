@@ -1038,8 +1038,6 @@ SymresStatus symres_function_header(AstFunction* func) {
     if (func->scope == NULL)
         func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
 
-    scope_enter(func->scope);
-
     if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
         bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
             SYMRES(constraint, *constraint);
@@ -1049,6 +1047,8 @@ SymresStatus symres_function_header(AstFunction* func) {
         // Will resume here after constraints have been met.
         return Symres_Success;
     }
+
+    scope_enter(func->scope);
 
     bh_arr_each(AstParam, param, func->params) {
         if (param->default_value != NULL) {
