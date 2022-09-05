@@ -1,6 +1,17 @@
 #ifndef BH_H
 #define BH_H
 
+#ifdef BH_STATIC
+    #define BH_DEF static
+#else
+    #ifdef BH_INTERNAL
+        #define BH_DEF __attribute__((visibility("hidden")))
+    #else
+        #define BH_DEF
+    #endif
+#endif
+
+
 // NOTE: For lseek64
 #define _LARGEFILE64_SOURCE
 
@@ -21,6 +32,7 @@
     #include <fcntl.h>
     #include <unistd.h>
     #include <dirent.h>
+    #include <pthread.h>
 #endif
 
 #include <stdlib.h>
@@ -168,6 +180,7 @@ u8* float_to_ieee754(f32 f, b32 reverse);
 u8* double_to_ieee754(f64 f, b32 reverse);
 
 u64 uleb128_to_uint(u8* bytes, i32 *byte_walker);
+BH_DEF i64 leb128_to_int(u8* bytes, i32 *byte_count);
 
 
 
@@ -261,11 +274,31 @@ typedef struct bh__arena_internal {
     void* data; // Not actually a pointer, just used for the offset
 } bh__arena_internal;
 
-void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size);
-void bh_arena_free(bh_arena* alloc);
-bh_allocator bh_arena_allocator(bh_arena* alloc);
-BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
+BH_DEF void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size);
+BH_DEF void bh_arena_clear(bh_arena* alloc);
+BH_DEF void bh_arena_free(bh_arena* alloc);
+BH_DEF bh_allocator bh_arena_allocator(bh_arena* alloc);
+BH_DEF BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
 
+
+// ATOMIC ARENA ALLOCATOR
+typedef struct bh_atomic_arena {
+    bh_allocator backing;
+    ptr first_arena, current_arena;
+    isize size, arena_size; // in bytes
+
+    pthread_mutex_t mutex;
+} bh_atomic_arena;
+
+typedef struct bh__atomic_arena_internal {
+    ptr next_arena;
+    void* data; // Not actually a pointer, just used for the offset
+} bh__atomic_arena_internal;
+
+BH_DEF void bh_atomic_arena_init(bh_atomic_arena* alloc, bh_allocator backing, isize arena_size);
+BH_DEF void bh_atomic_arena_free(bh_atomic_arena* alloc);
+BH_DEF bh_allocator bh_atomic_arena_allocator(bh_atomic_arena* alloc);
+BH_DEF BH_ALLOCATOR_PROC(bh_atomic_arena_allocator_proc);
 
 
 
@@ -518,16 +551,17 @@ typedef struct bh_buffer {
 #define BH_BUFFER_GROW_FORMULA(x)            ((x) > 0 ? ((x) << 1) : 16)
 #endif
 
-void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 length);
-void bh_buffer_free(bh_buffer* buffer);
-void bh_buffer_clear(bh_buffer* buffer);
-void bh_buffer_grow(bh_buffer* buffer, i32 length);
-void bh_buffer_append(bh_buffer* buffer, const void * data, i32 length);
-void bh_buffer_concat(bh_buffer* buffer, bh_buffer other);
-void bh_buffer_write_byte(bh_buffer* buffer, u8 byte);
-void bh_buffer_write_u32(bh_buffer* buffer, u32 i);
-void bh_buffer_write_u64(bh_buffer* buffer, u64 i);
-void bh_buffer_align(bh_buffer* buffer, u32 alignment);
+BH_DEF void bh_buffer_init(bh_buffer* buffer, bh_allocator alloc, i32 length);
+BH_DEF void bh_buffer_free(bh_buffer* buffer);
+BH_DEF void bh_buffer_clear(bh_buffer* buffer);
+BH_DEF void bh_buffer_grow(bh_buffer* buffer, i32 length);
+BH_DEF void bh_buffer_append(bh_buffer* buffer, const void * data, i32 length);
+BH_DEF void bh_buffer_concat(bh_buffer* buffer, bh_buffer other);
+BH_DEF void bh_buffer_write_byte(bh_buffer* buffer, u8 byte);
+BH_DEF void bh_buffer_write_u32(bh_buffer* buffer, u32 i);
+BH_DEF void bh_buffer_write_u64(bh_buffer* buffer, u64 i);
+BH_DEF void bh_buffer_write_string(bh_buffer* buffer, char *str);
+BH_DEF void bh_buffer_align(bh_buffer* buffer, u32 alignment);
 
 
 
@@ -598,6 +632,7 @@ typedef struct bh__arr {
 
 #define bh_arr_deleten(arr, i, n)     (bh__arr_deleten((void **) &(arr), sizeof(*(arr)), i, n))
 #define bh_arr_fastdelete(arr, i)     (arr[i] = arr[--bh__arrhead(arr)->length])
+#define bh_arr_fastdeleten(arr, n)    (bh__arrhead(arr)->length -= n)
 
 #define bh_arr_each(T, var, arr)      for (T* var = (arr); !bh_arr_end((arr), var); var++)
 #define bh_arr_rev_each(T, var, arr)  for (T* var = &bh_arr_last((arr)); !bh_arr_start((arr), var); var--)
@@ -1038,6 +1073,22 @@ void bh_arena_init(bh_arena* alloc, bh_allocator backing, isize arena_size) {
     ((bh__arena_internal *)(alloc->first_arena))->next_arena = NULL;
 }
 
+BH_DEF void bh_arena_clear(bh_arena* alloc) {
+    bh__arena_internal *walker = (bh__arena_internal *) alloc->first_arena;
+    walker = walker->next_arena;
+    if (walker != NULL) {
+        bh__arena_internal *trailer = walker;
+        while (walker != NULL) {
+            walker = walker->next_arena;
+            bh_free(alloc->backing, trailer);
+            trailer = walker;
+        }
+    }
+    
+    alloc->current_arena = alloc->first_arena;
+    alloc->size = sizeof(ptr);
+}
+
 void bh_arena_free(bh_arena* alloc) {
     bh__arena_internal *walker = (bh__arena_internal *) alloc->first_arena;
     bh__arena_internal *trailer = walker;
@@ -1104,6 +1155,93 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
     return retval;
 }
+
+
+// ATOMIC ARENA ALLOCATOR IMPLEMENTATION
+BH_DEF void bh_atomic_arena_init(bh_atomic_arena* alloc, bh_allocator backing, isize arena_size) {
+    arena_size = bh_max(arena_size, size_of(ptr));
+    ptr data = bh_alloc(backing, arena_size);
+
+    alloc->backing = backing;
+    alloc->arena_size = arena_size;
+    alloc->size = sizeof(ptr);
+    alloc->first_arena = data;
+    alloc->current_arena = data;
+    pthread_mutex_init(&alloc->mutex, NULL);
+
+    ((bh__arena_internal *)(alloc->first_arena))->next_arena = NULL;
+}
+
+BH_DEF void bh_atomic_arena_free(bh_atomic_arena* alloc) {
+    bh__atomic_arena_internal *walker = (bh__atomic_arena_internal *) alloc->first_arena;
+    bh__atomic_arena_internal *trailer = walker;
+    while (walker != NULL) {
+        walker = walker->next_arena;
+        bh_free(alloc->backing, trailer);
+        trailer = walker;
+    }
+
+    alloc->first_arena = NULL;
+    alloc->current_arena = NULL;
+    alloc->arena_size = 0;
+    alloc->size = 0;
+    pthread_mutex_destroy(&alloc->mutex);
+}
+
+BH_DEF bh_allocator bh_atomic_arena_allocator(bh_atomic_arena* alloc) {
+    return (bh_allocator) {
+        .proc = bh_atomic_arena_allocator_proc,
+        .data = alloc,
+    };
+}
+
+BH_DEF BH_ALLOCATOR_PROC(bh_atomic_arena_allocator_proc) {
+    bh_atomic_arena* alloc_arena = (bh_atomic_arena*) data;
+    pthread_mutex_lock(&alloc_arena->mutex);
+
+    ptr retval = NULL;
+
+    switch (action) {
+    case bh_allocator_action_alloc: {
+        bh_align(size, alignment);
+        bh_align(alloc_arena->size, alignment);
+
+        if (size > alloc_arena->arena_size - size_of(ptr)) {
+            // Size too large for the arena
+            break;
+        }
+
+        if (alloc_arena->size + size >= alloc_arena->arena_size) {
+            bh__arena_internal* new_arena = (bh__arena_internal *) bh_alloc(alloc_arena->backing, alloc_arena->arena_size);
+
+            if (new_arena == NULL) {
+                bh_printf_err("Arena Allocator: couldn't allocate new arena");
+                break;
+            }
+
+            new_arena->next_arena = NULL;
+            ((bh__arena_internal *)(alloc_arena->current_arena))->next_arena = new_arena;
+            alloc_arena->current_arena = new_arena;
+            alloc_arena->size = sizeof(ptr);
+        }
+
+        retval = bh_pointer_add(alloc_arena->current_arena, alloc_arena->size);
+        alloc_arena->size += size;
+    } break;
+
+    case bh_allocator_action_resize: {
+        // Do nothing since this is a fixed allocator
+    } break;
+
+    case bh_allocator_action_free: {
+        // Do nothing since this allocator isn't made for freeing memory
+    } break;
+    }
+
+    pthread_mutex_unlock(&alloc_arena->mutex);
+    return retval;
+}
+
 
 
 
@@ -1282,6 +1420,27 @@ u64 uleb128_to_uint(u8* bytes, i32 *byte_count) {
         if ((byte & 0x80) == 0) break;
         shift += 7;
     }
+    return res;
+}
+
+BH_DEF i64 leb128_to_int(u8* bytes, i32 *byte_count) {
+    i64 res = 0;
+    u64 shift = 0;
+    u64 size = 64;
+
+    u8 byte;
+    do {
+        byte = bytes[(*byte_count)++];
+        res |= (byte & 0x7f) << shift;
+        shift += 7;
+    } while ((byte & 0x80) != 0);
+
+    if ((shift < size) && (byte & 0x40) != 0) {
+        i64 zero_shifted = ~ 0x0;
+        zero_shifted = zero_shifted << shift;
+        return res | zero_shifted;
+    }
+    
     return res;
 }
 
@@ -2235,6 +2394,11 @@ void bh_buffer_write_u64(bh_buffer* buffer, u64 i) {
     bh_buffer_grow(buffer, buffer->length + 8);
     *((u64 *) bh_pointer_add(buffer->data, buffer->length)) = i;
     buffer->length += 8;
+}
+
+BH_DEF void bh_buffer_write_string(bh_buffer* buffer, char *str) {
+    u32 len = strlen(str);
+    bh_buffer_append(buffer, (const char *) str, len);
 }
 
 void bh_buffer_align(bh_buffer* buffer, u32 alignment) {
