@@ -14,14 +14,6 @@ sudo cp ./bin/onyx-pkg "$BIN_DIR/onyx-pkg"
 sudo mkdir -p "$CORE_DIR/tools"
 sudo cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
 
-cd compiler
-./build.sh $1
-cd ..
-
-cd runtime
-./build.sh $1
-cd ..
-
 if [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
     cd interpreter
     ./build.sh $1
@@ -39,6 +31,14 @@ if [ ! -f "$CORE_DIR/lib/lib$RUNTIME_LIBRARY.so" ] || true; then
     sudo cp "shared/include/onyx_library.h" "$CORE_DIR/include/onyx_library.h"
     sudo cp "$WASMER_INCLUDE_DIR/wasm.h" "$CORE_DIR/include/wasm.h"
 fi
+
+cd compiler
+./build.sh $1
+cd ..
+
+cd runtime
+./build.sh $1
+cd ..
 
 
 
