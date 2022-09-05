@@ -4,7 +4,7 @@
 
 $CC -shared -fpic -w \
     -o ../bin/onyx_runtime.so \
-    -I ../shared/include -I ../compiler/include -I ../lib/common/include \
+    -I ../shared/include -I ../compiler/include \
     ./onyx_runtime.c \
     -lpthread
 

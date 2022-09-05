@@ -20,5 +20,5 @@ RUNTIME_LIBRARY="wasmer"
 
 # Where the Wasmer library files can be found.
 # They are bundled with the project, but if a different version is available, these can be changed.
-WASMER_INCLUDE_DIR="$(pwd)/lib/common/include"
-WASMER_LIBRARY_DIR="$(pwd)/lib/linux_$ARCH/lib"
+WASMER_INCLUDE_DIR="$(pwd)/shared/include"
+WASMER_LIBRARY_DIR="$(pwd)/shared/lib/linux_$ARCH/lib"
