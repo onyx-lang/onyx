@@ -27,11 +27,11 @@ sudo mkdir -p "$CORE_DIR/tools"
 sudo cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
 
 cd compiler
-./build.sh
+./build.sh $1
 cd ..
 
 cd runtime
-./build.sh
+./build.sh $1
 cd ..
 
 # Otherwise the prompt ends on the same line
