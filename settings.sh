@@ -15,8 +15,8 @@ CC='gcc'
 # The architecture of your system. If your not sure, leave this alone.
 ARCH="$(uname -m)"
 
-RUNTIME_LIBRARY="ovmwasm"
-# RUNTIME_LIBRARY="wasmer"
+# RUNTIME_LIBRARY="ovmwasm"
+RUNTIME_LIBRARY="wasmer"
 
 # Where the Wasmer library files can be found.
 # They are bundled with the project, but if a different version is available, these can be changed.
