@@ -1145,6 +1145,12 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     WIL(for_node->token, WI_LOCAL_TEE, low_local);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
 
+    if (for_node->has_first) {
+        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(for_node->token, WI_I32_CONST, 1);
+        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
+    }
+
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
@@ -1191,6 +1197,11 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     WIL(for_node->token, WI_LOCAL_GET, step_local);
     WI(for_node->token, WI_I32_ADD);
     WIL(for_node->token, WI_LOCAL_SET, iter_local);
+    
+    if (for_node->has_first) {
+        WIL(for_node->token, WI_I32_CONST, 0);
+        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
+    }
 
     if (bh_arr_last(code).type != WI_JUMP)
         WID(for_node->token, WI_JUMP, 0x00);
@@ -1198,6 +1209,7 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
 
+    if (for_node->has_first) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(low_mem.type));
     local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
     local_raw_free(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
@@ -1230,6 +1242,12 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
 
+    if (for_node->has_first) {
+        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(for_node->token, WI_I32_CONST, 1);
+        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
+    }
+
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
@@ -1258,11 +1276,18 @@ EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, ptr_local);
 
+    if (for_node->has_first) {
+        WIL(NULL, WI_I32_CONST, 0);
+        WIL(NULL, WI_LOCAL_SET, for_node->first_local);
+    }
+
     if (bh_arr_last(code).type != WI_JUMP)
         WID(for_node->token, WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
+
+    if (for_node->has_first) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -1300,6 +1325,12 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
 
+    if (for_node->has_first) {
+        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(for_node->token, WI_I32_CONST, 1);
+        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
+    }
+
     emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
     emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
@@ -1328,12 +1359,18 @@ EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     WI(for_node->token, WI_PTR_ADD);
     WIL(for_node->token, WI_LOCAL_SET, ptr_local);
 
+    if (for_node->has_first) {
+        WIL(NULL, WI_I32_CONST, 0);
+        WIL(NULL, WI_LOCAL_SET, for_node->first_local);
+    }
+
     if (bh_arr_last(code).type != WI_JUMP)
         WID(for_node->token, WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
     emit_leave_structured_block(mod, &code);
 
+    if (for_node->has_first) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
@@ -1368,6 +1405,12 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
         remove_info.remove_func_type_idx = generate_type_idx(mod, remove_func_type.type);
 
         bh_arr_push(mod->for_remove_info, remove_info);
+    }
+
+    if (for_node->has_first) {
+        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
+        WIL(for_node->token, WI_I32_CONST, 1);
+        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
     }
 
     AstLocal* var = for_node->var;
@@ -1445,6 +1488,12 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     WID(for_node->token, WI_COND_JUMP, 0x01);
 
     emit_block(mod, &code, for_node->stmt, 0);
+
+    if (for_node->has_first) {
+        WIL(NULL, WI_I32_CONST, 0);
+        WIL(NULL, WI_LOCAL_SET, for_node->first_local);
+    }
+
     WID(for_node->token, WI_JUMP, 0x00);
 
     emit_leave_structured_block(mod, &code);
@@ -1455,6 +1504,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
 
     bh_arr_pop(mod->for_remove_info);
 
+    if (for_node->has_first) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
@@ -3316,6 +3366,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
             AstZeroValue *zv = (AstZeroValue *) expr;
             assert(zv->type);
             emit_zero_value_for_type(mod, &code, zv->type, zv->token);
+            break;
+        }
+
+        case Ast_Kind_Directive_First: {
+            AstDirectiveFirst *first = (AstDirectiveFirst *) expr;
+            WIL(first->token, WI_LOCAL_GET, first->for_node->first_local);
             break;
         }
 

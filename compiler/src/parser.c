@@ -756,6 +756,14 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) str_node;
                 break;
             }
+            else if (parse_possible_directive(parser, "first")) {
+                AstDirectiveFirst *first = make_node(AstDirectiveFirst, Ast_Kind_Directive_First);
+                first->token = parser->curr - 1;
+                first->type_node = (AstType *) &basic_type_bool;
+
+                retval = (AstTyped *) first;
+                break;
+            }
 
             onyx_report_error(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
             return NULL;
@@ -3297,6 +3305,13 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 bh_arr_push(parser->stored_tags, expr);
 
                 parser->tag_depth -= 1;
+                return;
+            }
+            else if (parse_possible_directive(parser, "doc")) {
+                // This is a future feature I want to add to the language, proper docstrings.
+                // For now (and so I start documenting thing...), #doc can be used anywhere
+                // at top level, followed by a string to add a doc string.
+                expect_token(parser, Token_Type_Literal_String);
                 return;
             }
             else {

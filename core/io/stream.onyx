@@ -205,6 +205,7 @@ buffer_stream_free :: (use bs: ^BufferStream) {
 
 #match builtin.delete buffer_stream_free
 
+#match core.string.as_str buffer_stream_to_str
 buffer_stream_to_str :: (use bs: ^BufferStream) -> str {
     if !write_enabled do return null_str;
 

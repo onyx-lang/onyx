@@ -42,6 +42,7 @@
     NODE(DirectiveInit)        \
     NODE(DirectiveLibrary)     \
     NODE(DirectiveRemove)      \
+    NODE(DirectiveFirst)       \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -217,6 +218,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Init,
     Ast_Kind_Directive_Library,
     Ast_Kind_Directive_Remove,
+    Ast_Kind_Directive_First,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -794,6 +796,11 @@ struct AstFor           {
     // But for now, this will do.
     b32 by_pointer : 1;
     b32 no_close   : 1;
+    b32 has_first  : 1;
+
+    // NOTE: This is used by the AstDirectiveFirst node for this
+    // for node to know which local variable to use.
+    u64 first_local;
 };
 struct AstIfWhile {
     AstNode_base;
@@ -1310,6 +1317,11 @@ struct AstDirectiveDefined {
 
 struct AstDirectiveRemove {
     AstNode_base;
+};
+
+struct AstDirectiveFirst {
+    AstTyped_base;
+    AstFor *for_node;
 };
 
 struct AstNote {

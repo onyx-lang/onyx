@@ -98,6 +98,7 @@ static const char* ast_node_names[] = {
     "INIT",
     "LIBRARY",
     "REMOVE",
+    "FIRST",
     "CALL SITE",
 
     "CODE BLOCK",

@@ -108,11 +108,13 @@ CheckStatus check_do_block(AstDoBlock** pdoblock);
 CheckStatus check_constraint(AstConstraint *constraint);
 CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFilePos pos);
 CheckStatus check_polyquery(AstPolyQuery *query);
+CheckStatus check_directive_first(AstDirectiveFirst *first);
 
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
 b32 all_checks_are_final           = 1;
 b32 inside_for_iterator            = 0;
+bh_arr(AstFor *) for_node_stack    = NULL;
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
@@ -324,7 +326,10 @@ CheckStatus check_for(AstFor* fornode) {
 
     fornode->flags |= Ast_Flag_Has_Been_Checked;
 
+
 fornode_expr_checked:
+    bh_arr_push(for_node_stack, fornode);
+
     old_inside_for_iterator = inside_for_iterator;
     inside_for_iterator = 0;
     iter_type = fornode->iter->type;
@@ -338,6 +343,7 @@ fornode_expr_checked:
         if (cs > Check_Errors_Start) return cs; 
     } while(0);
 
+    bh_arr_pop(for_node_stack);
     return Check_Success;
 }
 
@@ -1956,6 +1962,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know globals type.");
             break;
 
+        case Ast_Kind_Directive_First:
+            CHECK(directive_first, (AstDirectiveFirst *) expr);
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -2054,6 +2064,19 @@ CheckStatus check_remove_directive(AstDirectiveRemove *remove) {
     if (!inside_for_iterator) {
         ERROR(remove->token->pos, "#remove is only allowed in the body of a for-loop over an iterator.");
     }
+
+    return Check_Success;
+}
+
+CheckStatus check_directive_first(AstDirectiveFirst *first) {
+    if (bh_arr_length(for_node_stack) == 0) {
+        ERROR(first->token->pos, "#first is only allowed in the body of a for-loop.");
+    }
+
+    first->for_node = bh_arr_last(for_node_stack);
+    assert(first->for_node);
+
+    first->for_node->has_first = 1;
 
     return Check_Success;
 }
@@ -2171,8 +2194,11 @@ CheckStatus check_function(AstFunction* func) {
         }
     }
 
-    inside_for_iterator = 0;
     expected_return_type = &func->type->Function.return_type;
+
+    inside_for_iterator = 0;
+    if (for_node_stack) bh_arr_clear(for_node_stack);
+
     if (func->body) {
         CheckStatus status = check_block(func->body);
         if (status == Check_Error && func->generated_from && context.cycle_detected == 0)
