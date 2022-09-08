@@ -71,7 +71,7 @@ Type_Info_Basic :: struct {
 Type_Info_Pointer :: struct {
     use base : Type_Info;
 
-    @Rename
+    // @Rename
     to: type_expr;
 }
 
@@ -87,7 +87,7 @@ Type_Info_Function :: struct {
 Type_Info_Array :: struct {
     use base : Type_Info;
 
-    @Rename
+    // @Rename
     of: type_expr;
     count: u32;
 }
@@ -95,21 +95,21 @@ Type_Info_Array :: struct {
 Type_Info_Slice :: struct {
     use base : Type_Info;
 
-    @Rename
+    // @Rename
     of: type_expr;
 }
 
 Type_Info_Dynamic_Array :: struct {
     use base : Type_Info;
 
-    @Rename
+    // @Rename
     of: type_expr;
 }
 
 Type_Info_Variadic_Argument :: struct {
     use base : Type_Info;
 
-    @Rename
+    // @Rename
     of: type_expr;
 }
 

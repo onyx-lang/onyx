@@ -95,7 +95,7 @@ main :: (args) => {
         // The executable to use when compiling
         onyx_cmd: str;
         at_least_one_test_failed := false;
-        compile_only := false;   @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
+        compile_only := false;   // @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
     }
     exec_context := init(Execution_Context);
     exec_context.compile_only = settings.compile_only;

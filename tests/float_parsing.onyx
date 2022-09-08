@@ -4,7 +4,7 @@ use package core
 
 main :: (args: [] cstr) {
 
-    @CoreLibraries // The commented out cases can be re-enabled when f64_to_str is better.
+    // @CoreLibraries // The commented out cases can be re-enabled when f64_to_str is better.
     // Right now there is an integer overflow because it converts the float to an i64.
     strings := str.[
         /* these should parse fully */

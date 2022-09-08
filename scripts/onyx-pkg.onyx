@@ -119,7 +119,7 @@ run_init_command :: (args: [] cstr) {
         }
     }
 
-    @TODO // Validation for these fields.
+    // @TODO // Validation for these fields.
     r := io.reader_make(^stdio_stream);
     read_field("Package name: ", ^config.metadata.name);
     read_field("Package description: ", ^config.metadata.description);
@@ -220,7 +220,7 @@ run_show_command :: (args: [] cstr) {
 }
 
 #tag Command.{ "update", "Update dependencies to newest compatible versions.", "" }
-@Feature // Add "locked" dependencies that will never update?
+// @Feature // Add "locked" dependencies that will never update?
 run_update_command :: (args: [] cstr) {
     printf("Updating dependencies to newest compatible versions.\n");
     for^ config.dependencies.dependencies.entries {
@@ -357,7 +357,7 @@ run_rebuild_command :: (args: [] cstr) {
 
 #tag Command.{ "publish", "Bump version number and create a publishable version of the package", "" }
 run_publish_command :: (args: [] cstr) {
-    @TODO // Better error handling and reporting, as this is a delicate process.
+    // @TODO // Better error handling and reporting, as this is a delicate process.
 
     if !os.dir_exists(".git") {
         printf("It does not look like you are in a Git repository. In order to publish packages\n");

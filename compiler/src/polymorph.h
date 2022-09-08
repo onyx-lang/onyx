@@ -486,29 +486,28 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
             AstTyped* typed_param = lookup_param_in_arguments(func, param, args, err_msg);
             if (typed_param == NULL) return;
 
-            // CLEANUP FIXME HACK TODO GROSS
-            if (typed_param->kind == Ast_Kind_Argument) {
-                AstTyped* potential = ((AstArgument *) typed_param)->value;
-                if (potential->kind == Ast_Kind_Polymorphic_Proc) {
-                    if (param->idx < (u32) bh_arr_length(func->params)) {
-                        AstType *param_type = func->params[param->idx].local->type_node;
-                        if (param_type->kind == Ast_Kind_Function_Type) {
-                            AstFunctionType *ft = (AstFunctionType *) param_type;
-                            b32 all_types = 1;
-                            fori (i, 0, (i32) ft->param_count) {
-                                if (!node_is_type((AstNode *) ft->params[i])) {
-                                    all_types = 0;
-                                    break;
-                                }
-                            }
+            if (typed_param->kind != Ast_Kind_Argument) goto skip_nested_polymorph_case;
 
-                            if (all_types) {
-                                typed_param = try_lookup_based_on_partial_function_type((AstFunction *) potential, ft);
-                            }
-                        }
-                    }
+            AstTyped* potential = ((AstArgument *) typed_param)->value;
+            if (potential->kind != Ast_Kind_Polymorphic_Proc) goto skip_nested_polymorph_case;
+            if (param->idx >= (u32) bh_arr_length(func->params)) goto skip_nested_polymorph_case;
+
+            AstType *param_type = func->params[param->idx].local->type_node;
+            if (param_type->kind != Ast_Kind_Function_Type) goto skip_nested_polymorph_case;
+
+            AstFunctionType *ft = (AstFunctionType *) param_type;
+            b32 all_types = 1;
+            fori (i, 0, (i32) ft->param_count) {
+                if (!node_is_type((AstNode *) ft->params[i])) {
+                    all_types = 0;
+                    break;
                 }
             }
+
+            if (all_types) 
+                typed_param = try_lookup_based_on_partial_function_type((AstFunction *) potential, ft);
+
+          skip_nested_polymorph_case:
 
             actual_type = resolve_expression_type(typed_param);
             if (actual_type == NULL) return;

@@ -291,7 +291,7 @@ whitespace_skipped:
         goto token_parsed;
     }
 
-    if (*tokenizer->curr == '@') {
+    /*if (*tokenizer->curr == '@') {
         INCREMENT_CURR_TOKEN(tokenizer);
         u32 len = 2;
         while (char_is_alphanum(*(tokenizer->curr + 1)) || *(tokenizer->curr + 1) == '_') {
@@ -303,7 +303,7 @@ whitespace_skipped:
         tk.length = len;
         INCREMENT_CURR_TOKEN(tokenizer);
         goto token_parsed;
-    }
+    }*/
 
     // Number literal
     if (char_is_num(*tokenizer->curr)

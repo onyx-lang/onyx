@@ -2,7 +2,7 @@
 
 . ../settings.sh
 
-$CC -shared -fpic -w \
+$CC -shared -fpic -w -O2 \
     -o ../bin/onyx_runtime.so \
     -I ../shared/include -I ../compiler/include \
     ./onyx_runtime.c \

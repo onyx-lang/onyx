@@ -24,7 +24,7 @@ semaphore_post :: (s: ^Semaphore, count := 1) {
     scoped_mutex(^s.mutex);
     s.counter += count;
 
-    @Bug // This is susceptible to starvation. Semaphores should have a queue
+    // @Bug // This is susceptible to starvation. Semaphores should have a queue
     // or something like that.
     #if runtime.Wait_Notify_Available {
         __atomic_notify(^s.counter, maximum = count);

@@ -343,7 +343,7 @@ sort :: (arr: [] $T, cmp: (T, T) -> i32) {
         x := arr.data[i];
         j := i - 1;
 
-        @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
+        // @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
         while j >= 0 {
             if cmp(arr.data[j], x) > 0 {
                 arr.data[j + 1] = arr.data[j];

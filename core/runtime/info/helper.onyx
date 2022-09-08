@@ -248,7 +248,7 @@ struct_inherits :: (struct_type: type_expr, base_type: type_expr) -> bool {
     if t1.is_variadic           != t2.is_variadic           do return false;
 
     while i := 0; i < t1.parameter_types.count {
-        @Robustness // This does not handle nested procedure types
+        // @Robustness // This does not handle nested procedure types
         if t1.parameter_types[i] != t2.parameter_types[i] do return false;
     }
 

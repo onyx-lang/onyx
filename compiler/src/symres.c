@@ -323,8 +323,7 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     // the alias should have passed symbol resolution. If not, force a lookup
     // and yield if the alias was not ready.
     if ((*fa)->expr->kind == Ast_Kind_Alias) {
-        assert((*fa)->expr->entity);
-        if ((*fa)->expr->entity->state < Entity_State_Check_Types) {
+        if ((*fa)->expr->entity && (*fa)->expr->entity->state < Entity_State_Check_Types) {
             force_a_lookup = 1;
         }
     }
@@ -428,6 +427,22 @@ static SymresStatus symres_method_call(AstBinaryOp** mcall) {
         if ((*mcall)->right->kind != Ast_Kind_Call) {
             onyx_report_error((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
             return Symres_Error;
+        }
+
+        //
+        // This is a small hack that makes chaining method calls
+        // work. Because check_method_call replaces the method call
+        // and marks it as completed, if there are multiple references
+        // to the same method call node, one of them will be left dangling.
+        // To remedy this, an alias node an be placed around the method call
+        // so that when check_method_call replaces it, it is replaced
+        // within the alias, and all references are updated.
+        if ((*mcall)->left->kind == Ast_Kind_Method_Call) {
+            AstAlias *left_alias = onyx_ast_node_new(context.ast_alloc, sizeof(AstAlias), Ast_Kind_Alias);
+            left_alias->token = (*mcall)->left->token;
+            left_alias->alias = (*mcall)->left;
+
+            (*mcall)->left = (AstTyped *) left_alias;
         }
 
         AstFieldAccess* implicit_field_access = make_field_access(context.ast_alloc, (*mcall)->left, NULL);

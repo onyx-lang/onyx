@@ -49,7 +49,7 @@ pool_alloc :: (pool: ^PoolAllocator($Elem)) -> ^Elem {
 }
 
 pool_free :: (pool: ^PoolAllocator($Elem), elem: ^Elem) {
-    @TODO
+    // @TODO
     // Add a check that the elem pointer is actually in the buffer?? 
     
     *(cast(^rawptr) elem) = cast(rawptr) pool.first_free;

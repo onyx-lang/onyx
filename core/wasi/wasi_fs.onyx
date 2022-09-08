@@ -98,7 +98,7 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
         }
     }
 
-    @TODO // provide a better error code.
+    // @TODO // provide a better error code.
     return file, .NotFound;
 }
 

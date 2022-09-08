@@ -5,6 +5,7 @@ Enable_Custom_Formatters :: true
 #local {
     map :: package core.map
     string :: package core.string
+    array :: package core.array
 
     custom_formatters: Map(type_expr, #type (^Format_Output, ^Format, rawptr) -> void);
     custom_parsers   : Map(type_expr, #type (rawptr, str, Allocator) -> bool);
@@ -261,7 +262,7 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
     return str.{ buf.data, len };
 }
 
-@Remove // old aliases to not break old programs
+// @Remove // old aliases to not break old programs
 str_format :: format
 str_format_va :: format_va
 
@@ -321,6 +322,12 @@ Format :: struct {
     minimum_width := cast(u32) 0;
 }
 
+#local
+flush_to_dynstr :: (dynstr: ^[..] u8, to_write: str) => {
+    array.concat(dynstr, to_write);
+    return true;
+}
+
 
 format :: #match {}
 #match format (buffer: [] u8, format: str, va: ..any) -> str {
@@ -334,6 +341,19 @@ format :: #match {}
     out := format_va(*buffer, format, ~~va);
     buffer.count = out.count;
 }
+#match format (format: str, va: ..any) -> str {
+    buffer : [256] u8;
+    out    := make([..] u8);
+    output := Format_Output.{
+        ~~buffer, 0, buffer.count,
+        flush=.{ ^out, flush_to_dynstr }
+    };
+
+    final := format_va(^output, format, ~~va);
+    array.concat(^out, final);
+
+    return out;
+}
 
 format_va :: #match {}
 #match format_va (buffer: [] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) -> str {
@@ -344,6 +364,19 @@ format_va :: #match {}
     buffer.count = buffer.capacity;
     out := format_va(*buffer, format, va, flush);
     buffer.count = out.count;
+}
+#match format_va (format: [] u8, va: [] any) -> str {
+    buffer : [256] u8;
+    out    := make([..] u8);
+    output := Format_Output.{
+        ~~buffer, 0, buffer.count,
+        flush=.{ ^out, flush_to_dynstr }
+    };
+
+    final := format_va(^output, format, ~~va);
+    array.concat(^out, final);
+
+    return out;
 }
 
 #match format_va (output: ^Format_Output, format: str, va: [] any) -> str {
@@ -553,7 +586,7 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
             width := formatting.minimum_width;
             to_output := *cast(^str) v.data;
 
-            @Todo // escape '"' when quote_strings is enabled.
+            // @Todo // escape '"' when quote_strings is enabled.
             output->write(to_output);
             if to_output.count < width && !(formatting.quote_strings || formatting.single_quote_strings) {
                 for width - to_output.count do output->write(#char " ");
@@ -795,7 +828,7 @@ parse_any :: #match {}
         return custom_parsers[data_type](target, to_parse, string_allocator);
     }
 
-    use package runtime.info;
+    use runtime.info;
     info := get_type_info(data_type);
 
     switch data_type {
@@ -846,7 +879,7 @@ parse_any :: #match {}
             //
             // For now, this will return a substring in the original to_parse.
             dest := cast(^str) target;
-            *dest = string.read_until(^line, #char "\"") |> string.alloc_copy(string_allocator); @BUG // This does not handle escaped strings!
+            *dest = string.read_until(^line, #char "\"") |> string.alloc_copy(string_allocator); // @BUG // This does not handle escaped strings!
             return true;
         }
 
@@ -856,6 +889,11 @@ parse_any :: #match {}
                 // enum in order to know how large this integer should be.
                 *cast(^u32) target = ~~ str_to_i64(to_parse);
                 return true;
+            }
+
+            if info.kind == .Distinct {
+                d_info := cast(^Type_Info_Distinct) info;
+                return parse_any(target, d_info.base_type, to_parse, string_allocator);
             }
         }
     }

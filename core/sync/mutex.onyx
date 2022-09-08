@@ -37,7 +37,7 @@ mutex_lock :: (m: ^Mutex) {
         if m.owner == context.thread_id do return;
 
         #if runtime.Wait_Notify_Available {
-            @ThreadingCleanup // You cannot wait on the main thread in
+            // @ThreadingCleanup // You cannot wait on the main thread in
             // a web browser, for kind of obvious reasons. However, this
             // makes waiting for a mutex expensive because the only option
             // is to do a spin-lock. Ugh.

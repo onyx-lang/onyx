@@ -65,7 +65,7 @@ concat :: (s1: str, s2: str, allocator := context.allocator) -> str {
     return str.{ data, len1 + len2 };
 }
 
-@Cleanup // Don't love that the allocator is necessary here,
+// @Cleanup // Don't love that the allocator is necessary here,
 // but it is impossible to specify a default value for the
 // allocator while having a variadic number of strings. This
 // is only due to the languages constraints however. This
@@ -138,7 +138,7 @@ contains :: (s: str, substr: str) -> bool {
 }
 
 
-@TODO
+// @TODO
 // Check this for edge cases and other bugs. I'm not confident
 // it will work perfectly yet.                   - brendanfh 2020/12/21
 compare :: (str1: str, str2: str) -> i32 {

@@ -86,11 +86,11 @@ static void consume_token(OnyxParser* parser) {
     // :LinearTokenDependent
     parser->curr++;
     while (parser->curr->type == Token_Type_Comment || parser->curr->type == Token_Type_Note) {
-        if (parser->curr->type == Token_Type_Note) {
-            AstNote* note = make_node(AstNode, Ast_Kind_Note);
-            note->token = parser->curr;
-            ENTITY_SUBMIT(note);
-        }
+        // if (parser->curr->type == Token_Type_Note) {
+        //     AstNote* note = make_node(AstNode, Ast_Kind_Note);
+        //     note->token = parser->curr;
+        //     ENTITY_SUBMIT(note);
+        // }
 
         parser->curr++;
     }
@@ -2048,7 +2048,7 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         bh_arr(AstTyped *) meta_tags=NULL;
-        while (parse_possible_directive(parser, "tag")) {
+        while (parse_possible_directive(parser, "tag") || consume_token_if_next(parser, '@')) {
             if (meta_tags == NULL) bh_arr_new(global_heap_allocator, meta_tags, 1);
 
             parser->tag_depth += 1;
@@ -3248,7 +3248,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
                     consume_tokens(parser, 2);
                 }
 
-                inject->to_inject = parse_expression(parser, 0);
+                inject->to_inject = parse_top_level_expression(parser);
                 
                 ENTITY_SUBMIT(inject);
                 return;
@@ -3306,6 +3306,19 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
                 return;
             }
+
+            break;
+        }
+
+        case '@': {
+            consume_token(parser);
+            parser->tag_depth += 1;
+
+            AstTyped *expr = parse_expression(parser, 0);
+            bh_arr_push(parser->stored_tags, expr);
+
+            parser->tag_depth -= 1;
+            return;
         }
 
         default: break;

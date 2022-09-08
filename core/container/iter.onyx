@@ -593,7 +593,7 @@ as_iterator :: (r: range) -> Iterator(i32) {
 
 fold :: #match #local {}
 
-@Cleanup // some way to shorten this would be nice
+// @Cleanup // some way to shorten this would be nice
 #overload
 fold :: macro (it: $T, init: $R, combine: $S) -> #auto where Iterable(T) {
     fold :: fold

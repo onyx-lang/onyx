@@ -7,7 +7,7 @@ package builtin
 str  :: #type []u8;
 cstr :: #type ^u8;
 
-@Note
+// @Note
 // Because of many implementation details, all fields of this
 // struct are required to be i32's.
 range :: struct {
@@ -16,13 +16,13 @@ range :: struct {
     step : i32 = 1;
 }
 
-@Deprecated
+// @Deprecated
 vararg :: #type ^struct {
     data:  rawptr;
     count: i32;
 }
 
-@Deprecated
+// @Deprecated
 vararg_get :: #match {
     (va: vararg, ret: ^$T) -> bool {
         if va.count <= 0 do return false;
@@ -41,7 +41,7 @@ vararg_get :: #match {
     }
 }
 
-@NullProcHack
+// @NullProcHack
 null_proc :: () -> void #null ---
 null      :: cast(rawptr) 0;
 

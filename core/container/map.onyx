@@ -138,7 +138,7 @@ delete :: (use map: ^Map, key: map.Key_Type) {
 }
 
 update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
-    @Hack // Weird hack because 'lookup' exists at file scope.
+    // @Hack // Weird hack because 'lookup' exists at file scope.
     lookup_ :: lookup
 
     lr := lookup_(map, key);
@@ -160,7 +160,7 @@ empty :: (use map: ^Map) -> bool {
 format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V)) {
     output->write("{\n");
     for^ x.entries {
-        conv.format(output, "    {\"} => {\"}\n", it.key, it.value);
+        conv.format(output, "    {\"p} => {\"p}\n", it.key, it.value);
     }
     output->write("}");
 }

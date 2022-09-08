@@ -117,6 +117,10 @@ TCP_Server :: struct {
             Dying;
             Dead;
         }
+
+        read_complete :: (use this: ^Client) {
+            recv_ready_event_present = false;
+        }
     }
     client_allocator: Allocator;
     clients: [] ^Client;
@@ -176,7 +180,7 @@ tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_S
         conn_event := new(TCP_Event.Connection, allocator=server.event_allocator);
         conn_event.address = ^client.address;
         conn_event.client = client;
-        server.events << .{ .Connection, conn_event }; @Threading // This operation should be protected by a mutex?
+        server.events << .{ .Connection, conn_event }; // @Threading // This operation should be protected by a mutex?
     }
 }
 
@@ -249,14 +253,14 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
             data_event.client  = it;
             data_event.address = ^it.address;
             data_event.contents = memory.copy_slice(msg_buffer[0 .. bytes_read], allocator=server.event_allocator);
-            server.events << .{ .Data, data_event }; @Threading // See comment above.
+            server.events << .{ .Data, data_event }; // @Threading // See comment above.
 
         } elseif !it.recv_ready_event_present {
             it.recv_ready_event_present = true;
             ready_event := new(TCP_Event.Ready, allocator=server.event_allocator);
             ready_event.client  = it;
             ready_event.address = ^it.address;
-            server.events << .{ .Ready, ready_event }; @Threading // See comment above.
+            server.events << .{ .Ready, ready_event }; // @Threading // See comment above.
         }
     }
 
@@ -266,7 +270,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
             disconnect_event := new(TCP_Event.Disconnection, allocator=server.event_allocator);
             disconnect_event.client  = it;
             disconnect_event.address = ^it.address;
-            server.events << .{ .Disconnection, disconnect_event }; @Threading // See comment above.
+            server.events << .{ .Disconnection, disconnect_event }; // @Threading // See comment above.
         }
     }
 
@@ -333,7 +337,7 @@ wait_to_get_client_messages :: (use server: ^TCP_Server) -> [] ^TCP_Server.Clien
     for clients {
         if it == null do continue;
 
-        if it.state == .Alive {
+        if it.state == .Alive && !it.recv_ready_event_present {
             active_clients[active_clients.count] = it;
             active_clients.count += 1;
         }

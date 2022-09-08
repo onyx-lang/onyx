@@ -380,6 +380,22 @@ static CheckStatus collect_switch_case_blocks(AstSwitch* switchnode, AstBlock* r
                 break;
             }
 
+            case Ast_Kind_Static_If: {
+                // At this point, the static if will be resolved. So, this
+                // only needs to add the cases from one side or another.
+
+                AstIf* static_if = (AstIf *) walker;
+                assert(static_if->flags & Ast_Flag_Static_If_Resolved);
+
+                if (static_if_resolution(static_if)) {
+                    if (static_if->true_stmt) collect_switch_case_blocks(switchnode, static_if->true_stmt);
+                } else {
+                    if (static_if->false_stmt) collect_switch_case_blocks(switchnode, static_if->false_stmt);
+                }
+                
+                break;
+            }
+
             default:
                 ERROR(walker->token->pos, "This statement is not allowed here.");
         }
@@ -1689,12 +1705,15 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
             return Check_Success;
         }
 
+        if (!type_node) goto closest_not_found;
+
         char* closest = find_closest_symbol_in_node((AstNode *) type_node, field->field);
         if (closest) {
             ERROR_(field->token->pos, "Field '%s' does not exists on '%s'. Did you mean '%s'?", field->field, node_get_type_name(field->expr), closest);
-        } else {
-            ERROR_(field->token->pos, "Field '%s' does not exists on '%s'.", field->field, node_get_type_name(field->expr));
         }
+
+      closest_not_found:
+        ERROR_(field->token->pos, "Field '%s' does not exists on '%s'.", field->field, node_get_type_name(field->expr));
     }
 
     // NOTE: If this member was included into the structure through a "use x: ^T" kind of statement,
@@ -1726,7 +1745,6 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
     CHECK(expression, &mcall->left);
     if (mcall->left->type == NULL) YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
 
-    mcall->type = mcall->left->type;
     AstTyped* implicit_argument = mcall->left;
 
     // Symbol resolution should have ensured that this is call node.
