@@ -608,9 +608,12 @@ static SymresStatus symres_expression(AstTyped** expr) {
             SYMRES(directive_insert, (AstDirectiveInsert *) *expr);
             break;
 
-        case Ast_Kind_Do_Block:
+        case Ast_Kind_Do_Block: {
+            Scope* old_curr_scope = curr_scope;
             SYMRES(block, ((AstDoBlock *) *expr)->block);
+            curr_scope = old_curr_scope;
             break;
+        }
 
         case Ast_Kind_Param:
             if ((*expr)->flags & Ast_Flag_Param_Symbol_Dirty) {
