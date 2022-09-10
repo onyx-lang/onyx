@@ -419,11 +419,11 @@ static SymresStatus symres_pipe(AstBinaryOp** pipe) {
 //
 //     foo->member_function(...)
 static SymresStatus symres_method_call(AstBinaryOp** mcall) {
-    SYMRES(expression, &(*mcall)->left);
-    if ((*mcall)->left == NULL) return Symres_Error;
-
     // :EliminatingSymres
     if (((*mcall)->flags & Ast_Flag_Has_Been_Symres) == 0) {
+        SYMRES(expression, &(*mcall)->left);
+        if ((*mcall)->left == NULL) return Symres_Error;
+
         if ((*mcall)->right->kind != Ast_Kind_Call) {
             onyx_report_error((*mcall)->token->pos, Error_Critical, "'->' expected procedure call on right side.");
             return Symres_Error;

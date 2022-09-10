@@ -576,6 +576,8 @@ void expand_macro(AstCall** pcall, AstFunction* template) {
     AstNode* subst = (AstNode *) expansion;
 
     if (template->type->Function.return_type != &basic_types[Basic_Kind_Void]) {
+        expansion->rules = Block_Rule_Do_Block;
+
         AstDoBlock* doblock = (AstDoBlock *) onyx_ast_node_new(context.ast_alloc, sizeof(AstDoBlock), Ast_Kind_Do_Block);
         doblock->token = expansion->token;
         doblock->block = expansion;

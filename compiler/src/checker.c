@@ -1748,17 +1748,18 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
 
 CheckStatus check_method_call(AstBinaryOp** pmcall) {
     AstBinaryOp* mcall = *pmcall;
-    CHECK(expression, &mcall->left);
-    if (mcall->left->type == NULL) YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
-
-    AstTyped* implicit_argument = mcall->left;
-
-    // Symbol resolution should have ensured that this is call node.
-    AstCall* call_node = (AstCall *) mcall->right;
-    assert(call_node->kind == Ast_Kind_Call);
 
     // :Idempotency
     if ((mcall->flags & Ast_Flag_Has_Been_Checked) == 0) {
+        CHECK(expression, &mcall->left);
+        if (mcall->left->type == NULL) YIELD(mcall->token->pos, "Trying to resolve type of left hand side.");
+
+        AstTyped* implicit_argument = mcall->left;
+        AstCall* call_node = (AstCall *) mcall->right;
+
+        // Symbol resolution should have ensured that this is call node.
+        assert(call_node->kind == Ast_Kind_Call);
+
         // Implicitly take the address of the value if it is not already a pointer type.
         // This could be weird to think about semantically so some testing with real code
         // would be good.                                      - brendanfh 2020/02/05
@@ -1775,8 +1776,8 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
 
         *pmcall = (AstBinaryOp *) mcall->right;
         mcall->right->next = mcall->next;
+        mcall->flags |= Ast_Flag_Has_Been_Checked;
     }
-    mcall->flags |= Ast_Flag_Has_Been_Checked;
 
     CHECK(call, (AstCall **) pmcall);
     return Check_Success;

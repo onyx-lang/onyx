@@ -507,9 +507,22 @@ to_list :: (arr: [] $T, allocator := context.allocator) -> List(T) {
     return new_list;
 }
 
+find :: #match #local {}
+
+#overload
 find :: (arr: [] $T, value: T) -> i32 {
     for i: arr.count {
         if value == arr.data[i] do return i;
+    }
+
+    return -1;
+}
+
+#overload
+find :: macro (arr: [] $T, pred: Code) -> i32 {
+    for i: arr.count {
+        it := ^arr[i];
+        if #unquote pred do return i;
     }
 
     return -1;

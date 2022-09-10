@@ -39,7 +39,12 @@ void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln) {
 
         case PSK_Value:
             // CLEANUP: Maybe clone this?
-            assert(sln->value->flags & Ast_Flag_Comptime);
+            // assert(sln->value->flags & Ast_Flag_Comptime);
+            if ((sln->value->flags & Ast_Flag_Comptime) == 0) {
+                onyx_report_error(sln->value->token->pos, Error_Critical, "Expected value to be compile time known.");
+                return;
+            }
+            
             node = (AstNode *) sln->value;
             break;
     }
@@ -478,6 +483,7 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstF
 // the type that the parameter but be.
 static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunction* func, AstPolyParam* param, PolyProcLookupMethod pp_lookup, ptr actual, char** err_msg) {
     Type* actual_type = NULL;
+    b32 can_strip_pointer = 0;
 
     switch (pp_lookup) {
         case PPLM_By_Arguments: {
@@ -489,6 +495,14 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
             if (typed_param->kind != Ast_Kind_Argument) goto skip_nested_polymorph_case;
 
             AstTyped* potential = ((AstArgument *) typed_param)->value;
+
+            if (potential->kind == Ast_Kind_Address_Of) {
+                AstAddressOf *aof = (AstAddressOf *) potential;
+                if (aof->can_be_removed) {
+                    can_strip_pointer = 1;
+                }
+            }
+
             if (potential->kind != Ast_Kind_Polymorphic_Proc) goto skip_nested_polymorph_case;
             if (param->idx >= (u32) bh_arr_length(func->params)) goto skip_nested_polymorph_case;
 
@@ -530,6 +544,19 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
     }
 
     PolySolveResult res = solve_poly_type(param->poly_sym, param->type_expr, actual_type);
+
+    // If we are trying to match against an "address of" node that was
+    // placed because of a method call, there's a small change that the
+    // address of is unnecessary and can be removed. This happens in
+    // unify_node_and_type, but because that relies on knowning the type,
+    // it cannot happen until after polymorphic arguments are determined.
+    // This case simply tries matching everything again, but without the
+    // outer most pointer node. If everything succeeds, the pointer node
+    // will be removed when the actual value is checked later.
+    if (res.kind == PSK_Undefined && can_strip_pointer) {
+        res = solve_poly_type(param->poly_sym, param->type_expr, actual_type->Pointer.elem);
+    }
+
     if (res.kind == PSK_Undefined) {
         *err_msg = bh_aprintf(global_scratch_allocator,
             "Unable to solve for polymorphic variable '%b', given the type '%s'.",
