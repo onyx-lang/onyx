@@ -76,7 +76,9 @@ OnyxContext :: struct {
 #thread_local context : OnyxContext;
 
 assert :: (cond: bool, msg: str, site := #callsite) {
-    if !cond do context.assert_handler(msg, site);
+    if !cond {
+        context.assert_handler(msg, site);
+    }
 }
 
 

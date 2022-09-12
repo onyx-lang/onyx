@@ -46,6 +46,7 @@ syn match onyxCallGroup         "\<[a-zA-Z_][a-zA-Z0-9_\.]*\> *(" contains=onyxC
 syn match onyxCall              "\<[a-zA-Z_][a-zA-Z0-9_\.]*\>" contained
 
 syn match onyxDirective         "\#[a-zA-Z_]\+"
+syn match onyxTag               "@.\+$"
 
 syn region onyxString		    display start=+"+ skip=+\\\\\|\\"+ end=+"+ keepend
 
@@ -60,6 +61,7 @@ hi def link onyxNumber           Number
 hi def link onyxDefinition       Identifier
 hi def link onyxCall             Function
 hi def link onyxOperator         Operator
+hi def link onyxTag              Constant
 
 let b:current_syntax = "onyx"
 let &cpo = s:cpo_save

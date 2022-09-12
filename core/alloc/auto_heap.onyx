@@ -10,12 +10,17 @@ AutoHeapState :: struct {
 
     switch aa {
         case .Alloc {
-            data.set->insert(newptr);
+            if newptr != null {
+                data.set->insert(newptr);
+            }
         }
 
         case .Resize {
             data.set->remove(oldptr);
-            data.set->insert(newptr);
+
+            if newptr != null {
+                data.set->insert(newptr);
+            }
         }
 
         case .Free {

@@ -175,7 +175,14 @@ get_freed_size :: () => {
         #if runtime.Multi_Threading_Enabled do sync.scoped_mutex(^heap_mutex);
 
         hb_ptr := cast(^heap_freed_block) (cast(uintptr) ptr - sizeof heap_allocated_block);
-        #if Enable_Debug do assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
+        #if Enable_Debug {
+            // assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
+
+            if hb_ptr.size & Allocated_Flag != Allocated_Flag {
+                log("INVALID DOUBLE FREE");
+                return;
+            }
+        }
 
         hb_ptr.size &= ~Allocated_Flag;
         orig_size := hb_ptr.size - sizeof heap_allocated_block;

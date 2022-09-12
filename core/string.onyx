@@ -399,8 +399,8 @@ read_until :: (s: ^str, upto: str, skip := 0) -> str {
 
     } else {
         out.count = i;
-        s.data  += out.count + (upto.count - 1);
-        s.count -= out.count + (upto.count - 1);
+        s.data  += out.count;
+        s.count -= out.count;
     }
 
     return out;
