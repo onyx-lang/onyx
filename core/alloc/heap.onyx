@@ -178,6 +178,11 @@ get_freed_size :: () => {
         #if Enable_Debug {
             // assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
 
+            if cast(uintptr) hb_ptr < cast(uintptr) __heap_start {
+                log("FREEING STATIC DATA");
+                return;
+            }
+
             if hb_ptr.size & Allocated_Flag != Allocated_Flag {
                 log("INVALID DOUBLE FREE");
                 return;

@@ -365,9 +365,9 @@ format_va :: #match {}
     out := format_va(*buffer, format, va, flush);
     buffer.count = out.count;
 }
-#match format_va (format: [] u8, va: [] any) -> str {
+#match format_va (format: [] u8, va: [] any, allocator := context.allocator) -> str {
     buffer : [256] u8;
-    out    := make([..] u8);
+    out    := make([..] u8, allocator=allocator);
     output := Format_Output.{
         ~~buffer, 0, buffer.count,
         flush=.{ ^out, flush_to_dynstr }
