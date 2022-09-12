@@ -315,3 +315,9 @@ Link_Options :: struct {
     memory_min_size := 1024;
     memory_max_size := 65536;
 }
+
+
+package_id :: #distinct u32
+any_package :: cast(package_id) 0
+#operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2;
+#operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2;

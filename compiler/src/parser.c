@@ -3359,6 +3359,8 @@ submit_binding_to_entities:
 
 static AstPackage* parse_package_expression(OnyxParser* parser) {
     AstPackage* package_node = make_node(AstPackage, Ast_Kind_Package);
+    package_node->flags |= Ast_Flag_Comptime;
+    package_node->type_node = builtin_package_id_type;
     package_node->token = expect_token(parser, Token_Type_Keyword_Package);
 
     bh_arr_new(global_heap_allocator, package_node->path, 2);
@@ -3420,6 +3422,7 @@ static Package* parse_file_package(OnyxParser* parser) {
         pnode->token = *symbol;
         pnode->package = newpackage;
         pnode->package_name = newpackage->name;
+        pnode->flags |= Ast_Flag_Comptime;
 
         if (prevpackage != NULL) {
             symbol_subpackage_introduce(prevpackage->scope, (*symbol)->text, pnode);

@@ -17,6 +17,8 @@ bh_allocator global_heap_allocator;
 //
 // Program info and packages
 //
+static u64 next_package_id = 1;
+
 Package* package_lookup(char* package_name) {
     i32 index = shgeti(context.packages, package_name);
     if (index != -1) {
@@ -40,6 +42,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
 
         package->name = pac_name;
         package->use_package_entities = NULL;
+        package->id = next_package_id++;
 
         if (!strcmp(pac_name, "builtin")) {
             package->private_scope = scope_create(alloc, context.global_scope, pos);
@@ -55,6 +58,8 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
             AstPackage* package_node = onyx_ast_node_new(alloc, sizeof(AstPackage), Ast_Kind_Package);
             package_node->package_name = package->name;
             package_node->package = package;
+            package_node->type_node = builtin_package_id_type;
+            package_node->flags |= Ast_Flag_Comptime;
 
             symbol_raw_introduce(context.global_scope, pac_name, pos, (AstNode *) package_node);
         }

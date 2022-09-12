@@ -3375,6 +3375,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Package: {
+            AstPackage *package = (AstPackage *) expr;
+            WID(NULL, WI_I32_CONST, package->package->id);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -4077,6 +4083,12 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
 
     case Ast_Kind_Zero_Value: {
         memset(bh_pointer_add(ctx->data, offset), 0, type_size_of(node->type));
+        break;
+    }
+
+    case Ast_Kind_Package: {
+        AstPackage *package = (AstPackage *) node;
+        CE(u32, 0) = package->package->id;
         break;
     }
 

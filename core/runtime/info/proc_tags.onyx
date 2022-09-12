@@ -9,6 +9,7 @@ Tagged_Procedure :: struct {
     func: () -> void;
     type: type_expr;
     tags: [] any;
+    pack: package_id;
 }
 
 get_tags_for_procedure :: (func: $T) -> [] any {
@@ -25,6 +26,7 @@ get_tags_for_procedure :: (func: $T) -> [] any {
     func: () -> void;
     type: type_expr;
     tag : ^T;
+    pack: package_id;
 }
 
 get_procedures_with_tag :: ($tag_type: type_expr) -> [] GPWT_Result(tag_type) {
@@ -36,7 +38,8 @@ get_procedures_with_tag :: ($tag_type: type_expr) -> [] GPWT_Result(tag_type) {
             array.push(^results, .{
                 func = proc.func,
                 type = proc.type,
-                tag = cast(^tag_type) tag.data
+                tag = cast(^tag_type) tag.data,
+                pack = proc.pack,
             });
         }
     }

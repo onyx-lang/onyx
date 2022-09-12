@@ -887,6 +887,11 @@ Type* resolve_expression_type(AstTyped* node) {
         return resolve_expression_type((AstTyped *) ((AstMacro *) node)->body);
     }
 
+    if (node->kind == Ast_Kind_Package) {
+        node->type_node = builtin_package_id_type;
+        node->type = type_build_from_ast(context.ast_alloc, node->type_node);
+    }
+
     if (node->type == NULL)
         node->type = type_build_from_ast(context.ast_alloc, node->type_node);
 

@@ -829,9 +829,12 @@ static u64 build_tagged_procedures(OnyxWasmModule *module) {
         bh_buffer_align(&tag_proc_buffer, 4);
         tag_proc_info[index++] = tag_proc_buffer.length;
 
+        assert(func->entity && func->entity->package);
+
         bh_buffer_write_u32(&tag_proc_buffer, get_element_idx(module, func));
         bh_buffer_write_u32(&tag_proc_buffer, func->type->id);
         WRITE_SLICE(tag_array_base, tag_count);
+        bh_buffer_write_u32(&tag_proc_buffer, func->entity->package->id);
     }    
 
     if (context.options->verbose_output == 1) {

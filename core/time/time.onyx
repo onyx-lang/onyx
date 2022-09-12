@@ -15,15 +15,15 @@ package core.time
 // This structure has to match the 'struct tm'
 // defined in time.h of POSIX.
 Timestamp :: struct #size (sizeof u32 * 12) {
-    sec:   u32;
-    min:   u32;
-    hour:  u32;
-    mday:  u32;
-    mon:   u32;
-    year:  u32;
-    wday:  u32;
-    yday:  u32;
-    isdst: u32;
+    sec:   i32;
+    min:   i32;
+    hour:  i32;
+    mday:  i32;
+    mon:   i32;
+    year:  i32;
+    wday:  i32;
+    yday:  i32;
+    isdst: i32;
 }
 
 localtime :: __time_localtime
@@ -38,20 +38,241 @@ strftime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> str {
     return buf[0..len];
 }
 
-strptime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> bool {
-    f := cast(cstr) core.alloc.from_stack(format.length + 1);
-    core.memory.copy(f, format.data, format.length);
-    f[format.length] = 0;
+strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
+    use core
 
-    return __time_strptime(buf, f, tm); 
+    #persist weekdays   := str.[ "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" ];
+    #persist monthnames := str.[ "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" ];
+
+    buf := buf_;
+    format := format_;
+
+    working := true;
+    while working && buf.length > 0 && format.length > 0 {
+        c := format[0];
+        switch c {
+            case #char "%" {
+                string.advance(^format);
+                switch format[0] {
+                    case #char "a", #char "A" {
+                        for i: weekdays.count {
+                            w := weekdays[i];
+                            if string.equal_insensitive(w, buf[0 .. w.length]) {
+                                string.advance(^buf, w.length);
+                                tm.wday = i;
+                                break break;
+
+                            } elseif string.equal_insensitive(w[0 .. 3], buf[0 .. 3]) {
+                                string.advance(^buf, 3);
+                                tm.wday = i;
+                                break break;
+                            }
+                        }
+
+                        tm.wday = -1;
+                        working = false;
+                    }
+
+                    case #char "b", #char "B", #char "h" {
+                        for i: monthnames.count {
+                            m := monthnames[i];
+                            if string.equal_insensitive(m, buf[0 .. m.length]) {
+                                string.advance(^buf, m.length);
+                                tm.mon = i;
+                                break break;
+
+                            } elseif string.equal_insensitive(m[0 .. 3], buf[0 .. 3]) {
+                                string.advance(^buf, 3);
+                                tm.mon = i;
+                                break break;
+                            }
+                        }
+
+                        tm.mon = -1;
+                        working = false;
+                    }
+
+                    case #char "d", #char "e" {
+                        working = parse_number_and_advance(^buf, ^tm.mday, 1, 31, 0);
+                    }
+
+                    case #char "D" {
+                        working = parse_number_and_advance(^buf, ^tm.mon, 1, 12, -1);
+                        if !working do break;
+
+                        if buf[0] == #char "/" {
+                            string.advance(^buf);
+                            working = parse_number_and_advance(^buf, ^tm.mday, 1, 31, 0);
+                            if !working do break;
+
+                            if buf[0] == #char "/" {
+                                string.advance(^buf);
+                                working = parse_number_and_advance(^buf, ^tm.year, 0, 99, 0);
+                                if working && tm.year < 69 {
+                                    tm.year += 100;
+                                }
+                            }
+                        }
+                    }
+
+                    case #char "H" do working = parse_number_and_advance(^buf, ^tm.hour, 0, 23, 0);
+                    case #char "I" do working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
+                    case #char "j" do working = parse_number_and_advance(^buf, ^tm.yday, 1, 366, -1);
+                    case #char "m" do working = parse_number_and_advance(^buf, ^tm.mon, 1, 12, -1);
+                    case #char "M" do working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
+                    case #char "n", #char "t" do string.strip_leading_whitespace(^buf);
+
+                    case #char "p" {
+                        if string.equal_insensitive(buf[0 .. 2], "am") {
+                            if tm.hour == 12 do tm.hour = 0;
+                            string.advance(^buf, 2);
+
+                        } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
+                            if tm.hour < 12 do tm.hour += 12;
+                            string.advance(^buf, 2);
+
+                        } else {
+                            working = false;
+                        }
+                    }
+
+                    case #char "r" {
+                        working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
+                        if !working do break;
+
+                        if buf[0] == #char ":" {
+                            string.advance(^buf);
+
+                            working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
+                            if !working do break;
+
+                            if buf[0] == #char ":" {
+                                string.advance(^buf);
+
+                                working = parse_number_and_advance(^buf, ^tm.sec, 0, 59, 0);
+                                if !working do break;
+
+                                string.strip_leading_whitespace(^buf);
+
+                                if string.equal_insensitive(buf[0 .. 2], "am") {
+                                    if tm.hour == 12 do tm.hour = 0;
+                                    string.advance(^buf, 2);
+
+                                } elseif string.equal_insensitive(buf[0 .. 2], "pm") {
+                                    if tm.hour < 12 do tm.hour += 12;
+                                    string.advance(^buf, 2);
+
+                                } else {
+                                    working = false;
+                                }
+                            }
+                        }
+                    }
+
+                    case #char "R" {
+                        working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
+                        if !working do break;
+
+                        if buf[0] == #char ":" {
+                            string.advance(^buf);
+
+                            working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
+                        }
+                    }
+
+                    case #char "S" do working = parse_number_and_advance(^buf, ^tm.sec, 0, 59, 0);
+
+                    case #char "T" {
+                        working = parse_number_and_advance(^buf, ^tm.hour, 1, 12, 0);
+                        if !working do break;
+
+                        if buf[0] == #char ":" {
+                            string.advance(^buf);
+
+                            working = parse_number_and_advance(^buf, ^tm.min, 0, 59, 0);
+                            if !working do break;
+
+                            if buf[0] == #char ":" {
+                                string.advance(^buf);
+
+                                working = parse_number_and_advance(^buf, ^tm.sec, 0, 59, 0);
+                            }
+                        }
+                    }
+
+                    case #char "w" do working = parse_number_and_advance(^buf, ^tm.wday, 0, 6, 0);
+                    case #char "Y" do working = parse_number_and_advance(^buf, ^tm.year, 1900, 65535, -1900);
+
+                    case #char "y" {
+                        working = parse_number_and_advance(^buf, ^tm.year, 0, 99, 0);
+                        if working && tm.year < 69 {
+                            tm.year += 100;
+                        }
+                    }
+
+                    case #char "%" {
+                        if buf[0] != #char "%" {
+                            working = false;
+                        }
+                        string.advance(^buf);
+                    }
+
+                    case #default {
+                        working = false;
+                    }
+                }
+            }
+
+            case #char " ", #char "\t", #char "\r", #char "\n", #char "\f", #char "\v" {
+                string.strip_leading_whitespace(^buf);
+            }
+
+            case #default {
+                if c != buf[0] {
+                    working = false;
+
+                } else {
+                    string.advance(^buf);
+                }
+            }
+        }
+
+        string.advance(^format);
+    }
+
+    return working;
 }
+
+#local
+parse_number_and_advance :: (buf: ^[] u8, result: ^i32, low, high, offset: i32) -> bool {
+    use core {string}
+
+    n := 0;
+    while buf.count > 0 {
+        c := buf.data[0];
+        if c < #char "0" || c > #char "9" {
+            break;
+        }
+
+        n *= 10;
+        n += ~~(c - #char "0");
+        string.advance(buf);
+    }
+
+    if n >= low && n <= high {
+        *result = n + offset;
+        return true;
+    }
+
+    return false;
+}
+
 
 #local {
     #foreign "onyx_runtime" {
         __time_localtime :: (time: u64, tm: ^Timestamp) -> void ---
         __time_gmtime    :: (time: u64, tm: ^Timestamp) -> void ---
         __time_strftime  :: (buf: [] u8, format: cstr, tm: ^Timestamp) -> u32 ---
-        __time_strptime  :: (buf: [] u8, format: cstr, tm: ^Timestamp) -> bool ---
     }
 }
 

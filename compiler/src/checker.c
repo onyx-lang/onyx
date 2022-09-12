@@ -1667,6 +1667,10 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         YIELD(field->token->pos, "Trying to resolve type of source expression.");
     }
 
+    if (field->expr->kind == Ast_Kind_Package) {
+        return Check_Return_To_Symres;
+    }
+
     if (!type_is_structlike(field->expr->type)) {
         ERROR_(field->token->pos,
             "Cannot access field '%b' on '%s'. Type is not a struct.",

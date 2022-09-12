@@ -161,6 +161,21 @@ equal :: (str1: str, str2: str) -> bool {
     return true;
 }
 
+equal_insensitive :: (s1, s2: str) -> bool {
+    if s1.count != s2.count do return false;
+    while i := 0; i < s1.count {
+        defer i += 1;
+        if s1[i] == s2[i] do continue;
+
+        c1 := s1[i];
+        c2 := s2[i];
+        if c1 >= #char "A" && c1 <= #char "Z" do c1 += 32;
+        if c2 >= #char "A" && c2 <= #char "Z" do c2 += 32;
+        if c1 != c2 do return false;
+    }
+    return true;
+}
+
 #operator == equal
 #operator != macro (s1: str, s2: str) => !(s1 == s2);
 

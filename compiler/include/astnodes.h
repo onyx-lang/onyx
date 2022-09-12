@@ -1516,6 +1516,8 @@ struct Package {
     Scope *scope;
     Scope *private_scope;
 
+    u32 id;
+
     // NOTE: This tracks all of the 'use package' statements of this package throughout
     // the code base. This is used when a static if clears and new symbols are introduced.
     // 'use package' statements have to be reevaluated to pull in the new symbols.
@@ -1645,6 +1647,7 @@ extern AstType  *builtin_callsite_type;
 extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;
 extern AstType  *builtin_link_options_type;
+extern AstType  *builtin_package_id_type;
 extern AstTyped *type_table_node;
 extern AstTyped *foreign_blocks_node;
 extern AstType  *foreign_block_type;

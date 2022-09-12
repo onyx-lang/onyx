@@ -74,7 +74,6 @@ ONYX_LIBRARY {
     ONYX_FUNC(__time_localtime)
     ONYX_FUNC(__time_gmtime)
     ONYX_FUNC(__time_strftime)
-    ONYX_FUNC(__time_strptime)
 
     ONYX_FUNC(__net_create_socket)
     ONYX_FUNC(__net_close_socket)

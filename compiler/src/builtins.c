@@ -60,6 +60,7 @@ AstType  *builtin_callsite_type;
 AstType  *builtin_any_type;
 AstType  *builtin_code_type;
 AstType  *builtin_link_options_type;
+AstType  *builtin_package_id_type;
 
 AstTyped    *type_table_node = NULL;
 AstTyped    *foreign_blocks_node = NULL;
@@ -459,6 +460,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_link_options_type = (AstType *) symbol_raw_resolve(p->scope, "Link_Options");
     if (builtin_link_options_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Link_Options' type not found.");
+        return;
+    }
+
+    builtin_package_id_type = (AstType *) symbol_raw_resolve(p->scope, "package_id");
+    if (builtin_package_id_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'package_id' type not found.");
         return;
     }
 
