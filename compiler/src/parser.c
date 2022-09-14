@@ -2069,6 +2069,11 @@ static AstStructType* parse_struct(OnyxParser* parser) {
             parser->tag_depth -= 1;
         }
 
+        if (parser->curr->type == '}') {
+            consume_token(parser);
+            break;
+        }
+
         member_is_used = consume_token_if_next(parser, Token_Type_Keyword_Use);
 
         bh_arr_clear(member_list_temp);

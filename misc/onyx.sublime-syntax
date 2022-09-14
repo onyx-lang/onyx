@@ -51,8 +51,8 @@ contexts:
     - match: '#[a-zA-Z_]+'
       scope: keyword.other.onyx
 
-    - match: '@[a-zA-Z0-9_]+'
-      scope: meta.toc-list.task-tag.note.onyx
+    - match: '@[a-zA-Z0-9_.]+'
+      scope: keyword.other.onyx
 
     - match: '\$[a-zA-Z0-9_]+'
       scope: constant.other.onyx
