@@ -271,8 +271,8 @@ static u32 debug_get_file_id(OnyxWasmModule *mod, const char *name) {
                 file_info.line_count = fc->line_count;
             }
         }
-        shput(mod->debug_context->file_info, name, file_info);
 
+        shput(mod->debug_context->file_info, name, file_info);
         return id;
     }
 

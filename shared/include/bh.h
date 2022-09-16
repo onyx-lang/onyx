@@ -2447,6 +2447,8 @@ b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap) {
         arrptr = (bh__arr *) bh_alloc(alloc, sizeof(*arrptr) + elemsize * cap);
         if (arrptr == NULL) return 0;
 
+        memset(arrptr + 1, 0, elemsize * cap);
+
         arrptr->allocator = alloc;
         arrptr->capacity = cap;
         arrptr->length = 0;
@@ -2456,12 +2458,14 @@ b32 bh__arr_grow(bh_allocator alloc, void** arr, i32 elemsize, i32 cap) {
 
         if (arrptr->capacity < cap) {
             void* p;
-            i32 newcap = arrptr->capacity;
+            i32 newcap = arrptr->capacity, oldcap = arrptr->capacity;
             while (newcap < cap) newcap = BH_ARR_GROW_FORMULA(newcap);
 
             p = bh_resize(arrptr->allocator, arrptr, sizeof(*arrptr) + elemsize * newcap);
 
             if (p) {
+                memset(bh_pointer_add(((bh__arr *) p + 1), elemsize * oldcap), 0, elemsize * (newcap - oldcap - 1));
+
                 arrptr = (bh__arr *) p;
                 arrptr->capacity = newcap;
             } else {

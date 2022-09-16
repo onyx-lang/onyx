@@ -184,7 +184,7 @@ static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
                 }
             }
 
-            printf("[INFO ] Setting breakpoint at %s:%d (%xd)\n", filename, line, instr);
+            printf("[INFO ] Setting breakpoint at %s:%d (%x)\n", filename, line, instr);
             
             debug_breakpoint_t bp;
             bp.id = debug->next_breakpoint_id++;
