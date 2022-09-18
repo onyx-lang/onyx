@@ -14,6 +14,9 @@
     "activationEvents": [
         "onLanguage:onyx"
     ],
+    "repository": {
+        "url": "https://github.com/onyx-lang/onyx"
+    },
     "icon": "logo.png",
     "main": "./out/extension.js",
     "contributes": {
@@ -88,6 +91,11 @@
                                 "description": "The WASM file for debugging, compiled with the --debug flag.",
                                 "default": "out.wasm"
                             },
+                            "onyxFiles": {
+                                "type": "array",
+                                "description": "The Onyx files for compiling.",
+                                "default": "[]"
+                            },
                             "workingDir": {
                                 "type": "string",
                                 "description": "The working directory for the execution",
@@ -103,11 +111,14 @@
                 },
                 "initialConfigurations": [
                     {
+                        "name": "Onyx Attach",
                         "type": "onyx",
                         "request": "attach",
-                        "stopOnEntry": true
+                        "stopOnEntry": true,
+                        "socketPath": "/tmp/ovm-debug.0000"
                     },
                     {
+                        "name": "Onyx Launch",
                         "type": "onyx",
                         "request": "launch",
                         "wasmFile": "out.wasm",

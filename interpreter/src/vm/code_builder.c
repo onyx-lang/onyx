@@ -123,6 +123,18 @@ void ovm_code_builder_patch_else(ovm_code_builder_t *builder, label_target_t if_
 }
 
 void ovm_code_builder_add_nop(ovm_code_builder_t *builder) {
+    //
+    // If debugging info was not present in the binary,
+    // do not create NOP instructions. NOP instructions are
+    // normally used as placeholders / special instructions
+    // to signify something weird happened, such as an expanded
+    // macro or operator overload. When this happens, it is
+    // nice to have the correct location in the source tree
+    // so you don't magically jump from one place to another.
+    // HOWEVER, if there is no debug info, then this is not
+    // a concern, and NOPs can be ommited.
+    if (builder->debug_builder->data == NULL) return;
+
     ovm_instr_t nop = {0};
     nop.full_instr = OVMI_NOP;
 

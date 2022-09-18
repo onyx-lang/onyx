@@ -188,14 +188,30 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         });
     }
     launchRequest(response, args, request) {
-        this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
-            "cwd": args.workingDir,
+        return __awaiter(this, void 0, void 0, function* () {
+            if (args.wasmFile) {
+                this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
+                    "cwd": args.workingDir,
+                });
+            }
+            else if (args.onyxFiles) {
+                this.running_process = child_process.spawn("onyx", ["run", "--debug", ...args.onyxFiles], {
+                    "cwd": args.workingDir,
+                });
+            }
+            else {
+                this.sendErrorResponse(response, {
+                    format: "Expected either wasmFile or onyxFiles in launch configuration.",
+                    id: 1
+                });
+                return;
+            }
+            this.running_process.stdout.setEncoding("utf-8");
+            this.running_process.stdout.on("data", (chunk) => {
+                this.sendEvent(new debugadapter_1.OutputEvent(chunk, "console"));
+            });
+            this.attachRequest(response, { "socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": args.stopOnEntry });
         });
-        this.running_process.stdout.setEncoding("utf-8");
-        this.running_process.stdout.on("data", (chunk) => {
-            this.sendEvent(new debugadapter_1.OutputEvent(chunk, "console"));
-        });
-        this.attachRequest(response, { "socketPath": "/tmp/ovm-debug.0000", "stopOnEntry": args.stopOnEntry });
     }
     attachRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -279,6 +295,8 @@ class OVMDebugger extends EventEmitter {
         });
     }
     pause(thread_id = 0xffffffff) {
+        if (this.client == null)
+            return;
         let data = new ArrayBuffer(12);
         let view = new DataView(data);
         let cmd_id = this.next_command_id;
@@ -289,6 +307,8 @@ class OVMDebugger extends EventEmitter {
         this.pending_responses[cmd_id] = OVMCommand.PAUSE;
     }
     resume(thread_id = 0xffffffff) {
+        if (this.client == null)
+            return;
         let data = new ArrayBuffer(12);
         let view = new DataView(data);
         let cmd_id = this.next_command_id;
@@ -300,6 +320,8 @@ class OVMDebugger extends EventEmitter {
     }
     set_breakpoint(filename, line) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.client == null)
+                return Promise.resolve({});
             let data = new ArrayBuffer(16 + filename.length);
             let view = new DataView(data);
             let cmd_id = this.next_command_id;
@@ -317,6 +339,8 @@ class OVMDebugger extends EventEmitter {
     }
     remove_breakpoints_in_file(filename) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.client == null)
+                return Promise.resolve(false);
             let data = new ArrayBuffer(12 + filename.length);
             let view = new DataView(data);
             let cmd_id = this.next_command_id;
@@ -332,6 +356,8 @@ class OVMDebugger extends EventEmitter {
         });
     }
     step(granularity, thread_id) {
+        if (this.client == null)
+            return;
         let data = new ArrayBuffer(16);
         let view = new DataView(data);
         let cmd_id = this.next_command_id;
@@ -356,6 +382,8 @@ class OVMDebugger extends EventEmitter {
         this.pending_responses[cmd_id] = OVMCommand.STEP;
     }
     trace(thread_id) {
+        if (this.client == null)
+            return Promise.resolve([]);
         let data = new ArrayBuffer(12);
         let view = new DataView(data);
         let cmd_id = this.next_command_id;
@@ -367,6 +395,8 @@ class OVMDebugger extends EventEmitter {
         return this.preparePromise(cmd_id);
     }
     threads() {
+        if (this.client == null)
+            return Promise.resolve([]);
         let data = new ArrayBuffer(8);
         let view = new DataView(data);
         let cmd_id = this.next_command_id;
@@ -377,6 +407,8 @@ class OVMDebugger extends EventEmitter {
         return this.preparePromise(cmd_id);
     }
     variables(frame_index, thread_id) {
+        if (this.client == null)
+            return Promise.resolve([]);
         let data = new ArrayBuffer(16);
         let view = new DataView(data);
         let cmd_id = this.next_command_id;

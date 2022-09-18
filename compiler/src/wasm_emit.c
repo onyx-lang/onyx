@@ -391,6 +391,14 @@ static void debug_begin_function(OnyxWasmModule *mod, u32 func_idx, OnyxToken *t
     debug_set_position(mod, token);
 }
 
+static void debug_function_set_ptr_idx(OnyxWasmModule *mod, u32 func_idx, u64 ptr_idx) {
+    bh_arr_each(DebugFuncContext, func, mod->debug_context->funcs) {
+        if (func->func_index == func_idx) {
+            func->stack_ptr_idx = ptr_idx;
+        }
+    }
+}
+
 static void debug_end_function(OnyxWasmModule *mod) {
     bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_POPF);
     bh_buffer_write_byte(&mod->debug_context->op_buffer, DOT_END);
@@ -415,6 +423,7 @@ static void debug_leave_symbol_frame(OnyxWasmModule *mod) {
 #define debug_set_position(mod, token) (void)0
 #define debug_emit_instruction(mod, token) (void)0
 #define debug_begin_function(mod, idx, token, name) (void)0
+#define debug_function_set_ptr_idx(mod, func_idx, ptr_idx) (void)0
 #define debug_end_function(mod) (void)0
 #define debug_enter_symbol_frame(mod) (void)0
 #define debug_leave_symbol_frame(mod) (void)0
@@ -3815,6 +3824,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         // TODO: Emit debug info for the above instructions
 
         mod->stack_base_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+        debug_function_set_ptr_idx(mod, func_idx, mod->stack_base_idx);
 
         // Generate code
         emit_function_body(mod, &wasm_func.code, fd);

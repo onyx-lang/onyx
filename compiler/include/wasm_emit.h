@@ -810,7 +810,7 @@ typedef struct DebugFuncContext {
     u32 file_id;
     u32 line;
     u32 op_offset;
-    u32 stack_ptr_idx;
+    u64 stack_ptr_idx;
 
     u32 name_length;
     char *name;

@@ -675,19 +675,6 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
     ovm_value_t tmp_val;
 
     while (state->pc < bh_arr_length(program->code)) {
-        // This will become the line change detection
-        // debug_loc_info_t loc_info;
-        // debug_info_lookup_location(engine->debug->info, state->pc, &loc_info);
-        // if (loc_info.file_id != last_file || loc_info.line != last_line) {
-        //     last_file = loc_info.file_id;
-        //     last_line = loc_info.line;
-
-        //     debug_file_info_t file_info;
-        //     debug_info_lookup_file(engine->debug->info, last_file, &file_info);
-        //     
-        //     printf("(%d, %d) %s:%d\n", last_file, last_line, file_info.name, last_line);
-        // }
-        
 #ifdef OVM_VERBOSE
         ovm_program_print_instructions(program, state->pc, 1);
 #endif

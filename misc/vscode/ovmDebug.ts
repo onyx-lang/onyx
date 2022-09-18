@@ -12,6 +12,7 @@ import { Subject } from "await-notify";
 import * as net from "node:net";
 import * as child_process from "node:child_process";
 import { ChildProcess } from 'node:child_process';
+import { openStdin } from 'node:process';
 
 
 interface IOVMAttachRequestArguments extends DebugProtocol.AttachRequestArguments {
@@ -20,7 +21,8 @@ interface IOVMAttachRequestArguments extends DebugProtocol.AttachRequestArgument
 }
 
 interface IOVMLaunchRequestArguments extends DebugProtocol.AttachRequestArguments {
-    wasmFile: string;
+    wasmFile?: string;
+    onyxFiles?: [string];
 	workingDir: string;
     stopOnEntry?: boolean;
 }
@@ -257,10 +259,25 @@ export class OVMDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-    protected launchRequest(response: DebugProtocol.LaunchResponse, args: IOVMLaunchRequestArguments, request?: DebugProtocol.Request): void {
-		this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
-			"cwd": args.workingDir,	
-		});
+    protected async launchRequest(response: DebugProtocol.LaunchResponse, args: IOVMLaunchRequestArguments, request?: DebugProtocol.Request): Promise<void> {
+		if (args.wasmFile) {
+			this.running_process = child_process.spawn("onyx-run", ["--debug", args.wasmFile], {
+				"cwd": args.workingDir,	
+			});
+
+		} else if (args.onyxFiles) {
+			this.running_process = child_process.spawn("onyx", ["run", "--debug", ...args.onyxFiles], {
+				"cwd": args.workingDir,
+			});
+
+		} else {
+			this.sendErrorResponse(response, {
+				format: "Expected either wasmFile or onyxFiles in launch configuration.",
+				id: 1
+			} as DebugProtocol.Message);
+
+			return;
+		}
 
 		this.running_process.stdout.setEncoding("utf-8");
 		this.running_process.stdout.on("data", (chunk) => {
@@ -398,6 +415,8 @@ class OVMDebugger extends EventEmitter {
 	}
 
 	pause(thread_id: number = 0xffffffff): void {
+		if (this.client == null) return;
+
         let data = new ArrayBuffer(12);
         let view = new DataView(data);
 
@@ -413,6 +432,8 @@ class OVMDebugger extends EventEmitter {
 	}
 
     resume(thread_id: number = 0xffffffff): void {
+		if (this.client == null) return;
+
         let data = new ArrayBuffer(12);
         let view = new DataView(data);
 
@@ -428,6 +449,8 @@ class OVMDebugger extends EventEmitter {
     }
 
     async set_breakpoint(filename: string, line: number): Promise<IBreakpointValidation> {
+		if (this.client == null) return Promise.resolve({} as IBreakpointValidation);
+
         let data = new ArrayBuffer(16+filename.length);
         let view = new DataView(data);
 
@@ -450,6 +473,8 @@ class OVMDebugger extends EventEmitter {
     }
 	
 	async remove_breakpoints_in_file(filename: string): Promise<boolean> {
+		if (this.client == null) return Promise.resolve(false);
+
         let data = new ArrayBuffer(12+filename.length);
         let view = new DataView(data);
 
@@ -471,6 +496,8 @@ class OVMDebugger extends EventEmitter {
 	}
 
 	step(granularity: "line" | "instruction" | "over" | "out", thread_id: number): void {
+		if (this.client == null) return;
+
         let data = new ArrayBuffer(16);
         let view = new DataView(data);
 
@@ -493,6 +520,8 @@ class OVMDebugger extends EventEmitter {
 	}
 
 	trace(thread_id: number): Promise<IFileLocation[]> {
+		if (this.client == null) return Promise.resolve([]);
+
         let data = new ArrayBuffer(12);
         let view = new DataView(data);
 
@@ -510,6 +539,8 @@ class OVMDebugger extends EventEmitter {
 	}
 
 	threads(): Promise<IThreadInfo[]> {
+		if (this.client == null) return Promise.resolve([]);
+
         let data = new ArrayBuffer(8);
         let view = new DataView(data);
 
@@ -526,6 +557,8 @@ class OVMDebugger extends EventEmitter {
 	}
 
 	variables(frame_index: number, thread_id: number): Promise<IVariableInfo[]> {
+		if (this.client == null) return Promise.resolve([]);
+
         let data = new ArrayBuffer(16);
         let view = new DataView(data);
 
