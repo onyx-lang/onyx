@@ -30,6 +30,7 @@ typedef struct debug_file_info_t {
 } debug_file_info_t;
 
 typedef enum debug_sym_loc_kind_t {
+    debug_sym_loc_unknown  = 0,
     debug_sym_loc_register = 1,
     debug_sym_loc_stack    = 2,
     debug_sym_loc_global   = 3
@@ -292,12 +293,33 @@ typedef struct debug_runtime_value_builder_t {
     debug_func_info_t func_info;
     debug_file_info_t file_info;
     debug_loc_info_t loc_info;
-    debug_sym_info_t sym_info;
+    
+    // "base_" refers to the top symbol. In a layered
+    // query, this information is not outputted, only
+    // used to lookup the values inside of it.
+    debug_sym_loc_kind_t base_loc_kind;
+    u32 base_loc;
+    u32 base_type;
+
+    // "it_" refers to the current symbol to be output.
+    u32 max_index;
+    u32 it_index;
+
+    debug_sym_loc_kind_t it_loc_kind;
+    u32 it_loc;
+    u32 it_type;
+    char *it_name;
+    bool it_has_children; 
+
 } debug_runtime_value_builder_t;
 
 void debug_runtime_value_build_init(debug_runtime_value_builder_t *builder, bh_allocator alloc);
-void debug_runtime_value_build_free(debug_runtime_value_builder_t *builder);
+void debug_runtime_value_build_set_location(debug_runtime_value_builder_t *builder, debug_sym_loc_kind_t loc_kind, u32 loc, u32 type, char *name);
+void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u32 index);
+bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder);
 void debug_runtime_value_build_string(debug_runtime_value_builder_t *builder);
+void debug_runtime_value_build_clear(debug_runtime_value_builder_t *builder);
+void debug_runtime_value_build_free(debug_runtime_value_builder_t *builder);
 
 void *__debug_thread_entry(void *);
 

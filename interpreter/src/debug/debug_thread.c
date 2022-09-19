@@ -344,6 +344,7 @@ static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
         case CMD_VARS: {
             i32 stack_frame = parse_int(debug, ctx);
             u32 thread_id   = parse_int(debug, ctx);
+            u32 layers      = parse_int(debug, ctx);
 
             ON_THREAD(thread_id) {
                 bh_arr(ovm_stack_frame_t) frames = (*thread)->ovm_state->stack_frames;
@@ -361,40 +362,90 @@ static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
 
                 send_response_header(debug, msg_id);
 
+                debug_runtime_value_builder_t builder;
+                builder.state = debug;
+                builder.info = debug->info;
+                builder.ovm_state = (*thread)->ovm_state;
+                builder.ovm_frame = frame;
+                builder.func_info = func_info;
+                builder.file_info = file_info;
+                builder.loc_info = loc_info;
+                debug_runtime_value_build_init(&builder, bh_heap_allocator());
+
+                //
+                // The first layer specified is the symbol id to drill into.
+                // Therefore, the first layer is peeled off here before the
+                // following while loop. This makes the assumption that no
+                // symbol will have the id 0xffffffff. This is probably safe
+                // to assume, especially since just one more symbol and this
+                // whole system crashes...
+                u32 sym_id_to_match = 0xffffffff;
+                if (layers > 0) {
+                    sym_id_to_match = parse_int(debug, ctx);
+                    layers--;
+                }
+
                 i32 symbol_scope = loc_info.symbol_scope;
                 while (symbol_scope != -1) {
                     debug_sym_scope_t sym_scope = debug->info->symbol_scopes[symbol_scope];
+                    builder.sym_scope = sym_scope;
 
                     bh_arr_each(u32, sym_id, sym_scope.symbols) {
                         debug_sym_info_t *sym = &debug->info->symbols[*sym_id];
+                        debug_runtime_value_build_set_location(&builder, sym->loc_kind, sym->loc, sym->type, sym->name);
 
-                        send_int(debug, 0);
-                        send_string(debug, sym->name);
+                        //
+                        // If we are drilling to a particular symbol, and this is that symbol,
+                        // we have to do the generation a little differently. We first have to
+                        // pull the other layer queries in, and descend into those layers.
+                        // Then, we loop through each value at that layer and print their values.
+                        if (sym->sym_id == sym_id_to_match && sym_id_to_match != 0xffffffff) {
+                            while (layers--) {
+                                u32 desc = parse_int(debug, ctx);
+                                debug_runtime_value_build_descend(&builder, desc);
+                            }
 
-                        debug_runtime_value_builder_t builder;
-                        builder.state = debug;
-                        builder.info = debug->info;
-                        builder.ovm_state = (*thread)->ovm_state;
-                        builder.ovm_frame = frame;
-                        builder.sym_scope = sym_scope;
-                        builder.func_info = func_info;
-                        builder.file_info = file_info;
-                        builder.loc_info = loc_info;
-                        builder.sym_info = *sym;
+                            while (debug_runtime_value_build_step(&builder)) {
+                                debug_runtime_value_build_string(&builder);
+                                debug_type_info_t *type = &debug->info->types[builder.it_type];
 
-                        debug_runtime_value_build_init(&builder, bh_heap_allocator());
-                        debug_runtime_value_build_string(&builder);
-                        send_bytes(debug, builder.output.data, builder.output.length);
-                        debug_runtime_value_build_free(&builder);
+                                send_int(debug, 0);
+                                send_string(debug, builder.it_name);
+                                send_bytes(debug, builder.output.data, builder.output.length);
+                                send_string(debug, type->name);
+                                send_int(debug, builder.it_index - 1); // CLEANUP This should be 0 indexed, but because this is after the while loop condition, it is 1 indexed.
+                                send_bool(debug, builder.it_has_children);
 
-                        debug_type_info_t *type = &debug->info->types[sym->type];
-                        send_string(debug, type->name);
+                                debug_runtime_value_build_clear(&builder);
+                            }
+                            
+                            // This is important, as when doing a layered query, only one symbol
+                            // should be considered, and once found, should immediate stop.
+                            goto syms_done;
+
+                        } else if (sym_id_to_match == 0xffffffff) {
+                            // Otherwise, we simply print the value of the symbol as is.
+                            debug_type_info_t *type = &debug->info->types[sym->type];
+
+                            debug_runtime_value_build_string(&builder);
+
+                            send_int(debug, 0);
+                            send_string(debug, sym->name);
+                            send_bytes(debug, builder.output.data, builder.output.length);
+                            send_string(debug, type->name);
+                            send_int(debug, sym->sym_id);
+                            send_bool(debug, builder.it_has_children);
+
+                            debug_runtime_value_build_clear(&builder);
+                        }
                     }
 
                     symbol_scope = sym_scope.parent;
                 }
                 
+              syms_done:
                 send_int(debug, 1);
+                debug_runtime_value_build_free(&builder);
                 return;
             }
 

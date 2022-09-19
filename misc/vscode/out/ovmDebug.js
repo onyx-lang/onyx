@@ -137,6 +137,8 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     stackTraceRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
             let frames = yield this.debugger.trace(args.threadId);
+            this._frameReferences.reset();
+            this._variableReferences.reset();
             response.body = {
                 stackFrames: frames.map((f, i) => {
                     let source = new debugadapter_1.Source(this.fileNameToShortName(f.filename), this.convertDebuggerPathToClient(f.filename), undefined, undefined, "ovm-debug-src");
@@ -166,7 +168,7 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     scopesRequest(response, args, request) {
         let frameId = args.frameId;
         let frameRef = this._frameReferences.get(frameId);
-        let varRef = this._variableReferences.create(frameRef);
+        let varRef = this._variableReferences.create(Object.assign(Object.assign({}, frameRef), { variableChain: [] }));
         response.body = {
             scopes: [
                 new debugadapter_1.Scope("Locals", varRef, false),
@@ -176,11 +178,14 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     }
     variablesRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
-            const frameRef = this._variableReferences.get(args.variablesReference, { frameIndex: 0, threadId: 0 });
-            let vs = (yield this.debugger.variables(frameRef.frameIndex, frameRef.threadId))
+            const frameRef = this._variableReferences.get(args.variablesReference, { frameIndex: 0, threadId: 0, variableChain: [] });
+            let vs = (yield this.debugger.variables(frameRef.frameIndex, frameRef.threadId, frameRef.variableChain))
                 .map(v => {
                 let nv = new debugadapter_1.Variable(v.name, v.value);
                 nv.type = v.type;
+                if (v.hasChildren) {
+                    nv.variablesReference = this._variableReferences.create(Object.assign(Object.assign({}, frameRef), { variableChain: frameRef.variableChain.concat([v.symId]) }));
+                }
                 return nv;
             });
             response.body = { variables: vs };
@@ -406,16 +411,20 @@ class OVMDebugger extends EventEmitter {
         this.pending_responses[cmd_id] = OVMCommand.THREADS;
         return this.preparePromise(cmd_id);
     }
-    variables(frame_index, thread_id) {
+    variables(frame_index, thread_id, descention) {
         if (this.client == null)
             return Promise.resolve([]);
-        let data = new ArrayBuffer(16);
+        let data = new ArrayBuffer(20 + 4 * descention.length);
         let view = new DataView(data);
         let cmd_id = this.next_command_id;
         view.setUint32(0, cmd_id, true);
         view.setUint32(4, OVMCommand.VARS, true);
         view.setUint32(8, frame_index, true);
         view.setUint32(12, thread_id, true);
+        view.setUint32(16, descention.length, true);
+        for (let i = 0; i < descention.length; i++) {
+            view.setUint32(20 + i * 4, descention[i], true);
+        }
         this.client.write(new Uint8Array(data));
         this.pending_responses[cmd_id] = OVMCommand.VARS;
         return this.preparePromise(cmd_id);
@@ -515,7 +524,9 @@ class OVMDebugger extends EventEmitter {
                     let name = parser.parseString();
                     let value = parser.parseString();
                     let type = parser.parseString();
-                    result.push({ name, value, type });
+                    let symId = parser.parseUint32();
+                    let hasChildren = parser.parseBool();
+                    result.push({ name, value, type, symId, hasChildren });
                 }
                 this.resolvePromise(msg_id, result);
                 break;
@@ -581,7 +592,7 @@ class DataParser {
     }
     parseBool() {
         if (this.offset >= this.data.length)
-            return 0;
+            return false;
         this.offset += 1;
         return this.view.getUint8(this.offset - 1) != 0;
     }

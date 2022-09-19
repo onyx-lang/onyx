@@ -32,6 +32,12 @@ interface IFrameReference {
 	threadId: number;
 }
 
+interface IVariableReference {
+	frameIndex: number;
+	threadId: number;
+	variableChain: number[];
+}
+
 export class OVMDebugSession extends LoggingDebugSession {
 
 	private debugger: OVMDebugger;
@@ -43,7 +49,7 @@ export class OVMDebugSession extends LoggingDebugSession {
 
 	private _loadedSources: Map<string, Source>;
 
-	private _variableReferences = new Handles<IFrameReference>();
+	private _variableReferences = new Handles<IVariableReference>();
 	private _frameReferences = new Handles<IFrameReference>();
 
     public constructor() {
@@ -197,6 +203,9 @@ export class OVMDebugSession extends LoggingDebugSession {
 	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments, request?: DebugProtocol.Request): Promise<void> {
 		let frames = await this.debugger.trace(args.threadId);
 
+		this._frameReferences.reset();
+		this._variableReferences.reset();
+
 		response.body = {
 			stackFrames: frames.map((f, i) => {
 				let source = new Source(
@@ -236,7 +245,10 @@ export class OVMDebugSession extends LoggingDebugSession {
 		let frameId = args.frameId;
 
 		let frameRef = this._frameReferences.get(frameId);
-		let varRef   = this._variableReferences.create(frameRef);
+		let varRef   = this._variableReferences.create({
+			...frameRef,
+			variableChain: []
+		});
 
 		response.body = {
 			scopes: [
@@ -247,11 +259,19 @@ export class OVMDebugSession extends LoggingDebugSession {
 	}
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request): Promise<void> {
-		const frameRef = this._variableReferences.get(args.variablesReference, {frameIndex: 0, threadId: 0});
-		let vs: Variable[] = (await this.debugger.variables(frameRef.frameIndex, frameRef.threadId))
+		const frameRef = this._variableReferences.get(args.variablesReference, {frameIndex:0, threadId:0, variableChain:[]});
+
+		let vs: Variable[] = (await this.debugger.variables(frameRef.frameIndex, frameRef.threadId, frameRef.variableChain))
 			.map(v => {
 				let nv = new Variable(v.name, v.value) as DebugProtocol.Variable;
 				nv.type = v.type;
+				if (v.hasChildren) {
+					nv.variablesReference = this._variableReferences.create({
+						...frameRef,
+						variableChain: frameRef.variableChain.concat([v.symId]),
+					});
+				}
+
 				return nv;
 			});
 
@@ -363,6 +383,8 @@ interface IVariableInfo {
 	name: string;
 	value: string;
 	type: string;
+	symId: number;
+	hasChildren: boolean;
 }
 
 enum OVMCommand {
@@ -556,10 +578,10 @@ class OVMDebugger extends EventEmitter {
 		return this.preparePromise(cmd_id);
 	}
 
-	variables(frame_index: number, thread_id: number): Promise<IVariableInfo[]> {
+	variables(frame_index: number, thread_id: number, descention: number[]): Promise<IVariableInfo[]> {
 		if (this.client == null) return Promise.resolve([]);
 
-        let data = new ArrayBuffer(16);
+        let data = new ArrayBuffer(20 + 4 * descention.length);
         let view = new DataView(data);
 
         let cmd_id = this.next_command_id;
@@ -568,6 +590,11 @@ class OVMDebugger extends EventEmitter {
         view.setUint32(4, OVMCommand.VARS, true);
         view.setUint32(8, frame_index, true);
         view.setUint32(12, thread_id, true);
+		view.setUint32(16, descention.length, true);
+
+		for (let i=0; i<descention.length; i++) {
+			view.setUint32(20 + i * 4, descention[i], true);
+		}
 
         this.client.write(new Uint8Array(data));
 
@@ -693,7 +720,9 @@ class OVMDebugger extends EventEmitter {
 					let name  = parser.parseString();
 					let value = parser.parseString();
 					let type  = parser.parseString();
-					result.push({name, value, type});
+					let symId    = parser.parseUint32();
+					let hasChildren = parser.parseBool();
+					result.push({name, value, type, symId, hasChildren});
 				}
 
 				this.resolvePromise(msg_id, result);
@@ -776,7 +805,7 @@ class DataParser {
     }
 
     parseBool() {
-		if (this.offset >= this.data.length) return 0;
+		if (this.offset >= this.data.length) return false;
 
         this.offset += 1;
         return this.view.getUint8(this.offset - 1) != 0;
