@@ -34,6 +34,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\n"
     "Usage:\n"
     "\tonyx compile [-o <target file>] [--verbose] <input files>\n"
+    "\tonyx check [--verbose] <input files>\n"
 #ifdef ENABLE_RUN_WITH_WASMER
     "\tonyx run <input files> -- <args>\n"
 #endif
@@ -109,6 +110,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     if (!strcmp(argv[1], "help"))     options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
     if (!strcmp(argv[1], "compile")) {
         options.action = ONYX_COMPILE_ACTION_COMPILE;
+        arg_parse_start = 2;
+    }
+    if (!strcmp(argv[1], "check")) {
+        options.action = ONYX_COMPILE_ACTION_CHECK;
         arg_parse_start = 2;
     }
     #ifdef ENABLE_RUN_WITH_WASMER
@@ -501,7 +506,16 @@ static b32 process_entity(Entity* ent) {
 
         case Entity_State_Resolve_Symbols: symres_entity(ent); break;
         case Entity_State_Check_Types:     check_entity(ent);  break;
-        case Entity_State_Code_Gen:        emit_entity(ent);   break;
+
+        case Entity_State_Code_Gen: {
+            if (context.options->action == ONYX_COMPILE_ACTION_CHECK) {
+                ent->state = Entity_State_Finalized;
+                break;
+            }
+
+            emit_entity(ent);
+            break;
+        }
     }
 
     b32 changed = ent->state != before_state;
@@ -756,6 +770,10 @@ int main(int argc, char *argv[]) {
     CompilerProgress compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
     switch (compile_opts.action) {
         case ONYX_COMPILE_ACTION_PRINT_HELP: bh_printf(docstring); return 1;
+
+        case ONYX_COMPILE_ACTION_CHECK:
+            compiler_progress = onyx_compile();
+            break;
 
         case ONYX_COMPILE_ACTION_COMPILE:
             compiler_progress = onyx_compile();

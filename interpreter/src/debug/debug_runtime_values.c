@@ -284,8 +284,7 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
         case debug_type_kind_structure:
             return t->structure.member_count;
         
-        // TEMPORARY this will be the array elements
-        case debug_type_kind_array: return 0;
+        case debug_type_kind_array: return t->array.count;
     }
 }
 
@@ -376,6 +375,37 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
         return;
     }
 
+    if (type->kind == debug_type_kind_array) {
+        builder->base_type = type->array.type;
+        builder->max_index = get_subvalues_for_type(builder, builder->base_type);
+
+        debug_type_info_t *sub_type = &builder->info->types[builder->base_type];
+
+        // Double buffering here so if there are multiple
+        // pointer descentions, the names don't get mangled.
+        static char name_buffer[2048];
+        static char tmp_buffer[2048];
+        snprintf(tmp_buffer, 2048, "[%d]", index);
+        strncpy(name_buffer, tmp_buffer, 2048);
+        builder->it_name = name_buffer;
+
+        if (builder->base_loc_kind == debug_sym_loc_register) {
+            ovm_value_t value;
+            if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                goto bad_case;
+            }
+
+            builder->base_loc_kind = debug_sym_loc_global;
+            builder->base_loc = value.u32 + sub_type->size * index;
+        }
+
+        else if (builder->base_loc_kind == debug_sym_loc_stack || builder->base_loc_kind == debug_sym_loc_global) {
+            builder->base_loc += sub_type->size * index;
+        }
+
+        return;
+    }
+
   bad_case:
     builder->base_loc_kind = debug_sym_loc_unknown;
     return;        
@@ -385,12 +415,12 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
     if (builder->it_index >= builder->max_index) return false;
 
     debug_type_info_t *type = &builder->info->types[builder->base_type];
+    static char name_buffer[2048];
+    static char tmp_buffer[2048];
 
     if (type->kind == debug_type_kind_modifier && type->modifier.modifier_kind == debug_type_modifier_kind_pointer) {
         // Double buffering here so if there are multiple
         // pointer descentions, the names don't get mangled.
-        static char name_buffer[2048];
-        static char tmp_buffer[2048];
         snprintf(tmp_buffer, 2048, "*%s", builder->it_name);
         strncpy(name_buffer, tmp_buffer, 2048);
 
@@ -420,6 +450,34 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
         if (builder->base_loc_kind == debug_sym_loc_global) {
             builder->it_loc_kind = debug_sym_loc_global;
             builder->it_loc = builder->base_loc + mem->offset;
+        }
+    }
+
+    if (type->kind == debug_type_kind_array) {
+        snprintf(tmp_buffer, 2048, "[%d]", builder->it_index);
+        strncpy(name_buffer, tmp_buffer, 2048);
+        builder->it_name = name_buffer;
+        builder->it_type = type->array.type;
+        builder->it_has_children = get_subvalues_for_type(builder, builder->it_type) > 0;
+
+        debug_type_info_t *sub_type = &builder->info->types[builder->it_type];
+
+        if (builder->base_loc_kind == debug_sym_loc_register) {
+            ovm_value_t value;
+            if (lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                builder->base_loc_kind = debug_sym_loc_global;
+                builder->base_loc = value.u32 + sub_type->size * builder->it_index;
+            }
+        }
+
+        if (builder->base_loc_kind == debug_sym_loc_stack) {
+            builder->it_loc_kind = debug_sym_loc_stack;
+            builder->it_loc = builder->base_loc + sub_type->size * builder->it_index;
+        }
+
+        if (builder->base_loc_kind == debug_sym_loc_global) {
+            builder->it_loc_kind = debug_sym_loc_global;
+            builder->it_loc = builder->base_loc + sub_type->size * builder->it_index;
         }
     }
 

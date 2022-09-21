@@ -13,7 +13,7 @@ CubeState :: struct {
 }
 
 #match hash.to_u32 (c: CubePos) -> u32 {
-    return 17 * c.x + 13 * c.y + 11 * c.z + 19 * c.w;
+    return 17 * c.x + 13 * c.y + 11 * c.z + 21 * c.w;
 }
 
 #operator == (a: CubePos, b: CubePos) -> bool {
