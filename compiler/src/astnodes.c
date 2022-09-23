@@ -802,6 +802,31 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         }
     }
 
+    //
+    // This is a SUPER RARE case. It is used when checking to
+    // see if the return value from a interface constraint is
+    // an instance of a type generic polymorphic structure.
+    // For example, converting to an iterator can be tested with:
+    //
+    //       IsIterable :: interface (t: $T) {
+    //           { t->AsIterator() } -> Iterator;
+    //       }
+    //
+    // Here, Iterator is a polymorphic type, and would normally
+    // not be allowed in any other expression. However, check_constraint
+    // has a special check to see if the above happens, and when
+    // it does, this case allows the types to pass correctly.
+    // Note, this should be the ONLY time this happens. All
+    // other uses of checking polymorphic structures against
+    // actual nodes strictly forbidden.
+    else if (type->kind == Type_Kind_PolyStruct) {
+        if (node_type->kind == Type_Kind_Struct) {
+            if (node_type->Struct.constructed_from->type_id == type->id) {
+                return TYPE_MATCH_SUCCESS;
+            }
+        }
+    }
+
     return TYPE_MATCH_FAILED;
 }
 

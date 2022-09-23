@@ -1685,6 +1685,11 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
     AstNode* symbol_node = make_node(AstNode, Ast_Kind_Symbol);
     symbol_node->token = expect_token(parser, Token_Type_Symbol);
 
+    AstNode *implicit_interface = NULL;
+    if (consume_token_if_next(parser, '/')) {
+        implicit_interface = (AstNode *) parse_factor(parser);
+    }
+
     **next_insertion = (AstType *) symbol_node;
     *next_insertion = NULL;
 
@@ -1692,6 +1697,7 @@ static void parse_polymorphic_variable(OnyxParser* parser, AstType*** next_inser
         bh_arr_push(pv, ((AstPolyParam) {
             .kind     = PPK_Poly_Type,
             .poly_sym = symbol_node,
+            .implicit_interface = implicit_interface,
 
             // These will be filled out by function_params()
             .type_expr = NULL,

@@ -175,6 +175,17 @@ static AstSolidifiedFunction generate_solidified_function(
     //                                             - brendanfh 2021/01/18
     u32 removed_params = 0;
     bh_arr_each(AstPolyParam, param, pp->poly_params) {
+        if (param->implicit_interface) {
+            AstConstraint *constraint = onyx_ast_node_new(context.ast_alloc, sizeof(AstConstraint), Ast_Kind_Constraint);
+            constraint->interface = (AstInterface *) param->implicit_interface;
+            constraint->token = constraint->interface->token;
+
+            bh_arr_new(global_heap_allocator, constraint->type_args, 1);
+            bh_arr_push(constraint->type_args, (AstType *) ast_clone(context.ast_alloc, param->poly_sym));
+
+            bh_arr_push(solidified_func.func->constraints.constraints, constraint);
+        }
+
         if (param->kind != PPK_Baked_Value) continue;
 
         bh_arr_deleten(solidified_func.func->params, param->idx - removed_params, 1);
@@ -956,6 +967,7 @@ b32 potentially_convert_function_to_polyproc(AstFunction *func) {
         AstPolyParam pp;
         pp.idx = apv->idx;
         pp.kind = PPK_Poly_Type;
+        pp.implicit_interface = NULL;
 
         AstPolyCallType* pcall = onyx_ast_node_new(context.ast_alloc, sizeof(AstPolyCallType), Ast_Kind_Poly_Call_Type);
         pcall->callee = *apv->replace;

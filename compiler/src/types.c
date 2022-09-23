@@ -80,6 +80,14 @@ void types_dump_type_info() {
     }
 }
 
+Type* type_lookup_by_id(u32 id) {
+    if (bh_imap_has(&type_map, id)) {
+        return (Type *) bh_imap_get(&type_map, id);
+    }
+
+    return NULL;
+}
+
 b32 types_are_compatible_(Type* t1, Type* t2, b32 recurse_pointers) {
     // NOTE: If they are pointing to the same thing,
     // it is safe to assume they are the same type

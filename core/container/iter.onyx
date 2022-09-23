@@ -28,9 +28,8 @@ package core.iter
 
 as_iterator :: #match {}
 
-#local __iterable_test :: macro (i: Iterator($V)) {}
 Iterable :: interface (t: $T) {
-    as_iterator(t) |> __iterable_test();
+    { as_iterator(t) } -> Iterator;
 }
 
 close :: (it: Iterator($T)) {
@@ -413,7 +412,7 @@ const :: (value: $T) -> Iterator(T) {
 enumerate :: #match #local {}
 
 #overload
-enumerate :: macro (it: $T, start_index: i32 = 0) -> #auto where Iterable(T) {
+enumerate :: macro (it: $T/Iterable, start_index: i32 = 0) => {
     as_iterator :: as_iterator
     enumerate :: enumerate
     return enumerate(as_iterator(it), start_index);
@@ -595,7 +594,7 @@ fold :: #match #local {}
 
 // @Cleanup // some way to shorten this would be nice
 #overload
-fold :: macro (it: $T, init: $R, combine: $S) -> #auto where Iterable(T) {
+fold :: macro (it: $T/Iterable, init: $R, combine: $S) => {
     fold :: fold
     return fold(as_iterator(it), init, combine);
 }
@@ -612,7 +611,7 @@ fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
 count :: #match #local {}
 
 #overload
-count :: macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+count :: macro (it: $T/Iterable, cond: $F) => {
     count :: count
     return count(as_iterator(it), cond);
 }
@@ -627,7 +626,7 @@ count :: (it: Iterator($T), cond: (T) -> bool) -> i32 {
 some :: #match #local {}
 
 #overload
-some :: macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+some :: macro (it: $T/Iterable, cond: $F) => {
     some :: some
     as_iterator :: as_iterator
     return some(as_iterator(it), cond);
@@ -642,7 +641,7 @@ some :: (it: Iterator($T), cond: (T) -> bool) -> bool {
 every :: #match #local {}
 
 #overload
-every :: macro (it: $T, cond: $F) -> #auto where Iterable(T) {
+every :: macro (it: $T/Iterable, cond: $F) => {
     every :: every
     as_iterator :: as_iterator
     return every(as_iterator(it), cond);
@@ -670,7 +669,7 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     distributor :: #match #local {}
 
     #overload
-    distributor :: macro (it: $T) -> #auto where Iterable(T) {
+    distributor :: macro (it: $T/Iterable) => {
         distributor :: distributor;
         as_iterator :: as_iterator;
         return distributor(as_iterator(it));
@@ -716,7 +715,7 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     parallel_for :: #match #local {}
 
     #overload
-    parallel_for :: macro (iterable: $I, thread_count: u32, thread_data: ^$Ctx, body: Code) where Iterable(I) {
+    parallel_for :: macro (iterable: $I/Iterable, thread_count: u32, thread_data: ^$Ctx, body: Code) {
         parallel_for :: parallel_for;
         as_iterator  :: as_iterator;
 

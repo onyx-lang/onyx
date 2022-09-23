@@ -2811,6 +2811,12 @@ CheckStatus check_constraint(AstConstraint *constraint) {
 
             constraint->scope = scope_create(context.ast_alloc, constraint->interface->entity->scope, constraint->token->pos);
 
+            if (bh_arr_length(constraint->type_args) != bh_arr_length(constraint->interface->params)) {
+                ERROR_(constraint->token->pos, "Wrong number of arguments given to interface. Expected %d, got %d.",
+                    bh_arr_length(constraint->interface->params),
+                    bh_arr_length(constraint->type_args));
+            }
+
             fori (i, 0, bh_arr_length(constraint->interface->params)) {
                 InterfaceParam *ip = &constraint->interface->params[i];
 
@@ -2858,7 +2864,28 @@ CheckStatus check_constraint(AstConstraint *constraint) {
 
                     ic->expected_type = type_build_from_ast(context.ast_alloc, ic->expected_type_expr);
                     if (ic->expected_type == NULL) {
-                        YIELD(ic->expected_type_expr->token->pos, "Waiting on expected type expression to be resolved.");
+                        //
+                        // To make interfaces easier to use, I wanted to have
+                        // the ability to easily specify the return type as a
+                        // polymorphic structure, without needing to support
+                        // some crazy syntax like "-> Iterator($V)". For this
+                        // reason, I allow you to say "-> Iterator" in the
+                        // expected return type. Normally type_build_from_ast
+                        // does not return an instance of a polymorphic structure.
+                        // This prevents needing to handle that case across
+                        // the entire compiler. HOWEVER, in this case I actually
+                        // do want to get the polymorphic structure type if
+                        // it was one. So, I check here to see if the expected_type_expr
+                        // node has a type_id assigned. If it does, then there
+                        // is a chance it is a polymorphic struct. This bypasses
+                        // the usual code and looks up the type directly, from
+                        // then it will be used in the TYPE_CHECK below.
+                        if (ic->expected_type_expr->type_id) {
+                            ic->expected_type = type_lookup_by_id(ic->expected_type_expr->type_id);
+
+                        } else {
+                            YIELD(ic->expected_type_expr->token->pos, "Waiting on expected type expression to be resolved.");
+                        }
                     }
 
                     TYPE_CHECK(&ic->expr, ic->expected_type) {

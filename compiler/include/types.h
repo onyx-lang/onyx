@@ -192,6 +192,7 @@ struct AstStructLiteral;
 
 void types_init();
 void types_dump_type_info();
+Type* type_lookup_by_id(u32 id);
 
 b32 types_are_compatible(Type* t1, Type* t2);
 u32 type_size_of(Type* type);

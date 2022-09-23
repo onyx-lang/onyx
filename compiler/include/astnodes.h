@@ -1179,6 +1179,9 @@ struct AstPolyParam {
 
     // Used for baked values. The expected type of the parameter.
     Type* type;
+
+    // Used to store interface specified with $T/Interface.
+    AstNode *implicit_interface;
 };
 
 struct AstPolySolution {
