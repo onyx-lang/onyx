@@ -16,6 +16,12 @@ package core.iter
     // this reason, most allocator also support allocating their data from the context's
     // allocator simply by passing that allocator as an arugment.
 
+    //
+    // BUG: This is not a thread-safe allocator!!
+    // Why not use context.temp_allocator?
+    //
+
+    /*
     iter_ring_buffer: [1024] u8;
     iter_ring: alloc.ring.RingState;
     iter_allocator: Allocator;
@@ -24,6 +30,7 @@ package core.iter
         iter_ring = alloc.ring.make(iter_ring_buffer);
         iter_allocator = alloc.as_allocator(^iter_ring);
     }
+    */
 }
 
 as_iterator :: #match {}
@@ -38,7 +45,7 @@ close :: (it: Iterator($T)) {
 
 filter :: #match #local {}
 #overload
-filter :: (it: Iterator($T), predicate: (T) -> bool, allocator := iter_allocator) -> Iterator(T) {
+filter :: (it: Iterator($T), predicate: (T) -> bool, allocator := context.temp_allocator) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         predicate: (T) -> bool;
@@ -77,7 +84,7 @@ filter :: (it: Iterator($T), predicate: (T) -> bool, allocator := iter_allocator
 }
 
 #overload
-filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocator := iter_allocator) -> Iterator(T) {
+filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocator := context.temp_allocator) -> Iterator(T) {
     FilterIterator :: struct (T: type_expr, Ctx: type_expr) {
         iterator:  Iterator(T);
         predicate: (T, Ctx) -> bool;
@@ -120,7 +127,7 @@ filter :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocator :
 map :: #match #local {}
 
 #overload
-map :: (it: Iterator($T), transform: (T) -> $R, allocator := iter_allocator) -> Iterator(R) {
+map :: (it: Iterator($T), transform: (T) -> $R, allocator := context.temp_allocator) -> Iterator(R) {
     MapIterator :: struct (T: type_expr, R: type_expr) {
         iterator:  Iterator(T);
         transform: (T) -> R;
@@ -152,7 +159,7 @@ map :: (it: Iterator($T), transform: (T) -> $R, allocator := iter_allocator) -> 
 }
 
 #overload
-map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R, allocator := iter_allocator) -> Iterator(R) {
+map :: (it: Iterator($T), ctx: $Ctx, transform: (T, Ctx) -> $R, allocator := context.temp_allocator) -> Iterator(R) {
     MapIterator :: struct (T: type_expr, R: type_expr, Ctx: type_expr) {
         iterator:  Iterator(T);
         transform: (T, Ctx) -> R;
@@ -209,7 +216,7 @@ take_one :: (it: Iterator($T), no_close := false) -> (T, bool) {
     return !cont;
 }
 
-take :: (it: Iterator($T), count: u32, allocator := iter_allocator) -> Iterator(T) {
+take :: (it: Iterator($T), count: u32, allocator := context.temp_allocator) -> Iterator(T) {
     TakeIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         remaining: u32;
@@ -240,7 +247,7 @@ take :: (it: Iterator($T), count: u32, allocator := iter_allocator) -> Iterator(
     };
 }
 
-take_while :: (it: Iterator($T), predicate: (T) -> bool, allocator := iter_allocator) -> Iterator(T) {
+take_while :: (it: Iterator($T), predicate: (T) -> bool, allocator := context.temp_allocator) -> Iterator(T) {
     TakeIterator :: struct (T: type_expr) {
         iterator:  Iterator(T);
         predicate: (T) -> bool;
@@ -271,7 +278,7 @@ take_while :: (it: Iterator($T), predicate: (T) -> bool, allocator := iter_alloc
     };
 }
 
-skip :: (it: Iterator($T), count: u32, allocator := iter_allocator) -> Iterator(T) {
+skip :: (it: Iterator($T), count: u32, allocator := context.temp_allocator) -> Iterator(T) {
     SkipIterator :: struct (T: type_expr) {
         iterator: Iterator(T);
         to_skip:  i32;
@@ -315,7 +322,7 @@ skip :: (it: Iterator($T), count: u32, allocator := iter_allocator) -> Iterator(
     second: R;
 }
 
-zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R), allocator := iter_allocator) -> Iterator(Zipped(T, R)) {
+zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R), allocator := context.temp_allocator) -> Iterator(Zipped(T, R)) {
     ZippedIterator :: struct (T: type_expr, R: type_expr) {
         iterator1: Iterator(T);
         iterator2: Iterator(R);
@@ -353,8 +360,8 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
         idx:   u32;
     }
 
-    c := new(Context(T), allocator=iter_allocator);
-    c.iters = memory.copy_slice(iters, allocator=iter_allocator);
+    c := new(Context(T), allocator=context.temp_allocator);
+    c.iters = memory.copy_slice(iters, allocator=context.temp_allocator);
     c.idx = 0;
 
     next :: (use c: ^Context($T)) -> (T, bool) {
@@ -395,7 +402,7 @@ const :: (value: $T) -> Iterator(T) {
         return *(cast(^T) data), true;
     }
 
-    allocated := cast(^T) raw_alloc(iter_allocator, sizeof T);
+    allocated := cast(^T) raw_alloc(context.temp_allocator, sizeof T);
     *allocated = value;
 
     return .{
@@ -425,7 +432,7 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
         current_index: i32;
     }
 
-    ec := make(Enumeration_Context(T), allocator=iter_allocator);
+    ec := make(Enumeration_Context(T), allocator=context.temp_allocator);
     ec.iterator = it;
     ec.current_index = start_index;
 
@@ -459,7 +466,7 @@ from_array :: (arr: [] $T) -> Iterator(^T) {
         current: u32;
     }
 
-    c := make(Context(T), allocator=iter_allocator);
+    c := make(Context(T), allocator=context.temp_allocator);
     c.data = arr.data;
     c.count = arr.count;
     c.current = 0;
@@ -487,7 +494,7 @@ as_iterator :: (x: ^[..] $T) -> Iterator(T) {
         current: u32;
     }
 
-    c := make(Context(T), allocator=iter_allocator);
+    c := make(Context(T), allocator=context.temp_allocator);
     c.arr = x;
     c.current = 0;
 
@@ -524,7 +531,7 @@ as_iterator :: (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
         current: u32;
     }
 
-    c := make(Context(T), allocator=iter_allocator);
+    c := make(Context(T), allocator=context.temp_allocator);
     c.arr = x;
     c.current = 0;
 
@@ -580,7 +587,7 @@ as_iterator :: (r: range) -> Iterator(i32) {
         }
     }
 
-    c := new(Context, allocator=iter_allocator);
+    c := new(Context, allocator=context.temp_allocator);
     c.r = r;
     c.v = r.low;
 
