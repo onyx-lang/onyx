@@ -129,7 +129,7 @@ stream_size :: (use s: ^Stream) -> i32 {
 //
 //      - You can pass an existing slice. The behavior of this
 //          buffer depend on the other arguments. If you set
-//          write_enabled to false, then writing will be allowed
+//          write_enabled to false, then writing will not be allowed
 //          into this buffer. This is good practice if you only
 //          plan on using the stream as a read-only output for
 //          io.Reader.  If you enable writing, then you can

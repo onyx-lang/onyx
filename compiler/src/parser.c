@@ -3231,7 +3231,7 @@ static void parse_top_level_statement(OnyxParser* parser) {
 
                     add_overload->precedence = bh_max(pre->value.l, 0);
                 } else {
-                    add_overload->precedence = 0;
+                    add_overload->precedence = parser->overload_count++;
                 }
 
                 parser->parse_calls = 0;
@@ -3486,6 +3486,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.stored_tags = NULL;
     parser.parse_calls = 1;
     parser.tag_depth = 0;
+    parser.overload_count = 0;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,

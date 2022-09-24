@@ -44,15 +44,15 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     // These need to have aliases because some of them like
     // 'delete', collide with the global 'delete', which
     // causes it to map to the wrong function.
-    init    :: (package core.map).init
-    has     :: (package core.map).has
-    get     :: (package core.map).get
-    get_ptr :: (package core.map).get_ptr
-    put     :: (package core.map).put
-    delete  :: (package core.map).delete
-    update  :: (package core.map).update
-    clear   :: (package core.map).clear
-    empty   :: (package core.map).empty
+    init    :: init
+    has     :: has
+    get     :: get
+    get_ptr :: get_ptr
+    put     :: put
+    delete  :: delete
+    update  :: update
+    clear   :: clear
+    empty   :: empty
 }
 
 make :: ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {

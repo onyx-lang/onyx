@@ -34,6 +34,13 @@ typedef struct OnyxParser {
 
     bh_arr(AstTyped *) stored_tags;
 
+    // Used to set default precedence of #overload options.
+    // This way, the precedence order of multiple #overload
+    // options in the same file is given to be the lexical
+    // order. This does not make any guarentees about #overloads
+    // in other files.
+    u32 overload_count;
+
     u16 tag_depth : 16;
 
     b32 hit_unexpected_token : 1;
