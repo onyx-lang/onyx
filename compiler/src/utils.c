@@ -191,6 +191,10 @@ AstNode* symbol_resolve(Scope* start_scope, OnyxToken* tkn) {
 }
 
 AstNode* try_symbol_raw_resolve_from_node(AstNode* node, char* symbol) {
+    // CLEANUP: I think this has a lot of duplication from get_scope_from_node.
+    // There are some additional cases handled here, but I think the majority
+    // of this code could be rewritten in terms of get_scope_from_node.
+
     b32 used_pointer = 0;
 
     while (1) {
@@ -238,6 +242,15 @@ all_types_peeled_off:
                 return NULL;
 
             return symbol_raw_resolve(fb->scope, symbol);
+        }
+
+        case Ast_Kind_Basic_Type: {
+            AstBasicType *bt = (AstBasicType *) node;
+
+            if (bt->scope == NULL)
+                return NULL;
+
+            return symbol_raw_resolve(bt->scope, symbol);
         }
 
         case Ast_Kind_Enum_Type: {
@@ -455,6 +468,8 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
 
             // return and not continue because if the overload that didn't have a type will
             // work in the future, then it has to take precedence over the other options available.
+            bh_imap_free(&all_overloads);
+            bh_arr_free(args.values);
             return (AstTyped *) &node_that_signals_a_yield;
         }
         assert(overload->type->kind == Type_Kind_Function);
@@ -473,6 +488,8 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
         }
 
         if (tm == TYPE_MATCH_YIELD) {
+            bh_imap_free(&all_overloads);
+            bh_arr_free(args.values);
             return (AstTyped *) &node_that_signals_a_yield;
         }
     }
@@ -1087,6 +1104,11 @@ all_types_peeled_off:
             return &package->package->scope;
         } 
 
+        case Ast_Kind_Basic_Type: {
+            AstBasicType* btype = (AstBasicType *) node;
+            return &btype->scope;
+        }
+
         case Ast_Kind_Enum_Type: {
             AstEnumType* etype = (AstEnumType *) node;
             return &etype->scope;
@@ -1126,8 +1148,10 @@ Scope *get_scope_from_node_or_create(AstNode *node) {
     // is used in other parts of the compiler for struct/enum
     // scopes?
     if (!*pscope) {
-        assert(node->token);
-        *pscope = scope_create(context.ast_alloc, NULL, node->token->pos);
+        OnyxFilePos pos = {0};
+        if (node->token) pos = node->token->pos;
+
+        *pscope = scope_create(context.ast_alloc, NULL, pos);
     }
 
     return *pscope;

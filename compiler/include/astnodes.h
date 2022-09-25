@@ -897,7 +897,7 @@ struct AstSwitch {
     Type* type
 struct AstType { AstType_base; };
 
-struct AstBasicType     { AstType_base; Type* basic_type; };
+struct AstBasicType     { AstType_base; Type* basic_type; Scope *scope; };
 struct AstPointerType   { AstType_base; AstType* elem; };
 struct AstArrayType     { AstType_base; AstType* elem; AstTyped *count_expr; };
 struct AstSliceType     { AstType_base; AstType* elem; };

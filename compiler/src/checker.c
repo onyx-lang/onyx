@@ -1671,14 +1671,6 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         return Check_Return_To_Symres;
     }
 
-    if (!type_is_structlike(field->expr->type)) {
-        ERROR_(field->token->pos,
-            "Cannot access field '%b' on '%s'. Type is not a struct.",
-            field->token->text,
-            field->token->length,
-            node_get_type_name(field->expr));
-    }
-
     // Optimization for (*foo).member.
     if (field->expr->kind == Ast_Kind_Dereference) {
         field->expr = ((AstDereference *) field->expr)->expr;
@@ -1696,6 +1688,15 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         }
     }
 
+    if (!type_is_structlike(field->expr->type)) {
+        /*ERROR_(field->token->pos,
+            "Cannot access field '%b' on '%s'. Type is not a struct.",
+            field->token->text,
+            field->token->length,
+            node_get_type_name(field->expr));*/
+        goto try_resolve_from_type;
+    }
+
     StructMember smem;
     if (!type_lookup_member(field->expr->type, field->field, &smem)) {
         if (field->expr->type->kind == Type_Kind_Array) {
@@ -1705,25 +1706,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
             }
         }
 
-        AstNode* n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
-
-        AstType* type_node = field->expr->type->ast_type;
-        if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
-
-        if (n) {
-            *pfield = (AstFieldAccess *) n;
-            return Check_Success;
-        }
-
-        if (!type_node) goto closest_not_found;
-
-        char* closest = find_closest_symbol_in_node((AstNode *) type_node, field->field);
-        if (closest) {
-            ERROR_(field->token->pos, "Field '%s' does not exists on '%s'. Did you mean '%s'?", field->field, node_get_type_name(field->expr), closest);
-        }
-
-      closest_not_found:
-        ERROR_(field->token->pos, "Field '%s' does not exists on '%s'.", field->field, node_get_type_name(field->expr));
+        goto try_resolve_from_type;
     }
 
     // NOTE: If this member was included into the structure through a "use x: ^T" kind of statement,
@@ -1748,6 +1731,28 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     field->type = smem.type;
     field->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
+
+    // TODO: DOCUMENT THIS WEIRD CASE
+  try_resolve_from_type:
+    AstNode* n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
+
+    AstType* type_node = field->expr->type->ast_type;
+    if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
+
+    if (n) {
+        *pfield = (AstFieldAccess *) n;
+        return Check_Success;
+    }
+
+    if (!type_node) goto closest_not_found;
+
+    char* closest = find_closest_symbol_in_node((AstNode *) type_node, field->field);
+    if (closest) {
+        ERROR_(field->token->pos, "Field '%s' does not exists on '%s'. Did you mean '%s'?", field->field, node_get_type_name(field->expr), closest);
+    }
+
+  closest_not_found:
+    ERROR_(field->token->pos, "Field '%s' does not exists on '%s'.", field->field, node_get_type_name(field->expr));
 }
 
 CheckStatus check_method_call(AstBinaryOp** pmcall) {
