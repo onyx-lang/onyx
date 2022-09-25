@@ -1689,11 +1689,6 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     }
 
     if (!type_is_structlike(field->expr->type)) {
-        /*ERROR_(field->token->pos,
-            "Cannot access field '%b' on '%s'. Type is not a struct.",
-            field->token->text,
-            field->token->length,
-            node_get_type_name(field->expr));*/
         goto try_resolve_from_type;
     }
 
@@ -1732,7 +1727,15 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     field->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
 
-    // TODO: DOCUMENT THIS WEIRD CASE
+    // Field access is the general term for "a.b". In the early stages of the language,
+    // a field access in the checker was only used for accessing a member on a struct.
+    // However, as the language matured, I decided to add looking up things inside of
+    // the static scope a struct, and then more and more places to look up symbol after
+    // you know the type of the expression. The code below tries to lookup the symbol
+    // within the type and/or node of the expression. On failure, it will yield, as
+    // there might be an `#inject` that will add a symbol later. When a cycle is
+    // detected however, it uses the levenschtein distance to find the closest symbol
+    // to the attempted lookup.
   try_resolve_from_type:
     AstNode* n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
 
@@ -1742,6 +1745,12 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     if (n) {
         *pfield = (AstFieldAccess *) n;
         return Check_Success;
+    }
+
+    if (!context.cycle_detected) {
+        // Skipping the slightly expensive symbol lookup
+        // below by not using YIELD_ERROR.
+        return Check_Yield_Macro;
     }
 
     if (!type_node) goto closest_not_found;
