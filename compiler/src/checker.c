@@ -248,6 +248,10 @@ CheckStatus check_for(AstFor* fornode) {
         error_loc = fornode->token->pos;
     }
 
+    // @HACK This should be built elsewhere...
+    builtin_range_type_type = type_build_from_ast(context.ast_alloc, builtin_range_type);
+    if (builtin_range_type_type == NULL) YIELD(fornode->token->pos, "Waiting for 'range' structure to be built.");
+
     fornode->loop_type = For_Loop_Invalid;
     if (types_are_compatible(iter_type, &basic_types[Basic_Kind_I32])) {
         if (fornode->by_pointer) {

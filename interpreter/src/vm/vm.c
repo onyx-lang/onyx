@@ -865,17 +865,17 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
             OVM_OP(OVMI_CLZ, OVM_TYPE_I8 , __builtin_clz, u8)
             OVM_OP(OVMI_CLZ, OVM_TYPE_I16, __builtin_clz, u16)
             OVM_OP(OVMI_CLZ, OVM_TYPE_I32, __builtin_clz, u32)
-            OVM_OP(OVMI_CLZ, OVM_TYPE_I64, __builtin_clz, u64)
+            OVM_OP(OVMI_CLZ, OVM_TYPE_I64, __builtin_clzll, u64)
 
             OVM_OP(OVMI_CTZ, OVM_TYPE_I8 , __builtin_ctz, u8)
             OVM_OP(OVMI_CTZ, OVM_TYPE_I16, __builtin_ctz, u16)
             OVM_OP(OVMI_CTZ, OVM_TYPE_I32, __builtin_ctz, u32)
-            OVM_OP(OVMI_CTZ, OVM_TYPE_I64, __builtin_ctz, u64)
+            OVM_OP(OVMI_CTZ, OVM_TYPE_I64, __builtin_ctzll, u64)
 
             OVM_OP(OVMI_POPCNT, OVM_TYPE_I8 , __builtin_popcount, u8)
             OVM_OP(OVMI_POPCNT, OVM_TYPE_I16, __builtin_popcount, u16)
             OVM_OP(OVMI_POPCNT, OVM_TYPE_I32, __builtin_popcount, u32)
-            OVM_OP(OVMI_POPCNT, OVM_TYPE_I64, __builtin_popcount, u64)
+            OVM_OP(OVMI_POPCNT, OVM_TYPE_I64, __builtin_popcountll, u64)
 
             OVM_OP(OVMI_ABS,     OVM_TYPE_F32, __ovm_abs, f32);
             OVM_OP(OVMI_NEG,     OVM_TYPE_F32, -, f32);
