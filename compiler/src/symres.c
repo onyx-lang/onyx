@@ -519,7 +519,21 @@ static SymresStatus symres_expression(AstTyped** expr) {
     }
 
     switch ((*expr)->kind) {
-        case Ast_Kind_Symbol: SYMRES(symbol, (AstNode **) expr); break;
+        case Ast_Kind_Symbol:
+            SYMRES(symbol, (AstNode **) expr);
+
+            // HACK?
+            // I don't know how I never ran into this problem before,
+            // but when a symbol is resolved, there is never a "double
+            // check" that its type node is symbol resolved as well.
+            // This only proved to be an issue when using constraint
+            // sentinels, so I only added that case here. This should
+            // maybe be considered in the future because I think this
+            // lack of double checking could be causing other bugs.
+            if ((*expr)->kind == Ast_Kind_Constraint_Sentinel) {
+                SYMRES(type, &(*expr)->type_node);
+            }
+            break;
 
         case Ast_Kind_Binary_Op:
             SYMRES(expression, &((AstBinaryOp *)(*expr))->left);
@@ -622,6 +636,12 @@ static SymresStatus symres_expression(AstTyped** expr) {
                 SYMRES(expression, expr);
             }
             break;
+
+        case Ast_Kind_Constraint_Sentinel: {
+            AstTyped *sentinel = (AstTyped *) *expr;
+            SYMRES(type, &sentinel->type_node);
+            break;
+        }
 
         default: break;
     }

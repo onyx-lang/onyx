@@ -1985,6 +1985,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             CHECK(directive_first, (AstDirectiveFirst *) expr);
             break;
 
+        case Ast_Kind_Constraint_Sentinel:
+            if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know constraint sentinel's type.");
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -1993,7 +1997,6 @@ CheckStatus check_expression(AstTyped** pexpr) {
         case Ast_Kind_Package: break;
         case Ast_Kind_Error: break;
         case Ast_Kind_Unary_Field_Access: break;
-        case Ast_Kind_Constraint_Sentinel: break;
         case Ast_Kind_Switch_Case: break;
         case Ast_Kind_Foreign_Block: break;
         case Ast_Kind_Zero_Value: break;
@@ -2844,6 +2847,16 @@ CheckStatus check_constraint(AstConstraint *constraint) {
 
                 symbol_introduce(constraint->scope, ip->value_token, (AstNode *) sentinel);
                 symbol_introduce(constraint->scope, ip->type_token, (AstNode *) type_alias);
+            }
+
+            fori (i, 0, bh_arr_length(constraint->interface->vars)) {
+                InterfaceVariable *iv = &constraint->interface->vars[i];
+
+                AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
+                sentinel->token = iv->symbol;
+                sentinel->type_node = iv->type;
+
+                symbol_introduce(constraint->scope, iv->symbol, (AstNode *) sentinel);
             }
 
             assert(constraint->entity);
