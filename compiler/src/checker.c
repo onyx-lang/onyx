@@ -1736,10 +1736,12 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     // there might be an `#inject` that will add a symbol later. When a cycle is
     // detected however, it uses the levenschtein distance to find the closest symbol
     // to the attempted lookup.
+    AstNode *n;
+    AstType *type_node;
   try_resolve_from_type:
-    AstNode* n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
+    n = try_symbol_raw_resolve_from_type(field->expr->type, field->field);
 
-    AstType* type_node = field->expr->type->ast_type;
+    type_node = field->expr->type->ast_type;
     if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
 
     if (n) {
