@@ -197,7 +197,7 @@ ends_with :: (s: str, suffix: str) -> bool {
     return true;
 }
 
-is_empty :: macro (s: str) => s.count == 0 || s.data == null;
+is_empty :: (s: str) => s.count == 0 || s.data == null;
 
 index_of :: (s: str, c: u8) -> i32 {
     for s.count {

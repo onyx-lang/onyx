@@ -37,6 +37,8 @@ package core
 #load "./runtime/default_link_options"
 #load "./arg_parse"
 
+#load "./test/testing"
+
 #local runtime :: package runtime
 #if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
     #load "./os/file"

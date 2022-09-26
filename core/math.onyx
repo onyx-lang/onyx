@@ -339,3 +339,23 @@ gcd :: (a: $T, b: T) -> T {
 lcm :: (a: $T, b: T) -> T {
     return (a * b) / gcd(a, b);
 }
+
+
+
+//
+// Tests
+//
+
+#if #defined(core.Running_Tests) {
+
+use core {test}
+
+@test.test.{"GCD works"}
+(t: ^test.T) {
+    t->assert(gcd(35, 18) == 1, "gcd(35, 18) == 1");
+    t->assert(gcd(35, 15) == 5, "gcd(35, 15) == 5");
+    t->assert(gcd(35, 21) == 7, "gcd(35, 21) == 7");
+    t->assert(gcd(35, 70) == 35, "gcd(35, 70) == 35");
+}
+
+}
