@@ -982,10 +982,10 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
                 VAL(instr.r).dtype = instr.stype; \
                 break;
 
-            OVM_IMM(OVM_TYPE_I8,  i8,  i)
-            OVM_IMM(OVM_TYPE_I16, i16, i)
-            OVM_IMM(OVM_TYPE_I32, i32, i)
-            OVM_IMM(OVM_TYPE_I64, i64, l)
+            OVM_IMM(OVM_TYPE_I8,  u8,  i)
+            OVM_IMM(OVM_TYPE_I16, u16, i)
+            OVM_IMM(OVM_TYPE_I32, u32, i)
+            OVM_IMM(OVM_TYPE_I64, u64, l)
             OVM_IMM(OVM_TYPE_F32, f32, f)
             OVM_IMM(OVM_TYPE_F64, f64, d)
 
@@ -1009,10 +1009,10 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
                 break; \
             }
 
-            OVM_LOAD(OVM_TYPE_I8,  i8)
-            OVM_LOAD(OVM_TYPE_I16, i16)
-            OVM_LOAD(OVM_TYPE_I32, i32)
-            OVM_LOAD(OVM_TYPE_I64, i64)
+            OVM_LOAD(OVM_TYPE_I8,  u8)
+            OVM_LOAD(OVM_TYPE_I16, u16)
+            OVM_LOAD(OVM_TYPE_I32, u32)
+            OVM_LOAD(OVM_TYPE_I64, u64)
             OVM_LOAD(OVM_TYPE_F32, f32)
             OVM_LOAD(OVM_TYPE_F64, f64)
 
@@ -1024,10 +1024,10 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
                 *(stype *) &((u8 *) engine->memory)[VAL(instr.r).u32 + (u32) instr.b] = VAL(instr.a).stype; \
                 break;
 
-            OVM_STORE(OVM_TYPE_I8,  i8)
-            OVM_STORE(OVM_TYPE_I16, i16)
-            OVM_STORE(OVM_TYPE_I32, i32)
-            OVM_STORE(OVM_TYPE_I64, i64)
+            OVM_STORE(OVM_TYPE_I8,  u8)
+            OVM_STORE(OVM_TYPE_I16, u16)
+            OVM_STORE(OVM_TYPE_I32, u32)
+            OVM_STORE(OVM_TYPE_I64, u64)
             OVM_STORE(OVM_TYPE_F32, f32)
             OVM_STORE(OVM_TYPE_F64, f64)
 

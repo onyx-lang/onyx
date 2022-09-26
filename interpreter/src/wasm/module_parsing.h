@@ -727,7 +727,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x41: {
-            long long value = leb128_to_int(ctx->binary.data, &ctx->offset);
+            i64 value = leb128_to_int(ctx->binary.data, &ctx->offset);
 
             // NOTE: This assumes a little-endian CPU as the address is assumes
             // to be the least significant byte.
@@ -736,7 +736,7 @@ static void parse_instruction(build_context *ctx) {
         }
 
         case 0x42: {
-            long long value = leb128_to_int(ctx->binary.data, &ctx->offset);
+            i64 value = leb128_to_int(ctx->binary.data, &ctx->offset);
             ovm_code_builder_add_imm(&ctx->builder, OVM_TYPE_I64, &value);
             break;
         }

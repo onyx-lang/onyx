@@ -1424,19 +1424,19 @@ u64 uleb128_to_uint(u8* bytes, i32 *byte_count) {
 }
 
 BH_DEF i64 leb128_to_int(u8* bytes, i32 *byte_count) {
-    i64 res = 0;
+    u64 res = 0;
     u64 shift = 0;
     u64 size = 64;
 
     u8 byte;
     do {
         byte = bytes[(*byte_count)++];
-        res |= (byte & 0x7f) << shift;
+        res |= ((u64) (byte & 0x7f)) << shift;
         shift += 7;
     } while ((byte & 0x80) != 0);
 
     if ((shift < size) && (byte & 0x40) != 0) {
-        i64 zero_shifted = ~ 0x0;
+        u64 zero_shifted = ~ 0x0;
         zero_shifted = zero_shifted << shift;
         return res | zero_shifted;
     }
