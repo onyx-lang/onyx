@@ -61,7 +61,7 @@ main :: (args) => {
     }
     printf("{}\n", sd.arr);
     printf("On the main thread: {}\n", partial_arr);
-    println(test);
+    println(test_var);
 }
 
 
