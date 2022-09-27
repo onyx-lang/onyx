@@ -3278,7 +3278,11 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 parser->parse_calls = 1;
 
                 if (peek_token(0)->type == '{') {
-                    assert(!parser->injection_point);
+                    if (parser->injection_point) {
+                        onyx_report_error(dir_token->pos, Error_Critical, "#inject blocks cannot be nested.");
+                        return;
+                    }
+
                     parser->injection_point = injection_point;
 
                     expect_token(parser, '{');
@@ -3387,6 +3391,11 @@ submit_binding_to_entities:
     {
         if (!binding) return;
 
+        //
+        // If this binding is inside an #inject block,
+        // swap the binding node for an injection node
+        // onto the injection point. This is the easiest
+        // way I could think of doing this.
         if (parser->injection_point) {
             AstInjection *injection = make_node(AstInjection, Ast_Kind_Injection);
             injection->token = parser->injection_point->token;
