@@ -24,6 +24,7 @@ Reader :: struct {
     greedy : bool;
 
     is_empty :: reader_empty;
+    empty    :: reader_empty;
     read_all :: read_all;
     read_byte :: read_byte;
     unread_byte :: unread_byte;

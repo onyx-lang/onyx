@@ -761,6 +761,13 @@ CheckStatus check_call(AstCall** pcall) {
         return Check_Return_To_Symres;
     }
 
+    if (callee->kind == Ast_Kind_Function && callee->deprecated_warning) {
+        onyx_report_warning(callee->token->pos, "Calling a deprecated function: %b",
+            callee->deprecated_warning->token->text, callee->deprecated_warning->token->length);
+
+        onyx_report_warning(call->token->pos, "Here is where the deprecated function was called.");
+    }
+
     return Check_Success;
 }
 
@@ -1758,7 +1765,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     // constraints relay on Check_Error being returned, not Check_Yield_Macro. For
     // this reason, I have to produce an error at the last minute, BEFORE the loop
     // enters a cycle detected state, when there is no point of return.
-    if (!context.cycle_almost_detected) {
+    if (!context.cycle_almost_detected && !context.cycle_detected) {
         // Skipping the slightly expensive symbol lookup
         // below by not using YIELD_ERROR.
         return Check_Yield_Macro;
@@ -2430,15 +2437,14 @@ CheckStatus check_struct_defaults(AstStructType* s_node) {
 }
 
 CheckStatus check_temp_function_header(AstFunction* func) {
-    CheckStatus cs = check_function_header(func);
-    if (cs == Check_Error) {
-        if (func->flags & Ast_Flag_Header_Check_No_Error) {
-            onyx_clear_errors();
-        }
-
-        return Check_Failed;
+    if (func->flags & Ast_Flag_Header_Check_No_Error) {
+        onyx_errors_disable();
     }
 
+    CheckStatus cs = check_function_header(func);
+    onyx_errors_enable();
+
+    if (cs == Check_Error)  return Check_Failed;
     if (cs != Check_Success) return cs;
 
     return Check_Complete;
@@ -2542,6 +2548,13 @@ CheckStatus check_function_header(AstFunction* func) {
     }
 
     if (func->return_type != NULL) CHECK(type, &func->return_type);
+
+    if (func->deprecated_warning) {
+        CHECK(expression, (AstTyped **) &func->deprecated_warning);
+        if (func->deprecated_warning->kind != Ast_Kind_StrLit) {
+            ERROR(func->token->pos, "Expected deprecation warning to be a string literal.");
+        }
+    }
 
     func->type = type_build_function_type(context.ast_alloc, func);
     if (func->type == NULL) YIELD(func->token->pos, "Waiting for function type to be constructed");
@@ -2878,12 +2891,14 @@ CheckStatus check_constraint(AstConstraint *constraint) {
         }
 
         case Constraint_Phase_Checking_Expressions: {
+            onyx_errors_disable();
+
             fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
                 InterfaceConstraint* ic = &constraint->exprs[i];
 
                 CheckStatus cs = check_expression(&ic->expr);
                 if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
-                    onyx_clear_errors();
+                    onyx_errors_enable();
                     return cs;
                 }
 
@@ -2898,6 +2913,7 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 if (ic->expected_type_expr) {
                     cs = check_type(&ic->expected_type_expr);
                     if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
+                        onyx_errors_enable();
                         return cs;
                     }
 
@@ -2923,6 +2939,7 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                             ic->expected_type = type_lookup_by_id(ic->expected_type_expr->type_id);
 
                         } else {
+                            onyx_errors_enable();
                             YIELD(ic->expected_type_expr->token->pos, "Waiting on expected type expression to be resolved.");
                         }
                     }
@@ -2937,19 +2954,19 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 continue;
 
               constraint_error:
-                // HACK HACK HACK
-                onyx_clear_errors();
+                onyx_errors_enable();
                 *constraint->report_status = Constraint_Check_Status_Failed;
                 return Check_Failed;
             }
 
             // HACK HACK HACK
-            onyx_clear_errors();
+            onyx_errors_enable();
             *constraint->report_status = Constraint_Check_Status_Success;
             return Check_Complete;
         }
     }
 
+    onyx_errors_enable();
     return Check_Success;
 }
 

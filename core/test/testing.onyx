@@ -73,13 +73,13 @@ run_tests :: (packages: [] package_id = .[], log := true) -> bool {
         if failed_cases.count > 0 do printf("Failing test cases:\n");
 
         for failed_cases {
-            printf("[{}]\n", it.name if !string.is_empty(it.name) else "Unnamed test");
+            printf("[{}]\n", it.name if !string.empty(it.name) else "Unnamed test");
 
             for ^ it.assertions {
                 if it.passed do continue;
 
                 printf("    {} at {}:{}\n",
-                    it.name if !string.is_empty(it.name) else "Unnamed assertion",
+                    it.name if !string.empty(it.name) else "Unnamed assertion",
                     it.loc.file, it.loc.line);
             }
         }

@@ -494,7 +494,7 @@ attempt_remove_native_library :: (package_folder: str) -> bool {
         result, error := parse_ini_file(^r, ^inner_config);
 
         if result != .Success do return false;
-        if string.is_empty(inner_config.native_library.library) do return false;
+        if string.empty(inner_config.native_library.library) do return false;
 
         os.remove_file(tprintf("{}/{}{}", config.config.lib_bin_directory, inner_config.native_library.library, native_library_suffix));
     }
@@ -528,7 +528,7 @@ run_native_library_installation :: (folder: str) -> bool {
         result, error := parse_ini_file(^r, ^inner_config);
 
         if result != .Success do return false;
-        if string.is_empty(inner_config.native_library.build_cmd) do return true;
+        if string.empty(inner_config.native_library.build_cmd) do return true;
 
         args := string.split(inner_config.native_library.build_cmd, #char " ", context.temp_allocator);
         cmd  := args[0];
@@ -873,7 +873,7 @@ Config :: struct {
 
 load_config_file :: () -> bool {
     file_data := os.get_contents(global_arguments.config_file);
-    if string.is_empty(file_data) {
+    if string.empty(file_data) {
         return false;
     }
 

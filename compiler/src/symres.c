@@ -1133,6 +1133,10 @@ SymresStatus symres_function_header(AstFunction* func) {
 
     SYMRES(type, &func->return_type);
 
+    if (func->deprecated_warning) {
+        SYMRES(expression, (AstTyped **) &func->deprecated_warning);
+    }
+
     scope_leave();
 
     return Symres_Success;
@@ -1598,12 +1602,12 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
         if (param->local->type_node != NULL) {
             resolved_a_symbol = 0;
 
+            onyx_errors_disable();
             param->local->flags |= Ast_Flag_Symbol_Invisible;
             symres_type(&param->local->type_node);
             param->local->flags &= ~Ast_Flag_Symbol_Invisible;
-
-            onyx_clear_errors();
-
+            onyx_errors_enable();
+            
             if (resolved_a_symbol) query->successful_symres = 1;
         }
     }

@@ -1251,6 +1251,8 @@ struct AstFunction {
 
     bh_arr(AstTyped *) tags;
 
+    AstStrLit *deprecated_warning;
+
     // Polymorphic procedures use the following fields
     Scope *parent_scope_of_poly_proc;
     bh_arr(AstPolyParam) poly_params;

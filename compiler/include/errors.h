@@ -33,6 +33,8 @@ typedef struct OnyxErrors {
 extern OnyxErrors msgs;
 
 void onyx_errors_init(bh_arr(bh_file_contents)* files);
+void onyx_errors_enable();
+void onyx_errors_disable();
 void onyx_submit_error(OnyxError error);
 void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...);
 void onyx_submit_warning(OnyxError error);

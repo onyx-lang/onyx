@@ -609,6 +609,10 @@ static i32 onyx_compile() {
         }
 #endif
 
+        // Mostly a preventative thing to ensure that even if somehow
+        // errors were left disabled, they are re-enabled in this cycle.
+        onyx_errors_enable();
+
         entity_heap_remove_top(&context.entities);
         b32 changed = process_entity(ent);
 
@@ -656,6 +660,7 @@ static i32 onyx_compile() {
             entity_heap_insert_existing(&context.entities, ent);
     }
 
+    onyx_errors_print();
     u64 duration = bh_time_duration(start_time);
 
     if (context.options->verbose_output > 0) {
@@ -798,7 +803,6 @@ int main(int argc, char *argv[]) {
 
     switch (compiler_progress) {
         case ONYX_COMPILER_PROGRESS_ERROR:
-            onyx_errors_print();
             break;
 
         case ONYX_COMPILER_PROGRESS_FAILED_OUTPUT:

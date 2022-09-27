@@ -2,6 +2,7 @@
 #include "utils.h"
 
 OnyxErrors errors;
+static b32 errors_enabled = 1;
 
 void onyx_errors_init(bh_arr(bh_file_contents)* files) {
     errors.file_contents = files;
@@ -84,8 +85,25 @@ void onyx_errors_print() {
     }
 }
 
+void onyx_errors_enable() {
+    errors_enabled = 1;
+}
+
+void onyx_errors_disable() {
+    if (context.cycle_detected) {
+        errors_enabled = 1;
+        return;
+    }
+    
+    errors_enabled = 0;
+}
+
 b32 onyx_has_errors() {
-    return bh_arr_length(errors.errors) > 0;
+    bh_arr_each(OnyxError, err, errors.errors) {
+        if (err->rank >= Error_Waiting_On) return 1;
+    }
+
+    return 0;
 }
 
 void onyx_clear_errors() {
@@ -95,10 +113,13 @@ void onyx_clear_errors() {
 }
 
 void onyx_submit_error(OnyxError error) {
+    if (!errors_enabled) return;
+
     bh_arr_push(errors.errors, error);
 }
 
 void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) {
+    if (!errors_enabled) return;
 
     va_list vargs;
     va_start(vargs, format);
@@ -115,6 +136,8 @@ void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...) 
 }
 
 void onyx_submit_warning(OnyxError error) {
+    if (!errors_enabled) return;
+
     bh_file_contents file_contents = { 0 };
     bh_arr_each(bh_file_contents, fc, *errors.file_contents) {
         if (!strcmp(fc->filename, error.pos.filename)) {
@@ -128,6 +151,8 @@ void onyx_submit_warning(OnyxError error) {
 
 // This definitely doesn't do what I thought it did?
 void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
+    if (!errors_enabled) return;
+
     va_list vargs;
     va_start(vargs, format);
     char* msg = bh_bprintf_va(format, vargs);
@@ -136,7 +161,7 @@ void onyx_report_warning(OnyxFilePos pos, char* format, ...) {
     OnyxError err = {
         .pos = pos,
         .rank = Error_Warning,
-        .text = msg,
+        .text = bh_strdup(errors.msg_alloc, msg),
     };
 
     bh_arr_push(errors.errors, err);
