@@ -654,13 +654,19 @@ static i32 onyx_compile() {
             context.cycle_almost_detected = 0;
         }
 
-        if (onyx_has_errors()) return ONYX_COMPILER_PROGRESS_ERROR;
+        if (onyx_has_errors()) {
+            onyx_errors_print();
+            return ONYX_COMPILER_PROGRESS_ERROR;
+        }
 
         if (ent->state != Entity_State_Finalized && ent->state != Entity_State_Failed)
             entity_heap_insert_existing(&context.entities, ent);
     }
 
+    //
+    // There should not be any errors printing here, but there might be warnings.
     onyx_errors_print();
+
     u64 duration = bh_time_duration(start_time);
 
     if (context.options->verbose_output > 0) {

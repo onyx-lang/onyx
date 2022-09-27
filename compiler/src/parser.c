@@ -3272,18 +3272,31 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 return;
             }
             else if (parse_possible_directive(parser, "inject")) {
-                AstInjection *inject = make_node(AstInjection, Ast_Kind_Injection);
-                inject->token = dir_token;
-
+                AstTyped *injection_point;
                 parser->parse_calls = 0;
-                inject->full_loc = parse_expression(parser, 0);
+                injection_point = parse_expression(parser, 0);
                 parser->parse_calls = 1;
+
+                if (peek_token(0)->type == '{') {
+                    assert(!parser->injection_point);
+                    parser->injection_point = injection_point;
+
+                    expect_token(parser, '{');
+                    parse_top_level_statements_until(parser, '}');
+                    expect_token(parser, '}');
+
+                    parser->injection_point = NULL;
+                    return;
+                }
 
                 // See comment above
                 if (next_tokens_are(parser, 2, ':', ':')) {
                     consume_tokens(parser, 2);
                 }
 
+                AstInjection *inject = make_node(AstInjection, Ast_Kind_Injection);
+                inject->token = dir_token;
+                inject->full_loc = injection_point;
                 inject->to_inject = parse_top_level_expression(parser);
                 
                 ENTITY_SUBMIT(inject);
@@ -3373,6 +3386,17 @@ static void parse_top_level_statement(OnyxParser* parser) {
 submit_binding_to_entities:
     {
         if (!binding) return;
+
+        if (parser->injection_point) {
+            AstInjection *injection = make_node(AstInjection, Ast_Kind_Injection);
+            injection->token = parser->injection_point->token;
+            injection->dest = parser->injection_point;
+            injection->symbol = binding->token;
+            injection->to_inject = (AstTyped *) binding->node;
+
+            ENTITY_SUBMIT(injection);
+            return;
+        }
 
         Scope* target_scope = parser->package->scope;
 
@@ -3504,6 +3528,7 @@ OnyxParser onyx_parser_create(bh_allocator alloc, OnyxTokenizer *tokenizer) {
     parser.parse_calls = 1;
     parser.tag_depth = 0;
     parser.overload_count = 0;
+    parser.injection_point = NULL;
 
     parser.polymorph_context = (PolymorphicContext) {
         .root_node = NULL,

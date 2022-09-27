@@ -34,6 +34,12 @@ typedef struct OnyxParser {
 
     bh_arr(AstTyped *) stored_tags;
 
+    // NOTE: When inside of an #inject block, this is set to the node
+    // that should have the symbols injected onto it. If this is non-
+    // NULL, then top-level binding nodes are converted into injects
+    // onto this node.
+    AstTyped *injection_point;
+
     // Used to set default precedence of #overload options.
     // This way, the precedence order of multiple #overload
     // options in the same file is given to be the lexical
