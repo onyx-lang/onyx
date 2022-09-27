@@ -722,6 +722,7 @@ static i32 output_onyx_libraries_section(OnyxWasmModule* module, bh_buffer* buff
     return buff->length - prev_len;
 }
 
+/*
 static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* buff) {
     i32 prev_len = buff->length;
 
@@ -762,6 +763,7 @@ static i32 output_onyx_func_offset_section(OnyxWasmModule* module, bh_buffer* bu
 
     return buff->length - prev_len;
 }
+*/
 
 #ifdef ENABLE_DEBUG_INFO
 static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
@@ -1050,7 +1052,7 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
 
     // TODO: Consider if this should always be included?
     // It can amount to a lot of extra data.
-    output_onyx_func_offset_section(module, buffer);
+    // output_onyx_func_offset_section(module, buffer);
 }
 
 void onyx_wasm_module_write_to_file(OnyxWasmModule* module, bh_file file) {

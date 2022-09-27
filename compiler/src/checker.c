@@ -1753,7 +1753,12 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         return Check_Success;
     }
 
-    if (!context.cycle_detected) {
+    //
+    // This has to be cycle_almost_detected, not cycle_detected, because interface
+    // constraints relay on Check_Error being returned, not Check_Yield_Macro. For
+    // this reason, I have to produce an error at the last minute, BEFORE the loop
+    // enters a cycle detected state, when there is no point of return.
+    if (!context.cycle_almost_detected) {
         // Skipping the slightly expensive symbol lookup
         // below by not using YIELD_ERROR.
         return Check_Yield_Macro;
@@ -2878,6 +2883,7 @@ CheckStatus check_constraint(AstConstraint *constraint) {
 
                 CheckStatus cs = check_expression(&ic->expr);
                 if (cs == Check_Return_To_Symres || cs == Check_Yield_Macro) {
+                    onyx_clear_errors();
                     return cs;
                 }
 
