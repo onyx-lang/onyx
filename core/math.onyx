@@ -340,6 +340,43 @@ lcm :: (a: $T, b: T) -> T {
     return (a * b) / gcd(a, b);
 }
 
+is_nan :: #match #local {}
+
+#overload
+is_nan :: (x: f32) -> bool {
+    v := x;
+    i := *cast(^u32) ^v;
+    return (i & 0x7f800000) == 0x7f800000
+        && (i & 0x007fffff) != 0;
+}
+
+#overload
+is_nan :: (x: f64) -> bool {
+    v := x;
+    i := *cast(^u64) ^v;
+    return (i & 0x7ff0000000000000) == 0x7ff0000000000000
+        && (i & 0x000fffffffffffff) != 0;
+}
+
+
+is_inf :: #match #local {}
+
+#overload
+is_inf :: (x: f32) -> bool {
+    v := x;
+    i := *cast(^u32) ^v;
+    return (i & 0x7f800000) == 0x7f800000
+        && (i & 0x007fffff) == 0;
+}
+
+#overload
+is_inf :: (x: f64) -> bool {
+    v := x;
+    i := *cast(^u64) ^v;
+    return (i & 0x7ff0000000000000) == 0x7ff0000000000000
+        && (i & 0x000fffffffffffff) == 0;
+}
+
 
 
 //

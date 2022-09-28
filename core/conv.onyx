@@ -281,7 +281,16 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 // This is better than what used to be, but still relies on converting the integer
 // part of the float to an integer, which could overflow.
 f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
-    math :: package core.math
+    math :: package core.math;
+
+    if math.is_nan(f) {
+        return format(buf, "NaN");
+    }
+
+    if math.is_inf(f) {
+        if f > 0 do return format(buf, "Inf");
+        else     do return format(buf, "-Inf");
+    }
 
     len := 0;
 
