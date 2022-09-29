@@ -451,8 +451,11 @@ static SymresStatus symres_method_call(AstBinaryOp** mcall) {
         (*mcall)->flags |= Ast_Flag_Has_Been_Symres;
     }
 
-    assert((*mcall)->right->kind == Ast_Kind_Call);
     SYMRES(expression, (AstTyped **) &(*mcall)->right);
+
+    if ((*mcall)->right->kind != Ast_Kind_Call) {
+        *mcall = (AstBinaryOp *) (*mcall)->right;
+    }
 
     return Symres_Success;
 }

@@ -1728,6 +1728,7 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         new_access->type = containing_member.type;
         new_access->expr = field->expr;
         new_access->flags |= Ast_Flag_Has_Been_Checked;
+        new_access->flags |= Ast_Flag_Extra_Field_Access;
 
         field->expr = (AstTyped *) new_access;
     }
@@ -1810,12 +1811,19 @@ CheckStatus check_method_call(AstBinaryOp** pmcall) {
         bh_arr_insertn(call_node->args.values, 0, 1);
         call_node->args.values[0] = implicit_argument;
 
-        *pmcall = (AstBinaryOp *) mcall->right;
         mcall->right->next = mcall->next;
         mcall->flags |= Ast_Flag_Has_Been_Checked;
     }
 
-    CHECK(call, (AstCall **) pmcall);
+    CHECK(call, (AstCall **) &mcall->right);
+
+    if (mcall->right->kind != Ast_Kind_Call) {
+        *pmcall = (AstBinaryOp *) mcall->right;
+
+    } else {
+        mcall->type = mcall->right->type;
+    }
+
     return Check_Success;
 }
 

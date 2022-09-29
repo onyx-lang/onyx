@@ -1285,6 +1285,14 @@ AstLocal* make_local(bh_allocator a, OnyxToken* token, AstType* type_node) {
     return local;
 }
 
+AstLocal* make_local_with_type(bh_allocator a, OnyxToken* token, Type* type) {
+    AstLocal* local = onyx_ast_node_new(a, sizeof(AstLocal), Ast_Kind_Local);
+    local->token = token;
+    local->type = type;
+
+    return local;
+}
+
 AstNode* make_symbol(bh_allocator a, OnyxToken* sym) {
     AstNode* symbol = onyx_ast_node_new(a, sizeof(AstNode), Ast_Kind_Symbol);
     symbol->token = sym;

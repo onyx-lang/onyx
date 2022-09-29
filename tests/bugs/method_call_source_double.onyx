@@ -1,0 +1,36 @@
+#load "core/std"
+
+use core
+
+Foo :: struct {
+    use vtable: ^VTable;
+    x: u32;
+
+    VTable :: struct {
+        f: (^Foo) -> void;
+    }
+}
+
+good_foo := Foo.VTable.{
+    f = (f) => {
+        println("FOOOO!!!");
+        println(f.x);
+    }
+}
+
+make_foo :: () -> Foo {
+    foo : Foo;
+    foo.vtable = ^good_foo;
+    foo.x = 1234;
+
+    printf("Made foo!\n");
+    return foo;
+}
+
+main :: () {
+    foo := make_foo();
+    foo->f();
+
+    Foo.{^good_foo, 5678}->f();
+}
+

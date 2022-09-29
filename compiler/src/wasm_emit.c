@@ -709,7 +709,7 @@ EMIT_FUNC(local_allocation, AstTyped* stmt) {
     u64 local_idx = local_allocate(mod->local_alloc, stmt);
     bh_imap_put(&mod->local_map, (u64) stmt, local_idx);
 
-    if (local_is_wasm_local(stmt)) {
+    if (stmt->token && local_is_wasm_local(stmt)) {
         debug_introduce_symbol(mod, stmt->token, DSL_REGISTER, local_idx, stmt->type);
     } else {
         debug_introduce_symbol(mod, stmt->token, DSL_STACK, local_idx, stmt->type);
@@ -2080,6 +2080,78 @@ EMIT_FUNC(call, AstCall* call) {
     *pcode = code;
 }
 
+EMIT_FUNC(method_call, AstBinaryOp *mcall) {
+    AstCall *call_node = (AstCall *) mcall->right;
+
+    //
+    // This this is calling a function directly, just emit the call.
+    if (call_node->callee->kind == Ast_Kind_Function) {
+        emit_call(mod, pcode, call_node);
+        return;
+    }
+
+    //
+    // If this method call is anything more complicated, there should
+    // be a field access for the call's callee node.
+    assert(call_node->callee->kind == Ast_Kind_Field_Access);
+
+    bh_arr(WasmInstruction) code = *pcode;
+
+    AstFieldAccess *fa      = (AstFieldAccess *) call_node->callee;
+    AstFieldAccess **object = (AstFieldAccess **) &fa->expr;
+
+    //
+    // If this field access has another field access from a use
+    // by pointer member, descend into that structure.
+    if (fa->expr->flags & Ast_Flag_Extra_Field_Access) {
+        object = (AstFieldAccess**) &(*object)->expr;
+    }
+
+    //
+    // Create a local variable to store the result of the lookup.
+    AstLocal *tmp_local = make_local_with_type(context.ast_alloc, NULL, (*object)->type);
+    tmp_local->flags |= Ast_Flag_Decl_Followed_By_Init;
+    emit_local_allocation(mod, &code, (AstTyped *) tmp_local);
+
+    //
+    // Lookup information about the local variable.
+    u64 tmp_local_idx = bh_imap_get(&mod->local_map, (u64) tmp_local);
+    b32 tmp_is_wasm_local = (b32) ((tmp_local_idx & LOCAL_IS_WASM) != 0);
+    u64 offset = 0;
+
+    //
+    // Do the common assignment pattern found everywhere else.
+    if (!tmp_is_wasm_local) emit_local_location(mod, &code, tmp_local, &offset);
+
+    emit_expression(mod, &code, *object);
+
+    if (!tmp_is_wasm_local) emit_store_instruction(mod, &code, tmp_local->type, offset);
+    else                    WIL(mcall->token, WI_LOCAL_SET, tmp_local_idx);
+
+    //
+    // Replace the field access with the local variable
+    *object = (AstFieldAccess *) tmp_local;
+
+    //
+    // Replace the first argument of the function with a field access.
+    // If the first argument was an implicit address of, take the address
+    // of the local variable.
+    AstArgument *first_arg = (AstArgument *) call_node->args.values[0];
+    if (first_arg->value->kind == Ast_Kind_Address_Of && ((AstAddressOf *) first_arg->value)->can_be_removed) {
+        first_arg->value = (AstTyped *) make_address_of(context.ast_alloc, (AstTyped *) tmp_local);
+    } else {
+        first_arg->value = (AstTyped *) tmp_local;
+    }
+    
+    //
+    // Actually emit the function call.
+    emit_call(mod, &code, call_node);
+
+    *pcode = code;
+}
+
+
+
 // BUG: This implementation assumes that the host system C's implementation is using
 // little endian integers.
 #define SIMD_INT_CONST_INTRINSIC(type, count) { \
@@ -3162,6 +3234,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Binary_Op:      emit_binop(mod, &code, (AstBinaryOp *) expr); break;
         case Ast_Kind_Unary_Op:       emit_unaryop(mod, &code, (AstUnaryOp *) expr); break;
         case Ast_Kind_Alias:          emit_expression(mod, &code, ((AstAlias *) expr)->alias); break;
+        case Ast_Kind_Method_Call:    emit_method_call(mod, &code, (AstBinaryOp *) expr); break;
 
         case Ast_Kind_Address_Of: {
             AstAddressOf* aof = (AstAddressOf *) expr;
