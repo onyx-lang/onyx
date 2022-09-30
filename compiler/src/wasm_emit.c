@@ -2123,7 +2123,7 @@ EMIT_FUNC(method_call, AstBinaryOp *mcall) {
     // Do the common assignment pattern found everywhere else.
     if (!tmp_is_wasm_local) emit_local_location(mod, &code, tmp_local, &offset);
 
-    emit_expression(mod, &code, *object);
+    emit_expression(mod, &code, (AstTyped *) *object);
 
     if (!tmp_is_wasm_local) emit_store_instruction(mod, &code, tmp_local->type, offset);
     else                    WIL(mcall->token, WI_LOCAL_SET, tmp_local_idx);

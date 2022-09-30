@@ -2469,7 +2469,11 @@ CheckStatus check_function_header(AstFunction* func) {
 
     if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
         func->constraints.produce_errors = (func->flags & Ast_Flag_Header_Check_No_Error) == 0;
-        CHECK(constraint_context, &func->constraints, func->scope, func->token->pos);
+
+        OnyxToken *tkn = func->token;
+        if (func->generated_from) tkn = func->generated_from;
+
+        CHECK(constraint_context, &func->constraints, func->scope, tkn->pos);
 
         // All constraints have been met. Return to symbol resolution to finish
         // looking up all symbols in the function.

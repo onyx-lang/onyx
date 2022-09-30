@@ -768,113 +768,67 @@ static SymresStatus symres_switch(AstSwitch* switchnode) {
     return Symres_Success;
 }
 
-// CLEANUP: A lot of duplication going on in this function. A proper
-// "namespace" concept would be useful to remove a lot of the fluff
-// code here. There already is try_resolve_symbol_from_node which
-// may be able to do what is needed here?
 static SymresStatus symres_use(AstUse* use) {
     SYMRES(expression, &use->expr);
 
     AstTyped *use_expr = (AstTyped *) strip_aliases((AstNode *) use->expr);
+
+    Scope* used_scope = NULL;
 
     // :EliminatingSymres
     if (use_expr->kind == Ast_Kind_Package) {
         AstPackage* package = (AstPackage *) use_expr;
         SYMRES(package, package);
 
-        if (package->package->scope == curr_scope) return Symres_Success;
-
-        if (use->only == NULL) {
-            OnyxFilePos pos = { 0 };
-            if (use->token != NULL)
-                pos = use->token->pos;
-
-            scope_include(curr_scope, package->package->scope, pos);
-
-        } else {
-            bh_arr_each(QualifiedUse, qu, use->only) {
-                AstNode* thing = symbol_resolve(package->package->scope, qu->symbol_name);
-                if (thing == NULL) { // :SymresStall
-                    if (report_unresolved_symbols) {
-                        onyx_report_error(qu->symbol_name->pos, Error_Critical, 
-                                "The symbol '%b' was not found in this package.",
-                                qu->symbol_name->text, qu->symbol_name->length);
-                        return Symres_Error;
-                    } else {
-                        return Symres_Yield_Macro;
-                    }
-                }
-
-                symbol_introduce(curr_scope, qu->as_name, thing);
-            }
-        }
-
         if (!use->entity) {
             add_entities_for_node(NULL, (AstNode *) use, curr_scope, NULL);
         }
 
         package_track_use_package(package->package, use->entity);
-        return Symres_Success;
+        used_scope = package->package->scope;
     }
 
     if (use_expr->kind == Ast_Kind_Foreign_Block) {
         AstForeignBlock* fb = (AstForeignBlock *) use_expr;
         if (fb->entity->state <= Entity_State_Resolve_Symbols) return Symres_Yield_Macro;
 
-        if (fb->scope == curr_scope) return Symres_Success;
-
-        if (use->only == NULL) {
-            OnyxFilePos pos = { 0 };
-            if (use->token != NULL)
-                pos = use->token->pos;
-
-            scope_include(curr_scope, fb->scope, pos);
-
-        } else {
-            bh_arr_each(QualifiedUse, qu, use->only) {
-                AstNode* thing = symbol_resolve(fb->scope, qu->symbol_name);
-                if (thing == NULL) { // :SymresStall
-                    if (report_unresolved_symbols) {
-                        onyx_report_error(qu->symbol_name->pos, Error_Critical, 
-                                "The symbol '%b' was not found in this package.",
-                                qu->symbol_name->text, qu->symbol_name->length);
-                        return Symres_Error;
-                    } else {
-                        return Symres_Yield_Macro;
-                    }
-                }
-
-                symbol_introduce(curr_scope, qu->as_name, thing);
-            }
-        }
-
-        return Symres_Success;
+        used_scope = fb->scope;
     }
 
     if (use_expr->kind == Ast_Kind_Enum_Type) {
         AstEnumType* et = (AstEnumType *) use_expr;
-
-        bh_arr_each(AstEnumValue *, ev, et->values)
-            symbol_introduce(curr_scope, (*ev)->token, (AstNode *) *ev);
-
-        return Symres_Success;
+        used_scope = et->scope;
     }
 
     if (use_expr->kind == Ast_Kind_Struct_Type) {
         AstStructType* st = (AstStructType *) use_expr;
         if (!st->scope) return Symres_Success;
 
+        used_scope = st->scope;
+    }
+
+    if (used_scope) {
+        if (used_scope == curr_scope) return Symres_Success;
+
         if (use->only == NULL) {
-            scope_include(curr_scope, st->scope, use->token->pos);
+            OnyxFilePos pos = { 0 };
+            if (use->token != NULL)
+                pos = use->token->pos;
+
+            scope_include(curr_scope, used_scope, pos);
 
         } else {
             bh_arr_each(QualifiedUse, qu, use->only) {
-                AstNode* thing = symbol_resolve(st->scope, qu->symbol_name);
-                if (thing == NULL) {
-                    onyx_report_error(qu->symbol_name->pos, Error_Critical, 
-                            "The symbol '%b' was not found in this scope.",
-                            qu->symbol_name->text, qu->symbol_name->length);
-                    return Symres_Error;
+                AstNode* thing = symbol_resolve(used_scope, qu->symbol_name);
+                if (thing == NULL) { // :SymresStall
+                    if (report_unresolved_symbols) {
+                        onyx_report_error(qu->symbol_name->pos, Error_Critical, 
+                                "The symbol '%b' was not found in the used scope.",
+                                qu->symbol_name->text, qu->symbol_name->length);
+                        return Symres_Error;
+                    } else {
+                        return Symres_Yield_Macro;
+                    }
                 }
 
                 symbol_introduce(curr_scope, qu->as_name, thing);
