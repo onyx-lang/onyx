@@ -357,7 +357,7 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         }
     }
     else if (force_a_lookup) {
-        if (context.cycle_detected) {
+        if (context.cycle_detected || context.cycle_almost_detected) {
             onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' does not exist here. This is a bad error message.",
                 (*fa)->token->text,
                 (*fa)->token->length);
@@ -1565,14 +1565,46 @@ static SymresStatus symres_constraint(AstConstraint* constraint) {
         }
 
         case Constraint_Phase_Checking_Expressions: {
-            fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
-                SYMRES(expression, &constraint->exprs[i].expr);
+            SymresStatus ss;
+            onyx_errors_disable();
 
-                if (constraint->exprs[i].expected_type_expr) {
-                    SYMRES(type, &constraint->exprs[i].expected_type_expr);
+            fori (i, constraint->expr_idx, bh_arr_length(constraint->exprs)) {
+                InterfaceConstraint* ic = &constraint->exprs[i];
+
+                // Most of this logic was directly copied from the
+                // check_constraint code. There might be a better
+                // way to factor this?
+                ss = symres_expression(&ic->expr);
+                if (ss == Symres_Yield_Macro) {
+                    onyx_errors_enable();
+                    return ss;
                 }
+
+                if (ss == Symres_Error && !ic->invert_condition) {
+                    goto constraint_error;
+                }
+
+                if (ss == Symres_Success && ic->invert_condition) {
+                    goto constraint_error;
+                }
+
+                if (ic->expected_type_expr) {
+                    ss = symres_type(&ic->expected_type_expr);
+                    if (ss == Symres_Yield_Macro) {
+                        onyx_errors_enable();
+                        return ss;
+                    }
+                }
+
+                continue;
+
+              constraint_error:
+                onyx_errors_enable();
+                *constraint->report_status = Constraint_Check_Status_Failed;
+                return Symres_Error;
             }
 
+            onyx_errors_enable();
             return Symres_Success;
         }
     }
@@ -1762,6 +1794,7 @@ void symres_entity(Entity* ent) {
     if (ss == Symres_Yield_Micro) ent->micro_attempts++;
     if (ss == Symres_Complete)    ent->state = Entity_State_Finalized;
     if (ss == Symres_Goto_Parse)  ent->state = Entity_State_Parse;
+    if (ss == Symres_Error)       ent->state = Entity_State_Failed;
     if (ss == Symres_Success) {
         ent->macro_attempts = 0;
         ent->micro_attempts = 0;

@@ -54,61 +54,82 @@ Custom_Parse :: struct {
     parse: (rawptr, str, Allocator) -> bool;
 }
 
-str_to_i64 :: (s: str, base: u32 = 10) -> i64 {
+str_to_i64 :: #match #local {}
+
+#overload
+str_to_i64 :: macro (s: str, base: u32 = 10) -> i64 {
+    str_to_i64 :: str_to_i64;
+    s_ := s;
+    return str_to_i64(^s_, base);
+}
+
+#overload
+str_to_i64 :: (s: ^str, base: u32 = 10) -> i64 {
     use package core
 
     value: i64 = 0;
     mul := 1;
 
-    if s[0] == #char "-" {
+    if s.data[0] == #char "-" {
         mul = -1;
-        s = string.advance(s, 1);
+        string.advance(s, 1);
     }
 
-    if s[0] == #char "+" {
-        s = string.advance(s, 1);
+    if s.data[0] == #char "+" {
+         string.advance(s, 1);
     }
 
-    for c: s do switch c {
-        case #char "0" .. #char "9" {
-            value *= ~~base;
-            value += ~~(c - #char "0");
+    while !string.empty(*s) {
+        switch c := s.data[0]; c {
+            case #char "0" .. #char "9" {
+                value *= ~~base;
+                value += ~~(c - #char "0");
+            }
+
+            case #char "A" .. #char "Z" {
+                if base <= 10 do fallthrough;
+
+                value *= ~~base;
+                value += ~~((c - #char "A") + 10);
+            }
+            
+            case #char "a" .. #char "z" {
+                if base <= 10 do fallthrough;
+
+                value *= ~~base;
+                value += ~~((c - #char "a") + 10);
+            }
+
+            case #default do break break;
         }
 
-        case #char "A" .. #char "Z" {
-            if base <= 10 do fallthrough;
-
-            value *= ~~base;
-            value += ~~((c - #char "A") + 10);
-        }
-        
-        case #char "a" .. #char "z" {
-            if base <= 10 do fallthrough;
-
-            value *= ~~base;
-            value += ~~((c - #char "a") + 10);
-        }
-
-        case #default do break break;
+        string.advance(s);
     }
 
     return value * ~~mul;
 }
 
-str_to_f64 :: (s_: str) -> f64 {
+str_to_f64 :: #match #local {}
+
+#overload
+str_to_f64 :: macro (s: str) -> f64 {
+    str_to_f64 :: str_to_f64;
+    s_ := s;
+    return str_to_f64(^s_);
+}
+
+#overload
+str_to_f64 :: (s: ^str) -> f64 {
     use package core
 
-    // 's' needs to live on the stack to take its address. Stupid optimization
-    // that simple structs turn into registers for parameters.
-    s := s_;
-    string.strip_leading_whitespace(^s);
+    string.strip_leading_whitespace(s);
 
-    sign := parse_sign(^s);
-    value, _ := parse_digits(^s);    
+    sign := parse_sign(s);
+    value, _ := parse_digits(s);    
 
-    if s[0] == #char "." {
-        string.advance(^s, 1);
-        fraction, fraction_digits := parse_digits(^s);
+    if s.data[0] == #char "." {
+        string.advance(s, 1);
+        fraction, fraction_digits := parse_digits(s);
         while fraction_digits > 0 {
             fraction_digits -= 1;
             fraction /= 10;
@@ -118,11 +139,11 @@ str_to_f64 :: (s_: str) -> f64 {
 
     value *= sign;
 
-    if s[0] != #char "e" && s[0] != #char "E" do return value;
-    string.advance(^s, 1);
+    if s.data[0] != #char "e" && s.data[0] != #char "E" do return value;
+    string.advance(s, 1);
 
-    exponent_sign := parse_sign(^s);
-    exponent, _   := parse_digits(^s);
+    exponent_sign := parse_sign(s);
+    exponent, _   := parse_digits(s);
     if exponent_sign > 0 {
         while exponent > 0 {
             value *= 10;

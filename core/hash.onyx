@@ -11,9 +11,16 @@ to_u32 :: #match {
         for ch: key do hash += (hash << 5) + ~~ch;
         return hash;
     },
-    (key: type_expr) -> u32 do return to_u32(cast(u32) key);
+    (key: type_expr) -> u32 { return to_u32(cast(u32) key); },
+
+    #precedence 10000 macro (key: $T/HasHashMethod) => key->hash()
 }
 
 Hashable :: interface (t: $T) {
     { to_u32(t) } -> u32;
 }
+
+HasHashMethod :: interface (t: $T) {
+    { t->hash() } -> u32;
+}
+

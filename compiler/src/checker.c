@@ -781,10 +781,12 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
     if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
 
-    if (binop->overload_args == NULL) {
-        binop->overload_args = bh_alloc_item(context.ast_alloc, Arguments);
-        bh_arr_new(context.ast_alloc, binop->overload_args->values, 3);
-        bh_arr_set_length(binop->overload_args->values, third_argument ? 3 : 2);
+    if (binop->overload_args == NULL || binop->overload_args->values[1] == NULL) {
+        if (binop->overload_args == NULL) {
+            binop->overload_args = bh_alloc_item(context.ast_alloc, Arguments);
+            bh_arr_new(context.ast_alloc, binop->overload_args->values, 3);
+            bh_arr_set_length(binop->overload_args->values, third_argument ? 3 : 2);
+        }
 
         if (binop_is_assignment(binop->operation)) {
             binop->overload_args->values[0] = (AstTyped *) make_address_of(context.ast_alloc, binop->left);

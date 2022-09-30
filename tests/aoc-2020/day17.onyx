@@ -1,26 +1,41 @@
 #load "core/std"
 
-use package core
-reader :: package core.string.reader
+use core
+use core.string {reader}
+
+OverloadsEqual :: interface (t: $T) {
+    { T.equals(t, t) } -> bool;
+}
+
+#operator == macro (t: $T/OverloadsEqual, s: T) => t->equals(s);
+
 
 CubePos :: struct {
     x, y, z, w : i32;
 }
 
+#inject CubePos {
+    hash :: (c: CubePos) => {
+        hash: u32 = 7;
+        hash += hash << 5 + core.hash.to_u32(c.x);
+        hash += hash << 5 + core.hash.to_u32(c.y);
+        hash += hash << 5 + core.hash.to_u32(c.z);
+        hash += hash << 5 + core.hash.to_u32(c.w);
+        return hash;
+    }
+
+    equals :: (a, b: CubePos) => {
+        return (a.x == b.x)
+            && (a.y == b.y)
+            && (a.z == b.z)
+            && (a.w == b.w);
+    }
+}
+
+
 CubeState :: struct {
     alive := false;
     next  := false;
-}
-
-#match hash.to_u32 (c: CubePos) -> u32 {
-    return 17 * c.x + 13 * c.y + 11 * c.z + 21 * c.w;
-}
-
-#operator == (a: CubePos, b: CubePos) -> bool {
-    return (a.x == b.x)
-        && (a.y == b.y)
-        && (a.z == b.z)
-        && (a.w == b.w);
 }
 
 get_neighbor_count :: (cubes: ^Map(CubePos, CubeState), pos: CubePos) -> u32 {
