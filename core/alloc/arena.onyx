@@ -126,6 +126,21 @@ clear :: (arena: ^ArenaState) {
     arena.size = sizeof rawptr;
 }
 
+get_allocated_arenas :: (arena: ^ArenaState) -> u32 {
+    arenas := 0;
+    walker := arena.first_arena;
+    while walker != null {
+        arenas += 1;
+        walker = walker.next;
+    }
+
+    return arenas;
+}
+
+get_allocated_bytes :: (arena: ^ArenaState) -> u32 {
+    return get_allocated_arenas(arena) * (arena.arena_size - 1) + arena.size;
+}
+
 auto :: #match {
     macro (size := 32 * 1024, $dest: Code = #(context.allocator)) {
         alloc :: package core.alloc

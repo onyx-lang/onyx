@@ -114,6 +114,7 @@ static inline i32 ast_kind_to_size(AstNode* node) {
         case Ast_Kind_Constraint: return sizeof(AstConstraint);
         case Ast_Kind_Directive_Remove: return sizeof(AstDirectiveRemove);
         case Ast_Kind_Directive_First: return sizeof(AstDirectiveFirst);
+        case Ast_Kind_Directive_Export_Name: return sizeof(AstDirectiveExportName);
         case Ast_Kind_Count: return 0;
     }
 
@@ -576,6 +577,10 @@ AstNode* ast_clone(bh_allocator a, void* n) {
         case Ast_Kind_File_Contents:
             C(AstFileContents, filename_expr);
             E(nn);
+            break;
+
+        case Ast_Kind_Directive_Export_Name:
+            C(AstDirectiveExportName, func);
             break;
     }
 

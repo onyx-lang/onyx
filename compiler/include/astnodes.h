@@ -43,6 +43,7 @@
     NODE(DirectiveLibrary)     \
     NODE(DirectiveRemove)      \
     NODE(DirectiveFirst)       \
+    NODE(DirectiveExportName)  \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -219,6 +220,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Library,
     Ast_Kind_Directive_Remove,
     Ast_Kind_Directive_First,
+    Ast_Kind_Directive_Export_Name,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1335,6 +1337,13 @@ struct AstDirectiveRemove {
 struct AstDirectiveFirst {
     AstTyped_base;
     AstFor *for_node;
+};
+
+struct AstDirectiveExportName {
+    AstTyped_base;
+    AstFunction *func;
+    AstStrLit   *name;
+    b32 created_export_entity : 1;
 };
 
 struct AstNote {

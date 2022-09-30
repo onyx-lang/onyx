@@ -646,6 +646,12 @@ static SymresStatus symres_expression(AstTyped** expr) {
             break;
         }
 
+        case Ast_Kind_Directive_Export_Name: {
+            AstDirectiveExportName *ename = (AstDirectiveExportName *) *expr;
+            SYMRES(expression, (AstTyped **) &ename->func);
+            break;
+        }
+
         default: break;
     }
 
@@ -1412,19 +1418,16 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
             if (export->export->kind == Ast_Kind_Function) {
                 AstFunction *func = (AstFunction *) export->export;
-                func->exported_name = export->export_name;
                 func->is_exported = 1;
 
-                if (func->is_exported) {
-                    if (func->is_foreign) {
-                        onyx_report_error(export->token->pos, Error_Critical, "Cannot export a foreign function.");
-                        return Symres_Error;
-                    }
+                if (func->is_foreign) {
+                    onyx_report_error(export->token->pos, Error_Critical, "Cannot export a foreign function.");
+                    return Symres_Error;
+                }
 
-                    if (func->is_intrinsic) {
-                        onyx_report_error(export->token->pos, Error_Critical, "Cannot export an intrinsic function.");
-                        return Symres_Error;
-                    }
+                if (func->is_intrinsic) {
+                    onyx_report_error(export->token->pos, Error_Critical, "Cannot export an intrinsic function.");
+                    return Symres_Error;
                 }
             }
 

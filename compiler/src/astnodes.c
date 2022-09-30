@@ -99,6 +99,7 @@ static const char* ast_node_names[] = {
     "LIBRARY",
     "REMOVE",
     "FIRST",
+    "EXPORT NAME",
     "CALL SITE",
 
     "CODE BLOCK",

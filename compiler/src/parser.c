@@ -764,6 +764,15 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) first;
                 break;
             }
+            else if (parse_possible_directive(parser, "export_name")) {
+                AstDirectiveExportName *export_name = make_node(AstDirectiveExportName, Ast_Kind_Directive_Export_Name);
+                export_name->token = parser->curr - 1;
+                export_name->func  = (AstFunction *) parse_factor(parser);
+                export_name->type_node = builtin_string_type;
+                
+                retval = (AstTyped *) export_name;
+                break;
+            }
 
             onyx_report_error(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
             return NULL;

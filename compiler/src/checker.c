@@ -109,6 +109,7 @@ CheckStatus check_constraint(AstConstraint *constraint);
 CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFilePos pos);
 CheckStatus check_polyquery(AstPolyQuery *query);
 CheckStatus check_directive_first(AstDirectiveFirst *first);
+CheckStatus check_directive_export_name(AstDirectiveExportName *ename);
 
 // HACK HACK HACK
 b32 expression_types_must_be_known = 0;
@@ -2017,6 +2018,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know constraint sentinel's type.");
             break;
 
+        case Ast_Kind_Directive_Export_Name:
+            retval = check_directive_export_name((AstDirectiveExportName *) expr);
+            break;
+
         case Ast_Kind_StrLit: break;
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
@@ -2127,6 +2132,69 @@ CheckStatus check_directive_first(AstDirectiveFirst *first) {
     assert(first->for_node);
 
     first->for_node->has_first = 1;
+
+    return Check_Success;
+}
+
+CheckStatus check_directive_export_name(AstDirectiveExportName *ename) {
+    if (ename->func->kind != Ast_Kind_Function) {
+        ERROR(ename->token->pos, "#export_name can only be used on functions.");
+    }
+
+    if (ename->type == NULL) YIELD(ename->token->pos, "This should never yield here...");
+
+    ename->flags |= Ast_Flag_Comptime;
+
+    //
+    // TODO: Cleanup this code. I feel like there should be some convenience functions
+    // to make string literals, tokens, exports, etc...
+    if (ename->func->exported_name == NULL) {
+        if (ename->created_export_entity) {
+            return Check_Yield_Macro;
+        }
+
+        // In this case, we know the function is not exported.
+        assert(ename->func->is_exported == 0);
+
+        char *random_name = bh_alloc_array(context.ast_alloc, char, 16);
+        random_name[15] = 0;
+        fori (i, 0, 15) random_name[i] = (rand() % 26) + 'a';
+
+        OnyxToken *name_token = bh_alloc_item(context.ast_alloc, OnyxToken);
+        memset(name_token, 0, sizeof(*name_token));
+        name_token->type = Token_Type_Literal_String;
+        name_token->length = 15;
+        name_token->text = random_name;
+
+        AstStrLit* name = bh_alloc_item(context.ast_alloc, AstStrLit);
+        memset(name, 0, sizeof(AstStrLit));
+        name->kind  = Ast_Kind_StrLit;
+        name->token = name_token;
+        name->type_node = builtin_string_type;
+
+        add_entities_for_node(NULL, (AstNode *) name, NULL, NULL);
+        ename->name = name;
+
+        AstDirectiveExport *export = onyx_ast_node_new(context.ast_alloc, sizeof(AstDirectiveExport), Ast_Kind_Directive_Export);
+        export->token = ename->token;
+        export->export_name_expr = (AstTyped *) name;
+        export->export = (AstTyped *) ename->func;
+
+        add_entities_for_node(NULL, (AstNode *) export, NULL, NULL);
+
+        ename->created_export_entity = 1;
+        return Check_Yield_Macro;
+
+    } else {
+        AstStrLit* name = bh_alloc_item(context.ast_alloc, AstStrLit);
+        memset(name, 0, sizeof(AstStrLit));
+        name->kind  = Ast_Kind_StrLit;
+        name->token = ename->func->exported_name;
+        name->type_node = builtin_string_type;
+
+        add_entities_for_node(NULL, (AstNode *) name, NULL, NULL);
+        ename->name = name;
+    }
 
     return Check_Success;
 }
@@ -2773,6 +2841,11 @@ CheckStatus check_process_directive(AstNode* directive) {
         }
 
         export->export_name = export->export_name_expr->token;
+
+        AstFunction *exported_func = (AstFunction *) export->export;
+        if (exported_func->exported_name == NULL) {
+            exported_func->exported_name = export->export_name;
+        }
     }
 
     if (directive->kind == Ast_Kind_Directive_Init) {

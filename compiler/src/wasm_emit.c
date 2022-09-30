@@ -3463,6 +3463,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
             break;
         }
 
+        case Ast_Kind_Directive_Export_Name: {
+            AstDirectiveExportName *ename = (AstDirectiveExportName *) expr;
+            emit_expression(mod, &code, (AstTyped *) ename->name);
+            break;
+        }
+
         default:
             bh_printf("Unhandled case: %d\n", expr->kind);
             DEBUG_HERE;
@@ -4112,6 +4118,15 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         }
 
         break;
+    }
+
+    case Ast_Kind_Directive_Export_Name: {
+        AstDirectiveExportName *ename = (AstDirectiveExportName *) node;
+        node = (AstTyped *) ename->name;
+
+        // This fallthrough is very intentional. This replaces the value of "node"
+        // so the case below thinks it is just generating the constexpr of a string.
+        // fallthrough
     }
 
     case Ast_Kind_StrLit: {

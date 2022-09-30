@@ -62,25 +62,31 @@ SnailNum :: struct {
 
     reduce_explodes :: (use n: ^SnailNum, depth := 0) -> (reduced_something: bool, zero_node: bool) {
         if depth <= 3 {
-            did_reduce, zero_node := false, false;
-
             if left != null {
-                if did_reduce, zero_node = left->reduce_explodes(depth + 1); zero_node {
+                if did_reduce, zero_node := left->reduce_explodes(depth + 1); zero_node {
                     left = null;
+                    return true, false;
+
+                } elseif did_reduce {
+                    return true, false;
                 }
             }
 
-            if right != null && !did_reduce {
-                if did_reduce, zero_node = right->reduce_explodes(depth + 1); zero_node {
+            if right != null {
+                if did_reduce, zero_node := right->reduce_explodes(depth + 1); zero_node {
                     right = null;
+                    return true, false;
+
+                } elseif did_reduce {
+                    return true, false;
                 }
             }
 
-            return did_reduce, false;
+            return false, false;
         }
 
-        pleft  := n->pair_to_left();
-        pright := n->pair_to_right();
+        pleft  := n->number_to_left();
+        pright := n->number_to_right();
         if pleft  != null do *pleft += left_val;
         if pright != null do *pright += right_val;
 
@@ -135,7 +141,7 @@ SnailNum :: struct {
         if new_right != null do new_right.parent = parent;
     }
 
-    pair_to_left :: (n: ^SnailNum) -> ^u32 {
+    number_to_left :: (n: ^SnailNum) -> ^u32 {
         while n.parent != null && n.parent.left == n {
             n = n.parent;
         }
@@ -153,7 +159,7 @@ SnailNum :: struct {
         return ^n.right_val;
     }
 
-    pair_to_right :: (n: ^SnailNum) -> ^u32 {
+    number_to_right :: (n: ^SnailNum) -> ^u32 {
         while n.parent != null && n.parent.right == n {
             n = n.parent;
         }
@@ -222,7 +228,7 @@ SnailNum :: struct {
 
 
 main :: () {
-    num_arena := arena.make(context.allocator, 64 * 1024);
+    num_arena := arena.make(context.allocator, 256 * 1024);
     SnailNum.allocator = alloc.as_allocator(^num_arena);
     
     conv.register_custom_formatter(SnailNum.format);
