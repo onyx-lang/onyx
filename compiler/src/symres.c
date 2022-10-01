@@ -313,7 +313,11 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
 
     b32 force_a_lookup = 0;
 
-    if (expr->kind == Ast_Kind_Enum_Type || expr->kind == Ast_Kind_Type_Raw_Alias) {
+    if (expr->kind == Ast_Kind_Struct_Type ||
+        expr->kind == Ast_Kind_Poly_Struct_Type ||
+        expr->kind == Ast_Kind_Enum_Type ||
+        expr->kind == Ast_Kind_Type_Raw_Alias) {
+
         force_a_lookup = 1;
     }
 
@@ -905,19 +909,25 @@ static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
 
     b32 has_to_be_resolved = context.cycle_almost_detected;
 
+    onyx_errors_disable();
     resolved_a_symbol = 0;
     SymresStatus ss = symres_expression(&defined->expr);
     if (has_to_be_resolved && ss != Symres_Success && !resolved_a_symbol) {
         // The symbol definitely was not found and there is no chance that it could be found.
         defined->is_defined = 0;
+
+        onyx_errors_enable();
         return Symres_Success;
     }
 
     if (ss == Symres_Success) {
         defined->is_defined = 1;
+
+        onyx_errors_enable();
         return Symres_Success;
     }
 
+    onyx_errors_enable();
     return Symres_Yield_Macro;
 }
 
