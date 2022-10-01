@@ -1721,19 +1721,26 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     // NOTE: If this member was included into the structure through a "use x: ^T" kind of statement,
     // then we have to insert a intermediate field access in order to access the correct member.
     if (smem.use_through_pointer_index >= 0) {
-        StructMember containing_member;
-        assert(type_lookup_member_by_idx(field->expr->type, smem.use_through_pointer_index, &containing_member));
+        StructMember containing_member = smem;
 
-        AstFieldAccess *new_access = onyx_ast_node_new(context.ast_alloc, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
-        new_access->token = field->token;
-        new_access->offset = containing_member.offset;
-        new_access->idx = containing_member.idx;
-        new_access->type = containing_member.type;
-        new_access->expr = field->expr;
-        new_access->flags |= Ast_Flag_Has_Been_Checked;
-        new_access->flags |= Ast_Flag_Extra_Field_Access;
+        // TODO: The following code is not right after it loops, but this should never loop
+        // due to a check in types.c line 947.
+        AstTyped **dest = &field->expr;
+        do {
+            assert(type_lookup_member_by_idx((*dest)->type, containing_member.use_through_pointer_index, &containing_member));
 
-        field->expr = (AstTyped *) new_access;
+            AstFieldAccess *new_access = onyx_ast_node_new(context.ast_alloc, sizeof(AstFieldAccess), Ast_Kind_Field_Access);
+            new_access->token = field->token;
+            new_access->offset = containing_member.offset;
+            new_access->idx = containing_member.idx;
+            new_access->type = containing_member.type;
+            new_access->expr = *dest;
+            new_access->flags |= Ast_Flag_Has_Been_Checked;
+            new_access->flags |= Ast_Flag_Extra_Field_Access;
+
+            *dest = (AstTyped *) new_access;
+            dest = &new_access->expr;
+        } while (containing_member.use_through_pointer_index >= 0);
     }
 
     field->offset = smem.offset;
@@ -2453,10 +2460,12 @@ CheckStatus check_struct(AstStructType* s_node) {
             ERROR(s_node->token->pos, "Compound types are not allowed as struct member types.");
         }
 
-        if ((*smem)->used) {
+        if ((*smem)->used && !(*smem)->use_processed) {
             if (!type_struct_member_apply_use(context.ast_alloc, s_node->pending_type, *smem)) {
                 YIELD((*smem)->token->pos, "Waiting for use to be applied.");
             }
+
+            (*smem)->use_processed = 1;
         }
     }
 

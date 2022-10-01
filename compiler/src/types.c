@@ -936,34 +936,43 @@ b32 type_struct_member_apply_use(bh_allocator alloc, Type *s_type, StructMember 
         return 0;
     }
 
-    if (used_type->Struct.status == SPS_Start) return 0;
+    if (used_type->Struct.status < SPS_Uses_Done) return 0;
 
-    bh_arr_each(StructMember*, psmem, used_type->Struct.memarr) {
-        if (shgeti(s_type->Struct.members, (*psmem)->name) != -1) {
-            onyx_report_error(smem->token->pos, Error_Critical, "Used name '%s' conflicts with existing struct member.", (*psmem)->name);
+    fori (i, 0, shlen(used_type->Struct.members)) {
+        StructMember *nsmem = used_type->Struct.members[i].value;
+
+        //
+        // TODO: :Bugfix  Currently, nested use through pointers are not
+        // working correctly and I need to rethink them entirely.
+        if (nsmem->use_through_pointer_index >= 0) {
+            continue;
+        }
+
+        if (shgeti(s_type->Struct.members, nsmem->name) != -1) {
+            onyx_report_error(smem->token->pos, Error_Critical, "Used name '%s' conflicts with existing struct member.", nsmem->name);
             return 0;
         }
 
         StructMember* new_smem = bh_alloc_item(alloc, StructMember);
-        new_smem->type   = (*psmem)->type;
-        new_smem->name   = (*psmem)->name;
-        new_smem->meta_tags = (*psmem)->meta_tags;
-        new_smem->used = 0;
+        new_smem->type   = nsmem->type;
+        new_smem->name   = nsmem->name;
+        new_smem->meta_tags = nsmem->meta_tags;
+        new_smem->used = nsmem->used;
         new_smem->included_through_use = 1;
 
         if (type_is_pointer) {
-            new_smem->offset = (*psmem)->offset;
-            new_smem->idx = (*psmem)->idx;
+            new_smem->offset = nsmem->offset;
+            new_smem->idx = nsmem->idx;
             new_smem->initial_value = NULL;
             new_smem->use_through_pointer_index = smem->idx;
         } else {
-            new_smem->offset = smem->offset + (*psmem)->offset;
-            new_smem->idx    = -1; // Dummy value because I don't think this is needed.
-            new_smem->initial_value = (*psmem)->initial_value;
+            new_smem->offset = smem->offset + nsmem->offset;
+            new_smem->idx    = nsmem->idx; // Dummy value because I don't think this is needed.
+            new_smem->initial_value = nsmem->initial_value;
             new_smem->use_through_pointer_index = -1;
         }
 
-        shput(s_type->Struct.members, (*psmem)->name, new_smem);
+        shput(s_type->Struct.members, nsmem->name, new_smem);
     }
 
     return 1;

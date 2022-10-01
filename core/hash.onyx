@@ -13,7 +13,8 @@ to_u32 :: #match {
     },
     (key: type_expr) -> u32 { return to_u32(cast(u32) key); },
 
-    #precedence 10000 macro (key: $T/HasHashMethod) => key->hash()
+    #precedence 10000
+    macro (key: $T/HasHashMethod) => key->hash()
 }
 
 Hashable :: interface (t: $T) {

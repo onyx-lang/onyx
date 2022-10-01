@@ -82,6 +82,7 @@ typedef struct StructMember {
     i32 use_through_pointer_index;
     b32 included_through_use : 1;
     b32 used : 1;
+    b32 use_processed : 1;
 
     bh_arr(struct AstTyped *) meta_tags;
 } StructMember;
