@@ -3,7 +3,7 @@ package core.alloc.heap
 // Enable this to enable checking for invalid blocks and other corruptions
 // that may happen on the heap, with the added overhead of checking that
 // on every alloc/resize/free.
-Enable_Debug :: #defined( (package runtime.vars).Enable_Heap_Debug )
+Enable_Debug :: #defined( runtime.vars.Enable_Heap_Debug )
 
 // This is the implementation for the general purpose heap allocator.
 // It is a simple bump allocator, with a free list. It is not very good
@@ -14,7 +14,7 @@ Enable_Debug :: #defined( (package runtime.vars).Enable_Heap_Debug )
 #load "core/intrinsics/wasm"
 
 #if runtime.Multi_Threading_Enabled {
-    sync :: package core.sync
+    use core {sync}
 
     heap_mutex: sync.Mutex
 }
@@ -24,7 +24,7 @@ init :: () {
     heap_state.next_alloc = cast(rawptr) (cast(uintptr) __heap_start + 8);
     heap_state.remaining_space = (memory_size() << 16) - cast(u32) __heap_start;
 
-    use package core.alloc { heap_allocator }
+    use core.alloc { heap_allocator }
     heap_allocator.data = ^heap_state;
     heap_allocator.func = heap_alloc_proc;
 
@@ -45,14 +45,12 @@ get_freed_size :: () => {
 }
 
 #local {
-    use package core.intrinsics.wasm {
+    use core.intrinsics.wasm {
         memory_size, memory_grow,
         memory_copy, memory_fill,
     }
 
-    memory  :: package core.memory
-    math    :: package core.math
-    runtime :: package runtime
+    use core {memory, math}
 
     uintptr :: #type u32
 

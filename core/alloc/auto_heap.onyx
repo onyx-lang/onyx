@@ -51,7 +51,7 @@ auto_heap_free :: (hs: ^AutoHeapState) {
     hs.set->free();
 }
 
-#match (package core.alloc).as_allocator auto_heap_make_allocator
+#match core.alloc.as_allocator auto_heap_make_allocator
 auto_heap_make_allocator :: (hs: ^AutoHeapState) -> Allocator {
     return Allocator.{
         func = auto_heap_alloc_proc,
@@ -61,13 +61,13 @@ auto_heap_make_allocator :: (hs: ^AutoHeapState) -> Allocator {
 
 auto :: #match {
     macro () {
-        alloc :: package core.alloc
+        use core.alloc {heap}
         
-        auto_heap := alloc.heap.auto_heap_make();
+        auto_heap := heap.auto_heap_make();
         old_allocator := context.allocator;
-        context.allocator = alloc.heap.auto_heap_make_allocator(^auto_heap);
+        context.allocator = heap.auto_heap_make_allocator(^auto_heap);
         defer {
-            alloc.heap.auto_heap_free(^auto_heap);
+            heap.auto_heap_free(^auto_heap);
             context.allocator = old_allocator;
         }
     },

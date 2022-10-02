@@ -1,6 +1,6 @@
 package core.avl_tree
 
-#local math :: package core.math
+use core {math}
 
 AVL_Tree :: struct (T: type_expr) {
     data: T;

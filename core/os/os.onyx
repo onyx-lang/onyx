@@ -5,10 +5,7 @@ package core.os
     #error "The os library is currently only available on the WASI runtime, and should only be included if that is the chosen runtime."
 }
 
-#local {
-    runtime :: package runtime
-    string  :: package core.string
-}
+use core {string}
 
 list_directory :: (path: str) -> Iterator(DirectoryEntry) {
     Context :: struct {

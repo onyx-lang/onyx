@@ -2,7 +2,7 @@ package runtime
 
 #load "core/runtime/common"
 
-use package core
+use core
 
 #local {
     __stdout: os.File;

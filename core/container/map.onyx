@@ -1,24 +1,15 @@
 package core.map
 
-#local {
-    array  :: package core.array
-    hash   :: package core.hash
-    memory :: package core.memory
-    math   :: package core.math
-    conv   :: package core.conv
+use core {array, hash, memory, math, conv}
+use core.intrinsics.onyx { __initialize }
 
-    use package core.intrinsics.onyx { __initialize }
-}
+#local ValidKey :: interface (t: $T) {
+    // In order to use a certain type as a key in a Map, you must
+    // provide an implementation of core.hash.to_u32() for that type,
+    // and you must provide an operator overload for ==.
 
-#local {
-    ValidKey :: interface (t: $T) {
-        // In order to use a certain type as a key in a Map, you must
-        // provide an implementation of core.hash.to_u32() for that type,
-        // and you must provide an operator overload for ==.
-
-        { hash.to_u32(t) } -> u32;
-        { t == t         } -> bool;
-    }
+    { hash.to_u32(t) } -> u32;
+    { t == t         } -> bool;
 }
 
 #tag conv.Custom_Format.{
@@ -80,7 +71,7 @@ free :: (use map: ^Map) {
     if entries.data != null do array.free(^entries);
 }
 
-#match (package builtin).delete (package core.map).free
+#match builtin.delete core.map.free
 
 put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
     lr := lookup(map, key);
@@ -108,9 +99,9 @@ get :: (use map: ^Map, key: map.Key_Type) -> map.Value_Type {
     return default_value;
 }
 
-#operator []  macro (map: Map($K, $V), key: K) -> V do return (package core.map).get(^map, key);
-#operator []= macro (map: Map($K, $V), key: K, value: V) do (package core.map).put(^map, key, value);
-#operator ^[] macro (map: Map($K, $V), key: K) -> ^V do return (package core.map).get_ptr(^map, key);
+#operator []  macro (map: Map($K, $V), key: K) -> V do return core.map.get(^map, key);
+#operator []= macro (map: Map($K, $V), key: K, value: V) do core.map.put(^map, key, value);
+#operator ^[] macro (map: Map($K, $V), key: K) -> ^V do return core.map.get_ptr(^map, key);
 
 get_ptr :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
     lr := lookup(map, key);

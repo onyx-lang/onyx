@@ -1,6 +1,6 @@
 package core.math
 
-#local wasm :: package core.intrinsics.wasm
+use core.intrinsics {wasm}
 
 // Things that are useful in any math library:
 //  - Trigonometry

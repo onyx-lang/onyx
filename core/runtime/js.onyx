@@ -2,7 +2,7 @@ package runtime
 
 #load "core/runtime/common"
 
-use package core
+use core
 
 __output_string   :: (s: str)      -> u32  #foreign "host" "print_str" ---
 __exit            :: (status: i32) -> void #foreign "host" "exit" ---

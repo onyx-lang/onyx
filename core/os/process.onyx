@@ -4,10 +4,7 @@ package core.os
     #error "This file can only be included in the 'onyx' runtime, because Wasi has not defined how to spawn and manage processes.";
 }
 
-#local {
-    runtime :: package runtime
-    io      :: package core.io
-}
+use core {io}
 
 Process :: struct {
     Handle :: #distinct i64;

@@ -1,8 +1,6 @@
 package core.io
 
-memory :: package core.memory
-math   :: package core.math
-array  :: package core.array
+use core {memory, math, array}
 
 Reader :: struct {
     stream : ^Stream;

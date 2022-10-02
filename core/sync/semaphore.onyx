@@ -1,7 +1,6 @@
 package core.sync
 
-use package core.intrinsics.atomics
-#local runtime :: package runtime
+use core.intrinsics.atomics
 
 Semaphore :: struct {
     mutex   : Mutex;

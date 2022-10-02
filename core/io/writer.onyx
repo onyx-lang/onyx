@@ -1,6 +1,6 @@
 package core.io
 
-#local conv :: package core.conv
+use core {conv, string}
 
 Writer :: struct {
     stream : ^Stream;
@@ -32,39 +32,29 @@ write_str :: (use writer: ^Writer, s: str) {
 }
 
 write_cstr :: (use writer: ^Writer, cs: cstr) {
-    use package core
-
     s := string.from_cstr(cs);
     write_str(writer, s);
 }
 
 write_i32 :: (use writer: ^Writer, n: i32, base: u32 = 10) {
-    use package core
-
     buf : [256] u8;
     s := conv.i64_to_str(cast(i64) n, cast(u64) base, ~~buf);
     write_str(writer, s);
 }
 
 write_i64 :: (use writer: ^Writer, n: i64, base: u64 = 10) {
-    use package core
-
     buf : [256] u8;
     s := conv.i64_to_str(n, base, ~~buf);
     write_str(writer, s);
 }
 
 write_f32 :: (use writer: ^Writer, f: f32) {
-    use package core
-
     buf : [256] u8;
     s := conv.f64_to_str(cast(f64) f, ~~buf);
     write_str(writer, s);
 }
 
 write_f64 :: (use writer: ^Writer, f: f64) {
-    use package core
-
     buf : [256] u8;
     s := conv.f64_to_str(f, ~~buf);
     write_str(writer, s);

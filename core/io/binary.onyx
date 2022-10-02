@@ -1,6 +1,6 @@
 package core.io
 
-use package core
+use core
 
 BinaryWriter :: struct {
     stream: ^Stream;

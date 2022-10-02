@@ -1,13 +1,13 @@
 package core.arg_parse
 
-use package core
+use core
 
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     arg_iter := iter.as_iterator(c_args)
              |> iter.map((x) => string.from_cstr(*x));
     defer arg_iter.close(arg_iter.data);
 
-    use package runtime.info;
+    use runtime.info;
 
     ptr_type := cast(^Type_Info_Pointer) get_type_info(output.type);
     if ptr_type.kind != .Pointer do return false;

@@ -3,8 +3,8 @@ package runtime
 #load "core/wasi/wasi"
 #load "core/runtime/common"
 
-use package wasi
-use package core
+use wasi
+use core
 
 __output_string :: (s: str) -> u32 {
     STDOUT_FILENO :: 1

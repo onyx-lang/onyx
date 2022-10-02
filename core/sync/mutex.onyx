@@ -1,9 +1,7 @@
 package core.sync
 
-use package core.intrinsics.atomics
-use package core.thread { Thread_ID }
-
-#local runtime :: package runtime
+use core.intrinsics.atomics
+use core.thread { Thread_ID }
 
 // `lock` has two states: 0, and 1.
 //    0 means unlocked

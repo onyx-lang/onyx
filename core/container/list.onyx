@@ -127,7 +127,7 @@ fold :: (list: ^List($T), init: $R, f: (T, R) -> R) -> R {
     return val;
 }
 
-map :: #match {}
+map :: #match #local {}
 #match map (list: ^List($T), f: (^T) -> void) {
     elem := list.first;
     while elem != null {

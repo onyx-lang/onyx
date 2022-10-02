@@ -1,6 +1,6 @@
 package runtime.info
 
-#local io :: package core.io
+use core {io}
 
 write_type_name :: (writer: ^io.Writer, t: type_expr) {
     info := get_type_info(t);
@@ -324,7 +324,7 @@ populate_struct_vtable :: (table: ^$Table_Type, struct_type: type_expr, safe := 
 }
 
 for_all_types :: macro (body: Code) {
-    for (package runtime.info).type_table.count {
+    for runtime.info.type_table.count {
         type_info := (package runtime.info).type_table[it];
         type_idx  : type_expr = ~~ it;
 

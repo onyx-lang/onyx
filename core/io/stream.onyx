@@ -1,6 +1,6 @@
 package core.io
 
-use package core
+use core
 
 Stream :: struct {
     use vtable : ^Stream_Vtable;
@@ -197,13 +197,12 @@ buffer_stream_make :: #match #locked {
     }
 }
 
+#match builtin.delete buffer_stream_free
 buffer_stream_free :: (use bs: ^BufferStream) {
     if write_enabled && !fixed {
         delete(^data);
     }
 }
-
-#match builtin.delete buffer_stream_free
 
 #match core.string.as_str buffer_stream_to_str
 buffer_stream_to_str :: (use bs: ^BufferStream) -> str {

@@ -66,8 +66,7 @@ arena_alloc_proc :: (data: rawptr, aa: AllocationAction, size: u32, align: u32, 
 
         // This is incorrect, but because there is not an "old size",
         // this is the best possible.
-        memory :: package core.memory
-        memory.copy(newptr, oldptr, size);
+        core.memory.copy(newptr, oldptr, size);
 
         return newptr;
     }
@@ -92,7 +91,7 @@ make :: (backing: Allocator, arena_size: u32) -> ArenaState {
     };
 }
 
-#match (package core.alloc).as_allocator make_allocator
+#match core.alloc.as_allocator make_allocator
 make_allocator :: (rs: ^ArenaState) -> Allocator {
     return Allocator.{
         func = arena_alloc_proc,
@@ -143,13 +142,13 @@ get_allocated_bytes :: (arena: ^ArenaState) -> u32 {
 
 auto :: #match {
     macro (size := 32 * 1024, $dest: Code = #(context.allocator)) {
-        alloc :: package core.alloc
+        use core.alloc {arena, heap_allocator}
 
-        arena := alloc.arena.make(alloc.heap_allocator, size);
+        arena := arena.make(heap_allocator, size);
         old_allocator := #unquote dest;
-        (#unquote dest) = alloc.arena.make_allocator(^arena);
+        (#unquote dest) = arena.make_allocator(^arena);
         defer {
-            alloc.arena.free(^arena);
+            arena.free(^arena);
             (#unquote dest) = old_allocator;
         }
     },

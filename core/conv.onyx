@@ -3,9 +3,7 @@ package core.conv
 Enable_Custom_Formatters :: true
 
 #local {
-    map :: package core.map
-    string :: package core.string
-    array :: package core.array
+    use core {map, string, array, math}
 
     custom_formatters: Map(type_expr, #type (^Format_Output, ^Format, rawptr) -> void);
     custom_parsers   : Map(type_expr, #type (rawptr, str, Allocator) -> bool);
@@ -302,8 +300,6 @@ u64_to_str :: (n: u64, base: u64, buf: [] u8, min_length := 0, prefix := false) 
 // This is better than what used to be, but still relies on converting the integer
 // part of the float to an integer, which could overflow.
 f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
-    math :: package core.math;
-
     if math.is_nan(f) {
         return format(buf, "NaN");
     }

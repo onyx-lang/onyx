@@ -1,6 +1,6 @@
 package core.os
 
-#local fs :: package runtime.fs
+use runtime {fs}
 
 Directory :: fs.DirectoryData;
 

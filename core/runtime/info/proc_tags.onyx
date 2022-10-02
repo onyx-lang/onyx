@@ -1,6 +1,8 @@
 
 package runtime.info
 
+use core {array}
+
 tagged_procedures: [] ^Tagged_Procedure
 
 Tagged_Procedure :: struct {
@@ -30,7 +32,6 @@ get_tags_for_procedure :: (func: $T) -> [] any {
 }
 
 get_procedures_with_tag :: ($tag_type: type_expr) -> [] GPWT_Result(tag_type) {
-    array :: package core.array
     results := make([..] GPWT_Result(tag_type));
 
     for proc: tagged_procedures {

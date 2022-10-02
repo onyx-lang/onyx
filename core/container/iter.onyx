@@ -1,37 +1,6 @@
 package core.iter
 
-#local memory :: package core.memory
-#local alloc  :: package core.alloc
-
-#local {
-    //
-    // After struggling to think of a good way for iterators to manage their context
-    // data in a way that is completely degradative to the heap memory, I decided that
-    // the easiest and most programmer friendly way to do it was to completely remove
-    // their dependence on the heap. ALL iterators allocated in this file use the
-    // buffer below to store their data. This data is never "freed", but because it
-    // is a ring buffer, the data will be reused eventually. I think that 1024 bytes
-    // should be plently for the normal number of active iterators. However, it is
-    // possible that this *could* overrun, and unexpected behavior could ensue. For
-    // this reason, most allocator also support allocating their data from the context's
-    // allocator simply by passing that allocator as an arugment.
-
-    //
-    // BUG: This is not a thread-safe allocator!!
-    // Why not use context.temp_allocator?
-    //
-
-    /*
-    iter_ring_buffer: [1024] u8;
-    iter_ring: alloc.ring.RingState;
-    iter_allocator: Allocator;
-
-    #init () {
-        iter_ring = alloc.ring.make(iter_ring_buffer);
-        iter_allocator = alloc.as_allocator(^iter_ring);
-    }
-    */
-}
+use core {memory, alloc, array}
 
 as_iterator :: #match {}
 
@@ -512,7 +481,6 @@ as_iterator :: (x: ^[..] $T) -> Iterator(T) {
         //
         // This is current - 1 because current will have already
         // been incremented by the time this element calls #remove.
-        array :: package core.array
         array.delete(arr, current - 1);
         current -= 1;
     }
@@ -549,7 +517,6 @@ as_iterator :: (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
         //
         // This is current - 1 because current will have already
         // been incremented by the time this element calls #remove.
-        array :: package core.array
         array.delete(arr, current - 1);
         current -= 1;
     }
@@ -661,8 +628,6 @@ every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
 }
 
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
-    array :: package core.array
-
     arr := array.make(T, allocator=allocator);
     for v: it do array.push(^arr, v);
 
@@ -731,8 +696,7 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
 
     #overload
     parallel_for :: macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
-        thread :: package core.thread;
-        alloc  :: package core.alloc;
+        use core {thread, alloc}
         distributor :: distributor;
         as_iterator :: as_iterator;
 

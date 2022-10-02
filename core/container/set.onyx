@@ -1,11 +1,6 @@
 package core.set
 
-#local {
-    array :: package core.array
-    hash  :: package core.hash
-    memory :: package core.memory
-    math :: package core.math
-}
+use core {array, hash, memory, math}
 
 #local SetValue :: interface (t: $T) {
     { hash.to_u32(t) } -> u32;
@@ -44,7 +39,8 @@ make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(
     return set;
 }
 
-#match (package builtin).__make_overload macro (x: ^Set, allocator: Allocator) => (package core.set).make(x.Elem_Type, allocator = allocator);
+#overload
+builtin.__make_overload :: macro (x: ^Set, allocator: Allocator) => core.set.make(x.Elem_Type, allocator = allocator);
 
 init :: (set: ^Set($T), default := T.{}, allocator := context.allocator) {
     set.allocator = allocator;
@@ -61,7 +57,8 @@ free :: (use set: ^Set) {
     array.free(^entries);
 }
 
-#match (package builtin).delete (package core.set).free
+#overload
+builtin.delete :: core.set.free
 
 insert :: (use set: ^Set, value: set.Elem_Type) {
     if hashes.data == null do init(set);
@@ -75,7 +72,7 @@ insert :: (use set: ^Set, value: set.Elem_Type) {
     if full(set) do grow(set);
 }
 
-#operator << macro (set: Set($T), value: T) do (package core.set).insert(^set, value);
+#operator << macro (set: Set($T), value: T) do core.set.insert(^set, value);
 
 has :: (use set: ^Set, value: set.Elem_Type) -> bool {
     lr := lookup(set, value);
@@ -119,7 +116,7 @@ empty :: (use set: ^Set) -> bool {
     return entries.count == 0;
 }
 
-#match (package core.iter).as_iterator iterator
+#match core.iter.as_iterator iterator
 iterator :: (set: ^Set($T)) -> Iterator(T) {
     Context :: struct (T: type_expr) {
         set: ^Set(T);

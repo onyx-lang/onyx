@@ -1,7 +1,7 @@
 package core.os
 
-use package core
-#local fs :: package runtime.fs
+use core
+use runtime {fs}
 
 FileError :: enum {
     None       :: 0x00;

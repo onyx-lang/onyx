@@ -1,7 +1,7 @@
 package runtime
 
-use package core
-use package core.intrinsics.onyx { __initialize }
+use core
+use core.intrinsics.onyx { __initialize }
 
 // The default assert handler. This assumes that __output_string
 // and __exit are defined in the 'runtime' package.
@@ -39,7 +39,7 @@ __runtime_initialize :: () {
 // Use this procedure to initialize everything needed in the
 // standard library when you are dropped directly into a function.
 __thread_initialize :: macro () {
-    use package core.intrinsics.onyx { __initialize }
+    use core.intrinsics.onyx { __initialize }
 
     // This should only be true for the main thread.
     if __tls_base == null {
@@ -71,9 +71,7 @@ __thread_initialize :: macro () {
     }
 
     _thread_exit :: (id: i32) {
-        thread :: package core.thread
-
         raw_free(alloc.heap_allocator, __tls_base);
-        thread.__exited(id);
+        core.thread.__exited(id);
     }
 }

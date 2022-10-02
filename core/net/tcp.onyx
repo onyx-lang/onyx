@@ -1,14 +1,6 @@
 package core.net
 
-#local {
-    runtime :: package runtime
-    sync    :: package core.sync
-    thread  :: package core.thread
-    array   :: package core.array
-    memory  :: package core.memory
-    alloc   :: package core.alloc
-    os      :: package core.os
-}
+use core {sync, thread, array, memory, alloc, os}
 
 #if !runtime.Multi_Threading_Enabled {
     #error "Expected multi-threading to be enabled for TCP server.";

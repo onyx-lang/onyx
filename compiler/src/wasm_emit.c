@@ -260,6 +260,9 @@ static u32 debug_introduce_symbol(OnyxWasmModule *mod, OnyxToken *token, DebugSy
 static u32 debug_get_file_id(OnyxWasmModule *mod, const char *name) {
     assert(mod && mod->debug_context);
 
+    // This is not correct at all, but it will not cause an error.
+    if (!name) return 0;
+
     i32 index = shgeti(mod->debug_context->file_info, name);
     if (index == -1) {
         u32 id = mod->debug_context->next_file_id++;

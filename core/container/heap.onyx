@@ -1,8 +1,6 @@
 package core.heap
 
-#local {
-    array :: package core.array
-}
+use core {array}
 
 Heap :: struct (T: type_expr) {
     data: [..] T;
@@ -25,7 +23,7 @@ insert :: (use heap: ^Heap, v: heap.T) {
     shift_up(heap, data.count - 1);
 }
 
-#operator << macro (heap: Heap($T), v: T) do (package core.heap).insert(^heap, v);
+#operator << macro (heap: Heap($T), v: T) do core.heap.insert(^heap, v);
 
 remove_top :: (use heap: ^Heap) -> heap.T {
     x := data[0];

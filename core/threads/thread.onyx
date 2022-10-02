@@ -1,11 +1,9 @@
 package core.thread
 
-use package core
-use package core.intrinsics.atomics
+use core
+use core.intrinsics.atomics
 
 #package {
-    runtime :: package runtime
-
     thread_mutex   : sync.Mutex;
     next_thread_id := 1;
     thread_map     : Map(Thread_ID, ^Thread);
