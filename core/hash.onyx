@@ -21,6 +21,7 @@ Hashable :: interface (t: $T) {
     { to_u32(t) } -> u32;
 }
 
+#local
 HasHashMethod :: interface (t: $T) {
     { t->hash() } -> u32;
 }

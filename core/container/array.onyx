@@ -442,10 +442,20 @@ unique :: (arr: ^[] $T) {
 }
 
 
+fold :: #match #local {}
+
+#overload
 fold :: (arr: [] $T, init: $R, f: (T, R) -> R) -> R {
     val := init;
     for it: arr do val = f(it, val);
     return val;
+}
+
+#overload
+fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
+    acc := init;
+    for it: arr do acc = #unquote body;
+    return acc;
 }
 
 map :: #match #locked {

@@ -2969,16 +2969,6 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                 symbol_introduce(constraint->scope, ip->type_token, (AstNode *) type_alias);
             }
 
-            fori (i, 0, bh_arr_length(constraint->interface->vars)) {
-                InterfaceVariable *iv = &constraint->interface->vars[i];
-
-                AstTyped *sentinel = onyx_ast_node_new(context.ast_alloc, sizeof(AstTyped), Ast_Kind_Constraint_Sentinel);
-                sentinel->token = iv->symbol;
-                sentinel->type_node = iv->type;
-
-                symbol_introduce(constraint->scope, iv->symbol, (AstNode *) sentinel);
-            }
-
             assert(constraint->entity);
             constraint->entity->scope = constraint->scope;
 

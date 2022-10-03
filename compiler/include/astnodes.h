@@ -1101,18 +1101,12 @@ typedef struct InterfaceConstraint {
     b32 invert_condition: 1;
 } InterfaceConstraint;
 
-typedef struct InterfaceVariable {
-    OnyxToken *symbol;
-    AstType   *type;
-} InterfaceVariable;
-
 struct AstInterface {
     AstTyped_base;
     char *name;
 
     bh_arr(InterfaceParam)      params;
     bh_arr(InterfaceConstraint) exprs;
-    bh_arr(InterfaceVariable)   vars;
 };
 
 typedef enum ConstraintPhase {

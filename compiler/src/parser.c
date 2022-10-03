@@ -2177,23 +2177,10 @@ static AstInterface* parse_interface(OnyxParser* parser) {
     }
 
     bh_arr_new(global_heap_allocator, interface->exprs, 2);
-    bh_arr_new(global_heap_allocator, interface->vars, 2);
 
     expect_token(parser, '{');
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return interface;
-
-        if (parse_possible_directive(parser, "with")) {
-            InterfaceVariable v;
-            v.symbol = expect_token(parser, Token_Type_Symbol);
-            expect_token(parser, ':');
-
-            v.type = parse_type(parser);
-            expect_token(parser, ';');
-
-            bh_arr_push(interface->vars, v);
-            continue;
-        }
 
         InterfaceConstraint ic = {0};
         if (parse_possible_directive(parser, "not")) {
