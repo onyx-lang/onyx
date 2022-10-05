@@ -709,6 +709,17 @@ EMIT_FUNC(statement, AstNode* stmt) {
 }
 
 EMIT_FUNC(local_allocation, AstTyped* stmt) {
+    //
+    // If the statement does not have a type, it should not
+    // be emitted. The only case this should be used by is
+    // when a local is declared with "#auto" type and is
+    // never used, therefore never declaring its type.
+    if (stmt->type == NULL) {
+        assert(stmt->kind == Ast_Kind_Local);
+        onyx_report_warning(stmt->token->pos, "Unused local variable with unassigned type.");
+        return;
+    }
+
     u64 local_idx = local_allocate(mod->local_alloc, stmt);
     bh_imap_put(&mod->local_map, (u64) stmt, local_idx);
 

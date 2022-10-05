@@ -1341,7 +1341,13 @@ static i32 parse_possible_symbol_declaration(OnyxParser* parser, AstNode** ret) 
 
     AstType* type_node = NULL;
     if (parser->curr->type != '=') {
-        type_node = parse_type(parser);
+        if (parse_possible_directive(parser, "auto")) {
+            // Do nothing here.
+            // This allows for "x: #auto" to declare an x that will automatically be
+            // typed on the first assignment.
+        } else {
+            type_node = parse_type(parser);
+        }
     }
 
     AstLocal* local = make_local(parser->allocator, symbol, type_node);
