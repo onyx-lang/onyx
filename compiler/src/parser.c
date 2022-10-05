@@ -1299,7 +1299,13 @@ static i32 parse_possible_compound_symbol_declaration(OnyxParser* parser, AstNod
         prev_local->next = (AstNode *) assignment;
 
     } else {
-        AstType* type_for_all = parse_type(parser);
+        AstType* type_for_all = NULL;
+
+        // See comment in parse_possible_symbol_declaration about "#auto"
+        if (!parse_possible_directive(parser, "auto")) {
+            type_for_all = parse_type(parser);
+        }
+
         forll (AstLocal, local, first_local, next) {
             local->type_node = type_for_all;
         }
