@@ -634,6 +634,44 @@ to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     return arr;
 }
 
+//
+// Simple iterator comprehensions, in the same vein
+// as Pythons comprehension syntax.
+// 
+// Python:
+//     results = [it * 2 for it in [1, 2, 3, 4, 5]]
+// Onyx:
+//     results := iter.comp(u32.[1, 2, 3, 4, 5], #(it * 2));
+comp :: #match #local {}
+
+#overload
+comp :: macro (i: Iterator(^$V), value: Code) => {
+    it: V;
+    a := make([..] typeof #unquote value);
+
+    for __it: i {
+        it := *__it;
+        a << (#unquote value);
+    }
+    return a;
+}
+
+#overload
+comp :: macro (i: Iterator($V), value: Code) => {
+    it: V;
+    a := make([..] typeof #unquote value);
+
+    for i do a << (#unquote value);
+    return a;
+}
+
+#overload
+comp :: macro (i: $I/Iterable, value: Code) => {
+    as_iterator :: as_iterator
+    comp        :: comp
+    return comp(as_iterator(i), value);
+}
+
 
 #if runtime.Multi_Threading_Enabled {
     #local sync :: core.sync

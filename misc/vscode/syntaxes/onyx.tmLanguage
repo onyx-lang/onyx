@@ -220,7 +220,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>@[^\s;]+</string>
+					<string>@[^\n]+</string>
 					<key>name</key>
 					<string>keyword.tag.onyx</string>
 				</dict>

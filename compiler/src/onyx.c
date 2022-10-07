@@ -609,6 +609,21 @@ static i32 onyx_compile() {
         }
 #endif
 
+        /*
+        struct timespec spec;
+        clock_gettime(CLOCK_REALTIME, &spec);
+        u64 nano_time = spec.tv_nsec + 1000000000 * (spec.tv_sec % 100);
+        printf("%lu %d %d %d %d %d %d %d\n",
+                nano_time,
+                bh_arr_length(context.entities.entities),
+                context.entities.state_count[Entity_State_Introduce_Symbols],
+                context.entities.state_count[Entity_State_Parse],
+                context.entities.state_count[Entity_State_Resolve_Symbols],
+                context.entities.state_count[Entity_State_Check_Types],
+                context.entities.state_count[Entity_State_Code_Gen],
+                context.entities.state_count[Entity_State_Finalized]);
+        */
+
         // Mostly a preventative thing to ensure that even if somehow
         // errors were left disabled, they are re-enabled in this cycle.
         onyx_errors_enable();
