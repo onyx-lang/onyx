@@ -9,7 +9,9 @@ Iterable :: interface (t: $T) {
 }
 
 close :: (it: Iterator($T)) {
-    it.close(it.data);
+    if it.close != null_proc {
+        it.close(it.data);
+    }
 }
 
 filter :: #match #local {}

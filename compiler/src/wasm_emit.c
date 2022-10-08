@@ -1619,6 +1619,10 @@ EMIT_FUNC(switch, AstSwitch* switch_node) {
             WID(switch_node->expr->token, WI_BLOCK_START, 0x40);
             emit_expression(mod, &code, switch_node->expr);
             if (switch_node->min_case != 0) {
+                if (onyx_type_to_wasm_type(switch_node->expr->type) == WASM_TYPE_INT64) {
+                    WI(switch_node->expr->token, WI_I32_FROM_I64);
+                }
+
                 WID(switch_node->expr->token, WI_I32_CONST, switch_node->min_case);
                 WI(switch_node->expr->token, WI_I32_SUB);
             }
