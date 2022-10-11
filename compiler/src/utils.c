@@ -1223,7 +1223,7 @@ char *find_closest_symbol_in_scope_and_parents(Scope *scope, char *sym) {
 char *find_closest_symbol_in_node(AstNode* node, char *sym) {
     Scope *scope = get_scope_from_node(node);
     if (!scope) {
-        if (node->kind == Ast_Kind_Poly_Call_Type) {
+        if (node && node->kind == Ast_Kind_Poly_Call_Type) {
             AstPolyCallType* pcall = (AstPolyCallType *) node;
             return find_closest_symbol_in_node((AstNode *) pcall->callee, sym);
         }

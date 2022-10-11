@@ -467,7 +467,7 @@ read_until :: (use reader: ^Reader, until: u8, skip: u32 = 0, allocator := conte
     return out;
 }
 
-peek_byte :: (use reader: ^Reader) -> (u8, Error) {
+peek_byte :: (use reader: ^Reader, advance := 0) -> (u8, Error) {
     if reader_empty(reader) do return 0, .EOF;
 
     if start == end {
@@ -476,7 +476,11 @@ peek_byte :: (use reader: ^Reader) -> (u8, Error) {
         }
     }
 
-    return buffer[start], .None;
+    if start + advance >= end {
+        return 0, .EOF;
+    }
+
+    return buffer[start + advance], .None;
 }
 
 advance_line :: (use reader: ^Reader) {

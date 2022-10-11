@@ -425,6 +425,33 @@ read_until :: (s: ^str, upto: str, skip := 0) -> str {
     return out;
 }
 
+read_alphanum :: (s: ^str) -> str {
+    if s.count == 0 do return "";
+
+    out : str;
+    out.data = s.data;
+    out.count = 0;
+
+    for ch: *s {
+        switch ch {
+            case #char "a" .. #char "z",
+                 #char "A" .. #char "Z",
+                 #char "0" .. #char "9" {
+                out.count += 1;
+            }
+
+            case #default {
+                break break;
+            }
+        }
+    }
+
+    s.data += out.count;
+    s.count -= out.count;
+
+    return out;
+}
+
 read_until_any :: (s: ^str, skip: u32, uptos: ..u8) -> str {
     if s.count == 0 do return "";
 
