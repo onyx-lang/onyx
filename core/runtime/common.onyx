@@ -16,8 +16,10 @@ __assert_handler :: (msg: str, site: CallSite) {
 
     __output_string("\n");
 
-    // __exit(1);
-    *(cast(^i32) 0xffffffff);
+    core.intrinsics.wasm.unreachable();
+
+    // This will never return
+    return;
 }
 
 // This procedure should only be called once at the very begining

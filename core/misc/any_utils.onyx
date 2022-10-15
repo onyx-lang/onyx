@@ -1,0 +1,53 @@
+package core.misc
+
+use runtime.info {
+    get_type_info,
+    Type_Info_Pointer,
+    Type_Info_Struct,
+
+    get_struct_member
+}
+
+to_any :: macro (x: ^$T) => any.{x, T};
+
+any_deference :: (v: any) -> any {
+    t := get_type_info(v.type);
+    if t.kind == .Pointer {
+        p := cast(^Type_Info_Pointer) t;
+        return any.{*cast(^rawptr) v.data, p.to};
+    }
+
+    return .{null, void};
+}
+
+any_get_member :: (v: any, member_name: str) -> any {
+    t := get_type_info(v.type);
+    if t.kind == .Struct {
+        member := get_struct_member(v.type, member_name);
+        if member != null {
+            return any.{cast(^u8) v.data + member.offset, member.type};
+        }
+    }
+
+    return .{null, void};
+}
+
+any_to_map :: (v: any) -> (Map(str, any), success: bool) {
+    vals := v;
+    if get_type_info(vals.type).kind == .Pointer {
+        vals = any_deference(vals);
+    }
+
+    val_info := cast(^Type_Info_Struct) get_type_info(vals.type);
+    if val_info.kind != .Struct {
+        return .{}, false;
+    }
+
+    out: Map(str, any);
+    for ^ val_info.members {
+        out->put(it.name, any_get_member(vals, it.name));
+    }
+
+    return out, true;
+}
+

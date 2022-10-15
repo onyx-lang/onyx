@@ -428,8 +428,6 @@ static void output_instruction(WasmFunc* func, WasmInstruction* instr, bh_buffer
     i32 leb_len;
     u8* leb;
 
-    if (instr->type == WI_UNREACHABLE) assert(("EMITTING UNREACHABLE!!", 0));
-
     if (instr->type == WI_NOP && !context.options->debug_enabled) return;
 
     if (instr->type & SIMD_INSTR_MASK) {

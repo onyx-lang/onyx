@@ -51,6 +51,11 @@ struct ovm_wasm_binding {
 #define OVM_TO_WASM(o, w) { \
     (w).of.i64 = 0;\
     switch ((o).type) { \
+        case OVM_TYPE_NONE: \
+            (w).kind = WASM_I32; \
+            (w).of.i32 = 0; \
+            break; \
+ \
         case OVM_TYPE_I8: \
             (w).kind = WASM_I32; \
             (w).of.i32 = (i32) (o).i8; \

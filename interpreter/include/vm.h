@@ -335,6 +335,8 @@ struct ovm_instr_t {
 
 #define OVMI_CMPXCHG           0x70   // %r = %r == %a ? %b : %r 
 
+#define OVMI_BREAK             0xff
+
 //
 // OVM_TYPED_INSTR(OVMI_ADD, OVM_TYPE_I32) == instruction for adding i32s
 //

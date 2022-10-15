@@ -64,6 +64,7 @@ void               ovm_code_builder_pop_label_target(ovm_code_builder_t *builder
 void               ovm_code_builder_patch_else(ovm_code_builder_t *builder, label_target_t if_target);
 void               ovm_code_builder_free(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_nop(ovm_code_builder_t *builder);
+void               ovm_code_builder_add_break(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_binop(ovm_code_builder_t *builder, u32 instr);
 void               ovm_code_builder_add_unop(ovm_code_builder_t *builder, u32 instr);
 void               ovm_code_builder_add_imm(ovm_code_builder_t *builder, u32 ovm_type, void *imm);

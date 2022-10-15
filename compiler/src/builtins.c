@@ -105,6 +105,8 @@ const BuiltinSymbol builtin_symbols[] = {
 IntrinsicTable intrinsic_table;
 
 static IntrinsicMap builtin_intrinsics[] = {
+    { "unreachable",  ONYX_INTRINSIC_UNREACHABLE },
+
     { "memory_size",  ONYX_INTRINSIC_MEMORY_SIZE },
     { "memory_grow",  ONYX_INTRINSIC_MEMORY_GROW },
     { "memory_copy",  ONYX_INTRINSIC_MEMORY_COPY },

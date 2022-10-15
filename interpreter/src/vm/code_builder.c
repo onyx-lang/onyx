@@ -142,6 +142,13 @@ void ovm_code_builder_add_nop(ovm_code_builder_t *builder) {
     ovm_program_add_instructions(builder->program, 1, &nop);
 }
 
+void ovm_code_builder_add_break(ovm_code_builder_t *builder) {
+    ovm_instr_t break_ = {0};
+    break_.full_instr = OVMI_BREAK;
+    debug_info_builder_emit_location(builder->debug_builder);
+    ovm_program_add_instructions(builder->program, 1, &break_);
+}
+
 void ovm_code_builder_add_binop(ovm_code_builder_t *builder, u32 instr) {
     i32 right  = POP_VALUE(builder);
     i32 left   = POP_VALUE(builder);

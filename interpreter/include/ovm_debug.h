@@ -215,6 +215,7 @@ typedef enum debug_exec_state_t {
 typedef enum debug_pause_reason_t {
     debug_pause_entry = 1,
     debug_pause_step = 2,
+    debug_pause_exception = 3,
 } debug_pause_reason_t;
 
 typedef struct debug_breakpoint_t {

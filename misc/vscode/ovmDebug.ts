@@ -631,6 +631,7 @@ class OVMDebugger extends EventEmitter {
 					switch (reason_id) {
 						case 1: reason = "entry"; break;
 						case 2: reason = "step"; break;
+						case 3: reason = "exception"; break;
 					}
 
 					this.sendEvent("paused", { reason, threadId: thread_id });

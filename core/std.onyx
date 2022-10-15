@@ -39,6 +39,8 @@ package core
 
 #load "./test/testing"
 
+#load "./misc/any_utils"
+
 #local runtime :: package runtime
 #if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
     #load "./os/file"

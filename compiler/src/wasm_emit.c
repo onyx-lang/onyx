@@ -2240,6 +2240,8 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
     }
 
     switch (call->intrinsic) {
+        case ONYX_INTRINSIC_UNREACHABLE:  WI(call->token, WI_UNREACHABLE); break;
+        
         case ONYX_INTRINSIC_MEMORY_SIZE:  WID(call->token, WI_MEMORY_SIZE, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_GROW:  WID(call->token, WI_MEMORY_GROW, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_COPY:

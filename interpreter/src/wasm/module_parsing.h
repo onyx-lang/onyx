@@ -518,6 +518,7 @@ static void parse_instruction(build_context *ctx) {
     unsigned char instr_byte = CONSUME_BYTE(ctx);
     switch (instr_byte) {
         case 0x00:
+            ovm_code_builder_add_break(&ctx->builder);
             break;
 
         case 0x01:

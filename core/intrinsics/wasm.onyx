@@ -1,5 +1,8 @@
 package core.intrinsics.wasm
 
+// This does not return.
+unreachable  :: () -> void #intrinsic ---
+
 memory_size  :: () -> u32 #intrinsic ---
 memory_grow  :: (val: u32) -> i32 #intrinsic ---
 memory_copy  :: (dst: rawptr, src: rawptr, count: i32) -> void #intrinsic ---
