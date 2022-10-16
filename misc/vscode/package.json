@@ -2,7 +2,7 @@
     "name": "onyx",
     "displayName": "Onyx",
     "description": "Onyx syntax highlighting.",
-    "version": "0.0.4",
+    "version": "0.1.0",
     "publisher": "brendanfh",
     "license": "BSD-2-Clause",
     "engines": {
