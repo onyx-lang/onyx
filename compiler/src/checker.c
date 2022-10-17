@@ -3150,7 +3150,11 @@ CheckStatus check_polyquery(AstPolyQuery *query) {
                 goto poly_var_solved;
 
             case TYPE_MATCH_SPECIAL:
-                return Check_Yield_Macro;
+                if (solved_something || query->successful_symres) {
+                    return Check_Return_To_Symres;    
+                } else {
+                    return Check_Yield_Macro;
+                }
 
             case TYPE_MATCH_YIELD:
             case TYPE_MATCH_FAILED: {
