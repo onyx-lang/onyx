@@ -130,7 +130,7 @@ main :: (args) => {
 
         proc_reader := io.reader_make(^proc);
         output := io.read_all(^proc_reader);
-        defer memory.free_slice(^output);
+        defer delete(^output);
 
         if exit := os.process_wait(^proc); exit != .Success {
             // Error running the test case

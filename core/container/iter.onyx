@@ -709,7 +709,7 @@ comp :: macro (i: $I/Iterable, value: Code) => {
 
         close :: (use c: ^Context($T)) {
             sync.mutex_destroy(^c.mutex);
-            cfree(c);
+            delete(c);
         }
 
         // This iterator's context is allocated from the heap because

@@ -6,7 +6,7 @@ package core.alloc
 #load "./alloc/ring"
 #load "./alloc/pool"
 #load "./alloc/logging"
-#load "./alloc/auto_heap"
+#load "./alloc/gc"
 
 as_allocator :: #match {
     macro (a: Allocator) => a

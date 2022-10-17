@@ -1,0 +1,114 @@
+package core.alloc.gc
+
+GCState :: struct {
+    backing_allocator: Allocator;
+    first: ^GCLink;
+}
+
+#local
+GCLink :: struct {
+    prev: ^GCLink;
+    next: ^GCLink;
+    magic_number: u32;
+}
+
+make :: (backing := context.allocator) -> GCState {
+    hs: GCState;
+    hs.backing_allocator = backing;
+    return hs;
+}
+
+clear :: (hs: ^GCState) {
+    while l := hs.first; l != null {
+        n := l.next;
+        raw_free(hs.backing_allocator, l);
+        l = n;
+    }
+
+    hs.first = null;
+}
+
+#match core.alloc.as_allocator make_allocator
+make_allocator :: (hs: ^GCState) -> Allocator {
+    return Allocator.{
+        func = gc_alloc_proc,
+        data = hs
+    };
+}
+
+auto :: #match {
+    macro () {
+        use core.alloc {gc}
+        
+        gcs := gc.make();
+        old_allocator := context.allocator;
+        context.allocator = core.alloc.as_allocator(^gcs);
+        defer {
+            gc.clear(^gcs);
+            context.allocator = old_allocator;
+        }
+    },
+
+    macro (body: Code) -> i32 {
+        auto :: auto
+
+        #context_scope {
+            auto(); 
+            #unquote body;
+        }
+
+        return 0;
+    }
+}
+
+
+#local
+GC_Link_Magic_Number :: 0x1337face
+
+#local gc_alloc_proc :: (data: ^GCState, aa: AllocationAction, size: u32, align: u32, oldptr: rawptr) -> rawptr {
+
+    old: ^GCLink;
+
+    if oldptr != null {
+        old = (cast(^GCLink) oldptr) - 1;
+
+        //
+        // If this allocated space was not from an gc allocator,
+        // just try to free it using the backing allocator.
+        if old.magic_number != GC_Link_Magic_Number {
+            return data.backing_allocator.func(
+                data.backing_allocator.data, aa, size, align, oldptr
+            );
+        }
+    }
+
+    if aa == .Resize || aa == .Free {
+        if data.first == old {
+            data.first = data.first.next;
+
+        } else {
+            old.prev.next = old.next;
+            old.next.prev = old.prev;
+        }
+    }
+
+    newptr: ^GCLink = data.backing_allocator.func(
+        data.backing_allocator.data, aa,
+        size + sizeof GCLink, align, old);
+
+    if aa == .Alloc || aa == .Resize {
+        if newptr != null {
+            newptr.magic_number = GC_Link_Magic_Number;
+            newptr.next = data.first;
+            newptr.prev = null;
+
+            if data.first != null {
+                data.first.prev = newptr;
+            }
+
+            data.first = newptr;
+        }
+    }
+
+    return newptr + 1;
+}

@@ -4,6 +4,7 @@ package core.alloc.heap
 // that may happen on the heap, with the added overhead of checking that
 // on every alloc/resize/free.
 Enable_Debug :: #defined( runtime.vars.Enable_Heap_Debug )
+Enable_Clear_Freed_Memory :: #defined(runtime.vars.Enable_Heap_Clear_Freed_Memory)
 
 // This is the implementation for the general purpose heap allocator.
 // It is a simple bump allocator, with a free list. It is not very good
@@ -63,11 +64,11 @@ get_freed_size :: () => {
 
     heap_block :: struct {
         size         : u32;
+        magic_number : u32;
     }
 
     heap_freed_block :: struct {
         use base: heap_block;
-        magic_number : u32;
         next : ^heap_freed_block;
         prev : ^heap_freed_block;
     }
@@ -76,9 +77,10 @@ get_freed_size :: () => {
         use base: heap_block;
     }
 
-    Allocated_Flag          :: 0x1
-    Free_Block_Magic_Number :: 0xdeadbeef
-    Block_Split_Size        :: 256
+    Allocated_Flag           :: 0x1
+    Free_Block_Magic_Number  :: 0xdeadbeef
+    Alloc_Block_Magic_Number :: 0xbabecafe
+    Block_Split_Size         :: 256
 
     // FIX: This does not respect the choice of alignment
     heap_alloc :: (size_: u32, align: u32) -> rawptr {
@@ -137,6 +139,7 @@ get_freed_size :: () => {
             best.prev = null;
             best.magic_number = 0;
             best.size |= Allocated_Flag;
+            best.magic_number = Alloc_Block_Magic_Number;
             return cast(rawptr) (cast(uintptr) best + sizeof heap_allocated_block);
         }
 
@@ -144,6 +147,7 @@ get_freed_size :: () => {
             ret := cast(^heap_allocated_block) heap_state.next_alloc;
             ret.size = size;
             ret.size |= Allocated_Flag;
+            ret.magic_number = Alloc_Block_Magic_Number;
 
             heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
             heap_state.remaining_space -= size;
@@ -161,6 +165,7 @@ get_freed_size :: () => {
         ret := cast(^heap_allocated_block) heap_state.next_alloc;
         ret.size = size;
         ret.size |= Allocated_Flag;
+        ret.magic_number = Alloc_Block_Magic_Number;
 
         heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + size);
         heap_state.remaining_space -= size;
@@ -185,12 +190,19 @@ get_freed_size :: () => {
                 log("INVALID DOUBLE FREE");
                 return;
             }
+
+            if hb_ptr.magic_number != Alloc_Block_Magic_Number {
+                log("FREEING INVALID BLOCK");
+                return;
+            }
         }
 
         hb_ptr.size &= ~Allocated_Flag;
         orig_size := hb_ptr.size - sizeof heap_allocated_block;
 
-        #if Enable_Debug do memory_fill(ptr, ~~0xcc, orig_size);
+        #if Enable_Debug && Enable_Clear_Freed_Memory {
+            memory_fill(ptr, ~~0xcc, orig_size);
+        }
 
         if cast(uintptr) hb_ptr + hb_ptr.size < cast(uintptr) heap_state.next_alloc {
             next_block := cast(^heap_freed_block) (cast(uintptr) hb_ptr + hb_ptr.size);
@@ -275,6 +287,7 @@ get_freed_size :: () => {
 
             hb_ptr.size = new_size;
             hb_ptr.size |= Allocated_Flag;
+            hb_ptr.magic_number = Alloc_Block_Magic_Number;
             heap_state.next_alloc = cast(rawptr) (cast(uintptr) heap_state.next_alloc + needed_size);
             heap_state.remaining_space -= needed_size;
             return ptr;
