@@ -14,6 +14,7 @@ typedef enum TokenType {
 
     Token_Type_Comment              = 258,
 
+    Token_Type_Keyword_Start,
     Token_Type_Keyword_Package,
     Token_Type_Keyword_Struct,
     Token_Type_Keyword_Enum,
@@ -39,6 +40,7 @@ typedef enum TokenType {
     Token_Type_Keyword_Macro,
     Token_Type_Keyword_Interface,
     Token_Type_Keyword_Where,
+    Token_Type_Keyword_End,
 
     Token_Type_Right_Arrow,
     Token_Type_Left_Arrow,

@@ -3369,9 +3369,16 @@ static void parse_top_level_statement(OnyxParser* parser) {
             }
             else {
                 OnyxToken* directive_token = expect_token(parser, '#');
-                OnyxToken* symbol_token = expect_token(parser, Token_Type_Symbol);
+                OnyxToken* symbol_token = parser->curr;
+                consume_token(parser);
 
-                onyx_report_error(directive_token->pos, Error_Critical, "unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+                onyx_report_error(directive_token->pos, Error_Critical, "Unknown directive '#%b'.", symbol_token->text, symbol_token->length);
+
+                if (symbol_token->type > Token_Type_Keyword_Start && symbol_token->type < Token_Type_Keyword_End) {
+                    onyx_report_error(directive_token->pos, Error_Critical, "Did you mean the keyword, '%s'?",
+                        token_name(symbol_token->type));
+                }
+
                 return;
             }
 

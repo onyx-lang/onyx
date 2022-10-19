@@ -675,6 +675,20 @@ comp :: macro (i: $I/Iterable, value: Code) => {
 }
 
 
+//
+// Maybe at some point an alternate allocator would be good
+// for this? For now, I think the temporary allocator is sufficient.
+generator :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool)) -> Iterator(T) {
+    v := raw_alloc(context.temp_allocator, sizeof Ctx);
+    core.memory.copy(v, ctx, sizeof Ctx);
+
+    return .{
+        data = v,
+        next = gen
+    };
+}
+
+
 #if runtime.Multi_Threading_Enabled {
     #local sync :: core.sync
 

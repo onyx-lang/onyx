@@ -12,6 +12,7 @@ static const char* token_type_names[] = {
 
     "TOKEN_TYPE_COMMENT",
 
+    "", // start
     "package",
     "struct",
     "enum",
@@ -37,6 +38,7 @@ static const char* token_type_names[] = {
     "macro",
     "interface",
     "where",
+    "", // end
 
     "->",
     "<-",
