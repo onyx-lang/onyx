@@ -14,6 +14,40 @@ close :: (it: Iterator($T)) {
     }
 }
 
+// Implicit iterator
+
+#local
+ImplicitIterator :: interface (t: $T) {
+    { t->iter_open() } -> void;
+    t->iter_next();
+    { t->iter_close() } -> void;
+
+    {
+        do {
+            value, success := t->iter_next();
+            return success;
+        }
+    } -> bool;
+}
+
+#overload #precedence 10000
+as_iterator :: (x: $T/ImplicitIterator) => {
+    extract_iterator_type :: macro (x: $T, next: (T) -> ($I, bool)) -> Iterator(I) {
+        x->iter_open();
+
+        return .{
+            data  = x,
+            next  = next,
+            close = x.iter_close
+        };
+    }
+
+    return extract_iterator_type(x, T.iter_next);
+}
+
+
+// Iterator Modifiers
+
 filter :: #match #local {}
 #overload
 filter :: (it: Iterator($T), predicate: (T) -> bool, allocator := context.temp_allocator) -> Iterator(T) {

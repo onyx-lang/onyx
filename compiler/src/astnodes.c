@@ -638,8 +638,12 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                         node->token->text, node->token->length,
                         type_get_name(type),
                         closest);
-                    return TYPE_MATCH_FAILED;
+                } else {
+                    onyx_report_error(node->token->pos, Error_Critical, "'%b' does not exist in '%s'.",
+                        node->token->text, node->token->length, type_get_name(type));
                 }
+
+                return TYPE_MATCH_FAILED;
             }
 
             return TYPE_MATCH_YIELD;
