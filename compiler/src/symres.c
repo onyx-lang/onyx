@@ -113,8 +113,9 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
     s_node->flags |= Ast_Flag_Comptime;
 
     if (s_node->scope) {
-        // FIX: This is probably wrong for the long term.
-        s_node->scope->parent = curr_scope;
+        assert(s_node->entity);
+        assert(s_node->entity->scope);
+        s_node->scope->parent = s_node->entity->scope;
 
         scope_enter(s_node->scope);
     }
