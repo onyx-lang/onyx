@@ -203,7 +203,9 @@ CheckStatus check_if(AstIfWhile* ifnode) {
         CHECK(expression, &ifnode->cond);
 
         if (!type_is_bool(ifnode->cond->type)) {
-            ERROR_(ifnode->cond->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(ifnode->cond->type));
+            if (!implicit_cast_to_bool(&ifnode->cond)) {
+                ERROR_(ifnode->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(ifnode->cond->type));
+            }
         }
 
         if (ifnode->true_stmt)  CHECK(statement, (AstNode **) &ifnode->true_stmt);
@@ -219,7 +221,9 @@ CheckStatus check_while(AstIfWhile* whilenode) {
     CHECK(expression, &whilenode->cond);
 
     if (!type_is_bool(whilenode->cond->type)) {
-        ERROR_(whilenode->cond->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(whilenode->cond->type));
+        if (!implicit_cast_to_bool(&whilenode->cond)) {
+            ERROR_(whilenode->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(whilenode->cond->type));
+        }
     }
 
     if (whilenode->true_stmt)  CHECK(statement, (AstNode **) &whilenode->true_stmt);
@@ -1028,7 +1032,22 @@ CheckStatus check_binaryop_compare(AstBinaryOp** pbinop) {
 CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
-    if (!type_is_bool(binop->left->type) || !type_is_bool(binop->right->type)) {
+    b32 left_is_bool = 0;
+    b32 right_is_bool = 0;
+
+    if (type_is_bool(binop->left->type)) {
+        left_is_bool = 1;
+    } else if (implicit_cast_to_bool(&binop->left)) {
+        left_is_bool = 1;
+    }
+
+    if (type_is_bool(binop->right->type)) {
+        right_is_bool = 1;
+    } else if (implicit_cast_to_bool(&binop->right)) {
+        right_is_bool = 1;
+    }
+
+    if (!left_is_bool || !right_is_bool) {
         report_bad_binaryop(binop);
         return Check_Error;
     }
@@ -1227,16 +1246,15 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
         if (!cast_is_legal(unaryop->expr->type, unaryop->type, &err)) {
             ERROR_(unaryop->token->pos, "Cast Error: %s", err);
         }
-
-    } else {
-        unaryop->type = unaryop->expr->type;
     }
 
     if (unaryop->operation == Unary_Op_Not) {
         if (!type_is_bool(unaryop->expr->type)) {
-            ERROR_(unaryop->token->pos,
-                    "Bool negation operator expected bool type, got '%s'.",
-                    node_get_type_name(unaryop->expr));
+            if (!implicit_cast_to_bool(&unaryop->expr)) {
+                ERROR_(unaryop->token->pos,
+                        "Bool negation operator expected bool type, got '%s'.",
+                        node_get_type_name(unaryop->expr));
+            }
         }
     }
 
@@ -1246,6 +1264,10 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
                     "Bitwise operator expected integer type, got '%s'.",
                     node_get_type_name(unaryop->expr));
         }
+    }
+
+    if (unaryop->operation != Unary_Op_Cast) {
+        unaryop->type = unaryop->expr->type;
     }
 
     if (unaryop->expr->flags & Ast_Flag_Comptime) {
@@ -1475,8 +1497,10 @@ CheckStatus check_if_expression(AstIfExpression* if_expr) {
     CHECK(expression, &if_expr->false_expr);
 
     TYPE_CHECK(&if_expr->cond, &basic_types[Basic_Kind_Bool]) {
-        ERROR_(if_expr->token->pos, "If-expression expected boolean for condition, got '%s'.",
-            type_get_name(if_expr->cond->type));
+        if (!implicit_cast_to_bool(&if_expr->cond)) {
+            ERROR_(if_expr->token->pos, "If-expression expected boolean for condition, got '%s'.",
+                type_get_name(if_expr->cond->type));
+        }
     }
 
     resolve_expression_type((AstTyped *) if_expr);

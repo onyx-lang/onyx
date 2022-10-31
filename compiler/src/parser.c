@@ -1968,8 +1968,13 @@ static void struct_type_create_scope(OnyxParser *parser, AstStructType *s_node) 
         s_node->scope = scope_create(context.ast_alloc, parser->current_scope, s_node->token->pos);
         parser->current_scope = s_node->scope;
 
-        OnyxToken* current_symbol = bh_arr_last(parser->current_symbol_stack);
-        s_node->scope->name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
+        if (bh_arr_length(parser->current_symbol_stack) == 0) {
+            s_node->scope->name = "<anonymous>";
+
+        } else {
+            OnyxToken* current_symbol = bh_arr_last(parser->current_symbol_stack);
+            s_node->scope->name = bh_aprintf(global_heap_allocator, "%b", current_symbol->text, current_symbol->length);
+        }
     }
 }
 
@@ -2046,6 +2051,8 @@ static AstStructType* parse_struct(OnyxParser* parser) {
 
     expect_token(parser, '{');
 
+    struct_type_create_scope(parser, s_node);
+
     b32 member_is_used = 0;
     bh_arr(OnyxToken *) member_list_temp = NULL;
     bh_arr_new(global_heap_allocator, member_list_temp, 4);
@@ -2054,8 +2061,6 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         if (parser->hit_unexpected_token) return s_node;
 
         if (parse_possible_directive(parser, "persist")) {
-            struct_type_create_scope(parser, s_node);
-            
             b32 thread_local = parse_possible_directive(parser, "thread_local");
 
             OnyxToken* symbol = expect_token(parser, Token_Type_Symbol);
@@ -2070,8 +2075,6 @@ static AstStructType* parse_struct(OnyxParser* parser) {
         }
 
         if (next_tokens_are(parser, 3, Token_Type_Symbol, ':', ':')) {
-            struct_type_create_scope(parser, s_node);
-
             OnyxToken* binding_name = expect_token(parser, Token_Type_Symbol);
             consume_token(parser);
 

@@ -1185,6 +1185,48 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     return 1;
 }
 
+b32 implicit_cast_to_bool(AstTyped **pnode) {
+    AstTyped *node = *pnode;
+
+    if (node->type->kind == Type_Kind_Pointer) {
+        AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
+        zero->type = &basic_types[Basic_Kind_Rawptr];
+
+        AstBinaryOp* cmp = make_binary_op(context.ast_alloc, Binary_Op_Not_Equal, node, (AstTyped *) zero);
+        cmp->token = node->token;
+        cmp->type = &basic_types[Basic_Kind_Bool];
+
+        *pnode = (AstTyped *) cmp;
+        return 1;
+    }
+
+    if (node->type->kind == Type_Kind_Slice ||
+        node->type->kind == Type_Kind_DynArray ||
+        node->type->kind == Type_Kind_VarArgs) {
+        StructMember smem;
+        assert(type_lookup_member(node->type, "count", &smem));
+
+        // These fields are filled out here in order to prevent
+        // going through the type checker one more time.
+        AstFieldAccess *field = make_field_access(context.ast_alloc, node, "count");
+        field->offset = smem.offset;
+        field->idx = smem.idx;
+        field->type = smem.type;
+        field->flags |= Ast_Flag_Has_Been_Checked;
+
+        AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
+        zero->type = smem.type;
+
+        AstBinaryOp* cmp = make_binary_op(context.ast_alloc, Binary_Op_Not_Equal, (AstTyped *) field, (AstTyped *) zero);
+        cmp->type = &basic_types[Basic_Kind_Bool];
+
+        *pnode = (AstTyped *) cmp;
+        return 1;
+    }
+
+    return 0;
+}
+
 char* get_function_name(AstFunction* func) {
     if (func->kind != Ast_Kind_Function) return "<procedure>";
 

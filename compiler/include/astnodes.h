@@ -1723,6 +1723,8 @@ char *get_expression_string_value(AstTyped* node, b32 *out_is_valid);
 b32 cast_is_legal(Type* from_, Type* to_, char** err_msg);
 char* get_function_name(AstFunction* func);
 
+b32 implicit_cast_to_bool(AstTyped **pnode);
+
 AstNode* strip_aliases(AstNode* node);
 
 AstNumLit*       make_bool_literal(bh_allocator, b32 b);
