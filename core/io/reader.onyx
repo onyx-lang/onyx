@@ -65,6 +65,7 @@ reader_reset :: (use reader: ^Reader) {
     done = false;
 }
 
+#overload delete :: reader_free
 reader_free :: (use reader: ^Reader) {
     memory.free_slice(^buffer, buffer_allocator);
 }

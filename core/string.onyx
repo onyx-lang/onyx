@@ -509,6 +509,22 @@ split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
     return strarr[0 .. delim_count + 1];
 }
 
+split_iter :: (s: str, delim: u8) -> Iterator(str) {
+    return iter.generator(
+        ^.{ s = s, delim = delim },
+
+        (ctx: ^$T) -> (str, bool) {
+            if string.empty(ctx.s) {
+                return "", false;
+            }
+
+            ret: str;
+            ret, ctx.s = bisect(ctx.s, ctx.delim);
+            return ret, true;
+        }
+    );
+}
+
 //
 // Splits a string into two parts, divided by the
 // first instance of the provided character. Either

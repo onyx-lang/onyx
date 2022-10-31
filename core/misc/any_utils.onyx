@@ -10,6 +10,11 @@ use runtime.info {
 
 to_any :: macro (x: ^$T) => any.{x, T};
 
+any_as :: (a: any, $T: type_expr) -> ^T {
+    if a.type != T do return null;
+    return cast(^T) a.data;
+}
+
 any_deference :: (v: any) -> any {
     t := get_type_info(v.type);
     if t.kind == .Pointer {

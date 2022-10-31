@@ -1,0 +1,89 @@
+package core.time
+
+use core
+
+@conv.Custom_Format.{_format}
+@conv.Custom_Parse.{_parse}
+Date :: struct {
+    year: i32;
+
+    // Note that `month` and `day` are 0-based.
+    month, day: i32;
+}
+
+#inject Date {
+    month_durations := u32.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    add_months :: (d: Date, days: i32) -> Date {
+        nd := d;
+
+        nd.month += 1;
+        if nd.month >= 12 {
+            nd.month = 0;
+            nd.year += 1;
+        }
+
+        return nd;
+    }
+
+    add_days :: (d: Date, days: i32) -> Date {
+        nd := d;
+        nd.day += days;
+
+        while nd.day >= Date.month_durations[nd.month] {
+            nd.day -= Date.month_durations[nd.month];
+
+            // February leap year case
+            if nd.month == 1 {
+                if nd.year % 4 == 0 && (nd.year % 100 != 0 || nd.year % 400 == 0) {
+                    nd.day -= 1;
+                }
+            }
+
+            nd.month += 1;
+            if nd.month >= 12 {
+                nd.month = 0;
+                nd.year += 1;
+            }
+        }
+
+        return nd;
+    }
+
+    before :: (d1, d2: Date) -> bool {
+        if d1.year != d2.year do return d1.year < d2.year;
+        if d1.month != d2.month do return d1.month < d2.month;
+        return d1.day < d2.day;
+    }
+
+    after :: (d1, d2: Date) -> bool {
+        if d1.year != d2.year do return d1.year > d2.year;
+        if d1.month != d2.month do return d1.month > d2.month;
+        return d1.day > d2.day;
+    }
+
+    _parse :: (d: ^Date, text: str, _: Allocator) -> bool {
+        year,  t  := string.bisect(text, #char "-");
+        month, t' := string.bisect(t,    #char "-");
+        day,   t' := string.bisect(t,    #char "-");
+
+        d.year  = ~~  conv.str_to_i64(year);
+        d.month = ~~ (conv.str_to_i64(month) - 1);
+        d.day   = ~~ (conv.str_to_i64(day) - 1);
+
+        return true;
+    }
+
+    _format :: (output: ^conv.Format_Output, format: ^conv.Format, date: ^Date) {
+        conv.format(output, "{}-{}-{}", date.year, date.month + 1, date.day + 1);
+    }
+}
+
+#operator  + macro (d: Date, days: i32) => d->add_days(days);
+#operator  - macro (d: Date, days: i32) => d->add_days(-days);
+
+#operator == (d1, d2: Date) =>
+    d1.year == d2.year &&
+    d1.month == d2.month &&
+    d1.day == d2.day;
+

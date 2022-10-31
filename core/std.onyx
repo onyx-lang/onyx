@@ -41,6 +41,8 @@ package core
 
 #load "./misc/any_utils"
 
+#load "./encoding/csv"
+
 #local runtime :: package runtime
 #if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
     #load "./os/file"
@@ -53,6 +55,7 @@ package core
 
     #load "./os/process"
     #load "./time/time"
+    #load "./time/date"
 
     #load "./net/net"
     #load "./net/tcp"

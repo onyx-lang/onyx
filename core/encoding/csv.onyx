@@ -1,0 +1,113 @@
+package core.encoding.csv
+
+use core {string, array, iter, conv, io}
+use core.misc {any_as}
+use runtime.info {
+    get_type_info,
+    Type_Info_Struct
+}
+
+CSV :: struct (Output_Type: type_expr) {
+    entries: [..] Output_Type;
+}
+
+CSV_Column :: struct {
+    name: str;
+}
+
+#inject CSV {
+    make :: ($T: type_expr) => {
+        r := CSV(T).{};
+        r.entries = make(typeof r.entries);
+
+        return r;
+    }
+
+    delete :: (csv: ^CSV) {
+        delete(^csv.entries);
+    }
+    
+    ingress :: (csv: ^CSV, contents: str, headers_present := true) -> bool {
+        Header :: struct {
+            type: type_expr;
+            offset: i32;
+        }
+
+        s := contents;
+        any_headers := make([..] Header);
+        defer delete(^any_headers);
+
+        output_type_info: ^Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+
+        if headers_present {
+            header_line, s' := string.bisect(s, #char "\n");
+            for header: string.split_iter(header_line, #char ",") {
+                member := array.first(output_type_info.members, #(do {
+                    if tag := array.first(it.tags, #(it.type == CSV_Column)); tag {
+                        return any_as(*tag, CSV_Column).name == header;
+                    }
+
+                    return false;
+                }));
+
+                any_headers << (.{member.type, member.offset}) if member else .{void, -1};
+            }
+
+        } else {
+            for ^member: output_type_info.members {
+                any_headers << .{ member.type, member.offset };
+            }
+        }
+
+        for line: string.split_iter(s, #char "\n") {
+            out: csv.Output_Type;
+
+            for entry:
+                string.split_iter(line, #char ",")
+                |> iter.enumerate()
+            {
+                header := ^any_headers[entry.index];
+                if header.offset == -1 do continue;
+
+                target := cast(^u8) ^out + header.offset;
+
+                if header.type == str {
+                    *cast(^str) target = string.alloc_copy(entry.value);
+                } else {
+                    conv.parse_any(target, header.type, entry.value);
+                }
+            }
+
+            csv.entries << out;
+        }
+    }
+
+    egress :: (csv: ^CSV, writer: ^io.Writer, include_headers := true) {
+        output_type_info: ^Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
+
+        if include_headers {
+            for ^member: output_type_info.members {
+                if !#first do io.write(writer, ",");
+
+                if tag := array.first(member.tags, #(it.type == CSV_Column)); tag {
+                    io.write(writer, any_as(*tag, CSV_Column).name);
+                } else {
+                    io.write(writer, member.name);
+                }
+            }
+
+            io.write(writer, "\n");
+        }
+
+        for ^it: csv.entries {
+            for ^member: output_type_info.members {
+                if !#first do io.write(writer, ",");
+
+                io.write_format_va(writer, "{}", .[ .{cast(^u8) it + member.offset, member.type} ]);
+            }
+
+            io.write(writer, "\n");
+        }
+    }
+}
+
