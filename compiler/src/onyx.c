@@ -74,6 +74,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .use_post_mvp_features   = 1,
         .use_multi_threading     = 0,
+        .no_std                  = 0,
 
         .runtime = Runtime_Onyx,
 
@@ -161,6 +162,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
             else if (!strcmp(argv[i], "--generate-foreign-info")) {
                 options.generate_foreign_info = 1;
+            }
+            else if (!strcmp(argv[i], "--no-std")) {
+                options.no_std = 1;
             }
             else if (!strcmp(argv[i], "-I")) {
                 bh_arr_push(options.included_folders, argv[++i]);
@@ -316,6 +320,15 @@ static void context_init(CompileOptions* opts) {
     bh_arr_each(const char *, filename, opts->files) {
         AstInclude* load_node = create_load(context.ast_alloc, (char *) *filename);
         add_entities_for_node(NULL, (AstNode *) load_node, context.global_scope, NULL);
+    }
+
+    if (!context.options->no_std) {
+        entity_heap_insert(&context.entities, ((Entity) {
+            .state = Entity_State_Parse,
+            .type = Entity_Type_Load_File,
+            .package = NULL,
+            .include = create_load(context.ast_alloc, "core/std"),
+        }));
     }
 }
 

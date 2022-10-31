@@ -1579,6 +1579,7 @@ struct CompileOptions {
     b32 use_post_mvp_features : 1;
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
+    b32 no_std                : 1;
 
     Runtime runtime;
 
