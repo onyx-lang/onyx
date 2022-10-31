@@ -41,8 +41,6 @@ package core
 
 #load "./misc/any_utils"
 
-#load "./encoding/csv"
-
 #local runtime :: package runtime
 #if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
     #load "./os/file"
@@ -75,6 +73,9 @@ package core
 #if runtime.runtime != .Custom {
     #load "./runtime/info/helper"
     #load "./stdio"
+
+    #load "./encoding/base64"
+    #load "./encoding/csv"
 }
 
 #if runtime.Multi_Threading_Enabled {

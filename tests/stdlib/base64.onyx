@@ -1,0 +1,32 @@
+use core.encoding
+
+decode_test :: () {
+    for .[
+        "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu",
+        "bGlnaHQgdw==",
+        "bGlnaHQgd28=",
+        "bGlnaHQgd29y",
+    ] {
+        core.println(base64.decode(it));
+    }
+}
+
+encode_test :: () {
+    for .[
+        "Many hands make light work.",
+        "light w",
+        "light wo",
+        "light wor",
+        "light work",
+    ] {
+        encoded := base64.encode(it);
+        core.println(encoded);
+    }
+}
+
+main :: () {
+    decode_test();
+    core.println("\n");
+    encode_test();
+}
+

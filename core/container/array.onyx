@@ -305,6 +305,8 @@ contains :: #match #locked {
     }
 }
 
+empty :: (arr: [] $T) => arr.count == 0;
+
 // Uses '+' to sum.
 sum :: (arr: [] $T, start: T = 0) -> T {
     sum := start;

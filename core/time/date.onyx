@@ -14,6 +14,10 @@ Date :: struct {
 #inject Date {
     month_durations := u32.[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
+    make :: (year, month, day: i32) -> Date {
+        return .{ year, month - 1, day - 1 };
+    }
+
     add_months :: (d: Date, days: i32) -> Date {
         nd := d;
 
@@ -51,13 +55,13 @@ Date :: struct {
     }
 
     before :: (d1, d2: Date) -> bool {
-        if d1.year != d2.year do return d1.year < d2.year;
+        if d1.year  != d2.year  do return d1.year  < d2.year;
         if d1.month != d2.month do return d1.month < d2.month;
         return d1.day < d2.day;
     }
 
     after :: (d1, d2: Date) -> bool {
-        if d1.year != d2.year do return d1.year > d2.year;
+        if d1.year  != d2.year  do return d1.year  > d2.year;
         if d1.month != d2.month do return d1.month > d2.month;
         return d1.day > d2.day;
     }
