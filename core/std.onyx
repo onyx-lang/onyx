@@ -21,6 +21,7 @@ package core
 #load "./string"
 #load "./string/reader"
 #load "./string/buffer"
+#load "./string/char_utils"
 
 #load "./intrinsics/onyx"
 #load "./intrinsics/wasm"

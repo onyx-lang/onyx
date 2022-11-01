@@ -4,9 +4,14 @@ use runtime.info {
     get_type_info,
     Type_Info_Pointer,
     Type_Info_Struct,
+    Type_Info_Array,
+    Type_Info_Slice,
+    Type_Info_Dynamic_Array,
 
     get_struct_member
 }
+
+use core { iter, array }
 
 to_any :: macro (x: ^$T) => any.{x, T};
 
@@ -15,17 +20,32 @@ any_as :: (a: any, $T: type_expr) -> ^T {
     return cast(^T) a.data;
 }
 
-any_deference :: (v: any) -> any {
+// Dereference an pointer any.
+any_dereference :: (v: any) -> any {
     t := get_type_info(v.type);
     if t.kind == .Pointer {
         p := cast(^Type_Info_Pointer) t;
         return any.{*cast(^rawptr) v.data, p.to};
     }
 
-    return .{null, void};
+    return v;
 }
 
-any_get_member :: (v: any, member_name: str) -> any {
+// Subscript an array-like any.
+any_subscript :: (v: any, index: i32) -> any {
+    base_ptr, elem_type, count := any_as_array(v);
+    if index >= count || index < 0 {
+        return .{ null, void };
+    }
+
+    return any.{
+        cast(^u8) base_ptr + get_type_info(elem_type).size * index,
+        elem_type
+    };
+}
+
+// Select a member from an any.
+any_selector :: (v: any, member_name: str) -> any {
     t := get_type_info(v.type);
     if t.kind == .Struct {
         member := get_struct_member(v.type, member_name);
@@ -40,7 +60,7 @@ any_get_member :: (v: any, member_name: str) -> any {
 any_to_map :: (v: any) -> (Map(str, any), success: bool) {
     vals := v;
     if get_type_info(vals.type).kind == .Pointer {
-        vals = any_deference(vals);
+        vals = any_dereference(vals);
     }
 
     val_info := cast(^Type_Info_Struct) get_type_info(vals.type);
@@ -50,9 +70,57 @@ any_to_map :: (v: any) -> (Map(str, any), success: bool) {
 
     out: Map(str, any);
     for ^ val_info.members {
-        out->put(it.name, any_get_member(vals, it.name));
+        out->put(it.name, any_selector(vals, it.name));
     }
 
     return out, true;
 }
 
+// Creates an iterator out of an array-like any.
+any_iter :: (arr: any) -> Iterator(any) {
+    base_ptr, elem_type, count := any_as_array(arr);
+    if count == 0 {
+        return .{ null, ((_) => any.{}, false) };
+    }
+
+    return iter.generator(
+        ^.{
+            base_ptr  = base_ptr,
+            elem_type = elem_type,
+            elem_size = get_type_info(elem_type).size,
+            count     = count,
+            index     = 0,
+        },
+
+        (ctx: $T) -> (any, bool) {
+            if ctx.index < ctx.count {
+                defer ctx.index += 1;
+                return any.{ cast(^u8) ctx.base_ptr + ctx.elem_size * ctx.index, ctx.elem_type }, true;
+            }
+
+            return .{}, false;
+        }
+    );
+}
+
+
+#local
+any_as_array :: (arr: any) -> (rawptr, type_expr, u32) {
+    info := get_type_info(arr.type);
+
+    switch info.kind {
+        case .Array {
+            a := cast(^Type_Info_Array) info;
+            return arr.data, a.of, a.count;
+        }
+
+        case .Slice, .Dynamic_Array, .Variadic_Argument {
+            a := cast(^array.Untyped_Array) arr.data;
+            return a.data, (cast(^Type_Info_Dynamic_Array) info).of, a.count;
+        }
+
+        case #default {
+            return null, void, 0;
+        }
+    }
+}

@@ -1188,7 +1188,9 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
 b32 implicit_cast_to_bool(AstTyped **pnode) {
     AstTyped *node = *pnode;
 
-    if (node->type->kind == Type_Kind_Pointer) {
+    if ((node->type->kind == Type_Kind_Basic &&
+        node->type->Basic.kind == Basic_Kind_Rawptr)
+        || (node->type->kind == Type_Kind_Pointer)) {
         AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
         zero->type = &basic_types[Basic_Kind_Rawptr];
 
