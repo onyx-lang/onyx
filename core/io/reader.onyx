@@ -20,7 +20,9 @@ Reader :: struct {
     // that is available. Only set this if you know that the data
     // will always be available.
     greedy : bool;
+}
 
+#inject Reader {
     is_empty :: reader_empty;
     empty    :: reader_empty;
     read_all :: read_all;

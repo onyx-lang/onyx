@@ -1,12 +1,12 @@
 package core.alloc
 
-#load "./alloc/arena"
-#load "./alloc/fixed"
-#load "./alloc/heap"
-#load "./alloc/ring"
-#load "./alloc/pool"
-#load "./alloc/logging"
-#load "./alloc/gc"
+#load "./arena"
+#load "./fixed"
+#load "./heap"
+#load "./ring"
+#load "./pool"
+#load "./logging"
+#load "./gc"
 
 as_allocator :: #match {
     macro (a: Allocator) => a

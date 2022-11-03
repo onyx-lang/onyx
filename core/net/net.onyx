@@ -10,6 +10,10 @@ Socket :: struct {
     type: SocketType;
     family: SocketDomain;
 
+}
+
+// Inject methods for the socket
+#inject Socket {
     close     :: socket_close
     setting   :: socket_setting
     is_alive  :: socket_is_alive

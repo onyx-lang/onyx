@@ -425,6 +425,27 @@ run_list_versions :: (args: [] cstr) {
     }
 }
 
+#tag Command.{ "run", "Run the command provided in `config.run_cmd`." }
+run_run_command :: (args: [] cstr) {
+    if !string.empty(config.config.run_cmd) {
+        run_command_and_forward_output(config.config.run_cmd);
+    }
+}
+
+#tag Command.{ "debug", "Run the command provided in `config.debug_cmd`." }
+run_debug_command :: (args: [] cstr) {
+    if !string.empty(config.config.debug_cmd) {
+        run_command_and_forward_output(config.config.debug_cmd);
+    }
+}
+
+#tag Command.{ "test", "Run the command provided in `config.test_cmd`." }
+run_test_command :: (args: [] cstr) {
+    if !string.empty(config.config.test_cmd) {
+        run_command_and_forward_output(config.config.test_cmd);
+    }
+}
+
 
 #local {
     #if runtime.compiler_os == .Linux {
@@ -560,6 +581,22 @@ run_native_library_installation :: (folder: str) -> bool {
 
         return success;
     }
+}
+
+run_command_and_forward_output :: (cmd: str) => {
+    args := string.split(cmd, #char " ", context.temp_allocator);
+    prog := args[0];
+    args  = args[1 .. args.count];
+
+    run_proc := os.process_spawn(prog, args);
+    r := io.reader_make(^run_proc);
+
+    while !(r->empty()) {
+        line := r->read_line(consume_newline=true);
+        print(line);
+    }
+
+    return os.process_wait(^run_proc);
 }
 
 
@@ -791,6 +828,9 @@ Config :: struct {
     Config :: struct {
         lib_source_directory: str = "./lib";
         lib_bin_directory: str    = "./bin";
+        run_cmd: str;
+        debug_cmd: str;
+        test_cmd: str;
     }
     config: Config = .{};
 
@@ -931,8 +971,7 @@ parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseE
         output.type = (cast(^info.Type_Info_Pointer) t).to;
     }
 
-    // Set the temporary allocator to an arena that will be freed at the end.
-    alloc.arena.auto(32 * 1024,  #(context.temp_allocator));
+    defer alloc.clear_temp_allocator();
 
     active_item_ptr  := null;
     active_item_type := void;

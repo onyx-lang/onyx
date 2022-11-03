@@ -1,0 +1,98 @@
+package core.conv
+
+use core {map, string, array, math}
+
+//
+// This should be called with a pointer for the first argument.
+//
+//      x: i32;
+//      parse_any(^x, "12.34");
+parse_any :: #match {}
+#match parse_any (v: any, to_parse: str, string_allocator := context.allocator) -> bool {
+    use package runtime.info;
+
+    info := get_type_info(v.type);
+    if info.kind != .Pointer do return false;
+
+    data_type := (cast(^Type_Info_Pointer) info).to;
+    target := *cast(^rawptr) v.data;
+    return parse_any(target, data_type, to_parse, string_allocator);
+}
+
+#match parse_any (target: rawptr, data_type: type_expr, to_parse: str, string_allocator := context.allocator) -> bool {
+    if custom_parsers->has(data_type) {
+        return custom_parsers[data_type](target, to_parse, string_allocator);
+    }
+
+    use runtime.info;
+    info := get_type_info(data_type);
+
+    switch data_type {
+        case bool {
+            dest := cast(^bool) target;
+            *dest = false;
+            if to_parse[0] == #char "t" || to_parse[0] == #char "T" {
+                *dest = true;
+            }
+            return true;
+        }
+
+        integer_case :: macro (T: type_expr) {
+            case T {
+                dest := cast(^T) target;
+                *dest = cast(T) str_to_i64(to_parse);
+                return true;
+            }
+        }
+
+        integer_case(i8);
+        integer_case(i16);
+        integer_case(i32);
+        integer_case(i64);
+        integer_case(u8);
+        integer_case(u16);
+        integer_case(u32);
+        integer_case(u64);
+
+        case f32 {
+            dest := cast(^f32) target;
+            *dest = ~~ str_to_f64(to_parse);
+            return true;
+        }
+
+        case f64 {
+            dest := cast(^f64) target;
+            *dest = ~~ str_to_f64(to_parse);
+            return true;
+        }
+
+        case str {
+            if to_parse.count == 0       do return false;
+            if to_parse[0] != #char "\"" do return false;
+            line := to_parse;
+            string.advance(^line);
+
+            //
+            // For now, this will return a substring in the original to_parse.
+            dest := cast(^str) target;
+            *dest = string.read_until(^line, #char "\"") |> string.alloc_copy(string_allocator); // @BUG // This does not handle escaped strings!
+            return true;
+        }
+
+        case #default {
+            if info.kind == .Enum {
+                // TEMPORARY this needs to look at the backing type for the
+                // enum in order to know how large this integer should be.
+                *cast(^u32) target = ~~ str_to_i64(to_parse);
+                return true;
+            }
+
+            if info.kind == .Distinct {
+                d_info := cast(^Type_Info_Distinct) info;
+                return parse_any(target, d_info.base_type, to_parse, string_allocator);
+            }
+        }
+    }
+
+    return false;
+}

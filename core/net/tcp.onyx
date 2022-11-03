@@ -1,6 +1,6 @@
 package core.net
 
-use core {sync, thread, array, memory, alloc, os}
+use core {sync, thread, array, memory, alloc, os, iter}
 
 #if !runtime.Multi_Threading_Enabled {
     #error "Expected multi-threading to be enabled for TCP server.";
@@ -57,35 +57,32 @@ TCP_Event :: struct {
     }
 }
 
-tcp_get_events :: (use conn: ^TCP_Connection) -> Iterator(TCP_Event) {
-    next :: (use conn: ^TCP_Connection) -> (TCP_Event, bool) {
-        if event_cursor == events.count do return .{}, false;
-
-        defer event_cursor += 1;
-        return events[event_cursor], true;
-    }
-
-    close :: (use conn: ^TCP_Connection) {
-        for events {
-            switch it.kind {
-                case .Data {
-                    raw_free(event_allocator, (cast(^TCP_Event.Data) it.data).contents.data);
-                }
-            }
-
-            raw_free(event_allocator, it.data);
-        }
-
-        array.clear(^events);
-    }
-
+tcp_get_events :: (use conn: ^TCP_Connection) => {
     conn.event_cursor = 0;
 
-    return .{
-        data  = conn,
-        next  = next,
-        close = close,
-    };
+    return iter.generator(
+        conn,
+
+        (use conn: ^TCP_Connection) -> (TCP_Event, bool) {
+            if event_cursor == events.count do return .{}, false;
+
+            defer event_cursor += 1;
+            return events[event_cursor], true;
+        },
+
+        (use conn: ^TCP_Connection) {
+            for events {
+                switch it.kind {
+                    case .Data {
+                        raw_free(event_allocator, (cast(^TCP_Event.Data) it.data).contents.data);
+                    }
+                }
+
+                raw_free(event_allocator, it.data);
+            }
+
+            array.clear(^events);
+        });
 }
 
 
@@ -96,24 +93,6 @@ tcp_get_events :: (use conn: ^TCP_Connection) -> Iterator(TCP_Event) {
 TCP_Server :: struct {
     use connection: TCP_Connection;
 
-    Client :: struct {
-        use socket  : Socket;
-        address : Socket_Address;
-        state   : State;
-
-        recv_ready_event_present := false;
-
-        State :: enum {
-            Alive;
-            Being_Killed;
-            Dying;
-            Dead;
-        }
-
-        read_complete :: (use this: ^Client) {
-            recv_ready_event_present = false;
-        }
-    }
     client_allocator: Allocator;
     clients: [] ^Client;
 
@@ -134,6 +113,29 @@ TCP_Server :: struct {
     broadcast     :: tcp_server_broadcast
     handle_events :: tcp_server_handle_events
     kill_client   :: tcp_server_kill_client
+}
+
+#inject TCP_Server {
+    Client :: struct {
+        use socket  : Socket;
+        address : Socket_Address;
+        state   : State;
+
+        recv_ready_event_present := false;
+
+        State :: enum {
+            Alive;
+            Being_Killed;
+            Dying;
+            Dead;
+        }
+    }
+}
+
+#inject TCP_Server.Client {
+    read_complete :: (use this: ^TCP_Server.Client) {
+        recv_ready_event_present = false;
+    }
 }
 
 tcp_server_make :: (max_clients := 32, allocator := context.allocator) -> ^TCP_Server {

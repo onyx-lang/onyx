@@ -1,8 +1,8 @@
 package core
 
 
-#load "./alloc"
-#load "./memory"
+#load "./alloc/alloc"
+#load "./memory/memory"
 
 #load "./container/array"
 #load "./container/avl_tree"
@@ -13,12 +13,15 @@ package core
 #load "./container/bucket_array"
 #load "./container/heap"
 
-#load "./conv"
-#load "./math"
-#load "./random"
-#load "./hash"
+#load "./conv/conv"
+#load "./conv/format"
+#load "./conv/parse"
 
-#load "./string"
+#load "./math/math"
+#load "./random/random"
+#load "./hash/hash"
+
+#load "./string/string"
 #load "./string/reader"
 #load "./string/buffer"
 #load "./string/char_utils"
@@ -36,10 +39,10 @@ package core
 #load "./runtime/build_opts"
 #load "./runtime/common"
 #load "./runtime/default_link_options"
-#load "./arg_parse"
 
 #load "./test/testing"
 
+#load "./misc/arg_parse"
 #load "./misc/any_utils"
 
 #local runtime :: package runtime
@@ -73,7 +76,7 @@ package core
 #if runtime.runtime == .Js     { #load "./runtime/js" }
 #if runtime.runtime != .Custom {
     #load "./runtime/info/helper"
-    #load "./stdio"
+    #load "./io/stdio"
 
     #load "./encoding/base64"
     #load "./encoding/csv"

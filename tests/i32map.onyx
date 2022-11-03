@@ -19,7 +19,7 @@ main :: (args: [] cstr) {
 
     printf("{}{}\n", map.get(^imap, 50), map.get(^imap, 1234));
 
-    printf("{*}\n", ^imap);
+    printf("{*p}\n", ^imap);
 
     map.delete(^imap, 50);
     println(map.has(^imap, 50));

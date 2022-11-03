@@ -149,11 +149,21 @@ empty :: (use map: ^Map) -> bool {
 }
 
 format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V)) {
-    output->write("{\n");
-    for^ x.entries {
-        conv.format(output, "    {\"p} => {\"p}\n", it.key, it.value);
+    if format.pretty_printing {
+        output->write("{\n");
+        for^ x.entries {
+            conv.format(output, "    {\"p} => {\"p}\n", it.key, it.value);
+        }
+        output->write("}");
+
+    } else {
+        output->write("{ ");
+        for^ x.entries {
+            if !#first do output->write(", ");
+            conv.format(output, "{\"p} => {\"p}", it.key, it.value);
+        }
+        output->write(" }");
     }
-    output->write("}");
 }
 
 //
