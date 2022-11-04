@@ -105,7 +105,8 @@ ONYX_DEF(__kill_thread, (WASM_I32), (WASM_I32)) {
             #ifdef _BH_LINUX
             // This leads to some weirdness and bugs...
             //
-            pthread_kill(thread->thread, SIGKILL);
+            // pthread_kill(thread->thread, SIGKILL);
+            pthread_cancel(thread->thread);
             #endif
 
             #ifdef _BH_WINDOWS

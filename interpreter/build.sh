@@ -2,7 +2,7 @@
 
 . ../settings.sh
 
-# FLAGS="-g3"
+# FLAGS="-g3 -DOVM_DEBUG=1"
 # FLAGS="-g3 -DOVM_VERBOSE=1"
 FLAGS="-Ofast"
 LIBS="-pthread"

@@ -202,6 +202,8 @@ static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
             break;
 
           brk_send_error:
+            printf("[WARN ] Failed to set breakpoint at %s:%d (%x)\n", filename, line, instr);
+
             send_response_header(debug, msg_id);
             send_bool(debug, false);
             send_int(debug, -1);

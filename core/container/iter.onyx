@@ -33,7 +33,7 @@ ImplicitIterator :: interface (t: $T) {
 #overload #precedence 10000
 as_iterator :: (x: ^$T/ImplicitIterator) => {
     x->iter_open();
-    return generator(x, T.iter_next, T.iter_close);
+    return generator_no_copy(x, T.iter_next, T.iter_close);
 }
 
 
@@ -727,6 +727,17 @@ generator :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> void) -> I
         close = close
     };
 }
+
+generator_no_copy :: #match #local {}
+
+#overload
+generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool)) =>
+    Iterator(T).{ ctx, gen }
+
+#overload
+generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> void) =>
+    Iterator(T).{ ctx, gen, close }
+
 
 
 #if runtime.Multi_Threading_Enabled {

@@ -70,6 +70,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__exit)
     ONYX_FUNC(__sleep)
     ONYX_FUNC(__time)
+    ONYX_FUNC(__register_cleanup)
 
     ONYX_FUNC(__time_localtime)
     ONYX_FUNC(__time_gmtime)
@@ -83,6 +84,7 @@ ONYX_LIBRARY {
     ONYX_FUNC(__net_accept)
     ONYX_FUNC(__net_connect_unix)
     ONYX_FUNC(__net_connect_ipv4)
+    ONYX_FUNC(__net_shutdown)
     ONYX_FUNC(__net_send)
     ONYX_FUNC(__net_sendto)
     ONYX_FUNC(__net_recv)

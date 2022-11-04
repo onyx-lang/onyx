@@ -1246,8 +1246,6 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 #undef CMPXCHG
 
             case OVMI_BREAK:
-                printf("onyx: exiting early due to reaching an unreachable instruction.\n");
-                
                 if (state->debug) {
                     state->debug->state = debug_state_pausing;
                     state->debug->pause_reason = debug_pause_exception;
@@ -1255,6 +1253,8 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
                     assert(write(state->debug->state_change_write_fd, "1", 1));
                     sem_wait(&state->debug->wait_semaphore);
                 }
+                
+                printf("onyx: exiting early due to reaching an unreachable instruction.\n");
                 
                 return ((ovm_value_t) {0});
 

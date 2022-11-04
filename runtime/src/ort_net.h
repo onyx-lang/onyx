@@ -90,6 +90,12 @@ ONYX_DEF(__net_setting, (WASM_I32, WASM_I32, WASM_I32), ()) {
             setsockopt(s, SOL_SOCKET, SO_BROADCAST, (void *) &params->data[2].of.i32, sizeof(int));
             break;
         }
+
+        case 3: { // :EnumDependent  Reuse-Address
+            int s = params->data[0].of.i32;
+            setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (void *) &params->data[2].of.i32, sizeof(int));
+            break;
+        }
     }
     #endif
 
@@ -227,6 +233,16 @@ ONYX_DEF(__net_connect_ipv4, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32
     if (result == 0) results->data[0] = WASM_I32_VAL(0);
     else             results->data[0] = WASM_I32_VAL(3); // :EnumDependent
 
+    return NULL;
+    #endif
+
+    #ifdef _BH_WINDOWS
+    #endif
+}
+
+ONYX_DEF(__net_shutdown, (WASM_I32, WASM_I32), ()) {
+    #ifdef _BH_LINUX
+    shutdown(params->data[0].of.i32, params->data[1].of.i32);
     return NULL;
     #endif
 

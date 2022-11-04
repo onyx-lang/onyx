@@ -21,6 +21,7 @@ Socket :: struct {
     listen    :: socket_listen
     accept    :: socket_accept
     connect   :: socket_connect
+    shutdown  :: socket_shutdown
     send      :: socket_send
     sendto    :: socket_sendto
     sendall   :: socket_sendall
@@ -48,8 +49,15 @@ SocketType :: enum {
 }
 
 SocketSetting :: enum {
-    NonBlocking :: 0x01;
-    Broadcast   :: 0x02;
+    NonBlocking  :: 0x01;
+    Broadcast    :: 0x02;
+    ReuseAddress :: 0x03;
+}
+
+SocketShutdown :: enum {
+    Read :: 0;
+    Write :: 1;
+    ReadWrite :: 2;
 }
 
 #local UNIX_SOCKET_PATH_LEN :: 256
@@ -131,6 +139,10 @@ socket_bind :: (s: ^Socket, bind_address: ^Socket_Address) -> bool {
 
 socket_listen :: (s: ^Socket, backlog := 32) {
     __net_listen(s.handle, backlog);
+}
+
+socket_shutdown :: (s: ^Socket, how: SocketShutdown) {
+    __net_shutdown(s.handle, cast(u32) how);
 }
 
 socket_accept :: (s: ^Socket) -> (Socket, Socket_Address) {
@@ -271,6 +283,7 @@ network_to_host :: #match {}
     #package __net_accept        :: (handle: Socket.Handle, out_address: ^Socket_Address) -> Socket.Handle ---
     #package __net_connect_unix  :: (handle: Socket.Handle, path: str) -> SocketError ---
     #package __net_connect_ipv4  :: (handle: Socket.Handle, host: str, port: u16) -> SocketError ---
+    #package __net_shutdown      :: (handle: Socket.Handle, how: u32) -> void ---
     #package __net_send          :: (handle: Socket.Handle, data: [] u8)  -> i32 ---
     #package __net_sendto        :: (handle: Socket.Handle, data: [] u8, addr: ^Socket_Address)  -> i32 ---
     #package __net_recv          :: (handle: Socket.Handle, data: [] u8, async_would_block: ^bool) -> i32 ---
