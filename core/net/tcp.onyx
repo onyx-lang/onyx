@@ -107,7 +107,9 @@ TCP_Server :: struct {
     pulse_time_ms := 500;
 
     emit_data_events := true;
+}
 
+#inject TCP_Server {
     listen        :: tcp_server_listen
     stop          :: tcp_server_stop
     pulse         :: tcp_server_pulse
@@ -297,15 +299,6 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
             }
         }
     }
-
-    array.sort(clients, (a, b) => {
-        a_val := 1 if a == null else 0;
-        b_val := 1 if b == null else 0;
-
-        if a_val != b_val do return b_val - a_val;
-
-        return cast(i32) a.state - cast(i32) b.state;
-    });
 
     client_count = array.count_where(clients, #(it != null));
 

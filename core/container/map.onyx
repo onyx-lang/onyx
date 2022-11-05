@@ -31,6 +31,9 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
         value : V;
     }
 
+}
+
+#inject Map {
     //
     // These need to have aliases because some of them like
     // 'delete', collide with the global 'delete', which
@@ -44,6 +47,8 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     update  :: update
     clear   :: clear
     empty   :: empty
+    literal :: literal
+    as_iter :: as_iter
 }
 
 make :: ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {
@@ -165,6 +170,37 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
         output->write(" }");
     }
 }
+
+#local
+MapLiteralValue :: struct (K: type_expr, V: type_expr) {
+    key: K;
+    value: V;
+}
+
+literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, Value)) => {
+    m := core.map.make(Key, Value);
+    for ^ values {
+        m->put(it.key, it.value);
+    }
+
+    return m;
+}
+
+
+#overload core.iter.as_iterator as_iter
+
+as_iter :: (m: ^Map) =>
+    core.iter.generator(
+        ^.{ m = m, i = 0 },
+
+        (ctx) => {
+            if ctx.i >= ctx.m.entries.count {
+                return (typeof ctx.m.entries.data).{}, false;
+            }
+
+            defer ctx.i += 1;
+            return ^ctx.m.entries.data[ctx.i], true;
+        });
 
 //
 // Private symbols

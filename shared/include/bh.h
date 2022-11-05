@@ -282,6 +282,9 @@ BH_DEF BH_ALLOCATOR_PROC(bh_arena_allocator_proc);
 
 
 // ATOMIC ARENA ALLOCATOR
+// Currently, this is only available on Linux, as it is using pthreads.
+#ifdef _BH_LINUX
+
 typedef struct bh_atomic_arena {
     bh_allocator backing;
     ptr first_arena, current_arena;
@@ -299,6 +302,8 @@ BH_DEF void bh_atomic_arena_init(bh_atomic_arena* alloc, bh_allocator backing, i
 BH_DEF void bh_atomic_arena_free(bh_atomic_arena* alloc);
 BH_DEF bh_allocator bh_atomic_arena_allocator(bh_atomic_arena* alloc);
 BH_DEF BH_ALLOCATOR_PROC(bh_atomic_arena_allocator_proc);
+
+#endif
 
 
 
@@ -1158,6 +1163,7 @@ BH_ALLOCATOR_PROC(bh_arena_allocator_proc) {
 
 
 // ATOMIC ARENA ALLOCATOR IMPLEMENTATION
+#ifdef _BH_LINUX
 BH_DEF void bh_atomic_arena_init(bh_atomic_arena* alloc, bh_allocator backing, isize arena_size) {
     arena_size = bh_max(arena_size, size_of(ptr));
     ptr data = bh_alloc(backing, arena_size);
@@ -1241,6 +1247,7 @@ BH_DEF BH_ALLOCATOR_PROC(bh_atomic_arena_allocator_proc) {
     pthread_mutex_unlock(&alloc_arena->mutex);
     return retval;
 }
+#endif
 
 
 
