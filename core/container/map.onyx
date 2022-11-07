@@ -34,10 +34,6 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
 }
 
 #inject Map {
-    //
-    // These need to have aliases because some of them like
-    // 'delete', collide with the global 'delete', which
-    // causes it to map to the wrong function.
     init    :: init
     has     :: has
     get     :: get

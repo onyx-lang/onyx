@@ -3,34 +3,22 @@
 use package core
 
 count_iterator :: (lo: $T, hi: T, step: T = 1) -> Iterator(T) {
-    next :: (ci: ^CountIterator($T)) -> (T, bool) {
-        if ci.current > ci.high do return 0, false;
+    return iter.generator(
+        ^.{ low = lo, high = hi, step = step, current = lo },
+    
+        (ctx) => {
+            if ctx.current <= ctx.high {
+                defer ctx.current += ctx.step;
+                return ctx.current, true;
+            }
 
-        defer ci.current += ci.step;
-        return ci.current, true;
-    }
+            return 0, false;
+        },
 
-    close :: (data: rawptr) {
-        println("Closing the count iterator...");
-        cfree(data);
-    }
-
-    CountIterator :: struct (T:type_expr) {
-        low, high, step: T;
-        current: T;
-    }
-
-    count_iterator := new(CountIterator(T));
-    count_iterator.low = lo;
-    count_iterator.high = hi;
-    count_iterator.step = step;
-    count_iterator.current = lo;
-
-    return .{
-        data  = count_iterator,
-        next  = #solidify next {T=T},
-        close = close,
-    };
+        (ctx) => {
+            println("Closing the count iterator...");
+        }
+    );
 }
 
 main :: (args: [] cstr) {

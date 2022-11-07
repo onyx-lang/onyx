@@ -176,6 +176,10 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
         }
     }
 
+    new_temp :: macro (T: type_expr) => {
+        return new(T, allocator=context.temp_allocator);
+    }
+
     make :: #match {
         macro ($T: type_expr, allocator := context.allocator) => {
             return __make_overload(cast(^T) null, allocator=allocator);
@@ -184,6 +188,10 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
         macro ($T: type_expr, n: u32, allocator := context.allocator) => {
             return __make_overload(cast(^T) null, n, allocator=allocator);
         },
+    }
+
+    make_temp :: macro (T: type_expr) => {
+        return make(T, allocator=context.temp_allocator);
     }
 
     //

@@ -13,6 +13,9 @@ List :: struct (Elem_Type: type_expr) {
     last:  ^ListElem(Elem_Type) = null;
 
     // "Method" like things
+}
+
+#inject List {
     free         :: free
     push_end     :: push_end
     push_begin   :: push_begin
@@ -23,7 +26,7 @@ List :: struct (Elem_Type: type_expr) {
     contains     :: contains
     fold         :: fold
     map          :: map
-    get_iterator :: get_iterator
+    as_iter      :: as_iter
 }
 
 make :: ($T: type_expr, allocator := context.allocator) -> List(T) {
@@ -145,8 +148,8 @@ map :: #match #local {}
     }
 }
 
-#match core.iter.as_iterator get_iterator
-get_iterator :: (list: ^List($T)) -> Iterator(T) {
+#match core.iter.as_iterator as_iter
+as_iter :: (list: ^List($T)) -> Iterator(T) {
     iterator_next :: (list_iter: ^ListIterator($T)) -> (T, bool) {
         if list_iter.current == null do return .{}, false;
 
@@ -158,13 +161,12 @@ get_iterator :: (list: ^List($T)) -> Iterator(T) {
         current: ^ListElem(T);
     }
 
-    list_iterator := new(ListIterator(T));
+    list_iterator := new_temp(ListIterator(T));
     list_iterator.current = list.first;
 
     return .{
         data = list_iterator,
         next = #solidify iterator_next { T = T },
-        close = cfree,
     };
 }
 

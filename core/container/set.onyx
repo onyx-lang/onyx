@@ -20,7 +20,9 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
         hash  : u32;
         value : T;
     }
+}
 
+#inject Set {
     init     :: init
     free     :: free
     has      :: has
@@ -30,7 +32,7 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     remove   :: remove
     clear    :: clear
     empty    :: empty
-    iterator :: iterator
+    as_iter  :: as_iter
 }
 
 make :: ($T: type_expr, default := T.{}, allocator := context.allocator) -> Set(T) {
@@ -116,33 +118,20 @@ empty :: (use set: ^Set) -> bool {
     return entries.count == 0;
 }
 
-#match core.iter.as_iterator iterator
-iterator :: (set: ^Set($T)) -> Iterator(T) {
-    Context :: struct (T: type_expr) {
-        set: ^Set(T);
-        position: i32;
-    }
+#overload core.iter.as_iterator as_iter
 
-    context := new(Context(T));
-    context.set = set;
-    context.position = 0;
+as_iter :: (s: ^Set) =>
+    core.iter.generator(
+        ^.{ s = s, i = 0 },
 
-    next :: (use context: ^Context($T)) -> (T, bool) {
-        if position < set.entries.count {
-            defer position += 1;
-            return set.entries[position].value, true;
+        (ctx) => {
+            if ctx.i >= ctx.s.entries.count {
+                return (typeof ^ctx.s.entries.data.value).{}, false;
+            }
 
-        } else {
-            return .{}, false;
-        }
-    }
-
-    return .{
-        data = context,
-        next = #solidify next { T = T },
-        close = cfree,
-    };
-}
+            defer ctx.i += 1;
+            return ^ctx.s.entries.data[ctx.i].value, true;
+        });
 
 //
 // Private symbols

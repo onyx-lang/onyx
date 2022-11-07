@@ -455,33 +455,18 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
 
 #overload
 as_iterator :: from_array
-from_array :: (arr: [] $T) -> Iterator(^T) {
-    Context :: struct (T: type_expr) {
-        data: ^T;
-        count: u32;
-        current: u32;
-    }
+from_array :: (arr: [] $T) => generator(
+    ^.{ data = arr.data, count = arr.count, current = 0 },
 
-    c := make(Context(T), allocator=context.temp_allocator);
-    c.data = arr.data;
-    c.count = arr.count;
-    c.current = 0;
-
-    next :: (use _: ^Context($T)) -> (^T, bool) {
+    (use ctx: ^$T) -> (typeof ctx.data, bool) {
         if current < count {
             defer current += 1;
             return ^data[current], true;
-
-        } else {
-            return null, false;
         }
-    }
 
-    return .{
-        data  = c,
-        next  = #solidify next { T = T },
-    };
-}
+        return null, false;
+    }
+);
 
 #overload
 as_iterator :: (x: ^[..] $T) -> Iterator(T) {

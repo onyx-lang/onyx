@@ -65,7 +65,7 @@ Complex :: struct {
 #operator + (c1, c2: Complex) => Complex.{ c1.x + c2.x, c1.y + c2.y };
 #operator * (c1, c2: Complex) => Complex.{ c1.x * c2.x - c1.y * c2.y, c1.x * c2.y + c1.y * c2.x };
 
-consume :: macro (x: $T) -> #auto where iter.Iterable(T) {
+consume :: macro (x: $T/iter.Iterable) => {
     // This is a weird limitation of the Onyx type system.
     // In order to be able tell what the iterator produces, you
     // have to pattern match it in a procedure parameter. This means
