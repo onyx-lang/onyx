@@ -12,6 +12,7 @@ to_u32 :: #match {
         return hash;
     },
     (key: type_expr) -> u32 { return to_u32(cast(u32) key); },
+    (key: bool)   -> u32 { return 1 if key else 0; },
 
     #precedence 10000
     macro (key: $T/HasHashMethod) => key->hash()

@@ -18,8 +18,8 @@ good_foo := Foo.VTable.{
     }
 }
 
-make_foo :: () -> Foo {
-    foo : Foo;
+make_foo :: () -> ^Foo {
+    foo := new(Foo);
     foo.vtable = ^good_foo;
     foo.x = 1234;
 
@@ -28,8 +28,7 @@ make_foo :: () -> Foo {
 }
 
 main :: () {
-    foo := make_foo();
-    foo->f();
+    make_foo()->f();
 
     Foo.{^good_foo, 5678}->f();
 }

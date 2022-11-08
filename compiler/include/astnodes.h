@@ -1020,6 +1020,7 @@ struct AstDistinctType {
     char *name;
     AstType *base_type;
     Type *dtcache;
+    Scope *scope;
 };
 
 // Top level nodes

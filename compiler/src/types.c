@@ -621,6 +621,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             Type *distinct_type = type_create(Type_Kind_Distinct, alloc, 0);
             distinct_type->Distinct.base_type = base_type;
             distinct_type->Distinct.name = distinct->name;
+            distinct_type->ast_type = type_node;
             distinct->dtcache = distinct_type;
 
             type_register(distinct_type);

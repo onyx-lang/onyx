@@ -301,6 +301,11 @@ all_types_peeled_off:
             AstNode* callee = (AstNode *) ((AstPolyCallType *) node)->callee;
             return try_symbol_raw_resolve_from_node(callee, symbol);
         }
+
+        case Ast_Kind_Distinct_Type: {
+            AstDistinctType* dtype = (AstDistinctType *) node;
+            return symbol_raw_resolve(dtype->scope, symbol);
+        }
     }
 
     return NULL;
@@ -1123,6 +1128,11 @@ all_types_peeled_off:
             AstPolyStructType* pstype = (AstPolyStructType *) node;
             AstStructType* stype = pstype->base_struct;
             return &stype->scope;
+        }
+
+        case Ast_Kind_Distinct_Type: {
+            AstDistinctType* dtype = (AstDistinctType *) node;
+            return &dtype->scope;
         }
     }
 

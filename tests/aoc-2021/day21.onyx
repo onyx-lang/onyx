@@ -1,0 +1,227 @@
+use core
+
+PART :: 1
+
+#if PART == 1 {
+
+Die :: struct {
+    value: u32;
+    rolls: u32;
+}
+
+#inject Die {
+    make :: () -> Die {
+        return .{ 1, 0 };
+    }    
+
+    roll :: (d: ^Die) -> u32 {
+        defer d.value += 1;
+        defer d.rolls += 1;
+        return d.value;
+    }
+}
+
+Player :: struct {
+    square: u32;
+    score: u32;
+}
+
+#inject Player {
+    move :: (p: ^Player, squares: u32) {
+        p.square += squares;
+        p.square %= 10;
+        
+        p.score += (p.square + 1);
+    }
+}
+
+main :: () {
+    p1, p2: Player;
+
+    for os.with_file("./tests/aoc-2021/input/day21.txt") {
+        r := io.reader_make(it);
+
+        l1 := r->read_line(consume_newline=true);
+        l2 := r->read_line(consume_newline=true);
+
+        _, s1 := string.bisect(l1, #char ":");
+        _, s2 := string.bisect(l2, #char ":");
+
+        string.strip_whitespace(^s1);
+        string.strip_whitespace(^s2);
+
+        p1.square = ~~ (conv.str_to_i64(s1) - 1);
+        p2.square = ~~ (conv.str_to_i64(s2) - 1);
+    }
+
+    die := Die.make();
+    losing_score: u32;
+
+    while true {
+        play :: macro (player, opponent: ^Player) {
+            r1 := die->roll();
+            r2 := die->roll();
+            r3 := die->roll();
+
+            player->move(r1 + r2 + r3);
+
+            if player.score >= 1000 {
+                losing_score = opponent.score;
+                break;
+            }
+        }
+
+        play(^p1, ^p2);
+        play(^p2, ^p1);
+    }
+
+    println(losing_score * die.rolls);
+}
+
+} // End of part 1
+
+
+#if PART == 2 {
+
+Player :: struct {
+    square: u32;
+    score: u64;
+}
+
+#inject Player {
+    hash :: (p: Player) -> u32 {
+        h := 7;
+        h += h << 5 + hash.to_u32(p.square);
+        h += h << 5 + hash.to_u32(p.score);
+        return h;
+    }
+
+    move :: (p: Player, m: u32) -> Player {
+        n := p;
+        n.square += m;
+        n.square %= 10;
+        
+        n.score += ~~(n.square + 1);
+        return n;
+    }
+}
+
+#operator == (p1, p2: Player) => p1.square == p2.square && p1.score == p2.score;
+
+
+Case :: struct {
+    multiplier: u32;
+    spaces: u32;
+}
+
+cases := Case.[
+    Case.{ 1, 3 },
+    Case.{ 3, 4 },
+    Case.{ 6, 5 },
+    Case.{ 7, 6 },
+    Case.{ 6, 7 },
+    Case.{ 3, 8 },
+    Case.{ 1, 9 },
+]
+
+calc_wins_memo :: (p1, p2: Player, player_1_turn: bool) -> (u64, u64) {
+    #persist memo: Map(Pair(Pair(Player, Player), bool), Pair(u64, u64));
+
+    if memo->has(.{.{p1, p2}, player_1_turn}) {
+        v := memo->get(.{.{p1, p2}, player_1_turn});
+        return v.first, v.second;
+    }
+
+    v1, v2 := calc_wins(p1, p2, player_1_turn);
+    memo[.{.{p1, p2}, player_1_turn}] = .{v1, v2};
+    return v1, v2;
+}
+
+calc_wins :: (p1, p2: Player, player_1_turn := true) -> (u64, u64) {
+    if p1.score >= 21 {
+        return 1, 0;
+    }
+
+    elseif p2.score >= 21 {
+        return 0, 1;
+    }
+
+    else {
+        w1, w2: u64;
+        
+        if player_1_turn {
+            for^ cases {
+                n1, n2 := calc_wins_memo(
+                    p1->move(it.spaces),
+                    p2,
+                    false
+                );
+
+                w1 += n1 * ~~it.multiplier;
+                w2 += n2 * ~~it.multiplier;
+            }
+
+        } else {
+            for^ cases {
+                n1, n2 := calc_wins_memo(
+                    p1,
+                    p2->move(it.spaces),
+                    true
+                );
+
+                w1 += n1 * ~~it.multiplier;
+                w2 += n2 * ~~it.multiplier;
+            }
+        }
+
+        return w1, w2;
+    }
+}
+
+main :: () {
+    p1, p2: Player;
+
+    for os.with_file("./tests/aoc-2021/input/day21.txt") {
+        r := io.reader_make(it);
+
+        l1 := r->read_line(consume_newline=true);
+        l2 := r->read_line(consume_newline=true);
+
+        _, s1 := string.bisect(l1, #char ":");
+        _, s2 := string.bisect(l2, #char ":");
+
+        string.strip_whitespace(^s1);
+        string.strip_whitespace(^s2);
+
+        p1.square = cast(i32) (conv.str_to_i64(s1) - 1);
+        p2.square = cast(i32) (conv.str_to_i64(s2) - 1);
+    }
+
+    w1, w2 := calc_wins(p1, p2);
+    println(w1);
+    println(w2);
+    println(math.max(w1, w2));
+
+}
+
+}
+
+
+
+Pair :: struct (T1: type_expr, T2: type_expr) {
+    first: T1;
+    second: T2;
+}
+
+#inject Pair {
+    hash :: (p: Pair($T/hash.Hashable, $R/hash.Hashable)) -> u32 {
+        h := 7;
+        h += h << 5 + hash.to_u32(p.first);
+        h += h << 5 + hash.to_u32(p.second);
+        return h;
+    }
+}
+
+#operator == (p1: Pair, p2: typeof p1) =>
+    p1.first == p2.first && p1.second == p2.second;
+

@@ -1314,6 +1314,23 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             return Check_Success;
         }
 
+        if (bh_arr_length(sl->args.values) == 1) {
+            CHECK(expression, &sl->args.values[0]);
+
+            Type* type_to_match = sl->type;
+            if (sl->type->kind == Type_Kind_Distinct) {
+                type_to_match = sl->type->Distinct.base_type;
+            }
+
+            TYPE_CHECK(&sl->args.values[0], type_to_match) {
+                ERROR(sl->token->pos,
+                    "Mismatched type in initialized type. FIX ME");
+            }
+
+            sl->flags |= Ast_Flag_Has_Been_Checked;
+            return Check_Success;
+        }
+
         if ((sl->flags & Ast_Flag_Has_Been_Checked) != 0) {
             assert(sl->args.values);
             assert(sl->args.values[0]);

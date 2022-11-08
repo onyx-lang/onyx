@@ -458,6 +458,7 @@ static SymresStatus symres_method_call(AstBinaryOp** mcall) {
 
     SYMRES(expression, (AstTyped **) &(*mcall)->right);
 
+    // TODO: This doesn't look right? Does this ever happen? Check this...
     if ((*mcall)->right->kind != Ast_Kind_Call) {
         *mcall = (AstBinaryOp *) (*mcall)->right;
     }
