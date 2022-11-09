@@ -44,7 +44,7 @@ void insert_poly_sln_into_scope(Scope* scope, AstPolySolution *sln) {
                 onyx_report_error(sln->value->token->pos, Error_Critical, "Expected value to be compile time known.");
                 return;
             }
-            
+
             node = (AstNode *) sln->value;
             break;
     }
@@ -529,12 +529,12 @@ static void solve_for_polymorphic_param_type(PolySolveResult* resolved, AstFunct
                 }
             }
 
-            if (all_types) 
+            if (all_types)
                 typed_param = try_lookup_based_on_partial_function_type((AstFunction *) potential, ft);
 
           skip_nested_polymorph_case:
 
-            actual_type = resolve_expression_type(typed_param);
+            actual_type = query_expression_type(typed_param);
             if (actual_type == NULL) return;
 
             break;
@@ -910,7 +910,7 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_ar
 
     // NOTE: Cache the function for later use.
     shput(pp->concrete_funcs, unique_key, solidified_func);
-    
+
     return (AstFunction *) &node_that_signals_a_yield;
 }
 

@@ -116,6 +116,9 @@ b32 expression_types_must_be_known = 0;
 b32 all_checks_are_final           = 1;
 b32 inside_for_iterator            = 0;
 bh_arr(AstFor *) for_node_stack    = NULL;
+static bh_imap __binop_impossible_cache[Binary_Op_Count];
+static AstCall __binop_maybe_overloaded;
+
 
 #define STATEMENT_LEVEL 1
 #define EXPRESSION_LEVEL 2
@@ -349,7 +352,7 @@ fornode_expr_checked:
     do {
         CheckStatus cs = check_block(fornode->stmt);
         inside_for_iterator = old_inside_for_iterator;
-        if (cs > Check_Errors_Start) return cs; 
+        if (cs > Check_Errors_Start) return cs;
     } while(0);
 
     bh_arr_pop(for_node_stack);
@@ -407,7 +410,7 @@ static CheckStatus collect_switch_case_blocks(AstSwitch* switchnode, AstBlock* r
                 } else {
                     if (static_if->false_stmt) collect_switch_case_blocks(switchnode, static_if->false_stmt);
                 }
-                
+
                 break;
             }
 
@@ -784,7 +787,7 @@ static void report_bad_binaryop(AstBinaryOp* binop) {
 }
 
 static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* third_argument) {
-    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return NULL;
+    if (bh_arr_length(operator_overloads[binop->operation]) == 0) return &__binop_maybe_overloaded;
 
     if (binop->overload_args == NULL || binop->overload_args->values[1] == NULL) {
         if (binop->overload_args == NULL) {
@@ -1061,6 +1064,12 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
     return Check_Success;
 }
 
+static inline b32 type_is_not_basic_or_pointer(Type *t) {
+    return (t != NULL
+        && (t->kind != Type_Kind_Basic || (t->Basic.flags & Basic_Flag_SIMD) != 0)
+        && (t->kind != Type_Kind_Pointer));
+}
+
 CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
 
@@ -1125,14 +1134,27 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     }
 
     // NOTE: Try operator overloading before checking everything else.
-    if ((binop->left->type != NULL && (binop->left->type->kind != Type_Kind_Basic || (binop->left->type->Basic.flags & Basic_Flag_SIMD) != 0))
-        || (binop->right->type != NULL && (binop->right->type->kind != Type_Kind_Basic || (binop->right->type->Basic.flags & Basic_Flag_SIMD) != 0))) {
+    if (type_is_not_basic_or_pointer(binop->left->type) || type_is_not_basic_or_pointer(binop->right->type)) {
+
+        u64 cache_key = 0;
+        if (binop->left->type && binop->right->type) {
+            if (!__binop_impossible_cache[binop->operation].hashes) {
+                bh_imap_init(&__binop_impossible_cache[binop->operation], global_heap_allocator, 256);
+            }
+
+            cache_key = ((u64) (binop->left->type->id) << 32ll) | (u64) binop->right->type->id;
+
+            if (bh_imap_has(&__binop_impossible_cache[binop->operation], cache_key)) {
+                goto definitely_not_op_overload;
+            }
+        }
+
         AstCall *implicit_call = binaryop_try_operator_overload(binop, NULL);
 
         if (implicit_call == (AstCall *) &node_that_signals_a_yield)
             YIELD(binop->token->pos, "Trying to resolve operator overload.");
 
-        if (implicit_call != NULL) {
+        if (implicit_call != NULL && implicit_call != &__binop_maybe_overloaded) {
             // NOTE: Not a binary op
             implicit_call->next = binop->next;
             *pbinop = (AstBinaryOp *) implicit_call;
@@ -1140,7 +1162,13 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
             CHECK(call, (AstCall **) pbinop);
             return Check_Success;
         }
+
+        if (cache_key && implicit_call != &__binop_maybe_overloaded) {
+            bh_imap_put(&__binop_impossible_cache[binop->operation], cache_key, 1);
+        }
     }
+
+  definitely_not_op_overload:
 
     if (binop_is_assignment(binop->operation)) return check_binaryop_assignment(pbinop);
 
@@ -1323,8 +1351,10 @@ CheckStatus check_struct_literal(AstStructLiteral* sl) {
             }
 
             TYPE_CHECK(&sl->args.values[0], type_to_match) {
-                ERROR(sl->token->pos,
-                    "Mismatched type in initialized type. FIX ME");
+                ERROR_(sl->token->pos,
+                       "Mismatched type in initialized type. Expected something of type '%s', got '%s'.",
+                       type_get_name(type_to_match),
+                       type_get_name(sl->args.values[0]->type));
             }
 
             sl->flags |= Ast_Flag_Has_Been_Checked;
@@ -1582,7 +1612,7 @@ CheckStatus check_address_of(AstAddressOf** paof) {
     if (node_is_addressable_literal((AstNode *) aof->expr)) {
         resolve_expression_type(aof->expr);
     }
-    
+
     if (aof->expr->type == NULL) {
         YIELD(aof->token->pos, "Trying to resolve type of expression to take a reference.");
     }
@@ -1645,7 +1675,8 @@ CheckStatus check_subscript(AstSubscript** psub) {
 
     // NOTE: Try operator overloading before checking everything else.
     if (sub->expr->type != NULL &&
-        (sub->addr->type->kind != Type_Kind_Basic || sub->expr->type->kind != Type_Kind_Basic)) {
+        (sub->addr->type->kind != Type_Kind_Basic || sub->expr->type->kind != Type_Kind_Basic)
+        && !(type_is_array_accessible(sub->addr->type))) {
         // AstSubscript is the same as AstBinaryOp for the first sizeof(AstBinaryOp) bytes
         AstBinaryOp* binop = (AstBinaryOp *) sub;
         AstCall *implicit_call = binaryop_try_operator_overload(binop, NULL);
@@ -3192,7 +3223,7 @@ CheckStatus check_polyquery(AstPolyQuery *query) {
 
             case TYPE_MATCH_SPECIAL:
                 if (solved_something || query->successful_symres) {
-                    return Check_Return_To_Symres;    
+                    return Check_Return_To_Symres;
                 } else {
                     return Check_Yield_Macro;
                 }

@@ -96,6 +96,10 @@ Player :: struct {
         return h;
     }
 
+    __eq :: (p1, p2: Player) => {
+        return p1.square == p2.square && p1.score == p2.score;
+    }
+
     move :: (p: Player, m: u32) -> Player {
         n := p;
         n.square += m;
@@ -106,7 +110,12 @@ Player :: struct {
     }
 }
 
-#operator == (p1, p2: Player) => p1.square == p2.square && p1.score == p2.score;
+
+#local __HasEqMethod :: interface (t: $T) {
+    { T.__eq(t, t) } -> bool;
+}
+
+#operator == macro (t1: $T/__HasEqMethod, t2: typeof t1) => T.__eq(t1, t2);
 
 
 Case :: struct {

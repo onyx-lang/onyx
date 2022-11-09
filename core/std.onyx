@@ -44,6 +44,7 @@ package core
 
 #load "./misc/arg_parse"
 #load "./misc/any_utils"
+#load "./misc/method_ops"
 
 #local runtime :: package runtime
 #if runtime.runtime == .Wasi || runtime.runtime == .Onyx {

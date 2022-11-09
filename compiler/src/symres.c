@@ -1414,7 +1414,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            add_overload_option(&operator_overloads[operator->operator], 0, operator->overload);
+            add_overload_option(&operator_overloads[operator->operator], operator->precedence, operator->overload);
             break;
         }
 

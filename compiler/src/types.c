@@ -392,7 +392,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
-                    onyx_report_error((*member)->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name((*member)->type), mem_alignment); 
+                    onyx_report_error((*member)->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name((*member)->type), mem_alignment);
                     return NULL;
                 }
 
@@ -486,7 +486,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         }
 
         case Ast_Kind_VarArg_Type: {
-            Type* va_type = type_make_varargs(alloc, type_build_from_ast(alloc, ((AstVarArgType *) type_node)->elem));   
+            Type* va_type = type_make_varargs(alloc, type_build_from_ast(alloc, ((AstVarArgType *) type_node)->elem));
             if (va_type) va_type->ast_type = type_node;
             return va_type;
         }
@@ -603,7 +603,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             if (type_of->resolved_type != NULL) {
                 return type_of->resolved_type;
             }
-            
+
             return NULL;
         }
 
@@ -613,7 +613,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             Type *base_type = type_build_from_ast(alloc, distinct->base_type);
             if (base_type == NULL) return NULL;
-            if (base_type->kind != Type_Kind_Basic) {
+            if (base_type->kind != Type_Kind_Basic && base_type->kind != Type_Kind_Pointer) {
                 onyx_report_error(distinct->token->pos, Error_Critical, "Distinct types can only be made out of primitive types. '%s' is not a primitive type.", type_get_name(base_type));
                 return NULL;
             }
@@ -697,9 +697,9 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
         comp_type->Compound.types[i] = compound->exprs[i]->type;
         comp_type->Compound.size += bh_max(type_size_of(comp_type->Compound.types[i]), 4);
     }
-    
+
     bh_align(comp_type->Compound.size, 4);
-    
+
     comp_type->Compound.linear_members = NULL;
     bh_arr_new(global_heap_allocator, comp_type->Compound.linear_members, comp_type->Compound.count);
     build_linear_types_with_offset(comp_type, &comp_type->Compound.linear_members, 0);
@@ -741,7 +741,7 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
         }
 
         alignment = bh_max(alignment, mem_alignment);
-        
+
         // Should these structs be packed or not?
         bh_align(offset, mem_alignment);
 
@@ -876,7 +876,7 @@ Type* type_make_dynarray(bh_allocator alloc, Type* of) {
 Type* type_make_varargs(bh_allocator alloc, Type* of) {
     if (of == NULL) return NULL;
     if (of == (Type *) &node_that_signals_failure) return of;
-    
+
     assert(of->id > 0);
     u64 vararg_id = bh_imap_get(&type_vararg_map, of->id);
     if (vararg_id > 0) {
@@ -1233,7 +1233,7 @@ i32 type_linear_member_count(Type* type) {
         case Type_Kind_DynArray: return 5;
         case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
         case Type_Kind_Struct:   return bh_arr_length(type->Struct.linear_members);
-        default: return 1; 
+        default: return 1;
     }
 }
 
@@ -1241,7 +1241,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
     switch (type->kind) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs: {
-            if (idx == 0) { 
+            if (idx == 0) {
                 two->type = type_make_pointer(context.ast_alloc, type->Slice.elem);
                 two->offset = 0;
             }
@@ -1253,7 +1253,7 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
             return 1;
         }
         case Type_Kind_DynArray: {
-            if (idx == 0) { 
+            if (idx == 0) {
                 two->type = type_make_pointer(context.ast_alloc, type->DynArray.elem);
                 two->offset = 0;
             }
@@ -1407,7 +1407,7 @@ b32 type_is_compound(Type* type) {
         // single non-compound value; in this situation, the structure can be
         // "dissolved" at compile-time and turn into the underlying type.
         //
-        
+
         if (bh_arr_length(type->Struct.linear_members) != 1) return 1;
         return type_is_compound(type->Struct.linear_members[0].type);
     }

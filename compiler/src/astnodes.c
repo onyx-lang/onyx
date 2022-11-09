@@ -835,6 +835,100 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     return TYPE_MATCH_FAILED;
 }
 
+// TODO CLEANUP: Currently, query_expression_type and resolve_expression_type
+// are almost the exact same function. Any logic that would be added to one
+// will also HAVE TO BE ADDED TO THE OTHER. I would like to abstract the common
+// code between them, but I think there enough minor differences that that
+// might not be possible.
+
+Type* query_expression_type(AstTyped *node) {
+    if (node == NULL) return NULL;
+
+    if (node->kind == Ast_Kind_Argument) {
+        return query_expression_type(((AstArgument *) node)->value);
+    }
+
+    if (node->kind == Ast_Kind_If_Expression) {
+        AstIfExpression* if_expr = (AstIfExpression *) node;
+        return query_expression_type(if_expr->true_expr);
+    }
+
+    if (node->kind == Ast_Kind_Alias) {
+        AstAlias* alias = (AstAlias *) node;
+        return query_expression_type(alias->alias);
+    }
+
+    if (node_is_type((AstNode *) node)) {
+        return &basic_types[Basic_Kind_Type_Index];
+    }
+
+    if (node->kind == Ast_Kind_Array_Literal && node->type == NULL) {
+        AstArrayLiteral* al = (AstArrayLiteral *) node;
+        Type* elem_type = &basic_types[Basic_Kind_Void];
+        if (bh_arr_length(al->values) > 0) {
+            elem_type = query_expression_type(al->values[0]);
+        }
+
+        if (elem_type) {
+            return type_make_array(context.ast_alloc, elem_type, bh_arr_length(al->values));
+        }
+    }
+
+    if (node->kind == Ast_Kind_Struct_Literal && node->type == NULL) {
+        AstStructLiteral* sl = (AstStructLiteral *) node;
+        if (sl->stnode || sl->type_node) return NULL;
+
+        // If values without names are given to a struct literal without
+        // a type, then we cannot implicitly build the type of the struct
+        // literal, as the name of every member cannot be known. Maybe we
+        // could implicitly do something like _1, _2, ... for the members
+        // that we not given names?
+        if (bh_arr_length(sl->args.values) > 0) {
+            return NULL;
+        }
+
+        return type_build_implicit_type_of_struct_literal(context.ast_alloc, sl);
+    }
+
+    // If polymorphic procedures HAVE to have a type, most likely
+    // because they are part of a `typeof` expression, they are
+    // assigned a void type. This is cleared before the procedure
+    // is solidified.
+    if (node->kind == Ast_Kind_Polymorphic_Proc) {
+        return &basic_types[Basic_Kind_Void];
+    }
+
+    if (node->kind == Ast_Kind_Macro) {
+        return query_expression_type((AstTyped *) ((AstMacro *) node)->body);
+    }
+
+    if (node->kind == Ast_Kind_Package) {
+        return type_build_from_ast(context.ast_alloc, node->type_node);
+    }
+
+    if (node->type == NULL)
+        return type_build_from_ast(context.ast_alloc, node->type_node);
+
+    if (node->kind == Ast_Kind_NumLit && node->type->kind == Type_Kind_Basic) {
+        if (node->type->Basic.kind == Basic_Kind_Int_Unsized) {
+            b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ull << 32);
+            b32 unsign = ((AstNumLit *) node)->was_hex_literal;
+
+            if (((AstNumLit *) node)->was_char_literal) return &basic_types[Basic_Kind_U8];
+            else if ( big && !unsign) return &basic_types[Basic_Kind_I64];
+            else if ( big &&  unsign) return &basic_types[Basic_Kind_U64];
+            else if (!big && !unsign) return &basic_types[Basic_Kind_I32];
+            else if (!big &&  unsign) return &basic_types[Basic_Kind_U32];
+        }
+        else if (node->type->Basic.kind == Basic_Kind_Float_Unsized) {
+            return &basic_types[Basic_Kind_F64];
+        }
+    }
+
+    return node->type;
+}
+
+// See note above about query_expresion_type.
 Type* resolve_expression_type(AstTyped* node) {
     if (node == NULL) return NULL;
 
@@ -930,7 +1024,8 @@ Type* resolve_expression_type(AstTyped* node) {
             b32 big    = bh_abs(((AstNumLit *) node)->value.l) >= (1ull << 32);
             b32 unsign = ((AstNumLit *) node)->was_hex_literal;
 
-            if      ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);
+            if (((AstNumLit *) node)->was_char_literal) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U8]);
+            else if ( big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I64]);
             else if ( big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U64]);
             else if (!big && !unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_I32]);
             else if (!big &&  unsign) convert_numlit_to_type((AstNumLit *) node, &basic_types[Basic_Kind_U32]);

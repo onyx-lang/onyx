@@ -285,7 +285,7 @@ typedef enum AstFlags {
 
     Ast_Flag_Dead                  = BH_BIT(22),
 
-    Ast_Flag_Extra_Field_Access    = BH_BIT(23)
+    Ast_Flag_Extra_Field_Access    = BH_BIT(23),
 } AstFlags;
 
 typedef enum UnaryOp {
@@ -617,6 +617,7 @@ struct AstNumLit        {
     } value;
 
     b32 was_hex_literal : 1;
+    b32 was_char_literal : 1;
 };
 struct AstBinaryOp      {
     AstTyped_base;
@@ -697,7 +698,7 @@ struct AstArrayLiteral {
     bh_arr(AstTyped *) values;
 };
 struct AstRangeLiteral {
-    AstTyped_base; 
+    AstTyped_base;
 
     // HACK: Currently, range literals are parsed as binary operators, which means
     // the first sizeof(AstBinaryOp) bytes of this structure must match that of
@@ -850,7 +851,7 @@ struct AstSwitchCase {
 
     // NOTE: All expressions that end up in this block
     bh_arr(AstTyped *) values;
-    
+
     AstBlock *block;
 
     b32 is_default: 1; // Could this be inferred by the values array being null?
@@ -939,7 +940,7 @@ struct AstStructType {
     // completely generated, but is a valid pointer to where the
     // type will be generated to.
     Type *pending_type;
-    
+
     // NOTE: Used to store statically bound expressions in the struct.
     Scope* scope;
 
@@ -1309,6 +1310,8 @@ struct AstDirectiveOperator {
     AstNode_base;
 
     BinaryOp operator;
+
+    u64 precedence;
     AstTyped *overload;
 };
 
@@ -1402,7 +1405,7 @@ struct AstForeignBlock {
 
 typedef enum EntityState {
     Entity_State_Error,
-    
+
     Entity_State_Parse_Builtin,
     Entity_State_Introduce_Symbols,
     Entity_State_Parse,
@@ -1576,7 +1579,7 @@ struct CompileOptions {
     b32 print_notes             : 1;
     b32 no_colors               : 1;
     b32 no_file_contents        : 1;
-    
+
     b32 use_post_mvp_features : 1;
     b32 use_multi_threading   : 1;
     b32 generate_foreign_info : 1;
@@ -1717,7 +1720,14 @@ typedef enum TypeMatch {
 } TypeMatch;
 #define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
 TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
+
+// resolve_expression_type is a permanent action that modifies
+// the node in whatever is necessary to cement a type into it.
 Type* resolve_expression_type(AstTyped* node);
+
+// query_expression_type does not modify the node at all, but
+// does its best to deduce the type of the node without context.
+Type* query_expression_type(AstTyped *node);
 
 i64   get_expression_integer_value(AstTyped* node, b32 *out_is_valid);
 char *get_expression_string_value(AstTyped* node, b32 *out_is_valid);

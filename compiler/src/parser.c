@@ -632,6 +632,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 char_lit->flags |= Ast_Flag_Comptime;
                 char_lit->type_node = (AstType *) &basic_type_int_unsized;
                 char_lit->token = expect_token(parser, Token_Type_Literal_String);
+                char_lit->was_char_literal = 1;
 
                 i8 dest = '\0';
                 i32 length = string_process_escape_seqs((char *) &dest, char_lit->token->text, 1);
@@ -3244,6 +3245,16 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 }
 
               operator_determined:
+                if (parse_possible_directive(parser, "precedence")) {
+                    AstNumLit* pre = parse_int_literal(parser);
+                    if (parser->hit_unexpected_token) return;
+
+                    operator->precedence = bh_max(pre->value.l, 0);
+
+                } else {
+                    operator->precedence = parser->overload_count++;
+                }
+
                 operator->overload = parse_expression(parser, 0);
 
                 ENTITY_SUBMIT(operator);

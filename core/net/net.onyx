@@ -150,7 +150,7 @@ socket_accept :: (s: ^Socket) -> (Socket, Socket_Address) {
     new_addr: Socket_Address;
     new_socket.handle = __net_accept(s.handle, ^new_addr);
 
-    if new_socket.handle >= 0 {
+    if cast(i32) new_socket.handle >= 0 {
         new_socket.vtable = ^__net_socket_vtable;
     }
 
@@ -241,7 +241,7 @@ network_to_host :: #match {}
 
 #local __net_socket_vtable := io.Stream_Vtable.{
     read = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
-        if handle == 0 do return .BadFile, 0;
+        if cast(i32) handle == 0 do return .BadFile, 0;
         
         would_block := false;
         bytes_read := __net_recv(handle, buffer, ^would_block);
@@ -253,7 +253,7 @@ network_to_host :: #match {}
     },
 
     write_byte = (use s: ^Socket, byte: u8) -> io.Error {
-        if handle == 0 do return .BadFile;
+        if cast(i32) handle == 0 do return .BadFile;
 
         bytes_written := __net_send(handle, .[ byte ]);
         if bytes_written < 0 { s.vtable = null; return .BufferFull; }
@@ -261,7 +261,7 @@ network_to_host :: #match {}
     },
 
     write = (use s: ^Socket, buffer: [] u8) -> (io.Error, u32) {
-        if handle == 0 do return .BadFile, 0;
+        if cast(i32) handle == 0 do return .BadFile, 0;
         
         bytes_written := __net_send(handle, buffer);
         if bytes_written < 0 { s.vtable = null; }
