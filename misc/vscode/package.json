@@ -139,7 +139,7 @@
         "vscode-textmate-languageservice": "0.2.1"
     },
     "devDependencies": {
-        "vscode": "^1.1.37",
+        "vscode": "^1.1.34",
         "vscode-debugadapter": "^1.51.0"
     }
 }
