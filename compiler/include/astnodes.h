@@ -689,6 +689,8 @@ struct AstStructLiteral {
     AstTyped *stnode;
 
     Arguments args;
+
+    Type *generated_inferred_type;
 };
 struct AstArrayLiteral {
     AstTyped_base;

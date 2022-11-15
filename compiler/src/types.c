@@ -709,6 +709,10 @@ Type* type_build_compound_type(bh_allocator alloc, AstCompound* compound) {
 }
 
 Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLiteral* lit) {
+    if (lit->generated_inferred_type) {
+        return lit->generated_inferred_type;
+    }
+
     Type* type = type_create(Type_Kind_Struct, alloc, 0);
     type->ast_type = NULL;
     type->Struct.name = NULL;
@@ -779,6 +783,7 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
     build_linear_types_with_offset(type, &type->Struct.linear_members, 0);
 
     type->Struct.status = SPS_Uses_Done;
+    lit->generated_inferred_type = type;
     return type;
 }
 
