@@ -246,7 +246,7 @@ tcp_server_pulse :: (use server: ^TCP_Server) -> bool {
         // This is bad because if the pulse_time_ms is large, the server
         // will have a unnecessary delay for the first client to connect.
         os.sleep(pulse_time_ms);
-        return true;
+        return server.alive;
     }
 
     clients_with_messages := wait_to_get_client_messages(server);
