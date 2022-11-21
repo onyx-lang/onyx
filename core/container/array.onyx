@@ -184,7 +184,10 @@ pop :: (arr: ^[..] $T) -> T {
 }
 
 concat :: (arr: ^[..] $T, other: [] T) {
-    for ^o: other do push(arr, *o);
+    if !ensure_capacity(arr, arr.count + other.count) do return;
+
+    core.memory.copy(arr.data + arr.count, other.data, other.count * sizeof T);
+    arr.count += other.count;
 }
 
 filter :: macro (arr: ^[..] $T, body: Code) {

@@ -138,6 +138,27 @@ contains :: (s: str, substr: str) -> bool {
 }
 
 
+join :: (strs: [] str, sep: str, allocator := context.allocator) -> str {
+    if strs.count == 0 do return "";
+
+    len_sum := array.fold(strs, 0, #(acc + it.length));
+    out := make(str, len_sum + (strs.count - 1) * sep.count);
+
+    i := 0;
+    for strs {
+        if !#first {
+            core.memory.copy(^out.data[i], sep.data, sep.count);
+            i += sep.count;
+        }
+
+        core.memory.copy(^out.data[i], it.data, it.count);
+        i += it.count;
+    }
+
+    return out;
+}
+
+
 // @TODO
 // Check this for edge cases and other bugs. I'm not confident
 // it will work perfectly yet.                   - brendanfh 2020/12/21
