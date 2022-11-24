@@ -311,5 +311,13 @@ buffer_stream_vtable := Stream_Vtable.{
 
         return .None;
     },
+
+    close = (use dss: ^BufferStream) -> Error {
+        if write_enabled && !fixed {
+            delete(^data);
+        }
+
+        return .None;
+    }
 }
 

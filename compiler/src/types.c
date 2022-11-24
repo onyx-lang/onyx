@@ -761,11 +761,18 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
         smem->idx = idx;
         smem->name = bh_strdup(alloc, nv->token->text);
         smem->token = nv->token;
-        smem->initial_value = &nv->value;
         smem->meta_tags = NULL;
         smem->included_through_use = 0;
         smem->used = 0;
         smem->use_through_pointer_index = -1;
+
+        // Having this present caused more issues than its
+        // worth. I don't think this is necessary, and it allows
+        // you to access variables outside of where they are
+        // defined.
+        // smem->initial_value = &nv->value;
+        smem->initial_value = NULL;
+
         shput(type->Struct.members, nv->token->text, smem);
         bh_arr_push(type->Struct.memarr, smem);
         token_toggle_end(nv->token);

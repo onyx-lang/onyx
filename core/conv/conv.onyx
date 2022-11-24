@@ -2,7 +2,7 @@ package core.conv
 
 Enable_Custom_Formatters :: true
 
-use core {map, string, array, math}
+use core {string, math}
 
 str_to_i64 :: #match #local {}
 
@@ -132,6 +132,7 @@ str_to_f64 :: (s: ^str) -> f64 {
         return value, count;
     }
 }
+
 
 i64_to_str :: (n: i64, base: u64, buf: [] u8, min_length := 0, prefix := false) -> str {
     is_neg := false;
@@ -293,3 +294,14 @@ f64_to_str :: (f: f64, buf: [] u8, digits_after_decimal := 4) -> str {
 }
 
 
+// I like the way that parse_int reads better than 'str_to_i64'.
+// For a soft transistion, I am allowing the programmer to use either.
+// At some point, it might be worth deprecating 'str_to_i64', but no
+// in leaving it here for now. Same thing applied to all other functions
+// below.
+parse_int :: str_to_i64
+parse_float :: str_to_f64
+
+format_int :: i64_to_str
+format_uint :: u64_to_str
+format_float :: f64_to_str

@@ -11,8 +11,6 @@ List :: struct (Elem_Type: type_expr) {
 
     first: ^ListElem(Elem_Type) = null;
     last:  ^ListElem(Elem_Type) = null;
-
-    // "Method" like things
 }
 
 #inject List {
@@ -131,6 +129,17 @@ fold :: (list: ^List($T), init: $R, f: (T, R) -> R) -> R {
 }
 
 map :: #match #local {}
+#match map (list: ^List($T), f: (T) -> $R) -> List(R) {
+    new_list := make(R, allocator=list.allocator);
+    elem := list.first;
+    while elem != null {
+        push_end(^new_list, f(elem.data));
+        elem = elem.next;
+    }
+
+    return new_list;
+}
+
 #match map (list: ^List($T), f: (^T) -> void) {
     elem := list.first;
     while elem != null {
@@ -139,35 +148,16 @@ map :: #match #local {}
     }
 }
 
-#match map (list: ^List($T), f: (T) -> $R) -> List(R) {
-    new_list := make(R, allocator=list.allocator);
-    elem := list.first;
-    while elem != null {
-        push_end(new_list, f(elem.data));
-        elem = elem.next;
-    }
-}
 
 #match core.iter.as_iterator as_iter
-as_iter :: (list: ^List($T)) -> Iterator(T) {
-    iterator_next :: (list_iter: ^ListIterator($T)) -> (T, bool) {
-        if list_iter.current == null do return .{}, false;
+as_iter :: (list: ^List) =>
+    core.iter.generator(^.{current = list.first}, (ctx) => {
+        if ctx.current != null {
+            defer ctx.current = ctx.current.next;
+            return ctx.current.data, true;
+        }
 
-        defer list_iter.current = list_iter.current.next;
-        return list_iter.current.data, true;
-    }
-
-    ListIterator :: struct (T: type_expr) {
-        current: ^ListElem(T);
-    }
-
-    list_iterator := new_temp(ListIterator(T));
-    list_iterator.current = list.first;
-
-    return .{
-        data = list_iterator,
-        next = #solidify iterator_next { T = T },
-    };
-}
+        return .{}, false;
+    });
 
 #local allocate_elem :: macro (list: ^List($T)) => new(ListElem(T), allocator=list.allocator);

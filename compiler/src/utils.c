@@ -719,7 +719,10 @@ static AstNode* lookup_default_value_by_idx(AstNode* provider, i32 idx) {
                 bh_arr(StructMember *) memarr = sl->type->Struct.memarr;
                 if (idx >= bh_arr_length(memarr)) return NULL;
 
-                return (AstNode *) *memarr[idx]->initial_value;
+                if (memarr[idx]->initial_value)
+                    return (AstNode *) *memarr[idx]->initial_value;
+
+                return NULL;
             }
 
             return NULL;

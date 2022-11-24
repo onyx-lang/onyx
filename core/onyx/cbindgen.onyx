@@ -76,6 +76,8 @@ generate_c_binding :: (use binding_config: Binding_Config) -> bool {
     wrote := false;
     for file: os.with_file(output_file, .Write) {
         writer := io.writer_make(file);
+        defer io.writer_free(^writer);
+
         fb := runtime.info.get_foreign_block(foreign_block);
 
         write_file_introduction(^writer, preamble, fb.module_name);
@@ -231,9 +233,9 @@ compile_c_file :: (
 
     print_body :: (writer, method_name, method_info, cast_map) => {
         use runtime.info;
-        call := io.buffer_stream_make();
-        defer io.buffer_stream_free(^call);
-        callw := io.writer_make(^call);
+        callw, call := io.string_builder();
+        defer io.buffer_stream_free(call);
+        defer delete(cast(rawptr) call);
 
         param_num := 0;
         for method_info.parameter_types {
@@ -261,7 +263,7 @@ compile_c_file :: (
             param_num += 1;
         }
 
-        call_str := io.buffer_stream_to_str(^call);
+        call_str := io.buffer_stream_to_str(call);
         wasm_return_type := type_to_wasm_type(method_info.return_type, for_return=true);
         switch wasm_return_type {
             case ""    do io.write_format(writer,  "    {}({});\n", method_name, call_str[0..call_str.count-2]);

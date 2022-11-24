@@ -155,7 +155,7 @@ file_logger_close :: (logger := context.logger) {
 
 #local
 file_logger_proc :: (data: ^File, msg: str) {
-    writer := io.writer_make(data);
+    writer := io.writer_make(data, 0);
     io.write(^writer, msg);
     io.write(^writer, "\n");
 }

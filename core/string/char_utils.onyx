@@ -10,6 +10,14 @@ package core.string
         return (c >= #char "0" && c <= #char "9");
     }
 
+    is_lower :: (c: u8) -> bool {
+        return (c >= #char "a" && c <= #char "b");
+    }
+
+    is_upper :: (c: u8) -> bool {
+        return (c >= #char "A" && c <= #char "Z");
+    }
+
     is_alphanum :: (c: u8) -> bool {
         return c->is_alpha() || c->is_num();
     }

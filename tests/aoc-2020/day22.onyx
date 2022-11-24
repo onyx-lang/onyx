@@ -44,7 +44,7 @@ combat :: (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
 // Larger numbers are encoded in base 64.
 encode_hands :: (alloc: Allocator, p1: ^[..] u32, p2: ^[..] u32) -> str {
     stream := io.buffer_stream_make(256, alloc);
-    writer := io.writer_make(^stream);
+    writer := io.writer_make(^stream, 0);
 
     for n: *p1 {
         io.write_i64(^writer, ~~n, 64);

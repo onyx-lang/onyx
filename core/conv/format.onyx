@@ -417,8 +417,9 @@ format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
             // is through a io.Writer. That should maybe be changed in the future? Also, I think
             // 256 bytes is enough for the name of a type but I'm not entirely sure...
             stream := io.buffer_stream_make(~~buf, fixed=true);
-            writer := io.writer_make(^stream);
+            writer := io.writer_make(^stream, 0);
             write_type_name(^writer, value);
+            io.writer_flush(^writer);
 
             output->write(io.buffer_stream_to_str(^stream));
         }

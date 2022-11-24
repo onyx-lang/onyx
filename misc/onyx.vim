@@ -46,9 +46,10 @@ syn match onyxCallGroup         "\<[a-zA-Z_][a-zA-Z0-9_\.]*\> *(" contains=onyxC
 syn match onyxCall              "\<[a-zA-Z_][a-zA-Z0-9_\.]*\>" contained
 
 syn match onyxDirective         "\#[a-zA-Z_]\+"
-syn match onyxTag               "@.\+$"
+syn match onyxTag               "@[a-zA-Z0-9_]\+"
 
-syn region onyxString		    display start=+"+ skip=+\\\\\|\\"+ end=+"+ keepend
+syn region onyxString		    start=+"+ skip=+\\\\\|\\"+ end=+"\|$+ extend contains=@Spell
+syn region onyxMultiString      start=+"""+ end=+"""+ extend contains=@Spell
 
 hi def link onyxKeyword          Statement
 hi def link onyxType             Type
@@ -57,6 +58,7 @@ hi def link onyxCommentStart     Todo
 hi def link onyxConstant         Constant
 hi def link onyxDirective        Constant
 hi def link onyxString           String
+hi def link onyxMultiString      String
 hi def link onyxNumber           Number
 hi def link onyxDefinition       Identifier
 hi def link onyxCall             Function

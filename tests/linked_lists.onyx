@@ -1,0 +1,22 @@
+use core
+
+main :: () {
+    l := list.make(i32);
+
+    l->push_end(1);
+    l->push_end(2);
+    l->push_end(3);
+    l->push_end(4);
+    l->push_begin(5);
+    l->push_begin(6);
+    l->pop_end();
+    l->pop_begin();
+
+    println(l->count());
+
+    float_list := l->map(x => cast(f32) x);
+
+    for float_list->as_iter() {
+        println(it);
+    }
+}

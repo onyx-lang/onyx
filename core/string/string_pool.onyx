@@ -1,0 +1,41 @@
+package core.string
+
+use core { alloc, memory }
+use core.alloc { arena }
+
+StringPool :: struct {
+    arena: arena.Arena;
+}
+
+#inject StringPool {
+    add   :: pool_add;
+    flush :: pool_flush;
+    free  :: pool_free;
+}
+
+pool_make :: (maximum_string_length := 16384, allocator := context.allocator)
+    => StringPool.{
+        arena.make(allocator, maximum_string_length * 2)
+    }
+
+pool_add :: (sp: ^StringPool, s: str) -> str {
+    if s.count > sp.arena.arena_size do return "";
+
+    allocator := alloc.as_allocator(^sp.arena);
+
+    new_str := make(str, s.count, allocator);
+    memory.copy(new_str.data, s.data, s.count);
+    return new_str;
+}
+
+pool_flush :: (sp: ^StringPool) {
+    arena.clear(^sp.arena);
+}
+
+pool_free :: (sp: ^StringPool) {
+    arena.free(^sp.arena);
+}
+
+#overload
+builtin.delete :: pool_free
+

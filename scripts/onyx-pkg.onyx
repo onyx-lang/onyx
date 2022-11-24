@@ -932,6 +932,8 @@ load_config_file :: () -> bool {
 store_config_file :: () -> bool {
     for os.with_file(global_arguments.config_file, .Write) {
         writer := io.writer_make(it);
+        defer io.writer_free(^writer);
+
         return write_ini_file(^writer, config);
     }
 }
