@@ -11,7 +11,7 @@ package core.string
     }
 
     is_lower :: (c: u8) -> bool {
-        return (c >= #char "a" && c <= #char "b");
+        return (c >= #char "a" && c <= #char "z");
     }
 
     is_upper :: (c: u8) -> bool {
