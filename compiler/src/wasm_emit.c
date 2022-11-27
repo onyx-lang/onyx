@@ -4210,6 +4210,29 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         break;
     }
 
+    case Ast_Kind_Address_Of: {
+        AstAddressOf *aof = (AstAddressOf *) node;
+        AstNode *expr = strip_aliases((AstNode *) aof->expr);
+        assert(expr->kind == Ast_Kind_Memres);
+
+        DatumPatchInfo patch;
+        patch.kind = Datum_Patch_Data;
+        patch.index = ctx->data_id;
+        patch.location = offset;
+        patch.offset = 0;
+
+        // Here, we cannot use the data_id property of the
+        // memory reservation because there is no guarantee that
+        // it will be assigned yet. And unlike the rest of the
+        // compiler, we cannot yield here, so we simply set a
+        // pointer that will be used later in the linking phase
+        // to get the actual data id of the addressed node.
+        patch.node_to_use_if_data_id_is_null = expr;
+
+        bh_arr_push(ctx->module->data_patches, patch);
+        break;
+    }
+
     case Ast_Kind_NumLit: {
         // NOTE: This makes a big assumption that we are running on a
         // little endian machine, since WebAssembly is little endian
@@ -4643,7 +4666,17 @@ void onyx_wasm_module_link(OnyxWasmModule *module, OnyxWasmLinkOptions *options)
     }
 
     bh_arr_each(DatumPatchInfo, patch, module->data_patches) {
-        assert(patch->data_id > 0);
+        if (patch->data_id == 0) {
+            if (patch->node_to_use_if_data_id_is_null
+                && patch->node_to_use_if_data_id_is_null->kind == Ast_Kind_Memres) {
+
+                patch->data_id = ((AstMemRes *) patch->node_to_use_if_data_id_is_null)->data_id;
+
+            } else {
+                assert(("Unexpected empty data_id in linking!", 0));
+            }
+        }
+
         WasmDatum *datum = &module->data[patch->data_id - 1];
         assert(datum->id == patch->data_id);
 

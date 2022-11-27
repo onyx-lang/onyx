@@ -628,6 +628,8 @@ typedef struct DatumPatchInfo {
     u32 offset;
     u32 location;
     u32 index;
+
+    AstNode *node_to_use_if_data_id_is_null;
 } DatumPatchInfo;
 
 // Context used when building a constexpr buffer

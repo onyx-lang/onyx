@@ -11,7 +11,7 @@ package core
     #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
 }
 
-stdio_stream: io.Stream;
+stdio_stream: io.Stream = .{ vtable = ^stdio_vtable };
 
 auto_flush_stdio := true
 
@@ -122,10 +122,6 @@ byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 __stdio_init :: () {
     stdio.print_stream = io.buffer_stream_make(2048, context.allocator);
     stdio.print_writer = io.writer_make(^stdio.print_stream, 0);
-    
-    // This shouldn't need to be here, but because ^stdin_vtable is not a compile-time
-    // known value (even through it should be).
-    stdio_stream.vtable = ^stdio_vtable;
 }
 
 
