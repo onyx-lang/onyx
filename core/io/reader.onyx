@@ -1,6 +1,6 @@
 package core.io
 
-use core {memory, math, array}
+use core {memory, math, array, iter}
 
 Reader :: struct {
     stream : ^Stream;
@@ -552,25 +552,16 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
     return 0, .None;
 }
 
-lines :: (r: ^Reader, inplace := false) -> Iterator(str) {
-    Context :: struct {
-        r: ^Reader;
-        inplace: bool;
-    }
+lines :: (r: ^Reader, inplace := false) =>
+    iter.generator(^.{
+        r = r, inplace = inplace
 
-    c := new(Context, allocator=context.temp_allocator);
-    c.r = r;
-    c.inplace = inplace;
-
-    next :: (use c: ^Context) -> (str, bool) {
-        line := r->read_line(consume_newline=true, inplace=inplace);
+    }, (ctx: $C) -> (str, bool) {
+        line := ctx.r->read_line(consume_newline=true, inplace=ctx.inplace);
 
         if line.count > 0 do return line, true;
         else do return "", false;
-    }
-
-    return .{ c, next };
-}
+    });
 
 
 #local reader_consume_error :: (use reader: ^Reader) -> Error {

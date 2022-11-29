@@ -2,7 +2,19 @@ package core.string
 
 use core
 
+#doc "Generic procedure for turning something into a string."
 as_str :: #match {}
+
+#local HasAsStrMethod :: interface (t: $T) {
+    { T.as_str(t) } -> str;
+}
+
+#overload #precedence 10000
+as_str :: macro (t: $T/HasAsStrMethod) -> str {
+    return T.as_str(t);
+}
+
+
 
 free :: (s: str, allocator := context.allocator) do raw_free(allocator, s.data);
 

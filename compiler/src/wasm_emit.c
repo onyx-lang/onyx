@@ -4220,6 +4220,7 @@ static b32 emit_constexpr_(ConstExprContext *ctx, AstTyped *node, u32 offset) {
         patch.index = ctx->data_id;
         patch.location = offset;
         patch.offset = 0;
+        patch.data_id = 0;
 
         // Here, we cannot use the data_id property of the
         // memory reservation because there is no guarantee that

@@ -92,6 +92,7 @@ package core
     #load "./sync/condition_variable"
     #load "./sync/semaphore"
     #load "./sync/barrier"
+    #load "./sync/once"
 
     #load "./threads/thread"
 }

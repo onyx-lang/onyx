@@ -1,0 +1,28 @@
+package core.sync
+
+Once :: struct {
+    done: bool;
+    mutex: Mutex;
+}
+
+#inject Once.exec :: #match #local {}
+
+#overload
+Once.exec :: (o: ^Once, f: () -> $R) {
+    if o.done do return;
+
+    mutex_lock(^o.mutex);
+    o.done = true;
+    f();
+    mutex_unlock(^o.mutex);
+}
+
+#overload
+Once.exec :: (o: ^Once, ctx: $Ctx, f: (Ctx) -> $R) {
+    if o.done do return;
+
+    mutex_lock(^o.mutex);
+    o.done = true;
+    f(ctx);
+    mutex_unlock(^o.mutex);
+}
