@@ -28,6 +28,7 @@ Timestamp :: struct #size (sizeof u32 * 12) {
 
 localtime :: __time_localtime
 gmtime    :: __time_gmtime
+to_epoch  :: __time_mktime
 
 strftime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> str {
     f := cast(cstr) core.alloc.from_stack(format.length + 1);
@@ -272,6 +273,7 @@ parse_number_and_advance :: (buf: ^[] u8, result: ^i32, low, high, offset: i32) 
     #foreign "onyx_runtime" {
         __time_localtime :: (time: u64, tm: ^Timestamp) -> void ---
         __time_gmtime    :: (time: u64, tm: ^Timestamp) -> void ---
+        __time_mktime    :: (tm: ^Timestamp) -> u64 ---
         __time_strftime  :: (buf: [] u8, format: cstr, tm: ^Timestamp) -> u32 ---
     }
 }

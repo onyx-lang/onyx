@@ -192,7 +192,7 @@ buffer_stream_make :: #match #locked {
     (initial_size := 1024, allocator := context.allocator) -> BufferStream {
         return .{
             .{ vtable = ^buffer_stream_vtable },
-            make([..] u8, 1024, allocator = allocator)
+            make([..] u8, initial_size, allocator = allocator)
         };
     }
 }

@@ -19,3 +19,10 @@ ONYX_DEF(__time_strftime, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) 
     results->data[0] = WASM_I32_VAL(len); 
     return NULL;
 }
+
+ONYX_DEF(__time_mktime, (WASM_I32), (WASM_I64)) {
+    struct tm *time = (struct tm *) ONYX_PTR(params->data[0].of.i32);
+    results->data[0] = WASM_I64_VAL(mktime(time));
+    return NULL;
+}
+
