@@ -47,11 +47,11 @@ main :: (args) => {
             return iter.concat(
                 iter.as_iterator(edges)
                 |> iter.filter(name_copy, (x, n) => x.a == *n)
-                |> iter.map((x) => x.b),
+                |> iter.map(x => x.b),
 
                 iter.as_iterator(edges)
                 |> iter.filter(name_copy, (x, n) => x.b == *n)
-                |> iter.map((x) => x.a)
+                |> iter.map(x => x.a)
             );
         }
 

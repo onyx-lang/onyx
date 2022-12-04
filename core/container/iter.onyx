@@ -453,9 +453,21 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
     };
 }
 
+use core.intrinsics.types {type_is_struct}
+
+//
+// `from_array` has two almost identical implementations,
+// but the details are important here. Normally, `from_array`
+// returns an iterator by value, unless the array is of
+// structures, then it returns an iterator by pointer.
+// This seems weird, but in practice it is closer to what
+// you want, as you don't want to have to copy every structure
+// out of the array. While for primitives, you don't want to
+// dereference it everywhere.
+from_array :: #match #local {}
+
 #overload
-as_iterator :: from_array
-from_array :: (arr: [] $T) => generator(
+from_array :: (arr: [] $T/type_is_struct) => generator(
     ^.{ data = arr.data, count = arr.count, current = 0 },
 
     (use ctx: ^$T) -> (typeof ctx.data, bool) {
@@ -467,6 +479,24 @@ from_array :: (arr: [] $T) => generator(
         return null, false;
     }
 );
+
+#overload
+from_array :: (arr: [] $T) => generator(
+    ^.{ data = arr.data, count = arr.count, current = 0 },
+
+    (use ctx: ^$T) -> (typeof *ctx.data, bool) {
+        if current < count {
+            defer current += 1;
+            return data[current], true;
+        }
+
+        return .{}, false;
+    }
+);
+
+
+#overload
+as_iterator :: from_array
 
 #overload
 as_iterator :: (x: ^[..] $T) -> Iterator(T) {

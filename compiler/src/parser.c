@@ -2192,6 +2192,11 @@ static AstInterface* parse_interface(OnyxParser* parser) {
             expect_token(parser, ',');
     }
 
+    if (parse_possible_directive(parser, "intrinsic")) {
+        interface->is_intrinsic = 1;
+        return interface;
+    }
+
     bh_arr_new(global_heap_allocator, interface->exprs, 2);
 
     expect_token(parser, '{');

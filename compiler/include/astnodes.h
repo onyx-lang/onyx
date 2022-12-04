@@ -1113,6 +1113,8 @@ struct AstInterface {
 
     bh_arr(InterfaceParam)      params;
     bh_arr(InterfaceConstraint) exprs;
+
+    b32 is_intrinsic: 1;
 };
 
 typedef enum ConstraintPhase {
@@ -1791,6 +1793,8 @@ void expand_macro(AstCall** pcall, AstFunction* template);
 AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);
 
 Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
+
+b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

@@ -29,6 +29,7 @@ package core
 
 #load "./intrinsics/onyx"
 #load "./intrinsics/wasm"
+#load "./intrinsics/type_interfaces"
 
 #load "./io/io"
 #load "./io/stream"

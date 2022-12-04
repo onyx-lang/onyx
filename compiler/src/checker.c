@@ -3011,6 +3011,18 @@ CheckStatus check_constraint(AstConstraint *constraint) {
                     onyx_ast_node_kind_string(constraint->interface->kind));
             }
 
+            // #intrinsic interfaces
+            if (constraint->interface->is_intrinsic) {
+                b32 success = resolve_intrinsic_interface_constraint(constraint);
+                if (success) {
+                    *constraint->report_status = Constraint_Check_Status_Success;
+                    return Check_Complete;
+                } else {
+                    *constraint->report_status = Constraint_Check_Status_Failed;
+                    return Check_Failed;
+                }
+            }
+
             bh_arr_new(global_heap_allocator, constraint->exprs, bh_arr_length(constraint->interface->exprs));
             bh_arr_each(InterfaceConstraint, ic, constraint->interface->exprs) {
                 InterfaceConstraint new_ic = {0};
@@ -3154,7 +3166,14 @@ CheckStatus check_constraint_context(ConstraintContext *cc, Scope *scope, OnyxFi
                         strncat(constraint_map, "'", 511);
                     }
 
-                    onyx_report_error(constraint->exprs[constraint->expr_idx].expr->token->pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
+                    OnyxFilePos error_pos;
+                    if (constraint->exprs) {
+                        error_pos = constraint->exprs[constraint->expr_idx].expr->token->pos;
+                    } else {
+                        error_pos = constraint->interface->token->pos;
+                    }
+
+                    onyx_report_error(error_pos, Error_Critical, "Failed to satisfy constraint where %s.", constraint_map);
                     onyx_report_error(constraint->token->pos, Error_Critical, "Here is where the interface was used.");
                     onyx_report_error(pos, Error_Critical, "Here is the code that caused this constraint to be checked.");
 

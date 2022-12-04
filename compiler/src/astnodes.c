@@ -614,7 +614,11 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 break;
             }
 
-            default: assert(0);
+            // This is not the right thing to return here. In theory it should
+            // try to extract the type of the first element of the array and then
+            // use that as the `array_type`. Then only if there are no elements in the
+            // array should it return TYPE_MATCH_FAILED;
+            default: return TYPE_MATCH_FAILED;
         }
 
         node->type = array_type;
@@ -1586,4 +1590,31 @@ AstPolyCallType* convert_call_to_polycall(AstCall* call) {
     }
 
     return pct;
+}
+
+
+b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint) {
+    AstInterface *interface = constraint->interface;
+    Type* type = type_build_from_ast(context.ast_alloc, constraint->type_args[0]);
+    if (!type) return 0;
+
+    if (!strcmp(interface->name, "type_is_bool"))     return type_is_bool(type);
+    if (!strcmp(interface->name, "type_is_int"))      return type_is_integer(type);
+    if (!strcmp(interface->name, "type_is_float"))    return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_Float);
+    if (!strcmp(interface->name, "type_is_number"))   return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_Numeric);
+    if (!strcmp(interface->name, "type_is_simd"))     return type->kind == Type_Kind_Basic && (type->Basic.flags & Basic_Flag_SIMD);
+    if (!strcmp(interface->name, "type_is_pointer"))  return type_is_pointer(type) || type_is_rawptr(type);
+    if (!strcmp(interface->name, "type_is_enum"))     return type->kind == Type_Kind_Enum;
+    if (!strcmp(interface->name, "type_is_simple"))   return type->kind == Type_Kind_Basic
+                                                          || type->kind == Type_Kind_Enum
+                                                          || type->kind == Type_Kind_Pointer;
+    if (!strcmp(interface->name, "type_is_array"))    return type->kind == Type_Kind_Array;
+    if (!strcmp(interface->name, "type_is_slice"))    return type->kind == Type_Kind_Slice;
+    if (!strcmp(interface->name, "type_is_struct"))   return type->kind == Type_Kind_Struct;
+    if (!strcmp(interface->name, "type_is_compound")) return type->kind == Type_Kind_Array
+                                                          || type->kind == Type_Kind_Slice
+                                                          || type->kind == Type_Kind_DynArray
+                                                          || type->kind == Type_Kind_Struct;
+
+    return 0;
 }

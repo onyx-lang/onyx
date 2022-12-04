@@ -4,7 +4,7 @@ use core
 
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
     arg_iter := iter.as_iterator(c_args)
-             |> iter.map((x) => string.from_cstr(*x));
+             |> iter.map(string.from_cstr);
     defer arg_iter.close(arg_iter.data);
 
     use runtime.info;
