@@ -19,6 +19,8 @@ as_str :: macro (t: $T/HasAsStrMethod) -> str {
 free :: (s: str, allocator := context.allocator) do raw_free(allocator, s.data);
 
 alloc_copy :: (original: str, allocator := context.allocator) -> str {
+    if original.count == 0 do return .{};
+
     new_str : str;
     new_str.data = raw_alloc(allocator, sizeof u8 * original.count);
     new_str.count = original.count;
@@ -27,6 +29,8 @@ alloc_copy :: (original: str, allocator := context.allocator) -> str {
 }
 
 temp_copy :: (original: str) -> str {
+    if original.count == 0 do return .{};
+
     new_str := make([] u8, original.count, allocator=context.temp_allocator);
     copy(original, new_str);
     return new_str;

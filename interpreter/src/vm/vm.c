@@ -661,6 +661,16 @@ static inline double __ovm_copysign(a, b) double a, b; {
     return -a;
 }
 
+static inline void __ovm_trigger_exception(ovm_state_t *state) {
+    if (state->debug) {
+        state->debug->state = debug_state_pausing;
+        state->debug->pause_reason = debug_pause_exception;
+
+        assert(write(state->debug->state_change_write_fd, "1", 1));
+        sem_wait(&state->debug->wait_semaphore);
+    }
+}
+
 
 ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
     ovm_assert(engine);
@@ -1003,6 +1013,7 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 #define OVM_LOAD(type_, stype) \
             case OVM_TYPED_INSTR(OVMI_LOAD, type_): {\
                 ovm_assert(VAL(instr.a).type == OVM_TYPE_I32); \
+                if ((VAL(instr.a).u32 + (u32) instr.b) == 0) __ovm_trigger_exception(state); \
                 tmp_val.type = type_; \
                 tmp_val.stype = * (stype *) &((u8 *) engine->memory)[VAL(instr.a).u32 + (u32) instr.b]; \
                 VAL(instr.r) = tmp_val; \
@@ -1021,6 +1032,7 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 #define OVM_STORE(type_, stype) \
             case OVM_TYPED_INSTR(OVMI_STORE, type_): \
                 ovm_assert(VAL(instr.r).type == OVM_TYPE_I32); \
+                if ((VAL(instr.r).u32 + (u32) instr.b) == 0) __ovm_trigger_exception(state); \
                 *(stype *) &((u8 *) engine->memory)[VAL(instr.r).u32 + (u32) instr.b] = VAL(instr.a).stype; \
                 break;
 
@@ -1038,6 +1050,8 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
                 u32 src   = VAL(instr.a).u32;
                 u32 count = VAL(instr.b).u32;
 
+                if (!dest || !src) __ovm_trigger_exception(state);
+
                 u8 *base = engine->memory;
                 memmove(&base[dest], &base[src], count);
                 break;
@@ -1047,6 +1061,8 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
                 i32 dest  = VAL(instr.r).i32;
                 u8  byte  = VAL(instr.a).u8;
                 i32 count = VAL(instr.b).i32;
+
+                if (!dest) __ovm_trigger_exception(state);
 
                 u8 *base = engine->memory;
                 memset(&base[dest], byte, count);
@@ -1226,6 +1242,7 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 
 #define CMPXCHG(otype, ctype) \
     case OVM_TYPED_INSTR(OVMI_CMPXCHG, otype): {\
+        if (VAL(instr.r).u32 == 0) __ovm_trigger_exception(state); \
         ctype *addr = (ctype *) &((u8 *) engine->memory)[VAL(instr.r).u32]; \
  \
         VAL(instr.r).u64 = 0; \
@@ -1246,14 +1263,7 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 #undef CMPXCHG
 
             case OVMI_BREAK:
-                if (state->debug) {
-                    state->debug->state = debug_state_pausing;
-                    state->debug->pause_reason = debug_pause_exception;
-
-                    assert(write(state->debug->state_change_write_fd, "1", 1));
-                    sem_wait(&state->debug->wait_semaphore);
-                }
-                
+                __ovm_trigger_exception(state);
                 printf("onyx: exiting early due to reaching an unreachable instruction.\n");
                 
                 return ((ovm_value_t) {0});
