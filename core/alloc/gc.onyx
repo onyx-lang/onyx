@@ -83,11 +83,13 @@ GC_Link_Magic_Number :: 0x1337face
     }
 
     if aa == .Resize || aa == .Free {
-        if data.first == old {
-            data.first = data.first.next;
-
-        } else {
+        if old.prev {
             old.prev.next = old.next;
+        } else {
+            data.first = old.next;
+        }
+
+        if old.next {
             old.next.prev = old.prev;
         }
     }

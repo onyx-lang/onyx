@@ -235,7 +235,7 @@ compile_c_file :: (
         use runtime.info;
         callw, call := io.string_builder();
         defer io.buffer_stream_free(call);
-        defer delete(cast(rawptr) call);
+        defer cfree(call);
 
         param_num := 0;
         for method_info.parameter_types {

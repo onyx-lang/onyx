@@ -236,10 +236,32 @@ is_empty :: (s: str) -> bool #deprecated "Use 'string.empty' instead." {
     s.count == 0 || s.data == null;
 }
 
+index_of :: #match #local {}
+
+#overload
 index_of :: (s: str, c: u8) -> i32 {
     for s.count {
         if s[it] == c do return it;
     }
+    return -1;
+}
+
+#overload
+index_of :: (s: str, substr: str) -> i32 {
+    while i := 0; i < s.count {
+        start := i;
+        while j := 0; j < substr.count {
+            if s[i + j] != substr[j] {
+                i += j + 1;
+                continue continue;
+            }
+
+            j += 1;
+        }
+
+        return start;
+    }
+
     return -1;
 }
 
@@ -565,8 +587,21 @@ split_iter :: (s: str, delim: u8) -> Iterator(str) {
 // character occurs at the very beginning or end of
 // the string, or if it does not occur at all.
 //
+bisect :: #match #local {}
+
+#overload
 bisect :: (s: str, c: u8) -> (str, str) {
     index := index_of(s, c); 
+    if index == -1 {
+        return s, "";
+    }
+
+    return s[0 .. index], s[index+1 .. s.length];
+}
+
+#overload
+bisect :: (s: str, substr: str) -> (str, str) {
+    index := index_of(s, substr);
     if index == -1 {
         return s, "";
     }

@@ -1274,3 +1274,13 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 
     return ((ovm_value_t) {0});
 }
+
+
+void ovm_print_stack_trace(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
+    int i = 0;
+    bh_arr_rev_each(ovm_stack_frame_t, frame, state->stack_frames) {
+        ovm_func_t *func = frame->func;
+        printf("[%03d] %s\n", i++, func->name);
+    }
+}
+
