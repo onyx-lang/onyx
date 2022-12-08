@@ -769,7 +769,7 @@ static CompilerProgress onyx_flush_module() {
 
     if (context.options->documentation_file != NULL) {
         OnyxDocumentation docs = onyx_docs_generate();
-        docs.format = Doc_Format_Human;
+        docs.format = Doc_Format_Tags;
         onyx_docs_emit(&docs, context.options->documentation_file);
     }
 

@@ -171,7 +171,7 @@ CheckStatus check_return(AstReturn* retnode) {
             return Check_Success;
         }
 
-        if ((*expected_return_type)->Basic.size > 0) {
+        if ((*expected_return_type) != &basic_types[Basic_Kind_Void]) {
             ERROR_(retnode->token->pos,
                 "Returning from non-void function without a value. Expected a value of type '%s'.",
                 type_get_name(*expected_return_type));

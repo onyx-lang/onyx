@@ -452,9 +452,16 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             expect_token(parser, '(');
             cast_node->type_node = parse_type(parser);
-            expect_token(parser, ')');
 
-            cast_node->expr = parse_factor(parser);
+            if (peek_token(0)->type == ',') {
+                expect_token(parser, ',');
+                cast_node->expr = parse_factor(parser);
+                expect_token(parser, ')');
+
+            } else {
+                expect_token(parser, ')');
+                cast_node->expr = parse_factor(parser);
+            }
 
             retval = (AstTyped *) cast_node;
             break;
@@ -1477,6 +1484,7 @@ static AstNode* parse_statement(OnyxParser* parser) {
         case Token_Type_Literal_Integer:
         case Token_Type_Literal_Float:
         case Token_Type_Literal_String:
+        case Token_Type_Keyword_Cast:
             retval = (AstNode *) parse_compound_expression(parser, 1);
             if (retval->kind == Ast_Kind_Call || retval->kind == Ast_Kind_Method_Call) {
                 if (parser->curr->type == '{') {
