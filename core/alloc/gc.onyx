@@ -52,10 +52,8 @@ auto :: #match {
     macro (body: Code) -> i32 {
         auto :: auto
 
-        #context_scope {
-            auto(); 
-            #unquote body;
-        }
+        auto(); 
+        #unquote body;
 
         return 0;
     }

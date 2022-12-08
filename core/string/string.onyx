@@ -138,9 +138,10 @@ contains :: (s: str, c: u8) -> bool {
 #overload
 contains :: (s: str, substr: str) -> bool {
     while i := 0; i < s.count {
+        defer i += 1;
+
         while j := 0; j < substr.count {
             if s[i + j] != substr[j] {
-                i += j + 1;
                 continue continue;
             }
 
@@ -253,17 +254,17 @@ index_of :: (s: str, c: u8) -> i32 {
 #overload
 index_of :: (s: str, substr: str) -> i32 {
     while i := 0; i < s.count {
-        start := i;
+        defer i += 1;
+
         while j := 0; j < substr.count {
             if s[i + j] != substr[j] {
-                i += j + 1;
                 continue continue;
             }
 
             j += 1;
         }
 
-        return start;
+        return i;
     }
 
     return -1;
@@ -568,7 +569,27 @@ split :: (s: str, delim: u8, allocator := context.allocator) -> []str {
     return strarr[0 .. delim_count + 1];
 }
 
+split_iter :: #match #local {}
+
+#overload
 split_iter :: (s: str, delim: u8) -> Iterator(str) {
+    return iter.generator(
+        ^.{ s = s, delim = delim },
+
+        (ctx: ^$T) -> (str, bool) {
+            if string.empty(ctx.s) {
+                return "", false;
+            }
+
+            ret: str;
+            ret, ctx.s = bisect(ctx.s, ctx.delim);
+            return ret, true;
+        }
+    );
+}
+
+#overload
+split_iter :: (s: str, delim: str) -> Iterator(str) {
     return iter.generator(
         ^.{ s = s, delim = delim },
 
@@ -610,6 +631,6 @@ bisect :: (s: str, substr: str) -> (str, str) {
         return s, "";
     }
 
-    return s[0 .. index], s[index+1 .. s.length];
+    return s[0 .. index], s[index+substr.length .. s.length];
 }
 

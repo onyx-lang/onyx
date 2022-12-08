@@ -339,11 +339,13 @@ reverse :: (arr: [] $T) {
 //
 // Simple insertion sort
 //    cmp should return >0 if left > right
+// Returns the array to be used in '|>' chaining.
+// NOT A COPY OF THE ARRAY.
 //
 sort :: #match #local {}
 
 #overload
-sort :: (arr: [] $T, cmp: (T, T) -> i32) {
+sort :: (arr: [] $T, cmp: (T, T) -> i32) -> [] T {
     for i: 1 .. arr.count {
         x := arr.data[i];
         j := i - 1;
@@ -360,10 +362,12 @@ sort :: (arr: [] $T, cmp: (T, T) -> i32) {
 
         arr.data[j + 1] = x;
     }
+
+    return arr;
 }
 
 #overload
-sort :: (arr: [] $T, cmp: (^T, ^T) -> i32) {
+sort :: (arr: [] $T, cmp: (^T, ^T) -> i32) -> [] T {
     for i: 1 .. arr.count {
         j := i;
 
@@ -376,11 +380,13 @@ sort :: (arr: [] $T, cmp: (^T, ^T) -> i32) {
             }
         }
     }
+
+    return arr;
 }
 
 quicksort :: #match #locked {
-    (arr: [] $T, cmp: ( T,  T) -> i32) do quicksort_impl(arr, cmp, 0, arr.count - 1); ,
-    (arr: [] $T, cmp: (^T, ^T) -> i32) do quicksort_impl(arr, cmp, 0, arr.count - 1); ,
+    (arr: [] $T, cmp: ( T,  T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
+    (arr: [] $T, cmp: (^T, ^T) -> i32) => { quicksort_impl(arr, cmp, 0, arr.count - 1); return arr; },
 }
 
 #local {

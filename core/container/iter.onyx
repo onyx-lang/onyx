@@ -313,6 +313,98 @@ skip :: (it: Iterator($T), count: u32, allocator := context.temp_allocator) -> I
     };
 }
 
+skip_while :: #match #local {}
+
+#overload
+skip_while :: (it: Iterator($T), predicate: (T) -> bool, allocator := context.temp_allocator) -> Iterator(T) {
+    SkipIterator :: struct (T: type_expr) {
+        iterator: Iterator(T);
+        allocator: Allocator;
+        predicate: (T) -> bool;
+        skipped := false;
+    }
+
+    skip_iterator := new(SkipIterator(T), allocator=allocator);
+    skip_iterator.iterator = it;
+    skip_iterator.allocator = allocator;
+    skip_iterator.predicate = predicate;
+
+    next :: (si: ^SkipIterator($T)) -> (T, bool) {
+        while !si.skipped {
+            value, cont := si.iterator.next(si.iterator.data);
+
+            if !cont {
+                si.skipped = true;
+                return value, false;
+            }
+
+            if !si.predicate(value) {
+                si.skipped = true;
+                return value, true;
+            }
+        }
+
+        return si.iterator.next(si.iterator.data);
+    }
+
+    close :: (si: ^SkipIterator($T)) {
+        if si.iterator.close != null_proc do si.iterator.close(si.iterator.data);
+        raw_free(si.allocator, si);
+    }
+
+    return .{
+        data  = skip_iterator,
+        next  = #solidify next  { T=T },
+        close = #solidify close { T=T },
+    };
+}
+
+#overload
+skip_while :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocator := context.temp_allocator) -> Iterator(T) {
+    SkipIterator :: struct (T: type_expr, Ctx: type_expr) {
+        iterator: Iterator(T);
+        allocator: Allocator;
+        predicate: (T, Ctx) -> bool;
+        ctx: Ctx;
+        skipped := false;
+    }
+
+    skip_iterator := new(SkipIterator(T, Ctx), allocator=allocator);
+    skip_iterator.iterator = it;
+    skip_iterator.allocator = allocator;
+    skip_iterator.predicate = predicate;
+    skip_iterator.ctx = ctx;
+
+    next :: (si: ^SkipIterator($T, $Ctx)) -> (T, bool) {
+        while !si.skipped {
+            value, cont := si.iterator.next(si.iterator.data);
+
+            if !cont {
+                si.skipped = true;
+                return value, false;
+            }
+
+            if !si.predicate(value, si.ctx) {
+                si.skipped = true;
+                return value, true;
+            }
+        }
+
+        return si.iterator.next(si.iterator.data);
+    }
+
+    close :: (si: ^SkipIterator($T, $Ctx)) {
+        if si.iterator.close != null_proc do si.iterator.close(si.iterator.data);
+        raw_free(si.allocator, si);
+    }
+
+    return .{
+        data  = skip_iterator,
+        next  = #solidify next  { T=T, Ctx=Ctx },
+        close = #solidify close { T=T, Ctx=Ctx },
+    };
+}
+
 #local Zipped :: struct (T: type_expr, R: type_expr) {
     first: T;
     second: R;
