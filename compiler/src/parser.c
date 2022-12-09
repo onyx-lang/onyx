@@ -455,7 +455,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
 
             if (peek_token(0)->type == ',') {
                 expect_token(parser, ',');
-                cast_node->expr = parse_factor(parser);
+                cast_node->expr = parse_expression(parser, 0);
                 expect_token(parser, ')');
 
             } else {

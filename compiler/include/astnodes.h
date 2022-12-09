@@ -1589,6 +1589,8 @@ struct CompileOptions {
     b32 generate_foreign_info : 1;
     b32 no_std                : 1;
 
+    b32 generate_tag_file     : 1;
+
     Runtime runtime;
 
     bh_arr(const char *) included_folders;
@@ -1618,6 +1620,10 @@ struct Context {
 
     // NOTE: This is defined in onyxwasm.h
     struct OnyxWasmModule* wasm_module;
+
+    // NOTE: All definitions (bindings, injections, aliases) are
+    // present in this list when generating CTags.
+    bh_arr(AstNode *) tag_locations;
 
     b32 cycle_almost_detected : 1;
     b32 cycle_detected : 1;
@@ -1795,6 +1801,8 @@ AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* c
 Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySolution) slns, OnyxFilePos pos, b32 error_if_failed);
 
 b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
+
+void track_declaration_for_tags(AstNode *);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

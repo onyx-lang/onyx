@@ -761,6 +761,38 @@ every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
     return true;
 }
 
+prod :: (x: $I1/Iterable, y: $I2/Iterable) => {
+    y_iter   := as_iterator(y);
+    y_val, _ := take_one(y_iter);
+
+    return generator(
+        ^.{
+            x = x,
+            x_iter = as_iterator(x),
+
+            y_iter = y_iter,
+            y_val  = y_val
+        },
+
+        ctx => {
+            x_val, cont := take_one(ctx.x_iter);
+            if cont {
+                return .{ x=x_val, y=ctx.y_val }, true;
+            }
+
+            ctx.y_val, cont = take_one(ctx.y_iter);
+            if !cont do return .{}, false;
+
+            ctx.x_iter = as_iterator(ctx.x);
+            x_val, cont = take_one(ctx.x_iter);
+            if !cont do return .{}, false;
+
+            return .{ x=x_val, y=ctx.y_val }, true;
+        }
+    );
+}
+
+
 to_array :: (it: Iterator($T), allocator := context.allocator) -> [..] T {
     arr := array.make(T, allocator=allocator);
     for v: it do array.push(^arr, v);

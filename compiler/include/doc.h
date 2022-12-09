@@ -35,4 +35,6 @@ typedef struct OnyxDocumentation {
 OnyxDocumentation onyx_docs_generate();
 void onyx_docs_emit(OnyxDocumentation* doc, const char* filename);
 
+void onyx_docs_emit_tags(char *dest);
+
 #endif

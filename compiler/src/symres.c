@@ -1710,6 +1710,8 @@ void symres_entity(Entity* ent) {
     switch (ent->type) {
         case Entity_Type_Binding: {
             symbol_introduce(curr_scope, ent->binding->token, ent->binding->node);
+            track_declaration_for_tags((AstNode *) ent->binding);
+
             package_reinsert_use_packages(ent->package);
             next_state = Entity_State_Finalized;
             break;

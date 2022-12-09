@@ -1248,3 +1248,10 @@ char *find_closest_symbol_in_node(AstNode* node, char *sym) {
     return find_closest_symbol_in_scope(scope, sym, &dist);
 }
 
+
+
+void track_declaration_for_tags(AstNode *node) {
+    if (context.options->generate_tag_file) {
+        bh_arr_push(context.tag_locations, node);
+    }
+}

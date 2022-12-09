@@ -50,7 +50,8 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\t           -VVV         Very very verbose output (to be used by compiler developers).\n"
     "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\t--multi-threaded        Enables multi-threading for this compilation.\n"
-    "\t--doc <doc_file>\n"
+    "\t--tag                   Generates a C-Tag file.\n"
+    // "\t--doc <doc_file>\n"
     "\t--generate-foreign-info\n"
     "\n"
     "Developer flags:\n"
@@ -87,6 +88,8 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
 
         .passthrough_argument_count = 0,
         .passthrough_argument_data  = NULL,
+
+        .generate_tag_file = 0,
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -180,8 +183,11 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
                     options.runtime = Runtime_Wasi;
                 }
             }
-            else if (!strcmp(argv[i], "--doc")) {
-                options.documentation_file = argv[++i];
+            // else if (!strcmp(argv[i], "--doc")) {
+            //     options.documentation_file = argv[++i];
+            // }
+            else if (!strcmp(argv[i], "--tag")) {
+                options.generate_tag_file = 1;
             }
             else if (!strcmp(argv[i], "--debug")) {
                 options.debug_enabled = 1;
@@ -706,6 +712,10 @@ static i32 onyx_compile() {
         printf("\n");
     }
 
+    if (context.options->generate_tag_file) {
+        onyx_docs_emit_tags("./tags");
+    }
+
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
@@ -767,11 +777,11 @@ static CompilerProgress onyx_flush_module() {
 
     bh_file_close(&output_file);
 
-    if (context.options->documentation_file != NULL) {
-        OnyxDocumentation docs = onyx_docs_generate();
-        docs.format = Doc_Format_Tags;
-        onyx_docs_emit(&docs, context.options->documentation_file);
-    }
+    // if (context.options->documentation_file != NULL) {
+    //     OnyxDocumentation docs = onyx_docs_generate();
+    //     docs.format = Doc_Format_Human;
+    //     onyx_docs_emit(&docs, context.options->documentation_file);
+    // }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
