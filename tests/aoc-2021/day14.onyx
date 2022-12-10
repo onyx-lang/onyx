@@ -3,13 +3,9 @@
 use package core
 
 Rule :: struct {
-    pair: Pair;
+    pair: Pair(u8, u8);
     insert: u8;
 }
-
-Pair :: struct {a, b:u8;}
-#match hash.to_u32 (p: Pair) => cast(u32) (p.a * 3 + p.b * 7);
-#operator == (p1, p2: Pair) => p1.a == p2.a && p1.b == p2.b;
 
 State :: struct {
     now, next: u64;
@@ -42,8 +38,8 @@ main :: (args) => {
             io.skip_whitespace(^reader);
         }
 
-        polymer_state: Map(Pair, State);
-        add_to_state :: macro (pair: Pair, count: u64) {
+        polymer_state: Map(Pair(u8, u8), State);
+        add_to_state :: macro (pair: Pair(u8, u8), count: u64) {
             if polymer_state->has(pair) {
                 (^polymer_state[pair]).next += ~~count;
             } else {
@@ -59,7 +55,7 @@ main :: (args) => {
         }
 
         for start_polymer.count - 1 {
-            p := Pair.{ start_polymer[it], start_polymer[it + 1] };
+            p := Pair(u8, u8).{ start_polymer[it], start_polymer[it + 1] };
             add_to_state(p, 1);
         }
 
@@ -70,8 +66,8 @@ main :: (args) => {
                 pair_count := ^polymer_state[rule.pair];
                 if pair_count != null {
                     if pair_count.now > 0 {
-                        pair1 := Pair.{ rule.pair.a, rule.insert };
-                        pair2 := Pair.{ rule.insert, rule.pair.b };
+                        pair1 := Pair(u8, u8).{ rule.pair.first, rule.insert };
+                        pair2 := Pair(u8, u8).{ rule.insert, rule.pair.second };
                         add_to_state(pair1, pair_count.now);
                         add_to_state(pair2, pair_count.now);
                     }
@@ -82,7 +78,7 @@ main :: (args) => {
 
         mode: Map(u8, u64);
         for^ polymer_state.entries {
-            mode[it.key.b] = mode[it.key.b] + it.value.now;
+            mode[it.key.second] = mode[it.key.second] + it.value.now;
         }
 
         maximum := array.fold(mode.entries, cast(u64) 0, (x, y) => math.max(x.value, y));

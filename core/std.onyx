@@ -12,6 +12,7 @@ package core
 #load "./container/set"
 #load "./container/bucket_array"
 #load "./container/heap"
+#load "./container/pair"
 
 #load "./conv/conv"
 #load "./conv/format"

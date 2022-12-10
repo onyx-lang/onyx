@@ -214,23 +214,3 @@ main :: () {
 }
 
 }
-
-
-
-Pair :: struct (T1: type_expr, T2: type_expr) {
-    first: T1;
-    second: T2;
-}
-
-#inject Pair {
-    hash :: (p: Pair($T/hash.Hashable, $R/hash.Hashable)) -> u32 {
-        h := 7;
-        h += h << 5 + hash.to_u32(p.first);
-        h += h << 5 + hash.to_u32(p.second);
-        return h;
-    }
-}
-
-#operator == (p1: Pair, p2: typeof p1) =>
-    p1.first == p2.first && p1.second == p2.second;
-
