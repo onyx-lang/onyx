@@ -1,6 +1,6 @@
 package core.iter
 
-use core {memory, alloc, array}
+use core {memory, alloc, array, Pair}
 
 as_iterator :: #match {}
 
@@ -405,12 +405,7 @@ skip_while :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool, allocat
     };
 }
 
-#local Zipped :: struct (T: type_expr, R: type_expr) {
-    first: T;
-    second: R;
-}
-
-zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R), allocator := context.temp_allocator) -> Iterator(Zipped(T, R)) {
+zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R), allocator := context.temp_allocator) -> Iterator(Pair(T, R)) {
     ZippedIterator :: struct (T: type_expr, R: type_expr) {
         iterator1: Iterator(T);
         iterator2: Iterator(R);
@@ -422,7 +417,7 @@ zip :: (left_iterator: Iterator($T), right_iterator: Iterator($R), allocator := 
     zipped_iterator.iterator2 = right_iterator;
     zipped_iterator.allocator = allocator;
 
-    next :: (zi: ^ZippedIterator($T, $R)) -> (Zipped(T, R), bool) {
+    next :: (zi: ^ZippedIterator($T, $R)) -> (Pair(T, R), bool) {
         v1, cont1 := zi.iterator1.next(zi.iterator1.data);
         v2, cont2 := zi.iterator2.next(zi.iterator2.data);
 
@@ -777,7 +772,7 @@ prod :: (x: $I1/Iterable, y: $I2/Iterable) => {
         ctx => {
             x_val, cont := take_one(ctx.x_iter);
             if cont {
-                return .{ x=x_val, y=ctx.y_val }, true;
+                return Pair.make(x_val, ctx.y_val), true;
             }
 
             ctx.y_val, cont = take_one(ctx.y_iter);
@@ -787,7 +782,7 @@ prod :: (x: $I1/Iterable, y: $I2/Iterable) => {
             x_val, cont = take_one(ctx.x_iter);
             if !cont do return .{}, false;
 
-            return .{ x=x_val, y=ctx.y_val }, true;
+            return Pair.make(x_val, ctx.y_val), true;
         }
     );
 }

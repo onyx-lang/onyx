@@ -255,7 +255,10 @@ static PolySolveResult solve_poly_type(AstNode* target, AstType* type_expr, Type
         PolySolveElem elem = elem_queue[0];
         bh_arr_deleten(elem_queue, 0, 1);
 
-        if (elem.type_expr == (AstType *) target) {
+        // This check does not strictly need the `type_auto_return` check,
+        // but it does prevent bugs if the auto return type placeholder is
+        // accidentally inserted into the real type.
+        if (elem.type_expr == (AstType *) target && elem.actual != &type_auto_return) {
             result.kind = elem.kind;
 
             assert(elem.kind != PSK_Undefined);
@@ -476,7 +479,11 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstF
     }
 
     AstTyped *result = (AstTyped *) polymorphic_proc_lookup(pp, PPLM_By_Function_Type, ft->partial_function_type, pp->token);
-    if (result && result->type == NULL) {
+
+    // If the result is not ready (NULL, yield flag, no type, or `type_auto_return` as return type), wait.
+    if (result
+        && result->type == NULL
+        || (result->type->kind == Type_Kind_Function && result->type->Function.return_type == &type_auto_return)) {
         doing_nested_polymorph_lookup = 1;
         result = NULL;
     }
