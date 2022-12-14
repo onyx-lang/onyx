@@ -1,6 +1,6 @@
 use core
 
-f :: (ctx) => {
+f :: ctx => {
     x, y := 123, 456.0f;
     if ctx.a > 0 {
         return Pair.make(x, y), false;

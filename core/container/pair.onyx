@@ -36,6 +36,10 @@ core.hash.to_u32 :: (p: Pair($First_Type/hash.Hashable, $Second_Type/hash.Hashab
     return p1.first == p2.first && p1.second == p2.second;
 }
 
+#operator != (p1, p2: Pair($First_Type/Equatable, $Second_Type/Equatable)) => {
+    return !(p1.first == p2.first) || !(p1.second == p2.second);
+}
+
 #local Equatable :: interface (t: $T) {
     { t == t } -> bool;
 }
