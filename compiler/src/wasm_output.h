@@ -952,8 +952,7 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                     AstEnumValue *ev = *pev;
 
                     output_unsigned_integer(get_expression_integer_value(ev->value, NULL), &section_buff);
-                    output_unsigned_integer(ev->token->length, &section_buff);
-                    bh_buffer_append(&section_buff, ev->token->text, ev->token->length);
+                    output_name(ev->token->text, ev->token->length, &section_buff);
                 }
                 continue;
             }
@@ -968,6 +967,12 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             if (type->kind == Type_Kind_Slice) {
                 output_unsigned_integer(7, &section_buff);
                 output_unsigned_integer(type->Slice.elem->id, &section_buff);
+                continue;
+            }
+
+            if (type->kind == Type_Kind_DynArray) {
+                output_unsigned_integer(7, &section_buff);
+                output_unsigned_integer(type->DynArray.elem->id, &section_buff);
                 continue;
             }
 

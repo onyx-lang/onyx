@@ -4,6 +4,8 @@
 
 #include <ctype.h>
 
+#define MAX_SLICE_LENGTH 64
+
 static char write_buf[4096];
 
 #define WRITE(str) do {    \
@@ -188,8 +190,8 @@ static void append_slice_from_memory(debug_runtime_value_builder_t *builder, voi
     debug_type_info_t *elem_type = &builder->info->types[type_id];
 
     b32 count_overflowed = 0;
-    if (count > 256) {
-        count = 256;
+    if (count > MAX_SLICE_LENGTH) {
+        count = MAX_SLICE_LENGTH;
         count_overflowed = 1;
     }
 
@@ -417,6 +419,10 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
                 count = *ptr_loc;
             }
 
+            if (count > MAX_SLICE_LENGTH * 4) {
+                count = MAX_SLICE_LENGTH * 4;
+            }
+
             return count;
         }
     }
@@ -577,8 +583,6 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
         builder->it_type = type->modifier.modified_type;
         builder->it_has_children = get_subvalues_for_type(builder, builder->it_type) > 0;
 
-        // builder->it_loc_kind = debug_sym_loc_global;
-        // builder->it_loc = builder->base_loc;
         if (builder->base_loc_kind == debug_sym_loc_register) {
             ovm_value_t value;
             if (lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
@@ -609,10 +613,7 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
 
     if (type->kind == debug_type_kind_structure) {
         debug_type_structure_member_t *mem = &type->structure.members[builder->it_index];
-        snprintf(tmp_buffer, 2048, "%s", mem->name);
-        strncpy(name_buffer, tmp_buffer, 2048);
-
-        builder->it_name = name_buffer;
+        builder->it_name = mem->name;
         builder->it_has_children = get_subvalues_for_type(builder, mem->type) > 0;
         builder->it_type = mem->type;
 
