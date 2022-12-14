@@ -163,41 +163,24 @@ static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
             char    *filename = parse_string(debug, ctx);
             unsigned int line = parse_int(debug, ctx);
 
-            //
-            // TODO: This translation logic will have to be abstracted
-            debug_file_info_t file_info;
-            bool file_found = debug_info_lookup_file_by_name(debug->info, filename, &file_info);
-            if (!file_found) {
-                goto brk_send_error;
-            }
-
-            if (line > file_info.line_count) {
-                goto brk_send_error;
-            }
-
-            u32 instr;
-            while ((instr = debug->info->line_to_instruction[file_info.line_buffer_offset + line]) == 0) {
-                line += 1;
-
-                if (line > file_info.line_count) {
-                    goto brk_send_error;
-                }
-            }
+            i32 instr = debug_info_lookup_instr_by_file_line(debug->info, filename, line);
+            if (instr < 0) goto brk_send_error;
 
             printf("[INFO ] Setting breakpoint at %s:%d (%x)\n", filename, line, instr);
+
+            debug_file_info_t file_info;
+            debug_info_lookup_file_by_name(debug->info, filename, &file_info);
             
             debug_breakpoint_t bp;
             bp.id = debug->next_breakpoint_id++;
             bp.instr = instr;
             bp.file_id = file_info.file_id;
             bp.line = line;
-            bh_arr_each(debug_thread_state_t *, thread, debug->threads) {
-                bh_arr_push((*thread)->breakpoints, bp);
-            }
+            bh_arr_push(debug->breakpoints, bp);
 
             send_response_header(debug, msg_id);
             send_bool(debug, true);
-            send_int(debug, bp.id);    // TODO: This should be a unique breakpoint ID
+            send_int(debug, bp.id);
             send_int(debug, line);
             break;
 
@@ -220,14 +203,12 @@ static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
                 goto clr_brk_send_error;
             }
 
-            bh_arr_each(debug_thread_state_t *, thread, debug->threads) {
-                bh_arr_each(debug_breakpoint_t, bp, (*thread)->breakpoints) {
-                    if (bp->file_id == file_info.file_id) {
-                        // This is kind of hacky but it does successfully delete
-                        // a single element from the array and move the iterator.
-                        bh_arr_fastdelete((*thread)->breakpoints, bp - (*thread)->breakpoints);
-                        bp--;
-                    }
+            bh_arr_each(debug_breakpoint_t, bp, debug->breakpoints) {
+                if (bp->file_id == file_info.file_id) {
+                    // This is kind of hacky but it does successfully delete
+                    // a single element from the array and move the iterator.
+                    bh_arr_fastdelete(debug->breakpoints, bp - debug->breakpoints);
+                    bp--;
                 }
             }
 
@@ -554,7 +535,7 @@ void *__debug_thread_entry(void * data) {
                 (*thread)->state = debug_state_paused;
 
                 i32 instr = -1, bp_id = (*thread)->last_breakpoint_hit;
-                bh_arr_each(debug_breakpoint_t, bp, (*thread)->breakpoints) {
+                bh_arr_each(debug_breakpoint_t, bp, debug->breakpoints) {
                     if (bp->id == bp_id) {
                         instr = bp->instr;
                         break;

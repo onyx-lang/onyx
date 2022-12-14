@@ -696,7 +696,14 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
         if (state->debug) {
             if (state->debug->run_count == 0) {
                 state->debug->state = debug_state_pausing;
-                state->debug->pause_reason = debug_pause_entry; // This is not always due to entry...
+
+                if (state->debug->started) {
+                    state->debug->pause_reason = debug_pause_step;
+                } else {
+                    state->debug->pause_reason = debug_pause_entry;
+                    state->debug->started = 1;
+                }
+
                 goto should_wait;
             }
 
@@ -716,7 +723,8 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
                 }
             }
 
-            bh_arr_each(debug_breakpoint_t, bp, state->debug->breakpoints) {
+            ovm_assert(engine->debug);
+            bh_arr_each(debug_breakpoint_t, bp, engine->debug->breakpoints) {
                 if (bp->instr == (u32) state->pc) {
                     state->debug->state = debug_state_hit_breakpoint;
                     state->debug->last_breakpoint_hit = bp->id;

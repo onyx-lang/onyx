@@ -211,6 +211,31 @@ bool debug_info_lookup_file(debug_info_t *info, u32 file_id, debug_file_info_t *
     return true;
 }
 
+i32 debug_info_lookup_instr_by_file_line(debug_info_t *info, char *filename, u32 line) {
+    if (!info || !info->has_debug_info) return 0;
+
+    debug_file_info_t file_info;
+    bool file_found = debug_info_lookup_file_by_name(info, filename, &file_info);
+    if (!file_found) {
+        return -1;
+    }
+
+    if (line > file_info.line_count) {
+        return -1;
+    }
+
+    u32 instr;
+    while ((instr = info->line_to_instruction[file_info.line_buffer_offset + line]) == 0) {
+        line += 1;
+
+        if (line > file_info.line_count) {
+            return -1;
+        }
+    }
+
+    return instr;
+}
+
 //
 // For now, this is going to compare the strings exactly. In the future, it might be a good
 // to do a levenschtein distance or something, so the full path isn't needed.

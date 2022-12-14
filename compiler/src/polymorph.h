@@ -481,9 +481,10 @@ static AstTyped* try_lookup_based_on_partial_function_type(AstFunction *pp, AstF
     AstTyped *result = (AstTyped *) polymorphic_proc_lookup(pp, PPLM_By_Function_Type, ft->partial_function_type, pp->token);
 
     // If the result is not ready (NULL, yield flag, no type, or `type_auto_return` as return type), wait.
-    if (result
-        && result->type == NULL
-        || (result->type->kind == Type_Kind_Function && result->type->Function.return_type == &type_auto_return)) {
+    if (result && (
+            result->type == NULL
+        || (result->type->kind == Type_Kind_Function && result->type->Function.return_type == &type_auto_return)))
+    {
         doing_nested_polymorph_lookup = 1;
         result = NULL;
     }

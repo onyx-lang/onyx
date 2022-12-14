@@ -52,6 +52,8 @@ export class OVMDebugSession extends LoggingDebugSession {
 	private _variableReferences = new Handles<IVariableReference>();
 	private _frameReferences = new Handles<IFrameReference>();
 
+	private stopOnEntry: boolean;
+
     public constructor() {
         super("ovm-debug-log.txt");
 
@@ -68,6 +70,15 @@ export class OVMDebugSession extends LoggingDebugSession {
 		});
 
 		this.debugger.on("paused", (ev) => {
+			if (ev.reason == "entry") {
+				this.sendEvent(new ThreadEvent("started", ev.thread_id));
+
+				if (!this.stopOnEntry) {
+					this.debugger.resume(ev.thread_id);
+					return;
+				}
+			}
+
 			this.sendEvent(new StoppedEvent(ev.reason, ev.threadId));
 		});
 
@@ -315,12 +326,10 @@ export class OVMDebugSession extends LoggingDebugSession {
 		this._clientConnected = true;
 		this._clientConnectedNotifier.notify();
 
-		this.sendResponse(response);
-		this.sendEvent(new ThreadEvent("started", 1));
+		this.stopOnEntry = args.stopOnEntry ?? false;
 
-		if (!args.stopOnEntry) {
-			this.debugger.resume();
-		}
+		this.sendResponse(response);
+		// this.sendEvent(new ThreadEvent("started", 1));
     }
 
     protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request): void {

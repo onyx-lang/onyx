@@ -31,6 +31,13 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
             this.sendEvent(new debugadapter_1.StoppedEvent("breakpoint", ev.threadId));
         });
         this.debugger.on("paused", (ev) => {
+            if (ev.reason == "entry") {
+                this.sendEvent(new debugadapter_1.ThreadEvent("started", ev.thread_id));
+                if (!this.stopOnEntry) {
+                    this.debugger.resume(ev.thread_id);
+                    return;
+                }
+            }
             this.sendEvent(new debugadapter_1.StoppedEvent(ev.reason, ev.threadId));
         });
         this.debugger.on("terminated", () => {
@@ -219,16 +226,14 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         });
     }
     attachRequest(response, args, request) {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             yield this._configurationDone.wait(1000);
             yield this.debugger.connect(args.socketPath);
             this._clientConnected = true;
             this._clientConnectedNotifier.notify();
+            this.stopOnEntry = (_a = args.stopOnEntry) !== null && _a !== void 0 ? _a : false;
             this.sendResponse(response);
-            this.sendEvent(new debugadapter_1.ThreadEvent("started", 1));
-            if (!args.stopOnEntry) {
-                this.debugger.resume();
-            }
         });
     }
     pauseRequest(response, args, request) {

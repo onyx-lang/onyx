@@ -172,6 +172,7 @@ bool debug_info_lookup_location(debug_info_t *info, u32 instruction, debug_loc_i
 bool debug_info_lookup_file(debug_info_t *info, u32 file_id, debug_file_info_t *out);
 bool debug_info_lookup_file_by_name(debug_info_t *info, char *name, debug_file_info_t *out);
 bool debug_info_lookup_func(debug_info_t *info, u32 func_id, debug_func_info_t *out);
+i32  debug_info_lookup_instr_by_file_line(debug_info_t *info, char *filename, u32 line);
 
 //
 // This builder is used in conjunction with code builder to output
@@ -231,6 +232,13 @@ typedef struct debug_thread_state_t {
     debug_exec_state_t state;
     struct ovm_state_t *ovm_state;
 
+    // This flag signals if the thread has done
+    // ANY execution. When a thread first starts
+    // the thread signals a `paused` event, with
+    // an `entry` reason. When the thread pauses
+    // later on, it should be a `step` reason.
+    b32 started;
+
     i32 run_count;
     sem_t wait_semaphore;
 
@@ -239,7 +247,6 @@ typedef struct debug_thread_state_t {
     i32 extra_frames_since_last_pause;
     debug_pause_reason_t pause_reason;
 
-    bh_arr(debug_breakpoint_t) breakpoints;
     u32 last_breakpoint_hit;
 
     u32 state_change_write_fd;
@@ -262,6 +269,7 @@ typedef struct debug_state_t {
     u32 next_thread_id;
 
     u32 next_breakpoint_id;
+    bh_arr(debug_breakpoint_t) breakpoints;
 
     pthread_t debug_thread;
     bool debug_thread_running;

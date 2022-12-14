@@ -44,9 +44,6 @@ u32 debug_host_register_thread(debug_state_t *debug, ovm_state_t *ovm_state) {
     new_thread->run_count = 0;                    // Start threads in stopped state.
     sem_init(&new_thread->wait_semaphore, 0, 0);
 
-    new_thread->breakpoints = NULL;
-    bh_arr_new(debug->alloc, new_thread->breakpoints, 8);
-
     u32 id = debug->next_thread_id++;
     new_thread->id = id;
 
