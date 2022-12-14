@@ -56,6 +56,8 @@ typedef enum debug_type_kind_t {
     debug_type_kind_array     = 4,
     debug_type_kind_alias     = 5,
     debug_type_kind_function  = 6,
+    debug_type_kind_slice     = 7,
+    debug_type_kind_enum      = 8,
 } debug_type_kind_t;
 
 typedef enum debug_type_primitive_kind_t {
@@ -115,6 +117,21 @@ typedef struct debug_type_function_t {
     u32  return_type;
 } debug_type_function_t;
 
+typedef struct debug_type_slice_t {
+    u32 type; 
+} debug_type_slice_t;
+
+typedef struct debug_type_enum_value_t {
+    u64 value;
+    char *name;
+} debug_type_enum_value_t;
+
+typedef struct debug_type_enum_t {
+    u32 backing_type;
+    u32 value_count;
+    debug_type_enum_value_t *values;
+} debug_type_enum_t;
+
 typedef struct debug_type_info_t {
     u32 id;
     char *name;
@@ -128,6 +145,8 @@ typedef struct debug_type_info_t {
         debug_type_array_t     array;
         debug_type_alias_t     alias;
         debug_type_function_t  function;
+        debug_type_slice_t     slice;
+        debug_type_enum_t      enumeration;
     };
 } debug_type_info_t;
 
@@ -173,6 +192,8 @@ bool debug_info_lookup_file(debug_info_t *info, u32 file_id, debug_file_info_t *
 bool debug_info_lookup_file_by_name(debug_info_t *info, char *name, debug_file_info_t *out);
 bool debug_info_lookup_func(debug_info_t *info, u32 func_id, debug_func_info_t *out);
 i32  debug_info_lookup_instr_by_file_line(debug_info_t *info, char *filename, u32 line);
+
+char *debug_info_type_enum_find_name(debug_info_t *info, u32 enum_type, u64 value);
 
 //
 // This builder is used in conjunction with code builder to output

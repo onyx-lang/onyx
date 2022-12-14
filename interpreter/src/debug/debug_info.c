@@ -182,6 +182,26 @@ void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
                 type.function.return_type = uleb128_to_uint(data, &offset);
                 break;
 
+            case debug_type_kind_slice:
+                type.slice.type = uleb128_to_uint(data, &offset);
+                break;
+
+            case debug_type_kind_enum:
+                type.enumeration.backing_type = uleb128_to_uint(data, &offset);
+                type.enumeration.value_count = uleb128_to_uint(data, &offset);
+                type.enumeration.values = bh_alloc_array(info->alloc, debug_type_enum_value_t, type.enumeration.value_count);
+
+                fori (i, 0, type.enumeration.value_count) {
+                    type.enumeration.values[i].value = uleb128_to_uint(data, &offset);
+
+                    u32 name_length = uleb128_to_uint(data, &offset);
+                    type.enumeration.values[i].name = bh_alloc_array(info->alloc, char, name_length + 1);
+                    memcpy(type.enumeration.values[i].name, data + offset, name_length);
+                    type.enumeration.values[i].name[name_length] = 0;
+                    offset += name_length;
+                }
+                break;
+
             // Error handling
             default: assert(("Unrecognized type kind", 0));
         }
@@ -234,6 +254,19 @@ i32 debug_info_lookup_instr_by_file_line(debug_info_t *info, char *filename, u32
     }
 
     return instr;
+}
+
+char *debug_info_type_enum_find_name(debug_info_t *info, u32 enum_type, u64 value) {
+    debug_type_info_t *type = &info->types[enum_type];
+    if (type->kind != debug_type_kind_enum) return NULL;
+
+    fori (i, 0, type->enumeration.value_count) {
+        if (type->enumeration.values[i].value == value) {
+            return type->enumeration.values[i].name;
+        }
+    }
+
+    return NULL;
 }
 
 //

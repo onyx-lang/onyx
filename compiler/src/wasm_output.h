@@ -911,6 +911,12 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                     continue;
                 }
 
+                if (type->Basic.kind == Basic_Kind_U8) {
+                    output_unsigned_integer(1, &section_buff);
+                    output_unsigned_integer(5, &section_buff);
+                    continue;
+                }
+
                 output_unsigned_integer(1, &section_buff);
                 if      (type->Basic.kind == Basic_Kind_Void) output_unsigned_integer(0, &section_buff);
                 else if (type_is_bool(type))                  output_unsigned_integer(4, &section_buff);
@@ -935,9 +941,20 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
             }
 
             if (type->kind == Type_Kind_Enum) {
-                output_unsigned_integer(5, &section_buff);
-                output_unsigned_integer(2, &section_buff);
+                output_unsigned_integer(8, &section_buff);
                 output_unsigned_integer(type->Enum.backing->id, &section_buff);
+
+                AstEnumType *e_type = (AstEnumType *) type->ast_type;
+                assert(e_type->kind == Ast_Kind_Enum_Type);
+
+                output_unsigned_integer(bh_arr_length(e_type->values), &section_buff);
+                bh_arr_each(AstEnumValue *, pev, e_type->values) {
+                    AstEnumValue *ev = *pev;
+
+                    output_unsigned_integer(get_expression_integer_value(ev->value, NULL), &section_buff);
+                    output_unsigned_integer(ev->token->length, &section_buff);
+                    bh_buffer_append(&section_buff, ev->token->text, ev->token->length);
+                }
                 continue;
             }
 
@@ -945,6 +962,12 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                 output_unsigned_integer(4, &section_buff);
                 output_unsigned_integer(type->Array.count, &section_buff);
                 output_unsigned_integer(type->Array.elem->id, &section_buff);
+                continue;
+            }
+
+            if (type->kind == Type_Kind_Slice) {
+                output_unsigned_integer(7, &section_buff);
+                output_unsigned_integer(type->Slice.elem->id, &section_buff);
                 continue;
             }
 

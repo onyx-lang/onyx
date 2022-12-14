@@ -2,6 +2,8 @@
 #include "ovm_debug.h"
 #include "vm.h"
 
+#include <ctype.h>
+
 static char write_buf[4096];
 
 #define WRITE(str) do {    \
@@ -35,6 +37,8 @@ static bool lookup_stack_pointer(debug_runtime_value_builder_t *builder, u32 *ou
     *out = stack_ptr.u32;    
     return true;
 }
+
+static void append_slice_from_memory(debug_runtime_value_builder_t *builder, void *elem_data, u32 count, u32 type_id);
 
 static void append_value_from_memory_with_type(debug_runtime_value_builder_t *builder, void *base, u32 type_id) {
     debug_type_info_t *type = &builder->info->types[type_id];
@@ -75,6 +79,16 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
                     if ((*(u8 *) base) != 0) { WRITE("true"); }
                     else                     { WRITE("false"); }
                     break;
+
+                case debug_type_primitive_kind_character: {
+                    unsigned char c = *(u8 *) base;
+                    if (!iscntrl(c) && isascii(c)) {
+                        WRITE_FORMAT("%c", c);
+                    } else {
+                        WRITE_FORMAT("\\x%02hhx", c);
+                    }
+                    break;
+                }
 
                 default:
                     WRITE("(err)");
@@ -136,9 +150,73 @@ static void append_value_from_memory_with_type(debug_runtime_value_builder_t *bu
             break;
         }
 
+        case debug_type_kind_slice: {
+            void *elem_data = bh_pointer_add(builder->state->ovm_engine->memory, *(u32 *) base);
+            u32 count = *(u32 *) bh_pointer_add(base, 4);
+            u32 type_id = type->slice.type;
+
+            append_slice_from_memory(builder, elem_data, count, type_id);
+            break;
+        }
+
+        case debug_type_kind_enum: {
+            debug_type_info_t *backing_type = &builder->info->types[type->enumeration.backing_type];
+
+            u64 value = 0;
+            switch (backing_type->size) {
+                case 1: value = *(u8  *) base; break;
+                case 2: value = *(u16 *) base; break;
+                case 4: value = *(u32 *) base; break;
+                case 8: value = *(u64 *) base; break;
+            }
+
+            char *name = debug_info_type_enum_find_name(builder->info, type_id, value);
+            if (name) {
+                WRITE(name);
+            } else {
+                WRITE_FORMAT("%lu", value);
+            }
+
+            break;
+        }
+
         default: WRITE("(unknown)"); break;
     }
 }
+
+static void append_slice_from_memory(debug_runtime_value_builder_t *builder, void *elem_data, u32 count, u32 type_id) {
+    debug_type_info_t *elem_type = &builder->info->types[type_id];
+
+    b32 count_overflowed = 0;
+    if (count > 256) {
+        count = 256;
+        count_overflowed = 1;
+    }
+
+    if (elem_type->kind == debug_type_kind_primitive &&
+        elem_type->primitive.primitive_kind == debug_type_primitive_kind_character) {
+        WRITE("\"");
+
+        fori (i, 0, (i32) count) {
+            append_value_from_memory_with_type(builder, bh_pointer_add(elem_data, i * elem_type->size), elem_type->id);
+        }
+
+        if (count_overflowed) WRITE("...");
+        WRITE("\"");
+        return;
+    }
+
+    WRITE("[");
+
+    fori (i, 0, (i32) count) {
+        if (i != 0) WRITE(", ");
+        append_value_from_memory_with_type(builder, bh_pointer_add(elem_data, i * elem_type->size), elem_type->id);
+    }
+
+    if (count_overflowed) WRITE("...");
+    WRITE("]");
+}
+
 
 static void append_ovm_value_with_type(debug_runtime_value_builder_t *builder, ovm_value_t value, u32 type_id) {
     debug_type_info_t *type = &builder->info->types[type_id];
@@ -220,6 +298,17 @@ static void append_ovm_value_with_type(debug_runtime_value_builder_t *builder, o
             break;
         }
 
+        case debug_type_kind_enum: {
+            char *name = debug_info_type_enum_find_name(builder->info, type_id, value.u64);
+            if (name == NULL) {
+                WRITE_FORMAT("%lu", value.u64);
+            } else {
+                WRITE(name);
+            }
+
+            break;
+        }
+
         default: WRITE("(unknown)"); break;
     }
 }
@@ -260,6 +349,20 @@ static void append_value_from_register(debug_runtime_value_builder_t *builder, u
         return;
     }
 
+    if (type->kind == debug_type_kind_slice) {
+        ovm_value_t base_reg;
+        ovm_value_t count_reg;
+
+        if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, reg, &base_reg)) return;
+        if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, reg + 1, &count_reg)) return;
+
+        void *elem_data = bh_pointer_add(builder->state->ovm_engine->memory, base_reg.u32);
+        u32 count = count_reg.u32;
+
+        append_slice_from_memory(builder, elem_data, count, type->slice.type);
+        return;
+    }
+
     if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, reg, &value)) {
         WRITE("(err)")
         return;
@@ -272,7 +375,8 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
     debug_type_info_t *t = &builder->info->types[type];
     switch (t->kind) {
         case debug_type_kind_primitive: return 0;
-        case debug_type_kind_function: return 0;
+        case debug_type_kind_function:  return 0;
+        case debug_type_kind_enum:      return 0;
 
         case debug_type_kind_modifier:
             if (t->modifier.modifier_kind == debug_type_modifier_kind_pointer) return 1;
@@ -285,6 +389,36 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
             return t->structure.member_count;
         
         case debug_type_kind_array: return t->array.count;
+
+        case debug_type_kind_slice: {
+            // :Refactor
+            u32 count = 0;
+            if (builder->base_loc_kind == debug_sym_loc_register) {
+                ovm_value_t value;
+                if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc + 1, &value)) {
+                    return 0;
+                }
+
+                count = value.u32;
+            }
+
+            else if (builder->base_loc_kind == debug_sym_loc_stack) {
+                u32 stack_ptr;
+                if (!lookup_stack_pointer(builder, &stack_ptr)) {
+                    return 0;
+                }    
+
+                u32 *ptr_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc + 4);
+                count = *ptr_loc;
+            }
+
+            else if (builder->base_loc_kind == debug_sym_loc_global) {
+                u32 *ptr_loc = bh_pointer_add(builder->state->ovm_engine->memory, builder->base_loc + 4);
+                count = *ptr_loc;
+            }
+
+            return count;
+        }
     }
 }
 
@@ -311,19 +445,14 @@ void debug_runtime_value_build_set_location(debug_runtime_value_builder_t *build
 }
 
 void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u32 index) {
-    builder->it_index = 0;
-
     debug_type_info_t *type = &builder->info->types[builder->base_type];
+
     if (type->kind == debug_type_kind_modifier && type->modifier.modifier_kind == debug_type_modifier_kind_pointer) {
         if (index > 0) {
             goto bad_case;
         }
 
         builder->base_type = type->modifier.modified_type;
-        type = &builder->info->types[builder->base_type];
-
-        builder->max_index = get_subvalues_for_type(builder, builder->base_type);
-        builder->it_index = 0;
 
         if (builder->base_loc_kind == debug_sym_loc_register) {
             ovm_value_t value;
@@ -350,8 +479,6 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
             u32 *ptr_loc = bh_pointer_add(builder->state->ovm_engine->memory, builder->base_loc);
             builder->base_loc = *ptr_loc;
         }
-
-        return;
     }
 
     if (type->kind == debug_type_kind_structure) {
@@ -361,7 +488,6 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
 
         debug_type_structure_member_t *mem = &type->structure.members[index];
         builder->base_type = mem->type;
-        builder->max_index = get_subvalues_for_type(builder, builder->base_type);
         builder->it_name = mem->name;
 
         if (builder->base_loc_kind == debug_sym_loc_register) {
@@ -371,23 +497,12 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
         else if (builder->base_loc_kind == debug_sym_loc_stack || builder->base_loc_kind == debug_sym_loc_global) {
             builder->base_loc += mem->offset;
         }
-
-        return;
     }
 
     if (type->kind == debug_type_kind_array) {
         builder->base_type = type->array.type;
-        builder->max_index = get_subvalues_for_type(builder, builder->base_type);
 
         debug_type_info_t *sub_type = &builder->info->types[builder->base_type];
-
-        // Double buffering here so if there are multiple
-        // pointer descentions, the names don't get mangled.
-        static char name_buffer[2048];
-        static char tmp_buffer[2048];
-        snprintf(tmp_buffer, 2048, "[%d]", index);
-        strncpy(name_buffer, tmp_buffer, 2048);
-        builder->it_name = name_buffer;
 
         if (builder->base_loc_kind == debug_sym_loc_register) {
             ovm_value_t value;
@@ -402,9 +517,43 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
         else if (builder->base_loc_kind == debug_sym_loc_stack || builder->base_loc_kind == debug_sym_loc_global) {
             builder->base_loc += sub_type->size * index;
         }
-
-        return;
     }
+
+    if (type->kind == debug_type_kind_slice) {
+        builder->base_type = type->slice.type;
+        debug_type_info_t *sub_type = &builder->info->types[builder->base_type];
+
+        if (builder->base_loc_kind == debug_sym_loc_register) {
+            ovm_value_t value;
+            if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                goto bad_case;
+            }
+
+            builder->base_loc_kind = debug_sym_loc_global;
+            builder->base_loc = value.u32 + sub_type->size * index;
+        }
+
+        else if (builder->base_loc_kind == debug_sym_loc_stack) {
+            u32 stack_ptr;
+            if (!lookup_stack_pointer(builder, &stack_ptr)) {
+                goto bad_case;
+            }    
+
+            u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc);
+
+            builder->base_loc_kind = debug_sym_loc_global;
+            builder->base_loc = *data_loc + index * sub_type->size;
+        }
+
+        else if (builder->base_loc_kind == debug_sym_loc_global) {
+            u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, builder->base_loc);
+            builder->base_loc = *data_loc + index * sub_type->size;
+        }
+    }
+
+    builder->max_index = get_subvalues_for_type(builder, builder->base_type);
+    builder->it_index = 0;
+    return;
 
   bad_case:
     builder->base_loc_kind = debug_sym_loc_unknown;
@@ -424,16 +573,46 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
         snprintf(tmp_buffer, 2048, "*%s", builder->it_name);
         strncpy(name_buffer, tmp_buffer, 2048);
 
-        builder->it_loc_kind = builder->base_loc_kind;
-        builder->it_loc = builder->base_loc;
         builder->it_name = name_buffer;
         builder->it_type = type->modifier.modified_type;
         builder->it_has_children = get_subvalues_for_type(builder, builder->it_type) > 0;
+
+        // builder->it_loc_kind = debug_sym_loc_global;
+        // builder->it_loc = builder->base_loc;
+        if (builder->base_loc_kind == debug_sym_loc_register) {
+            ovm_value_t value;
+            if (lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                builder->it_loc_kind = debug_sym_loc_global;
+                builder->it_loc = value.u32;
+            }
+        }
+
+        if (builder->base_loc_kind == debug_sym_loc_stack) {
+            u32 stack_ptr;
+            if (!lookup_stack_pointer(builder, &stack_ptr)) {
+                return false;
+            }    
+
+            u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc);
+
+            builder->it_loc_kind = debug_sym_loc_global;
+            builder->it_loc = *data_loc;
+        }
+
+        if (builder->base_loc_kind == debug_sym_loc_global) {
+            u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, builder->base_loc);
+
+            builder->it_loc_kind = debug_sym_loc_global;
+            builder->it_loc = *data_loc;
+        }
     }
 
     if (type->kind == debug_type_kind_structure) {
         debug_type_structure_member_t *mem = &type->structure.members[builder->it_index];
-        builder->it_name = mem->name;
+        snprintf(tmp_buffer, 2048, "%s", mem->name);
+        strncpy(name_buffer, tmp_buffer, 2048);
+
+        builder->it_name = name_buffer;
         builder->it_has_children = get_subvalues_for_type(builder, mem->type) > 0;
         builder->it_type = mem->type;
 
@@ -481,6 +660,42 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
         }
     }
 
+    if (type->kind == debug_type_kind_slice) {
+        snprintf(tmp_buffer, 2048, "[%d]", builder->it_index);
+        strncpy(name_buffer, tmp_buffer, 2048);
+        builder->it_name = name_buffer;
+        builder->it_type = type->slice.type;
+        builder->it_has_children = get_subvalues_for_type(builder, builder->it_type) > 0;
+
+        debug_type_info_t *sub_type = &builder->info->types[builder->it_type];
+
+        if (builder->base_loc_kind == debug_sym_loc_register) {
+            ovm_value_t value;
+            if (lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                builder->it_loc_kind = debug_sym_loc_global;
+                builder->it_loc = value.u32 + sub_type->size * builder->it_index;
+            }
+        }
+
+        if (builder->base_loc_kind == debug_sym_loc_stack) {
+            u32 stack_ptr;
+            if (!lookup_stack_pointer(builder, &stack_ptr)) {
+                return false;
+            }    
+
+            u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, stack_ptr + builder->base_loc);
+
+            builder->it_loc_kind = debug_sym_loc_global;
+            builder->it_loc = *data_loc + sub_type->size * builder->it_index;
+        }
+
+        if (builder->base_loc_kind == debug_sym_loc_global) {
+            u32 *data_loc = bh_pointer_add(builder->state->ovm_engine->memory, builder->base_loc);
+
+            builder->it_loc_kind = debug_sym_loc_global;
+            builder->it_loc = *data_loc + sub_type->size * builder->it_index;
+        }
+    }
 
     builder->it_index++;
     return true;
