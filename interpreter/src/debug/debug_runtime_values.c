@@ -334,6 +334,15 @@ static void append_value_from_register(debug_runtime_value_builder_t *builder, u
 
     debug_type_info_t *type = &builder->info->types[type_id];
     if (type->kind == debug_type_kind_structure) {
+        if (!type->structure.simple) {
+            if (lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                void *base = bh_pointer_add(builder->state->ovm_engine->memory, value.u32);
+                append_value_from_memory_with_type(builder, base, type_id);
+            }
+
+            return;
+        }
+
         WRITE("{ ");
 
         fori (i, 0, (i32) type->structure.member_count) {
@@ -631,8 +640,19 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
         builder->it_type = mem->type;
 
         if (builder->base_loc_kind == debug_sym_loc_register) {
-            builder->it_loc_kind = debug_sym_loc_register;
-            builder->it_loc = builder->base_loc + builder->it_index;
+            if (type->structure.simple) {
+                builder->it_loc_kind = debug_sym_loc_register;
+                builder->it_loc = builder->base_loc + builder->it_index;
+
+            } else {
+                ovm_value_t value;
+                if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                    return false;
+                }
+
+                builder->it_loc_kind = debug_sym_loc_global;
+                builder->it_loc = value.u32 + mem->offset;
+            }
         }
 
         if (builder->base_loc_kind == debug_sym_loc_stack) {
