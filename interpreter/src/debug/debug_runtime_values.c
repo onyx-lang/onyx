@@ -23,7 +23,7 @@ static bool lookup_register_in_frame(ovm_state_t *state, ovm_stack_frame_t *fram
     if (frame == &bh_arr_last(state->stack_frames)) {
         val_num_base = state->value_number_offset;
     } else {
-        val_num_base = (frame + 1)->value_number_base;
+        val_num_base = frame->value_number_base;
     }
 
     *out = state->numbered_values[val_num_base + reg];
@@ -295,6 +295,8 @@ static void append_ovm_value_with_type(debug_runtime_value_builder_t *builder, o
             break;
         }
 
+        // TODO: Should this output all of the members?
+        // Is this guaranteed to only have 1 member?
         case debug_type_kind_structure: {
             append_ovm_value_with_type(builder, value, type->structure.members[0].type);
             break;
@@ -497,7 +499,18 @@ void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u
         builder->it_name = mem->name;
 
         if (builder->base_loc_kind == debug_sym_loc_register) {
-            builder->base_loc += index;
+            if (type->structure.simple) {
+                builder->base_loc += index;
+
+            } else {
+                ovm_value_t value;
+                if (!lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->base_loc, &value)) {
+                    goto bad_case;
+                }
+
+                builder->base_loc_kind = debug_sym_loc_global;
+                builder->base_loc = value.u32 + mem->offset;
+            }
         }
 
         else if (builder->base_loc_kind == debug_sym_loc_stack || builder->base_loc_kind == debug_sym_loc_global) {

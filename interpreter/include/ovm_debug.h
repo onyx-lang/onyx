@@ -92,6 +92,7 @@ typedef struct debug_type_structure_member_t {
 } debug_type_structure_member_t;
 
 typedef struct debug_type_structure_t {
+    b32 simple;
     u32 member_count;
     debug_type_structure_member_t *members;
 } debug_type_structure_t;

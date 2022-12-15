@@ -970,14 +970,18 @@ static i32 output_ovm_debug_sections(OnyxWasmModule* module, bh_buffer* buff) {
                 continue;
             }
 
-            if (type->kind == Type_Kind_DynArray) {
-                output_unsigned_integer(7, &section_buff);
-                output_unsigned_integer(type->DynArray.elem->id, &section_buff);
-                continue;
-            }
+            // This would be nice if this would work...
+            // But it breaks when passing dynamic arrays as parameters.
+            // if (type->kind == Type_Kind_DynArray) {
+            //     output_unsigned_integer(7, &section_buff);
+            //     output_unsigned_integer(type->DynArray.elem->id, &section_buff);
+            //     continue;
+            // }
 
             if (type_is_structlike_strict(type)) {
                 output_unsigned_integer(3, &section_buff);
+
+                output_unsigned_integer(type_structlike_is_simple(type), &section_buff);
 
                 i32 mem_count = type_structlike_mem_count(type);
                 output_unsigned_integer(mem_count, &section_buff);

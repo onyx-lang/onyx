@@ -146,6 +146,8 @@ void debug_info_import_type_info(debug_info_t *info, u8 *data, u32 len) {
                 break;
 
             case debug_type_kind_structure:
+                type.structure.simple = uleb128_to_uint(data, &offset);
+
                 type.structure.member_count = uleb128_to_uint(data, &offset);
                 type.structure.members = bh_alloc_array(info->alloc, debug_type_structure_member_t, type.structure.member_count);
 
