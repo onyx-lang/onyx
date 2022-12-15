@@ -565,7 +565,6 @@ void *__debug_thread_entry(void * data) {
         }
 
         if (debug->send_buffer.length > 0) {
-            send(debug->client_fd, &debug->send_buffer.length, sizeof(i32), 0);
             send(debug->client_fd, debug->send_buffer.data, debug->send_buffer.length, 0);
             bh_buffer_clear(&debug->send_buffer);
         }

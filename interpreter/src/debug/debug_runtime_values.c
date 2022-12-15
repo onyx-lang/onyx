@@ -419,8 +419,8 @@ static u32 get_subvalues_for_type(debug_runtime_value_builder_t *builder, u32 ty
                 count = *ptr_loc;
             }
 
-            if (count > MAX_SLICE_LENGTH * 4) {
-                count = MAX_SLICE_LENGTH * 4;
+            if (count > MAX_SLICE_LENGTH) {
+                count = MAX_SLICE_LENGTH;
             }
 
             return count;

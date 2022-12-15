@@ -807,6 +807,10 @@ class DataParser {
         let len = this.parseUint32();
         let str = "";
         for (let i=0; i<len; i++) {
+			if (this.offset + i >= this.data.length) {
+				break;
+			}
+
             str += String.fromCharCode(this.view.getUint8(this.offset + i));
         }
         this.offset += len;
