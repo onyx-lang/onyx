@@ -4,7 +4,7 @@
 
 # FLAGS="-g3 -O2 -DOVM_DEBUG=1"
 # FLAGS="-g3 -DOVM_VERBOSE=1"
-FLAGS="-Ofast"
+FLAGS="-Ofast -fno-stack-protector"
 LIBS="-pthread"
 TARGET="../shared/lib/linux_$(uname -m)/lib/libovmwasm.so"
 C_FILES="src/wasm.c src/vm/*.c src/wasm/*.c src/debug/*.c"

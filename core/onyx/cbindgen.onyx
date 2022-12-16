@@ -365,7 +365,6 @@ compile_c_file :: (
                 s_info := cast(^Type_Info_Struct) param_info;
                 if s_info.members.count == 1 {
                     return type_encoding(s_info.members[0].type);
-                    return;
                 }
 
                 assert(false, "Passing structures between wasm and c is not yet supported.");

@@ -1028,18 +1028,14 @@ OVMI_INSTR_EXEC(ovmi_exec_return) {
     i32 extra_params = bh_arr_length(state->params) - func->param_count; \
     ovm_assert(extra_params >= 0); \
     ovm__func_setup_stack_frame(state, func, instr->r); \
+    bh_arr_fastdeleten(state->params, func->param_count); \
     if (func->kind == OVM_FUNC_INTERNAL) { \
-        fori (i, 0, func->param_count) { \
-            VAL(i) = state->params[i + extra_params]; \
-        } \
-        bh_arr_fastdeleten(state->params, func->param_count); \
-\
+        memcpy(&VAL(0), &state->params[extra_params], func->param_count * sizeof(ovm_value_t)); \
         state->pc = func->start_instr; \
     } else { \
         ovm_value_t result = {0}; \
         ovm_external_func_t external_func = state->external_funcs[func->external_func_idx]; \
         external_func.native_func(external_func.userdata, &state->params[extra_params], &result); \
-        bh_arr_fastdeleten(state->params, func->param_count); \
 \
         ovm__func_teardown_stack_frame(state); \
 \
