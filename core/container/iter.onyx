@@ -232,7 +232,7 @@ take :: (it: Iterator($T), count: u32, allocator := context.temp_allocator) -> I
     }
 
     close :: ($T: type_expr, ti: ^TakeIterator(T)) {
-        ti.iterator.close(ti.iterator.data);
+        if ti.iterator.close != null_proc do ti.iterator.close(ti.iterator.data);
         raw_free(ti.allocator, ti);
     }
 

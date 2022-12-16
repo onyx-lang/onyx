@@ -1076,90 +1076,85 @@ OVMI_INSTR_EXEC(ovmi_exec_bri_z)  { if (VAL(instr->b).i32 == 0) state->pc += VAL
 
 
 //
-// Conversion (make this better!)
+// Conversion
 //
 
-OVMI_INSTR_EXEC(ovmi_exec_cvt) {
-    ovm_value_t tmp_val;
-
-    switch (instr->full_instr) {
-
-#define CVT(stype, dtype, otype, ctype) \
-    tmp_val.dtype = (ctype) VAL(instr->a).stype; \
-    tmp_val.type = otype; \
-    VAL(instr->r) = tmp_val; \
-    break
-
-        case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I16): CVT(u8, u16, OVM_TYPE_I16, u16);
-        case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I32): CVT(u8, u32, OVM_TYPE_I32, u32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I64): CVT(u8, u64, OVM_TYPE_I64, u64);
-        case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I16): CVT(i8, i16, OVM_TYPE_I16, i16);
-        case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I32): CVT(i8, i32, OVM_TYPE_I32, i32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I64): CVT(i8, i64, OVM_TYPE_I64, i64);
-
-        case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I8):  CVT(u16, u8,  OVM_TYPE_I8, u8);
-        case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I32): CVT(u16, u32, OVM_TYPE_I32, u32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I64): CVT(u16, u64, OVM_TYPE_I64, u64);
-        case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I8):  CVT(i16, i8,  OVM_TYPE_I8, i8);
-        case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I32): CVT(i16, i32, OVM_TYPE_I32, i32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I64): CVT(i16, i64, OVM_TYPE_I64, i64);
-
-        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I8):  CVT(u32, u8,  OVM_TYPE_I8,  u8);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I16): CVT(u32, u16, OVM_TYPE_I16, u16);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I64): CVT(u32, u64, OVM_TYPE_I64, u64);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I8):  CVT(i32, i8,  OVM_TYPE_I8,  i8);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I16): CVT(i32, i16, OVM_TYPE_I16, i16);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I64): CVT(i32, i64, OVM_TYPE_I64, i64);
-
-        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_F32): CVT(u32, f32, OVM_TYPE_F32, f32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_F32): CVT(i32, f32, OVM_TYPE_F32, f32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_F64): CVT(u32, f64, OVM_TYPE_F64, f64);
-        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_F64): CVT(i32, f64, OVM_TYPE_F64, f64);
-
-        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I8):  CVT(u64, u8,  OVM_TYPE_I8,  u8);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I16): CVT(u64, u16, OVM_TYPE_I16, u16);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I32): CVT(u64, u32, OVM_TYPE_I32, u32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I8):  CVT(i64, i8,  OVM_TYPE_I8,  i8);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I16): CVT(i64, i16, OVM_TYPE_I16, i16);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I32): CVT(i64, i32, OVM_TYPE_I32, i32);
-
-        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_F32): CVT(u64, f32, OVM_TYPE_F32, f32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_F32): CVT(i64, f32, OVM_TYPE_F32, f32);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_F64): CVT(u64, f64, OVM_TYPE_F64, f64);
-        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_F64): CVT(i64, f64, OVM_TYPE_F64, f64);
-
-        case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_I32): CVT(f32, u32, OVM_TYPE_I32, u32);
-        case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_I64): CVT(f32, u64, OVM_TYPE_I64, u64);
-        case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_F64): CVT(f32, f64, OVM_TYPE_F64, f64);
-        case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_I32): CVT(f32, i32, OVM_TYPE_I32, i32);
-        case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_I64): CVT(f32, i64, OVM_TYPE_I64, i64);
-        case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_F64): CVT(f32, f64, OVM_TYPE_F64, f64);
-
-        case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_I32): CVT(f64, u32, OVM_TYPE_I32, u32);
-        case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_I64): CVT(f64, u64, OVM_TYPE_I64, u64);
-        case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_F32): CVT(f64, f32, OVM_TYPE_F32, f32);
-        case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_I32): CVT(f64, i32, OVM_TYPE_I32, i32);
-        case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_I64): CVT(f64, i64, OVM_TYPE_I64, i64);
-        case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_F32): CVT(f64, f32, OVM_TYPE_F32, f32);
-
-#undef CVT
-
-#define CVT(stype, dtype, otype, ctype) \
-    tmp_val.type = otype; \
-    tmp_val.dtype = *(ctype *) &VAL(instr->a).stype; \
-    VAL(instr->r) = tmp_val; \
-    break
-
-        case OVM_TYPED_INSTR(OVMI_TRANSMUTE_I32, OVM_TYPE_F32): CVT(u32, f32, OVM_TYPE_F32, f32);
-        case OVM_TYPED_INSTR(OVMI_TRANSMUTE_I64, OVM_TYPE_F64): CVT(u64, f64, OVM_TYPE_F64, f64);
-        case OVM_TYPED_INSTR(OVMI_TRANSMUTE_F32, OVM_TYPE_I32): CVT(f32, u32, OVM_TYPE_I32, u32);
-        case OVM_TYPED_INSTR(OVMI_TRANSMUTE_F64, OVM_TYPE_I64): CVT(f64, u64, OVM_TYPE_I64, u64);
-
-#undef CVT
+#define OVM_CVT(n1, n2, stype, dtype, otype, ctype) \
+    OVMI_INSTR_EXEC(ovmi_exec_cvt_##n1##_##n2) { \
+        ovm_value_t tmp_val; \
+        tmp_val.dtype = (ctype) VAL(instr->a).stype; \
+        tmp_val.type = otype; \
+        VAL(instr->r) = tmp_val; \
+        NEXT_OP; \
     }
 
-    NEXT_OP;
-}
+OVM_CVT(i8, i16,   u8, u16, OVM_TYPE_I16, u16);
+OVM_CVT(i8, i32,   u8, u32, OVM_TYPE_I32, u32);
+OVM_CVT(i8, i64,   u8, u64, OVM_TYPE_I64, u64);
+OVM_CVT(i8_s, i16, i8, i16, OVM_TYPE_I16, i16);
+OVM_CVT(i8_s, i32, i8, i32, OVM_TYPE_I32, i32);
+OVM_CVT(i8_s, i64, i8, i64, OVM_TYPE_I64, i64);
+
+OVM_CVT(i16,   i8,  u16, u8,  OVM_TYPE_I8, u8);
+OVM_CVT(i16,   i32, u16, u32, OVM_TYPE_I32, u32);
+OVM_CVT(i16,   i64, u16, u64, OVM_TYPE_I64, u64);
+OVM_CVT(i16_s, i8,  i16, i8,  OVM_TYPE_I8, i8);
+OVM_CVT(i16_s, i32, i16, i32, OVM_TYPE_I32, i32);
+OVM_CVT(i16_s, i64, i16, i64, OVM_TYPE_I64, i64);
+
+OVM_CVT(i32,   i8,  u32, u8,  OVM_TYPE_I8,  u8);
+OVM_CVT(i32,   i16, u32, u16, OVM_TYPE_I16, u16);
+OVM_CVT(i32,   i64, u32, u64, OVM_TYPE_I64, u64);
+OVM_CVT(i32_s, i8,  i32, i8,  OVM_TYPE_I8,  i8);
+OVM_CVT(i32_s, i16, i32, i16, OVM_TYPE_I16, i16);
+OVM_CVT(i32_s, i64, i32, i64, OVM_TYPE_I64, i64);
+OVM_CVT(i32,   f32, u32, f32, OVM_TYPE_F32, f32);
+OVM_CVT(i32_s, f32, i32, f32, OVM_TYPE_F32, f32);
+OVM_CVT(i32,   f64, u32, f64, OVM_TYPE_F64, f64);
+OVM_CVT(i32_s, f64, i32, f64, OVM_TYPE_F64, f64);
+
+OVM_CVT(i64,   i8,  u64, u8,  OVM_TYPE_I8,  u8);
+OVM_CVT(i64,   i16, u64, u16, OVM_TYPE_I16, u16);
+OVM_CVT(i64,   i32, u64, u32, OVM_TYPE_I32, u32);
+OVM_CVT(i64_s, i8,  i64, i8,  OVM_TYPE_I8,  i8);
+OVM_CVT(i64_s, i16, i64, i16, OVM_TYPE_I16, i16);
+OVM_CVT(i64_s, i32, i64, i32, OVM_TYPE_I32, i32);
+OVM_CVT(i64,   f32, u64, f32, OVM_TYPE_F32, f32);
+OVM_CVT(i64_s, f32, i64, f32, OVM_TYPE_F32, f32);
+OVM_CVT(i64,   f64, u64, f64, OVM_TYPE_F64, f64);
+OVM_CVT(i64_s, f64, i64, f64, OVM_TYPE_F64, f64);
+
+OVM_CVT(f32,   i32, f32, u32, OVM_TYPE_I32, u32);
+OVM_CVT(f32,   i64, f32, u64, OVM_TYPE_I64, u64);
+OVM_CVT(f32,   f64, f32, f64, OVM_TYPE_F64, f64);
+OVM_CVT(f32_s, i32, f32, i32, OVM_TYPE_I32, i32);
+OVM_CVT(f32_s, i64, f32, i64, OVM_TYPE_I64, i64);
+OVM_CVT(f32_s, f64, f32, f64, OVM_TYPE_F64, f64);
+
+OVM_CVT(f64,   i32, f64, u32, OVM_TYPE_I32, u32);
+OVM_CVT(f64,   i64, f64, u64, OVM_TYPE_I64, u64);
+OVM_CVT(f64,   f32, f64, f32, OVM_TYPE_F32, f32);
+OVM_CVT(f64_s, i32, f64, i32, OVM_TYPE_I32, i32);
+OVM_CVT(f64_s, i64, f64, i64, OVM_TYPE_I64, i64);
+OVM_CVT(f64_s, f32, f64, f32, OVM_TYPE_F32, f32);
+
+#undef OVM_CVT
+
+#define OVM_CVT(n1, n2, stype, dtype, otype, ctype) \
+    OVMI_INSTR_EXEC(ovmi_exec_transmute_##n1##_##n2) { \
+        ovm_value_t tmp_val; \
+        tmp_val.dtype = *(ctype *) &VAL(instr->a).stype; \
+        tmp_val.type = otype; \
+        VAL(instr->r) = tmp_val; \
+        NEXT_OP; \
+    }
+
+OVM_CVT(i32, f32, u32, f32, OVM_TYPE_F32, f32);
+OVM_CVT(i64, f64, u64, f64, OVM_TYPE_F64, f64);
+OVM_CVT(f32, i32, f32, u32, OVM_TYPE_I32, u32);
+OVM_CVT(f64, i64, f64, u64, OVM_TYPE_I64, u64);
+
+#undef CVT
 
 
 //
@@ -1264,22 +1259,22 @@ static ovmi_instr_exec_t ovmi_dispatch[] = {
     IROW_FLOAT(min)
     IROW_FLOAT(max)
     IROW_FLOAT(copysign)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt) // 0x40
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
-    IROW_SAME(cvt)
+    NULL, NULL, ovmi_exec_cvt_i8_i16, ovmi_exec_cvt_i8_i32, ovmi_exec_cvt_i8_i64, NULL, NULL, NULL,
+    NULL, NULL, ovmi_exec_cvt_i8_s_i16, ovmi_exec_cvt_i8_s_i32, ovmi_exec_cvt_i8_s_i64, NULL, NULL, NULL,
+    NULL, ovmi_exec_cvt_i16_i8,   NULL, ovmi_exec_cvt_i16_i32, ovmi_exec_cvt_i16_i64, NULL, NULL, NULL,
+    NULL, ovmi_exec_cvt_i16_s_i8, NULL, ovmi_exec_cvt_i16_s_i32, ovmi_exec_cvt_i16_s_i64, NULL, NULL, NULL,
+    NULL, ovmi_exec_cvt_i32_i8,   ovmi_exec_cvt_i32_i16,   NULL, ovmi_exec_cvt_i32_i64, ovmi_exec_cvt_i32_f32, ovmi_exec_cvt_i32_f64, NULL,  // 0x40
+    NULL, ovmi_exec_cvt_i32_s_i8, ovmi_exec_cvt_i32_s_i16, NULL, ovmi_exec_cvt_i32_s_i64, ovmi_exec_cvt_i32_s_f32, ovmi_exec_cvt_i32_s_f64, NULL,
+    NULL, ovmi_exec_cvt_i64_i8,   ovmi_exec_cvt_i64_i16,   ovmi_exec_cvt_i64_i32,   NULL, ovmi_exec_cvt_i64_f32, ovmi_exec_cvt_i64_f64, NULL,
+    NULL, ovmi_exec_cvt_i64_s_i8, ovmi_exec_cvt_i64_s_i16, ovmi_exec_cvt_i64_s_i32, NULL, ovmi_exec_cvt_i64_s_f32, ovmi_exec_cvt_i64_s_f64, NULL,
+    NULL, NULL, NULL, ovmi_exec_cvt_f32_i32, ovmi_exec_cvt_f32_i64, NULL, ovmi_exec_cvt_f32_f64, NULL,
+    NULL, NULL, NULL, ovmi_exec_cvt_f32_s_i32, ovmi_exec_cvt_f32_s_i64, NULL, ovmi_exec_cvt_f32_s_f64, NULL,
+    NULL, NULL, NULL, ovmi_exec_cvt_f64_i32, ovmi_exec_cvt_f64_i64, ovmi_exec_cvt_f64_f32, NULL, NULL,
+    NULL, NULL, NULL, ovmi_exec_cvt_f64_s_i32, ovmi_exec_cvt_f64_s_i64, ovmi_exec_cvt_f64_s_f32, NULL, NULL,
+    NULL, NULL, NULL, ovmi_exec_transmute_i32_f32, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, ovmi_exec_transmute_i64_f64, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, ovmi_exec_transmute_f32_i32, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, ovmi_exec_transmute_f64_i64, NULL,
     IROW_INT(cmpxchg)
     IROW_SAME(illegal)
 };
