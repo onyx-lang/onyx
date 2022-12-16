@@ -105,6 +105,8 @@ bool ovm_program_load_from_file(ovm_program_t *program, ovm_engine_t *engine, ch
 // 
 struct ovm_state_t {
     ovm_store_t *store;
+    ovm_engine_t *engine;
+    ovm_program_t *program;
 
     i32 pc;
     i32 value_number_offset;
@@ -241,6 +243,7 @@ struct ovm_instr_t {
 
 #define OVM_INSTR_TYPE(instr)  ((instr).full_instr >> 24)
 #define OVM_INSTR_INSTR(instr) ((instr).full_instr & 0xffffff)
+#define OVM_INSTR_MASK         0xff
 
 #define OVMI_ATOMIC            0x00800000 // Flag an instruction as atomic
 

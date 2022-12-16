@@ -477,6 +477,8 @@ ovm_state_t *ovm_state_new(ovm_engine_t *engine, ovm_program_t *program) {
     ovm_state_t *state = bh_alloc_item(store->arena_allocator, ovm_state_t);
 
     state->store = store;
+    state->engine = engine;
+    state->program = program;
     state->pc = 0;
     state->value_number_offset = 0;
 
@@ -538,9 +540,7 @@ void ovm_state_register_set(ovm_state_t *state, i32 idx, ovm_value_t val) {
 //
 // Function calling
 
-static inline void ovm__func_setup_stack_frame(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program, i32 func_idx, i32 result_number) {
-    ovm_func_t *func = &program->funcs[func_idx];
-
+static inline void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *func, i32 result_number) {
     //
     // Push a stack frame
     ovm_stack_frame_t frame;
@@ -566,7 +566,7 @@ static inline void ovm__func_setup_stack_frame(ovm_engine_t *engine, ovm_state_t
     }
 }
 
-static inline ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
+static inline ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state) {
     ovm_stack_frame_t frame = bh_arr_pop(state->stack_frames);
     bh_arr_fastdeleten(state->numbered_values, frame.value_number_count);
 
@@ -587,31 +587,31 @@ static inline ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_engine_t *eng
 }
 
 ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program, i32 func_idx, i32 param_count, ovm_value_t *params) {
-    ovm_func_t func = program->funcs[func_idx];
+    ovm_func_t *func = &program->funcs[func_idx];
     ovm_assert(func.value_number_count >= func.param_count);
 
-    switch (func.kind) {
+    switch (func->kind) {
         case OVM_FUNC_INTERNAL: {
-            ovm__func_setup_stack_frame(engine, state, program, func_idx, 0);
+            ovm__func_setup_stack_frame(state, func, 0);
 
             fori (i, 0, param_count) {
                 state->numbered_values[i + state->value_number_offset] = params[i];
             }
 
-            state->pc = func.start_instr;
+            state->pc = func->start_instr;
             ovm_value_t result = ovm_run_code(engine, state, program);
 
             return result;
         }
 
         case OVM_FUNC_EXTERNAL: {
-            ovm__func_setup_stack_frame(engine, state, program, func_idx, 0);
+            ovm__func_setup_stack_frame(state, func, 0);
 
             ovm_value_t result = {0};
-            ovm_external_func_t external_func = state->external_funcs[func.external_func_idx];
+            ovm_external_func_t external_func = state->external_funcs[func->external_func_idx];
             external_func.native_func(external_func.userdata, params, &result);
 
-            ovm__func_teardown_stack_frame(engine, state, program);
+            ovm__func_teardown_stack_frame(state);
             return result;
         }
 
@@ -671,573 +671,575 @@ static inline void __ovm_trigger_exception(ovm_state_t *state) {
     }
 }
 
+static inline void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
+    if (!state->debug) return;
 
-ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
-    ovm_assert(engine);
-    ovm_assert(state);
-    ovm_assert(program);
+    if (state->debug->run_count == 0) {
+        state->debug->state = debug_state_pausing;
+
+        if (state->debug->started) {
+            state->debug->pause_reason = debug_pause_step;
+        } else {
+            state->debug->pause_reason = debug_pause_entry;
+            state->debug->started = 1;
+        }
+
+        goto should_wait;
+    }
+
+    if (state->debug->pause_at_next_line) {
+        if (state->debug->pause_within == -1 || state->debug->pause_within == bh_arr_last(state->stack_frames).func->id) {
+
+            debug_loc_info_t l1, l2;
+            debug_info_lookup_location(engine->debug->info, state->pc - 1, &l1);
+            debug_info_lookup_location(engine->debug->info, state->pc,     &l2);
+
+            if (l1.file_id != l2.file_id || l1.line != l2.line) {
+                state->debug->pause_at_next_line = false;
+                state->debug->pause_reason = debug_pause_step;
+                state->debug->state = debug_state_pausing;
+                goto should_wait;
+            }
+        }
+    }
+
+    ovm_assert(engine->debug);
+    bh_arr_each(debug_breakpoint_t, bp, engine->debug->breakpoints) {
+        if (bp->instr == (u32) state->pc) {
+            state->debug->state = debug_state_hit_breakpoint;
+            state->debug->last_breakpoint_hit = bp->id;
+            goto should_wait;
+        }
+    }
+
+    goto shouldnt_wait;
+
+    should_wait:
+    assert(write(state->debug->state_change_write_fd, "1", 1));
+    sem_wait(&state->debug->wait_semaphore);
+    state->debug->state = debug_state_running;
+
+    shouldnt_wait:
+    if (state->debug->run_count > 0) state->debug->run_count--;
+}
+
+
+
+//
+// Running code with Continuation-Passing Style
+//
+
+
+
+#define OVMI_INSTR_PROTO(name) \
+    ovm_value_t name(ovm_instr_t *instr, ovm_state_t *state, u8 *memory, ovm_instr_t *code)
+
+#define OVMI_INSTR_EXEC(name) \
+    static OVMI_INSTR_PROTO(name)
+
+#define NEXT_OP \
+    if (instr->full_instr & OVMI_ATOMIC) pthread_mutex_unlock(&state->engine->atomic_mutex); \
+    __ovm_debug_hook(state->engine, state); \
+    instr = &code[state->pc++]; \
+    if (instr->full_instr & OVMI_ATOMIC) pthread_mutex_lock(&state->engine->atomic_mutex); \
+    return ovmi_dispatch[instr->full_instr & OVM_INSTR_MASK](instr, state, memory, code);
 
 #define VAL(loc) state->numbered_values[(u32) (loc + state->value_number_offset)]
 
-    ovm_instr_t *code = program->code;
-    bool release_mutex_at_end = false;
 
-    ovm_value_t tmp_val;
+typedef OVMI_INSTR_PROTO((* ovmi_instr_exec_t));
 
-    while (state->pc < bh_arr_length(program->code)) {
-#ifdef OVM_VERBOSE
-        ovm_program_print_instructions(program, state->pc, 1);
-#endif
+static ovmi_instr_exec_t ovmi_dispatch[];
 
-        tmp_val.type = OVM_TYPE_NONE;
-        tmp_val.u64  = 0;
 
-        // Check if breakpoints are hit
-        if (state->debug) {
-            if (state->debug->run_count == 0) {
-                state->debug->state = debug_state_pausing;
+//
+// Special Operations
+//
 
-                if (state->debug->started) {
-                    state->debug->pause_reason = debug_pause_step;
-                } else {
-                    state->debug->pause_reason = debug_pause_entry;
-                    state->debug->started = 1;
-                }
+OVMI_INSTR_EXEC(ovmi_exec_nop) {
+    NEXT_OP;
+}
 
-                goto should_wait;
-            }
 
-            if (state->debug->pause_at_next_line) {
-                if (state->debug->pause_within == -1 || state->debug->pause_within == bh_arr_last(state->stack_frames).func->id) {
+//
+// Binary Operations
+//
 
-                    debug_loc_info_t l1, l2;
-                    debug_info_lookup_location(engine->debug->info, state->pc - 1, &l1);
-                    debug_info_lookup_location(engine->debug->info, state->pc,     &l2);
+#define OVM_OP_EXEC(name, op) \
+    OVMI_INSTR_EXEC(ovmi_exec_##name) { \
+        switch (OVM_INSTR_TYPE(*instr)) { \
+            OVM_OP(OVM_TYPE_I8 , op, i8) \
+            OVM_OP(OVM_TYPE_I16, op, i16) \
+            OVM_OP(OVM_TYPE_I32, op, i32) \
+            OVM_OP(OVM_TYPE_I64, op, i64) \
+            OVM_OP(OVM_TYPE_F32, op, f32) \
+            OVM_OP(OVM_TYPE_F64, op, f64) \
+        } \
+        NEXT_OP; \
+    }
 
-                    if (l1.file_id != l2.file_id || l1.line != l2.line) {
-                        state->debug->pause_at_next_line = false;
-                        state->debug->pause_reason = debug_pause_step;
-                        state->debug->state = debug_state_pausing;
-                        goto should_wait;
-                    }
-                }
-            }
+#define OVM_OP_UNSIGNED_EXEC(name, op) \
+    OVMI_INSTR_EXEC(ovmi_exec_##name) { \
+        switch (OVM_INSTR_TYPE(*instr)) { \
+            OVM_OP(OVM_TYPE_I8 , op, u8) \
+            OVM_OP(OVM_TYPE_I16, op, u16) \
+            OVM_OP(OVM_TYPE_I32, op, u32) \
+            OVM_OP(OVM_TYPE_I64, op, u64) \
+            OVM_OP(OVM_TYPE_F32, op, f32) \
+            OVM_OP(OVM_TYPE_F64, op, f64) \
+        } \
+        NEXT_OP; \
+    }
 
-            ovm_assert(engine->debug);
-            bh_arr_each(debug_breakpoint_t, bp, engine->debug->breakpoints) {
-                if (bp->instr == (u32) state->pc) {
-                    state->debug->state = debug_state_hit_breakpoint;
-                    state->debug->last_breakpoint_hit = bp->id;
-                    goto should_wait;
-                }
-            }
+#define OVM_OP_INTEGER_EXEC(name, op) \
+    OVMI_INSTR_EXEC(ovmi_exec_##name) { \
+        switch (OVM_INSTR_TYPE(*instr)) { \
+            OVM_OP(OVM_TYPE_I8 , op, i8) \
+            OVM_OP(OVM_TYPE_I16, op, i16) \
+            OVM_OP(OVM_TYPE_I32, op, i32) \
+            OVM_OP(OVM_TYPE_I64, op, i64) \
+        } \
+        NEXT_OP; \
+    }
 
-            goto shouldnt_wait;
+#define OVM_OP_INTEGER_UNSIGNED_EXEC(name, op) \
+    OVMI_INSTR_EXEC(ovmi_exec_##name) { \
+        switch (OVM_INSTR_TYPE(*instr)) { \
+            OVM_OP(OVM_TYPE_I8 , op, u8) \
+            OVM_OP(OVM_TYPE_I16, op, u16) \
+            OVM_OP(OVM_TYPE_I32, op, u32) \
+            OVM_OP(OVM_TYPE_I64, op, u64) \
+        } \
+        NEXT_OP; \
+    }
 
-          should_wait:
-            assert(write(state->debug->state_change_write_fd, "1", 1));
-            sem_wait(&state->debug->wait_semaphore);
-            state->debug->state = debug_state_running;
+#define OVM_OP_FLOAT_EXEC(name, op) \
+    OVMI_INSTR_EXEC(ovmi_exec_##name) { \
+        switch (OVM_INSTR_TYPE(*instr)) { \
+            OVM_OP(OVM_TYPE_F32, op, f32) \
+            OVM_OP(OVM_TYPE_F64, op, f64) \
+        } \
+        NEXT_OP; \
+    }
 
-          shouldnt_wait:
-            if (state->debug->run_count > 0) state->debug->run_count--;
-        }
+#define OVM_OP(t, op, ctype) \
+    case t: \
+        ovm_assert(VAL(instr->a).type == t && VAL(instr->b).type == t); \
+        VAL(instr->r).ctype = VAL(instr->a).ctype op VAL(instr->b).ctype; \
+        VAL(instr->r).type = t; \
+        break;
 
-        //
-        // Incrementing the program counter here.
-        // All instructions that compute something relative
-        // to the program counter have to know that the program
-        // counter will refer to the instruction AFTER the one
-        // being executed.                  - brendanfh 2022/06/13
-        ovm_instr_t instr = code[state->pc++];
-
-        if (instr.full_instr & OVMI_ATOMIC) {
-            pthread_mutex_lock(&engine->atomic_mutex);
-            release_mutex_at_end = true;
-
-            instr.full_instr &= ~OVMI_ATOMIC;
-        }
-
-        switch (instr.full_instr) {
-            case OVMI_NOP: break;
-
-#define OVM_OP(i, t, op, ctype) \
-            case OVM_TYPED_INSTR(i, t): \
-                ovm_assert(VAL(instr.a).type == t && VAL(instr.b).type == t); \
-                tmp_val.type = t; \
-                tmp_val.ctype = VAL(instr.a).ctype op VAL(instr.b).ctype; \
-                VAL(instr.r) = tmp_val; \
-                break;
-
-            OVM_OP(OVMI_ADD, OVM_TYPE_I8 , +, i8)
-            OVM_OP(OVMI_ADD, OVM_TYPE_I16, +, i16)
-            OVM_OP(OVMI_ADD, OVM_TYPE_I32, +, i32)
-            OVM_OP(OVMI_ADD, OVM_TYPE_I64, +, i64)
-            OVM_OP(OVMI_ADD, OVM_TYPE_F32, +, f32)
-            OVM_OP(OVMI_ADD, OVM_TYPE_F64, +, f64)
-
-            OVM_OP(OVMI_SUB, OVM_TYPE_I8 , -, i8)
-            OVM_OP(OVMI_SUB, OVM_TYPE_I16, -, i16)
-            OVM_OP(OVMI_SUB, OVM_TYPE_I32, -, i32)
-            OVM_OP(OVMI_SUB, OVM_TYPE_I64, -, i64)
-            OVM_OP(OVMI_SUB, OVM_TYPE_F32, -, f32)
-            OVM_OP(OVMI_SUB, OVM_TYPE_F64, -, f64)
-
-            OVM_OP(OVMI_MUL, OVM_TYPE_I8 , *, i8)
-            OVM_OP(OVMI_MUL, OVM_TYPE_I16, *, i16)
-            OVM_OP(OVMI_MUL, OVM_TYPE_I32, *, i32)
-            OVM_OP(OVMI_MUL, OVM_TYPE_I64, *, i64)
-            OVM_OP(OVMI_MUL, OVM_TYPE_F32, *, f32)
-            OVM_OP(OVMI_MUL, OVM_TYPE_F64, *, f64)
-
-            OVM_OP(OVMI_DIV, OVM_TYPE_I8 , /, u8)
-            OVM_OP(OVMI_DIV, OVM_TYPE_I16, /, u16)
-            OVM_OP(OVMI_DIV, OVM_TYPE_I32, /, u32)
-            OVM_OP(OVMI_DIV, OVM_TYPE_I64, /, u64)
-            OVM_OP(OVMI_DIV, OVM_TYPE_F32, /, f32)
-            OVM_OP(OVMI_DIV, OVM_TYPE_F64, /, f64)
-
-            OVM_OP(OVMI_DIV_S, OVM_TYPE_I8 , /, i8)
-            OVM_OP(OVMI_DIV_S, OVM_TYPE_I16, /, i16)
-            OVM_OP(OVMI_DIV_S, OVM_TYPE_I32, /, i32)
-            OVM_OP(OVMI_DIV_S, OVM_TYPE_I64, /, i64)
-            OVM_OP(OVMI_DIV_S, OVM_TYPE_F32, /, f32)
-            OVM_OP(OVMI_DIV_S, OVM_TYPE_F64, /, f64)
-
-            OVM_OP(OVMI_REM, OVM_TYPE_I8 , %, u8)
-            OVM_OP(OVMI_REM, OVM_TYPE_I16, %, u16)
-            OVM_OP(OVMI_REM, OVM_TYPE_I32, %, u32)
-            OVM_OP(OVMI_REM, OVM_TYPE_I64, %, u64)
-
-            OVM_OP(OVMI_REM_S, OVM_TYPE_I8 , %, i8)
-            OVM_OP(OVMI_REM_S, OVM_TYPE_I16, %, i16)
-            OVM_OP(OVMI_REM_S, OVM_TYPE_I32, %, i32)
-            OVM_OP(OVMI_REM_S, OVM_TYPE_I64, %, i64)
-
-            OVM_OP(OVMI_AND, OVM_TYPE_I8 , &, u8)
-            OVM_OP(OVMI_AND, OVM_TYPE_I16, &, u16)
-            OVM_OP(OVMI_AND, OVM_TYPE_I32, &, u32)
-            OVM_OP(OVMI_AND, OVM_TYPE_I64, &, u64)
-
-            OVM_OP(OVMI_OR, OVM_TYPE_I8 , |, u8)
-            OVM_OP(OVMI_OR, OVM_TYPE_I16, |, u16)
-            OVM_OP(OVMI_OR, OVM_TYPE_I32, |, u32)
-            OVM_OP(OVMI_OR, OVM_TYPE_I64, |, u64)
-
-            OVM_OP(OVMI_XOR, OVM_TYPE_I8 , ^, u8)
-            OVM_OP(OVMI_XOR, OVM_TYPE_I16, ^, u16)
-            OVM_OP(OVMI_XOR, OVM_TYPE_I32, ^, u32)
-            OVM_OP(OVMI_XOR, OVM_TYPE_I64, ^, u64)
-
-            OVM_OP(OVMI_SHL, OVM_TYPE_I8 , <<, u8)
-            OVM_OP(OVMI_SHL, OVM_TYPE_I16, <<, u16)
-            OVM_OP(OVMI_SHL, OVM_TYPE_I32, <<, u32)
-            OVM_OP(OVMI_SHL, OVM_TYPE_I64, <<, u64)
-
-            OVM_OP(OVMI_SHR, OVM_TYPE_I8 , >>, u8)
-            OVM_OP(OVMI_SHR, OVM_TYPE_I16, >>, u16)
-            OVM_OP(OVMI_SHR, OVM_TYPE_I32, >>, u32)
-            OVM_OP(OVMI_SHR, OVM_TYPE_I64, >>, u64)
-
-            OVM_OP(OVMI_SAR, OVM_TYPE_I8 , >>, i8)
-            OVM_OP(OVMI_SAR, OVM_TYPE_I16, >>, i16)
-            OVM_OP(OVMI_SAR, OVM_TYPE_I32, >>, i32)
-            OVM_OP(OVMI_SAR, OVM_TYPE_I64, >>, i64)
+OVM_OP_EXEC(add, +)
+OVM_OP_EXEC(sub, -)
+OVM_OP_EXEC(mul, *)
+OVM_OP_EXEC(div_s, /)
+OVM_OP_UNSIGNED_EXEC(div, /)
+OVM_OP_INTEGER_UNSIGNED_EXEC(rem, %)
+OVM_OP_INTEGER_EXEC(rem_s, %)
+OVM_OP_INTEGER_UNSIGNED_EXEC(and, &)
+OVM_OP_INTEGER_UNSIGNED_EXEC(or, |)
+OVM_OP_INTEGER_UNSIGNED_EXEC(xor, ^)
+OVM_OP_INTEGER_UNSIGNED_EXEC(shl, <<)
+OVM_OP_INTEGER_UNSIGNED_EXEC(shr, >>)
+OVM_OP_INTEGER_EXEC(sar, >>)
 
 #undef OVM_OP
 
-#define OVM_OP(i, t, func, ctype) \
-            case OVM_TYPED_INSTR(i, t): \
-                ovm_assert(VAL(instr.a).type == t && VAL(instr.b).type == t); \
-                tmp_val.type = t; \
-                tmp_val.ctype = func( VAL(instr.a).ctype, VAL(instr.b).ctype ); \
-                VAL(instr.r) = tmp_val; \
-                break;
+#define OVM_OP(t, func, ctype) \
+    case t: \
+        ovm_assert(VAL(instr->a).type == t && VAL(instr->b).type == t); \
+        VAL(instr->r).ctype = func( VAL(instr->a).ctype, VAL(instr->b).ctype ); \
+        VAL(instr->r).type = t; \
+        break;
 
-            OVM_OP(OVMI_ROTL, OVM_TYPE_I8 , __rolb, u8)
-            OVM_OP(OVMI_ROTL, OVM_TYPE_I16, __rolw, u16)
-            OVM_OP(OVMI_ROTL, OVM_TYPE_I32, __rold, u32)
-            OVM_OP(OVMI_ROTL, OVM_TYPE_I64, __rolq, u64)
+OVMI_INSTR_EXEC(ovmi_exec_rotl) {
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_OP(OVM_TYPE_I8 , __rolb, u8)
+        OVM_OP(OVM_TYPE_I16, __rolw, u16)
+        OVM_OP(OVM_TYPE_I32, __rold, u32)
+        OVM_OP(OVM_TYPE_I64, __rolq, u64)
+    }
+    NEXT_OP;
+}
 
-            OVM_OP(OVMI_ROTR, OVM_TYPE_I8 , __rorb, u8)
-            OVM_OP(OVMI_ROTR, OVM_TYPE_I16, __rorw, u16)
-            OVM_OP(OVMI_ROTR, OVM_TYPE_I32, __rord, u32)
-            OVM_OP(OVMI_ROTR, OVM_TYPE_I64, __rorq, u64)
+OVMI_INSTR_EXEC(ovmi_exec_rotr) {
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_OP(OVM_TYPE_I8 , __rorb, u8)
+        OVM_OP(OVM_TYPE_I16, __rorw, u16)
+        OVM_OP(OVM_TYPE_I32, __rord, u32)
+        OVM_OP(OVM_TYPE_I64, __rorq, u64)
+    }
+    NEXT_OP;
+}
 
-            OVM_OP(OVMI_MIN, OVM_TYPE_F32, bh_min, f32)
-            OVM_OP(OVMI_MAX, OVM_TYPE_F32, bh_max, f32)
-
-            OVM_OP(OVMI_MIN, OVM_TYPE_F64, bh_min, f64)
-            OVM_OP(OVMI_MAX, OVM_TYPE_F64, bh_max, f64)
-
-#undef OVM_OP
-
-#define OVM_OP(i, t, op, ctype) \
-            case OVM_TYPED_INSTR(i, t): \
-                ovm_assert(VAL(instr.a).type == t); \
-                tmp_val.type = t; \
-                tmp_val.ctype = (ctype) op (VAL(instr.a).ctype); \
-                VAL(instr.r) = tmp_val; \
-                break;
-
-            OVM_OP(OVMI_CLZ, OVM_TYPE_I8 , __builtin_clz, u8)
-            OVM_OP(OVMI_CLZ, OVM_TYPE_I16, __builtin_clz, u16)
-            OVM_OP(OVMI_CLZ, OVM_TYPE_I32, __builtin_clz, u32)
-            OVM_OP(OVMI_CLZ, OVM_TYPE_I64, __builtin_clzll, u64)
-
-            OVM_OP(OVMI_CTZ, OVM_TYPE_I8 , __builtin_ctz, u8)
-            OVM_OP(OVMI_CTZ, OVM_TYPE_I16, __builtin_ctz, u16)
-            OVM_OP(OVMI_CTZ, OVM_TYPE_I32, __builtin_ctz, u32)
-            OVM_OP(OVMI_CTZ, OVM_TYPE_I64, __builtin_ctzll, u64)
-
-            OVM_OP(OVMI_POPCNT, OVM_TYPE_I8 , __builtin_popcount, u8)
-            OVM_OP(OVMI_POPCNT, OVM_TYPE_I16, __builtin_popcount, u16)
-            OVM_OP(OVMI_POPCNT, OVM_TYPE_I32, __builtin_popcount, u32)
-            OVM_OP(OVMI_POPCNT, OVM_TYPE_I64, __builtin_popcountll, u64)
-
-            OVM_OP(OVMI_ABS,     OVM_TYPE_F32, __ovm_abs, f32);
-            OVM_OP(OVMI_NEG,     OVM_TYPE_F32, -, f32);
-            OVM_OP(OVMI_CEIL,    OVM_TYPE_F32, __ovm_ceil, f32);
-            OVM_OP(OVMI_FLOOR,   OVM_TYPE_F32, __ovm_floor, f32);
-            OVM_OP(OVMI_TRUNC,   OVM_TYPE_F32, __ovm_trunc, f32);
-            OVM_OP(OVMI_NEAREST, OVM_TYPE_F32, __ovm_nearest, f32);
-            OVM_OP(OVMI_SQRT,    OVM_TYPE_F32, sqrt, f32);  // TODO: REMOVE THE NEED FOR libm!!!
-
-            OVM_OP(OVMI_ABS,     OVM_TYPE_F64, __ovm_abs, f64);
-            OVM_OP(OVMI_NEG,     OVM_TYPE_F64, -, f64);
-            OVM_OP(OVMI_CEIL,    OVM_TYPE_F64, __ovm_ceil, f64);
-            OVM_OP(OVMI_FLOOR,   OVM_TYPE_F64, __ovm_floor, f64);
-            OVM_OP(OVMI_TRUNC,   OVM_TYPE_F64, __ovm_trunc, f64);
-            OVM_OP(OVMI_NEAREST, OVM_TYPE_F64, __ovm_nearest, f64);
-            OVM_OP(OVMI_SQRT,    OVM_TYPE_F64, sqrt, f64);  // TODO: REMOVE THE NEED FOR libm!!!
+OVM_OP_FLOAT_EXEC(min, bh_min)
+OVM_OP_FLOAT_EXEC(max, bh_max)
+OVM_OP_FLOAT_EXEC(copysign, __ovm_copysign)
 
 #undef OVM_OP
 
-#define OVM_OP(i, t, op, ctype, cast_type) \
-            case OVM_TYPED_INSTR(i, t): \
-                ovm_assert(VAL(instr.a).type == t && VAL(instr.b).type == t); \
-                tmp_val.type = OVM_TYPE_I32; \
-                tmp_val.i32 = ((VAL(instr.a).ctype op VAL(instr.b).ctype)) ? 1 : 0; \
-                VAL(instr.r) = tmp_val; \
-                break;
 
-            OVM_OP(OVMI_LT, OVM_TYPE_I8 , <, u8,  u8)
-            OVM_OP(OVMI_LT, OVM_TYPE_I16, <, u16, u16)
-            OVM_OP(OVMI_LT, OVM_TYPE_I32, <, u32, u32)
-            OVM_OP(OVMI_LT, OVM_TYPE_I64, <, u64, u64)
-            OVM_OP(OVMI_LT, OVM_TYPE_F32, <, f32, f32)
-            OVM_OP(OVMI_LT, OVM_TYPE_F64, <, f64, f32)
+#define OVM_OP(t, op, ctype) \
+    case t: \
+        ovm_assert(VAL(instr->a).type == t); \
+        VAL(instr->r).type = t; \
+        VAL(instr->r).ctype = (ctype) op (VAL(instr->a).ctype); \
+        break;
 
-            OVM_OP(OVMI_LT_S, OVM_TYPE_I8 , <, i8,  i8)
-            OVM_OP(OVMI_LT_S, OVM_TYPE_I16, <, i16, i16)
-            OVM_OP(OVMI_LT_S, OVM_TYPE_I32, <, i32, i32)
-            OVM_OP(OVMI_LT_S, OVM_TYPE_I64, <, i64, i64)
-            OVM_OP(OVMI_LT_S, OVM_TYPE_F32, <, f32, f32)
-            OVM_OP(OVMI_LT_S, OVM_TYPE_F64, <, f64, f32)
+OVMI_INSTR_EXEC(ovmi_exec_clz) {
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_OP(OVM_TYPE_I8 , __builtin_clz, u8)
+        OVM_OP(OVM_TYPE_I16, __builtin_clz, u16)
+        OVM_OP(OVM_TYPE_I32, __builtin_clz, u32)
+        OVM_OP(OVM_TYPE_I64, __builtin_clzll, u64)
+    }
+    NEXT_OP;
+}
 
-            OVM_OP(OVMI_LE, OVM_TYPE_I8 , <=, u8,  u8)
-            OVM_OP(OVMI_LE, OVM_TYPE_I16, <=, u16, u16)
-            OVM_OP(OVMI_LE, OVM_TYPE_I32, <=, u32, u32)
-            OVM_OP(OVMI_LE, OVM_TYPE_I64, <=, u64, u64)
-            OVM_OP(OVMI_LE, OVM_TYPE_F32, <=, f32, f32)
-            OVM_OP(OVMI_LE, OVM_TYPE_F64, <=, f64, f64)
+OVMI_INSTR_EXEC(ovmi_exec_ctz) {
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_OP(OVM_TYPE_I8 , __builtin_ctz, u8)
+        OVM_OP(OVM_TYPE_I16, __builtin_ctz, u16)
+        OVM_OP(OVM_TYPE_I32, __builtin_ctz, u32)
+        OVM_OP(OVM_TYPE_I64, __builtin_ctzll, u64)
+    }
+    NEXT_OP;
+}
 
-            OVM_OP(OVMI_LE_S, OVM_TYPE_I8 , <=, i8,  i8)
-            OVM_OP(OVMI_LE_S, OVM_TYPE_I16, <=, i16, i16)
-            OVM_OP(OVMI_LE_S, OVM_TYPE_I32, <=, i32, i32)
-            OVM_OP(OVMI_LE_S, OVM_TYPE_I64, <=, i64, i64)
-            OVM_OP(OVMI_LE_S, OVM_TYPE_F32, <=, f32, f32)
-            OVM_OP(OVMI_LE_S, OVM_TYPE_F64, <=, f64, f64)
+OVMI_INSTR_EXEC(ovmi_exec_popcount) {
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_OP(OVM_TYPE_I8 , __builtin_popcount, u8)
+        OVM_OP(OVM_TYPE_I16, __builtin_popcount, u16)
+        OVM_OP(OVM_TYPE_I32, __builtin_popcount, u32)
+        OVM_OP(OVM_TYPE_I64, __builtin_popcountll, u64)
+    }
+    NEXT_OP;
+}
 
-            OVM_OP(OVMI_EQ, OVM_TYPE_I8 , ==, i8,  i8)
-            OVM_OP(OVMI_EQ, OVM_TYPE_I16, ==, i16, i16)
-            OVM_OP(OVMI_EQ, OVM_TYPE_I32, ==, i32, i32)
-            OVM_OP(OVMI_EQ, OVM_TYPE_I64, ==, i64, i64)
-            OVM_OP(OVMI_EQ, OVM_TYPE_F32, ==, f32, f32)
-            OVM_OP(OVMI_EQ, OVM_TYPE_F64, ==, f64, f64)
-
-            OVM_OP(OVMI_GE, OVM_TYPE_I8 , >=, u8,  u8)
-            OVM_OP(OVMI_GE, OVM_TYPE_I16, >=, u16, u16)
-            OVM_OP(OVMI_GE, OVM_TYPE_I32, >=, u32, u32)
-            OVM_OP(OVMI_GE, OVM_TYPE_I64, >=, u64, u64)
-            OVM_OP(OVMI_GE, OVM_TYPE_F32, >=, f32, f32)
-            OVM_OP(OVMI_GE, OVM_TYPE_F64, >=, f64, f64)
-
-            OVM_OP(OVMI_GE_S, OVM_TYPE_I8 , >=, i8,  i8)
-            OVM_OP(OVMI_GE_S, OVM_TYPE_I16, >=, i16, i16)
-            OVM_OP(OVMI_GE_S, OVM_TYPE_I32, >=, i32, i32)
-            OVM_OP(OVMI_GE_S, OVM_TYPE_I64, >=, i64, i64)
-            OVM_OP(OVMI_GE_S, OVM_TYPE_F32, >=, f32, f32)
-            OVM_OP(OVMI_GE_S, OVM_TYPE_F64, >=, f64, f64)
-
-            OVM_OP(OVMI_GT, OVM_TYPE_I8 , >, u8,  u8)
-            OVM_OP(OVMI_GT, OVM_TYPE_I16, >, u16, u16)
-            OVM_OP(OVMI_GT, OVM_TYPE_I32, >, u32, u32)
-            OVM_OP(OVMI_GT, OVM_TYPE_I64, >, u64, u64)
-            OVM_OP(OVMI_GT, OVM_TYPE_F32, >, f32, f32)
-            OVM_OP(OVMI_GT, OVM_TYPE_F64, >, f64, f64)
-
-            OVM_OP(OVMI_GT_S, OVM_TYPE_I8 , >, i8,  i8)
-            OVM_OP(OVMI_GT_S, OVM_TYPE_I16, >, i16, i16)
-            OVM_OP(OVMI_GT_S, OVM_TYPE_I32, >, i32, i32)
-            OVM_OP(OVMI_GT_S, OVM_TYPE_I64, >, i64, i64)
-            OVM_OP(OVMI_GT_S, OVM_TYPE_F32, >, f32, f32)
-            OVM_OP(OVMI_GT_S, OVM_TYPE_F64, >, f64, f64)
-
-            OVM_OP(OVMI_NE, OVM_TYPE_I8 , !=, i8,  i8)
-            OVM_OP(OVMI_NE, OVM_TYPE_I16, !=, i16, i16)
-            OVM_OP(OVMI_NE, OVM_TYPE_I32, !=, i32, i32)
-            OVM_OP(OVMI_NE, OVM_TYPE_I64, !=, i64, i64)
-            OVM_OP(OVMI_NE, OVM_TYPE_F32, !=, f32, f32)
-            OVM_OP(OVMI_NE, OVM_TYPE_F64, !=, f64, f64)
+OVM_OP_FLOAT_EXEC(abs,     __ovm_abs)
+OVM_OP_FLOAT_EXEC(neg,     -)
+OVM_OP_FLOAT_EXEC(ceil,    __ovm_ceil)
+OVM_OP_FLOAT_EXEC(floor,   __ovm_floor)
+OVM_OP_FLOAT_EXEC(trunc,   __ovm_trunc)
+OVM_OP_FLOAT_EXEC(nearest, __ovm_nearest)
+OVM_OP_FLOAT_EXEC(sqrt,    sqrt)
 
 #undef OVM_OP
+
+
+#define OVM_OP(t, op, ctype) \
+    case t: \
+        ovm_assert(VAL(instr->a).type == t && VAL(instr->b).type == t); \
+        VAL(instr->r).type = OVM_TYPE_I32; \
+        VAL(instr->r).i32 = ((VAL(instr->a).ctype op VAL(instr->b).ctype)) ? 1 : 0; \
+        break;
+
+OVM_OP_EXEC(eq, ==)
+OVM_OP_EXEC(ne, !=)
+OVM_OP_UNSIGNED_EXEC(lt, <)
+OVM_OP_UNSIGNED_EXEC(le, <=)
+OVM_OP_UNSIGNED_EXEC(gt, >)
+OVM_OP_UNSIGNED_EXEC(ge, >=)
+OVM_OP_EXEC(lt_s, <)
+OVM_OP_EXEC(le_s, <=)
+OVM_OP_EXEC(gt_s, >)
+OVM_OP_EXEC(ge_s, >=)
+
+#undef OVM_OP
+
+
+
+//
+// Memory / register operations
+//
 
 #define OVM_IMM(t, dtype, stype) \
-            case OVM_TYPED_INSTR(OVMI_IMM, t): \
-                VAL(instr.r).type = t; \
-                VAL(instr.r).u64 = 0; \
-                VAL(instr.r).dtype = instr.stype; \
-                break;
+    case t: \
+        VAL(instr->r).type = t; \
+        VAL(instr->r).u64 = 0; \
+        VAL(instr->r).dtype = instr->stype; \
+        break;
 
-            OVM_IMM(OVM_TYPE_I8,  u8,  i)
-            OVM_IMM(OVM_TYPE_I16, u16, i)
-            OVM_IMM(OVM_TYPE_I32, u32, i)
-            OVM_IMM(OVM_TYPE_I64, u64, l)
-            OVM_IMM(OVM_TYPE_F32, f32, f)
-            OVM_IMM(OVM_TYPE_F64, f64, d)
+
+OVMI_INSTR_EXEC(ovmi_exec_imm) {
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_IMM(OVM_TYPE_I8,  u8,  i);
+        OVM_IMM(OVM_TYPE_I16, u16, i);
+        OVM_IMM(OVM_TYPE_I32, u32, i);
+        OVM_IMM(OVM_TYPE_I64, u64, l);
+        OVM_IMM(OVM_TYPE_F32, f32, f);
+        OVM_IMM(OVM_TYPE_F64, f64, d);
+    }
+    NEXT_OP;
+}
 
 #undef OVM_IMM
 
-            case OVMI_MOV:
-                VAL(instr.r) = VAL(instr.a);
-
-#ifdef OVM_VERBOSE
-                printf("$%d = %lx\n", instr.r, VAL(instr.r).u64);
-#endif
-
-                break;
+OVMI_INSTR_EXEC(ovmi_exec_mov) {
+    VAL(instr->r) = VAL(instr->a);
+    NEXT_OP;
+}
 
 #define OVM_LOAD(type_, stype) \
-            case OVM_TYPED_INSTR(OVMI_LOAD, type_): {\
-                ovm_assert(VAL(instr.a).type == OVM_TYPE_I32); \
-                if ((VAL(instr.a).u32 + (u32) instr.b) == 0) __ovm_trigger_exception(state); \
-                tmp_val.type = type_; \
-                tmp_val.stype = * (stype *) &((u8 *) engine->memory)[VAL(instr.a).u32 + (u32) instr.b]; \
-                VAL(instr.r) = tmp_val; \
-                break; \
-            }
+    case type_: {\
+        VAL(instr->r).stype = * (stype *) &memory[dest]; \
+        VAL(instr->r).type = type_; \
+        break; \
+    }
 
-            OVM_LOAD(OVM_TYPE_I8,  u8)
-            OVM_LOAD(OVM_TYPE_I16, u16)
-            OVM_LOAD(OVM_TYPE_I32, u32)
-            OVM_LOAD(OVM_TYPE_I64, u64)
-            OVM_LOAD(OVM_TYPE_F32, f32)
-            OVM_LOAD(OVM_TYPE_F64, f64)
+OVMI_INSTR_EXEC(ovmi_exec_load) {
+    ovm_assert(VAL(instr->a).type == OVM_TYPE_I32);
+    u32 dest = VAL(instr->a).u32 + (u32) instr->b;
+    if (dest == 0) __ovm_trigger_exception(state);
+
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_LOAD(OVM_TYPE_I8,  u8)
+        OVM_LOAD(OVM_TYPE_I16, u16)
+        OVM_LOAD(OVM_TYPE_I32, u32)
+        OVM_LOAD(OVM_TYPE_I64, u64)
+        OVM_LOAD(OVM_TYPE_F32, f32)
+        OVM_LOAD(OVM_TYPE_F64, f64)
+    }
+    NEXT_OP;
+}
 
 #undef OVM_LOAD
 
 #define OVM_STORE(type_, stype) \
-            case OVM_TYPED_INSTR(OVMI_STORE, type_): \
-                ovm_assert(VAL(instr.r).type == OVM_TYPE_I32); \
-                if ((VAL(instr.r).u32 + (u32) instr.b) == 0) __ovm_trigger_exception(state); \
-                *(stype *) &((u8 *) engine->memory)[VAL(instr.r).u32 + (u32) instr.b] = VAL(instr.a).stype; \
-                break;
+    case type_: \
+        *(stype *) &memory[dest] = VAL(instr->a).stype; \
+        break;
 
-            OVM_STORE(OVM_TYPE_I8,  u8)
-            OVM_STORE(OVM_TYPE_I16, u16)
-            OVM_STORE(OVM_TYPE_I32, u32)
-            OVM_STORE(OVM_TYPE_I64, u64)
-            OVM_STORE(OVM_TYPE_F32, f32)
-            OVM_STORE(OVM_TYPE_F64, f64)
+
+OVMI_INSTR_EXEC(ovmi_exec_store) {
+    ovm_assert(VAL(instr->r).type == OVM_TYPE_I32);
+    u32 dest = VAL(instr->r).u32 + (u32) instr->b;
+    if (dest == 0) __ovm_trigger_exception(state);
+
+    switch (OVM_INSTR_TYPE(*instr)) {
+        OVM_STORE(OVM_TYPE_I8,  u8)
+        OVM_STORE(OVM_TYPE_I16, u16)
+        OVM_STORE(OVM_TYPE_I32, u32)
+        OVM_STORE(OVM_TYPE_I64, u64)
+        OVM_STORE(OVM_TYPE_F32, f32)
+        OVM_STORE(OVM_TYPE_F64, f64)
+    }
+    NEXT_OP;
+}
 
 #undef OVM_STORE
 
-            case OVMI_COPY: {
-                u32 dest  = VAL(instr.r).u32;
-                u32 src   = VAL(instr.a).u32;
-                u32 count = VAL(instr.b).u32;
+OVMI_INSTR_EXEC(ovmi_exec_copy) {
+    u32 dest  = VAL(instr->r).u32;
+    u32 src   = VAL(instr->a).u32;
+    u32 count = VAL(instr->b).u32;
 
-                if (!dest || !src) __ovm_trigger_exception(state);
+    if (!dest || !src) __ovm_trigger_exception(state);
 
-                u8 *base = engine->memory;
-                memmove(&base[dest], &base[src], count);
-                break;
-            }
+    memmove(&memory[dest], &memory[src], count);
 
-            case OVMI_FILL: {
-                i32 dest  = VAL(instr.r).i32;
-                u8  byte  = VAL(instr.a).u8;
-                i32 count = VAL(instr.b).i32;
+    NEXT_OP;
+}
 
-                if (!dest) __ovm_trigger_exception(state);
+OVMI_INSTR_EXEC(ovmi_exec_fill) {
+    i32 dest  = VAL(instr->r).i32;
+    u8  byte  = VAL(instr->a).u8;
+    i32 count = VAL(instr->b).i32;
 
-                u8 *base = engine->memory;
-                memset(&base[dest], byte, count);
-                break;
-            }
+    if (!dest) __ovm_trigger_exception(state);
 
-            case OVMI_REG_GET: {
-                VAL(instr.r) = state->registers[instr.a];
-                break;
-            }
+    memset(&memory[dest], byte, count);
 
-            case OVMI_REG_SET: {
-                state->registers[instr.r] = VAL(instr.a);
-                break;
-            }
+    NEXT_OP;
+}
 
-            case OVMI_IDX_ARR: {
-                ovm_static_integer_array_t data_elem = program->static_data[instr.a];
-                ovm_assert(VAL(instr.b).u32 < (u32) data_elem.len);
+OVMI_INSTR_EXEC(ovmi_exec_reg_get) {
+    VAL(instr->r) = state->registers[instr->a];
 
-                tmp_val.type = OVM_TYPE_I32;
-                tmp_val.i32 = program->static_integers[data_elem.start_idx + VAL(instr.b).u32];
-                VAL(instr.r) = tmp_val;
-                break;
-            }
+    NEXT_OP;
+}
 
-            case OVMI_PARAM:
-                bh_arr_push(state->params, VAL(instr.a));
-                break;
+OVMI_INSTR_EXEC(ovmi_exec_reg_set) {
+    state->registers[instr->r] = VAL(instr->a);
 
-            case OVMI_RETURN: {
-                ovm_value_t val = VAL(instr.a);
-                ovm_stack_frame_t frame = ovm__func_teardown_stack_frame(engine, state, program);
-                state->pc = frame.return_address;
+    NEXT_OP;
+}
 
-                if (bh_arr_length(state->stack_frames) == 0) {
-                    return val;
-                }
+OVMI_INSTR_EXEC(ovmi_exec_idx_arr) {
+    ovm_static_integer_array_t data_elem = state->program->static_data[instr->a];
+    ovm_assert(VAL(instr->b).u32 < (u32) data_elem.len);
 
-                ovm_func_t *new_func = bh_arr_last(state->stack_frames).func;
-                if (new_func->kind == OVM_FUNC_EXTERNAL) {
-                    return val;
-                }
+    VAL(instr->r).i32 = state->program->static_integers[data_elem.start_idx + VAL(instr->b).u32];
+    VAL(instr->r).type = OVM_TYPE_I32;
 
-                if (frame.return_number_value >= 0) {
-                    VAL(frame.return_number_value) = val;
-                }
+    NEXT_OP;
+}
+
+
+//
+// Function calling
+//
+
+OVMI_INSTR_EXEC(ovmi_exec_param) {
+    bh_arr_push(state->params, VAL(instr->a));
+
+    NEXT_OP;
+}
+
+OVMI_INSTR_EXEC(ovmi_exec_return) {
+    ovm_value_t val = VAL(instr->a);
+    ovm_stack_frame_t frame = ovm__func_teardown_stack_frame(state);
+    state->pc = frame.return_address;
+
+    if (bh_arr_length(state->stack_frames) == 0) {
+        return val;
+    }
+
+    ovm_func_t *new_func = bh_arr_last(state->stack_frames).func;
+    if (new_func->kind == OVM_FUNC_EXTERNAL) {
+        return val;
+    }
+
+    if (frame.return_number_value >= 0) {
+        VAL(frame.return_number_value) = val;
+    }
 
 #ifdef OVM_VERBOSE
-                printf("Returning from %s to %s: ", frame.func->name, bh_arr_last(state->stack_frames).func->name);
-                ovm_print_val(val);
-                printf("\n\n");
+    printf("Returning from %s to %s: ", frame.func->name, bh_arr_last(state->stack_frames).func->name);
+    ovm_print_val(val);
+    printf("\n\n");
 #endif
 
-                break;
-            }
+    NEXT_OP;
+}
+
 
 #define OVM_CALL_CODE(func_idx) \
-            i32 fidx = func_idx; \
-            ovm_func_t *func = &program->funcs[fidx]; \
-            i32 extra_params = bh_arr_length(state->params) - func->param_count; \
-            ovm_assert(extra_params >= 0); \
-            ovm__func_setup_stack_frame(engine, state, program, fidx, instr.r); \
-            if (func->kind == OVM_FUNC_INTERNAL) { \
-                fori (i, 0, func->param_count) { \
-                    VAL(i) = state->params[i + extra_params]; \
-                } \
-                bh_arr_fastdeleten(state->params, func->param_count); \
- \
-                state->pc = func->start_instr; \
-            } else { \
-                ovm_value_t result = {0}; \
-                ovm_external_func_t external_func = state->external_funcs[func->external_func_idx]; \
-                external_func.native_func(external_func.userdata, &state->params[extra_params], &result); \
-                bh_arr_fastdeleten(state->params, func->param_count); \
- \
-                ovm__func_teardown_stack_frame(engine, state, program); \
- \
-                if (instr.r >= 0) { \
-                    VAL(instr.r) = result; \
-                } \
-            }
+    i32 fidx = func_idx; \
+    ovm_func_t *func = &state->program->funcs[fidx]; \
+    i32 extra_params = bh_arr_length(state->params) - func->param_count; \
+    ovm_assert(extra_params >= 0); \
+    ovm__func_setup_stack_frame(state, func, instr->r); \
+    if (func->kind == OVM_FUNC_INTERNAL) { \
+        fori (i, 0, func->param_count) { \
+            VAL(i) = state->params[i + extra_params]; \
+        } \
+        bh_arr_fastdeleten(state->params, func->param_count); \
+\
+        state->pc = func->start_instr; \
+    } else { \
+        ovm_value_t result = {0}; \
+        ovm_external_func_t external_func = state->external_funcs[func->external_func_idx]; \
+        external_func.native_func(external_func.userdata, &state->params[extra_params], &result); \
+        bh_arr_fastdeleten(state->params, func->param_count); \
+\
+        ovm__func_teardown_stack_frame(state); \
+\
+        if (instr->r >= 0) { \
+            VAL(instr->r) = result; \
+        } \
+    }
 
-            case OVMI_CALL: {
-                OVM_CALL_CODE(instr.a);
-                break;
-            }
 
-            case OVMI_CALLI: {
-                OVM_CALL_CODE(VAL(instr.a).i32);
-                break;
-            }
+OVMI_INSTR_EXEC(ovmi_exec_call) {
+    OVM_CALL_CODE(instr->a);
+    NEXT_OP;
+}
+
+OVMI_INSTR_EXEC(ovmi_exec_calli) {
+    OVM_CALL_CODE(VAL(instr->a).i32);
+    NEXT_OP;
+}
 
 #undef OVM_CALL_CODE
 
-            case OVMI_BR:     state->pc += instr.a; break;
-            case OVMI_BRI:    state->pc += VAL(instr.a).i32; break;
-            case OVMI_BR_NZ:  if (VAL(instr.b).i32 != 0) state->pc += instr.a; break;
-            case OVMI_BRI_NZ: if (VAL(instr.b).i32 != 0) state->pc += VAL(instr.a).i32; break;
-            case OVMI_BR_Z:   if (VAL(instr.b).i32 == 0) state->pc += instr.a; break;
-            case OVMI_BRI_Z:  if (VAL(instr.b).i32 == 0) state->pc += VAL(instr.a).i32; break;
 
+
+//
+// Branching Instructions
+//
+
+OVMI_INSTR_EXEC(ovmi_exec_br)     { state->pc += instr->a; NEXT_OP; }
+OVMI_INSTR_EXEC(ovmi_exec_bri)    { state->pc += VAL(instr->a).i32; NEXT_OP; }
+OVMI_INSTR_EXEC(ovmi_exec_br_nz)  { if (VAL(instr->b).i32 != 0) state->pc += instr->a; NEXT_OP; }
+OVMI_INSTR_EXEC(ovmi_exec_bri_nz) { if (VAL(instr->b).i32 != 0) state->pc += VAL(instr->a).i32; NEXT_OP; }
+OVMI_INSTR_EXEC(ovmi_exec_br_z)   { if (VAL(instr->b).i32 == 0) state->pc += instr->a; NEXT_OP; }
+OVMI_INSTR_EXEC(ovmi_exec_bri_z)  { if (VAL(instr->b).i32 == 0) state->pc += VAL(instr->a).i32; NEXT_OP; }
+
+
+//
+// Conversion (make this better!)
+//
+
+OVMI_INSTR_EXEC(ovmi_exec_cvt) {
+    ovm_value_t tmp_val;
+
+    switch (instr->full_instr) {
 
 #define CVT(stype, dtype, otype, ctype) \
+    tmp_val.dtype = (ctype) VAL(instr->a).stype; \
     tmp_val.type = otype; \
-    tmp_val.dtype = (ctype) VAL(instr.a).stype; \
-    VAL(instr.r) = tmp_val; \
+    VAL(instr->r) = tmp_val; \
     break
 
-            case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I16): CVT(u8, u16, OVM_TYPE_I16, u16);
-            case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I32): CVT(u8, u32, OVM_TYPE_I32, u32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I64): CVT(u8, u64, OVM_TYPE_I64, u64);
-            case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I16): CVT(i8, i16, OVM_TYPE_I16, i16);
-            case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I32): CVT(i8, i32, OVM_TYPE_I32, i32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I64): CVT(i8, i64, OVM_TYPE_I64, i64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I16): CVT(u8, u16, OVM_TYPE_I16, u16);
+        case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I32): CVT(u8, u32, OVM_TYPE_I32, u32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I8,   OVM_TYPE_I64): CVT(u8, u64, OVM_TYPE_I64, u64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I16): CVT(i8, i16, OVM_TYPE_I16, i16);
+        case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I32): CVT(i8, i32, OVM_TYPE_I32, i32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I8_S, OVM_TYPE_I64): CVT(i8, i64, OVM_TYPE_I64, i64);
 
-            case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I8):  CVT(u16, u8,  OVM_TYPE_I8, u8);
-            case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I32): CVT(u16, u32, OVM_TYPE_I32, u32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I64): CVT(u16, u64, OVM_TYPE_I64, u64);
-            case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I8):  CVT(i16, i8,  OVM_TYPE_I8, i8);
-            case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I32): CVT(i16, i32, OVM_TYPE_I32, i32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I64): CVT(i16, i64, OVM_TYPE_I64, i64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I8):  CVT(u16, u8,  OVM_TYPE_I8, u8);
+        case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I32): CVT(u16, u32, OVM_TYPE_I32, u32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I16,   OVM_TYPE_I64): CVT(u16, u64, OVM_TYPE_I64, u64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I8):  CVT(i16, i8,  OVM_TYPE_I8, i8);
+        case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I32): CVT(i16, i32, OVM_TYPE_I32, i32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I16_S, OVM_TYPE_I64): CVT(i16, i64, OVM_TYPE_I64, i64);
 
-            case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I8):  CVT(u32, u8,  OVM_TYPE_I8,  u8);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I16): CVT(u32, u16, OVM_TYPE_I16, u16);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I64): CVT(u32, u64, OVM_TYPE_I64, u64);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I8):  CVT(i32, i8,  OVM_TYPE_I8,  i8);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I16): CVT(i32, i16, OVM_TYPE_I16, i16);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I64): CVT(i32, i64, OVM_TYPE_I64, i64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I8):  CVT(u32, u8,  OVM_TYPE_I8,  u8);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I16): CVT(u32, u16, OVM_TYPE_I16, u16);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_I64): CVT(u32, u64, OVM_TYPE_I64, u64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I8):  CVT(i32, i8,  OVM_TYPE_I8,  i8);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I16): CVT(i32, i16, OVM_TYPE_I16, i16);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_I64): CVT(i32, i64, OVM_TYPE_I64, i64);
 
-            case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_F32): CVT(u32, f32, OVM_TYPE_F32, f32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_F32): CVT(i32, f32, OVM_TYPE_F32, f32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_F64): CVT(u32, f64, OVM_TYPE_F64, f64);
-            case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_F64): CVT(i32, f64, OVM_TYPE_F64, f64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_F32): CVT(u32, f32, OVM_TYPE_F32, f32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_F32): CVT(i32, f32, OVM_TYPE_F32, f32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32,   OVM_TYPE_F64): CVT(u32, f64, OVM_TYPE_F64, f64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I32_S, OVM_TYPE_F64): CVT(i32, f64, OVM_TYPE_F64, f64);
 
-            case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I8):  CVT(u64, u8,  OVM_TYPE_I8,  u8);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I16): CVT(u64, u16, OVM_TYPE_I16, u16);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I32): CVT(u64, u32, OVM_TYPE_I32, u32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I8):  CVT(i64, i8,  OVM_TYPE_I8,  i8);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I16): CVT(i64, i16, OVM_TYPE_I16, i16);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I32): CVT(i64, i32, OVM_TYPE_I32, i32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I8):  CVT(u64, u8,  OVM_TYPE_I8,  u8);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I16): CVT(u64, u16, OVM_TYPE_I16, u16);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_I32): CVT(u64, u32, OVM_TYPE_I32, u32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I8):  CVT(i64, i8,  OVM_TYPE_I8,  i8);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I16): CVT(i64, i16, OVM_TYPE_I16, i16);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_I32): CVT(i64, i32, OVM_TYPE_I32, i32);
 
-            case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_F32): CVT(u64, f32, OVM_TYPE_F32, f32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_F32): CVT(i64, f32, OVM_TYPE_F32, f32);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_F64): CVT(u64, f64, OVM_TYPE_F64, f64);
-            case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_F64): CVT(i64, f64, OVM_TYPE_F64, f64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_F32): CVT(u64, f32, OVM_TYPE_F32, f32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_F32): CVT(i64, f32, OVM_TYPE_F32, f32);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64,   OVM_TYPE_F64): CVT(u64, f64, OVM_TYPE_F64, f64);
+        case OVM_TYPED_INSTR(OVMI_CVT_I64_S, OVM_TYPE_F64): CVT(i64, f64, OVM_TYPE_F64, f64);
 
-            case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_I32): CVT(f32, u32, OVM_TYPE_I32, u32);
-            case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_I64): CVT(f32, u64, OVM_TYPE_I64, u64);
-            case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_F64): CVT(f32, f64, OVM_TYPE_F64, f64);
-            case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_I32): CVT(f32, i32, OVM_TYPE_I32, i32);
-            case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_I64): CVT(f32, i64, OVM_TYPE_I64, i64);
-            case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_F64): CVT(f32, f64, OVM_TYPE_F64, f64);
+        case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_I32): CVT(f32, u32, OVM_TYPE_I32, u32);
+        case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_I64): CVT(f32, u64, OVM_TYPE_I64, u64);
+        case OVM_TYPED_INSTR(OVMI_CVT_F32,   OVM_TYPE_F64): CVT(f32, f64, OVM_TYPE_F64, f64);
+        case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_I32): CVT(f32, i32, OVM_TYPE_I32, i32);
+        case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_I64): CVT(f32, i64, OVM_TYPE_I64, i64);
+        case OVM_TYPED_INSTR(OVMI_CVT_F32_S, OVM_TYPE_F64): CVT(f32, f64, OVM_TYPE_F64, f64);
 
-            case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_I32): CVT(f64, u32, OVM_TYPE_I32, u32);
-            case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_I64): CVT(f64, u64, OVM_TYPE_I64, u64);
-            case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_F32): CVT(f64, f32, OVM_TYPE_F32, f32);
-            case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_I32): CVT(f64, i32, OVM_TYPE_I32, i32);
-            case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_I64): CVT(f64, i64, OVM_TYPE_I64, i64);
-            case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_F32): CVT(f64, f32, OVM_TYPE_F32, f32);
+        case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_I32): CVT(f64, u32, OVM_TYPE_I32, u32);
+        case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_I64): CVT(f64, u64, OVM_TYPE_I64, u64);
+        case OVM_TYPED_INSTR(OVMI_CVT_F64,   OVM_TYPE_F32): CVT(f64, f32, OVM_TYPE_F32, f32);
+        case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_I32): CVT(f64, i32, OVM_TYPE_I32, i32);
+        case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_I64): CVT(f64, i64, OVM_TYPE_I64, i64);
+        case OVM_TYPED_INSTR(OVMI_CVT_F64_S, OVM_TYPE_F32): CVT(f64, f32, OVM_TYPE_F32, f32);
 
 #undef CVT
 
 #define CVT(stype, dtype, otype, ctype) \
     tmp_val.type = otype; \
-    tmp_val.dtype = *(ctype *) &VAL(instr.a).stype; \
-    VAL(instr.r) = tmp_val; \
+    tmp_val.dtype = *(ctype *) &VAL(instr->a).stype; \
+    VAL(instr->r) = tmp_val; \
     break
 
             case OVM_TYPED_INSTR(OVMI_TRANSMUTE_I32, OVM_TYPE_F32): CVT(u32, f32, OVM_TYPE_F32, f32);
@@ -1246,51 +1248,259 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
             case OVM_TYPED_INSTR(OVMI_TRANSMUTE_F64, OVM_TYPE_I64): CVT(f64, u64, OVM_TYPE_I64, u64);
 
 #undef CVT
+    }
 
+    NEXT_OP;
+}
+
+
+//
+// Compare exchange
+//
 
 #define CMPXCHG(otype, ctype) \
-    case OVM_TYPED_INSTR(OVMI_CMPXCHG, otype): {\
-        if (VAL(instr.r).u32 == 0) __ovm_trigger_exception(state); \
-        ctype *addr = (ctype *) &((u8 *) engine->memory)[VAL(instr.r).u32]; \
+    case otype: {\
+        if (VAL(instr->r).u32 == 0) __ovm_trigger_exception(state); \
+        ctype *addr = (ctype *) &memory[VAL(instr->r).u32]; \
  \
-        VAL(instr.r).u64 = 0; \
-        VAL(instr.r).type = otype; \
-        VAL(instr.r).ctype = *addr; \
+        VAL(instr->r).u64 = 0; \
+        VAL(instr->r).type = otype; \
+        VAL(instr->r).ctype = *addr; \
  \
-        if (*addr == VAL(instr.a).ctype) { \
-            *addr = VAL(instr.b).ctype ; \
+        if (*addr == VAL(instr->a).ctype) { \
+            *addr = VAL(instr->b).ctype ; \
         } \
         break; \
     }
 
-            CMPXCHG(OVM_TYPE_I8,  i8)
-            CMPXCHG(OVM_TYPE_I16, i16)
-            CMPXCHG(OVM_TYPE_I32, i32)
-            CMPXCHG(OVM_TYPE_I64, i64)
+OVMI_INSTR_EXEC(ovmi_exec_cmpxchg) {
+    switch (OVM_INSTR_TYPE(*instr)) {
+        CMPXCHG(OVM_TYPE_I8,  i8)
+        CMPXCHG(OVM_TYPE_I16, i16)
+        CMPXCHG(OVM_TYPE_I32, i32)
+        CMPXCHG(OVM_TYPE_I64, i64)
+    }
+
+    NEXT_OP;
+}
 
 #undef CMPXCHG
 
-            case OVMI_BREAK:
-                __ovm_trigger_exception(state);
-                printf("onyx: exiting early due to reaching an unreachable instruction.\n");
-                
-                return ((ovm_value_t) {0});
 
-            default:
-                printf("ERROR:\n");
-                ovm_program_print_instructions(program, state->pc - 1, 1);
-                fflush(stdout);
-                ovm_assert(("ILLEGAL INSTRUCTION", 0));
-                break;
-        }
-
-        if (release_mutex_at_end) {
-            pthread_mutex_unlock(&engine->atomic_mutex);
-            release_mutex_at_end = false;
-        }
-    }
-
+OVMI_INSTR_EXEC(ovmi_exec_illegal) {
+    __ovm_trigger_exception(state);
     return ((ovm_value_t) {0});
+}
+
+//
+// Dispatch table
+//
+
+static ovmi_instr_exec_t ovmi_dispatch[256] = {
+    // 0x00
+    ovmi_exec_nop,
+    ovmi_exec_add,
+    ovmi_exec_sub,
+    ovmi_exec_mul,
+    ovmi_exec_div,
+    ovmi_exec_div_s,
+    ovmi_exec_rem,
+    ovmi_exec_rem_s,
+    ovmi_exec_and,
+    ovmi_exec_or,
+    ovmi_exec_xor,
+    ovmi_exec_shl,
+    ovmi_exec_shr,
+    ovmi_exec_sar,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+
+    // 0x10
+    ovmi_exec_imm,
+    ovmi_exec_mov,
+    ovmi_exec_load,
+    ovmi_exec_store,
+    ovmi_exec_copy,
+    ovmi_exec_fill,
+    ovmi_exec_reg_get,
+    ovmi_exec_reg_set,
+    ovmi_exec_idx_arr,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+
+    // 0x20
+    ovmi_exec_lt,
+    ovmi_exec_lt_s,
+    ovmi_exec_le,
+    ovmi_exec_le_s,
+    ovmi_exec_eq,
+    ovmi_exec_ge,
+    ovmi_exec_ge_s,
+    ovmi_exec_gt,
+    ovmi_exec_gt_s,
+    ovmi_exec_ne,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+
+    // 0x30
+    ovmi_exec_param,
+    ovmi_exec_return,
+    ovmi_exec_call,
+    ovmi_exec_calli,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+
+    // 0x40
+    ovmi_exec_br,
+    ovmi_exec_br_z,
+    ovmi_exec_br_nz,
+    ovmi_exec_bri,
+    ovmi_exec_bri_z,
+    ovmi_exec_bri_nz,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+
+    // 0x50
+    ovmi_exec_clz,
+    ovmi_exec_ctz,
+    ovmi_exec_popcount,
+    ovmi_exec_rotl,
+    ovmi_exec_rotr,
+    ovmi_exec_abs,
+    ovmi_exec_neg,
+    ovmi_exec_ceil,
+    ovmi_exec_floor,
+    ovmi_exec_trunc,
+    ovmi_exec_nearest,
+    ovmi_exec_sqrt,
+    ovmi_exec_min,
+    ovmi_exec_max,
+    ovmi_exec_copysign,
+    ovmi_exec_illegal,
+
+    // 0x60
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+    ovmi_exec_cvt,
+
+    // 0x70
+    ovmi_exec_cmpxchg,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+    ovmi_exec_illegal,
+
+    // 0x80
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+
+    // 0x90
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+
+    // 0xA0
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+
+    // 0xB0
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+
+    // 0xC0
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+
+    // 0xD0
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+
+    // 0xE0
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+
+    // 0xF0
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+    ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal, ovmi_exec_illegal,
+};
+
+
+ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {
+    ovm_assert(engine);
+    ovm_assert(state);
+    ovm_assert(program);
+
+    ovm_instr_t *code = program->code;
+    u8 *memory = engine->memory;
+
+    ovm_instr_t *instr = &code[state->pc];
+    NEXT_OP;
 }
 
 
