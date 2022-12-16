@@ -144,7 +144,7 @@ void ovm_code_builder_add_nop(ovm_code_builder_t *builder) {
 
 void ovm_code_builder_add_break(ovm_code_builder_t *builder) {
     ovm_instr_t break_ = {0};
-    break_.full_instr = OVMI_BREAK;
+    break_.full_instr = OVM_TYPED_INSTR(OVMI_BREAK, OVM_TYPE_NONE);
     debug_info_builder_emit_location(builder->debug_builder);
     ovm_program_add_instructions(builder->program, 1, &break_);
 }
@@ -200,7 +200,7 @@ void ovm_code_builder_add_unop(ovm_code_builder_t *builder, u32 instr) {
 
 void ovm_code_builder_add_branch(ovm_code_builder_t *builder, i32 label_idx) {
     ovm_instr_t branch_instr = {0};
-    branch_instr.full_instr = OVMI_BR;
+    branch_instr.full_instr = OVM_TYPED_INSTR(OVMI_BR, OVM_TYPE_NONE);
     branch_instr.a = -1;
 
     branch_patch_t patch;
@@ -218,9 +218,9 @@ void ovm_code_builder_add_branch(ovm_code_builder_t *builder, i32 label_idx) {
 void ovm_code_builder_add_cond_branch(ovm_code_builder_t *builder, i32 label_idx, bool branch_if_true, bool targets_else) {
     ovm_instr_t branch_instr = {0};
     if (branch_if_true) {
-        branch_instr.full_instr = OVMI_BR_NZ;
+        branch_instr.full_instr = OVM_TYPED_INSTR(OVMI_BR_NZ, OVM_TYPE_NONE);
     } else {
-        branch_instr.full_instr = OVMI_BR_Z;
+        branch_instr.full_instr = OVM_TYPED_INSTR(OVMI_BR_Z, OVM_TYPE_NONE);
     }
 
     branch_instr.a = -1;
@@ -259,16 +259,16 @@ void ovm_code_builder_add_branch_table(ovm_code_builder_t *builder, i32 count, i
     instrs[1].a = index_register;
     instrs[1].b = tmp_register;
 
-    instrs[2].full_instr = OVMI_BR_Z;
+    instrs[2].full_instr = OVM_TYPED_INSTR(OVMI_BR_Z, OVM_TYPE_NONE);
     instrs[2].a = -1;
     instrs[2].b = tmp_register;
 
-    instrs[3].full_instr = OVMI_IDX_ARR;
+    instrs[3].full_instr = OVM_TYPED_INSTR(OVMI_IDX_ARR, OVM_TYPE_NONE);
     instrs[3].r = tmp_register;
     instrs[3].a = table_idx;
     instrs[3].b = index_register;
     
-    instrs[4].full_instr = OVMI_BRI;
+    instrs[4].full_instr = OVM_TYPED_INSTR(OVMI_BRI, OVM_TYPE_NONE);
     instrs[4].a = tmp_register;
     
     POP_VALUE(builder);
@@ -301,7 +301,7 @@ void ovm_code_builder_add_branch_table(ovm_code_builder_t *builder, i32 count, i
 
 void ovm_code_builder_add_return(ovm_code_builder_t *builder) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_RETURN;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_RETURN, OVM_TYPE_NONE);
 
     i32 values_on_stack = bh_arr_length(builder->execution_stack);
     assert(values_on_stack == 0 || values_on_stack == 1);
@@ -323,7 +323,7 @@ static void ovm_code_builder_add_params(ovm_code_builder_t *builder, i32 param_c
 
     fori (i, 0, param_count) {
         ovm_instr_t param_instr = {0};
-        param_instr.full_instr = OVMI_PARAM;
+        param_instr.full_instr = OVM_TYPED_INSTR(OVMI_PARAM, OVM_TYPE_NONE);
         param_instr.a = flipped_params[param_count - 1 - i];
 
         debug_info_builder_emit_location(builder->debug_builder);
@@ -335,7 +335,7 @@ void ovm_code_builder_add_call(ovm_code_builder_t *builder, i32 func_idx, i32 pa
     ovm_code_builder_add_params(builder, param_count);
 
     ovm_instr_t call_instr = {0};
-    call_instr.full_instr = OVMI_CALL;
+    call_instr.full_instr = OVM_TYPED_INSTR(OVMI_CALL, OVM_TYPE_NONE);
     call_instr.a = func_idx;
     call_instr.r = -1;
 
@@ -355,12 +355,12 @@ void ovm_code_builder_add_indirect_call(ovm_code_builder_t *builder, i32 param_c
     ovm_instr_t call_instrs[2] = {0};
 
     // idxarr %k, table, %j
-    call_instrs[0].full_instr = OVMI_IDX_ARR;
+    call_instrs[0].full_instr = OVM_TYPED_INSTR(OVMI_IDX_ARR, OVM_TYPE_NONE);
     call_instrs[0].r = NEXT_VALUE(builder);
     call_instrs[0].a = builder->func_table_arr_idx;
     call_instrs[0].b = POP_VALUE(builder);
 
-    call_instrs[1].full_instr = OVMI_CALLI;
+    call_instrs[1].full_instr = OVM_TYPED_INSTR(OVMI_CALLI, OVM_TYPE_NONE);
     call_instrs[1].a = call_instrs[0].r;
     call_instrs[1].r = -1;
 
@@ -385,7 +385,7 @@ void ovm_code_builder_drop_value(ovm_code_builder_t *builder) {
 
 void ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_MOV;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
     instr.r = NEXT_VALUE(builder);
     instr.a = local_idx; // This makes the assumption that the params will be in
                          // the lower "address space" of the value numbers. This
@@ -401,7 +401,7 @@ void ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx) 
 
 void ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_MOV;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
     instr.r = local_idx; // This makes the assumption that the params will be in
                          // the lower "address space" of the value numbers. This
                          // will be true for web assembly, because that's how it
@@ -415,7 +415,7 @@ void ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx) 
 
 void ovm_code_builder_add_local_tee(ovm_code_builder_t *builder, i32 local_idx) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_MOV;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
     instr.r = local_idx; // This makes the assumption that the params will be in
                          // the lower "address space" of the value numbers. This
                          // will be true for web assembly, because that's how it
@@ -431,7 +431,7 @@ void ovm_code_builder_add_local_tee(ovm_code_builder_t *builder, i32 local_idx) 
 
 void ovm_code_builder_add_register_get(ovm_code_builder_t *builder, i32 reg_idx) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_REG_GET;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_REG_GET, OVM_TYPE_NONE);
     instr.r = NEXT_VALUE(builder);
     instr.a = reg_idx;
 
@@ -443,7 +443,7 @@ void ovm_code_builder_add_register_get(ovm_code_builder_t *builder, i32 reg_idx)
 
 void ovm_code_builder_add_register_set(ovm_code_builder_t *builder, i32 reg_idx) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_REG_SET;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_REG_SET, OVM_TYPE_NONE);
     instr.r = reg_idx;
     instr.a = POP_VALUE(builder);
 
@@ -479,7 +479,7 @@ void ovm_code_builder_add_store(ovm_code_builder_t *builder, u32 ovm_type, i32 o
 void ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32 offset) {
     if (offset == 0) {
         ovm_instr_t cmpxchg_instr = {0};
-        cmpxchg_instr.full_instr = OVM_TYPED_INSTR(OVMI_ATOMIC | OVMI_CMPXCHG, ovm_type);
+        cmpxchg_instr.full_instr = OVMI_ATOMIC | OVM_TYPED_INSTR(OVMI_CMPXCHG, ovm_type);
         cmpxchg_instr.b = POP_VALUE(builder);
         cmpxchg_instr.a = POP_VALUE(builder);
         cmpxchg_instr.r = POP_VALUE(builder);
@@ -510,7 +510,7 @@ void ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32
     instrs[1].b = instrs[0].r;
 
     // cmpxchg.x %m, %n
-    instrs[2].full_instr = OVM_TYPED_INSTR(OVMI_ATOMIC | OVMI_CMPXCHG, ovm_type);
+    instrs[2].full_instr = OVMI_ATOMIC | OVM_TYPED_INSTR(OVMI_CMPXCHG, ovm_type);
     instrs[2].r = instrs[1].r;
     instrs[2].a = expected_reg;
     instrs[2].b = value_reg;
@@ -525,7 +525,7 @@ void ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32
 
 void ovm_code_builder_add_memory_copy(ovm_code_builder_t *builder) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_COPY;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_COPY, OVM_TYPE_NONE);
     instr.b = POP_VALUE(builder);
     instr.a = POP_VALUE(builder);
     instr.r = POP_VALUE(builder);
@@ -536,7 +536,7 @@ void ovm_code_builder_add_memory_copy(ovm_code_builder_t *builder) {
 
 void ovm_code_builder_add_memory_fill(ovm_code_builder_t *builder) {
     ovm_instr_t instr = {0};
-    instr.full_instr = OVMI_FILL;
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_FILL, OVM_TYPE_NONE);
     instr.b = POP_VALUE(builder);
     instr.a = POP_VALUE(builder);
     instr.r = POP_VALUE(builder);
@@ -549,7 +549,7 @@ void ovm_code_builder_add_memory_fill(ovm_code_builder_t *builder) {
 // CopyNPaste from _add_load
 void ovm_code_builder_add_atomic_load(ovm_code_builder_t *builder, u32 ovm_type, i32 offset) {
     ovm_instr_t load_instr = {0};
-    load_instr.full_instr = OVM_TYPED_INSTR(OVMI_ATOMIC | OVMI_LOAD, ovm_type);
+    load_instr.full_instr = OVMI_ATOMIC | OVM_TYPED_INSTR(OVMI_LOAD, ovm_type);
     load_instr.b = offset;
     load_instr.a = POP_VALUE(builder);
     load_instr.r = NEXT_VALUE(builder);
@@ -564,7 +564,7 @@ void ovm_code_builder_add_atomic_load(ovm_code_builder_t *builder, u32 ovm_type,
 // CopyNPaste from _add_store
 void ovm_code_builder_add_atomic_store(ovm_code_builder_t *builder, u32 ovm_type, i32 offset) {
     ovm_instr_t store_instr = {0};
-    store_instr.full_instr = OVM_TYPED_INSTR(OVMI_ATOMIC | OVMI_STORE, ovm_type);
+    store_instr.full_instr = OVMI_ATOMIC | OVM_TYPED_INSTR(OVMI_STORE, ovm_type);
     store_instr.b = offset;
     store_instr.a = POP_VALUE(builder);
     store_instr.r = POP_VALUE(builder);
