@@ -59,7 +59,11 @@ OnyxContext :: struct {
     assert_handler : (msg: str, site: CallSite) -> void;
 
     thread_id      : i32;
+
+    user_data: rawptr;
+    user_data_type: type_expr;
 }
+
 
 #if runtime.runtime != .Custom {
     #local default_logger :: (data: rawptr, msg: str) {
@@ -81,6 +85,17 @@ assert :: (cond: bool, msg: str, site := #callsite) {
     }
 }
 
+#inject OnyxContext {
+    set_user_data :: macro (c: ^OnyxContext, data: ^$T) {
+        c.user_data = data;
+        c.user_data_type = T;
+    }
+
+    get_user_data :: macro (c: ^OnyxContext, $T: type_expr) -> ^T {
+        if c.user_data_type != T do return null;
+        return ~~ c.user_data;
+    }
+}
 
 //
 // Basic logging

@@ -499,9 +499,9 @@ some :: #match #locked {
 
     macro (arr: [] $T, predicate_body: Code) -> bool {
         for arr {
-            if #unquote predicate_body do return false;
+            if #unquote predicate_body do return true;
         }
-        return true;
+        return false;
     }
 }
 
