@@ -154,6 +154,10 @@ struct ovm_state_t {
     // Temporary value used in computations. Should not be used otherwise.
     ovm_value_t __tmp_value;
 
+    //
+    // TODO Doc
+    ovm_value_t *__frame_values;
+
     debug_thread_state_t *debug;
 };
 
