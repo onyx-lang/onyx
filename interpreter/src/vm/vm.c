@@ -546,7 +546,7 @@ void ovm_state_register_set(ovm_state_t *state, i32 idx, ovm_value_t val) {
 //
 // Function calling
 
-static inline void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *func, i32 result_number) {
+static void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *func, i32 result_number) {
     //
     // Push a stack frame
     ovm_stack_frame_t frame;
@@ -572,7 +572,7 @@ static inline void ovm__func_setup_stack_frame(ovm_state_t *state, ovm_func_t *f
     }
 }
 
-static inline ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state) {
+static ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state) {
     ovm_stack_frame_t frame = bh_arr_pop(state->stack_frames);
     bh_arr_fastdeleten(state->numbered_values, frame.value_number_count);
 
@@ -667,7 +667,7 @@ static inline double __ovm_copysign(a, b) double a, b; {
     return -a;
 }
 
-static inline void __ovm_trigger_exception(ovm_state_t *state) {
+static void __ovm_trigger_exception(ovm_state_t *state) {
     if (state->debug) {
         state->debug->state = debug_state_pausing;
         state->debug->pause_reason = debug_pause_exception;
@@ -677,7 +677,7 @@ static inline void __ovm_trigger_exception(ovm_state_t *state) {
     }
 }
 
-static inline void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
+static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
     if (!state->debug) return;
 
     if (state->debug->run_count == 0) {
@@ -1033,14 +1033,13 @@ OVMI_INSTR_EXEC(ovmi_exec_return) {
         memcpy(&VAL(0), &state->params[extra_params], func->param_count * sizeof(ovm_value_t)); \
         state->pc = func->start_instr; \
     } else { \
-        ovm_value_t result = {0}; \
         ovm_external_func_t external_func = state->external_funcs[func->external_func_idx]; \
-        external_func.native_func(external_func.userdata, &state->params[extra_params], &result); \
+        external_func.native_func(external_func.userdata, &state->params[extra_params], &state->__tmp_value); \
 \
         ovm__func_teardown_stack_frame(state); \
 \
         if (instr->r >= 0) { \
-            VAL(instr->r) = result; \
+            VAL(instr->r) = state->__tmp_value; \
         } \
     }
 
@@ -1077,10 +1076,9 @@ OVMI_INSTR_EXEC(ovmi_exec_bri_z)  { if (VAL(instr->b).i32 == 0) state->pc += VAL
 
 #define OVM_CVT(n1, n2, stype, dtype, otype, ctype) \
     OVMI_INSTR_EXEC(ovmi_exec_cvt_##n1##_##n2) { \
-        ovm_value_t tmp_val; \
-        tmp_val.dtype = (ctype) VAL(instr->a).stype; \
-        tmp_val.type = otype; \
-        VAL(instr->r) = tmp_val; \
+        state->__tmp_value.dtype = (ctype) VAL(instr->a).stype; \
+        state->__tmp_value.type = otype; \
+        VAL(instr->r) = state->__tmp_value; \
         NEXT_OP; \
     }
 

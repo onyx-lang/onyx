@@ -48,6 +48,32 @@ struct ovm_static_integer_array_t {
     i32 len;
 };
 
+#define OVM_TYPE_NONE   0x00
+#define OVM_TYPE_I8     0x01
+#define OVM_TYPE_I16    0x02
+#define OVM_TYPE_I32    0x03
+#define OVM_TYPE_I64    0x04
+#define OVM_TYPE_F32    0x05
+#define OVM_TYPE_F64    0x06
+#define OVM_TYPE_V128   0x07
+
+struct ovm_value_t {
+    ovm_valtype_t type;
+    union {
+        i8  i8;
+        i16 i16;
+        i32 i32;
+        i64 i64;
+        u8  u8;
+        u16 u16;
+        u32 u32;
+        u64 u64;
+        f32 f32;
+        f64 f64;
+    };
+};
+
+
 //
 // Represents a program that is runnable by the
 // VM. It can be constructed incrementally as needed.
@@ -124,6 +150,10 @@ struct ovm_state_t {
     // native functions linked.
     bh_arr(ovm_external_func_t) external_funcs;
 
+    //
+    // Temporary value used in computations. Should not be used otherwise.
+    ovm_value_t __tmp_value;
+
     debug_thread_state_t *debug;
 };
 
@@ -195,31 +225,6 @@ ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t
 // This engine uses a simple Three Address Code (3AC) instruction representation
 // with an "infinite" value number (register) count.
 //
-
-#define OVM_TYPE_NONE   0x00
-#define OVM_TYPE_I8     0x01
-#define OVM_TYPE_I16    0x02
-#define OVM_TYPE_I32    0x03
-#define OVM_TYPE_I64    0x04
-#define OVM_TYPE_F32    0x05
-#define OVM_TYPE_F64    0x06
-#define OVM_TYPE_V128   0x07
-
-struct ovm_value_t {
-    ovm_valtype_t type;
-    union {
-        i8  i8;
-        i16 i16;
-        i32 i32;
-        i64 i64;
-        u8  u8;
-        u16 u16;
-        u32 u32;
-        u64 u64;
-        f32 f32;
-        f64 f64;
-    };
-};
 
 struct ovm_instr_t {
     u32 full_instr;
