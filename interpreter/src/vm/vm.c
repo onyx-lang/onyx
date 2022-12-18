@@ -489,14 +489,15 @@ ovm_state_t *ovm_state_new(ovm_engine_t *engine, ovm_program_t *program) {
     state->value_number_offset = 0;
 
     state->numbered_values = NULL;
-    state->params = NULL;
     state->stack_frames = NULL;
     state->registers = NULL;
     bh_arr_new(store->heap_allocator, state->numbered_values, 128);
-    bh_arr_new(store->heap_allocator, state->params, 16);
     bh_arr_new(store->heap_allocator, state->stack_frames, 32);
     bh_arr_new(store->heap_allocator, state->registers, program->register_count);
     bh_arr_insert_end(state->registers, program->register_count);
+
+    state->param_buf = bh_alloc_array(store->arena_allocator, ovm_value_t, OVM_MAX_PARAM_COUNT);
+    state->param_count = 0;
 
     state->external_funcs = NULL;
     bh_arr_new(store->heap_allocator, state->external_funcs, 8);
@@ -517,7 +518,6 @@ void ovm_state_delete(ovm_state_t *state) {
     ovm_store_t *store = state->store;
 
     bh_arr_free(state->numbered_values);
-    bh_arr_free(state->params);
     bh_arr_free(state->stack_frames);
     bh_arr_free(state->registers);
     bh_arr_free(state->external_funcs);
@@ -736,11 +736,13 @@ static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
 #define OVMI_FUNC_NAME(n) ovmi_exec_##n
 #define OVMI_DISPATCH_NAME ovmi_dispatch
 #define OVMI_DEBUG_HOOK ((void)0)
+#define OVMI_EXCEPTION_HOOK ((void)0)
 #include "./vm_instrs.h"
 
 #define OVMI_FUNC_NAME(n) ovmi_exec_debug_##n
 #define OVMI_DISPATCH_NAME ovmi_debug_dispatch
 #define OVMI_DEBUG_HOOK if (state->debug) __ovm_debug_hook(state->engine, state)
+#define OVMI_EXCEPTION_HOOK __ovm_trigger_exception(state)
 #include "./vm_instrs.h"
 
 ovm_value_t ovm_run_code(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program) {

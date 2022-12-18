@@ -129,6 +129,9 @@ bool ovm_program_load_from_file(ovm_program_t *program, ovm_engine_t *engine, ch
 // Represents ephemeral state / execution context.
 // If multiple threads are used, multiple states are needed.
 // 
+
+#define OVM_MAX_PARAM_COUNT 64
+
 struct ovm_state_t {
     ovm_store_t *store;
     ovm_engine_t *engine;
@@ -138,9 +141,11 @@ struct ovm_state_t {
     i32 value_number_offset;
     
     bh_arr(ovm_value_t) numbered_values;
-    bh_arr(ovm_value_t) params;
     bh_arr(ovm_stack_frame_t) stack_frames;
     bh_arr(ovm_value_t) registers;
+
+    ovm_value_t *param_buf;
+    u32          param_count;
 
     //
     // Originally, these were stored on the ovm_program that

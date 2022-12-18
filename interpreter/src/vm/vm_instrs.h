@@ -181,7 +181,7 @@ OVMI_INSTR_EXEC(mov) {
     OVMI_INSTR_EXEC(load_##otype) { \
         ovm_assert(VAL(instr->a).type == OVM_TYPE_I32); \
         u32 dest = VAL(instr->a).u32 + (u32) instr->b; \
-        if (dest == 0) __ovm_trigger_exception(state); \
+        if (dest == 0) OVMI_EXCEPTION_HOOK; \
         VAL(instr->r).stype = * (stype *) &memory[dest]; \
         VAL(instr->r).type = type_; \
         NEXT_OP; \
@@ -200,7 +200,7 @@ OVM_LOAD(f64, OVM_TYPE_F64, f64)
     OVMI_INSTR_EXEC(store_##otype) { \
         ovm_assert(VAL(instr->r).type == OVM_TYPE_I32); \
         u32 dest = VAL(instr->r).u32 + (u32) instr->b; \
-        if (dest == 0) __ovm_trigger_exception(state); \
+        if (dest == 0) OVMI_EXCEPTION_HOOK; \
         *(stype *) &memory[dest] = VAL(instr->a).stype; \
         NEXT_OP; \
     }
@@ -220,7 +220,7 @@ OVMI_INSTR_EXEC(copy) {
     u32 src   = VAL(instr->a).u32;
     u32 count = VAL(instr->b).u32;
 
-    if (!dest || !src) __ovm_trigger_exception(state);
+    if (!dest || !src) OVMI_EXCEPTION_HOOK;
 
     memmove(&memory[dest], &memory[src], count);
 
@@ -232,7 +232,7 @@ OVMI_INSTR_EXEC(fill) {
     u8  byte  = VAL(instr->a).u8;
     i32 count = VAL(instr->b).i32;
 
-    if (!dest) __ovm_trigger_exception(state);
+    if (!dest) OVMI_EXCEPTION_HOOK;
 
     memset(&memory[dest], byte, count);
 
@@ -267,7 +267,9 @@ OVMI_INSTR_EXEC(idx_arr) {
 //
 
 OVMI_INSTR_EXEC(param) {
-    bh_arr_push(state->params, VAL(instr->a));
+    // bh_arr_push(state->params, VAL(instr->a));
+    ovm_assert((state->param_count <= OVM_MAX_PARAM_COUNT));
+    state->param_buf[state->param_count++] = VAL(instr->a);
 
     NEXT_OP;
 }
@@ -304,17 +306,17 @@ OVMI_INSTR_EXEC(return) {
 #define OVM_CALL_CODE(func_idx) \
     i32 fidx = func_idx; \
     ovm_func_t *func = &state->program->funcs[fidx]; \
-    i32 extra_params = bh_arr_length(state->params) - func->param_count; \
+    i32 extra_params = state->param_count - func->param_count; \
     ovm_assert(extra_params >= 0); \
     ovm__func_setup_stack_frame(state, func, instr->r); \
-    bh_arr_fastdeleten(state->params, func->param_count); \
+    state->param_count -= func->param_count; \
     if (func->kind == OVM_FUNC_INTERNAL) { \
         values = state->__frame_values; \
-        memcpy(&VAL(0), &state->params[extra_params], func->param_count * sizeof(ovm_value_t)); \
+        memcpy(&VAL(0), &state->param_buf[extra_params], func->param_count * sizeof(ovm_value_t)); \
         state->pc = func->start_instr; \
     } else { \
         ovm_external_func_t external_func = state->external_funcs[func->external_func_idx]; \
-        external_func.native_func(external_func.userdata, &state->params[extra_params], &state->__tmp_value); \
+        external_func.native_func(external_func.userdata, &state->param_buf[extra_params], &state->__tmp_value); \
 \
         ovm__func_teardown_stack_frame(state); \
 \
@@ -438,7 +440,7 @@ OVM_CVT(f64, i64, f64, u64, OVM_TYPE_I64, u64);
 #define CMPXCHG(otype, ctype) \
     OVMI_INSTR_EXEC(cmpxchg_##ctype) { \
         pthread_mutex_lock(&state->engine->atomic_mutex); \
-        if (VAL(instr->r).u32 == 0) __ovm_trigger_exception(state); \
+        if (VAL(instr->r).u32 == 0) OVMI_EXCEPTION_HOOK; \
         ctype *addr = (ctype *) &memory[VAL(instr->r).u32]; \
  \
         VAL(instr->r).u64 = 0; \
@@ -460,7 +462,7 @@ CMPXCHG(OVM_TYPE_I64, i64)
 
 
 OVMI_INSTR_EXEC(illegal) {
-    __ovm_trigger_exception(state);
+    OVMI_EXCEPTION_HOOK;
     return ((ovm_value_t) {0});
 }
 
@@ -579,4 +581,5 @@ static ovmi_instr_exec_t OVMI_DISPATCH_NAME[] = {
 #undef OVMI_FUNC_NAME
 #undef OVMI_DISPATCH_NAME
 #undef OVMI_DEBUG_HOOK
+#undef OVMI_EXCEPTION_HOOK
 
