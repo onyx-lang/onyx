@@ -1649,7 +1649,7 @@ CheckStatus check_address_of(AstAddressOf** paof) {
 
     aof->type = type_make_pointer(context.ast_alloc, expr->type);
 
-    if (expr->kind == Ast_Kind_Memres) {
+    if (expr->kind == Ast_Kind_Memres && !((AstMemRes *) expr)->threadlocal) {
         aof->flags |= Ast_Flag_Comptime;
     }
 

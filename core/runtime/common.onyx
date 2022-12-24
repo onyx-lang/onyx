@@ -56,6 +56,12 @@ __thread_initialize :: macro () {
     context.temp_allocator = alloc.temp_allocator;
     context.assert_handler = __assert_handler;
 
+    //
+    // The default log level is Info. This seems reasonable, but it does
+    // mean that all Debug messages will be omitted unless it is changed
+    // manually.
+    default_log_level(.Info);
+
     __stdio_init();
 }
 

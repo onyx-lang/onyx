@@ -54,7 +54,7 @@ OnyxContext :: struct {
     allocator      : Allocator;
     temp_allocator : Allocator;
 
-    logger         : Logger = .{ default_logger, null };
+    logger         : Logger = .{ default_logger_proc, ^default_logger };
 
     assert_handler : (msg: str, site: CallSite) -> void;
 
@@ -64,18 +64,6 @@ OnyxContext :: struct {
     user_data_type: type_expr;
 }
 
-
-#if runtime.runtime != .Custom {
-    #local default_logger :: (data: rawptr, msg: str) {
-        use package core
-        println(msg);
-    }
-
-} else {
-    #local default_logger :: (data: rawptr, msg: str) {
-        // In a custom runtime, there is no way to know how to log something.
-    }
-}
 
 #thread_local context : OnyxContext;
 
@@ -101,14 +89,63 @@ assert :: (cond: bool, msg: str, site := #callsite) {
 // Basic logging
 //
 
+Log_Level :: enum {
+    Debug;
+    Info;
+    Warning;
+    Error;
+    Critical;
+}
+
 Logger :: struct {
-    func : (data: rawptr, msg: str) -> void;
+    func : (data: rawptr, level: Log_Level, msg: str, module: str) -> void;
     data : rawptr;
 }
 
-log :: (msg: str, use logger: Logger = context.logger) {
-    func(data, msg);
+log :: #match #local {}
+
+#overload
+log :: (level: Log_Level, msg: str) {
+    context.logger.func(context.logger.data, level, msg, "");
 }
+
+#overload
+log :: (level: Log_Level, module, msg: str) {
+    context.logger.func(context.logger.data, level, msg, module);
+}
+
+
+
+//
+// A sensible default logger.
+//
+Default_Logger :: struct {
+    minimum_level: Log_Level;
+}
+
+#local #thread_local default_logger: Default_Logger;
+
+default_log_level :: (level: Log_Level) {
+    default_logger.minimum_level = level;
+}
+
+#if runtime.runtime != .Custom {
+    #local default_logger_proc :: (logger: ^Default_Logger, level: Log_Level, msg: str, module: str) {
+        if level < logger.minimum_level do return;
+
+        if module {
+            core.printf("[{}][{}] {}\n", level, module, msg);
+        } else {
+            core.printf("[{}] {}\n", level, msg);
+        }
+    }
+
+} else {
+    #local default_logger_proc :: (data: rawptr, level: Log_Level, msg: str, module: str) {
+        // In a custom runtime, there is no way to know how to log something.
+    }
+}
+
 
 
 //

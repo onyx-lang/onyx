@@ -57,7 +57,7 @@ HOW:
 
         [ ] transmute
 
-        [ ] look into creating a source map
+        [X] look into creating a source map
             - first-look looks really gross
             - whoever came up with the source map spec should be fired... why are people so afraid of binary files??
             - DWARF looks like it might be easier, but it still doesn't look fun.
@@ -82,7 +82,7 @@ HOW:
             - Checking which things are allowed to cast to/from should be checked in the checker,
                 not in the wasm generatation
 
-        [ ] Interop with C
+        [X] Interop with C
             - Difficult feature
             - Would be nice to use existing C code (such as stb headers)
             - Some way to make this happen without needing a full C compiler would be nice
