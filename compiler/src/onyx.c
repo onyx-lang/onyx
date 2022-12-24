@@ -672,10 +672,10 @@ static i32 onyx_compile() {
                 if (ent->macro_attempts > highest_watermark) {
                     entity_heap_insert_existing(&context.entities, ent);
 
-                    if (context.cycle_almost_detected) {
+                    if (context.cycle_almost_detected == 3) {
                         dump_cycles();
                     } else {
-                        context.cycle_almost_detected = 1;
+                        context.cycle_almost_detected += 1;
                     }
                 }
             }

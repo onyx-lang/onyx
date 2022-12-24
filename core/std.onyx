@@ -46,10 +46,8 @@ package core
 #load "./test/testing"
 
 #load "./misc/arg_parse"
-#load "./misc/any_utils"
 #load "./misc/method_ops"
 
-#local runtime :: package runtime
 #if runtime.runtime == .Wasi || runtime.runtime == .Onyx {
     #load "./os/file"
     #load "./os/os"
@@ -85,6 +83,7 @@ package core
 
     #load "./encoding/base64"
     #load "./encoding/csv"
+    #load "./misc/any_utils"
 }
 
 #if runtime.Multi_Threading_Enabled {

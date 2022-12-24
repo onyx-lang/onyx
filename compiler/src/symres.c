@@ -362,7 +362,7 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         }
     }
     else if (force_a_lookup) {
-        if (context.cycle_detected || context.cycle_almost_detected) {
+        if (context.cycle_detected || context.cycle_almost_detected >= 2) {
             onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' does not exist here. This is a bad error message.",
                 (*fa)->token->text,
                 (*fa)->token->length);
@@ -909,7 +909,7 @@ static SymresStatus symres_directive_solidify(AstDirectiveSolidify** psolid) {
 static SymresStatus symres_directive_defined(AstDirectiveDefined** pdefined) {
     AstDirectiveDefined* defined = *pdefined;
 
-    b32 has_to_be_resolved = context.cycle_almost_detected;
+    b32 has_to_be_resolved = context.cycle_almost_detected >= 1;
 
     onyx_errors_disable();
     resolved_a_symbol = 0;

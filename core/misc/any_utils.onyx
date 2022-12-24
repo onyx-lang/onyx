@@ -11,8 +11,12 @@ use runtime.info {
     get_struct_member
 }
 
-use core { iter, array }
+use core { iter, array, string }
 
+// Either to_any or as_any will work. I prefer `as_any` because
+// much of the rest of the standard library uses `as_...` for
+// conversion.
+as_any :: to_any
 to_any :: macro (x: ^$T) => any.{x, T};
 
 any_as :: (a: any, $T: type_expr) -> ^T {
@@ -52,6 +56,27 @@ any_selector :: (v: any, member_name: str) -> any {
         if member != null {
             return any.{cast(^u8) v.data + member.offset, member.type};
         }
+    }
+
+    return .{null, void};
+}
+
+// This selector works with selecting "foo.bar.joe"
+any_nested_selector :: (v: any, member_name: str) -> any {
+    t := get_type_info(v.type);
+    if t.kind != .Struct do return .{};
+
+    part_name, next_name := string.bisect(member_name, #char ".");
+
+    member := get_struct_member(v.type, part_name);
+    if member {
+        if next_name {
+            return any_nested_selector(any.{cast(^u8) v.data + member.offset, member.type}, next_name);
+        }
+
+        return any.{
+            cast(^u8, v.data) + member.offset, member.type
+        };
     }
 
     return .{null, void};

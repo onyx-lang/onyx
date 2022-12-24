@@ -741,7 +741,7 @@ static void __ovm_debug_hook(ovm_engine_t *engine, ovm_state_t *state) {
 
 #define OVMI_FUNC_NAME(n) ovmi_exec_debug_##n
 #define OVMI_DISPATCH_NAME ovmi_debug_dispatch
-#define OVMI_DEBUG_HOOK if (state->debug) __ovm_debug_hook(state->engine, state)
+#define OVMI_DEBUG_HOOK __ovm_debug_hook(state->engine, state)
 #define OVMI_EXCEPTION_HOOK __ovm_trigger_exception(state)
 #include "./vm_instrs.h"
 

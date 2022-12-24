@@ -23,6 +23,8 @@ wasm_engine_t *wasm_engine_new_with_config(wasm_config_t *config) {
         engine->engine->debug = debug;
 
         debug_host_init(engine->engine->debug, engine->engine);
+        debug->listen_path = config->listen_path;
+
         debug_host_start(engine->engine->debug);
     }
 

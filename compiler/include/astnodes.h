@@ -1625,7 +1625,7 @@ struct Context {
     // present in this list when generating CTags.
     bh_arr(AstNode *) tag_locations;
 
-    b32 cycle_almost_detected : 1;
+    u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;
 };
 

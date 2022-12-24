@@ -244,6 +244,8 @@ Untyped_Array :: struct {
 
 // Things that work with slices and arrays
 
+use core.intrinsics.types {type_is_struct}
+
 transplant :: (arr: [] $T, old_index: i32, new_index: i32) -> bool {
     if old_index < 0 || old_index >= arr.count do return false;
     if new_index < 0 || new_index >= arr.count do return false;
@@ -477,32 +479,44 @@ map :: #match #locked {
     macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
 }
 
-every :: #match #locked {
-    macro (arr: [] $T, predicate: (T) -> bool) -> bool {
-        every :: every
-        return every(arr, #(predicate(it)));
-    },
+every :: #match #local {}
 
-    macro (arr: [] $T, predicate_body: Code) -> bool {
-        for arr {
-            if !(#unquote predicate_body) do return false;
-        }
-        return true;
-    }
+#overload
+every :: macro (arr: [] $T, predicate: (T) -> bool) -> bool {
+    every :: every
+    return every(arr, #(predicate(it)));
 }
 
-some :: #match #locked {
-    macro (arr: [] $T, predicate: (T) -> bool) -> bool {
-        some :: some
-        return every(arr, #(predicate(it)));
-    },
-
-    macro (arr: [] $T, predicate_body: Code) -> bool {
-        for arr {
-            if #unquote predicate_body do return true;
-        }
-        return false;
+#overload
+every :: macro (arr: [] $T, predicate_body: Code) -> bool {
+    for arr {
+        if !(#unquote predicate_body) do return false;
     }
+    return true;
+}
+
+some :: #match #local {}
+
+#overload
+some :: macro (arr: [] $T, predicate: (T) -> bool) -> bool {
+    some :: some
+    return every(arr, #(predicate(it)));
+}
+
+#overload
+some :: macro (arr: [] $T/type_is_struct, predicate_body: Code) -> bool {
+    for ^ arr {
+        if #unquote predicate_body do return true;
+    }
+    return false;
+}
+
+#overload
+some :: macro (arr: [] $T, predicate_body: Code) -> bool {
+    for arr {
+        if #unquote predicate_body do return true;
+    }
+    return false;
 }
 
 fill :: (arr: [] $T, value: T) {
@@ -540,9 +554,19 @@ find :: (arr: [] $T, value: T) -> i32 {
 }
 
 #overload
-find :: macro (arr: [] $T, pred: Code) -> i32 {
+find :: macro (arr: [] $T/type_is_struct, pred: Code) -> i32 {
     for i: arr.count {
         it := ^arr[i];
+        if #unquote pred do return i;
+    }
+
+    return -1;
+}
+
+#overload
+find :: macro (arr: [] $T, pred: Code) -> i32 {
+    for i: arr.count {
+        it := arr[i];
         if #unquote pred do return i;
     }
 
@@ -563,9 +587,18 @@ first :: #match #locked {
         return first(arr, #(predicate(it)));
     },
 
+    macro (arr: [] $T/type_is_struct, predicate_body: Code) -> ^T {
+        for ^ arr {
+            if #unquote predicate_body do return it;
+        }
+
+        return null;
+    },
+
     macro (arr: [] $T, predicate_body: Code) -> ^T {
         // This is to preserve the semantics that "it" is
-        // not a pointer (same as contains)
+        // not a pointer (same as contains), when T is not a
+        // structure.
         for ^it_ptr: arr {
             it := *it_ptr;
             if #unquote predicate_body do return it_ptr;

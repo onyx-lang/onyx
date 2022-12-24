@@ -284,6 +284,8 @@ typedef struct debug_state_t {
     bh_arena tmp_arena;
     bh_allocator tmp_alloc;
 
+    char *listen_path;
+
     debug_info_t *info;
     struct ovm_engine_t *ovm_engine;
 

@@ -42,22 +42,24 @@ main :: (args: [] cstr) {
 
     command_procedures := runtime.info.get_procedures_with_tag(Command);
     defer delete(^command_procedures);
-    for command_procedures {
-        if it.tag.command == command {
-            if it.tag.require_config_file {
-                if !load_config_file() {
-                    eprintf("Failed to open {}.\n", global_arguments.config_file);
-                    os.exit(1);
-                }
 
-                loaded_config_file = true;
-            }
-
-            assert(it.type == #type ([] cstr) -> void, "BAD TYPE FOR COMMAND PROCEDURE!");
-            (*cast(^([] cstr) -> void) ^it.func)(arguments);
-            break;
-        }
+    command_tag := array.first(command_procedures, #(it.tag.command == command));
+    if !command_tag {
+        run_help_command(arguments);
+        return;
     }
+
+    if command_tag.tag.require_config_file {
+        if !load_config_file() {
+            eprintf("Failed to open {}.\n", global_arguments.config_file);
+            os.exit(1);
+        }
+
+        loaded_config_file = true;
+    }
+
+    assert(command_tag.type == #type ([] cstr) -> void, "BAD TYPE FOR COMMAND PROCEDURE!");
+    (*cast(^([] cstr) -> void) ^command_tag.func)(arguments);
 }
 
 Command :: struct {
@@ -334,7 +336,7 @@ run_sync_command :: (args: [] cstr) {
 package-or-url   Git repository name or package name on disk to remove.
 """
 }
-run_rebuild_command :: (args: [] cstr) {
+run_rebuild_command :: (args: [] cstr)  {
     if args.count < 1 {
         eprintf("Expected package name.");
         return;
@@ -444,6 +446,11 @@ run_test_command :: (args: [] cstr) {
     if !string.empty(config.config.test_cmd) {
         run_command_and_forward_output(config.config.test_cmd);
     }
+}
+
+#tag Command.{ "new", "Create a new project from an installed template." }
+run_new_command :: (args: [] cstr) {
+
 }
 
 
@@ -740,6 +747,8 @@ Git :: struct {
 
         version_str := tprintf("v{}", version);
         full_dest   := tprintf("{}/{}", config.config.lib_source_directory, ".cloned");
+
+        os.remove_directory(full_dest);
 
         // Use 'git clone' to clone the bare minimum amount to get the released version.
         git_proc    := os.process_spawn(git_path, .["clone", "--depth", "1", "-b", version_str, repo, full_dest]);

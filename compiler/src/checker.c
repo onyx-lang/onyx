@@ -2161,7 +2161,9 @@ CheckStatus check_insert_directive(AstDirectiveInsert** pinsert) {
     AstCodeBlock* code_block = (AstCodeBlock *) insert->code_expr;
     code_block = (AstCodeBlock *) strip_aliases((AstNode *) code_block);
 
-    assert(code_block->kind == Ast_Kind_Code_Block);
+    if (code_block->kind != Ast_Kind_Code_Block) {
+        ERROR(insert->token->pos, "Expected compile-time known expression of type 'Code'.");
+    }
 
     AstNode* cloned_block = ast_clone(context.ast_alloc, code_block->code);
     cloned_block->next = insert->next;

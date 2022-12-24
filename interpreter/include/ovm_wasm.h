@@ -9,9 +9,11 @@
 
 struct wasm_config_t {
     bool debug_enabled;
+    char *listen_path;
 };
 
 void wasm_config_enable_debug(wasm_config_t *config, bool enabled);
+void wasm_config_set_listen_path(wasm_config_t *config, char *listen_path);
 
 struct wasm_engine_t {
     wasm_config_t *config;

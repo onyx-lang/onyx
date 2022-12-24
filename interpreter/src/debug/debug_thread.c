@@ -465,8 +465,8 @@ void *__debug_thread_entry(void * data) {
 
     struct sockaddr_un local_addr, remote_addr;
     local_addr.sun_family = AF_UNIX;
-    strcpy(local_addr.sun_path, "/tmp/ovm-debug.0000"); // TODO: Make this dynamic so mulitple servers can exist at a time.
-    unlink(local_addr.sun_path);                        // TODO: Remove this line for the same reason.
+    strcpy(local_addr.sun_path, debug->listen_path); // TODO: Make this dynamic so mulitple servers can exist at a time.
+    unlink(local_addr.sun_path);                     // TODO: Remove this line for the same reason.
     int len = strlen(local_addr.sun_path) + sizeof(local_addr.sun_family);
     bind(debug->listen_socket_fd, (struct sockaddr *)&local_addr, len);
     

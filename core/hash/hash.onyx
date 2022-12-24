@@ -1,7 +1,14 @@
 package core.hash
 
 to_u32 :: #match {
+    // Does this need to have a higher precedence value?
+    // Because if I wanted to have a custom type as the key
+    // of a map that only looks at some of the members of the
+    // struct to determine its hash, that would not be possible
+    // as any pointer would match this case instead of the actual
+    // one defined for the type...
     (key: rawptr) -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
+
     (key: i8)     -> u32 { return ~~ key; },
     (key: i16)    -> u32 { return 0x9ce7 ^ cast(u32) key; },
     (key: i32)    -> u32 { return 0xcbf29ce7 ^ cast(u32) key; },
