@@ -1089,6 +1089,9 @@ struct AstOverloadedFunction {
     // function.
     bh_imap            all_overloads;
 
+    AstType *expected_return_node;
+    Type    *expected_return_type;
+
     b32 locked : 1;
     b32 only_local_functions : 1;
 };
@@ -1407,6 +1410,11 @@ struct AstForeignBlock {
     u32 foreign_block_number;
 };
 
+typedef struct EntityJobData {
+    enum TypeMatch (*func)(void *job_data);
+    void *job_data;
+} EntityJobData;
+
 typedef enum EntityState {
     Entity_State_Error,
 
@@ -1457,6 +1465,7 @@ typedef enum EntityType {
     Entity_Type_Struct_Member_Default,
     Entity_Type_Memory_Reservation,
     Entity_Type_Expression,
+    Entity_Type_Job,                    // Represents an arbitrary job (function pointer).
     Entity_Type_Global,
     Entity_Type_Overloaded_Function,
     Entity_Type_Function,
@@ -1507,6 +1516,7 @@ typedef struct Entity {
         AstInterface          *interface;
         AstConstraint         *constraint;
         AstDirectiveLibrary   *library;
+        EntityJobData         *job_data;
     };
 } Entity;
 
@@ -1528,6 +1538,7 @@ Entity* entity_heap_top(EntityHeap* entities);
 void entity_heap_change_top(EntityHeap* entities, Entity* new_top);
 void entity_heap_remove_top(EntityHeap* entities);
 void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type);
+void entity_heap_add_job(EntityHeap *entities, enum TypeMatch (*func)(void *), void *job_data);
 
 // If target_arr is null, the entities will be placed directly in the heap.
 void add_entities_for_node(bh_arr(Entity *)* target_arr, AstNode* node, Scope* scope, Package* package);
@@ -1728,6 +1739,7 @@ typedef enum TypeMatch {
     TYPE_MATCH_YIELD,
     TYPE_MATCH_SPECIAL, // Only used for nest polymorph function lookups
 } TypeMatch;
+
 #define unify_node_and_type(node, type) (unify_node_and_type_((node), (type), 1))
 TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent);
 
@@ -1790,10 +1802,19 @@ AstFunction* polymorphic_proc_build_only_header_with_slns(AstFunction* pp, bh_ar
 b32 potentially_convert_function_to_polyproc(AstFunction *func);
 AstPolyCallType* convert_call_to_polycall(AstCall* call);
 
+
+typedef struct OverloadReturnTypeCheck {
+    Type *expected_type;
+    AstTyped *node;
+    OnyxToken *group;
+} OverloadReturnTypeCheck;
+
 void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
 AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type);
 void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overloads);
+void report_incorrect_overload_expected_type(Type *given, Type *expected, OnyxToken *overload, OnyxToken *group);
+void ensure_overload_returns_correct_type(AstTyped *overload, AstOverloadedFunction *group);
 
 void expand_macro(AstCall** pcall, AstFunction* template);
 AstFunction* macro_resolve_header(AstMacro* macro, Arguments* args, OnyxToken* callsite, b32 error_if_failed);

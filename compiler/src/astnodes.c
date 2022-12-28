@@ -177,6 +177,7 @@ const char* entity_type_strings[Entity_Type_Count] = {
     "Struct Member Default",
     "Memory Reservation",
     "Expression",
+    "Job",
     "Global",
     "Overloaded_Function",
     "Function",
@@ -666,8 +667,12 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
         if (func->kind == Ast_Kind_Function)
             func->flags |= Ast_Flag_Function_Used;
 
-        *pnode = func;
-        node = *pnode;
+        if (permanent) {
+            ensure_overload_returns_correct_type(func, (AstOverloadedFunction *) node);
+            *pnode = func;
+        }
+
+        node = func;
     }
 
     if (node->kind == Ast_Kind_Polymorphic_Proc) {

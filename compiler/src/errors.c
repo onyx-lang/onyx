@@ -98,6 +98,10 @@ void onyx_errors_disable() {
     errors_enabled = 0;
 }
 
+b32 onyx_errors_are_enabled() {
+    return errors_enabled;
+}
+
 b32 onyx_has_errors() {
     bh_arr_each(OnyxError, err, errors.errors) {
         if (err->rank >= Error_Waiting_On) return 1;

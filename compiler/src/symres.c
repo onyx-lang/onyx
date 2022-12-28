@@ -1203,6 +1203,11 @@ static SymresStatus symres_overloaded_function(AstOverloadedFunction* ofunc) {
     bh_arr_each(OverloadOption, overload, ofunc->overloads) {
         SYMRES(expression, &overload->option);
     }
+
+    if (ofunc->expected_return_node) {
+        SYMRES(type, &ofunc->expected_return_node);
+    }
+
     return Symres_Success;
 }
 

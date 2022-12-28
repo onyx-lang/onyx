@@ -234,3 +234,39 @@ Making a proper "linkage" phase of the compiler:  :ProperLinking
         - The data section
         - The stack size
         - The memory constraints (in pages)
+
+Add mandatory return type for a matched group.
+    [x] Parse the syntax
+        - `#match -> u32`
+        - `#match #local -> u32 {}`
+    [x] When the return type of an overload is definitely known,
+        check it immediately.
+    [x] Otherwise, when the return type is known, through polymorph
+        substitution or auto return evaluation, then check the return
+        type is correctly.
+    [ ] This should have the same rules as the interface
+        return type matching, meaning a polymorphic structure can match an
+        instance of that structure. For example,
+        `#match -> Iterator { x => iter.comp(x, #(it)) }`
+
+Parameterized Code Blocks:
+    As code blocks are being used more and more as an alternative to closures
+    or lambdas, I'm seeing the possibility for more confusion and less readability
+    in code that heavily uses them. In order to make things a little clearer,
+    code blocks are now going to be able to take "parameters" that allow you
+    to explicitly give a name to the important symbol(s) in a code block.
+
+    [ ] Add parsing for this feature
+        - #(...)       Code block with no parameters
+        - #|x|(...)    Code block with one parameter
+        - #|x, y|(...) Code block with two parameters
+
+        - #quote |x| {...}
+        - #quote |x, y| {...}
+        
+        - #unquote code
+        - #unquote code(x)
+        - #unquote code(x, y)
+
+
+

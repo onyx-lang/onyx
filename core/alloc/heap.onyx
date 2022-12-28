@@ -182,17 +182,17 @@ get_freed_size :: () => {
             // assert(hb_ptr.size & Allocated_Flag == Allocated_Flag, "Corrupted heap on free. This could be due to a double free, or using memory past were you allocated it.");
 
             if cast(uintptr) hb_ptr < cast(uintptr) __heap_start {
-                log("FREEING STATIC DATA");
+                log(.Error, "Core", "FREEING STATIC DATA");
                 return;
             }
 
             if hb_ptr.size & Allocated_Flag != Allocated_Flag {
-                log("INVALID DOUBLE FREE");
+                log(.Error, "Core", "INVALID DOUBLE FREE");
                 return;
             }
 
             if hb_ptr.magic_number != Alloc_Block_Magic_Number {
-                log("FREEING INVALID BLOCK");
+                log(.Error, "Core", "FREEING INVALID BLOCK");
                 return;
             }
         }

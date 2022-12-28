@@ -576,7 +576,10 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
     if (call->kind == Ast_Kind_Intrinsic_Call) return Check_Success;
 
     AstTyped* callee = (AstTyped *) strip_aliases((AstNode *) call->callee);
+    AstTyped* original_callee = callee;
+
     b32 calling_a_macro = 0;
+    b32 need_to_check_overload_return_type = 0;
 
     if (callee->kind == Ast_Kind_Overloaded_Function) {
         AstTyped* new_callee = find_matching_overload_by_arguments(
@@ -591,6 +594,8 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
         if (new_callee == (AstTyped *) &node_that_signals_a_yield) {
             YIELD(call->token->pos, "Waiting for overloaded function option to pass type-checking.");
         }
+
+        need_to_check_overload_return_type = 1;
 
         callee = new_callee;
     }
@@ -631,6 +636,10 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
         ERROR_(call->token->pos,
                 "Attempting to call something that is not a function, '%b'.",
                 callee->token->text, callee->token->length);
+    }
+
+    if (need_to_check_overload_return_type) {
+        ensure_overload_returns_correct_type(callee, (AstOverloadedFunction *) original_callee);
     }
 
     *effective_callee = callee;
@@ -2421,12 +2430,12 @@ CheckStatus check_function(AstFunction* func) {
     return Check_Success;
 }
 
-CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
+CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     b32 done = 1;
 
     bh_imap all_overloads;
     bh_imap_init(&all_overloads, global_heap_allocator, 4);
-    build_all_overload_options(func->overloads, &all_overloads);
+    build_all_overload_options(ofunc->overloads, &all_overloads);
 
     bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
         AstTyped* node = (AstTyped *) entry->key;
@@ -2451,10 +2460,39 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* func) {
         }
     }
 
-    bh_imap_free(&all_overloads);
+    if (!done) {
+        bh_imap_free(&all_overloads);
+        YIELD(ofunc->token->pos, "Waiting for all options to pass type-checking.");
+    }
 
-    if (done) return Check_Success;
-    else      YIELD(func->token->pos, "Waiting for all options to pass type-checking.");
+    if (ofunc->expected_return_node) {
+        ofunc->expected_return_type = type_build_from_ast(context.ast_alloc, ofunc->expected_return_node);
+        if (!ofunc->expected_return_type) YIELD(ofunc->token->pos, "Waiting to construct expected return type.");
+
+        bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {
+            AstTyped* node = (AstTyped *) entry->key;
+
+            if (node->kind == Ast_Kind_Function) {
+                AstFunction *func = (AstFunction *) node;
+
+                if (!func->type) continue;
+                if (!func->type->Function.return_type) continue;
+
+                Type *return_type = func->type->Function.return_type;
+                if (return_type == &type_auto_return) continue;
+
+                if (!types_are_compatible(return_type, ofunc->expected_return_type)) {
+                    report_incorrect_overload_expected_type(return_type, ofunc->expected_return_type, func->token, ofunc->token);
+                    bh_imap_free(&all_overloads);
+                    return Check_Error;
+                }
+            }
+        }
+    }
+    
+
+    bh_imap_free(&all_overloads);
+    return Check_Success;
 }
 
 CheckStatus check_struct(AstStructType* s_node) {
@@ -3287,6 +3325,18 @@ poly_query_done:
     return Check_Complete;
 }
 
+CheckStatus check_arbitrary_job(EntityJobData *job) {
+    TypeMatch result = job->func(job->job_data);
+
+    switch (result) {
+        case TYPE_MATCH_SUCCESS: return Check_Complete;
+        case TYPE_MATCH_FAILED:  return Check_Error;
+        case TYPE_MATCH_YIELD:   return Check_Yield_Macro;
+    }
+
+    return Check_Error;
+}
+
 void check_entity(Entity* ent) {
     CheckStatus cs = Check_Success;
 
@@ -3324,6 +3374,8 @@ void check_entity(Entity* ent) {
                 onyx_report_error(ent->expr->token->pos, Error_Critical, "#file_contents is disabled for this compilation.");
             }
             break;
+
+        case Entity_Type_Job: cs = check_arbitrary_job(ent->job_data); break;
 
         default: break;
     }

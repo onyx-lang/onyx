@@ -3,7 +3,7 @@ package core.string
 use core
 
 #doc "Generic procedure for turning something into a string."
-as_str :: #match {}
+as_str :: #match -> str {}
 
 #local HasAsStrMethod :: interface (t: $T) {
     { T.as_str(t) } -> str;

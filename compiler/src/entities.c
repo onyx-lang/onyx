@@ -146,6 +146,19 @@ void entity_change_type(EntityHeap* entities, Entity *ent, EntityType new_type) 
     ent->type = new_type;
 }
 
+void entity_heap_add_job(EntityHeap *entities, TypeMatch (*func)(void *), void *job_data) {
+    EntityJobData *job = bh_alloc(global_heap_allocator, sizeof(*job));
+    job->func = func;
+    job->job_data = job_data;
+    
+    Entity ent;
+    ent.type = Entity_Type_Job;
+    ent.state = Entity_State_Check_Types;
+    ent.job_data = job;
+
+    entity_heap_insert(entities, ent);
+}
+
 // NOTE(Brendan Hansen): Uses the entity heap in the context structure
 void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* scope, Package* package) {
 #define ENTITY_INSERT(_ent)                                     \

@@ -580,6 +580,73 @@ void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overl
     bh_imap_free(&all_overloads);
 }
 
+void report_incorrect_overload_expected_type(Type *given, Type *expected, OnyxToken *overload, OnyxToken *group) {
+    onyx_report_error(overload->pos, Error_Critical,
+            "Expected this overload option to return '%s', but instead it returns '%s'.",
+            type_get_name(expected), type_get_name(given));
+
+    onyx_report_error(group->pos, Error_Critical, "Here is where the overloaded function was defined.");
+}
+
+static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
+    OverloadReturnTypeCheck *data = raw_data;
+    Type *expected_type = data->expected_type;
+    AstTyped *node      = data->node;
+
+    assert(expected_type && node);
+    
+    // If the entity on the node has been completed and unused,
+    // skip checking this because the function is likely not used.
+    if (node->entity && node->entity->state >= Entity_State_Finalized) {
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    // HACK: This case should go away, but there were issues with some overloads
+    // not ever completing there auto return type resolution, likely because they
+    // were not actually used. This creates a problem here because this code
+    // will still wait for them. As a cheap solution, if there is a cycle detected,
+    // return success, even if the types may not match.
+    if (context.cycle_almost_detected > 0) {
+        return TYPE_MATCH_SUCCESS;
+    }
+
+    AstFunction *func = (AstFunction *) node;
+    if (func->kind == Ast_Kind_Macro) {
+        func = (AstFunction *) ((AstMacro *) func)->body;
+    }
+
+    if (!func->type) return TYPE_MATCH_YIELD;
+    if (!func->type->Function.return_type) return TYPE_MATCH_YIELD;
+
+    Type *return_type = func->type->Function.return_type;
+    if (return_type == &type_auto_return) return TYPE_MATCH_YIELD;
+
+    if (!types_are_compatible(return_type, expected_type)) {
+        report_incorrect_overload_expected_type(return_type, expected_type, func->token, data->group);
+        return TYPE_MATCH_FAILED;
+    }
+
+    return TYPE_MATCH_SUCCESS;
+}
+
+void ensure_overload_returns_correct_type(AstTyped *overload, AstOverloadedFunction *group) {
+    // This might not be entirely right as the type might not have been constructed yet, I think?
+    //
+    // Also, as a HACK, this does not check for the correct return type when errors are disabled.
+    // Errors are only disabled when doing something non-permantent, like checking an interface
+    // constraint, so this is a cheap way to tell if that is where we are coming from.
+    //
+    if (group->expected_return_type && onyx_errors_are_enabled()) {
+        OverloadReturnTypeCheck *data = bh_alloc_item(context.ast_alloc, OverloadReturnTypeCheck);
+        data->expected_type = group->expected_return_type;
+        data->node = overload;
+        data->group = group->token;
+
+        entity_heap_add_job(&context.entities, ensure_overload_returns_correct_type_job, data);
+    }
+}
+
+
 
 //
 // Macros

@@ -746,7 +746,17 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             else if (parse_possible_directive(parser, "unquote")) {
                 AstDirectiveInsert* insert = make_node(AstDirectiveInsert, Ast_Kind_Directive_Insert);
                 insert->token = parser->curr - 1;
+
+                // Parsing calls is disabled here for the potential future feature
+                // of using a call-like syntax for passing "parameters" to inserted
+                // code blocks. Something like `#unquote foo(x, y)`. This would require
+                // different parsing than the normal call so it would just be detected
+                // here manually. Also, it does not hurt having this here because there
+                // is currently no way to dynamically get a code block to insert from
+                // a call, because it is impossible to "return" a code block.
+                parser->parse_calls = 0;
                 insert->code_expr = parse_expression(parser, 0);
+                parser->parse_calls = 1;
 
                 retval = (AstTyped *) insert;
                 break;
@@ -2408,10 +2418,8 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
 
     // This could be checked elsewhere?
     if (locked && local) {
-        onyx_report_error(token->pos, Error_Critical, "Only one of '#locked' and '#local' can because use at a time.");
+        onyx_report_error(token->pos, Error_Critical, "Only one of '#locked' and '#local' can be use at a time.");
     }
-
-    expect_token(parser, '{');
 
     AstOverloadedFunction* ofunc = make_node(AstOverloadedFunction, Ast_Kind_Overloaded_Function);
     ofunc->token = token;
@@ -2420,6 +2428,14 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
     ofunc->only_local_functions = local;
 
     bh_arr_new(global_heap_allocator, ofunc->overloads, 4);
+
+    if (peek_token(0)->type == Token_Type_Right_Arrow) {
+        expect_token(parser, Token_Type_Right_Arrow);
+
+        ofunc->expected_return_node = parse_type(parser);
+    }
+
+    expect_token(parser, '{');
 
     u64 precedence = 0;
     while (!consume_token_if_next(parser, '}')) {

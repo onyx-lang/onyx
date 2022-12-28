@@ -35,6 +35,7 @@ extern OnyxErrors msgs;
 void onyx_errors_init(bh_arr(bh_file_contents)* files);
 void onyx_errors_enable();
 void onyx_errors_disable();
+b32 onyx_errors_are_enabled();
 void onyx_submit_error(OnyxError error);
 void onyx_report_error(OnyxFilePos pos, OnyxErrorRank rank, char * format, ...);
 void onyx_submit_warning(OnyxError error);
