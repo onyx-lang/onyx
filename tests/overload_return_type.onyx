@@ -1,0 +1,31 @@
+
+use core
+
+main :: () {
+    overloaded_proc(i32.{}) |> println();
+    overloaded_proc(f32.{}) |> println();
+    overloaded_proc(main)   |> println();
+    overloaded_proc()       |> println();
+}
+
+overloaded_proc :: #match -> str {}
+
+#overload
+overloaded_proc :: (_: i32) -> str {
+    return "Working";
+}
+
+#overload
+overloaded_proc :: (_: f32) => {
+    return "Also working";
+}
+
+#overload
+overloaded_proc :: (_) => {
+    return "Again, working";
+}
+
+#overload
+overloaded_proc :: macro () => "Super working";
+
+

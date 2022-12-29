@@ -166,7 +166,7 @@ Socket_Poll_Status :: enum {
 socket_poll_all :: (sockets: [] ^Socket, timeout := -1, stat_buff: [] Socket_Poll_Status = .[]) {
     if sockets.count > stat_buff.count do return;
 
-    handles := (cast(^Socket.Handle) alloc.from_stack(sockets.count * sizeof Socket.Handle))[0 .. sockets.count];
+    handles := alloc.array_from_stack(Socket.Handle, sockets.count);
     for i: sockets.count {
         handles[i] = sockets[i].handle;
     }

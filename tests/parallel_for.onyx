@@ -1,6 +1,4 @@
-#load "core/std"
-
-use package core
+use core {sync, iter, println}
 
 main :: () {
     sum := 0;

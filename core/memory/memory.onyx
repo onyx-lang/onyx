@@ -58,7 +58,9 @@ resize_slice :: (sl: [] $T, new_size: i32, allocator := context.allocator) -> []
 
 #overload
 builtin.__make_overload :: macro (_: ^[] $T, count: u32, allocator := context.allocator) -> [] T {
-    return (package core.memory).make_slice(T, count, allocator);
+    ret := (package core.memory).make_slice(T, count, allocator);
+    memory.set(ret.data, 0, sizeof T * count);
+    return ret;
 }
 
 #overload
