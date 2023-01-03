@@ -89,12 +89,12 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         // make VS Code send setExpression request
         response.body.supportsSetExpression = false;
         // make VS Code send disassemble request
-        response.body.supportsDisassembleRequest = false;
+        response.body.supportsDisassembleRequest = true;
         response.body.supportsSteppingGranularity = true;
         response.body.supportsInstructionBreakpoints = false;
         // make VS Code able to read and write variable memory
-        response.body.supportsReadMemoryRequest = false;
-        response.body.supportsWriteMemoryRequest = false;
+        response.body.supportsReadMemoryRequest = true;
+        response.body.supportsWriteMemoryRequest = true;
         response.body.supportSuspendDebuggee = false;
         response.body.supportTerminateDebuggee = true;
         response.body.supportsFunctionBreakpoints = true;
@@ -157,7 +157,9 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
                         threadId: args.threadId,
                         frameIndex: i
                     });
-                    return new debugadapter_1.StackFrame(frameRef, f.funcname, source, f.line);
+                    let stack_frame = new debugadapter_1.StackFrame(frameRef, f.funcname, source, f.line);
+                    stack_frame.instructionPointerReference = "1234";
+                    return stack_frame;
                 })
             };
             this.sendResponse(response);
@@ -192,6 +194,9 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
                 nv.type = v.type;
                 if (v.hasChildren) {
                     nv.variablesReference = this._variableReferences.create(Object.assign(Object.assign({}, frameRef), { variableChain: frameRef.variableChain.concat([v.symId]) }));
+                }
+                if (v.memoryReference > 0) {
+                    nv.memoryReference = v.memoryReference.toString();
                 }
                 return nv;
             });
@@ -263,6 +268,40 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         this.debugger.step("line", args.threadId);
         this.sendResponse(response);
     }
+    disassembleRequest(response, args, request) {
+        console.log(args);
+        response.body = {
+            instructions: [
+                {
+                    address: "0",
+                    instruction: "i32.add %3, %1, %2",
+                }
+            ]
+        };
+        this.sendResponse(response);
+    }
+    readMemoryRequest(response, args, request) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let addr = parseInt(args.memoryReference) + args.offset;
+            let mem = yield this.debugger.read_memory(addr, args.count);
+            response.body = {
+                address: addr.toString(),
+                data: Buffer.from(mem.data).toString("base64"),
+            };
+            this.sendResponse(response);
+        });
+    }
+    writeMemoryRequest(response, args, request) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let addr = parseInt(args.memoryReference) + args.offset;
+            let data = Buffer.from(args.data, "base64");
+            let bytesWritten = yield this.debugger.write_memory(addr, data);
+            response.body = {
+                bytesWritten: bytesWritten,
+            };
+            this.sendResponse(response);
+        });
+    }
     fileNameToShortName(filename) {
         return filename.substring(filename.lastIndexOf("/") + 1);
     }
@@ -279,6 +318,8 @@ var OVMCommand;
     OVMCommand[OVMCommand["TRACE"] = 6] = "TRACE";
     OVMCommand[OVMCommand["THREADS"] = 7] = "THREADS";
     OVMCommand[OVMCommand["VARS"] = 8] = "VARS";
+    OVMCommand[OVMCommand["MEM_R"] = 9] = "MEM_R";
+    OVMCommand[OVMCommand["MEM_W"] = 10] = "MEM_W";
 })(OVMCommand || (OVMCommand = {}));
 var OVMEvent;
 (function (OVMEvent) {
@@ -434,6 +475,35 @@ class OVMDebugger extends EventEmitter {
         this.pending_responses[cmd_id] = OVMCommand.VARS;
         return this.preparePromise(cmd_id);
     }
+    read_memory(addr, count) {
+        if (this.client == null)
+            return Promise.resolve({});
+        let data = new ArrayBuffer(16);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.MEM_R, true);
+        view.setUint32(8, addr, true);
+        view.setUint32(12, count, true);
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.MEM_R;
+        return this.preparePromise(cmd_id);
+    }
+    write_memory(addr, data_to_write) {
+        if (this.client == null)
+            return Promise.resolve(0);
+        let data = new ArrayBuffer(16 + data_to_write.byteLength);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.MEM_W, true);
+        view.setUint32(8, addr, true);
+        view.setUint32(12, data_to_write.byteLength, true);
+        new Uint8Array(data).set(new Uint8Array(data_to_write), 16);
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.MEM_W;
+        return this.preparePromise(cmd_id);
+    }
     parseIncoming(data) {
         let parser = new DataParser(data);
         while (parser.offset != data.length) {
@@ -534,9 +604,20 @@ class OVMDebugger extends EventEmitter {
                     let type = parser.parseString();
                     let symId = parser.parseUint32();
                     let hasChildren = parser.parseBool();
-                    result.push({ name, value, type, symId, hasChildren });
+                    let memoryReference = parser.parseUint32();
+                    result.push({ name, value, type, symId, hasChildren, memoryReference });
                 }
                 this.resolvePromise(msg_id, result);
+                break;
+            }
+            case OVMCommand.MEM_R: {
+                let data = parser.parseBytes();
+                this.resolvePromise(msg_id, { data: data });
+                break;
+            }
+            case OVMCommand.MEM_W: {
+                let count = parser.parseUint32();
+                this.resolvePromise(msg_id, count);
                 break;
             }
             default:
@@ -600,6 +681,12 @@ class DataParser {
         }
         this.offset += len;
         return str;
+    }
+    parseBytes() {
+        let len = this.parseUint32();
+        let result = this.data.buffer.slice(this.offset, this.offset + len);
+        this.offset += len;
+        return result;
     }
     parseBool() {
         if (this.offset >= this.data.length)

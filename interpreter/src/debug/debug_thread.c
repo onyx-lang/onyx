@@ -18,6 +18,8 @@
 #define CMD_TRACE 6
 #define CMD_THREADS 7
 #define CMD_VARS 8
+#define CMD_MEM_R 9
+#define CMD_MEM_W 10
 
 #define EVT_NOP 0
 #define EVT_BRK_HIT 1
@@ -67,12 +69,12 @@ static int parse_int(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
     return i;
 }
 
-static char *parse_bytes(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
-    int len = parse_int(debug, ctx);
+static char *parse_bytes(debug_state_t *debug, struct msg_parse_ctx_t *ctx, u32 *len) {
+    *len = parse_int(debug, ctx);
 
-    char *buf = bh_alloc_array(debug->tmp_alloc, char, len);
-    memcpy(buf, &ctx->data[ctx->offset], len);
-    ctx->offset += len;
+    char *buf = bh_alloc_array(debug->tmp_alloc, char, *len);
+    memcpy(buf, &ctx->data[ctx->offset], *len);
+    ctx->offset += *len;
 
     return buf;
 }
@@ -114,330 +116,378 @@ static void get_stack_frame_location(debug_state_t *debug,
     assert(debug_info_lookup_file(debug->info, loc_info->file_id, file_info));
 }
 
-static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
+
+
+//
+// Command handling
+//
+
+#define DEBUG_COMMAND_HANDLER(name) \
+    void name(debug_state_t *debug, struct msg_parse_ctx_t *ctx, u32 msg_id)
+
+typedef DEBUG_COMMAND_HANDLER((* debug_command_handler_t));
+
 #define ON_THREAD(tid) \
     bh_arr_each(debug_thread_state_t *, thread, debug->threads) \
         if ((*thread)->id == tid)
 
-    u32 msg_id     = parse_int(debug, ctx);
-    u32 command_id = parse_int(debug, ctx);
 
-    // printf("[INFO ] Recv command: %d\n", command_id);
+static DEBUG_COMMAND_HANDLER(debug_command_nop) {
+    send_response_header(debug, msg_id);
+}
 
-    switch (command_id) {
-        case CMD_NOP: {
-            send_response_header(debug, msg_id);
-            break;
+static DEBUG_COMMAND_HANDLER(debug_command_res) {
+    u32 thread_id = parse_int(debug, ctx);
+
+    bool resumed_a_thread = false;
+
+    // Release the thread(s)
+    bh_arr_each(debug_thread_state_t *, thread, debug->threads) {
+        if (thread_id == 0xffffffff || (*thread)->id == thread_id) {
+            resume_thread(*thread);
+            resumed_a_thread = true;
         }
+    }
 
-        case CMD_RES: {
-            u32 thread_id = parse_int(debug, ctx);
+    send_response_header(debug, msg_id);
+    send_bool(debug, resumed_a_thread);
+}
 
-            bool resumed_a_thread = false;
+static DEBUG_COMMAND_HANDLER(debug_command_pause) {
+    u32 thread_id = parse_int(debug, ctx);
 
-            // Release the thread(s)
-            bh_arr_each(debug_thread_state_t *, thread, debug->threads) {
-                if (thread_id == 0xffffffff || (*thread)->id == thread_id) {
-                    resume_thread(*thread);
-                    resumed_a_thread = true;
-                }
-            }
+    ON_THREAD(thread_id) {
+        (*thread)->run_count = 0;
+    }
 
-            send_response_header(debug, msg_id);
-            send_bool(debug, resumed_a_thread);
-            break;
+    send_response_header(debug, msg_id);
+}
+
+static DEBUG_COMMAND_HANDLER(debug_command_brk) {
+    char    *filename = parse_string(debug, ctx);
+    unsigned int line = parse_int(debug, ctx);
+
+    i32 instr = debug_info_lookup_instr_by_file_line(debug->info, filename, line);
+    if (instr < 0) goto brk_send_error;
+
+    printf("[INFO ] Setting breakpoint at %s:%d (%x)\n", filename, line, instr);
+
+    debug_file_info_t file_info;
+    debug_info_lookup_file_by_name(debug->info, filename, &file_info);
+    
+    debug_breakpoint_t bp;
+    bp.id = debug->next_breakpoint_id++;
+    bp.instr = instr;
+    bp.file_id = file_info.file_id;
+    bp.line = line;
+    bh_arr_push(debug->breakpoints, bp);
+
+    send_response_header(debug, msg_id);
+    send_bool(debug, true);
+    send_int(debug, bp.id);
+    send_int(debug, line);
+    return;
+
+  brk_send_error:
+    printf("[WARN ] Failed to set breakpoint at %s:%d (%x)\n", filename, line, instr);
+
+    send_response_header(debug, msg_id);
+    send_bool(debug, false);
+    send_int(debug, -1);
+    send_int(debug, 0);
+}
+
+static DEBUG_COMMAND_HANDLER(debug_command_clr_brk) {
+    char *filename = parse_string(debug, ctx);
+
+    debug_file_info_t file_info;
+    bool file_found = debug_info_lookup_file_by_name(debug->info, filename, &file_info);
+    if (!file_found) {
+        goto clr_brk_send_error;
+    }
+
+    bh_arr_each(debug_breakpoint_t, bp, debug->breakpoints) {
+        if (bp->file_id == file_info.file_id) {
+            // This is kind of hacky but it does successfully delete
+            // a single element from the array and move the iterator.
+            bh_arr_fastdelete(debug->breakpoints, bp - debug->breakpoints);
+            bp--;
         }
+    }
 
-        case CMD_PAUSE: {
-            u32 thread_id = parse_int(debug, ctx);
+    send_response_header(debug, msg_id);
+    send_bool(debug, true);
+    return;
 
-            ON_THREAD(thread_id) {
-                (*thread)->run_count = 0;
-            }
+  clr_brk_send_error:
+    send_response_header(debug, msg_id);
+    send_bool(debug, false);
+}
 
-            send_response_header(debug, msg_id);
-            break;
+static DEBUG_COMMAND_HANDLER(debug_command_step) {
+    u32 granularity = parse_int(debug, ctx);
+    u32 thread_id = parse_int(debug, ctx);
+    
+    if (granularity == 1) {
+        ON_THREAD(thread_id) {
+            (*thread)->pause_at_next_line = true;
+            (*thread)->pause_within = -1;
+            resume_thread(*thread);
         }
+    }
 
-        case CMD_BRK: {
-            char    *filename = parse_string(debug, ctx);
-            unsigned int line = parse_int(debug, ctx);
-
-            i32 instr = debug_info_lookup_instr_by_file_line(debug->info, filename, line);
-            if (instr < 0) goto brk_send_error;
-
-            printf("[INFO ] Setting breakpoint at %s:%d (%x)\n", filename, line, instr);
-
-            debug_file_info_t file_info;
-            debug_info_lookup_file_by_name(debug->info, filename, &file_info);
-            
-            debug_breakpoint_t bp;
-            bp.id = debug->next_breakpoint_id++;
-            bp.instr = instr;
-            bp.file_id = file_info.file_id;
-            bp.line = line;
-            bh_arr_push(debug->breakpoints, bp);
-
-            send_response_header(debug, msg_id);
-            send_bool(debug, true);
-            send_int(debug, bp.id);
-            send_int(debug, line);
-            break;
-
-          brk_send_error:
-            printf("[WARN ] Failed to set breakpoint at %s:%d (%x)\n", filename, line, instr);
-
-            send_response_header(debug, msg_id);
-            send_bool(debug, false);
-            send_int(debug, -1);
-            send_int(debug, 0);
-            break;
+    if (granularity == 2) {
+        ON_THREAD(thread_id) {
+            (*thread)->run_count = 1;
+            resume_thread(*thread);
         }
+    }
 
-        case CMD_CLR_BRK: {
-            char *filename = parse_string(debug, ctx);
-
-            debug_file_info_t file_info;
-            bool file_found = debug_info_lookup_file_by_name(debug->info, filename, &file_info);
-            if (!file_found) {
-                goto clr_brk_send_error;
-            }
-
-            bh_arr_each(debug_breakpoint_t, bp, debug->breakpoints) {
-                if (bp->file_id == file_info.file_id) {
-                    // This is kind of hacky but it does successfully delete
-                    // a single element from the array and move the iterator.
-                    bh_arr_fastdelete(debug->breakpoints, bp - debug->breakpoints);
-                    bp--;
-                }
-            }
-
-            send_response_header(debug, msg_id);
-            send_bool(debug, true);
-            break;
-
-          clr_brk_send_error:
-            send_response_header(debug, msg_id);
-            send_bool(debug, false);
-            break;
+    if (granularity == 3) {
+        ON_THREAD(thread_id) {
+            ovm_stack_frame_t *last_frame = &bh_arr_last((*thread)->ovm_state->stack_frames);
+            (*thread)->pause_at_next_line = true;
+            (*thread)->pause_within = last_frame->func->id;
+            (*thread)->extra_frames_since_last_pause = 0;
+            resume_thread(*thread);
         }
+    }
 
-        case CMD_STEP: {
-            u32 granularity = parse_int(debug, ctx);
-            u32 thread_id = parse_int(debug, ctx);
-            
-            if (granularity == 1) {
-                ON_THREAD(thread_id) {
-                    (*thread)->pause_at_next_line = true;
-                    (*thread)->pause_within = -1;
-                    resume_thread(*thread);
-                }
+    if (granularity == 4) {
+        ON_THREAD(thread_id) {
+            if (bh_arr_length((*thread)->ovm_state->stack_frames) == 1) {
+                (*thread)->pause_within = -1;
+            } else {
+                ovm_stack_frame_t *last_frame = &bh_arr_last((*thread)->ovm_state->stack_frames);
+                (*thread)->pause_within = (last_frame - 1)->func->id;
             }
 
-            if (granularity == 2) {
-                ON_THREAD(thread_id) {
-                    (*thread)->run_count = 1;
-                    resume_thread(*thread);
-                }
-            }
-
-            if (granularity == 3) {
-                ON_THREAD(thread_id) {
-                    ovm_stack_frame_t *last_frame = &bh_arr_last((*thread)->ovm_state->stack_frames);
-                    (*thread)->pause_at_next_line = true;
-                    (*thread)->pause_within = last_frame->func->id;
-                    (*thread)->extra_frames_since_last_pause = 0;
-                    resume_thread(*thread);
-                }
-            }
-
-            if (granularity == 4) {
-                ON_THREAD(thread_id) {
-                    if (bh_arr_length((*thread)->ovm_state->stack_frames) == 1) {
-                        (*thread)->pause_within = -1;
-                    } else {
-                        ovm_stack_frame_t *last_frame = &bh_arr_last((*thread)->ovm_state->stack_frames);
-                        (*thread)->pause_within = (last_frame - 1)->func->id;
-                    }
-
-                    (*thread)->pause_at_next_line = true;
-                    (*thread)->extra_frames_since_last_pause = 0;
-                    resume_thread(*thread);
-                }
-            }
-
-            send_response_header(debug, msg_id);
-            break;
+            (*thread)->pause_at_next_line = true;
+            (*thread)->extra_frames_since_last_pause = 0;
+            resume_thread(*thread);
         }
+    }
 
-        case CMD_TRACE: {
-            unsigned int thread_id = parse_int(debug, ctx);
+    send_response_header(debug, msg_id);
+}
 
-            debug_thread_state_t *thread = NULL;
-            bh_arr_each(debug_thread_state_t *, pthread, debug->threads) {
-                if ((*pthread)->id == thread_id) {
-                    thread = *pthread;
-                    break;
-                }
-            }
+static DEBUG_COMMAND_HANDLER(debug_command_trace) {
+    unsigned int thread_id = parse_int(debug, ctx);
 
-            if (thread == NULL) {
-                send_response_header(debug, msg_id);
-                send_int(debug, 0);
-                break;
-            }
-
-            bh_arr(ovm_stack_frame_t) frames = thread->ovm_state->stack_frames;
-
-            send_response_header(debug, msg_id);
-            send_int(debug, bh_arr_length(frames));
-
-            bh_arr_rev_each(ovm_stack_frame_t, frame, frames) {
-                debug_func_info_t func_info;
-                debug_file_info_t file_info;
-                debug_loc_info_t  loc_info;
-
-                get_stack_frame_location(debug, &func_info, &file_info, &loc_info, thread, frame);
-
-                send_string(debug, func_info.name);
-                send_string(debug, file_info.name);
-                send_int(debug, loc_info.line);
-            }
-
-            break;
-        }
-
-        case CMD_THREADS: {
-            bh_arr(debug_thread_state_t *) threads = debug->threads;
-
-            send_response_header(debug, msg_id);
-            send_int(debug, bh_arr_length(threads));
-
-            char buf[128];
-            bh_arr_each(debug_thread_state_t *, thread, threads) {
-                send_int(debug, (*thread)->id);
-
-                snprintf(buf, 128, "thread #%d", (*thread)->id);
-                send_string(debug, buf);
-            }
-
-            break;
-        }
-
-        case CMD_VARS: {
-            i32 stack_frame = parse_int(debug, ctx);
-            u32 thread_id   = parse_int(debug, ctx);
-            u32 layers      = parse_int(debug, ctx);
-
-            ON_THREAD(thread_id) {
-                bh_arr(ovm_stack_frame_t) frames = (*thread)->ovm_state->stack_frames;
-                if (stack_frame >= bh_arr_length(frames)) {
-                    goto vars_error;
-                }
-
-                ovm_stack_frame_t *frame = &frames[bh_arr_length(frames) - 1 - stack_frame];
-
-                debug_func_info_t func_info;
-                debug_file_info_t file_info;
-                debug_loc_info_t  loc_info;
-
-                get_stack_frame_location(debug, &func_info, &file_info, &loc_info, *thread, frame);
-
-                send_response_header(debug, msg_id);
-
-                debug_runtime_value_builder_t builder;
-                builder.state = debug;
-                builder.info = debug->info;
-                builder.ovm_state = (*thread)->ovm_state;
-                builder.ovm_frame = frame;
-                builder.func_info = func_info;
-                builder.file_info = file_info;
-                builder.loc_info = loc_info;
-                debug_runtime_value_build_init(&builder, bh_heap_allocator());
-
-                //
-                // The first layer specified is the symbol id to drill into.
-                // Therefore, the first layer is peeled off here before the
-                // following while loop. This makes the assumption that no
-                // symbol will have the id 0xffffffff. This is probably safe
-                // to assume, especially since just one more symbol and this
-                // whole system crashes...
-                u32 sym_id_to_match = 0xffffffff;
-                if (layers > 0) {
-                    sym_id_to_match = parse_int(debug, ctx);
-                    layers--;
-                }
-
-                i32 symbol_scope = loc_info.symbol_scope;
-                while (symbol_scope != -1) {
-                    debug_sym_scope_t sym_scope = debug->info->symbol_scopes[symbol_scope];
-                    builder.sym_scope = sym_scope;
-
-                    bh_arr_each(u32, sym_id, sym_scope.symbols) {
-                        debug_sym_info_t *sym = &debug->info->symbols[*sym_id];
-                        debug_runtime_value_build_set_location(&builder, sym->loc_kind, sym->loc, sym->type, sym->name);
-
-                        //
-                        // If we are drilling to a particular symbol, and this is that symbol,
-                        // we have to do the generation a little differently. We first have to
-                        // pull the other layer queries in, and descend into those layers.
-                        // Then, we loop through each value at that layer and print their values.
-                        if (sym->sym_id == sym_id_to_match && sym_id_to_match != 0xffffffff) {
-                            while (layers--) {
-                                u32 desc = parse_int(debug, ctx);
-                                debug_runtime_value_build_descend(&builder, desc);
-                            }
-
-                            while (debug_runtime_value_build_step(&builder)) {
-                                debug_runtime_value_build_string(&builder);
-                                debug_type_info_t *type = &debug->info->types[builder.it_type];
-
-                                send_int(debug, 0);
-                                send_string(debug, builder.it_name);
-                                send_bytes(debug, builder.output.data, builder.output.length);
-                                send_string(debug, type->name);
-                                send_int(debug, builder.it_index - 1); // CLEANUP This should be 0 indexed, but because this is after the while loop condition, it is 1 indexed.
-                                send_bool(debug, builder.it_has_children);
-
-                                debug_runtime_value_build_clear(&builder);
-                            }
-                            
-                            // This is important, as when doing a layered query, only one symbol
-                            // should be considered, and once found, should immediate stop.
-                            goto syms_done;
-
-                        } else if (sym_id_to_match == 0xffffffff) {
-                            // Otherwise, we simply print the value of the symbol as is.
-                            debug_type_info_t *type = &debug->info->types[sym->type];
-
-                            debug_runtime_value_build_string(&builder);
-
-                            send_int(debug, 0);
-                            send_string(debug, sym->name);
-                            send_bytes(debug, builder.output.data, builder.output.length);
-                            send_string(debug, type->name);
-                            send_int(debug, sym->sym_id);
-                            send_bool(debug, builder.it_has_children);
-
-                            debug_runtime_value_build_clear(&builder);
-                        }
-                    }
-
-                    symbol_scope = sym_scope.parent;
-                }
-                
-              syms_done:
-                send_int(debug, 1);
-                debug_runtime_value_build_free(&builder);
-                return;
-            }
-
-          vars_error:
-            send_response_header(debug, msg_id);
-            send_int(debug, 1);
+    debug_thread_state_t *thread = NULL;
+    bh_arr_each(debug_thread_state_t *, pthread, debug->threads) {
+        if ((*pthread)->id == thread_id) {
+            thread = *pthread;
             break;
         }
     }
+
+    if (thread == NULL) {
+        send_response_header(debug, msg_id);
+        send_int(debug, 0);
+        return;
+    }
+
+    bh_arr(ovm_stack_frame_t) frames = thread->ovm_state->stack_frames;
+
+    send_response_header(debug, msg_id);
+    send_int(debug, bh_arr_length(frames));
+
+    bh_arr_rev_each(ovm_stack_frame_t, frame, frames) {
+        debug_func_info_t func_info;
+        debug_file_info_t file_info;
+        debug_loc_info_t  loc_info;
+
+        get_stack_frame_location(debug, &func_info, &file_info, &loc_info, thread, frame);
+
+        send_string(debug, func_info.name);
+        send_string(debug, file_info.name);
+        send_int(debug, loc_info.line);
+    }
+}
+
+static DEBUG_COMMAND_HANDLER(debug_command_threads) {
+    bh_arr(debug_thread_state_t *) threads = debug->threads;
+
+    send_response_header(debug, msg_id);
+    send_int(debug, bh_arr_length(threads));
+
+    char buf[128];
+    bh_arr_each(debug_thread_state_t *, thread, threads) {
+        send_int(debug, (*thread)->id);
+
+        snprintf(buf, 128, "thread #%d", (*thread)->id);
+        send_string(debug, buf);
+    }
+}
+
+static DEBUG_COMMAND_HANDLER(debug_command_vars) {
+    i32 stack_frame = parse_int(debug, ctx);
+    u32 thread_id   = parse_int(debug, ctx);
+    u32 layers      = parse_int(debug, ctx);
+
+    debug_thread_state_t **thread = NULL;
+    bh_arr_each(debug_thread_state_t *, t, debug->threads)
+        if ((*t)->id == thread_id)
+            thread = t;
+
+    if (thread == NULL) {
+        goto vars_error;
+    }
+
+    bh_arr(ovm_stack_frame_t) frames = (*thread)->ovm_state->stack_frames;
+    if (stack_frame >= bh_arr_length(frames)) {
+        goto vars_error;
+    }
+
+    ovm_stack_frame_t *frame = &frames[bh_arr_length(frames) - 1 - stack_frame];
+
+    debug_func_info_t func_info;
+    debug_file_info_t file_info;
+    debug_loc_info_t  loc_info;
+
+    get_stack_frame_location(debug, &func_info, &file_info, &loc_info, *thread, frame);
+
+    send_response_header(debug, msg_id);
+
+    debug_runtime_value_builder_t builder;
+    builder.state = debug;
+    builder.info = debug->info;
+    builder.ovm_state = (*thread)->ovm_state;
+    builder.ovm_frame = frame;
+    builder.func_info = func_info;
+    builder.file_info = file_info;
+    builder.loc_info = loc_info;
+    debug_runtime_value_build_init(&builder, bh_heap_allocator());
+
+    //
+    // The first layer specified is the symbol id to drill into.
+    // Therefore, the first layer is peeled off here before the
+    // following while loop. This makes the assumption that no
+    // symbol will have the id 0xffffffff. This is probably safe
+    // to assume, especially since just one more symbol and this
+    // whole system crashes...
+    u32 sym_id_to_match = 0xffffffff;
+    if (layers > 0) {
+        sym_id_to_match = parse_int(debug, ctx);
+        layers--;
+    }
+
+    i32 symbol_scope = loc_info.symbol_scope;
+    while (symbol_scope != -1) {
+        debug_sym_scope_t sym_scope = debug->info->symbol_scopes[symbol_scope];
+        builder.sym_scope = sym_scope;
+
+        bh_arr_each(u32, sym_id, sym_scope.symbols) {
+            debug_sym_info_t *sym = &debug->info->symbols[*sym_id];
+            debug_runtime_value_build_set_location(&builder, sym->loc_kind, sym->loc, sym->type, sym->name);
+
+            //
+            // If we are drilling to a particular symbol, and this is that symbol,
+            // we have to do the generation a little differently. We first have to
+            // pull the other layer queries in, and descend into those layers.
+            // Then, we loop through each value at that layer and print their values.
+            if (sym->sym_id == sym_id_to_match && sym_id_to_match != 0xffffffff) {
+                while (layers--) {
+                    u32 desc = parse_int(debug, ctx);
+                    debug_runtime_value_build_descend(&builder, desc);
+                }
+
+                while (debug_runtime_value_build_step(&builder)) {
+                    debug_runtime_value_build_string(&builder);
+                    debug_type_info_t *type = &debug->info->types[builder.it_type];
+
+                    send_int(debug, 0);
+                    send_string(debug, builder.it_name);
+                    send_bytes(debug, builder.output.data, builder.output.length);
+                    send_string(debug, type->name);
+                    send_int(debug, builder.it_index - 1); // CLEANUP This should be 0 indexed, but because this is after the while loop condition, it is 1 indexed.
+                    send_bool(debug, builder.it_has_children);
+                    send_int(debug, debug_runtime_value_get_it_addr(&builder));
+
+                    debug_runtime_value_build_clear(&builder);
+                }
+                
+                // This is important, as when doing a layered query, only one symbol
+                // should be considered, and once found, should immediate stop.
+                goto syms_done;
+
+            } else if (sym_id_to_match == 0xffffffff) {
+                // Otherwise, we simply print the value of the symbol as is.
+                debug_type_info_t *type = &debug->info->types[sym->type];
+
+                debug_runtime_value_build_string(&builder);
+
+                send_int(debug, 0);
+                send_string(debug, sym->name);
+                send_bytes(debug, builder.output.data, builder.output.length);
+                send_string(debug, type->name);
+                send_int(debug, sym->sym_id);
+                send_bool(debug, builder.it_has_children);
+                send_int(debug, debug_runtime_value_get_it_addr(&builder));
+
+                debug_runtime_value_build_clear(&builder);
+            }
+        }
+
+        symbol_scope = sym_scope.parent;
+    }
+        
+  syms_done:
+    send_int(debug, 1);
+    debug_runtime_value_build_free(&builder);
+    return;
+
+  vars_error:
+    send_response_header(debug, msg_id);
+    send_int(debug, 1);
+}
+
+static DEBUG_COMMAND_HANDLER(debug_command_memory_read) {
+    u32 addr = parse_int(debug, ctx);
+    u32 count = parse_int(debug, ctx);
+
+    count = bh_min(count, 2048);
+
+    send_response_header(debug, msg_id);
+    send_bytes(debug, bh_pointer_add(debug->ovm_engine->memory, addr), count);
+}
+
+static DEBUG_COMMAND_HANDLER(debug_command_memory_write) {
+    u32 addr = parse_int(debug, ctx);
+    u32 count;
+
+    u8 *data = parse_bytes(debug, ctx, &count);
+    memcpy(bh_pointer_add(debug->ovm_engine->memory, addr), data, count);
+
+    send_response_header(debug, msg_id);
+    send_int(debug, count);
+}
+
+static debug_command_handler_t command_handlers[] = {
+    [CMD_NOP]     = debug_command_nop,
+    [CMD_RES]     = debug_command_res,
+    [CMD_PAUSE]   = debug_command_pause,
+    [CMD_BRK]     = debug_command_brk,
+    [CMD_CLR_BRK] = debug_command_clr_brk,
+    [CMD_STEP]    = debug_command_step,
+    [CMD_TRACE]   = debug_command_trace,
+    [CMD_THREADS] = debug_command_threads,
+    [CMD_VARS]    = debug_command_vars,
+    [CMD_MEM_R]   = debug_command_memory_read,
+    [CMD_MEM_W]   = debug_command_memory_write,
+};
+
+static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
+    u32 msg_id     = parse_int(debug, ctx);
+    u32 command_id = parse_int(debug, ctx);
+
+    if (command_id >= sizeof(command_handlers) / sizeof(command_handlers[0])) {
+        send_response_header(debug, msg_id);
+        return;
+    }
+
+    command_handlers[command_id](debug, ctx, msg_id);
 }
 
 static void process_message(debug_state_t *debug, char *msg, unsigned int bytes_read) {

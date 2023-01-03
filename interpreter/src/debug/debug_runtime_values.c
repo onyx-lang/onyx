@@ -735,6 +735,36 @@ bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder) {
     return true;
 }
 
+u32 debug_runtime_value_get_it_addr(debug_runtime_value_builder_t *builder) {
+    if (builder->it_loc_kind == debug_sym_loc_register) {
+        debug_type_info_t *type = &builder->info->types[builder->it_type];
+
+        if (type->kind == debug_type_kind_slice) {
+            ovm_value_t value;
+            if (lookup_register_in_frame(builder->ovm_state, builder->ovm_frame, builder->it_loc, &value)) {
+                return value.u32;
+            }
+        }
+
+        return 0;
+    }
+
+    if (builder->it_loc_kind == debug_sym_loc_stack) {
+        u32 stack_ptr;
+        if (!lookup_stack_pointer(builder, &stack_ptr)) {
+            return 0;
+        }
+
+        return builder->it_loc + stack_ptr;
+    }
+
+    if (builder->it_loc_kind == debug_sym_loc_global) {
+        return builder->it_loc;
+    }
+
+    return 0;
+}
+
 void debug_runtime_value_build_string(debug_runtime_value_builder_t *builder) {
     if (builder->it_loc_kind == debug_sym_loc_register) {
         append_value_from_register(builder, builder->it_loc, builder->it_type);

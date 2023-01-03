@@ -343,7 +343,6 @@ typedef struct debug_runtime_value_builder_t {
     u32 it_type;
     char *it_name;
     bool it_has_children; 
-
 } debug_runtime_value_builder_t;
 
 void debug_runtime_value_build_init(debug_runtime_value_builder_t *builder, bh_allocator alloc);
@@ -351,6 +350,7 @@ void debug_runtime_value_build_set_location(debug_runtime_value_builder_t *build
 void debug_runtime_value_build_descend(debug_runtime_value_builder_t *builder, u32 index);
 bool debug_runtime_value_build_step(debug_runtime_value_builder_t *builder);
 void debug_runtime_value_build_string(debug_runtime_value_builder_t *builder);
+u32  debug_runtime_value_get_it_addr(debug_runtime_value_builder_t *builder);
 void debug_runtime_value_build_clear(debug_runtime_value_builder_t *builder);
 void debug_runtime_value_build_free(debug_runtime_value_builder_t *builder);
 
