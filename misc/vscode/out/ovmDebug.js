@@ -158,7 +158,7 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
                         frameIndex: i
                     });
                     let stack_frame = new debugadapter_1.StackFrame(frameRef, f.funcname, source, f.line);
-                    stack_frame.instructionPointerReference = "1234";
+                    stack_frame.instructionPointerReference = f.instructionPointer.toString();
                     return stack_frame;
                 })
             };
@@ -269,16 +269,20 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
         this.sendResponse(response);
     }
     disassembleRequest(response, args, request) {
-        console.log(args);
-        response.body = {
-            instructions: [
-                {
-                    address: "0",
-                    instruction: "i32.add %3, %1, %2",
-                }
-            ]
-        };
-        this.sendResponse(response);
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log(args);
+            let addr = parseInt(args.memoryReference) + args.offset;
+            let instrs = yield this.debugger.disassemble(addr, args.instructionCount);
+            response.body = {
+                instructions: instrs.map((i, index) => {
+                    return {
+                        address: (index + addr).toString(),
+                        instruction: i.instr
+                    };
+                })
+            };
+            this.sendResponse(response);
+        });
     }
     readMemoryRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -320,6 +324,7 @@ var OVMCommand;
     OVMCommand[OVMCommand["VARS"] = 8] = "VARS";
     OVMCommand[OVMCommand["MEM_R"] = 9] = "MEM_R";
     OVMCommand[OVMCommand["MEM_W"] = 10] = "MEM_W";
+    OVMCommand[OVMCommand["DISASM"] = 11] = "DISASM";
 })(OVMCommand || (OVMCommand = {}));
 var OVMEvent;
 (function (OVMEvent) {
@@ -504,6 +509,20 @@ class OVMDebugger extends EventEmitter {
         this.pending_responses[cmd_id] = OVMCommand.MEM_W;
         return this.preparePromise(cmd_id);
     }
+    disassemble(addr, count) {
+        if (this.client == null)
+            return Promise.resolve([]);
+        let data = new ArrayBuffer(16);
+        let view = new DataView(data);
+        let cmd_id = this.next_command_id;
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.DISASM, true);
+        view.setUint32(8, addr, true);
+        view.setUint32(12, count, true);
+        this.client.write(new Uint8Array(data));
+        this.pending_responses[cmd_id] = OVMCommand.DISASM;
+        return this.preparePromise(cmd_id);
+    }
     parseIncoming(data) {
         let parser = new DataParser(data);
         while (parser.offset != data.length) {
@@ -580,7 +599,8 @@ class OVMDebugger extends EventEmitter {
                     let funcname = parser.parseString();
                     let filename = parser.parseString();
                     let line = parser.parseInt32();
-                    result.push({ funcname, filename, line });
+                    let ip = parser.parseInt32();
+                    result.push({ funcname, filename, line, instructionPointer: ip });
                 }
                 this.resolvePromise(msg_id, result);
                 break;
@@ -618,6 +638,15 @@ class OVMDebugger extends EventEmitter {
             case OVMCommand.MEM_W: {
                 let count = parser.parseUint32();
                 this.resolvePromise(msg_id, count);
+                break;
+            }
+            case OVMCommand.DISASM: {
+                let result = new Array();
+                while (parser.parseInt32() == 0) {
+                    let instr = parser.parseString();
+                    result.push({ instr });
+                }
+                this.resolvePromise(msg_id, result);
                 break;
             }
             default:

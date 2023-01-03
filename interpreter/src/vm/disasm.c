@@ -17,6 +17,14 @@ enum instr_format_kind_t {
     instr_format_store,
 
     instr_format_idx_arr,
+
+    instr_format_br,
+    instr_format_br_cond,
+    instr_format_bri,
+    instr_format_bri_cond,
+
+    instr_format_call,
+    instr_format_calli,
 };
 
 typedef struct instr_format_t {
@@ -131,20 +139,57 @@ void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_te
         case OVM_TYPE_V128: bh_buffer_write_string(instr_text, "v128."); break;
     }
 
-    instr_format_t *format = &instr_formats[OVM_INSTR_INSTR(instr)];
+    instr_format_t *format = &instr_formats[OVM_INSTR_INSTR(*instr)];
 
-    bh_buffer_write(instr_text, format->instr);
+    bh_buffer_write_string(instr_text, format->instr);
 
-    char *formatted = NULL;
+    u32 formatted = 0;
     switch (format->kind) {
         case instr_format_rab: formatted = snprintf(buf, 255, "%%%d, %%%d, %%%d", instr->r, instr->a, instr->b); break;
         case instr_format_ra:  formatted = snprintf(buf, 255, "%%%d, %%%d", instr->r, instr->a); break;
         case instr_format_a:   formatted = snprintf(buf, 255, "%%%d", instr->a); break;
+
+        case instr_format_imm:
+            switch (OVM_INSTR_TYPE(*instr)) {
+                case OVM_TYPE_I8:   formatted = snprintf(buf, 255, "%%%d, %hhd", instr->r, instr->i); break;
+                case OVM_TYPE_I16:  formatted = snprintf(buf, 255, "%%%d, %hd", instr->r, instr->i); break;
+                case OVM_TYPE_I32:  formatted = snprintf(buf, 255, "%%%d, %d", instr->r, instr->i); break;
+                case OVM_TYPE_I64:  formatted = snprintf(buf, 255, "%%%d, %ld", instr->r, instr->l); break;
+                case OVM_TYPE_F32:  formatted = snprintf(buf, 255, "%%%d, %f", instr->r, instr->f); break;
+                case OVM_TYPE_F64:  formatted = snprintf(buf, 255, "%%%d, %lf", instr->r, instr->d); break;
+            }
+            break;
+
+        case instr_format_load:  formatted = snprintf(buf, 255, "%%%d, [%%%d + %d]", instr->r, instr->a, instr->b); break;
+        case instr_format_store: formatted = snprintf(buf, 255, "[%%%d + %d], %%%d", instr->r, instr->b, instr->a); break;
+
+        case instr_format_idx_arr: formatted = snprintf(buf, 255, "%%%d, __global_arr_%d[%%%d]", instr->r, instr->a, instr->b); break;
+
+        case instr_format_br:       formatted = snprintf(buf, 255, "%d", instr_addr + instr->a); break;
+        case instr_format_br_cond:  formatted = snprintf(buf, 255, "%d, %%%d", instr_addr + instr->a, instr->b); break;
+        case instr_format_bri:      formatted = snprintf(buf, 255, "ip + %%%d", instr->a); break;
+        case instr_format_bri_cond: formatted = snprintf(buf, 255, "ip + %%%d, %%%d", instr->a, instr->b); break;
+
+        case instr_format_call:
+            if (instr->r >= 0) {
+                formatted = snprintf(buf, 255, "%%%d, %d  <%s>", instr->r, instr->a, program->funcs[instr->a].name);
+            } else {
+                formatted = snprintf(buf, 255, "%d  <%s>", instr->a, program->funcs[instr->a].name);
+            }
+            break;
+
+        case instr_format_calli:
+            if (instr->r >= 0) {
+                formatted = snprintf(buf, 255, "%%%d, %%%d", instr->r, instr->a);
+            } else {
+                formatted = snprintf(buf, 255, "%%%d", instr->a);
+            }
+            break;
     }
 
-    if (formatted) {
+    if (formatted > 0) {
         bh_buffer_write_byte(instr_text, ' ');
-        bh_buffer_write_string(instr_text, formatted);
+        bh_buffer_append(instr_text, buf, formatted);
     }
 }
 

@@ -96,13 +96,8 @@ static void resume_thread(debug_thread_state_t *thread) {
     sem_post(&thread->wait_semaphore);
 }
 
-static void get_stack_frame_location(debug_state_t *debug,
-    debug_func_info_t *func_info, debug_file_info_t *file_info, debug_loc_info_t *loc_info,
-    debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
-
+static u32 get_stack_frame_instruction_pointer(debug_state_t *debug, debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
     ovm_func_t *func = frame->func;
-
-    assert(debug_info_lookup_func(debug->info, func->id, func_info));
 
     u32 instr;
     if (frame == &bh_arr_last(thread->ovm_state->stack_frames)) {
@@ -110,6 +105,19 @@ static void get_stack_frame_location(debug_state_t *debug,
     } else {
         instr = (frame + 1)->return_address;
     }
+
+    return instr;
+}
+
+static void get_stack_frame_location(debug_state_t *debug,
+    debug_func_info_t *func_info, debug_file_info_t *file_info, debug_loc_info_t *loc_info,
+    debug_thread_state_t *thread, ovm_stack_frame_t *frame) {
+
+    ovm_func_t *func = frame->func;
+
+    u32 instr = get_stack_frame_instruction_pointer(debug, thread, frame);
+
+    assert(debug_info_lookup_func(debug->info, func->id, func_info));
 
     while (!debug_info_lookup_location(debug->info, instr, loc_info))
         instr++;
@@ -304,6 +312,7 @@ static DEBUG_COMMAND_HANDLER(debug_command_trace) {
         send_string(debug, func_info.name);
         send_string(debug, file_info.name);
         send_int(debug, loc_info.line);
+        send_int(debug, get_stack_frame_instruction_pointer(debug, thread, frame));
     }
 }
 
@@ -468,6 +477,31 @@ static DEBUG_COMMAND_HANDLER(debug_command_memory_write) {
 static DEBUG_COMMAND_HANDLER(debug_command_disassmble) {
     u32 addr = parse_int(debug, ctx);
     u32 count = parse_int(debug, ctx);
+
+    send_response_header(debug, msg_id);
+
+    bh_buffer instr_buf;
+    bh_buffer_init(&instr_buf, debug->tmp_alloc, 1024);
+
+    // This is kind of a hack, but currently there is no
+    // easy way to access the program text for the current
+    // program without going through a thread. So I just go
+    // through the first thread.
+    ovm_program_t *prog = debug->threads[0]->ovm_state->program;
+
+    while (addr < bh_arr_length(prog->code) && count--) {
+        send_int(debug, 0);
+
+        ovm_disassemble(prog, addr, &instr_buf);
+
+        send_bytes(debug, instr_buf.data, instr_buf.length);
+        bh_buffer_clear(&instr_buf);
+
+        addr += 1;
+    }
+
+    send_int(debug, 1);
+    bh_buffer_free(&instr_buf);
 }
 
 static debug_command_handler_t command_handlers[] = {

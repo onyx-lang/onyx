@@ -238,7 +238,7 @@ export class OVMDebugSession extends LoggingDebugSession {
 				});
 
 				let stack_frame = new StackFrame(frameRef, f.funcname, source, f.line);
-				stack_frame.instructionPointerReference = "1234";
+				stack_frame.instructionPointerReference = f.instructionPointer.toString();
 				
 				return stack_frame;
 			})
@@ -375,16 +375,17 @@ export class OVMDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	protected disassembleRequest(response: DebugProtocol.DisassembleResponse, args: DebugProtocol.DisassembleArguments, request?: DebugProtocol.Request): void {
-		console.log(args);
+	protected async disassembleRequest(response: DebugProtocol.DisassembleResponse, args: DebugProtocol.DisassembleArguments, request?: DebugProtocol.Request): Promise<void> {
+		let addr = parseInt(args.memoryReference) + args.offset;
+		let instrs = await this.debugger.disassemble(addr, args.instructionCount);
 
 		response.body = {
-			instructions: [
-				{
-					address: "0",
-					instruction: "i32.add %3, %1, %2",
-				}
-			]
+			instructions: instrs.map((i, index) => {
+				return {
+					address: (index + addr - 1).toString(),
+					instruction: i.instr,
+				};
+			})
 		};
 
 		this.sendResponse(response);
@@ -426,6 +427,7 @@ interface IFileLocation {
 	funcname: string;
 	filename: string;
 	line: number;
+	instructionPointer: number;
 }
 
 interface IBreakpointValidation {
@@ -452,6 +454,10 @@ interface IReadMemory {
 	data: ArrayBuffer;
 }
 
+interface IDisassembledInstruction {
+	instr: string;
+}
+
 enum OVMCommand {
 	NOP     = 0,
 	RES     = 1,
@@ -464,6 +470,7 @@ enum OVMCommand {
 	VARS    = 8,
 	MEM_R   = 9,
 	MEM_W   = 10,
+	DISASM  = 11
 }
 
 enum OVMEvent {
@@ -712,6 +719,26 @@ class OVMDebugger extends EventEmitter {
 		return this.preparePromise(cmd_id);
 	}
 
+	disassemble(addr: number, count: number): Promise<IDisassembledInstruction[]> {
+		if (this.client == null) return Promise.resolve([]);
+
+        let data = new ArrayBuffer(16);
+        let view = new DataView(data);
+
+        let cmd_id = this.next_command_id;
+
+        view.setUint32(0, cmd_id, true);
+        view.setUint32(4, OVMCommand.DISASM, true);
+        view.setUint32(8, addr, true);
+        view.setUint32(12, count, true);
+
+        this.client.write(new Uint8Array(data));
+
+        this.pending_responses[cmd_id] = OVMCommand.DISASM;
+
+		return this.preparePromise(cmd_id);
+	}
+
 	private parseIncoming(data: Buffer): void {
 		let parser = new DataParser(data);
 
@@ -801,8 +828,9 @@ class OVMDebugger extends EventEmitter {
 					let funcname = parser.parseString();
 					let filename = parser.parseString();
 					let line     = parser.parseInt32();
+					let ip       = parser.parseInt32();
 
-					result.push({funcname, filename, line});
+					result.push({funcname, filename, line, instructionPointer: ip});
 				}
 				
 				this.resolvePromise(msg_id, result);
@@ -851,6 +879,18 @@ class OVMDebugger extends EventEmitter {
 				let count = parser.parseUint32();
 
 				this.resolvePromise(msg_id, count);
+				break;
+			}
+
+			case OVMCommand.DISASM: {
+				let result = new Array<IDisassembledInstruction>();
+
+				while (parser.parseInt32() == 0) {
+					let instr = parser.parseString();
+					result.push({ instr });
+				}
+
+				this.resolvePromise(msg_id, result);
 				break;
 			}
 
