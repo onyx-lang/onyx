@@ -360,5 +360,7 @@ struct ovm_instr_t {
 #define OVM_TYPED_INSTR(instr, type)  (((instr) << 3) | (type))
 
 
+void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_text);
+
 #endif
 

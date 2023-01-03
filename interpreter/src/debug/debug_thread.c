@@ -20,6 +20,7 @@
 #define CMD_VARS 8
 #define CMD_MEM_R 9
 #define CMD_MEM_W 10
+#define CMD_DISASM 11
 
 #define EVT_NOP 0
 #define EVT_BRK_HIT 1
@@ -464,6 +465,11 @@ static DEBUG_COMMAND_HANDLER(debug_command_memory_write) {
     send_int(debug, count);
 }
 
+static DEBUG_COMMAND_HANDLER(debug_command_disassmble) {
+    u32 addr = parse_int(debug, ctx);
+    u32 count = parse_int(debug, ctx);
+}
+
 static debug_command_handler_t command_handlers[] = {
     [CMD_NOP]     = debug_command_nop,
     [CMD_RES]     = debug_command_res,
@@ -476,6 +482,7 @@ static debug_command_handler_t command_handlers[] = {
     [CMD_VARS]    = debug_command_vars,
     [CMD_MEM_R]   = debug_command_memory_read,
     [CMD_MEM_W]   = debug_command_memory_write,
+    [CMD_DISASM]  = debug_command_disassmble,
 };
 
 static void process_command(debug_state_t *debug, struct msg_parse_ctx_t *ctx) {
