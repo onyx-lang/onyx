@@ -12,6 +12,10 @@
 
 #define PUSH_VALUE(b, r) (bh_arr_push((b)->execution_stack, r))
 
+#define LAST_VALUE(b) bh_arr_last((b)->execution_stack)
+
+#define IS_TEMPORARY_VALUE(b, r) (r >= (b->param_count + b->local_count))
+
 static inline int NEXT_VALUE(ovm_code_builder_t *b) {
 #if defined(BUILDER_DEBUG)
     b->highest_value_number += 1;
@@ -400,6 +404,21 @@ void ovm_code_builder_add_local_get(ovm_code_builder_t *builder, i32 local_idx) 
 }
 
 void ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx) {
+    // :PrimitiveOptimization
+    // Perform a simple optimization that an immediate temporary moved to
+    // a local can be optimized as an immediate loaded directly to a local.
+    {
+        ovm_instr_t *last_instr = &bh_arr_last(builder->program->code);
+        if (OVM_INSTR_INSTR(*last_instr) == OVMI_IMM) {
+            if (IS_TEMPORARY_VALUE(builder, last_instr->r)
+                && last_instr->r == LAST_VALUE(builder)) {
+                last_instr->r = local_idx;
+                POP_VALUE(builder);
+                return;
+            }
+        }
+    }
+
     ovm_instr_t instr = {0};
     instr.full_instr = OVM_TYPED_INSTR(OVMI_MOV, OVM_TYPE_NONE);
     instr.r = local_idx; // This makes the assumption that the params will be in

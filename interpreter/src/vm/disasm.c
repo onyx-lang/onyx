@@ -165,8 +165,8 @@ void ovm_disassemble(ovm_program_t *program, u32 instr_addr, bh_buffer *instr_te
 
         case instr_format_idx_arr: formatted = snprintf(buf, 255, "%%%d, __global_arr_%d[%%%d]", instr->r, instr->a, instr->b); break;
 
-        case instr_format_br:       formatted = snprintf(buf, 255, "%d", instr_addr + instr->a); break;
-        case instr_format_br_cond:  formatted = snprintf(buf, 255, "%d, %%%d", instr_addr + instr->a, instr->b); break;
+        case instr_format_br:       formatted = snprintf(buf, 255, "%d", instr_addr + instr->a + 1); break;
+        case instr_format_br_cond:  formatted = snprintf(buf, 255, "%d, %%%d", instr_addr + instr->a + 1, instr->b); break;
         case instr_format_bri:      formatted = snprintf(buf, 255, "ip + %%%d", instr->a); break;
         case instr_format_bri_cond: formatted = snprintf(buf, 255, "ip + %%%d, %%%d", instr->a, instr->b); break;
 

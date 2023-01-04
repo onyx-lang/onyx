@@ -148,11 +148,7 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
             this._variableReferences.reset();
             response.body = {
                 stackFrames: frames.map((f, i) => {
-                    let source = new debugadapter_1.Source(this.fileNameToShortName(f.filename), this.convertDebuggerPathToClient(f.filename), undefined, undefined, "ovm-debug-src");
-                    if (!this._loadedSources.has(source.name)) {
-                        this._loadedSources.set(source.name, source);
-                        this.sendEvent(new debugadapter_1.LoadedSourceEvent("new", source));
-                    }
+                    let source = this.loadSource(f.filename);
                     let frameRef = this._frameReferences.create({
                         threadId: args.threadId,
                         frameIndex: i
@@ -270,14 +266,19 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     }
     disassembleRequest(response, args, request) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log(args);
             let addr = parseInt(args.memoryReference) + args.offset;
             let instrs = yield this.debugger.disassemble(addr, args.instructionCount);
             response.body = {
                 instructions: instrs.map((i, index) => {
+                    let source;
+                    if (i.newSource != null) {
+                        source = this.loadSource(i.newSource);
+                    }
                     return {
                         address: (index + addr).toString(),
-                        instruction: i.instr
+                        instruction: i.instr,
+                        line: i.line,
+                        location: source,
                     };
                 })
             };
@@ -308,6 +309,14 @@ class OVMDebugSession extends debugadapter_1.LoggingDebugSession {
     }
     fileNameToShortName(filename) {
         return filename.substring(filename.lastIndexOf("/") + 1);
+    }
+    loadSource(filename) {
+        let source = new debugadapter_1.Source(this.fileNameToShortName(filename), this.convertDebuggerPathToClient(filename), undefined, undefined, "ovm-debug-src");
+        if (!this._loadedSources.has(source.name)) {
+            this._loadedSources.set(source.name, source);
+            this.sendEvent(new debugadapter_1.LoadedSourceEvent("new", source));
+        }
+        return source;
     }
 }
 exports.OVMDebugSession = OVMDebugSession;
@@ -644,7 +653,12 @@ class OVMDebugger extends EventEmitter {
                 let result = new Array();
                 while (parser.parseInt32() == 0) {
                     let instr = parser.parseString();
-                    result.push({ instr });
+                    let line = parser.parseUint32();
+                    let newSource = null;
+                    if (parser.parseBool()) {
+                        newSource = parser.parseString();
+                    }
+                    result.push({ instr, line, newSource });
                 }
                 this.resolvePromise(msg_id, result);
                 break;

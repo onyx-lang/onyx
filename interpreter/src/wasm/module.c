@@ -29,6 +29,10 @@ static bool module_build(wasm_module_t *module, const wasm_byte_vec_t *binary) {
     // But Onyx does not do this, so I don't care at the moment.
     module->program->register_count = module->globaltypes.size;
 
+    #if 0
+        printf("Program instruction count: %d\n", bh_arr_length(module->program->code));
+    #endif
+
     return true;
 }
 

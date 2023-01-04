@@ -220,18 +220,8 @@ export class OVMDebugSession extends LoggingDebugSession {
 
 		response.body = {
 			stackFrames: frames.map((f, i) => {
-				let source = new Source(
-					this.fileNameToShortName(f.filename),
-					this.convertDebuggerPathToClient(f.filename),
-					undefined, undefined, "ovm-debug-src"
-				);
+				let source = this.loadSource(f.filename);
 
-				if (!this._loadedSources.has(source.name)) {
-					this._loadedSources.set(source.name, source);
-	
-					this.sendEvent(new LoadedSourceEvent("new", source));
-				}
-				
 				let frameRef = this._frameReferences.create({
 					threadId: args.threadId,
 					frameIndex: i
@@ -381,9 +371,16 @@ export class OVMDebugSession extends LoggingDebugSession {
 
 		response.body = {
 			instructions: instrs.map((i, index) => {
+				let source: DebugProtocol.Source | null;
+				if (i.newSource != null) {
+					source = this.loadSource(i.newSource);
+				}
+
 				return {
-					address: (index + addr - 1).toString(),
+					address: (index + addr).toString(),
 					instruction: i.instr,
+					line: i.line,
+					location: source,
 				};
 			})
 		};
@@ -421,6 +418,22 @@ export class OVMDebugSession extends LoggingDebugSession {
 	private fileNameToShortName(filename: string): string {
 		return filename.substring(filename.lastIndexOf("/") + 1);
 	}
+
+	private loadSource(filename: string): Source {
+		let source = new Source(
+			this.fileNameToShortName(filename),
+			this.convertDebuggerPathToClient(filename),
+			undefined, undefined, "ovm-debug-src"
+		);
+
+		if (!this._loadedSources.has(source.name)) {
+			this._loadedSources.set(source.name, source);
+
+			this.sendEvent(new LoadedSourceEvent("new", source));
+		}
+				
+		return source;
+	}
 }
 
 interface IFileLocation {
@@ -456,6 +469,8 @@ interface IReadMemory {
 
 interface IDisassembledInstruction {
 	instr: string;
+	line: number;
+	newSource?: string;
 }
 
 enum OVMCommand {
@@ -887,7 +902,14 @@ class OVMDebugger extends EventEmitter {
 
 				while (parser.parseInt32() == 0) {
 					let instr = parser.parseString();
-					result.push({ instr });
+					let line  = parser.parseUint32();
+
+					let newSource: string | null = null;
+					if (parser.parseBool()) {
+						newSource = parser.parseString();
+					}
+
+					result.push({ instr, line, newSource });
 				}
 
 				this.resolvePromise(msg_id, result);

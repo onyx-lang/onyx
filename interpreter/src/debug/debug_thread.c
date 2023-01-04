@@ -489,6 +489,9 @@ static DEBUG_COMMAND_HANDLER(debug_command_disassmble) {
     // through the first thread.
     ovm_program_t *prog = debug->threads[0]->ovm_state->program;
 
+    debug_loc_info_t loc_info;
+    u32 last_file_id = 0xffffffff;
+
     while (addr < bh_arr_length(prog->code) && count--) {
         send_int(debug, 0);
 
@@ -496,6 +499,18 @@ static DEBUG_COMMAND_HANDLER(debug_command_disassmble) {
 
         send_bytes(debug, instr_buf.data, instr_buf.length);
         bh_buffer_clear(&instr_buf);
+
+        debug_info_lookup_location(debug->info, addr, &loc_info);
+        send_int(debug, loc_info.line);
+
+        if (loc_info.file_id != last_file_id) {
+            send_bool(debug, true);
+            send_string(debug, debug->info->files[loc_info.file_id].name);
+
+            last_file_id = loc_info.file_id;
+        } else {
+            send_bool(debug, false);
+        }
 
         addr += 1;
     }
