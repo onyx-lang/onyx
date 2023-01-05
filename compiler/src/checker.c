@@ -2333,7 +2333,17 @@ CheckStatus check_statement(AstNode** pstmt) {
                 CHECK(type, &typed_stmt->type_node);
 
                 if (!node_is_type((AstNode *) typed_stmt->type_node)) {
-                    ERROR(stmt->token->pos, "Local's type is not a type.");
+                    if (typed_stmt->type_node->type == &basic_types[Basic_Kind_Type_Index]) {
+                        onyx_report_error(stmt->token->pos, Error_Critical, "The type of this local variable is a runtime-known type, not a compile-time known type.");
+
+                        if (typed_stmt->type_node->kind == Ast_Kind_Param) {
+                            onyx_report_error(stmt->token->pos, Error_Critical, "Try adding a '$' to the parameter name to make this a compile-time known type.");
+                        }
+
+                        return Check_Error;
+                    } else {
+                        ERROR(stmt->token->pos, "The type of this local is not a type.");
+                    }
                 }
 
                 YIELD(typed_stmt->token->pos, "Waiting for local variable's type.");
