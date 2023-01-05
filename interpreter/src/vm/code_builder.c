@@ -410,8 +410,15 @@ void ovm_code_builder_add_local_set(ovm_code_builder_t *builder, i32 local_idx) 
     {
         ovm_instr_t *last_instr = &bh_arr_last(builder->program->code);
         if (OVM_INSTR_INSTR(*last_instr) == OVMI_IMM) {
-            if (IS_TEMPORARY_VALUE(builder, last_instr->r)
-                && last_instr->r == LAST_VALUE(builder)) {
+            if (IS_TEMPORARY_VALUE(builder, last_instr->r) && last_instr->r == LAST_VALUE(builder)) {
+                last_instr->r = local_idx;
+                POP_VALUE(builder);
+                return;
+            }
+        }
+
+        if (OVM_INSTR_INSTR(*last_instr) == OVMI_REG_GET) {
+            if (IS_TEMPORARY_VALUE(builder, last_instr->r) && last_instr->r == LAST_VALUE(builder)) {
                 last_instr->r = local_idx;
                 POP_VALUE(builder);
                 return;
@@ -461,6 +468,21 @@ void ovm_code_builder_add_register_get(ovm_code_builder_t *builder, i32 reg_idx)
 }
 
 void ovm_code_builder_add_register_set(ovm_code_builder_t *builder, i32 reg_idx) {
+    // :PrimitiveOptimization
+    {
+        ovm_instr_t *last_instr = &bh_arr_last(builder->program->code);
+        if (OVM_INSTR_INSTR(*last_instr) == OVMI_MOV) {
+            if (IS_TEMPORARY_VALUE(builder, last_instr->r) && last_instr->r == LAST_VALUE(builder)) {
+                
+                last_instr->full_instr = OVM_TYPED_INSTR(OVMI_REG_SET, OVM_TYPE_NONE);
+                last_instr->r = reg_idx;
+
+                POP_VALUE(builder);
+                return;
+            }
+        }
+    }
+
     ovm_instr_t instr = {0};
     instr.full_instr = OVM_TYPED_INSTR(OVMI_REG_SET, OVM_TYPE_NONE);
     instr.r = reg_idx;

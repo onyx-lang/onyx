@@ -557,10 +557,10 @@ from_array :: #match #local {}
 from_array :: (arr: [] $T/type_is_struct) => generator(
     ^.{ data = arr.data, count = arr.count, current = 0 },
 
-    (use ctx: ^$T) -> (typeof ctx.data, bool) {
-        if current < count {
-            defer current += 1;
-            return ^data[current], true;
+    ctx => {
+        if ctx.current < ctx.count {
+            defer ctx.current += 1;
+            return ^ctx.data[ctx.current], true;
         }
 
         return null, false;
@@ -571,10 +571,10 @@ from_array :: (arr: [] $T/type_is_struct) => generator(
 from_array :: (arr: [] $T) => generator(
     ^.{ data = arr.data, count = arr.count, current = 0 },
 
-    (use ctx: ^$T) -> (typeof *ctx.data, bool) {
-        if current < count {
-            defer current += 1;
-            return data[current], true;
+    ctx => {
+        if ctx.current < ctx.count {
+            defer ctx.current += 1;
+            return ctx.data[ctx.current], true;
         }
 
         return .{}, false;
