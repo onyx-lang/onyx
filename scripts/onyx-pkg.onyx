@@ -1,5 +1,6 @@
 
 #load "core/std"
+#load "core/encoding/ini"
 
 //
 // A list of repository URLs to get packages from.
@@ -286,7 +287,7 @@ run_sync_command :: (args: [] cstr) {
         package_path := config.dependency_folders.folders[to_install.repo];
         for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
             r := io.reader_make(it);
-            result, error := parse_ini_file(^r, ^inner_config);
+            result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
 
             if result != .Success {
                 eprintf("Failed to parse onyx-pkg.ini in {}. Skipping...\n", to_install.repo);
@@ -519,7 +520,7 @@ attempt_remove_native_library :: (package_folder: str) -> bool {
     inner_config: Config;
     for os.with_file(tprintf("{}/onyx-pkg.ini", package_folder)) {
         r := io.reader_make(it);
-        result, error := parse_ini_file(^r, ^inner_config);
+        result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
 
         if result != .Success do return false;
         if string.empty(inner_config.native_library.library) do return false;
@@ -539,7 +540,7 @@ get_installed_version_of_package :: (package_path: str) -> SemVer {
     inner_config: Config;
     for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, package_path)) {
         r := io.reader_make(it);
-        result, error := parse_ini_file(^r, ^inner_config);
+        result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
 
         if result == .Success {
             return inner_config.metadata.version;
@@ -553,7 +554,7 @@ run_native_library_installation :: (folder: str) -> bool {
     inner_config: Config;
     for os.with_file(tprintf("{}/{}/onyx-pkg.ini", config.config.lib_source_directory, folder)) {
         r := io.reader_make(it);
-        result, error := parse_ini_file(^r, ^inner_config);
+        result, error := encoding.ini.parse_ini_file(^r, ^inner_config);
 
         if result != .Success do return false;
         if string.empty(inner_config.native_library.build_cmd) do return true;
@@ -767,7 +768,7 @@ Git :: struct {
                 successfully_parsed := false;
                 for os.with_file(tprintf("{}/onyx-pkg.ini", full_dest)) {
                     r := io.reader_make(it);
-                    result, error := parse_ini_file(^r, ^new_config);
+                    result, error := encoding.ini.parse_ini_file(^r, ^new_config);
 
                     if result == .Success {
                         successfully_parsed = true;
@@ -929,7 +930,7 @@ load_config_file :: () -> bool {
     reader, stream := io.reader_from_string(file_data);
     defer cfree(stream);
 
-    result, error := parse_ini_file(^reader, ^config);
+    result, error := encoding.ini.parse_ini_file(^reader, ^config);
     if result != .Success {
         eprintf("{w5} | {}\n", error.line, error.msg);
         return false;
@@ -943,149 +944,8 @@ store_config_file :: () -> bool {
         writer := io.writer_make(it);
         defer io.writer_free(^writer);
 
-        return write_ini_file(^writer, config);
+        return encoding.ini.write_ini_file(^writer, config);
     }
 }
 
 
-
-#local {
-    IniParseResult :: enum {
-        Success;
-        Error;
-    }
-
-    IniParseError :: struct {
-        msg: str;
-        line: u32;
-    }
-}
-
-parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
-    info :: runtime.info
-
-    line := 1;
-    error :: macro (msg: str) {
-        return .Error, .{ msg, line };
-    }
-
-    next_line :: macro () {
-        r->advance_line();
-        line += 1;
-    }
-
-    output: any;
-    if t := info.get_type_info(output_ptr.type); t.kind != .Pointer {
-        error("Expected pointer type for parameter.");
-    } else {
-        output.data = *cast(^rawptr) output_ptr.data;
-        output.type = (cast(^info.Type_Info_Pointer) t).to;
-    }
-
-    defer alloc.clear_temp_allocator();
-
-    active_item_ptr  := null;
-    active_item_type := void;
-
-    r->skip_whitespace();
-    while !(r->is_empty()) {
-        defer r->skip_whitespace();
-
-        if b, e := r->peek_byte(); b == #char "[" {
-            assert(r->read_byte() == #char "[", "expected [");
-            section_name := r->read_until(#char "]", allocator=context.temp_allocator);
-            assert(r->read_byte() == #char "]", "expected ]");
-
-            stripped_section_name := string.strip_whitespace(section_name);
-            member := info.get_struct_member(output.type, stripped_section_name);
-            if member == null {
-                error(msg = aprintf("'{}' is not a valid section name.", stripped_section_name));
-            }
-
-            active_item_ptr  = cast(^u8) output.data + member.offset;
-            active_item_type = member.type;
-
-            parse_method := info.get_struct_method(active_item_type, "parse_ini");
-            if parse_method != null {
-                next_line();
-
-                f := *cast(^(rawptr, ^io.Reader) -> bool) parse_method.data;
-                if !f(active_item_ptr, r) {
-                    error(msg = aprintf("Failed parsing."));
-                }
-
-                r->read_until(#char "[", inplace=true);
-            }
-
-            continue;
-
-        } elseif e != .None {
-            if e == .EOF do break;
-            error(msg = aprintf("Error reading file: {}", e));
-        }
-
-        defer next_line();
-
-        field_name := r->read_until(#char "=", allocator=context.temp_allocator);
-        assert(r->read_byte() == #char "=", "expected =");
-
-        field := info.get_struct_member(active_item_type, string.strip_whitespace(field_name));
-        target := cast(^u8) active_item_ptr + field.offset;
-        value_string := r->read_until(#char "\n", allocator=context.temp_allocator);
-        parsed_successfully := conv.parse_any(target, field.type, value_string);
-
-        if !parsed_successfully {
-            //
-            // If the type is a string, then the value can be the entire line
-            // of text. No need to force the quotes.
-            if field.type == str {
-                *cast(^str) target = value_string
-                                  |> string.strip_whitespace()
-                                  |> string.alloc_copy();
-
-            } else {
-                error(aprintf("Failed to parse value."));
-            }
-        }
-
-    } else {
-        error("Empty file");
-    }
-
-    return .Success, .{"",0};
-}
-
-write_ini_file :: (w: ^io.Writer, output: any) -> bool {
-    info :: runtime.info
-
-    output_info := cast(^info.Type_Info_Struct) info.get_type_info(output.type);
-    if output_info.kind != .Struct do return false;
-
-    for^ output_info.members {
-        io.write_format(w, "[{}]\n", it.name);
-        defer io.write(w, "\n");
-
-        member_info := cast(^info.Type_Info_Struct) info.get_type_info(it.type);
-        if member_info.kind != .Struct do continue;
-
-        member_data := cast(^u8) output.data + it.offset;
-
-        if write_method := info.get_struct_method(it.type, "write_ini"); write_method != null {
-            wm := *cast(^(rawptr, ^io.Writer) -> bool) write_method.data;
-            if !wm(member_data, w) {
-                return false;
-            }
-
-            continue;
-        }
-
-        for^ prop: member_info.members {
-            io.write_format_va(w, "{}={}\n", .[
-                .{^prop.name, str},
-                .{member_data + prop.offset, prop.type}
-            ]);
-        }
-    }
-
-    return true;
-}

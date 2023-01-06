@@ -163,6 +163,9 @@ Socket_Poll_Status :: enum {
     Closed    :: 2;
 }
 
+// TODO: Cleanup this function. The stat_buff should be something that is at least
+// as big as the sockets array, and the timeout should be the last parameter because
+// it is not required.
 socket_poll_all :: (sockets: [] ^Socket, timeout := -1, stat_buff: [] Socket_Poll_Status = .[]) {
     if sockets.count > stat_buff.count do return;
 

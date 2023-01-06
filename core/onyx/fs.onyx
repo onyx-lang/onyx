@@ -39,6 +39,9 @@ __file_open :: (path: str, mode := os.OpenMode.Read) -> (FileData, os.FileError)
     __dir_read   :: (dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool ---
     __dir_create :: (path: str) -> bool ---
     __dir_remove :: (path: str) -> bool ---
+
+
+    __enable_non_blocking_stdin :: () -> void ---
 }
 
 __file_stream_vtable := io.Stream_Vtable.{

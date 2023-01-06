@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = void 0;
 const vscode = require("vscode");
 const vsctmls = require("vscode-textmate-languageservice");
+let client;
 function activate(context) {
     return __awaiter(this, void 0, void 0, function* () {
         let console = vscode.window.createOutputChannel("Onyx Extension");
@@ -26,6 +27,18 @@ function activate(context) {
         context.subscriptions.push(vscode.languages.registerWorkspaceSymbolProvider(workspaceSymbolProvider));
         // context.subscriptions.push(vscode.languages.registerFoldingRangeProvider(selector, foldingProvider));
         context.subscriptions.push(vscode.languages.registerDefinitionProvider({ 'language': 'onyx' }, peekFileDefinitionProvider));
+        // client = new vslc.LanguageClient("onyx-lsp", {
+        // 	command: "onyx-lsp",
+        // 	transport: TransportKind.stdio,
+        // }, {
+        // 	documentSelector: [
+        // 		{ scheme: "file", language: "onyx" },
+        // 	],
+        // 	synchronize: {
+        // 		fileEvents: vscode.workspace.createFileSystemWatcher("**/*.onyx")
+        // 	}
+        // });
+        // client.start();
         console.appendLine("Onyx Extension loaded.");
     });
 }

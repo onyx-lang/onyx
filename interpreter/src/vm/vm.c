@@ -598,7 +598,7 @@ static ovm_stack_frame_t ovm__func_teardown_stack_frame(ovm_state_t *state) {
 
 ovm_value_t ovm_func_call(ovm_engine_t *engine, ovm_state_t *state, ovm_program_t *program, i32 func_idx, i32 param_count, ovm_value_t *params) {
     ovm_func_t *func = &program->funcs[func_idx];
-    ovm_assert(func.value_number_count >= func.param_count);
+    ovm_assert(func->value_number_count >= func->param_count);
 
     switch (func->kind) {
         case OVM_FUNC_INTERNAL: {

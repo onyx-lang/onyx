@@ -20,6 +20,14 @@ Reader :: struct {
     // that is available. Only set this if you know that the data
     // will always be available.
     greedy : bool;
+
+    // A very special flag that should probably only be used on
+    // standard input (hence the name). This flag says that if there
+    // is ANY data left in the buffer, do not try to fill the buffer
+    // with a call to stream_read. This will produce incorrect results
+    // for things like read_line, but will prevent hanging when using
+    // a blocking read source like stdin.
+    stdin: bool;
 }
 
 #inject Reader {
@@ -594,6 +602,10 @@ lines :: (r: ^Reader, inplace := false) =>
 
     if end >= buffer.count {
         return .BufferFull;
+    }
+
+    if end > 0 && stdin {
+        return .None;
     }
 
     err, n := stream_read(stream, buffer[end .. buffer.count]);
