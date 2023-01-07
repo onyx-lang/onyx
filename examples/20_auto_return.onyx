@@ -34,7 +34,7 @@ main :: (args: [] cstr) {
             return arr;
         }
 
-        return consume_inner(iter.as_iterator(it));
+        return consume_inner(iter.as_iter(it));
     }
 
 

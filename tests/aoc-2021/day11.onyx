@@ -50,7 +50,7 @@ main :: (args) => {
                 }
             }
 
-            for flash: iter.as_iterator(^to_flash) {
+            for flash: iter.as_iter(^to_flash) {
                 for y: -1 .. 2 do for x: -1 .. 2 {
                     if y == 0 && x == 0 do continue;
 
@@ -60,7 +60,7 @@ main :: (args) => {
                 }
             }
 
-            for flash: iter.as_iterator(^to_flash) {
+            for flash: iter.as_iter(^to_flash) {
                 set_octopus(flash.x, flash.y, 0);
                 if step <= 100 do flash_count += 1;
             }

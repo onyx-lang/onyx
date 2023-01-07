@@ -72,7 +72,7 @@ main :: (args) => {
             }
         }
 
-        for iter.as_iterator(range.{ BITS - 1, 0, -1 }) {
+        for iter.as_iter(range.{ BITS - 1, 0, -1 }) {
             filter_array(oxygen_array, it, #(A >= B));
             filter_array(co2_array,    it, #(A <  B));
         }

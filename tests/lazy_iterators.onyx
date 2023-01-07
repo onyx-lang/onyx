@@ -40,7 +40,7 @@ main :: (args: [] cstr) {
         }
     }
 
-    iterator := iter.as_iterator(1 .. 11)
+    iterator := iter.as_iter(1 .. 11)
                 |> iter.map((x: i32) -> i32     { return x * 2; })
                 |> iter.filter((x: i32) -> bool { return x > 10; })
                 |> iter.map((x: i32) -> i32     { return x + 42; });

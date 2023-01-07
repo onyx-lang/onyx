@@ -321,7 +321,7 @@ tcp_server_broadcast :: (use server: ^TCP_Server, data: [] u8, except: ^TCP_Serv
 
 tcp_server_handle_events :: macro (server: ^TCP_Server, handler: Code) {
     while server->pulse() {
-        for iter.as_iterator(^server.connection) {
+        for iter.as_iter(^server.connection) {
             switch it.kind do #unquote handler;
         }
     }

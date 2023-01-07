@@ -31,7 +31,7 @@ f :: (thing: ^Thing, other: typeof thing) {
 
 main :: (args) => {
     m: Map(i32, str);
-    dumb(iter.as_iterator(1 .. 10), ^m);
+    dumb(iter.as_iter(1 .. 10), ^m);
 
     V :: Vector2(i32)
     v1 := V.{ 1, 0 };
@@ -43,7 +43,7 @@ main :: (args) => {
     t: Thing(f32);
     f(^t, ^t);
 
-    for iter.as_iterator(0 .. 100) |> iter.map(x => x * 2) |> iter.filter(x => x <= 10) {
+    for iter.as_iter(0 .. 100) |> iter.map(x => x * 2) |> iter.filter(x => x <= 10) {
         println(it);
     }
 }

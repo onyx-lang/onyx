@@ -183,8 +183,7 @@ literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, 
 }
 
 
-#overload core.iter.as_iterator as_iter
-
+#overload core.iter.as_iter as_iter
 as_iter :: (m: ^Map) =>
     core.iter.generator(
         ^.{ m = m, i = 0 },

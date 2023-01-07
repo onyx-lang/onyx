@@ -35,7 +35,7 @@ main :: (args) => {
     println(quickest_no_types(3, 4.0f));
 
     // This is an example of what the iter package looks like.
-    val := iter.as_iterator(range.{ 20, 1, -1 })
+    val := iter.as_iter(range.{ 20, 1, -1 })
             |> iter.map(x => x * 2)
             |> iter.map(x => cast(f32) x)
             |> iter.filter(x => x > 20)

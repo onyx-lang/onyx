@@ -101,8 +101,8 @@ for_each :: macro (b: Bucket_Array($T), body: Code) {
     }
 }
 
-#match iter.as_iterator iterator
-iterator :: (b: ^Bucket_Array($T)) -> Iterator(T) {
+#match iter.as_iter as_iter
+as_iter :: (b: ^Bucket_Array($T)) -> Iterator(T) {
     Context :: struct (T: type_expr) {
         ba         : ^Bucket_Array(T);
         bucket_idx : i32;

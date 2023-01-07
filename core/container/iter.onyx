@@ -2,10 +2,10 @@ package core.iter
 
 use core {memory, alloc, array, Pair}
 
-as_iterator :: #match {}
+as_iter :: #match {}
 
 Iterable :: interface (t: $T) {
-    { as_iterator(t) } -> Iterator;
+    { as_iter(t) } -> Iterator;
 }
 
 close :: (it: Iterator($T)) {
@@ -31,9 +31,34 @@ ImplicitIterator :: interface (t: $T) {
 }
 
 #overload #precedence 10000
-as_iterator :: (x: ^$T/ImplicitIterator) => {
+as_iter :: (x: ^$T/ImplicitIterator) => {
     x->iter_open();
     return generator_no_copy(x, T.iter_next, T.iter_close);
+}
+
+// nocheckin
+// Does it make sense for the language to have
+// the iterator "methods" as actual methods
+// on every iterator type? Or should you
+// just have to use the `iter.` variants
+// instead?
+#inject Iterator {
+    filter :: filter;
+    map :: map;
+    zip :: zip;
+
+    take_one :: take_one;
+    take :: take;
+    take_while :: take_while;
+    skip :: skip;
+    skip_while :: skip_while;
+    
+    enumerate :: enumerate;
+
+    fold :: fold;
+    count :: count;
+    some :: some;
+    every :: every;
 }
 
 
@@ -503,9 +528,9 @@ enumerate :: #match #local {}
 
 #overload
 enumerate :: macro (it: $T/Iterable, start_index: i32 = 0) => {
-    as_iterator :: as_iterator
+    as_iter :: as_iter
     enumerate :: enumerate
-    return enumerate(as_iterator(it), start_index);
+    return enumerate(as_iter(it), start_index);
 }
 
 #overload
@@ -583,10 +608,10 @@ from_array :: (arr: [] $T) => generator(
 
 
 #overload
-as_iterator :: from_array
+as_iter :: from_array
 
 #overload
-as_iterator :: (x: ^[..] $T) -> Iterator(T) {
+as_iter :: (x: ^[..] $T) -> Iterator(T) {
     Context :: struct (T: type_expr) {
         arr: ^[..] T;
         current: u32;
@@ -622,7 +647,7 @@ as_iterator :: (x: ^[..] $T) -> Iterator(T) {
 }
 
 #overload
-as_iterator :: (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
+as_iter :: (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
     Context :: struct (T: type_expr) {
         arr: ^[..] T;
         current: u32;
@@ -658,7 +683,7 @@ as_iterator :: (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
 }
 
 #overload
-as_iterator :: (r: range) -> Iterator(i32) {
+as_iter :: (r: range) -> Iterator(i32) {
     Context :: struct {
         r: range;
         v: i32;
@@ -699,7 +724,7 @@ fold :: #match #local {}
 #overload
 fold :: macro (it: $T/Iterable, init: $R, combine: $S) => {
     fold :: fold
-    return fold(as_iterator(it), init, combine);
+    return fold(as_iter(it), init, combine);
 }
 
 #overload
@@ -716,7 +741,7 @@ count :: #match #local {}
 #overload
 count :: macro (it: $T/Iterable, cond: $F) => {
     count :: count
-    return count(as_iterator(it), cond);
+    return count(as_iter(it), cond);
 }
 
 #overload
@@ -731,8 +756,8 @@ some :: #match #local {}
 #overload
 some :: macro (it: $T/Iterable, cond: $F) => {
     some :: some
-    as_iterator :: as_iterator
-    return some(as_iterator(it), cond);
+    as_iter :: as_iter
+    return some(as_iter(it), cond);
 }
 
 #overload
@@ -746,8 +771,8 @@ every :: #match #local {}
 #overload
 every :: macro (it: $T/Iterable, cond: $F) => {
     every :: every
-    as_iterator :: as_iterator
-    return every(as_iterator(it), cond);
+    as_iter :: as_iter
+    return every(as_iter(it), cond);
 }
 
 #overload
@@ -757,13 +782,13 @@ every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
 }
 
 prod :: (x: $I1/Iterable, y: $I2/Iterable) => {
-    y_iter   := as_iterator(y);
+    y_iter   := as_iter(y);
     y_val, _ := take_one(y_iter);
 
     return generator(
         ^.{
             x = x,
-            x_iter = as_iterator(x),
+            x_iter = as_iter(x),
 
             y_iter = y_iter,
             y_val  = y_val
@@ -778,7 +803,7 @@ prod :: (x: $I1/Iterable, y: $I2/Iterable) => {
             ctx.y_val, cont = take_one(ctx.y_iter);
             if !cont do return .{}, false;
 
-            ctx.x_iter = as_iterator(ctx.x);
+            ctx.x_iter = as_iter(ctx.x);
             x_val, cont = take_one(ctx.x_iter);
             if !cont do return .{}, false;
 
@@ -828,9 +853,9 @@ comp :: macro (i: Iterator($V), value: Code) => {
 
 #overload
 comp :: macro (i: $I/Iterable, value: Code) => {
-    as_iterator :: as_iterator
+    as_iter :: as_iter
     comp        :: comp
-    return comp(as_iterator(i), value);
+    return comp(as_iter(i), value);
 }
 
 
@@ -882,8 +907,8 @@ generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> vo
     #overload
     distributor :: macro (it: $T/Iterable) => {
         distributor :: distributor;
-        as_iterator :: as_iterator;
-        return distributor(as_iterator(it));
+        as_iter :: as_iter;
+        return distributor(as_iter(it));
     }
 
     #overload
@@ -928,16 +953,16 @@ generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> vo
     #overload
     parallel_for :: macro (iterable: $I/Iterable, thread_count: u32, thread_data: ^$Ctx, body: Code) {
         parallel_for :: parallel_for;
-        as_iterator  :: as_iterator;
+        as_iter  :: as_iter;
 
-        parallel_for(as_iterator(iterable), thread_count, thread_data, body);
+        parallel_for(as_iter(iterable), thread_count, thread_data, body);
     }
 
     #overload
     parallel_for :: macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
         use core {thread, alloc}
         distributor :: distributor;
-        as_iterator :: as_iterator;
+        as_iter :: as_iter;
 
         if thread_count != 0 {
             dist := distributor(iter);

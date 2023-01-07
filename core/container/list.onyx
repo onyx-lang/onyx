@@ -149,7 +149,7 @@ map :: #match #local {}
 }
 
 
-#match core.iter.as_iterator as_iter
+#match core.iter.as_iter as_iter
 as_iter :: (list: ^List) =>
     core.iter.generator(^.{current = list.first}, (ctx) => {
         if ctx.current != null {

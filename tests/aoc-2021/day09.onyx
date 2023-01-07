@@ -120,7 +120,7 @@ main :: (args) => {
 
         array.quicksort(lowest_count.entries, (a, b) => b.value - a.value);
 
-        answer := iter.as_iterator(lowest_count.entries)
+        answer := iter.as_iter(lowest_count.entries)
                |> iter.map((x) => x.value)
                |> iter.take(3)
                |> iter.fold(1, (x, y) => x * y);

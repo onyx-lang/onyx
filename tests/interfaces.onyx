@@ -89,7 +89,7 @@ consume :: macro (x: $T/iter.Iterable) => {
         },
     }
 
-    iterator := iter.as_iterator(x);
+    iterator := iter.as_iter(x);
     return consume_inner(iterator);
 }
 

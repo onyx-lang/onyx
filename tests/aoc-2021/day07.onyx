@@ -7,7 +7,7 @@ main :: (args) => {
         reader := io.reader_make(file);
         nums := io.read_all(^reader)
             |> string.split(#char ",")
-            |> iter.as_iterator()
+            |> iter.as_iter()
             |> iter.map((x) => cast(i32) conv.parse_int(x))
             |> iter.to_array();
 

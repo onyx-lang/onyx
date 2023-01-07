@@ -45,11 +45,11 @@ main :: (args) => {
             *name_copy = name;
 
             return iter.concat(
-                iter.as_iterator(edges)
+                iter.as_iter(edges)
                 |> iter.filter(name_copy, (x, n) => x.a == *n)
                 |> iter.map(x => x.b),
 
-                iter.as_iterator(edges)
+                iter.as_iter(edges)
                 |> iter.filter(name_copy, (x, n) => x.b == *n)
                 |> iter.map(x => x.a)
             );
@@ -61,7 +61,7 @@ main :: (args) => {
         }
 
         edge_map: Map(str, [] str);
-        for v: iter.as_iterator(^verticies) {
+        for v: iter.as_iter(^verticies) {
             edge_map[*v] = children_of(^edges, *v) |> iter.to_array();
         }
 

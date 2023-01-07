@@ -3,7 +3,7 @@ package core.arg_parse
 use core
 
 arg_parse :: (c_args: [] cstr, output: any) -> bool {
-    arg_iter := iter.as_iterator(c_args)
+    arg_iter := iter.as_iter(c_args)
              |> iter.map(string.from_cstr);
     defer arg_iter.close(arg_iter.data);
 
