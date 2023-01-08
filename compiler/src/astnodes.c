@@ -733,16 +733,16 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
     // [N] T  -> [] T
     // [..] T -> [] T
     // ..T    -> [] T
-    else if (node_type && type->kind == Type_Kind_Slice) {
-        if (node_type->kind == Type_Kind_Array || node_type->kind == Type_Kind_DynArray || node_type->kind == Type_Kind_VarArgs) {
-            char* dummy;
-            b32 legal = cast_is_legal(node_type, type, &dummy);
-            if (permanent && legal) {
-                *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
-            }
+    else if (node_type && type->kind == Type_Kind_Slice &&
+        (node_type->kind == Type_Kind_Array || node_type->kind == Type_Kind_DynArray || node_type->kind == Type_Kind_VarArgs)) {
 
-            return legal ? TYPE_MATCH_SUCCESS : TYPE_MATCH_FAILED;
+        char* dummy;
+        b32 legal = cast_is_legal(node_type, type, &dummy);
+        if (permanent && legal) {
+            *pnode = (AstTyped *) make_cast(context.ast_alloc, node, type);
         }
+
+        return legal ? TYPE_MATCH_SUCCESS : TYPE_MATCH_FAILED;
     }
 
     // If the node is a numeric literal, try to convert it to the destination type.
@@ -839,6 +839,38 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
                 return TYPE_MATCH_SUCCESS;
             }
         }
+    }
+
+    //
+    // This case enables to ability to have less values on the
+    // left hand side of an assignment than what the right hand
+    // side call would be returning.
+    else if (node_type->kind == Type_Kind_Compound) {
+        AstCall *call = get_call_expr_from_node((AstNode *) node);
+        if (!call) return TYPE_MATCH_FAILED;
+
+        i32 keep = 0;
+
+        if (type->kind != Type_Kind_Compound) {
+            if (!types_are_compatible(node_type->Compound.types[0], type)) {
+                return TYPE_MATCH_FAILED;
+            }
+
+            keep += type_linear_member_count(type);
+
+        } else {
+            fori (i, 0, type->Compound.count) {
+                if (!types_are_compatible(node_type->Compound.types[i], type->Compound.types[i])) {
+                    return TYPE_MATCH_FAILED;
+                }
+
+                keep += type_linear_member_count(node_type->Compound.types[i]);
+            }
+        }
+
+        call->ignored_return_value_count = type_linear_member_count(node_type) - keep;
+
+        return TYPE_MATCH_SUCCESS;
     }
 
     return TYPE_MATCH_FAILED;

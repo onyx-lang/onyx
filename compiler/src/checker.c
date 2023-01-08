@@ -842,6 +842,28 @@ static AstCall* binaryop_try_operator_overload(AstBinaryOp* binop, AstTyped* thi
 }
 
 
+static CheckStatus assign_type_or_check(AstTyped **node, Type *type, OnyxToken *report_loc) {
+    if (node && (*node)->type == NULL) {
+        (*node)->type = type;
+
+    } else {
+        TYPE_CHECK(node, type) {
+            ERROR_(report_loc->pos,
+                    "Cannot assign value of type '%s' to a '%s'.",
+                    type_get_name(type),
+                    node_get_type_name(*node));
+            return Check_Error;
+        }
+    }
+
+    return Check_Success;
+}
+
+#define TRY_ASSIGN_TYPE_OR_FAIL(node, type, report) do { \
+    CheckStatus stat = assign_type_or_check((node), (type), (report)); \
+    if (stat != Check_Success) return stat; \
+    } while (0);
+
 CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
     AstBinaryOp* binop = *pbinop;
     if (current_checking_level == EXPRESSION_LEVEL)
@@ -880,20 +902,38 @@ CheckStatus check_binaryop_assignment(AstBinaryOp** pbinop) {
                     ERROR(binop->token->pos, "Could not resolve type of right hand side to infer.");
 
                 } else {
-                    YIELD(binop->token->pos, "Trying to resolve try of right hand side.");
+                    YIELD(binop->token->pos, "Trying to resolve type of right hand side.");
                 }
             }
 
             if (right_type->kind == Type_Kind_Compound) {
                 AstCompound* lhs = (AstCompound *) binop->left;
-                i32 expr_count = right_type->Compound.count;
-                if (lhs->kind != Ast_Kind_Compound || bh_arr_length(lhs->exprs) != expr_count) {
-                    ERROR_(binop->token->pos, "Expected left hand side to have %d expressions.", expr_count);
+
+                i32 given_expr_count = right_type->Compound.count;
+                i32 store_expr_count = 1;
+                if (lhs->kind == Ast_Kind_Compound) {
+                    store_expr_count = bh_arr_length(lhs->exprs);
                 }
 
-                fori (i, 0, expr_count) lhs->exprs[i]->type = right_type->Compound.types[i];
+                if (get_call_expr_from_node((AstNode *) binop->right)) {
+                    if (store_expr_count > given_expr_count) {
+                        ERROR_(binop->token->pos, "Left hand side can only have %d expressions here.", given_expr_count);
+                    }
 
-                lhs->type = type_build_compound_type(context.ast_alloc, lhs);
+                } else if (store_expr_count != given_expr_count) {
+                    ERROR_(binop->token->pos, "Expected left hand side to have %d expressions.", given_expr_count);
+                }
+
+                if (store_expr_count == 1 && lhs->kind != Ast_Kind_Compound) {
+                    TRY_ASSIGN_TYPE_OR_FAIL(&binop->left, right_type->Compound.types[0], binop->token);
+
+                } else {
+                    fori (i, 0, store_expr_count) {
+                        TRY_ASSIGN_TYPE_OR_FAIL(&lhs->exprs[i], right_type->Compound.types[i], binop->token);
+                    }
+
+                    lhs->type = type_build_compound_type(context.ast_alloc, lhs);
+                }
 
             } else {
                 binop->left->type = right_type;
@@ -1194,11 +1234,7 @@ CheckStatus check_binaryop(AstBinaryOp** pbinop) {
     if (binop->operation == Binary_Op_Bool_And || binop->operation == Binary_Op_Bool_Or)
         return check_binaryop_bool(pbinop);
 
-    // NOTE: The left side cannot be compound.
-    //       The right side always is numeric.
-    //       The left side cannot be rawptr.
-    if (type_is_compound(binop->left->type))  goto bad_binaryop;
-    if (!type_is_numeric(binop->right->type)) goto bad_binaryop;
+    // NOTE: The left side cannot be rawptr.
     if (type_is_rawptr(binop->left->type)) {
         ERROR(binop->token->pos, "Cannot operate on a 'rawptr'. Cast it to a another pointer type first.");
     }

@@ -45,7 +45,6 @@ C_FILES="onyxrun wasm_runtime "
 echo "Compiling onyx-run..."
 $CC -o "../bin/onyx-run" \
     $FLAGS \
-    "-DCORE_INSTALLATION=\"CORE_DIR\"" \
     $INCLUDES \
     $(echo "$C_FILES" | sed 's/ /\n/g;s/\([a-zA-Z_0-9]*\)\n/src\/\1.c\n/g;s/\n/ /g') \
     $LIBS

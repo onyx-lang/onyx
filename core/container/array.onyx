@@ -183,11 +183,21 @@ pop :: (arr: ^[..] $T) -> T {
     return arr.data[arr.count];
 }
 
+concat :: #match #local {}
+
+#overload
 concat :: (arr: ^[..] $T, other: [] T) {
     if !ensure_capacity(arr, arr.count + other.count) do return;
 
     core.memory.copy(arr.data + arr.count, other.data, other.count * sizeof T);
     arr.count += other.count;
+}
+
+#overload
+concat :: (arr: ^[..] $T, other: Iterator(T)) {
+    for other {
+        push(arr, it);
+    }
 }
 
 filter :: macro (arr: ^[..] $T, body: Code) {
@@ -471,6 +481,7 @@ fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
     return acc;
 }
 
+/*
 map :: #match #locked {
     macro (arr: [] $T, f: (^T) -> void)                do for ^it: arr do f(it);,
     macro (arr: [] $T, f: (T) -> T)                    do for ^it: arr do *it = f(*it);,
@@ -478,6 +489,7 @@ map :: #match #locked {
     macro (arr: [] $T, data: $R, f: (^T, R) -> void)   do for ^it: arr do f(it, data);,
     macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
 }
+*/
 
 every :: #match #local {}
 

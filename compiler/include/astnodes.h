@@ -726,6 +726,7 @@ struct AstCall {
     };
 
     VarArgKind va_kind;
+    i32 ignored_return_value_count;
 };
 struct AstCompound {
     AstTyped_base;
@@ -1894,6 +1895,12 @@ static inline AstFunction* get_function_from_node(AstNode* node) {
     if (node->kind == Ast_Kind_Function) return (AstFunction *) node;
     if (node->kind == Ast_Kind_Polymorphic_Proc) return (AstFunction *) node;
     if (node->kind == Ast_Kind_Macro) return get_function_from_node((AstNode*) ((AstMacro *) node)->body);
+    return NULL;
+}
+
+static inline AstCall *get_call_expr_from_node(AstNode *node) {
+    if (node->kind == Ast_Kind_Call) return (AstCall *) node;
+    if (node->kind == Ast_Kind_Method_Call) return (AstCall *) ((AstBinaryOp *) node)->right;
     return NULL;
 }
 

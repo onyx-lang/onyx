@@ -492,7 +492,10 @@ EMIT_FUNC(assignment,                    AstBinaryOp* assign);
 EMIT_FUNC(assignment_of_array,           AstTyped* left, AstTyped* right);
 EMIT_FUNC(compound_assignment,           AstBinaryOp* assign);
 EMIT_FUNC(store_instruction,             Type* type, u32 offset);
+EMIT_FUNC(flip_and_store_instruction,    AstTyped *lval, OnyxToken *token);
+EMIT_FUNC(generic_store_instruction,     AstTyped *lval, OnyxToken *token);
 EMIT_FUNC(load_instruction,              Type* type, u32 offset);
+EMIT_FUNC(load_with_ignored_instruction, Type* type, u32 offset, i32 ignored_value_count);
 EMIT_FUNC(if,                            AstIfWhile* if_node);
 EMIT_FUNC(while,                         AstIfWhile* while_node);
 EMIT_FUNC(for,                           AstFor* for_node);
@@ -512,7 +515,7 @@ EMIT_FUNC(local_location,                AstLocal* local, u64* offset_return);
 EMIT_FUNC(memory_reservation_location,   AstMemRes* memres);
 EMIT_FUNC(location_return_offset,        AstTyped* expr, u64* offset_return);
 EMIT_FUNC(location,                      AstTyped* expr);
-EMIT_FUNC(compound_load,                 Type* type, u64 offset);
+EMIT_FUNC(compound_load,                 Type* type, u64 offset, i32 ignored_value_count);
 EMIT_FUNC(struct_lval,                   AstTyped* lval);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
 EMIT_FUNC(compound_store,                Type* type, u64 offset, b32 location_first);
@@ -898,32 +901,21 @@ EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
 
     emit_expression(mod, &code, assign->right);
 
+    if (assign->left->kind != Ast_Kind_Compound) {
+        emit_generic_store_instruction(mod, &code, (AstTyped *) assign->left, assign->token);
+        *pcode = code;
+        return;
+    }
+
+    // It is assumed at this point that the correct number
+    // of expression/values will be on the stack to consume.
+    //
+    // In reverse, for each location to store on the left hand side,
+    // store the values on the stack into their respective locations.
+    //
     AstCompound* compound_lval = (AstCompound *) assign->left;
     bh_arr_rev_each(AstTyped *, plval, compound_lval->exprs) {
-        AstTyped *lval = *plval;
-
-        if (type_is_structlike_strict(lval->type)) {
-            emit_struct_lval(mod, &code, lval);
-            continue;
-        }
-
-        if (lval->kind == Ast_Kind_Local || lval->kind == Ast_Kind_Param) {
-            if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
-                u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
-                WIL(assign->token, WI_LOCAL_SET, localidx);
-                continue;
-            }
-        }
-
-        WasmType wt = onyx_type_to_wasm_type(lval->type);
-        u64 expr_tmp = local_raw_allocate(mod->local_alloc, wt);
-        WIL(assign->token, WI_LOCAL_SET, expr_tmp);
-        u64 offset = 0;
-        emit_location_return_offset(mod, &code, lval, &offset);
-        WIL(assign->token, WI_LOCAL_GET, expr_tmp);
-
-        local_raw_free(mod->local_alloc, wt);
-        emit_store_instruction(mod, &code, lval->type, offset);
+        emit_generic_store_instruction(mod, &code, *plval, assign->token);
     }
 
     *pcode = code;
@@ -980,11 +972,76 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     *pcode = code;
 }
 
+EMIT_FUNC(flip_and_store_instruction, AstTyped *lval, OnyxToken *token) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    WasmType wt = onyx_type_to_wasm_type(lval->type);
+    u64 expr_tmp = local_raw_allocate(mod->local_alloc, wt);
+    WIL(token, WI_LOCAL_SET, expr_tmp);
+
+    u64 offset = 0;
+    emit_location_return_offset(mod, &code, lval, &offset);
+    WIL(token, WI_LOCAL_GET, expr_tmp);
+
+    local_raw_free(mod->local_alloc, wt);
+    emit_store_instruction(mod, &code, lval->type, offset);
+
+    *pcode = code;
+    return;
+}
+
+//
+// What "store_instruction" should have been. This takes an l-value, assumes
+// a value of that type is on the value stack, and then stores it into the l-value,
+// doing whatever is necessary.
+EMIT_FUNC(generic_store_instruction, AstTyped *lval, OnyxToken *token) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    // If this is a structure, use the emit_struct_lval function.
+    if (type_is_structlike_strict(lval->type)) {
+        emit_struct_lval(mod, &code, lval);
+    }
+
+    // If this is a WASM local, simply set the local and continue.
+    else if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
+        u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
+        WIL(token, WI_LOCAL_SET, localidx);
+    }
+
+    else if (type_is_compound(lval->type)) {
+        u64 offset = 0;
+        emit_location_return_offset(mod, &code, lval, &offset);
+        emit_compound_store(mod, &code, lval->type, offset, 1);
+    }
+
+    // Otherwise, you have to do this "fun" sequence of instructions
+    // where you temporarily store the top value on the stack, emit
+    // the location, and then replace the value. If WASM would have
+    // just decided to place the location parameter for the store
+    // instructions at the top of the stack, not the second to top,
+    // this would not be an issue.
+    else {
+        emit_flip_and_store_instruction(mod, &code, lval, token);
+    }
+
+    *pcode = code;
+    return;
+}
+
+EMIT_FUNC(load_with_ignored_instruction, Type* type, u32 offset, i32 ignored_value_count) {
+    if (type_is_compound(type)) {
+        emit_compound_load(mod, pcode, type, offset, ignored_value_count);
+        return;
+    }
+
+    emit_load_instruction(mod, pcode, type, offset);
+}
+
 EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (type_is_compound(type)) {
-        emit_compound_load(mod, pcode, type, offset);
+        emit_compound_load(mod, pcode, type, offset, 0);
         return;
     }
 
@@ -1240,84 +1297,6 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     *pcode = code;
 }
 
-EMIT_FUNC(for_array, AstFor* for_node, u64 iter_local) {
-    bh_arr(WasmInstruction) code = *pcode;
-
-    u64 end_ptr_local, ptr_local;
-    end_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-
-    if (for_node->by_pointer) {
-        ptr_local = iter_local;
-    } else {
-        ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    }
-
-    AstLocal* var = for_node->var;
-    b32 it_is_local = (b32) ((iter_local & LOCAL_IS_WASM) != 0);
-    u64 offset = 0;
-
-    u64 elem_size;
-    if (for_node->by_pointer) elem_size = type_size_of(var->type->Pointer.elem);
-    else                      elem_size = type_size_of(var->type);
-
-    WIL(for_node->token, WI_LOCAL_TEE, ptr_local);
-    WIL(for_node->token, WI_PTR_CONST, for_node->iter->type->Array.count * elem_size);
-    WI(for_node->token, WI_PTR_ADD);
-    WIL(for_node->token, WI_LOCAL_SET, end_ptr_local);
-
-    if (for_node->has_first) {
-        for_node->first_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
-        WIL(for_node->token, WI_I32_CONST, 1);
-        WIL(for_node->token, WI_LOCAL_SET, for_node->first_local);
-    }
-
-    emit_enter_structured_block(mod, &code, SBT_Breakable_Block, for_node->token);
-    emit_enter_structured_block(mod, &code, SBT_Basic_Loop, for_node->token);
-    emit_enter_structured_block(mod, &code, SBT_Continue_Block, for_node->token);
-
-    WIL(for_node->token, WI_LOCAL_GET, ptr_local);
-    WIL(for_node->token, WI_LOCAL_GET, end_ptr_local);
-    WI(for_node->token, WI_PTR_GE);
-    WID(for_node->token, WI_COND_JUMP, 0x02);
-
-    if (!for_node->by_pointer) {
-        if (!it_is_local) emit_local_location(mod, &code, var, &offset);
-
-        WIL(for_node->token, WI_LOCAL_GET, ptr_local);
-        emit_load_instruction(mod, &code, var->type, 0);
-
-        if (!it_is_local) emit_store_instruction(mod, &code, var->type, offset);
-        else              WIL(for_node->token, WI_LOCAL_SET, iter_local);
-    }
-
-    emit_block(mod, &code, for_node->stmt, 0);
-
-    emit_leave_structured_block(mod, &code);
-
-    WIL(for_node->token, WI_LOCAL_GET, ptr_local);
-    WIL(for_node->token, WI_PTR_CONST, elem_size);
-    WI(for_node->token, WI_PTR_ADD);
-    WIL(for_node->token, WI_LOCAL_SET, ptr_local);
-
-    if (for_node->has_first) {
-        WIL(NULL, WI_I32_CONST, 0);
-        WIL(NULL, WI_LOCAL_SET, for_node->first_local);
-    }
-
-    if (bh_arr_last(code).type != WI_JUMP)
-        WID(for_node->token, WI_JUMP, 0x00);
-
-    emit_leave_structured_block(mod, &code);
-    emit_leave_structured_block(mod, &code);
-
-    if (for_node->has_first) local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
-
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    if (!for_node->by_pointer) local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-
-    *pcode = code;
-}
-
 EMIT_FUNC(for_slice, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -1551,12 +1530,25 @@ EMIT_FUNC(for, AstFor* for_node) {
 
     switch (for_node->loop_type) {
         case For_Loop_Range:    emit_for_range(mod, &code, for_node, iter_local); break;
-        case For_Loop_Array:    emit_for_array(mod, &code, for_node, iter_local); break;
+
+        // NOTE: For static arrays, simply outputing the size
+        // of the array right after the pointer to the start
+        // of the array essentially makes it a slice.
+        case For_Loop_Array:
+            WIL(NULL, WI_I32_CONST, for_node->iter->type->Array.count);
+            emit_for_slice(mod, &code, for_node, iter_local);
+            break;
+
         // NOTE: A dynamic array is just a slice with a capacity and allocator on the end.
         // Just dropping the extra fields will mean we can just use the slice implementation.
         //                                                  - brendanfh   2020/09/04
         //                                                  - brendanfh   2021/04/13
-        case For_Loop_DynArr:   WI(for_node->token, WI_DROP); WI(for_node->token, WI_DROP); WI(for_node->token, WI_DROP);
+        case For_Loop_DynArr:
+            WI(for_node->token, WI_DROP);
+            WI(for_node->token, WI_DROP);
+            WI(for_node->token, WI_DROP);
+            // fallthrough
+
         case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local); break;
         case For_Loop_Iterator: emit_for_iterator(mod, &code, for_node, iter_local); break;
         default: onyx_report_error(for_node->token->pos, Error_Critical, "Invalid for loop type. You should probably not be seeing this...");
@@ -2091,7 +2083,7 @@ EMIT_FUNC(call, AstCall* call) {
 
     if (cc == CC_Return_Stack) {
         WID(call_token, WI_GLOBAL_GET, stack_top_idx);
-        emit_load_instruction(mod, &code, return_type, reserve_size - return_size);
+        emit_load_with_ignored_instruction(mod, &code, return_type, reserve_size - return_size, call->ignored_return_value_count);
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -2746,14 +2738,18 @@ EMIT_FUNC(struct_lval, AstTyped* lval) {
     *pcode = code;
 }
 
-EMIT_FUNC(compound_load, Type* type, u64 offset) {
+EMIT_FUNC(compound_load, Type* type, u64 offset, i32 ignored_value_count) {
     bh_arr(WasmInstruction) code = *pcode;
     i32 mem_count = type_linear_member_count(type);
     TypeWithOffset two;
 
+    assert(mem_count > ignored_value_count);
+    mem_count -= ignored_value_count;
+
     if (mem_count == 1) {
         type_linear_member_lookup(type, 0, &two);
         emit_load_instruction(mod, &code, two.type, offset + two.offset); // two.offset should be 0
+
     } else {
         u64 tmp_idx = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         WIL(NULL, WI_LOCAL_TEE, tmp_idx);
@@ -2980,7 +2976,6 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
 EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
-    u64 offset = 0;
     u64 result_local    = local_allocate(mod->local_alloc, (AstTyped *) if_expr);
     b32 result_is_local = (b32) ((result_local & LOCAL_IS_WASM) != 0);
     bh_imap_put(&mod->local_map, (u64) if_expr, result_local);
@@ -2988,26 +2983,17 @@ EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
     emit_expression(mod, &code, if_expr->cond);
 
     emit_enter_structured_block(mod, &code, SBT_Basic_If, if_expr->token);
-        if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
-
         emit_expression(mod, &code, if_expr->true_expr);
+        emit_generic_store_instruction(mod, &code, (AstTyped *) if_expr, if_expr->token);
 
-        if (!result_is_local) emit_store_instruction(mod, &code, if_expr->type, offset);
-        else                  WIL(if_expr->token, WI_LOCAL_SET, result_local);
-
-    offset = 0;
     WI(if_expr->token, WI_ELSE);
-        if (!result_is_local) emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
-
         emit_expression(mod, &code, if_expr->false_expr);
-
-        if (!result_is_local) emit_store_instruction(mod, &code, if_expr->type, offset);
-        else                  WIL(if_expr->token, WI_LOCAL_SET, result_local);
+        emit_generic_store_instruction(mod, &code, (AstTyped *) if_expr, if_expr->token);
 
     emit_leave_structured_block(mod, &code);
 
-    offset = 0;
     if (!result_is_local) {
+        u64 offset = 0;
         emit_local_location(mod, &code, (AstLocal *) if_expr, &offset);
         emit_load_instruction(mod, &code, if_expr->type, offset);
 
@@ -3055,7 +3041,9 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
         case Ast_Kind_Param:
         case Ast_Kind_Local:
         case Ast_Kind_Array_Literal:
-        case Ast_Kind_Struct_Literal: {
+        case Ast_Kind_Struct_Literal:
+        case Ast_Kind_Do_Block:
+        case Ast_Kind_If_Expression: {
             emit_local_location(mod, &code, (AstLocal *) expr, offset_return);
             break;
         }
@@ -3631,16 +3619,9 @@ EMIT_FUNC(return, AstReturn* ret) {
     if (ret->expr) {
         if (bh_arr_length(mod->return_location_stack) > 0) {
             AstLocal* dest = bh_arr_last(mod->return_location_stack);
-            u64 dest_loc = bh_imap_get(&mod->local_map, (u64) dest);
-            b32 dest_is_local = (b32) ((dest_loc & LOCAL_IS_WASM) != 0);
-
-            u64 offset = 0;
-            if (!dest_is_local) emit_local_location(mod, &code, dest, &offset);
 
             emit_expression(mod, &code, ret->expr);
-
-            if (!dest_is_local) emit_store_instruction(mod, &code, dest->type, offset);
-            else                WIL(NULL, WI_LOCAL_SET, dest_loc);
+            emit_generic_store_instruction(mod, &code, (AstTyped *) dest, NULL);
 
         } else if (mod->curr_cc == CC_Return_Stack) {
             WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
