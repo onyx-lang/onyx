@@ -116,7 +116,6 @@ typedef enum StructProcessingStatus {
         Table(StructMember *) members;                            \
         bh_arr(StructMember *) memarr;                            \
         bh_arr(struct AstPolySolution) poly_sln;                  \
-        bh_arr(TypeWithOffset) linear_members;                    \
         struct AstType *constructed_from;                         \
         bh_arr(struct AstTyped *) meta_tags;                      \
         StructProcessingStatus status;                            \

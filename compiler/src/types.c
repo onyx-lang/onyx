@@ -448,10 +448,6 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             s_type->Struct.alignment = alignment;
             s_type->Struct.size = size;
 
-            s_type->Struct.linear_members = NULL;
-            bh_arr_new(global_heap_allocator, s_type->Struct.linear_members, s_type->Struct.mem_count);
-            build_linear_types_with_offset(s_type, &s_type->Struct.linear_members, 0);
-
             s_type->Struct.status = SPS_Members_Done;
             return s_type;
         }
@@ -785,9 +781,6 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
 
     type->Struct.alignment = alignment;
     type->Struct.size = size;
-    type->Struct.linear_members = NULL;
-    bh_arr_new(global_heap_allocator, type->Struct.linear_members, type->Struct.mem_count);
-    build_linear_types_with_offset(type, &type->Struct.linear_members, 0);
 
     type->Struct.status = SPS_Uses_Done;
     lit->generated_inferred_type = type;
@@ -908,6 +901,8 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
 }
 
 void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset) {
+    // nocheckin :StructAsm
+    /*
     if (type_is_structlike_strict(type)) {
         u32 mem_count = type_structlike_mem_count(type);
         StructMember smem = { 0 };
@@ -916,7 +911,9 @@ void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u
             build_linear_types_with_offset(smem.type, pdest, offset + smem.offset);
         }
 
-    } else if (type->kind == Type_Kind_Compound) {
+    } else */
+
+    if (type->kind == Type_Kind_Compound) {
         u32 elem_offset = 0;
         fori (i, 0, type->Compound.count) {
             build_linear_types_with_offset(type->Compound.types[i], pdest, offset + elem_offset);
@@ -1244,7 +1241,6 @@ i32 type_linear_member_count(Type* type) {
         case Type_Kind_VarArgs:  return 2;
         case Type_Kind_DynArray: return 5;
         case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
-        case Type_Kind_Struct:   return bh_arr_length(type->Struct.linear_members);
         default: return 1;
     }
 }
@@ -1286,7 +1282,6 @@ b32 type_linear_member_lookup(Type* type, i32 idx, TypeWithOffset* two) {
             return 1;
         }
         case Type_Kind_Compound: *two = type->Compound.linear_members[idx]; return 1;
-        case Type_Kind_Struct:   *two = type->Struct.linear_members[idx];   return 1;
 
         case Type_Kind_Distinct:
             two->type = type->Distinct.base_type;
@@ -1327,32 +1322,26 @@ i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset) {
 
             return -1;
         }
-        case Type_Kind_Struct: {
-            i32 idx = 0;
-            bh_arr_each(TypeWithOffset, two, type->Struct.linear_members) {
-                if (two->offset == offset) return idx;
-                idx++;
-            }
-
+        default:
+            if (offset == 0) return 0;
             return -1;
-        }
-        default: return -1;
     }
 }
 
-b32 type_struct_is_simple(Type* type) {
+/*b32 type_struct_is_simple(Type* type) {
     if (type->kind != Type_Kind_Struct) return 0;
 
     b32 is_simple = 1;
     bh_arr_each(StructMember *, mem, type->Struct.memarr) {
-        if (type_is_compound((*mem)->type) || (*mem)->type->kind == Type_Kind_Array) {
+        if (type_linear_member_count((*mem)->type) != 1
+            (*mem)->type->kind == Type_Kind_Array) {
             is_simple = 0;
             break;
         }
     }
 
     return is_simple;
-}
+}*/
 
 b32 type_is_pointer(Type* type) {
     if (type == NULL) return 0;
@@ -1413,23 +1402,14 @@ b32 type_is_numeric(Type* type) {
 b32 type_is_compound(Type* type) {
     if (type == NULL) return 0;
 
-    if (type->kind == Type_Kind_Struct) {
-        //
-        // This is for the kind of common case where a structure simply wraps a
-        // single non-compound value; in this situation, the structure can be
-        // "dissolved" at compile-time and turn into the underlying type.
-        //
-
-        if (bh_arr_length(type->Struct.linear_members) != 1) return 1;
-        return type_is_compound(type->Struct.linear_members[0].type);
-    }
-
     return type->kind != Type_Kind_Basic
         && type->kind != Type_Kind_Pointer
         && type->kind != Type_Kind_Enum
         && type->kind != Type_Kind_Function
         && type->kind != Type_Kind_Array
-        && type->kind != Type_Kind_Distinct;
+        && type->kind != Type_Kind_Distinct
+        && type->kind != Type_Kind_Struct
+        && type->kind != Type_Kind_DynArray;
 }
 
 b32 type_is_simd(Type* type) {
@@ -1494,10 +1474,10 @@ u32 type_structlike_mem_count(Type* type) {
 u32 type_structlike_is_simple(Type* type) {
     if (type == NULL) return 0;
     switch (type->kind) {
-        case Type_Kind_Struct:   return type_struct_is_simple(type);
         case Type_Kind_Slice:    return 1;
         case Type_Kind_VarArgs:  return 1;
         case Type_Kind_DynArray: return 0;
+        case Type_Kind_Struct:   return 0; // :StructAsm type_struct_is_simple(type);
         default: return 0;
     }
 }

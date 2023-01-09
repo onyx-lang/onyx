@@ -69,3 +69,19 @@ which is obviously a structure. In the new system, passing each result as a para
 to the next function would not work as shown with the array example above. A solution
 to this problem must be found before this refactor can be completed.
 
+
+
+
+
+SOLUTION
+========
+
+I was very dumb when I wrote the above text.
+
+This is actually very simple, and already something that the compiler is doing. I am
+just doing it wrong in the fixed-size array case. The rule has to be: ALL structure
+arguments need to be copied into a buffer for ARGUMENTS to the call. This already
+happens with non-simple structure. Currently, it does not happen for array, so that
+is why I thought this was a larger issue. The optimization that l-value structures
+passed by value can simply be their pointer and not-copied can be done in the future,
+but to get this optimization working, that does not have to be done.
