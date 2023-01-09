@@ -12,7 +12,7 @@ use package wasi {
     FileDescriptor,
     FDFlags, OFlags, Rights,
     LookupFlags, Errno,
-    IOVec, IOVecArray, Size,
+    IOVec, Size,
     FileStat, Whence
 }
 
@@ -185,7 +185,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     read = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_read(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_read);
+        error := wasi.fd_read(data.fd, ^vec, 1, ^bytes_read);
         if error != .Success do return .BadFile, 0;
 
         return .None, bytes_read;
@@ -194,7 +194,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     read_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
         bytes_read : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_pread(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ~~at, ^bytes_read);
+        error := wasi.fd_pread(data.fd, ^vec, 1, ~~at, ^bytes_read);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
         if error != .Success do return .BadFile, 0;
@@ -206,7 +206,7 @@ __file_stream_vtable := io.Stream_Vtable.{
         bytes_read : wasi.Size;
         byte  : u8;
         vec   := IOVec.{ buf = cast(u32) ^byte, len = 1};
-        error := wasi.fd_read(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_read);
+        error := wasi.fd_read(data.fd, ^vec, 1, ^bytes_read);
         if error != .Success do return .BadFile, 0;
 
         return .None, byte;
@@ -215,7 +215,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     write = (use fs: ^os.File, buffer: [] u8) -> (io.Error, u32) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_write(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_written);
+        error := wasi.fd_write(data.fd, ^vec, 1, ^bytes_written);
         if error != .Success do return .BadFile, 0;
 
         return .None, bytes_written;
@@ -224,7 +224,7 @@ __file_stream_vtable := io.Stream_Vtable.{
     write_at = (use fs: ^os.File, at: u32, buffer: [] u8) -> (io.Error, u32) {
         bytes_written : wasi.Size;
         vec   := IOVec.{ buf = cast(u32) buffer.data, len = buffer.count };
-        error := wasi.fd_pwrite(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ~~at, ^bytes_written);
+        error := wasi.fd_pwrite(data.fd, ^vec, 1, ~~at, ^bytes_written);
 
         // FIX: Maybe report io.Error.OutOfBounds if the 'at' was out of bounds?
         if error != .Success do return .BadFile, 0;
@@ -236,7 +236,7 @@ __file_stream_vtable := io.Stream_Vtable.{
         bytes_written : wasi.Size;
         byte_to_write := byte;
         vec   := IOVec.{ buf = cast(u32) ^byte_to_write, len = 1 };
-        error := wasi.fd_write(data.fd, IOVecArray.{ cast(u32) ^vec, 1 }, ^bytes_written);
+        error := wasi.fd_write(data.fd, ^vec, 1, ^bytes_written);
         if error != .Success do return .BadFile;
 
         return .None;

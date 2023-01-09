@@ -30,7 +30,7 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 #library "onyx_runtime"
 
 #foreign "onyx_runtime" {
-    __file_get_standard :: (fd: i32, out: ^fs.FileData.Handle) -> bool ---
+    __file_get_standard :: (fd: i32, out: ^fs.FileData) -> bool ---
 
     __args_get       :: (argv: ^^u8, arg_buf: ^u8) -> void ---
     __args_sizes_get :: (argc: ^i32, arg_buf_size: ^i32) -> void ---
@@ -43,23 +43,23 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 }
 
 #export "_start" () {
-    fd: fs.FileData.Handle;
+    fd: fs.FileData;
     __file_get_standard(1, ^fd);
     __stdout = .{
         .{ ^fs.__file_stream_vtable },
-        .{ fd },
+        fd
     };
     
     __file_get_standard(2, ^fd);
     __stderr = .{
         .{ ^fs.__file_stream_vtable },
-        .{ fd },
+        fd
     };
 
     __file_get_standard(0, ^fd);
     __stdin = .{
         .{ ^fs.__file_stream_vtable },
-        .{ fd },
+        fd
     };
 
     __runtime_initialize();

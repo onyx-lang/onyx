@@ -21,7 +21,7 @@ OpenMode :: enum {
 
 File :: struct {
     use stream : io.Stream;
-    use data   : fs.FileData;
+    data   : fs.FileData;
 }
 
 // Most of these types were stollen directly from

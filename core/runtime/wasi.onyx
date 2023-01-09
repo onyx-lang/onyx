@@ -11,7 +11,7 @@ __output_string :: (s: str) -> u32 {
 
     vec := IOVec.{ buf = cast(u32) s.data, len = s.count };
     tmp : Size;
-    fd_write(STDOUT_FILENO, IOVecArray.{ cast(u32) ^vec, 1 }, ^tmp);
+    fd_write(STDOUT_FILENO, ^vec, 1, ^tmp);
     fd_datasync(STDOUT_FILENO);
     return tmp;
 }
@@ -23,7 +23,7 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 
     vec := IOVec.{ buf = cast(i32) buffer.data, len = buffer.count };
     read: Size;
-    error := fd_read(STDIN_FILENO, .{ cast(i32) ^vec, 1 }, ^read);
+    error := fd_read(STDIN_FILENO, ^vec, 1, ^read);
     if error != .Success do return -1;
 
     return read;

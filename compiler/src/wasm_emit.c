@@ -542,6 +542,7 @@ EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
 EMIT_FUNC(array_store,                   Type* type, u32 offset);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                 AstRangeLiteral* range);
+EMIT_FUNC_NO_ARGS(load_slice);
 EMIT_FUNC(if_expression,                 AstIfExpression* if_expr);
 EMIT_FUNC(do_block,                      AstDoBlock* doblock);
 EMIT_FUNC(expression,                    AstTyped* expr);
@@ -1419,6 +1420,17 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     // Allocate temporaries for iterator contents
+    u64 iterator_base_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    WIL(for_node->token, WI_LOCAL_TEE, iterator_base_ptr);
+    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 0);
+    WIL(for_node->token, WI_LOCAL_GET, iterator_base_ptr);
+    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 4);
+    WIL(for_node->token, WI_LOCAL_GET, iterator_base_ptr);
+    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 8);
+    WIL(for_node->token, WI_LOCAL_GET, iterator_base_ptr);
+    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 12);
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+
     u64 iterator_data_ptr    = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 iterator_next_func   = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
     u64 iterator_close_func  = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
@@ -1546,6 +1558,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
+    local_raw_free(mod->local_alloc, WASM_TYPE_FUNC);
     local_raw_free(mod->local_alloc, WASM_TYPE_INT32);
     *pcode = code;
 }
@@ -1580,9 +1593,7 @@ EMIT_FUNC(for, AstFor* for_node) {
         //                                                  - brendanfh   2020/09/04
         //                                                  - brendanfh   2021/04/13
         case For_Loop_DynArr:
-            WI(for_node->token, WI_DROP);
-            WI(for_node->token, WI_DROP);
-            WI(for_node->token, WI_DROP);
+            emit_load_slice(mod, &code);
             // fallthrough
 
         case For_Loop_Slice:    emit_for_slice(mod, &code, for_node, iter_local); break;
@@ -2871,7 +2882,7 @@ EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
         // there should be a separate path taken to reduce the amount of redundant memory.
         WIL(sl->token, WI_LOCAL_GET, mod->stack_base_idx);
         emit_expression(mod, &code, *val);
-        emit_store_instruction(mod, &code, (*val)->type, smem.offset);
+        emit_store_instruction(mod, &code, (*val)->type, smem.offset + local_offset);
 
         idx += 1;
     }
@@ -3101,6 +3112,21 @@ EMIT_FUNC(range_literal, AstRangeLiteral* range) {
     *pcode = code;
 }
 
+EMIT_FUNC_NO_ARGS(load_slice) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 ugly_temporary = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    WIL(NULL, WI_LOCAL_TEE, ugly_temporary);
+    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 0);
+
+    WIL(NULL, WI_LOCAL_GET, ugly_temporary);
+    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_I32], POINTER_SIZE);
+
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+
+    *pcode = code;
+}
+
 EMIT_FUNC(if_expression, AstIfExpression* if_expr) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -3171,7 +3197,8 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
         case Ast_Kind_Array_Literal:
         case Ast_Kind_Struct_Literal:
         case Ast_Kind_Do_Block:
-        case Ast_Kind_If_Expression: {
+        case Ast_Kind_If_Expression:
+        case Ast_Kind_Call_Site: {
             emit_local_location(mod, &code, (AstLocal *) expr, offset_return);
             break;
         }
@@ -3549,9 +3576,31 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Call_Site: {
             AstCallSite* callsite = (AstCallSite *) expr;
 
+            emit_local_allocation(mod, &code, (AstTyped *) callsite);
+
+            u64 local_offset = (u64) bh_imap_get(&mod->local_map, (u64) callsite);
+            assert((local_offset & LOCAL_IS_WASM) == 0);
+
+            StructMember smem;
+
+            type_lookup_member_by_idx(callsite->type, 0, &smem);
+            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
             emit_expression(mod, &code, (AstTyped *) callsite->filename);
+            emit_store_instruction(mod, &code, smem.type, local_offset + smem.offset);
+
+            type_lookup_member_by_idx(callsite->type, 1, &smem);
+            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
             emit_expression(mod, &code, (AstTyped *) callsite->line);
+            emit_store_instruction(mod, &code, smem.type, local_offset + smem.offset);
+
+            type_lookup_member_by_idx(callsite->type, 2, &smem);
+            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
             emit_expression(mod, &code, (AstTyped *) callsite->column);
+            emit_store_instruction(mod, &code, smem.type, local_offset + smem.offset);
+
+            WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
+            WIL(NULL, WI_PTR_CONST, local_offset);
+            WI(NULL, WI_PTR_ADD);
             break;
         }
 
@@ -3665,9 +3714,7 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
     }
 
     if (to->kind == Type_Kind_Slice && from->kind == Type_Kind_DynArray) {
-        WI(NULL, WI_DROP);
-        WI(NULL, WI_DROP);
-        WI(NULL, WI_DROP);
+        emit_load_slice(mod, &code);
         *pcode = code;
         return;
     }
