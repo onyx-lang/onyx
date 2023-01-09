@@ -32,6 +32,7 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
             return onyx_type_to_wasm_type(type->Struct.linear_members[0].type);
         }
         
+        // :StructAsm
         return WASM_TYPE_VOID;
     }
 
@@ -828,6 +829,8 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
     }
 
     if (lval->kind == Ast_Kind_Field_Access) {
+        // :StructAsm
+        // This code was never right anyway...
         AstFieldAccess* fa = (AstFieldAccess *) lval;
         if (fa->expr->kind == Ast_Kind_Param && type_is_structlike_strict(fa->expr->type)) {
             emit_expression(mod, &code, assign->right);
@@ -927,11 +930,13 @@ EMIT_FUNC(compound_assignment, AstBinaryOp* assign) {
 EMIT_FUNC(store_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    // :StructAsm
     if (type_is_compound(type)) {
         emit_compound_store(mod, pcode, type, offset, 0);
         return;
     }
 
+    // :StructAsm
     if (type->kind == Type_Kind_Struct) {
         assert(bh_arr_length(type->Struct.linear_members) == 1);
         type = type->Struct.linear_members[0].type;
@@ -1000,6 +1005,7 @@ EMIT_FUNC(generic_store_instruction, AstTyped *lval, OnyxToken *token) {
     bh_arr(WasmInstruction) code = *pcode;
 
     // If this is a structure, use the emit_struct_lval function.
+    // :StructAsm
     if (type_is_structlike_strict(lval->type)) {
         emit_struct_lval(mod, &code, lval);
     }
@@ -1042,11 +1048,13 @@ EMIT_FUNC(load_with_ignored_instruction, Type* type, u32 offset, i32 ignored_val
 EMIT_FUNC(load_instruction, Type* type, u32 offset) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    // :StructAsm
     if (type_is_compound(type)) {
         emit_compound_load(mod, pcode, type, offset, 0);
         return;
     }
 
+    // :StructAsm
     if (type->kind == Type_Kind_Struct) {
         assert(bh_arr_length(type->Struct.linear_members) == 1);
         type = type->Struct.linear_members[0].type;
@@ -1454,6 +1462,9 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
         // CLEANUP: Calling a function is way too f-ing complicated. FACTOR IT!!
         u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
 
+        // :StructAsm
+        // :StructAsm
+        // :StructAsm
         TypeWithOffset next_func_type;
         type_linear_member_lookup(for_node->iter->type, 1, &next_func_type);
         Type* return_type = next_func_type.type->Function.return_type;
@@ -1966,6 +1977,7 @@ EMIT_FUNC(call, AstCall* call) {
             place_on_stack = 1;
         }
 
+        // :StructAsm
         if (place_on_stack) WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
 
         emit_expression(mod, &code, arg->value);
@@ -2084,6 +2096,10 @@ EMIT_FUNC(call, AstCall* call) {
     }
 
     if (cc == CC_Return_Stack) {
+        // :StructAsm
+        // :StructAsm
+        // :StructAsm
+        // :StructAsm
         WID(call_token, WI_GLOBAL_GET, stack_top_idx);
         emit_load_with_ignored_instruction(mod, &code, return_type, reserve_size - return_size, call->ignored_return_value_count);
     }
@@ -2731,6 +2747,7 @@ EMIT_FUNC(local_location, AstLocal* local, u64* offset_return) {
 EMIT_FUNC(struct_lval, AstTyped* lval) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    // :StructAsm
     assert(type_is_structlike_strict(lval->type));
 
     u64 offset = 0;
@@ -2813,6 +2830,7 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
 EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    // :StructAsm
     bh_arr_each(AstTyped *, val, sl->args.values) {
         emit_expression(mod, &code, *val);
     }
@@ -3040,6 +3058,7 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
     expr = (AstTyped *) strip_aliases((AstNode *) expr);
 
     switch (expr->kind) {
+        // :StructAsm
         case Ast_Kind_Param:
         case Ast_Kind_Local:
         case Ast_Kind_Array_Literal:
@@ -3214,6 +3233,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         }
 
         case Ast_Kind_Struct_Literal: {
+            // :StructAsm
             emit_struct_literal(mod, &code, (AstStructLiteral *) expr);
             break;
         }
@@ -3626,6 +3646,7 @@ EMIT_FUNC(return, AstReturn* ret) {
             emit_generic_store_instruction(mod, &code, (AstTyped *) dest, NULL);
 
         } else if (mod->curr_cc == CC_Return_Stack) {
+            // :StructAsm
             WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
             WID(NULL, WI_I32_CONST, type_size_of(ret->expr->type));
             WI(NULL, WI_I32_SUB);
@@ -3750,6 +3771,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
             *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]);
 
         }
+        // :StructAsm
         else if (type_is_structlike_strict(*param_type)) {
             u32 mem_count = type_structlike_mem_count(*param_type);
             StructMember smem;
@@ -3868,6 +3890,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         bh_arr_each(AstParam, param, fd->params) {
             switch (type_get_param_pass(param->local->type)) {
                 case Param_Pass_By_Value: {
+                    // :StructAsm
                     if (type_is_structlike_strict(param->local->type)) {
                         debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
                         bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
@@ -3878,6 +3901,7 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
                     // fallthrough
                 }
 
+                // :StructAsm
                 case Param_Pass_By_Implicit_Pointer: {
                     debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
                     bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);
