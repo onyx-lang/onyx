@@ -726,30 +726,32 @@ EMIT_FUNC(local_allocation, AstTyped* stmt) {
     u64 local_idx = local_allocate(mod->local_alloc, stmt);
     bh_imap_put(&mod->local_map, (u64) stmt, local_idx);
 
-    if (stmt->token && local_is_wasm_local(stmt)) {
-        debug_introduce_symbol(mod, stmt->token, DSL_REGISTER, local_idx, stmt->type);
-    } else {
-        debug_introduce_symbol(mod, stmt->token, DSL_STACK, local_idx, stmt->type);
-    }
-
-    if (stmt->kind == Ast_Kind_Local && !(stmt->flags & Ast_Flag_Decl_Followed_By_Init)) {
-        bh_arr(WasmInstruction) code = *pcode;
-        if (local_is_wasm_local(stmt)) {
-            emit_zero_value(mod, &code, onyx_type_to_wasm_type(stmt->type));
-            WIL(stmt->token, WI_LOCAL_SET, local_idx);
-
+    if (stmt->kind == Ast_Kind_Local) {
+        if (stmt->token && local_is_wasm_local(stmt)) {
+            debug_introduce_symbol(mod, stmt->token, DSL_REGISTER, local_idx, stmt->type);
         } else {
-            emit_location(mod, &code, stmt);
-            WID(stmt->token, WI_I32_CONST, 0);
-            WID(stmt->token, WI_I32_CONST, type_size_of(stmt->type));
-            if (context.options->use_post_mvp_features) {
-                WID(stmt->token, WI_MEMORY_FILL, 0x00);
-            } else {
-                emit_intrinsic_memory_fill(mod, &code);
-            }
+            debug_introduce_symbol(mod, stmt->token, DSL_STACK, local_idx, stmt->type);
         }
 
-        *pcode = code;
+        if (!(stmt->flags & Ast_Flag_Decl_Followed_By_Init)) {
+            bh_arr(WasmInstruction) code = *pcode;
+            if (local_is_wasm_local(stmt)) {
+                emit_zero_value(mod, &code, onyx_type_to_wasm_type(stmt->type));
+                WIL(stmt->token, WI_LOCAL_SET, local_idx);
+
+            } else {
+                emit_location(mod, &code, stmt);
+                WID(stmt->token, WI_I32_CONST, 0);
+                WID(stmt->token, WI_I32_CONST, type_size_of(stmt->type));
+                if (context.options->use_post_mvp_features) {
+                    WID(stmt->token, WI_MEMORY_FILL, 0x00);
+                } else {
+                    emit_intrinsic_memory_fill(mod, &code);
+                }
+            }
+
+            *pcode = code;
+        }
     }
 
     bh_arr_push(mod->local_allocations, ((AllocatedSpace) {
