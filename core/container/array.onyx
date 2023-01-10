@@ -344,7 +344,9 @@ average :: (arr: [] $T) -> T {
 
 reverse :: (arr: [] $T) {
     for i: arr.count / 2 {
-        arr[i], arr[arr.count - 1 - i] = arr[arr.count - 1 - i], arr[i];
+        tmp := arr[i];
+        arr[i] = arr[arr.count - 1 - i];
+        arr[arr.count - 1 - i] = tmp;
     }
 }
 
@@ -385,7 +387,10 @@ sort :: (arr: [] $T, cmp: (^T, ^T) -> i32) -> [] T {
 
         while j > 0 {
             if cmp(^arr.data[j - 1], ^arr.data[j]) > 0 {
-                arr.data[j], arr.data[j - 1] = arr.data[j - 1], arr.data[j];
+                tmp := arr.data[j];
+                arr.data[j] = arr.data[j - 1];
+                arr.data[j - 1] = tmp;
+
                 j -= 1;
             } else {
                 break;
@@ -421,7 +426,9 @@ quicksort :: #match #locked {
         for j: lo .. hi+1 {
             if cmp(arr[j], pivot) <= 0 {
                 i += 1;
-                arr[i], arr[j] = arr[j], arr[i];
+                tmp := arr[i];
+                arr[i] = arr[j];
+                arr[j] = tmp;
             }
         }
 
@@ -436,7 +443,9 @@ quicksort :: #match #locked {
         for j: lo .. hi+1 {
             if cmp(^arr[j], pivot) <= 0 {
                 i += 1;
-                arr[i], arr[j] = arr[j], arr[i];
+                tmp := arr[i];
+                arr[i] = arr[j];
+                arr[j] = tmp;
             }
         }
 
