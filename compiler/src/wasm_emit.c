@@ -550,7 +550,7 @@ EMIT_FUNC(cast,                          AstUnaryOp* cast);
 EMIT_FUNC(return,                        AstReturn* ret);
 EMIT_FUNC(stack_enter,                   u64 stacksize);
 EMIT_FUNC(zero_value,                    WasmType wt);
-EMIT_FUNC(zero_value_for_type,           Type* type, OnyxToken* where);
+EMIT_FUNC(zero_value_for_type,           Type* type, OnyxToken* where, AstTyped *alloc_node);
 
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt, OnyxToken* block_token);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
@@ -2914,42 +2914,14 @@ EMIT_FUNC(struct_store, Type *type, u32 offset) {
         local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
     }
 
-    u64 rptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    u64 lptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    WIL(NULL, WI_LOCAL_SET, rptr_local);
-    WIL(NULL, WI_LOCAL_SET, lptr_local);
+    WIL(NULL, WI_I32_CONST, type_size_of(type));
 
-    WIL(NULL, WI_LOCAL_GET, rptr_local);
-    WID(NULL, WI_I32_CONST, 0);
-    WI(NULL, WI_I32_NE);
-    emit_enter_structured_block(mod, &code, SBT_Basic_If, NULL);
-
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        WIL(NULL, WI_LOCAL_GET, rptr_local);
-        WIL(NULL, WI_I32_CONST, type_size_of(type));
-
-        // Use a simple memory copy if it is available.
-        if (context.options->use_post_mvp_features) {
-            WI(NULL, WI_MEMORY_COPY);
-        } else {
-            emit_intrinsic_memory_copy(mod, &code);
-        }
-
-    WI(NULL, WI_ELSE);
-
-        WIL(NULL, WI_LOCAL_GET, lptr_local);
-        WIL(NULL, WI_I32_CONST, 0);
-        WIL(NULL, WI_I32_CONST, type_size_of(type));
-
-        if (context.options->use_post_mvp_features) {
-            WI(NULL, WI_MEMORY_FILL);
-        } else {
-            emit_intrinsic_memory_fill(mod, &code);
-        }
-
-    emit_leave_structured_block(mod, &code);
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    // Use a simple memory copy if it is available.
+    if (context.options->use_post_mvp_features) {
+        WI(NULL, WI_MEMORY_COPY);
+    } else {
+        emit_intrinsic_memory_copy(mod, &code);
+    }
 
     *pcode = code;
     return;
@@ -3198,7 +3170,8 @@ EMIT_FUNC(location_return_offset, AstTyped* expr, u64* offset_return) {
         case Ast_Kind_Struct_Literal:
         case Ast_Kind_Do_Block:
         case Ast_Kind_If_Expression:
-        case Ast_Kind_Call_Site: {
+        case Ast_Kind_Call_Site:
+        case Ast_Kind_Zero_Value: {
             emit_local_location(mod, &code, (AstLocal *) expr, offset_return);
             break;
         }
@@ -3633,7 +3606,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Zero_Value: {
             AstZeroValue *zv = (AstZeroValue *) expr;
             assert(zv->type);
-            emit_zero_value_for_type(mod, &code, zv->type, zv->token);
+            emit_zero_value_for_type(mod, &code, zv->type, zv->token, (AstTyped *) zv);
             break;
         }
 
@@ -3883,7 +3856,7 @@ EMIT_FUNC(zero_value, WasmType wt) {
     *pcode = code;
 }
 
-EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
+EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_node) {
     bh_arr(WasmInstruction) code = *pcode;
 
     if (onyx_type_is_multiple_wasm_values(type)) {
@@ -3892,7 +3865,20 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where) {
 
         fori (i, 0, mem_count) {
             type_linear_member_lookup(type, i, &two);
-            emit_zero_value_for_type(mod, &code, two.type, where);
+            emit_zero_value_for_type(mod, &code, two.type, where, NULL);
+        }
+
+    } else if (onyx_type_is_stored_in_memory(type) && alloc_node) {
+        emit_local_allocation(mod, &code, alloc_node);
+
+        emit_location(mod, &code, alloc_node);
+        WIL(NULL, WI_I32_CONST, 0);
+        WIL(NULL, WI_I32_CONST, type_size_of(type));
+
+        if (context.options->use_post_mvp_features) {
+            WI(NULL, WI_MEMORY_FILL);
+        } else {
+            emit_intrinsic_memory_fill(mod, &code);
         }
 
     } else if (type->kind == Type_Kind_Function) {

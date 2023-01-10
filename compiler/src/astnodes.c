@@ -94,7 +94,6 @@ static const char* ast_node_names[] = {
     "OPERATOR OVERLOAD",
     "EXPORT",
     "DEFINED",
-    "TAG",
     "INIT",
     "LIBRARY",
     "REMOVE",
