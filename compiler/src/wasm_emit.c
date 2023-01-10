@@ -3469,9 +3469,8 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 emit_load_instruction(mod, &code, field->type, offset);
 
             } else if (onyx_type_is_stored_in_memory(field->expr->type)) {
-                u64 offset = 0;
                 emit_expression(mod, &code, field->expr);
-                emit_load_instruction(mod, &code, field->type, offset);
+                emit_load_instruction(mod, &code, field->type, field->offset);
 
             } else {
                 emit_expression(mod, &code, field->expr);
