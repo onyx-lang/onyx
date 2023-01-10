@@ -539,6 +539,7 @@ EMIT_FUNC(compound_load,                 Type* type, u64 offset, i32 ignored_val
 EMIT_FUNC(compound_store,                Type* type, u64 offset, b32 location_first);
 EMIT_FUNC(struct_store,                  Type* type, u32 offset);
 EMIT_FUNC(struct_literal,                AstStructLiteral* sl);
+EMIT_FUNC(struct_as_separate_values,     Type *type, u32 offset);
 EMIT_FUNC(array_store,                   Type* type, u32 offset);
 EMIT_FUNC(array_literal,                 AstArrayLiteral* al);
 EMIT_FUNC(range_literal,                 AstRangeLiteral* range);
@@ -1257,6 +1258,8 @@ EMIT_FUNC(for_range, AstFor* for_node, u64 iter_local) {
     u64 high_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(high_mem.type));
     u64 step_local = local_raw_allocate(mod->local_alloc, onyx_type_to_wasm_type(step_mem.type));
 
+    emit_struct_as_separate_values(mod, &code, builtin_range_type_type, 0);
+
     WIL(for_node->token, WI_LOCAL_SET, step_local);
     WIL(for_node->token, WI_LOCAL_SET, high_local);
     WIL(for_node->token, WI_LOCAL_TEE, low_local);
@@ -1420,16 +1423,7 @@ EMIT_FUNC(for_iterator, AstFor* for_node, u64 iter_local) {
     bh_arr(WasmInstruction) code = *pcode;
 
     // Allocate temporaries for iterator contents
-    u64 iterator_base_ptr = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-    WIL(for_node->token, WI_LOCAL_TEE, iterator_base_ptr);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 0);
-    WIL(for_node->token, WI_LOCAL_GET, iterator_base_ptr);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 4);
-    WIL(for_node->token, WI_LOCAL_GET, iterator_base_ptr);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 8);
-    WIL(for_node->token, WI_LOCAL_GET, iterator_base_ptr);
-    emit_load_instruction(mod, &code, &basic_types[Basic_Kind_Rawptr], 12);
-    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    emit_struct_as_separate_values(mod, &code, for_node->iter->type, 0);
 
     u64 iterator_data_ptr    = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
     u64 iterator_next_func   = local_raw_allocate(mod->local_alloc, WASM_TYPE_FUNC);
@@ -2043,6 +2037,10 @@ EMIT_FUNC(call, AstCall* call) {
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
                 WID(call_token, WI_I32_CONST, arg->value->type->id);
                 emit_store_instruction(mod, &code, &basic_types[Basic_Kind_Type_Index], reserve_size + arg_size + 4);
+
+                WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+                WIL(call_token, WI_I32_CONST, reserve_size + arg_size);
+                WI(call_token, WI_I32_ADD);
 
                 reserve_size += 2 * POINTER_SIZE;
             }
@@ -2927,6 +2925,34 @@ EMIT_FUNC(struct_store, Type *type, u32 offset) {
     return;
 }
 
+EMIT_FUNC(struct_as_separate_values, Type *type, u32 offset) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    u64 value_location = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
+    WIL(NULL, WI_LOCAL_SET, value_location);
+
+    assert(onyx_type_is_stored_in_memory(type));
+
+    i32 mem_count = type_structlike_mem_count(type);
+    StructMember smem;
+
+    fori (i, 0, mem_count) {
+        type_lookup_member_by_idx(type, i, &smem);
+
+        WIL(NULL, WI_LOCAL_GET, value_location);
+        emit_load_instruction(mod, &code, smem.type, offset + smem.offset);
+
+        if (onyx_type_is_stored_in_memory(smem.type)) {
+            // This load will be relative to the base address given above.
+            emit_struct_as_separate_values(mod, &code, smem.type, smem.offset);
+        }
+    }
+
+    local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+    *pcode = code;
+    return;
+}
+
 EMIT_FUNC(array_store, Type* type, u32 offset) {
     assert(type->kind == Type_Kind_Array);
     bh_arr(WasmInstruction) code = *pcode;
@@ -3068,8 +3094,10 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
     }
 
     WIL(al->token, WI_LOCAL_GET, mod->stack_base_idx);
-    WIL(al->token, WI_PTR_CONST, local_offset);
-    WI(al->token, WI_PTR_ADD);
+    if (local_offset > 0) {
+        WIL(al->token, WI_PTR_CONST, local_offset);
+        WI(al->token, WI_PTR_ADD);
+    }
 
     *pcode = code;
 }
@@ -3077,9 +3105,29 @@ EMIT_FUNC(array_literal, AstArrayLiteral* al) {
 EMIT_FUNC(range_literal, AstRangeLiteral* range) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    // nocheckin TODO ABSTRACT THIS PATTERN!!!!!!!!!!
+    emit_local_allocation(mod, &code, (AstTyped *) range);
+    u64 local_offset = (u64) bh_imap_get(&mod->local_map, (u64) range);
+    assert((local_offset & LOCAL_IS_WASM) == 0);
+
+    WIL(range->token, WI_LOCAL_GET, mod->stack_base_idx);
     emit_expression(mod, &code, range->low);
+    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], local_offset + 0);
+
+    WIL(range->token, WI_LOCAL_GET, mod->stack_base_idx);
     emit_expression(mod, &code, range->high);
+    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], local_offset + 4);
+
+    WIL(range->token, WI_LOCAL_GET, mod->stack_base_idx);
     emit_expression(mod, &code, range->step);
+    emit_store_instruction(mod, &code, &basic_types[Basic_Kind_I32], local_offset + 8);
+
+    WIL(range->token, WI_LOCAL_GET, mod->stack_base_idx);
+
+    if (local_offset > 0) {
+        WIL(NULL, WI_PTR_CONST, local_offset);
+        WI(NULL, WI_PTR_ADD);
+    }
 
     *pcode = code;
 }
@@ -3414,11 +3462,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
                 }
             }
 
-            if (is_lval((AstNode *) field->expr)
-                || type_is_pointer(field->expr->type)
-                || onyx_type_is_stored_in_memory(field->expr->type)) {
+
+            if (is_lval((AstNode *) field->expr) || type_is_pointer(field->expr->type)) {
                 u64 offset = 0;
                 emit_field_access_location(mod, &code, field, &offset);
+                emit_load_instruction(mod, &code, field->type, offset);
+
+            } else if (onyx_type_is_stored_in_memory(field->expr->type)) {
+                u64 offset = 0;
+                emit_expression(mod, &code, field->expr);
                 emit_load_instruction(mod, &code, field->type, offset);
 
             } else {
@@ -3472,6 +3524,7 @@ EMIT_FUNC(expression, AstTyped* expr) {
             AstSubscript* sl = (AstSubscript *) expr;
 
             emit_expression(mod, &code, sl->expr);
+            emit_struct_as_separate_values(mod, &code, sl->expr->type, 0); // nocheckin This should be optimized for range literals
 
             u64 lo_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
             u64 hi_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_INT32);
@@ -3572,8 +3625,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
             emit_store_instruction(mod, &code, smem.type, local_offset + smem.offset);
 
             WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
-            WIL(NULL, WI_PTR_CONST, local_offset);
-            WI(NULL, WI_PTR_ADD);
+
+            if (local_offset > 0) {
+                WIL(NULL, WI_PTR_CONST, local_offset);
+                WI(NULL, WI_PTR_ADD);
+            }
+
             break;
         }
 
@@ -3880,6 +3937,8 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         } else {
             emit_intrinsic_memory_fill(mod, &code);
         }
+
+        emit_location(mod, &code, alloc_node);
 
     } else if (type->kind == Type_Kind_Function) {
         WID(NULL, WI_I32_CONST, mod->null_proc_func_idx);
