@@ -3964,11 +3964,7 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     i32 params_left = param_count;
 
     while (params_left-- > 0) {
-        if ((*param_type)->kind == Type_Kind_Struct) {
-            *(t++) = (char) onyx_type_to_wasm_type(*param_type);
-        }
-
-        else if (type_get_param_pass(*param_type) == Param_Pass_By_Implicit_Pointer) {
+        if (type_get_param_pass(*param_type) == Param_Pass_By_Implicit_Pointer) {
             *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]);
 
         }

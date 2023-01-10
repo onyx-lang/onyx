@@ -56,7 +56,9 @@ remove_top :: (use heap: ^Heap) -> heap.T {
             }
 
             if idx != min_index {
-                data[min_index], data[idx] = data[idx], data[min_index];
+                tmp := data[idx];
+                data[idx] = data[min_index];
+                data[min_index] = tmp;
                 idx = min_index;
                 continue;
             }
@@ -70,7 +72,9 @@ remove_top :: (use heap: ^Heap) -> heap.T {
             parent := heap_parent(idx);
             if compare(data[parent], data[idx]) <= 0 do break;
 
-            data[parent], data[idx] = data[idx], data[parent];
+            tmp := data[parent];
+            data[parent] = data[idx];
+            data[idx] = tmp;
             idx = parent;
         }
     }

@@ -96,9 +96,16 @@ main :: (args) => {
         onyx_cmd: str;
         at_least_one_test_failed := false;
         compile_only := false;   // @Bug // why is this necessary? why is settings.compile_only false when in the thread code?
+
+        failed_tests: ^[..] str;
+        failed_tests_mutex: sync.Mutex;
     }
     exec_context := init(Execution_Context);
     exec_context.compile_only = settings.compile_only;
+
+    failed_tests := make([..] str);
+    exec_context.failed_tests = ^failed_tests;
+    sync.mutex_init(^exec_context.failed_tests_mutex);
 
     switch runtime.compiler_os {
         case .Linux {
@@ -150,12 +157,21 @@ main :: (args) => {
                 printf("Expected:\n{}\n", expected_output);
                 printf("Got:\n{}\n", output);
                 thread_data.at_least_one_test_failed = true;
+
+                sync.critical_section(^thread_data.failed_tests_mutex) {
+                    array.push(thread_data.failed_tests, it.source_file);
+                }
             }
         }
     }
 
     if exec_context.at_least_one_test_failed {
         print_color(.Red, "FAILED\n");
+
+        for failed_tests {
+            printf("  {}\n", it);
+        }
+        
         os.exit(-1);
 
     } else {

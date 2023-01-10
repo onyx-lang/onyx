@@ -919,6 +919,14 @@ void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u
             build_linear_types_with_offset(type->Compound.types[i], pdest, offset + elem_offset);
             elem_offset += bh_max(type_size_of(type->Compound.types[i]), 4);
         }
+        
+    } else if (type->kind == Type_Kind_Slice || type->kind == Type_Kind_VarArgs) {
+        u32 mem_count = type_structlike_mem_count(type);
+        StructMember smem = { 0 };
+        fori (i, 0, mem_count) {
+            type_lookup_member_by_idx(type, i, &smem);
+            build_linear_types_with_offset(smem.type, pdest, offset + smem.offset);
+        }
 
     } else {
         bh_arr(TypeWithOffset) dest = *pdest;
