@@ -966,26 +966,18 @@ generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> vo
 
         if thread_count != 0 {
             dist := distributor(iter);
-            t_data := Thread_Data(iter.Iter_Type, Ctx).{
-                iter = ^dist,
-                data = thread_data,
-            };
+            t_data := ^.{iter = ^dist, data = thread_data};
 
             threads := alloc.array_from_stack(thread.Thread, thread_count - 1);
-            for^ threads do thread.spawn(it, ^t_data, #solidify thread_function {body=body});
+            for^ threads do thread.spawn(it, t_data, #solidify thread_function {body=body});
 
-            thread_function(^t_data, body);
+            thread_function(t_data, body);
 
             for^ threads do thread.join(it);
             dist.close(dist.data);
         }
 
-        Thread_Data :: struct (T: type_expr, Ctx: type_expr) {
-            iter: ^Iterator(T);
-            data: ^Ctx;
-        }
-
-        thread_function :: (__data: ^Thread_Data, $body: Code) {
+        thread_function :: (__data: ^$T, $body: Code) {
             thread_data := __data.data;
             for #no_close *__data.iter {
                 #unquote body;

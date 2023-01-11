@@ -40,7 +40,7 @@ __runtime_initialize :: () {
 
 // Use this procedure to initialize everything needed in the
 // standard library when you are dropped directly into a function.
-__thread_initialize :: macro () {
+__thread_initialize :: () {
     use core.intrinsics.onyx { __initialize }
 
     // This should only be true for the main thread.

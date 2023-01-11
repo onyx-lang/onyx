@@ -1336,21 +1336,6 @@ i32 type_get_idx_of_linear_member_with_offset(Type* type, u32 offset) {
     }
 }
 
-/*b32 type_struct_is_simple(Type* type) {
-    if (type->kind != Type_Kind_Struct) return 0;
-
-    b32 is_simple = 1;
-    bh_arr_each(StructMember *, mem, type->Struct.memarr) {
-        if (type_linear_member_count((*mem)->type) != 1
-            (*mem)->type->kind == Type_Kind_Array) {
-            is_simple = 0;
-            break;
-        }
-    }
-
-    return is_simple;
-}*/
-
 b32 type_is_pointer(Type* type) {
     if (type == NULL) return 0;
     return type->kind == Type_Kind_Pointer;

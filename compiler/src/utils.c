@@ -948,6 +948,9 @@ typedef enum ArgState {
 
 TypeMatch check_arguments_against_type(Arguments* args, TypeFunction* func_type, VarArgKind* va_kind,
                                        OnyxToken* location, char* func_name, OnyxError* error) {
+    // In this function, if error is not NULL, then it is assumed that permanent changes can
+    // be made. Otherwise, permanent changes should be avoided; only detecting issues should be done.
+
     b32 permanent = location != NULL;
     if (func_name == NULL) func_name = "UNKNOWN FUNCTION";
 

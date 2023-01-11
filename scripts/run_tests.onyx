@@ -100,7 +100,7 @@ main :: (args) => {
         failed_tests: ^[..] str;
         failed_tests_mutex: sync.Mutex;
     }
-    exec_context := init(Execution_Context);
+    exec_context := Execution_Context.{};
     exec_context.compile_only = settings.compile_only;
 
     failed_tests := make([..] str);
@@ -143,6 +143,11 @@ main :: (args) => {
             // Error running the test case
             print_color(.Red, "[{}]  Error '{}' in test case {}.\n{}", context.thread_id, exit, it.source_file, output);
             thread_data.at_least_one_test_failed = true;
+
+            sync.critical_section(^thread_data.failed_tests_mutex) {
+                array.push(thread_data.failed_tests, it.source_file);
+            }
+
             continue;
         }
 

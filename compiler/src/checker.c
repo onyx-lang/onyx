@@ -719,6 +719,7 @@ CheckStatus check_call(AstCall** pcall) {
             filename->kind  = Ast_Kind_StrLit;
             filename->token = str_token;
             filename->data_id = 0;
+            filename->type_node = builtin_string_type;
 
             add_entities_for_node(NULL, (AstNode *) filename, NULL, NULL);
             callsite->filename = filename;
@@ -2150,7 +2151,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             retval = check_directive_export_name((AstDirectiveExportName *) expr);
             break;
 
-        case Ast_Kind_StrLit: break;
+        case Ast_Kind_StrLit:
+            if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know string literals type. This is a weird one...") ;
+            break;
+
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;
@@ -3403,6 +3407,7 @@ void check_entity(Entity* ent) {
         case Entity_Type_Enum_Value:               cs = check_expression(&ent->enum_value->value); break;
         case Entity_Type_Process_Directive:        cs = check_process_directive((AstNode *) ent->expr); break;
 
+        case Entity_Type_String_Literal:
         case Entity_Type_Expression:
             cs = check_expression(&ent->expr);
             resolve_expression_type(ent->expr);
