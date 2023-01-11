@@ -155,31 +155,35 @@ static void local_raw_free(LocalAllocator* la, WasmType wt) {
     la->freed[idx]++;
 }
 
+static u64 local_allocate_type_in_memory(LocalAllocator* la, Type *type) {
+    u32 size = type_size_of(type);
+    u32 alignment = type_alignment_of(type);
+
+    bh_align(la->curr_stack, alignment);
+
+    if (la->max_stack < la->curr_stack)
+        la->max_stack = la->curr_stack;
+
+    bh_align(size, alignment);
+
+    if (la->max_stack - la->curr_stack >= (i32) size) {
+        la->curr_stack += size;
+
+    } else {
+        la->max_stack += size - (la->max_stack - la->curr_stack);
+        la->curr_stack = la->max_stack;
+    }
+
+    return la->curr_stack - size;
+}
+
 static u64 local_allocate(LocalAllocator* la, AstTyped* local) {
     if (local_is_wasm_local(local)) {
         WasmType wt = onyx_type_to_wasm_type(local->type);
         return local_raw_allocate(la, wt);
 
     } else {
-        u32 size = type_size_of(local->type);
-        u32 alignment = type_alignment_of(local->type);
-
-        bh_align(la->curr_stack, alignment);
-
-        if (la->max_stack < la->curr_stack)
-            la->max_stack = la->curr_stack;
-
-        bh_align(size, alignment);
-
-        if (la->max_stack - la->curr_stack >= (i32) size) {
-            la->curr_stack += size;
-
-        } else {
-            la->max_stack += size - (la->max_stack - la->curr_stack);
-            la->curr_stack = la->max_stack;
-        }
-
-        return la->curr_stack - size;
+        return local_allocate_type_in_memory(la, local->type);
     }
 }
 
@@ -550,6 +554,7 @@ EMIT_FUNC(zero_value,                      WasmType wt);
 EMIT_FUNC(zero_value_for_type,             Type* type, OnyxToken* where, AstTyped *alloc_node);
 EMIT_FUNC(stack_address,                   u32 offset, OnyxToken *token);
 EMIT_FUNC(values_into_contiguous_memory,   u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values);
+EMIT_FUNC(wasm_copy,                       OnyxToken *token);
 
 
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt, OnyxToken* block_token);
@@ -2296,11 +2301,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
         case ONYX_INTRINSIC_MEMORY_SIZE:  WID(call->token, WI_MEMORY_SIZE, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_GROW:  WID(call->token, WI_MEMORY_GROW, 0x00); break;
         case ONYX_INTRINSIC_MEMORY_COPY:
-            if (context.options->use_post_mvp_features) {
-                WIL(call->token, WI_MEMORY_COPY, 0x00);
-            } else {
-                emit_intrinsic_memory_copy(mod, &code);
-            }
+            emit_wasm_copy(mod, &code, call->token);
             break;
         case ONYX_INTRINSIC_MEMORY_FILL:
             if (context.options->use_post_mvp_features) {
@@ -2861,11 +2862,23 @@ EMIT_FUNC(compound_store, Type* type, u64 offset, b32 location_first) {
     *pcode = code;
 }
 
+EMIT_FUNC(wasm_copy, OnyxToken *token) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    if (context.options->use_post_mvp_features) {
+        WIL(token, WI_MEMORY_COPY, 0x00);
+    } else {
+        emit_intrinsic_memory_copy(mod, &code);
+    }
+
+    *pcode = code;
+}
+
 EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values) {
     bh_arr(WasmInstruction) code = *pcode;
 
     assert(onyx_type_is_stored_in_memory(type));
-    assert(value_count == type_structlike_mem_count(type));
+    assert(value_count == (i32) type_structlike_mem_count(type));
 
     StructMember smem;
     fori (i, 0, value_count) {
@@ -2923,11 +2936,7 @@ EMIT_FUNC(struct_store, Type *type, u32 offset) {
     WIL(NULL, WI_I32_CONST, type_size_of(type));
 
     // Use a simple memory copy if it is available.
-    if (context.options->use_post_mvp_features) {
-        WI(NULL, WI_MEMORY_COPY);
-    } else {
-        emit_intrinsic_memory_copy(mod, &code);
-    }
+    emit_wasm_copy(mod, &code, NULL);
 
     *pcode = code;
     return;
@@ -3818,15 +3827,37 @@ EMIT_FUNC(return, AstReturn* ret) {
             emit_store_instruction(mod, &code, ret->expr->type, 0);
 
         } else {
+            //
+            // This code needs to handle the case where you are returning a r-value structure
+            // that lives on the stack of another function, AND you need to invoke deferred
+            // statements afterwards. Because you cannot know what a deferred statement may
+            // do, you have to prepare for the worst and copy the value to stack memory.
+            // Otherwise, the deferred statement may invoke a function that stomps all over
+            // the value's memory. For example,
+            //
+            //     f :: () => Foo.{1, 2, 3};
+            //     g :: () => {
+            //         defer printf("Doing lots of things! {}\n", 123);
+            //         return f();
+            //     }
+            //
+            b32 need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 0;
+            u64 return_value_buffer;
+            if (onyx_type_is_stored_in_memory(ret->expr->type)
+                && !is_lval((AstNode *) ret->expr)
+                && bh_arr_length(mod->deferred_stmts) > 0) {
+                need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls = 1;
+
+                return_value_buffer = local_allocate_type_in_memory(mod->local_alloc, ret->expr->type);
+                emit_stack_address(mod, &code, return_value_buffer, NULL);
+            }
+
             emit_expression(mod, &code, ret->expr);
 
-            if (onyx_type_is_stored_in_memory(ret->expr->type)) {
-                u64 stack_top_idx = bh_imap_get(&mod->index_map, (u64) &builtin_stack_top);
-
-                WID(NULL, WI_GLOBAL_GET, stack_top_idx);
-                WID(NULL, WI_PTR_CONST, type_size_of(ret->expr->type));
-                WI(NULL, WI_PTR_ADD);
-                WID(NULL, WI_GLOBAL_SET, stack_top_idx);
+            if (need_to_copy_to_separate_buffer_to_avoid_corrupted_from_deferred_calls) {
+                WIL(NULL, WI_I32_CONST, type_size_of(ret->expr->type));
+                emit_wasm_copy(mod, &code, NULL);
+                emit_stack_address(mod, &code, return_value_buffer, NULL);
             }
         }
     }
