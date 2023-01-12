@@ -554,8 +554,9 @@ EMIT_FUNC(zero_value,                      WasmType wt);
 EMIT_FUNC(zero_value_for_type,             Type* type, OnyxToken* where, AstTyped *alloc_node);
 EMIT_FUNC(stack_address,                   u32 offset, OnyxToken *token);
 EMIT_FUNC(values_into_contiguous_memory,   u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values);
+EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset);
 EMIT_FUNC(wasm_copy,                       OnyxToken *token);
-
+EMIT_FUNC(wasm_fill,                       OnyxToken *token);
 
 EMIT_FUNC(enter_structured_block,        StructuredBlockType sbt, OnyxToken* block_token);
 EMIT_FUNC_NO_ARGS(leave_structured_block);
@@ -769,11 +770,7 @@ EMIT_FUNC_RETURNING(u64, local_allocation, AstTyped* stmt) {
                 emit_location(mod, &code, stmt);
                 WID(stmt->token, WI_I32_CONST, 0);
                 WID(stmt->token, WI_I32_CONST, type_size_of(stmt->type));
-                if (context.options->use_post_mvp_features) {
-                    WID(stmt->token, WI_MEMORY_FILL, 0x00);
-                } else {
-                    emit_intrinsic_memory_fill(mod, &code);
-                }
+                emit_wasm_fill(mod, &code, NULL);
             }
 
             *pcode = code;
@@ -883,9 +880,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
         u64 base_ptr_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
         WIL(NULL, WI_LOCAL_SET, base_ptr_local);
 
-        AstStructLiteral *sl = (AstStructLiteral *) assign->right;
-        emit_values_into_contiguous_memory(mod, &code, base_ptr_local,
-                assign->right->type, offset, bh_arr_length(sl->args.values), sl->args.values);
+        emit_struct_literal_into_contiguous_memory(mod, &code, (AstStructLiteral *) assign->right, base_ptr_local, offset);
 
         local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
 
@@ -1024,8 +1019,6 @@ EMIT_FUNC(flip_and_store_instruction, AstTyped *lval, OnyxToken *token) {
     u64 expr_tmp = local_raw_allocate(mod->local_alloc, wt);
     WIL(token, WI_LOCAL_SET, expr_tmp);
 
-    // nocheckin
-    // emit_location_return_offset(mod, &code, lval, &offset);
     emit_location(mod, &code, lval);
     WIL(token, WI_LOCAL_GET, expr_tmp);
 
@@ -1042,11 +1035,6 @@ EMIT_FUNC(flip_and_store_instruction, AstTyped *lval, OnyxToken *token) {
 // doing whatever is necessary.
 EMIT_FUNC(generic_store_instruction, AstTyped *lval, OnyxToken *token) {
     bh_arr(WasmInstruction) code = *pcode;
-
-    // If this is a structure, use the emit_struct_lval function.
-    // if (type_is_structlike_strict(lval->type)) {
-    //     emit_struct_lval(mod, &code, lval);
-    // }
 
     // If this is a WASM local, simply set the local and continue.
     if (bh_imap_get(&mod->local_map, (u64) lval) & LOCAL_IS_WASM) {
@@ -2008,13 +1996,16 @@ EMIT_FUNC(call, AstCall* call) {
             place_on_stack = 1;
         }
 
-        if (place_on_stack) WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+        if (arg->value->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(arg->value->type)) {
+            emit_struct_literal_into_contiguous_memory(mod, &code, (AstStructLiteral *) arg->value, stack_top_store_local, reserve_size);
 
-        emit_expression(mod, &code, arg->value);
+        } else {
+            if (place_on_stack) WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
+            emit_expression(mod, &code, arg->value);
+            if (place_on_stack) emit_store_instruction(mod, &code, arg->value->type, reserve_size);
+        }
 
         if (place_on_stack) {
-            emit_store_instruction(mod, &code, arg->value->type, reserve_size);
-
             if (arg->va_kind == VA_Kind_Not_VA) {
                 // Non-variadic arguments on the stack need a pointer to them placed on the WASM stack.
                 WIL(call_token, WI_LOCAL_GET, stack_top_store_local);
@@ -2304,11 +2295,7 @@ EMIT_FUNC(intrinsic_call, AstCall* call) {
             emit_wasm_copy(mod, &code, call->token);
             break;
         case ONYX_INTRINSIC_MEMORY_FILL:
-            if (context.options->use_post_mvp_features) {
-                WIL(call->token, WI_MEMORY_FILL, 0x00);
-            } else {
-                emit_intrinsic_memory_fill(mod, &code);
-            }
+            emit_wasm_fill(mod, &code, call->token);
             break;
 
         case ONYX_INTRINSIC_INITIALIZE: {
@@ -2874,6 +2861,18 @@ EMIT_FUNC(wasm_copy, OnyxToken *token) {
     *pcode = code;
 }
 
+EMIT_FUNC(wasm_fill, OnyxToken *token) {
+    bh_arr(WasmInstruction) code = *pcode;
+
+    if (context.options->use_post_mvp_features) {
+        WID(token, WI_MEMORY_FILL, 0x00);
+    } else {
+        emit_intrinsic_memory_fill(mod, &code);
+    }
+
+    *pcode = code;
+}
+
 EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 offset, i32 value_count, AstTyped **values) {
     bh_arr(WasmInstruction) code = *pcode;
 
@@ -2884,14 +2883,36 @@ EMIT_FUNC(values_into_contiguous_memory, u64 base_ptr_local, Type *type, u32 off
     fori (i, 0, value_count) {
         type_lookup_member_by_idx(type, i, &smem);
 
-        // CLEANUP: When emitting a structure literal inside of a structure literal,
-        // there should be a separate path taken to reduce the amount of redundant memory.
-        WIL(NULL, WI_LOCAL_GET, base_ptr_local);
-        emit_expression(mod, &code, values[i]);
-        emit_store_instruction(mod, &code, values[i]->type, smem.offset + offset);
+        // When emitting a structure literal into memory, simply place it directly into the memory.
+        // Otherwise, the structure literal would be placed somewhere in memory, and then needlessly
+        // copied to its final destination.
+        if (values[i]->kind == Ast_Kind_Struct_Literal && onyx_type_is_stored_in_memory(values[i]->type)) {
+            emit_struct_literal_into_contiguous_memory(mod, &code, (AstStructLiteral *) values[i], base_ptr_local, smem.offset + offset);
+
+        // When emitting a zero-value, simple zero the bytes in memory. Otherwise you run into the
+        // same problem described above.
+        } else if (values[i]->kind == Ast_Kind_Zero_Value && onyx_type_is_stored_in_memory(values[i]->type)) {
+            WIL(NULL, WI_LOCAL_GET, base_ptr_local);
+            WIL(NULL, WI_PTR_CONST, smem.offset + offset);
+            WI(NULL, WI_PTR_ADD);
+
+            WIL(NULL, WI_I32_CONST, 0);
+            WIL(NULL, WI_I32_CONST, type_size_of(values[i]->type));
+
+            emit_wasm_fill(mod, &code, NULL);
+
+        } else {
+            WIL(NULL, WI_LOCAL_GET, base_ptr_local);
+            emit_expression(mod, &code, values[i]);
+            emit_store_instruction(mod, &code, values[i]->type, smem.offset + offset);
+        }
     }
 
     *pcode = code;
+}
+
+EMIT_FUNC(struct_literal_into_contiguous_memory, AstStructLiteral* sl, u64 base_ptr_local, u32 offset) {
+    emit_values_into_contiguous_memory(mod, pcode, base_ptr_local, sl->type, offset, bh_arr_length(sl->args.values), sl->args.values);
 }
 
 EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
@@ -2909,8 +2930,7 @@ EMIT_FUNC(struct_literal, AstStructLiteral* sl) {
     u64 local_offset = emit_local_allocation(mod, &code, (AstTyped *) sl);
     assert((local_offset & LOCAL_IS_WASM) == 0);
 
-    emit_values_into_contiguous_memory(mod, &code, mod->stack_base_idx,
-            sl->type, local_offset, bh_arr_length(sl->args.values), sl->args.values);
+    emit_struct_literal_into_contiguous_memory(mod, &code, sl, mod->stack_base_idx, local_offset);
     emit_stack_address(mod, &code, local_offset, sl->token);
 
     *pcode = code;
@@ -3074,14 +3094,8 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
         }
 
         WIL(NULL, WI_I32_CONST, 0);
-
         WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-
-        if (context.options->use_post_mvp_features) {
-            WI(NULL, WI_MEMORY_FILL);
-        } else {
-            emit_intrinsic_memory_fill(mod, &code);
-        }
+        emit_wasm_fill(mod, &code, NULL);
     }
 
     local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
@@ -3951,12 +3965,7 @@ EMIT_FUNC(zero_value_for_type, Type* type, OnyxToken* where, AstTyped *alloc_nod
         emit_location(mod, &code, alloc_node);
         WIL(NULL, WI_I32_CONST, 0);
         WIL(NULL, WI_I32_CONST, type_size_of(type));
-
-        if (context.options->use_post_mvp_features) {
-            WI(NULL, WI_MEMORY_FILL);
-        } else {
-            emit_intrinsic_memory_fill(mod, &code);
-        }
+        emit_wasm_fill(mod, &code, NULL);
 
         emit_location(mod, &code, alloc_node);
 
