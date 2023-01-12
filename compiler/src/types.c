@@ -1232,10 +1232,10 @@ b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem) {
 }
 
 i32 type_linear_member_count(Type* type) {
+    if (!type) return 0;
     switch (type->kind) {
         case Type_Kind_Slice:
         case Type_Kind_VarArgs:  return 2;
-        case Type_Kind_DynArray: return 5;
         case Type_Kind_Compound: return bh_arr_length(type->Compound.linear_members);
         default: return 1;
     }
@@ -1381,16 +1381,7 @@ b32 type_is_numeric(Type* type) {
 }
 
 b32 type_is_compound(Type* type) {
-    if (type == NULL) return 0;
-
-    return type->kind != Type_Kind_Basic
-        && type->kind != Type_Kind_Pointer
-        && type->kind != Type_Kind_Enum
-        && type->kind != Type_Kind_Function
-        && type->kind != Type_Kind_Array
-        && type->kind != Type_Kind_Distinct
-        && type->kind != Type_Kind_Struct
-        && type->kind != Type_Kind_DynArray;
+    return type_linear_member_count(type) > 1;
 }
 
 b32 type_is_simd(Type* type) {
