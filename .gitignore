@@ -17,3 +17,4 @@ tmp/
 .vscode/
 dist/
 **/node_modules/
+onyx-lsp.ini

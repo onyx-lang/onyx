@@ -526,7 +526,7 @@ typedef enum ForLoopType {
 typedef enum ParamPassType {
     Param_Pass_Invalid,
     Param_Pass_By_Value,
-    Param_Pass_By_VarArg,
+    Param_Pass_By_Multiple_Values,
     Param_Pass_By_Implicit_Pointer,
 } ParamPassType;
 
@@ -1887,7 +1887,10 @@ static inline CallingConvention type_function_get_cc(Type* type) {
 }
 
 static inline ParamPassType type_get_param_pass(Type* type) {
-    if (type_is_structlike_strict(type) && !type_structlike_is_simple(type)) return Param_Pass_By_Implicit_Pointer;
+    if (type_is_structlike_strict(type)) {
+        if (type_structlike_is_simple(type)) return Param_Pass_By_Multiple_Values;
+        else                                 return Param_Pass_By_Implicit_Pointer;
+    }
     return Param_Pass_By_Value;
 }
 

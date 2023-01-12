@@ -27,45 +27,20 @@
 #define WASM_TYPE_VOID    0x00
 
 static b32 onyx_type_is_stored_in_memory(Type *type) {
-    if (type->kind == Type_Kind_Struct || type->kind == Type_Kind_DynArray) {
-        return 1;
-    }
-
-    return 0;
+    return type->kind == Type_Kind_Struct
+        || type->kind == Type_Kind_DynArray;
 }
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
-    if (onyx_type_is_stored_in_memory(type)) {
-        return WASM_TYPE_PTR;
-    }
+    if (onyx_type_is_stored_in_memory(type)) return WASM_TYPE_PTR;
 
-    if (type->kind == Type_Kind_Slice) {
-        return WASM_TYPE_VOID;
-    }
-
-    if (type->kind == Type_Kind_Compound) {
-        return WASM_TYPE_VOID;
-    }
-
-    if (type->kind == Type_Kind_Enum) {
-        return onyx_type_to_wasm_type(type->Enum.backing);
-    }
-
-    if (type->kind == Type_Kind_Distinct) {
-        return onyx_type_to_wasm_type(type->Distinct.base_type);
-    }
-
-    if (type->kind == Type_Kind_Pointer) {
-        return WASM_TYPE_PTR;
-    }
-
-    if (type->kind == Type_Kind_Array) {
-        return WASM_TYPE_PTR;
-    }
-
-    if (type->kind == Type_Kind_Function) {
-        return WASM_TYPE_FUNC;
-    }
+    if (type->kind == Type_Kind_Slice)    return WASM_TYPE_VOID;
+    if (type->kind == Type_Kind_Compound) return WASM_TYPE_VOID;
+    if (type->kind == Type_Kind_Enum)     return onyx_type_to_wasm_type(type->Enum.backing);
+    if (type->kind == Type_Kind_Distinct) return onyx_type_to_wasm_type(type->Distinct.base_type);
+    if (type->kind == Type_Kind_Pointer)  return WASM_TYPE_PTR;
+    if (type->kind == Type_Kind_Array)    return WASM_TYPE_PTR;
+    if (type->kind == Type_Kind_Function) return WASM_TYPE_FUNC;
 
     if (type->kind == Type_Kind_Basic) {
         TypeBasic* basic = &type->Basic;
@@ -88,14 +63,10 @@ static WasmType onyx_type_to_wasm_type(Type* type) {
 }
 
 static b32 onyx_type_is_multiple_wasm_values(Type *type) {
-    if (type->kind == Type_Kind_Slice || type->kind == Type_Kind_VarArgs) {
-        return 1;
-    }
-
     // Dynamic arrays and slices are represented as a single pointer to
     // data for the structure.
-
-    return 0;
+    return type->kind == Type_Kind_Slice
+        || type->kind == Type_Kind_VarArgs;
 }
 
 static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft);
@@ -3315,15 +3286,15 @@ EMIT_FUNC(expression, AstTyped* expr) {
             u64 localidx = bh_imap_get(&mod->local_map, (u64) param);
 
             switch (type_get_param_pass(param->type)) {
-                case Param_Pass_By_Value: {
-                    if (type_is_structlike_strict(expr->type)) {
-                        u32 mem_count = type_structlike_mem_count(expr->type);
-                        fori (idx, 0, mem_count) WIL(NULL, WI_LOCAL_GET, localidx + idx);
+                case Param_Pass_By_Multiple_Values: {
+                    u32 mem_count = type_structlike_mem_count(expr->type);
+                    fori (idx, 0, mem_count) WIL(NULL, WI_LOCAL_GET, localidx + idx);
+                    break;
+                }
 
-                    } else {
-                        assert(localidx & LOCAL_IS_WASM);
-                        WIL(NULL, WI_LOCAL_GET, localidx);
-                    }
+                case Param_Pass_By_Value: {
+                    assert(localidx & LOCAL_IS_WASM);
+                    WIL(NULL, WI_LOCAL_GET, localidx);
                     break;
                 }
 
@@ -3472,26 +3443,24 @@ EMIT_FUNC(expression, AstTyped* expr) {
         case Ast_Kind_Field_Access: {
             AstFieldAccess* field = (AstFieldAccess* ) expr;
 
-            if (field->expr->kind == Ast_Kind_Param) {
-                if (type_get_param_pass(field->expr->type) == Param_Pass_By_Value && !type_is_pointer(field->expr->type)) {
-                    u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
-                    assert(localidx & LOCAL_IS_WASM);
-                    WIL(NULL, WI_LOCAL_GET, localidx);
-                    break;
-                }
+            if (field->expr->kind == Ast_Kind_Param && type_get_param_pass(field->expr->type) == Param_Pass_By_Multiple_Values) {
+                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
+                assert(localidx & LOCAL_IS_WASM);
+                WIL(NULL, WI_LOCAL_GET, localidx);
             }
 
-
-            if (is_lval((AstNode *) field->expr) || type_is_pointer(field->expr->type)) {
+            else if (is_lval((AstNode *) field->expr) || type_is_pointer(field->expr->type)) {
                 u64 offset = 0;
                 emit_field_access_location(mod, &code, field, &offset);
                 emit_load_instruction(mod, &code, field->type, offset);
+            }
 
-            } else if (onyx_type_is_stored_in_memory(field->expr->type)) {
+            else if (onyx_type_is_stored_in_memory(field->expr->type)) {
                 emit_expression(mod, &code, field->expr);
                 emit_load_instruction(mod, &code, field->type, field->offset);
+            }
 
-            } else {
+            else {
                 emit_expression(mod, &code, field->expr);
 
                 i32 idx = type_get_idx_of_linear_member_with_offset(field->expr->type, field->offset);
@@ -3994,24 +3963,22 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     i32 params_left = param_count;
 
     while (params_left-- > 0) {
-        if (type_get_param_pass(*param_type) == Param_Pass_By_Implicit_Pointer) {
-            *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]);
+        switch (type_get_param_pass(*param_type)) {
+            case Param_Pass_By_Value:            *(t++) = (char) onyx_type_to_wasm_type(*param_type); break;
+            case Param_Pass_By_Implicit_Pointer: *(t++) = (char) onyx_type_to_wasm_type(&basic_types[Basic_Kind_Rawptr]); break;
 
-        }
+            case Param_Pass_By_Multiple_Values: {
+                u32 mem_count = type_structlike_mem_count(*param_type);
+                StructMember smem;
 
-        else if (onyx_type_is_multiple_wasm_values(*param_type)) {
-            u32 mem_count = type_structlike_mem_count(*param_type);
-            StructMember smem;
+                fori (i, 0, mem_count) {
+                    type_lookup_member_by_idx(*param_type, i, &smem);
+                    *(t++) = (char) onyx_type_to_wasm_type(smem.type);
+                }
 
-            fori (i, 0, mem_count) {
-                type_lookup_member_by_idx(*param_type, i, &smem);
-                *(t++) = (char) onyx_type_to_wasm_type(smem.type);
+                param_count += mem_count - 1;
+                break;
             }
-
-            param_count += mem_count - 1;
-
-        } else {
-            *(t++) = (char) onyx_type_to_wasm_type(*param_type);
         }
 
         param_type++;
@@ -4119,22 +4086,17 @@ static void emit_function(OnyxWasmModule* mod, AstFunction* fd) {
         u64 localidx = 0;
         bh_arr_each(AstParam, param, fd->params) {
             switch (type_get_param_pass(param->local->type)) {
-                case Param_Pass_By_Value: {
-                    if (type_is_structlike_strict(param->local->type)) {
-                        debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
-                        bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
-                        localidx += type_structlike_mem_count(param->local->type);
+                case Param_Pass_By_Multiple_Values: 
+                    debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
+                    bh_imap_put(&mod->local_map, (u64) param->local, localidx | LOCAL_IS_WASM);
+                    localidx += type_structlike_mem_count(param->local->type);
+                    break;
 
-                        break;
-                    }
-                    // fallthrough
-                }
-
-                case Param_Pass_By_Implicit_Pointer: {
+                case Param_Pass_By_Value:
+                case Param_Pass_By_Implicit_Pointer:
                     debug_introduce_symbol(mod, param->local->token, DSL_REGISTER, localidx | LOCAL_IS_WASM, param->local->type);
                     bh_imap_put(&mod->local_map, (u64) param->local, localidx++ | LOCAL_IS_WASM);
                     break;
-                }
 
                 default: assert(0);
             }

@@ -901,18 +901,6 @@ Type* type_make_varargs(bh_allocator alloc, Type* of) {
 }
 
 void build_linear_types_with_offset(Type* type, bh_arr(TypeWithOffset)* pdest, u32 offset) {
-    // nocheckin :StructAsm
-    /*
-    if (type_is_structlike_strict(type)) {
-        u32 mem_count = type_structlike_mem_count(type);
-        StructMember smem = { 0 };
-        fori (i, 0, mem_count) {
-            type_lookup_member_by_idx(type, i, &smem);
-            build_linear_types_with_offset(smem.type, pdest, offset + smem.offset);
-        }
-
-    } else */
-
     if (type->kind == Type_Kind_Compound) {
         u32 elem_offset = 0;
         fori (i, 0, type->Compound.count) {
