@@ -222,11 +222,7 @@ OVMI_INSTR_EXEC(copy) {
 
     if (!dest || !src) OVMI_EXCEPTION_HOOK;
 
-    if (src + count > dest) {
-        memmove(&memory[dest], &memory[src], count);
-    } else {
-        memcpy(&memory[dest], &memory[src], count);
-    }
+    memmove(&memory[dest], &memory[src], count);
 
     NEXT_OP;
 }
