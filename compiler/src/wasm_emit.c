@@ -27,12 +27,19 @@
 #define WASM_TYPE_VOID    0x00
 
 static b32 onyx_type_is_stored_in_memory(Type *type) {
+    if (type_struct_is_just_one_basic_value(type)) return 0;
+
     return type->kind == Type_Kind_Struct
         || type->kind == Type_Kind_DynArray;
 }
 
 static WasmType onyx_type_to_wasm_type(Type* type) {
     if (onyx_type_is_stored_in_memory(type)) return WASM_TYPE_PTR;
+
+    if (type_struct_is_just_one_basic_value(type)) {
+        Type *asdf = type_struct_is_just_one_basic_value(type);
+        return onyx_type_to_wasm_type(asdf);
+    }
 
     if (type->kind == Type_Kind_Slice)    return WASM_TYPE_VOID;
     if (type->kind == Type_Kind_Compound) return WASM_TYPE_VOID;
@@ -821,7 +828,7 @@ EMIT_FUNC(assignment, AstBinaryOp* assign) {
 
             u64 localidx = bh_imap_get(&mod->local_map, (u64) lval);
 
-            if (lval->kind == Ast_Kind_Param && type_is_structlike_strict(lval->type)) {
+            if (lval->kind == Ast_Kind_Param && onyx_type_is_multiple_wasm_values(lval->type)) {
                 u32 mem_count = type_structlike_mem_count(lval->type);
                 fori (i, 0, mem_count) WIL(assign->token, WI_LOCAL_SET, localidx + i);
 
@@ -951,9 +958,12 @@ EMIT_FUNC(store_instruction, Type* type, u32 offset) {
         return;
     }
 
+    if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
     if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
     if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
+
+    assert(type);
 
     u32 alignment = type_get_alignment_log2(type);
 
@@ -1060,9 +1070,12 @@ EMIT_FUNC(load_instruction, Type* type, u32 offset) {
         return;
     }
 
+    if (type->kind == Type_Kind_Struct)   type = type_struct_is_just_one_basic_value(type);
     if (type->kind == Type_Kind_Enum)     type = type->Enum.backing;
     if (type->kind == Type_Kind_Distinct) type = type->Distinct.base_type;
     if (type->kind == Type_Kind_Function) type = &basic_types[Basic_Kind_U32];
+
+    assert(type);
 
     i32 load_size   = type_size_of(type);
     i32 is_basic    = type->kind == Type_Kind_Basic || type->kind == Type_Kind_Pointer;
@@ -1694,7 +1707,6 @@ EMIT_FUNC(defer_code, WasmInstruction* deferred_code, u32 code_count) {
 
 EMIT_FUNC(deferred_stmt, DeferredStmt deferred_stmt) {
     bh_arr(WasmInstruction) code = *pcode;
-
     if (deferred_stmt.defer_node) {
         WI(deferred_stmt.defer_node->token, WI_NOP);
     }
@@ -2983,32 +2995,8 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
     WI(NULL, WI_I32_NE);
     emit_enter_structured_block(mod, &code, SBT_Basic_If, NULL);
 
-    //
-    // CLEANUP: Most of these cases could be much shorter if they used existing intrinsics.
-    //
-    if (elem_count <= 2) {
-        // Inline copying for a small number of elements. It still may be faster to do this in a tight loop.
-
-        fori (i, 0, elem_count) {
-            if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == lptr_local)
-                bh_arr_last(code).type = WI_LOCAL_TEE;
-            else
-                WIL(NULL, WI_LOCAL_GET, lptr_local);
-
-            WIL(NULL, WI_LOCAL_GET, rptr_local);
-            emit_load_instruction(mod, &code, elem_type, i * elem_size);
-
-            emit_store_instruction(mod, &code, elem_type, i * elem_size + offset);
-        }
-
-    } else if (context.options->use_post_mvp_features) {
-        // Use a simple memory copy if it is available. This may be what happens in the case below too at a later time.
-
-        if (bh_arr_last(code).type == WI_LOCAL_SET && (u64) bh_arr_last(code).data.l == lptr_local)
-            bh_arr_last(code).type = WI_LOCAL_TEE;
-        else
-            WIL(NULL, WI_LOCAL_GET, lptr_local);
-
+    {
+        WIL(NULL, WI_LOCAL_GET, lptr_local);
         if (offset != 0) {
             WIL(NULL, WI_PTR_CONST, offset);
             WI(NULL, WI_PTR_ADD);
@@ -3016,43 +3004,7 @@ EMIT_FUNC(array_store, Type* type, u32 offset) {
 
         WIL(NULL, WI_LOCAL_GET, rptr_local);
         WIL(NULL, WI_I32_CONST, elem_count * elem_size);
-        WI(NULL, WI_MEMORY_COPY);
-
-    } else {
-        // Emit a loop that copies the memory. This could be switched to a tight loop that just copies word per word.
-
-        u64 offset_local = local_raw_allocate(mod->local_alloc, WASM_TYPE_PTR);
-        WIL(NULL, WI_PTR_CONST, 0);
-        WIL(NULL, WI_LOCAL_SET, offset_local);
-
-        WID(NULL, WI_BLOCK_START, 0x40);
-        WID(NULL, WI_LOOP_START, 0x40);
-            WIL(NULL, WI_LOCAL_GET, offset_local);
-            WIL(NULL, WI_LOCAL_GET, lptr_local);
-            WI(NULL, WI_PTR_ADD);
-
-            WIL(NULL, WI_LOCAL_GET, offset_local);
-            WIL(NULL, WI_LOCAL_GET, rptr_local);
-            WI(NULL, WI_PTR_ADD);
-
-            emit_load_instruction(mod, &code, elem_type, 0);
-            emit_store_instruction(mod, &code, elem_type, offset);
-
-            WIL(NULL, WI_LOCAL_GET, offset_local);
-            WIL(NULL, WI_PTR_CONST, elem_size);
-            WI(NULL, WI_PTR_ADD);
-            WIL(NULL, WI_LOCAL_TEE, offset_local);
-
-            WIL(NULL, WI_PTR_CONST, elem_count * elem_size);
-            WI(NULL, WI_PTR_GE);
-            WID(NULL, WI_COND_JUMP, 0x01);
-
-            WID(NULL, WI_JUMP, 0x00);
-
-        WI(NULL, WI_LOOP_END);
-        WI(NULL, WI_BLOCK_END);
-
-        local_raw_free(mod->local_alloc, WASM_TYPE_PTR);
+        emit_wasm_copy(mod, &code, NULL);
     }
 
     WI(NULL, WI_ELSE);
@@ -3445,6 +3397,12 @@ EMIT_FUNC(expression, AstTyped* expr) {
 
             if (field->expr->kind == Ast_Kind_Param && type_get_param_pass(field->expr->type) == Param_Pass_By_Multiple_Values) {
                 u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr) + field->idx;
+                assert(localidx & LOCAL_IS_WASM);
+                WIL(NULL, WI_LOCAL_GET, localidx);
+            }
+
+            else if (field->expr->kind == Ast_Kind_Param && type_struct_is_just_one_basic_value(field->expr->type)) {
+                u64 localidx = bh_imap_get(&mod->local_map, (u64) field->expr);
                 assert(localidx & LOCAL_IS_WASM);
                 WIL(NULL, WI_LOCAL_GET, localidx);
             }
@@ -3985,13 +3943,6 @@ static i32 generate_type_idx(OnyxWasmModule* mod, Type* ft) {
     *(t++) = ':';
 
     WasmType return_type = onyx_type_to_wasm_type(ft->Function.return_type);
-
-    /*
-    if (ft->Function.return_type->kind == Type_Kind_Struct
-        && type_linear_member_count(ft->Function.return_type) == 1) {
-        return_type = onyx_type_to_wasm_type(ft->Function.return_type->Struct.linear_members[0].type);
-    }
-    */
 
     *(t++) = (char) return_type;
     *t = '\0';

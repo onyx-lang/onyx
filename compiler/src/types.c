@@ -1449,7 +1449,7 @@ u32 type_structlike_is_simple(Type* type) {
         case Type_Kind_Slice:    return 1;
         case Type_Kind_VarArgs:  return 1;
         case Type_Kind_DynArray: return 0;
-        case Type_Kind_Struct:   return 0; // :StructAsm type_struct_is_simple(type);
+        case Type_Kind_Struct:   return 0;
         default: return 0;
     }
 }
@@ -1469,4 +1469,12 @@ b32 type_struct_constructed_from_poly_struct(Type* struct_type, struct AstType* 
     if (struct_type->kind != Type_Kind_Struct) return 0;
 
     return struct_type->Struct.constructed_from == from;
+}
+
+Type* type_struct_is_just_one_basic_value(Type *type) {
+    if (!type)                                                 return NULL;
+    if (type->kind != Type_Kind_Struct)                        return NULL;
+    if (bh_arr_length(type->Struct.memarr) != 1)               return NULL;
+    if (type->Struct.memarr[0]->type->kind != Type_Kind_Basic) return NULL;
+    return type->Struct.memarr[0]->type;
 }

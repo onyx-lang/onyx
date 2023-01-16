@@ -1,9 +1,11 @@
 package core
 
-#tag conv.Custom_Format.{ #solidify cptr.format {T=T} }
+@conv.Custom_Format.{ #solidify cptr.format {T=T} }
 cptr :: struct (T: type_expr) {
     data: u64;
+}
 
+#inject cptr {
     make :: macro (ptr: ^$T) -> cptr(T) {
         __cptr_make :: __cptr_make
         return .{ __cptr_make(ptr) };
