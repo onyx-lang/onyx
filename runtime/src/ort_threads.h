@@ -5,6 +5,7 @@
 typedef struct OnyxThread {
     i32 id;
     i32 tls_base;
+    i32 stack_base;
     i32 funcidx;
     i32 dataptr;
     wasm_instance_t* instance;
@@ -49,7 +50,7 @@ static i32 onyx_run_thread(void *data) {
     i32 thread_id = thread->id;
 
     { // Call the _thread_start procedure
-        wasm_val_t args[]    = { WASM_I32_VAL(thread_id), WASM_I32_VAL(thread->tls_base), WASM_I32_VAL(thread->funcidx), WASM_I32_VAL(thread->dataptr) };
+        wasm_val_t args[]    = { WASM_I32_VAL(thread_id), WASM_I32_VAL(thread->tls_base), WASM_I32_VAL(thread->stack_base), WASM_I32_VAL(thread->funcidx), WASM_I32_VAL(thread->dataptr) };
         wasm_val_vec_t results = { 0, 0 };
         wasm_val_vec_t args_array = WASM_ARRAY_VEC(args);
 
@@ -73,15 +74,16 @@ static i32 onyx_run_thread(void *data) {
     return 0;
 }
 
-ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
+ONYX_DEF(__spawn_thread, (WASM_I32, WASM_I32, WASM_I32, WASM_I32, WASM_I32), (WASM_I32)) {
     if (threads == NULL) bh_arr_new(bh_heap_allocator(), threads, 128);
     bh_arr_insert_end(threads, 1);
     OnyxThread *thread = &bh_arr_last(threads);
 
-    thread->id       = params->data[0].of.i32;
-    thread->tls_base = params->data[1].of.i32;
-    thread->funcidx  = params->data[2].of.i32;
-    thread->dataptr  = params->data[3].of.i32;
+    thread->id         = params->data[0].of.i32;
+    thread->tls_base   = params->data[1].of.i32;
+    thread->stack_base = params->data[2].of.i32;
+    thread->funcidx    = params->data[3].of.i32;
+    thread->dataptr    = params->data[4].of.i32;
 
     #ifdef _BH_LINUX
         pthread_create(&thread->thread, NULL, onyx_run_thread, thread);

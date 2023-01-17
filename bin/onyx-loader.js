@@ -15,7 +15,7 @@ window.ONYX_MODULES.push({
 
     exit: function() { debugger; },
 
-    spawn_thread: function(id, funcidx, dataptr) {
+    spawn_thread: function(id, tls_base, stack_base, funcidx, dataptr) {
         try {
             let needed_imports = {};
 
@@ -37,6 +37,8 @@ window.ONYX_MODULES.push({
                 funcidx    : funcidx,
                 dataptr    : dataptr,
                 imports    : needed_imports,
+                tls_base   : tls_base,
+                stack_base : stack_base
             });
 
             return 1;

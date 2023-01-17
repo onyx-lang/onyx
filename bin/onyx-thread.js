@@ -32,7 +32,7 @@ self.onmessage = function (msg) {
     .then(function(res) {
         self.ONYX_MEMORY = data.memory;
 
-        res.instance.exports._thread_start(data.thread_id, data.funcidx, data.dataptr);
+        res.instance.exports._thread_start(data.thread_id, data.tls_base, data.stack_base, data.funcidx, data.dataptr);
         res.instance.exports._thread_exit(data.thread_id);
     });
-}
+,

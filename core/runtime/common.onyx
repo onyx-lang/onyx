@@ -66,11 +66,12 @@ __thread_initialize :: () {
 }
 
 #if Multi_Threading_Enabled {
-    _thread_start :: (id: i32, tls_base: rawptr, func: (data: rawptr) -> void, data: rawptr) {
+    _thread_start :: (id: i32, tls_base: rawptr, stack_base: rawptr, func: (data: rawptr) -> void, data: rawptr) {
         __tls_base = tls_base;
+        __stack_top = stack_base;
+
         context.thread_id = id;
 
-        __stack_top = raw_alloc(alloc.heap_allocator, 1 << 20);
         __thread_initialize();
 
         func(data);

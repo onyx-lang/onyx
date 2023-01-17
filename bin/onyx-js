@@ -22,7 +22,7 @@ const ENV = {
             process.exit(status);
         },
 
-        spawn_thread(id, tls_base, funcidx, dataptr) {
+        spawn_thread(id, tls_base, stack_base, funcidx, dataptr) {
             try {
                 workers[id] = new Worker(__filename, {
                     workerData: {
@@ -30,6 +30,7 @@ const ENV = {
                         memory: wasm_memory,
                         wasm_bytes: wasm_bytes,
                         tls_base: tls_base,
+                        stack_base: stack_base,
                         funcidx: funcidx,
                         dataptr: dataptr,
                     },
