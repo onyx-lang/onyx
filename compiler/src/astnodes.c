@@ -1320,11 +1320,14 @@ b32 cast_is_legal(Type* from_, Type* to_, char** err_msg) {
     return 1;
 }
 
-b32 implicit_cast_to_bool(AstTyped **pnode) {
+
+
+static bh_imap implicit_cast_to_bool_cache;
+
+TypeMatch implicit_cast_to_bool(AstTyped **pnode) {
     AstTyped *node = *pnode;
 
-    if ((node->type->kind == Type_Kind_Basic &&
-        node->type->Basic.kind == Basic_Kind_Rawptr)
+    if ((node->type->kind == Type_Kind_Basic && node->type->Basic.kind == Basic_Kind_Rawptr)
         || (node->type->kind == Type_Kind_Pointer)) {
         AstNumLit *zero = make_int_literal(context.ast_alloc, 0);
         zero->type = &basic_types[Basic_Kind_Rawptr];
@@ -1334,7 +1337,7 @@ b32 implicit_cast_to_bool(AstTyped **pnode) {
         cmp->type = &basic_types[Basic_Kind_Bool];
 
         *pnode = (AstTyped *) cmp;
-        return 1;
+        return TYPE_MATCH_SUCCESS;
     }
 
     if (node->type->kind == Type_Kind_Slice ||
@@ -1358,10 +1361,39 @@ b32 implicit_cast_to_bool(AstTyped **pnode) {
         cmp->type = &basic_types[Basic_Kind_Bool];
 
         *pnode = (AstTyped *) cmp;
-        return 1;
+        return TYPE_MATCH_SUCCESS;
+    }
+    
+    if (implicit_cast_to_bool_cache.entries == NULL) {
+        bh_imap_init(&implicit_cast_to_bool_cache, global_heap_allocator, 8);
     }
 
-    return 0;
+    if (!bh_imap_has(&implicit_cast_to_bool_cache, (u64) node)) {
+        AstArgument *implicit_arg = make_argument(context.ast_alloc, node);
+        
+        Arguments *args = bh_alloc_item(context.ast_alloc, Arguments);
+        bh_arr_new(context.ast_alloc, args->values, 1);
+        bh_arr_push(args->values, (AstTyped *) implicit_arg);
+
+        bh_imap_put(&implicit_cast_to_bool_cache, (u64) node, (u64) args);
+    }
+    
+    Arguments *args = (Arguments *) bh_imap_get(&implicit_cast_to_bool_cache, (u64) node);
+    AstFunction *overload = (AstFunction *) find_matching_overload_by_arguments(builtin_implicit_bool_cast->overloads, args);
+
+    if (overload == NULL)                                       return TYPE_MATCH_FAILED;
+    if (overload == (AstFunction *) &node_that_signals_a_yield) return TYPE_MATCH_YIELD;
+    
+    AstCall *implicit_call = onyx_ast_node_new(context.ast_alloc, sizeof(AstCall), Ast_Kind_Call);
+    implicit_call->token = node->token;
+    implicit_call->callee = (AstTyped *) overload;
+    implicit_call->va_kind = VA_Kind_Not_VA;
+    implicit_call->args.values = args->values;
+
+    *(AstCall **) pnode = implicit_call;
+    bh_imap_delete(&implicit_cast_to_bool_cache, (u64) node);
+
+    return TYPE_MATCH_YIELD;
 }
 
 char* get_function_name(AstFunction* func) {

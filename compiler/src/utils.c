@@ -465,9 +465,8 @@ AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, 
 
         // NOTE: Overload is not something that is known to be overloadable.
         if (overload == NULL) continue;
-        if (overload == (AstFunction *) &node_that_signals_a_yield) return (AstTyped *) overload;
         if (overload->kind != Ast_Kind_Function) continue;
-        if (overload->type == NULL) {
+        if (overload == (AstFunction *) &node_that_signals_a_yield || overload->type == NULL) {
             // If it was not possible to create the type for this procedure, tell the
             // caller that this should yield and try again later.
 

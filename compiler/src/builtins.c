@@ -69,6 +69,7 @@ AstTyped    *tagged_procedures_node = NULL;
 AstFunction *builtin_initialize_data_segments = NULL;
 AstFunction *builtin_run_init_procedures = NULL;
 bh_arr(AstFunction *) init_procedures = NULL;
+AstOverloadedFunction *builtin_implicit_bool_cast;
 
 const BuiltinSymbol builtin_symbols[] = {
     { NULL, "void",       (AstNode *) &basic_type_void },
@@ -456,6 +457,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_run_init_procedures = (AstFunction *) symbol_raw_resolve(p->scope, "__run_init_procedures");
     if (builtin_run_init_procedures == NULL || builtin_run_init_procedures->kind != Ast_Kind_Function) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__run_init_procedures' procedure not found.");
+        return;
+    }
+
+    builtin_implicit_bool_cast = (AstOverloadedFunction *) symbol_raw_resolve(p->scope, "__implicit_bool_cast");
+    if (builtin_implicit_bool_cast == NULL || builtin_implicit_bool_cast->kind != Ast_Kind_Overloaded_Function) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'__implicit_bool_cast' #match procedure not found.");
         return;
     }
 

@@ -206,7 +206,9 @@ CheckStatus check_if(AstIfWhile* ifnode) {
         CHECK(expression, &ifnode->cond);
 
         if (!type_is_bool(ifnode->cond->type)) {
-            if (!implicit_cast_to_bool(&ifnode->cond)) {
+            TypeMatch implicit_cast = implicit_cast_to_bool(&ifnode->cond);
+            if (implicit_cast == TYPE_MATCH_YIELD) YIELD(ifnode->token->pos, "Waiting for implicit cast to bool to check.");
+            if (implicit_cast == TYPE_MATCH_FAILED) {
                 ERROR_(ifnode->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(ifnode->cond->type));
             }
         }
@@ -224,7 +226,9 @@ CheckStatus check_while(AstIfWhile* whilenode) {
     CHECK(expression, &whilenode->cond);
 
     if (!type_is_bool(whilenode->cond->type)) {
-        if (!implicit_cast_to_bool(&whilenode->cond)) {
+        TypeMatch implicit_cast = implicit_cast_to_bool(&whilenode->cond);
+        if (implicit_cast == TYPE_MATCH_YIELD) YIELD(whilenode->token->pos, "Waiting for implicit cast to bool to check.");
+        if (implicit_cast == TYPE_MATCH_FAILED) {
             ERROR_(whilenode->token->pos, "Expected expression of type 'bool' for condition, got '%s'", type_get_name(whilenode->cond->type));
         }
     }
@@ -1090,14 +1094,22 @@ CheckStatus check_binaryop_bool(AstBinaryOp** pbinop) {
 
     if (type_is_bool(binop->left->type)) {
         left_is_bool = 1;
-    } else if (implicit_cast_to_bool(&binop->left)) {
-        left_is_bool = 1;
+    } else {
+        TypeMatch implicit_cast = implicit_cast_to_bool(&binop->left);
+        if (implicit_cast == TYPE_MATCH_YIELD) YIELD(binop->token->pos, "Waiting for implicit cast to bool to check.");
+        if (implicit_cast == TYPE_MATCH_SUCCESS) {
+            left_is_bool = 1;
+        }
     }
 
     if (type_is_bool(binop->right->type)) {
         right_is_bool = 1;
-    } else if (implicit_cast_to_bool(&binop->right)) {
-        right_is_bool = 1;
+    } else {
+        TypeMatch implicit_cast = implicit_cast_to_bool(&binop->right);
+        if (implicit_cast == TYPE_MATCH_YIELD) YIELD(binop->token->pos, "Waiting for implicit cast to bool to check.");
+        if (implicit_cast == TYPE_MATCH_SUCCESS) {
+            right_is_bool = 1;
+        }
     }
 
     if (!left_is_bool || !right_is_bool) {
@@ -1324,7 +1336,9 @@ CheckStatus check_unaryop(AstUnaryOp** punop) {
 
     if (unaryop->operation == Unary_Op_Not) {
         if (!type_is_bool(unaryop->expr->type)) {
-            if (!implicit_cast_to_bool(&unaryop->expr)) {
+            TypeMatch implicit_cast = implicit_cast_to_bool(&unaryop->expr);
+            if (implicit_cast == TYPE_MATCH_YIELD) YIELD(unaryop->token->pos, "Waiting for implicit cast to bool to check.");
+            if (implicit_cast == TYPE_MATCH_FAILED) {
                 ERROR_(unaryop->token->pos,
                         "Bool negation operator expected bool type, got '%s'.",
                         node_get_type_name(unaryop->expr));
@@ -1590,7 +1604,9 @@ CheckStatus check_if_expression(AstIfExpression* if_expr) {
     CHECK(expression, &if_expr->false_expr);
 
     TYPE_CHECK(&if_expr->cond, &basic_types[Basic_Kind_Bool]) {
-        if (!implicit_cast_to_bool(&if_expr->cond)) {
+        TypeMatch implicit_cast = implicit_cast_to_bool(&if_expr->cond);
+        if (implicit_cast == TYPE_MATCH_YIELD) YIELD(if_expr->token->pos, "Waiting for implicit cast to bool to check.");
+        if (implicit_cast == TYPE_MATCH_FAILED) {
             ERROR_(if_expr->token->pos, "If-expression expected boolean for condition, got '%s'.",
                 type_get_name(if_expr->cond->type));
         }
