@@ -51,6 +51,7 @@ static const char* docstring = "Onyx compiler version " VERSION "\n"
     "\t--wasm-mvp              Use only WebAssembly MVP features.\n"
     "\t--multi-threaded        Enables multi-threading for this compilation.\n"
     "\t--tag                   Generates a C-Tag file.\n"
+    "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
     // "\t--doc <doc_file>\n"
     "\t--generate-foreign-info\n"
     "\n"
@@ -90,6 +91,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         .passthrough_argument_data  = NULL,
 
         .generate_tag_file = 0,
+        .generate_symbol_info_file = 0,
     };
 
     bh_arr_new(alloc, options.files, 2);
@@ -188,6 +190,10 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             // }
             else if (!strcmp(argv[i], "--tag")) {
                 options.generate_tag_file = 1;
+            }
+            else if (!strcmp(argv[i], "--syminfo")) {
+                options.generate_symbol_info_file = 1;
+                options.symbol_info_file = argv[++i];
             }
             else if (!strcmp(argv[i], "--debug")) {
                 options.debug_enabled = 1;
@@ -335,6 +341,14 @@ static void context_init(CompileOptions* opts) {
             .package = NULL,
             .include = create_load(context.ast_alloc, "core/std"),
         }));
+    }
+
+    if (context.options->generate_symbol_info_file) {
+        context.symbol_info = bh_alloc_item(global_heap_allocator, SymbolInfoTable);
+        bh_imap_init(&context.symbol_info->node_to_id, global_heap_allocator, 512);
+        bh_arr_new(global_heap_allocator, context.symbol_info->symbols, 128);
+        bh_arr_new(global_heap_allocator, context.symbol_info->symbols_resolutions, 128);
+        sh_new_arena(context.symbol_info->files);
     }
 }
 
@@ -714,6 +728,10 @@ static i32 onyx_compile() {
 
     if (context.options->generate_tag_file) {
         onyx_docs_emit_tags("./tags");
+    }
+
+    if (context.options->generate_symbol_info_file) {
+        onyx_docs_emit_symbol_info(context.options->symbol_info_file);
     }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;

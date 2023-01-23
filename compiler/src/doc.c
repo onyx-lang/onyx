@@ -51,6 +51,74 @@ void onyx_docs_emit_tags(char *dest) {
     bh_file_close(&tags_file);
 }
 
+void onyx_docs_emit_symbol_info(const char *dest) {
+    bh_file sym_file;
+    if (bh_file_create(&sym_file, dest) != BH_FILE_ERROR_NONE) {
+        bh_printf("Cannot create '%s'.\n", dest);
+        return;
+    }
+
+    SymbolInfoTable *syminfo = context.symbol_info;
+
+    bh_buffer file_section;
+    bh_buffer_init(&file_section, global_heap_allocator, 2048);
+    fori (i, 0, shlen(syminfo->files)) {
+        char *filename = syminfo->files[i].key;
+        u32   file_id  = syminfo->files[i].value;
+        bh_buffer_write_u32(&file_section, file_id);
+        bh_buffer_write_u32(&file_section, strlen(filename));
+        bh_buffer_write_string(&file_section, filename);
+    }
+
+    bh_buffer sym_def_section;
+    bh_buffer_init(&sym_def_section, global_heap_allocator, 2048);
+    bh_arr_each(SymbolInfo, sym, syminfo->symbols) {
+        bh_buffer_write_u32(&sym_def_section, sym->id);
+        bh_buffer_write_u32(&sym_def_section, sym->file_id);
+        bh_buffer_write_u32(&sym_def_section, sym->line);
+        bh_buffer_write_u32(&sym_def_section, sym->column);
+    }
+
+    bh_buffer sym_res_section;
+    bh_buffer_init(&sym_res_section, global_heap_allocator, 2048);
+    bh_arr_each(SymbolResolution, sym, syminfo->symbols_resolutions) {
+        bh_buffer_write_u32(&sym_res_section, sym->file_id);
+        bh_buffer_write_u32(&sym_res_section, sym->line);
+        bh_buffer_write_u32(&sym_res_section, sym->column);
+        bh_buffer_write_u32(&sym_res_section, sym->length);
+        bh_buffer_write_u32(&sym_res_section, sym->symbol_id);
+    }
+
+    bh_buffer header_section;
+    bh_buffer_init(&header_section, global_heap_allocator, 16);
+    bh_buffer_append(&header_section, "OSYM", 4);
+    bh_buffer_write_u32(&header_section, 1);
+    bh_buffer_write_u32(&header_section, 32);
+    bh_buffer_write_u32(&header_section, shlenu(syminfo->files));
+    bh_buffer_write_u32(&header_section, 32 + file_section.length);
+    bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols));
+    bh_buffer_write_u32(&header_section, 32 + file_section.length + sym_def_section.length);
+    bh_buffer_write_u32(&header_section, bh_arr_length(syminfo->symbols_resolutions));
+
+    bh_file_write(&sym_file, header_section.data, header_section.length);
+    bh_file_write(&sym_file, file_section.data, file_section.length);
+    bh_file_write(&sym_file, sym_def_section.data, sym_def_section.length);
+    bh_file_write(&sym_file, sym_res_section.data, sym_res_section.length);
+
+    bh_file_close(&sym_file);
+
+    bh_buffer_free(&header_section);
+    bh_buffer_free(&file_section);
+    bh_buffer_free(&sym_def_section);
+    bh_buffer_free(&sym_res_section);
+
+
+    bh_arr_free(syminfo->symbols);
+    bh_arr_free(syminfo->symbols_resolutions);
+    shfree(syminfo->files);
+    bh_imap_free(&syminfo->node_to_id);
+}
+
 // static i32 cmp_doc_entry(const void * a, const void * b) {
 //     DocEntry* d1 = (DocEntry *) a;
 //     DocEntry* d2 = (DocEntry *) b;

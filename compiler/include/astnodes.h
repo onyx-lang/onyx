@@ -1601,7 +1601,8 @@ struct CompileOptions {
     b32 generate_foreign_info : 1;
     b32 no_std                : 1;
 
-    b32 generate_tag_file     : 1;
+    b32 generate_tag_file         : 1;
+    b32 generate_symbol_info_file : 1;
 
     Runtime runtime;
 
@@ -1609,6 +1610,7 @@ struct CompileOptions {
     bh_arr(const char *) files;
     const char* target_file;
     const char* documentation_file;
+    const char* symbol_info_file;
 
     b32 debug_enabled;
 
@@ -1636,6 +1638,8 @@ struct Context {
     // NOTE: All definitions (bindings, injections, aliases) are
     // present in this list when generating CTags.
     bh_arr(AstNode *) tag_locations;
+
+    struct SymbolInfoTable *symbol_info;
 
     u32 cycle_almost_detected : 2;
     b32 cycle_detected : 1;
@@ -1827,6 +1831,9 @@ Type* polymorphic_struct_lookup(AstPolyStructType* ps_type, bh_arr(AstPolySoluti
 b32 resolve_intrinsic_interface_constraint(AstConstraint *constraint);
 
 void track_declaration_for_tags(AstNode *);
+
+void track_declaration_for_symbol_info(OnyxFilePos, AstNode *);
+void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved);
 
 // NOTE: Useful inlined functions
 static inline b32 is_lval(AstNode* node) {

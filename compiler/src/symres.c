@@ -99,6 +99,7 @@ static SymresStatus symres_symbol(AstNode** symbol_node) {
         }
 
     } else {
+        track_resolution_for_symbol_info(*symbol_node, res);
         *symbol_node = res;
         resolved_a_symbol = 1;
     }
@@ -334,8 +335,11 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
     }
 
     AstNode* resolution = try_symbol_resolve_from_node((AstNode *) expr, (*fa)->token);
-    if (resolution) *((AstNode **) fa) = resolution;
-    else if (expr->kind == Ast_Kind_Package) {
+    if (resolution) {
+        track_resolution_for_symbol_info((AstNode *) *fa, resolution);
+        *((AstNode **) fa) = resolution;
+
+    } else if (expr->kind == Ast_Kind_Package) {
         if (report_unresolved_symbols) {
             token_toggle_end((*fa)->token);
             char *closest = find_closest_symbol_in_node((AstNode *) expr, (*fa)->token->text);
@@ -360,8 +364,8 @@ static SymresStatus symres_field_access(AstFieldAccess** fa) {
         } else {
             return Symres_Yield_Macro;
         }
-    }
-    else if (force_a_lookup) {
+
+    } else if (force_a_lookup) {
         if (context.cycle_detected || context.cycle_almost_detected >= 2) {
             onyx_report_error((*fa)->token->pos, Error_Critical, "'%b' does not exist here. This is a bad error message.",
                 (*fa)->token->text,

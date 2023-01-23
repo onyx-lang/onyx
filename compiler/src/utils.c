@@ -7,6 +7,7 @@
 #include "parser.h"
 #include "astnodes.h"
 #include "errors.h"
+#include "doc.h"
 
 bh_scratch global_scratch;
 bh_allocator global_scratch_allocator;
@@ -144,6 +145,7 @@ b32 symbol_raw_introduce(Scope* scope, char* name, OnyxFilePos pos, AstNode* sym
     }
 
     shput(scope->symbols, name, symbol);
+    track_declaration_for_symbol_info(pos, symbol);
     return 1;
 }
 
@@ -1077,7 +1079,9 @@ type_checking_done:
     if (arg_pos < func_type->needed_param_count) {
         if (error != NULL) {
             error->pos = location->pos;
-            error->text = "Too few arguments to function call.";
+            error->text = bh_aprintf(global_heap_allocator,
+                    "Too few arguments to function call. Expected at least %d argument%s, but only got %d.",
+                    func_type->needed_param_count, bh_num_plural(func_type->needed_param_count), arg_pos);
         }
         return TYPE_MATCH_FAILED;
     }
@@ -1085,7 +1089,9 @@ type_checking_done:
     if (arg_pos < (u32) arg_count) {
         if (error != NULL) {
             error->pos = location->pos;
-            error->text = bh_aprintf(global_heap_allocator, "Too many arguments to function call. %d %d", arg_pos, arg_count);
+            error->text = bh_aprintf(global_heap_allocator,
+                    "Too many arguments to function call. Expected at most %d argument%s, but got %d.",
+                    arg_pos, bh_num_plural(arg_pos), arg_count);
         }
         return TYPE_MATCH_FAILED;
     }
@@ -1323,4 +1329,60 @@ void track_declaration_for_tags(AstNode *node) {
     if (context.options->generate_tag_file) {
         bh_arr_push(context.tag_locations, node);
     }
+}
+
+
+static u32 symbol_info_get_file_id(SymbolInfoTable *syminfo, const char *filename) {
+    u32 file_id;
+    if (shgeti(syminfo->files, filename) == -1) {
+        file_id = syminfo->next_file_id++;
+        shput(syminfo->files, filename, file_id);
+
+    } else {
+        file_id = shget(syminfo->files, filename);
+    }
+
+    return file_id;
+}
+
+void track_declaration_for_symbol_info(OnyxFilePos pos, AstNode *node) {
+    if (!context.options->generate_symbol_info_file) return;
+    if (pos.filename == NULL) return;
+
+    SymbolInfoTable *syminfo = context.symbol_info;
+    assert(syminfo);
+
+    u32 symbol_id = syminfo->next_symbol_id++;
+    u32 file_id = symbol_info_get_file_id(syminfo, pos.filename);
+
+    SymbolInfo symbol;
+    symbol.id = symbol_id;
+    symbol.file_id = file_id;
+    symbol.line = pos.line;
+    symbol.column = pos.column;
+    bh_arr_push(syminfo->symbols, symbol);
+
+    bh_imap_put(&syminfo->node_to_id, (u64) node, (u64) symbol_id);
+}
+
+void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved) {
+    if (!context.options->generate_symbol_info_file) return;
+
+    SymbolInfoTable *syminfo = context.symbol_info;
+    assert(syminfo);
+
+    if (!bh_imap_has(&syminfo->node_to_id, (u64) resolved)) return;
+
+    u32 symbol_id = (u32) bh_imap_get(&syminfo->node_to_id, (u64) resolved);
+
+    u32 file_id = symbol_info_get_file_id(syminfo, original->token->pos.filename);
+
+    SymbolResolution res;
+    res.symbol_id = symbol_id;
+    res.file_id = file_id;
+    res.line = original->token->pos.line;
+    res.column = original->token->pos.column;
+    res.length = original->token->length;
+
+    bh_arr_push(syminfo->symbols_resolutions, res);
 }
