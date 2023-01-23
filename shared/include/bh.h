@@ -145,7 +145,9 @@ static inline u64 log2_dumb(u64 n) {
     }
 }
 
-
+static inline const char* bh_num_plural(u64 i) {
+    return i != 1 ? "s" : "";
+}
 
 static inline const char* bh_num_suffix(u64 i) {
     if (i == 11 || i == 12 || i == 13) return "th";

@@ -1,0 +1,64 @@
+package core
+
+@conv.Custom_Format.{ #solidify format {T=Value_Type} }
+Optional :: struct (Value_Type: type_expr) {
+    has_value: bool;
+    value: Value_Type;
+}
+
+#inject Optional {
+    make  :: (x: $T) => Optional(T).{ has_value = true, value = x };
+
+    value_or :: (o: Optional, default: o.Value_Type) -> o.Value_Type {
+        if !o.has_value do return default;
+        return o.value;
+    }
+
+    reset :: (o: ^Optional) {
+        o.has_value = false;
+        core.memory.set(^o.value, 0, sizeof o.Value_Type);
+    }
+
+    set :: (o: ^Optional, value: o.Value_Type) {
+        o.has_value = true;
+        o.value = value;
+    }
+
+    and_then :: (o: Optional($T), transform: (T) -> Optional($R)) -> Optional(R) {
+        if !o.has_value do return .{ false };
+        return transform(o.value);
+    }
+
+    transform :: (o: Optional($T), transform: (T) -> $R) -> Optional(R) {
+        if !o.has_value do return .{ false };
+        return Optional.make(transform(o.value));
+    }
+
+    or_else :: (o: Optional($T), generate: () -> Optional(T)) -> Optional(T) {
+        if o.has_value do return o;
+        return generate();
+    }
+
+    hash :: (o: Optional($T/core.hash.Hashable)) -> u32 {
+        if !o.has_value do return 0;
+        return core.hash.to_u32(o.value);
+    }
+
+    format :: (o: ^conv.Format_Output, format: ^conv.Format, opt: ^Optional($T)) {
+        if opt.has_value {
+            conv.format(o, "Some({\"})", opt.value);
+        } else {
+            o->write("None");
+        }
+    }
+}
+
+#operator == (o1, o2: Optional($T)) -> bool {
+    if o1.has_value != o2.has_value do return false;
+    if !o1.has_value do return true;
+    return o1.value == o2.value;
+}
+
+#overload
+__implicit_bool_cast :: macro (o: Optional) => o.has_value;
+

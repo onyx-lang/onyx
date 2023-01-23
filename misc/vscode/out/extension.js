@@ -9,9 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activate = void 0;
+exports.deactivate = exports.activate = void 0;
 const vscode = require("vscode");
 const vsctmls = require("vscode-textmate-languageservice");
+const vslc = require("vscode-languageclient/node");
 let client;
 function activate(context) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -21,25 +22,33 @@ function activate(context) {
         const engine = new vsctmls.textmateEngine.TextmateEngine('onyx', 'source.onyx');
         const documentSymbolProvider = new vsctmls.documentSymbols.DocumentSymbolProvider(engine);
         const workspaceSymbolProvider = new vsctmls.workspaceSymbols.WorkspaceSymbolProvider('onyx', documentSymbolProvider);
-        // const foldingProvider = new vsctmls.folding.FoldingProvider(engine);
         const peekFileDefinitionProvider = new vsctmls.peekDefinitions.PeekDefinitionProvider(documentSymbolProvider);
         context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(selector, documentSymbolProvider));
         context.subscriptions.push(vscode.languages.registerWorkspaceSymbolProvider(workspaceSymbolProvider));
-        // context.subscriptions.push(vscode.languages.registerFoldingRangeProvider(selector, foldingProvider));
         context.subscriptions.push(vscode.languages.registerDefinitionProvider({ 'language': 'onyx' }, peekFileDefinitionProvider));
-        // client = new vslc.LanguageClient("onyx-lsp", {
-        // 	command: "onyx-lsp",
-        // 	transport: TransportKind.stdio,
-        // }, {
-        // 	documentSelector: [
-        // 		{ scheme: "file", language: "onyx" },
-        // 	],
-        // 	synchronize: {
-        // 		fileEvents: vscode.workspace.createFileSystemWatcher("**/*.onyx")
-        // 	}
-        // });
-        // client.start();
+        let serverOptions = {
+            command: "onyx-lsp",
+            transport: vslc.TransportKind.stdio,
+        };
+        let clientOptions = {
+            documentSelector: [
+                { scheme: "file", language: "onyx" },
+            ],
+            connectionOptions: {
+                cancellationStrategy: null,
+                maxRestartCount: 5
+            }
+        };
+        client = new vslc.LanguageClient("onyx-lsp", serverOptions, clientOptions);
+        client.start();
         console.appendLine("Onyx Extension loaded.");
     });
 }
 exports.activate = activate;
+function deactivate() {
+    if (!client) {
+        return undefined;
+    }
+    return client.stop();
+}
+exports.deactivate = deactivate;

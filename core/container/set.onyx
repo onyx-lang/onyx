@@ -1,6 +1,6 @@
 package core.set
 
-use core {array, hash, memory, math}
+use core {array, hash, memory, math, Optional}
 
 #local SetValue :: interface (t: $T) {
     { hash.to_u32(t) } -> u32;
@@ -28,6 +28,7 @@ Set :: struct (Elem_Type: type_expr) where SetValue(Elem_Type) {
     has      :: has
     get      :: get
     get_ptr  :: get_ptr
+    get_opt  :: get_opt
     insert   :: insert
     remove   :: remove
     clear    :: clear
@@ -89,6 +90,13 @@ get :: (use set: ^Set, value: set.Elem_Type) -> set.Elem_Type {
 get_ptr :: (use set: ^Set, value: set.Elem_Type) -> ^set.Elem_Type {
     lr := lookup(set, value);
     return (^entries[lr.entry_index].value) if lr.entry_index >= 0 else null;
+}
+
+get_opt :: (use set: ^Set, value: set.Elem_Type) -> Optional(set.Elem_Type) {
+    lr := lookup(set, value);
+    if lr.entry_index >= 0 do return Optional.make(entries[lr.entry_index].value);
+
+    return .{};
 }
 
 remove :: (use set: ^Set, value: set.Elem_Type) {
