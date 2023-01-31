@@ -44,6 +44,7 @@
     NODE(DirectiveRemove)      \
     NODE(DirectiveFirst)       \
     NODE(DirectiveExportName)  \
+    NODE(DirectiveThisPackage) \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -221,6 +222,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Remove,
     Ast_Kind_Directive_First,
     Ast_Kind_Directive_Export_Name,
+    Ast_Kind_Directive_This_Package,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,

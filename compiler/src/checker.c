@@ -2171,6 +2171,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
             if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know string literals type. This is a weird one...") ;
             break;
 
+        case Ast_Kind_Directive_This_Package:
+            YIELD(expr->token->pos, "Waiting to resolve #this_package.");
+            break;
+
         case Ast_Kind_File_Contents: break;
         case Ast_Kind_Overloaded_Function: break;
         case Ast_Kind_Enum_Value: break;

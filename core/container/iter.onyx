@@ -527,11 +527,8 @@ const :: (value: $T) -> Iterator(T) {
 enumerate :: #match #local {}
 
 #overload
-enumerate :: macro (it: $T/Iterable, start_index: i32 = 0) => {
-    as_iter :: as_iter
-    enumerate :: enumerate
-    return enumerate(as_iter(it), start_index);
-}
+enumerate :: macro (it: $T/Iterable, start_index: i32 = 0) =>
+    #this_package.enumerate(#this_package.as_iter(it), start_index);
 
 #overload
 enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Value(T)) {
@@ -722,10 +719,8 @@ fold :: #match #local {}
 
 // @Cleanup // some way to shorten this would be nice
 #overload
-fold :: macro (it: $T/Iterable, init: $R, combine: $S) => {
-    fold :: fold
-    return fold(as_iter(it), init, combine);
-}
+fold :: macro (it: $T/Iterable, init: $R, combine: $S) =>
+    #this_package.fold(#this_package.as_iter(it), init, combine);
 
 #overload
 fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
@@ -739,10 +734,8 @@ fold :: (it: Iterator($T), initial_value: $R, combine: (T, R) -> R) -> R {
 count :: #match #local {}
 
 #overload
-count :: macro (it: $T/Iterable, cond: $F) => {
-    count :: count
-    return count(as_iter(it), cond);
-}
+count :: macro (it: $T/Iterable, cond: $F) =>
+    #this_package.count(#this_package.as_iter(it), cond);
 
 #overload
 count :: (it: Iterator($T), cond: (T) -> bool) -> i32 {
@@ -754,11 +747,8 @@ count :: (it: Iterator($T), cond: (T) -> bool) -> i32 {
 some :: #match #local {}
 
 #overload
-some :: macro (it: $T/Iterable, cond: $F) => {
-    some :: some
-    as_iter :: as_iter
-    return some(as_iter(it), cond);
-}
+some :: macro (it: $T/Iterable, cond: $F) =>
+    #this_package.some(#this_package.as_iter(it), cond);
 
 #overload
 some :: (it: Iterator($T), cond: (T) -> bool) -> bool {
@@ -769,11 +759,8 @@ some :: (it: Iterator($T), cond: (T) -> bool) -> bool {
 every :: #match #local {}
 
 #overload
-every :: macro (it: $T/Iterable, cond: $F) => {
-    every :: every
-    as_iter :: as_iter
-    return every(as_iter(it), cond);
-}
+every :: macro (it: $T/Iterable, cond: $F) =>
+    #this_package.every(#this_package.as_iter(it), cond);
 
 #overload
 every :: (it: Iterator($T), cond: (T) -> bool) -> bool {
@@ -852,11 +839,8 @@ comp :: macro (i: Iterator($V), value: Code) => {
 }
 
 #overload
-comp :: macro (i: $I/Iterable, value: Code) => {
-    as_iter :: as_iter
-    comp        :: comp
-    return comp(as_iter(i), value);
-}
+comp :: macro (i: $I/Iterable, value: Code) =>
+    #this_package.comp(#this_package.as_iter(i), value);
 
 
 //
@@ -905,11 +889,8 @@ generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> vo
     distributor :: #match #local {}
 
     #overload
-    distributor :: macro (it: $T/Iterable) => {
-        distributor :: distributor;
-        as_iter :: as_iter;
-        return distributor(as_iter(it));
-    }
+    distributor :: macro (it: $T/Iterable) =>
+        #this_package.distributor(#this_package.as_iter(it));
 
     #overload
     distributor :: (it: Iterator) -> Iterator(it.Iter_Type) {
@@ -952,20 +933,20 @@ generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> vo
 
     #overload
     parallel_for :: macro (iterable: $I/Iterable, thread_count: u32, thread_data: ^$Ctx, body: Code) {
-        parallel_for :: parallel_for;
-        as_iter  :: as_iter;
-
-        parallel_for(as_iter(iterable), thread_count, thread_data, body);
+        #this_package.parallel_for(
+            #this_package.as_iter(iterable),
+            thread_count,
+            thread_data,
+            body
+        );
     }
 
     #overload
     parallel_for :: macro (iter: Iterator($T), thread_count: u32, thread_data: ^$Ctx, body: Code) {
         use core {thread, alloc}
-        distributor :: distributor;
-        as_iter :: as_iter;
 
         if thread_count != 0 {
-            dist := distributor(iter);
+            dist := #this_package.distributor(iter);
             t_data := ^.{iter = ^dist, data = thread_data};
 
             threads := alloc.array_from_stack(thread.Thread, thread_count - 1);
