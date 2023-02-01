@@ -9,7 +9,6 @@ Socket :: struct {
     handle: Handle;
     type: SocketType;
     family: SocketDomain;
-
 }
 
 // Inject methods for the socket
@@ -107,6 +106,7 @@ socket_create :: (domain: SocketDomain, type: SocketType) -> (Socket, SocketErro
     err := __net_create_socket(^s.handle, domain, type);
     if err == .None {
         s.vtable = ^__net_socket_vtable;
+        s.flags |= .Block_On_Read;
     }
 
     return s, err;
@@ -119,6 +119,11 @@ socket_close :: (s: ^Socket) {
 
 socket_setting :: (s: ^Socket, setting: SocketSetting, value: u32) {
     __net_setting(s.handle, setting, value);
+
+    if setting == .NonBlocking {
+        if value > 0 do s.flags = ~~ (cast(u32) s.flags & cast(u32) ~io.Stream_Flags.Block_On_Read);
+        else do         s.flags |= io.Stream_Flags.Block_On_Read;
+    }
 }
 
 socket_is_alive :: (s: ^Socket) -> bool {
@@ -185,7 +190,6 @@ socket_send :: (s: ^Socket, data: [] u8) -> i32 {
 
 socket_sendto :: (s: ^Socket, data: [] u8, addr: ^Socket_Address) -> i32 {
     sent := __net_sendto(s.handle, data, addr);
-    // if sent < 0 s.{ s.vtable = null; }
     return sent;
 }
 
@@ -234,11 +238,11 @@ socket_recvfrom :: (s: ^Socket, buffer: [] u8) -> (Socket_Address, i32) {
     return sa, received;
 }
 
-host_to_network :: #match {}
+host_to_network :: #match #local {}
 #match host_to_network (x: u16) => __net_host_to_net_s(x);
 #match host_to_network (x: u32) => __net_host_to_net_l(x);
 
-network_to_host :: #match {}
+network_to_host :: #match #local {}
 #match network_to_host (x: u16) => __net_net_to_host_s(x);
 #match network_to_host (x: u32) => __net_net_to_host_l(x);
 
@@ -250,7 +254,7 @@ network_to_host :: #match {}
         bytes_read := __net_recv(handle, buffer, ^would_block);
         if bytes_read < 0 && !would_block do s.vtable = null;
 
-        if would_block do return .ReadPending, bytes_read;
+        if would_block do return .ReadLater, bytes_read;
 
         return .None, bytes_read;
     },

@@ -4,9 +4,17 @@ use core
 
 Stream :: struct {
     use vtable : ^Stream_Vtable;
+    flags: Stream_Flags;
 }
 
-// #package
+// These flags are used by things like io.Reader as hints
+// for how the stream will behave under certain circumstances.
+Stream_Flags :: enum #flags {
+    // This flags signals that any call to stream_read *could*
+    // block for arbitrary amounts of time.
+    Block_On_Read;
+}
+
 Stream_Vtable :: struct {
     seek         : (s: ^Stream, to: i32, whence: SeekFrom) -> Error            = null_proc;
     tell         : (s: ^Stream) -> (Error, u32)                                = null_proc;

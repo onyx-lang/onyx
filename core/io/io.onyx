@@ -30,6 +30,9 @@ Error :: enum {
     // Not possible to unread.
     InvalidUnread  :: 0x09;
 
-    // When reading from a stream, no data was read.
+    // When reading from a stream, no data was read, but data will become available soon.
     ReadPending    :: 0x0a;
+
+    // When reading from a stream, no data was read, and data will not become available soon.
+    ReadLater      :: 0x0b;
 }

@@ -491,11 +491,8 @@ concat :: (iters: ..Iterator($T)) -> Iterator(T) {
         // But I don't know what the semantics should be for specifying which
         // if any iterators to close.
         for^ iters {
-            it.close(it.data);
+            if it.close != null_proc do it.close(it.data);
         }
-
-        // memory.free_slice(^iters);
-        // cfree(c);
     }
 
     return .{
@@ -552,7 +549,6 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
 
     close :: (use data: ^Enumeration_Context($T)) {
         if iterator.close != null_proc do iterator.close(iterator.data);
-        // cfree(data);
     }
 
     return .{
@@ -955,7 +951,7 @@ generator_no_copy :: (ctx: ^$Ctx, gen: (^Ctx) -> ($T, bool), close: (^Ctx) -> vo
             thread_function(t_data, body);
 
             for^ threads do thread.join(it);
-            dist.close(dist.data);
+            if dist.close != null_proc do dist.close(dist.data);
         }
 
         thread_function :: (__data: ^$T, $body: Code) {
