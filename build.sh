@@ -7,13 +7,14 @@ echo "Installing core libs"
 sudo mkdir -p "$CORE_DIR"
 sudo cp -r ./core/ "$CORE_DIR"
 
-# This is a development feature to allow for quickly reinstalling core libraries
-# without have to recompile the entire compiler
-[ "$1" = "core" ] && exit 0
 
 sudo cp ./bin/onyx-pkg "$BIN_DIR/onyx-pkg"
 sudo mkdir -p "$CORE_DIR/tools"
 sudo cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
+
+# This is a development feature to allow for quickly reinstalling core libraries
+# without have to recompile the entire compiler
+[ "$1" = "core" ] && exit 0
 
 if [ "$RUNTIME_LIBRARY" = "ovmwasm" ]; then
     cd interpreter

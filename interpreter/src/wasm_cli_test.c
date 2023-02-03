@@ -45,7 +45,5 @@ int main(int argc, char *argv[]) {
         const wasm_name_t *export_name = wasm_exporttype_name(exports.data[i]);
         bh_printf("exports: %b  %d\n", export_name->data, export_name->size, wasm_externtype_kind(wasm_exporttype_type(exports.data[i])));
     }
-
-    ovm_program_print_instructions(module->program, 0, bh_arr_length(module->program->code));
 }
 

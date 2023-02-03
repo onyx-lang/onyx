@@ -94,8 +94,6 @@ struct ovm_program_t {
 ovm_program_t *ovm_program_new(ovm_store_t *store);
 void ovm_program_delete(ovm_program_t *program);
 void ovm_program_add_instructions(ovm_program_t *program, i32 instr_count, ovm_instr_t *instrs);
-void ovm_program_print_instructions(ovm_program_t *program, i32 start_instr, i32 instr_count);
-void ovm_raw_print_instructions(i32 instr_count, ovm_instr_t *instrs);
 
 int  ovm_program_register_static_ints(ovm_program_t *program, int len, int *data);
 int  ovm_program_register_func(ovm_program_t *program, char *name, i32 instr, i32 param_count, i32 value_number_count);
