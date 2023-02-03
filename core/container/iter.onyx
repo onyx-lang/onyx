@@ -676,40 +676,26 @@ as_iter :: (x: ^[..] $T, by_pointer: bool) -> Iterator(^T) {
 }
 
 #overload
-as_iter :: (r: range) -> Iterator(i32) {
-    Context :: struct {
-        r: range;
-        v: i32;
-    }
-
-    next :: (use c: ^Context) -> (i32, bool) {
-        if r.step > 0 {
-            if v >= r.high {
+as_iter :: (r: range) => generator(
+    ^.{ r = r, v = r.low },
+    ctx => {
+        if ctx.r.step > 0 {
+            if ctx.v >= ctx.r.high {
                 return 0, false;
             } else {
-                defer v += r.step;
-                return v, true;
+                defer ctx.v += ctx.r.step;
+                return ctx.v, true;
             }
 
         } else {
-            if v < r.high {
+            if ctx.v < ctx.r.high {
                 return 0, false;
             } else {
-                defer v += r.step;
-                return v, true;
+                defer ctx.v += ctx.r.step;
+                return ctx.v, true;
             }
         }
-    }
-
-    c := new(Context, allocator=context.temp_allocator);
-    c.r = r;
-    c.v = r.low;
-
-    return .{
-        data  = c,
-        next  = next,
-    };
-}
+    });
 
 fold :: #match #local {}
 

@@ -637,3 +637,39 @@ count_where :: macro (arr: [] $T, predicate_body: Code) -> u32 {
     }
     return count;
 }
+
+
+windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
+    use core {iter}
+
+    return iter.generator(
+        ^.{ arr=arr, width=width, pos=0 },
+        ctx => {
+            if ctx.pos + ctx.width < ctx.arr.count {
+                defer ctx.pos += 1;
+                return ctx.arr.data[ctx.pos .. ctx.pos+ctx.width], true;
+            }
+
+            return .{}, false;
+        }
+    );
+}
+
+chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
+    use core {iter}
+
+    return iter.generator(
+        ^.{ arr=arr, width=width, pos=0 },
+        ctx => {
+            if ctx.pos < ctx.arr.count {
+                defer ctx.pos += ctx.width;
+
+                end := core.math.min(ctx.pos+ctx.width, ctx.arr.count);
+                return ctx.arr.data[ctx.pos .. end], true;
+            }
+
+            return .{}, false;
+        }
+    );
+}
+
