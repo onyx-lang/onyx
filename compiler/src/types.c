@@ -390,6 +390,12 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                     return NULL;
                 }
 
+                if ((*member)->type->kind == Type_Kind_Struct
+                    && (*member)->type->Struct.status == SPS_Start) {
+                    s_node->pending_type_is_valid = 0;
+                    return NULL;
+                }
+
                 mem_alignment = type_alignment_of((*member)->type);
                 if (mem_alignment <= 0) {
                     onyx_report_error((*member)->token->pos, Error_Critical, "Invalid member type: %s. Has alignment %d", type_get_name((*member)->type), mem_alignment);
