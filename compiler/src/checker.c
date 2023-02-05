@@ -1834,14 +1834,12 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         token_toggle_end(field->token);
     }
 
-    if (field->expr->type->kind == Type_Kind_Struct) {
-        if (field->expr->type->Struct.status != SPS_Uses_Done) {
-            YIELD(field->token->pos, "Waiting for struct type to be completed before looking up members.");
-        }
-    }
-
     if (!type_is_structlike(field->expr->type)) {
         goto try_resolve_from_type;
+    }
+
+    if (!type_is_ready_for_lookup(field->expr->type)) {
+        YIELD(field->token->pos, "Waiting for struct type to be completed before looking up members.");
     }
 
     StructMember smem;

@@ -256,9 +256,7 @@ u32 type_alignment_of(Type* type) {
     }
 }
 
-// If this function returns NULL, then the caller MUST yield because the type may still be constructed in the future.
-// If there was an error constructing the type, then this function will report that directly.
-Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b32 accept_partial_types) {
+static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b32 accept_partial_types) {
     if (type_node == NULL) return NULL;
 
     switch (type_node->kind) {
@@ -392,8 +390,7 @@ Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b32 acce
                     return accept_partial_types ? s_node->pending_type : NULL;
                 }
 
-                if ((*member)->type->kind == Type_Kind_Struct
-                    && (*member)->type->Struct.status == SPS_Start) {
+                if ((*member)->type->kind == Type_Kind_Struct && (*member)->type->Struct.status == SPS_Start) {
                     s_node->pending_type_is_valid = 0;
                     return accept_partial_types ? s_node->pending_type : NULL;
                 }
@@ -636,6 +633,8 @@ Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b32 acce
     return NULL;
 }
 
+// If this function returns NULL, then the caller MUST yield because the type may still be constructed in the future.
+// If there was an error constructing the type, then this function will report that directly.
 Type *type_build_from_ast(bh_allocator alloc, AstType* type_node) {
     return type_build_from_ast_inner(alloc, type_node, 0);
 }
@@ -1144,6 +1143,16 @@ Type* type_get_contained_type(Type* type) {
         case Type_Kind_VarArgs:  return type->VarArgs.elem;
         default: return NULL;
     }
+}
+
+b32 type_is_ready_for_lookup(Type* type) {
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+
+    if (type->kind == Type_Kind_Struct) {
+        return type->Struct.status == SPS_Uses_Done;
+    }
+
+    return 1;
 }
 
 static const StructMember slice_members[] = {
