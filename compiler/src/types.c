@@ -49,6 +49,8 @@ static Table(u64) type_func_map;
 
 static Type* type_create(TypeKind kind, bh_allocator a, u32 extra_type_pointer_count) {
     Type* type = bh_alloc(a, sizeof(Type) + sizeof(Type *) * extra_type_pointer_count);
+    memset(type, 0, sizeof(Type));
+
     type->kind = kind;
     type->ast_type = NULL;
     return type;
