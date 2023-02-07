@@ -2534,7 +2534,29 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     }
 
     if (ofunc->expected_return_node) {
-        ofunc->expected_return_type = type_build_from_ast(context.ast_alloc, ofunc->expected_return_node);
+        AstType *expected_return_node = (AstType *) strip_aliases((AstNode *) ofunc->expected_return_node);
+
+        if (expected_return_node->kind == Ast_Kind_Poly_Struct_Type) {
+            //
+            // When you declare the expected return type of a #match'ed procedure to
+            // be a polymorphic structure type, a special case has to happen. By trying
+            // to build the type, the polymorphic structure will be given a type-id.
+            // type_build_from_ast() will never return a polymorphic structure type
+            // because that is never valid in the type system. However, we can by-pass
+            // this and look it up directly using type_lookup_by_id.
+            type_build_from_ast(context.ast_alloc, expected_return_node);
+
+            if (expected_return_node->type_id) {
+                ofunc->expected_return_type = type_lookup_by_id(expected_return_node->type_id);
+                
+                // Return early here because the following code does not work with a
+                // polymorphic expected return type.
+                bh_imap_free(&all_overloads);
+                return Check_Success;
+            }
+        }
+
+        ofunc->expected_return_type = type_build_from_ast(context.ast_alloc, expected_return_node);
         if (!ofunc->expected_return_type) YIELD(ofunc->token->pos, "Waiting to construct expected return type.");
 
         bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {

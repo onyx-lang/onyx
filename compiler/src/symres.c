@@ -1493,8 +1493,12 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
             Scope *scope = get_scope_from_node_or_create((AstNode *) inject->dest);
             if (scope == NULL) {
-                onyx_report_error(inject->token->pos, Error_Critical, "Cannot #inject here.");
-                return Symres_Error;
+                if (context.cycle_almost_detected >= 1) {
+                    onyx_report_error(inject->token->pos, Error_Critical, "Cannot #inject here.");
+                    return Symres_Error;
+                }
+
+                return Symres_Yield_Macro;
             }
 
             AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);

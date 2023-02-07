@@ -620,6 +620,19 @@ static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
     Type *return_type = func->type->Function.return_type;
     if (return_type == &type_auto_return) return TYPE_MATCH_YIELD;
 
+    // See the note about using Polymorphic Structures as expected return types,
+    // in check_overloaded_function().
+    if (expected_type->kind == Type_Kind_PolyStruct) {
+        if (   return_type->kind == Type_Kind_Struct
+            && return_type->Struct.constructed_from
+            && return_type->Struct.constructed_from->type_id == expected_type->id) {
+            return TYPE_MATCH_SUCCESS;
+        }
+
+        report_incorrect_overload_expected_type(return_type, expected_type, func->token, data->group);
+        return TYPE_MATCH_FAILED;
+    }
+
     if (!types_are_compatible(return_type, expected_type)) {
         report_incorrect_overload_expected_type(return_type, expected_type, func->token, data->group);
         return TYPE_MATCH_FAILED;

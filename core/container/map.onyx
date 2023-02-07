@@ -3,18 +3,7 @@ package core.map
 use core {array, hash, memory, math, conv, Optional}
 use core.intrinsics.onyx { __initialize }
 
-#local ValidKey :: interface (t: $T) {
-    // In order to use a certain type as a key in a Map, you must
-    // provide an implementation of core.hash.to_u32() for that type,
-    // and you must provide an operator overload for ==.
-
-    { hash.to_u32(t) } -> u32;
-    { t == t         } -> bool;
-}
-
-#tag conv.Custom_Format.{
-    #solidify format_map {K=Key_Type, V=Value_Type}
-}
+@conv.Custom_Format.{ #solidify format_map {K=Key_Type, V=Value_Type} }
 Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type) {
     allocator : Allocator;
 
@@ -32,6 +21,15 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     }
 }
 
+#local ValidKey :: interface (t: $T) {
+    // In order to use a certain type as a key in a Map, you must
+    // provide an implementation of core.hash.to_u32() for that type,
+    // and you must provide an operator overload for ==.
+
+    { hash.to_u32(t) } -> u32;
+    { t == t         } -> bool;
+}
+
 #inject Map {
     init    :: init
     has     :: has
@@ -47,13 +45,14 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     as_iter :: as_iter
 }
 
+
+#match __make_overload macro (x: ^Map($K, $V), allocator := context.allocator) => #this_package.make(K, V);
+
 make :: ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {
     map : Map(Key, Value);
     init(^map, default = default);
     return map;
 }
-
-#match __make_overload macro (x: ^Map($K, $V), allocator := context.allocator) => core.map.make(K, V);
 
 init :: (use map: ^Map($K, $V), default := V.{}) {
     __initialize(map);
@@ -67,12 +66,12 @@ init :: (use map: ^Map($K, $V), default := V.{}) {
     array.init(^entries, allocator=allocator);
 }
 
+#match builtin.delete core.map.free
+
 free :: (use map: ^Map) {
     if hashes.data != null  do memory.free_slice(^hashes, allocator=allocator);
     if entries.data != null do array.free(^entries);
 }
-
-#match builtin.delete core.map.free
 
 put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
     lr := lookup(map, key);
@@ -99,10 +98,6 @@ get :: (use map: ^Map, key: map.Key_Type) -> map.Value_Type {
 
     return default_value;
 }
-
-#operator []  macro (map: Map($K, $V), key: K) -> V do return core.map.get(^map, key);
-#operator []= macro (map: Map($K, $V), key: K, value: V) do core.map.put(^map, key, value);
-#operator ^[] macro (map: Map($K, $V), key: K) -> ^V do return core.map.get_ptr(^map, key);
 
 get_ptr :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
     lr := lookup(map, key);
@@ -132,15 +127,15 @@ delete :: (use map: ^Map, key: map.Key_Type) {
 
     array.fast_delete(^entries, lr.entry_index);
     last := lookup(map, entries[lr.entry_index].key);
+
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
 update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
-    // @Hack // Weird hack because 'lookup' exists at file scope.
     lookup_ :: lookup
-
     lr := lookup_(map, key);
+
     if lr.entry_index >= 0 {
         it := ^map.entries[lr.entry_index].value;
         #unquote body;
@@ -189,13 +184,11 @@ literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, 
     return m;
 }
 
-
-#overload core.iter.as_iter as_iter
 as_iter :: (m: ^Map) =>
     core.iter.generator(
         ^.{ m = m, i = 0 },
 
-        (ctx) => {
+        ctx => {
             if ctx.i >= ctx.m.entries.count {
                 return (typeof ctx.m.entries.data).{}, false;
             }
@@ -203,6 +196,11 @@ as_iter :: (m: ^Map) =>
             defer ctx.i += 1;
             return ^ctx.m.entries.data[ctx.i], true;
         });
+
+
+#operator []  macro (map: Map($K, $V), key: K) -> V      { return #this_package.get(^map, key); }
+#operator ^[] macro (map: Map($K, $V), key: K) -> ^V     { return #this_package.get_ptr(^map, key); }
+#operator []= macro (map: Map($K, $V), key: K, value: V) { #this_package.put(^map, key, value); }
 
 //
 // Private symbols
@@ -220,7 +218,7 @@ as_iter :: (m: ^Map) =>
         if hashes.data == null do init(map);
         lr := MapLookupResult.{};
 
-        hash_value: u32 = hash.to_u32(key); // You cannot use this type for the key, unless you add an overload.
+        hash_value: u32 = hash.to_u32(key);
         lr.hash = hash_value;
 
         lr.hash_index = hash_value % hashes.count;
