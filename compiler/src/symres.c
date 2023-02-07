@@ -1381,12 +1381,21 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             SYMRES(expression, (AstTyped **) &add_overload->overloaded_function);
             if (add_overload->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
 
-            if (add_overload->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
+            AstOverloadedFunction *ofunc = (AstOverloadedFunction *) strip_aliases((AstNode *) add_overload->overloaded_function);
+            if (ofunc->kind == Ast_Kind_Symbol) {
+                if (context.cycle_detected) {
+                    onyx_report_error(add_overload->token->pos, Error_Waiting_On, "Waiting for matched procedure to be known.");
+                    return Symres_Error;
+                }
+
+                return Symres_Yield_Macro;
+            }
+
+            if (ofunc->kind != Ast_Kind_Overloaded_Function) {
                 onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure.");
                 return Symres_Error;
             }
 
-            AstOverloadedFunction* ofunc = (AstOverloadedFunction *) add_overload->overloaded_function;
             if (ofunc->locked) {
                 onyx_report_error(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
                 onyx_report_error(ofunc->token->pos, Error_Critical, "Here is the original #match.");
