@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 TILE_DATA_WIDTH  :: 10
 TILE_DATA_HEIGHT :: 10
@@ -241,7 +240,7 @@ scan_for_monsters :: (forest: ^u8, ori: TO, width: u32, height: u32) -> bool {
 main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day20.txt";
 
-	file := reader.make(contents);	
+	file := contents;	
 
 	tiles := array.make(Tile);
 	defer array.free(^tiles);
@@ -259,16 +258,16 @@ main :: (args: [] cstr) {
 	tile_data_ring := alloc.ring.make(.{ ~~ tile_data, 200 * sizeof TileData });
 	tile_allocator := alloc.ring.make_allocator(^tile_data_ring);
 
-	while !reader.empty(^file) {
-		reader.read_word(^file); // 'Tile '
-		id := reader.read_u32(^file);
+	while !string.empty(file) {
+		string.advance(^file, 5); // 'Tile '
+		id := cast(u32, conv.parse_int(^file));
 
-		reader.advance_line(^file);
+		string.advance_line(^file);
 
 		td := cast(^bool) raw_alloc(tile_allocator, sizeof TileData);
 
 		for y: 0 .. 10 {
-			line := reader.read_line(^file);
+			line, file' := string.bisect(file, #char "\n");
 
 			for x: 0 .. 10 {
 				td[x + y * TILE_DATA_WIDTH] = (line[x] == #char "#");
@@ -285,7 +284,7 @@ main :: (args: [] cstr) {
 			edges = edges,
 		});
 
-		reader.advance_line(^file);
+		string.advance_line(^file);
 	}
 
     for ^t: tiles do map.put(^tile_map, t.id, t);

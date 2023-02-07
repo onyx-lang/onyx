@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 Ship :: struct {
     x : i32 = 0;
@@ -35,13 +34,15 @@ turn_around :: (ship: ^Ship) {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day12.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
     ship := Ship.{ fx = 10, fy = -1 };
-    while !reader.empty(^file) {
-        dir := reader.read_byte(^file);
-        val := reader.read_u32(^file);
-        reader.advance_line(^file); 
+    while !string.empty(file) {
+        dir := file[0];
+        string.advance(^file, 1);
+
+        val := cast(u32, conv.parse_int(^file));
+        string.advance_line(^file); 
         
         switch dir {
             case #char "N" do ship.fy -= val;

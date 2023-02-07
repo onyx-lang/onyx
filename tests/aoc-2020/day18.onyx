@@ -1,24 +1,22 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
-parse_factor :: (file: ^reader.String_Reader) -> u64 {
-	reader.skip_whitespace(file);
+parse_factor :: (file: ^str) -> u64 {
+	string.strip_leading_whitespace(file);
 
 	switch *file.data {
-		// Now may be a good time to add a range based case statement...
 		case #char "0" .. #char "9" {
-			return reader.read_u64(file);
+			return conv.parse_int(file);
 		}
 
 		case #char "(" {
-			reader.skip_bytes(file, 1);
+            string.advance(file, 1);
 
 			value := parse_expression_mul(file);
 
-			reader.skip_whitespace(file);
-			reader.skip_bytes(file, 1);
+            string.strip_leading_whitespace(file);
+            string.advance(file, 1);
 
 			return value;
 		}
@@ -27,37 +25,41 @@ parse_factor :: (file: ^reader.String_Reader) -> u64 {
 	return 0;
 }
 
-parse_expression_add :: (file: ^reader.String_Reader) -> u64 {
-	reader.skip_whitespace(file);
+parse_expression_add :: (file: ^str) -> u64 {
+	string.strip_leading_whitespace(file);
 
 	left := parse_factor(file);
 
-	reader.skip_whitespace(file);
+	string.strip_leading_whitespace(file);
 	while *file.data == #char "+" {
-		op := reader.read_byte(file);
+		op    := file.data[0];
+        string.advance(file, 1);
+
 		right := parse_factor(file);
 
 		left += right;
 
-		reader.skip_whitespace(file);
+		string.strip_leading_whitespace(file);
 	}
 
 	return left;
 }
 
-parse_expression_mul :: (file: ^reader.String_Reader) -> u64 {
-	reader.skip_whitespace(file);
+parse_expression_mul :: (file: ^str) -> u64 {
+    string.strip_leading_whitespace(file);
 
 	left := parse_expression_add(file);
 
-	reader.skip_whitespace(file);
+    string.strip_leading_whitespace(file);
 	while *file.data == #char "*" {
-		op   := reader.read_byte(file);
+		op    := file.data[0];
+        string.advance(file, 1);
+
 		right := parse_expression_add(file);
 
 		left *= right;
 
-		reader.skip_whitespace(file);
+		string.strip_leading_whitespace(file);
 	}
 
 	return left;
@@ -65,11 +67,10 @@ parse_expression_mul :: (file: ^reader.String_Reader) -> u64 {
 
 main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day18.txt";
-
-	file := reader.make(contents);
+    file := contents;
 
 	total: u64 = 0;
-	while !reader.empty(^file) {
+	while !string.empty(file) {
 		total += parse_expression_mul(^file);
 	}
 

@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 /*
 	What questions the data layout needs to answer easily:
@@ -34,7 +33,7 @@ allergen_map   : map.Map(str, Allergen);
 main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day21.txt";
 
-	file := reader.make(contents);
+	file := contents;
 
     map.init(^ingredient_map, .{});
     map.init(^allergen_map, .{});
@@ -47,14 +46,14 @@ main :: (args: [] cstr) {
     defer array.free(^foods);
 
     line_num := 0;
-	while !reader.empty(^file) {
+	while !string.empty(file) {
         food : Food;
         array.init(^food.ingredients, 16);
         array.init(^food.allergens);
 
         while *file.data != #char "(" {
-            ingredient_name := reader.read_word(^file);
-            reader.skip_bytes(^file, 1); // ' '
+            ingredient_name := string.read_alphanum(^file);
+            string.advance(^file, 1); // ' '
 
             array.push(^food.ingredients, ingredient_name);
 
@@ -69,11 +68,11 @@ main :: (args: [] cstr) {
             map.put(^ingredient_map, ingredient_name, ingredient);
         }
 
-        reader.skip_bytes(^file, 10); // '(contains '
+        string.advance(^file, 10); // '(contains '
 
         while *file.data != #char ")" {
-            allergen_name := reader.read_word(^file);
-            if *file.data == #char "," do reader.skip_bytes(^file, 2); // ', '
+            allergen_name := string.read_alphanum(^file);
+            if *file.data == #char "," do string.advance(^file, 2); // ', '
 
             array.push(^food.allergens, allergen_name);
 
@@ -90,7 +89,7 @@ main :: (args: [] cstr) {
 
         array.push(^foods, food);
         
-        reader.advance_line(^file);
+        string.advance_line(^file);
         line_num += 1;
 	}
 

@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 power_mod :: (base: u32, exp: u32, mod: u32) -> u32 {
     t: u64 = 1;
@@ -55,10 +54,10 @@ transform_subject :: (subject: u32, loop_size: u32) -> u32 {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day25.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
-    card_pub_key := reader.read_u32(^file);
-    door_pub_key := reader.read_u32(^file);
+    card_pub_key := cast(u32, conv.parse_int(^file));
+    door_pub_key := cast(u32, conv.parse_int(^file));
 
     card_loop_secret := dlp_bsgs(20201227, 7, card_pub_key);
     door_loop_secret := dlp_bsgs(20201227, 7, door_pub_key);

@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 initial_numbers := u32.[ 1, 20, 8, 12, 0, 14 ];
 

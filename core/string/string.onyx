@@ -541,7 +541,7 @@ advance_line :: (s: ^str) {
     if s.count == 0 do return;
 
     adv := 0;
-    while s.data[adv] != #char "\n" do adv += 1;
+    while s.data[adv] != #char "\n" && adv <= s.count do adv += 1;
 
     s.data += adv + 1;
     s.count -= adv + 1;

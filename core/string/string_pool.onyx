@@ -3,6 +3,16 @@ package core.string
 use core { alloc, memory }
 use core.alloc { arena }
 
+//
+// Many times, storing strings is annoying because you need
+// to keep the data alive, while moving pointers around and
+// changing them.
+//
+// To remedy this, a StringPool is a simple wrapper around
+// an arena allocator that enables you to quickly copy a
+// string to the pool. From there, you can use the string
+// until the pool is cleared or freed.
+//
 StringPool :: struct {
     arena: arena.Arena;
 }
@@ -13,11 +23,16 @@ StringPool :: struct {
     free  :: pool_free;
 }
 
+//
+// Creates a StringPool capable of storing a string of at
+// most `maximum_string_length` bytes.
 pool_make :: (maximum_string_length := 16384, allocator := context.allocator)
     => StringPool.{
-        arena.make(allocator, maximum_string_length * 2)
+        arena.make(allocator, maximum_string_length)
     }
 
+//
+// Copies a string into the pool, returning the copied string.
 pool_add :: (sp: ^StringPool, s: str) -> str {
     if s.count > sp.arena.arena_size do return "";
 
@@ -28,10 +43,14 @@ pool_add :: (sp: ^StringPool, s: str) -> str {
     return new_str;
 }
 
+//
+// Clears all entries in the pool.
 pool_flush :: (sp: ^StringPool) {
     arena.clear(^sp.arena);
 }
 
+//
+// Completely frees all memory in the pool.
 pool_free :: (sp: ^StringPool) {
     arena.free(^sp.arena);
 }

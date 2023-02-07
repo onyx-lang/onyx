@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 GameOfSeats :: struct {
     width  : u32;
@@ -68,7 +67,7 @@ gos_iter :: (use gos: ^GameOfSeats) -> bool {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day11.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
     gos : GameOfSeats;
     array.init(^gos.seats, 32);
@@ -76,8 +75,8 @@ main :: (args: [] cstr) {
 
     gos.height = 0;
 
-    while !reader.empty(^file) {
-        line := reader.read_line(^file);
+    while !string.empty(file) {
+        line, file' := string.bisect(file, #char "\n");
         for ch: line do switch ch {
             case #char "." do array.push(^gos.seats, SeatState.Floor);
             case #char "L" do array.push(^gos.seats, SeatState.Empty);
