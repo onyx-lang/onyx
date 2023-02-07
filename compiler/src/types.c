@@ -605,6 +605,11 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 return type_of->resolved_type;
             }
 
+            // Why does this have to be here?
+            if (type_of->expr->type != NULL) {
+                return type_of->expr->type;
+            }
+
             return NULL;
         }
 

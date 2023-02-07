@@ -378,7 +378,7 @@ enumerate :: (it: Iterator($T), start_index: i32 = 0) -> Iterator(Enumeration_Va
             value, cont := next(ec.iterator);
             if cont {
                 defer ec.current_index += 1;
-                return Enumeration_Value(typeof value).{ current_index, value }, true;
+                return Enumeration_Value(typeof value).{ ec.current_index, value }, true;
             }
 
             return .{}, false;
