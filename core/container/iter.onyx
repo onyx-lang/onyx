@@ -280,7 +280,7 @@ skip_while :: (it: Iterator($T), predicate: (T) -> bool) -> Iterator(T) {
 #overload
 skip_while :: (it: Iterator($T), ctx: $Ctx, predicate: (T, Ctx) -> bool) -> Iterator(T) {
     return generator(
-        ^.{ iterator = it, ctx = ctx, predicate = predicate },
+        ^.{ iterator = it, ctx = ctx, predicate = predicate, skipped = false },
 
         si => {
             while !si.skipped {
@@ -647,7 +647,7 @@ prod :: macro (x: $I/Iterable, y: $I2/Iterable) => {
 }
 
 #overload
-prod :: (x: $I1/Iterable, y_iter: Iterator(y)) => {
+prod :: (x: $I1/Iterable, y_iter: Iterator($Y)) => {
     y_val, _ := take_one(y_iter);
 
     return generator(
