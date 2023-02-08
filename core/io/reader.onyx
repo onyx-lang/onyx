@@ -1,33 +1,26 @@
 package core.io
 
+// Reader is a buffered reader over a Stream.
+// If you do not need a buffered reader, simply
+// use the stream_read functions to read from the
+// stream. Because Reader is buffered, there are
+// several things it can do that a non-buffered
+// reader could not, like 'read the next line',
+// or 'read until a period'.
+
 use core {memory, math, array, iter}
 
 Reader :: struct {
-    stream : ^Stream;
+    stream: ^Stream;
 
     buffer: [] u8;
     buffer_allocator: Allocator;
 
     start, end: u32; // The start and ending positions of the edges of the buffer "window".    
-
     last_byte: i32;
 
     error: Error;
-
-    done : bool; // If an .EOF was reached.
-
-    // If a .ReadPending was reached, still work with the data
-    // that is available. Only set this if you know that the data
-    // will always be available.
-    greedy : bool;
-
-    // A very special flag that should probably only be used on
-    // standard input (hence the name). This flag says that if there
-    // is ANY data left in the buffer, do not try to fill the buffer
-    // with a call to stream_read. This will produce incorrect results
-    // for things like read_line, but will prevent hanging when using
-    // a blocking read source like stdin.
-    stdin: bool;
+    done: bool; // If an .EOF was reached.
 }
 
 #inject Reader {
@@ -53,13 +46,12 @@ Reader :: struct {
     lines :: lines;
 }
 
-reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator, greedy := false) -> Reader {
+reader_make :: (s: ^Stream, buffer_size := 4096, allocator := context.allocator) -> Reader {
     assert(s.vtable != null, "Stream vtable was not setup correctly.");
 
     reader: Reader;
     reader.stream = s;
     reader.error = .None;
-    reader.greedy = greedy;
 
     memory.alloc_slice(^reader.buffer, buffer_size, allocator);
     reader.buffer_allocator = allocator;
@@ -174,8 +166,10 @@ read_bytes :: (use reader: ^Reader, bytes: [] u8) -> (i32, Error) {
 
     write_index := 0;
     while n > 0 && !reader_empty(reader) {
-        if reader_read_next_chunk(reader) == .ReadPending {
-            return write_index, .ReadPending;
+        if  err := reader_read_next_chunk(reader);
+            err == .ReadPending || err == .ReadLater
+        {
+            return write_index, err;
         }
 
         to_write := math.min(n, end);
@@ -562,8 +556,8 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
 
 lines :: (r: ^Reader, inplace := false) =>
     iter.generator(^.{
-        r = r, inplace = inplace
-
+        r = r,
+        inplace = inplace
     }, (ctx: $C) -> (str, bool) {
         line := ctx.r->read_line(consume_newline=true, inplace=ctx.inplace);
 
@@ -604,7 +598,11 @@ lines :: (r: ^Reader, inplace := false) =>
         return .BufferFull;
     }
 
-    if end > 0 && stdin {
+    // If this stream will block on a read, use the data that is present
+    // in the buffer currently. In theory, it would be better to have a
+    // 'stream_poll' that tests if the next read would block, but that
+    // can happen later.
+    if end > 0 && stream.flags & .Block_On_Read {
         return .None;
     }
 
@@ -615,8 +613,7 @@ lines :: (r: ^Reader, inplace := false) =>
     // to be read, so this should try again later. This has to return None
     // if the end is equal to start because that means that the buffer is
     // completely empty.
-    if err == .ReadPending {
-        if greedy do err = .NoProgress;
+    if err == .ReadPending || err == .ReadLater {
         error = err;
         return err if end == 0 else .None;
     }

@@ -9,7 +9,7 @@ as_str :: #match -> str {}
     { T.as_str(t) } -> str;
 }
 
-#overload #precedence 10000
+#overload #order 10000
 as_str :: macro (t: $T/HasAsStrMethod) -> str {
     return T.as_str(t);
 }
@@ -541,7 +541,7 @@ advance_line :: (s: ^str) {
     if s.count == 0 do return;
 
     adv := 0;
-    while s.data[adv] != #char "\n" do adv += 1;
+    while s.data[adv] != #char "\n" && adv <= s.count do adv += 1;
 
     s.data += adv + 1;
     s.count -= adv + 1;

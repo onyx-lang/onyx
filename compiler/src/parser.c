@@ -791,6 +791,15 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) export_name;
                 break;
             }
+            else if (parse_possible_directive(parser, "this_package")) {
+                AstPackage *this_package = make_node(AstPackage, Ast_Kind_Directive_This_Package);
+                this_package->token = parser->curr - 1;
+                this_package->type_node = builtin_package_id_type;
+                ENTITY_SUBMIT(this_package);
+
+                retval = (AstTyped *) this_package;
+                break;
+            }
 
             onyx_report_error(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
             return NULL;
@@ -2437,19 +2446,19 @@ static AstOverloadedFunction* parse_overloaded_function(OnyxParser* parser, Onyx
 
     expect_token(parser, '{');
 
-    u64 precedence = 0;
+    u64 order = 0;
     while (!consume_token_if_next(parser, '}')) {
         if (parser->hit_unexpected_token) return ofunc;
 
-        if (parse_possible_directive(parser, "precedence")) {
+        if (parse_possible_directive(parser, "order")) {
             AstNumLit* pre = parse_int_literal(parser);
             if (parser->hit_unexpected_token) return ofunc;
 
-            precedence = bh_max(pre->value.l, 0);
+            order = bh_max(pre->value.l, 0);
         }
 
         AstTyped* option = parse_expression(parser, 0);
-        add_overload_option(&ofunc->overloads, precedence++, option);
+        add_overload_option(&ofunc->overloads, order++, option);
 
         if (parser->curr->type != '}')
             expect_token(parser, ',');
@@ -3274,14 +3283,14 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 }
 
               operator_determined:
-                if (parse_possible_directive(parser, "precedence")) {
+                if (parse_possible_directive(parser, "order")) {
                     AstNumLit* pre = parse_int_literal(parser);
                     if (parser->hit_unexpected_token) return;
 
-                    operator->precedence = bh_max(pre->value.l, 0);
+                    operator->order = bh_max(pre->value.l, 0);
 
                 } else {
-                    operator->precedence = parser->overload_count++;
+                    operator->order = parser->overload_count++;
                 }
 
                 operator->overload = parse_expression(parser, 0);
@@ -3293,13 +3302,13 @@ static void parse_top_level_statement(OnyxParser* parser) {
                 AstDirectiveAddOverload *add_overload = make_node(AstDirectiveAddOverload, Ast_Kind_Directive_Add_Overload);
                 add_overload->token = dir_token;
 
-                if (parse_possible_directive(parser, "precedence")) {
+                if (parse_possible_directive(parser, "order")) {
                     AstNumLit* pre = parse_int_literal(parser);
                     if (parser->hit_unexpected_token) return;
 
-                    add_overload->precedence = bh_max(pre->value.l, 0);
+                    add_overload->order = bh_max(pre->value.l, 0);
                 } else {
-                    add_overload->precedence = parser->overload_count++;
+                    add_overload->order = parser->overload_count++;
                 }
 
                 parser->parse_calls = 0;

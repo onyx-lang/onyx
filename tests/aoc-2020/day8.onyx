@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 OpCode :: enum (u16) {
     Nop; Acc; Jmp;
@@ -46,19 +45,20 @@ get_acc_value :: (instrs: [..] Instruction, ret_acc: ^i32) -> bool {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day8.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
     instrs := array.make(Instruction, 32);
     defer array.free(^instrs);
 
-    while !reader.empty(^file) {
-        word := reader.read_bytes(^file, 3);
-        reader.skip_bytes(^file, 1);
+    while !string.empty(file) {
+        word := file.data[0 .. 3];
+        string.advance(^file, 4);
 
-        sign := reader.read_byte(^file);
-        val := cast(i32) reader.read_u32(^file);
+        sign := file.data[0];
+        string.advance(^file, 1);
+        val := cast(i32) conv.parse_int(^file);
 
-        reader.advance_line(^file);
+        string.advance_line(^file);
 
         if sign == #char "-" do val *= -1;
 

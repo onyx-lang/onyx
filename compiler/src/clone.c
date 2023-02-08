@@ -29,6 +29,7 @@ static inline b32 should_clone(AstNode* node) {
         case Ast_Kind_Basic_Type:
         case Ast_Kind_Enum_Type:
         case Ast_Kind_Enum_Value:
+        case Ast_Kind_Directive_This_Package: // Not copied, because it should depend on where it was written, not where a macro/polymorphic function was expanded.
             return 0;
 
         default: return 1;

@@ -320,6 +320,12 @@ contains :: #match #locked {
     }
 }
 
+// Tests if array is empty.
+// Normally this is unneeded, as arrays have a 'truthiness'
+// that depends on their count. For example, instead of saying:
+//     if array.empty(arr) { ... }
+// You can simply say:
+//     if !arr { ... }
 empty :: (arr: [] $T) => arr.count == 0;
 
 // Uses '+' to sum.
@@ -329,12 +335,16 @@ sum :: (arr: [] $T, start: T = 0) -> T {
     return sum;
 }
 
+// Uses '*' to multiply.
 product :: (arr: [] $T, start: T = 1) -> T {
     prod := start;
     for it: arr do prod *= it;
     return prod;
 }
 
+// Uses '+' to add the elements together.
+// Then use '/ i32' to divide by the number of elements.
+// Both of these are assumed to work.
 average :: (arr: [] $T) -> T {
     sum := cast(T) 0;
     for it: *arr do sum += it;
@@ -364,7 +374,8 @@ sort :: (arr: [] $T, cmp: (T, T) -> i32) -> [] T {
         x := arr.data[i];
         j := i - 1;
 
-        // @ShortCircuitLogicalOps // This is written this way because '&&' does not short circuit right now.
+        // @ShortCircuitLogicalOps
+        // This is written this way because '&&' does not short circuit right now.
         while j >= 0 {
             if cmp(arr.data[j], x) > 0 {
                 arr.data[j + 1] = arr.data[j];
@@ -490,23 +501,10 @@ fold :: macro (arr: [] $T, init: $R, body: Code) -> R {
     return acc;
 }
 
-/*
-map :: #match #locked {
-    macro (arr: [] $T, f: (^T) -> void)                do for ^it: arr do f(it);,
-    macro (arr: [] $T, f: (T) -> T)                    do for ^it: arr do *it = f(*it);,
-    macro (arr: [] $T, body: Code)                     do for ^it: arr do #unquote body;,
-    macro (arr: [] $T, data: $R, f: (^T, R) -> void)   do for ^it: arr do f(it, data);,
-    macro (arr: [] $T, data: $R, f: (T, R) -> T)       do for ^it: arr do *it = f(*it, data);,
-}
-*/
-
 every :: #match #local {}
 
 #overload
-every :: macro (arr: [] $T, predicate: (T) -> bool) -> bool {
-    every :: every
-    return every(arr, #(predicate(it)));
-}
+every :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.every(arr, #(predicate(it)));
 
 #overload
 every :: macro (arr: [] $T, predicate_body: Code) -> bool {
@@ -519,10 +517,7 @@ every :: macro (arr: [] $T, predicate_body: Code) -> bool {
 some :: #match #local {}
 
 #overload
-some :: macro (arr: [] $T, predicate: (T) -> bool) -> bool {
-    some :: some
-    return every(arr, #(predicate(it)));
-}
+some :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.some(arr, #(predicate(it)));
 
 #overload
 some :: macro (arr: [] $T/type_is_struct, predicate_body: Code) -> bool {
@@ -629,17 +624,52 @@ first :: #match #locked {
     }
 }
 
-count_where :: #match #locked {
-    macro (arr: [] $T, predicate: (T) -> bool) -> u32 {
-        count_where :: count_where
-        return count_where(arr, #(predicate(it)));
-    },
+count_where :: #match #local {}
 
-    macro (arr: [] $T, predicate_body: Code) -> u32 {
-        count: u32 = 0;
-        for arr {
-            if #unquote predicate_body do count += 1;
-        }
-        return count;
+#overload
+count_where :: macro (arr: [] $T, predicate: (T) -> bool) => #this_package.count_where(arr, #(predicate(it)));
+
+#overload
+count_where :: macro (arr: [] $T, predicate_body: Code) -> u32 {
+    count: u32 = 0;
+    for arr {
+        if #unquote predicate_body do count += 1;
     }
+    return count;
 }
+
+
+windows :: (arr: [] $T, width: i32) -> Iterator([] T) {
+    use core {iter}
+
+    return iter.generator(
+        ^.{ arr=arr, width=width, pos=0 },
+        ctx => {
+            if ctx.pos + ctx.width < ctx.arr.count {
+                defer ctx.pos += 1;
+                return ctx.arr.data[ctx.pos .. ctx.pos+ctx.width], true;
+            }
+
+            return .{}, false;
+        }
+    );
+}
+
+chunks :: (arr: [] $T, width: i32) -> Iterator([] T) {
+    use core {iter}
+
+    return iter.generator(
+        ^.{ arr=arr, width=width, pos=0 },
+        ctx => {
+            if ctx.pos < ctx.arr.count {
+                defer ctx.pos += ctx.width;
+
+                end := core.math.min(ctx.pos+ctx.width, ctx.arr.count);
+                return ctx.arr.data[ctx.pos .. end], true;
+            }
+
+            return .{}, false;
+        }
+    );
+}
+

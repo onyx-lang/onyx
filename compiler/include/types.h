@@ -217,6 +217,7 @@ const char* type_get_name(Type* type);
 u32 type_get_alignment_log2(Type* type);
 Type* type_get_contained_type(Type* type);
 
+b32 type_is_ready_for_lookup(Type* type);
 b32 type_lookup_member(Type* type, char* member, StructMember* smem);
 b32 type_lookup_member_by_idx(Type* type, i32 idx, StructMember* smem);
 

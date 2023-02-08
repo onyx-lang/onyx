@@ -44,6 +44,7 @@
     NODE(DirectiveRemove)      \
     NODE(DirectiveFirst)       \
     NODE(DirectiveExportName)  \
+    NODE(DirectiveThisPackage) \
                                \
     NODE(Return)               \
     NODE(Jump)                 \
@@ -221,6 +222,7 @@ typedef enum AstKind {
     Ast_Kind_Directive_Remove,
     Ast_Kind_Directive_First,
     Ast_Kind_Directive_Export_Name,
+    Ast_Kind_Directive_This_Package,
     Ast_Kind_Call_Site,
 
     Ast_Kind_Code_Block,
@@ -1075,7 +1077,7 @@ struct OverloadOption {
     // This is u64 because padding will make it that anyway.
     // Consider: would there be any practical benefit to having the precedence setting
     // be a compile-time known value? as opposed to a hardcoded value?
-    u64 precedence;
+    u64 order;
 
     AstTyped* option;
 };
@@ -1310,7 +1312,7 @@ struct AstDirectiveAddOverload {
     AstNode *overloaded_function;
 
     // See note in OverloadOption. This could be refactored into an OverloadOption?
-    u64 precedence;
+    u64 order;
     AstTyped *overload;
 };
 
@@ -1319,7 +1321,7 @@ struct AstDirectiveOperator {
 
     BinaryOp operator;
 
-    u64 precedence;
+    u64 order;
     AstTyped *overload;
 };
 
@@ -1816,7 +1818,7 @@ typedef struct OverloadReturnTypeCheck {
     OnyxToken *group;
 } OverloadReturnTypeCheck;
 
-void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload);
+void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload);
 AstTyped* find_matching_overload_by_arguments(bh_arr(OverloadOption) overloads, Arguments* args);
 AstTyped* find_matching_overload_by_type(bh_arr(OverloadOption) overloads, Type* type);
 void report_unable_to_match_overload(AstCall* call, bh_arr(OverloadOption) overloads);

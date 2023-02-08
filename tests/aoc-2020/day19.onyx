@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 // nt -> t
 Term :: struct {
@@ -108,45 +107,46 @@ cyk_algorithm :: (use grammar: ^Grammar, input: str) -> bool {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day19.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
     grammar : Grammar;
     grammar_init(^grammar);
     defer grammar_free(^grammar);
 
     while *file.data != #char "\n" {
-        nt0 := reader.read_u32(^file);
+        nt0 := cast(u32, conv.parse_int(^file));
 
-        reader.skip_bytes(^file, 2); // ': '
+        string.advance(^file, 2); // ': '
 
         if *file.data == #char "\"" {
-            reader.skip_bytes(^file, 1); // '"'
-            t := reader.read_byte(^file);
+            string.advance(^file, 1); // '"'
+            t := file[0];
+            string.advance(^file, 1);
 
             array.push(^grammar.terminate_rules, Term.{ nt0, t });
 
         } else {
             while true {
-                nt1 := reader.read_u32(^file);
+                nt1 := cast(u32, conv.parse_int(^file));
 
                 if *file.data == #char "\n" {
                     array.push(^grammar.unit_rules, Unit.{ nt0, nt1 });
                     break;
 
                 } else {
-                    reader.skip_bytes(^file, 1); // ' '
+                    string.advance(^file, 1); // ' '
 
                     if next_ch := *file.data; next_ch >= #char "0" && next_ch <= #char "9" {
-                        nt2 := reader.read_u32(^file);
+                        nt2 := cast(u32, conv.parse_int(^file));
                         array.push(^grammar.production_rules, Prod.{ nt0, nt1, nt2 });
 
-                        if *file.data == #char " " do reader.skip_bytes(^file, 1);
+                        if *file.data == #char " " do string.advance(^file, 1);
                     } else {
                         array.push(^grammar.unit_rules, Unit.{ nt0, nt1 });
                     }
 
                     if *file.data == #char "|" {
-                        reader.skip_bytes(^file, 1); // ' |'
+                        string.advance(^file, 1); // ' |'
                     } else {
                         break;
                     }
@@ -154,15 +154,15 @@ main :: (args: [] cstr) {
             }
         }
 
-        reader.advance_line(^file);
+        string.advance_line(^file);
     }
 
     grammar_prepare(^grammar);
 
     valid_count := 0;
-    reader.advance_line(^file);
-    while !reader.empty(^file) {
-        line := reader.read_line(^file);
+    string.advance_line(^file);
+    while !string.empty(file) {
+        line, file' := string.bisect(file, #char "\n");
         if cyk_algorithm(^grammar, line) do valid_count += 1;
     }
 

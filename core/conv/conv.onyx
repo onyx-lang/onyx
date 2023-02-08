@@ -17,6 +17,8 @@ str_to_i64 :: macro (s: str, base: u32 = 10) -> i64 {
 str_to_i64 :: (s: ^str, base: u32 = 10) -> i64 {
     use package core
 
+    string.strip_leading_whitespace(s);
+
     value: i64 = 0;
     mul := 1;
 

@@ -63,7 +63,7 @@ that the program is compiling under. If no `#link_options` is provided,
 these default values are used.
 
 Alternatively, there could just be a optional variable in
-`package runtime.vars` that would define the link options. And if,
+`package runtime.vars` that would define the link options. And if
 one is not specified than a definition in the standard library
 would define it like so
 

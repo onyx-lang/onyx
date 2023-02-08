@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 Field :: struct {
 	name : str = "";
@@ -20,14 +19,14 @@ field_valid :: (use field: ^Field, n: u32) -> bool {
 
 total_scanning_error := 0;
 
-read_ticket_and_validate :: (file: ^reader.String_Reader, fields: [..] Field, ticket_store: ^u32) -> bool {
+read_ticket_and_validate :: (file: ^str, fields: [..] Field, ticket_store: ^u32) -> bool {
 	retval := true;
 
 	for i: 0 .. fields.count {
-		n := reader.read_u32(file);
+		n := cast(u32, conv.parse_int(file));
 		ticket_store[i] = n;
 
-		if file.data[0] == #char "," do reader.skip_bytes(file, 1);
+		if file.data[0] == #char "," do string.advance(file, 1);
 
 		valid_count := 0;
 		for ^field: fields {
@@ -40,52 +39,52 @@ read_ticket_and_validate :: (file: ^reader.String_Reader, fields: [..] Field, ti
 		}
 	}
 
-	reader.advance_line(file);
+    string.advance_line(file);
 	return retval;
 }
 
 main :: (args: [] cstr) {
 	contents := #file_contents "./tests/aoc-2020/input/day16.txt";
 
-	file := reader.make(contents);
+	file := contents;
 
 	fields := array.make(Field, 20);
 	defer array.free(^fields);
 
 	// Read until the first empty line
-	while *file.data != #char "\n" {
+	while file.data[0] != #char "\n" {
 		field := Field.{};
-		field.name = reader.read_until(^file, 0, #char ":");		
+		field.name, file = string.bisect(file, #char ":");		
 
-		reader.skip_bytes(^file, 2);
-		field.lower0 = reader.read_u32(^file);
+		string.advance(^file, 1);
+		field.lower0 = ~~ conv.parse_int(^file);
 
-		reader.skip_bytes(^file, 1);
-		field.upper0 = reader.read_u32(^file);
+		string.advance(^file, 1);
+		field.upper0 = ~~ conv.parse_int(^file);
 
-		reader.skip_bytes(^file, 4);
-		field.lower1 = reader.read_u32(^file);
+		string.advance(^file, 4);
+		field.lower1 = ~~ conv.parse_int(^file);
 
-		reader.skip_bytes(^file, 1);
-		field.upper1 = reader.read_u32(^file);
+		string.advance(^file, 1);
+		field.upper1 = ~~ conv.parse_int(^file);
 
-		reader.advance_line(^file);
+		string.advance_line(^file);
 
 		array.push(^fields, field);
 	}
 
-	for i: 0 .. 2 do reader.advance_line(^file);
+	for i: 0 .. 2 do string.advance_line(^file);
 
 	my_ticket := array.make(u32, fields.count);
 	defer array.free(^my_ticket);
 	read_ticket_and_validate(^file, fields, my_ticket.data);
 
-	for i: 0 .. 2 do reader.advance_line(^file);
+	for i: 0 .. 2 do string.advance_line(^file);
 
 	ticket_data := array.make(u32, 1024);
 	defer array.free(^ticket_data);
 
-	while !reader.empty(^file) {
+	while !string.empty(file) {
 		array.ensure_capacity(^ticket_data, ticket_data.count + fields.count);
 		if read_ticket_and_validate(^file, fields, ^ticket_data[ticket_data.count]) {
 			ticket_data.count += fields.count;

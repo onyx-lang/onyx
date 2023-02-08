@@ -1,6 +1,25 @@
 package core.hash
 
-to_u32 :: #match -> u32 {
+//
+// DEPRECATED: to_u32 is the old name that kind of
+// makes sense, but is a little unintuitive. Use
+// core.hash.hash instead.
+to_u32 :: hash
+
+//
+// This overloaded procedure defines how to hash something.
+// It is used throughout the standard library to hash values.
+// There are many overloads to it in the standard library, and
+// more can be added using #overload. Or, a hash method can be
+// defined for a structure or distinct type.
+//
+//     Person :: struct {
+//         hash :: (p: Person) {
+//             return // ...
+//         }
+//     }
+
+hash :: #match -> u32 {
     // Does this need to have a higher precedence value?
     // Because if I wanted to have a custom type as the key
     // of a map that only looks at some of the members of the
@@ -21,12 +40,12 @@ to_u32 :: #match -> u32 {
     (key: type_expr) -> u32 { return to_u32(cast(u32) key); },
     (key: bool)   -> u32 { return 1 if key else 0; },
 
-    #precedence 10000
+    #order 10000
     macro (key: $T/HasHashMethod) => key->hash()
 }
 
 Hashable :: interface (t: $T) {
-    { to_u32(t) } -> u32;
+    { hash(t) } -> u32;
 }
 
 #local

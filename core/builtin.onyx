@@ -268,7 +268,7 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
         //
         // This is the fallback option for make. It simply allocates a zero-intialized
         // element of type T.
-        #precedence 1000 (_: ^$T, allocator := context.allocator) -> ^T {
+        #order 1000 (_: ^$T, allocator := context.allocator) -> ^T {
             memory :: package core.memory
 
             res := cast(^T) raw_alloc(allocator, sizeof T);
@@ -278,7 +278,7 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
     }
 
     delete :: #match {
-        #precedence 1000 macro (x: ^$T, allocator := context.allocator) {
+        #order 1000 macro (x: ^$T, allocator := context.allocator) {
             if x != null do raw_free(allocator, x);
         }
     }

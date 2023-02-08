@@ -7,12 +7,14 @@
 // :EliminatingSymres - notes the places where too much work is being done in symbol resolution
 
 // Variables used during the symbol resolution phase.
-static Scope*       curr_scope    = NULL;
+static Scope*       current_scope    = NULL;
 static b32 report_unresolved_symbols = 1;
 static b32 resolved_a_symbol         = 0;
 
 // Everything related to waiting on is imcomplete at the moment.
 static Entity* waiting_on         = NULL;
+
+static Entity* current_entity = NULL;
 
 #define SYMRES(kind, ...) do { \
     SymresStatus ss = symres_ ## kind (__VA_ARGS__); \
@@ -73,21 +75,21 @@ static SymresStatus symres_constraint(AstConstraint* constraint);
 static SymresStatus symres_polyquery(AstPolyQuery *query);
 
 static void scope_enter(Scope* new_scope) {
-    curr_scope = new_scope;
+    current_scope = new_scope;
 }
 
 static void scope_leave() {
-    curr_scope = curr_scope->parent;
+    current_scope = current_scope->parent;
 }
 
 static SymresStatus symres_symbol(AstNode** symbol_node) {
     OnyxToken* token = (*symbol_node)->token;
-    AstNode* res = symbol_resolve(curr_scope, token);
+    AstNode* res = symbol_resolve(current_scope, token);
 
     if (!res) { // :SymresStall
         if (report_unresolved_symbols) {
             token_toggle_end(token);
-            char *closest = find_closest_symbol_in_scope_and_parents(curr_scope, token->text);
+            char *closest = find_closest_symbol_in_scope_and_parents(current_scope, token->text);
             token_toggle_end(token);
 
             if (closest) onyx_report_error(token->pos, Error_Critical, "Unable to resolve symbol '%b'. Did you mean '%s'?", token->text, token->length, closest);
@@ -262,7 +264,7 @@ static SymresStatus symres_local(AstLocal** local) {
     SYMRES(type, &(*local)->type_node);
 
     if ((*local)->token != NULL)
-        symbol_introduce(curr_scope, (*local)->token, (AstNode *) *local);
+        symbol_introduce(current_scope, (*local)->token, (AstNode *) *local);
 
     return Symres_Success;
 }
@@ -636,9 +638,9 @@ static SymresStatus symres_expression(AstTyped** expr) {
             break;
 
         case Ast_Kind_Do_Block: {
-            Scope* old_curr_scope = curr_scope;
+            Scope* old_current_scope = current_scope;
             SYMRES(block, ((AstDoBlock *) *expr)->block);
-            curr_scope = old_curr_scope;
+            current_scope = old_current_scope;
             break;
         }
 
@@ -695,7 +697,7 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
 
     } else {
         if (ifnode->initialization != NULL) {
-            ifnode->scope = scope_create(context.ast_alloc, curr_scope, ifnode->token->pos);
+            ifnode->scope = scope_create(context.ast_alloc, current_scope, ifnode->token->pos);
             scope_enter(ifnode->scope);
 
             SYMRES(statement_chain, &ifnode->initialization);
@@ -715,7 +717,7 @@ static SymresStatus symres_if(AstIfWhile* ifnode) {
 
 static SymresStatus symres_while(AstIfWhile* whilenode) {
     if (whilenode->initialization != NULL) {
-        whilenode->scope = scope_create(context.ast_alloc, curr_scope, whilenode->token->pos);
+        whilenode->scope = scope_create(context.ast_alloc, current_scope, whilenode->token->pos);
         scope_enter(whilenode->scope);
 
         SYMRES(statement_chain, &whilenode->initialization);
@@ -732,7 +734,7 @@ static SymresStatus symres_while(AstIfWhile* whilenode) {
 }
 
 static SymresStatus symres_for(AstFor* fornode) {
-    fornode->scope = scope_create(context.ast_alloc, curr_scope, fornode->token->pos);
+    fornode->scope = scope_create(context.ast_alloc, current_scope, fornode->token->pos);
     scope_enter(fornode->scope);
     SYMRES(expression, &fornode->iter);
     SYMRES(local, &fornode->var);
@@ -755,7 +757,7 @@ static SymresStatus symres_case(AstSwitchCase *casenode) {
 
 static SymresStatus symres_switch(AstSwitch* switchnode) {
     if (switchnode->initialization != NULL) {
-        switchnode->scope = scope_create(context.ast_alloc, curr_scope, switchnode->token->pos);
+        switchnode->scope = scope_create(context.ast_alloc, current_scope, switchnode->token->pos);
         scope_enter(switchnode->scope);
 
         SYMRES(statement_chain, &switchnode->initialization);
@@ -797,7 +799,7 @@ static SymresStatus symres_use(AstUse* use) {
         SYMRES(package, package);
 
         if (!use->entity) {
-            add_entities_for_node(NULL, (AstNode *) use, curr_scope, NULL);
+            add_entities_for_node(NULL, (AstNode *) use, current_scope, NULL);
         }
 
         package_track_use_package(package->package, use->entity);
@@ -824,14 +826,14 @@ static SymresStatus symres_use(AstUse* use) {
     }
 
     if (used_scope) {
-        if (used_scope == curr_scope) return Symres_Success;
+        if (used_scope == current_scope) return Symres_Success;
 
         if (use->only == NULL) {
             OnyxFilePos pos = { 0 };
             if (use->token != NULL)
                 pos = use->token->pos;
 
-            scope_include(curr_scope, used_scope, pos);
+            scope_include(current_scope, used_scope, pos);
 
         } else {
             bh_arr_each(QualifiedUse, qu, use->only) {
@@ -847,7 +849,7 @@ static SymresStatus symres_use(AstUse* use) {
                     }
                 }
 
-                symbol_introduce(curr_scope, qu->as_name, thing);
+                symbol_introduce(current_scope, qu->as_name, thing);
             }
         }
 
@@ -875,7 +877,7 @@ static SymresStatus symres_use(AstUse* use) {
         fori (i, 0, shlen(st->Struct.members)) {
             StructMember* value = st->Struct.members[i].value;
             AstFieldAccess* fa = make_field_access(context.ast_alloc, use_expr, value->name);
-            symbol_raw_introduce(curr_scope, value->name, use->token->pos, (AstNode *) fa);
+            symbol_raw_introduce(current_scope, value->name, use->token->pos, (AstNode *) fa);
         }
 
         return Symres_Success;
@@ -997,13 +999,13 @@ static SymresStatus symres_statement_chain(AstNode** walker) {
 static SymresStatus symres_block(AstBlock* block) {
     if (block->rules & Block_Rule_New_Scope) {
         if (block->scope == NULL)
-            block->scope = scope_create(context.ast_alloc, curr_scope, block->token->pos);
+            block->scope = scope_create(context.ast_alloc, current_scope, block->token->pos);
 
         scope_enter(block->scope);
     }
 
     if (block->binding_scope != NULL)
-        scope_include(curr_scope, block->binding_scope, block->token->pos);
+        scope_include(current_scope, block->binding_scope, block->token->pos);
 
     if (block->body) {
         AstNode** start = &block->body;
@@ -1048,7 +1050,7 @@ SymresStatus symres_function_header(AstFunction* func) {
     func->flags |= Ast_Flag_Comptime;
 
     if (func->scope == NULL)
-        func->scope = scope_create(context.ast_alloc, curr_scope, func->token->pos);
+        func->scope = scope_create(context.ast_alloc, current_scope, func->token->pos);
 
     if (func->constraints.constraints != NULL && func->constraints.constraints_met == 0) {
         bh_arr_each(AstConstraint *, constraint, func->constraints.constraints) {
@@ -1070,7 +1072,7 @@ SymresStatus symres_function_header(AstFunction* func) {
     }
 
     bh_arr_each(AstParam, param, func->params) {
-        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+        symbol_introduce(current_scope, param->local->token, (AstNode *) param->local);
     }
 
     bh_arr_each(AstParam, param, func->params) {
@@ -1090,8 +1092,8 @@ SymresStatus symres_function_header(AstFunction* func) {
             // what the ramifications of that is.
             assert((*node)->kind == Ast_Kind_Static_If || (*node)->kind == Ast_Kind_File_Contents);
 
-            // Need to curr_scope->parent because curr_scope is the function body scope.
-            Scope *scope = curr_scope->parent;
+            // Need to current_scope->parent because current_scope is the function body scope.
+            Scope *scope = current_scope->parent;
 
             if ((*node)->kind == Ast_Kind_Static_If) {
                 AstIf *static_if = (AstIf *) *node;
@@ -1168,7 +1170,7 @@ SymresStatus symres_function(AstFunction* func) {
                     fori (i, 0, shlen(st->Struct.members)) {
                         StructMember* value = st->Struct.members[i].value;
                         AstFieldAccess* fa = make_field_access(context.ast_alloc, (AstTyped *) param->local, value->name);
-                        symbol_raw_introduce(curr_scope, value->name, param->local->token->pos, (AstNode *) fa);
+                        symbol_raw_introduce(current_scope, value->name, param->local->token->pos, (AstNode *) fa);
                     }
 
                     param->use_processed = 1;
@@ -1242,7 +1244,7 @@ static SymresStatus symres_enum(AstEnumType* enum_node) {
 
     if (enum_node->scope == NULL) {
         enum_node->backing_type = type_build_from_ast(context.ast_alloc, enum_node->backing);
-        enum_node->scope = scope_create(context.ast_alloc, curr_scope, enum_node->token->pos);
+        enum_node->scope = scope_create(context.ast_alloc, current_scope, enum_node->token->pos);
 
         type_build_from_ast(context.ast_alloc, (AstType *) enum_node);
     }
@@ -1363,7 +1365,7 @@ static SymresStatus symres_struct_defaults(AstType* t) {
 
 static SymresStatus symres_polyproc(AstFunction* pp) {
     pp->flags |= Ast_Flag_Comptime;
-    pp->parent_scope_of_poly_proc = curr_scope;
+    pp->parent_scope_of_poly_proc = current_scope;
     return Symres_Success;
 }
 
@@ -1383,12 +1385,21 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             SYMRES(expression, (AstTyped **) &add_overload->overloaded_function);
             if (add_overload->overloaded_function == NULL) return Symres_Error; // NOTE: Error message will already be generated
 
-            if (add_overload->overloaded_function->kind != Ast_Kind_Overloaded_Function) {
+            AstOverloadedFunction *ofunc = (AstOverloadedFunction *) strip_aliases((AstNode *) add_overload->overloaded_function);
+            if (ofunc->kind == Ast_Kind_Symbol) {
+                if (context.cycle_detected) {
+                    onyx_report_error(add_overload->token->pos, Error_Waiting_On, "Waiting for matched procedure to be known.");
+                    return Symres_Error;
+                }
+
+                return Symres_Yield_Macro;
+            }
+
+            if (ofunc->kind != Ast_Kind_Overloaded_Function) {
                 onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure.");
                 return Symres_Error;
             }
 
-            AstOverloadedFunction* ofunc = (AstOverloadedFunction *) add_overload->overloaded_function;
             if (ofunc->locked) {
                 onyx_report_error(add_overload->token->pos, Error_Critical, "Cannot add match option here as the original #match was declared as #locked.");
                 onyx_report_error(ofunc->token->pos, Error_Critical, "Here is the original #match.");
@@ -1403,7 +1414,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             SYMRES(expression, (AstTyped **) &add_overload->overload);
-            add_overload_option(&ofunc->overloads, add_overload->precedence, add_overload->overload);
+            add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
             break;
         }
 
@@ -1423,7 +1434,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            add_overload_option(&operator_overloads[operator->operator], operator->precedence, operator->overload);
+            add_overload_option(&operator_overloads[operator->operator], operator->order, operator->overload);
             break;
         }
 
@@ -1495,8 +1506,12 @@ static SymresStatus symres_process_directive(AstNode* directive) {
 
             Scope *scope = get_scope_from_node_or_create((AstNode *) inject->dest);
             if (scope == NULL) {
-                onyx_report_error(inject->token->pos, Error_Critical, "Cannot #inject here.");
-                return Symres_Error;
+                if (context.cycle_almost_detected >= 1) {
+                    onyx_report_error(inject->token->pos, Error_Critical, "Cannot #inject here.");
+                    return Symres_Error;
+                }
+
+                return Symres_Yield_Macro;
             }
 
             AstBinding *binding = onyx_ast_node_new(context.ast_alloc, sizeof(AstBinding), Ast_Kind_Binding);
@@ -1509,6 +1524,13 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             add_entities_for_node(NULL, (AstNode *) binding, scope, pac);
+            return Symres_Complete;
+        }
+
+        case Ast_Kind_Directive_This_Package: {
+            AstPackage *package = (AstPackage *) directive;
+            package->kind = Ast_Kind_Package;
+            package->package = current_entity->package;
             return Symres_Complete;
         }
     }
@@ -1605,7 +1627,7 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
             if (pp->kind == PPK_Baked_Value && pp->idx == idx) goto skip_introducing_symbol;
         }
 
-        symbol_introduce(curr_scope, param->local->token, (AstNode *) param->local);
+        symbol_introduce(current_scope, param->local->token, (AstNode *) param->local);
 
     skip_introducing_symbol:
         idx++;
@@ -1631,7 +1653,7 @@ static SymresStatus symres_polyquery(AstPolyQuery *query) {
 
 static SymresStatus symres_foreign_block(AstForeignBlock *fb) {
     if (fb->scope == NULL)
-        fb->scope = scope_create(context.ast_alloc, curr_scope, fb->token->pos);
+        fb->scope = scope_create(context.ast_alloc, current_scope, fb->token->pos);
 
     bh_arr_each(Entity *, pent, fb->captured_entities) {
         Entity *ent = *pent;
@@ -1709,6 +1731,7 @@ static SymresStatus symres_file_contents(AstFileContents* fc) {
 }
 
 void symres_entity(Entity* ent) {
+    current_entity = ent;
     if (ent->scope) scope_enter(ent->scope);
 
     report_unresolved_symbols = context.cycle_detected;
@@ -1718,7 +1741,7 @@ void symres_entity(Entity* ent) {
 
     switch (ent->type) {
         case Entity_Type_Binding: {
-            symbol_introduce(curr_scope, ent->binding->token, ent->binding->node);
+            symbol_introduce(current_scope, ent->binding->token, ent->binding->node);
             track_declaration_for_tags((AstNode *) ent->binding);
 
             package_reinsert_use_packages(ent->package);
@@ -1781,5 +1804,6 @@ void symres_entity(Entity* ent) {
         ent->state = next_state;
     }
 
-    curr_scope = NULL;
+    current_scope = NULL;
+    current_entity = NULL;
 }

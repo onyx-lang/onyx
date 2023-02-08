@@ -1823,25 +1823,18 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         return Check_Return_To_Symres;
     }
 
-    // Optimization for (*foo).member.
-    if (field->expr->kind == Ast_Kind_Dereference) {
-        field->expr = ((AstDereference *) field->expr)->expr;
-    }
-
     if (field->token != NULL && field->field == NULL) {
         token_toggle_end(field->token);
         field->field = bh_strdup(context.ast_alloc, field->token->text);
         token_toggle_end(field->token);
     }
 
-    if (field->expr->type->kind == Type_Kind_Struct) {
-        if (field->expr->type->Struct.status != SPS_Uses_Done) {
-            YIELD(field->token->pos, "Waiting for struct type to be completed before looking up members.");
-        }
-    }
-
     if (!type_is_structlike(field->expr->type)) {
         goto try_resolve_from_type;
+    }
+
+    if (!type_is_ready_for_lookup(field->expr->type)) {
+        YIELD(field->token->pos, "Waiting for struct type to be completed before looking up members.");
     }
 
     StructMember smem;
@@ -2169,6 +2162,10 @@ CheckStatus check_expression(AstTyped** pexpr) {
 
         case Ast_Kind_StrLit:
             if (expr->type == NULL) YIELD(expr->token->pos, "Waiting to know string literals type. This is a weird one...") ;
+            break;
+
+        case Ast_Kind_Directive_This_Package:
+            YIELD(expr->token->pos, "Waiting to resolve #this_package.");
             break;
 
         case Ast_Kind_File_Contents: break;
@@ -2532,7 +2529,29 @@ CheckStatus check_overloaded_function(AstOverloadedFunction* ofunc) {
     }
 
     if (ofunc->expected_return_node) {
-        ofunc->expected_return_type = type_build_from_ast(context.ast_alloc, ofunc->expected_return_node);
+        AstType *expected_return_node = (AstType *) strip_aliases((AstNode *) ofunc->expected_return_node);
+
+        if (expected_return_node->kind == Ast_Kind_Poly_Struct_Type) {
+            //
+            // When you declare the expected return type of a #match'ed procedure to
+            // be a polymorphic structure type, a special case has to happen. By trying
+            // to build the type, the polymorphic structure will be given a type-id.
+            // type_build_from_ast() will never return a polymorphic structure type
+            // because that is never valid in the type system. However, we can by-pass
+            // this and look it up directly using type_lookup_by_id.
+            type_build_from_ast(context.ast_alloc, expected_return_node);
+
+            if (expected_return_node->type_id) {
+                ofunc->expected_return_type = type_lookup_by_id(expected_return_node->type_id);
+                
+                // Return early here because the following code does not work with a
+                // polymorphic expected return type.
+                bh_imap_free(&all_overloads);
+                return Check_Success;
+            }
+        }
+
+        ofunc->expected_return_type = type_build_from_ast(context.ast_alloc, expected_return_node);
         if (!ofunc->expected_return_type) YIELD(ofunc->token->pos, "Waiting to construct expected return type.");
 
         bh_arr_each(bh__imap_entry, entry, all_overloads.entries) {

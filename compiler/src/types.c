@@ -49,6 +49,8 @@ static Table(u64) type_func_map;
 
 static Type* type_create(TypeKind kind, bh_allocator a, u32 extra_type_pointer_count) {
     Type* type = bh_alloc(a, sizeof(Type) + sizeof(Type *) * extra_type_pointer_count);
+    memset(type, 0, sizeof(Type));
+
     type->kind = kind;
     type->ast_type = NULL;
     return type;
@@ -254,15 +256,13 @@ u32 type_alignment_of(Type* type) {
     }
 }
 
-// If this function returns NULL, then the caller MUST yield because the type may still be constructed in the future.
-// If there was an error constructing the type, then this function will report that directly.
-Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
+static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b32 accept_partial_types) {
     if (type_node == NULL) return NULL;
 
     switch (type_node->kind) {
         case Ast_Kind_Pointer_Type: {
-            // ((AstPointerType *) type_node)->elem->flags |= type_node->flags & Ast_Flag_Header_Check_No_Error;
-            Type* ptr_type = type_make_pointer(alloc, type_build_from_ast(alloc, ((AstPointerType *) type_node)->elem));
+            Type *inner_type = type_build_from_ast_inner(alloc, ((AstPointerType *) type_node)->elem, 1);
+            Type *ptr_type = type_make_pointer(alloc, inner_type);
             if (ptr_type) ptr_type->ast_type = type_node;
             return ptr_type;
         }
@@ -271,7 +271,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             AstFunctionType* ftype_node = (AstFunctionType *) type_node;
             u64 param_count = ftype_node->param_count;
 
-            Type* return_type = type_build_from_ast(alloc, ftype_node->return_type);
+            Type* return_type = type_build_from_ast_inner(alloc, ftype_node->return_type, 1);
             if (return_type == NULL) return NULL;
 
             Type* func_type = type_create(Type_Kind_Function, alloc, param_count);
@@ -283,7 +283,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             if (param_count > 0) {
                 fori (i, 0, (i64) param_count) {
-                    func_type->Function.params[i] = type_build_from_ast(alloc, ftype_node->params[i]);
+                    func_type->Function.params[i] = type_build_from_ast_inner(alloc, ftype_node->params[i], 1);
 
                     // LEAK LEAK LEAK
                     if (func_type->Function.params[i] == NULL) return NULL;
@@ -311,13 +311,13 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         case Ast_Kind_Array_Type: {
             AstArrayType* a_node = (AstArrayType *) type_node;
 
-            Type *elem_type = type_build_from_ast(alloc, a_node->elem);
+            Type *elem_type = type_build_from_ast_inner(alloc, a_node->elem, 1);
             if (elem_type == NULL)  return NULL;
 
             u32 count = 0;
             if (a_node->count_expr) {
                 if (a_node->count_expr->type == NULL)
-                    a_node->count_expr->type = type_build_from_ast(alloc, a_node->count_expr->type_node);
+                    a_node->count_expr->type = type_build_from_ast_inner(alloc, a_node->count_expr->type_node, 1);
 
                 if (node_is_auto_cast((AstNode *) a_node->count_expr)) {
                     a_node->count_expr = ((AstUnaryOp *) a_node)->expr;
@@ -387,7 +387,12 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
                 if ((*member)->type == NULL) {
                     s_node->pending_type_is_valid = 0;
-                    return NULL;
+                    return accept_partial_types ? s_node->pending_type : NULL;
+                }
+
+                if ((*member)->type->kind == Type_Kind_Struct && (*member)->type->Struct.status == SPS_Start) {
+                    s_node->pending_type_is_valid = 0;
+                    return accept_partial_types ? s_node->pending_type : NULL;
                 }
 
                 mem_alignment = type_alignment_of((*member)->type);
@@ -470,19 +475,19 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         }
 
         case Ast_Kind_Slice_Type: {
-            Type* slice_type = type_make_slice(alloc, type_build_from_ast(alloc, ((AstSliceType *) type_node)->elem));
+            Type* slice_type = type_make_slice(alloc, type_build_from_ast_inner(alloc, ((AstSliceType *) type_node)->elem, 1));
             if (slice_type) slice_type->ast_type = type_node;
             return slice_type;
         }
 
         case Ast_Kind_DynArr_Type: {
-            Type* dynarr_type = type_make_dynarray(alloc, type_build_from_ast(alloc, ((AstDynArrType *) type_node)->elem));
+            Type* dynarr_type = type_make_dynarray(alloc, type_build_from_ast_inner(alloc, ((AstDynArrType *) type_node)->elem, 1));
             if (dynarr_type) dynarr_type->ast_type = type_node;
             return dynarr_type;
         }
 
         case Ast_Kind_VarArg_Type: {
-            Type* va_type = type_make_varargs(alloc, type_build_from_ast(alloc, ((AstVarArgType *) type_node)->elem));
+            Type* va_type = type_make_varargs(alloc, type_build_from_ast_inner(alloc, ((AstVarArgType *) type_node)->elem, 1));
             if (va_type) va_type->ast_type = type_node;
             return va_type;
         }
@@ -492,7 +497,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
         }
 
         case Ast_Kind_Type_Alias: {
-            Type* type = type_build_from_ast(alloc, ((AstTypeAlias *) type_node)->to);
+            Type* type = type_build_from_ast_inner(alloc, ((AstTypeAlias *) type_node)->to, 1);
             if (type && type->ast_type) type_node->type_id = type->id;
             return type;
         }
@@ -531,7 +536,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
             bh_arr_new(global_heap_allocator, slns, bh_arr_length(pc_type->params));
             bh_arr_each(AstNode *, given, pc_type->params) {
                 if (node_is_type(*given)) {
-                    Type* param_type = type_build_from_ast(alloc, (AstType *) *given);
+                    Type* param_type = type_build_from_ast_inner(alloc, (AstType *) *given, 1);
 
                     // LEAK LEAK LEAK
                     if (param_type == NULL) return NULL;
@@ -571,7 +576,7 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
 
             fori (i, 0, type_count) {
                 assert(ctype->types[i] != NULL);
-                comp_type->Compound.types[i] = type_build_from_ast(alloc, ctype->types[i]);
+                comp_type->Compound.types[i] = type_build_from_ast_inner(alloc, ctype->types[i], 1);
 
                 // LEAK LEAK LEAK
                 if (comp_type->Compound.types[i] == NULL) return NULL;
@@ -600,6 +605,11 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
                 return type_of->resolved_type;
             }
 
+            // Why does this have to be here?
+            if (type_of->expr->type != NULL) {
+                return type_of->expr->type;
+            }
+
             return NULL;
         }
 
@@ -626,6 +636,12 @@ Type* type_build_from_ast(bh_allocator alloc, AstType* type_node) {
     }
 
     return NULL;
+}
+
+// If this function returns NULL, then the caller MUST yield because the type may still be constructed in the future.
+// If there was an error constructing the type, then this function will report that directly.
+Type *type_build_from_ast(bh_allocator alloc, AstType* type_node) {
+    return type_build_from_ast_inner(alloc, type_node, 0);
 }
 
 // CLEANUP: This needs to be merged with the very similar code from up above.
@@ -1057,11 +1073,16 @@ const char* type_get_name(Type* type) {
         case Type_Kind_Basic: return type->Basic.name;
         case Type_Kind_Pointer: return bh_aprintf(global_scratch_allocator, "^%s", type_get_name(type->Pointer.elem));
         case Type_Kind_Array: return bh_aprintf(global_scratch_allocator, "[%d] %s", type->Array.count, type_get_name(type->Array.elem));
+
+        case Type_Kind_PolyStruct:
+            return type->PolyStruct.name;
+
         case Type_Kind_Struct:
             if (type->Struct.name)
                 return type->Struct.name;
             else
                 return "<anonymous struct>";
+
         case Type_Kind_Enum:
             if (type->Enum.name)
                 return type->Enum.name;
@@ -1132,6 +1153,16 @@ Type* type_get_contained_type(Type* type) {
         case Type_Kind_VarArgs:  return type->VarArgs.elem;
         default: return NULL;
     }
+}
+
+b32 type_is_ready_for_lookup(Type* type) {
+    if (type->kind == Type_Kind_Pointer) type = type->Pointer.elem;
+
+    if (type->kind == Type_Kind_Struct) {
+        return type->Struct.status == SPS_Uses_Done;
+    }
+
+    return 1;
 }
 
 static const StructMember slice_members[] = {

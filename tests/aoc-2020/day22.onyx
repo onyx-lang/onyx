@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 key_arena : alloc.arena.ArenaState;
 key_alloc : Allocator;
@@ -103,28 +102,28 @@ recursive_combat :: (player1: ^[..] u32, player2: ^[..] u32) -> u32 {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day22.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
     player1 := array.make(u32);
     player2 := array.make(u32);
     defer array.free(^player1);
     defer array.free(^player2);
 
-    reader.advance_line(^file); // 'Player 1:'
+    string.advance_line(^file); // 'Player 1:'
     while *file.data != #char "\n" {
-        card := reader.read_u32(^file);
+        card := cast(u32, conv.parse_int(^file));
         array.push(^player1, card);
 
-        reader.advance_line(^file);
+        string.advance_line(^file);
     }
 
-    reader.advance_line(^file); // '\n'
-    reader.advance_line(^file); // 'Player 2:'
-    while !reader.empty(^file) {
-        card := reader.read_u32(^file);
+    string.advance_line(^file); // '\n'
+    string.advance_line(^file); // 'Player 2:'
+    while !string.empty(file) {
+        card := cast(u32, conv.parse_int(^file));
         array.push(^player2, card);
 
-        reader.advance_line(^file);
+        string.advance_line(^file);
     }
 
     {

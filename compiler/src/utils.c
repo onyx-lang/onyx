@@ -381,12 +381,12 @@ void scope_clear(Scope* scope) {
 //  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
 //
 
-void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload) {
+void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload) {
     bh_arr(OverloadOption) overloads = *poverloads;
 
     i32 index = -1;
     fori (i, 0, bh_arr_length(overloads)) {
-        if (overloads[i].precedence > precedence) {
+        if (overloads[i].order > order) {
             index = i;
             break;
         }
@@ -394,14 +394,14 @@ void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, Ast
 
     if (index < 0) {
         bh_arr_push(overloads, ((OverloadOption) {
-            .precedence = precedence,
-            .option     = overload,
+            .order  = order,
+            .option = overload,
         }));
 
     } else {
         bh_arr_insertn(overloads, index, 1);
-        overloads[index].precedence = precedence;
-        overloads[index].option     = overload;
+        overloads[index].order  = order;
+        overloads[index].option = overload;
     }
 
     *poverloads = overloads;
@@ -621,6 +621,19 @@ static TypeMatch ensure_overload_returns_correct_type_job(void *raw_data) {
 
     Type *return_type = func->type->Function.return_type;
     if (return_type == &type_auto_return) return TYPE_MATCH_YIELD;
+
+    // See the note about using Polymorphic Structures as expected return types,
+    // in check_overloaded_function().
+    if (expected_type->kind == Type_Kind_PolyStruct) {
+        if (   return_type->kind == Type_Kind_Struct
+            && return_type->Struct.constructed_from
+            && return_type->Struct.constructed_from->type_id == expected_type->id) {
+            return TYPE_MATCH_SUCCESS;
+        }
+
+        report_incorrect_overload_expected_type(return_type, expected_type, func->token, data->group);
+        return TYPE_MATCH_FAILED;
+    }
 
     if (!types_are_compatible(return_type, expected_type)) {
         report_incorrect_overload_expected_type(return_type, expected_type, func->token, data->group);

@@ -29,7 +29,6 @@ int main(int argc, char *argv[]) {
     ovm_state_t  *state = ovm_state_new(engine, prog);
 
     ovm_program_load_from_file(prog, engine, argv[1]);
-    ovm_program_print_instructions(prog, 0, bh_arr_length(prog->code));
 
     static int func_table[] = { 0, 1, 6 };
     ovm_program_register_static_ints(prog, 3, func_table);

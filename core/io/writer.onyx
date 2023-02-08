@@ -176,8 +176,8 @@ write :: #match {
 
     write_format,
 
-    // Catch all for any type. Has a high precedence so you can easily override it.
-    #precedence 1000 macro (w: ^Writer, a: $T) {
+    // Catch all for any type. Has a high order so you can easily override it.
+    #order 1000 macro (w: ^Writer, a: $T) {
         write_format :: write_format
         write_format(w, "{}", a);
     }

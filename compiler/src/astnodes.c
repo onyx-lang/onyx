@@ -99,6 +99,7 @@ static const char* ast_node_names[] = {
     "REMOVE",
     "FIRST",
     "EXPORT NAME",
+    "THIS PACKAGE",
     "CALL SITE",
 
     "CODE BLOCK",

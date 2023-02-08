@@ -1,14 +1,17 @@
 This file discusses what Onyx will look like in its shipped form, on Windows, MacOS and Linux.
 
-Windows ---------------------------------------------------------
+Windows
+---------------------
 Things that are needed:
     * onyx.exe exists in the path
     * onyx.exe knows where the core modules are installed (%APPDATA%\Local ?)
 
-MacOS   ---------------------------------------------------------
+MacOS
+---------------------
 I know nothing about shipping portable things on MacOS...
 
-Linux   ---------------------------------------------------------
+Linux
+---------------------
 The way that build.sh installs Onyx on Linux is pretty close to the long term solution. That being,
 copying the core library to /usr/share/onyx/core and the necessary dependencies (libwasmer at the
 moment) to /usr/share/onyx/lib, and the executable to /usr/bin/onyx. This feels pretty intact with

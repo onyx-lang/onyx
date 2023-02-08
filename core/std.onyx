@@ -24,7 +24,6 @@ package core
 #load "./hash/hash"
 
 #load "./string/string"
-#load "./string/reader"
 #load "./string/buffer"
 #load "./string/char_utils"
 #load "./string/string_pool"

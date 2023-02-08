@@ -1,7 +1,6 @@
 #load "core/std"
 
 use core
-use core.string {reader}
 
 OverloadsEqual :: interface (t: $T) {
     { T.equals(t, t) } -> bool;
@@ -54,14 +53,14 @@ get_neighbor_count :: (cubes: ^Map(CubePos, CubeState), pos: CubePos) -> u32 {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day17.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
     cubes := map.make(CubePos, CubeState, .{});
     defer map.free(^cubes);
 
     z := 0;
-    while !reader.empty(^file) {
-        line := reader.read_line(^file);
+    while !string.empty(file) {
+        line, file' := string.bisect(file, #char "\n");
 
         x := 0;
         for ch: line {

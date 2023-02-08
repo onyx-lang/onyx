@@ -1,7 +1,6 @@
 #load "core/std"
 
 use package core
-reader :: package core.string.reader
 
 count_ending_paths :: (nums: [..] u32) -> u64 {
     tally := array.make(u64, nums.count);
@@ -26,14 +25,14 @@ count_ending_paths :: (nums: [..] u32) -> u64 {
 main :: (args: [] cstr) {
     contents := #file_contents "./tests/aoc-2020/input/day10.txt";
 
-    file := reader.make(contents);
+    file := contents;
 
     nums := array.make(u32);
     defer array.free(^nums);
 
-    while !reader.empty(^file) {
-        array.push(^nums, reader.read_u32(^file)); 
-        reader.advance_line(^file);
+    while !string.empty(file) {
+        array.push(^nums, ~~ conv.parse_int(^file)); 
+        string.advance_line(^file);
     }
 
     // Slight hack, but having 0 in the array makes both parts easier

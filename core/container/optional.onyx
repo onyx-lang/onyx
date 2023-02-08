@@ -1,5 +1,22 @@
 package core
 
+// Optional is helper type that encapsulates the idea of an empty
+// value, without resorting to null pointers. Optionals are usually
+// provided as a return value from procedures that could fail. There
+// are several helper methods that you can use to make it easier to
+// work with optionals.
+
+// Because Optional is a newer addition to the standard library of Onyx,
+// much of the standard library does not use it. Currently it is only
+// used by Map and Set in their `get_opt` function. In theory, it should
+// be used in many more places, instead of returning `.{}`.
+
+#doc """
+    Optional(T) is a simply a structure with a flag of whether or not
+    the optional contains a value. When the `has_value` is true, the
+    `value` member will be populated with an initialized value.
+    Otherwise, `value` should be a zeroed buffer.
+"""
 @conv.Custom_Format.{ #solidify format {T=Value_Type} }
 Optional :: struct (Value_Type: type_expr) {
     has_value: bool;
@@ -7,33 +24,60 @@ Optional :: struct (Value_Type: type_expr) {
 }
 
 #inject Optional {
-    make  :: (x: $T) => Optional(T).{ has_value = true, value = x };
+    #doc """
+        Helper procedure for creating an Optional with a value.
+        Pass a type as the first argument to force the type, otherwise
+        the type will be inferred from the parameter type.
+    """
+    make :: #match #locked {
+        ((x: $T) => Optional(T).{ has_value = true, value = x }),
+        ($T: type_expr, x: T) => (Optional(T).{ has_value = true, value = x })
+    }
 
+    #doc """
+        Create an empty Optional of a certain type. This procedure
+        is mostly useless, because you can use `.{}` in type inferred
+        places to avoid having to specify the type.
+    """
+    empty :: macro (T: type_expr) => Optional(T).{}; 
+
+    #doc """
+        Extracts the value from the Optional, or uses a default if
+        no value is present.
+    """
     value_or :: (o: Optional, default: o.Value_Type) -> o.Value_Type {
         if !o.has_value do return default;
         return o.value;
     }
 
+    #doc "Clears the value in the Optional, zeroing the memory of the value."
     reset :: (o: ^Optional) {
         o.has_value = false;
         core.memory.set(^o.value, 0, sizeof o.Value_Type);
     }
 
+    #doc "Sets the value in the Optional."
     set :: (o: ^Optional, value: o.Value_Type) {
         o.has_value = true;
         o.value = value;
     }
 
+    #doc "Monadic chaining operation."
     and_then :: (o: Optional($T), transform: (T) -> Optional($R)) -> Optional(R) {
         if !o.has_value do return .{ false };
         return transform(o.value);
     }
 
+    #doc "Changes the value inside the optional, if present."
     transform :: (o: Optional($T), transform: (T) -> $R) -> Optional(R) {
         if !o.has_value do return .{ false };
         return Optional.make(transform(o.value));
     }
 
+    #doc """
+        Like `value_or`, but instead of providing a value, you
+        provide a function to generate a value.
+    """
     or_else :: (o: Optional($T), generate: () -> Optional(T)) -> Optional(T) {
         if o.has_value do return o;
         return generate();

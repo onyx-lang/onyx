@@ -368,6 +368,7 @@ void add_entities_for_node(bh_arr(Entity *) *target_arr, AstNode* node, Scope* s
         case Ast_Kind_Directive_Operator:
         case Ast_Kind_Directive_Init:
         case Ast_Kind_Directive_Library:
+        case Ast_Kind_Directive_This_Package:
         case Ast_Kind_Injection: {
             ent.type = Entity_Type_Process_Directive;
             ent.expr = (AstTyped *) node;

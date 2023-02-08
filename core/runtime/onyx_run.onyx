@@ -58,7 +58,7 @@ __read_from_input :: (buffer: [] u8) -> i32 {
 
     __file_get_standard(0, ^fd);
     __stdin = .{
-        .{ ^fs.__file_stream_vtable },
+        .{ ^fs.__file_stream_vtable, .Block_On_Read },
         fd
     };
 

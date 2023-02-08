@@ -108,13 +108,19 @@ run_init_command :: (args: [] cstr) {
 
     printf("Creating new project manifest in {}.\n\n", global_arguments.config_file);
 
-    read_field :: macro (f: str, dest: ^$T) {
+    read_field :: macro (f: str, dest: ^$T, default: T) {
         while true {
             print(f);
             line := r->read_line(consume_newline=true, allocator=context.temp_allocator)
                     |> string.strip_whitespace();
 
+            if !line {
+                *dest = default;
+                break;
+            }
+
             if conv.parse_any(dest, T, line, context.allocator) do break;
+
             if T == str {
                 *cast(^str) dest = string.alloc_copy(line);
                 break;
@@ -124,11 +130,11 @@ run_init_command :: (args: [] cstr) {
 
     // @TODO // Validation for these fields.
     r := io.reader_make(^stdio_stream);
-    read_field("Package name: ", ^config.metadata.name);
-    read_field("Package description: ", ^config.metadata.description);
-    read_field("Package url: ", ^config.metadata.url);
-    read_field("Package author: ", ^config.metadata.author);
-    read_field("Package version (X.Y.Z): ", ^config.metadata.version);
+    read_field("Package name: ", ^config.metadata.name, "");
+    read_field("Package description: ", ^config.metadata.description, "");
+    read_field("Package url: ", ^config.metadata.url, "");
+    read_field("Package author: ", ^config.metadata.author, "");
+    read_field("Package version (0.0.1): ", ^config.metadata.version, .{0, 0, 1});
 }
 
 #tag Command.{ "add", "Add a new dependency to the project.", "package-url [version]",
@@ -420,11 +426,14 @@ run_list_versions :: (args: [] cstr) {
 
     pack := string.as_str(args[0]);
 
+    pack      = Git.get_full_repo_uri(pack);
     versions := Git.get_available_versions(pack);
     defer delete(^versions);
 
+    array.sort(versions, SemVer.compare);
+
     for versions {
-        printf("- {}\n", it);
+        printf("{}\n", it);
     }
 }
 
@@ -726,7 +735,8 @@ Git :: struct {
         defer delete(^versions);
 
         array.sort(versions, SemVer.compare);
-        return versions[0];
+        latest := versions[0];
+        return latest;
     }
 
     get_latest_compatible_version :: (repo: str, current_version: SemVer) -> SemVer {
@@ -794,13 +804,19 @@ Git :: struct {
             }
 
             if !os.dir_rename(full_dest, actual_dest) {
+                eprintf("Failed to move temporary package to final destination when fetching {}.\n", repo);
                 os.remove_directory(full_dest);
                 return false;
             }
 
             // Remove the .git folder, as it is unneeded.
             unnecessary_git_dir := tprintf("{}/.git", actual_dest);
-            return os.remove_directory(unnecessary_git_dir);
+            if !os.remove_directory(unnecessary_git_dir) {
+                eprintf("Failed to delete .git folder of {}.\n", repo);
+                return false;
+            }
+
+            return true;
         }
 
         return false;
@@ -818,6 +834,7 @@ Git :: struct {
         run_command(git_path, .["commit", "-m", tprintf("version {}", config.metadata.version)]);
         run_command(git_path, .["tag", tprintf("v{}", config.metadata.version)]);
         run_command(git_path, .["push", "--tags"]);
+        run_command(git_path, .["push"]);
         return true;
     }
 }

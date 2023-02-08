@@ -3,18 +3,12 @@ package core.map
 use core {array, hash, memory, math, conv, Optional}
 use core.intrinsics.onyx { __initialize }
 
-#local ValidKey :: interface (t: $T) {
-    // In order to use a certain type as a key in a Map, you must
-    // provide an implementation of core.hash.to_u32() for that type,
-    // and you must provide an operator overload for ==.
-
-    { hash.to_u32(t) } -> u32;
-    { t == t         } -> bool;
-}
-
-#tag conv.Custom_Format.{
-    #solidify format_map {K=Key_Type, V=Value_Type}
-}
+//
+// Map is a generic hash-map implementation that uses chaining.
+// Values can be of any type. Keys must of a type that supports
+// the core.hash.to_u32, and the '==' operator.
+//
+@conv.Custom_Format.{ #solidify format_map {K=Key_Type, V=Value_Type} }
 Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type) {
     allocator : Allocator;
 
@@ -32,6 +26,15 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     }
 }
 
+#local ValidKey :: interface (t: $T) {
+    // In order to use a certain type as a key in a Map, you must
+    // provide an implementation of core.hash.to_u32() for that type,
+    // and you must provide an operator overload for ==.
+
+    { hash.to_u32(t) } -> u32;
+    { t == t         } -> bool;
+}
+
 #inject Map {
     init    :: init
     has     :: has
@@ -47,14 +50,26 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     as_iter :: as_iter
 }
 
-make :: ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {
+
+//
+// Allows for creation of a Map using make().
+//
+//     m := make(Map(str, i32));
+//
+#overload
+__make_overload :: macro (x: ^Map($K, $V), allocator := context.allocator) =>
+    #this_package.make(K, V);
+
+//
+// Creates and initializes a new map using the types provided.
+make :: macro ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {
     map : Map(Key, Value);
-    init(^map, default = default);
+    #this_package.init(^map, default = default);
     return map;
 }
 
-#match __make_overload macro (x: ^Map($K, $V), allocator := context.allocator) => core.map.make(K, V);
-
+//
+// Initializes a map.
 init :: (use map: ^Map($K, $V), default := V.{}) {
     __initialize(map);
 
@@ -67,13 +82,20 @@ init :: (use map: ^Map($K, $V), default := V.{}) {
     array.init(^entries, allocator=allocator);
 }
 
+//
+// Allows for deletion of a Map using delete(^map).
+#match builtin.delete core.map.free
+
+//
+// Destroys a map and frees all memory.
 free :: (use map: ^Map) {
     if hashes.data != null  do memory.free_slice(^hashes, allocator=allocator);
     if entries.data != null do array.free(^entries);
 }
 
-#match builtin.delete core.map.free
-
+//
+// Sets the value at the specified key, or creates a new entry
+// if the key was not already present.
 put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
     lr := lookup(map, key);
 
@@ -88,11 +110,20 @@ put :: (use map: ^Map, key: map.Key_Type, value: map.Value_Type) {
     if full(map) do grow(map);
 }
 
+//
+// Returns true if the map contains the key.
 has :: (use map: ^Map, key: map.Key_Type) -> bool {
     lr := lookup(map, key);
     return lr.entry_index >= 0;
 }
 
+//
+// Returns the value at the specified key, or map.default_value if
+// the key is not present.
+//
+// This is subject to change with the addition of Optional to the
+// standard library.
+//
 get :: (use map: ^Map, key: map.Key_Type) -> map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return entries[lr.entry_index].value;
@@ -100,10 +131,9 @@ get :: (use map: ^Map, key: map.Key_Type) -> map.Value_Type {
     return default_value;
 }
 
-#operator []  macro (map: Map($K, $V), key: K) -> V do return core.map.get(^map, key);
-#operator []= macro (map: Map($K, $V), key: K, value: V) do core.map.put(^map, key, value);
-#operator ^[] macro (map: Map($K, $V), key: K) -> ^V do return core.map.get_ptr(^map, key);
-
+//
+// Returns a pointer to the value at the specified key, or null if
+// the key is not present.
 get_ptr :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return ^entries[lr.entry_index].value;
@@ -111,6 +141,10 @@ get_ptr :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
     return null;
 }
 
+//
+// Returns an Optional of the value at the specified key. The Optional
+// has a value if the key is present, otherwise the optional does not
+// have a value.
 get_opt :: (use map: ^Map, key: map.Key_Type) -> Optional(map.Value_Type) {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return Optional.make(entries[lr.entry_index].value);
@@ -118,6 +152,8 @@ get_opt :: (use map: ^Map, key: map.Key_Type) -> Optional(map.Value_Type) {
     return .{};
 }
 
+//
+// Removes an entry from the map.
 delete :: (use map: ^Map, key: map.Key_Type) {
     lr := lookup(map, key);
     if lr.entry_index < 0 do return;
@@ -132,30 +168,50 @@ delete :: (use map: ^Map, key: map.Key_Type) {
 
     array.fast_delete(^entries, lr.entry_index);
     last := lookup(map, entries[lr.entry_index].key);
+
     if last.entry_prev >= 0    do entries[last.entry_prev].next = lr.entry_index;
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
+//
+// Helper macro that finds a value by the key, and if it exists,
+// runs the code, providing an `it` variable that is a pointer
+// to the value.
+//
+//     m: Map(str, i32);
+//     m->update("test") {
+//         *it += 10;
+//     }
+// or:
+//     m->update("test", #(*it += 10));
+//
 update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
-    // @Hack // Weird hack because 'lookup' exists at file scope.
     lookup_ :: lookup
-
     lr := lookup_(map, key);
+
     if lr.entry_index >= 0 {
         it := ^map.entries[lr.entry_index].value;
         #unquote body;
     }
 }
 
+//
+// Removes all entries from the hash map. Does NOT
+// modify memory, so be wary of dangling pointers!
 clear :: (use map: ^Map) {
     for i: 0 .. hashes.count do hashes.data[i] = -1;
     entries.count = 0;
 }
 
+//
+// Returns if the map does not contain any elements.
 empty :: (use map: ^Map) -> bool {
     return entries.count == 0;
 }
 
+//
+// Helper procedure to nicely format a Map when printing.
+// Rarely ever called directly, instead used by conv.format_any.
 format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V)) {
     if format.pretty_printing {
         output->write("{\n");
@@ -174,12 +230,14 @@ format_map :: (output: ^conv.Format_Output, format: ^conv.Format, x: ^Map($K, $V
     }
 }
 
-#local
-MapLiteralValue :: struct (K: type_expr, V: type_expr) {
-    key: K;
-    value: V;
-}
-
+//
+// Quickly create a Map with some entries.
+//
+//     Map.literal(str, i32, .[
+//         .{ "test", 123 },
+//         .{ "foo",  456 },
+//     ]);
+//
 literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, Value)) => {
     m := core.map.make(Key, Value);
     for ^ values {
@@ -189,13 +247,20 @@ literal :: ($Key: type_expr, $Value: type_expr, values: [] MapLiteralValue(Key, 
     return m;
 }
 
+#local
+MapLiteralValue :: struct (K: type_expr, V: type_expr) {
+    key: K;
+    value: V;
+}
 
-#overload core.iter.as_iter as_iter
+//
+// Produces an iterator that yields all values of the map,
+// in an unspecified order, as Map is unordered.
 as_iter :: (m: ^Map) =>
     core.iter.generator(
         ^.{ m = m, i = 0 },
 
-        (ctx) => {
+        ctx => {
             if ctx.i >= ctx.m.entries.count {
                 return (typeof ctx.m.entries.data).{}, false;
             }
@@ -204,8 +269,20 @@ as_iter :: (m: ^Map) =>
             return ^ctx.m.entries.data[ctx.i], true;
         });
 
+
+//
+// Helper operator overloads for accessing values, accessing
+// values by pointer, and setting values.
+#operator []  macro (map: Map($K, $V), key: K) -> V      { return #this_package.get(^map, key); }
+#operator ^[] macro (map: Map($K, $V), key: K) -> ^V     { return #this_package.get_ptr(^map, key); }
+#operator []= macro (map: Map($K, $V), key: K, value: V) { #this_package.put(^map, key, value); }
+
 //
 // Private symbols
+// 
+// These are used for the implementation of Map,
+// but do not need to be used by any other part
+// of the code.
 //
 
 #local {
@@ -220,7 +297,7 @@ as_iter :: (m: ^Map) =>
         if hashes.data == null do init(map);
         lr := MapLookupResult.{};
 
-        hash_value: u32 = hash.to_u32(key); // You cannot use this type for the key, unless you add an overload.
+        hash_value: u32 = hash.to_u32(key);
         lr.hash = hash_value;
 
         lr.hash_index = hash_value % hashes.count;
@@ -238,7 +315,7 @@ as_iter :: (m: ^Map) =>
         return lr;
     }
 
-    full :: (use map: ^Map) => entries.count >= ~~(0.75f * ~~hashes.count);
+    full :: (use map: ^Map) => entries.count >= (hashes.count * 3) / 4;
 
     grow :: (use map: ^Map) {
         new_size := math.max(hashes.count << 1, 8);
