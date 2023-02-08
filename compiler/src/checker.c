@@ -1823,11 +1823,6 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         return Check_Return_To_Symres;
     }
 
-    // Optimization for (*foo).member.
-    if (field->expr->kind == Ast_Kind_Dereference) {
-        field->expr = ((AstDereference *) field->expr)->expr;
-    }
-
     if (field->token != NULL && field->field == NULL) {
         token_toggle_end(field->token);
         field->field = bh_strdup(context.ast_alloc, field->token->text);
