@@ -65,7 +65,7 @@ close :: (it: Iterator) {
 // type has the necessary methods.
 //
 
-#overload #precedence 10000
+#overload #order 10000
 as_iter :: (x: ^$T/ImplicitIterator) => {
     x->iter_open();
     return generator_no_copy(x, T.iter_next, T.iter_close);
@@ -86,7 +86,7 @@ ImplicitIterator :: interface (t: $T) {
 }
 
 
-#overload #precedence 10000
+#overload #order 10000
 as_iter :: macro (x: $T/HasAsIter) => x->as_iter();
 
 #local

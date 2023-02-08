@@ -3,9 +3,9 @@
 use package core
 
 overloaded :: #match {
-    #precedence 10 (x: i32) { println("Option X"); },
-    #precedence 5  (y: i32) { println("Option Y"); },
-    #precedence 4  (z: i32) { println("Option Z"); },
+    #order 10 (x: i32) { println("Option X"); },
+    #order 5  (y: i32) { println("Option Y"); },
+    #order 4  (z: i32) { println("Option Z"); },
 }
 
 main :: (args: [] cstr) {
@@ -15,6 +15,6 @@ main :: (args: [] cstr) {
     overloaded(z=10);
 }
 
-#match #precedence 3 overloaded (q: i32) { println("Option Q"); }
-#match #precedence 2 overloaded (r: i32) { println("Option R"); }
-#match #precedence 1 overloaded (m: i32) { println("Option M"); }
+#match #order 3 overloaded (q: i32) { println("Option Q"); }
+#match #order 2 overloaded (r: i32) { println("Option R"); }
+#match #order 1 overloaded (m: i32) { println("Option M"); }

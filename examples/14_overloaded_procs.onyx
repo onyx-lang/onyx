@@ -56,7 +56,7 @@ main :: (args: [] cstr) {
     person_set << .{ "Joe", 38 };
 
     // "Joe" will only be printed once.
-    for person: set.iterator(^person_set) {
+    for person: set.as_iter(^person_set) {
         println(person);
     }
 }
@@ -72,15 +72,16 @@ print_type :: #match {
 // type knowledge at runtime. To rectify this, let's add a new case that makes
 // this work for any type:
 
-#match print_type #precedence 10 (x: $T) {
+#match #order 10 print_type (x: $T) {
     printf("Fallback case: called with a {} ({})\n", T, x);
 }
 
-// There are a couple things going on here. The #match directive takes two "parameters": the overloaded procedure to add a match option to, and the option itself. The other
-// thing to notice is the "#precedence 10" specification. Onyx tries to match the arguments you provided
+// There are a couple things going on here. The #match directive takes two "parameters": the overloaded
+// procedure to add a match option to, and the option itself. The other
+// thing to notice is the "#order 10" specification. Onyx tries to match the arguments you provided
 // with each of the options. The first one that matches perfectly, is the one that is used. The order in
-// which it does this process is important, and that is why you can control it with the #precedence
-// directive. The #precedence directive is allowed in two places: right before the option in the original
+// which it does this process is important, and that is why you can control it with the #order
+// directive. The #order directive is allowed in two places: right before the option in the original
 // #match directive, or in front of the option in an #match directive, as seen above. Currently,
 // the options are sorted in ascending order according to the precedence. I feel like this is backwards,
 // so that may change in the future. Either way, setting the precedence allows you to place the options

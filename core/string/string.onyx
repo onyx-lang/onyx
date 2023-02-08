@@ -9,7 +9,7 @@ as_str :: #match -> str {}
     { T.as_str(t) } -> str;
 }
 
-#overload #precedence 10000
+#overload #order 10000
 as_str :: macro (t: $T/HasAsStrMethod) -> str {
     return T.as_str(t);
 }

@@ -24,24 +24,24 @@ package core
 }
 
 #if #defined(runtime.vars.Onyx_Enable_Operator_Methods) {
-    #operator ==  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasEqMethod(T, R) do return T.__eq(t, r);
-    #operator !=  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasNeMethod(T, R) do return T.__ne(t, r);
-    #operator <   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasLtMethod(T, R) do return T.__lt(t, r);
-    #operator <=  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasLeMethod(T, R) do return T.__le(t, r);
-    #operator >   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasGtMethod(T, R) do return T.__gt(t, r);
-    #operator >=  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasGeMethod(T, R) do return T.__ge(t, r);
-    #operator +   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasAddMethod(T, R) do return T.__add(t, r);
-    #operator -   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasMinusMethod(T, R) do return T.__minus(t, r);
-    #operator *   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasMulMethod(T, R) do return T.__mul(t, r);
-    #operator /   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasDivMethod(T, R) do return T.__div(t, r);
-    #operator %   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasModMethod(T, R) do return T.__mod(t, r);
-    #operator &   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasAndMethod(T, R) do return T.__and(t, r);
-    #operator |   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasOrMethod(T, R) do return T.__or(t, r);
-    #operator <<  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasShlMethod(T, R) do return T.__shl(t, r);
-    #operator >>  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasShrMethod(T, R) do return T.__shr(t, r);
-    #operator >>> #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasSarMethod(T, R) do return T.__sar(t, r);
-    #operator ^   #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasXorMethod(T, R) do return T.__xor(t, r);
-    #operator &&  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasBandMethod(T, R) do return T.__band(t, r);
-    #operator ||  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasBorMethod(T, R) do return T.__bor(t, r);
-    #operator []  #precedence 10000 macro (t: $T, r: $R) -> #auto where __HasSubMethod(T, R) do return T.__sub(t, r);
+    #operator ==  #order 10000 macro (t: $T, r: $R) -> #auto where __HasEqMethod(T, R) do return T.__eq(t, r);
+    #operator !=  #order 10000 macro (t: $T, r: $R) -> #auto where __HasNeMethod(T, R) do return T.__ne(t, r);
+    #operator <   #order 10000 macro (t: $T, r: $R) -> #auto where __HasLtMethod(T, R) do return T.__lt(t, r);
+    #operator <=  #order 10000 macro (t: $T, r: $R) -> #auto where __HasLeMethod(T, R) do return T.__le(t, r);
+    #operator >   #order 10000 macro (t: $T, r: $R) -> #auto where __HasGtMethod(T, R) do return T.__gt(t, r);
+    #operator >=  #order 10000 macro (t: $T, r: $R) -> #auto where __HasGeMethod(T, R) do return T.__ge(t, r);
+    #operator +   #order 10000 macro (t: $T, r: $R) -> #auto where __HasAddMethod(T, R) do return T.__add(t, r);
+    #operator -   #order 10000 macro (t: $T, r: $R) -> #auto where __HasMinusMethod(T, R) do return T.__minus(t, r);
+    #operator *   #order 10000 macro (t: $T, r: $R) -> #auto where __HasMulMethod(T, R) do return T.__mul(t, r);
+    #operator /   #order 10000 macro (t: $T, r: $R) -> #auto where __HasDivMethod(T, R) do return T.__div(t, r);
+    #operator %   #order 10000 macro (t: $T, r: $R) -> #auto where __HasModMethod(T, R) do return T.__mod(t, r);
+    #operator &   #order 10000 macro (t: $T, r: $R) -> #auto where __HasAndMethod(T, R) do return T.__and(t, r);
+    #operator |   #order 10000 macro (t: $T, r: $R) -> #auto where __HasOrMethod(T, R) do return T.__or(t, r);
+    #operator <<  #order 10000 macro (t: $T, r: $R) -> #auto where __HasShlMethod(T, R) do return T.__shl(t, r);
+    #operator >>  #order 10000 macro (t: $T, r: $R) -> #auto where __HasShrMethod(T, R) do return T.__shr(t, r);
+    #operator >>> #order 10000 macro (t: $T, r: $R) -> #auto where __HasSarMethod(T, R) do return T.__sar(t, r);
+    #operator ^   #order 10000 macro (t: $T, r: $R) -> #auto where __HasXorMethod(T, R) do return T.__xor(t, r);
+    #operator &&  #order 10000 macro (t: $T, r: $R) -> #auto where __HasBandMethod(T, R) do return T.__band(t, r);
+    #operator ||  #order 10000 macro (t: $T, r: $R) -> #auto where __HasBorMethod(T, R) do return T.__bor(t, r);
+    #operator []  #order 10000 macro (t: $T, r: $R) -> #auto where __HasSubMethod(T, R) do return T.__sub(t, r);
 }

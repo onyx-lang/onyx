@@ -1410,7 +1410,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             SYMRES(expression, (AstTyped **) &add_overload->overload);
-            add_overload_option(&ofunc->overloads, add_overload->precedence, add_overload->overload);
+            add_overload_option(&ofunc->overloads, add_overload->order, add_overload->overload);
             break;
         }
 
@@ -1430,7 +1430,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 return Symres_Error;
             }
 
-            add_overload_option(&operator_overloads[operator->operator], operator->precedence, operator->overload);
+            add_overload_option(&operator_overloads[operator->operator], operator->order, operator->overload);
             break;
         }
 

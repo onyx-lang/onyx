@@ -379,12 +379,12 @@ void scope_clear(Scope* scope) {
 //  * Resolving an overload from a TypeFunction (so an overloaded procedure can be passed as a parameter)
 //
 
-void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, AstTyped* overload) {
+void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 order, AstTyped* overload) {
     bh_arr(OverloadOption) overloads = *poverloads;
 
     i32 index = -1;
     fori (i, 0, bh_arr_length(overloads)) {
-        if (overloads[i].precedence > precedence) {
+        if (overloads[i].order > order) {
             index = i;
             break;
         }
@@ -392,14 +392,14 @@ void add_overload_option(bh_arr(OverloadOption)* poverloads, u64 precedence, Ast
 
     if (index < 0) {
         bh_arr_push(overloads, ((OverloadOption) {
-            .precedence = precedence,
-            .option     = overload,
+            .order  = order,
+            .option = overload,
         }));
 
     } else {
         bh_arr_insertn(overloads, index, 1);
-        overloads[index].precedence = precedence;
-        overloads[index].option     = overload;
+        overloads[index].order  = order;
+        overloads[index].option = overload;
     }
 
     *poverloads = overloads;
