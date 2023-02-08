@@ -51,6 +51,18 @@ void onyx_docs_emit_tags(char *dest) {
     bh_file_close(&tags_file);
 }
 
+static i32 sort_symbol_resolutions(const SymbolResolution *a, const SymbolResolution *b) {
+    if (a->file_id != b->file_id) {
+        return a->file_id > b->file_id ? 1 : -1;
+    }
+
+    if (a->line != b->line) {
+        return a->line > b->line ? 1 : -1;
+    }
+
+    return 0;
+}
+
 void onyx_docs_emit_symbol_info(const char *dest) {
     bh_file sym_file;
     if (bh_file_create(&sym_file, dest) != BH_FILE_ERROR_NONE) {
@@ -59,6 +71,11 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     }
 
     SymbolInfoTable *syminfo = context.symbol_info;
+
+    qsort(syminfo->symbols_resolutions,
+            bh_arr_length(syminfo->symbols_resolutions),
+            sizeof(SymbolResolution),
+            (int (*)(const void *, const void*)) sort_symbol_resolutions);
 
     bh_buffer file_section;
     bh_buffer_init(&file_section, global_heap_allocator, 2048);

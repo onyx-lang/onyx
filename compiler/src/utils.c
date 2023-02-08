@@ -1365,6 +1365,8 @@ void track_declaration_for_symbol_info(OnyxFilePos pos, AstNode *node) {
     SymbolInfoTable *syminfo = context.symbol_info;
     assert(syminfo);
 
+    if (bh_imap_has(&syminfo->node_to_id, (u64) node)) return;
+
     u32 symbol_id = syminfo->next_symbol_id++;
     u32 file_id = symbol_info_get_file_id(syminfo, pos.filename);
 
