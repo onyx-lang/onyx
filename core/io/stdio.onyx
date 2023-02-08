@@ -11,7 +11,7 @@ package core
     #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
 }
 
-stdio_stream: io.Stream = .{ vtable = ^stdio_vtable };
+stdio_stream: io.Stream = .{ vtable = ^stdio_vtable, flags = .Block_On_Read };
 
 auto_flush_stdio := true
 
