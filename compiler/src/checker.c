@@ -1878,6 +1878,8 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     field->idx = smem.idx;
     field->type = smem.type;
     field->flags |= Ast_Flag_Has_Been_Checked;
+
+    track_resolution_for_symbol_info((AstNode *) field, (AstNode *) smem.member_node);
     return Check_Success;
 
     // Field access is the general term for "a.b". In the early stages of the language,
@@ -1898,6 +1900,8 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
     if (!n) n = try_symbol_raw_resolve_from_node((AstNode *) type_node, field->field);
 
     if (n) {
+        track_resolution_for_symbol_info((AstNode *) *pfield, n);
+
         *pfield = (AstFieldAccess *) n;
         return Check_Success;
     }

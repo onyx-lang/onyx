@@ -85,6 +85,9 @@ typedef struct StructMember {
     b32 use_processed : 1;
 
     bh_arr(struct AstTyped *) meta_tags;
+
+    // Used in reporting errors and symbol information.
+    struct AstStructMember *member_node;
 } StructMember;
 
 typedef struct TypeWithOffset TypeWithOffset;

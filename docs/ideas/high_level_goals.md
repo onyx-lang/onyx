@@ -35,6 +35,11 @@ documentation.
 
 
 [Core Library Cleanup](./core_libraries.md)
+- [ ] Add improved time functionality
+  - [ ] clock_gettime
+  - [ ] clock_settime
+  - [ ] clock_getres
+  - [ ] clock
 --------------------
 
 

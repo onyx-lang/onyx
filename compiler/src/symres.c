@@ -149,6 +149,7 @@ static SymresStatus symres_struct_type(AstStructType* s_node) {
 
     fori (i, 0, bh_arr_length(s_node->members)) {
         AstStructMember *member = s_node->members[i];
+        track_declaration_for_symbol_info(member->token->pos, (AstNode *) member);
 
         if (member->type_node) {
             SymresStatus ss = symres_type(&member->type_node);

@@ -386,6 +386,10 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                     (*member)->type = type_build_from_ast(alloc, (*member)->type_node);
 
                 if ((*member)->type == NULL) {
+                    if (context.cycle_detected) {
+                        onyx_report_error((* member)->token->pos, Error_Critical, "Unable to figure out the type of this structure member.");
+                    }
+
                     s_node->pending_type_is_valid = 0;
                     return accept_partial_types ? s_node->pending_type : NULL;
                 }
@@ -421,6 +425,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
                 smem->token = (*member)->token;
                 smem->initial_value = &(*member)->initial_value;
                 smem->meta_tags = (*member)->meta_tags;
+                smem->member_node = *member;
 
                 smem->included_through_use = 0;
                 smem->used = (*member)->is_used;
@@ -596,7 +601,7 @@ static Type* type_build_from_ast_inner(bh_allocator alloc, AstType* type_node, b
 
         case Ast_Kind_Alias: {
             AstAlias* alias = (AstAlias *) type_node;
-            return type_build_from_ast(alloc, (AstType *) alias->alias);
+            return type_build_from_ast_inner(alloc, (AstType *) alias->alias, accept_partial_types);
         }
 
         case Ast_Kind_Typeof: {
@@ -777,6 +782,7 @@ Type* type_build_implicit_type_of_struct_literal(bh_allocator alloc, AstStructLi
         smem->included_through_use = 0;
         smem->used = 0;
         smem->use_through_pointer_index = -1;
+        smem->member_node = NULL;
 
         // Having this present caused more issues than its
         // worth. I don't think this is necessary, and it allows
@@ -981,6 +987,7 @@ b32 type_struct_member_apply_use(bh_allocator alloc, Type *s_type, StructMember 
         new_smem->meta_tags = nsmem->meta_tags;
         new_smem->used = nsmem->used;
         new_smem->included_through_use = 1;
+        new_smem->member_node = nsmem->member_node;
 
         if (type_is_pointer) {
             new_smem->offset = nsmem->offset;

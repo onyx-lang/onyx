@@ -301,30 +301,31 @@ strptime :: (buf_: [] u8, format_: [] u8, tm: ^Timestamp) -> bool {
     }
 
     return working;
-}
 
-#local
-parse_number_and_advance :: (buf: ^[] u8, result: ^i32, low, high, offset: i32) -> bool {
-    use core {string}
+    //
+    // Helper function used above
+    parse_number_and_advance :: (buf: ^[] u8, result: ^i32, low, high, offset: i32) -> bool {
+        use core {string}
 
-    n := 0;
-    while buf.count > 0 {
-        c := buf.data[0];
-        if c < #char "0" || c > #char "9" {
-            break;
+        n := 0;
+        while buf.count > 0 {
+            c := buf.data[0];
+            if c < #char "0" || c > #char "9" {
+                break;
+            }
+
+            n *= 10;
+            n += ~~(c - #char "0");
+            string.advance(buf);
         }
 
-        n *= 10;
-        n += ~~(c - #char "0");
-        string.advance(buf);
-    }
+        if n >= low && n <= high {
+            *result = n + offset;
+            return true;
+        }
 
-    if n >= low && n <= high {
-        *result = n + offset;
-        return true;
+        return false;
     }
-
-    return false;
 }
 
 #local {

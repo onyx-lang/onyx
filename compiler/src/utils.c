@@ -1382,6 +1382,7 @@ void track_declaration_for_symbol_info(OnyxFilePos pos, AstNode *node) {
 
 void track_resolution_for_symbol_info(AstNode *original, AstNode *resolved) {
     if (!context.options->generate_symbol_info_file) return;
+    if (!resolved) return;
 
     SymbolInfoTable *syminfo = context.symbol_info;
     assert(syminfo);
