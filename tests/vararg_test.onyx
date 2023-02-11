@@ -9,12 +9,14 @@ old_va_test :: (prefix: str, va: ..i32) {
     for v: va do println(v);
 }
 
-new_va_test :: (prefix: str, va: ...) {
+new_va_test :: (prefix: str, va: ..any) {
     println(prefix);
 
     for i: 0 .. va.count {
-        x : i32;
-        vararg_get(va, ^x);
+        // The right way to do it is this:
+        // x := * misc.any_as(va[i], i32);
+
+        x := *cast(^i32, va[i].data);
         println(x);
     }
 }

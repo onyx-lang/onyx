@@ -1,55 +1,92 @@
 package builtin
 
+//
+// Explanation of `package builtin`
+//
+// The package "builtin" is a special package, and this file is a special file.
+// This file is automatically included in EVERY Onyx compilation. It contains
+// many of the core data types and "magic" functions that Onyx needs to operate.
+// There is no way to not include this file, so the number of things in here
+// have, and should continue, to remain limited.
+//
+// "builtin" is a special package. Because many of these core data types are
+// needed in every single Onyx file, it would be nice if they were always
+// accessible. To make this possible, the *public* scope of the builtin package
+// is actually the *global* scope, the scope above every package. The global
+// scope is visible to every file. By mapping builtin's public scope to the
+// global scope, everything in this file can be accessed without needing to
+// 'use' or prefix anything.
+//
+
+
+
+
+
 // CLEANUP: Should builtin.onyx really be including other files in the compilation?
 // Does that complicate things too much?
 #load "core/runtime/build_opts"
 
-str  :: #type []u8;
-cstr :: #type ^u8;
+//
+// The builtin string and C-string types.
+// A string is simply a slice of bytes, and a c-string is a pointer
+// to byte, with a null-terminator ('\0') at the end.
+str  :: #type [] u8;
+cstr :: #type  ^ u8;
 
-// @Note
-// Because of many implementation details, all fields of this
-// struct are required to be i32's.
+
+
+
+//
+// This is the type of a range literal (i.e. 1 .. 5).
+// This is a special type that the compiler knows how to iterator through.
+// So, one can simply write:
+//
+//      for x: 1 .. 5 { ... }
+//
+// Although not controllable from the literal syntax, there is a `step`
+// member that allows you control how many numbers to advance each iteration.
+// For example, range.{ 0, 100, 2 } would iterate over the even numbers, and
+// range.{ 100, 0, -1 } would count backwards from 100 to 0 (and including 0).
 range :: struct {
     low  : i32;
     high : i32;
     step : i32 = 1;
 }
 
-// @Deprecated
-vararg :: #type ^struct {
-    data:  rawptr;
-    count: i32;
-}
 
-// @Deprecated
-vararg_get :: #match {
-    (va: vararg, ret: ^$T) -> bool {
-        if va.count <= 0 do return false;
-        *ret = *cast(^T) va.data;
-        va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
-        va.count -= 1;
-        return true;
-    },
 
-    (va: vararg, $T: type_expr, default: T = 0) -> (bool, T) {
-        if va.count <= 0 do return false, default;
-        ret := *cast(^T) va.data;
-        va.data = cast(rawptr) (cast(^u8) va.data + sizeof T);
-        va.count -= 1;
-        return true, ret;
-    }
-}
 
-// @NullProcHack
+//
+// `null` in Onyx is simply the address 0, as a rawptr, so it implicitly
+// casts to all other pointer types.
+null :: cast(rawptr) 0
+
+//
+// `null_proc` is a special function that breaks the normal rules of type
+// checking. `null_proc`, or any procedure marked with `#null`, is assignable
+// to any function type, regardless of if the types match. For example,
+//
+//     f: (i32) -> i32 = null_proc;
+//
+// Even though `null_proc` is a `() -> void` function, it bypasses that check
+// and gets assigned to `f`. If f is called, there will be a runtime exception.
+// This is by design.
 null_proc :: () -> void #null ---
-null      :: cast(rawptr) 0;
 
+//
 // I find myself wanting to return a completely nullified string like the
 // one below that I decided to added a builtin binding for it. This might
 // go away at some point and would just need to be defined in every file.
 null_str  :: str.{ null, 0 }
 
+
+
+//
+// 
+#thread_local context : OnyxContext;
+
+//
+//
 OnyxContext :: struct {
     allocator      : Allocator;
     temp_allocator : Allocator;
@@ -64,15 +101,8 @@ OnyxContext :: struct {
     user_data_type: type_expr;
 }
 
-
-#thread_local context : OnyxContext;
-
-assert :: (cond: bool, msg: str, site := #callsite) {
-    if !cond {
-        context.assert_handler(msg, site);
-    }
-}
-
+//
+//
 #inject OnyxContext {
     set_user_data :: macro (c: ^OnyxContext, data: ^$T) {
         c.user_data = data;
@@ -84,6 +114,17 @@ assert :: (cond: bool, msg: str, site := #callsite) {
         return ~~ c.user_data;
     }
 }
+
+
+
+//
+//
+assert :: (cond: bool, msg: str, site := #callsite) {
+    if !cond {
+        context.assert_handler(msg, site);
+    }
+}
+
 
 //
 // Basic logging
@@ -311,7 +352,9 @@ any :: struct {
 }
 
 
-// Represents a code block. Not constructable outside of using a '#quote' directive.
+// Represents a code block that can be passed around at compile-time.
+// This is commonly used with macros or polymorphic procedures to create
+// very power extensions to the syntax.
 Code :: struct {_:i32;}
 
 
@@ -337,7 +380,7 @@ Code :: struct {_:i32;}
 __initialize_data_segments :: () -> void ---
 
 // This is also a special compiler generated procedure that calls all procedures specified with
-// #init, in the specified order. It should theoritically only be called once on the main thread.
+// #init, in the specified order. It should theoretically only be called once on the main thread.
 __run_init_procedures :: () -> void ---
 
 // This overloaded procedure allow you to define an implicit rule for how to convert any value
@@ -386,3 +429,20 @@ package_id :: #distinct u32
 any_package :: cast(package_id) 0
 #operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2;
 #operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2;
+
+
+
+//
+// DEPRECATED THINGS
+//
+
+//
+// This is the special type of a paramter that was declared to have the type '...'.
+// This is an old feature of the language now called  'untyped varargs'. It had
+// a similar construction to varargs in C/C++. Because it is incredibly unsafe
+// and not programmer friendly, this way of doing it has been deprecated in
+// favor of  using '..any', which provides type information along with the data.
+vararg :: #type ^struct {
+    data:  rawptr;
+    count: i32;
+}

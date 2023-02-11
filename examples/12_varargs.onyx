@@ -36,6 +36,10 @@ main :: (args: [] cstr) {
 
     typed_varargs(1, 2, 3, 4);
 
+    // This part about "untyped-varargs" is now entirely deprecated. The new
+    // way of using '..any' is so much better. The language still has support
+    // for '...' as the type of a parameter, but that will go away soon.
+    //
     // This is how you specify an untyped variadic procedure. Notice the extra '.'
     // in the type. The access the arguments, you need to use the builtin procedure,
     // 'vararg_get'. This procedure has two overloads that you can use:
@@ -54,18 +58,19 @@ main :: (args: [] cstr) {
     //
     //   printf :: (format: str, va: ...) -> void
     //   printf("%i %f %l %d", int, float, long, double);
-    untyped_varargs :: (args: ...) {
-        print("Untyped variadic arguments: ");
+    //
+    // untyped_varargs :: (args: ...) {
+    //     print("Untyped variadic arguments: ");
 
-        x: i32;
-        while vararg_get(args, ^x) {
-            printf("{} ", cast(rawptr) x);
-        }
+    //     x: i32;
+    //     while vararg_get(args, ^x) {
+    //         printf("{} ", cast(rawptr) x);
+    //     }
 
-        print("\n");
-    }
+    //     print("\n");
+    // }
 
-    untyped_varargs(1.0f, 2.0f, 3.0f, 4.0f);
+    // untyped_varargs(1.0f, 2.0f, 3.0f, 4.0f);
 
 
 

@@ -1,14 +1,9 @@
 package core.time
 
-//
-// This module provides a thin wrapper for the builtin POSIX
-// time functionality of:
-//      - localtime, gmtime
-//      - strptime, strftime
-//
+use core {os, conv}
 
 #if runtime.runtime != .Onyx {
-    #error "'core.time' should only be used with the Onyx runtime.";
+    #error "'core.time' should only be used with the Onyx runtime, for now.";
 }
 
 //
@@ -26,9 +21,73 @@ Timestamp :: struct #size (sizeof u32 * 12) {
     isdst: i32;
 }
 
+#inject Timestamp {
+    as_date :: (t: Timestamp) -> Date {
+        return Date.make(t.year + 1900, t.mon + 1, t.mday);
+    }
+
+    from_date :: (d: Date) -> Timestamp {
+        return .{
+            year = d.year + 1900,
+            mday = d.day,
+            mon  = d.month
+        };
+    }
+
+    to_epoch :: to_epoch
+}
+
+@conv.Custom_Format_Proc.{ Timestamp }
+(output: ^conv.Format_Output, format: ^conv.Format, time: ^Timestamp) {
+    time_buf: [64] u8;
+    to_output := strftime(time_buf, "%Y-%m-%d %H:%M:%S", time);
+
+    output->write(to_output);
+}
+
+@conv.Custom_Parse_Proc.{ Timestamp }
+(time: ^Timestamp, data: str, _: Allocator) -> bool {
+    return strptime(data, "%Y-%m-%d %H:%M:%S", time);
+}
+
+
+now :: () -> Timestamp {
+    current_time := os.time();
+
+    //
+    // Localtime operates on seconds, while os.time
+    // returns milliseconds.
+    return localtime(current_time / 1000);
+}
+
+to_epoch :: __time_mktime
+
+
+localtime :: #match #local {}
+
+#overload
 localtime :: __time_localtime
-gmtime    :: __time_gmtime
-to_epoch  :: __time_mktime
+
+#overload
+localtime :: (seconds: u64) -> Timestamp {
+    t: Timestamp;
+    __time_localtime(seconds, ^t);
+    return t;
+}
+
+
+gmtime :: #match #local {}
+
+#overload
+gmtime :: __time_gmtime
+
+#overload
+gmtime :: (seconds: u64) -> Timestamp {
+    t: Timestamp;
+    __time_gmtime(seconds, ^t);
+    return t;
+}
+
 
 strftime :: (buf: [] u8, format: [] u8, tm: ^Timestamp) -> str {
     f := cast(cstr) core.alloc.from_stack(format.length + 1);
@@ -268,12 +327,11 @@ parse_number_and_advance :: (buf: ^[] u8, result: ^i32, low, high, offset: i32) 
     return false;
 }
 
-
 #local {
     #foreign "onyx_runtime" {
         __time_localtime :: (time: u64, tm: ^Timestamp) -> void ---
         __time_gmtime    :: (time: u64, tm: ^Timestamp) -> void ---
-        __time_mktime    :: (tm: ^Timestamp) -> u64 ---
+        __time_mktime    :: (tm: ^Timestamp) -> i64 ---
         __time_strftime  :: (buf: [] u8, format: cstr, tm: ^Timestamp) -> u32 ---
     }
 }
