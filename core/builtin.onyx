@@ -260,59 +260,71 @@ cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
 // This cannot be used in a custom runtime, as the other core
 // packages are not included.
 #if runtime.runtime != .Custom {
-    new :: #match {
-        ($T: type_expr, allocator := context.allocator) -> ^T {
-            use package core.intrinsics.onyx { __initialize }
-            memory :: package core.memory
+    new :: #match #local {}
 
-            res := cast(^T) raw_alloc(allocator, sizeof T);
-            memory.set(res, 0, sizeof T);
-            __initialize(res);
+    #overload
+    new :: ($T: type_expr, allocator := context.allocator) -> ^T {
+        use package core.intrinsics.onyx { __initialize }
+        memory :: package core.memory
 
-            return res;
-        },
+        res := cast(^T) raw_alloc(allocator, sizeof T);
+        memory.set(res, 0, sizeof T);
+        __initialize(res);
 
-        (T: type_expr, allocator := context.allocator) -> rawptr {
-            memory :: package core.memory
-            type_info :: package runtime.info
+        return res;
+    }
 
-            info := type_info.get_type_info(T);
-            size := type_info.size_of(T);
-            if size == 0 do return null;
+    #overload
+    new :: (T: type_expr, allocator := context.allocator) -> rawptr {
+        memory :: package core.memory
+        type_info :: package runtime.info
 
-            res := raw_alloc(allocator, size);
-            memory.set(res, 0, size);
+        info := type_info.get_type_info(T);
+        size := type_info.size_of(T);
+        if size == 0 do return null;
 
-            if info.kind == .Struct {
-                s_info := cast(^type_info.Type_Info_Struct) info;
-                for s_info.members {
-                    if it.default != null {
-                        member_size := type_info.size_of(it.type);
-                        memory.copy(cast(^u8) res + it.offset, it.default, member_size);
-                    }
+        res := raw_alloc(allocator, size);
+        memory.set(res, 0, size);
+
+        if info.kind == .Struct {
+            s_info := cast(^type_info.Type_Info_Struct) info;
+            for s_info.members {
+                if it.default != null {
+                    member_size := type_info.size_of(it.type);
+                    memory.copy(cast(^u8) res + it.offset, it.default, member_size);
                 }
             }
-
-            return res;
         }
+
+        return res;
     }
 
     new_temp :: macro (T: type_expr) => {
         return new(T, allocator=context.temp_allocator);
     }
 
-    make :: #match {
-        macro ($T: type_expr, allocator := context.allocator) => {
-            return __make_overload(cast(^T) null, allocator=allocator);
-        },
+    make :: #match #local {}
 
-        macro ($T: type_expr, n: u32, allocator := context.allocator) => {
-            return __make_overload(cast(^T) null, n, allocator=allocator);
-        },
+    #overload
+    make :: macro ($T: type_expr, allocator := context.allocator) => {
+        return __make_overload(cast(^T) null, allocator=allocator);
     }
 
+    #overload
+    make :: macro ($T: type_expr, n: u32, allocator := context.allocator) => {
+        return __make_overload(cast(^T) null, n, allocator=allocator);
+    }
+
+    make_temp :: #match #local {}
+
+    #overload
     make_temp :: macro (T: type_expr) => {
         return make(T, allocator=context.temp_allocator);
+    }
+
+    #overload
+    make_temp :: macro (T: type_expr, n: u32) => {
+        return make(T, n, allocator=context.temp_allocator);
     }
 
     //
