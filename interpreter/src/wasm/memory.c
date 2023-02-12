@@ -31,12 +31,5 @@ wasm_memory_pages_t wasm_memory_size(const wasm_memory_t *memory) {
 }
 
 bool wasm_memory_grow(wasm_memory_t *memory, wasm_memory_pages_t pages) {
-    //
-    // This will always fail, as initially the VM is created with
-    // a 4GiB mmap, so growing it will not be an option. If that
-    // changes and a dynamically allocated solution is used, then
-    // this can change. I don't see that changing however, as I will
-    // never need to use this on 32-bit systems, and that would be the
-    // only case that I would not like to try to mmap 4 gigs.
-    return false;
+    return ovm_engine_memory_ensure_capacity(memory->inner.memory.engine, pages * MEMORY_PAGE_SIZE);
 }

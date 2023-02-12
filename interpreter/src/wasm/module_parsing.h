@@ -712,18 +712,13 @@ static void parse_instruction(build_context *ctx) {
 
         case 0x3F: {
             assert(CONSUME_BYTE(ctx) == 0x00);
-
-            int memory_size = 65535;
-            ovm_code_builder_add_imm(&ctx->builder, OVM_TYPE_I32, &memory_size);
+            ovm_code_builder_add_memory_size(&ctx->builder);
             break;
         }
 
         case 0x40: {
             assert(CONSUME_BYTE(ctx) == 0x00);
-            ovm_code_builder_drop_value(&ctx->builder);
-
-            int value = -1;
-            ovm_code_builder_add_imm(&ctx->builder, OVM_TYPE_I32, &value);
+            ovm_code_builder_add_memory_grow(&ctx->builder);
             break;
         }
 

@@ -317,6 +317,7 @@ OVMI_INSTR_EXEC(return) {
     } else { \
         ovm_external_func_t external_func = state->external_funcs[func->external_func_idx]; \
         external_func.native_func(external_func.userdata, &state->param_buf[extra_params], &state->__tmp_value); \
+        memory = state->engine->memory; \
 \
         ovm__func_teardown_stack_frame(state); \
 \
@@ -461,6 +462,31 @@ CMPXCHG(OVM_TYPE_I64, i64)
 #undef CMPXCHG
 
 
+//
+// Memory
+//
+
+OVMI_INSTR_EXEC(mem_size) {
+    VAL(instr->r).u32 = (u32) state->engine->memory_size / 65536;
+    VAL(instr->r).type = OVM_TYPE_I32;
+    NEXT_OP;
+}
+
+OVMI_INSTR_EXEC(mem_grow) {
+    ovm_assert(VAL(instr->a).type == OVM_TYPE_I32);
+    VAL(instr->r).type = OVM_TYPE_I32;
+    VAL(instr->r).u32 = (u32) state->engine->memory_size / 65536;
+
+    if (!ovm_engine_memory_ensure_capacity(state->engine,
+            state->engine->memory_size + VAL(instr->a).u32 * 65536)) {
+        VAL(instr->r).i32 = -1;
+    }
+    
+    memory = state->engine->memory;
+    NEXT_OP;
+}
+
+
 OVMI_INSTR_EXEC(illegal) {
     OVMI_EXCEPTION_HOOK;
     return ((ovm_value_t) {0});
@@ -558,6 +584,8 @@ static ovmi_instr_exec_t OVMI_DISPATCH_NAME[] = {
     NULL, NULL, NULL, NULL, NULL, NULL, D(transmute_f64_i64), NULL,
     IROW_INT(cmpxchg)
     IROW_SAME(illegal)
+    IROW_UNTYPED(mem_size)
+    IROW_UNTYPED(mem_grow)
 };
 
 #undef D

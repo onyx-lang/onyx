@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "vm.h"
 
 #include <sys/mman.h>
@@ -141,11 +143,21 @@ ovm_engine_t *ovm_engine_new(ovm_store_t *store) {
     ovm_engine_t *engine = bh_alloc_item(store->heap_allocator, ovm_engine_t);
 
     engine->store = store;
-    engine->memory_size = 1ull << 32;
-    engine->memory = mmap(NULL, engine->memory_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    engine->memory_size = 0;
+    engine->memory = NULL;
+    engine->debug = NULL;
     pthread_mutex_init(&engine->atomic_mutex, NULL);
 
-    engine->debug = NULL;
+    //
+    // HACK: This should not be necessary, but because moving the memory around
+    // causes issues with other standard libraries (like STBTT and STBI), it is
+    // better to allocate a large amount here and avoid needing to reallocate.
+    // A solution should be possible, because other runtimes like Wasmer support
+    // this.
+    i64 attempt_to_allocate = 1ull << 32;
+    while (!ovm_engine_memory_ensure_capacity(engine, attempt_to_allocate)) {
+        attempt_to_allocate /= 2;
+    }
 
     return engine;
 }
@@ -153,8 +165,35 @@ ovm_engine_t *ovm_engine_new(ovm_store_t *store) {
 void ovm_engine_delete(ovm_engine_t *engine) {
     ovm_store_t *store = engine->store;
 
-    munmap(engine->memory, engine->memory_size);
+    if (engine->memory) {
+        munmap(engine->memory, engine->memory_size);
+    }
+    
     bh_free(store->heap_allocator, engine);
+}
+
+bool ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size) {
+    if (engine->memory_size >= minimum_size) return true;
+
+    void *new_addr;
+
+    if (engine->memory == NULL) {
+        new_addr = mmap(NULL, minimum_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    } else {
+        new_addr = mremap(engine->memory, engine->memory_size, minimum_size, MREMAP_MAYMOVE);
+    }
+
+    if (new_addr == MAP_FAILED) {
+        // Something went wrong...
+        // At this point the program should probably horifically crash.
+
+        return false;
+    }
+
+    engine->memory_size = minimum_size;
+    engine->memory = new_addr;
+
+    return true;
 }
 
 void ovm_engine_memory_copy(ovm_engine_t *engine, i64 target, void *data, i64 size) {

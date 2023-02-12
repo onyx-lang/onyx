@@ -333,6 +333,10 @@ wasm_instance_t *wasm_instance_new(wasm_store_t *store, const wasm_module_t *mod
 
     prepare_instance(instance, imports);
 
+    assert(bh_arr_length(instance->memories) == 1);
+    u32 memory_size = (instance->memories[0]->inner.type->memory.limits.min) * MEMORY_PAGE_SIZE;
+    ovm_engine_memory_ensure_capacity(store->engine->engine, memory_size);
+
     if (trap) *trap = NULL;
 
     return instance;

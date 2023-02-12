@@ -119,6 +119,7 @@ struct ovm_engine_t {
 
 ovm_engine_t *ovm_engine_new(ovm_store_t *store);
 void          ovm_engine_delete(ovm_engine_t *engine);
+bool          ovm_engine_memory_ensure_capacity(ovm_engine_t *engine, i64 minimum_size);
 void          ovm_engine_memory_copy(ovm_engine_t *engine, i64 target, void *data, i64 size);
 
 bool ovm_program_load_from_file(ovm_program_t *program, ovm_engine_t *engine, char *filename);
@@ -351,6 +352,9 @@ struct ovm_instr_t {
 #define OVMI_CMPXCHG           0x4c   // %r = %r == %a ? %b : %r 
 
 #define OVMI_BREAK             0x4d
+
+#define OVMI_MEM_SIZE          0x4e   // %r = <size in bytes of memory>
+#define OVMI_MEM_GROW          0x4f   // %r = <grow memory, return new size in bytes>
 
 //
 // OVM_TYPED_INSTR(OVMI_ADD, OVM_TYPE_I32) == instruction for adding i32s

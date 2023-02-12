@@ -564,6 +564,29 @@ void ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32
     PUSH_VALUE(builder, instrs[2].r);
 }
 
+void ovm_code_builder_add_memory_size(ovm_code_builder_t *builder) {
+    ovm_instr_t instr = {0};
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_MEM_SIZE, OVM_TYPE_NONE);
+    instr.r = NEXT_VALUE(builder);
+
+    debug_info_builder_emit_location(builder->debug_builder);
+    ovm_program_add_instructions(builder->program, 1, &instr);
+
+    PUSH_VALUE(builder, instr.r);
+}
+
+void ovm_code_builder_add_memory_grow(ovm_code_builder_t *builder) {
+    ovm_instr_t instr = {0};
+    instr.full_instr = OVM_TYPED_INSTR(OVMI_MEM_GROW, OVM_TYPE_NONE);
+    instr.a = POP_VALUE(builder);
+    instr.r = NEXT_VALUE(builder);
+
+    debug_info_builder_emit_location(builder->debug_builder);
+    ovm_program_add_instructions(builder->program, 1, &instr);
+
+    PUSH_VALUE(builder, instr.r);
+}
+
 void ovm_code_builder_add_memory_copy(ovm_code_builder_t *builder) {
     ovm_instr_t instr = {0};
     instr.full_instr = OVM_TYPED_INSTR(OVMI_COPY, OVM_TYPE_NONE);

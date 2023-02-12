@@ -87,5 +87,7 @@ void               ovm_code_builder_add_atomic_store(ovm_code_builder_t *builder
 void               ovm_code_builder_add_cmpxchg(ovm_code_builder_t *builder, u32 ovm_type, i32 offset);
 void               ovm_code_builder_add_memory_copy(ovm_code_builder_t *builder);
 void               ovm_code_builder_add_memory_fill(ovm_code_builder_t *builder);
+void               ovm_code_builder_add_memory_size(ovm_code_builder_t *builder);
+void               ovm_code_builder_add_memory_grow(ovm_code_builder_t *builder);
 
 #endif
