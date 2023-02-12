@@ -22,10 +22,6 @@ package builtin
 
 
 
-// CLEANUP: Should builtin.onyx really be including other files in the compilation?
-// Does that complicate things too much?
-#load "core/runtime/build_opts"
-
 //
 // The builtin string and C-string types.
 // A string is simply a slice of bytes, and a c-string is a pointer
@@ -82,27 +78,48 @@ null_str  :: str.{ null, 0 }
 
 
 //
-// 
+// The 'context' is used to store thread-local configuration for things like
+// allocators, loggers, exception handles, and other things. It is thread
+// local so every threads gets its own copy.
 #thread_local context : OnyxContext;
 
 //
-//
+// This is the type of the 'context' global variable.
 OnyxContext :: struct {
+    // The allocator used by default by the standard library. It is by
+    // default the global heap allocator.
     allocator      : Allocator;
+
+    // The allocator used for all "temporary" things. By default, the
+    // temp_allocator is a thread-local arena allocator, that has to
+    // be manually reset using `alloc.clear_temp_allocator()`. What
+    // is "temporary" is up to your program; you can clear the
+    // temporary allocator when you see fit. Generally this is at the
+    // start of the main loop of your program.
     temp_allocator : Allocator;
 
-    logger         : Logger = .{ default_logger_proc, ^default_logger };
+    // Defines what happens when `log()` is called. Defaults to a
+    // logger that filters log messages by their severity.
+    logger         : Logger = .{ Default_Logger.log, ^default_logger };
 
+    // Defines what happens when an `assert()` check fails. Defaults
+    // to printing the error and running an unreachable instruction,
+    // causing a fault.
     assert_handler : (msg: str, site: CallSite) -> void;
 
+    // The thread_id of the current thread. The main thread is
+    // 0, and subsequent threads are given incremental ids.
     thread_id      : i32;
 
+    // Allows you to place any data on the context that you want to.
+    // Generally used in place a closure mechanism.
     user_data: rawptr;
     user_data_type: type_expr;
 }
 
 //
-//
+// Define helper methods for setting and retrieving the user_data
+// stored on the context.
 #inject OnyxContext {
     set_user_data :: macro (c: ^OnyxContext, data: ^$T) {
         c.user_data = data;
@@ -117,8 +134,11 @@ OnyxContext :: struct {
 
 
 
+// CLEANUP: Does assert() need to be in the builtin file?
+// It uses context.assert_handler, but does it needt to be here?
 //
-//
+// Checks if the condition is true. If not, invoke the context's
+// assert handler.
 assert :: (cond: bool, msg: str, site := #callsite) {
     if !cond {
         context.assert_handler(msg, site);
@@ -162,6 +182,8 @@ log :: (level: Log_Level, module, msg: str) {
 //
 Default_Logger :: struct {
     minimum_level: Log_Level;
+
+    log :: default_logger_proc;
 }
 
 #local #thread_local default_logger: Default_Logger;
@@ -194,8 +216,11 @@ default_log_level :: (level: Log_Level) {
 // The implementations of all of the allocators can be found in core/alloc/.
 // These need to be here so the context structure has the types and enum values.
 //
-#local
-Default_Allocation_Alignment :: 16
+
+Allocator :: struct {
+    data: rawptr;
+    func: (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
+}
 
 AllocationAction :: enum {
     Alloc;
@@ -204,29 +229,32 @@ AllocationAction :: enum {
 }
 
 #local
-allocator_proc :: #type (data: rawptr, action: AllocationAction, size: u32, align: u32, old_ptr: rawptr) -> rawptr;
+Default_Allocation_Alignment :: 16
 
-Allocator :: struct {
-    data: rawptr;
-    func: allocator_proc;
-}
-
+//
+// Helper procedure to allocate out of an allocator.
 raw_alloc :: (use a: Allocator, size: u32, alignment := Default_Allocation_Alignment) -> rawptr {
     return func(data, AllocationAction.Alloc, size, alignment, null);
 }
 
+//
+// Helper procedure to resize an allocation from an allocator.
 raw_resize :: (use a: Allocator, ptr: rawptr, size: u32, alignment := Default_Allocation_Alignment) -> rawptr {
     return func(data, AllocationAction.Resize, size, alignment, ptr);
 }
 
+//
+// Helper procedure to free an allocation from an allocator.
 raw_free :: (use a: Allocator, ptr: rawptr) {
     func(data, AllocationAction.Free, 0, 0, ptr);
 }
 
-// Allocators using the context structure.
-calloc  :: (size: u32) -> rawptr do return raw_alloc(context.allocator, size);
-cresize :: (ptr: rawptr, size: u32) -> rawptr do return raw_resize(context.allocator, ptr, size);
-cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
+//
+// Helper function to allocate/free using allocator in the context structure.
+calloc  :: (size: u32)              => raw_alloc(context.allocator, size);
+cresize :: (ptr: rawptr, size: u32) => raw_resize(context.allocator, ptr, size);
+cfree   :: (ptr: rawptr)            => raw_free(context.allocator, ptr);
+
 
 //
 // This cannot be used in a custom runtime, as the other core
@@ -326,6 +354,28 @@ cfree   :: (ptr: rawptr) do raw_free(context.allocator, ptr);
 }
 
 
+//
+// Represents a generic "iterator" or "generator" of a specific
+// type. Can be used in a for-loop natively.
+//
+// `data` is used for contextual information and is passed to
+// the `next`, `close`, and `remove` procedures.
+//
+// `next` is used to extract the next value out of the iterator.
+// It returns the next value, and a continuation flag. If the
+// flag is false, the value should be ignored and iteration should
+// stop.
+//
+// `close` should called when the iterator has ended. This is
+// done automatically in for-loops, and in the `core.iter` library.
+// In for-loops, `close` is called no matter which way the for-loop
+// exits (`break`, `return`, etc). Using this rule, iterator can
+// be used to create "resources" that automatically close when you
+// are done with them.
+//
+// `remove` is used to tell the iterator to remove the last value
+// returned from some underlying data store. Invoked automatically
+// using the `#remove` directive in a for-loop.
 Iterator :: struct (Iter_Type: type_expr) {
     data:   rawptr;
     next:   (data: rawptr) -> (Iter_Type, bool);
@@ -334,7 +384,7 @@ Iterator :: struct (Iter_Type: type_expr) {
 }
 
 
-
+//
 // This structure represents the result of a '#callsite' expression. Currently,
 // #callsite is only valid (and parsed) as a default value for a procedure parameter.
 // It allows the function to get the address of the calling site, which can be
@@ -346,18 +396,24 @@ CallSite :: struct {
 }
 
 
+//
+// This structure is used to represent any value in the language.
+// It contains a pointer to the data, and the type of the value.
+// Using the `core.misc` library, you can easily manipulate `any`s
+// and build runtime polymorphism.
 any :: struct {
     data: rawptr;
     type: type_expr;
 }
 
-
+//
 // Represents a code block that can be passed around at compile-time.
 // This is commonly used with macros or polymorphic procedures to create
 // very power extensions to the syntax.
 Code :: struct {_:i32;}
 
 
+//
 // Define aliases for common datastructures in the core library, if the core library is available.
 // I'm on the fence about keeping this, as the programmer may want to use these names for their own
 // structures, but for the moment I don't see any harm. I'm also thinking about removing the '[..]'
@@ -374,21 +430,65 @@ Code :: struct {_:i32;}
 }
 
 
+//
 // This procedure is a special compiler generated procedure that initializes all the data segments
 // in the program. It should only be called once, by the main thread, at the start of execution. It
 // is undefined behaviour if it is called more than once.
 __initialize_data_segments :: () -> void ---
 
+//
 // This is also a special compiler generated procedure that calls all procedures specified with
 // #init, in the specified order. It should theoretically only be called once on the main thread.
 __run_init_procedures :: () -> void ---
 
+//
 // This overloaded procedure allow you to define an implicit rule for how to convert any value
 // into a boolean. A default is provided for ALL pointer types and array types, but this can
 // be used for structures or distinct types.
 __implicit_bool_cast :: #match -> bool {}
 
+//
+// Defines all options for changing the memory layout, imports and exports,
+// and more of an Onyx binary.
+Link_Options :: struct {
+    // By default the memory layout of a binary is:
+    //   reserved | static-data | stack | heap
+    // But when stack_first is true, it is:
+    //   reserved | stack | static-data | heap
+    stack_first     := false;
+    
+    // The size, in bytes of the stack.
+    stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
 
+    // The alignment of the start addres of the stack.
+    stack_alignment := 16;
+
+    // How large the reserved section at the start
+    // of memory should be. Because `null` is a valid
+    // address in WASM, it makes sense to reserve some
+    // memory at the beginning of the binary so `null`
+    // always points to nothing.
+    null_reserve_size := 16;
+
+    // Controls if/how the WASM memory will be imported.
+    import_memory := IMPORT_MEMORY_DEFAULT;
+    import_memory_module_name := IMPORT_MEMORY_MODULE_NAME_DEFAULT;
+    import_memory_import_name := IMPORT_MEMORY_IMPORT_NAME_DEFAULT;
+
+    // Controls if/how the WASM memory will be exported.
+    export_memory := true;
+    export_memory_name := "memory";
+
+    // Controls if/how the WASM function table will be exported.
+    export_func_table := true;
+    export_func_table_name := "func_table";
+
+    // Controls the minimum and maximum number of pages for WASM memory.
+    memory_min_size := 1024;
+    memory_max_size := 65536;
+}
+
+// Define settings for the link options depending on the runtime.
 #local {
     #if runtime.runtime == .Onyx {
         IMPORT_MEMORY_DEFAULT :: true;
@@ -402,31 +502,24 @@ __implicit_bool_cast :: #match -> bool {}
     }
 }
 
-// Should this be here? and/or should its name be so generic?
-Link_Options :: struct {
-    stack_first     := false;
-    stack_size      := 16 * 65536;  // 16 pages * 65536 bytes per page = 1 MiB stack
-    stack_alignment := 16;
 
-    null_reserve_size := 16;
-
-    import_memory := IMPORT_MEMORY_DEFAULT;
-    import_memory_module_name := IMPORT_MEMORY_MODULE_NAME_DEFAULT;
-    import_memory_import_name := IMPORT_MEMORY_IMPORT_NAME_DEFAULT;
-
-    export_memory := true;
-    export_memory_name := "memory";
-
-    export_func_table := true;
-    export_func_table_name := "func_table";
-
-    memory_min_size := 1024;
-    memory_max_size := 65536;
-}
-
-
+//
+// Special type used to represent a package at runtime.
+// For example,
+//
+//     x: package_id = package main
+//
+// Currently, there is not much you can do with this; it is
+// only used by the runtime.info library if you want to filter
+// tags based on which package they are coming from.
 package_id :: #distinct u32
+
+//
+// Special value used to represents any package.
 any_package :: cast(package_id) 0
+
+//
+// Allow for comparing `package_id`s
 #operator == macro (p1, p2: package_id) => cast(u32) p1 == cast(u32) p2;
 #operator != macro (p1, p2: package_id) => cast(u32) p1 != cast(u32) p2;
 
