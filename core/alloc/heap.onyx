@@ -1,16 +1,19 @@
 package core.alloc.heap
 
-// Enable this to enable checking for invalid blocks and other corruptions
-// that may happen on the heap, with the added overhead of checking that
-// on every alloc/resize/free.
-Enable_Debug :: #defined( runtime.vars.Enable_Heap_Debug )
-Enable_Clear_Freed_Memory :: #defined(runtime.vars.Enable_Heap_Clear_Freed_Memory)
 
 // This is the implementation for the general purpose heap allocator.
 // It is a simple bump allocator, with a free list. It is not very good
 // but it suffices for the kinds of things being done in the early days
 // of the language. You will not make your own instance of the heap
 // allocator, since it controls WASM intrinsics such as memory_grow.
+
+
+
+// Enable this to enable checking for invalid blocks and other corruptions
+// that may happen on the heap, with the added overhead of checking that
+// on every alloc/resize/free.
+Enable_Debug :: #defined( runtime.vars.Enable_Heap_Debug )
+Enable_Clear_Freed_Memory :: #defined(runtime.vars.Enable_Heap_Clear_Freed_Memory)
 
 #load "core/intrinsics/wasm"
 

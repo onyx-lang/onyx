@@ -1,5 +1,11 @@
 package core.alloc.atomic
 
+//
+// AtomicAllocator wraps another allocator in a mutex,
+// ensuring that every allocation is thread-safe. This
+// is not needed for the general purpose heap allocator,
+// as that already has a thread-safe implementation.
+
 use core {sync}
 
 AtomicAllocator :: struct {

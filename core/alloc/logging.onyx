@@ -1,7 +1,10 @@
 package core.alloc.log
 
-// FIXME: This should use context.logger instead of printf.
+// This allocator simply wraps another allocator and
+// prints every allocation/deallocation made by that 
+// allocator.
 
+#local
 Allocation_Action_Strings := str.[
     " alloc",
     "  free",
@@ -13,9 +16,11 @@ logging_allocator_proc :: (data: rawptr, aa: AllocationAction, size: u32, align:
     allocator := cast(^Allocator) data;
     res := allocator.func(allocator.data, aa, size, align, oldptr);
 
-    use core { printf }
-    printf("{} with size {}, align {}, oldptr {} returns {}\n",
+    use core { tprintf }
+    msg := tprintf("{} with size {}, align {}, oldptr {} returns {}\n",
         Allocation_Action_Strings[cast(u32) aa], size, align, oldptr, res);
+
+    log(.Info, "Core", msg);
 
     return res;
 }
