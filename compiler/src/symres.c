@@ -1397,7 +1397,8 @@ static SymresStatus symres_process_directive(AstNode* directive) {
             }
 
             if (ofunc->kind != Ast_Kind_Overloaded_Function) {
-                onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure.");
+                onyx_report_error(add_overload->token->pos, Error_Critical, "#match directive expects a matched procedure, got %s.",
+                            onyx_ast_node_kind_string(ofunc->kind));
                 return Symres_Error;
             }
 
@@ -1411,6 +1412,7 @@ static SymresStatus symres_process_directive(AstNode* directive) {
                 if (!token_same_file(add_overload->token, ofunc->token)) {
                     onyx_report_error(add_overload->token->pos, Error_Critical, "Cannot add match option here as this option is not within the same file as the original #match declared with #local.");
                     onyx_report_error(ofunc->token->pos, Error_Critical, "Here is the original #match.");
+                    return Symres_Error;
                 }
             }
 

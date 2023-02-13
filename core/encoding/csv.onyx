@@ -1,5 +1,14 @@
 package core.encoding.csv
 
+//
+// A simple CSV parsing and encoding library.
+// 
+// This library is used to ingest and output a CSV file. It uses
+// a polymorphic structure to represent a CSV over a particular
+// set of data. This helps with type safety, as well as making
+// it ergonomic to work with.
+//
+
 use core {string, array, iter, conv, io}
 use core.misc {any_as}
 use runtime.info {
@@ -7,15 +16,29 @@ use runtime.info {
     Type_Info_Struct
 }
 
+//
+// Represents data from a CSV file of a particular type.
 CSV :: struct (Output_Type: type_expr) {
     entries: [..] Output_Type;
 }
 
+//
+// Tag-type used to tell the ingress and egress methods what
+// the column name of a particular data element should be.
+//
+// Data :: struct {
+//     @CSV_Column.{"Actual Column Name"}
+//     variable_name: str;
+// }
 CSV_Column :: struct {
     name: str;
 }
 
+//
+// Define methods used with the CSV structure.
 #inject CSV {
+    //
+    // Create and initialize a CSV with no elements.
     make :: ($T: type_expr) => {
         r := CSV(T).{};
         r.entries = make(typeof r.entries);
@@ -23,24 +46,44 @@ CSV_Column :: struct {
         return r;
     }
 
+    //
+    // Frees all data in a CSV.
     delete :: (csv: ^CSV) {
         delete(^csv.entries);
     }
+
+    //
+    // Ingests data from a string representing CSV data.
+    // Uses the type of the CSV to know what columns should be expected.
+    // If `headers_presents` is true, the first line will be treated as
+    // headers, and cross checked with the CSV_Column tag information.
+    // Use this when the columns from your CSV have a different order
+    // from the order of fields in the structure.
+    ingress_string :: (csv: ^CSV, contents: str, headers_present := true) -> bool {
+        reader, stream := io.reader_from_string(contents);
+        defer cfree(stream);
+
+        return csv->ingress(^reader, headers_present);
+    }
     
-    ingress :: (csv: ^CSV, contents: str, headers_present := true) -> bool {
+    //
+    // Ingests data from an Reader containing CSV data.
+    // Uses the type of the CSV to know what columns should be expectd.
+    ingress :: (csv: ^CSV, reader: ^io.Reader, headers_present := true) -> bool {
         Header :: struct {
             type: type_expr;
             offset: i32;
         }
 
-        s := contents;
         any_headers := make([..] Header);
         defer delete(^any_headers);
 
         output_type_info: ^Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
 
         if headers_present {
-            header_line, s' := string.bisect(s, #char "\n");
+            header_line := reader->read_line(allocator=context.temp_allocator)
+                        |> string.strip_trailing_whitespace();
+
             for header: string.split_iter(header_line, #char ",") {
                 member := array.first(output_type_info.members, #(do {
                     if tag := array.first(it.tags, #(it.type == CSV_Column)); tag {
@@ -59,12 +102,13 @@ CSV_Column :: struct {
             }
         }
 
-        for line: string.split_iter(s, #char "\n") {
+        for line: reader->lines() {
+            defer string.free(line);
+
             out: csv.Output_Type;
 
-            for entry:
-                string.split_iter(line, #char ",")
-                |> iter.enumerate()
+            for entry: string.split_iter(line, #char ",")
+                    |> iter.enumerate()
             {
                 header := ^any_headers[entry.index];
                 if header.offset == -1 do continue;
@@ -82,6 +126,10 @@ CSV_Column :: struct {
         }
     }
 
+    //
+    // Outputs data from a CSV into a Writer.
+    // When `include_headers` is true, the first line outputted will be
+    // the headers of the CSV, according to the CSV_Column tag information.
     egress :: (csv: ^CSV, writer: ^io.Writer, include_headers := true) {
         output_type_info: ^Type_Info_Struct = ~~ get_type_info(csv.Output_Type);
 
@@ -109,5 +157,35 @@ CSV_Column :: struct {
             io.write(writer, "\n");
         }
     }
+}
+
+
+//
+// Example and test case
+//
+
+@core.test.test.{"CSV Test"}
+(t: ^core.test.T) {
+    data := """first,second,third
+1,test 1,1.2
+2,test 2,2.4
+3,test 3,3.6""";
+
+    Data :: struct {
+        @CSV_Column.{"first"}
+        first: i32;
+
+        @CSV_Column.{"second"}
+        second: str;
+
+        @CSV_Column.{"third"}
+        third: f32;
+    }
+
+    csv: CSV(Data);
+    csv->ingress_string(data);
+
+    t->assert(csv.entries[0].first == 1,   "First entry matches");
+    t->assert(csv.entries[2].third == 3.6, "Last entry matches");
 }
 

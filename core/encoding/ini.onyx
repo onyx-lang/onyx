@@ -5,19 +5,23 @@ use core {
     aprintf
 }
 
-#local {
-    IniParseResult :: enum {
-        Success;
-        Error;
-    }
-
-    IniParseError :: struct {
-        msg: str;
-        line: u32;
-    }
+IniParseResult :: enum {
+    Success;
+    Error;
 }
 
-parse_ini_file :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
+IniParseError :: struct {
+    msg: str;
+    line: u32;
+}
+
+parse_ini_file :: macro (r: ^io.Reader, output_ptr: ^$T) => {
+    parse_ini_file_inner :: parse_ini_file_inner
+    return parse_ini_file_inner(r, output_ptr);
+}
+
+#local
+parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, IniParseError) {
     info :: runtime.info
 
     line := 1;

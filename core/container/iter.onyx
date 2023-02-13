@@ -60,7 +60,7 @@ close :: (it: Iterator) {
 //
 // Implicit iterator creation
 //
-// The following overloads of as_iter all for an automatic
+// The following overloads of as_iter allow for an automatic
 // definition of how to declare an iterator, provided the
 // type has the necessary methods.
 //
