@@ -100,7 +100,7 @@ OnyxContext :: struct {
 
     // Defines what happens when `log()` is called. Defaults to a
     // logger that filters log messages by their severity.
-    logger         : Logger = .{ Default_Logger.log, ^default_logger };
+    logger         : Logger = .{ default_logger_proc, ^default_logger };
 
     // Defines what happens when an `assert()` check fails. Defaults
     // to printing the error and running an unreachable instruction,

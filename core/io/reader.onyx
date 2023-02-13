@@ -554,12 +554,13 @@ skip_bytes :: (use reader: ^Reader, bytes: u32) -> (skipped: i32, err: Error) {
     return 0, .None;
 }
 
-lines :: (r: ^Reader, inplace := false) =>
+lines :: (r: ^Reader, inplace := false, allocator := context.allocator) =>
     iter.generator(^.{
         r = r,
-        inplace = inplace
+        inplace = inplace,
+        allocator = allocator,
     }, (ctx: $C) -> (str, bool) {
-        line := ctx.r->read_line(consume_newline=true, inplace=ctx.inplace);
+        line := ctx.r->read_line(consume_newline=true, inplace=ctx.inplace, allocator=ctx.allocator);
 
         if line.count > 0 do return line, true;
         else do return "", false;

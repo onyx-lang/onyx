@@ -591,6 +591,10 @@ static CheckStatus check_resolve_callee(AstCall* call, AstTyped** effective_call
             &call->args);
 
         if (new_callee == NULL) {
+            if (context.cycle_almost_detected < 2) {
+                YIELD(call->token->pos, "Waiting to know all options for overloaded function");
+            }
+ 
             report_unable_to_match_overload(call, ((AstOverloadedFunction *) callee)->overloads);
             return Check_Error;
         }

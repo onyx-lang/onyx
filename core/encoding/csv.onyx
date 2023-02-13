@@ -102,9 +102,7 @@ CSV_Column :: struct {
             }
         }
 
-        for line: reader->lines() {
-            defer string.free(line);
-
+        for line: reader->lines(allocator = context.temp_allocator) {
             out: csv.Output_Type;
 
             for entry: string.split_iter(line, #char ",")
