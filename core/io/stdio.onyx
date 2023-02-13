@@ -1,36 +1,86 @@
-package core
 // Currently, these symbols are dumped in the 'core' namespace, which means
 // most programs that just 'use package core' can access all of them, which
 // is convenient; However, it doesn't hurt to wonder if they should be the
 // 'core.io' package so these would become like 'io.printf(...)'. Of course,
 // you could always still do 'use package core.io', which would bring these
 // in anyway.
+package core
 
 
+//
+// Ensure this file did not get included in a custom runtime, as it is
+// not possible to print anything if the runtime is not known. This check
+// could be replaced with something like !#defined(runtime.__output_string),
+// but that can happen when custom runtimes are more needed.
 #if runtime.runtime == .Custom {
-    #error "'stdio' can only be included in the 'wasi' or 'js' runtime."
+    #error "'stdio' cannot be used in a custom runtime."
 }
 
-stdio_stream: io.Stream = .{ vtable = ^stdio_vtable, flags = .Block_On_Read };
+//
+// Every thread contains its own copy of standard input and output options.
+#thread_local stdio : struct {
+    // Two-way stream of standard input and output.
+    stream       : io.Stream;
 
-auto_flush_stdio := true
+    // These fields are used to create a buffer of standard output.
+    print_stream : io.BufferStream;
+    print_writer : io.Writer;
 
+    // When this is true, the print_stream is flushed when the last character
+    // is a newline. When this is false, all flushing is entirely manual.
+    auto_flush : bool;
+}
+
+//
+// Internal procedure called at thread initialization to setup the
+// `stdio` object. This should not be called more than once per thread,
+// so you will likely never need to call it.
+__stdio_init :: () {
+    stdio.print_stream = io.buffer_stream_make(2048, context.allocator);
+    stdio.print_writer = io.writer_make(^stdio.print_stream, 0);
+
+    stdio.stream = .{ vtable = ^stdio_vtable, flags = .Block_On_Read };
+
+    stdio.auto_flush = true;
+}
+
+
+//
+// Internal procedure to flush data from the print_stream to standard
+// output. Can be used directly, or through io.stream_flush(^stdio.stream);
+__flush_stdio :: () {
+    if stdio.print_stream.data.count == 0 do return;
+
+    ^stdio.print_stream
+        |> io.buffer_stream_to_str()
+        |> runtime.__output_string();
+
+    ^stdio.print_stream |> io.stream_flush();
+}
+
+//
+// Generic procedure to print something. This is normally not used
+// directly, but does support passing a different number of arguments
+// that are sent directly to io.write.
 print :: #match #locked {
     (x: str) {
         io.write(^stdio.print_writer, x);
-        if x[x.count - 1] == #char "\n" && auto_flush_stdio do __flush_stdio();
+        if x[x.count - 1] == #char "\n" && stdio.auto_flush do __flush_stdio();
     },
 
     (x)    => { io.write(^stdio.print_writer, x); },
     (x, y) => { io.write(^stdio.print_writer, x, y); },
 }
 
+//
+// Helper procedure that prints something, then prints a newline.
 println :: (x) => {
     print(x);
     print("\n");
 }
 
-// Standard formatted print.
+//
+// Standard formatted print to standard output.
 printf :: (format: str, va: ..any) {
     flush :: (_, to_output) => {
         io.write(^stdio.print_writer, to_output);
@@ -42,8 +92,9 @@ printf :: (format: str, va: ..any) {
     print(conv.format_va(buffer, format, va, .{null, flush}));
 }
 
-// Print to standard error, if available.
 #if #defined(runtime.__output_error) {
+    //
+    // Prints to standard error, if available.
     eprintf :: (format: str, va: ..any) -> str {
         flush :: (_, to_output) => {
             runtime.__output_error(to_output);
@@ -55,21 +106,31 @@ printf :: (format: str, va: ..any) {
     }
 }
 
-// Print to a dynamically allocated string.
+//
+// Prints to a dynamically allocated string, and returns the string.
+// It is the callers responsibility to free the string.
 aprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);
     return string.alloc_copy(out);
 }
 
-// Print to a TEMPORARY dynamically allocated string.
+//
+// Prints to a dynamically allocated string in the temporary allocator,
+// and returns the string. 
 tprintf :: (format: str, va: ..any) -> str {
     buffer: [8196] u8;
     out := conv.format_va(buffer, format, va);
     return string.alloc_copy(out, allocator=context.temp_allocator);
 }
 
-byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
+
+//
+// Helper procedure that outputs a set of bytes at a certain location,
+// useful in debugging. The implementation does not use printf or
+// stdio.stream, because if those are corrupted due to a heap/memory
+// bug, they cannot be used.
+__byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
     temp: [3] u8;
 
     u8_ptr := cast(^u8) ptr;
@@ -114,27 +175,8 @@ byte_dump :: (ptr: rawptr, byte_count: u32, bytes_per_line := 8) {
 // Private and internal things
 //
 
-#thread_local stdio : struct {
-    print_stream : io.BufferStream;
-    print_writer : io.Writer;
-}
-
-__stdio_init :: () {
-    stdio.print_stream = io.buffer_stream_make(2048, context.allocator);
-    stdio.print_writer = io.writer_make(^stdio.print_stream, 0);
-}
-
-
-__flush_stdio :: () {
-    if stdio.print_stream.data.count == 0 do return;
-
-    ^stdio.print_stream
-        |> io.buffer_stream_to_str()
-        |> runtime.__output_string();
-
-    ^stdio.print_stream |> io.stream_flush();
-}
-
+//
+// The v-table for the stream in stdio.
 #local stdio_vtable := io.Stream_Vtable.{
     read = (_: ^io.Stream, buffer: [] u8) -> (io.Error, u32) {
         __flush_stdio();

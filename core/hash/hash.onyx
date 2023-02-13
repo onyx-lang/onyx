@@ -18,7 +18,7 @@ to_u32 :: hash
 //             return // ...
 //         }
 //     }
-
+//
 hash :: #match -> u32 {
     // Does this need to have a higher precedence value?
     // Because if I wanted to have a custom type as the key
@@ -44,6 +44,10 @@ hash :: #match -> u32 {
     macro (key: $T/HasHashMethod) => key->hash()
 }
 
+//
+// Interface that holds true when the type has a hash() overload defined.
+// Useful in datastructure when the ability to hash is dependent on whether
+// the stored type is hashable. See core/container/pair.onyx for an example.
 Hashable :: interface (t: $T) {
     { hash(t) } -> u32;
 }

@@ -41,6 +41,7 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
     get     :: get
     get_ptr :: get_ptr
     get_opt :: get_opt
+    get_ptr_or_create :: get_ptr_or_create
     put     :: put
     delete  :: delete
     update  :: update
@@ -139,6 +140,20 @@ get_ptr :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
     if lr.entry_index >= 0 do return ^entries[lr.entry_index].value;
 
     return null;
+}
+
+//
+// Returns a pointer to the value at the specified key. If the key
+// is not in the map, a new value is created and inserted, then the
+// pointer to that value is returned.
+get_ptr_or_create :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
+    lr := lookup(map, key);
+    if lr.entry_index < 0 {
+        put(map, key, .{});
+        lr = lookup(map, key);
+    }
+
+    return ^entries[lr.entry_index].value;
 }
 
 //

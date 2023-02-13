@@ -3,10 +3,8 @@ package core.conv
 use core {map, string, array, math}
 
 //
-// This should be called with a pointer for the first argument.
-//
-//      x: i32;
-//      parse_any(^x, "12.34");
+// Parses many different types from a string into a value.
+// Uses a custom parser if one has been specified for the type given.
 parse_any :: #match {}
 
 #overload
@@ -68,8 +66,6 @@ parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_alloca
             line := to_parse;
             string.advance(^line);
 
-            //
-            // For now, this will return a substring in the original to_parse.
             dest := cast(^str) target;
             *dest = string.read_until(^line, #char "\"") |> string.alloc_copy(string_allocator); // @BUG // This does not handle escaped strings!
             return true;

@@ -131,7 +131,7 @@ atanh :: (t: $T) -> T {
 //
 // Exponentials and logarithms.
 // Exponentials with floats are implemented using a binary search using square roots, since
-// square roots are intrinsic to WASM and therefore "fast". Expoentials with integers are
+// square roots are intrinsic to WASM and therefore "fast". Exponentials with integers are
 // implemented using a fast algorithm that minimizes the number of the mulitplications that
 // are needed. Logarithms are implemented using a polynomial that is accurate in the range of
 // [1, 2], and then utilizes this identity for values outside of that range,
