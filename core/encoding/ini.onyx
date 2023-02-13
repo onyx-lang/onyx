@@ -1,22 +1,69 @@
 package core.encoding.ini
 
+//
+// This library allows for parsing and formatting a simple 'ini' like
+// file format. It is very crude, but enables a quick way to create
+// a configuration file that can be mapped to a structure.
+//
+// The data for the ini file is stored in a 2-deep nested structure.
+// The outer structure stores the sections, and each section is
+// represented as another structure. For example,
+//
+//     Config :: struct {
+//         metadata: struct {
+//             name: str;
+//             version: str;
+//         };
+//     
+//         player_settings: struct {
+//             speed: f32;
+//             display_name: str;
+//         };
+//     }
+//
+// This corresponds to an ini file with the following data:
+//
+//     [metadata]
+//     name=some name
+//     version=0.0.1
+//     
+//     [player_settings]
+//     speed=1.2
+//     display_name=Player
+//
+
 use core {
     alloc, conv, string, io,
     aprintf
 }
+use core.intrinsics.types {
+    type_is_struct
+}
 
+//
+// Represents if the parsing was successful or encountered an error.
 IniParseResult :: enum {
     Success;
     Error;
 }
 
+//
+// Represents an error that occured while parsing.
 IniParseError :: struct {
     msg: str;
     line: u32;
 }
 
-parse_ini_file :: macro (r: ^io.Reader, output_ptr: ^$T) => {
+//
+// Parses an ini file into the variable given. Only structures
+// work with this procedure, as the structure provides the section
+// and value names.
+parse_ini_file :: macro (r: ^io.Reader, output_ptr: ^$T/type_is_struct) => {
     parse_ini_file_inner :: parse_ini_file_inner
+
+    // No need to make the actual implementation polymorphic.
+    // That can work with an any, but this macro provides proper errors
+    // a pointer to a structure is not provided.
     return parse_ini_file_inner(r, output_ptr);
 }
 
@@ -115,7 +162,18 @@ parse_ini_file_inner :: (r: ^io.Reader, output_ptr: any) -> (IniParseResult, Ini
     return .Success, .{"",0};
 }
 
-write_ini_file :: (w: ^io.Writer, output: any) -> bool {
+
+//
+// Outputs a two-level structure into an ini file. The inverse of `parse_ini_file`.
+write_ini_file :: macro (w: ^io.Writer, output: $T/type_is_struct) => {
+    write_ini_file_inner :: write_ini_file_inner
+
+    // See note above in parse_ini_file.
+    return write_ini_file_inner(w, output);
+}
+
+#local
+write_ini_file_inner :: (w: ^io.Writer, output: any) -> bool {
     info :: runtime.info
 
     output_info := cast(^info.Type_Info_Struct) info.get_type_info(output.type);

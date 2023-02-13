@@ -8,18 +8,14 @@ use core {map, string, array, math}
 //      x: i32;
 //      parse_any(^x, "12.34");
 parse_any :: #match {}
-#match parse_any (v: any, to_parse: str, string_allocator := context.allocator) -> bool {
-    use package runtime.info;
 
-    info := get_type_info(v.type);
-    if info.kind != .Pointer do return false;
-
-    data_type := (cast(^Type_Info_Pointer) info).to;
-    target := *cast(^rawptr) v.data;
-    return parse_any(target, data_type, to_parse, string_allocator);
+#overload
+parse_any :: macro (v: ^$T, to_parse: str, string_allocator := context.allocator) -> bool {
+    return #this_package.parse_any(v, T, to_parse, string_allocator);
 }
 
-#match parse_any (target: rawptr, data_type: type_expr, to_parse: str, string_allocator := context.allocator) -> bool {
+#overload
+parse_any :: (target: rawptr, data_type: type_expr, to_parse: str, string_allocator := context.allocator) -> bool {
     if custom_parsers->has(data_type) {
         return custom_parsers[data_type](target, to_parse, string_allocator);
     }

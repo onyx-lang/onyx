@@ -143,18 +143,26 @@ flush_to_dynstr :: (dynstr: ^[..] u8, to_write: str) => {
 
 
 format :: #match {}
-#match format (buffer: [] u8, format: str, va: ..any) -> str {
+
+#overload
+format :: (buffer: [] u8, format: str, va: ..any) -> str {
     return format_va(buffer, format, ~~va); 
 }
-#match format (output: ^Format_Output, format: str, va: ..any) -> str {
+
+#overload
+format :: (output: ^Format_Output, format: str, va: ..any) -> str {
     return format_va(output, format, ~~va); 
 }
-#match format (buffer: ^[..] u8, format: str, va: ..any) {
+
+#overload
+format :: (buffer: ^[..] u8, format: str, va: ..any) {
     buffer.count = buffer.capacity;
     out := format_va(*buffer, format, ~~va);
     buffer.count = out.count;
 }
-#match format (format: str, va: ..any) -> str {
+
+#overload
+format :: (format: str, va: ..any) -> str {
     buffer : [256] u8;
     out    := make([..] u8);
     output := Format_Output.{
@@ -169,16 +177,22 @@ format :: #match {}
 }
 
 format_va :: #match {}
-#match format_va (buffer: [] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) -> str {
+
+#overload
+format_va :: (buffer: [] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) -> str {
     output := Format_Output.{ buffer.data, 0, buffer.count, flush };
     return format_va(^output, format, va);
 }
-#match format_va (buffer: ^[..] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) {
+
+#overload
+format_va :: (buffer: ^[..] u8, format: str, va: [] any, flush := Format_Flush_Callback.{}) {
     buffer.count = buffer.capacity;
     out := format_va(*buffer, format, va, flush);
     buffer.count = out.count;
 }
-#match format_va (format: [] u8, va: [] any, allocator := context.allocator) -> str {
+
+#overload
+format_va :: (format: [] u8, va: [] any, allocator := context.allocator) -> str {
     buffer : [256] u8;
     out    := make([..] u8, allocator=allocator);
     output := Format_Output.{
@@ -192,7 +206,8 @@ format_va :: #match {}
     return out;
 }
 
-#match format_va (output: ^Format_Output, format: str, va: [] any) -> str {
+#overload
+format_va :: (output: ^Format_Output, format: str, va: [] any) -> str {
     vararg_index := 0;
 
     while i := 0; i < format.count {
@@ -316,6 +331,7 @@ format_va :: #match {}
 
     return .{ output.data, output.count };
 }
+
 
 format_any :: (output: ^Format_Output, formatting: ^Format, v: any) {
     use package runtime.info

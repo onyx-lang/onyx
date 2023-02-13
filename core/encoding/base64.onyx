@@ -1,5 +1,16 @@
 package core.encoding.base64
 
+//
+// A simple Base64 encoding and decoding library. Currently
+// only supports base64 with + and / characters. A simple
+// find and replace could be used to change to other base64
+// standards.
+//
+
+//
+// Encodes the given data in base64 into a new buffer, allocated
+// from the allocator provided. It is the callers responsibilty
+// to free this memory.
 encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     out := make([..] u8, allocator=allocator);
 
@@ -33,6 +44,9 @@ encode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     return out;
 }
 
+//
+// Decodes the given base64 data into a new buffer, allocated
+// from the allocator provided.
 decode :: (data: [] u8, allocator := context.allocator) -> [] u8 {
     if data.count % 4 != 0 do return null_str;
 
