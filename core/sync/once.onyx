@@ -1,5 +1,12 @@
 package core.sync
 
+//
+// Once is a thread-safe mechanism for executing a particular
+// function only once. It is simply a flag with a mutex.
+//
+
+//
+// Represents something will only happen once.
 Once :: struct {
     done: bool;
     mutex: Mutex;
@@ -7,6 +14,8 @@ Once :: struct {
 
 #inject Once.exec :: #match #local {}
 
+//
+// Run a function with no arguments once.
 #overload
 Once.exec :: (o: ^Once, f: () -> $R) {
     scoped_mutex(^o.mutex);
@@ -16,6 +25,8 @@ Once.exec :: (o: ^Once, f: () -> $R) {
     f();
 }
 
+//
+// Run a function with one argument once.
 #overload
 Once.exec :: (o: ^Once, ctx: $Ctx, f: (Ctx) -> $R) {
     scoped_mutex(^o.mutex);
