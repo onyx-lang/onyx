@@ -9,13 +9,24 @@ use core.intrinsics.atomics
     thread_map     : Map(Thread_ID, ^Thread);
 }
 
+//
+// An id of a thread.
 Thread_ID :: #type i32
 
+//
+// Represents a thread. Currently, this is very simple; just the id
+// of the thread and whether or not it is alive.
 Thread :: struct {
     id    : Thread_ID;
     alive : bool;
 }
 
+//
+// Spawns a new thread using the runtime.__spawn_thread function.
+// The primary job of this function is to create the thread-local
+// storage and stack for the new thread, and pass those on.
+// Currently the stack size is not controllable, but that could
+// be remedied.
 spawn :: (t: ^Thread, data: ^$T, func: (^T) -> void) {
     sync.scoped_mutex(^thread_mutex);
 
@@ -33,6 +44,10 @@ spawn :: (t: ^Thread, data: ^$T, func: (^T) -> void) {
     runtime.__spawn_thread(t.id, tls_base, stack_base, func, data);
 }
 
+//
+// Waits for a thread to finish before returning.
+// If the thread was not alive in the first place,
+// immediately return.
 join :: (t: ^Thread) {
     while t.alive {
         #if runtime.Wait_Notify_Available {
@@ -44,6 +59,9 @@ join :: (t: ^Thread) {
     }
 }
 
+//
+// Forcefully kill a thread using runtime.__kill_thread.
+// Does nothing if the thread was not alive.
 kill :: (t: ^Thread) -> i32 {
     if !t.alive do return -1;
 
@@ -53,10 +71,16 @@ kill :: (t: ^Thread) -> i32 {
     return 1;
 }
 
+//
+// Special procedure that should only be called once globally
+// that initialize the map of thread ids to thread data.
 __initialize :: () {
     thread_map->init();
 }
 
+//
+// Special procedure that is called when a thread exits,
+// or by kill() above.
 __exited :: (id: i32) {
     sync.scoped_mutex(^thread_mutex);
 

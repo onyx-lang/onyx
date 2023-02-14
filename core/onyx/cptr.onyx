@@ -1,22 +1,42 @@
 package core
 
+//
+// Sometimes when interfacing with libraries from C, it is really helpful
+// to be able to represent pointers to things outside of the bounds of the
+// WASM memory. For one concrete example, glGetString takes an enum and
+// procudes a character pointer to a static string with that enum's name.
+// Without this library, it would be impossible to access this memory,
+// without first copying it into the WASM memory. That requires a lot of
+// overhead, so instead this library allows Onxy to access memory outside
+// the normal bounds.
+//
+// cptr(T) is a C-pointer to a value of type T. It has a couple useful
+// methods, namely: read(), extract_str(), and to_rawptr().
+//
+
 @conv.Custom_Format.{ #solidify cptr.format {T=T} }
 cptr :: struct (T: type_expr) {
     data: u64;
 }
 
 #inject cptr {
+    //
+    // Creates a new C-pointer from an Onyx pointer.
     make :: macro (ptr: ^$T) -> cptr(T) {
         __cptr_make :: __cptr_make
         return .{ __cptr_make(ptr) };
     }
 
+    //
+    // Extract the data out of a C pointer into a buffer in the Onyx memory.
     read :: (this: cptr($T)) -> T {
         buf: [sizeof T] u8;
         __cptr_read(this.data, ~~buf, sizeof T);
         return *cast(^T) buf;
     }
 
+    //
+    // Helper procedures for quickly reading an integer of various sizes.
     read_u8  :: (this: cptr(u8))  => __cptr_read_u8(this.data);
     read_u16 :: (this: cptr(u16)) => __cptr_read_u16(this.data);
     read_u32 :: (this: cptr(u32)) => __cptr_read_u32(this.data);
@@ -26,6 +46,7 @@ cptr :: struct (T: type_expr) {
     read_i32 :: (this: cptr(i32)) => cast(i32) __cptr_read_u32(this.data);
     read_i64 :: (this: cptr(i64)) => cast(i64) __cptr_read_u64(this.data);
 
+    //
     // When given a non-zero-sized dest, this procedure
     // fills the dest buffer with the contents of the string
     // up to the number bytes in the dest buffer. This
@@ -34,6 +55,9 @@ cptr :: struct (T: type_expr) {
     // using __cptr_read_u8 would be slow compared to strlen().
     extract_str :: (this: cptr(u8), dest: [] u8) => __cptr_extract_str(this.data, dest);
 
+    //
+    // This procedure attempts to convert a C-pointer back into an
+    // Onyx pointer, if the pointer lives with the Onyx memory space.
     to_rawptr :: (this: cptr($T)) -> ^T {
         // I'm treating NULL as more of a concept, than as an actual value here,
         // because if something returns a NULL pointer, it should logically map
@@ -54,6 +78,9 @@ cptr :: struct (T: type_expr) {
     }
 }
 
+
+//
+// Allows for pointer addition.
 #operator + macro (p: cptr($T), v: i32) -> cptr(T) {
     return .{ p.data + ~~(v * sizeof T) };
 }

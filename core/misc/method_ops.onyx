@@ -1,5 +1,24 @@
 package core
 
+//
+// This file defines an optional language feature called method operators.
+// Instead of defining an operator overload using the #operator directive,
+// one can simply define a __op method in the structure to define how to
+// perform the operations. For example,
+//
+//     Vec2 :: struct { x, y: f32 }
+//
+//     #inject Vec2 {
+//         __add :: (v1, v2: Vec2) => Vec2.{ v1.x + v2.x, v1.y + v2.y };
+//     }
+//
+// This is an optional language feature because it currently significantly
+// affects compile-time, on average adding 30% to the total compilation time.
+// To enable this feature, add this somewhere:
+//
+//     #inject runtime.vars.Onyx_Enable_Operator_Methods :: true
+//
+
 #local {
     __HasEqMethod     :: interface (t: $T, r: $R) { T.__eq(t, r); }
     __HasNeMethod     :: interface (t: $T, r: $R) { T.__ne(t, r); }
