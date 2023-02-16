@@ -4,7 +4,7 @@ package runtime.info
 //
 // Foreign Blocks
 // Because foreign blocks can generate a lot of data, and their data is only
-// really helpful in a handful of cases, you need to pass "--generate-foreign-bindings"
+// really helpful in a handful of cases, you need to pass "--generate-foreign-info"
 // to have these arrays filled out.
 //
 

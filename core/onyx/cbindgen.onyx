@@ -197,14 +197,11 @@ compile_c_file :: (
         assert(method_info.kind == .Function, "Expected function type.");
 
         io.write_format(writer, "ONYX_DEF({}, (", ff.name);
-        i := 0;
-        for method_info.parameter_types {
-            io.write(writer, type_encoding(it));
 
-            if i != method_info.parameter_types.count - 1 {
-                io.write(writer, ", ");
-            }
-            i += 1;
+        for method_info.parameter_types {
+            if !#first do io.write(writer, ", ");
+
+            io.write(writer, type_encoding(it));
         }
 
         io.write(writer, "), (");

@@ -330,7 +330,7 @@ as_iter :: (m: ^Map) =>
         return lr;
     }
 
-    full :: (use map: ^Map) => entries.count >= (hashes.count * 3) / 4;
+    full :: (use map: ^Map) => entries.count >= (hashes.count >> 2) * 3;
 
     grow :: (use map: ^Map) {
         new_size := math.max(hashes.count << 1, 8);
@@ -348,9 +348,9 @@ as_iter :: (m: ^Map) =>
         for ^entry: entries {
             defer index += 1;
 
-            lr := lookup(map, entry.key);
-            entries[index].next = hashes[lr.hash_index];
-            hashes[lr.hash_index] = index;
+            hash_index := entry.hash % hashes.count;
+            entries[index].next = hashes[hash_index];
+            hashes[hash_index] = index;
         }
     }
 }

@@ -173,7 +173,7 @@ as_iter :: (s: ^Set) =>
         return lr;
     }
 
-    full :: (use set: ^Set) => entries.count >= ~~(0.75f * ~~hashes.count);
+    full :: (use set: ^Set) => entries.count >= (hashes.count >> 2) * 3;
 
     grow :: (use set: ^Set) {
         new_size := math.max(hashes.count << 1, 8);
@@ -191,9 +191,9 @@ as_iter :: (s: ^Set) =>
         for ^entry: entries {
             defer index += 1;
 
-            lr := lookup(set, entry.value); 
-            entries[index].next = hashes[lr.hash_index];
-            hashes[lr.hash_index] = index;
+            hash_index := entry.hash % hashes.count;
+            entries[index].next = hashes[hash_index];
+            hashes[hash_index] = index;
         }
     }
 }
