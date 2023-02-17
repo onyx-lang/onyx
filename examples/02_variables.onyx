@@ -1,24 +1,36 @@
-// This time, we are not adding, 'package main' to the top of the file, since
-// every file is automatically part of the main package unless specified otherwise.
+// Notice this time, we are not adding, 'package main' or '#load "core/std"'
+// to the top of the file, since every file is automatically part of the
+// main package unless specified otherwise, and every compilations includes
+// the standard library.
 
-#load "core/std"
+main :: () {
 
-use package core
-
-main :: (args: [] cstr) {
-
-    // This is the syntax for declaring a local variable in a procedure.
+    // To declare a local variable, the variable name is simply followed by
+    // a single ':', and then the type of the variable is given. In this case,
+    // `foo` is an `i32`, which is Onyx's 32-bit signed integer type. It is
+    // then immediately assigned the value of 10.
     foo: i32;
     foo = 10;
 
-    // You don't have to put the declaration and assignment on different lines.
-    footwo: i32 = 10;
+    // You can combine the two lines above into one, just as you would expected.
+    // This declares `bar` to be an `i32`, and assigns it the value 10.
+    bar: i32 = 10;
 
-    // If you leave the type out between the : and the =, the type is automatically
-    // inferred from the right hand side of the equals.
-    bar := 15;
+    // As a MAJOR convenience, you can omit the type of a variable, if it can
+    // be determined by the type of the right hand side expression. In this
+    // line, the integer `15` defaults to the type `i32`. This type is then
+    // used as the type of `qux`. This may not seem super useful yet, but
+    // when there are very compilated types in your program, this saves
+    // a lot of typing and _arguably_ makes the code more readable.
+    qux := 15;
 
-    printf("foo is {}\n", foo);
-    printf("footwo is {}\n", footwo);
-    printf("bar is {}\n", bar);
+    //
+    // As an aside, the `printf` function in the `core` package is used to
+    // print formatted strings. Because of a lot of language features that
+    // will be discussed later, `printf` simply uses '{}' to denote where
+    // a value should be formatted, instead of pre-typed strings, like "%s",
+    // or "%d" from C.
+    core.printf("foo is {}\n", foo);
+    core.printf("bar is {}\n", bar);
+    core.printf("qux is {}\n", qux);
 }
