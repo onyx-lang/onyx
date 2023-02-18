@@ -59,8 +59,8 @@ static const char *build_docstring = DOCSTRING_HEADER
     "\t                        Automatically enabled for \"onyx\" runtime.\n"
     "\t--tag                   Generates a C-Tag file.\n"
     "\t--syminfo <target_file> Generates a symbol resolution information file. Used by onyx-lsp.\n"
-    "\t--generate-foreign-info Generates information for #foreign blocks.\n"
-    // "\t--doc <doc_file>\n"
+    "\t--doc <doc_file>\n"
+    "\t--generate-foreign-info\n"
     "\n"
     "Developer options:\n"
     "\t--no-colors               Disables colors in the error message.\n"
@@ -205,9 +205,9 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
                     options.runtime = Runtime_Onyx;
                 }
             }
-            // else if (!strcmp(argv[i], "--doc")) {
-            //     options.documentation_file = argv[++i];
-            // }
+            else if (!strcmp(argv[i], "--doc")) {
+                options.documentation_file = argv[++i];
+            }
             else if (!strcmp(argv[i], "--tag")) {
                 options.generate_tag_file = 1;
             }
@@ -781,6 +781,10 @@ static i32 onyx_compile() {
         onyx_docs_emit_symbol_info(context.options->symbol_info_file);
     }
 
+    if (context.options->documentation_file != NULL) {
+        onyx_docs_emit_odoc(context.options->documentation_file);
+    }
+
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }
 
@@ -841,12 +845,6 @@ static CompilerProgress onyx_flush_module() {
     }
 
     bh_file_close(&output_file);
-
-    // if (context.options->documentation_file != NULL) {
-    //     OnyxDocumentation docs = onyx_docs_generate();
-    //     docs.format = Doc_Format_Human;
-    //     onyx_docs_emit(&docs, context.options->documentation_file);
-    // }
 
     return ONYX_COMPILER_PROGRESS_SUCCESS;
 }

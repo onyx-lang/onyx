@@ -44,6 +44,7 @@ Package* package_lookup_or_create(char* package_name, Scope* parent_scope, bh_al
         package->name = pac_name;
         package->use_package_entities = NULL;
         package->id = next_package_id++;
+        bh_arr_new(global_heap_allocator, package->sub_packages, 4);
 
         if (!strcmp(pac_name, "builtin")) {
             package->private_scope = scope_create(alloc, context.global_scope, pos);
@@ -153,15 +154,22 @@ void symbol_builtin_introduce(Scope* scope, char* sym, AstNode *node) {
     shput(scope->symbols, sym, node);
 }
 
-void symbol_subpackage_introduce(Scope* scope, char* sym, AstPackage* package) {
+void symbol_subpackage_introduce(Package* parent, char* sym, AstPackage* subpackage) {
+    Scope *scope = parent->scope;
+
     i32 index = shgeti(scope->symbols, sym);
     if (index != -1) {
         AstNode* maybe_package = scope->symbols[index].value;
         
         // CLEANUP: Make this assertion an actual error message.
         assert(maybe_package->kind == Ast_Kind_Package);
+
     } else {
-        shput(scope->symbols, sym, (AstNode *) package);
+        shput(scope->symbols, sym, (AstNode *) subpackage);
+
+        // Parent: parent->id
+        // Child:  subpackage->package->id
+        bh_arr_push(parent->sub_packages, subpackage->package->id);
     }
 }
 

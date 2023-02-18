@@ -1,0 +1,58 @@
+package core.doc
+
+Doc :: struct {
+    header: Doc_Header;
+
+    packages: [] Doc_Package;
+    entities: [] Doc_Entity;
+    files:    [] Doc_File;
+}
+
+
+Doc_Magic_Bytes :: "ODOC"
+
+Doc_Header :: struct {
+    magic_bytes: [4] u8;
+    version: u32;
+    
+    program_name: str;
+    build_time: u32;
+}
+
+Doc_File :: struct {
+    Id :: #distinct i32
+
+    package_id: Doc_Package.Id;
+    name: str;
+}
+
+Doc_Location :: struct {
+    file_id: Doc_File.Id;
+    line: i32;
+    col: i32;
+}
+
+Doc_Package :: struct {
+    Id :: #distinct i32
+
+    name: str;             // i.e. 'io'
+    qualified_name: str;   // i.e. 'core.io'
+
+    subpackages: [] Id;
+}
+
+
+Doc_Entity_Kind :: enum {
+    Procedure :: 1;
+}
+
+Doc_Entity :: struct {
+    kind: Doc_Entity_Kind;
+
+    package_id: Doc_Package.Id;
+    location: Doc_Location;
+
+    name: str;
+    notes: str;
+}
+

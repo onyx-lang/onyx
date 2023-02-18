@@ -3660,7 +3660,7 @@ static Package* parse_file_package(OnyxParser* parser) {
         pnode->flags |= Ast_Flag_Comptime;
 
         if (prevpackage != NULL) {
-            symbol_subpackage_introduce(prevpackage->scope, (*symbol)->text, pnode);
+            symbol_subpackage_introduce(prevpackage, (*symbol)->text, pnode);
             package_reinsert_use_packages(prevpackage);
         }
 

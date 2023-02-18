@@ -1570,6 +1570,9 @@ struct Package {
 
     u32 id;
 
+    // NOTE: id's of the sub-packages
+    bh_arr(u32) sub_packages;
+
     // NOTE: This tracks all of the 'use package' statements of this package throughout
     // the code base. This is used when a static if clears and new symbols are introduced.
     // 'use package' statements have to be reevaluated to pull in the new symbols.

@@ -136,245 +136,102 @@ void onyx_docs_emit_symbol_info(const char *dest) {
     bh_imap_free(&syminfo->node_to_id);
 }
 
-// static i32 cmp_doc_entry(const void * a, const void * b) {
-//     DocEntry* d1 = (DocEntry *) a;
-//     DocEntry* d2 = (DocEntry *) b;
-// 
-//     return strncmp(d1->def, d2->def, 1024);
-// }
-// 
-// static i32 cmp_doc_package(const void * a, const void * b) {
-//     DocPackage* d1 = (DocPackage *) a;
-//     DocPackage* d2 = (DocPackage *) b;
-// 
-//     return strncmp(d1->name, d2->name, 1024);
-// }
-// 
-// static char* node_to_doc_def(const char* sym, AstNode *node, bh_allocator a) {
-//     static char buf[1024];
-//     memset(buf, 0, 1023);
-// 
-//     strncat(buf, sym, 1023);
-//     strncat(buf, " :: ", 1023);
-// 
-//     switch (node->kind) {
-//         case Ast_Kind_Function: {
-//             strncat(buf, "(", 1023);
-// 
-//             AstFunction *func = (AstFunction *) node;
-//             bh_arr_each(AstParam, param, func->params) {
-//                 if (param != func->params)
-//                     strncat(buf, ", ", 1023);
-// 
-//                 token_toggle_end(param->local->token);
-//                 strncat(buf, param->local->token->text, 1023);
-//                 token_toggle_end(param->local->token);
-// 
-//                 strncat(buf, ": ", 1023);
-// 
-//                 strncat(buf, type_get_name(param->local->type), 1023);
-// 
-//                 if (param->default_value != NULL) {
-//                     strncat(buf, " = <default>", 1023);
-//                 }
-//             }
-// 
-//             strncat(buf, ") -> ", 1023);
-//             strncat(buf, type_get_name(func->type->Function.return_type), 1023);
-// 
-//             break;
-//         }
-// 
-//         case Ast_Kind_Struct_Type: {
-//             strncat(buf, "struct { ", 1023);
-// 
-//             AstStructType* st = (AstStructType *) node;
-//             bh_arr_each(AstStructMember *, smem, st->members) {
-// 
-//                 token_toggle_end((*smem)->token);
-//                 strncat(buf, (*smem)->token->text, 1023);
-//                 token_toggle_end((*smem)->token);
-// 
-//                 strncat(buf, ": ", 1023);
-// 
-//                 strncat(buf, type_get_name((*smem)->type), 1023);
-// 
-//                 strncat(buf, "; ", 1023);
-//             }
-// 
-//             strncat(buf, "}", 1023);
-//             break;
-//         }
-// 
-//         case Ast_Kind_Basic_Type:
-//         case Ast_Kind_Array_Type:
-//         case Ast_Kind_Type_Alias:
-//         case Ast_Kind_Slice_Type:
-//         case Ast_Kind_DynArr_Type: {
-//             strncat(buf, type_get_name(type_build_from_ast(global_heap_allocator, (AstType *) node)), 1023);
-//             break;
-//         }
-// 
-//         default: {
-//             strncat(buf, "<unimplemented printing>", 1023);
-//         }
-//     }
-// 
-//     return bh_strdup(a, buf);
-// }
-// 
-// static DocPackage doc_package_create(Package* p, bh_allocator a) {
-//     DocPackage dp;
-//     dp.name = p->name;
-//     dp.public_entries = NULL;
-//     dp.private_entries = NULL;
-// 
-//     bh_arr_new(global_heap_allocator, dp.public_entries, 16);
-//     bh_arr_new(global_heap_allocator, dp.private_entries, 16);
-// 
-//     fori (i, 0, shlen(p->scope->symbols)) {
-//         char *key = p->scope->symbols[i].key;
-//         AstNode *value = p->scope->symbols[i].value;
-//         if (!key || !value) continue;
-// 
-//         DocEntry de;
-//         if (value->token) de.pos = value->token->pos;
-//         de.def = node_to_doc_def(key, value, a);
-//         de.sym = (char *) key;
-//         de.additional = NULL;
-// 
-//         bh_arr_push(dp.public_entries, de);
-//     }
-// 
-//     fori (i, 0, shlen(p->private_scope->symbols)) {
-//         char *key = p->scope->symbols[i].key;
-//         AstNode *value = p->scope->symbols[i].value;
-//         if (!key || !value) continue;
-// 
-//         DocEntry de;
-//         if (value->token) de.pos = value->token->pos;
-//         de.def = node_to_doc_def(key, value, a);
-//         de.sym = (char *) key;
-//         de.additional = NULL;
-// 
-//         bh_arr_push(dp.private_entries, de);
-//     }
-// 
-//     qsort(dp.public_entries,  bh_arr_length(dp.public_entries),  sizeof(DocEntry), cmp_doc_entry);
-//     qsort(dp.private_entries, bh_arr_length(dp.private_entries), sizeof(DocEntry), cmp_doc_entry);
-// 
-//     return dp;
-// }
-// 
-// OnyxDocumentation onyx_docs_generate() {
-//     OnyxDocumentation doc;
-// 
-//     bh_arena_init(&doc.doc_arena, global_heap_allocator, 16 * 1024);
-//     bh_allocator a = bh_arena_allocator(&doc.doc_arena);
-// 
-//     doc.package_docs = NULL;
-//     bh_arr_new(global_heap_allocator, doc.package_docs, 16);
-// 
-//     fori (i, 0, shlen(context.packages)) {
-//         DocPackage dp = doc_package_create(context.packages[i].value, a);
-//         bh_arr_push(doc.package_docs, dp);
-//     }
-// 
-//     qsort(doc.package_docs, bh_arr_length(doc.package_docs), sizeof(DocPackage), cmp_doc_package);
-// 
-//     return doc;
-// }
-// 
-// static void onyx_docs_emit_human(OnyxDocumentation* doc, bh_file* file) {
-//     // NOTE: Disabling fancy line printing until I can make it better
-//     #if 0
-//     bh_arr_each(DocPackage, dp, doc->package_docs) {
-//         bh_printf("Package '%s'\n", dp->name);
-// 
-//         if (bh_arr_length(dp->public_entries) > 0) {
-//             bh_printf("\xe2\x94\x9c\xe2\x94\x80 Public symbols\n");
-//             bh_arr_each(DocEntry, de, dp->public_entries) {
-//                 bh_printf("\xe2\x94\x82  \xe2\x94\x9c\xe2\x94\x80 %s\n", de->def);
-// 
-//                 if (de->pos.filename != NULL)
-//                     bh_printf("\xe2\x94\x82  \xe2\x94\x82    at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
-//                 else
-//                     bh_printf("\xe2\x94\x82  \xe2\x94\x82    compiler built-in\n");
-// 
-//                 bh_printf("\xe2\x94\x82  \xe2\x94\x82\n");
-//             }
-//         }
-// 
-//         if (bh_arr_length(dp->private_entries) > 0) {
-//             bh_printf("\xe2\x94\x9c\xe2\x94\x80 Private symbols\n");
-//             bh_arr_each(DocEntry, de, dp->private_entries) {
-//                 bh_printf("\xe2\x94\x82  \xe2\x94\x9c\xe2\x94\x80 %s\n", de->def);
-//                 if (de->pos.filename != NULL)
-//                     bh_printf("\xe2\x94\x82  \xe2\x94\x82    at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
-//                 else
-//                     bh_printf("\xe2\x94\x82  \xe2\x94\x82    compiler built-in\n");
-// 
-//                 bh_printf("\xe2\x94\x82  \xe2\x94\x82\n");
-//             }
-// 
-//             bh_printf("\n");
-//         }
-//     }
-//     #else
-//     bh_arr_each(DocPackage, dp, doc->package_docs) {
-//         bh_fprintf(file, "Package '%s'\n", dp->name);
-// 
-//         if (bh_arr_length(dp->public_entries) > 0) {
-//             bh_fprintf(file, "   Public symbols\n");
-//             bh_arr_each(DocEntry, de, dp->public_entries) {
-//                 bh_fprintf(file, "     %s\n", de->def);
-// 
-//                 if (de->pos.filename != NULL)
-//                     bh_fprintf(file, "        at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
-//                 else
-//                     bh_fprintf(file, "        compiler built-in\n");
-// 
-//                 bh_fprintf(file, "    \n");
-//             }
-//         }
-// 
-//         if (bh_arr_length(dp->private_entries) > 0) {
-//             bh_fprintf(file, "   Private symbols\n");
-//             bh_arr_each(DocEntry, de, dp->private_entries) {
-//                 bh_fprintf(file, "      %s\n", de->def);
-//                 if (de->pos.filename != NULL)
-//                     bh_fprintf(file, "        at %s:%d,%d\n", de->pos.filename, de->pos.line, de->pos.column);
-//                 else
-//                     bh_fprintf(file, "        compiler built-in\n");
-// 
-//                 bh_fprintf(file, "    \n");
-//             }
-// 
-//             bh_fprintf(file, "\n");
-//         }
-//     }
-//     #endif
-// }
-// 
-// 
-// 
-// static void onyx_docs_emit_html(OnyxDocumentation* doc, bh_file* file) {
-//     bh_fprintf(file, "HTML documentation output not supported yet.\n");
-//     return;
-// }
-// 
-// void onyx_docs_emit(OnyxDocumentation* doc, const char* filename) {
-//     bh_file file;
-//     if (bh_file_create(&file, filename) != BH_FILE_ERROR_NONE) {
-//         bh_printf("ERROR: Failed to open file '%s' for writing documentation.\n", filename);
-//         return;
-//     }
-// 
-//     switch (doc->format) {
-//         case Doc_Format_Human: onyx_docs_emit_human(doc, &file); break;
-//         case Doc_Format_Html: onyx_docs_emit_html(doc, &file); break;
-//     }
-// 
-//     bh_file_close(&file);
-// }
+
+
+//
+// Onyx Documentation Format
+//
+
+#define Doc_Magic_Bytes "ODOC"
+
+
+struct Doc_String {
+    u32 offset;
+    u32 length;
+};
+
+struct Doc_Array {
+    u32 offset;
+    u32 length;
+};
+
+struct Doc_Header {
+    u8  magic_bytes[4];
+    u32 version;
+
+    struct Doc_String program_name;
+    u32 build_time;
+};
+
+struct Doc_File {
+    u32 package_id;
+    struct Doc_String name;
+};
+
+struct Doc_Location {
+    u32 file_id;
+    i32 line;
+    i32 col;
+};
+
+struct Doc_Package {
+    struct Doc_String name;
+    struct Doc_String qualified_name;
+    
+    struct Doc_Array subpackages;
+};
+
+enum Doc_Entity_Kind {
+    Entity_Kind_Procedure = 1,
+};
+
+struct Doc_Entity {
+    enum Doc_Entity_Kind kind;
+
+    u32 package_id;
+    struct Doc_Location location;
+
+    struct Doc_String name;
+    struct Doc_String notes;
+};
+
+struct Doc {
+    struct Doc_Header header;
+
+    struct Doc_Array packages;
+    struct Doc_Array entities;
+    struct Doc_Array files;
+};
+
+void onyx_docs_emit_odoc(const char *dest) {
+    bh_file doc_file;
+    if (bh_file_create(&doc_file, dest) != BH_FILE_ERROR_NONE) {
+        bh_printf("Cannot create '%s'.\n", dest);
+        return;
+    }
+
+    struct Doc final_doc;
+
+    memcpy(final_doc.header.magic_bytes, Doc_Magic_Bytes, 4);
+    final_doc.header.version = 1;
+
+    final_doc.header.program_name.offset = 0;
+    final_doc.header.program_name.length = 0;
+
+    final_doc.header.build_time = bh_time_curr() / 1000;
+
+    final_doc.packages.offset = 0;
+    final_doc.packages.length = 0;
+
+    final_doc.entities.offset = 0;
+    final_doc.entities.length = 0;
+
+    final_doc.files.offset = 0;
+    final_doc.files.length = 0;
+
+    bh_file_write(&doc_file, &final_doc, sizeof(struct Doc));
+    bh_file_close(&doc_file);
+}
+
+
 
