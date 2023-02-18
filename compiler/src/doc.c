@@ -205,11 +205,23 @@ struct Doc {
 
 
 typedef struct DocGenerator {
-
+    bh_buffer string_buffer;
 } DocGenerator;
 
-u32 doc_gen_add_string(DocGenerator *gen, char *data, u32 len) {
+void doc_gen_init(DocGenerator *gen) {
+    bh_buffer_init(&gen->string_buffer, global_heap_allocator, 256);
+}
 
+void doc_gen_deinit(DocGenerator *gen) {
+    bh_buffer_free(&gen->string_buffer);
+}
+
+u32 doc_gen_add_string(DocGenerator *gen, char *data, u32 len) {
+    u32 offset = gen->string_buffer.length;
+
+    bh_buffer_append(&gen->string_buffer, data, len);
+
+    return offset;
 }
 
 void onyx_docs_emit_odoc(const char *dest) {
@@ -220,6 +232,7 @@ void onyx_docs_emit_odoc(const char *dest) {
     }
 
     DocGenerator gen;
+    doc_gen_init(&gen);
 
     struct Doc final_doc;
 
@@ -243,6 +256,8 @@ void onyx_docs_emit_odoc(const char *dest) {
     final_doc.files.length = 0;
 
     bh_file_write(&doc_file, &final_doc, sizeof(struct Doc));
+
+    doc_gen_deinit(&gen);
     bh_file_close(&doc_file);
 }
 
