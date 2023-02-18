@@ -4611,7 +4611,7 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     };
 
     bh_arena* eid = bh_alloc(global_heap_allocator, sizeof(bh_arena));
-    bh_arena_init(eid, global_heap_allocator, 8196);
+    bh_arena_init(eid, global_heap_allocator, 16 * 1024 * 1024);
     module.extended_instr_data = eid;
     module.extended_instr_alloc = bh_arena_allocator(eid);
 

@@ -29,7 +29,7 @@ use core.intrinsics.types {type_is_struct}
 
 
 //
-// Thge standard function to convert something to an Iterator.
+// The standard function to convert something to an Iterator.
 // For-loops currently do not use this function to determine
 // how to iterate over something unknown, but that could be
 // a feature down the line.
