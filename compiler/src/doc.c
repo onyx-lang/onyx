@@ -203,6 +203,15 @@ struct Doc {
     struct Doc_Array files;
 };
 
+
+typedef struct DocGenerator {
+
+} DocGenerator;
+
+u32 doc_gen_add_string(DocGenerator *gen, char *data, u32 len) {
+
+}
+
 void onyx_docs_emit_odoc(const char *dest) {
     bh_file doc_file;
     if (bh_file_create(&doc_file, dest) != BH_FILE_ERROR_NONE) {
@@ -210,13 +219,17 @@ void onyx_docs_emit_odoc(const char *dest) {
         return;
     }
 
+    DocGenerator gen;
+
     struct Doc final_doc;
 
     memcpy(final_doc.header.magic_bytes, Doc_Magic_Bytes, 4);
     final_doc.header.version = 1;
 
-    final_doc.header.program_name.offset = 0;
-    final_doc.header.program_name.length = 0;
+    char *program_name = context.options->target_file;
+    u32 program_name_len = strlen(program_name);
+    final_doc.header.program_name.offset = doc_gen_add_string(&gen, program_name, program_name_len);
+    final_doc.header.program_name.length = program_name_len;
 
     final_doc.header.build_time = bh_time_curr() / 1000;
 

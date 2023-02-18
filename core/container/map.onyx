@@ -3,11 +3,11 @@ package core.map
 use core {array, hash, memory, math, conv, Optional}
 use core.intrinsics.onyx { __initialize }
 
-//
-// Map is a generic hash-map implementation that uses chaining.
-// Values can be of any type. Keys must of a type that supports
-// the core.hash.hash, and the '==' operator.
-//
+#doc """
+   Map is a generic hash-map implementation that uses chaining.
+   Values can be of any type. Keys must of a type that supports
+   the core.hash.hash, and the '==' operator.
+"""
 @conv.Custom_Format.{ #solidify format_map {K=Key_Type, V=Value_Type} }
 Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Type) {
     allocator : Allocator;
@@ -52,17 +52,18 @@ Map :: struct (Key_Type: type_expr, Value_Type: type_expr) where ValidKey(Key_Ty
 }
 
 
-//
-// Allows for creation of a Map using make().
-//
-//     m := make(Map(str, i32));
-//
+#doc """
+   Allows for creation of a Map using make().
+  
+       m := make(Map(str, i32));
+"""
 #overload
 __make_overload :: macro (x: &Map($K, $V), allocator := context.allocator) =>
     #this_package.make(K, V);
 
-//
-// Creates and initializes a new map using the types provided.
+#doc """
+   Creates and initializes a new map using the types provided.
+"""
 make :: macro ($Key: type_expr, $Value: type_expr, default := Value.{}) -> Map(Key, Value) {
     map : Map(Key, Value);
     #this_package.init(&map, default = default);
@@ -188,19 +189,19 @@ delete :: (use map: &Map, key: map.Key_Type) {
     else                       do hashes[last.hash_index] = lr.entry_index;
 }
 
-//
-// Helper macro that finds a value by the key, and if it exists,
-// runs the code, providing an `it` variable that is a pointer
-// to the value.
-//
-//     m: Map(str, i32);
-//     m->update("test") {
-//         *it += 10;
-//     }
-// or:
-//     m->update("test", #(*it += 10));
-//
-update :: macro (map: &Map, key: map.Key_Type, body: Code) {
+#doc """
+   Helper macro that finds a value by the key, and if it exists,
+   runs the code, providing an `it` variable that is a pointer
+   to the value.
+  
+       m: Map(str, i32);
+       m->update("test") {
+           *it += 10;
+       }
+   or:
+       m->update("test", #(*it += 10));
+"""  
+update :: macro (map: ^Map, key: map.Key_Type, body: Code) {
     lookup_ :: lookup
     lr := lookup_(map, key);
 
