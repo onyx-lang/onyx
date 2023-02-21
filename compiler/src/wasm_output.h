@@ -1064,7 +1064,9 @@ void onyx_wasm_module_write_to_buffer(OnyxWasmModule* module, bh_buffer* buffer)
     bh_buffer_append(buffer, WASM_VERSION, 4);
 
 #ifdef ENABLE_DEBUG_INFO
-    output_ovm_debug_sections(module, buffer);
+    if (context.options->debug_enabled) {
+        output_ovm_debug_sections(module, buffer);
+    }
 #endif
     output_typesection(module, buffer);
     output_importsection(module, buffer);

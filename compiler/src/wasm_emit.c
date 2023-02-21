@@ -302,6 +302,10 @@ static void debug_set_position(OnyxWasmModule *mod, OnyxToken *token) {
 //    - REP
 //    - SET, REP 0
 static void debug_emit_instruction(OnyxWasmModule *mod, OnyxToken *token) {
+    if (!context.options->debug_enabled) {
+        return;
+    }
+
     DebugContext *ctx = mod->debug_context; 
     assert(ctx && ctx->last_token);
 

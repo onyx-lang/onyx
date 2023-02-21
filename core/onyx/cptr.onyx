@@ -29,10 +29,16 @@ cptr :: struct (T: type_expr) {
 
     //
     // Extract the data out of a C pointer into a buffer in the Onyx memory.
-    read :: (this: cptr($T)) -> T {
-        buf: [sizeof T] u8;
-        __cptr_read(this.data, ~~buf, sizeof T);
-        return *cast(^T) buf;
+    read :: #match {
+        //
+        // Special, error-inducing case for cptr(void)
+        (this: cptr(void)) -> void { },
+
+        (this: cptr($T)) -> T {
+            buf: [sizeof T] u8;
+            __cptr_read(this.data, ~~buf, sizeof T);
+            return *cast(^T) buf;
+        }
     }
 
     //
@@ -69,8 +75,17 @@ cptr :: struct (T: type_expr) {
         // to the memory address 0, not the base address for the WASM
         // memory.
         mem_base_ptr := __cptr_make(cast(rawptr) 1);
-        assert(mem_base_ptr <= this.data + 1 && this.data + 1 <= mem_base_ptr + ~~(wasm.memory_size() << 16), "Invalid conversion from cptr to rawptr: pointer value out of Onyx memory range.");
+        assert(mem_base_ptr <= this.data + 1 && (this.data + 1) >> 16 <= mem_base_ptr + ~~(wasm.memory_size()), "Invalid conversion from cptr to rawptr: pointer value out of Onyx memory range.");
         return ~~(this.data - mem_base_ptr + 1);
+    }
+
+    as :: (this: cptr($T), $new_type: type_expr) -> cptr(new_type) {
+        return .{ this.data };
+    }
+
+    at :: (this: cptr($T), index: i32) -> T {
+        elem := this + index;
+        return elem->read();
     }
 
     format :: (output: ^conv.Format_Output, format: ^conv.Format, p: ^cptr($T)) {

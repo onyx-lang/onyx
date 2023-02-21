@@ -467,7 +467,7 @@ CMPXCHG(OVM_TYPE_I64, i64)
 //
 
 OVMI_INSTR_EXEC(mem_size) {
-    VAL(instr->r).u32 = (u32) state->engine->memory_size / 65536;
+    VAL(instr->r).u32 = (u32) (state->engine->memory_size / 65536);
     VAL(instr->r).type = OVM_TYPE_I32;
     NEXT_OP;
 }
@@ -475,7 +475,7 @@ OVMI_INSTR_EXEC(mem_size) {
 OVMI_INSTR_EXEC(mem_grow) {
     ovm_assert(VAL(instr->a).type == OVM_TYPE_I32);
     VAL(instr->r).type = OVM_TYPE_I32;
-    VAL(instr->r).u32 = (u32) state->engine->memory_size / 65536;
+    VAL(instr->r).u32 = (u32) (state->engine->memory_size / 65536);
 
     if (!ovm_engine_memory_ensure_capacity(state->engine,
             state->engine->memory_size + VAL(instr->a).u32 * 65536)) {

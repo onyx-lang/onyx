@@ -800,6 +800,14 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                 retval = (AstTyped *) this_package;
                 break;
             }
+            else if (parse_possible_directive(parser, "Self")) {
+                if (parser->injection_point == NULL) {
+                    onyx_report_error((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
+                }
+
+                retval = parser->injection_point;
+                break;
+            }
 
             onyx_report_error(parser->curr->pos, Error_Critical, "Invalid directive in expression.");
             return NULL;
@@ -1966,6 +1974,18 @@ static AstType* parse_type(OnyxParser* parser) {
                 *next_insertion = (AstType *) parse_typeof(parser);
                 next_insertion = NULL;
                 break;
+            }
+
+            case '#': {
+                if (parse_possible_directive(parser, "Self")) {
+                    if (parser->injection_point == NULL) {
+                        onyx_report_error((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
+                    }
+
+                    *next_insertion = (AstType *) parser->injection_point;
+                    next_insertion = NULL;
+                    break;
+                }
             }
 
             default:
