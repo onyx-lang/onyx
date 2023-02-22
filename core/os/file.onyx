@@ -136,26 +136,56 @@ is_directory :: (path: str) -> bool {
 }
 
 
-file_logger_open :: (filename: str, allocator := context.allocator) -> Logger {
-    file := new(File, allocator);
 
-    error := os.FileError.None;
-    error, *file = open(filename, mode=.Append);
-    assert(error != .None, "Unable to open file for logging.");
+//
+// File Logging
+//
 
-    return .{ file_logger_proc, file };
+File_Logger :: struct {
+    file: ^File;
+    filename: str;
+    allocator: Allocator;
+
+    old_logger: Logger;
 }
 
-file_logger_close :: (logger := context.logger) {
-    close(cast(^File) logger.data);
+file_logger_open :: (filename: str, allocator := context.allocator) -> ^File_Logger {
+    file_logger := new(File_Logger, allocator);
+    file_logger.allocator = allocator;
+    file_logger.filename = filename;
 
-    // @Robustness: this could be the wrong allocator if the context allocator wasn't used.    
-    cfree(logger.data);
+    file_logger.file = new(File, allocator);
+
+    error := os.FileError.None;
+    error, *file_logger.file = open(filename, mode=.Append);
+    assert(error == .None, "Unable to open file for logging.");
+
+    return file_logger;
+}
+
+file_logger_use :: (logger: ^File_Logger) {
+    logger.old_logger = context.logger;
+    context.logger = .{ file_logger_proc, logger };
+}
+
+file_logger_close :: (logger: ^File_Logger) {
+    if logger.old_logger.data {
+        context.logger = logger.old_logger;
+    }
+
+    close(logger.file);
+
+    raw_free(logger.allocator, logger.file);
+    raw_free(logger.allocator, logger);
 }
 
 #local
-file_logger_proc :: (data: ^File, level: Log_Level, msg: str, module: str) {
-    writer := io.writer_make(data, 0);
-    io.write(^writer, msg);
-    io.write(^writer, "\n");
+file_logger_proc :: (logger: ^File_Logger, level: Log_Level, msg: str, module: str) {
+    writer := io.writer_make(logger.file, 0);
+
+    if module {
+        io.write_format(^writer, "[{}][{}] {}\n", level, module, msg);
+    } else {
+        io.write_format(^writer, "[{}] {}\n", level, msg);
+    }
 }
