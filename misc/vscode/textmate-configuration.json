@@ -22,7 +22,12 @@
     "declarations": [
         "entity.name.function.onyx",
         "entity.name.type.onyx",
-        "entity.name.block.onyx"
+        "entity.name.type.class.onyx",
+        "entity.name.type.interface.onyx",
+        "entity.name.type.enum.onyx",
+        "entity.name.type.namespace.onyx",
+        "entity.name.block.onyx",
+        "entity.name.tag.onyx"
     ],
     "indentation": {
       "punctuation.block.begin.onyx": 1,
@@ -38,6 +43,10 @@
     },
     "symbols": {
         "entity.name.function.onyx": 11,
+        "entity.name.type.namespace.onyx": 2,
+        "entity.name.type.class.onyx": 4,
+        "entity.name.type.interface.onyx": 10,
+        "entity.name.type.enum.onyx": 9,
         "entity.name.type.onyx": 22
     }
 }

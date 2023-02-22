@@ -38,6 +38,10 @@
 			<key>include</key>
 			<string>#string_escaped_char</string>
 		</dict>
+		<dict>
+			<key>include</key>
+			<string>#generic_tags</string>
+		</dict>
 	</array>
 	<key>repository</key>
 	<dict>
@@ -59,6 +63,7 @@
 				</dict>
 			</array>
 		</dict>
+
 		<key>line_comment</key>
 		<dict>
 			<key>begin</key>
@@ -127,6 +132,7 @@
 				</dict>
 			</array>
 		</dict>
+
 		<key>comments</key>
 		<dict>
 			<key>patterns</key>
@@ -148,6 +154,7 @@
 				</dict>
 			</array>
 		</dict>
+		
 		<key>keywords</key>
 		<dict>
 			<key>patterns</key>
@@ -172,7 +179,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(it|it_index)\b</string>
+					<string>\b(it)\b</string>
 					<key>name</key>
 					<string>keyword.other.onyx</string>
 				</dict>
@@ -212,20 +219,15 @@
 					<key>name</key>
 					<string>keyword.function.onyx</string>
 				</dict>
-				<dict>
+				<!-- <dict>
 					<key>match</key>
-					<string>([#]\s*\b([[:alpha:]_]+[[:alnum:]_]*)\b)</string>
+					<string>([#]\s*\binject.+\b)</string>
 					<key>name</key>
-					<string>keyword.tag.onyx</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>@[^\n]+</string>
-					<key>name</key>
-					<string>keyword.tag.onyx</string>
-				</dict>
+					<string>keyword.tag.onyx entity.name.function.onyx</string>
+				</dict> -->
 			</array>
 		</dict>
+
 		<key>types</key>
 		<dict>
 			<key>patterns</key>
@@ -287,6 +289,7 @@
 				</dict>
 			</array>
 		</dict>
+
 		<key>functions_and_declarations</key>
 		<dict>
 			<key>patterns</key>
@@ -360,13 +363,47 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(struct|enum|interface)</string>
+					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(struct)</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>meta.type.onyx entity.name.type.onyx</string>
+							<string>meta.type.onyx entity.name.type.class.onyx</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>storage.type.onyx</string>
+						</dict>
+					</dict>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(interface)</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>meta.type.onyx entity.name.type.interface.onyx</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>storage.type.onyx</string>
+						</dict>
+					</dict>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(enum)</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>meta.type.onyx entity.name.type.enum.onyx</string>
 						</dict>
 						<key>2</key>
 						<dict>
@@ -406,13 +443,35 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b([#]\s*foreign)</string>
+					<string>([#]\s*\b(?:foreign|local|package)\b).+({)</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>keyword.tag.onyx entity.name.block.onyx</string>
+							<string>keyword.tag.onyx entity.name.type.namespace.onyx</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.block.start.onyx</string>
+						</dict>
+					</dict>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>([#]\s*\binject\b)\s+(\b[^{]+\b)</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.tag.onyx</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>entity.name.type.namespace.onyx</string>
 						</dict>
 					</dict>
 				</dict>
@@ -430,6 +489,7 @@
 				</dict>
 			</array>
 		</dict>
+
 		<key>string_escaped_char</key>
 		<dict>
 			<key>patterns</key>
@@ -448,6 +508,7 @@
 				</dict>
 			</array>
 		</dict>
+
 		<key>strings</key>
 		<dict>
 			<key>patterns</key>
@@ -482,6 +543,25 @@
 							<string>#string_escaped_char</string>
 						</dict>
 					</array>
+				</dict>
+			</array>
+		</dict>
+
+		<key>generic_tags</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>([#]\s*\b([[:alpha:]_]+[[:alnum:]_]*)\b)</string>
+					<key>name</key>
+					<string>keyword.tag.onyx</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>@[^\n]+</string>
+					<key>name</key>
+					<string>keyword.tag.onyx</string>
 				</dict>
 			</array>
 		</dict>
