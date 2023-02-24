@@ -438,7 +438,7 @@ static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* para
         return NULL;
 
     // NOTE: This check is safe because currently the arguments given without a name
-    // always map to the beginning indidies of the argument array.
+    // always map to the beginning indicies of the argument array.
     if (param->idx >= (u64) bh_arr_length(arg_arr)) {
         OnyxToken* param_name = func->params[param->idx].local->token;
 
@@ -448,7 +448,12 @@ static AstTyped* lookup_param_in_arguments(AstFunction* func, AstPolyParam* para
             }
         }
 
-        if (param->idx <= (u64) bh_arr_length(func->params)) {
+        // This enables the following case:
+        //
+        //    f :: (x: i32, $T: type_expr = i32) -> T { ... }
+        //    f(10);
+        //
+        if (param->idx < (u64) bh_arr_length(func->params)) {
             if (func->params[param->idx].default_value) {
                 return (AstTyped *) func->params[param->idx].default_value;
             }
@@ -616,7 +621,11 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
     AstType *param_type_expr = func->params[param->idx].local->type_node;
     if (param_type_expr == (AstType *) &basic_type_type_expr) {
         if (!node_is_type((AstNode *) value)) {
-            if (err_msg) *err_msg = "Expected type expression.";
+            if (err_msg)
+                // CLEANUP: Use a different allocator.
+                *err_msg = bh_aprintf(global_heap_allocator,
+                    "Expected type expression here, got a '%s'.",
+                    type_get_name(value->type));
             return;
         }
 
@@ -629,7 +638,7 @@ static void solve_for_polymorphic_param_value(PolySolveResult* resolved, AstFunc
         resolve_expression_type(value);
 
         if ((value->flags & Ast_Flag_Comptime) == 0) {
-            if (err_msg) *err_msg = "Expected compile-time known argument.";
+            if (err_msg) *err_msg = "Expected compile-time known argument here.";
             return;
         }
 

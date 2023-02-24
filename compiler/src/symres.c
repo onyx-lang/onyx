@@ -1367,6 +1367,17 @@ static SymresStatus symres_struct_defaults(AstType* t) {
 static SymresStatus symres_polyproc(AstFunction* pp) {
     pp->flags |= Ast_Flag_Comptime;
     pp->parent_scope_of_poly_proc = current_scope;
+
+    bh_arr_each(AstPolyParam, p, pp->poly_params) {
+        if (p->kind != PSK_Value) continue;
+
+        AstParam *param = &pp->params[p->idx];
+        if (param->default_value != NULL) {
+            SYMRES(expression, &param->default_value);
+            if (onyx_has_errors()) return Symres_Error;
+        }
+    }
+
     return Symres_Success;
 }
 
