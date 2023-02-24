@@ -109,9 +109,7 @@ static const char* ast_node_names[] = {
 
     "FOREIGN BLOCK",
     "ZERO VALUE",
-
-    "NOTE",
-
+    
     "AST_NODE_KIND_COUNT",
 };
 
@@ -150,7 +148,6 @@ const char* entity_state_strings[Entity_State_Count] = {
 const char* entity_type_strings[Entity_Type_Count] = {
     "Unknown",
     "Error",
-    "Note",
     "Add to Load Path",
     "Load File",
     "Binding (Declaration)",
@@ -513,7 +510,6 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
 
         else if (type->Basic.flags & Basic_Flag_Float) {
             if (type->Basic.size == 4) {
-                // TODO(Brendan): Check these boundary conditions
                 if (bh_abs(num->value.l) >= (1 << 23)) {
                     onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 32-bit float exactly.", num->value.l);
                     return 0;
@@ -524,7 +520,6 @@ b32 convert_numlit_to_type(AstNumLit* num, Type* to_type) {
                 return 1;
             }
             if (type->Basic.size == 8) {
-                // TODO(Brendan): Check these boundary conditions
                 if (bh_abs(num->value.l) >= (1ull << 52)) {
                     onyx_report_error(num->token->pos, Error_Critical, "Integer '%l' does not fit in 64-bit float exactly.", num->value.l);
                     return 0;

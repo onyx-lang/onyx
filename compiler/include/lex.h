@@ -78,8 +78,6 @@ typedef enum TokenType {
     Token_Type_Literal_True,
     Token_Type_Literal_False,
 
-    Token_Type_Note,
-
     Token_Type_Count,
 } TokenType;
 

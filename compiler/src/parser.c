@@ -85,13 +85,7 @@ static void consume_token(OnyxParser* parser) {
     parser->prev = parser->curr;
     // :LinearTokenDependent
     parser->curr++;
-    while (parser->curr->type == Token_Type_Comment || parser->curr->type == Token_Type_Note) {
-        // if (parser->curr->type == Token_Type_Note) {
-        //     AstNote* note = make_node(AstNode, Ast_Kind_Note);
-        //     note->token = parser->curr;
-        //     ENTITY_SUBMIT(note);
-        // }
-
+    while (parser->curr->type == Token_Type_Comment) {
         parser->curr++;
     }
 }
@@ -162,7 +156,7 @@ static b32 next_tokens_are(OnyxParser* parser, i32 n, ...) {
 
     i32 matched = 1;
 
-    // BUG: This does not take into consideration comments and notes that can occur between any tokens.
+    // BUG: This does not take into consideration comments that can occur between any tokens.
     fori (i, 0, n) {
         TokenType expected_type = va_arg(va, TokenType);
         if (peek_token(i)->type != expected_type) {
@@ -3644,7 +3638,7 @@ void onyx_parser_free(OnyxParser* parser) {
 
 void onyx_parse(OnyxParser *parser) {
     // NOTE: Skip comments at the beginning of the file
-    while (consume_token_if_next(parser, Token_Type_Comment) || consume_token_if_next(parser, Token_Type_Note));
+    while (consume_token_if_next(parser, Token_Type_Comment));
 
     parser->package = parse_file_package(parser);
     parser->file_scope = scope_create(parser->allocator, parser->package->private_scope, parser->tokenizer->tokens[0].pos);

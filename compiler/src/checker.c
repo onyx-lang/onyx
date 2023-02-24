@@ -1859,7 +1859,8 @@ CheckStatus check_field_access(AstFieldAccess** pfield) {
         StructMember containing_member = smem;
 
         // TODO: The following code is not right after it loops, but this should never loop
-        // due to a check in types.c line 947.
+        // due to a check in types.c line 947. When nested use-through-pointers are allowed,
+        // thing will have to be reconsidered.
         AstTyped **dest = &field->expr;
         do {
             assert(type_lookup_member_by_idx((*dest)->type, containing_member.use_through_pointer_index, &containing_member));
@@ -2602,13 +2603,19 @@ CheckStatus check_struct(AstStructType* s_node) {
             Type *arg_type = type_build_from_ast(context.ast_alloc, s_node->polymorphic_argument_types[i]);
             if (arg_type == NULL) YIELD(s_node->polymorphic_argument_types[i]->token->pos, "Waiting to build type for polymorph argument.");
 
-            // CLEANUP: This might be wrong...
-            if (s_node->polymorphic_arguments[i].value) {
-                TYPE_CHECK(&s_node->polymorphic_arguments[i].value, arg_type) {
-                    ERROR_(s_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
-                        type_get_name(arg_type),
-                        type_get_name(s_node->polymorphic_arguments[i].value->type));
-                }
+            //
+            // This check should always be false, but it handles
+            // the case where somewhere a type was expected, but
+            // not enough values were provided. This is checked
+            // elsewhere when instantiating a polymorphic sturucture.
+            if (i >= bh_arr_length(s_node->polymorphic_arguments)
+                || !s_node->polymorphic_arguments[i].value) continue;
+
+            
+            TYPE_CHECK(&s_node->polymorphic_arguments[i].value, arg_type) {
+                ERROR_(s_node->polymorphic_arguments[i].value->token->pos, "Expected value of type %s, got %s.",
+                    type_get_name(arg_type),
+                    type_get_name(s_node->polymorphic_arguments[i].value->type));
             }
         }
     }

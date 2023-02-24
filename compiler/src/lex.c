@@ -75,8 +75,6 @@ static const char* token_type_names[] = {
     "true",
     "false",
 
-    "NOTE",
-
     "TOKEN_TYPE_COUNT"
 };
 
@@ -292,20 +290,6 @@ whitespace_skipped:
         INCREMENT_CURR_TOKEN(tokenizer);
         goto token_parsed;
     }
-
-    /*if (*tokenizer->curr == '@') {
-        INCREMENT_CURR_TOKEN(tokenizer);
-        u32 len = 2;
-        while (char_is_alphanum(*(tokenizer->curr + 1)) || *(tokenizer->curr + 1) == '_') {
-            len++;
-            INCREMENT_CURR_TOKEN(tokenizer);
-        }
-
-        tk.type = Token_Type_Note;
-        tk.length = len;
-        INCREMENT_CURR_TOKEN(tokenizer);
-        goto token_parsed;
-    }*/
 
     // Number literal
     if (char_is_num(*tokenizer->curr)

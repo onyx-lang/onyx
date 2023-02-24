@@ -97,7 +97,6 @@
     NODE(PolyProc)             \
     NODE(PolyQuery)            \
                                \
-    NODE(Note)                 \
     NODE(CallSite)             \
                                \
     NODE(CodeBlock)            \
@@ -233,8 +232,6 @@ typedef enum AstKind {
     Ast_Kind_Foreign_Block,
 
     Ast_Kind_Zero_Value,
-
-    Ast_Kind_Note,
 
     Ast_Kind_Count
 } AstKind;
@@ -1356,9 +1353,6 @@ struct AstDirectiveExportName {
     b32 created_export_entity : 1;
 };
 
-struct AstNote {
-    AstNode_base;
-};
 
 struct AstCallSite {
     AstTyped_base;
@@ -1441,7 +1435,6 @@ typedef enum EntityType {
     Entity_Type_Unknown,
 
     Entity_Type_Error,
-    Entity_Type_Note,
     Entity_Type_Load_Path,
     Entity_Type_Load_File,
     Entity_Type_Binding,
@@ -1594,7 +1587,6 @@ struct CompileOptions {
     b32 fun_output              : 1;
     b32 print_function_mappings : 1;
     b32 print_static_if_results : 1;
-    b32 print_notes             : 1;
     b32 no_colors               : 1;
     b32 no_file_contents        : 1;
 
