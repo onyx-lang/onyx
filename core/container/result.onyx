@@ -1,0 +1,90 @@
+package core
+
+use core {Optional, conv}
+
+@conv.Custom_Format.{ #solidify format {T=Ok_Type, E=Err_Type} }
+Result :: struct (Ok_Type: type_expr, Err_Type: type_expr) {
+    status: Result_Status;
+    __data: Result_Data(Ok_Type, Err_Type);
+}
+
+Result_Status :: enum {
+    Ok  :: 1;
+    Err :: 2;
+}
+
+#local
+Result_Data :: struct (T: type_expr, E: type_expr) {
+    value: T;
+    error: E;
+}
+
+
+#inject Result {
+    // Ok  :: macro (x: $T) do return .{ .Ok, .{ value = x } };
+    // Err :: macro (x: $T) do return .{ .Err, .{ error = x } };
+
+    is_ok :: (r: #Self) => r.status == .Ok;
+
+    is_err :: (r: #Self) => !r.status == .Err;
+
+    ok :: (r: #Self) -> Optional(r.Ok_Type) {
+        if r.status == .Ok do return Optional.make(r.__data.value);
+        return .{};
+    }
+
+    err :: (r: #Self) -> Optional(r.Err_Type) {
+        if r.status == .Err do return Optional.make(r.__data.error);
+        return .{};
+    }
+
+    unwrap :: (r: #Self) -> r.Ok_Type {
+        if r.status == .Err {
+            msg := tprintf("Unwrapping Result with error '{}'.", r.__data.error);
+            assert(false, msg);
+            return .{};
+        }
+
+        return r.__data.value;
+    }
+
+    unwrap_or_default :: (r: #Self) -> r.Ok_Type {
+        if r.status == .Err do return .{};
+
+        return r.__data.value;
+    }
+
+    transform :: (r: #Self, f: (r.Ok_Type) -> $R) => {
+        if r.status == .Err do return r;
+        return .{ .Ok, .{ value = f(r.__data.value) } };
+    }
+
+    and_then :: (r: #Self, f: (r.Ok_Type) -> Result($R, r.Err_Type)) -> Result(R, r.Err_Type) {
+        if r.status == .Err do return r;
+        return .{ .Ok, .{ value = f(r.__data.value) } };
+    }
+
+    or_else :: (r: Result, generate: () -> typeof r) => {
+        if r.status == .Ok do return r;
+        return .{};
+    }
+
+    forward_err :: macro (r: Result($T, $E)) -> T {
+        res := r;
+        if res.status == .Ok do return res.__data.value;
+
+        return #from_enclosing .{ .Err, .{ error = res.__data.error } };
+    }
+
+    format :: (o: ^conv.Format_Output, format: ^conv.Format, res: ^Result($T, $E)) {
+        if res.status == .Ok {
+            conv.format(o, "{}({\"})", res.status, res.__data.value);
+        } else {
+            conv.format(o, "{}({\"})", res.status, res.__data.error);
+        }
+    }
+}
+
+#overload
+__implicit_bool_cast :: macro (r: Result($O, $E)) => r.status == .Ok;
+
