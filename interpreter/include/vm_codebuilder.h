@@ -41,6 +41,8 @@ struct label_target_t {
     i32 idx;
     label_kind_t kind;
     i32 instr;
+
+    i32 values_on_stack_before_block;
 };
 
 enum branch_patch_kind_t {

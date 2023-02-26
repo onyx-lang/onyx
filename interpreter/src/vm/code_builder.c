@@ -71,6 +71,7 @@ i32 ovm_code_builder_push_label_target(ovm_code_builder_t *builder, label_kind_t
     target.kind = kind;
     target.idx = builder->next_label_idx++;
     target.instr = -1;
+    target.values_on_stack_before_block = bh_arr_length(builder->execution_stack);
 
     if (kind == label_kind_loop) {
         target.instr = bh_arr_length(builder->program->code);
@@ -105,6 +106,11 @@ void ovm_code_builder_pop_label_target(ovm_code_builder_t *builder) {
         
         bh_arr_fastdelete(builder->branch_patches, i);
         i--;
+    }
+
+    i32 values_on_stack = bh_arr_length(builder->execution_stack);
+    if (values_on_stack > target.values_on_stack_before_block) {
+        bh_arr_set_length(builder->execution_stack, target.values_on_stack_before_block);
     }
 }
 
@@ -308,9 +314,9 @@ void ovm_code_builder_add_return(ovm_code_builder_t *builder) {
     instr.full_instr = OVM_TYPED_INSTR(OVMI_RETURN, OVM_TYPE_NONE);
 
     i32 values_on_stack = bh_arr_length(builder->execution_stack);
-    assert(values_on_stack == 0 || values_on_stack == 1);
+    // assert(values_on_stack == 0 || values_on_stack == 1);
 
-    if (values_on_stack == 1) {
+    if (values_on_stack > 0) {
         instr.a = POP_VALUE(builder);
     }
 
