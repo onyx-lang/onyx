@@ -595,7 +595,16 @@ TypeMatch unify_node_and_type_(AstTyped** pnode, Type* type, b32 permanent) {
 
         // If this shouldn't make permanent changes and submit entities,
         // just assume that it works and don't submit the entities.
-        if (!permanent) return TYPE_MATCH_SUCCESS;
+        if (!permanent) {
+            //
+            // This only works if the destination type is an array or slice,
+            // otherwise there is no way the array literal would match.
+            if (type->kind != Type_Kind_Array && type->kind != Type_Kind_Slice) {
+                return TYPE_MATCH_FAILED;
+            }
+
+            return TYPE_MATCH_SUCCESS;
+        }
 
         Type* array_type=NULL;
         switch (type->kind) {
