@@ -19,7 +19,7 @@ struct ovm_code_builder_t {
     bh_arr(label_target_t) label_stack;
     bh_arr(branch_patch_t) branch_patches;
 
-    i32 param_count, local_count;
+    i32 param_count, result_count, local_count;
 
     ovm_program_t *program;
     i32 start_instr;
@@ -59,7 +59,7 @@ struct branch_patch_t {
     bool targets_else;
 };
 
-ovm_code_builder_t ovm_code_builder_new(ovm_program_t *program, debug_info_builder_t *debug, i32 param_count, i32 local_count);
+ovm_code_builder_t ovm_code_builder_new(ovm_program_t *program, debug_info_builder_t *debug, i32 param_count, i32 result_count, i32 local_count);
 label_target_t     ovm_code_builder_wasm_target_idx(ovm_code_builder_t *builder, i32 idx);
 i32                ovm_code_builder_push_label_target(ovm_code_builder_t *builder, label_kind_t kind);
 void               ovm_code_builder_pop_label_target(ovm_code_builder_t *builder);

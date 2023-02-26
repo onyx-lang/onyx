@@ -936,11 +936,12 @@ static void parse_code_section(build_context *ctx) {
         // Set up a lot of stuff...
 
         i32 func_idx = bh_arr_length(ctx->program->funcs);
-        i32 param_count = ctx->module->functypes.data[i]->type.func.params.size;
+        i32 param_count  = ctx->module->functypes.data[i]->type.func.params.size;
+        i32 result_count = ctx->module->functypes.data[i]->type.func.results.size;
 
         debug_info_builder_begin_func(&ctx->debug_builder, func_idx);
 
-        ctx->builder = ovm_code_builder_new(ctx->program, &ctx->debug_builder, param_count, total_locals);
+        ctx->builder = ovm_code_builder_new(ctx->program, &ctx->debug_builder, param_count, result_count, total_locals);
         ctx->builder.func_table_arr_idx = ctx->func_table_arr_idx;
 
         ovm_code_builder_push_label_target(&ctx->builder, label_kind_func);
