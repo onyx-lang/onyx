@@ -3754,13 +3754,18 @@ EMIT_FUNC(cast, AstUnaryOp* cast) {
 EMIT_FUNC(return, AstReturn* ret) {
     bh_arr(WasmInstruction) code = *pcode;
 
+    AstLocal* result_destination = NULL;
+    i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, ret->from_enclosing_scope ? 2 : 1);
+
+    if (bh_arr_length(mod->return_location_stack) > 0 && jump_label >= 0) {
+        result_destination = bh_arr_last(mod->return_location_stack);
+    }
+
     // If we have an expression to return, we see if it should be placed on the linear memory stack, or the WASM stack.
     if (ret->expr) {
-        if (bh_arr_length(mod->return_location_stack) > 0) {
-            AstLocal* dest = bh_arr_last(mod->return_location_stack);
-
+        if (result_destination) {
             emit_expression(mod, &code, ret->expr);
-            emit_generic_store_instruction(mod, &code, (AstTyped *) dest, NULL);
+            emit_generic_store_instruction(mod, &code, (AstTyped *) result_destination, NULL);
 
         } else if (mod->curr_cc == CC_Return_Stack) {
             WIL(NULL, WI_LOCAL_GET, mod->stack_base_idx);
@@ -3809,7 +3814,6 @@ EMIT_FUNC(return, AstReturn* ret) {
     // Clear the normal deferred statements
     emit_deferred_stmts(mod, &code);
 
-    i64 jump_label = get_structured_jump_label(mod, Jump_Type_Return, 1);
     if (jump_label >= 0) {
         WIL(NULL, WI_JUMP, jump_label);
 
@@ -4654,6 +4658,9 @@ OnyxWasmModule onyx_wasm_module_create(bh_allocator alloc) {
     module.debug_context->next_file_id = 0;
     module.debug_context->next_sym_id = 0;
     module.debug_context->last_token = NULL;
+    module.debug_context->sym_info = NULL;
+    module.debug_context->sym_patches = NULL;
+    module.debug_context->funcs = NULL;
 
     sh_new_arena(module.debug_context->file_info);
     bh_arr_new(global_heap_allocator, module.debug_context->sym_info, 32);

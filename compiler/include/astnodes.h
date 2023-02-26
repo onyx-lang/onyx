@@ -758,7 +758,7 @@ struct AstDirectiveSolidify {
 };
 
 // Intruction Node
-struct AstReturn        { AstNode_base; AstTyped* expr; };
+struct AstReturn        { AstNode_base; AstTyped* expr; b32 from_enclosing_scope: 1; };
 struct AstJump          { AstNode_base; JumpType jump; u32 count; };
 
 typedef struct QualifiedUse {

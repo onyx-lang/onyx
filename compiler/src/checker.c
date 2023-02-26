@@ -133,9 +133,21 @@ static inline void fill_in_type(AstTyped* node) {
 }
 
 // HACK: This should be baked into a structure, not a global variable.
-static Type** expected_return_type = NULL;
+static bh_arr(Type **) expected_return_type_stack = NULL;
 
 CheckStatus check_return(AstReturn* retnode) {
+    Type ** expected_return_type;
+    
+    if (retnode->from_enclosing_scope) {
+        if (bh_arr_length(expected_return_type_stack) <= 1) {
+            ERROR(retnode->token->pos, "#from_enclosing is not valid here, as this return statement is not inside of a do-block or expression macro.");
+        }
+
+        expected_return_type = expected_return_type_stack[bh_arr_length(expected_return_type_stack) - 2];
+    } else {
+        expected_return_type = expected_return_type_stack[bh_arr_length(expected_return_type_stack) - 1];
+    }
+
     if (retnode->expr) {
         CHECK(expression, &retnode->expr);
 
@@ -1632,15 +1644,15 @@ CheckStatus check_do_block(AstDoBlock** pdoblock) {
 
     fill_in_type((AstTyped *) doblock);
 
-    Type** old_expected_return_type = expected_return_type;
-    expected_return_type = &doblock->type;
+    bh_arr_push(expected_return_type_stack, &doblock->type);
 
     doblock->block->rules = Block_Rule_Do_Block;
     CHECK(block, doblock->block);
 
     if (doblock->type == &type_auto_return) doblock->type = &basic_types[Basic_Kind_Void];
 
-    expected_return_type = old_expected_return_type;
+    bh_arr_pop(expected_return_type_stack);
+
     doblock->flags |= Ast_Flag_Has_Been_Checked;
     return Check_Success;
 }
@@ -2478,7 +2490,8 @@ CheckStatus check_function(AstFunction* func) {
         }
     }
 
-    expected_return_type = &func->type->Function.return_type;
+    bh_arr_clear(expected_return_type_stack);
+    bh_arr_push(expected_return_type_stack, &func->type->Function.return_type);
 
     inside_for_iterator = 0;
     if (for_node_stack) bh_arr_clear(for_node_stack);
@@ -2489,13 +2502,12 @@ CheckStatus check_function(AstFunction* func) {
             ERROR(func->generated_from->pos, "Error in polymorphic procedure generated from this location.");
 
         if (status != Check_Success) {
-            expected_return_type = NULL;
             return status;
         }
     }
 
-    if (*expected_return_type == &type_auto_return) {
-        *expected_return_type = &basic_types[Basic_Kind_Void];
+    if (*bh_arr_last(expected_return_type_stack) == &type_auto_return) {
+        *bh_arr_last(expected_return_type_stack) = &basic_types[Basic_Kind_Void];
     }
 
     func->flags |= Ast_Flag_Has_Been_Checked;

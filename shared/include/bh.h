@@ -926,7 +926,9 @@ ptr bh_alloc(bh_allocator a, isize size) {
 }
 
 ptr bh_alloc_aligned(bh_allocator a, isize size, isize alignment) {
-    return a.proc(a.data, bh_allocator_action_alloc, size, alignment, NULL,  0);
+    ptr ret = a.proc(a.data, bh_allocator_action_alloc, size, alignment, NULL,  0);
+    if (ret) memset(ret, 0, size);
+    return ret;
 }
 
 ptr bh_resize(bh_allocator a, ptr data, isize new_size) {
@@ -1294,8 +1296,8 @@ BH_ALLOCATOR_PROC(bh_scratch_allocator_proc) {
         scratch->curr = bh_pointer_add(scratch->curr, size);
 
         if (scratch->curr >= scratch->end) {
-            scratch->curr = scratch->memory;
-            retval = scratch->curr;
+            retval = scratch->memory;
+            scratch->curr = bh_pointer_add(scratch->memory, size);
         }
     } break;
 
