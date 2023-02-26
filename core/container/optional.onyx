@@ -83,6 +83,16 @@ Optional :: struct (Value_Type: type_expr) {
         return generate();
     }
 
+    #doc """
+        Returns the value inside the optional, if there is one.
+        If not, an assertion is thrown and the context's assert
+        handler must take care of it.
+    """
+    unwrap :: (o: Optional) -> o.Value_Type {
+        if o.has_value do return o.value;
+        assert(false, "Unwrapping empty Optional.");
+    }
+
     hash :: (o: Optional($T/core.hash.Hashable)) -> u32 {
         if !o.has_value do return 0;
         return core.hash.to_u32(o.value);

@@ -14,6 +14,7 @@ package core
 #load "./container/heap"
 #load "./container/pair"
 #load "./container/optional"
+#load "./container/result"
 
 #load "./conv/conv"
 #load "./conv/format"

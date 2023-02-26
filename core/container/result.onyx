@@ -54,6 +54,15 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         return r.__data.value;
     }
 
+    expect :: (r: #Self, msg: str) -> r.Ok_Type {
+        if r.status == .Err {
+            assert(false, msg);
+            return .{};
+        }
+
+        return r.__data.value;
+    }
+
     transform :: (r: #Self, f: (r.Ok_Type) -> $R) => {
         if r.status == .Err do return r;
         return .{ .Ok, .{ value = f(r.__data.value) } };
@@ -74,6 +83,13 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         if res.status == .Ok do return res.__data.value;
 
         return #from_enclosing .{ .Err, .{ error = res.__data.error } };
+    }
+
+    or_return :: macro (r: Result($T, $E), v: $V) -> T {
+        res := r;
+        if res.status == .Ok do return res.__data.value;
+        
+        return #from_enclosing v;
     }
 
     format :: (o: ^conv.Format_Output, format: ^conv.Format, res: ^Result($T, $E)) {
