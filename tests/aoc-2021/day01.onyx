@@ -14,8 +14,7 @@ count_increasing :: (arr: [] $T) -> u32 {
 }
 
 main :: (args) => {
-    err, file := os.open("./tests/aoc-2021/input/day01.txt");
-    assert(err == .None, "Error opening file");
+    file := os.open("./tests/aoc-2021/input/day01.txt")->expect("Error opening file");
     reader := io.reader_make(^file);
     defer os.close(^file);
 

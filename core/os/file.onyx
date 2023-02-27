@@ -64,18 +64,18 @@ get_contents_from_file :: (file: ^File) -> str {
     return data[0 .. size];
 }
 
-open :: (path: str, mode := OpenMode.Read) -> (os.FileError, File) {
+open :: (path: str, mode := OpenMode.Read) -> Result(File, os.FileError) {
     file := File.{
         stream = .{ vtable = null },
         data   = .{},
     };
 
     file_data, error := fs.__file_open(path, mode);
-    if error != .None do return error, file;
+    if error != .None do return .{ .Err, .{error=error} };
 
     file.data = file_data;
     file.vtable = ^fs.__file_stream_vtable;
-    return .None, file;
+    return .{ .Ok, .{value=file} };
 }
 
 close :: (file: ^File) {
@@ -87,8 +87,7 @@ get_contents :: #match {
     get_contents_from_file,
 
     (path: str) -> str {
-        error, file := open(path, .Read);
-        if error != .None do return .{ null, 0 };
+        file := open(path, .Read)->or_return(null_str);
         defer close(^file);
 
         return get_contents(^file);
@@ -103,8 +102,8 @@ with_file :: (path: str, mode := OpenMode.Read) -> Iterator(^File) {
     }
 
     c := new(Context);
-    if err, file_stream := open(path, mode); err == .None {
-        c.file_stream = file_stream;
+    if file_stream := open(path, mode); file_stream {
+        c.file_stream = file_stream->unwrap();
         c.valid_file_stream = true;
     }
 
@@ -149,18 +148,21 @@ File_Logger :: struct {
     old_logger: Logger;
 }
 
-file_logger_open :: (filename: str, allocator := context.allocator) -> ^File_Logger {
+file_logger_open :: (filename: str, allocator := context.allocator) -> Result(^File_Logger, str) {
     file_logger := new(File_Logger, allocator);
     file_logger.allocator = allocator;
     file_logger.filename = filename;
 
     file_logger.file = new(File, allocator);
 
-    error := os.FileError.None;
-    error, *file_logger.file = open(filename, mode=.Append);
-    assert(error == .None, "Unable to open file for logging.");
+    *file_logger.file = open(filename, mode=.Append)->catch(#quote {
+        raw_free(allocator, file_logger.file);
+        raw_free(allocator, file_logger);
 
-    return file_logger;
+        return #from_enclosing .{ .Err, .{error = "Unable to open file for logging."} };
+    });
+
+    return .{ .Ok, .{ value=file_logger } };
 }
 
 file_logger_use :: (logger: ^File_Logger) {
