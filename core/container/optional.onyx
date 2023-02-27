@@ -83,6 +83,13 @@ Optional :: struct (Value_Type: type_expr) {
         return generate();
     }
 
+    or_return :: macro (o: Optional($T)) -> T {
+        value := o;
+        if value.has_value do return value.value;
+
+        return #from_enclosing .{};
+    }
+
     hash :: (o: Optional($T/core.hash.Hashable)) -> u32 {
         if !o.has_value do return 0;
         return core.hash.to_u32(o.value);
