@@ -92,6 +92,13 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         return #from_enclosing v;
     }
 
+    catch :: macro (r: Result($T, $E), on_err: Code) -> T {
+        res := r;
+        if res.status == .Ok do return res.__data.value;
+
+        #unquote on_err;
+    }
+
     format :: (o: ^conv.Format_Output, format: ^conv.Format, res: ^Result($T, $E)) {
         if res.status == .Ok {
             conv.format(o, "{}({\"})", res.status, res.__data.value);

@@ -148,16 +148,21 @@ File_Logger :: struct {
     old_logger: Logger;
 }
 
-file_logger_open :: (filename: str, allocator := context.allocator) -> ^File_Logger {
+file_logger_open :: (filename: str, allocator := context.allocator) -> Result(^File_Logger, str) {
     file_logger := new(File_Logger, allocator);
     file_logger.allocator = allocator;
     file_logger.filename = filename;
 
     file_logger.file = new(File, allocator);
 
-    *file_logger.file = open(filename, mode=.Append)->expect("Unable to open file for logging.");
+    *file_logger.file = open(filename, mode=.Append)->catch(#quote {
+        raw_free(allocator, file_logger.file);
+        raw_free(allocator, file_logger);
 
-    return file_logger;
+        return #from_enclosing .{ .Err, .{error = "Unable to open file for logging."} };
+    });
+
+    return .{ .Ok, .{ value=file_logger } };
 }
 
 file_logger_use :: (logger: ^File_Logger) {
