@@ -19,3 +19,5 @@ dist/
 **/node_modules/
 onyx-lsp.ini
 shared/lib/linux_x86_64/lib/libovmwasm.so
+bin/onyx-run
+bin/onyx
