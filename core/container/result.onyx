@@ -21,8 +21,8 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
 
 
 #inject Result {
-    // Ok  :: macro (x: $T) do return .{ .Ok, .{ value = x } };
-    // Err :: macro (x: $T) do return .{ .Err, .{ error = x } };
+    return_ok  :: macro (x: $T) do return .{ .Ok, .{ value = x } };
+    return_err :: macro (x: $T) do return .{ .Err, .{ error = x } };
 
     is_ok :: (r: #Self) => r.status == .Ok;
 
