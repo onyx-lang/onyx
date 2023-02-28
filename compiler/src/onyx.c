@@ -206,7 +206,22 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
             }
 #endif
             else {
-                bh_arr_push(options.files, argv[i]);
+                if (bh_str_ends_with(argv[i], ".wasm") && options.action == ONYX_COMPILE_ACTION_RUN) {
+                    if (bh_arr_length(options.files) > 0) {
+                        bh_printf("Expected only one '.wasm', or multiple '.onyx' files to be given, not a mixture.\n");
+                        exit(1);
+                    }
+
+                    options.action = ONYX_COMPILE_ACTION_RUN_WASM;
+                    options.target_file = argv[i];
+
+                    options.passthrough_argument_count = argc - i - 1;
+                    options.passthrough_argument_data  = &argv[i + 1];
+                    break;
+
+                } else {
+                    bh_arr_push(options.files, argv[i]);
+                }
             }
         }
     }
@@ -799,18 +814,33 @@ static CompilerProgress onyx_flush_module() {
 }
 
 #ifdef ENABLE_RUN_WITH_WASMER
-static b32 onyx_run() {
-    link_wasm_module();
-
-    bh_buffer code_buffer;
-    onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
-
+static b32 onyx_run_module(bh_buffer code_buffer) {
     onyx_run_initialize(context.options->debug_enabled);
 
     if (context.options->verbose_output > 0)
         bh_printf("Running program:\n");
 
     return onyx_run_wasm(code_buffer, context.options->passthrough_argument_count, context.options->passthrough_argument_data);
+}
+
+static b32 onyx_run_wasm_file(const char *filename) {
+    bh_file_contents contents = bh_file_read_contents(global_heap_allocator, filename);
+
+    bh_buffer code_buffer;
+    code_buffer.data = contents.data;
+    code_buffer.length = contents.length;
+
+    return onyx_run_module(code_buffer);
+}
+
+static b32 onyx_run() {
+    link_wasm_module();
+
+    bh_buffer code_buffer;
+    onyx_wasm_module_write_to_buffer(context.wasm_module, &code_buffer);
+
+    return onyx_run_module(code_buffer);
+    
 }
 #endif
 
@@ -852,6 +882,14 @@ int main(int argc, char *argv[]) {
                 }
             }
             break;
+        #endif
+
+        #ifdef ENABLE_RUN_WITH_WASMER
+        case ONYX_COMPILE_ACTION_RUN_WASM:
+            compiler_progress = ONYX_COMPILER_PROGRESS_SUCCESS;
+            if (!onyx_run_wasm_file(context.options->target_file)) {
+                compiler_progress = ONYX_COMPILER_PROGRESS_ERROR;
+            }
         #endif
 
         default: break;
