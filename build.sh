@@ -8,7 +8,6 @@ sudo mkdir -p "$CORE_DIR"
 sudo cp -r ./core/ "$CORE_DIR"
 
 
-sudo cp ./bin/onyx-pkg "$BIN_DIR/onyx-pkg"
 sudo mkdir -p "$CORE_DIR/tools"
 sudo cp ./scripts/onyx-pkg.onyx "$CORE_DIR/tools"
 

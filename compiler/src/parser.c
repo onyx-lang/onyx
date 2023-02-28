@@ -799,7 +799,10 @@ static AstTyped* parse_factor(OnyxParser* parser) {
                     onyx_report_error((parser->curr - 2)->pos, Error_Critical, "#Self is only allowed in an #inject block.");
                 }
 
-                retval = parser->injection_point;
+                AstAlias* alias = make_node(AstAlias, Ast_Kind_Alias);
+                alias->token = parser->injection_point->token;
+                alias->alias = parser->injection_point;
+                retval = (AstTyped *) alias;
                 break;
             }
 

@@ -14,36 +14,27 @@
 #define VERSION "v0.1.0"
 
 
-// #ifndef CORE_INSTALLATION
-//     #ifdef _BH_LINUX
-//     #define CORE_INSTALLATION "/usr/share/onyx"
-//     #elif defined(_WIN32) || defined(_WIN64)
-//     #define CORE_INSTALLATION "\\dev\\onyx\\"
-//     #endif
-// #endif
-
-
-
-
 Context context;
 
 
-static const char* docstring = "Onyx compiler version " VERSION "\n"
+static const char* docstring = "Onyx toolchain version " VERSION "\n"
     "\n"
-    "The compiler for the Onyx programming language, created by Brendan Hansen.\n"
+    "The toolchain for the Onyx programming language, created by Brendan Hansen.\n"
     "\n"
     "Usage:\n"
     "\tonyx compile [-o <target file>] [--verbose] <input files>\n"
-    "\tonyx check [--verbose] <input files>\n"
+    "\tonyx check <input files>\n"
 #ifdef ENABLE_RUN_WITH_WASMER
     "\tonyx run <input files> -- <args>\n"
 #endif
+    "\tonyx pkg\n"
     // "\tonyx doc <input files>\n"
     "\tonyx help\n"
     "\n"
-    "Flags:\n"
+    "Compile Flags:\n"
     "\t<input files>           List of initial files\n"
     "\t-o <target_file>        Specify the target file (default: out.wasm).\n"
+    "\t   --output <target_file>\n"
     "\t--runtime, -r <runtime> Specifies the runtime. Can be: onyx, wasi, js, custom.\n"
     "\t--verbose, -V           Verbose output.\n"
     "\t           -VV          Very verbose output.\n"
@@ -113,7 +104,7 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
     i32 arg_parse_start = 1;
 
     if (!strcmp(argv[1], "help"))     options.action = ONYX_COMPILE_ACTION_PRINT_HELP;
-    if (!strcmp(argv[1], "compile")) {
+    if (!strcmp(argv[1], "compile") || !strcmp(argv[1], "build")) {
         options.action = ONYX_COMPILE_ACTION_COMPILE;
         arg_parse_start = 2;
     }
@@ -121,17 +112,24 @@ static CompileOptions compile_opts_parse(bh_allocator alloc, int argc, char *arg
         options.action = ONYX_COMPILE_ACTION_CHECK;
         arg_parse_start = 2;
     }
+    if (!strcmp(argv[1], "pkg") || !strcmp(argv[1], "package")) {
+        options.action = ONYX_COMPILE_ACTION_RUN;
+        options.passthrough_argument_count = argc - 2;
+        options.passthrough_argument_data  = &argv[2];
+        arg_parse_start = argc;
+
+        bh_arr_push(options.files, bh_aprintf(global_heap_allocator, "%s/tools/onyx-pkg.onyx", core_installation));
+    }
     #ifdef ENABLE_RUN_WITH_WASMER
     else if (!strcmp(argv[1], "run")) {
         options.action = ONYX_COMPILE_ACTION_RUN;
         arg_parse_start = 2;
     }
     #endif
-    else options.action = ONYX_COMPILE_ACTION_COMPILE;
 
     if (options.action != ONYX_COMPILE_ACTION_PRINT_HELP) {
         fori(i, arg_parse_start, argc) {
-            if (!strcmp(argv[i], "-o")) {
+            if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
                 options.target_file = argv[++i];
             }
             else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-V")) {

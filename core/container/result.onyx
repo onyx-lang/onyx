@@ -159,7 +159,7 @@ Result_Data :: struct (T: type_expr, E: type_expr) {
         If result contains Err, the given code is run. This code is
         expected to either:
             - Return a good value with `return`
-            - Return an error value with `return #enclosing_scope`
+            - Return an error value with `return #from_enclosing`
 
         This procedure is subject to change.
     """
