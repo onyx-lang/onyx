@@ -397,6 +397,15 @@ Iterator :: struct (Iter_Type: type_expr) {
 
 
 //
+// nocheckin DOCUMENT THIS
+Optional :: struct (Value_Type: type_expr) {
+    has_value: bool;
+    value: Value_Type;
+}
+
+
+
+//
 // This structure represents the result of a '#callsite' expression. Currently,
 // #callsite is only valid (and parsed) as a default value for a procedure parameter.
 // It allows the function to get the address of the calling site, which can be

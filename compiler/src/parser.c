@@ -568,6 +568,7 @@ static AstTyped* parse_factor(OnyxParser* parser) {
             break;
         }
 
+        case '?':
         case '[': {
             AstType *type = parse_type(parser);
             retval = (AstTyped *) type;
@@ -1974,6 +1975,23 @@ static AstType* parse_type(OnyxParser* parser) {
             case Token_Type_Keyword_Typeof: {
                 *next_insertion = (AstType *) parse_typeof(parser);
                 next_insertion = NULL;
+                break;
+            }
+
+            case '?': {
+                assert(builtin_optional_type);
+
+                bh_arr(AstNode *) params = NULL;
+                bh_arr_new(global_heap_allocator, params, 1);
+                bh_arr_set_length(params, 1);
+
+                AstPolyCallType* pc_type = make_node(AstPolyCallType, Ast_Kind_Poly_Call_Type);
+                pc_type->token = expect_token(parser, '?');
+                pc_type->callee = builtin_optional_type;
+                pc_type->params = params;
+                *next_insertion = (AstType *) pc_type;
+
+                next_insertion = (AstType **) &params[0];
                 break;
             }
 

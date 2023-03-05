@@ -11,18 +11,6 @@ package core
 // used by Map and Set in their `get_opt` function. In theory, it should
 // be used in many more places, instead of returning `.{}`.
 
-#doc """
-    Optional(T) is a simply a structure with a flag of whether or not
-    the optional contains a value. When the `has_value` is true, the
-    `value` member will be populated with an initialized value.
-    Otherwise, `value` should be a zeroed buffer.
-"""
-@conv.Custom_Format.{ #solidify format {T=Value_Type} }
-Optional :: struct (Value_Type: type_expr) {
-    has_value: bool;
-    value: Value_Type;
-}
-
 #inject Optional {
     #doc """
         Helper procedure for creating an Optional with a value.
@@ -103,14 +91,6 @@ Optional :: struct (Value_Type: type_expr) {
     hash :: (o: Optional($T/core.hash.Hashable)) -> u32 {
         if !o.has_value do return 0;
         return core.hash.to_u32(o.value);
-    }
-
-    format :: (o: ^conv.Format_Output, format: ^conv.Format, opt: ^Optional($T)) {
-        if opt.has_value {
-            conv.format(o, "Some({\"})", opt.value);
-        } else {
-            o->write("None");
-        }
     }
 }
 

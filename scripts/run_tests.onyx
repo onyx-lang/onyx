@@ -126,7 +126,7 @@ main :: (args) => {
         args: [] str;
         if thread_data.compile_only {
             printf("[{}]  Compiling test {}...\n", context.thread_id, it.source_file);
-            args = .[it.source_file];
+            args = .["build", it.source_file];
         } else {
             printf("[{}]  Running test {}...\n", context.thread_id, it.source_file);
             args = .["run", it.source_file];

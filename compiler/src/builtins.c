@@ -56,6 +56,7 @@ Type     *builtin_vararg_type_type;
 AstTyped *builtin_context_variable;
 AstType  *builtin_allocator_type;
 AstType  *builtin_iterator_type;
+AstType  *builtin_optional_type;
 AstType  *builtin_callsite_type;
 AstType  *builtin_any_type;
 AstType  *builtin_code_type;
@@ -427,6 +428,12 @@ void initialize_builtins(bh_allocator a) {
     builtin_iterator_type = (AstType *) symbol_raw_resolve(p->scope, "Iterator");
     if (builtin_iterator_type == NULL) {
         onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Iterator' struct not found in builtin package.");
+        return;
+    }
+
+    builtin_optional_type = (AstType *) symbol_raw_resolve(p->scope, "Optional");
+    if (builtin_optional_type == NULL) {
+        onyx_report_error((OnyxFilePos) { 0 }, Error_Critical, "'Optional' struct not found in builtin package.");
         return;
     }
 

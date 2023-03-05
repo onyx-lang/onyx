@@ -1689,6 +1689,7 @@ extern Type     *builtin_vararg_type_type;
 extern AstTyped *builtin_context_variable;
 extern AstType  *builtin_allocator_type;
 extern AstType  *builtin_iterator_type;
+extern AstType  *builtin_optional_type;
 extern AstType  *builtin_callsite_type;
 extern AstType  *builtin_any_type;
 extern AstType  *builtin_code_type;

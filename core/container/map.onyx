@@ -160,7 +160,7 @@ get_ptr_or_create :: (use map: ^Map, key: map.Key_Type) -> ^map.Value_Type {
 // Returns an Optional of the value at the specified key. The Optional
 // has a value if the key is present, otherwise the optional does not
 // have a value.
-get_opt :: (use map: ^Map, key: map.Key_Type) -> Optional(map.Value_Type) {
+get_opt :: (use map: ^Map, key: map.Key_Type) -> ?map.Value_Type {
     lr := lookup(map, key);
     if lr.entry_index >= 0 do return Optional.make(entries[lr.entry_index].value);
 
