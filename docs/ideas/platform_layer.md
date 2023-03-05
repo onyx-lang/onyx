@@ -12,7 +12,21 @@ functions does hurt a little bit, because it is not possible to say
 this document will serve as that "header file"
 
 ## Always Expected
+
+### Types
+
+### Procedures
 - `__start() -> void`
+
+### Values
+- `Supports_Files :: bool`
+- `Supports_Directories :: bool`
+- `Supports_Os :: bool`
+- `Supports_Processes :: bool`
+- `Supports_Time :: bool`
+- `Supports_Networking :: bool`
+- `Supports_Type_Info :: bool`
+- `Supports_Threads :: bool`
 
 
 ## Files
@@ -37,6 +51,7 @@ this document will serve as that "header file"
 ### Types
 - `DirectoryData`
 
+### Procedures
 - `__dir_open(path: str, dir: ^DirectoryData) -> bool`
 - `__dir_close(dir: DirectoryData) -> void`
 - `__dir_read(dir: DirectoryData, out_entry: ^os.DirectoryEntry) -> bool`
@@ -112,21 +127,3 @@ this document will serve as that "header file"
 - `__process_destroy(handle: ProcessData) -> void`
 
 ### Values
-
-
-## Platform Support Flags
-
-### Types
-
-### Procedures
-
-### Values
-
-- `Supports_Files :: bool`
-- `Supports_Directories :: bool`
-- `Supports_Os :: bool`
-- `Supports_Processes :: bool`
-- `Supports_Time :: bool`
-- `Supports_Networking :: bool`
-- `Supports_Type_Info :: bool`
-- `Supports_Threads :: bool`
